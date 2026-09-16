@@ -1,4 +1,5 @@
 import { app, dialog } from "electron"
+import { Product } from "@loginom-ai-agent/product"
 import pkg from "electron-updater"
 import { UPDATER_ENABLED } from "./constants"
 import { createUpdaterController, type UpdaterReadyRecord } from "./updater-controller"
@@ -18,6 +19,7 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
   autoUpdater.allowDowngrade = true
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = false
+  if (Product.updateFeed) autoUpdater.setFeedURL({ provider: "generic", url: Product.updateFeed })
   logger.log("auto updater configured", {
     channel: autoUpdater.channel,
     allowPrerelease: autoUpdater.allowPrerelease,
@@ -25,7 +27,7 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
     currentVersion: app.getVersion(),
   })
 
-  const store = getStore("opencode.updater")
+  const store = getStore(Product.stores.updater)
   return createUpdaterController({
     enabled: UPDATER_ENABLED,
     currentVersion: app.getVersion(),

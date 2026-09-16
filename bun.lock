@@ -27,6 +27,10 @@
         "turbo": "2.10.2",
       },
     },
+    "apps/loginom-site": {
+      "name": "@loginom-ai-agent/site",
+      "version": "0.1.0",
+    },
     "packages/app": {
       "name": "@opencode-ai/app",
       "version": "1.18.31",
@@ -385,6 +389,7 @@
       "name": "@opencode-ai/desktop",
       "version": "1.18.31",
       "dependencies": {
+        "@loginom-ai-agent/product": "workspace:*",
         "@zip.js/zip.js": "2.7.62",
         "drizzle-orm": "catalog:",
         "effect": "catalog:",
@@ -559,6 +564,10 @@
         "@typescript/native-preview": "catalog:",
       },
     },
+    "packages/loginom-runtime": {
+      "name": "@loginom-ai-agent/runtime",
+      "version": "0.1.0",
+    },
     "packages/opencode": {
       "name": "opencode",
       "version": "1.18.31",
@@ -594,6 +603,7 @@
         "@effect/platform-node": "catalog:",
         "@ff-labs/fff-bun": "0.9.4",
         "@gitlab/opencode-gitlab-auth": "1.3.3",
+        "@loginom-ai-agent/product": "workspace:*",
         "@modelcontextprotocol/sdk": "1.29.0",
         "@octokit/graphql": "9.0.2",
         "@octokit/rest": "catalog:",
@@ -718,6 +728,15 @@
         "@opentui/keymap",
         "@opentui/solid",
       ],
+    },
+    "packages/product": {
+      "name": "@loginom-ai-agent/product",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@tsconfig/node22": "catalog:",
+        "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
+      },
     },
     "packages/protocol": {
       "name": "@opencode-ai/protocol",
@@ -1801,6 +1820,12 @@
     "@kurkle/color": ["@kurkle/color@0.3.4", "", {}, "sha512-M5UknZPHRu3DEDWoipU6sE8PdkZ6Z/S+v4dD+Ke8IaNlpdSQah50lz1KtcFBa2vsdOnwbbnxJwVM4wty6udA5w=="],
 
     "@leichtgewicht/ip-codec": ["@leichtgewicht/ip-codec@2.0.5", "", {}, "sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw=="],
+
+    "@loginom-ai-agent/product": ["@loginom-ai-agent/product@workspace:packages/product"],
+
+    "@loginom-ai-agent/runtime": ["@loginom-ai-agent/runtime@workspace:packages/loginom-runtime"],
+
+    "@loginom-ai-agent/site": ["@loginom-ai-agent/site@workspace:apps/loginom-site"],
 
     "@lukeed/ms": ["@lukeed/ms@2.0.2", "", {}, "sha512-9I2Zn6+NJLfaGoz9jN3lpwDgAYvfGeNYdbAIjJOqzs4Tpc+VU3Jqq4IofSUBKajiDS8k9fZIg18/z13mpk1bsA=="],
 

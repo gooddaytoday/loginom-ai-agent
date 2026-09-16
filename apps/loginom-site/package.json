@@ -1,0 +1,10 @@
+{
+  "name": "@loginom-ai-agent/site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "build": "node build.mjs"
+  }
+}

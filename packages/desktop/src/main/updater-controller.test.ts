@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { createUpdaterController, type UpdaterBackend, type UpdaterReadyRecord } from "./updater-controller"
 
-function setup(input?: { currentVersion?: string; ready?: UpdaterReadyRecord }) {
+function setup(input?: { currentVersion?: string; ready?: UpdaterReadyRecord; enabled?: boolean }) {
   const calls: string[] = []
   const backend: UpdaterBackend = {
     async checkForUpdates() {
@@ -17,7 +17,7 @@ function setup(input?: { currentVersion?: string; ready?: UpdaterReadyRecord }) 
   }
   let ready = input?.ready
   const controller = createUpdaterController({
-    enabled: true,
+    enabled: input?.enabled ?? true,
     currentVersion: input?.currentVersion ?? "1.0.0",
     backend,
     persistence: {
@@ -37,6 +37,14 @@ function setup(input?: { currentVersion?: string; ready?: UpdaterReadyRecord }) 
 }
 
 describe("updater controller", () => {
+  test("disabled feed never downloads or installs a previously persisted update", async () => {
+    const app = setup({ enabled: false, ready: { version: "2.0.0" } })
+    expect(await app.controller.start()).toEqual({ status: "disabled" })
+    expect(await app.controller.check()).toEqual({ status: "disabled" })
+    await expect(app.controller.install()).rejects.toThrow("Update is not ready to install")
+    expect(app.calls).toEqual([])
+  })
+
   test("checks, downloads, persists, and publishes one authoritative ready state", async () => {
     const app = setup()
     const states: ReturnType<typeof app.controller.getState>[] = []
