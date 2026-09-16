@@ -1,6 +1,39 @@
 import { DESKTOP_NATIVE_ENGLISH } from "./desktop-native"
 
 export const dict = {
+  "loginom.invalidKey": "The AI server rejected the API key. Check your key.",
+  "loginom.serverUnavailable": "The AI server is unavailable. Check the network and retry.",
+  "loginom.invalidPassword": "Loginom did not confirm login. Check your username and password.",
+  "loginom.accountMismatch": "The Loginom session belongs to another account. Settings were not saved.",
+  "loginom.webUnavailable": "The Loginom web application is unavailable or timed out.",
+  "loginom.browserFailed": "Could not start the bundled Loginom browser.",
+
+  "loginom.continue": "Save and continue",
+  "loginom.later": "Later",
+  "loginom.welcome": "Welcome to Loginom AI Agent",
+  "loginom.description":
+    "Connect your AI server and Loginom web application. You can change these settings anytime in Loginom.",
+  "loginom.desktopOnly": "Loginom connections are available in the desktop application.",
+  "loginom.apiKey": "Loginom AI server API key",
+  "loginom.url": "Loginom web application URL",
+  "loginom.username": "Loginom username",
+  "loginom.password": "Loginom password",
+  "loginom.keySaved": "A key is saved. Leave this field empty to keep it.",
+  "loginom.passwordSaved": "A password is saved. Enter a replacement or choose an empty password.",
+  "loginom.emptyPassword": "Use an empty password",
+  "loginom.folder": "Loginom user folder",
+  "loginom.pending": "Settings will apply after active Loginom tasks and unfinished operation recovery complete.",
+  "loginom.runtimeFailed":
+    "Loginom is unavailable. Check and save your connection settings again. Other application features remain available.",
+  "loginom.checked": "Connection verified. Settings have not been saved yet.",
+  "loginom.failed": "Could not verify or apply the connection. Check server availability and credentials.",
+  "loginom.conflict": "Another window changed these settings. Reload current settings and try again.",
+  "loginom.save": "Save changes",
+  "loginom.check": "Check connection",
+  "loginom.checking": "Checking connection…",
+  "loginom.cancel": "Cancel pending changes",
+  "loginom.reload": "Reload current settings",
+
   ...DESKTOP_NATIVE_ENGLISH,
   "command.category.suggested": "Suggested",
   "command.category.view": "View",
@@ -623,7 +656,8 @@ export const dict = {
   "error.chain.didYouMean": "Did you mean: {{suggestions}}",
   "error.chain.modelNotFound": "Model not found: {{provider}}/{{model}}",
   "error.chain.checkConfig": "Check your config (loginom-ai-agent.json) provider/model names",
-  "error.chain.mcpFailed": 'MCP server "{{name}}" failed. Note, Loginom AI Agent does not support MCP authentication yet.',
+  "error.chain.mcpFailed":
+    'MCP server "{{name}}" failed. Note, Loginom AI Agent does not support MCP authentication yet.',
   "error.chain.providerAuthFailed": "Provider authentication failed ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
     'Failed to initialize provider "{{provider}}". Check credentials and configuration.',
@@ -914,7 +948,8 @@ export const dict = {
   "settings.general.row.appearance.title": "Appearance",
   "settings.general.row.appearance.description": "Customise how Loginom AI Agent looks on your device",
   "settings.general.row.colorScheme.title": "Color scheme",
-  "settings.general.row.colorScheme.description": "Choose whether Loginom AI Agent follows the system, light, or dark theme",
+  "settings.general.row.colorScheme.description":
+    "Choose whether Loginom AI Agent follows the system, light, or dark theme",
   "settings.general.row.theme.title": "Theme",
   "settings.general.row.theme.description": "Customise how Loginom AI Agent is themed.",
   "settings.general.row.font.title": "Code Font",

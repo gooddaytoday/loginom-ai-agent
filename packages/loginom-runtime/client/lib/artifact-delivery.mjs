@@ -189,6 +189,7 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
  }
  return Object.freeze({
   get busy(){return active!==null;},
+  get unsettled(){return active!==null || [...jobs.values()].some(job=>job.phase!=='completed' && job.outcome?.effect_possible===true);},
   deliver(request,{signal}={}) {
    requireValue(request&&Object.keys(request).sort().join(',')==='artifact_id,budget_ms,operation_id,upload_grant_id','Exact delivery request required');
    requireValue(typeof request.operation_id==='string'&&/^[A-Za-z0-9_.:-]{1,80}$/.test(request.operation_id),'Bounded delivery ID required');

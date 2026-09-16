@@ -2305,6 +2305,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return value(...args);
     }]));
   return Object.freeze({...exposed,
+    hasUnsettledWork:()=>!!(running||pending||nodeJobs.busy||delivery.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
     resumeArtifactDelivery:(request,options)=>delivery.resume(request,options),
     artifactDeliveryStatus:id=>delivery.status(id)});

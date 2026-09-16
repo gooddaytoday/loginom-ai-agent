@@ -1,6 +1,8 @@
+import { loginomHostPort } from "./loginom/host-port"
+import type { desktopLoginom } from "./loginom/desktop-service"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { app, utilityProcess } from "electron"
+import { app, utilityProcess, MessageChannelMain } from "electron"
 import type { Details } from "electron"
 import { getLogger } from "./logging"
 import { getUserShell, loadShellEnv } from "./shell-env"
@@ -22,6 +24,7 @@ const SIDECAR_STOP_TIMEOUT = 6_000
 
 type SpawnLocalServerOptions = {
   userDataPath: string
+  loginom?: Awaited<ReturnType<typeof desktopLoginom>>
   onStdout?: (message: string) => void
   onStderr?: (message: string) => void
   onExit?: (code: number) => void
@@ -67,6 +70,8 @@ export async function spawnLocalServer(
     serviceName: SIDECAR_SERVICE_NAME,
     stdio: "pipe",
   })
+  const loginomChannel = options.loginom ? new MessageChannelMain() : undefined
+  if (loginomChannel && options.loginom) loginomHostPort(loginomChannel.port1, options.loginom)
   let exited = false
   const exit = defer<number>()
 
@@ -78,6 +83,7 @@ export async function spawnLocalServer(
   app.on("child-process-gone", onProcessGone)
   child.once("exit", (code) => {
     exited = true
+    loginomChannel?.port1.close()
     app.off("child-process-gone", onProcessGone)
     options.onExit?.(code)
     exit.resolve(code)
@@ -129,13 +135,16 @@ export async function spawnLocalServer(
     child.on("message", onMessage)
     child.on("exit", onExit)
     refreshTimeout()
-    child.postMessage({
-      type: "start",
-      hostname,
-      port,
-      password,
-      userDataPath: options.userDataPath,
-    })
+    child.postMessage(
+      {
+        type: "start",
+        hostname,
+        port,
+        password,
+        userDataPath: options.userDataPath,
+      },
+      loginomChannel ? [loginomChannel.port2] : [],
+    )
   }).catch((error) => {
     if (!exited) child.kill()
     throw error

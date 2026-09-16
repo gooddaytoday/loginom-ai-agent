@@ -1,3 +1,4 @@
+import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
 import path from "path"
@@ -1080,6 +1081,13 @@ const layer = Layer.effect(
 
     const runLoop: (sessionID: SessionID) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
+        const loginom = yield* Effect.acquireRelease(
+          Effect.promise(() => LoginomHost.acquire(sessionID).catch(() => undefined)),
+          (lease) =>
+            Effect.promise(async () => {
+              await lease?.release()
+            }),
+        )
         const ctx = yield* InstanceState.context
         let structured: unknown
         let step = 0
@@ -1224,6 +1232,7 @@ const layer = Layer.effect(
             const promptOps = yield* ops()
 
             const tools = yield* SessionTools.resolve({
+              loginom,
               agent,
               session,
               model,
@@ -1265,6 +1274,11 @@ const layer = Layer.effect(
               ...env,
               ...instructions,
               ...(mcpInstructions ? [mcpInstructions] : []),
+              ...(loginom
+                ? [
+                    "Loginom is available through the bundled loginom_* tools. Start Loginom work with loginom_dock_prepare and follow its verified instructions. All Dock tool names mentioned there have the loginom_ prefix here. Connection credentials are managed privately by the desktop; never ask the model to enter or reveal them.",
+                  ]
+                : []),
               ...(skills ? [skills] : []),
             ]
             const format = lastUser.format ?? { type: "text" as const }
@@ -1338,6 +1352,7 @@ const layer = Layer.effect(
         yield* compaction.prune({ sessionID }).pipe(Effect.ignore, Effect.forkIn(scope))
         return yield* lastAssistant(sessionID)
       },
+      Effect.scoped,
     )
 
     const loop: (input: LoopInput) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.loop")(function* (

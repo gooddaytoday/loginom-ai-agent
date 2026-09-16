@@ -13,6 +13,14 @@ const cache = new Map<string, Store>()
 // in index.ts has executed, which would result in files being written to the default directory
 // (e.g. bad: %APPDATA%\@opencode-ai\desktop\loginom-ai-agent.settings vs good: %APPDATA%\com.loginom.aiagent.dev\loginom-ai-agent.settings).
 export function getStore(name = SETTINGS_STORE) {
+  if (
+    typeof name !== "string" ||
+    !/^[a-zA-Z0-9_.-]+$/.test(name) ||
+    name.startsWith(".") ||
+    name === "connection.json" ||
+    name === "connection"
+  )
+    throw new Error("Invalid renderer store")
   const cached = cache.get(name)
   if (cached) return cached
   const next = new Store({

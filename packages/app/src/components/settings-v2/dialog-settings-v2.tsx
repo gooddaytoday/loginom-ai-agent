@@ -1,3 +1,4 @@
+import { SettingsLoginom } from "../settings-loginom"
 import { Component, createMemo, createSignal, startTransition } from "solid-js"
 import { Dialog } from "@loginom-ai-agent/ui/v2/dialog-v2"
 import { TabsV2 } from "@loginom-ai-agent/ui/v2/tabs-v2"
@@ -57,6 +58,10 @@ export const DialogSettings: Component<{
                 <div class="flex flex-col gap-1.5">
                   <TabsV2.SectionTitle>{language.t("settings.section.desktop")}</TabsV2.SectionTitle>
                   <div class="flex flex-col gap-1.5 w-full">
+                    <TabsV2.Trigger value="loginom">
+                      <Icon name="server" />
+                      Loginom
+                    </TabsV2.Trigger>
                     <TabsV2.Trigger value="general">
                       <Icon name="sliders" />
                       {language.t("settings.tab.general")}
@@ -93,6 +98,9 @@ export const DialogSettings: Component<{
             </div>
           </div>
         </TabsV2.List>
+        <TabsV2.Content value="loginom" class="settings-v2-panel">
+          <SettingsLoginom />
+        </TabsV2.Content>
         <TabsV2.Content value="general" class="settings-v2-panel">
           <SettingsGeneralV2 sessionID={props.sessionID} />
         </TabsV2.Content>

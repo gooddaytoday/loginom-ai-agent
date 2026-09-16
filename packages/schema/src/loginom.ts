@@ -27,6 +27,7 @@ export const View = Schema.Struct({
   hasApiKey: Schema.Boolean,
   hasPassword: Schema.Boolean,
   state: State,
+  failure: Schema.optionalKey(Schema.String),
 })
 export type View = typeof View.Type
 export const Validation = Schema.Struct({ validationId: Schema.String, expiresAt: Schema.Number })

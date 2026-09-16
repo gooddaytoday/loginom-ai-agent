@@ -1,0 +1,10 @@
+[data-slot="dialog-content"].loginom-dialog {
+  max-height: calc(100dvh - 32px);
+}
+
+[data-component="settings-loginom"] .loginom-actions {
+  position: sticky;
+  bottom: 0;
+  padding-block: 12px;
+  background: var(--surface-raised-stronger-non-alpha);
+}

@@ -51,7 +51,10 @@ const require = __cjs_mod__.createRequire(import.meta.url);
 `,
         },
       },
-      externalizeDeps: { include: [nodePtyPkg] },
+      externalizeDeps: {
+        include: [nodePtyPkg],
+        exclude: ["@loginom-ai-agent/product", "@loginom-ai-agent/schema", "@loginom-ai-agent/loginom-host"],
+      },
     },
     plugins: [
       {

@@ -7,6 +7,7 @@ interface ImportMeta {
 }
 
 declare module "virtual:loginom-ai-agent-server" {
+  export const LoginomHost: typeof import("@loginom-ai-agent/loginom-host/adapter").LoginomHost
   export namespace Server {
     export const listen: typeof import("../../../agent/dist/types/src/node").Server.listen
     export type Listener = import("../../../agent/dist/types/src/node").Server.Listener

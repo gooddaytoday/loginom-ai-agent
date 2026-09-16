@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "1.18.31",
+  "version": "0.1.0",
   "name": "@loginom-ai-agent/agent",
   "type": "module",
   "license": "MIT",
@@ -151,7 +151,8 @@
     "xdg-basedir": "5.1.0",
     "yargs": "18.0.0",
     "zod": "catalog:",
-    "@loginom-ai-agent/product": "workspace:*"
+    "@loginom-ai-agent/product": "workspace:*",
+    "@loginom-ai-agent/loginom-host": "workspace:*"
   },
   "overrides": {
     "drizzle-orm": "catalog:"

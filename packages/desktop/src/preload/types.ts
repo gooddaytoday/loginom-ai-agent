@@ -1,3 +1,4 @@
+import type { Loginom } from "@loginom-ai-agent/schema/loginom"
 import type { DesktopMenuAction } from "@loginom-ai-agent/app/desktop-menu"
 import type { WslServersPlatform } from "@loginom-ai-agent/app/wsl/types"
 import type { UpdaterState } from "@loginom-ai-agent/app/updater"
@@ -43,6 +44,7 @@ export type FatalRendererError = {
 }
 
 export type ElectronAPI = {
+  loginom: Loginom.API
   killSidecar: () => Promise<void>
   installCli: () => Promise<string>
   awaitInitialization: () => Promise<ServerReadyData>

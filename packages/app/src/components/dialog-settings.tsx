@@ -1,3 +1,4 @@
+import { SettingsLoginom } from "./settings-loginom"
 import { Component, createSignal, startTransition } from "solid-js"
 import { Dialog } from "@loginom-ai-agent/ui/dialog"
 import { Tabs } from "@loginom-ai-agent/ui/tabs"
@@ -37,6 +38,10 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
                 <div class="flex flex-col gap-1.5">
                   <Tabs.SectionTitle>{language.t("settings.section.desktop")}</Tabs.SectionTitle>
                   <div class="flex flex-col gap-1.5 w-full">
+                    <Tabs.Trigger value="loginom">
+                      <Icon name="server" />
+                      Loginom
+                    </Tabs.Trigger>
                     <Tabs.Trigger value="general">
                       <Icon name="sliders" />
                       {language.t("settings.tab.general")}
@@ -73,6 +78,9 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
             </div>
           </div>
         </Tabs.List>
+        <Tabs.Content value="loginom" class="no-scrollbar">
+          <SettingsLoginom />
+        </Tabs.Content>
         <Tabs.Content value="general" class="no-scrollbar">
           <SettingsGeneral />
         </Tabs.Content>

@@ -21,7 +21,6 @@ async function signWindows(configuration: { path: string }) {
   )
 }
 
-
 const channel = productChannel(process.env.LOGINOM_AI_AGENT_CHANNEL)
 const appId = Product.channels[channel]
 const config: Configuration = {
@@ -32,10 +31,19 @@ const config: Configuration = {
   directories: { output: "dist", buildResources: "resources" },
   extraMetadata: { desktopName: `${appId}.desktop` },
   files: ["out/**/*", "resources/icons/**/*"],
-  extraResources: process.platform === "darwin" ? [{
-    from: "native/", to: "native/",
-    filter: ["index.js", "index.d.ts", "build/Release/mac_window.node", "swift-build/**"],
-  }] : [],
+  extraResources: [
+    { from: "resources/loginom", to: "loginom" },
+    { from: "resources/icons", to: "icons" },
+    ...(process.platform === "darwin"
+      ? [
+          {
+            from: "native/",
+            to: "native/",
+            filter: ["index.js", "index.d.ts", "build/Release/mac_window.node", "swift-build/**"],
+          },
+        ]
+      : []),
+  ],
   protocols: { name: Product.name, schemes: [Product.scheme] },
   mac: {
     category: "public.app-category.productivity",
@@ -55,7 +63,8 @@ const config: Configuration = {
     verifyUpdateCodeSignature: true,
   },
   nsis: {
-    oneClick: true, perMachine: false,
+    oneClick: true,
+    perMachine: false,
     installerIcon: "resources/icons/icon.ico",
     installerHeaderIcon: "resources/icons/icon.ico",
   },
@@ -67,6 +76,7 @@ const config: Configuration = {
     target: ["AppImage", "deb"],
   },
   deb: {
+    maintainer: "Loginom",
     packageName: productSlug(channel),
     fpm: [`${path.join(packageDir, "resources", `${appId}.metainfo.xml`)}=/usr/share/metainfo/${appId}.metainfo.xml`],
   },

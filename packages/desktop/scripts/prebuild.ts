@@ -8,3 +8,5 @@ await $`bun ./scripts/copy-icons.ts ${channel}`
 await $`bun ./scripts/copy-metainfo.ts ${channel}`
 
 await $`cd ../agent && bun script/build-node.ts`
+
+await $`bun ./scripts/bundle-loginom.ts`

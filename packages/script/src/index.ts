@@ -25,16 +25,17 @@ const env = {
 }
 const CHANNEL = await (async () => {
   if (env.LOGINOM_AI_AGENT_CHANNEL) return env.LOGINOM_AI_AGENT_CHANNEL
-  if (env.LOGINOM_AI_AGENT_BUMP) return "latest"
-  if (env.LOGINOM_AI_AGENT_VERSION && !env.LOGINOM_AI_AGENT_VERSION.startsWith("0.0.0-")) return "latest"
+  if (env.LOGINOM_AI_AGENT_BUMP) return "prod"
+  if (env.LOGINOM_AI_AGENT_VERSION && !env.LOGINOM_AI_AGENT_VERSION.startsWith("0.0.0-")) return "prod"
   return await $`git branch --show-current`.text().then((x) => x.trim())
 })()
-const IS_PREVIEW = CHANNEL !== "latest"
+const IS_PREVIEW = CHANNEL !== "latest" && CHANNEL !== "prod"
 
 const VERSION = await (async () => {
   if (env.LOGINOM_AI_AGENT_VERSION) return env.LOGINOM_AI_AGENT_VERSION
   if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
   const version = rootPkg.version
+  if (!env.LOGINOM_AI_AGENT_BUMP) return version
   const [major, minor, patch] = version.split(".").map((x: string) => Number(x) || 0)
   const t = env.LOGINOM_AI_AGENT_BUMP?.toLowerCase()
   if (t === "major") return `${major + 1}.0.0`

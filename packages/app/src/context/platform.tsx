@@ -1,3 +1,4 @@
+import type { Loginom } from "@loginom-ai-agent/schema/loginom"
 import { createSimpleContext } from "@loginom-ai-agent/ui/context"
 import type { AsyncStorage, SyncStorage } from "@solid-primitives/storage"
 import type { Accessor } from "solid-js"
@@ -29,6 +30,7 @@ export type FatalRendererErrorLog = {
 }
 
 type PlatformBase = {
+  loginom?: Loginom.API
   /** App version */
   version?: string
 

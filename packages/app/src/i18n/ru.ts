@@ -1,4 +1,39 @@
 export const dict = {
+  "loginom.invalidKey": "AI-сервер отклонил API-ключ. Проверьте ключ.",
+  "loginom.serverUnavailable": "AI-сервер недоступен. Проверьте сеть и повторите попытку.",
+  "loginom.invalidPassword": "Loginom не подтвердил вход. Проверьте имя пользователя и пароль.",
+  "loginom.accountMismatch": "Открыта сессия другого пользователя Loginom. Подключение не сохранено.",
+  "loginom.webUnavailable": "Веб-приложение Loginom недоступно или не ответило вовремя.",
+  "loginom.browserFailed": "Не удалось запустить комплектный браузер Loginom.",
+
+  "loginom.continue": "Сохранить и продолжить",
+  "loginom.later": "Позже",
+  "loginom.welcome": "Добро пожаловать в Loginom AI Agent",
+  "loginom.description":
+    "Подключите AI-сервер и веб-приложение Loginom. Эти параметры всегда доступны в разделе Loginom.",
+  "loginom.desktopOnly": "Подключение Loginom доступно в установленном приложении.",
+  "loginom.apiKey": "API-ключ Loginom AI сервера",
+  "loginom.url": "Адрес веб-приложения Loginom",
+  "loginom.username": "Имя пользователя Loginom",
+  "loginom.password": "Пароль Loginom",
+  "loginom.keySaved": "Ключ сохранён. Оставьте поле пустым, чтобы не менять его.",
+  "loginom.passwordSaved": "Пароль сохранён. Введите новый или выберите использование пустого пароля.",
+  "loginom.emptyPassword": "Использовать пустой пароль",
+  "loginom.folder": "Папка пользователя в Loginom",
+  "loginom.pending":
+    "Настройки применяются после завершения активных задач Loginom и восстановления незавершённых операций.",
+  "loginom.runtimeFailed":
+    "Подключение Loginom недоступно. Проверьте параметры и сохраните их повторно. Другие возможности приложения доступны.",
+  "loginom.checked": "Подключение проверено. Настройки ещё не сохранены.",
+  "loginom.failed":
+    "Не удалось завершить проверку или применение. Проверьте доступность серверов и данные подключения.",
+  "loginom.conflict": "Настройки изменены в другом окне. Загрузите текущие настройки и повторите изменения.",
+  "loginom.save": "Сохранить изменения",
+  "loginom.check": "Проверить подключение",
+  "loginom.checking": "Проверка подключения…",
+  "loginom.cancel": "Отменить применение",
+  "loginom.reload": "Загрузить текущие настройки",
+
   "desktop.menu.app": "Loginom AI Agent",
   "desktop.menu.file": "Файл",
   "desktop.menu.edit": "Правка",
@@ -922,7 +957,8 @@ export const dict = {
   "settings.general.row.appearance.title": "Внешний вид",
   "settings.general.row.appearance.description": "Настройте внешний вид Loginom AI Agent на вашем устройстве",
   "settings.general.row.colorScheme.title": "Цветовая схема",
-  "settings.general.row.colorScheme.description": "Выберите, следует ли Loginom AI Agent системной, светлой или тёмной теме",
+  "settings.general.row.colorScheme.description":
+    "Выберите, следует ли Loginom AI Agent системной, светлой или тёмной теме",
   "settings.general.row.theme.title": "Тема",
   "settings.general.row.theme.description": "Настройте оформление Loginom AI Agent.",
   "settings.general.row.font.title": "Шрифт кода",

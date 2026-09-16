@@ -1,3 +1,5 @@
+import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
+import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Agent } from "@/agent/agent"
 import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
 import { Provider } from "@/provider/provider"
@@ -12,7 +14,7 @@ import { Truncate } from "@/tool/truncate"
 
 import { Plugin } from "@/plugin"
 import type { TaskPromptOps } from "@/tool/task"
-import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
+import { type Tool as AITool, type JSONSchema7, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
 import { Effect } from "effect"
 import { MessageV2 } from "./message-v2"
 import { Session } from "./session"
@@ -39,6 +41,7 @@ const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
 ])
 
 export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
+  loginom?: Awaited<ReturnType<typeof LoginomHost.acquire>>
   agent: Agent.Info
   model: Provider.Model
   session: Session.Info
@@ -487,6 +490,102 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         }),
       )
     tools[key] = item
+  }
+
+  const loginom = input.loginom
+  if (loginom) {
+    const catalog = yield* Effect.promise(() =>
+      loginom
+        .tools()
+        .then((value) => ListToolsResultSchema.parse(value))
+        .catch(() => undefined),
+    )
+    const user = input.messages.findLast((message) => message.info.role === "user")
+    if (user) {
+      const files = user.parts.flatMap((part) => {
+        if (part.type !== "file" || !part.url.startsWith("data:") || !part.filename) return []
+        const match = part.url.match(/^data:[^,]*;base64,([A-Za-z0-9+/=]*)$/)
+        return match ? [{ name: part.filename, data: match[1] }] : []
+      })
+      if (files.length) {
+        const admitted = yield* Effect.promise(() =>
+          loginom.admit(user.info.id, files).then(
+            () => true,
+            () => false,
+          ),
+        )
+        if (!admitted) return tools
+      }
+    }
+    if (user && catalog)
+      for (const definition of catalog.tools) {
+        const key = `loginom_${definition.name}`
+        tools[key] = tool({
+          description: definition.description,
+          inputSchema: jsonSchema(
+            ProviderTransform.schema(input.model, {
+              ...definition.inputSchema,
+              properties: Object.fromEntries(
+                Object.entries(definition.inputSchema.properties ?? {}).filter(
+                  ([name]) => name !== "host_context_token",
+                ),
+              ),
+              required: definition.inputSchema.required?.filter((name) => name !== "host_context_token"),
+            } as JSONSchema7),
+          ),
+          execute(args, options) {
+            return run.promise(
+              Effect.gen(function* () {
+                const ctx = context(args, options)
+                yield* plugin.trigger(
+                  "tool.execute.before",
+                  { tool: key, sessionID: ctx.sessionID, callID: options.toolCallId },
+                  { args },
+                )
+                yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
+                const result = yield* Effect.promise(async () =>
+                  CallToolResultSchema.parse(
+                    await loginom.call(definition.name, args, user.info.id, options.abortSignal),
+                  ),
+                )
+                yield* plugin.trigger(
+                  "tool.execute.after",
+                  { tool: key, sessionID: ctx.sessionID, callID: options.toolCallId, args },
+                  result,
+                )
+                const text = result.content.flatMap((block) => (block.type === "text" ? [block.text] : []))
+                const truncated = yield* truncate.output(text.join("\n\n"), {}, input.agent)
+                const output = {
+                  title: definition.name,
+                  output: truncated.content,
+                  metadata: {
+                    generation: loginom.generation,
+                    truncated: truncated.truncated,
+                    ...(truncated.truncated ? { outputPath: truncated.outputPath } : {}),
+                  },
+                  attachments: result.content.flatMap((block) =>
+                    block.type === "image"
+                      ? [
+                          {
+                            type: "file" as const,
+                            mime: block.mimeType,
+                            url: `data:${block.mimeType};base64,${block.data}`,
+                            id: PartID.ascending(),
+                            sessionID: ctx.sessionID,
+                            messageID: input.processor.message.id,
+                          },
+                        ]
+                      : [],
+                  ),
+                  content: result.content,
+                }
+                if (options.abortSignal?.aborted) yield* input.processor.completeToolCall(options.toolCallId, output)
+                return output
+              }),
+            )
+          },
+        })
+      }
   }
 
   return tools

@@ -1,3 +1,4 @@
+import { LoginomButton } from "@/components/loginom-button"
 import { createEffect, Suspense, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { DebugBar } from "@/components/debug-bar"
@@ -30,6 +31,9 @@ export default function NewLayout(props: ParentProps) {
         "padding-bottom": "env(safe-area-inset-bottom, 0px)",
       }}
     >
+      <div class="absolute bottom-3 left-3 z-20">
+        <LoginomButton />
+      </div>
       <Titlebar
         update={update}
         debugTools={

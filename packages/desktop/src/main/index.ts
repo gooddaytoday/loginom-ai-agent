@@ -1,9 +1,11 @@
+import { desktopLoginom } from "./loginom/desktop-service"
+import { registerLoginomIpc } from "./loginom/ipc"
 import { randomUUID } from "node:crypto"
 import { mkdirSync, rmSync } from "node:fs"
 import * as http from "node:http"
 import { createServer } from "node:net"
 import { homedir, tmpdir } from "node:os"
-import { join } from "node:path"
+import { isAbsolute, join } from "node:path"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
 import type { Event } from "electron"
 import { app, BrowserWindow } from "electron"
@@ -118,8 +120,8 @@ const main = Effect.gen(function* () {
   const onboardingTestRoot = ((): string | undefined => {
     if (!TEST_ONBOARDING) return
 
-    const root = join(tmpdir(), `loginom-ai-agent-onboarding-${randomUUID()}`)
-    rmSync(root, { recursive: true, force: true })
+    const root = process.env.LOGINOM_AI_AGENT_TEST_ROOT ?? join(tmpdir(), `loginom-ai-agent-onboarding-${randomUUID()}`)
+    if (!isAbsolute(root)) throw new Error("Test profile must be absolute")
     ;["data", "config", "cache", "state", "desktop", "session"].forEach((dir) =>
       mkdirSync(join(root, dir), { recursive: true }),
     )
@@ -272,6 +274,11 @@ const main = Effect.gen(function* () {
     checkForUpdates: () => void showUpdaterDialog(updater, true),
     relaunch,
   }
+  const loginom = yield* Effect.promise(() => desktopLoginom())
+  registerLoginomIpc(loginom.api)
+  app.on("before-quit", () => {
+    void loginom.close()
+  })
   registerIpcHandlers({
     killSidecar: () => killSidecar(),
     relaunch,
@@ -370,6 +377,7 @@ const main = Effect.gen(function* () {
     const { listener, health } = yield* Effect.promise(() =>
       spawnLocalServer(hostname, port, password, {
         userDataPath: app.getPath("userData"),
+        loginom,
         onStdout: (message) => writeLog("server", "stdout", { message }),
         onStderr: (message) => writeLog("server", "stderr", { message }, "warn"),
         onExit: (code) => writeLog("utility", "sidecar exited", { code }, "warn"),
