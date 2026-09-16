@@ -14,7 +14,7 @@ export const dict = {
   "desktop.updater.downloadFailed.message": "Yangilanishni yuklab boʻlmadi",
   "desktop.updater.downloaded.title": "Yangilanish yuklab olindi",
   "desktop.updater.downloaded.prompt":
-    "OpenCodening {{version}} versiyasi yuklab olindi, uni oʻrnatib, qayta ishga tushirmoqchimisiz?",
+    "Loginom AI Agentning {{version}} versiyasi yuklab olindi, uni oʻrnatib, qayta ishga tushirmoqchimisiz?",
   "desktop.updater.installFailed.title": "Yangilash amalga oshmadi",
   "desktop.updater.installFailed.message": "Yangilanishni oʻrnatib boʻlmadi",
   "desktop.cli.installed.title": "CLI o'rnatildi",

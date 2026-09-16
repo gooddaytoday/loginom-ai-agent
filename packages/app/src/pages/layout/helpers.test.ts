@@ -79,7 +79,9 @@ describe("layout deep links", () => {
   })
 
   test("parses new-session deep links with optional prompt", () => {
-    expect(parseNewSessionDeepLink("loginom-ai-agent://new-session?directory=/tmp/demo")).toEqual({ directory: "/tmp/demo" })
+    expect(parseNewSessionDeepLink("loginom-ai-agent://new-session?directory=/tmp/demo")).toEqual({
+      directory: "/tmp/demo",
+    })
     expect(parseNewSessionDeepLink("loginom-ai-agent://new-session?directory=/tmp/demo&prompt=hello%20world")).toEqual({
       directory: "/tmp/demo",
       prompt: "hello world",
@@ -102,10 +104,10 @@ describe("layout deep links", () => {
 
   test("drains global deep links once", () => {
     const target = {
-      __OPENCODE__: {
+      __LOGINOM_AI_AGENT__: {
         deepLinks: ["loginom-ai-agent://open-project?directory=/a"],
       },
-    } as unknown as Window & { __OPENCODE__?: { deepLinks?: string[] } }
+    } as unknown as Window & { __LOGINOM_AI_AGENT__?: { deepLinks?: string[] } }
 
     expect(drainPendingDeepLinks(target)).toEqual(["loginom-ai-agent://open-project?directory=/a"])
     expect(drainPendingDeepLinks(target)).toEqual([])

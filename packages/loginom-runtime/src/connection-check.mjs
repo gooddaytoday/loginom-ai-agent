@@ -55,7 +55,7 @@ export async function checkKnowledge(endpoint, apiKey) {
   }
 }
 
-export async function loginBrowser({ browserPath, profile, candidate, headless = false }) {
+export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false }) {
   const { chromium } = require("playwright-core")
   await mkdir(profile, { recursive: true, mode: 0o700 })
   const context = await chromium
@@ -63,18 +63,35 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       executablePath: browserPath,
       headless,
       chromiumSandbox: true,
+      ...(!headless
+        ? {
+            args: [
+              "--start-maximized",
+              ...(process.platform === "linux" &&
+              process.env.WAYLAND_DISPLAY &&
+              (process.env.XDG_SESSION_TYPE === "wayland" || !process.env.DISPLAY)
+                ? ["--ozone-platform=wayland"]
+                : []),
+            ],
+          }
+        : {}),
       viewport: headless ? { width: 1280, height: 800 } : null,
     })
     .catch(() => {
       throw Error("LOGINOM_BROWSER_START_FAILED")
     })
   try {
-    return await loginPage(context.pages()[0] ?? (await context.newPage()), candidate)
+    const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate)
+    if (!keepOpen) {
+      await context.close()
+      return result
+    }
+    // MCP receives this same live context through its public contextGetter API.
+    return { ...result, context }
   } catch (error) {
+    await context.close().catch(() => undefined)
     if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED"].includes(error?.message)) throw error
     throw Error("LOGINOM_LOGIN_UNAVAILABLE")
-  } finally {
-    await context.close()
   }
 }
 

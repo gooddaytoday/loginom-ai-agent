@@ -76,7 +76,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport } = {}) {
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
   const userWorkflows = createUserWorkflowBindings();
@@ -93,7 +93,7 @@ export async function createBridge(config, session) {
   const remoteTransport = () => new StreamableHTTPClientTransport(new URL(config.endpoint), {
     requestInit: { headers: { Authorization: `Bearer ${config.apiKey}` }, redirect: 'error' },
   });
-  const browserTransport = new StdioClientTransport({
+  const browserTransport = managedBrowserTransport ?? new StdioClientTransport({
     command: process.execPath,
     args: [session.browserCli, '--config', session.browserConfig],
     env: browserProcessEnvironment(session.browserRoot),

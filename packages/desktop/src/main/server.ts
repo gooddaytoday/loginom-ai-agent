@@ -8,6 +8,7 @@ import { getLogger } from "./logging"
 import { getUserShell, loadShellEnv } from "./shell-env"
 import { getStore } from "./store"
 import { DEFAULT_SERVER_URL_KEY } from "./store-keys"
+import { CHANNEL } from "./constants"
 
 export type HealthCheck = { wait: Promise<void> }
 
@@ -52,6 +53,7 @@ export function preferAppEnv(userDataPath: string) {
     LOGINOM_AI_AGENT_EXPERIMENTAL_ICON_DISCOVERY: "true",
     LOGINOM_AI_AGENT_EXPERIMENTAL_FILEWATCHER: "true",
     LOGINOM_AI_AGENT_CLIENT: "desktop",
+    LOGINOM_AI_AGENT_CHANNEL: CHANNEL,
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
   })
   return shellEnv

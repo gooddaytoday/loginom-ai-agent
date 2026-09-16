@@ -63,17 +63,22 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
   onMount(() => {
     void load().catch(error)
     const timer = setInterval(() => {
-      if (!platform.loginom || !pending() || busy()) return
+      if (!platform.loginom || busy()) return
       void platform.loginom
         .status()
         .then(async (current) => {
+          const previous = view()
           setView(current)
           if (current.failure) {
             await load()
             error(new Error(current.failure))
             return
           }
-          if (current.state === "ready" && !editing()) {
+          if (
+            current.state === "ready" &&
+            !editing() &&
+            (previous?.state !== "ready" || previous.revision !== current.revision)
+          ) {
             await load()
             props.onSaved?.()
           }
@@ -199,8 +204,30 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
           <Show when={pending()}>
             <p role="status">{language.t("loginom.pending")}</p>
           </Show>
-          <Show when={view()?.state === "recoverable-error"}>
+          <Show when={view()?.state === "recoverable-error" && !view()?.recoveries?.length}>
             <p role="alert">{language.t("loginom.runtimeFailed")}</p>
+          </Show>
+          <Show when={view()?.recoveries?.length}>
+            <p role="alert">{language.t("loginom.recoveryRequired")}</p>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={busy()}
+              onClick={async () => {
+                if (!platform.loginom || busy()) return
+                setBusy(true)
+                try {
+                  await platform.loginom.acknowledgeRecovery({ revision: view()!.revision, ids: view()!.recoveries! })
+                  await load()
+                } catch (value) {
+                  error(value)
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            >
+              {language.t("loginom.acknowledgeRecovery")}
+            </Button>
           </Show>
           <Show when={message()}>
             <p role={failed() ? "alert" : "status"}>{message()}</p>

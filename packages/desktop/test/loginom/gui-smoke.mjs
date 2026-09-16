@@ -10,7 +10,10 @@ const launch = () =>
   _electron.launch({
     executablePath:
       process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE ?? resolve(directory, "node_modules/electron/dist/electron"),
-    args: process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE ? [] : [directory],
+    args: [
+      ...(process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE ? [] : [directory]),
+      ...(process.env.LOGINOM_AI_AGENT_TEST_WAYLAND === "1" ? ["--ozone-platform=wayland"] : []),
+    ],
     cwd: directory,
     env: { ...process.env, LOGINOM_AI_AGENT_TEST_ONBOARDING: "1", LOGINOM_AI_AGENT_TEST_ROOT: profile },
     timeout: 120_000,
@@ -41,7 +44,7 @@ try {
   )
     throw Error("ONBOARDING_FIELDS_INVALID")
   const bounds = await form.locator('button[type="submit"]').boundingBox()
-  const viewport = page.viewportSize()
+  const viewport = await page.evaluate(() => ({ height: innerHeight, width: innerWidth }))
   if (!bounds || bounds.y < 0 || bounds.y + bounds.height > (viewport?.height ?? 800))
     throw Error("ONBOARDING_ACTIONS_CLIPPED")
   await mkdir("/tmp/loginom-gui-evidence", { recursive: true })

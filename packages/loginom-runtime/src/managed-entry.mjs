@@ -1,6 +1,7 @@
 import { createRequire } from "node:module"
+import { randomUUID } from "node:crypto"
 import { isAbsolute, join } from "node:path"
-import { mkdir } from "node:fs/promises"
+import { mkdir, readFile } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
 import { loginBrowser, checkConnection } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
@@ -15,6 +16,8 @@ const state = {
   client: undefined,
   controller: undefined,
   session: undefined,
+  browser: undefined,
+  browserServer: undefined,
   inputs: new Map(),
 }
 const send = (message) => {
@@ -24,6 +27,8 @@ async function close() {
   state.controller?.abort()
   await state.client?.close().catch(() => undefined)
   await state.bridge?.close().catch(() => undefined)
+  await state.browserServer?.close().catch(() => undefined)
+  await state.browser?.close().catch(() => undefined)
   process.disconnect?.()
 }
 process.on("disconnect", () => {
@@ -49,7 +54,16 @@ process.on("message", async (message) => {
       )
         throw Error("LOGINOM_START_INVALID")
       const resources = await verifyResources(input.resources)
-      const directory = join(input.stateDir, "generations", String(input.generation), "chats", input.chat)
+      // A new process must never overwrite the receipts or browser state of a crashed attempt.
+      const directory = join(
+        input.stateDir,
+        "generations",
+        String(input.generation),
+        "chats",
+        input.chat,
+        "attempts",
+        randomUUID(),
+      )
       await mkdir(directory, { recursive: true, mode: 0o700 })
       const login = {
         browserPath: resources.browserPath,
@@ -62,7 +76,8 @@ process.on("message", async (message) => {
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
-      await loginBrowser(login)
+      const authenticated = await loginBrowser({ ...login, keepOpen: true })
+      state.browser = authenticated.context
       const config = {
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
@@ -88,9 +103,16 @@ process.on("message", async (message) => {
         managed: { directory, browserPath: resources.browserPath, browserRoot: resources.browserRoot },
       })
       state.session = session
-      state.bridge = await createBridge(config, session)
       const { Client } = require("@modelcontextprotocol/sdk/client/index.js")
       const { InMemoryTransport } = require("@modelcontextprotocol/sdk/inMemory.js")
+      const { createConnection } = require("@playwright/mcp")
+      state.browserServer = await createConnection(
+        JSON.parse(await readFile(session.browserConfig, "utf8")),
+        async () => authenticated.context,
+      )
+      const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
+      await state.browserServer.connect(browserServerTransport)
+      state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport })
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
       state.client = new Client({ name: "loginom-ai-agent-host", version: "0.1.0" })
       await state.bridge.server.connect(serverTransport)
@@ -141,7 +163,12 @@ process.on("message", async (message) => {
     const controller = new AbortController()
     state.controller = controller
     try {
-      const result = await state.client.callTool(message.input, undefined, { signal: controller.signal })
+      // dock_node_wait may legitimately wait 60 seconds. Leave room for its receipt
+      // before the supervisor's 120-second deadline, instead of the SDK's 60-second default.
+      const result = await state.client.callTool(message.input, undefined, {
+        signal: controller.signal,
+        timeout: 105_000,
+      })
       send({ id: message.id, result: { result, recoveryPending: state.bridge.hasUnsettledWork() } })
     } finally {
       state.controller = undefined

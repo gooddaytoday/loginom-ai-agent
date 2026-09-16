@@ -62,7 +62,7 @@
   "packages/loginom-runtime/client/lib/session.mjs": {
     "baseHash": "db89431390466874ef7ea709f5e8c866d1558dd54fc776c9ea1befd3bf286ef3",
     "hash": "687de9f3d6829f0ba79a9e0f5fcdd43c8b77a69d7f7a36bd1a16cf85304284d6",
-    "reason": "Add managed absolute browser/profile paths, avoid process-wide browser environment mutation in managed mode, and replace archived host manifests with active runtime source pin; require Chromium sandbox."
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events."
   },
   "packages/loginom-runtime/client/lib/artifact-delivery.mjs": {
     "baseHash": "da9cbb8f3e56aff85dd67748cfeafb6621646b1b894ccf9726ece2db381ef4b7",
@@ -71,12 +71,22 @@
   },
   "packages/loginom-runtime/client/lib/bridge.mjs": {
     "baseHash": "320d3b5bd4ae32801ebc9aee717f59ac877fadfbc2c88790c0ca3f86d60568b6",
-    "hash": "65af131b45f57dfeab5ca47f2e90982a5871c89cabc1d6fbc8ff1e1524c9478b",
-    "reason": "Expose unsettled execution and ambiguous artifact delivery state to the managed desktop recovery lease; preserve runtime execution semantics."
+    "hash": "04532251f97ba7845fedc6a3d817b8ac46eb8c9af18753d639b9c8e6ff3fa12c",
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events."
   },
   "packages/loginom-runtime/client/lib/executor.mjs": {
     "baseHash": "7aba17d9f7c87b965c3681f9d3676f29ec0902d2d04390ee256c5ef050811c9c",
     "hash": "656e3380f37fbcc26a47e46a8cb3e05309eebcf2b685a00925aa7b05b0ca3a10",
     "reason": "Expose unsettled execution and ambiguous artifact delivery state to the managed desktop recovery lease; preserve runtime execution semantics."
+  },
+  "packages/loginom-runtime/client/lib/workspace-ui.mjs": {
+    "baseHash": "9502b06f52383cdf9998e7b3215667e0c0d348257b74b11bce4228f85048d225",
+    "hash": "944340cdacb8db425c11a83b6f3cb98bd3733ca9e64402c760d453bc338a5dc7",
+    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance."
+  },
+  "packages/loginom-runtime/client/test/workspace-ui.test.mjs": {
+    "baseHash": "ba842620009a57cda3c852178cc44548f4eb126b012e6418eff2089e76afa756",
+    "hash": "4466202b9c8f40b9a06774357a2c33631d18483eee795e19a05fdd9933832d93",
+    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance."
   }
 }

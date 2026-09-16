@@ -268,7 +268,7 @@ function LayoutCompatibility(props: ParentProps) {
 
 declare global {
   interface Window {
-    __OPENCODE__?: {
+    __LOGINOM_AI_AGENT__?: {
       deepLinks?: string[]
     }
     api?: {

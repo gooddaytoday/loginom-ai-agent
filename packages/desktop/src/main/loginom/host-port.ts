@@ -65,21 +65,26 @@ export function loginomHostPort(port: MessagePortMain, service: Awaited<ReturnTy
       if (data.method !== "call" || typeof input.name !== "string" || typeof input.userMessage !== "string")
         throw new Error("LOGINOM_CALL_INVALID")
       run.calls++
+      const recovery = { id: undefined as string | undefined }
       try {
+        recovery.id = await service.journal.begin(run.chat, run.lease.generation)
         const runtime = await service.runtime(run.lease.generation, run.chat)
         const result = await runtime.request("call", { name: input.name, arguments: input.args })
         if (!result || typeof result !== "object" || !("recoveryPending" in result) || !("result" in result))
           throw new Error("LOGINOM_REPLY_INVALID")
         if (result.recoveryPending) {
+          await service.journal.settle(recovery.id, false)
           run.lease.holdRecovery()
           service.recoveries.set(run.chat, run.lease)
         }
         if (result.recoveryPending === false) {
+          await service.journal.settle(recovery.id, true)
           run.lease.reconciled()
           service.recoveries.delete(run.chat)
         }
         port.postMessage({ id: data.id, result: result.result })
       } catch {
+        if (recovery.id) await service.journal.settle(recovery.id, false)
         run.lease.holdRecovery()
         service.recoveries.set(run.chat, run.lease)
         throw new Error("LOGINOM_CALL_UNCERTAIN")

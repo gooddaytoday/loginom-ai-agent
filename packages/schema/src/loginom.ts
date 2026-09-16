@@ -28,11 +28,13 @@ export const View = Schema.Struct({
   hasPassword: Schema.Boolean,
   state: State,
   failure: Schema.optionalKey(Schema.String),
+  recoveries: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 export type View = typeof View.Type
 export const Validation = Schema.Struct({ validationId: Schema.String, expiresAt: Schema.Number })
 export const Save = Schema.Struct({ validationId: Schema.String, revision: NonNegativeInt })
 export const Cancel = Schema.Struct({ revision: NonNegativeInt })
+export const AcknowledgeRecovery = Schema.Struct({ revision: NonNegativeInt, ids: Schema.Array(Schema.String) })
 
 export type API = {
   read(): Promise<View>
@@ -40,4 +42,5 @@ export type API = {
   check(candidate: Candidate): Promise<typeof Validation.Type>
   save(input: typeof Save.Type): Promise<View>
   cancelPending(input: typeof Cancel.Type): Promise<View>
+  acknowledgeRecovery(input: typeof AcknowledgeRecovery.Type): Promise<View>
 }

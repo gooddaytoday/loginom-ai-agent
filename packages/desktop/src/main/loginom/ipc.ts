@@ -19,6 +19,13 @@ export function registerLoginomIpc(api: Loginom.API) {
   const candidate = Schema.decodeUnknownOption(Loginom.Candidate)
   const save = Schema.decodeUnknownOption(Loginom.Save)
   const cancel = Schema.decodeUnknownOption(Loginom.Cancel)
+  const acknowledge = Schema.decodeUnknownOption(Loginom.AcknowledgeRecovery)
+  ipcMain.handle("loginom-acknowledge-recovery", (event, value: unknown) => {
+    sender(event)
+    const decoded = acknowledge(value)
+    if (Option.isNone(decoded)) throw new Error("LOGINOM_RECOVERY_INVALID")
+    return api.acknowledgeRecovery(decoded.value)
+  })
   ipcMain.handle("loginom-read", (event) => {
     sender(event)
     return api.read()

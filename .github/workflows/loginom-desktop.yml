@@ -1,0 +1,65 @@
+name: Loginom Linux desktop candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    env:
+      LOGINOM_AI_AGENT_CHANNEL: prod
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/loginom-browsers
+      LOGINOM_AI_AGENT_BROWSER_SOURCE: ${{ runner.temp }}/loginom-browsers
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.19.0"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: "1.3.14"
+      - name: Install build dependencies
+        run: |
+          bun install --frozen-lockfile
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-0 libnss3 libgbm1 libasound2 xvfb xauth squashfs-tools
+          echo "LOGINOM_AI_AGENT_NODE_SOURCE=$(command -v node)" >> "$GITHUB_ENV"
+      - name: Provision pinned browser for the build
+        working-directory: packages/loginom-runtime/client
+        run: |
+          npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
+          node node_modules/playwright/cli.js install chromium
+      - name: Build and package
+        working-directory: packages/desktop
+        run: |
+          bun run build
+          bun typecheck
+          bun test src/main/loginom electron-builder.config.test.ts scripts/release/artifact.test.ts
+          bun run package:linux --x64 --publish never
+      - name: Archive source and inspect artifacts
+        run: |
+          git archive --format=tar.gz --output=packages/desktop/dist/loginom-ai-agent-0.1.0-source.tar.gz HEAD
+          cd packages/desktop
+          bun scripts/release/write-manifest.ts --target linux-x64 --version 0.1.0 --channel prod --dist dist --resources resources/loginom --output dist/release-manifest.json
+          bun scripts/release/verify-artifact.ts --manifest dist/release-manifest.json --artifact dist/loginom-ai-agent-linux-amd64.deb --report dist/static-deb.json
+          bun scripts/release/verify-artifact.ts --manifest dist/release-manifest.json --artifact dist/loginom-ai-agent-linux-x86_64.AppImage --report dist/static-appimage.json
+      - name: Offline non-root OS matrix
+        working-directory: packages/desktop
+        run: bun test/loginom/docker/run-matrix.ts --artifact dist/loginom-ai-agent-linux-amd64.deb --output dist/linux-matrix
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: loginom-linux-candidate
+          path: |
+            packages/desktop/dist/*.deb
+            packages/desktop/dist/*.AppImage
+            packages/desktop/dist/*-source.tar.gz
+            packages/desktop/dist/*.json
+            packages/desktop/dist/*.sha256
+            packages/desktop/dist/linux-matrix
+          retention-days: 14

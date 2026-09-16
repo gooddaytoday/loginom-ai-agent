@@ -31,29 +31,48 @@ export function connectionStore(directory: string, codec = credentials(process.p
       if (!info.isDirectory() || info.isSymbolicLink() || (process.getuid && info.uid !== process.getuid())) {
         throw new Error("LOGINOM_STORE_OWNER_INVALID")
       }
-      if (process.platform !== "win32" && (info.mode & 0o077) !== 0) throw new Error("LOGINOM_STORE_PERMISSIONS_INVALID")
+      if (process.platform !== "win32" && (info.mode & 0o077) !== 0)
+        throw new Error("LOGINOM_STORE_PERMISSIONS_INVALID")
     }
   }
   async function write(file: string, record: ConnectionRecord, replace: boolean) {
     await protectDirectory()
     const temporary = `${file}.${randomUUID()}.tmp`
     try {
-      const handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
+      const handle = await open(
+        temporary,
+        constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+        0o600,
+      )
       try {
         await handle.writeFile(JSON.stringify(record))
         await handle.sync()
-      } finally { await handle.close() }
+      } finally {
+        await handle.close()
+      }
       if (replace) await rename(temporary, file)
-      if (!replace) await link(temporary, file).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === "EEXIST") throw new Error("LOGINOM_GENERATION_EXISTS")
-        throw error
-      })
+      if (!replace)
+        await link(temporary, file).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "EEXIST") throw new Error("LOGINOM_GENERATION_EXISTS")
+          throw error
+        })
       // The directory entry must survive a power loss after the pointer commit.
       if (process.platform !== "win32") {
-        const parent = await open(file === join(directory, "connection.json") ? directory : join(directory, "generations"), constants.O_RDONLY)
-        try { await parent.sync() } finally { await parent.close() }
+        const parent = await open(
+          file === join(directory, "connection.json") || file === join(directory, "pending.json")
+            ? directory
+            : join(directory, "generations"),
+          constants.O_RDONLY,
+        )
+        try {
+          await parent.sync()
+        } finally {
+          await parent.close()
+        }
       }
-    } finally { await rm(temporary, { force: true }) }
+    } finally {
+      await rm(temporary, { force: true })
+    }
   }
   async function read(file: string) {
     await protectDirectory()
@@ -65,34 +84,98 @@ export function connectionStore(directory: string, codec = credentials(process.p
     const value = await (async () => {
       try {
         const info = await handle.stat()
-        if (!info.isFile() || (process.getuid && info.uid !== process.getuid())
-          || (process.platform !== "win32" && (info.mode & 0o077) !== 0)) throw new Error("LOGINOM_STORE_PERMISSIONS_INVALID")
+        if (
+          !info.isFile() ||
+          (process.getuid && info.uid !== process.getuid()) ||
+          (process.platform !== "win32" && (info.mode & 0o077) !== 0)
+        )
+          throw new Error("LOGINOM_STORE_PERMISSIONS_INVALID")
         return await handle.readFile("utf8")
-      } finally { await handle.close() }
+      } finally {
+        await handle.close()
+      }
     })()
     const result = decode(value)
-    if (Option.isNone(result) || !Number.isSafeInteger(result.value.generation) || result.value.generation < 1
-      || !Number.isSafeInteger(result.value.revision) || result.value.revision < 1) throw new Error("LOGINOM_STORE_INVALID")
+    if (
+      Option.isNone(result) ||
+      !Number.isSafeInteger(result.value.generation) ||
+      result.value.generation < 1 ||
+      !Number.isSafeInteger(result.value.revision) ||
+      result.value.revision < 1
+    )
+      throw new Error("LOGINOM_STORE_INVALID")
     return result.value
   }
   function generationPath(generation: number) {
     if (!Number.isSafeInteger(generation) || generation < 1) throw new Error("LOGINOM_GENERATION_INVALID")
     return join(directory, "generations", `${generation}.json`)
   }
+  function decodeRecord(record: ConnectionRecord): ActiveConnection {
+    return {
+      generation: record.generation,
+      revision: record.revision,
+      url: record.url,
+      username: record.username,
+      ...codec.decode(record.secrets),
+    }
+  }
   return {
+    async pending(): Promise<ActiveConnection | undefined> {
+      const record = await read(join(directory, "pending.json"))
+      return record && decodeRecord(record)
+    },
+    async savePending(value: ActiveConnection) {
+      await write(
+        join(directory, "pending.json"),
+        {
+          generation: value.generation,
+          revision: value.revision,
+          url: value.url,
+          username: value.username,
+          secrets: codec.encode(value),
+        },
+        true,
+      )
+    },
+    async clearPending() {
+      await protectDirectory()
+      await rm(join(directory, "pending.json"), { force: true })
+      if (process.platform === "win32") return
+      const handle = await open(directory, constants.O_RDONLY)
+      try {
+        await handle.sync()
+      } finally {
+        await handle.close()
+      }
+    },
+    async staged(generation: number) {
+      const record = await read(generationPath(generation))
+      return record && decodeRecord(record)
+    },
     async latestGeneration() {
       await protectDirectory()
       const names = await readdir(join(directory, "generations"))
-      return names.reduce((highest, name) => /^\d+\.json$/.test(name) && Number.isSafeInteger(Number(name.slice(0, -5)))
-        ? Math.max(highest, Number(name.slice(0, -5))) : highest, 0)
+      return names.reduce(
+        (highest, name) =>
+          /^\d+\.json$/.test(name) && Number.isSafeInteger(Number(name.slice(0, -5)))
+            ? Math.max(highest, Number(name.slice(0, -5)))
+            : highest,
+        0,
+      )
     },
     async read(): Promise<ActiveConnection | undefined> {
       const record = await read(join(directory, "connection.json"))
       if (!record) return
-      return { generation: record.generation, revision: record.revision, url: record.url, username: record.username, ...codec.decode(record.secrets) }
+      return decodeRecord(record)
     },
     async stage(value: ActiveConnection) {
-      const record = { generation: value.generation, revision: value.revision, url: value.url, username: value.username, secrets: codec.encode(value) }
+      const record = {
+        generation: value.generation,
+        revision: value.revision,
+        url: value.url,
+        username: value.username,
+        secrets: codec.encode(value),
+      }
       await write(generationPath(value.generation), record, false)
     },
     async activate(generation: number) {

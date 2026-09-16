@@ -12,6 +12,7 @@ for (const channel of ["dev", "beta", "prod"] as const) {
     else process.env.LOGINOM_AI_AGENT_CHANNEL = previous
     expect(config.appId).toBe(Product.channels[channel])
     expect(config.extraMetadata?.desktopName).toBe(`${Product.channels[channel]}.desktop`)
+    expect(config.linux?.syncDesktopName).toBe(true)
     expect(config.linux?.executableName).toBe(productSlug(channel))
     expect(config.deb?.packageName).toBe(productSlug(channel))
     expect(config.linux?.desktop?.entry?.StartupWMClass).toBe(Product.channels[channel])

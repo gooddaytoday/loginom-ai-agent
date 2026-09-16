@@ -9,7 +9,7 @@ export const dict: Record<string, string> = {
   "desktop.updater.checkFailed.title": "དུས་མཐུན་ཞིབ་དཔྱད་འཐུས་ཤོར་འབྱུང་ཡོདཔ།",
   "desktop.updater.checkFailed.message": "དུས་མཐུན་བཟོ་ནིའི་དོན་ལུ་ ཞིབ་དཔྱད་འབད་ནི་ལུ་འཐུས་ཤོར་འབྱུང་ཡོདཔ།",
   "desktop.updater.none.title": "དུས་མཐུན་བཟོ་མི་ཚུགས།",
-  "desktop.updater.none.message": "ཁྱོད་ཀྱིས་ཧེ་མ་ལས་ OpenCodeགི་ཐོན་རིམ་གསརཔ་འདི་ལག་ལེན་འཐབ་དོ།",
+  "desktop.updater.none.message": "ཁྱོད་ཀྱིས་ཧེ་མ་ལས་ Loginom AI Agentགི་ཐོན་རིམ་གསརཔ་འདི་ལག་ལེན་འཐབ་དོ།",
   "desktop.updater.downloadFailed.title": "དུས་མཐུན་འཐུས་ཤོར་འབྱུང་ཡོདཔ།",
   "desktop.updater.downloadFailed.message": "དུས་མཐུན་ཕབ་ལེན་འབད་ནི་ལུ་འཐུས་ཤོར་འབྱུང་ཡོདཔ།",
   "desktop.updater.downloaded.title": "དུས་མཐུན་ཕབ་ལེན་འབད་ཡོདཔ།",

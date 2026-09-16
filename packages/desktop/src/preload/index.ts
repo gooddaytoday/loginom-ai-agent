@@ -17,6 +17,7 @@ const api: ElectronAPI = {
     check: (candidate) => ipcRenderer.invoke("loginom-check", candidate),
     save: (input) => ipcRenderer.invoke("loginom-save", input),
     cancelPending: (input) => ipcRenderer.invoke("loginom-cancel-pending", input),
+    acknowledgeRecovery: (input) => ipcRenderer.invoke("loginom-acknowledge-recovery", input),
   },
   killSidecar: () => ipcRenderer.invoke("kill-sidecar"),
   installCli: () => ipcRenderer.invoke("install-cli"),

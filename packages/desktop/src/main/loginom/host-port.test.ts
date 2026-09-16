@@ -9,6 +9,7 @@ import { connectionService } from "./connection-service"
 import { connectionStore } from "./connection-store"
 import type { desktopLoginom } from "./desktop-service"
 import { transport } from "@loginom-ai-agent/loginom-host/transport"
+import { recoveryStore } from "./recovery-store"
 
 test("release during child startup retains the generation until the actual call is reconciled", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-port-"))
@@ -57,6 +58,7 @@ test("release during child startup retains the generation until the actual call 
     main as unknown as MessagePortMain,
     {
       ...service,
+      journal: await recoveryStore(join(directory, "recovery")),
       recoveries: new Map(),
       async runtime() {
         entered.resolve()

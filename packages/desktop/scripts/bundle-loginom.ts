@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { cp, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises"
+import { chmod, cp, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises"
 import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { $ } from "bun"
 import release from "../../product/loginom-release.json"
@@ -24,6 +24,7 @@ for (const [path, expected] of [
   [node, release.nodeSha256],
   [join(browsers, `chromium-${release.chromiumRevision}/chrome-linux64/chrome`), release.browserSha256],
   [join(source, "client/package-lock.json"), release.runtimeLockSha256],
+  [resolve(source, "../product/models.json"), release.modelsSha256],
 ]) {
   if (
     createHash("sha256")
@@ -75,6 +76,29 @@ if (
 }
 const browser = `browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome`
 await stat(join(staging, browser))
+// Chrome for Testing ships chrome_sandbox, while Chromium's fallback looks for chrome-sandbox.
+// DEB installs these files as root; retain the standard setuid sandbox for kernels without user namespaces.
+await cp(
+  join(dirname(join(staging, browser)), "chrome_sandbox"),
+  join(dirname(join(staging, browser)), "chrome-sandbox"),
+)
+await chmod(join(dirname(join(staging, browser)), "chrome-sandbox"), 0o4755)
+await mkdir(join(staging, "licenses"))
+await cp(resolve(source, "../../LICENSE"), join(staging, "licenses/OpenCode-MIT.txt"))
+await cp(resolve(dirname(node), "../LICENSE"), join(staging, "licenses/Node.txt"))
+await cp(join(source, "LICENSE"), join(staging, "licenses/Loginom-Dock-AGPL-3.0.txt"))
+await Bun.write(
+  join(staging, "THIRD_PARTY_NOTICES.md"),
+  `# Third-party notices
+
+Loginom AI Agent includes code derived from OpenCode (MIT) and Loginom Dock (AGPL-3.0).
+The original copyright/license notices are preserved in licenses/.
+Node.js license and bundled dependency notices are in licenses/Node.txt.
+Playwright, MCP and their dependency license files are included alongside their package sources in runtime/client/node_modules/.
+Electron and Chromium notices are included at the application root by electron-builder.
+The active Dock JavaScript sources are included in runtime/.
+`,
+)
 const files: Array<{ path: string; sha256: string }> = []
 async function collect(directory: string): Promise<void> {
   const entries = await readdir(directory, { withFileTypes: true })

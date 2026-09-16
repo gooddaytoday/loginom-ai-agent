@@ -1,6 +1,9 @@
 import { DESKTOP_NATIVE_ENGLISH } from "./desktop-native"
 
 export const dict = {
+  "loginom.recoveryRequired":
+    "The previous run ended before Loginom operations were confirmed. Check their results in the Loginom web application before continuing. Operations will not be replayed automatically; their journals are preserved.",
+  "loginom.acknowledgeRecovery": "Results checked — finish recovery",
   "loginom.invalidKey": "The AI server rejected the API key. Check your key.",
   "loginom.serverUnavailable": "The AI server is unavailable. Check the network and retry.",
   "loginom.invalidPassword": "Loginom did not confirm login. Check your username and password.",

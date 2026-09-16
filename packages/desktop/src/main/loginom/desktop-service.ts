@@ -7,6 +7,7 @@ import { supervise } from "@loginom-ai-agent/loginom-host/supervisor"
 import { connectionService } from "./connection-service"
 import { connectionStore, type ActiveConnection } from "./connection-store"
 import { credentials } from "./credentials"
+import { recoveryStore } from "./recovery-store"
 
 export async function desktopLoginom() {
   const resources = app.isPackaged
@@ -14,6 +15,7 @@ export async function desktopLoginom() {
     : resolve(import.meta.dirname, "../../resources/loginom")
   const root = join(app.getPath("userData"), "loginom")
   const inputs = inputStore(join(root, "inputs"))
+  const journal = await recoveryStore(join(root, "recovery"))
   const generations = new Map<
     number,
     { connection: ActiveConnection; children: Map<string, Promise<Awaited<ReturnType<typeof supervise>>>> }
@@ -62,9 +64,11 @@ export async function desktopLoginom() {
         }
       },
     },
+    journal,
   )
   return {
     ...service,
+    journal,
     recoveries: new Map<string, NonNullable<ReturnType<typeof service.acquire>>>(),
     async inputs(generation: number, chat: string, userMessage: string, files: InputFile[]) {
       const current = generations.get(generation)

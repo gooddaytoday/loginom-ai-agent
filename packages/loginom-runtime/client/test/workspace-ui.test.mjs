@@ -722,6 +722,21 @@ test('global toolbar is discoverable and readable above a large workspace', asyn
   assert.ok(detail.output.scan.detail_elements<10);
 });
 
+test('package menu remains discoverable above a large workflow', async () => {
+  const page=new Page({ clock: fixtureClock().Date });
+  const menu=page.add('div','MF;MainMenuForm');
+  page.add('button','MF;MainMenuForm;btnClosePackage','Закрыть пакет',undefined,menu);
+  for(let i=0;i<6500;i++) page.add('div',null,'background');
+  const discovery=await page.execute({mode:'observe',discover_roots:true});
+  assert.equal(discovery.status,'SUCCEEDED');
+  const root=discovery.output.ui.elements.find(e=>e.tid==='MF;MainMenuForm');
+  assert.ok(root);assert.deepEqual(root.allowed_actions,[]);
+  const detail=await page.execute({mode:'observe',root_ref:root.ref});
+  assert.equal(detail.status,'SUCCEEDED');
+  const close=detail.output.ui.elements.find(e=>e.tid==='MF;MainMenuForm;btnClosePackage');
+  assert.ok(close.allowed_actions.includes('click'));
+});
+
 test('selected root traverses only its small subtree while a large background and global blocker remain outside', async () => {
   const page=new Page({ clock: fixtureClock().Date }),root=page.add('div','Form;btnSection','Section',{x:30,y:100,width:300,height:100});
   page.add('input','Form;edtInside','',{x:35,y:110,width:100,height:25},root);

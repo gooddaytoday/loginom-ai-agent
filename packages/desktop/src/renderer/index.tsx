@@ -71,9 +71,9 @@ type DesktopWindowState = {
 
 const emitDeepLinks = (urls: string[]) => {
   if (urls.length === 0) return
-  window.__OPENCODE__ ??= {}
-  const pending = window.__OPENCODE__.deepLinks ?? []
-  window.__OPENCODE__.deepLinks = [...pending, ...urls]
+  window.__LOGINOM_AI_AGENT__ ??= {}
+  const pending = window.__LOGINOM_AI_AGENT__.deepLinks ?? []
+  window.__LOGINOM_AI_AGENT__.deepLinks = [...pending, ...urls]
   window.dispatchEvent(new CustomEvent(deepLinkEvent, { detail: { urls } }))
 }
 
@@ -258,7 +258,7 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
 
       const notification = new Notification(title, {
         body: description ?? "",
-        icon: "https://opencode.ai/favicon-96x96-v3.png",
+        icon: "./loginom-icon.png",
       })
       notification.onclick = () => {
         void window.api.showWindow()
