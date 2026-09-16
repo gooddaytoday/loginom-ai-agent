@@ -1,0 +1,6 @@
+{
+  "status": "PASS",
+  "applicationSha256": "efe262dfa56a33e7dd28c4a5afdfa73cc022c508bfcef7a32ebf22f4637b1439",
+  "debMatchesTestedPayload": true,
+  "appimageMatchesTestedPayload": true
+}

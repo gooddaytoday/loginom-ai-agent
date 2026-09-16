@@ -1,6 +1,6 @@
 # Linux: сборка и проверка
 
-Цель — Ubuntu 22.04+ и Debian 12+, x86_64. Windows и macOS собираются и отлаживаются на отдельных машинах по соседним инструкциям. Основной Linux-пакет — DEB; AppImage — дополнительный переносимый вариант. Ни один из этих документов сам по себе не означает успешную приёмку.
+Цель — Ubuntu 22.04+ и Debian 12+, x86_64. Windows и macOS собираются и отлаживаются на отдельных машинах по соседним инструкциям. Основной Linux-пакет — DEB; AppImage — дополнительный переносимый вариант. Выполненные проверки и их границы приведены в [итоговом отчёте от 16 сентября 2026](reports/2026-09-16-linux/report.md).
 
 ## Сборка
 
@@ -20,7 +20,7 @@ bun test src/main/loginom electron-builder.config.test.ts scripts/release/artifa
 
 Результат: `dist/loginom-ai-agent-linux-amd64.deb` и `dist/loginom-ai-agent-linux-x86_64.AppImage`. Runtime вне ASAR включает собственные Node, Playwright/MCP, Chromium и исходники клиента Dock. Ресурсы проверяются по `resource-manifest.json`. При первом запуске не выполняется установка npm или браузера.
 
-DEB устанавливается через `apt install ./loginom-ai-agent-linux-amd64.deb`: apt разрешает системные зависимости, включая GTK, NSS, GBM и ALSA. AppImage требует эти системные библиотеки и рабочий FUSE либо предварительное извлечение. Sandbox Chromium остаётся включённым; запуск root и `--no-sandbox` не являются допустимыми обходами ошибок приёмки.
+DEB устанавливается через `apt install ./loginom-ai-agent-linux-amd64.deb`: apt разрешает системные зависимости, включая GTK, NSS, GBM и ALSA. AppImage требует эти системные библиотеки и рабочий FUSE либо предварительное извлечение. Для ALSA нужна настоящая библиотека: `libasound2t64` на Ubuntu 24+/Debian 13, `libasound2` на Ubuntu 22/Debian 12; OSS shim её не заменяет. Sandbox Chromium остаётся включённым; запуск root и `--no-sandbox` не являются допустимыми обходами ошибок приёмки.
 
 Исходный архив создавать из того же проверенного commit:
 
@@ -64,17 +64,17 @@ Desktop prod хранит профиль в `${XDG_CONFIG_HOME:-~/.config}/com.l
 
 Перед отправкой tool call main сохраняет маркер. После аварии не подтверждённые маркеры блокируют новые операции Loginom и применение pending-подключения. В настройках пользователь проверяет фактический результат в Loginom и явно завершает восстановление. Это не подтверждает успех старой операции и не повторяет её. Старая история и receipts сохраняются в отдельных каталогах попыток. Остальные модельные чаты продолжают работать.
 
-Удаление DEB удаляет приложение, но сохраняет пользовательские настройки и историю. Существующие OpenCode wrapper/desktop и репозиторий Dock не удаляются автоматически. Автообновление отключено, пока собственный feed и обновление N→N+1 не прошли отдельную проверку; проверка отсутствия обновлений не засчитывается за этот тест.
+Удаление DEB удаляет приложение, но сохраняет пользовательские настройки и историю. Существующие OpenCode wrapper/desktop и репозиторий Dock не удаляются автоматически. Автообновление пользовательской сборки отключено до настройки собственного публичного feed. Изолированный тест N→N+1 уже выполнен; проверка отсутствия обновлений не засчитывается за этот тест.
 
-## Runtime parent crash
+## Аварийное завершение родителя runtime
 
-From `packages/desktop`, with the pinned Bun in PATH:
+Из `packages/desktop`, с закреплённым Bun в PATH:
 
 ```sh
 LOGINOM_AI_AGENT_TEST_CONFIG=/path/to/private/config.json bun test/loginom/parent-crash.ts
 ```
 
-This authenticates an isolated runtime, records only its own process tree, kills its supervisor parent and requires all live descendants to exit within 20 seconds. It does not repeat business mutations. The verified local run tracked 12 processes and left no live descendants. The full A/B acceptance additionally passed independent saved-package reopening with totals 55 and 101 (`/tmp/loginom-linux-oracle-Kp7heo/summary.json` on the implementation machine).
+Тест авторизует изолированный runtime, фиксирует только собственное дерево процессов, завершает родителя supervisor и требует выхода всех живых потомков за 20 секунд. Бизнес-операции не повторяются. Локальная проверка отслеживала 12 процессов и не оставила живых потомков. Независимое открытие сохранённых пакетов с итогами 55 и 101 проверяется отдельным A/B-сценарием.
 
 
 ## Проверка собственного обновления

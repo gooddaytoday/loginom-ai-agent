@@ -1,6 +1,6 @@
 # Приёмка Loginom AI Agent на отдельных машинах
 
-Статус на 2026-09-16: **план проверок, а не отчёт об успешном выполнении**. Нативную отладку Windows и macOS выполняют отдельные агенты на соответствующих машинах. Здесь определены входные материалы, порядок проверки и формат доказательств. Эти документы не разрешают публикацию релиза или изменение рабочего сервера Loginom.
+Статус на 2026-09-16: Windows/macOS — **план нативных проверок**; выполненные Linux-проверки описаны в [отдельном отчёте](reports/2026-09-16-linux/report.md). Нативную отладку Windows и macOS выполняют отдельные агенты на соответствующих машинах. Здесь определены входные материалы, порядок проверки и формат доказательств. Эти документы не разрешают публикацию релиза или изменение рабочего сервера Loginom.
 
 Согласованное поведение описано в [спецификации](../../superpowers/specs/2026-09-16-loginom-ai-agent-desktop-design.md), этапы работ — в [плане реализации](../../superpowers/plans/2026-09-16-loginom-ai-agent.md). Инструкции платформ: [Windows](windows.md), [macOS](macos.md), [Linux](linux.md). Результат каждого запуска оформляется по [шаблону отчёта](report-template.md).
 
@@ -31,7 +31,7 @@
 
 ### Release manifest: обязательный контракт передачи
 
-Manifest — JSON с версией схемы и отдельным SHA256, по контракту [плана сборки R2](../../superpowers/plans/2026-09-16-loginom-release.md). Его целевой путь: `artifacts/loginom-ai-agent/<version>/<platform>-<arch>/release-manifest.json`. Это требование к будущему результату сборки; команды его генерации сначала реализуются по плану.
+Manifest — JSON с версией схемы и отдельным SHA256, по контракту [плана сборки R2](../../superpowers/plans/2026-09-16-loginom-release.md). Его целевой путь: `artifacts/loginom-ai-agent/<version>/<platform>-<arch>/release-manifest.json`. Для Linux генерация и проверка реализованы: команды приведены в [Linux-инструкции](linux.md), итоговый manifest — в отчёте. Нативные агенты должны расширить платформенные ресурсы и проверить свои артефакты.
 
 | Поле | Содержание |
 | --- | --- |
@@ -127,9 +127,9 @@ REC-01/CON-07 выполняются на одноразовом тестово�
 - [Prebuild](../../../packages/desktop/scripts/prebuild.ts): сборка Node sidecar; в dev также загрузка существующего CLI. Это не будущая упаковка Loginom runtime.
 - [Prepare](../../../packages/desktop/scripts/prepare.ts): меняет `package.json` версии; не запускать автоматически для чтения/проверки.
 - [Текущий CI](../../../.github/workflows/publish.yml) и [setup-bun](../../../.github/actions/setup-bun/action.yml): Node 24, Bun из корневого `packageManager`, Windows hoisted linker; upstream release job ограничен чужим репозиторием.
-- [Desktop entry](../../../packages/desktop/src/main/index.ts), [sidecar](../../../packages/desktop/src/main/sidecar.ts), [logging](../../../packages/desktop/src/main/logging.ts): точки выбора backend, старые имена путей, экспорт логов.
+- [Desktop entry](../../../packages/desktop/src/main/index.ts), [sidecar](../../../packages/desktop/src/main/sidecar.ts), [logging](../../../packages/desktop/src/main/logging.ts): точки выбора backend, пути профиля и экспорт логов.
 
-Все эти ссылки — отправные точки для адаптации. Наличие существующего build script не означает готовность Loginom дистрибутива или правильное включение перенесённого Dock. После реализации backend перемещается из `packages/opencode` в `packages/agent`, namespace пакетов — `@loginom-ai-agent/*`, переменные — `LOGINOM_AI_AGENT_*`. Целевые app ID: `com.loginom.aiagent`, `com.loginom.aiagent.beta`, `com.loginom.aiagent.dev`. Manifest должен отражать итоговые пути и имена проверяемой сборки.
+Все эти ссылки — отправные точки для адаптации. Наличие существующего build script не означает готовность Loginom дистрибутива или правильное включение перенесённого Dock. В Linux-реализации backend уже перемещён из `packages/opencode` в `packages/agent`, namespace пакетов — `@loginom-ai-agent/*`, переменные — `LOGINOM_AI_AGENT_*`. Целевые app ID: `com.loginom.aiagent`, `com.loginom.aiagent.beta`, `com.loginom.aiagent.dev`. Manifest должен отражать итоговые пути и имена проверяемой сборки.
 
 ## Уточнения после Linux-реализации
 

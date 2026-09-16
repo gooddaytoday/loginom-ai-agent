@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "8ac362966a5801c2180ce7ea2de4a9aae6da3efa",
+  "artifactHash": "9be7763b93681f5149cdfbecfef1f42adf89da2c6ab2ecb7cb6719d7fb79e963",
+  "applicationSha256": "efe262dfa56a33e7dd28c4a5afdfa73cc022c508bfcef7a32ebf22f4637b1439",
+  "reports": [
+    {
+      "name": "ubuntu22",
+      "base": "ubuntu:22.04",
+      "status": "PASS",
+      "network": "none",
+      "finalPayload": {
+        "status": "PASS",
+        "uid": 1200,
+        "node": "v24.19.0",
+        "os": "PRETTY_NAME=\"Ubuntu 22.04.5 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"22.04\"\nVERSION=\"22.04.5 LTS (Jammy Jellyfish)\"\nVERSION_CODENAME=jammy\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=jammy\n",
+        "manifestHash": "886cd9ed60648ec7d1ee366878b520ad9ea602afc28eaff371742c72b51074f5",
+        "browserSandbox": true,
+        "offlineWizard": true
+      },
+      "installationEvidence": "Clean baseline DEB install and launch; final packaged payload mounted read-only on the installed OS dependencies",
+      "baselineArtifactHash": "33df41f7c90d00e657d2b479c099b32901786e7c9d0192df2564710933675972",
+      "baselineLaunch": "PASS"
+    },
+    {
+      "name": "ubuntu24",
+      "base": "ubuntu:24.04",
+      "status": "PASS",
+      "network": "none",
+      "finalPayload": {
+        "status": "PASS",
+        "uid": 1200,
+        "node": "v24.19.0",
+        "os": "PRETTY_NAME=\"Ubuntu 24.04.4 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\nVERSION=\"24.04.4 LTS (Noble Numbat)\"\nVERSION_CODENAME=noble\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=noble\nLOGO=ubuntu-logo\n",
+        "manifestHash": "886cd9ed60648ec7d1ee366878b520ad9ea602afc28eaff371742c72b51074f5",
+        "browserSandbox": true,
+        "offlineWizard": true
+      },
+      "installationEvidence": "Final DEB installed after removing the failed development package and its OSS shim; clean dependency resolution also checked",
+      "baselineArtifactHash": "33df41f7c90d00e657d2b479c099b32901786e7c9d0192df2564710933675972",
+      "baselineLaunch": "FAILED_ALSA_SHIM_FIXED_IN_FINAL_DEB"
+    },
+    {
+      "name": "ubuntu26",
+      "base": "ubuntu:26.04",
+      "status": "PASS",
+      "network": "none",
+      "finalPayload": {
+        "status": "PASS",
+        "uid": 1200,
+        "node": "v24.19.0",
+        "os": "PRETTY_NAME=\"Ubuntu 26.04.1 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"26.04\"\nVERSION=\"26.04.1 LTS (Resolute Raccoon)\"\nVERSION_CODENAME=resolute\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=resolute\nLOGO=ubuntu-logo\n",
+        "manifestHash": "886cd9ed60648ec7d1ee366878b520ad9ea602afc28eaff371742c72b51074f5",
+        "browserSandbox": true,
+        "offlineWizard": true
+      },
+      "installationEvidence": "Clean baseline DEB install and launch; final packaged payload mounted read-only on the installed OS dependencies",
+      "baselineArtifactHash": "33df41f7c90d00e657d2b479c099b32901786e7c9d0192df2564710933675972",
+      "baselineLaunch": "PASS"
+    },
+    {
+      "name": "debian12",
+      "base": "debian:bookworm-slim",
+      "status": "PASS",
+      "network": "none",
+      "finalPayload": {
+        "status": "PASS",
+        "uid": 1200,
+        "node": "v24.19.0",
+        "os": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"12\"\nVERSION=\"12 (bookworm)\"\nVERSION_CODENAME=bookworm\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"\n",
+        "manifestHash": "886cd9ed60648ec7d1ee366878b520ad9ea602afc28eaff371742c72b51074f5",
+        "browserSandbox": true,
+        "offlineWizard": true
+      },
+      "installationEvidence": "Clean baseline DEB install and launch; final packaged payload mounted read-only on the installed OS dependencies",
+      "baselineArtifactHash": "33df41f7c90d00e657d2b479c099b32901786e7c9d0192df2564710933675972",
+      "baselineLaunch": "PASS"
+    },
+    {
+      "name": "debian13",
+      "base": "debian:trixie-slim",
+      "status": "PASS",
+      "network": "none",
+      "finalPayload": {
+        "status": "PASS",
+        "uid": 1200,
+        "node": "v24.19.0",
+        "os": "PRETTY_NAME=\"Debian GNU/Linux 13 (trixie)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"13\"\nVERSION=\"13 (trixie)\"\nVERSION_CODENAME=trixie\nDEBIAN_VERSION_FULL=13.6\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"\n",
+        "manifestHash": "886cd9ed60648ec7d1ee366878b520ad9ea602afc28eaff371742c72b51074f5",
+        "browserSandbox": true,
+        "offlineWizard": true
+      },
+      "installationEvidence": "Clean baseline DEB install and launch; final packaged payload mounted read-only on the installed OS dependencies",
+      "baselineArtifactHash": "33df41f7c90d00e657d2b479c099b32901786e7c9d0192df2564710933675972",
+      "baselineLaunch": "PASS"
+    }
+  ],
+  "limitations": [
+    "Docker uses the host kernel and explicit seccomp/AppArmor exceptions to permit Chromium namespaces.",
+    "Final payload checks use a tmpfs test profile; disk durability was tested separately.",
+    "Four final payload launches reuse OS dependencies installed by the baseline DEB; Ubuntu24 additionally installs the final DEB."
+  ]
+}

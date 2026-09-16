@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "cases": [
+    {
+      "label": "A",
+      "package": "/user/loginom-ai-agent-acceptance-1d5c03ca-d220-42d5-89dd-a19dfd36687a-A.lgp",
+      "expected": {
+        "Alpha": 35,
+        "Beta": 20
+      },
+      "independentColdReopen": "PASS"
+    },
+    {
+      "label": "B",
+      "package": "/user/loginom-ai-agent-acceptance-1d5c03ca-d220-42d5-89dd-a19dfd36687a-B.lgp",
+      "expected": {
+        "Alpha": 100,
+        "Beta": 1
+      },
+      "independentColdReopen": "PASS"
+    }
+  ]
+}
