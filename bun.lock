@@ -33,7 +33,7 @@
     },
     "packages/agent": {
       "name": "@loginom-ai-agent/agent",
-      "version": "1.18.31",
+      "version": "0.1.0",
       "bin": {
         "loginom-ai-agent": "./bin/loginom-ai-agent",
       },
@@ -176,6 +176,7 @@
         "@kobalte/core": "catalog:",
         "@loginom-ai-agent/client": "file:vendor/opencode-ai-client-1.17.13-v2.tgz",
         "@loginom-ai-agent/core": "workspace:*",
+        "@loginom-ai-agent/product": "workspace:*",
         "@loginom-ai-agent/schema": "workspace:*",
         "@loginom-ai-agent/sdk": "workspace:*",
         "@loginom-ai-agent/session-ui": "workspace:*",
@@ -521,11 +522,8 @@
     },
     "packages/desktop": {
       "name": "@loginom-ai-agent/desktop",
-      "version": "1.18.31",
+      "version": "0.1.0",
       "dependencies": {
-        "@loginom-ai-agent/loginom-host": "workspace:*",
-        "@loginom-ai-agent/product": "workspace:*",
-        "@loginom-ai-agent/schema": "workspace:*",
         "@zip.js/zip.js": "2.7.62",
         "drizzle-orm": "catalog:",
         "effect": "catalog:",
@@ -538,6 +536,9 @@
       "devDependencies": {
         "@actions/artifact": "4.0.0",
         "@loginom-ai-agent/app": "workspace:*",
+        "@loginom-ai-agent/loginom-host": "workspace:*",
+        "@loginom-ai-agent/product": "workspace:*",
+        "@loginom-ai-agent/schema": "workspace:*",
         "@loginom-ai-agent/ui": "workspace:*",
         "@lydell/node-pty": "catalog:",
         "@sentry/solid": "catalog:",

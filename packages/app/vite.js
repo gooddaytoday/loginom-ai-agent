@@ -26,7 +26,7 @@ export default [
           },
         },
         define: {
-          "import.meta.env.VITE_OPENCODE_CHANNEL": JSON.stringify(channel),
+          "import.meta.env.VITE_LOGINOM_AI_AGENT_CHANNEL": JSON.stringify(channel),
         },
         worker: {
           format: "es",

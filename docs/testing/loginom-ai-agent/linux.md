@@ -65,3 +65,13 @@ Desktop prod хранит профиль в `${XDG_CONFIG_HOME:-~/.config}/com.l
 Перед отправкой tool call main сохраняет маркер. После аварии не подтверждённые маркеры блокируют новые операции Loginom и применение pending-подключения. В настройках пользователь проверяет фактический результат в Loginom и явно завершает восстановление. Это не подтверждает успех старой операции и не повторяет её. Старая история и receipts сохраняются в отдельных каталогах попыток. Остальные модельные чаты продолжают работать.
 
 Удаление DEB удаляет приложение, но сохраняет пользовательские настройки и историю. Существующие OpenCode wrapper/desktop и репозиторий Dock не удаляются автоматически. Автообновление отключено, пока собственный feed и обновление N→N+1 не прошли отдельную проверку; проверка отсутствия обновлений не засчитывается за этот тест.
+
+## Runtime parent crash
+
+From `packages/desktop`, with the pinned Bun in PATH:
+
+```sh
+LOGINOM_AI_AGENT_TEST_CONFIG=/path/to/private/config.json bun test/loginom/parent-crash.ts
+```
+
+This authenticates an isolated runtime, records only its own process tree, kills its supervisor parent and requires all live descendants to exit within 20 seconds. It does not repeat business mutations. The verified local run tracked 12 processes and left no live descendants. The full A/B acceptance additionally passed independent saved-package reopening with totals 55 and 101 (`/tmp/loginom-linux-oracle-Kp7heo/summary.json` on the implementation machine).

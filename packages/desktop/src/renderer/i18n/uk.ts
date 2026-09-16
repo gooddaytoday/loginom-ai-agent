@@ -22,7 +22,7 @@ export const dict = {
 
   "desktop.cli.installed.title": "CLI встановлено",
   "desktop.cli.installed.message":
-    "CLI встановлено за шляхом {{path}}\n\nПерезапустіть термінал, щоб використовувати команду 'opencode'.",
+    "CLI встановлено за шляхом {{path}}\n\nПерезапустіть термінал, щоб використовувати команду 'loginom-ai-agent'.",
   "desktop.cli.failed.title": "Не вдалося встановити",
   "desktop.cli.failed.message": "Не вдалося встановити CLI: {{error}}",
 

@@ -48,6 +48,7 @@
     "vite-plugin-solid": "catalog:"
   },
   "dependencies": {
+    "@loginom-ai-agent/product": "workspace:*",
     "@corvu/drawer": "catalog:",
     "@dnd-kit/abstract": "0.5.0",
     "@dnd-kit/dom": "0.5.0",

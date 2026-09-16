@@ -20,7 +20,6 @@ const api: ElectronAPI = {
     acknowledgeRecovery: (input) => ipcRenderer.invoke("loginom-acknowledge-recovery", input),
   },
   killSidecar: () => ipcRenderer.invoke("kill-sidecar"),
-  installCli: () => ipcRenderer.invoke("install-cli"),
   awaitInitialization: () => ipcRenderer.invoke("await-initialization"),
   wslServers: {
     getState: () => ipcRenderer.invoke("wsl-servers-get-state"),
