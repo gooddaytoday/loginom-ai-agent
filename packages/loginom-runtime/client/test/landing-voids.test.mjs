@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { voidDistance, voidIntervalsAtX, segmentAvoidsVoids } from '../../landing/variants/voids-geometry.mjs';
-import { FLOW_ROUTES, sampleFlowPoint, sampleDriftPoint, createScene, prepareScene } from '../../landing/variants/voids.mjs';
+import { voidDistance, voidIntervalsAtX, segmentAvoidsVoids } from '../../../../apps/loginom-site/variants/voids-geometry.mjs';
+import { FLOW_ROUTES, sampleFlowPoint, sampleDriftPoint, createScene, prepareScene } from '../../../../apps/loginom-site/variants/voids.mjs';
 
 function paintRecorder() {
   const hash = createHash('sha256');

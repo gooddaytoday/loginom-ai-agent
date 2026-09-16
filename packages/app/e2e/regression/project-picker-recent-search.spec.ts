@@ -28,7 +28,7 @@ async function openProjectDialog(page: Page) {
   })
   await page.addInitScript((dirs) => {
     localStorage.setItem(
-      "opencode.global.dat:server",
+      "loginom-ai-agent.global.dat:server",
       JSON.stringify({
         projects: { local: dirs.map((worktree: string) => ({ worktree, expanded: false })) },
         lastProject: {},

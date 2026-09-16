@@ -1,4 +1,4 @@
-# @opencode-ai/slack
+# @loginom-ai-agent/slack
 
 Slack bot integration for opencode that creates threaded conversations.
 

@@ -1,6 +1,6 @@
-import type { Message, Part, PermissionRequest, QuestionRequest, SessionStatus, Todo } from "@opencode-ai/sdk/v2/client"
-import type { FileDiffInfo } from "@opencode-ai/client/promise"
-import type { SessionMessageInfo } from "@opencode-ai/client/promise"
+import type { Message, Part, PermissionRequest, QuestionRequest, SessionStatus, Todo } from "@loginom-ai-agent/sdk/v2/client"
+import type { FileDiffInfo } from "@loginom-ai-agent/client/promise"
+import type { SessionMessageInfo } from "@loginom-ai-agent/client/promise"
 
 export const SESSION_CACHE_LIMIT = 40
 

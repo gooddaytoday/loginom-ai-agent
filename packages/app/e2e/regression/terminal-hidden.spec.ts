@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import { mockOpenCodeServer } from "../utils/mock-server"
 import { expectSessionTitle } from "../utils/waits"
 
-const directory = "C:/OpenCode/HiddenTerminalRegression"
+const directory = "C:/Loginom AI Agent/HiddenTerminalRegression"
 const projectID = "proj_hidden_terminal_regression"
 const sessionID = "ses_hidden_terminal_regression"
 const title = "Hidden terminal regression"
@@ -24,7 +24,7 @@ test("unmounts the terminal panel while it is hidden", async ({ page }) => {
       all: [
         {
           id: "opencode",
-          name: "OpenCode",
+          name: "Loginom AI Agent",
           models: { test: { id: "test", name: "Test", limit: { context: 200_000 } } },
         },
       ],

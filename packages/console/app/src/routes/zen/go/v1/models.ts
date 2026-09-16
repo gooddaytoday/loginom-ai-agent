@@ -1,5 +1,5 @@
 import type { APIEvent } from "@solidjs/start/server"
-import { ZenData } from "@opencode-ai/console-core/model.js"
+import { ZenData } from "@loginom-ai-agent/console-core/model.js"
 import { buildModelsResponse, buildOptionsResponse } from "../../util/modelsHandler"
 import { inferenceUnavailable, proxyInference } from "~/lib/inference-proxy"
 

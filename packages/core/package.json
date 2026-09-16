@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "version": "1.18.31",
-  "name": "@opencode-ai/core",
+  "name": "@loginom-ai-agent/core",
   "type": "module",
   "license": "MIT",
   "private": true,
@@ -57,7 +57,7 @@
     "@parcel/watcher-linux-x64-musl": "2.5.1",
     "@parcel/watcher-win32-arm64": "2.5.1",
     "@parcel/watcher-win32-x64": "2.5.1",
-    "@opencode-ai/http-recorder": "workspace:*",
+    "@loginom-ai-agent/http-recorder": "workspace:*",
     "drizzle-kit": "catalog:"
   },
   "dependencies": {
@@ -89,11 +89,11 @@
     "@ff-labs/fff-bun": "0.9.4",
     "@npmcli/arborist": "9.4.0",
     "@npmcli/config": "10.8.1",
-    "@opencode-ai/effect-drizzle-sqlite": "workspace:*",
-    "@opencode-ai/effect-sqlite-node": "workspace:*",
-    "@opencode-ai/llm": "workspace:*",
-    "@opencode-ai/schema": "workspace:*",
-    "@opencode-ai/plugin": "workspace:*",
+    "@loginom-ai-agent/effect-drizzle-sqlite": "workspace:*",
+    "@loginom-ai-agent/effect-sqlite-node": "workspace:*",
+    "@loginom-ai-agent/llm": "workspace:*",
+    "@loginom-ai-agent/schema": "workspace:*",
+    "@loginom-ai-agent/plugin": "workspace:*",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/context-async-hooks": "2.6.1",
     "@opentelemetry/exporter-trace-otlp-http": "0.214.0",
@@ -124,7 +124,8 @@
     "venice-ai-sdk-provider": "2.1.1",
     "which": "6.0.1",
     "xdg-basedir": "5.1.0",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@loginom-ai-agent/product": "workspace:*"
   },
   "overrides": {
     "drizzle-orm": "catalog:"

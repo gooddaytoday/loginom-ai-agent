@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
 
 import { ShikiStreamTokenizer } from "@shikijs/stream"
-import { createMarkdownParser } from "@opencode-ai/ui/context/marked-parser"
-import { OpenCodeTheme } from "@opencode-ai/ui/context/marked-theme"
+import { createMarkdownParser } from "@loginom-ai-agent/ui/context/marked-parser"
+import { OpenCodeTheme } from "@loginom-ai-agent/ui/context/marked-theme"
 import {
   bundledLanguages,
   createHighlighter,

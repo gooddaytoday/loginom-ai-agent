@@ -1,4 +1,4 @@
-import type { UserMessage } from "@opencode-ai/sdk/v2"
+import type { UserMessage } from "@loginom-ai-agent/sdk/v2"
 
 type Local = {
   session: {

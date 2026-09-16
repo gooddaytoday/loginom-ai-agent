@@ -3,7 +3,7 @@ import { mockOpenCodeServer } from "../utils/mock-server"
 import { expectAppVisible } from "../utils/waits"
 
 const draftID = "draft_new_session_panel_corner"
-const directory = "C:/OpenCode/NewSessionPanelCorner"
+const directory = "C:/Loginom AI Agent/NewSessionPanelCorner"
 const server = `http://${process.env.PLAYWRIGHT_SERVER_HOST ?? "127.0.0.1"}:${process.env.PLAYWRIGHT_SERVER_PORT ?? "4096"}`
 
 test.use({
@@ -29,17 +29,17 @@ test("matches the rounded panel corners to the dark new-session background", asy
   await page.addInitScript(
     ({ directory, draftID, server }) => {
       localStorage.setItem("settings.v3", JSON.stringify({ general: { newLayoutDesigns: true } }))
-      localStorage.setItem("opencode-theme-id", "oc-2")
+      localStorage.setItem("loginom-ai-agent-theme-id", "oc-2")
       localStorage.setItem("opencode-color-scheme", "dark")
       localStorage.setItem(
-        "opencode.global.dat:server",
+        "loginom-ai-agent.global.dat:server",
         JSON.stringify({
           projects: { local: [{ worktree: directory, expanded: true }] },
           lastProject: { local: directory },
         }),
       )
       localStorage.setItem(
-        "opencode.window.browser.dat:tabs",
+        "loginom-ai-agent.window.browser.dat:tabs",
         JSON.stringify([{ type: "draft", draftID, server, directory }]),
       )
     },

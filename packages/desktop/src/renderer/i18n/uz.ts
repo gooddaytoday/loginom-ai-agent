@@ -9,7 +9,7 @@ export const dict = {
   "desktop.updater.checkFailed.title": "Yangilanish tekshiruvi amalga oshmadi",
   "desktop.updater.checkFailed.message": "Yangilanishlarni tekshirib boʻlmadi",
   "desktop.updater.none.title": "Yangilanish mavjud emas",
-  "desktop.updater.none.message": "Siz allaqachon OpenCode ning oxirgi versiyasidan foydalanyapsiz",
+  "desktop.updater.none.message": "Siz allaqachon Loginom AI Agent ning oxirgi versiyasidan foydalanyapsiz",
   "desktop.updater.downloadFailed.title": "Yangilash amalga oshmadi",
   "desktop.updater.downloadFailed.message": "Yangilanishni yuklab boʻlmadi",
   "desktop.updater.downloaded.title": "Yangilanish yuklab olindi",

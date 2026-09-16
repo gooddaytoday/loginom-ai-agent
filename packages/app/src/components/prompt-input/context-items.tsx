@@ -1,10 +1,10 @@
 import { Component, For, Show } from "solid-js"
 import { Dynamic } from "solid-js/web"
-import { FileIcon } from "@opencode-ai/ui/file-icon"
-import { IconButton } from "@opencode-ai/ui/icon-button"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
-import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
-import { getDirectory, getFilename, getFilenameTruncated } from "@opencode-ai/core/util/path"
+import { FileIcon } from "@loginom-ai-agent/ui/file-icon"
+import { IconButton } from "@loginom-ai-agent/ui/icon-button"
+import { Tooltip } from "@loginom-ai-agent/ui/tooltip"
+import { TooltipV2 } from "@loginom-ai-agent/ui/v2/tooltip-v2"
+import { getDirectory, getFilename, getFilenameTruncated } from "@loginom-ai-agent/core/util/path"
 import type { ContextItem } from "@/context/prompt"
 
 type PromptContextItem = ContextItem & { key: string }

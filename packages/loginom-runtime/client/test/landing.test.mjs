@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { installation } from '../../landing/instructions.mjs';
+import { installation } from '../../../../apps/loginom-site/instructions.mjs';
 
-const release = JSON.parse(await readFile(new URL('../../landing/release.json', import.meta.url)));
+const release = JSON.parse(await readFile(new URL('../../../../apps/loginom-site/release.json', import.meta.url)));
 release.downloadBase = `${release.repository}/releases/download/${encodeURIComponent(release.tag)}`;
 
 test('landing selection keeps the downloaded archive, extraction and checksum in sync', () => {

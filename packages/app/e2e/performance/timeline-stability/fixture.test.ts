@@ -22,7 +22,7 @@ describe("timeline fixture validation", () => {
     ).toThrow()
     expect(() =>
       validateTimelineEvent({
-        directory: "C:/OpenCode/TimelineStability",
+        directory: "C:/Loginom AI Agent/TimelineStability",
         payload: {
           id: "evt_invalid_status",
           type: "session.status",

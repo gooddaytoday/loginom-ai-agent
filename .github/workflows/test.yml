@@ -67,7 +67,7 @@ jobs:
         timeout-minutes: 20
         run: GITHUB_ACTIONS=false bun turbo test
         env:
-          OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
+          LOGINOM_AI_AGENT_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
 
       - name: Check generated client
         if: runner.os == 'Linux'
@@ -76,7 +76,7 @@ jobs:
 
       - name: Run HttpApi exerciser gates
         if: runner.os == 'Linux'
-        working-directory: packages/opencode
+        working-directory: packages/agent
         run: bun run test:httpapi
 
   e2e:

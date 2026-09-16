@@ -1,4 +1,4 @@
-import { base64Encode } from "@opencode-ai/core/util/encode"
+import { base64Encode } from "@loginom-ai-agent/core/util/encode"
 import { expect, test, type Page } from "@playwright/test"
 import {
   assistantMessage,
@@ -65,7 +65,7 @@ for (const scenario of scenarios) {
         all: [
           {
             id: "opencode",
-            name: "OpenCode",
+            name: "Loginom AI Agent",
             models: {
               "claude-opus-4-6": {
                 id: "claude-opus-4-6",

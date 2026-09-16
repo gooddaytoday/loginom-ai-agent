@@ -13,7 +13,7 @@ Ferdigheter lastes inn på forespørsel via det opprinnelige `skill`-verktøyet 
 Opret én mappe per ferdighetsnavn og tilføj inn en `SKILL.md` i den.
 OpenCode søker etter disse stedene:
 
-- Prosjektkonfigurasjon: `.opencode/skills/<name>/SKILL.md`
+- Prosjektkonfigurasjon: `.loginom-ai-agent/skills/<name>/SKILL.md`
 - Global konfigurasjon: `~/.config/opencode/skills/<name>/SKILL.md`
 - Prosjekt Claude-kompatibel: `.claude/skills/<name>/SKILL.md`
 - Global Claude-kompatibel: `~/.claude/skills/<name>/SKILL.md`
@@ -25,7 +25,7 @@ OpenCode søker etter disse stedene:
 ## Forstå opdagelsen
 
 For prosjektlokale stier går OpenCode opp fra din nåværende arbejdskatalog til den når git-arbeidstreet.
-Den laster alle matchende `skills/*/SKILL.md` i `.opencode/` og alle matchende `.claude/skills/*/SKILL.md` eller `.agents/skills/*/SKILL.md` underveis.
+Den laster alle matchende `skills/*/SKILL.md` i `.loginom-ai-agent/` og alle matchende `.claude/skills/*/SKILL.md` eller `.agents/skills/*/SKILL.md` underveis.
 
 Globale definisjoner lastes også inn fra `~/.config/opencode/skills/*/SKILL.md`, `~/.claude/skills/*/SKILL.md` og `~/.agents/skills/*/SKILL.md`.
 
@@ -73,7 +73,7 @@ Hold det spesifikt nok til at agenten kan velge riktig.
 
 ## Brug et eksempel
 
-Lag `.opencode/skills/git-release/SKILL.md` slik:
+Lag `.loginom-ai-agent/skills/git-release/SKILL.md` slik:
 
 ```markdown
 ---
@@ -124,7 +124,7 @@ skill({ name: "git-release" })
 
 ## Konfigurer tilladelser
 
-Kontroller hvilke ferdigheter agenter har tilgang til ved at bruge mønsterbaserte tillatelser i `opencode.json`:
+Kontroller hvilke ferdigheter agenter har tilgang til ved at bruge mønsterbaserte tillatelser i `loginom-ai-agent.json`:
 
 ```json
 {
@@ -163,7 +163,7 @@ permission:
 ---
 ```
 
-**For innebygde agenter** (i `opencode.json`):
+**For innebygde agenter** (i `loginom-ai-agent.json`):
 
 ```json
 {

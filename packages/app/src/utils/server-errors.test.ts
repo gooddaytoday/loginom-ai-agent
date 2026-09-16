@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { SessionNotFoundError } from "@opencode-ai/sdk/v2/client"
+import type { SessionNotFoundError } from "@loginom-ai-agent/sdk/v2/client"
 import type { ConfigInvalidError, ProviderModelNotFoundError } from "./server-errors"
 import { formatServerError, isSessionNotFoundError, parseReadableConfigInvalidError } from "./server-errors"
 
@@ -37,7 +37,7 @@ describe("parseReadableConfigInvalidError", () => {
     const error = {
       name: "ConfigInvalidError",
       data: {
-        path: "opencode.config.ts",
+        path: "loginom-ai-agent.config.ts",
         issues: [
           { path: ["settings", "host"], message: "Required" },
           { path: ["mode"], message: "Invalid" },

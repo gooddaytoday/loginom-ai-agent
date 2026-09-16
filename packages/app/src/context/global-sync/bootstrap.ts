@@ -8,7 +8,7 @@ import type {
   QuestionRequest,
   ReferenceInfo,
   Session,
-} from "@opencode-ai/sdk/v2/client"
+} from "@loginom-ai-agent/sdk/v2/client"
 import type {
   AgentListInput,
   AgentListOutput,
@@ -22,10 +22,10 @@ import type {
   ReferenceListInput,
   ReferenceListOutput,
   SessionApi,
-} from "@opencode-ai/client/promise"
+} from "@loginom-ai-agent/client/promise"
 import { showToast } from "@/utils/toast"
-import { getFilename } from "@opencode-ai/core/util/path"
-import { retry } from "@opencode-ai/core/util/retry"
+import { getFilename } from "@loginom-ai-agent/core/util/path"
+import { retry } from "@loginom-ai-agent/core/util/retry"
 import { batch } from "solid-js"
 import { produce, reconcile, type SetStoreFunction, type Store } from "solid-js/store"
 import type { State, VcsCache } from "./types"
@@ -40,7 +40,7 @@ import {
 import { formatServerError } from "@/utils/server-errors"
 import { QueryClient, queryOptions } from "@tanstack/solid-query"
 import { loadMcpQuery, loadMcpResourcesQuery } from "../server-sync"
-import { NormalizedProviderListResponse } from "@opencode-ai/session-ui/context"
+import { NormalizedProviderListResponse } from "@loginom-ai-agent/session-ui/context"
 import { ScopedKey, type ServerScope } from "@/utils/server-scope"
 import { normalizeSessionInfo } from "@/utils/session"
 import type { ServerProtocol } from "@/utils/server-protocol"

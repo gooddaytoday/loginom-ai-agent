@@ -71,9 +71,9 @@ If the desktop app is crashing on launch, hanging, or behaving strangely, start 
 
 Open your global config file and look for a `plugin` key.
 
-- **macOS/Linux**: `~/.config/opencode/opencode.jsonc` (or `~/.config/opencode/opencode.json`)
-- **macOS/Linux** (older installs): `~/.local/share/opencode/opencode.jsonc`
-- **Windows**: Press `WIN+R` and paste `%USERPROFILE%\.config\opencode\opencode.jsonc`
+- **macOS/Linux**: `~/.config/opencode/loginom-ai-agent.jsonc` (or `~/.config/opencode/loginom-ai-agent.json`)
+- **macOS/Linux** (older installs): `~/.local/share/opencode/loginom-ai-agent.jsonc`
+- **Windows**: Press `WIN+R` and paste `%USERPROFILE%\.config\opencode\loginom-ai-agent.jsonc`
 
 If you have plugins configured, temporarily disable them by removing the key or setting it to an empty array:
 
@@ -92,7 +92,7 @@ OpenCode can also load local plugins from disk. Temporarily move these out of th
   - **macOS/Linux**: `~/.config/opencode/plugins/`
   - **Windows**: Press `WIN+R` and paste `%USERPROFILE%\.config\opencode\plugins`
 - **Project plugins** (only if you use per-project config)
-  - `<your-project>/.opencode/plugins/`
+  - `<your-project>/.loginom-ai-agent/plugins/`
 
 If the app starts working again, re-enable plugins one at a time to find which one is causing the issue.
 
@@ -125,13 +125,13 @@ From the Home screen, click the server name (with the status dot) to open the Se
 
 #### Remove `server.port` / `server.hostname` from your config
 
-If your `opencode.json(c)` contains a `server` section, temporarily remove it and restart the desktop app.
+If your `loginom-ai-agent.json(c)` contains a `server` section, temporarily remove it and restart the desktop app.
 
 #### Check environment variables
 
-If you have `OPENCODE_PORT` set in your environment, the desktop app will try to use that port for the local server.
+If you have `LOGINOM_AI_AGENT_PORT` set in your environment, the desktop app will try to use that port for the local server.
 
-- Unset `OPENCODE_PORT` (or pick a free port) and restart.
+- Unset `LOGINOM_AI_AGENT_PORT` (or pick a free port) and restart.
 
 ---
 
@@ -172,7 +172,7 @@ If the app won't start and you can't clear settings from inside the UI, reset th
 1. Quit OpenCode Desktop.
 2. Find and delete these files (they live in the OpenCode Desktop app data directory):
 
-- `opencode.settings.dat` (desktop default server URL)
+- `loginom-ai-agent.settings.dat` (desktop default server URL)
 - `opencode.global.dat` and `opencode.workspace.*.dat` (UI state like recent servers/projects)
 
 To find the directory quickly:

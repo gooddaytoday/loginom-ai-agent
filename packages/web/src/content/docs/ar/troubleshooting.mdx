@@ -57,9 +57,9 @@ description: المشكلات الشائعة وكيفية حلها.
 
 افتح ملف الإعدادات العام وابحث عن المفتاح `plugin`.
 
-- **macOS/Linux**: `~/.config/opencode/opencode.jsonc` (أو `~/.config/opencode/opencode.json`)
-- **macOS/Linux** (عمليات تثبيت أقدم): `~/.local/share/opencode/opencode.jsonc`
-- **Windows**: اضغط `WIN+R` والصق `%USERPROFILE%\.config\opencode\opencode.jsonc`
+- **macOS/Linux**: `~/.config/opencode/loginom-ai-agent.jsonc` (أو `~/.config/opencode/loginom-ai-agent.json`)
+- **macOS/Linux** (عمليات تثبيت أقدم): `~/.local/share/opencode/loginom-ai-agent.jsonc`
+- **Windows**: اضغط `WIN+R` والصق `%USERPROFILE%\.config\opencode\loginom-ai-agent.jsonc`
 
 إذا كانت لديك إضافات مضبوطة، فقم بتعطيلها مؤقتا بإزالة المفتاح أو ضبطه على مصفوفة فارغة:
 
@@ -78,7 +78,7 @@ description: المشكلات الشائعة وكيفية حلها.
   - **macOS/Linux**: `~/.config/opencode/plugins/`
   - **Windows**: اضغط `WIN+R` والصق `%USERPROFILE%\.config\opencode\plugins`
 - **إضافات المشروع** (فقط إذا كنت تستخدم إعدادات لكل مشروع)
-  - `<your-project>/.opencode/plugins/`
+  - `<your-project>/.loginom-ai-agent/plugins/`
 
 إذا عاد التطبيق للعمل، فأعد تفعيل الإضافات واحدة تلو الأخرى لمعرفة أيها يسبب المشكلة.
 
@@ -111,13 +111,13 @@ description: المشكلات الشائعة وكيفية حلها.
 
 #### إزالة `server.port` / `server.hostname` من الإعدادات
 
-إذا كان `opencode.json(c)` يحتوي على قسم `server`، فأزله مؤقتا ثم أعد تشغيل تطبيق سطح المكتب.
+إذا كان `loginom-ai-agent.json(c)` يحتوي على قسم `server`، فأزله مؤقتا ثم أعد تشغيل تطبيق سطح المكتب.
 
 #### تحقق من متغيرات البيئة
 
-إذا كان `OPENCODE_PORT` مضبوطا في بيئتك، فسيحاول تطبيق سطح المكتب استخدام ذلك المنفذ للخادم المحلي.
+إذا كان `LOGINOM_AI_AGENT_PORT` مضبوطا في بيئتك، فسيحاول تطبيق سطح المكتب استخدام ذلك المنفذ للخادم المحلي.
 
-- أزل ضبط `OPENCODE_PORT` (أو اختر منفذا متاحا) ثم أعد التشغيل.
+- أزل ضبط `LOGINOM_AI_AGENT_PORT` (أو اختر منفذا متاحا) ثم أعد التشغيل.
 
 ---
 
@@ -158,7 +158,7 @@ description: المشكلات الشائعة وكيفية حلها.
 1. أغلق OpenCode Desktop.
 2. اعثر على هذه الملفات واحذفها (توجد في دليل بيانات تطبيق OpenCode Desktop):
 
-- `opencode.settings.dat` (عنوان URL الافتراضي لخادم سطح المكتب)
+- `loginom-ai-agent.settings.dat` (عنوان URL الافتراضي لخادم سطح المكتب)
 - `opencode.global.dat` و `opencode.workspace.*.dat` (حالة الواجهة مثل الخوادم/المشاريع الأخيرة)
 
 للعثور على الدليل بسرعة:

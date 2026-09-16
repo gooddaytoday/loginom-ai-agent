@@ -54,12 +54,12 @@ async function start(command: StartCommand) {
     ensureLoopbackNoProxy()
     useSystemCertificates()
     useEnvProxy()
-    const { Server } = await import("virtual:opencode-server")
+    const { Server } = await import("virtual:loginom-ai-agent-server")
 
     listener = await Server.listen({
       port: command.port,
       hostname: command.hostname,
-      username: "opencode",
+      username: "loginom-ai-agent",
       password: command.password,
       cors: ["oc://renderer"],
     })
@@ -82,8 +82,8 @@ async function stop() {
 
 function prepareSidecarEnv(password: string, userDataPath: string) {
   Object.assign(process.env, {
-    OPENCODE_SERVER_USERNAME: "opencode",
-    OPENCODE_SERVER_PASSWORD: password,
+    LOGINOM_AI_AGENT_SERVER_USERNAME: "loginom-ai-agent",
+    LOGINOM_AI_AGENT_SERVER_PASSWORD: password,
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
   })
 }

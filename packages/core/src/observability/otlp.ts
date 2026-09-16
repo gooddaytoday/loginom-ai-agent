@@ -35,13 +35,13 @@ function resourceAttributes() {
 
 export function resource(): { serviceName: string; serviceVersion: string; attributes: Record<string, string> } {
   return {
-    serviceName: "opencode",
+    serviceName: "loginom-ai-agent",
     serviceVersion: InstallationVersion,
     attributes: {
       ...resourceAttributes(),
       "deployment.environment.name": InstallationChannel,
-      "opencode.client": Flag.OPENCODE_CLIENT,
-      "opencode.run": runID,
+      "loginom-ai-agent.client": Flag.LOGINOM_AI_AGENT_CLIENT,
+      "loginom-ai-agent.run": runID,
       "service.instance.id": runID,
     },
   }

@@ -1,35 +1,35 @@
 import { expect, test } from "bun:test"
 import { Schema } from "effect"
-import { AgentV2 } from "@opencode-ai/core/agent"
-import { ModelV2 } from "@opencode-ai/core/model"
-import { SessionV2 } from "@opencode-ai/core/session"
-import { Agent } from "@opencode-ai/schema/agent"
-import { Location } from "@opencode-ai/schema/location"
-import { Model } from "@opencode-ai/schema/model"
-import { AgentAttachment, FileAttachment, Prompt, Source } from "@opencode-ai/schema/prompt"
-import { Provider } from "@opencode-ai/schema/provider"
-import { Project } from "@opencode-ai/schema/project"
-import { ProjectDirectories } from "@opencode-ai/schema/project-directories"
-import { PermissionV1 } from "@opencode-ai/schema/permission-v1"
-import { Session } from "@opencode-ai/schema/session"
-import { SessionInput } from "@opencode-ai/schema/session-input"
-import { SessionMessage } from "@opencode-ai/schema/session-message"
-import { Workspace } from "@opencode-ai/schema/workspace"
-import { Command } from "@opencode-ai/schema/command"
-import { Connection } from "@opencode-ai/schema/connection"
-import { Credential } from "@opencode-ai/schema/credential"
-import { FileSystem } from "@opencode-ai/schema/filesystem"
-import { Integration } from "@opencode-ai/schema/integration"
-import { LLM } from "@opencode-ai/schema/llm"
-import { Permission } from "@opencode-ai/schema/permission"
-import { Plugin } from "@opencode-ai/schema/plugin"
-import { Pty } from "@opencode-ai/schema/pty"
-import { Reference } from "@opencode-ai/schema/reference"
-import { SessionTodo } from "@opencode-ai/schema/session-todo"
-import { Skill } from "@opencode-ai/schema/skill"
-import { AbsolutePath, DateTimeUtcFromMillis, optional, statics } from "@opencode-ai/schema/schema"
-import { ProviderV2 } from "@opencode-ai/core/provider"
-import { PluginV2 } from "@opencode-ai/core/plugin"
+import { AgentV2 } from "@loginom-ai-agent/core/agent"
+import { ModelV2 } from "@loginom-ai-agent/core/model"
+import { SessionV2 } from "@loginom-ai-agent/core/session"
+import { Agent } from "@loginom-ai-agent/schema/agent"
+import { Location } from "@loginom-ai-agent/schema/location"
+import { Model } from "@loginom-ai-agent/schema/model"
+import { AgentAttachment, FileAttachment, Prompt, Source } from "@loginom-ai-agent/schema/prompt"
+import { Provider } from "@loginom-ai-agent/schema/provider"
+import { Project } from "@loginom-ai-agent/schema/project"
+import { ProjectDirectories } from "@loginom-ai-agent/schema/project-directories"
+import { PermissionV1 } from "@loginom-ai-agent/schema/permission-v1"
+import { Session } from "@loginom-ai-agent/schema/session"
+import { SessionInput } from "@loginom-ai-agent/schema/session-input"
+import { SessionMessage } from "@loginom-ai-agent/schema/session-message"
+import { Workspace } from "@loginom-ai-agent/schema/workspace"
+import { Command } from "@loginom-ai-agent/schema/command"
+import { Connection } from "@loginom-ai-agent/schema/connection"
+import { Credential } from "@loginom-ai-agent/schema/credential"
+import { FileSystem } from "@loginom-ai-agent/schema/filesystem"
+import { Integration } from "@loginom-ai-agent/schema/integration"
+import { LLM } from "@loginom-ai-agent/schema/llm"
+import { Permission } from "@loginom-ai-agent/schema/permission"
+import { Plugin } from "@loginom-ai-agent/schema/plugin"
+import { Pty } from "@loginom-ai-agent/schema/pty"
+import { Reference } from "@loginom-ai-agent/schema/reference"
+import { SessionTodo } from "@loginom-ai-agent/schema/session-todo"
+import { Skill } from "@loginom-ai-agent/schema/skill"
+import { AbsolutePath, DateTimeUtcFromMillis, optional, statics } from "@loginom-ai-agent/schema/schema"
+import { ProviderV2 } from "@loginom-ai-agent/core/provider"
+import { PluginV2 } from "@loginom-ai-agent/core/plugin"
 
 test("Core reuses the canonical shared schemas", async () => {
   const [
@@ -55,27 +55,27 @@ test("Core reuses the canonical shared schemas", async () => {
     coreSchema,
     coreWorkspace,
   ] = await Promise.all([
-    import("@opencode-ai/core/command"),
-    import("@opencode-ai/core/integration/connection"),
-    import("@opencode-ai/core/credential"),
-    import("@opencode-ai/core/filesystem"),
-    import("@opencode-ai/core/integration"),
-    import("@opencode-ai/core/location"),
-    import("@opencode-ai/llm"),
-    import("@opencode-ai/core/permission"),
-    import("@opencode-ai/core/v1/permission"),
-    import("@opencode-ai/core/project/copy"),
-    import("@opencode-ai/core/pty"),
-    import("@opencode-ai/core/project/schema"),
-    import("@opencode-ai/core/reference"),
-    import("@opencode-ai/core/session/input"),
-    import("@opencode-ai/core/session/message"),
-    import("@opencode-ai/core/session/todo"),
-    import("@opencode-ai/core/session/prompt"),
-    import("@opencode-ai/core/skill"),
-    import("@opencode-ai/core/v2-schema"),
-    import("@opencode-ai/core/schema"),
-    import("@opencode-ai/core/workspace"),
+    import("@loginom-ai-agent/core/command"),
+    import("@loginom-ai-agent/core/integration/connection"),
+    import("@loginom-ai-agent/core/credential"),
+    import("@loginom-ai-agent/core/filesystem"),
+    import("@loginom-ai-agent/core/integration"),
+    import("@loginom-ai-agent/core/location"),
+    import("@loginom-ai-agent/llm"),
+    import("@loginom-ai-agent/core/permission"),
+    import("@loginom-ai-agent/core/v1/permission"),
+    import("@loginom-ai-agent/core/project/copy"),
+    import("@loginom-ai-agent/core/pty"),
+    import("@loginom-ai-agent/core/project/schema"),
+    import("@loginom-ai-agent/core/reference"),
+    import("@loginom-ai-agent/core/session/input"),
+    import("@loginom-ai-agent/core/session/message"),
+    import("@loginom-ai-agent/core/session/todo"),
+    import("@loginom-ai-agent/core/session/prompt"),
+    import("@loginom-ai-agent/core/skill"),
+    import("@loginom-ai-agent/core/v2-schema"),
+    import("@loginom-ai-agent/core/schema"),
+    import("@loginom-ai-agent/core/workspace"),
   ])
 
   const schemas = [

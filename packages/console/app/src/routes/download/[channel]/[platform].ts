@@ -1,5 +1,5 @@
 import type { APIEvent } from "@solidjs/start"
-import { waitUntil } from "@opencode-ai/console-resource"
+import { waitUntil } from "@loginom-ai-agent/console-resource"
 import type { DownloadPlatform } from "../types"
 
 const prodAssetNames: Record<string, string> = {

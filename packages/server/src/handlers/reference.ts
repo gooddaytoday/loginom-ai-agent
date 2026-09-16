@@ -1,4 +1,4 @@
-import { Reference } from "@opencode-ai/core/reference"
+import { Reference } from "@loginom-ai-agent/core/reference"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Api } from "../api"
 import { response } from "../location"

@@ -1,4 +1,4 @@
-import { define } from "@opencode-ai/plugin/v2/effect"
+import { define } from "@loginom-ai-agent/plugin/v2/effect"
 import { Effect } from "effect"
 
 export default define({

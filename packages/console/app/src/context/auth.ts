@@ -1,9 +1,9 @@
 import { getRequestEvent } from "solid-js/web"
-import { and, Database, eq, inArray, isNull, sql } from "@opencode-ai/console-core/drizzle/index.js"
-import { UserTable } from "@opencode-ai/console-core/schema/user.sql.js"
-import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
+import { and, Database, eq, inArray, isNull, sql } from "@loginom-ai-agent/console-core/drizzle/index.js"
+import { UserTable } from "@loginom-ai-agent/console-core/schema/user.sql.js"
+import { WorkspaceTable } from "@loginom-ai-agent/console-core/schema/workspace.sql.js"
 import { redirect } from "@solidjs/router"
-import { Actor } from "@opencode-ai/console-core/actor.js"
+import { Actor } from "@loginom-ai-agent/console-core/actor.js"
 
 import { createClient } from "@openauthjs/openauth/client"
 
@@ -13,7 +13,7 @@ export const AuthClient = createClient({
 })
 
 import { useSession } from "@solidjs/start/http"
-import { Resource } from "@opencode-ai/console-resource"
+import { Resource } from "@loginom-ai-agent/console-resource"
 
 export interface AuthSession {
   account?: Record<

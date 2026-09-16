@@ -13,7 +13,7 @@ description: "عرّف سلوكاً قابلاً لإعادة الاستخدام
 أنشئ مجلداً واحداً لكل اسم مهارة وضع بداخله ملف `SKILL.md`.
 يبحث OpenCode في هذه المواقع:
 
-- إعدادات المشروع: `.opencode/skills/<name>/SKILL.md`
+- إعدادات المشروع: `.loginom-ai-agent/skills/<name>/SKILL.md`
 - إعدادات عامة: `~/.config/opencode/skills/<name>/SKILL.md`
 - مشروع متوافق مع Claude: `.claude/skills/<name>/SKILL.md`
 - عام متوافق مع Claude: `~/.claude/skills/<name>/SKILL.md`
@@ -25,7 +25,7 @@ description: "عرّف سلوكاً قابلاً لإعادة الاستخدام
 ## فهم الاكتشاف
 
 بالنسبة لمسارات المشروع المحلية، يتدرج OpenCode صعوداً من دليل العمل الحالي حتى يصل إلى `git worktree`.
-ويحمّل أي ملفات مطابقة لـ `skills/*/SKILL.md` داخل `.opencode/` وأي ملفات مطابقة لـ `.claude/skills/*/SKILL.md` أو `.agents/skills/*/SKILL.md` على طول الطريق.
+ويحمّل أي ملفات مطابقة لـ `skills/*/SKILL.md` داخل `.loginom-ai-agent/` وأي ملفات مطابقة لـ `.claude/skills/*/SKILL.md` أو `.agents/skills/*/SKILL.md` على طول الطريق.
 
 كما تُحمَّل التعريفات العامة أيضاً من `~/.config/opencode/skills/*/SKILL.md` و `~/.claude/skills/*/SKILL.md` و `~/.agents/skills/*/SKILL.md`.
 
@@ -73,7 +73,7 @@ description: "عرّف سلوكاً قابلاً لإعادة الاستخدام
 
 ## استخدم مثالاً
 
-أنشئ `.opencode/skills/git-release/SKILL.md` بهذا الشكل:
+أنشئ `.loginom-ai-agent/skills/git-release/SKILL.md` بهذا الشكل:
 
 ```markdown
 ---
@@ -124,7 +124,7 @@ skill({ name: "git-release" })
 
 ## تهيئة الصلاحيات
 
-تحكم في المهارات التي يمكن للوكلاء الوصول إليها باستخدام صلاحيات مبنية على أنماط داخل `opencode.json`:
+تحكم في المهارات التي يمكن للوكلاء الوصول إليها باستخدام صلاحيات مبنية على أنماط داخل `loginom-ai-agent.json`:
 
 ```json
 {
@@ -163,7 +163,7 @@ permission:
 ---
 ```
 
-**للوكلاء المدمجين** (في `opencode.json`):
+**للوكلاء المدمجين** (في `loginom-ai-agent.json`):
 
 ```json
 {

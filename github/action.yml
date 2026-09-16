@@ -52,7 +52,7 @@ runs:
       id: cache
       uses: actions/cache@v4
       with:
-        path: ~/.opencode/bin
+        path: ~/.loginom-ai-agent/bin
         key: opencode-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}
 
     - name: Install opencode
@@ -62,7 +62,7 @@ runs:
 
     - name: Add opencode to PATH
       shell: bash
-      run: echo "$HOME/.opencode/bin" >> $GITHUB_PATH
+      run: echo "$HOME/.loginom-ai-agent/bin" >> $GITHUB_PATH
 
     - name: Run opencode
       shell: bash

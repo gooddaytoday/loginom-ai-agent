@@ -1,4 +1,4 @@
-import type { ProviderAuthMethod } from "@opencode-ai/sdk/v2/client"
+import type { ProviderAuthMethod } from "@loginom-ai-agent/sdk/v2/client"
 
 const data = {
   provider: {

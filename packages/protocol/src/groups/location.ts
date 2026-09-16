@@ -1,4 +1,4 @@
-import { Location } from "@opencode-ai/schema/location"
+import { Location } from "@loginom-ai-agent/schema/location"
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 

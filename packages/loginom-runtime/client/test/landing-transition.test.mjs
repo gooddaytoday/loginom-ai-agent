@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mountVariant } from '../../landing/variants/engine.mjs';
+import { mountVariant } from '../../../../apps/loginom-site/variants/engine.mjs';
 
 function setup({ reduced = false } = {}) {
   class Element extends EventTarget {

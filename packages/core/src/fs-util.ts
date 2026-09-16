@@ -46,7 +46,7 @@ export namespace FSUtil {
     readonly globMatch: (pattern: string, filepath: string) => boolean
   }
 
-  export class Service extends Context.Service<Service, Interface>()("@opencode/FileSystem") {}
+  export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/FileSystem") {}
 
   export const use = serviceUse(Service)
 

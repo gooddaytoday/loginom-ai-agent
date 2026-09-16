@@ -1,7 +1,7 @@
-import { base64Encode } from "@opencode-ai/core/util/encode"
-import { Event } from "@opencode-ai/schema/event"
-import { SessionStatusEvent } from "@opencode-ai/schema/session-status-event"
-import { SessionV1 } from "@opencode-ai/schema/session-v1"
+import { base64Encode } from "@loginom-ai-agent/core/util/encode"
+import { Event } from "@loginom-ai-agent/schema/event"
+import { SessionStatusEvent } from "@loginom-ai-agent/schema/session-status-event"
+import { SessionV1 } from "@loginom-ai-agent/schema/session-v1"
 import type {
   AssistantMessage,
   GlobalEvent,
@@ -12,14 +12,14 @@ import type {
   ToolPart,
   ToolState,
   UserMessage,
-} from "@opencode-ai/sdk/v2/client"
+} from "@loginom-ai-agent/sdk/v2/client"
 import { expect, type Page } from "@playwright/test"
 import { Schema } from "effect"
 import { mockOpenCodeServer } from "../../utils/mock-server"
 import { installSseTransport } from "../../utils/sse-transport"
 import { expectSessionTitle } from "../../utils/waits"
 
-export const directory = "C:/OpenCode/TimelineStability"
+export const directory = "C:/Loginom AI Agent/TimelineStability"
 export const projectID = "proj_timeline_stability"
 export const sessionID = "ses_timeline_stability"
 export const userID = "msg_1000_timeline_user"
@@ -144,7 +144,7 @@ export async function setupTimeline(
   }, input.settings ?? {})
   if (input.locale) {
     await page.addInitScript((locale) => {
-      localStorage.setItem("opencode.global.dat:language", JSON.stringify({ locale }))
+      localStorage.setItem("loginom-ai-agent.global.dat:language", JSON.stringify({ locale }))
     }, input.locale)
   }
   if (input.reducedMotion) await page.emulateMedia({ reducedMotion: "reduce" })
@@ -558,7 +558,7 @@ function provider() {
     all: [
       {
         id: "opencode",
-        name: "OpenCode",
+        name: "Loginom AI Agent",
         models: { "claude-opus-4-6": { id: "claude-opus-4-6", name: "Claude Opus 4.6", limit: { context: 200_000 } } },
       },
     ],

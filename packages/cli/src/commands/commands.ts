@@ -1,9 +1,9 @@
 import { Argument, Flag } from "effect/unstable/cli"
 import { Spec } from "../framework/spec"
 
-declare const OPENCODE_CLI_NAME: string | undefined
+declare const LOGINOM_AI_AGENT_CLI_NAME: string | undefined
 
-export const Commands = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME : "opencode", {
+export const Commands = Spec.make(typeof LOGINOM_AI_AGENT_CLI_NAME === "string" ? LOGINOM_AI_AGENT_CLI_NAME : "opencode", {
   description: "OpenCode 2.0 preview command line interface",
   commands: [
     Spec.make("api", {

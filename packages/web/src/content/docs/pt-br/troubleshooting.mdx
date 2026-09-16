@@ -57,9 +57,9 @@ Se o aplicativo de desktop estiver travando ao iniciar, pendurado ou se comporta
 
 Abra seu arquivo de configuração global e procure uma chave `plugin`.
 
-- **macOS/Linux**: `~/.config/opencode/opencode.jsonc` (ou `~/.config/opencode/opencode.json`)
-- **macOS/Linux** (instalações mais antigas): `~/.local/share/opencode/opencode.jsonc`
-- **Windows**: Pressione `WIN+R` e cole `%USERPROFILE%\.config\opencode\opencode.jsonc`
+- **macOS/Linux**: `~/.config/opencode/loginom-ai-agent.jsonc` (ou `~/.config/opencode/loginom-ai-agent.json`)
+- **macOS/Linux** (instalações mais antigas): `~/.local/share/opencode/loginom-ai-agent.jsonc`
+- **Windows**: Pressione `WIN+R` e cole `%USERPROFILE%\.config\opencode\loginom-ai-agent.jsonc`
 
 Se você tiver plugins configurados, desative-os temporariamente removendo a chave ou definindo-a como um array vazio:
 
@@ -78,7 +78,7 @@ O opencode também pode carregar plugins locais do disco. Mova-os temporariament
   - **macOS/Linux**: `~/.config/opencode/plugins/`
   - **Windows**: Pressione `WIN+R` e cole `%USERPROFILE%\.config\opencode\plugins`
 - **Plugins de projeto** (apenas se você usar configuração por projeto)
-  - `<your-project>/.opencode/plugins/`
+  - `<your-project>/.loginom-ai-agent/plugins/`
 
 Se o aplicativo voltar a funcionar, reative os plugins um por um para descobrir qual está causando o problema.
 
@@ -111,13 +111,13 @@ Na tela inicial, clique no nome do servidor (com o ponto de status) para abrir o
 
 #### Removendo `server.port` / `server.hostname` da sua configuração
 
-Se seu `opencode.json(c)` contiver uma seção `server`, remova-a temporariamente e reinicie o aplicativo de desktop.
+Se seu `loginom-ai-agent.json(c)` contiver uma seção `server`, remova-a temporariamente e reinicie o aplicativo de desktop.
 
 #### Verificando as variáveis de ambiente
 
-Se você tiver `OPENCODE_PORT` definido em seu ambiente, o aplicativo de desktop tentará usar essa porta para o servidor local.
+Se você tiver `LOGINOM_AI_AGENT_PORT` definido em seu ambiente, o aplicativo de desktop tentará usar essa porta para o servidor local.
 
-- Desfaça `OPENCODE_PORT` (ou escolha uma porta livre) e reinicie.
+- Desfaça `LOGINOM_AI_AGENT_PORT` (ou escolha uma porta livre) e reinicie.
 
 ---
 
@@ -158,7 +158,7 @@ Se o aplicativo não iniciar e você não conseguir limpar as configurações pe
 1. Saia do opencode Desktop.
 2. Encontre e exclua estes arquivos (eles estão no diretório de dados do aplicativo opencode Desktop):
 
-- `opencode.settings.dat` (URL do servidor padrão do desktop)
+- `loginom-ai-agent.settings.dat` (URL do servidor padrão do desktop)
 - `opencode.global.dat` e `opencode.workspace.*.dat` (estado da interface como servidores/projetos recentes)
 
 Para encontrar o diretório rapidamente:

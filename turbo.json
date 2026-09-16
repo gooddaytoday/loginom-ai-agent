@@ -1,7 +1,7 @@
 {
   "$schema": "https://v2-8-13.turborepo.dev/schema.json",
-  "globalEnv": ["CI", "OPENCODE_DISABLE_SHARE"],
-  "globalPassThroughEnv": ["CI", "OPENCODE_DISABLE_SHARE"],
+  "globalEnv": ["CI", "LOGINOM_AI_AGENT_DISABLE_SHARE"],
+  "globalPassThroughEnv": ["CI", "LOGINOM_AI_AGENT_DISABLE_SHARE"],
   "tasks": {
     "typecheck": {},
     "build": {
@@ -13,22 +13,22 @@
       "outputs": [],
       "passThroughEnv": ["*"]
     },
-    "@opencode-ai/core#test": {
+    "@loginom-ai-agent/core#test": {
       "dependsOn": ["^build"],
       "outputs": []
     },
-    "@opencode-ai/function#test": {
+    "@loginom-ai-agent/function#test": {
       "outputs": []
     },
-    "@opencode-ai/app#test": {
+    "@loginom-ai-agent/app#test": {
       "dependsOn": ["^build"],
       "outputs": []
     },
-    "@opencode-ai/ui#test": {
+    "@loginom-ai-agent/ui#test": {
       "dependsOn": ["^build"],
       "outputs": []
     },
-    "@opencode-ai/session-ui#test": {
+    "@loginom-ai-agent/session-ui#test": {
       "dependsOn": ["^build"],
       "outputs": []
     }

@@ -57,9 +57,9 @@ Hvis skrivebordsappen går ned ved opstart, hænger eller opfører sig mærkelig
 
 Åbn den globale konfigurationsfil og se efter en `plugin`-nøgle.
 
-- **macOS/Linux**: `~/.config/opencode/opencode.jsonc` (eller `~/.config/opencode/opencode.json`)
-- **macOS/Linux** (ældre installationer): `~/.local/share/opencode/opencode.jsonc`
-- **Windows**: Tryk `WIN+R` og indsæt `%USERPROFILE%\.config\opencode\opencode.jsonc`
+- **macOS/Linux**: `~/.config/opencode/loginom-ai-agent.jsonc` (eller `~/.config/opencode/loginom-ai-agent.json`)
+- **macOS/Linux** (ældre installationer): `~/.local/share/opencode/loginom-ai-agent.jsonc`
+- **Windows**: Tryk `WIN+R` og indsæt `%USERPROFILE%\.config\opencode\loginom-ai-agent.jsonc`
 
 Hvis du har konfigureret plugins, deaktiver dem midlertidigt ved at fjerne nøglen eller sætte den til et tomt array:
 
@@ -78,7 +78,7 @@ OpenCode kan også indlæse lokale plugins fra disken. Flyt disse midlertidigt v
   - **macOS/Linux**: `~/.config/opencode/plugins/`
   - **Windows**: Tryk `WIN+R` og indsæt `%USERPROFILE%\.config\opencode\plugins`
 - **Projektplugins** (kun hvis du bruger konfiguration per projekt)
-  - `<your-project>/.opencode/plugins/`
+  - `<your-project>/.loginom-ai-agent/plugins/`
 
 Hvis appen begynder at fungere igen, aktiverer du plugins én ad gangen for at finde ud af, hvilken som forårsager problemet.
 
@@ -111,13 +111,13 @@ Fra startskærmen klikker du på servernavnet (med statusprikken) for at åbne s
 
 #### Fjern `server.port` / `server.hostname` fra din konfiguration
 
-Hvis `opencode.json(c)` indeholder en `server`-del, fjern den midlertidigt og start skrivebordsappen på ny.
+Hvis `loginom-ai-agent.json(c)` indeholder en `server`-del, fjern den midlertidigt og start skrivebordsappen på ny.
 
 #### Tjek miljøvariabler
 
-Hvis du har `OPENCODE_PORT` sat i dit miljø, vil skrivebordsappen prøve at bruge den port for den lokale server.
+Hvis du har `LOGINOM_AI_AGENT_PORT` sat i dit miljø, vil skrivebordsappen prøve at bruge den port for den lokale server.
 
-- Deaktiver `OPENCODE_PORT` (eller vælg en ledig port) og start på ny.
+- Deaktiver `LOGINOM_AI_AGENT_PORT` (eller vælg en ledig port) og start på ny.
 
 ---
 
@@ -158,7 +158,7 @@ Hvis appen ikke starter og du ikke kan slette indstillingerne fra UI, nulstil sk
 1. Afslut OpenCode Desktop.
 2. Find og slet disse filer (de findes i OpenCode Desktop-appens datamappe):
 
-- `opencode.settings.dat` (skrivebordsstandardserver URL)
+- `loginom-ai-agent.settings.dat` (skrivebordsstandardserver URL)
 - `opencode.global.dat` og `opencode.workspace.*.dat` (UI tilstand som nylige servere/projekter)
 
 Sådan finder du mappen hurtigt:

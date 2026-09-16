@@ -39,7 +39,7 @@ export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
       config: config.directory,
       worktree: config.directory,
       directory: config.directory,
-      home: "C:/OpenCode",
+      home: "C:/Loginom AI Agent",
     },
     "/project": [config.project],
     "/project/current": config.project,
@@ -159,7 +159,7 @@ export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
         config: config.directory,
         worktree: config.directory,
         directory: config.directory,
-        home: "C:/OpenCode",
+        home: "C:/Loginom AI Agent",
       })
     if (path === "/api/permission/request")
       return json(route, {

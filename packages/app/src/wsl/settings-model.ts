@@ -286,7 +286,7 @@ export function addableProbePlan(input: {
   const pending = ordered.flatMap((item) => {
     if (item.version === 1) return []
     if (!state.distroProbes[item.name]) return [`distro:${item.name}`]
-    if (wslDistroReady(state, item.name) && !state.opencodeChecks[item.name]) return [`opencode:${item.name}`]
+    if (wslDistroReady(state, item.name) && !state.opencodeChecks[item.name]) return [`loginom-ai-agent:${item.name}`]
     return []
   })
   if (!pending.length) return

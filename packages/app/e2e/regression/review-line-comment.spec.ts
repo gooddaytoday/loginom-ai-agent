@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test"
-import { base64Encode } from "@opencode-ai/core/util/encode"
+import { base64Encode } from "@loginom-ai-agent/core/util/encode"
 import { mockOpenCodeServer } from "../utils/mock-server"
 import { expectAppVisible, expectSessionTitle } from "../utils/waits"
 
-const directory = "C:/OpenCode/ReviewLineCommentRegression"
+const directory = "C:/Loginom AI Agent/ReviewLineCommentRegression"
 const sessionID = "ses_review_line_comment_regression"
 const title = "Review line comment regression"
 

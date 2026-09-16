@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 const packagePath = (name) => require.resolve(`${name}/package.json`);
 const json = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
-export async function createSession(config, { headless = false } = {}) {
+export async function createSession(config, { headless = false, managed = null } = {}) {
   const expectedNode = (await readFile(new URL('../.node-version', import.meta.url), 'utf8')).trim();
   if (process.versions.node !== expectedNode) throw new Error(`Dock requires Node.js ${expectedNode}`);
   if (!['darwin', 'linux', 'win32'].includes(process.platform)) throw new Error('Dock supports macOS, Linux and Windows');
@@ -19,17 +19,17 @@ export async function createSession(config, { headless = false } = {}) {
     throw new Error('A visible Dock browser requires a graphical session');
   }
   const id = randomUUID();
-  const directory = join(config.stateDir, 'sessions', id);
+  const directory = managed?.directory ?? join(config.stateDir, 'sessions', id);
   const profile = join(directory, 'browser-profile');
   const artifacts = join(directory, 'artifacts');
   await privateDirectory(config.stateDir);
   for (const path of [directory, profile, artifacts]) {
     await mkdir(path, { recursive: true, mode: 0o700 });
   }
-  const browserRoot = join(config.stateDir, 'runtime', 'browsers');
-  process.env.PLAYWRIGHT_BROWSERS_PATH = browserRoot;
+  const browserRoot = managed?.browserRoot ?? join(config.stateDir, 'runtime', 'browsers');
+  if (!managed) process.env.PLAYWRIGHT_BROWSERS_PATH = browserRoot;
   const { chromium } = await import('playwright-core');
-  const executablePath = chromium.executablePath();
+  const executablePath = managed?.browserPath ?? chromium.executablePath();
   await executableExists(executablePath);
   const mcp = await json(packagePath('@playwright/mcp'));
   // SDK's wildcard export resolves package.json inside dist/cjs, without version.
@@ -44,7 +44,7 @@ export async function createSession(config, { headless = false } = {}) {
   }
   const browsers = await json(join(dirname(packagePath('playwright-core')), 'browsers.json'));
   const chromiumRevision = browsers.browsers.find(item => item.name === 'chromium');
-  const sourcePin=await createRuntimeSourcePin(import.meta.url,['../.node-version', '../package.json', '../package-lock.json',
+  const sourcePin=managed ? await createRuntimeSourcePin(import.meta.url, ['../.node-version', '../package.json', '../package-lock.json']) : await createRuntimeSourcePin(import.meta.url,['../.node-version', '../package.json', '../package-lock.json',
     '../bin/loginom-dock.mjs', '../bin/hermes-mcp.mjs', '../bin/host-session.mjs', './config.mjs', './session.mjs', './catalog.mjs', './action-catalog.mjs', './capability-registry.mjs', './effect-contracts.mjs', './outcome-verification.mjs', './executor.mjs',
     './bridge.mjs', './managed-shutdown.mjs', './workspace.mjs', './workspace-ui.mjs', './node-procedure.mjs', './node-wizard-close.mjs', './node-wizard-open.mjs', './node-apply.mjs', './node-context.mjs', './node-output-context.mjs', './node-table-context.mjs', './node-output-procedure.mjs', './table-format-pages.mjs', './table-output-pages.mjs', './table-output-values.mjs', './node-execution-evidence.mjs', './node-process-context.mjs', './node-execution-procedure.mjs', './text-import-node.mjs', './text-import-limits.mjs', './text-import-limits.json', './text-import-encoding.mjs', './import-definition-pages.mjs', './node-contracts.mjs', './node-target.mjs', './node-target-browser.mjs', './node-contracts.d.ts', './text-import-procedure.mjs', './observation-pages.mjs', './artifacts.mjs', './execution-journal.mjs', './recovery-context.mjs', './platform.mjs', './native.mjs', './clipboard.mjs', './skill.mjs', './hooks.mjs', './history.mjs', './archive.mjs', './redact.mjs',
     '../bin/hook.mjs', '../bin/diagnostic.mjs', '../bin/dispatch.mjs', './hook-runtime.mjs', './install.mjs', './diagnostics.mjs', '../../examples/memory-plugin-shared/lib/mcp-proxy-config.mjs',
@@ -66,7 +66,7 @@ export async function createSession(config, { headless = false } = {}) {
   const executorMode = ['executor-preview', 'executor-replay'].includes(config.mode);
   await writeFile(browserConfig, JSON.stringify({
     browser: { browserName: 'chromium', userDataDir: profile,
-      launchOptions: { executablePath, headless, ...(!headless ? { args: ['--start-maximized'] } : {}) }, contextOptions: { viewport: browserViewport } },
+      launchOptions: { executablePath, headless, ...(managed ? { chromiumSandbox: true } : {}), ...(!headless ? { args: ['--start-maximized'] } : {}) }, contextOptions: { viewport: browserViewport } },
     capabilities: ['core', 'vision'], outputDir: artifacts,
     saveSession: false, timeouts: { action: 15000, navigation: 120000, ...(executorMode ? { settle: 0 } : {}) },
   }), { mode: 0o600 });

@@ -1,10 +1,10 @@
 import { describe, expect } from "bun:test"
 import { Context, Deferred, Effect, Exit, Fiber, Layer, Scope } from "effect"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { EventV2 } from "@opencode-ai/core/event"
-import { QuestionV2 } from "@opencode-ai/core/question"
-import { SessionV2 } from "@opencode-ai/core/session"
+import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
+import { AppNodeBuilder } from "@loginom-ai-agent/core/effect/app-node-builder"
+import { EventV2 } from "@loginom-ai-agent/core/event"
+import { QuestionV2 } from "@loginom-ai-agent/core/question"
+import { SessionV2 } from "@loginom-ai-agent/core/session"
 import { testEffect } from "./lib/effect"
 
 const questions = AppNodeBuilder.build(LayerNode.group([EventV2.node, QuestionV2.node]))

@@ -65,7 +65,7 @@ Das System-Theme ist ideal fuer Nutzer, die:
 
 Du kannst ein Theme ueber `/theme` auswaehlen oder direkt in der [Konfiguration](/docs/config) setzen.
 
-```json title="opencode.json" {3}
+```json title="loginom-ai-agent.json" {3}
 {
   "$schema": "https://opencode.ai/config.json",
   "theme": "tokyonight"
@@ -87,8 +87,8 @@ Themes werden aus mehreren Verzeichnissen in folgender Reihenfolge geladen, wobe
 
 1. **Eingebaute Themes** - Diese sind im Binary eingebettet
 2. **Benutzer-Config-Verzeichnis** - Definiert in `~/.config/opencode/themes/*.json` oder `$XDG_CONFIG_HOME/opencode/themes/*.json`
-3. **Projekt-Root-Verzeichnis** - Definiert in `<project-root>/.opencode/themes/*.json`
-4. **Aktuelles Arbeitsverzeichnis** - Definiert in `./.opencode/themes/*.json`
+3. **Projekt-Root-Verzeichnis** - Definiert in `<project-root>/.loginom-ai-agent/themes/*.json`
+4. **Aktuelles Arbeitsverzeichnis** - Definiert in `./.loginom-ai-agent/themes/*.json`
 
 Wenn mehrere Verzeichnisse ein Theme mit demselben Namen enthalten, wird das Theme aus dem Verzeichnis mit der hoeheren Prioritaet verwendet.
 
@@ -108,8 +108,8 @@ vim ~/.config/opencode/themes/my-theme.json
 Und fuer projektspezifische Themes:
 
 ```bash no-frame
-mkdir -p .opencode/themes
-vim .opencode/themes/my-theme.json
+mkdir -p .loginom-ai-agent/themes
+vim .loginom-ai-agent/themes/my-theme.json
 ```
 
 ---

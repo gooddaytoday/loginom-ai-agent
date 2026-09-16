@@ -10,7 +10,7 @@ export type VisualCapture = {
 }
 
 export async function startVisualCapture(page: Page, startedAtEpoch: number) {
-  if (process.env.OPENCODE_STABILITY_CAPTURE !== "1") return
+  if (process.env.LOGINOM_AI_AGENT_STABILITY_CAPTURE !== "1") return
   const session = await page.context().newCDPSession(page)
   await session.send("Page.enable")
   const recording: VisualCapture = {

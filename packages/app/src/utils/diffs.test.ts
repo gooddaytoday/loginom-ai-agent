@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import type { SnapshotFileDiff } from "@opencode-ai/sdk/v2"
-import type { FileDiffInfo } from "@opencode-ai/client/promise"
-import type { Message } from "@opencode-ai/sdk/v2/client"
+import type { SnapshotFileDiff } from "@loginom-ai-agent/sdk/v2"
+import type { FileDiffInfo } from "@loginom-ai-agent/client/promise"
+import type { Message } from "@loginom-ai-agent/sdk/v2/client"
 import { diffs, message } from "./diffs"
 
 const item = {

@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
-import type { TuiPlugin, TuiPluginApi, TuiRouteCurrent } from "@opencode-ai/plugin/tui"
-import type { SnapshotFileDiff, VcsFileDiff } from "@opencode-ai/sdk/v2"
+import type { TuiPlugin, TuiPluginApi, TuiRouteCurrent } from "@loginom-ai-agent/plugin/tui"
+import type { SnapshotFileDiff, VcsFileDiff } from "@loginom-ai-agent/sdk/v2"
 import {
   TextAttributes,
   type BorderSides,

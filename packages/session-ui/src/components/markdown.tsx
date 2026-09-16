@@ -1,6 +1,6 @@
-import { useI18n } from "@opencode-ai/ui/context/i18n"
+import { useI18n } from "@loginom-ai-agent/ui/context/i18n"
 import morphdom from "morphdom"
-import { checksum } from "@opencode-ai/core/util/encode"
+import { checksum } from "@loginom-ai-agent/core/util/encode"
 import {
   type Accessor,
   type ComponentProps,
@@ -13,9 +13,9 @@ import {
   splitProps,
 } from "solid-js"
 import { isServer, render } from "solid-js/web"
-import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
-import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
-import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
+import { Icon as IconV2 } from "@loginom-ai-agent/ui/v2/icon"
+import { IconButtonV2 } from "@loginom-ai-agent/ui/v2/icon-button-v2"
+import { TooltipV2 } from "@loginom-ai-agent/ui/v2/tooltip-v2"
 import { canReusePendingBlock, completedProjection } from "./markdown-projection"
 import type { Block, Projection } from "./markdown-stream"
 import {

@@ -57,9 +57,9 @@ OpenCode Desktop 會在背景執行一個本地 OpenCode 伺服器（即 `openco
 
 開啟你的全域設定檔，查找 `plugin` 鍵。
 
-- **macOS/Linux**: `~/.config/opencode/opencode.jsonc`（或 `~/.config/opencode/opencode.json`）
-- **macOS/Linux**（舊版安裝）: `~/.local/share/opencode/opencode.jsonc`
-- **Windows**: 按 `WIN+R` 並貼上 `%USERPROFILE%\.config\opencode\opencode.jsonc`
+- **macOS/Linux**: `~/.config/opencode/loginom-ai-agent.jsonc`（或 `~/.config/opencode/loginom-ai-agent.json`）
+- **macOS/Linux**（舊版安裝）: `~/.local/share/opencode/loginom-ai-agent.jsonc`
+- **Windows**: 按 `WIN+R` 並貼上 `%USERPROFILE%\.config\opencode\loginom-ai-agent.jsonc`
 
 如果你設定了外掛，請透過移除該鍵或將其設定為空陣列來暫時停用它們：
 
@@ -78,7 +78,7 @@ OpenCode 還可以從磁碟載入本地外掛。暫時將這些外掛移走（�
   - **macOS/Linux**: `~/.config/opencode/plugins/`
   - **Windows**: 按 `WIN+R` 並貼上 `%USERPROFILE%\.config\opencode\plugins`
 - **專案外掛**（僅當你使用了專案級設定時）
-  - `<your-project>/.opencode/plugins/`
+  - `<your-project>/.loginom-ai-agent/plugins/`
 
 如果應用程式恢復正常，請逐個重新啟用外掛，找出導致問題的那個。
 
@@ -111,13 +111,13 @@ OpenCode Desktop 可以啟動自己的本地伺服器（預設行為），也可
 
 #### 從設定中移除 `server.port` / `server.hostname`
 
-如果你的 `opencode.json(c)` 包含 `server` 部分，請暫時移除該部分並重新啟動桌面應用程式。
+如果你的 `loginom-ai-agent.json(c)` 包含 `server` 部分，請暫時移除該部分並重新啟動桌面應用程式。
 
 #### 檢查環境變數
 
-如果你在環境中設定了 `OPENCODE_PORT`，桌面應用程式將嘗試使用該連接埠作為本地伺服器連接埠。
+如果你在環境中設定了 `LOGINOM_AI_AGENT_PORT`，桌面應用程式將嘗試使用該連接埠作為本地伺服器連接埠。
 
-- 取消設定 `OPENCODE_PORT`（或選擇一個空閒連接埠）並重新啟動。
+- 取消設定 `LOGINOM_AI_AGENT_PORT`（或選擇一個空閒連接埠）並重新啟動。
 
 ---
 
@@ -158,7 +158,7 @@ OpenCode Desktop 僅在以下情況下顯示系統通知：
 1. 退出 OpenCode Desktop。
 2. 找到並刪除以下檔案（它們位於 OpenCode Desktop 應用程式資料目錄中）：
 
-- `opencode.settings.dat`（桌面預設伺服器 URL）
+- `loginom-ai-agent.settings.dat`（桌面預設伺服器 URL）
 - `opencode.global.dat` 和 `opencode.workspace.*.dat`（UI 狀態，如最近的伺服器/專案）
 
 快速找到該目錄：

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import type { Project } from "@opencode-ai/sdk/v2/client"
-import type { SessionInfo } from "@opencode-ai/client/promise"
+import type { Project } from "@loginom-ai-agent/sdk/v2/client"
+import type { SessionInfo } from "@loginom-ai-agent/client/promise"
 import { createRoot } from "solid-js"
 import { createServerSessionEntries } from "@/components/command-palette"
 import type { LocalProject } from "@/context/layout"

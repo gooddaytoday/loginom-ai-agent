@@ -24,7 +24,7 @@ const words = [
 const serverKey = "http://127.0.0.1:4096"
 const sourceID = "ses_smoke_source"
 const targetID = "ses_smoke_target"
-const directory = "C:/OpenCode/SmokeProject"
+const directory = "C:/Loginom AI Agent/SmokeProject"
 const projectID = "proj_smoke_timeline"
 const model = { providerID: "opencode", modelID: "claude-opus-4-6", variant: "max" }
 
@@ -254,7 +254,7 @@ export const fixture = {
     all: [
       {
         id: "opencode",
-        name: "OpenCode",
+        name: "Loginom AI Agent",
         models: { "claude-opus-4-6": { id: "claude-opus-4-6", name: "Claude Opus 4.6", limit: { context: 200_000 } } },
       },
     ],

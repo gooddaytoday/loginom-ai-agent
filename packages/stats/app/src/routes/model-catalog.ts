@@ -1,4 +1,4 @@
-import { statModel } from "@opencode-ai/stats-core/domain/model-normalization"
+import { statModel } from "@loginom-ai-agent/stats-core/domain/model-normalization"
 import { query } from "@solidjs/router"
 
 export const modelCatalogSourceUrl = "https://models.opencode.ai/catalog.json"

@@ -63,7 +63,7 @@ description: اختر سمة مدمجة أو عرّف سمة خاصة بك.
 
 يمكنك اختيار سمة بفتح منتقي السمات باستخدام الأمر `/theme`. أو يمكنك تحديدها في [الضبط](/docs/config).
 
-```json title="opencode.json" {3}
+```json title="loginom-ai-agent.json" {3}
 {
   "$schema": "https://opencode.ai/config.json",
   "theme": "tokyonight"
@@ -84,8 +84,8 @@ description: اختر سمة مدمجة أو عرّف سمة خاصة بك.
 
 1. **السمات المدمجة** - تكون مضمنة داخل الملف التنفيذي
 2. **مجلد ضبط المستخدم** - معرّف في `~/.config/opencode/themes/*.json` أو `$XDG_CONFIG_HOME/opencode/themes/*.json`
-3. **مجلد جذر المشروع** - معرّف في `<project-root>/.opencode/themes/*.json`
-4. **مجلد العمل الحالي** - معرّف في `./.opencode/themes/*.json`
+3. **مجلد جذر المشروع** - معرّف في `<project-root>/.loginom-ai-agent/themes/*.json`
+4. **مجلد العمل الحالي** - معرّف في `./.loginom-ai-agent/themes/*.json`
 
 إذا احتوت عدة مجلدات على سمة بالاسم نفسه، فستُستخدم السمة من المجلد ذي الأولوية الأعلى.
 
@@ -105,8 +105,8 @@ vim ~/.config/opencode/themes/my-theme.json
 وللسمات الخاصة بالمشروع:
 
 ```bash no-frame
-mkdir -p .opencode/themes
-vim .opencode/themes/my-theme.json
+mkdir -p .loginom-ai-agent/themes
+vim .loginom-ai-agent/themes/my-theme.json
 ```
 
 ---

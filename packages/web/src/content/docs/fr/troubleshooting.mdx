@@ -57,9 +57,9 @@ Si l'application de bureau plante au lancement, se bloque ou se comporte étrang
 
 Ouvrez votre fichier de configuration global et recherchez une clé `plugin`.
 
-- **macOS/Linux** : `~/.config/opencode/opencode.jsonc` (ou `~/.config/opencode/opencode.json`)
-- **macOS/Linux** (anciennes installations) : `~/.local/share/opencode/opencode.jsonc`
-- **Windows** : appuyez sur `WIN+R` et collez `%USERPROFILE%\.config\opencode\opencode.jsonc`
+- **macOS/Linux** : `~/.config/opencode/loginom-ai-agent.jsonc` (ou `~/.config/opencode/loginom-ai-agent.json`)
+- **macOS/Linux** (anciennes installations) : `~/.local/share/opencode/loginom-ai-agent.jsonc`
+- **Windows** : appuyez sur `WIN+R` et collez `%USERPROFILE%\.config\opencode\loginom-ai-agent.jsonc`
 
 Si vous avez configuré des plugins, désactivez-les temporairement en supprimant la clé ou en la définissant sur un tableau vide :
 
@@ -78,7 +78,7 @@ OpenCode peut également charger des plugins locaux à partir du disque. Écarte
   - **macOS/Linux** : `~/.config/opencode/plugins/`
   - **Windows** : appuyez sur `WIN+R` et collez `%USERPROFILE%\.config\opencode\plugins`
 - **Plugins de projet** (uniquement si vous utilisez une configuration par projet)
-  - `<your-project>/.opencode/plugins/`
+  - `<your-project>/.loginom-ai-agent/plugins/`
 
 Si l'application recommence à fonctionner, réactivez les plugins un par un pour trouver celui à l'origine du problème.
 
@@ -111,13 +111,13 @@ Depuis l'écran d'accueil, cliquez sur le nom du serveur (avec le point d'état)
 
 #### Supprimez `server.port` / `server.hostname` de votre configuration
 
-Si votre `opencode.json(c)` contient une section `server`, supprimez-la temporairement et redémarrez l'application de bureau.
+Si votre `loginom-ai-agent.json(c)` contient une section `server`, supprimez-la temporairement et redémarrez l'application de bureau.
 
 #### Vérifier les variables d'environnement
 
-Si `OPENCODE_PORT` est défini dans votre environnement, l'application de bureau tentera d'utiliser ce port pour le serveur local.
+Si `LOGINOM_AI_AGENT_PORT` est défini dans votre environnement, l'application de bureau tentera d'utiliser ce port pour le serveur local.
 
-- Désactivez `OPENCODE_PORT` (ou choisissez un port libre) et redémarrez.
+- Désactivez `LOGINOM_AI_AGENT_PORT` (ou choisissez un port libre) et redémarrez.
 
 ---
 
@@ -158,7 +158,7 @@ Si l'application ne démarre pas et que vous ne pouvez pas effacer les paramètr
 1. Quittez le bureau OpenCode.
 2. Recherchez et supprimez ces fichiers (ils se trouvent dans le répertoire de données de l'application OpenCode Desktop) :
 
-- `opencode.settings.dat` (serveur de bureau par défaut URL)
+- `loginom-ai-agent.settings.dat` (serveur de bureau par défaut URL)
 - `opencode.global.dat` et `opencode.workspace.*.dat` (état de l'interface utilisateur comme les serveurs/projets récents)
 
 Pour trouver rapidement le répertoire :

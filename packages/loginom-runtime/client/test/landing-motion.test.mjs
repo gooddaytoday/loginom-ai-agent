@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mountDataFlow, WORKFLOW_NODES, WORKFLOW_EDGES, flowPoint, workflowProjection } from '../../landing/hero.mjs';
+import { mountDataFlow, WORKFLOW_NODES, WORKFLOW_EDGES, flowPoint, workflowProjection } from '../../../../apps/loginom-site/hero.mjs';
 
 function scene({ reduced = false, contextAvailable = true } = {}) {
   class Element extends EventTarget {

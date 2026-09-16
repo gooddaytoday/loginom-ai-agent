@@ -1,2 +1,2 @@
 export * as SessionMessage from "./message"
-export * from "@opencode-ai/schema/session-message"
+export * from "@loginom-ai-agent/schema/session-message"

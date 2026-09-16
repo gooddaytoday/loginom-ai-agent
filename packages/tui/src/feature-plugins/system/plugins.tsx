@@ -1,4 +1,4 @@
-import type { TuiPlugin, TuiPluginApi, TuiPluginStatus } from "@opencode-ai/plugin/tui"
+import type { TuiPlugin, TuiPluginApi, TuiPluginStatus } from "@loginom-ai-agent/plugin/tui"
 import type { BuiltinTuiPlugin } from "../builtins"
 import { useTerminalDimensions } from "@opentui/solid"
 import { fileURLToPath } from "url"

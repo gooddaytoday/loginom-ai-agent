@@ -1,10 +1,10 @@
-import { base64Encode } from "@opencode-ai/core/util/encode"
+import { base64Encode } from "@loginom-ai-agent/core/util/encode"
 import type { Page } from "@playwright/test"
 import { mockOpenCodeServer } from "../../utils/mock-server"
 import { expectAppVisible, expectSessionTitle } from "../../utils/waits"
 import { expect } from "../benchmark"
 
-const directory = "C:/OpenCode/TimelineStateRegression"
+const directory = "C:/Loginom AI Agent/TimelineStateRegression"
 const projectID = "proj_timeline_state_regression"
 const sessionID = "ses_timeline_state_regression"
 const userMessageID = "msg_user_regression"
@@ -494,7 +494,7 @@ function provider() {
     all: [
       {
         id: "opencode",
-        name: "OpenCode",
+        name: "Loginom AI Agent",
         models: { "claude-opus-4-6": { id: "claude-opus-4-6", name: "Claude Opus 4.6", limit: { context: 200_000 } } },
       },
     ],

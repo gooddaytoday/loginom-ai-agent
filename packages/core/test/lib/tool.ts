@@ -1,6 +1,6 @@
-import { AgentV2 } from "@opencode-ai/core/agent"
-import { SessionMessage } from "@opencode-ai/core/session/message"
-import { ToolRegistry } from "@opencode-ai/core/tool/registry"
+import { AgentV2 } from "@loginom-ai-agent/core/agent"
+import { SessionMessage } from "@loginom-ai-agent/core/session/message"
+import { ToolRegistry } from "@loginom-ai-agent/core/tool/registry"
 import { Effect } from "effect"
 
 export const toolIdentity = {

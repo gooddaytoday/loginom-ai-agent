@@ -57,9 +57,9 @@ opencode Desktop запускает локальный сервер opencode (с
 
 Откройте файл глобальной конфигурации и найдите ключ `plugin`.
 
-- **macOS/Linux**: `~/.config/opencode/opencode.jsonc` (или `~/.config/opencode/opencode.json`)
-- **macOS/Linux** (более ранние версии): `~/.local/share/opencode/opencode.jsonc`
-- **Windows**: нажмите `WIN+R` и вставьте `%USERPROFILE%\.config\opencode\opencode.jsonc`.
+- **macOS/Linux**: `~/.config/opencode/loginom-ai-agent.jsonc` (или `~/.config/opencode/loginom-ai-agent.json`)
+- **macOS/Linux** (более ранние версии): `~/.local/share/opencode/loginom-ai-agent.jsonc`
+- **Windows**: нажмите `WIN+R` и вставьте `%USERPROFILE%\.config\opencode\loginom-ai-agent.jsonc`.
 
 Если у вас настроены плагины, временно отключите их, удалив ключ или установив для него пустой массив:
 
@@ -78,7 +78,7 @@ opencode также может загружать локальные плаги�
   - **macOS/Linux**: `~/.config/opencode/plugins/`
   - **Windows**: нажмите `WIN+R` и вставьте `%USERPROFILE%\.config\opencode\plugins`.
 - **Плагины проекта** (только если вы используете конфигурацию для каждого проекта)
-  - `<your-project>/.opencode/plugins/`
+  - `<your-project>/.loginom-ai-agent/plugins/`
 
 Если приложение снова начнет работать, повторно включите плагины по одному, чтобы определить, какой из них вызывает проблему.
 
@@ -111,13 +111,13 @@ opencode Desktop может либо запустить собственный �
 
 #### Удалите `server.port`/`server.hostname` из вашей конфигурации.
 
-Если ваш `opencode.json(c)` содержит раздел `server`, временно удалите его и перезапустите настольное приложение.
+Если ваш `loginom-ai-agent.json(c)` содержит раздел `server`, временно удалите его и перезапустите настольное приложение.
 
 #### Проверьте переменные среды
 
-Если в вашей среде установлен `OPENCODE_PORT`, настольное приложение попытается использовать этот порт для локального сервера.
+Если в вашей среде установлен `LOGINOM_AI_AGENT_PORT`, настольное приложение попытается использовать этот порт для локального сервера.
 
-- Отмените настройку `OPENCODE_PORT` (или выберите свободный порт) и перезапустите.
+- Отмените настройку `LOGINOM_AI_AGENT_PORT` (или выберите свободный порт) и перезапустите.
 
 ---
 
@@ -158,7 +158,7 @@ opencode Desktop отображает системные уведомления 
 1. Закройте рабочий стол opencode.
 2. Найдите и удалите эти файлы (они находятся в каталоге данных приложения opencode Desktop):
 
-- `opencode.settings.dat` (URL-адрес сервера по умолчанию для рабочего стола)
+- `loginom-ai-agent.settings.dat` (URL-адрес сервера по умолчанию для рабочего стола)
 - `opencode.global.dat` и `opencode.workspace.*.dat` (состояние пользовательского интерфейса, например, недавние серверы/проекты)
 
 Чтобы быстро найти каталог:

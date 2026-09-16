@@ -1,9 +1,9 @@
 import fs from "fs/promises"
 import os from "os"
 import { Effect } from "effect"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { EffectFlock } from "@opencode-ai/core/util/effect-flock"
-import { Global } from "@opencode-ai/core/global"
+import { AppNodeBuilder } from "@loginom-ai-agent/core/effect/app-node-builder"
+import { EffectFlock } from "@loginom-ai-agent/core/util/effect-flock"
+import { Global } from "@loginom-ai-agent/core/global"
 
 type Msg = {
   key: string

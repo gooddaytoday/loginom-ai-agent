@@ -8,7 +8,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { ACTION_CATALOG_ROOT, pinActionCatalog as pinRemoteActionCatalog, ACCEPTANCE_CHECKS, EXECUTOR_REVISION,
   validateReplayAcceptance, assertCatalogTarget } from '../lib/action-catalog.mjs';
-import { updateForE2E } from '../../deploy/loginom-dock/build-action-catalog.mjs';
+import { updateForE2E } from '../../../../services/loginom-ai/deploy/loginom-dock/build-action-catalog.mjs';
 import { createActionRuntime, parseCapabilityResult } from '../lib/executor.mjs';
 
 const exec = promisify(execFile);
@@ -192,7 +192,7 @@ test('builder is deterministic and marks only actions affected by E2E dependency
   t.after(() => rm(directory, { recursive: true, force: true }));
   const first = join(directory, 'first'), second = join(directory, 'second');
   await mkdir(first); await mkdir(second);
-  const script = new URL('../../deploy/loginom-dock/build-action-catalog.mjs', import.meta.url);
+  const script = new URL('../../../../services/loginom-ai/deploy/loginom-dock/build-action-catalog.mjs', import.meta.url);
   await exec(process.execPath, [script.pathname, '--out', first]);
   await exec(process.execPath, [script.pathname, '--out', second]);
   for (const name of ['actions.json', 'selectors.json', 'source-index.json', 'manifest.json', 'current.json']) {

@@ -57,9 +57,9 @@ OpenCode Desktop は、ローカル OpenCode サーバー (`opencode-cli` サイ
 
 グローバル設定ファイルを開き、`plugin` キーを探します。
 
-- **macOS/Linux**: `~/.config/opencode/opencode.jsonc` (または `~/.config/opencode/opencode.json`)
-- **macOS/Linux** (古いインストール): `~/.local/share/opencode/opencode.jsonc`
-- **Windows**: `WIN+R` を押して `%USERPROFILE%\.config\opencode\opencode.jsonc` を貼り付けます
+- **macOS/Linux**: `~/.config/opencode/loginom-ai-agent.jsonc` (または `~/.config/opencode/loginom-ai-agent.json`)
+- **macOS/Linux** (古いインストール): `~/.local/share/opencode/loginom-ai-agent.jsonc`
+- **Windows**: `WIN+R` を押して `%USERPROFILE%\.config\opencode\loginom-ai-agent.jsonc` を貼り付けます
 
 プラグインを構成している場合は、キーを削除するか空の配列に設定して、プラグインを一時的に無効にします。
 
@@ -78,7 +78,7 @@ OpenCode はディスクからローカルプラグインをロードするこ�
   - **macOS/Linux**: `~/.config/opencode/plugins/`
   - **Windows**: `WIN+R` を押して `%USERPROFILE%\.config\opencode\plugins` を貼り付けます
 - **プロジェクトプラグイン** (プロジェクトごとの構成を使用する場合のみ)
-  - `<your-project>/.opencode/plugins/`
+  - `<your-project>/.loginom-ai-agent/plugins/`
 
 アプリが再び動作し始めた場合は、プラグインを 1 つずつ再度有効にして、問題の原因となっているプラ​​グインを特定します。
 
@@ -111,13 +111,13 @@ OpenCode Desktop は、独自のローカルサーバー (デフォルト) を�
 
 #### 設定から `server.port` / `server.hostname` を削除します
 
-`opencode.json(c)` に `server` セクションが含まれている場合は、それを一時的に削除し、デスクトップアプリを再起動します。
+`loginom-ai-agent.json(c)` に `server` セクションが含まれている場合は、それを一時的に削除し、デスクトップアプリを再起動します。
 
 #### 環境変数を確認する
 
-環境に `OPENCODE_PORT` が設定されている場合、デスクトップアプリはローカルサーバーにそのポートを使用しようとします。
+環境に `LOGINOM_AI_AGENT_PORT` が設定されている場合、デスクトップアプリはローカルサーバーにそのポートを使用しようとします。
 
-- `OPENCODE_PORT` の設定を解除して (または空きポートを選択して)、再起動します。
+- `LOGINOM_AI_AGENT_PORT` の設定を解除して (または空きポートを選択して)、再起動します。
 
 ---
 
@@ -158,7 +158,7 @@ OpenCode Desktop では、次の場合にのみシステム通知が表示され
 1. OpenCode デスクトップを終了します。
 2. これらのファイルを見つけて削除します (これらのファイルは OpenCode デスクトップアプリのデータディレクトリにあります)。
 
-- `opencode.settings.dat` (デスクトップのデフォルトサーバー URL)
+- `loginom-ai-agent.settings.dat` (デスクトップのデフォルトサーバー URL)
 - `opencode.global.dat` および `opencode.workspace.*.dat` (最近のサーバー/プロジェクトなどの UI 状態)
 
 ディレクトリをすばやく見つけるには:

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HERO_VARIANTS, HERO_STORAGE_KEY, selectNextVariant } from '../../landing/hero-selection.mjs';
-import { mountHeroCycle } from '../../landing/hero-cycle.mjs';
+import { HERO_VARIANTS, HERO_STORAGE_KEY, selectNextVariant } from '../../../../apps/loginom-site/hero-selection.mjs';
+import { mountHeroCycle } from '../../../../apps/loginom-site/hero-cycle.mjs';
 
 function storageFor(backing = new Map()) {
   const reads = [], writes = [];

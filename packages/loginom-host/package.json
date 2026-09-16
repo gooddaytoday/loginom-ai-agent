@@ -1,0 +1,9 @@
+{
+  "name": "@loginom-ai-agent/loginom-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { "./*": "./src/*.ts" },
+  "scripts": { "test": "bun test", "typecheck": "tsgo --noEmit" },
+  "devDependencies": { "@tsconfig/node22": "catalog:", "@types/bun": "catalog:", "@types/node": "catalog:", "@typescript/native-preview": "catalog:" }
+}

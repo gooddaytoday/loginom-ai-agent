@@ -1,6 +1,6 @@
-# OpenCode Desktop
+# Loginom AI Agent Desktop
 
-The OpenCode Desktop app, built with Electron.
+The Loginom AI Agent Desktop app, built with Electron.
 
 ## Development
 

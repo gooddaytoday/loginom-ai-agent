@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createFlowInteraction } from '../../landing/flow-interaction.mjs';
-import { createScene as clouds } from '../../landing/variants/clouds.mjs';
-import { createScene as glyphs } from '../../landing/variants/glyphs.mjs';
-import { createScene as ribbons } from '../../landing/variants/ribbons.mjs';
-import { createScene as voids } from '../../landing/variants/voids.mjs';
+import { createFlowInteraction } from '../../../../apps/loginom-site/flow-interaction.mjs';
+import { createScene as clouds } from '../../../../apps/loginom-site/variants/clouds.mjs';
+import { createScene as glyphs } from '../../../../apps/loginom-site/variants/glyphs.mjs';
+import { createScene as ribbons } from '../../../../apps/loginom-site/variants/ribbons.mjs';
+import { createScene as voids } from '../../../../apps/loginom-site/variants/voids.mjs';
 
 const length = ({ x, y }) => Math.hypot(x, y);
 

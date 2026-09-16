@@ -57,9 +57,9 @@ OpenCode Desktop รันเซิร์ฟเวอร์ OpenCode ในเ�
 
 เปิดไฟล์กำหนดค่าส่วนกลางของคุณแล้วมองหาคีย์ `plugin`
 
-- **macOS/Linux**: `~/.config/opencode/opencode.jsonc` (หรือ `~/.config/opencode/opencode.json`)
-- **macOS/Linux** (การติดตั้งเก่ากว่า): `~/.local/share/opencode/opencode.jsonc`
-- **Windows**: กด `WIN+R` แล้ววาง `%USERPROFILE%\.config\opencode\opencode.jsonc`
+- **macOS/Linux**: `~/.config/opencode/loginom-ai-agent.jsonc` (หรือ `~/.config/opencode/loginom-ai-agent.json`)
+- **macOS/Linux** (การติดตั้งเก่ากว่า): `~/.local/share/opencode/loginom-ai-agent.jsonc`
+- **Windows**: กด `WIN+R` แล้ววาง `%USERPROFILE%\.config\opencode\loginom-ai-agent.jsonc`
 
 หากคุณได้กำหนดค่าปลั๊กอินไว้ ให้ปิดการใช้งานชั่วคราวโดยลบคีย์ออกหรือตั้งค่าเป็นอาร์เรย์ว่าง:
 
@@ -78,7 +78,7 @@ OpenCode ยังสามารถโหลดปลั๊กอินใน�
   - **macOS/Linux**: `~/.config/opencode/plugins/`
   - **Windows**: กด `WIN+R` แล้ววาง `%USERPROFILE%\.config\opencode\plugins`
 - **ปลั๊กอินโครงการ** (เฉพาะในกรณีที่คุณใช้การกำหนดค่าต่อโครงการ)
-  - `<your-project>/.opencode/plugins/`
+  - `<your-project>/.loginom-ai-agent/plugins/`
 
 หากแอปเริ่มทำงานอีกครั้ง ให้เปิดใช้งานปลั๊กอินอีกครั้งทีละรายการเพื่อดูว่าปลั๊กอินใดเป็นสาเหตุของปัญหา
 
@@ -111,13 +111,13 @@ OpenCode Desktop สามารถเริ่มต้นเซิร์ฟเ
 
 #### ลบ `server.port` / `server.hostname` ออกจากการกำหนดค่าของคุณ
 
-หาก `opencode.json(c)` ของคุณมีส่วน `server` ให้ลบออกชั่วคราวแล้วรีสตาร์ทแอปเดสก์ท็อป
+หาก `loginom-ai-agent.json(c)` ของคุณมีส่วน `server` ให้ลบออกชั่วคราวแล้วรีสตาร์ทแอปเดสก์ท็อป
 
 #### ตรวจสอบตัวแปรสภาพแวดล้อม
 
-หากคุณตั้งค่า `OPENCODE_PORT` ในสภาพแวดล้อมของคุณ แอปเดสก์ท็อปจะพยายามใช้พอร์ตนั้นสำหรับเซิร์ฟเวอร์ภายในเครื่อง
+หากคุณตั้งค่า `LOGINOM_AI_AGENT_PORT` ในสภาพแวดล้อมของคุณ แอปเดสก์ท็อปจะพยายามใช้พอร์ตนั้นสำหรับเซิร์ฟเวอร์ภายในเครื่อง
 
-- ยกเลิกการตั้งค่า `OPENCODE_PORT` (หรือเลือกพอร์ตว่าง) แล้วรีสตาร์ท
+- ยกเลิกการตั้งค่า `LOGINOM_AI_AGENT_PORT` (หรือเลือกพอร์ตว่าง) แล้วรีสตาร์ท
 
 ---
 
@@ -158,7 +158,7 @@ OpenCode Desktop จะแสดงการแจ้งเตือนของ
 1. ออกจากเดสก์ท็อป OpenCode
 2. ค้นหาและลบไฟล์เหล่านี้ (อยู่ในไดเร็กทอรีข้อมูลแอป OpenCode Desktop):
 
-- `opencode.settings.dat` (เซิร์ฟเวอร์เริ่มต้นของเดสก์ท็อป URL)
+- `loginom-ai-agent.settings.dat` (เซิร์ฟเวอร์เริ่มต้นของเดสก์ท็อป URL)
 - `opencode.global.dat` และ `opencode.workspace.*.dat` (สถานะ UI เช่น เซิร์ฟเวอร์ล่าสุด/projects)
 
 หากต้องการค้นหาไดเร็กทอรีอย่างรวดเร็ว:

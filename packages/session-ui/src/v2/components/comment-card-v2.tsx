@@ -1,7 +1,7 @@
 import { createSignal, onCleanup, onMount, Show } from "solid-js"
-import { FileIcon } from "@opencode-ai/ui/file-icon"
-import { getFilenameTruncated } from "@opencode-ai/core/util/path"
-import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
+import { FileIcon } from "@loginom-ai-agent/ui/file-icon"
+import { getFilenameTruncated } from "@loginom-ai-agent/core/util/path"
+import { TooltipV2 } from "@loginom-ai-agent/ui/v2/tooltip-v2"
 import { AttachmentCardV2 } from "./attachment-card-v2"
 
 export function CommentCardV2(props: {

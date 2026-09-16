@@ -1,0 +1,67 @@
+{
+  "packages/loginom-runtime/client/test/action-catalog-lifecycle.test.mjs": {
+    "baseHash": "6004e3b91aa6afd3eff0a3f36d3d054ae840e6c432d57853320033b3fc59389a",
+    "hash": "003998adfac46f66717657d08f741c9e6c391a6a0f855c4c8437422d7ba97605",
+    "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "packages/loginom-runtime/client/test/action-catalog.test.mjs": {
+    "baseHash": "0c9669279108f71871bbdeaaec81ab8a3f8a6580dde63a703abec0f68a8905d7",
+    "hash": "5d9f1965fe60eb22d3723fc31e6508978497cf0d89fa5f9c653acbedd50fdd00",
+    "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "packages/loginom-runtime/client/test/hooks.test.mjs": {
+    "baseHash": "5eec1e38bd6b401eaf5c3b3a36fb06ab723ca1330013ba246621e60a6de6b290",
+    "hash": "e4798cd5508f3681a7029d7b8b96a8d4b910e5813ec6805b23284fc1bddf940a",
+    "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "packages/loginom-runtime/client/test/landing-cycle.test.mjs": {
+    "baseHash": "f697d9dff450ca86fcac189d3e19b47a8cf3b18ccea59f69d958b1bc44c0a277",
+    "hash": "fae6ff425dc0158f24e30ad6399c0be8a4cc4ea88b8b7e8640a27723fbd038a9",
+    "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "packages/loginom-runtime/client/test/landing-motion.test.mjs": {
+    "baseHash": "69f7b2774bb9cc372606d2e538ac73e1375077858020dace1d7d5c6b9f5f208c",
+    "hash": "136a0b75ea12a305cdb7eb0ba47b5ef3c6155d1e32f59451055b3f1eee3f2232",
+    "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "packages/loginom-runtime/client/test/landing-pointer.test.mjs": {
+    "baseHash": "bd325beb627fab2eb0e292910af8c919705c4191193301e80b569b3961fc47c2",
+    "hash": "d50b3a9bf59a0a7452382e1eb5f15d39e4ee30b54d0c60931318444685ec935e",
+    "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "packages/loginom-runtime/client/test/landing-transition.test.mjs": {
+    "baseHash": "8b947b931b042c17922f12fbf8b7008af8e25a532357d55a7924e7c68b54158e",
+    "hash": "856cd8842f5078697ed5a9d95f3fde69d42d83fc53d3b1c399e15793e376a9e5",
+    "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "packages/loginom-runtime/client/test/landing-variants.test.mjs": {
+    "baseHash": "bd0634bd1fa7384dd466e6400f1f9de6d2e20caa3fd3796821982c8b15906efb",
+    "hash": "afa96e2987f96fb5ddc3db12d7e1f64605405bfe6c8f278ac36de610592b5602",
+    "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "packages/loginom-runtime/client/test/landing-voids.test.mjs": {
+    "baseHash": "b03a36d7b6b148e91e6d10b8768c175b973bcfa48770d994b4368ba7b4b54706",
+    "hash": "d94a31f1585c31ec553a812b4dc15af5a3abd25f399046e002c18e41aeab8e52",
+    "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "packages/loginom-runtime/client/test/landing.test.mjs": {
+    "baseHash": "388b664707a9c9a0d44de3fa32b6b82ed03cc2958d8120ebfc64dc23f3319997",
+    "hash": "929d06a244b0fcf4ee007f88626c8206156e593e84f6d4706a8805a4790e3657",
+    "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "services/loginom-ai/deploy/loginom-dock/build-action-catalog.mjs": {
+    "baseHash": "8a4c29d40d4c86dccea28598907a4c88e6fc8ab072b81ae0de8b93ae55e9bd6d",
+    "hash": "c1eca0b6c48fd84d11d9ee03ab925a33d1f71eb5d020004f85245d786a51836f",
+    "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "services/loginom-ai/deploy/loginom-dock/publish-action-catalog.py": {
+    "baseHash": "98b9dc45b781a9e50c73c60f2b6d52e63def4fdcee6e3a03e566e47e134655c0",
+    "hash": "e162f6f66c2ff594a1797fee8fb93d6e852df0314bbdbf9eeb70650ed596ea5d",
+    "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "packages/loginom-runtime/client/lib/session.mjs": {
+    "baseHash": "db89431390466874ef7ea709f5e8c866d1558dd54fc776c9ea1befd3bf286ef3",
+    "hash": "687de9f3d6829f0ba79a9e0f5fcdd43c8b77a69d7f7a36bd1a16cf85304284d6",
+    "reason": "Add managed absolute browser/profile paths, avoid process-wide browser environment mutation in managed mode, and replace archived host manifests with active runtime source pin; require Chromium sandbox."
+  }
+}

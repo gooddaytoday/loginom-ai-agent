@@ -4,9 +4,9 @@ import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { ACTION_CATALOG_ROOT, pinActionCatalog, validateCompatibility } from '../../client/lib/action-catalog.mjs';
+import { ACTION_CATALOG_ROOT, pinActionCatalog, validateCompatibility } from '../../../../packages/loginom-runtime/client/lib/action-catalog.mjs';
 
-import { validateEffect } from '../../client/lib/effect-contracts.mjs';
+import { validateEffect } from '../../../../packages/loginom-runtime/client/lib/effect-contracts.mjs';
 
 export function configurePackageRoots(catalog, roots) {
   if(roots===undefined)return catalog;
@@ -111,7 +111,7 @@ async function main() {
   } });
   if (!values.out) throw new Error('--out is required');
   const scriptDirectory = fileURLToPath(new URL('.', import.meta.url));
-  const input = resolve(values.input ?? join(scriptDirectory, '../../executor/catalog'));
+  const input = resolve(values.input ?? join(scriptDirectory, '../../../../packages/loginom-runtime/executor/catalog'));
   const out = resolve(values.out);
   await mkdir(out, { recursive: true, mode: 0o700 });
   if ((await readdir(out)).length) throw new Error('Output directory must be empty');
@@ -127,7 +127,7 @@ async function main() {
   }
   let selectors = await parse(join(input, 'selectors.json'));
   let index = await parse(join(input, 'source-index.json'));
-  const compatibility = await parse(resolve(values.compatibility ?? join(scriptDirectory, '../../executor/catalog/compatibility.json')));
+  const compatibility = await parse(resolve(values.compatibility ?? join(scriptDirectory, '../../../../packages/loginom-runtime/executor/catalog/compatibility.json')));
   if (values['loginom-build'] !== undefined) compatibility.loginom_build = values['loginom-build'];
   validateCompatibility(compatibility);
   const sourceManifest = values['e2e-manifest'] ? await parse(resolve(values['e2e-manifest'])) : null;

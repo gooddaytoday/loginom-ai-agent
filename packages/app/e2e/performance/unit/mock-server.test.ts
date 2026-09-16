@@ -14,7 +14,7 @@ test("applies message latency after a list response gate is released", async () 
   } as unknown as Page
   await mockOpenCodeServer(page, {
     provider: {},
-    directory: "C:/OpenCode",
+    directory: "C:/Loginom AI Agent",
     project: {},
     sessions: [{ id: "session" }],
     messageDelay: 25,

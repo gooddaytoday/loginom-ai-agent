@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { ACCEPTANCE_CHECKS, EXECUTOR_REVISION } from '../lib/action-catalog.mjs';
-import { minimumExecutorRevision, configurePackageRoots, configureSessionStorage } from '../../deploy/loginom-dock/build-action-catalog.mjs';
+import { minimumExecutorRevision, configurePackageRoots, configureSessionStorage } from '../../../../services/loginom-ai/deploy/loginom-dock/build-action-catalog.mjs';
 import { requireCapability } from '../lib/capability-registry.mjs';
 import { makeCapabilityCode } from '../lib/executor.mjs';
 
@@ -30,8 +30,8 @@ test('session storage catalogs require prepared host directories and retain immu
 });
 
 const exec = promisify(execFile);
-const builder = fileURLToPath(new URL('../../deploy/loginom-dock/build-action-catalog.mjs', import.meta.url));
-const publisher = fileURLToPath(new URL('../../deploy/loginom-dock/publish-action-catalog.py', import.meta.url));
+const builder = fileURLToPath(new URL('../../../../services/loginom-ai/deploy/loginom-dock/build-action-catalog.mjs', import.meta.url));
+const publisher = fileURLToPath(new URL('../../../../services/loginom-ai/deploy/loginom-dock/publish-action-catalog.py', import.meta.url));
 const canonical = value => JSON.stringify(value, null, 2) + '\n';
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 

@@ -77,9 +77,9 @@ Pour les utilisateurs migrant depuis Claude Code, OpenCode prend en charge les c
 Pour désactiver la compatibilité Claude Code, définissez l'une de ces variables d'environnement :
 
 ```bash
-export OPENCODE_DISABLE_CLAUDE_CODE=1        # Disable all .claude support
-export OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=1 # Disable only ~/.claude/CLAUDE.md
-export OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1 # Disable only .claude/skills
+export LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE=1        # Disable all .claude support
+export LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_PROMPT=1 # Disable only ~/.claude/CLAUDE.md
+export LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_SKILLS=1 # Disable only .claude/skills
 ```
 
 ---
@@ -98,11 +98,11 @@ Le premier fichier correspondant gagne dans chaque catégorie. Par exemple, si v
 
 ## Instructions personnalisées
 
-Vous pouvez spécifier des fichiers d'instructions personnalisés dans votre `opencode.json` ou dans le `~/.config/opencode/opencode.json` global. Cela vous permet, à vous et à votre équipe, de réutiliser les règles existantes plutôt que d'avoir à les dupliquer dans AGENTS.md.
+Vous pouvez spécifier des fichiers d'instructions personnalisés dans votre `loginom-ai-agent.json` ou dans le `~/.config/opencode/loginom-ai-agent.json` global. Cela vous permet, à vous et à votre équipe, de réutiliser les règles existantes plutôt que d'avoir à les dupliquer dans AGENTS.md.
 
 Exemple:
 
-```json title="opencode.json"
+```json title="loginom-ai-agent.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": ["CONTRIBUTING.md", "docs/guidelines.md", ".cursor/rules/*.md"]
@@ -111,7 +111,7 @@ Exemple:
 
 Vous pouvez également utiliser des URL distantes pour charger des instructions à partir du Web.
 
-```json title="opencode.json"
+```json title="loginom-ai-agent.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": ["https://raw.githubusercontent.com/my-org/shared-rules/main/style.md"]
@@ -128,11 +128,11 @@ Tous les fichiers d'instructions sont combinés avec vos fichiers `AGENTS.md`.
 
 Bien que opencode n'analyse pas automatiquement les références de fichiers dans `AGENTS.md`, vous pouvez obtenir des fonctionnalités similaires de deux manières :
 
-### Utilisation de opencode.json
+### Utilisation de loginom-ai-agent.json
 
-L'approche recommandée consiste à utiliser le champ `instructions` dans `opencode.json` :
+L'approche recommandée consiste à utiliser le champ `instructions` dans `loginom-ai-agent.json` :
 
-```json title="opencode.json"
+```json title="loginom-ai-agent.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": ["docs/development-standards.md", "test/testing-guidelines.md", "packages/*/AGENTS.md"]
@@ -176,5 +176,5 @@ Cette approche vous permet de :
 - Assurez-vous que opencode charge les fichiers uniquement lorsque cela est nécessaire pour une tâche spécifique.
 
 :::tip
-Pour les monorepos ou les projets avec des normes partagées, l'utilisation de `opencode.json` avec des modèles globaux (comme `packages/*/AGENTS.md`) est plus maintenable que les instructions manuelles.
+Pour les monorepos ou les projets avec des normes partagées, l'utilisation de `loginom-ai-agent.json` avec des modèles globaux (comme `packages/*/AGENTS.md`) est plus maintenable que les instructions manuelles.
 :::

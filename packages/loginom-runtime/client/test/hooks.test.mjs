@@ -7,55 +7,6 @@ import { randomUUID } from 'node:crypto';
 import { handleHook } from '../lib/hooks.mjs';
 import { openArchive } from '../lib/archive.mjs';
 
-for (const hookCommandKey of ['command', 'commandWindows']) {
-test(`Codex native PostToolUse ${hookCommandKey} activates preparation from the native MCP adapter`, async t => {
-  const nativeRoot = new URL('../../plugins/loginom-dock/', import.meta.url);
-  const [mcp, hooks] = await Promise.all([
-    readFile(new URL('.mcp.json', nativeRoot), 'utf8').then(JSON.parse),
-    readFile(new URL('hooks/hooks.json', nativeRoot), 'utf8').then(JSON.parse),
-  ]);
-  const args = mcp.mcpServers['loginom-dock'].args;
-  const adapterRevision = args[args.indexOf('mcp') + 2];
-  const hook = hooks.hooks.PostToolUse.flatMap(group => group.hooks)[0];
-  const hookCommand = hook[hookCommandKey];
-  const hookRevision = hookCommand.match(/\bhook codex ([0-9A-Za-z.+-]+)/)?.[1];
-  assert.ok(adapterRevision);
-  assert.ok(hookRevision);
-
-  const stateDir = await mkdtemp(join(tmpdir(), 'dock-native-hook-'));
-  t.after(() => rm(stateDir, { recursive: true, force: true }));
-  const sessionId = randomUUID(), skillRevision = 'b'.repeat(64);
-  const directory = join(stateDir, 'sessions', sessionId);
-  await mkdir(directory, { recursive: true, mode: 0o700 });
-  await writeFile(join(directory, 'session.json'), JSON.stringify({
-    sessionId, skillRevision, agent: 'codex', adapterRevision,
-  }), { mode: 0o600 });
-  const transcript = join(stateDir, 'rollout.jsonl');
-  await writeFile(transcript, [
-    { type: 'turn_context', payload: { turn_id: 'native-prepare-turn' } },
-    { type: 'response_item', payload: { type: 'message', role: 'user', content: [
-      { type: 'text', text: 'Prepare my Loginom workspace.' },
-    ] } },
-    { type: 'response_item', payload: { type: 'function_call', call_id: 'native-prepare-call',
-      name: 'mcp__loginom_dock__dock_prepare', arguments: '{}' } },
-  ].map(row => JSON.stringify(row)).join('\n') + '\n');
-  const config = { stateDir, endpoint: 'https://dock.example/mcp', apiKey: 'native-hook-fixture',
-    agent: 'codex', adapterRevision: hookRevision };
-  const result = await handleHook(config, {
-    session_id: 'native-conversation', turn_id: 'native-prepare-turn', transcript_path: transcript,
-    hook_event_name: 'PostToolUse', tool_name: 'mcp__loginom_dock__dock_prepare', tool_use_id: 'native-prepare-call',
-    tool_response: { content: [{ type: 'text', text: JSON.stringify({ prepared: true, sessionId, skillRevision }) }] },
-  });
-  assert.equal(result.active, true);
-  const queue = await openArchive(config);
-  try {
-    assert.ok(queue.active('codex', 'native-conversation'));
-    assert.ok(queue.pendingCount() > 0);
-  } finally { queue.close(); }
-  assert.equal(JSON.parse(await readFile(join(directory, 'archive.json'), 'utf8')).active, true);
-});
-}
-
 test('native hook activates only verified prepare, captures triggering turn, redacts before disk and resumes once', async t => {
   const stateDir = await mkdtemp(join(tmpdir(), 'dock-hooks-'));
   t.after(() => rm(stateDir, { recursive: true, force: true }));

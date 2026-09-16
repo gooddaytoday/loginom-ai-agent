@@ -59,9 +59,9 @@ opencode 데스크톱은 배경에서 로컬 opencode 서버 (`opencode-cli` sid
 
 글로벌 설정 파일을 열고 `plugin` 키를 찾습니다.
 
--**macOS/리눅스**: `~/.config/opencode/opencode.jsonc` (또는 `~/.config/opencode/opencode.json`) -**macOS/Linux** (외부 설치): `~/.local/share/opencode/opencode.jsonc`
+-**macOS/리눅스**: `~/.config/opencode/loginom-ai-agent.jsonc` (또는 `~/.config/opencode/loginom-ai-agent.json`) -**macOS/Linux** (외부 설치): `~/.local/share/opencode/loginom-ai-agent.jsonc`
 
-- **Windows**: 압박 `WIN+R`와 풀 `%USERPROFILE%\.config\opencode\opencode.jsonc`
+- **Windows**: 압박 `WIN+R`와 풀 `%USERPROFILE%\.config\opencode\loginom-ai-agent.jsonc`
 
 구성 된 플러그인이있는 경우, 일시적으로 키를 제거하거나 빈 배열로 설정하여 비활성화하십시오.
 
@@ -79,7 +79,7 @@ opencode는 디스크에서 로컬 플러그인을로드 할 수 있습니다. T
 - **글로벌 플러그인** -**macOS/리눅스**: `~/.config/opencode/plugins/`
 - **Windows**: 압박 `WIN+R`와 풀 `%USERPROFILE%\.config\opencode\plugins`
 - **프로젝트 플러그인** (프로젝트 설정만 사용)
-- `<your-project>/.opencode/plugins/`
+- `<your-project>/.loginom-ai-agent/plugins/`
 
 앱이 다시 일하는 경우, 재 활성화 플러그인은 한 번에 문제가 발생할 수 있습니다.
 
@@ -113,13 +113,13 @@ Home 화면에서 Server Picker를 열려면 서버 이름(상태 점)을 클릭
 
 #### 설정에서 server.port/server.hostname 제거
 
-`opencode.json(c)`가 `server` 섹션을 포함하면 일시적으로 제거하고 데스크톱 앱을 다시 시작합니다.
+`loginom-ai-agent.json(c)`가 `server` 섹션을 포함하면 일시적으로 제거하고 데스크톱 앱을 다시 시작합니다.
 
 ### 환경 변수 확인
 
-`OPENCODE_PORT`가 있는 경우, 데스크탑 앱은 로컬 서버의 포트를 사용하려고 합니다.
+`LOGINOM_AI_AGENT_PORT`가 있는 경우, 데스크탑 앱은 로컬 서버의 포트를 사용하려고 합니다.
 
-- `OPENCODE_PORT` (또는 무료 포트를 선택) 및 재시작.
+- `LOGINOM_AI_AGENT_PORT` (또는 무료 포트를 선택) 및 재시작.
 
 ---
 
@@ -160,7 +160,7 @@ opencode 데스크톱은 시스템 알림을 보여줍니다 :
 1. Quit opencode 데스크탑.
 2. 이 파일을 찾아 삭제 (opencode 데스크톱 앱 데이터 디렉토리에서 라이브):
 
-- `opencode.settings.dat` (데스크톱 기본 서버 URL)
+- `loginom-ai-agent.settings.dat` (데스크톱 기본 서버 URL)
 - `opencode.global.dat` 및 `opencode.workspace.*.dat` (최근 서버/프로젝트와 같은 UI 국가)
 
 빠른 디렉토리를 찾을 수:

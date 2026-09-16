@@ -37,7 +37,7 @@ describe("WSL server settings presentation", () => {
     expect(wslRuntimeRetryable({ kind: "stopped" })).toBe(true)
   })
 
-  test("offers install and update only when OpenCode needs attention", () => {
+  test("offers install and update only when Loginom AI Agent needs attention", () => {
     expect(wslOpencodeAction(undefined)).toBeUndefined()
     expect(
       wslOpencodeAction({
@@ -179,7 +179,7 @@ describe("WSL server settings presentation", () => {
     expect(model.busy).toBe(true)
   })
 
-  test("does not report ready when OpenCode is present but cannot run", () => {
+  test("does not report ready when Loginom AI Agent is present but cannot run", () => {
     const model = addServerViewModel({
       state: {
         ...readyWslState,
@@ -191,7 +191,7 @@ describe("WSL server settings presentation", () => {
         opencodeChecks: {
           Debian: {
             distro: "Debian",
-            resolvedPath: "/home/me/.opencode/bin/opencode",
+            resolvedPath: "/home/me/.loginom-ai-agent/bin/opencode",
             version: null,
             expectedVersion: "1.2.3",
             matchesDesktop: null,

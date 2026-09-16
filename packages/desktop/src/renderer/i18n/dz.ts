@@ -14,7 +14,7 @@ export const dict: Record<string, string> = {
   "desktop.updater.downloadFailed.message": "དུས་མཐུན་ཕབ་ལེན་འབད་ནི་ལུ་འཐུས་ཤོར་འབྱུང་ཡོདཔ།",
   "desktop.updater.downloaded.title": "དུས་མཐུན་ཕབ་ལེན་འབད་ཡོདཔ།",
   "desktop.updater.downloaded.prompt":
-    "OpenCode གི་ཐོན་རིམ་ {{version}} ཕབ་ལེན་འབད་ཡོདཔ་ལས་ གཞི་བཙུགས་འབད་དེ་ ལོག་འགོ་བཙུགས་ནི་ཨིན་ན?",
+    "Loginom AI Agent གི་ཐོན་རིམ་ {{version}} ཕབ་ལེན་འབད་ཡོདཔ་ལས་ གཞི་བཙུགས་འབད་དེ་ ལོག་འགོ་བཙུགས་ནི་ཨིན་ན?",
   "desktop.updater.installFailed.title": "དུས་མཐུན་འཐུས་ཤོར་འབྱུང་ཡོདཔ།",
   "desktop.updater.installFailed.message": "དུས་མཐུན་གཞི་བཙུགས་འབད་ནི་ལུ་འཐུས་ཤོར་འབྱུང་ཡོདཔ།",
   "desktop.cli.installed.title": "CLI བཙུགས་ཡོདཔ།",

@@ -76,9 +76,9 @@ Claude Code から移行するユーザーのために、OpenCode はフォー�
 Claude Code の互換性を無効にするには、次の環境変数のいずれかを設定します。
 
 ```bash
-export OPENCODE_DISABLE_CLAUDE_CODE=1        # Disable all .claude support
-export OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=1 # Disable only ~/.claude/CLAUDE.md
-export OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1 # Disable only .claude/skills
+export LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE=1        # Disable all .claude support
+export LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_PROMPT=1 # Disable only ~/.claude/CLAUDE.md
+export LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_SKILLS=1 # Disable only .claude/skills
 ```
 
 ---
@@ -97,11 +97,11 @@ OpenCode が開始されると、次の順序でルールファイルが検索�
 
 ## カスタム指示
 
-`opencode.json` またはグローバル `~/.config/opencode/opencode.json` でカスタム命令ファイルを指定できます。これにより、あなたとあなたのチームは、既存のルールを AGENTS.md に複製するのではなく、再利用することができます。
+`loginom-ai-agent.json` またはグローバル `~/.config/opencode/loginom-ai-agent.json` でカスタム命令ファイルを指定できます。これにより、あなたとあなたのチームは、既存のルールを AGENTS.md に複製するのではなく、再利用することができます。
 
 例：
 
-```json title="opencode.json"
+```json title="loginom-ai-agent.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": ["CONTRIBUTING.md", "docs/guidelines.md", ".cursor/rules/*.md"]
@@ -110,7 +110,7 @@ OpenCode が開始されると、次の順序でルールファイルが検索�
 
 リモート URL を使用して Web から命令をロードすることもできます。
 
-```json title="opencode.json"
+```json title="loginom-ai-agent.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": ["https://raw.githubusercontent.com/my-org/shared-rules/main/style.md"]
@@ -127,11 +127,11 @@ OpenCode が開始されると、次の順序でルールファイルが検索�
 
 OpenCode は `AGENTS.md` のファイル参照を自動的に解析しませんが、次の 2 つの方法で同様の機能を実現できます。
 
-### `opencode.json` の使用
+### `loginom-ai-agent.json` の使用
 
-推奨されるアプローチは、`instructions` の `opencode.json` フィールドを使用することです。
+推奨されるアプローチは、`instructions` の `loginom-ai-agent.json` フィールドを使用することです。
 
-```json title="opencode.json"
+```json title="loginom-ai-agent.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": ["docs/development-standards.md", "test/testing-guidelines.md", "packages/*/AGENTS.md"]
@@ -175,5 +175,5 @@ Read the following file immediately as it's relevant to all workflows: @rules/ge
 - OpenCode が特定のタスクに必要な場合にのみファイルをロードするようにする
 
 :::tip
-モノリポジトリまたは共有標準を使用するプロジェクトの場合、グロブパターン (`opencode.json` など) で `packages/*/AGENTS.md` を使用する方が、手動で指示するよりも保守しやすくなります。
+モノリポジトリまたは共有標準を使用するプロジェクトの場合、グロブパターン (`loginom-ai-agent.json` など) で `packages/*/AGENTS.md` を使用する方が、手動で指示するよりも保守しやすくなります。
 :::
