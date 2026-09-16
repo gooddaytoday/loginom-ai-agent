@@ -98,7 +98,8 @@ const config: Configuration = {
       "libuuid1",
       "libsecret-1-0",
       "libgbm1",
-      "libasound2 | libasound2t64",
+      // Ubuntu 24's unversioned libasound2 virtual package can select the incomplete OSS shim.
+      "libasound2t64 | libasound2 (>= 1.0.16)",
       "ca-certificates",
       "fonts-liberation",
       "libcurl4 | libcurl4t64 | libcurl3-gnutls",
