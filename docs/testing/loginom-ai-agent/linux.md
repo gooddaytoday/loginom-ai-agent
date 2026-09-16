@@ -75,3 +75,8 @@ LOGINOM_AI_AGENT_TEST_CONFIG=/path/to/private/config.json bun test/loginom/paren
 ```
 
 This authenticates an isolated runtime, records only its own process tree, kills its supervisor parent and requires all live descendants to exit within 20 seconds. It does not repeat business mutations. The verified local run tracked 12 processes and left no live descendants. The full A/B acceptance additionally passed independent saved-package reopening with totals 55 and 101 (`/tmp/loginom-linux-oracle-Kp7heo/summary.json` on the implementation machine).
+
+
+## Проверка собственного обновления
+
+В репозитории есть [воспроизводимый тест AppImage N→N+1](../../../packages/desktop/test/loginom/updater/README.md). Он создаёт только изолированные тестовые сборки с локальным feed, проверяет повреждённый SHA512 и чужие targets/channels, обновляет приложение и проверяет сохранность настройки и сообщения чата. В пользовательской сборке feed остаётся отключённым; публикация отдельно не выполнялась.
