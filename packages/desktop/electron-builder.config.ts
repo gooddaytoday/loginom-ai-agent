@@ -28,7 +28,7 @@ const config: Configuration = {
   appId,
   productName: productName(channel),
   artifactName: Product.artifactName,
-  publish: null,
+  publish: Product.updateFeed ? { provider: "generic", url: Product.updateFeed } : null,
   async afterPack(context) {
     if (context.electronPlatformName !== "linux") return
     // Resource copying normalizes modes. Restore the Chromium fallback before DEB ownership becomes root.
