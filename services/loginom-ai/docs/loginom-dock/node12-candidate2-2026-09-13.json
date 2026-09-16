@@ -1,0 +1,58 @@
+{
+  "current_unchanged": true,
+  "checked_at": "2026-09-13T04:13:07.278486+00:00",
+  "catalog_version": "2026.09.13-node12.2-candidate",
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node12.2-candidate/manifest.json",
+  "manifest_sha256": "d0c9a5bedc170754dd251c982508e0ad8568d300091eda0027962c496df62adf",
+  "staged": true,
+  "activated": false,
+  "readback_files": {
+    "actions.json": "8d395a70cf6613390a693d570df58c7e57cbf401e1d8a6069ceb2d044bf1f584",
+    "selectors.json": "6d7da442ed90d588997eb39bad262ddd6bacc06fb680148d9a36397827513da2",
+    "source-index.json": "bb7f919275dcbabd45667c36fc34015a1a94572a1cb3837f2f881e6adee5a844",
+    "manifest.json": "d0c9a5bedc170754dd251c982508e0ad8568d300091eda0027962c496df62adf"
+  },
+  "allowed_roots": {
+    "package.save_as": [
+      "/test-1/packages"
+    ],
+    "package.save_checkpoint": [
+      "/test-1/packages"
+    ]
+  },
+  "compatibility": {
+    "profile_id": "loginom-7.4.2-macos-chromium-ru",
+    "loginom_build": "7.4.2",
+    "platform": "macos",
+    "browser": "chromium"
+  },
+  "e2e_commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+  "stale_actions": [],
+  "server_evidence_path": "/opt/loginom-dock/releases/20260913-node12.2-candidate",
+  "current_server": "/opt/loginom-dock/releases/20260904-landing-7b711846",
+  "current_catalog_sha256": null,
+  "source_sha": "0e11a3fb24ca40a9f855008d2b0d1856d6f771ad",
+  "runtime_revision": "1459a3d10e84a0f4742933f68333cb5843f27347b0062656d090a306446e4248",
+  "harness_revision": "b8d5b9ced1725cbbb64da0d92d93a74cd2f90bf9b8f8ff0efbf1a4a2f434b9d3",
+  "preparation_report_commit": "14c1c71ff461ddbc9e065d9772dee334831d5981",
+  "source_archive_sha256": "39876dd6a497762bf1ea2f8626d6d3dde2b2c279c564f964448c3adec4939192",
+  "source_members_verified": 628,
+  "readback_verified": true,
+  "local_download": ".dock/node12-candidate2-20260913/server-candidate",
+  "candidate_preflight_verified": true,
+  "hermes_started": true,
+  "preflight_receipt_sha256": "e9dd6baa90c20abd5ff6a0f35489f48bb51ba1b0d9e505b6b71d230070d6ef29",
+  "preflight_report_commit": "b4853c97a09a12096b44475587274681ee285350",
+  "acceptance_slot": "node12-hermes-20260913-d0c9a5be-candidate2",
+  "acceptance_developer_turn": "01a09906-308f-7520-8d5e-8187e7e7a81d",
+  "acceptance_dispatch_verified": true,
+  "acceptance_run_id": "20260913-072904-3cc4ad0e",
+  "acceptance_status": "completed_frozen_audit_failed",
+  "audit_passed": 112,
+  "audit_total": 118,
+  "acceptance_report_commit": "59062bff9520a90c1e616bd72a680ce393fd3ded",
+  "followup": "Strict identity-only import verifier correction on immutable saved live evidence",
+  "branch_acceptance_status": "accepted_scoped_by_separate_versioned_reassessment",
+  "branch_acceptance_evidence": "docs/loginom-dock/node12-branch-acceptance-2026-09-13.json",
+  "original_frozen_audit_preserved": true
+}

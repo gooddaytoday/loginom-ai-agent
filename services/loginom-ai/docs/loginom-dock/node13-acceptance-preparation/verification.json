@@ -1,0 +1,23 @@
+{
+  "passed": true,
+  "model_started": false,
+  "browser_started": false,
+  "runtime_unchanged": true,
+  "archive_readback": true,
+  "frozen_goal_unchanged": true,
+  "source_manifest_sha256": "772f5f873dbe6a95c851e258e40992540e7e3c0c9a24fc4eed11026e5b88752a",
+  "source_archive_sha256": "3daf75bb171c4297b9f7b2b013b4310555640ca9810ac07413fde923a7a5903e",
+  "files": {
+    "docs/loginom-dock/node13-acceptance-preparation/admission.template.json": "d42f54468dbbc77ef85b44be3b78a0780aaee135360541e1563d493aba106cca",
+    "docs/loginom-dock/node13-acceptance-preparation/compatibility.json": "ef7bdb64b42808f095bf45542b233577f5fcbb7750a9c6dae846e100551ef437",
+    "docs/loginom-dock/node13-acceptance-preparation/current-remote-pins.json": "1540fa2e43d9c1d7f70379a3b5837e589ce59c9c1ed78241eebf9ed733cda9b7",
+    "docs/loginom-dock/node13-acceptance-preparation/environment.json": "a2bbb9a6222901d7ccaaf265198befc7caef5df78bee9fe62ac19a4b863ce91f",
+    "docs/loginom-dock/node13-acceptance-preparation/evidence-map.json": "1fbee7938a4361b364e0fc38b9e1dd3cd238be83c712253e3e7a953a4bc4e166",
+    "docs/loginom-dock/node13-acceptance-preparation/source-manifest.json": "772f5f873dbe6a95c851e258e40992540e7e3c0c9a24fc4eed11026e5b88752a"
+  },
+  "local_test_logs": {
+    ".dock/node13-candidate-prep/python-tests-complete.log": "087fca4b1f88d9bb39ec6700e8fac1f7d4fa59a69a36394d6a09d24bb4656fac",
+    ".dock/node13-candidate-prep/blocked-launch-final.json": "3eef60e960408ebf8f7299239303bfdfc63f0d947ddca1f128c0404b4a40aa4b",
+    ".dock/node13-candidate-prep/historical-catalog-rejection.log": "e64526b65d38ad54c83f81ac7b7960c762caf5541d9196a8bffd1759f3acea99"
+  }
+}

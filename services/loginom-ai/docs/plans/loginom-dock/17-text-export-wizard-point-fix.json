@@ -1,0 +1,180 @@
+{
+  "status": "ready-for-Hermes-retry",
+  "base_commit": "9aa83ae2319470a35af75f989a5a2edb78e37a29",
+  "previous_run": "20260913-232417-e60ceb43",
+  "previous_phase": "node17:hermes-full:7:9aa83ae2",
+  "previous_slot": "node17-hermes-20260913-ac814f07",
+  "previous_full_audit": {
+    "passed": false,
+    "scope": "node17_full_goal",
+    "checks": {
+      "projection": {
+        "passed": false,
+        "failures": [
+          "user_node_error"
+        ]
+      },
+      "incomplete_or_invalid": {
+        "passed": false,
+        "reason": ""
+      }
+    }
+  },
+  "previous_cleanup": {
+    "run_id": "20260913-232417-e60ceb43",
+    "returncode": 0,
+    "timed_out": false,
+    "remaining_pids": [],
+    "closed": true,
+    "slot": "node17-hermes-20260913-ac814f07"
+  },
+  "full_goal_passed": false,
+  "failure": {
+    "operation": "export-csv-to-tsv-20260913-232417-e60ceb43",
+    "status": "AMBIGUOUS",
+    "phase": "open",
+    "step": 21,
+    "action": "begin_wizard",
+    "step_status": "NOT_APPLIED",
+    "error_code": "UI_REFERENCE_OBSCURED",
+    "successful_nodeops": 9,
+    "attempted_nodeops": 10,
+    "tsv_execution_started": false,
+    "observer_dispatches": 0,
+    "save_reopen_reached": false,
+    "bounds": {
+      "x": 1114,
+      "y": 86,
+      "width": 24,
+      "height": 24
+    },
+    "observed_point": {
+      "x": 1126,
+      "y": 104
+    },
+    "old_center": {
+      "x": 1126,
+      "y": 98
+    },
+    "root_cause_confirmed": true,
+    "cause": "Action discarded a verified visible settings point and used the obscured box center"
+  },
+  "fix": "Native wizard_open controls reuse the current observed point; geometry, identity and exact elementFromPoint hit guards remain mandatory",
+  "live": {
+    "directory": ".dock/text-export/live-1789331872062",
+    "package": "/test-2/node17-wizard-clipping-run7.lgp",
+    "diagnostic_copy_only": true,
+    "geometry_preparation": "Moved diagnostic nodes and scrolled native diagram44px; exact failing button box and point reproduced",
+    "before_status": "NOT_APPLIED",
+    "after_status": "SUCCEEDED",
+    "same_control_geometry_and_owner": true,
+    "opened_node_id": "597defb3-357f-4450-b0b4-ef91a57f6e06",
+    "wizard_owner": "ExportCSV",
+    "settings_applied": false,
+    "execution_started": false,
+    "normal_cleanup": {
+      "package_closed": true,
+      "login_form": true,
+      "user": "test-2"
+    },
+    "evidence_sha256": {
+      "wizard-point-before.json": "b0e92e526447c06fb781bdff65e788feb10bc2eba4bb4b22e70df735b9301fae",
+      "wizard-point-after.json": "d3095a52dc284cf758714befe2deb5ffd2b3eebdc0511e2ed5ccb466d4b686ec",
+      "browser-39.json": "c3a2edd84773ec743680ffaf4551efcd924033bd975e8566e998c1bdedbd7a7a",
+      "browser-40.json": "16ecdb937b9f5ce260d59414e0c81f1d3ab6249126d46210ab12c0a59b77bf44",
+      "wizard-session-cleanup.json": "23df1499dd7a145c9a532768b48710c41fb9a31ede401a1bfbbd4b3ba04a8b4f",
+      "wizard-confirm-close-save.json": "fa0d0a0abf003d0e9de281af391d5f8d61fe10d6cee64e4414df8aec867559ac",
+      "copy-preparation.json": "335730cb64e66c86adb492870d2658180778e4647b9b7a422a49a5fefdcfb712"
+    },
+    "runtime_note": "Harness baseline cd471237; after proof executes freshly imported current serialized workspace-ui capability; full current runtime component required",
+    "cleanup": {
+      "session_id": "b58a3260-f5b0-4f3a-adc1-dce126014c98",
+      "remaining_pids": [],
+      "closed": true
+    }
+  },
+  "runtime": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
+  "manifest_sha256": "1b1f55b42bccba1439ae12a0c230922cb0b0f14fa958520c083abca7ba5f8cfd",
+  "launch": {
+    "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export",
+    "argv": [
+      "python3",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/tools/loginom-acceptance/run.py",
+      "--run",
+      "--goal",
+      "text-export-node-complete",
+      "--model-profile",
+      "chatgpt-sol",
+      "--runs-root",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs",
+      "--node",
+      "/Users/kartamyshev/.loginom-dock/releases/0.1.0-dev.20260910.3-80ca61417ec7/runtime/node",
+      "--hermes-home",
+      "/Users/kartamyshev/.hermes",
+      "--hermes",
+      "/Users/kartamyshev/.local/bin/hermes",
+      "--hermes-python",
+      "/Users/kartamyshev/.hermes/hermes-agent/venv/bin/python",
+      "--hermes-source",
+      "/Users/kartamyshev/.hermes/hermes-agent",
+      "--dock-config",
+      "/Users/kartamyshev/.loginom-dock/config.json",
+      "--browsers",
+      "/Users/kartamyshev/.loginom-dock/runtime/browsers",
+      "--loginom-user",
+      "test-2",
+      "--loginom-url",
+      "http://logi-test-plan.bg.local/app/?testable=true",
+      "--storage-directory",
+      "/test-2",
+      "--manifest-uri",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node11.2-candidate/manifest.json",
+      "--manifest-sha256",
+      "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "--timeout",
+      "3600",
+      "--max-turns",
+      "100"
+    ],
+    "requires_coordinator_slot": true,
+    "model_started": false
+  },
+  "limits": [
+    "Full run7 FAIL retained",
+    "No model persistence/fresh original audit: save was never reached",
+    "No second model until new slot",
+    "No repeat full review/merge/deploy/shared plugin"
+  ],
+  "tests": {
+    "node_passed": 341,
+    "workspace_ui_passed": 261,
+    "python_passed": 24,
+    "faithful_old_code_regression_failed": true,
+    "fixed_clipped_and_fully_covered_cases_passed": true
+  },
+  "component": {
+    "run_id": "20260913-235110-fb8639df",
+    "audit_path": "docs/plans/loginom-dock/17-text-export-wizard-point-component-success.json",
+    "audit_sha256": "cd6d0788ae5e418b1b977de98df4435f9d478e34e4b356095097b972552ac4c6",
+    "passed": true,
+    "bytes": 124,
+    "actual_downloads": 1,
+    "actual_replace_dispatches": 1,
+    "successful_replacements": 1,
+    "cleanup": {
+      "session_id": "de95e28d-8308-4eac-846d-8530e6ddfa37",
+      "remaining_pids": [],
+      "closed": true
+    },
+    "global_config_unchanged": true
+  },
+  "preflight": {
+    "path": ".dock/node17/wizard-point-preflight.json",
+    "sha256": "42c7f8c6c9f3fc134294f8724097cef91334af8c082820550e9e1b518dda56ac",
+    "passed": true,
+    "model_started": false,
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "low"
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "checked_at": "2026-09-13T01:58:41.417Z",
+  "generation": "20260913.5",
+  "immutable_files_verified": 28,
+  "preserved_legacy_hook_definitions": 25,
+  "existing_task_noops": 20,
+  "unexpected_official_spawns": 0,
+  "cursors": [
+    {
+      "thread_id": "01a0971e-804e-7f42-923a-4cdb1de181be",
+      "floor": 1469,
+      "current": 1469,
+      "effective_peer": "-Users-kartamyshev-Git-loginom-dock",
+      "routing_verified": true
+    },
+    {
+      "thread_id": "01a0971e-9324-7cd1-8610-cf343b3838b1",
+      "floor": 1644,
+      "current": 1644,
+      "effective_peer": "-Users-kartamyshev-Git-loginom-dock",
+      "routing_verified": true
+    },
+    {
+      "thread_id": "01a0971e-a2c3-7e21-898b-9b865527a484",
+      "floor": 1770,
+      "current": 1770,
+      "effective_peer": "-Users-kartamyshev-Git-loginom-dock",
+      "routing_verified": true
+    },
+    {
+      "thread_id": "01a09738-2d64-7dc2-8cb3-634663d0b406",
+      "floor": 1783,
+      "current": 1992,
+      "effective_peer": "-Users-kartamyshev-Git-loginom-dock",
+      "routing_verified": true
+    }
+  ],
+  "normal_hook_trust": [
+    {
+      "cwd": "/Users/kartamyshev/Git/loginom-dock",
+      "project_hooks": 10,
+      "trusted": true,
+      "original_memory_hooks": 5
+    },
+    {
+      "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-11-replacement",
+      "project_hooks": 10,
+      "trusted": true,
+      "original_memory_hooks": 0
+    },
+    {
+      "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates",
+      "project_hooks": 10,
+      "trusted": true,
+      "original_memory_hooks": 0
+    },
+    {
+      "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-13-date-time",
+      "project_hooks": 10,
+      "trusted": true,
+      "original_memory_hooks": 0
+    },
+    {
+      "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-14-missing-values",
+      "project_hooks": 10,
+      "trusted": true,
+      "original_memory_hooks": 0
+    }
+  ],
+  "global_mcp_reload": false,
+  "new_app_task_created": true,
+  "schema_version": 1,
+  "mechanism_implemented": true,
+  "mechanism_installed": true,
+  "permission": "User authorized independent future-task project memory enrollment",
+  "tests": {
+    "node": {
+      "passed": 83,
+      "baseline": 46,
+      "migration": 19,
+      "independent_enrollment": 18,
+      "scope": "offline fixtures"
+    },
+    "python": {
+      "passed": 3,
+      "scope": "temporary real Git repositories/worktrees; no app task or remote capture"
+    }
+  },
+  "runtime_files_verified": 18,
+  "registered_coordinator_memory_health": "healthy",
+  "first_fresh_app_task": {
+    "created": true,
+    "bootstrap_verified": true,
+    "registered_actor_access_verified": true,
+    "capture_extraction_verified": true,
+    "next_gate": "Each subsequent task still requires its own registration, actor access and first substantive capture/extraction check",
+    "node": 16,
+    "thread_id": "01a0992c-6ce0-7f10-bd53-9bf92ed7ae8a",
+    "capture_cursor_observed": 194,
+    "capture_transport_verified": true,
+    "extraction_completed": true,
+    "extracted_memory_changes": 6,
+    "new_project_knowledge_verified": true,
+    "first_capture_evidence": "docs/loginom-dock/node16-start-2026-09-13.json",
+    "substantive_capture_evidence": "docs/loginom-dock/node16-shared-memory-knowledge-2026-09-13.json",
+    "substantive_capture_checked_at": "2026-09-13T08:19:55.751741+00:00",
+    "project_additions": 5,
+    "global_profile_updates": 1
+  },
+  "legacy_registry_unchanged": true,
+  "legacy_worker_configs_unchanged": true,
+  "original_official_plugin_scripts_unchanged": true,
+  "global_peer_override": false,
+  "app_restart": false,
+  "shared_dock_plugin_reinstalled": false,
+  "per_task_registration_required": true,
+  "first_fresh_app_task_end_to_end_verified": true
+}

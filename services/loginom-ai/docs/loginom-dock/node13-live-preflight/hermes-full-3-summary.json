@@ -1,0 +1,160 @@
+{
+  "run_id": "20260914-091807-4289644a",
+  "branch": "codex/node-13-date-time",
+  "tested_source": "77e9cf5067871cb619b8580045c8ac3f55132ee5",
+  "runtime": "d5fd1ba79586069c27b9f5c8626cf885f9a5fe7e28e6274b01bc0081ada9558f",
+  "inputs_sha256": "3040f93c1c6d8db2cd4c4b05dec2fd49a3b4f20c2847ca37d62796882d8e7d34",
+  "goal_sha256": "711d1cec738c444e9c90bc806218fe36dc1feeb877ee1f23d13f38e7c386e750",
+  "candidate_sha256": "db38f7f249c0c051d8b77a22e0ac80a817ecb96a9820bfb0f74b8199a496c634",
+  "provider": "openai-codex",
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "model_started": true,
+  "launcher_exit_code": 0,
+  "slot": "node13-hermes-20260914-full3",
+  "slot_released": true,
+  "package_path": "/test-3/packages/Dock-date-time-20260914-091807-4289644a.lgp",
+  "hermes_session": "ef9133bf-91b5-41c0-bab7-a56362252af3",
+  "reopen_session": "d2cc7fa6-bced-430e-bb6c-e526adfdf8e2",
+  "full_goal_audit": {
+    "passed": true,
+    "checks": 45,
+    "remaining_checks": [],
+    "auditor_node_admitted": false,
+    "auditor_model_started": false,
+    "flags_note": "report() in date_time_sales_acceptance.py fixes both flags to false; passed is calculated from checks; formal rollout/review is not performed"
+  },
+  "independent_persistence": {
+    "passed": true,
+    "checks": 30,
+    "nodes": 6,
+    "public_node_applies": 5,
+    "saved_import_diagnostic_protocol": 2,
+    "configuration_repaired": false
+  },
+  "regression": {
+    "client_pass": 1478,
+    "client_skip": 1,
+    "python_pass": 548,
+    "continuation_pass": 31,
+    "client_sandbox_retests_pass": 14
+  },
+  "transport_reference_resolution": {
+    "original_evidence_sha256": "bfc391763cb74698f4ff874d850be006f3786cda2af5f647e1eacfe0bef67a7c",
+    "resolver_sha256": "863036fb61a61d497159a0cabea954b94555f9c7fe0f4b0bf4d692b96a4d4470",
+    "resolutions": [
+      {
+        "session_id": "20260914_122035_f7c9c7",
+        "tool_call_id": "call_zuf0XQC0Z6WlXIEdICXNqp6W@16:0",
+        "reply_row": 17,
+        "original_tool_call_id": "call_UYifp06HP5MYsb7LHhFxKI1f@14:0",
+        "original_reply_row": 15,
+        "marker": "[hermes note: this result is byte-identical to the mcp__loginom_dock__dock_node_wait result earlier this turn (tool_call_id call_UYifp06HP5MYsb7LHhFxKI1f). Refer to that result; it has not changed. Args: {\"operation_id\":\"node02-calendar-done\",\"timeout_ms\":60000}]",
+        "kind": "hermes_exact_running_poll_reference"
+      },
+      {
+        "session_id": "20260914_122035_f7c9c7",
+        "tool_call_id": "call_7MIVBToeIKYjjpDYu2J5c4FG@24:0",
+        "reply_row": 25,
+        "original_tool_call_id": "call_ygzwxAboEGCxUAwx7UpPMqsj@22:0",
+        "original_reply_row": 23,
+        "marker": "[hermes note: this result is byte-identical to the mcp__loginom_dock__dock_node_wait result earlier this turn (tool_call_id call_ygzwxAboEGCxUAwx7UpPMqsj). Refer to that result; it has not changed. Args: {\"operation_id\":\"node03-calendar-execute\",\"timeout_ms\":60000}]",
+        "kind": "hermes_exact_running_poll_reference"
+      },
+      {
+        "session_id": "20260914_122035_f7c9c7",
+        "tool_call_id": "call_bCN4i13sdAvSWJ3ErlBxCrcs@32:0",
+        "reply_row": 33,
+        "original_tool_call_id": "call_V7X2GeVIlXRVri3fy2QJWcS5@30:0",
+        "original_reply_row": 31,
+        "marker": "[hermes note: this result is byte-identical to the mcp__loginom_dock__dock_node_wait result earlier this turn (tool_call_id call_V7X2GeVIlXRVri3fy2QJWcS5). Refer to that result; it has not changed. Args: {\"operation_id\":\"node04-calendar-rename-execute\",\"timeout_ms\":60000}]",
+        "kind": "hermes_exact_running_poll_reference"
+      },
+      {
+        "session_id": "20260914_122035_f7c9c7",
+        "tool_call_id": "call_gMJ6mlNxzDnfj4MrTd1QNP7i@54:0",
+        "reply_row": 55,
+        "original_tool_call_id": "call_dKEcdQh6df0ZrGpibIltkeYl@52:0",
+        "original_reply_row": 53,
+        "marker": "[hermes note: this result is byte-identical to the mcp__loginom_dock__dock_node_wait result earlier this turn (tool_call_id call_dKEcdQh6df0ZrGpibIltkeYl). Refer to that result; it has not changed. Args: {\"operation_id\":\"node08-empty-calendar-done\",\"timeout_ms\":60000}]",
+        "kind": "hermes_exact_running_poll_reference"
+      },
+      {
+        "session_id": "20260914_122035_f7c9c7",
+        "tool_call_id": "call_8pk6MmbDUSbSzv3DzsoiSVhV@62:0",
+        "reply_row": 63,
+        "original_tool_call_id": "call_P2sWSXmT672Oo4YxvayCUHg5@60:0",
+        "original_reply_row": 61,
+        "marker": "[hermes note: this result is byte-identical to the mcp__loginom_dock__dock_node_wait result earlier this turn (tool_call_id call_P2sWSXmT672Oo4YxvayCUHg5). Refer to that result; it has not changed. Args: {\"operation_id\":\"node09-empty-calendar-execute\",\"timeout_ms\":60000}]",
+        "kind": "hermes_exact_running_poll_reference"
+      }
+    ],
+    "original_evidence_modified": false,
+    "frozen_auditor_modified": false
+  },
+  "cleanup": {
+    "package_closed_without_save": true,
+    "dialogs_remaining": 0,
+    "diagnostic_exit_code": 0,
+    "owned_processes_remaining": []
+  },
+  "evidence": [
+    {
+      "path": ".dock/node13-acceptance/runs/20260914-091807-4289644a/evidence.json",
+      "sha256": "bfc391763cb74698f4ff874d850be006f3786cda2af5f647e1eacfe0bef67a7c",
+      "bytes": 972895728
+    },
+    {
+      "path": ".dock/node13-acceptance/runs/20260914-091807-4289644a/audit-before-reopen-resolved.json",
+      "sha256": "2a20837d58fb461eee3903643df12f1d01ab4275acb6ea5051b1a52c20a44696",
+      "bytes": 52126
+    },
+    {
+      "path": ".dock/node13-acceptance/runs/20260914-091807-4289644a/audit-final-resolved.json",
+      "sha256": "2dbfab71d920da39026e401171fabfbeab4e21d7696767a14652cb518b501f7c",
+      "bytes": 75341
+    },
+    {
+      "path": ".dock/node13-acceptance/runs/20260914-091807-4289644a/reopen-events-projection-receipt.json",
+      "sha256": "da4288ff0e62ad411ce1b3a9f6375fb23e8129c9cd4d45b141aea4bf229cfaf8",
+      "bytes": 653
+    },
+    {
+      "path": ".dock/node13-live-preflight/final-admission-3/admission.before-slot.json",
+      "sha256": "dc4270c42b3cdd6f7a3ff0868f80f9342cc73f77739da68dc231d1e8cbc8022e",
+      "bytes": 21299
+    },
+    {
+      "path": ".dock/node13-live-preflight/final-admission-3/admission.json",
+      "sha256": "d74556471e4ce8d8ca6a67f1bfaa11ab507d5e6c75e803e9049105f28cd2b225",
+      "bytes": 21594
+    },
+    {
+      "path": ".dock/node13-live-preflight/final-admission-3/check-assigned.json",
+      "sha256": "3cfd9a2bfa63434cde72391030e54d3d4b6becdbae2a12977e7c95c9a5eb9c2d",
+      "bytes": 1174
+    },
+    {
+      "path": ".dock/node13-live-preflight/final-admission-3/post-run-kit.json",
+      "sha256": "72437575c200f451b36934cbcfc272aa7684b67e5d0e9dbac39f30ea8c8d32f4",
+      "bytes": 810
+    },
+    {
+      "path": ".dock/node13-live-preflight/final-admission-3/model-exit-cleanup.json",
+      "sha256": "9f3169bc121eb6d6f45e42dac9110d8179a3a11eeabffc9033055d387dc92363",
+      "bytes": 286
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/d2cc7fa6-bced-430e-bb6c-e526adfdf8e2/diagnostics.json",
+      "sha256": "3b0e2e30c62b8c30191610f21680b229a92e8a46b50244432174f59a5cb34696",
+      "bytes": 725092
+    }
+  ],
+  "limitations": [
+    "source branch only; no merge, push, review, build, deployment or installed-client update",
+    "persisted import in a fresh session uses the dedicated diagnostic protocol, not public node.apply",
+    "historical full2 admission remains invalid; earlier failure evidence preserved",
+    "old unrelated holder session server close remains unconfirmed; its local processes are absent"
+  ],
+  "recorded_at": "2026-09-14T11:04:54.616795+00:00"
+}

@@ -1,0 +1,64 @@
+{
+  "status": "implemented_live_verified_source_runtime",
+  "date": "2026-09-12",
+  "review_defects": {
+    "offscreen_join_keys": "confirmed_fixed",
+    "retained_excluded_output": "confirmed_fixed"
+  },
+  "run_id": "20260912-065436-43d5fd56",
+  "runtime_revision": "fe2641eb0e73a5810b12e95f3a0991cd47623db3d330817f56675897a442f0b3",
+  "model": {
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning": "low"
+  },
+  "loginom_build": "7.4.2",
+  "loginom_user": "test-1",
+  "package_path": "/test-1/packages/Dock-acceptance-20260912-065436-43d5fd56.lgp",
+  "audit": {
+    "passed": true,
+    "checks": 58
+  },
+  "negative_audit": {
+    "passed": true,
+    "checks": 7
+  },
+  "local_checks": {
+    "client_passed": 1344,
+    "client_skipped": 1,
+    "python_passed": 492
+  },
+  "live_wide_input_columns": [
+    40,
+    40
+  ],
+  "outputs": {
+    "initial": [
+      1,
+      79
+    ],
+    "changed": [
+      1,
+      78
+    ],
+    "reopened_fresh": [
+      1,
+      78
+    ]
+  },
+  "evidence_directory": ".dock/join-review-20260912/hermes-runs/20260912-065436-43d5fd56",
+  "sha256": {
+    "request.json": "e635fa483e46911454fa1dc045ca2caf178b8ee008c4ef930cde85a2f033edfd",
+    "scenario.txt": "a7e453dc6b56a2c86b0ae08077c193b5f3ff6df8fa27737d0a67ebaf003b53b9",
+    "evidence.json": "e0f7a6ab244f6a3450d41a53045461b54c7dc5f71db4c73625dd3c9de4b79926",
+    "join-node-audit.json": "033d49782d0192b3d8f385a5889c1d414abbc542977d3a26b5713e3c5c0e522b",
+    "full-audit-negatives.json": "e9cafa29de7c88aa968ea37b0de9b5927b5e82f479e5681c28d76d0058f61e8f"
+  },
+  "client_installed": false,
+  "production_deployed": false,
+  "committed": false,
+  "limitations": [
+    "Live Join schemas above 40 fields per input were not tested.",
+    "Right/full/difference joins and restoring excluded output fields remain outside this follow-up."
+  ]
+}

@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loginom-dock.duckdns.org/schemas/executor/replay-acceptance-v1.json",
+  "title": "Acceptance of one immutable replay candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "manifest_sha256",
+    "runtime",
+    "target",
+    "agent",
+    "checks",
+    "evidence_uri",
+    "evidence_sha256",
+    "recorded_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "status": {
+      "const": "PASSED"
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clientRevision",
+        "playwright",
+        "chromiumRevision",
+        "executorRevision",
+        "capabilityAbi"
+      ],
+      "properties": {
+        "clientRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "playwright": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chromiumRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executorRevision": {
+          "const": "1.1.0"
+        },
+        "capabilityAbi": {
+          "const": 1
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "loginom_build",
+        "platform",
+        "browser"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "loginom_build": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "const": "macos"
+        },
+        "browser": {
+          "const": "chromium"
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "provider",
+        "model",
+        "reasoning_effort"
+      ],
+      "properties": {
+        "name": {
+          "const": "hermes"
+        },
+        "provider": {
+          "const": "openai-codex"
+        },
+        "model": {
+          "const": "gpt-5.6-luna"
+        },
+        "reasoning_effort": {
+          "const": "medium"
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_add",
+        "link_create_standard",
+        "link_create_input_add",
+        "package_save_as",
+        "reopen",
+        "negative",
+        "ambiguous",
+        "cleanup",
+        "agent_partial_link_recovery",
+        "agent_ui_recovery",
+        "transport_receipt_recovery"
+      ],
+      "properties": {
+        "node_add": {
+          "const": true
+        },
+        "link_create_standard": {
+          "const": true
+        },
+        "link_create_input_add": {
+          "const": true
+        },
+        "package_save_as": {
+          "const": true
+        },
+        "reopen": {
+          "const": true
+        },
+        "negative": {
+          "const": true
+        },
+        "ambiguous": {
+          "const": true
+        },
+        "cleanup": {
+          "const": true
+        },
+        "agent_partial_link_recovery": {
+          "const": true
+        },
+        "agent_ui_recovery": {
+          "const": true
+        },
+        "transport_receipt_recovery": {
+          "const": true
+        }
+      }
+    },
+    "evidence_uri": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

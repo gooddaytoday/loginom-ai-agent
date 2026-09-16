@@ -1,0 +1,31 @@
+protocol: openviking-assets/1
+
+defaults:
+  git:
+    watch_interval: 0
+
+# Canonical source locations. Before remote ingestion, copy this catalog into
+# Dock-owned state and configure the verified internal HTTPS transport/auth_ref.
+# Do not attach a PAT to these HTTP URLs. Stable `to` values survive relocation.
+catalog:
+  - name: ai-skills
+    connector: git
+    description: Loginom automation skill and shared agent instructions
+    to: viking://resources/loginom-dock/sources/ai-skills
+    params:
+      repo_url: http://git.basegroup.ru/testing/ai-skills.git
+      branch: master
+  - name: e2e-tests
+    connector: git
+    description: Loginom selectors, helpers, test scenarios and fixtures
+    to: viking://resources/loginom-dock/sources/e2e-tests
+    params:
+      repo_url: http://git.basegroup.ru/testing/e2e-tests.git
+      branch: master
+  - name: loginom-help
+    connector: git
+    description: Loginom product documentation and illustrations
+    to: viking://resources/loginom-dock/sources/loginom-help
+    params:
+      repo_url: http://git.basegroup.ru/support/loginom-help.git
+      branch: master

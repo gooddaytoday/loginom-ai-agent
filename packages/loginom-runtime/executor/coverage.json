@@ -1,0 +1,5772 @@
+{
+  "schema_version": 1,
+  "scope": "post-mvp-required",
+  "inventory_completeness": {
+    "e2e_component_labels": "complete_for_pinned_node_namespace",
+    "live_catalog": "77 observed entries in 12 groups; hidden/virtualized completeness not proven",
+    "help_modes": "77_component_documents_bound; detailed_mode_review_partial",
+    "not_a_release_attestation": true
+  },
+  "statuses": [
+    "planned",
+    "implemented",
+    "live_verified",
+    "released",
+    "blocked",
+    "unsupported"
+  ],
+  "sources": {
+    "e2e-labels": {
+      "repository": "e2e-tests",
+      "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+      "path": "bg/labels.ts",
+      "sha256": "059353e36203ba86c8f27edbebcfa4d87093579b5c1615f57f9e66a79f4783ea",
+      "attribution": "Loginom E2E tests, BaseGroup Labs"
+    },
+    "scope-plan": {
+      "path": "docs/plans/2026-09-02-loginom-dock-implementation-plan-history-through-2026-09-07.md"
+    },
+    "loginom-help": {
+      "repository": "loginom-help",
+      "commit": "353e506ba04b77a2926d8ddf8472b36c684b67fd",
+      "attribution": "Loginom Help, BaseGroup Labs",
+      "scope": "reviewed component documents; does not establish runtime availability"
+    },
+    "live-palette": {
+      "path": "executor/inventory/palette-2026-09-05.json",
+      "sha256": "256e7faa65c7d9ea9c0f344b7e5f87c0e3e18e92f785a9a2c4489beb5b189baf",
+      "scope": "observed names only; not configuration, execution or licensing proof"
+    }
+  },
+  "contracts": {
+    "component_pipeline": {
+      "inputs": [
+        "owned_node_ref",
+        "typed_settings",
+        "authorized_input_artifacts"
+      ],
+      "outputs": [
+        "settings_readback",
+        "execution_identity",
+        "schema_and_data_proof",
+        "reopened_settings_and_result"
+      ],
+      "effects": [
+        "configure",
+        "execute",
+        "inspect",
+        "save"
+      ],
+      "ownership": "Only the requested node/package and explicitly authorized output artifacts"
+    },
+    "domain_operation": {
+      "inputs": [
+        "observed_owned_context",
+        "typed_operation_parameters"
+      ],
+      "outputs": [
+        "domain_receipt",
+        "completeness",
+        "goal_obligations"
+      ],
+      "effects": [
+        "declared_per_handler"
+      ],
+      "ownership": "Exact objects bound before mutation; preserve unrelated objects"
+    }
+  },
+  "capabilities": [
+    {
+      "id": "component.imports.OneCRequest",
+      "family": "imports",
+      "component_label": "1С Запрос",
+      "goal": "Настроить «1С Запрос», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 68
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/import/1c-db.md",
+          "sha256": "2cb0042b92c1ef550013214b5d58ffe950f9ef28089d6937d618df99663da4ff",
+          "document_title": "Импорт из 1C:Предприятие 8.x"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 12
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 23
+        },
+        {
+          "section": "Применение параметров в запросах",
+          "line": 32
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Импорт>1С_Запрос;TreeText",
+        "observed_label": "1С Запрос",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.imports.DataBase",
+      "family": "imports",
+      "component_label": "База данных",
+      "goal": "Настроить «База данных», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 70
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/import/database.md",
+          "sha256": "50568b2e23e27b2bb39756632adc75a0425a321dd60aad5adb3cd0e35e2e8234",
+          "document_title": "Импорт из базы данных"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 12
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 27
+        },
+        {
+          "section": "Применение переменных в запросах",
+          "line": 78
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Импорт>База_данных;TreeText",
+        "observed_label": "База данных",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.imports.Text",
+      "family": "imports",
+      "component_label": "Текстовый файл",
+      "goal": "Настроить «Текстовый файл», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 72
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/import/txt/README.md",
+          "sha256": "c64262c58056b84373b961f65b38ec2cac70f033fcb23cdc1c6214d52e3837a0",
+          "document_title": "Импорт из текстового файла"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 16
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Импорт>Текстовый_файл;TreeText",
+        "observed_label": "Текстовый файл",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.imports.Warehouse",
+      "family": "imports",
+      "component_label": "Deductor Warehouse",
+      "goal": "Настроить «Deductor Warehouse», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 74
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/import/warehouse.md",
+          "sha256": "63b034eb841eb1bf26f31b299f44dd9c499857c8a152815c0342d8df35d4de47",
+          "document_title": "Импорт из Deductor Warehouse"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 10
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 22
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Импорт>Deductor_Warehouse;TreeText",
+        "observed_label": "Deductor Warehouse",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.imports.Excel",
+      "family": "imports",
+      "component_label": "Excel файл",
+      "goal": "Настроить «Excel файл», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 76
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/import/excel/README.md",
+          "sha256": "fe3a3cb6dc57eef600fb88fdf59b51dff03cb59735308dba4529853d0797ac01",
+          "document_title": "Импорт из Excel-файла"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 18
+        },
+        {
+          "section": "Особенности множественного импорта",
+          "line": 127
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Импорт>Excel_файл;TreeText",
+        "observed_label": "Excel файл",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.imports.Kafka",
+      "family": "imports",
+      "component_label": "Kafka",
+      "goal": "Настроить «Kafka», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 78
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/import/kafka.md",
+          "sha256": "e3161f693a265dde8ddcf74396398d400b0520c02c3071cd0ea35d0e12354455",
+          "document_title": "Импорт из брокера сообщений Kafka"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 8
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 21
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Импорт>Kafka;TreeText",
+        "observed_label": "Kafka",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.imports.Lgd",
+      "family": "imports",
+      "component_label": "Loginom Data файл",
+      "goal": "Настроить «Loginom Data файл», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 80
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/import/ldf.md",
+          "sha256": "95ed9afec1e8a77ba1b83d4f0ce5e2f55b4f52678abdeacf09041afe3c10bb74",
+          "document_title": "Импорт из LGD-файла"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 10
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 20
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Импорт>Loginom_Data_файл;TreeText",
+        "observed_label": "Loginom Data файл",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.imports.Xml",
+      "family": "imports",
+      "component_label": "XML файл",
+      "goal": "Настроить «XML файл», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 82
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/import/xml.md",
+          "sha256": "70d81e83ec81ac935628b76b92954038047ab8d244ad6a080621cac9f7f053d5",
+          "document_title": "Импорт из XML-файла"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 10
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 21
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Импорт>XML_файл;TreeText",
+        "observed_label": "XML файл",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.GroupData",
+      "family": "transform",
+      "component_label": "Группировка",
+      "goal": "Настроить «Группировка», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 87
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/grouping.md",
+          "sha256": "858a671d866f4631996d77d2b18f5ec2ad582d0c1c407d42033161bc3acba386",
+          "document_title": "Группировка"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 44
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Группировка;TreeText",
+        "observed_label": "Группировка",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.DateTimeReform",
+      "family": "transform",
+      "component_label": "Дата и время",
+      "goal": "Настроить «Дата и время», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 89
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/trans-datatime/README.md",
+          "sha256": "21ca1fc84cc5699bedc0569529b55f83f9360f8da1c224d9734220cfeb8ce203",
+          "document_title": "Дата и время"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 32
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Дата_и_время;TreeText",
+        "observed_label": "Дата и время",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.EnrichData",
+      "family": "transform",
+      "component_label": "Дополнение данных",
+      "goal": "Настроить «Дополнение данных», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 91
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/enrich-data.md",
+          "sha256": "3c7cab7e4bdbe9348ae4415c3503bb819326e28298b1512274915341bfaf1708",
+          "document_title": "Дополнение данных"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 9
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 21
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Дополнение_данных;TreeText",
+        "observed_label": "Дополнение данных",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.Replace",
+      "family": "transform",
+      "component_label": "Замена",
+      "goal": "Настроить «Замена», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 93
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/substitution/README.md",
+          "sha256": "c3cc5a20f367b6f1e93ad57f5c69f23ea2c35b2b78eae80ddc2ca4fd0caba5ea",
+          "document_title": "Замена"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Source-кандидат exact реализован; автономная приёмка не проведена",
+        "Прямая разработка и save/reopen проверены; N11-R1 исправлено, целевая матрица 13/13 PASS, 16/16 negative; отчёт docs/plans/loginom-dock/11-fix-results-2026-09-13.md",
+        "Loginom 7.4.2 ограничивает other/value real двумя знаками; other Null flag=true расходится с примером Help"
+      ],
+      "next_step": "Ожидать назначения координатором автономной приёмки Hermes Sol/low; статус planned сохраняется до принятия",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 23
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Замена;TreeText",
+        "observed_label": "Замена",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.Calculator",
+      "family": "transform",
+      "component_label": "Калькулятор",
+      "goal": "Настроить «Калькулятор», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 95
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/calc/README.md",
+          "sha256": "91b0724df472492ea08a3d1b37596ba7edffd523c99a3bafb684a1a33633bcb4",
+          "document_title": "Калькулятор"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 17
+        },
+        {
+          "section": "Синтаксис калькулятора",
+          "line": 101
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Калькулятор;TreeText",
+        "observed_label": "Калькулятор",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.CrossTable",
+      "family": "transform",
+      "component_label": "Кросс-таблица",
+      "goal": "Настроить «Кросс-таблица», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 97
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/cross-table.md",
+          "sha256": "ff1bf4769dbcb470ebc9b3fc748251afd8d47851e1cf6af23d41536db4d5dc47",
+          "document_title": "Кросс-таблица"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 50
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Кросс-таблица;TreeText",
+        "observed_label": "Кросс-таблица",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.UnionData",
+      "family": "transform",
+      "component_label": "Объединение",
+      "goal": "Настроить «Объединение», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 99
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/union.md",
+          "sha256": "94beece5a219fa3a25f584fc9cab52b70ef89327ae2d58a839b452c12fef5c8f",
+          "document_title": "Объединение"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 57
+        },
+        {
+          "section": "Описание узла",
+          "line": 91
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Объединение;TreeText",
+        "observed_label": "Объединение",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.ReformColumns",
+      "family": "transform",
+      "component_label": "Параметры полей",
+      "goal": "Настроить «Параметры полей», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "live_verified",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 101
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/fields-features.md",
+          "sha256": "468d52678beb28fd60b10a1600b5afa785cc5e55490b9bd2ba86629c8b097f9e",
+          "document_title": "Параметры полей"
+        }
+      ],
+      "supported_profiles": [
+        "loginom-7.4.2-macos-chromium"
+      ],
+      "unit_evidence": [
+        {
+          "path": ".dock/field-parameters/client-suite-4.log",
+          "sha256": "c0bb6b330a192d59e766c42f2713c50886e9aa68501b1b3bc3090d483af90b8b",
+          "passed": 1235,
+          "skipped": 1
+        },
+        {
+          "path": ".dock/field-parameters/python-suite-6.log",
+          "sha256": "4a1c8f90eec2dd38d2efbd7e3ec9c01814772292a7c8c63b55e09fd82e835c0f",
+          "passed": 458
+        },
+        {
+          "path": ".dock/reform-review-20260911/client-tests.log",
+          "sha256": "d848f3e51d7fd2d42313fea865232987721e53f26871dcdf7db58f932f2033dd",
+          "passed": 1244,
+          "skipped": 1
+        },
+        {
+          "path": ".dock/reform-review-20260911/python-tests.log",
+          "sha256": "4539f16ecb7c9b05c835f8634fbe98e66029cc6bbdd3bba203428cbc47d2d220",
+          "passed": 461
+        }
+      ],
+      "live_evidence": [
+        {
+          "path": ".dock/field-parameters/hermes-runs/20260911-083239-ed5ccd06/reform-node-audit.json",
+          "sha256": "3d9441a6bbedf408271a20836cb4d44996dadcce612514991e9ce7766f6fd810",
+          "report_path": "docs/plans/loginom-dock/05-completion-audit.md",
+          "runtime_revision": "df1071d2606bbfe355084010ef14c1d1d8aa1adf074d71f8f445c7864d1770db",
+          "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.08-node-apply.1-candidate/manifest.json",
+          "manifest_sha256": "936ef73d933e85bfd8429b8b0f2b515c543ca415a2b22ba57e108232c54ddf44",
+          "native_skill_sha256": "2940ccd01337a3b9fc6d394e803ed50df295dfb41b4f4cf3c1484da961c44e53",
+          "target": "Loginom 7.4.2 Linux / macOS Chromium",
+          "proof_scope": "scalar node.apply; new/existing; exact output; save/reopen/reexecute",
+          "checks_passed": 49
+        },
+        {
+          "path": ".dock/reform-review-20260911/hermes-runs/20260911-110726-82fa90aa/reform-node-audit.json",
+          "sha256": "35a9604caf6a7f5d778c9638d62c2a5560a08f00b1427569b6edf504d135f96f",
+          "report_path": "docs/loginom-dock/field-parameters-review-2026-09-11.md",
+          "runtime_revision": "ab4702e56bbe6dac75a7df75f99919e5f6152324bf3d0633eae11cdf4bf03313",
+          "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.08-node-apply.1-candidate/manifest.json",
+          "manifest_sha256": "936ef73d933e85bfd8429b8b0f2b515c543ca415a2b22ba57e108232c54ddf44",
+          "native_skill_sha256": "2940ccd01337a3b9fc6d394e803ed50df295dfb41b4f4cf3c1484da961c44e53",
+          "target": "Loginom 7.4.2 Linux / macOS Chromium",
+          "proof_scope": "scalar node.apply; new/existing; exact output; save/reopen/reexecute",
+          "checks_passed": 49
+        },
+        {
+          "path": ".dock/client-update-field-parameters-20260911/live-1789115736748/installed-independent-audit.json",
+          "sha256": "626b24122b403e242556614dde2ab158d397b4dc9b45db62bd0ed7cd105999fd",
+          "report_path": "docs/loginom-dock/client-update-field-parameters-2026-09-11.md",
+          "runtime_revision": "1161c1c8f8d82bd3742d4d49bf84ab69f98bf348dcdcb487f4fcb4257881ddfa",
+          "target": "Loginom 7.4.2 Linux / macOS Chromium",
+          "proof_scope": "installed client; existing saved reform configuration; fresh 6x4 output; no new Hermes run or save after rerun",
+          "checks_passed": 11
+        }
+      ],
+      "known_gaps": [
+        "Установлен локальный клиент для macOS; публичный выпуск и новая автономная приёмка объединённого комплекта не выполнялись",
+        "Пять scalar-типов; не более 128 изменений и 1000 полей в полной инвентаризации",
+        "Полноточный sample ограничен 10 строками; Loginom 7.5 и весь V4/V5 не приняты",
+        "Live отмена проверена до браузерной работы, не во время серверного вычисления"
+      ],
+      "next_step": "Продолжить подпланы06/09/10; публичный выпуск выполнить отдельной принятой поставкой V5",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 32
+        },
+        {
+          "section": "Исключение столбцов",
+          "line": 44
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Параметры_полей;TreeText",
+        "observed_label": "Параметры полей",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.UngroupData",
+      "family": "transform",
+      "component_label": "Разгруппировка",
+      "goal": "Настроить «Разгруппировка», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 103
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/ungrouping.md",
+          "sha256": "2bfde1790730c5af18814ffc48115c86fa0658380c3577bb1b06278919cc3534",
+          "document_title": "Разгруппировка"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 59
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 91
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Разгруппировка;TreeText",
+        "observed_label": "Разгруппировка",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.ColumnFlipping",
+      "family": "transform",
+      "component_label": "Свертка столбцов",
+      "goal": "Настроить «Свертка столбцов», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 105
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/collapse-columns.md",
+          "sha256": "2523ce039fb565104814f27c36c4c7a390d6eeb2e31b268c2075eb80c22698c1",
+          "document_title": "Свёртка столбцов"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 34
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 44
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Свертка_столбцов;TreeText",
+        "observed_label": "Свертка столбцов",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.SlidingWindow",
+      "family": "transform",
+      "component_label": "Скользящее окно",
+      "goal": "Настроить «Скользящее окно», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 107
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/lag.md",
+          "sha256": "2de7379271bad3c47509bd8385479520e9b7806bf12de21e7769e53977103317",
+          "document_title": "Скользящее окно"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 48
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 58
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Скользящее_окно;TreeText",
+        "observed_label": "Скользящее окно",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.JoinData",
+      "family": "transform",
+      "component_label": "Слияние",
+      "goal": "Настроить «Слияние», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 109
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/join/README.md",
+          "sha256": "d9a1ddc1a1b22fc2e60975ae178e0b1bd440fdcc27871519b1da96107098ff37",
+          "document_title": "Слияние"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 27
+        }
+      ],
+      "documented_modes": [
+        {
+          "name": "Полное соединение",
+          "path": "data/processors/transformation/join/cross.md",
+          "sha256": "a712bf771671297cec1aa453f6891458adc9d135316e1377568003613d4ca87e"
+        },
+        {
+          "name": "Разность",
+          "path": "data/processors/transformation/join/difference.md",
+          "sha256": "c6fe6b91c15fc2663c12ed09d6c87fd00d31701f9c4dcedbff4fb99659ef0fe0"
+        },
+        {
+          "name": "Внутреннее соединение",
+          "path": "data/processors/transformation/join/inner.md",
+          "sha256": "4d9fd4037e7761e37f54e949f035d505c8097987d0de2176d4a22611923458a5"
+        },
+        {
+          "name": "Левое соединение",
+          "path": "data/processors/transformation/join/left.md",
+          "sha256": "23e2cfd708cbbc3cb6f823cc6cf9db38575dc22a88a020735f568e25490738d5"
+        },
+        {
+          "name": "Правое соединение",
+          "path": "data/processors/transformation/join/right.md",
+          "sha256": "221aa7ee249ccb24a915abd98d6198d118f3b68e6258465db080b1ee8dc754db"
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Слияние;TreeText",
+        "observed_label": "Слияние",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.ColUnionData",
+      "family": "transform",
+      "component_label": "Соединение",
+      "goal": "Настроить «Соединение», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 111
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/column-union.md",
+          "sha256": "306fb9478f88cae989c68a84c8ade020429b5418ce6a3fd625fe44fd790eb8ec",
+          "document_title": "Соединение"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 25
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Соединение;TreeText",
+        "observed_label": "Соединение",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.Sorting",
+      "family": "transform",
+      "component_label": "Сортировка",
+      "goal": "Настроить «Сортировка», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 113
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/sorting.md",
+          "sha256": "65cb89bff7e390d5977199a9148cbf878ff33f49cf533e15cfdaa4e272607f05",
+          "document_title": "Сортировка"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 24
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Сортировка;TreeText",
+        "observed_label": "Сортировка",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.transform.FilterData",
+      "family": "transform",
+      "component_label": "Фильтр строк",
+      "goal": "Настроить «Фильтр строк», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "live_verified",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 115
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/transformation/row-filter/README.md",
+          "sha256": "54fa63cff322550cc97d90db11ffea37e5226c9cb52d3de1ca55665b0898f83f",
+          "document_title": "Фильтр строк"
+        }
+      ],
+      "supported_profiles": [
+        "loginom-7.4.2-macos-chromium"
+      ],
+      "unit_evidence": [
+        {
+          "path": ".dock/row-filter-review/python-tests.log",
+          "sha256": "cf3568b1bb25798e3201cc3fab8e732cadd20fb30d63383f6e384f5be684c165",
+          "passed": 475
+        },
+        {
+          "path": ".dock/row-filter-review/client-tests-final.log",
+          "sha256": "a81d89489b28e83ab5395a004bad3d9b4a7bf4e69dbf676f6804f9689bf51f32",
+          "passed": 1287,
+          "skipped": 1
+        },
+        {
+          "path": ".dock/row-filter/all-client-tests-final-candidate.log",
+          "sha256": "ae335f64c60ebef3954528a791566d79f55629fc84118c9896f6aa025f2082a9",
+          "passed": 1279,
+          "skipped": 1
+        },
+        {
+          "path": ".dock/row-filter/python-tests-final-source-name.log",
+          "sha256": "7313792bc95b5f664ba0a53e50a345015940ec9b9154e6ce5f40e220eb26db28",
+          "passed": 475
+        }
+      ],
+      "live_evidence": [
+        {
+          "path": ".dock/client-update-row-filter-20260911/live-1789141466433/installed-independent-audit.json",
+          "sha256": "24ecc7fb547bd1864fca2811146a164ceb6f7b9d719bfc0dd2e122c85b30a278",
+          "report_path": "docs/loginom-dock/client-update-row-filter-2026-09-11.md",
+          "runtime_revision": "f14d6452ef74c43fd75730f87bae2db8bb3d4e7faca2aeb5604a47af96d0f61e",
+          "target": "Loginom 7.4.2 Linux / installed macOS Chromium client",
+          "proof_scope": "installed bundle; saved diagnostic copy reopened; existing filter rerun without reconfiguration; exact 5+5 rows and 50 values; preserved mappings and graph; not a separate Hermes acceptance",
+          "checks_passed": 11
+        },
+        {
+          "path": ".dock/row-filter-review/hermes-runs/20260911-181616-1338ee3f/filter-node-audit.json",
+          "sha256": "cd863cad675f06f8e2b597c93bbd13defe6b4e7dd912178f9ec97294ca5d9062",
+          "report_path": "docs/loginom-dock/row-filter-review-live-2026-09-11.md",
+          "runtime_revision": "fd2999ce9f87a878882a20962eda56b69941d15dcedd8d7a70852579c5819e53",
+          "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.08-node-apply.1-candidate/manifest.json",
+          "manifest_sha256": "936ef73d933e85bfd8429b8b0f2b515c543ca415a2b22ba57e108232c54ddf44",
+          "native_skill_sha256": "714104445d37265943ab5e7d55a7c505c00fe38a62bc38a0c3c8ea24f7764b39",
+          "target": "Loginom 7.4.2 Linux / macOS Chromium",
+          "proof_scope": "post-review conditions node.apply; both exact outputs; save/reopen/reexecute without reassignment; 49 frozen checks and 10 negative substitutions",
+          "checks_passed": 49
+        },
+        {
+          "path": ".dock/row-filter/hermes-runs/20260911-154023-843300b0/filter-node-audit.json",
+          "sha256": "8fad61fa1cd80daf4d5e923efe6ee1548f496658cb11e20cfde40a8aee07d2d8",
+          "report_path": "docs/plans/loginom-dock/06-completion-audit.md",
+          "runtime_revision": "5c945f3e189e6588acf036ca7139e35c62bf055b30b7ce78bd1fa7b2c548756d",
+          "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.08-node-apply.1-candidate/manifest.json",
+          "manifest_sha256": "936ef73d933e85bfd8429b8b0f2b515c543ca415a2b22ba57e108232c54ddf44",
+          "native_skill_sha256": "714104445d37265943ab5e7d55a7c505c00fe38a62bc38a0c3c8ea24f7764b39",
+          "target": "Loginom 7.4.2 Linux / macOS Chromium",
+          "proof_scope": "conditions node.apply; new/existing; both exact outputs; save/reopen/reexecute without reassignment",
+          "checks_passed": 49
+        },
+        {
+          "path": ".dock/row-filter/complete-matrix-audit.json",
+          "sha256": "9a0783b212927664b08cb18cef52521c80a91034a934ab688d76b7ca87c74932",
+          "report_path": "docs/plans/loginom-dock/06-completion-audit.md",
+          "target": "Loginom 7.4.2 Linux / macOS Chromium",
+          "proof_scope": "90 operator/type cases; independent raw configuration and both fixture partitions; source revisions recorded per case",
+          "checks_passed": 90
+        }
+      ],
+      "known_gaps": [
+        "Проверен source runtime; установленный клиент и публичный выпуск не обновлены",
+        "Только scalar conditions; управляющие переменные и variant не поддержаны",
+        "До 64 групп, 128 строк условий/ИЛИ, 128 элементов списка; полноточная выборка до 10 строк",
+        "Имена полей ограничены идентификаторным контрактом аналитических обработчиков; локальные даты без timezone",
+        "Общие безопасные отказы при невидимых портах графа и недоступной прокрутке отдельного импорта сохранены в отчёте; Loginom 7.5 и весь V4/V5 не приняты",
+        "Полный публичный preflight нового узла при preview 1000 полей ограничен общим UI_SCAN_LIMIT; широкие проверки фильтра выполнены диагностическим UI-драйвером, не полной публичной node.apply приёмкой"
+      ],
+      "next_step": "Продолжить подпланы09/10; сборку на VPS, установку и публичный выпуск выполнить отдельной принятой поставкой",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 34
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Трансформация>Фильтр_строк;TreeText",
+        "observed_label": "Фильтр строк",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.control.ExecNode",
+      "family": "control",
+      "component_label": "Выполнение_узла",
+      "goal": "Настроить «Выполнение_узла», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 121
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/control/execute-node.md",
+          "sha256": "3a47a1c3f1be2e56c750d4f1c46b60d4c0c4815023e14bd441615a82f5f9e6c8",
+          "document_title": "Выполнение узла"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 21
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 25
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Управление>Выполнение_узла;TreeText",
+        "observed_label": "Выполнение узла",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.control.SuperNode",
+      "family": "control",
+      "component_label": "Подмодель",
+      "goal": "Настроить «Подмодель», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 123
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/control/supernode.md",
+          "sha256": "773db1414185f715ac84f01bf59ce9cdaa4352b7226728e477de030d82785493",
+          "document_title": "Подмодель"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 12
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 29
+        },
+        {
+          "section": "Область построения Подмодели",
+          "line": 51
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Управление>Подмодель;TreeText",
+        "observed_label": "Подмодель",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.control.ReferenceNode",
+      "family": "control",
+      "component_label": "Узел-ссылка",
+      "goal": "Настроить «Узел-ссылка», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 125
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/control/reference-node.md",
+          "sha256": "c52aaedb4f66f7332248e49be087afd18cf203e68b9fe3d9e3dd46ff85a99d90",
+          "document_title": "Узел-ссылка"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 10
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 14
+        },
+        {
+          "section": "Видимость узлов",
+          "line": 20
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Управление>Узел-ссылка;TreeText",
+        "observed_label": "Узел-ссылка",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.control.Condition",
+      "family": "control",
+      "component_label": "Условие",
+      "goal": "Настроить «Условие», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 127
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/control/condition.md",
+          "sha256": "2531ff2db571a30b782dda972677deb94de4a3ff8dfdad7d4a37362149174818",
+          "document_title": "Условие"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 15
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 29
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Управление>Условие;TreeText",
+        "observed_label": "Условие",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.control.Loop",
+      "family": "control",
+      "component_label": "Цикл",
+      "goal": "Настроить «Цикл», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 129
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/control/loop.md",
+          "sha256": "8c364257942868c2d0b89dedd089010816da3f2b4e90e8df7d7dab06bd927bf1",
+          "document_title": "Цикл"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 25
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 29
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Управление>Цикл;TreeText",
+        "observed_label": "Цикл",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.research.AutoCorrelation",
+      "family": "research",
+      "component_label": "Автокорреляция",
+      "goal": "Настроить «Автокорреляция», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 135
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/scrutiny/autocorrelation.md",
+          "sha256": "0438f31fe2b44b74f1470025e4fc9f9a01931cf31579f6b4873f9351bd84049f",
+          "document_title": "Автокорреляция"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 50
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 67
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Исследование>Автокорреляция;TreeText",
+        "observed_label": "Автокорреляция",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.research.Duplicates",
+      "family": "research",
+      "component_label": "Дубликаты и противоречия",
+      "goal": "Настроить «Дубликаты и противоречия», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 137
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/scrutiny/duplicates.md",
+          "sha256": "790dff5331881b19516f6942d87c4df9bd7201049fb389386a7058bae77a9a68",
+          "document_title": "Дубликаты и противоречия"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 46
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Исследование>Дубликаты_и_противоречия;TreeText",
+        "observed_label": "Дубликаты и противоречия",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.research.Quality",
+      "family": "research",
+      "component_label": "Качество данных",
+      "goal": "Настроить «Качество данных», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 139
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "В проверенном Help найден визуализатор «Качество данных», не одноимённый processor; не приравнивать автоматически"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Исследование>Качество_данных;TreeText",
+        "observed_label": "Качество данных",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.research.CorrAnalysis",
+      "family": "research",
+      "component_label": "Корреляционный анализ",
+      "goal": "Настроить «Корреляционный анализ», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 141
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/scrutiny/correlation-analysis.md",
+          "sha256": "82856b922ec8f2b520b282cea4788823992662ee2bf441bb264bd054837c0382",
+          "document_title": "Корреляционный анализ"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 44
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 65
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Исследование>Корреляционный_анализ;TreeText",
+        "observed_label": "Корреляционный анализ",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.research.FactorAnalysis",
+      "family": "research",
+      "component_label": "Факторный анализ",
+      "goal": "Настроить «Факторный анализ», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 143
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/scrutiny/factor-analysis.md",
+          "sha256": "5f7095d7ab04314efa2c7762a479ffeea5dd2ec6b001ba1240ce26867e5de7c8",
+          "document_title": "Факторный анализ"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 54
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 65
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Исследование>Факторный_анализ;TreeText",
+        "observed_label": "Факторный анализ",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.preprocessing.DataRecovery",
+      "family": "preprocessing",
+      "component_label": "Заполнение пропусков",
+      "goal": "Настроить «Заполнение пропусков», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 148
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/preprocessing/imputation.md",
+          "sha256": "1fbfa56ced9cd7abcdad27f73eb2c321667d6faabc3c727a7e0f452ff231b507",
+          "document_title": "Заполнение пропусков"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 11
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 21
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Предобработка>Заполнение_пропусков;TreeText",
+        "observed_label": "Заполнение пропусков",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.preprocessing.Binning",
+      "family": "preprocessing",
+      "component_label": "Квантование",
+      "goal": "Настроить «Квантование», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 150
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/preprocessing/binning.md",
+          "sha256": "7581587222f6b1429a98354dabe8b85b75608d89736fe9bb66f5a64aa732b586",
+          "document_title": "Квантование"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 24
+        },
+        {
+          "section": "Особенности выполнения узла",
+          "line": 92
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Предобработка>Квантование;TreeText",
+        "observed_label": "Квантование",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.preprocessing.CoarseClasses",
+      "family": "preprocessing",
+      "component_label": "Конечные классы",
+      "goal": "Настроить «Конечные классы», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 152
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/preprocessing/coarse-classes.md",
+          "sha256": "4af8f37bed4b49b05b8da52d024fb1392dba9819e26fa435f301b30d64d33d55",
+          "document_title": "Конечные классы"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 76
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Предобработка>Конечные_классы;TreeText",
+        "observed_label": "Конечные классы",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.preprocessing.DataPartition",
+      "family": "preprocessing",
+      "component_label": "Разбиение на множества",
+      "goal": "Настроить «Разбиение на множества», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 154
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/preprocessing/partitioning.md",
+          "sha256": "007ed6aa2757a89a494b05bb7723bbd5713365bb96d007b097aa242c06d83574",
+          "document_title": "Разбиение на множества"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 10
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 22
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Предобработка>Разбиение_на_множества;TreeText",
+        "observed_label": "Разбиение на множества",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.preprocessing.Elimoutlier",
+      "family": "preprocessing",
+      "component_label": "Редактирование выбросов",
+      "goal": "Настроить «Редактирование выбросов», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 156
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/preprocessing/eliminate-outliers.md",
+          "sha256": "3db92e7ed63079ab6912203cb22751b5e54d89300759cf2b96152ff09cd043a3",
+          "document_title": "Редактирование выбросов"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 10
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 22
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Предобработка>Редактирование_выбросов;TreeText",
+        "observed_label": "Редактирование выбросов",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.preprocessing.Smoothing",
+      "family": "preprocessing",
+      "component_label": "Сглаживание",
+      "goal": "Настроить «Сглаживание», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 158
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/preprocessing/smoothing.md",
+          "sha256": "6274ba8bf6e63c341c09118cded039145e8f2008b9e03e02153acce065c944ba",
+          "document_title": "Сглаживание"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 16
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 26
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Предобработка>Сглаживание;TreeText",
+        "observed_label": "Сглаживание",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.preprocessing.Sampling",
+      "family": "preprocessing",
+      "component_label": "Сэмплинг",
+      "goal": "Настроить «Сэмплинг», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 160
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/preprocessing/sampling.md",
+          "sha256": "6a2638eb30f19042d7cf788c13bc8f51a7632be33964a6446cc50ec29e77639c",
+          "document_title": "Сэмплинг"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 12
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 22
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Предобработка>Сэмплинг;TreeText",
+        "observed_label": "Сэмплинг",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.dataMining.AssnRules",
+      "family": "dataMining",
+      "component_label": "Ассоциативные правила",
+      "goal": "Настроить «Ассоциативные правила», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 165
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/datamining/association-rules.md",
+          "sha256": "40733acc21e6df90ddbb73ffe3890c61a68da29575d337e223ea6a418347340b",
+          "document_title": "Ассоциативные правила"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 56
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Data_Mining>Ассоциативные_правила;TreeText",
+        "observed_label": "Ассоциативные правила",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.dataMining.Clustering",
+      "family": "dataMining",
+      "component_label": "Кластеризация",
+      "goal": "Настроить «Кластеризация», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 167
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/datamining/clustering.md",
+          "sha256": "04dc274841e2f6e353087578bddc6a9a40e396c604450f50df64f41929072bd1",
+          "document_title": "Кластеризация"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 18
+        },
+        {
+          "section": "Мастер настройки узла",
+          "line": 49
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Data_Mining>Кластеризация;TreeText",
+        "observed_label": "Кластеризация",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.dataMining.Clope",
+      "family": "dataMining",
+      "component_label": "Кластеризация транзакций",
+      "goal": "Настроить «Кластеризация транзакций», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 169
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/datamining/transaction-clustering.md",
+          "sha256": "b9aa10d04af8e156b63e44a5903f406618e75b8657587823fe089ffd2a5561a5",
+          "document_title": "Кластеризация транзакций"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 14
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 47
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Data_Mining>Кластеризация_транзакций;TreeText",
+        "observed_label": "Кластеризация транзакций",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.dataMining.LinRegression",
+      "family": "dataMining",
+      "component_label": "Линейная регрессия",
+      "goal": "Настроить «Линейная регрессия», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 171
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/datamining/linear-regression/README.md",
+          "sha256": "b9869720ca9b93398de9c0019bacb4f9f6170cafec301fb715fc19194b7c84a8",
+          "document_title": "Линейная регрессия"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 18
+        },
+        {
+          "section": "Мастер настройки узла",
+          "line": 30
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Data_Mining>Линейная_регрессия;TreeText",
+        "observed_label": "Линейная регрессия",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.dataMining.LogRegression",
+      "family": "dataMining",
+      "component_label": "Логистическая регрессия",
+      "goal": "Настроить «Логистическая регрессия», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 173
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/datamining/logistic-regression/README.md",
+          "sha256": "685c48bb9d3959a940f7323bdc862e6e1b2d5442a04c08c92a308d85adad5fc3",
+          "document_title": "Логистическая регрессия"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 10
+        },
+        {
+          "section": "Мастер настройки узла",
+          "line": 28
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Data_Mining>Логистическая_регрессия;TreeText",
+        "observed_label": "Логистическая регрессия",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.dataMining.NeuralnetClass",
+      "family": "dataMining",
+      "component_label": "Нейросеть (классификация)",
+      "goal": "Настроить «Нейросеть (классификация)», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 175
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/datamining/neural-network-classification.md",
+          "sha256": "e5ef536ea5050642d47af2b37da6c3fe93502ac397909a69300ec283ea54a681",
+          "document_title": "Нейросеть (классификация)"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 23
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 38
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Data_Mining>Нейросеть_(классификация);TreeText",
+        "observed_label": "Нейросеть (классификация)",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.dataMining.NeuralnetReg",
+      "family": "dataMining",
+      "component_label": "Нейросеть (регрессия)",
+      "goal": "Настроить «Нейросеть (регрессия)», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 177
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/datamining/neural-network-regression.md",
+          "sha256": "64bf8f331efe6b5d8826d605837ae1714f45c90fbc5a0ff455590067362bdde7",
+          "document_title": "Нейросеть (регрессия)"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 17
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 32
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Data_Mining>Нейросеть_(регрессия);TreeText",
+        "observed_label": "Нейросеть (регрессия)",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.dataMining.Sonn",
+      "family": "dataMining",
+      "component_label": "Самоорганизующаяся сеть",
+      "goal": "Настроить «Самоорганизующаяся сеть», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 179
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/datamining/self-organizing-network.md",
+          "sha256": "41d8f441c1046c355aead395ee3cd0f97da0b3b5272ae75dd1d2083d6f01ead8",
+          "document_title": "Самоорганизующиеся сети"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 16
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 44
+        }
+      ],
+      "documented_modes": [
+        "Сети Кохонена",
+        "Нейронный газ",
+        "Обучение до получения выходных наборов"
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Data_Mining>Самоорганизующаяся_сеть;TreeText",
+        "observed_label": "Самоорганизующаяся сеть",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.dataMining.Arimax",
+      "family": "dataMining",
+      "component_label": "ARIMAX",
+      "goal": "Настроить «ARIMAX», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 181
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/datamining/arimax.md",
+          "sha256": "2a2667e09946fed450bbb092c4e4311301571a1b70873d02a4825e4a8022956f",
+          "document_title": "ARIMAX"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 14
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 55
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Data_Mining>ARIMAX;TreeText",
+        "observed_label": "ARIMAX",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.dataMining.EmClust",
+      "family": "dataMining",
+      "component_label": "EM Кластеризация",
+      "goal": "Настроить «EM Кластеризация», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 183
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/datamining/em-clustering.md",
+          "sha256": "d581901218f66742db73980f20bc5786d4f05297f6e1b646106953c69c886d54",
+          "document_title": "EM Кластеризация"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 12
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 44
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Data_Mining>EM_Кластеризация;TreeText",
+        "observed_label": "EM Кластеризация",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.programming.JavaScript",
+      "family": "programming",
+      "component_label": "JavaScript",
+      "goal": "Настроить «JavaScript», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 188
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/programming/java-script/README.md",
+          "sha256": "64971484e027d97ced0db920bcd087def2f2aae319d5963b88047585f51ca692",
+          "document_title": "JavaScript"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 7
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 23
+        },
+        {
+          "section": "Доступ из кода JavaScript к данным портов и другим встроенным объектам",
+          "line": 57
+        },
+        {
+          "section": "Fetch API",
+          "line": 70
+        },
+        {
+          "section": "File Storage API",
+          "line": 74
+        },
+        {
+          "section": "Обработка ошибок",
+          "line": 78
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Программирование>JavaScript;TreeText",
+        "observed_label": "JavaScript",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.programming.Python",
+      "family": "programming",
+      "component_label": "Python",
+      "goal": "Настроить «Python», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 190
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/programming/python/README.md",
+          "sha256": "de37bff0cbafd56af973d143f57c30dad7c8f5ceaa63e5feee0e38cec2d1b750",
+          "document_title": "Python"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 7
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 27
+        },
+        {
+          "section": "Доступ из кода Python к данным портов и другим встроенным объектам",
+          "line": 80
+        },
+        {
+          "section": "Обработка ошибок",
+          "line": 91
+        },
+        {
+          "section": "Глобальные функции",
+          "line": 95
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Программирование>Python;TreeText",
+        "observed_label": "Python",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.variables.Replace",
+      "family": "variables",
+      "component_label": "Замена (переменные)",
+      "goal": "Настроить «Замена (переменные)», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 195
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/variables/variables-replace.md",
+          "sha256": "bad7f442a04e6ab2272b6e2cc1ef14e86cf954531e47169ec14a851378834101",
+          "document_title": "Замена (переменные)"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 14
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 24
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Переменные>Замена_(переменные);TreeText",
+        "observed_label": "Замена (переменные)",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.variables.Calculator",
+      "family": "variables",
+      "component_label": "Калькулятор (переменные)",
+      "goal": "Настроить «Калькулятор (переменные)», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 197
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/variables/variables-calc.md",
+          "sha256": "43e71a7c267e9e7949cf6b06bbfa56e36077d33cb120b86e2ed91d37cc836a6d",
+          "document_title": "Калькулятор (переменные)"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 10
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 20
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Переменные>Калькулятор_(переменные);TreeText",
+        "observed_label": "Калькулятор (переменные)",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.variables.VarToData",
+      "family": "variables",
+      "component_label": "Переменные в таблицу",
+      "goal": "Настроить «Переменные в таблицу», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 199
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/variables/variables-to-table.md",
+          "sha256": "8030c17dee74381ec075d765477c182443b1d84ee224b6b957cbf75b8d2a45aa",
+          "document_title": "Переменные в таблицу"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 8
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 18
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Переменные>Переменные_в_таблицу;TreeText",
+        "observed_label": "Переменные в таблицу",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.variables.ColunionDataVar",
+      "family": "variables",
+      "component_label": "Соединение (переменные)",
+      "goal": "Настроить «Соединение (переменные)», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 201
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/variables/variables-union.md",
+          "sha256": "8545ad5da90b80269f9077047d9a31bad1db688f914277c2fe4811c222f7fe26",
+          "document_title": "Соединение (переменные)"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 10
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Переменные>Соединение_(переменные);TreeText",
+        "observed_label": "Соединение (переменные)",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.variables.DataToVar",
+      "family": "variables",
+      "component_label": "Таблица в переменные",
+      "goal": "Настроить «Таблица в переменные», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 203
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/variables/variables-from-table.md",
+          "sha256": "5cdae307955f87f84867a547512014e063093223822cdd2778eb6ce7b827f0ed",
+          "document_title": "Таблица в переменные"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 8
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 18
+        },
+        {
+          "section": "Содержание выходного набора",
+          "line": 66
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Переменные>Таблица_в_переменные;TreeText",
+        "observed_label": "Таблица в переменные",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.trees.JSONToTree",
+      "family": "trees",
+      "component_label": "JSON в дерево",
+      "goal": "Настроить «JSON в дерево», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 208
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/data-trees/json-to-tree.md",
+          "sha256": "1751f408bc9cfee16fadef364678ea80c1d297501273c52e83d7fd807f5520d3",
+          "document_title": "JSON в дерево"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 8
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 17
+        },
+        {
+          "section": "Особенности работы компонента",
+          "line": 112
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Дерево_данных>JSON_в_дерево;TreeText",
+        "observed_label": "JSON в дерево",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.trees.TreeToData",
+      "family": "trees",
+      "component_label": "Дерево в таблицу",
+      "goal": "Настроить «Дерево в таблицу», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 210
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/data-trees/tree-to-table.md",
+          "sha256": "a8993a45e93042aecec0c8b06dc9f1d185d591a2d604662de1f5f20cd00a49b7",
+          "document_title": "Дерево в таблицу"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 8
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 17
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Дерево_данных>Дерево_в_таблицу;TreeText",
+        "observed_label": "Дерево в таблицу",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.trees.CalculatorTree",
+      "family": "trees",
+      "component_label": "Калькулятор (дерево)",
+      "goal": "Настроить «Калькулятор (дерево)», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 212
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/data-trees/calculator-tree/README.md",
+          "sha256": "c890ba2559f97797965fa840b029a9b8fb2e348680e8af581bfba16cc5c09c4a",
+          "document_title": "Калькулятор (дерево)"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 8
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 19
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Дерево_данных>Калькулятор_(дерево);TreeText",
+        "observed_label": "Калькулятор (дерево)",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.trees.UnionTree",
+      "family": "trees",
+      "component_label": "Объединение (дерево)",
+      "goal": "Настроить «Объединение (дерево)», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 214
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/data-trees/union-tree.md",
+          "sha256": "5be72d6068e2cc8c267124bb61271ba67a08a34ca0a2714290bc28c40cf7d73f",
+          "document_title": "Объединение (дерево)"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 24
+        },
+        {
+          "section": "Описание режимов работы компонента",
+          "line": 34
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Дерево_данных>Объединение_(дерево);TreeText",
+        "observed_label": "Объединение (дерево)",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.trees.JoindataTree",
+      "family": "trees",
+      "component_label": "Слияние (дерево)",
+      "goal": "Настроить «Слияние (дерево)», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 216
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/data-trees/join-tree.md",
+          "sha256": "f87b7df810fb97d2bf5b7e1ce35338cfaa1c202d27cd157a8475a7027cf68b94",
+          "document_title": "Слияние (дерево)"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 15
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 26
+        },
+        {
+          "section": "Особенности слияния в Контейнер и Массив",
+          "line": 53
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Дерево_данных>Слияние_(дерево);TreeText",
+        "observed_label": "Слияние (дерево)",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.trees.DataToTree",
+      "family": "trees",
+      "component_label": "Таблица в дерево",
+      "goal": "Настроить «Таблица в дерево», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 218
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/data-trees/table-to-tree.md",
+          "sha256": "c230365b2c41a89f5d210599ae2a3f43eef59bceedd8172ea0dd06b351952a24",
+          "document_title": "Таблица в дерево"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 8
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 18
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Дерево_данных>Таблица_в_дерево;TreeText",
+        "observed_label": "Таблица в дерево",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.trees.TreeToJSON",
+      "family": "trees",
+      "component_label": "Дерево в JSON",
+      "goal": "Настроить «Дерево в JSON», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 220
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/data-trees/tree-to-json.md",
+          "sha256": "fe8d3325324f215f21a118490e4c7fec88bdeb66c909bf1e83d346f48c0ba10f",
+          "document_title": "Дерево в JSON"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 8
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 17
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Дерево_данных>Дерево_в_JSON;TreeText",
+        "observed_label": "Дерево в JSON",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.integration.ExecCmd",
+      "family": "integration",
+      "component_label": "Выполнение программы",
+      "goal": "Настроить «Выполнение программы», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 225
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/integration/exec-program.md",
+          "sha256": "527f2f33da677bfbb915ae3032ef2c0c83ef6f89390dd4ab601e2259ee4550c8",
+          "document_title": "Выполнение программы"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 14
+        },
+        {
+          "section": "Мастер настройки узла",
+          "line": 30
+        },
+        {
+          "section": "Написание команд",
+          "line": 40
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Интеграция>Выполнение_программы;TreeText",
+        "observed_label": "Выполнение программы",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.integration.ExtractXml",
+      "family": "integration",
+      "component_label": "Разбор XML",
+      "goal": "Настроить «Разбор XML», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 227
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/integration/extracting-xml.md",
+          "sha256": "9c3147872c7c27038b1109d40bd29f3070085b36b9739aa407cbf23c2fc92488",
+          "document_title": "Разбор XML"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Описание",
+          "line": 6
+        },
+        {
+          "section": "Порты",
+          "line": 10
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 31
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Интеграция>Разбор_XML;TreeText",
+        "observed_label": "Разбор XML",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.integration.DataToXml",
+      "family": "integration",
+      "component_label": "Формирование XML",
+      "goal": "Настроить «Формирование XML», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 229
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/integration/xml-generation.md",
+          "sha256": "612cc0c6e88fd9755b5cb12b497cdce91d21aa48e9dd6f25136d8ec61173e471",
+          "document_title": "Формирование XML"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 10
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 22
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Интеграция>Формирование_XML;TreeText",
+        "observed_label": "Формирование XML",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.integration.RestRequest",
+      "family": "integration",
+      "component_label": "REST-запрос",
+      "goal": "Настроить «REST-запрос», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 231
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/integration/rest-request.md",
+          "sha256": "e8f667a51393b546642e14ff0680980c03dad372ecead87241cc9075f25d0120",
+          "document_title": "REST-запрос"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 19
+        },
+        {
+          "section": "Настройка",
+          "line": 32
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Интеграция>REST-запрос;TreeText",
+        "observed_label": "REST-запрос",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.integration.SoapRequest",
+      "family": "integration",
+      "component_label": "SOAP-запрос",
+      "goal": "Настроить «SOAP-запрос», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 233
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/integration/soap-request.md",
+          "sha256": "45f37cf5b56879e3f5d5c916ef6ca55fbc0fb67d090e0e84443fa51218f6f36b",
+          "document_title": "SOAP-запрос"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 12
+        },
+        {
+          "section": "Настройка",
+          "line": 26
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Интеграция>SOAP-запрос;TreeText",
+        "observed_label": "SOAP-запрос",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.integration.SqlScript",
+      "family": "integration",
+      "component_label": "SQL-скрипт",
+      "goal": "Настроить «SQL-скрипт», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 235
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/processors/integration/sql-script.md",
+          "sha256": "3f5e6a9eedd5a8ee82b879a4a740f9467e8e46521247c4948e0875a0ac2a4314",
+          "document_title": "SQL-скрипт"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 8
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 25
+        },
+        {
+          "section": "Особенности работы с транзакциями и SQL-скриптами",
+          "line": 56
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Интеграция>SQL-скрипт;TreeText",
+        "observed_label": "SQL-скрипт",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.exports.DataBase",
+      "family": "exports",
+      "component_label": "База данных",
+      "goal": "Настроить «База данных», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 240
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/export/database.md",
+          "sha256": "6fca2d4f65214eefb730964de2b667c4557feb324252a9a2153bf8903e2dc108",
+          "document_title": "Экспорт в базу данных"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 22
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Экспорт>База_данных;TreeText",
+        "observed_label": "База данных",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.exports.Text",
+      "family": "exports",
+      "component_label": "Текстовый файл",
+      "goal": "Настроить «Текстовый файл», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 242
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/export/txt-csv.md",
+          "sha256": "649520f7b800d6f12e2226bdaf456aa715bb82878c78b89c6fe8d56808d81067",
+          "document_title": "Экспорт в текстовый файл"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 13
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Экспорт>Текстовый_файл;TreeText",
+        "observed_label": "Текстовый файл",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.exports.Warehouse",
+      "family": "exports",
+      "component_label": "Deductor Warehouse",
+      "goal": "Настроить «Deductor Warehouse», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 244
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/export/warehouse.md",
+          "sha256": "9fef03c1ffdf3df89c5342f36ec9bc5da81b6b5778e36bcdb8e840748efbbfdd",
+          "document_title": "Экспорт в Deductor Warehouse"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Мастер настройки",
+          "line": 15
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Экспорт>Deductor_Warehouse;TreeText",
+        "observed_label": "Deductor Warehouse",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.exports.Excel",
+      "family": "exports",
+      "component_label": "Excel файл",
+      "goal": "Настроить «Excel файл», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 246
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/export/excel.md",
+          "sha256": "f2e29be6a6006e963cb4da63659b870fc93065d8c78507f7ab94b90dcdd14ebf",
+          "document_title": "Экспорт в Excel-файл"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 11
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 18
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Экспорт>Excel_файл;TreeText",
+        "observed_label": "Excel файл",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.exports.Kafka",
+      "family": "exports",
+      "component_label": "Kafka",
+      "goal": "Настроить «Kafka», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 248
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/export/kafka.md",
+          "sha256": "a022ca7308df7f79f81811a2dec32845697ccaec43fbf85ec16f2a8d5d366532",
+          "document_title": "Экспорт в Kafka"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 6
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 13
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Экспорт>Kafka;TreeText",
+        "observed_label": "Kafka",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.exports.Lgd",
+      "family": "exports",
+      "component_label": "Loginom Data файл",
+      "goal": "Настроить «Loginom Data файл», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 250
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/export/ldf.md",
+          "sha256": "161a0cd126553a1ebf392b9993819ce8599c234d73feef99375c632fa8ea765b",
+          "document_title": "Экспорт в LGD-файл"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 12
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 19
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Экспорт>Loginom_Data_файл;TreeText",
+        "observed_label": "Loginom Data файл",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "component.exports.Tableau",
+      "family": "exports",
+      "component_label": "Tableau файл",
+      "goal": "Настроить «Tableau файл», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 252
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/export/tableau.md",
+          "sha256": "9085d9a1601c7d6af9958894540a373726ed26becb0be40fb2c0ca64ba7dd7f6",
+          "document_title": "Экспорт в Tableau файл"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Наличие в E2E labels не подтверждает доступность в текущей лицензии/UI",
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Проверить доступность в live UI; source review мастера и отдельная цепочка с данными",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 8
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 16
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "proof_scope": "not_observed; absence_and_license_not_established"
+      }
+    },
+    {
+      "id": "component.exports.Xml",
+      "family": "exports",
+      "component_label": "XML файл",
+      "goal": "Настроить «XML файл», выполнить, проверить данные и воспроизвести после открытия пакета",
+      "modes": [
+        "configure",
+        "execute",
+        "inspect_result",
+        "save_reopen"
+      ],
+      "contract": "component_pipeline",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "e2e-labels",
+          "line": 254
+        },
+        {
+          "source": "loginom-help",
+          "path": "data/integration/export/xml.md",
+          "sha256": "c9e69c2793c037dc5e0e092cfdd23649c043c2f4ad37dc0b8149cf001b01bee0",
+          "document_title": "Экспорт в XML-файл"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Нет принятого сквозного контракта",
+        "Разделы Help найдены; детальные режимы и live доступность требуют проверки"
+      ],
+      "next_step": "Source review мастера и отдельная цепочка с настройкой, данными и save/reopen",
+      "documented_sections": [
+        {
+          "section": "Порты",
+          "line": 10
+        },
+        {
+          "section": "Мастер настройки",
+          "line": 18
+        }
+      ],
+      "palette_observation": {
+        "source": "live-palette",
+        "tid": "MF;TF-1;ModelForm;colVendors_Компоненты>Экспорт>XML_файл;TreeText",
+        "observed_label": "XML файл",
+        "proof_scope": "presence_only"
+      }
+    },
+    {
+      "id": "workspace.bootstrap_observe",
+      "family": "workspace",
+      "goal": "workspace: bootstrap_observe",
+      "modes": [
+        "bootstrap_observe"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "workspace.prepare",
+      "family": "workspace",
+      "goal": "workspace: prepare",
+      "modes": [
+        "prepare"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "workspace.tabs",
+      "family": "workspace",
+      "goal": "workspace: tabs",
+      "modes": [
+        "tabs"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "package.create",
+      "family": "package",
+      "goal": "package: create",
+      "modes": [
+        "create"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "package.open",
+      "family": "package",
+      "goal": "package: open",
+      "modes": [
+        "open"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "package.close",
+      "family": "package",
+      "goal": "package: close",
+      "modes": [
+        "close"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "package.save",
+      "family": "package",
+      "goal": "package: save",
+      "modes": [
+        "save"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "package.save_as",
+      "family": "package",
+      "goal": "package: save_as",
+      "modes": [
+        "save_as"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "package.read_only",
+      "family": "package",
+      "goal": "package: read_only",
+      "modes": [
+        "read_only"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "package.conflict",
+      "family": "package",
+      "goal": "package: conflict",
+      "modes": [
+        "conflict"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "graph.node_add",
+      "family": "graph",
+      "goal": "graph: node_add",
+      "modes": [
+        "node_add"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "graph.node_rename",
+      "family": "graph",
+      "goal": "graph: node_rename",
+      "modes": [
+        "node_rename"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "graph.node_move",
+      "family": "graph",
+      "goal": "graph: node_move",
+      "modes": [
+        "node_move"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "graph.node_delete",
+      "family": "graph",
+      "goal": "graph: node_delete",
+      "modes": [
+        "node_delete"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "graph.node_clone",
+      "family": "graph",
+      "goal": "graph: node_clone",
+      "modes": [
+        "node_clone"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "graph.clipboard_copy_cut_paste",
+      "family": "graph",
+      "goal": "graph: clipboard_copy_cut_paste",
+      "modes": [
+        "clipboard_copy_cut_paste"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "graph.link_create",
+      "family": "graph",
+      "goal": "graph: link_create",
+      "modes": [
+        "link_create"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "graph.link_delete",
+      "family": "graph",
+      "goal": "graph: link_delete",
+      "modes": [
+        "link_delete"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "graph.link_reconnect",
+      "family": "graph",
+      "goal": "graph: link_reconnect",
+      "modes": [
+        "link_reconnect"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "graph.port_settings",
+      "family": "graph",
+      "goal": "graph: port_settings",
+      "modes": [
+        "port_settings"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "graph.auto_link_retain_remove",
+      "family": "graph",
+      "goal": "graph: auto_link_retain_remove",
+      "modes": [
+        "auto_link_retain_remove"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "files.upload",
+      "family": "files",
+      "goal": "files: upload",
+      "modes": [
+        "upload"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "files.download",
+      "family": "files",
+      "goal": "files: download",
+      "modes": [
+        "download"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "files.overwrite",
+      "family": "files",
+      "goal": "files: overwrite",
+      "modes": [
+        "overwrite"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "files.partial_transfer",
+      "family": "files",
+      "goal": "files: partial_transfer",
+      "modes": [
+        "partial_transfer"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "connections.create",
+      "family": "connections",
+      "goal": "connections: create",
+      "modes": [
+        "create"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "connections.configure",
+      "family": "connections",
+      "goal": "connections: configure",
+      "modes": [
+        "configure"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "connections.test",
+      "family": "connections",
+      "goal": "connections: test",
+      "modes": [
+        "test"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "connections.connect",
+      "family": "connections",
+      "goal": "connections: connect",
+      "modes": [
+        "connect"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "connections.disconnect",
+      "family": "connections",
+      "goal": "connections: disconnect",
+      "modes": [
+        "disconnect"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "connections.delete",
+      "family": "connections",
+      "goal": "connections: delete",
+      "modes": [
+        "delete"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "variables.package",
+      "family": "variables",
+      "goal": "variables: package",
+      "modes": [
+        "package"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "variables.workflow",
+      "family": "variables",
+      "goal": "variables: workflow",
+      "modes": [
+        "workflow"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "variables.node",
+      "family": "variables",
+      "goal": "variables: node",
+      "modes": [
+        "node"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "variables.mapping",
+      "family": "variables",
+      "goal": "variables: mapping",
+      "modes": [
+        "mapping"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "variables.control_ports",
+      "family": "variables",
+      "goal": "variables: control_ports",
+      "modes": [
+        "control_ports"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "submodel.enter_leave",
+      "family": "submodel",
+      "goal": "submodel: enter_leave",
+      "modes": [
+        "enter_leave"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "submodel.compose",
+      "family": "submodel",
+      "goal": "submodel: compose",
+      "modes": [
+        "compose"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "submodel.expand",
+      "family": "submodel",
+      "goal": "submodel: expand",
+      "modes": [
+        "expand"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "submodel.boundary_mapping",
+      "family": "submodel",
+      "goal": "submodel: boundary_mapping",
+      "modes": [
+        "boundary_mapping"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "execution.start",
+      "family": "execution",
+      "goal": "execution: start",
+      "modes": [
+        "start"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "execution.status",
+      "family": "execution",
+      "goal": "execution: status",
+      "modes": [
+        "status"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "execution.wait",
+      "family": "execution",
+      "goal": "execution: wait",
+      "modes": [
+        "wait"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "execution.stop",
+      "family": "execution",
+      "goal": "execution: stop",
+      "modes": [
+        "stop"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "execution.error_repair",
+      "family": "execution",
+      "goal": "execution: error_repair",
+      "modes": [
+        "error_repair"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "results.schema",
+      "family": "results",
+      "goal": "results: schema",
+      "modes": [
+        "schema"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "results.count",
+      "family": "results",
+      "goal": "results: count",
+      "modes": [
+        "count"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "results.sample",
+      "family": "results",
+      "goal": "results: sample",
+      "modes": [
+        "sample"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "results.full_small_dataset",
+      "family": "results",
+      "goal": "results: full_small_dataset",
+      "modes": [
+        "full_small_dataset"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "results.empty",
+      "family": "results",
+      "goal": "results: empty",
+      "modes": [
+        "empty"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "results.visualizer",
+      "family": "results",
+      "goal": "results: visualizer",
+      "modes": [
+        "visualizer"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "results.export",
+      "family": "results",
+      "goal": "results: export",
+      "modes": [
+        "export"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "agent.observe",
+      "family": "agent",
+      "goal": "agent: observe",
+      "modes": [
+        "observe"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "agent.ui_gesture",
+      "family": "agent",
+      "goal": "agent: ui_gesture",
+      "modes": [
+        "ui_gesture"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "agent.reconcile",
+      "family": "agent",
+      "goal": "agent: reconcile",
+      "modes": [
+        "reconcile"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "agent.repair",
+      "family": "agent",
+      "goal": "agent: repair",
+      "modes": [
+        "repair"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "agent.abandon",
+      "family": "agent",
+      "goal": "agent: abandon",
+      "modes": [
+        "abandon"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "agent.goal_obligations",
+      "family": "agent",
+      "goal": "agent: goal_obligations",
+      "modes": [
+        "goal_obligations"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "agent.restart_checkpoint",
+      "family": "agent",
+      "goal": "agent: restart_checkpoint",
+      "modes": [
+        "restart_checkpoint"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "delivery.source_provenance",
+      "family": "delivery",
+      "goal": "delivery: source_provenance",
+      "modes": [
+        "source_provenance"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "delivery.catalog_compatibility",
+      "family": "delivery",
+      "goal": "delivery: catalog_compatibility",
+      "modes": [
+        "catalog_compatibility"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "delivery.skill_compatibility",
+      "family": "delivery",
+      "goal": "delivery: skill_compatibility",
+      "modes": [
+        "skill_compatibility"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "delivery.native_codex",
+      "family": "delivery",
+      "goal": "delivery: native_codex",
+      "modes": [
+        "native_codex"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "delivery.native_hermes",
+      "family": "delivery",
+      "goal": "delivery: native_hermes",
+      "modes": [
+        "native_hermes"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "delivery.macos",
+      "family": "delivery",
+      "goal": "delivery: macos",
+      "modes": [
+        "macos"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "delivery.linux",
+      "family": "delivery",
+      "goal": "delivery: linux",
+      "modes": [
+        "linux"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "delivery.windows",
+      "family": "delivery",
+      "goal": "delivery: windows",
+      "modes": [
+        "windows"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    },
+    {
+      "id": "delivery.rollback",
+      "family": "delivery",
+      "goal": "delivery: rollback",
+      "modes": [
+        "rollback"
+      ],
+      "contract": "domain_operation",
+      "status": "planned",
+      "source_dependencies": [
+        {
+          "source": "scope-plan",
+          "section": "13.1 / P1–P9"
+        }
+      ],
+      "supported_profiles": [],
+      "unit_evidence": [],
+      "live_evidence": [],
+      "known_gaps": [
+        "Требуется отдельный контракт и приёмка на выбранном runtime"
+      ],
+      "next_step": "Привязать handler, источники, эффекты и независимое доказательство результата"
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#A23938">
+  <title>Loginom Dock — установка и работа с Codex и Hermes</title>
+  <meta name="description" content="Подключите Codex или Hermes к Loginom. Пошаговая установка плагина на macOS, Linux и Windows, примеры задач и общая база знаний Loginom Dock.">
+  <meta property="og:title" content="Loginom Dock — от задачи к сценарию">
+  <meta property="og:description" content="Ваш AI-агент, знания Loginom и работающий браузер. Установка, первые шаги и примеры.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://loginom-dock.duckdns.org/">
+  <link rel="canonical" href="https://loginom-dock.duckdns.org/">
+  <link rel="icon" href="/assets/dock-mark.svg" type="image/svg+xml">
+  <link rel="preload" href="/assets/SourceSansPro-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/hero.css">
+  <link rel="stylesheet" href="/variants/variants.css">
+  <script type="module" src="/app.js"></script>
+  <script type="module" src="/hero-cycle.mjs"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Перейти к содержимому</a>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="wordmark" href="#" aria-label="Loginom AI — на главную"><span>Loginom <strong>AI</strong></span></a>
+    <nav class="desktop-nav" aria-label="Основная навигация"><a href="#features">Возможности</a><a href="#install">Установка</a><a href="#usage">Как пользоваться</a><a href="#faq">Вопросы</a></nav>
+    <a class="header-cta" href="#install">Подключить <span aria-hidden="true">↗</span></a>
+    <details class="mobile-menu"><summary aria-label="Открыть меню"><span aria-hidden="true">☰</span></summary><nav aria-label="Мобильная навигация"><a href="#features">Возможности</a><a href="#install">Установка</a><a href="#usage">Как пользоваться</a><a href="#faq">Вопросы</a></nav></details>
+  </div>
+</header>
+<main id="main">
+  <section class="hero hero-immersive" aria-labelledby="hero-title">
+    <div class="hero-atmosphere" aria-hidden="true"></div>
+    <div class="hero-inner container">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="small-line"></span> LOGINOM + ВАШ AI-АГЕНТ</p>
+      <h1 id="hero-title">От вашей задачи<br>к сценарию<br><span>в Loginom.</span></h1>
+      <p class="hero-description">Вы описываете задачу.<br>Агент превращает её в работающий сценарий.</p>
+      <div class="hero-actions"><a class="button" href="#install">Установить плагин <span aria-hidden="true">↗</span></a><a class="text-link" href="#usage">Как это работает <span aria-hidden="true">↓</span></a></div>
+      <p class="hero-agents">Для Codex и Hermes <span aria-hidden="true">/</span> В вашем браузере</p>
+    </div>
+    <div class="data-flow" data-flow>
+      <p class="sr-only">Визуализация потока данных: входящие данные сходятся, преобразуются и расходятся по направлениям результата.</p>
+      <img class="data-flow-fallback" src="/variants/clouds-poster.jpg" alt="" width="1280" height="720" aria-hidden="true">
+      <canvas class="data-flow-canvas" aria-hidden="true"></canvas>
+      <button class="flow-next" type="button" data-flow-next hidden aria-label="Следующий поток данных"></button>
+      <div class="flow-caption" aria-hidden="true"><span class="flow-cross">+</span> ДАННЫЕ → СЦЕНАРИЙ → РЕЗУЛЬТАТ</div>
+      <div class="flow-controls" hidden>
+        <span class="flow-hint" aria-hidden="true">Двигайте курсор</span>
+        <button class="flow-control" type="button" data-flow-replay aria-label="Повторить появление потока данных" title="Повторить появление"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 7M4 4v6h6"/></svg></button>
+        <button class="flow-control" type="button" data-flow-pause aria-label="Приостановить анимацию" aria-pressed="false" title="Приостановить анимацию"><svg class="flow-pause-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg><svg class="flow-play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m9 5 11 7-11 7z"/></svg></button>
+    </div>
+    </div>
+    </div>
+    <div class="hero-foot container">
+      <a class="hero-scroll" href="#features"><span aria-hidden="true">↓</span> Данные. Знания. Действия.</a>
+      <p class="hero-meta">macOS <span>·</span> Linux <span>·</span> Windows <a href="{{RELEASE_URL}}">v{{VERSION}} <span aria-hidden="true">↗</span></a></p>
+    </div>
+  </section>
+
+  <section class="features-band" id="features" aria-labelledby="features-title">
+    <div class="container"><h2 class="sr-only" id="features-title">Что даёт Loginom Dock</h2><div class="feature-grid">
+      <article><span class="feature-number">01 / ЗНАНИЯ</span><h3>Агент знает, где искать</h3><p>Справка, примеры и инструкции Loginom доступны в общей базе Dock.</p></article>
+      <article><span class="feature-number">02 / ДЕЙСТВИЯ</span><h3>Работает в вашем браузере</h3><p>Готовые скрипты настраивают 14 типов узлов, связывают их и проверяют данные в Loginom.</p></article>
+      <article><span class="feature-number">03 / РЕЗУЛЬТАТ</span><h3>Сценарий остаётся у вас</h3><p>Откройте сохранённый пакет, проверьте результат и продолжите работу.</p></article>
+    </div></div>
+  </section>
+
+  <section class="container section installation" id="install" aria-labelledby="install-title">
+    <div class="section-heading"><div><p class="eyebrow">ПОДКЛЮЧЕНИЕ</p><h2 id="install-title">Начните со своего агента</h2></div><p>Выберите агента и систему.<br>Остальное подготовит мастер установки.</p></div>
+    <div class="install-layout">
+      <aside class="install-options" aria-label="Параметры установки">
+        <fieldset><legend>1. Какой агент используете?</legend><div class="agent-options">
+          <label class="choice-card"><input type="radio" name="agent" value="codex" checked><span class="choice-icon" aria-hidden="true">⌘</span><span><strong>Codex</strong><small>Приложение или CLI</small></span><span class="choice-check" aria-hidden="true">✓</span></label>
+          <label class="choice-card"><input type="radio" name="agent" value="hermes"><span class="choice-icon" aria-hidden="true">✳</span><span><strong>Hermes</strong><small>Ваш профиль агента</small></span><span class="choice-check" aria-hidden="true">✓</span></label>
+        </div></fieldset>
+        <fieldset><legend>2. На какой системе?</legend><div class="platform-options"><label><input type="radio" name="platform" value="darwin-arm64" checked><span>macOS <small>Apple Silicon</small></span></label><label><input type="radio" name="platform" value="linux-x64"><span>Linux <small>x64</small></span></label><label><input type="radio" name="platform" value="win32-x64"><span>Windows <small>11 x64</small></span></label></div></fieldset>
+        <div class="requirements"><h3>Подготовьте заранее</h3><ul><li><span data-agent="codex">Codex 0.149.1 или новее в ветке 0.x; команда <code>codex</code> доступна в терминале.</span><span data-agent="hermes" hidden>Hermes 0.21.0 или новее в ветке 0.x; команда <code>hermes</code> доступна в терминале.</span></li><li>Клиентский ключ от администратора Dock.</li><li>Адрес и учётную запись вашего веб-приложения Loginom.</li><li>Существующую рабочую папку в хранилище Loginom.</li><li>Доступ к Dock, GitHub и Loginom. Для внутреннего стенда — VPN.</li></ul><p data-platform="linux-x64" hidden>Для Linux нужен рабочий стол с графическим окружением, чтобы агент мог открыть браузер.</p><p data-platform="win32-x64" hidden>Для Windows откройте PowerShell в каталоге загрузок. Установка выполняется в профиле текущего пользователя и не требует режима разработчика.</p><p data-agent="hermes" hidden>Для работы потребуется совместимая модель с поддержкой инструментов, настроенная в Hermes. Loginom Dock использует текущую конфигурацию Hermes.</p></div>
+        <a class="aside-link" href="#faq">Не уверены в совместимости? <span aria-hidden="true">↘</span></a>
+      </aside>
+      <div class="install-guide" aria-label="Шаги установки">
+        <article class="install-step"><div class="step-index">01</div><div class="step-content"><h3>Скачайте готовый комплект</h3><p>В архиве — плагин, среда выполнения и мастер подключения. Системные Node.js и Python переустанавливать не нужно.</p><a class="button download-button" id="download-link" href="{{MAC_URL}}"><span aria-hidden="true">↓</span> <span id="download-label">Скачать для macOS</span><span class="download-size" id="download-size">{{MAC_SIZE}}</span></a><div class="download-notes"><span>Версия {{VERSION}}</span><a href="{{RELEASE_URL}}">Все файлы выпуска ↗</a></div>
+          <details class="checksum"><summary>Как проверить скачанный файл?</summary><p>В папке со скачанным архивом откройте терминал и выполните команду. Сравните результат с SHA-256 ниже — они должны совпасть.</p><div class="code-block"><pre><code id="checksum-command">shasum -a 256 {{MAC_FILE}}</code></pre><button type="button" class="copy-button" data-copy-target="checksum-command" aria-label="Копировать команду проверки">Копировать</button></div><span class="mini-label">Ожидаемый SHA-256</span><code class="hash" id="checksum-value">{{MAC_HASH}}</code><a href="{{SUMS_URL}}">Скачать контрольные суммы</a></details>
+        </div></article>
+        <article class="install-step"><div class="step-index">02</div><div class="step-content"><h3>Запустите мастер установки</h3><p>Откройте терминал в папке со скачанным архивом. Команды распакуют комплект и запустят мастер для <strong data-agent-name>Codex</strong>.</p><div class="code-block terminal"><div class="terminal-top"><span>Терминал</span><button type="button" class="copy-button" data-copy-target="install-command" aria-label="Копировать команды установки">Копировать</button></div><pre><code id="install-command">tar -xzf {{MAC_FILE}}
+cd loginom-dock
+./install.sh --agent codex</code></pre></div><p class="note" data-platform="darwin-arm64">На Mac папку можно открыть в терминале через меню Finder «Службы → Новый терминал по адресу папки», если этот пункт включён.</p><p class="note" data-platform="linux-x64" hidden>В файловом менеджере Linux используйте «Открыть в терминале». Если мастер сообщит об отсутствующих библиотеках браузера, их должен установить администратор системы.</p><details data-agent="hermes" hidden class="extra-profile"><summary>Если у вас отдельный профиль Hermes</summary><p>Добавьте <code>--hermes-home</code> с полным путём к каталогу нужного профиля:</p><pre><code>./install.sh --agent hermes --hermes-home /путь/к/профилю</code></pre></details>
+        </div></article>
+        <article class="install-step"><div class="step-index">03</div><div class="step-content"><h3>Укажите параметры подключения</h3><p>Мастер запросит параметры подключения и рабочую папку. Клиентский ключ вводится скрыто, только на вашем компьютере.</p><dl class="setup-fields"><div><dt>Адрес Dock <span>уже задан по умолчанию</span></dt><dd class="endpoint-row"><code id="dock-endpoint">{{ENDPOINT}}</code><button type="button" class="copy-button" data-copy-target="dock-endpoint" aria-label="Копировать адрес Dock">Копировать</button></dd></div><div><dt>Клиентский ключ</dt><dd>Получите у администратора Loginom Dock. Это ключ доступа к общей базе, а не ключ модели.</dd></div><div><dt>Адрес Loginom</dt><dd>Адрес вашего веб-приложения с параметром <code>?testable=true</code>. Если в адресе уже есть параметры, добавьте <code>&amp;testable=true</code>.</dd></div><div><dt>Рабочая папка Loginom</dt><dd>Например, <code>/analyst/Мои сценарии</code>. Выберите доступную вам папку на сервере Loginom: здесь будут храниться пакеты, загруженные датасеты и результаты.</dd></div></dl><p class="note">Мастер подготовит браузер, установит плагин и проверит сервер, инструкции и доступность Loginom. Вход в сам Loginom выполняется отдельно.</p></div></article>
+        <article class="install-step last-step"><div class="step-index">04</div><div class="step-content"><h3>Откройте новую задачу</h3><p data-agent="codex">Мастер зарегистрирует каталог и плагин Loginom Dock в Codex. Если Codex запросит доверие к обработчикам плагина, проверьте их в <code>/hooks</code> и подтвердите. Затем начните новую задачу.</p><p data-agent="hermes" hidden>Плагин установлен в выбранный профиль Hermes. Если используете gateway, перезапустите его. Затем откройте новую сессию Hermes.</p><div class="first-prompt"><span class="mini-label">Напишите агенту</span><p id="first-prompt">Проверь подключение Loginom Dock и открой мой Loginom.</p><button type="button" class="copy-button" data-copy-target="first-prompt" aria-label="Копировать первую задачу">Копировать</button></div><p class="note">Дождитесь успешной диагностики. При необходимости войдите в Loginom в открывшемся браузере Dock.</p></div></article>
+      </div>
+    </div>
+    <noscript><p class="release-note">Для переключения инструкций нужен JavaScript. Все варианты установки доступны в <a href="{{INSTALL_URL}}">полной инструкции</a>. <a href="{{LINUX_URL}}">Архив Linux x64</a>. Команда для Hermes: <code>./install.sh --agent hermes</code>.</p></noscript>
+    <div class="release-note"><span class="release-badge">Предварительная версия</span><p>Версия {{VERSION}} включает 14 типов узлов. Сквозная проверка нового рабочего процесса выполнена на macOS с Loginom 7.4.2. Комплекты Linux и Windows выпущены на основе прежней поддержки этих систем; новая проверка в их графической среде запланирована после RC. <a href="{{RELEASE_URL}}">Открыть выпуск ↗</a></p></div>
+  </section>
+
+  <section class="usage-section" id="usage" aria-labelledby="usage-title"><div class="container section">
+    <div class="section-heading"><div><p class="eyebrow">ПЕРВАЯ ЗАДАЧА</p><h2 id="usage-title">Поставьте задачу.<br>Посмотрите, как она выполняется.</h2></div><p>Общайтесь с агентом обычным языком.<br>Работа со сценарием будет видна в браузере.</p></div>
+    <div class="usage-layout"><div class="usage-steps"><article><span>1</span><div><h3>Опишите входные данные и цель</h3><p>Приложите CSV, TSV или текстовый датасет в Codex; в Hermes используйте вложение или @file. Объясните цель и укажите имя пакета в выбранной рабочей папке Loginom.</p></div></article><article><span>2</span><div><h3>Следите за работой в Loginom</h3><p>Агент обращается к документации и выполняет действия в отдельном браузере. При необходимости уточняйте задачу в чате.</p></div></article><article><span>3</span><div><h3>Проверьте результат</h3><p>Посмотрите строки и типы полей, проверьте расчёт. Попросите сохранить пакет под новым именем и открыть его повторно.</p></div></article></div>
+    <div class="example-panel"><div class="example-tabs" role="group" aria-label="Примеры задач"><button type="button" data-example="create" aria-pressed="true">Создать сценарий</button><button type="button" data-example="explain" aria-pressed="false">Разобраться</button><button type="button" data-example="change" aria-pressed="false">Доработать</button></div><div class="example-body"><span class="mini-label">Пример запроса</span><p id="example-prompt">Нужно определить, какие товары и регионы приносят наибольшую выручку. В Loginom создай новый пакет и загрузи приложенный файл sales.csv. Рассчитай выручку каждой продажи, сгруппируй данные отдельно по товарам и регионам и отсортируй обе таблицы по убыванию выручки. Покажи лидеров, сохрани сценарий в новом пакете и открой его повторно для проверки.</p><div class="example-actions"><button type="button" class="button button-small" data-copy-target="example-prompt">Копировать запрос</button><a id="example-fixture" href="/assets/sales.csv" download>Скачать sales.csv ↓</a></div></div></div></div>
+  </div></section>
+
+  <section class="container section shared-section" aria-labelledby="shared-title"><div><p class="eyebrow">КАК УСТРОЕН DOCK</p><h2 id="shared-title">Ваш браузер.<br>Общие знания.</h2><p>Codex или Hermes выполняет задачу на вашем компьютере. Сервер Dock предоставляет инструкции, справку и опыт работы с Loginom.</p></div><div class="shared-details"><article><h3><span aria-hidden="true">↗</span> Опыт доступен команде</h3><p>После успешной подготовки Loginom-задачи её сообщения и результаты инструментов сохраняются в общем архиве Dock после очистки секретов. Архив доступен другим участникам Dock.</p></article><article><h3><span aria-hidden="true">⌂</span> Браузер остаётся локальным</h3><p>У каждой задачи свой профиль браузера. Профили и двоичные файлы не входят в архив Dock; личный провайдер памяти агента сохраняется.</p></article></div></section>
+
+  <section class="faq-section" id="faq" aria-labelledby="faq-title"><div class="container section faq-layout"><div><p class="eyebrow">ПОЛЕЗНО ЗНАТЬ</p><h2 id="faq-title">Вопросы<br>перед стартом</h2><p>Установка, доступ<br>и повседневная работа.</p><a class="text-link" href="{{INSTALL_URL}}">Полная инструкция ↓</a></div><div class="faq-list">
+    <details><summary>Где получить клиентский ключ Dock?</summary><p>Обратитесь к администратору вашей установки Loginom Dock. Он выдаст клиентский ключ общего аккаунта. Введите его в локальном мастере установки — на этой странице формы для ключа нет. Для входа в само приложение Loginom нужна отдельная учётная запись.</p></details>
+    <details><summary>Какие операционные системы поддерживаются?</summary><p>Loginom Dock работает на Windows 11 x64, macOS с Apple Silicon (M1 и новее) и Linux x64 с графическим окружением. Для Mac требуется процессор Apple Silicon. Проверить его можно в меню Apple → «Об этом Mac».</p></details>
+    <details><summary>Какие узлы уже настраиваются готовыми скриптами?</summary><p>Импорт текстового файла, Параметры полей, Фильтр строк, Слияние, Объединение, Калькулятор, Группировка, Сортировка, Замена, Дубликаты, Дата и время, Заполнение пропусков, Свёртка столбцов и Экспорт текстового файла. Поддержаны проверенные режимы этих узлов; остальные режимы и узлы добавляются постепенно.</p></details>
+    <details><summary>Какие файлы можно приложить к задаче?</summary><p>Для автоматического импорта в этом RC используйте CSV, TSV или текстовый файл: до 8 вложений, до 16 МиБ каждое и до 64 МиБ суммарно. Dock загружает отдельную копию в рабочую папку Loginom, сохраняя существующие файлы. Передача XLSX и JSON предусмотрена, но готовые обработчики их импорта в этот RC не входят. Вложения из мессенджеров пока не проверены.</p></details>
+    <details><summary>Какую модель использует Loginom Dock?</summary><p>Codex или Hermes использует модель, настроенную в самом агенте. Loginom Dock добавляет инструменты для работы с Loginom и не меняет текущую конфигурацию модели.</p></details>
+    <details><summary>Зачем в адресе Loginom параметр testable?</summary><p>Параметр <code>?testable=true</code> включает идентификаторы элементов интерфейса, по которым агент находит нужные кнопки и узлы. Если адрес уже содержит знак вопроса и другие параметры, используйте <code>&amp;testable=true</code>. Сам параметр не заменяет вход в приложение.</p></details>
+    <details><summary>Что делать, если подключение не проходит?</summary><p>Проверьте VPN, если работаете с внутренним стендом, адрес Loginom, параметр <code>testable=true</code> и клиентский ключ. На Linux убедитесь, что агент запущен в графической сессии. Затем в новой задаче попросите: «Проверь диагностику Loginom Dock и объясни, что мешает подключению». При обращении к администратору приложите текст ошибки без ключей.</p></details>
+    <details><summary>Можно ли продолжить существующий сценарий?</summary><p>Да. Укажите агенту нужный пакет и конкретную доработку: какое поле, узел или проверку добавить. Для первого знакомства удобно попросить сохранить результат в новую копию, а затем сравнить её с исходным пакетом.</p></details>
+    <details><summary>Как обновить, откатить или удалить плагин?</summary><p>Для обновления скачайте новый релиз, распакуйте его в отдельную папку и снова запустите мастер для того же агента и профиля. Из папки распакованного комплекта можно использовать команды ниже. Здесь выбран <strong data-agent-name>Codex</strong>; переключить агента можно в разделе установки.</p><span class="mini-label">Обновление с сохранением настроек</span><pre><code id="update-command">./install.sh --agent codex</code></pre><span class="mini-label">Откат к предыдущей установке</span><pre><code id="rollback-command">./install.sh --agent codex --rollback</code></pre><span class="mini-label">Удаление плагина выбранного агента</span><pre><code id="uninstall-command">./install.sh --agent codex --uninstall</code></pre><p>Откат доступен, если была предыдущая установка. Для отдельного профиля Hermes повторите параметр <code>--hermes-home</code>. Удаление плагина сохраняет локальные артефакты и общую серверную историю.</p></details>
+  </div></div></section>
+
+  <section class="container final-cta"><div><p class="eyebrow">ГОТОВЫ ПОПРОБОВАТЬ?</p><h2>Ваш следующий сценарий<br>начинается с одной задачи.</h2></div><a class="button" href="#install">Подключить Loginom Dock <span aria-hidden="true">↗</span></a></section>
+</main>
+<footer class="site-footer"><div class="container footer-top"><a class="wordmark" href="#"><img src="/assets/dock-mark.svg" width="32" height="32" alt=""><span>Loginom <strong>Dock</strong></span></a><p>Знания Loginom. Действия вашего агента.</p><div><a href="https://github.com/kartamyshev-dev/loginom-dock">GitHub ↗</a><a href="https://loginom.ru/">О платформе Loginom ↗</a></div></div><div class="container footer-bottom"><span>На основе OpenViking · <a href="https://github.com/kartamyshev-dev/loginom-dock/blob/main/LICENSE">AGPL-3.0</a></span><a href="{{RELEASE_URL}}">Версия {{VERSION}} · предварительный выпуск</a></div></footer>
+<p id="copy-status" class="sr-only" role="status" aria-live="polite"></p>
+</body>
+</html>

@@ -1,0 +1,1 @@
+{"description":"Empty input preserves the explicit seven-column derived schema and zero rows.","names":["Id","Category","Category_Replace","Category_Replaced","Code","Amount","Keep"],"types":["integer","string","string","boolean","integer","real","string"],"rows":[]}

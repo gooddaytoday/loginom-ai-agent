@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Loginom Dock</title>
+  <rect width="512" height="512" rx="112" fill="#f26926"/>
+  <g fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M170 154v198h172"/>
+    <path d="M182 254h74a66 66 0 0 0 66-66v-22"/>
+  </g>
+  <g fill="#fff">
+    <rect x="132" y="116" width="76" height="76" rx="20"/>
+    <rect x="284" y="116" width="76" height="76" rx="20"/>
+    <rect x="132" y="314" width="76" height="76" rx="20"/>
+    <rect x="304" y="314" width="76" height="76" rx="20"/>
+  </g>
+</svg>

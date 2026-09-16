@@ -1,0 +1,27 @@
+/* Shared composition for the four hero scenes and their fixed previews. */
+.data-flow { width: 68%; height: 108%; right: -3%; top: -4%; }
+.data-flow-canvas, .data-flow-fallback { mask-image: linear-gradient(to right, transparent, #000 13%); }
+.flow-caption { top: 10%; left: 27%; font-size: 9px; color: #c7b0a7; letter-spacing: .19em; }
+.flow-cross { font-size: 15px; }
+.flow-controls { bottom: 8%; right: 13%; }
+body[data-variant="clouds"] .hero-atmosphere { background: radial-gradient(ellipse at 76% 48%, #65302923, transparent 56%); }
+body[data-variant="glyphs"] .hero-atmosphere { background: radial-gradient(ellipse at 76% 48%, #5d2d391c, transparent 56%); }
+body[data-variant="ribbons"] .hero-atmosphere { background: radial-gradient(ellipse at 76% 48%, #69463518, transparent 56%); }
+body[data-variant="voids"] .hero-atmosphere { background: radial-gradient(ellipse at 76% 48%, #74443121, transparent 56%); }
+@media (max-width: 1050px) and (min-width: 761px) {
+  .data-flow { width: 65%; right: -1%; }
+  .flow-caption { left: 20%; font-size: 8px; }
+}
+@media (max-width: 760px) {
+  .data-flow { position: relative; width: calc(100% + 44px); height: clamp(290px, 74vw, 390px); right: auto; top: auto; margin: -12px -22px 0; }
+  .data-flow-canvas, .data-flow-fallback { mask-image: none; }
+  .flow-controls { bottom: 3%; right: 7%; }
+}
+@media (max-width: 370px) {
+  .data-flow { width: calc(100% + 34px); margin-left: -17px; margin-right: -17px; }
+}
+/* Artifact-only route for inspecting and capturing each generated illustration. */
+body.variant-art { margin: 0; width: 100vw; height: 100vh; background: #101012; overflow: hidden; }
+.variant-art .data-flow { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; }
+.variant-art .data-flow-canvas, .variant-art .data-flow-fallback { mask-image: none; }
+.variant-art .flow-controls, .variant-art .flow-caption { display: none; }

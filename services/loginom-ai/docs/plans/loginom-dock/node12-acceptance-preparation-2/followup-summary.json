@@ -1,0 +1,68 @@
+{
+  "command_id": "node12:acceptance-followup:1:cc24a1f5e07f78076c901965a028b67858272754",
+  "source_commit": "0e11a3fb24ca40a9f855008d2b0d1856d6f771ad",
+  "native_session": "fbb98fee-183b-4330-8fb9-2a23a61f9248",
+  "native_package": "/test-1/packages/Node12-followup1-native-20260913.lgp",
+  "native_audit": {
+    "passed": true,
+    "checks": 34
+  },
+  "parameter_diagnostic": {
+    "passed": true,
+    "checks": 6
+  },
+  "negative_checks": {
+    "all_rejected": true,
+    "cases": 13
+  },
+  "client_tests": {
+    "pass": 1404,
+    "skip": 1,
+    "fail": 0
+  },
+  "python_tests": {
+    "pass": 524,
+    "fail": 0
+  },
+  "source_archive_verified_files": 628,
+  "autonomous_acceptance_passed": false,
+  "hermes_started": false,
+  "stage_performed": false,
+  "new_slot_granted": false,
+  "old_failed_run_original_hashes_unchanged": true,
+  "evidence": {
+    "native/native-audit.json": {
+      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/native/native-audit.json",
+      "sha256": "4a5f195666f7413b044b0460cb3ae8decdcd02e6de43865da568ed64e89cfaca"
+    },
+    "native/negative-audit.json": {
+      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/native/negative-audit.json",
+      "sha256": "1cdcfae33885e42980137f42377ab895a467d8bbbe56c581c058a2855e6ffdce"
+    },
+    "native/settings-diagnostic-audit.json": {
+      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/native/settings-diagnostic-audit.json",
+      "sha256": "5efa3d12b13830c1ac38b64c2f66cb42710304a3ff58d6e56035bab2ddba840b"
+    },
+    "native/evidence.json": {
+      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/native/evidence.json",
+      "sha256": "053f403be2138be9644cace472bf6917d31e647f8a055179692c4aea1b5830a5"
+    },
+    "old-run-reaudit-final.json": {
+      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/old-run-reaudit-final.json",
+      "sha256": "c56d60efa238bec773f475d1d2a520a89b87774b4a30b6c3eb38f8e4b81d3efe"
+    },
+    "source-preflight.json": {
+      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/source-preflight.json",
+      "sha256": "f5548e431d51a5dd07c21747148d68d42735da660f0b527a1dd7aa86de177870"
+    },
+    "ui-7.json": {
+      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/ui-7.json",
+      "sha256": "9736a490a09ae5539d97ba477c7710e45cbf3cbb09b3232542c7a2f9513443d9"
+    },
+    "process-check-final.json": {
+      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/process-check-final.json",
+      "sha256": "454f692d4c572501b2b1e42685cf1f47fea309d7fb1838dcea26785d25ceceb9"
+    }
+  },
+  "own_processes_remaining": []
+}

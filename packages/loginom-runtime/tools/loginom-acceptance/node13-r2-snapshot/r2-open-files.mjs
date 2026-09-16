@@ -1,0 +1,1 @@
+return await ctx.execute(`async page=>{await page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnFilestorage"]').click();return {body:(await page.locator('body').innerText()).slice(-4500),rows:await page.locator('[data-tid*="FileStorageForm;colName_"]:visible').evaluateAll(es=>es.map(e=>({tid:e.getAttribute('data-tid'),text:e.textContent})))};}`);

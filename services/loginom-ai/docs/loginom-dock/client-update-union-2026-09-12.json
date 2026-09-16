@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-12",
+  "status": "installed_verified",
+  "client_id": "0.1.0-dev.20260910.3-80ca61417ec7",
+  "accepted_main": "0e2bb03ffd351c5685ef56ed2f5d811edd33a531",
+  "installation_source": "39930ca21eadde9f7a9a635ced110417507873e3",
+  "installation_snapshot_local_only": true,
+  "vps_build": "/opt/loginom-dock/client-build/union-20260912-0e2bb03f",
+  "bundle_sha256": "7e8fd54e15613e16dd4d3e7c69eab88cb4ca2eaacd5d07d24699ff2c8b7e2bc6",
+  "bundle_files": 4192,
+  "main_files_unchanged": 374,
+  "preserved_diagnostic_files": 4,
+  "runtime": "0d2bc6c1ed4e8120b2ee958822612caf6d8ad52adad22ea6ee5dc052731c1f4b",
+  "accepted_source_runtime": "c475d504d9d81f54807c6a3b272351b6fbbe0959d434465e384dc3e0caca190a",
+  "previous": "releases/0.1.0-dev.20260910.3-0e806f650d40",
+  "tests": {
+    "client_passed": 1385,
+    "client_skipped": 1,
+    "installed_live_checks": 13,
+    "source_autonomous_checks": 84,
+    "source_autonomous_run": "20260912-202024-3ae2302f"
+  },
+  "mcp": [
+    {
+      "agent": "codex",
+      "connected": true,
+      "tools": 48,
+      "server": {
+        "name": "loginom-dock",
+        "version": "0.1.0-dev.20260910.3"
+      }
+    },
+    {
+      "agent": "hermes",
+      "connected": true,
+      "tools": 34,
+      "server": {
+        "name": "loginom-dock",
+        "version": "0.1.0-dev.20260910.3"
+      }
+    }
+  ],
+  "configuration": {
+    "dock-config": true,
+    "hermes-profile": true,
+    "hermes-config": true,
+    "codex-only-marketplace-source": true
+  },
+  "evidence_directory": ".dock/client-update-union-20260912",
+  "limitations": [
+    "Installed live checks are operator diagnostics, not a new autonomous run",
+    "Initial many-input check stopped before a port effect; diagnostic node overlap was removed and the remaining check passed in a fresh session",
+    "Post-build VPS SSH inventory failed with Permission denied; successful build/archive verification preceded this failure",
+    "No public GitHub Release, landing update or production catalog switch"
+  ],
+  "artifacts": {
+    "installation.json": {
+      "path": ".dock/client-update-union-20260912/installation.json",
+      "sha256": "2561b4d8c582e884f8bb3fc0b705e9dd94073391901fb91f64e2bd3c44c55db3"
+    },
+    "bundle-verification.json": {
+      "path": ".dock/client-update-union-20260912/bundle-verification.json",
+      "sha256": "83dad148af3f52f176723d4cc5cc7ba2f61fa314de279c5b3d5b69d30582865b"
+    },
+    "installed-runtime-verification.json": {
+      "path": ".dock/client-update-union-20260912/installed-runtime-verification.json",
+      "sha256": "6b11cfb694fab8527d02c59b08bb914e533a232e19cd4070950df016f48a954f"
+    },
+    "configuration-verification.json": {
+      "path": ".dock/client-update-union-20260912/configuration-verification.json",
+      "sha256": "6939985948736b7d86eba4dcbf0851614df3e0753a3860db16d45d3102aa9b75"
+    },
+    "final-bundle-verification.json": {
+      "path": ".dock/client-update-union-20260912/final-bundle-verification.json",
+      "sha256": "eac056b62a7fbb7c3a7653e14f956b2bde89642ddf55faae041ce91f07797fd7"
+    },
+    "gateway-verification.json": {
+      "path": ".dock/client-update-union-20260912/gateway-verification.json",
+      "sha256": "56279cf6f74b0913a3e2b3decd3a47d19a368635418e6e260eb6865781c17cc3"
+    },
+    "mcp-smoke.json": {
+      "path": ".dock/client-update-union-20260912/mcp-smoke.json",
+      "sha256": "e3b8ee0907d77ba0beeff011383771145ca091569346c6ccaeadc921251ae4a5"
+    },
+    "live-1789236231022/installed-union-audit.json": {
+      "path": ".dock/client-update-union-20260912/live-1789236231022/installed-union-audit.json",
+      "sha256": "6e8dee8094efe2b88095cf56e053deb793a0e7836344e5e737a6482f5b18b7c1"
+    }
+  }
+}

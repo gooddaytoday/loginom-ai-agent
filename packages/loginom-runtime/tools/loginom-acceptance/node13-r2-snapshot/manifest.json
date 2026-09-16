@@ -1,0 +1,147 @@
+{
+  "kind": "executed_operator_harness_snapshot",
+  "session": "aa03cb93-8df3-4b1c-808e-6a13e835caf4",
+  "runtime": "2488fdaa08e4d6da9b7a31fb7598f675a8ad972efd65640b34cbc851feb16e2b",
+  "files": [
+    {
+      "original": ".dock/r2-start.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-start.mjs",
+      "sha256": "e093505adcc291d2419a1ac0775358a33ec97d6c8ac1c8fa701955d9d25c4548"
+    },
+    {
+      "original": ".dock/r2-prepare.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-prepare.mjs",
+      "sha256": "255b4a14053f97cfb57542a6a6a7724bf9a310eea9bba4d631602fd63833b664"
+    },
+    {
+      "original": ".dock/graph.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/graph.mjs",
+      "sha256": "6ac93b3c4aa00035a4d030150931df976884c4716ad6aa83bd10bab55252ef96"
+    },
+    {
+      "original": ".dock/activate-import-guarded.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/activate-import-guarded.mjs",
+      "sha256": "a3de3fee743171e4a0561b769b9df29bbd726c71e80436ad849fcd97f8870335"
+    },
+    {
+      "original": ".dock/activate-empty-guarded.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/activate-empty-guarded.mjs",
+      "sha256": "2ba42acc53cfcbe6edeef9cc919c4dcf5a47d871af5dd02f16c25b9ae76c3f33"
+    },
+    {
+      "original": ".dock/r2-baseline.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-baseline.mjs",
+      "sha256": "dd6c4afa81ec6f084641f653426d73a5454840599e85fbc5d34016d2f852afb2"
+    },
+    {
+      "original": ".dock/r2-open-files.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-open-files.mjs",
+      "sha256": "69e94f9744d2e97e3e6e31729baf88668e5a4a7a67d8187c5a57a2cad5a3c41e"
+    },
+    {
+      "original": ".dock/r2-files-state.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-files-state.mjs",
+      "sha256": "61534a1b3cac0fa0bd38143612af25354b30cfb303ae3d64f391b97e649c7821"
+    },
+    {
+      "original": ".dock/r2-enter-files.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-enter-files.mjs",
+      "sha256": "62aa51864f083f98cd63ce010e232ccee0ffbd30de86542c2f109fe7c09bb8dc"
+    },
+    {
+      "original": ".dock/r2-upload.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-upload.mjs",
+      "sha256": "f9d80c3c07fae2efec66ce54db49af36e649508eab3007e000783329c5d84731"
+    },
+    {
+      "original": ".dock/r2-open-import.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-open-import.mjs",
+      "sha256": "611b8fb58f9c327f5f18ea0245d859ac6a7c6fabe1c062e03b68c85d4c7f3d9e"
+    },
+    {
+      "original": ".dock/current-ui.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/current-ui.mjs",
+      "sha256": "eeb458fc100216cc442ea01e2dde4230eb345addc55f3afbb048e69cf030580f"
+    },
+    {
+      "original": ".dock/r2-import-controls.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-import-controls.mjs",
+      "sha256": "b74cef68f25f59ebaba01269a9c0c96baafadbcd138e2c173f7098951b12bc1a"
+    },
+    {
+      "original": ".dock/r2-import-setup.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-import-setup.mjs",
+      "sha256": "8386af0d7c4d8b408619b3e0f9766f78799a0a5a2aa394f10d467e05b685ff8b"
+    },
+    {
+      "original": ".dock/r2-import-confirm.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-import-confirm.mjs",
+      "sha256": "66b99e7623ba100dc218cf3eb4486dc147fd119f07c9d843bb16cb3ef28c569f"
+    },
+    {
+      "original": ".dock/r2-import-path.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-import-path.mjs",
+      "sha256": "e0e698b7229befc2d1194f1e763076a304235dc186223dc84541ca773bfee36b"
+    },
+    {
+      "original": ".dock/r2-import-next.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-import-next.mjs",
+      "sha256": "d68e5120de894d7a7b2ff2b31d90c2c5a7b2fbb0a2161f477b2fa259859c44c2"
+    },
+    {
+      "original": ".dock/r2-import-finish.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-import-finish.mjs",
+      "sha256": "f8a62957ddb96e5b4f7487a26ef7d85aa213d7c536560b0781553138e3155a7d"
+    },
+    {
+      "original": ".dock/r2-tabs.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-tabs.mjs",
+      "sha256": "08f96d335770f4364928d0a1933afc5760dee7396ac510a56225e158fb042480"
+    },
+    {
+      "original": ".dock/r2-hide-source.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-hide-source.mjs",
+      "sha256": "037706dc0352581262ddba33718b9bce09ca1af27ea02d747279c02c860bef25"
+    },
+    {
+      "original": ".dock/r2-failure.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-failure.mjs",
+      "sha256": "31d43aac5fe0db42e7da4264d5a80aefb1a0b5a1b657602bcb2f410cd3714f21"
+    },
+    {
+      "original": ".dock/r2-repeat.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-repeat.mjs",
+      "sha256": "63ee9483e6784efff71a13469381c1e01983340f1dd44b2f3512a178f885ca55"
+    },
+    {
+      "original": ".dock/r2-restore-source.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-restore-source.mjs",
+      "sha256": "f5374c16cc5c45c5ab7f6dcff8a2525f76920ef70b189386a07a3430e6d04bef"
+    },
+    {
+      "original": ".dock/r2-restored.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-restored.mjs",
+      "sha256": "f513f2a9e3db87d37b8258e3f3f101127af5d19560ad1419aa54d425baf512ef"
+    },
+    {
+      "original": ".dock/release-package.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/release-package.mjs",
+      "sha256": "bea5d5eb06800020e811580108b4679264b78bec5f3a0244ead176b80323fbf6"
+    },
+    {
+      "original": ".dock/screen-state.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/screen-state.mjs",
+      "sha256": "239cb9743d2ef503a6135e1f5543cb88d4558d5f39323e3dca430e7defb6b5a0"
+    },
+    {
+      "original": ".dock/r2-discard-copy.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-discard-copy.mjs",
+      "sha256": "f04180d74481333b155d15db40e4454a03427bd9c747743385225ab2148bce3b"
+    },
+    {
+      "original": ".dock/r2-final-files.mjs",
+      "snapshot": "tools/loginom-acceptance/node13-r2-snapshot/r2-final-files.mjs",
+      "sha256": "575b9d94667e5249e2d3586eda8f36145ee3993efacc648214998762fc8aa2b4"
+    }
+  ]
+}

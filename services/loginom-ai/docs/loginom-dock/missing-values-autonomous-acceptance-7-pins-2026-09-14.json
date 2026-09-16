@@ -1,0 +1,1242 @@
+{
+  "assignment": "node14:hermes-full:7:20260914",
+  "slot": "node14-hermes-20260914-full7",
+  "result": "FAIL",
+  "summary": {
+    "run_id": "20260914-114821-f7a403f6",
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning": "low",
+    "api_calls": 33,
+    "usage_completed": true,
+    "model_returncode": 0,
+    "model_timed_out": false,
+    "launcher_returncode": 0,
+    "counts": {
+      "calls": 40,
+      "replies": 40,
+      "events": 2783,
+      "prepared": 6,
+      "statuses": {
+        "SUCCEEDED": 4,
+        "NOT_APPLIED": 1,
+        "AMBIGUOUS": 1
+      },
+      "successful_imports": 4,
+      "successful_missing_values": 0,
+      "saves": 0
+    },
+    "pairing_errors": [],
+    "import_component_proofs": [
+      {
+        "operation_id": "import-120",
+        "scoped_proof": true,
+        "attempts": 3,
+        "full_goal_accepted": false
+      }
+    ],
+    "auth_guard": {
+      "policy": "existing-hermes-no-refresh-or-import-v1",
+      "installed": true,
+      "blocked_attempts": 0
+    },
+    "auth_connection_unchanged": true,
+    "runtime_unchanged": true,
+    "harness_unchanged": true,
+    "native_skill_unchanged": true,
+    "operations": [
+      {
+        "operation_id": "import-base",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 80
+        }
+      },
+      {
+        "operation_id": "import-precision",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 300
+        }
+      },
+      {
+        "operation_id": "import-skew",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 520
+        }
+      },
+      {
+        "operation_id": "import-boundary",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 740
+        }
+      },
+      {
+        "operation_id": "import-120",
+        "type": "imports.text",
+        "status": "NOT_APPLIED",
+        "effect_possible": false,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 960
+        }
+      },
+      {
+        "operation_id": "import-120b",
+        "type": "imports.text",
+        "status": "AMBIGUOUS",
+        "effect_possible": true,
+        "cleanup_complete": false,
+        "pending_phase": "configure",
+        "position": {
+          "x": 350,
+          "y": 80
+        },
+        "error": {
+          "code": "NODE_APPLY_STOPPED",
+          "message": "Import field has no observed horizontal scroller"
+        },
+        "last_target_checkpoint": {
+          "signature": "6149c2d74e42eeb376074309abcc21bf7eef8c355ffb8110dc7adf60927cd386",
+          "receipts": [
+            {
+              "id": "import-120b:graph:0",
+              "kind": "create",
+              "parameters": {
+                "kind": "new",
+                "label": "Сто двадцать",
+                "position": {
+                  "x": 350,
+                  "y": 80
+                },
+                "type": "imports.text"
+              },
+              "verified": true,
+              "receipt": {
+                "status": "SUCCEEDED",
+                "effect_possible": true,
+                "after": {
+                  "complete": true,
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_ref": {
+                    "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+                    "prefix": "MF;TF-1",
+                    "navigation_path": [
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                        "label": ""
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                        "label": "Пакеты"
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                        "label": "Package1"
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                        "label": "Модуль1"
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                        "label": "Сценарий"
+                      }
+                    ],
+                    "workflow_id": "1789375717215-uairn8h84wc-1"
+                  },
+                  "dom_epoch": 1,
+                  "nodes": [
+                    {
+                      "ref": {
+                        "document_id": "1789375717215-uairn8h84wc",
+                        "workflow_id": "1789375717215-uairn8h84wc-1",
+                        "node_id": "2c3f98ec-f16f-4ae9-8b99-c66b61bfa598"
+                      },
+                      "type": "imports.text",
+                      "label": "Точные числа",
+                      "dom_epoch": 47,
+                      "position": {
+                        "x": 80,
+                        "y": 304
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789375717215-uairn8h84wc",
+                        "workflow_id": "1789375717215-uairn8h84wc-1",
+                        "node_id": "2ef53e79-be16-46ef-8712-55f426ca8a26"
+                      },
+                      "type": "imports.text",
+                      "label": "Граница",
+                      "dom_epoch": 49,
+                      "position": {
+                        "x": 80,
+                        "y": 744
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789375717215-uairn8h84wc",
+                        "workflow_id": "1789375717215-uairn8h84wc-1",
+                        "node_id": "6620f9de-e585-39c7-88a9-35255088ebb7"
+                      },
+                      "type": "bg-vendor-icon-modelvariables",
+                      "label": "Переменные сценария",
+                      "dom_epoch": 45,
+                      "position": {
+                        "x": 16,
+                        "y": 164
+                      },
+                      "inputs": [],
+                      "outputs": [],
+                      "other_ports": [
+                        "Output_Var-0",
+                        "Output_Var-1",
+                        "Output_Var-2",
+                        "Output_Var-3",
+                        "Output_Var-4"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789375717215-uairn8h84wc",
+                        "workflow_id": "1789375717215-uairn8h84wc-1",
+                        "node_id": "709003e9-c302-48c9-9cbe-878235eed281"
+                      },
+                      "type": "imports.text",
+                      "label": "Асимметрия",
+                      "dom_epoch": 48,
+                      "position": {
+                        "x": 80,
+                        "y": 520
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789375717215-uairn8h84wc",
+                        "workflow_id": "1789375717215-uairn8h84wc-1",
+                        "node_id": "a78f5900-0078-44ea-b942-284f0a12dc98"
+                      },
+                      "type": "imports.text",
+                      "label": "База",
+                      "dom_epoch": 46,
+                      "position": {
+                        "x": 80,
+                        "y": 80
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789375717215-uairn8h84wc",
+                        "workflow_id": "1789375717215-uairn8h84wc-1",
+                        "node_id": "d5b0b083-655e-420d-b7f0-560d690473ee"
+                      },
+                      "type": "imports.text",
+                      "label": "Текстовый файл",
+                      "dom_epoch": 50,
+                      "position": {
+                        "x": 352,
+                        "y": 80
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    }
+                  ],
+                  "links": [],
+                  "foreign_links": [],
+                  "interaction_ready": true
+                },
+                "cleanup_complete": true
+              }
+            },
+            {
+              "id": "import-120b:graph:1",
+              "kind": "rename",
+              "parameters": {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "d5b0b083-655e-420d-b7f0-560d690473ee"
+                },
+                "label": "Сто двадцать"
+              },
+              "verified": true,
+              "receipt": {
+                "status": "SUCCEEDED",
+                "effect_possible": true,
+                "after": {
+                  "complete": true,
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_ref": {
+                    "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+                    "prefix": "MF;TF-1",
+                    "navigation_path": [
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                        "label": ""
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                        "label": "Пакеты"
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                        "label": "Package1"
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                        "label": "Модуль1"
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                        "label": "Сценарий"
+                      }
+                    ],
+                    "workflow_id": "1789375717215-uairn8h84wc-1"
+                  },
+                  "dom_epoch": 1,
+                  "nodes": [
+                    {
+                      "ref": {
+                        "document_id": "1789375717215-uairn8h84wc",
+                        "workflow_id": "1789375717215-uairn8h84wc-1",
+                        "node_id": "2c3f98ec-f16f-4ae9-8b99-c66b61bfa598"
+                      },
+                      "type": "imports.text",
+                      "label": "Точные числа",
+                      "dom_epoch": 53,
+                      "position": {
+                        "x": 80,
+                        "y": 304
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789375717215-uairn8h84wc",
+                        "workflow_id": "1789375717215-uairn8h84wc-1",
+                        "node_id": "2ef53e79-be16-46ef-8712-55f426ca8a26"
+                      },
+                      "type": "imports.text",
+                      "label": "Граница",
+                      "dom_epoch": 55,
+                      "position": {
+                        "x": 80,
+                        "y": 744
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789375717215-uairn8h84wc",
+                        "workflow_id": "1789375717215-uairn8h84wc-1",
+                        "node_id": "6620f9de-e585-39c7-88a9-35255088ebb7"
+                      },
+                      "type": "bg-vendor-icon-modelvariables",
+                      "label": "Переменные сценария",
+                      "dom_epoch": 51,
+                      "position": {
+                        "x": 16,
+                        "y": 164
+                      },
+                      "inputs": [],
+                      "outputs": [],
+                      "other_ports": [
+                        "Output_Var-0",
+                        "Output_Var-1",
+                        "Output_Var-2",
+                        "Output_Var-3",
+                        "Output_Var-4"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789375717215-uairn8h84wc",
+                        "workflow_id": "1789375717215-uairn8h84wc-1",
+                        "node_id": "709003e9-c302-48c9-9cbe-878235eed281"
+                      },
+                      "type": "imports.text",
+                      "label": "Асимметрия",
+                      "dom_epoch": 54,
+                      "position": {
+                        "x": 80,
+                        "y": 520
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789375717215-uairn8h84wc",
+                        "workflow_id": "1789375717215-uairn8h84wc-1",
+                        "node_id": "a78f5900-0078-44ea-b942-284f0a12dc98"
+                      },
+                      "type": "imports.text",
+                      "label": "База",
+                      "dom_epoch": 52,
+                      "position": {
+                        "x": 80,
+                        "y": 80
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789375717215-uairn8h84wc",
+                        "workflow_id": "1789375717215-uairn8h84wc-1",
+                        "node_id": "d5b0b083-655e-420d-b7f0-560d690473ee"
+                      },
+                      "type": "imports.text",
+                      "label": "Сто двадцать",
+                      "dom_epoch": 56,
+                      "position": {
+                        "x": 352,
+                        "y": 80
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    }
+                  ],
+                  "links": [],
+                  "foreign_links": [],
+                  "interaction_ready": true
+                },
+                "cleanup_complete": true
+              }
+            }
+          ],
+          "baseline": {
+            "complete": true,
+            "document_id": "1789375717215-uairn8h84wc",
+            "workflow_ref": {
+              "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+              "prefix": "MF;TF-1",
+              "navigation_path": [
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                  "label": ""
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                  "label": "Пакеты"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                  "label": "Package1"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                  "label": "Модуль1"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                  "label": "Сценарий"
+                }
+              ],
+              "workflow_id": "1789375717215-uairn8h84wc-1"
+            },
+            "dom_epoch": 1,
+            "nodes": [
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "2c3f98ec-f16f-4ae9-8b99-c66b61bfa598"
+                },
+                "type": "imports.text",
+                "label": "Точные числа",
+                "dom_epoch": 42,
+                "position": {
+                  "x": 80,
+                  "y": 304
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "2ef53e79-be16-46ef-8712-55f426ca8a26"
+                },
+                "type": "imports.text",
+                "label": "Граница",
+                "dom_epoch": 44,
+                "position": {
+                  "x": 80,
+                  "y": 744
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "6620f9de-e585-39c7-88a9-35255088ebb7"
+                },
+                "type": "bg-vendor-icon-modelvariables",
+                "label": "Переменные сценария",
+                "dom_epoch": 40,
+                "position": {
+                  "x": 16,
+                  "y": 164
+                },
+                "inputs": [],
+                "outputs": [],
+                "other_ports": [
+                  "Output_Var-0",
+                  "Output_Var-1",
+                  "Output_Var-2",
+                  "Output_Var-3",
+                  "Output_Var-4"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "709003e9-c302-48c9-9cbe-878235eed281"
+                },
+                "type": "imports.text",
+                "label": "Асимметрия",
+                "dom_epoch": 43,
+                "position": {
+                  "x": 80,
+                  "y": 520
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "a78f5900-0078-44ea-b942-284f0a12dc98"
+                },
+                "type": "imports.text",
+                "label": "База",
+                "dom_epoch": 41,
+                "position": {
+                  "x": 80,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              }
+            ],
+            "links": [],
+            "foreign_links": [],
+            "interaction_ready": true
+          },
+          "targetId": "d5b0b083-655e-420d-b7f0-560d690473ee",
+          "effect_possible": true,
+          "pending": null,
+          "auto_created_links": [],
+          "last_graph": {
+            "complete": true,
+            "document_id": "1789375717215-uairn8h84wc",
+            "workflow_ref": {
+              "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+              "prefix": "MF;TF-1",
+              "navigation_path": [
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                  "label": ""
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                  "label": "Пакеты"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                  "label": "Package1"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                  "label": "Модуль1"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                  "label": "Сценарий"
+                }
+              ],
+              "workflow_id": "1789375717215-uairn8h84wc-1"
+            },
+            "dom_epoch": 1,
+            "nodes": [
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "2c3f98ec-f16f-4ae9-8b99-c66b61bfa598"
+                },
+                "type": "imports.text",
+                "label": "Точные числа",
+                "dom_epoch": 53,
+                "position": {
+                  "x": 80,
+                  "y": 304
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "2ef53e79-be16-46ef-8712-55f426ca8a26"
+                },
+                "type": "imports.text",
+                "label": "Граница",
+                "dom_epoch": 55,
+                "position": {
+                  "x": 80,
+                  "y": 744
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "6620f9de-e585-39c7-88a9-35255088ebb7"
+                },
+                "type": "bg-vendor-icon-modelvariables",
+                "label": "Переменные сценария",
+                "dom_epoch": 51,
+                "position": {
+                  "x": 16,
+                  "y": 164
+                },
+                "inputs": [],
+                "outputs": [],
+                "other_ports": [
+                  "Output_Var-0",
+                  "Output_Var-1",
+                  "Output_Var-2",
+                  "Output_Var-3",
+                  "Output_Var-4"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "709003e9-c302-48c9-9cbe-878235eed281"
+                },
+                "type": "imports.text",
+                "label": "Асимметрия",
+                "dom_epoch": 54,
+                "position": {
+                  "x": 80,
+                  "y": 520
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "a78f5900-0078-44ea-b942-284f0a12dc98"
+                },
+                "type": "imports.text",
+                "label": "База",
+                "dom_epoch": 52,
+                "position": {
+                  "x": 80,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "d5b0b083-655e-420d-b7f0-560d690473ee"
+                },
+                "type": "imports.text",
+                "label": "Сто двадцать",
+                "dom_epoch": 56,
+                "position": {
+                  "x": 352,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              }
+            ],
+            "links": [],
+            "foreign_links": [],
+            "interaction_ready": true
+          },
+          "completed": true,
+          "final_graph": {
+            "complete": true,
+            "document_id": "1789375717215-uairn8h84wc",
+            "workflow_ref": {
+              "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+              "prefix": "MF;TF-1",
+              "navigation_path": [
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                  "label": ""
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                  "label": "Пакеты"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                  "label": "Package1"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                  "label": "Модуль1"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                  "label": "Сценарий"
+                }
+              ],
+              "workflow_id": "1789375717215-uairn8h84wc-1"
+            },
+            "dom_epoch": 1,
+            "nodes": [
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "2c3f98ec-f16f-4ae9-8b99-c66b61bfa598"
+                },
+                "type": "imports.text",
+                "label": "Точные числа",
+                "dom_epoch": 53,
+                "position": {
+                  "x": 80,
+                  "y": 304
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "2ef53e79-be16-46ef-8712-55f426ca8a26"
+                },
+                "type": "imports.text",
+                "label": "Граница",
+                "dom_epoch": 55,
+                "position": {
+                  "x": 80,
+                  "y": 744
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "6620f9de-e585-39c7-88a9-35255088ebb7"
+                },
+                "type": "bg-vendor-icon-modelvariables",
+                "label": "Переменные сценария",
+                "dom_epoch": 51,
+                "position": {
+                  "x": 16,
+                  "y": 164
+                },
+                "inputs": [],
+                "outputs": [],
+                "other_ports": [
+                  "Output_Var-0",
+                  "Output_Var-1",
+                  "Output_Var-2",
+                  "Output_Var-3",
+                  "Output_Var-4"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "709003e9-c302-48c9-9cbe-878235eed281"
+                },
+                "type": "imports.text",
+                "label": "Асимметрия",
+                "dom_epoch": 54,
+                "position": {
+                  "x": 80,
+                  "y": 520
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "a78f5900-0078-44ea-b942-284f0a12dc98"
+                },
+                "type": "imports.text",
+                "label": "База",
+                "dom_epoch": 52,
+                "position": {
+                  "x": 80,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789375717215-uairn8h84wc",
+                  "workflow_id": "1789375717215-uairn8h84wc-1",
+                  "node_id": "d5b0b083-655e-420d-b7f0-560d690473ee"
+                },
+                "type": "imports.text",
+                "label": "Сто двадцать",
+                "dom_epoch": 56,
+                "position": {
+                  "x": 352,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              }
+            ],
+            "links": [],
+            "foreign_links": [],
+            "interaction_ready": true
+          },
+          "result": {
+            "status": "SUCCEEDED",
+            "phase": "target_ready",
+            "node": {
+              "ref": {
+                "document_id": "1789375717215-uairn8h84wc",
+                "workflow_id": "1789375717215-uairn8h84wc-1",
+                "node_id": "d5b0b083-655e-420d-b7f0-560d690473ee"
+              },
+              "type": "imports.text",
+              "label": "Сто двадцать",
+              "dom_epoch": 56,
+              "position": {
+                "x": 352,
+                "y": 80
+              },
+              "inputs": [],
+              "outputs": [
+                0
+              ],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-1"
+              ],
+              "locked": false
+            },
+            "created": true,
+            "links": [],
+            "auto_created_links": [],
+            "effects": [
+              {
+                "id": "import-120b:graph:0",
+                "kind": "create",
+                "verified": true
+              },
+              {
+                "id": "import-120b:graph:1",
+                "kind": "rename",
+                "verified": true
+              }
+            ],
+            "configured": false,
+            "executed": false,
+            "package_saved": false
+          }
+        }
+      }
+    ],
+    "full_goal_accepted": false,
+    "independent_reopen": false
+  },
+  "slot_release": {
+    "checked_at": "2026-09-14T08:58:27.571986+00:00",
+    "own_processes": [],
+    "slot": "node14-hermes-20260914-full7",
+    "run_id": "20260914-114821-f7a403f6",
+    "launcher_returncode": 0,
+    "model_returncode": 0,
+    "timed_out": false,
+    "local_slot_released": true,
+    "coordinator_transfer_blocked": true
+  },
+  "receipts": {
+    ".dock/node14-autonomous-acceptance-7/parse-candidate.mjs": {
+      "bytes": 1022,
+      "sha256": "586ca6f48f6a3daf964db2510e169ef381b1e5a1a274d5f941bc03a3f386ef6b"
+    },
+    ".dock/node14-autonomous-acceptance-7/prelaunch.py": {
+      "bytes": 3144,
+      "sha256": "a39aa6f15b8757d2bb4a9abfb996b0062fb3445107eb2f282ea887c1f191a801"
+    },
+    ".dock/node14-autonomous-acceptance-7/export-probe.json": {
+      "bytes": 41360,
+      "sha256": "1d1024de4bc505f2a89970c268535f906e40f371e51b515cdbe5ce9b40460b4e"
+    },
+    ".dock/node14-autonomous-acceptance-7/prelaunch-receipt.json": {
+      "bytes": 3830,
+      "sha256": "1abafeb5949d221657d50d71609d8219fe4adbc9dff9789d42d96212be56ffa3"
+    },
+    ".dock/node14-autonomous-acceptance-7/failure-request.json": {
+      "bytes": 4138,
+      "sha256": "50451bf07827acf7cc1744ce174c037abec49cbf3704c1a9b762b804e825db0c"
+    },
+    ".dock/node14-autonomous-acceptance-7/result-summary.json": {
+      "bytes": 34953,
+      "sha256": "aac869141afa5749dc885b1eb196079a926e3825347efcd94f3c9f45d9e7354e"
+    },
+    ".dock/node14-autonomous-acceptance-7/config-check.json": {
+      "bytes": 301,
+      "sha256": "3cfa7c1f8f49dcee67aa7d8cbd092461f285911abde5829eee5ab6ebd0b246c7"
+    },
+    ".dock/node14-autonomous-acceptance-7/target-failures.json": {
+      "bytes": 30654,
+      "sha256": "78d38f290cdede70f1ee8b0bdee0ab32889e87f2c01fb36c818f69f413239b52"
+    },
+    ".dock/node14-autonomous-acceptance-7/launcher-start.json": {
+      "bytes": 70,
+      "sha256": "150f0a3724b2b737d83fd9119db5ddc13be10fc6437403ca5f00484e7f0228aa"
+    },
+    ".dock/node14-autonomous-acceptance-7/launch-started.json": {
+      "bytes": 104,
+      "sha256": "7f3bb33f1aefde98eb3a1288059273d9ed08b7c144b15db63bc22af2050ef66a"
+    },
+    ".dock/node14-autonomous-acceptance-7/launch-once.py": {
+      "bytes": 2688,
+      "sha256": "54dfe116d5d19b3315b6e68278a43f019bc115306d322b71d301638ca3fe9f3d"
+    },
+    ".dock/node14-autonomous-acceptance-7/failure-observation.json": {
+      "bytes": 141035,
+      "sha256": "17712d18b9903b5ca3e13acc17d1944d512ebf08e113464aa7c3893c33d839bb"
+    },
+    ".dock/node14-autonomous-acceptance-7/authorization.json": {
+      "bytes": 446,
+      "sha256": "33c0f8fbb12883cdeb1f8f66cedd882ac766c10c6b6b1c5c0342948aa7084f0e"
+    },
+    ".dock/node14-autonomous-acceptance-7/summarize.py": {
+      "bytes": 3330,
+      "sha256": "eda4d8c40f5aa04b8c32256ae862bc0e03b01703bd7018f68eca405ad42ea239"
+    },
+    ".dock/node14-autonomous-acceptance-7/generated-config-check.json": {
+      "bytes": 273,
+      "sha256": "19a9e41e0cee540cb2bd2d93579930e605ad867bd6d55d6ab58841031d81a94d"
+    },
+    ".dock/node14-autonomous-acceptance-7/preflight-output.txt": {
+      "bytes": 242,
+      "sha256": "2f8295ac5c38097ff46ff7fd517940223a4706e9678daf94528fc5b53e733aca"
+    },
+    ".dock/node14-autonomous-acceptance-7/parser-receipt.json": {
+      "bytes": 856,
+      "sha256": "05cf701041180b59d1a9ea96a9a25fb24efe32a3c636b7ed4237e03dc482bcf1"
+    },
+    ".dock/node14-autonomous-acceptance-7/model-process.json": {
+      "bytes": 238,
+      "sha256": "ffffc548d40703518648b1707f9a375c23b092787c331b950c590d7c9c7ddffc"
+    },
+    ".dock/node14-autonomous-acceptance-7/slot-release.json": {
+      "bytes": 306,
+      "sha256": "9e500e6cbb9718d6fd7c7e5c49ddcbc03663fc82b3f2295d4847cdd107ef9b91"
+    },
+    ".dock/node14-autonomous-acceptance-7/candidate-readback.json": {
+      "bytes": 2154,
+      "sha256": "bebd465f121ca649f61550845c8deb0c1def54ad2c1cbe3e27dc821ec9c93544"
+    },
+    ".dock/node14-autonomous-acceptance-7/download.mjs": {
+      "bytes": 1689,
+      "sha256": "f951aef8ee3d241e283ed668a6d0790e923f38917d8abad27cdf5f795c8785e0"
+    },
+    ".dock/node14-autonomous-acceptance-7/launcher-exit.json": {
+      "bytes": 75,
+      "sha256": "a015f1ab1bd9d3bccbb499d5b9833b9fd46ed5d005452e4716bbdb3dbe6aa22c"
+    },
+    ".dock/node14-autonomous-acceptance-7/progress-v2.json": {
+      "bytes": 1259,
+      "sha256": "12be2a55d2406794b3545d76cdb324b58065ce739cb7e8218b9b5e3fc06a70ff"
+    },
+    ".dock/node14-autonomous-acceptance-7/progress.py": {
+      "bytes": 1581,
+      "sha256": "f51fb436c9339600ab76cec5d110124d0382dea1d306feb4eced7f15582607da"
+    },
+    ".dock/node14-autonomous-acceptance-7/model-started.json": {
+      "bytes": 214,
+      "sha256": "da007413494fd38d6330dee7714dc523bc4bd3f4b1b91f8551fcb8b71dbe2b53"
+    },
+    ".dock/node14-autonomous-acceptance-7/preflight.json": {
+      "bytes": 128312,
+      "sha256": "a1ea1f7e8dab143bb7a86a96c5f7c36c83ac6b2f1963da127519b799c7586347"
+    },
+    ".dock/node14-autonomous-acceptance-7/launcher.log": {
+      "bytes": 469,
+      "sha256": "0a518b04b66c9fc5b259fe4850c1b40ffa11c649f8adc970a4cfe6c75ac8683d"
+    },
+    ".dock/node14-autonomous-acceptance-7/import-failure-checkpoints.json": {
+      "bytes": 1731118,
+      "sha256": "e08e0475dfc05af40150bf5367023b2f5d0be04f74b9585c9dbdb64c7fd00a20"
+    },
+    ".dock/node14-autonomous-acceptance-7/runs/20260914-114821-f7a403f6/evidence.json": {
+      "bytes": 182047880,
+      "sha256": "16ef082080a9cc9266ffd04c5afaf620af842f2b8e601b7991ef24c2efe8f85a"
+    },
+    ".dock/node14-autonomous-acceptance-7/runs/20260914-114821-f7a403f6/request.json": {
+      "bytes": 130627,
+      "sha256": "362cf2a3265bccd91c9adf2ea740fc868199df5e1165d3ae987cc0d7ce0d3859"
+    },
+    ".dock/node14-autonomous-acceptance-7/runs/20260914-114821-f7a403f6/scenario.txt": {
+      "bytes": 9657,
+      "sha256": "7c66bfe2fadc5358681c897947494028314725bf8fceea1208e1e5d4b7c08127"
+    },
+    ".dock/node14-autonomous-acceptance-7/runs/20260914-114821-f7a403f6/attempt.json": {
+      "bytes": 106,
+      "sha256": "6ee0d99ded2c6f0d9fbebc9d40b66ff22b6312c432774e1d1c644d7e095d2869"
+    },
+    ".dock/node14-autonomous-acceptance-7/runs/20260914-114821-f7a403f6/tool-precheck.json": {
+      "bytes": 1112,
+      "sha256": "1deb718120d86d3cde78ffa8f091aeb1dbefc1f0d2c48416af5b924c587ed26c"
+    },
+    ".dock/node14-autonomous-acceptance-7/runs/20260914-114821-f7a403f6/final-audit.json": {
+      "bytes": 427,
+      "sha256": "cd0b08214cf1e8c8a4e6a61e479cc1460a0337181f6682d0e9eeb0a5f2bedf17"
+    },
+    ".dock/node14-autonomous-acceptance-7/runs/20260914-114821-f7a403f6/private/usage.json": {
+      "bytes": 433,
+      "sha256": "fd4d1232452deed1ff69c7eda4e20e313a9f37ded2fb0cafda29e0e96536306f"
+    },
+    ".dock/node14-autonomous-acceptance-7/runs/20260914-114821-f7a403f6/private/auth-guard.json": {
+      "bytes": 95,
+      "sha256": "315569ba52cfa4d284c4760a7c8fedbcb629c95ed62afa9c54b39aac473811c8"
+    },
+    ".dock/node14-autonomous-acceptance-7/runs/20260914-114821-f7a403f6/geometry-ecffee14-4f73-46c9-8c62-c94d550bb958.json": {
+      "bytes": 620,
+      "sha256": "e5e5a87b83079c7f1e3f7ef24d84446317357b3cb6dc52a4c031e37ce9ed5203"
+    },
+    ".dock/node14-autonomous-acceptance-7/runs/20260914-114821-f7a403f6/private/dock-state/sessions/ecffee14-4f73-46c9-8c62-c94d550bb958/execution-events.jsonl": {
+      "bytes": 89514525,
+      "sha256": "7211b9a98e989152c7f3a33125144946b48896632091324333b488d407e83ed4"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "assignment": "node17:download-evidence-fix:1:921c5340",
+  "tooling_only": true,
+  "live_sessions_started": 0,
+  "hermes_started": false,
+  "tests": {
+    "node_passed": 28,
+    "python_passed": 20
+  },
+  "runtime": "347615cbae29323d80b57488b794ecce607b5b9e0d2fbe86aa88b7460241311c",
+  "runtime_inputs": 155,
+  "harness_inputs": 277,
+  "manifest_sha256": "3d3417e4587859fd6179727dd66e74986fe5fe2c78930ea3571ee6e75bc165d3",
+  "full_goal": {
+    "nodeops": 22,
+    "deliveries": 3,
+    "all_save_reopen_required": true
+  },
+  "user_v1_evidence": null,
+  "gates": {
+    "component": "blocked: Native observer component changed since evidence",
+    "full": "blocked: Native observer component changed since evidence"
+  },
+  "next_owner": "coordinator",
+  "next_trigger": "Review diagnostic scope before any new live run",
+  "files_sha256": {
+    "text-export-observer-response.mjs": "3872fff8881859f0bda6650f076df212a4e34b3b75ad7817d1222efade93f6ae",
+    "text-export-observer-response.test.mjs": "57fc3d73443a7dd7f4cf245604cce21329923676272ce6f29b4dfba658be6f9b",
+    "text-export-observer-native.mjs": "4846af8eb6d8bb9f0b9d4215ed00f60ef0de4f69dfda4dc03af5f01ecb4dd0fb",
+    "text-export-observer-sdk.mjs": "557f3f922913a91a00f43cd0efc5e47c611cec53938358ea91a635eb857656ba"
+  }
+}

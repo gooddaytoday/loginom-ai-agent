@@ -1,0 +1,733 @@
+{
+  "command_id": "node11:persistence-verifier-reassessment:1:5891dfdc",
+  "status": "frozen_run_reassessment_PASS_59_of_59",
+  "verifier_commit": "9ddb33edf973264e90222f16f75fb832c7dcb2ff",
+  "verifier_version": "replacement-persistence-draft-overwrite-v2",
+  "verifier_sha256": "5449a8f2cad5b53a0aa46cf5003182f3fdc747456581618e75854d88e9037f33",
+  "entry_sha256": "b2637f85d25acf80ef727ac726613110cadeb1038098cd139f82f97066ff633a",
+  "tests": {
+    "focused": 17,
+    "replacement_family": 36,
+    "passed": true,
+    "scope": "synthetic_focused_save_contract_negatives_plus_existing_replacement_checks"
+  },
+  "reassessment": {
+    "schema_version": 1,
+    "scope": "offline_frozen_execution_reassessment",
+    "run_id": "20260913-122247-a862a34d",
+    "verifier_version": "replacement-persistence-draft-overwrite-v2",
+    "verifier_commit": "9ddb33edf973264e90222f16f75fb832c7dcb2ff",
+    "verifier_sha256": "5449a8f2cad5b53a0aa46cf5003182f3fdc747456581618e75854d88e9037f33",
+    "entry_sha256": "b2637f85d25acf80ef727ac726613110cadeb1038098cd139f82f97066ff633a",
+    "original_execution_source_commit": "49c8b68fc1be96fea2cf177d56f4595028db9627",
+    "product_source_commit": "b05715340937f9c828e03bc6ec7a88f3adf086da",
+    "source_files_verified": 392,
+    "runtime_revision": "8d6d4b3cd7f5d19a3ac1e9ac6537ff8219f97f9898326227df3f3ae55dcb1380",
+    "manifest_sha256": "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+    "goal_sha256": "d283e683fe61298a9273365ca485d63e16fb582d08b45d42dfefb70c65952a9c",
+    "artifacts_before": {
+      "launch-receipt.json": {
+        "sha256": "dd81b98241947b41aee4101edc732a2141e8dd90a0933dcaf7e93407d4662172",
+        "bytes": 729
+      },
+      "request.json": {
+        "sha256": "48cf291327a67573692068a7039dd39fda4d9fd3134f85f75edb65b49fc0db4b",
+        "bytes": 127856
+      },
+      "scenario.txt": {
+        "sha256": "bf1541435655c8a1ac185ad192a64dc946644276483de9e50b5ed9faa5d701f4",
+        "bytes": 5534
+      },
+      "candidate-pin.json": {
+        "sha256": "08e5857a230b09587ea0c6b1529c3884448c9381952c04e935f3695225772339",
+        "bytes": 2097
+      },
+      "tool-precheck.json": {
+        "sha256": "f790eb966905442feb480123a6655cf41be8cec56158c6c69e788a95cbe3c386",
+        "bytes": 1408
+      },
+      "attempt.json": {
+        "sha256": "c3a094d17207753f4ca7cde2cc643c18bdae5bab98afa930d0aad0ea587b50bb",
+        "bytes": 106
+      },
+      "efficiency.json": {
+        "sha256": "8c6747e0d18bf21a8fae33eaa2f7790c610ef55879df12c06f1f2ff7420097ad",
+        "bytes": 22784
+      },
+      "evidence.json": {
+        "sha256": "9e7954bbec597b994b843a5f88ca2043f2d1d2a18ae94dec627e7bb7c954c612",
+        "bytes": 316203041
+      },
+      "replacement-acceptance-audit.json": {
+        "sha256": "714dd34e3fd7f13614fb173eec91f866bee905e3a7e51e4fe7b8ccfdb717a5cf",
+        "bytes": 16573
+      },
+      "save-failure-observation.json": {
+        "sha256": "46b98cb11375c18a8880818430488337d30f3c970cd71d7382869630b8ff5c51",
+        "bytes": 3669
+      },
+      "process-cleanup.json": {
+        "sha256": "99b63a9345556556b92959e60488033e9e94b9af0bd61f47c6d7ed967db3024b",
+        "bytes": 158
+      }
+    },
+    "artifacts_after": {
+      "launch-receipt.json": {
+        "sha256": "dd81b98241947b41aee4101edc732a2141e8dd90a0933dcaf7e93407d4662172",
+        "bytes": 729
+      },
+      "request.json": {
+        "sha256": "48cf291327a67573692068a7039dd39fda4d9fd3134f85f75edb65b49fc0db4b",
+        "bytes": 127856
+      },
+      "scenario.txt": {
+        "sha256": "bf1541435655c8a1ac185ad192a64dc946644276483de9e50b5ed9faa5d701f4",
+        "bytes": 5534
+      },
+      "candidate-pin.json": {
+        "sha256": "08e5857a230b09587ea0c6b1529c3884448c9381952c04e935f3695225772339",
+        "bytes": 2097
+      },
+      "tool-precheck.json": {
+        "sha256": "f790eb966905442feb480123a6655cf41be8cec56158c6c69e788a95cbe3c386",
+        "bytes": 1408
+      },
+      "attempt.json": {
+        "sha256": "c3a094d17207753f4ca7cde2cc643c18bdae5bab98afa930d0aad0ea587b50bb",
+        "bytes": 106
+      },
+      "efficiency.json": {
+        "sha256": "8c6747e0d18bf21a8fae33eaa2f7790c610ef55879df12c06f1f2ff7420097ad",
+        "bytes": 22784
+      },
+      "evidence.json": {
+        "sha256": "9e7954bbec597b994b843a5f88ca2043f2d1d2a18ae94dec627e7bb7c954c612",
+        "bytes": 316203041
+      },
+      "replacement-acceptance-audit.json": {
+        "sha256": "714dd34e3fd7f13614fb173eec91f866bee905e3a7e51e4fe7b8ccfdb717a5cf",
+        "bytes": 16573
+      },
+      "save-failure-observation.json": {
+        "sha256": "46b98cb11375c18a8880818430488337d30f3c970cd71d7382869630b8ff5c51",
+        "bytes": 3669
+      },
+      "process-cleanup.json": {
+        "sha256": "99b63a9345556556b92959e60488033e9e94b9af0bd61f47c6d7ed967db3024b",
+        "bytes": 158
+      }
+    },
+    "original_result": {
+      "passed": false,
+      "passed_checks": 57,
+      "total_checks": 59
+    },
+    "hermes_runs": 0,
+    "browser_started": false,
+    "result": {
+      "passed": true,
+      "checks": {
+        "public_projection": {
+          "passed": true,
+          "scope": "user_v1_exact_projection_and_prepared_workflow"
+        },
+        "coordinator_stage_pin": {
+          "passed": true
+        },
+        "goal": {
+          "passed": true
+        },
+        "model": {
+          "passed": true
+        },
+        "frozen_export": {
+          "passed": true
+        },
+        "native_skill": {
+          "passed": true
+        },
+        "artifacts": {
+          "passed": true
+        },
+        "ordinary_dock_only": {
+          "passed": true
+        },
+        "eleven_operations": {
+          "passed": true
+        },
+        "initial_labels": {
+          "passed": true
+        },
+        "exact_reads": {
+          "passed": true
+        },
+        "requested_parameters_0": {
+          "passed": true
+        },
+        "replacement_contract_0": {
+          "passed": true
+        },
+        "requested_parameters_1": {
+          "passed": true
+        },
+        "replacement_contract_1": {
+          "passed": true
+        },
+        "requested_parameters_2": {
+          "passed": true
+        },
+        "replacement_contract_2": {
+          "passed": true
+        },
+        "requested_parameters_3": {
+          "passed": true
+        },
+        "replacement_contract_3": {
+          "passed": true
+        },
+        "requested_parameters_4": {
+          "passed": true
+        },
+        "replacement_contract_4": {
+          "passed": true
+        },
+        "link_Typed": {
+          "passed": true
+        },
+        "link_Preserved": {
+          "passed": true
+        },
+        "partial_identity_node-preserved-add-c-a862a34d": {
+          "passed": true
+        },
+        "partial_identity_node-preserved-mode-replace-a862a34d": {
+          "passed": true
+        },
+        "partial_identity_node-preserved-mode-add-final-a862a34d": {
+          "passed": true
+        },
+        "output_node-typed-create-a862a34d": {
+          "passed": true,
+          "checks": {
+            "configuration": {
+              "passed": true,
+              "failures": [],
+              "scope": "replacement_raw_configuration"
+            },
+            "output": {
+              "passed": true,
+              "failures": [],
+              "execution_id": "1789291388339-lohyx1s2as:214:5",
+              "scope": "fresh_calculator_table_against_independent_expected",
+              "source_identity_verified": false,
+              "package_persistence_verified": false
+            },
+            "returned_schema": {
+              "passed": true
+            }
+          },
+          "scope": "replacement_single_operation",
+          "source_identity_verified": false,
+          "package_persistence_verified": false,
+          "autonomous_acceptance": false
+        },
+        "effective_settings_0": {
+          "passed": true
+        },
+        "output_node-preserved-create-a862a34d": {
+          "passed": true,
+          "checks": {
+            "configuration": {
+              "passed": true,
+              "failures": [],
+              "scope": "replacement_raw_configuration"
+            },
+            "output": {
+              "passed": true,
+              "failures": [],
+              "execution_id": "1789291388339-lohyx1s2as:214:7",
+              "scope": "fresh_calculator_table_against_independent_expected",
+              "source_identity_verified": false,
+              "package_persistence_verified": false
+            },
+            "returned_schema": {
+              "passed": true
+            }
+          },
+          "scope": "replacement_single_operation",
+          "source_identity_verified": false,
+          "package_persistence_verified": false,
+          "autonomous_acceptance": false
+        },
+        "effective_settings_1": {
+          "passed": true
+        },
+        "output_node-preserved-add-c-a862a34d": {
+          "passed": true,
+          "checks": {
+            "configuration": {
+              "passed": true,
+              "failures": [],
+              "scope": "replacement_raw_configuration"
+            },
+            "output": {
+              "passed": true,
+              "failures": [],
+              "execution_id": "1789291388339-lohyx1s2as:214:9",
+              "scope": "fresh_calculator_table_against_independent_expected",
+              "source_identity_verified": false,
+              "package_persistence_verified": false
+            },
+            "returned_schema": {
+              "passed": true
+            }
+          },
+          "scope": "replacement_single_operation",
+          "source_identity_verified": false,
+          "package_persistence_verified": false,
+          "autonomous_acceptance": false
+        },
+        "effective_settings_2": {
+          "passed": true
+        },
+        "output_node-preserved-mode-replace-a862a34d": {
+          "passed": true,
+          "checks": {
+            "configuration": {
+              "passed": true,
+              "failures": [],
+              "scope": "replacement_raw_configuration"
+            },
+            "output": {
+              "passed": true,
+              "failures": [],
+              "execution_id": "1789291388339-lohyx1s2as:214:11",
+              "scope": "fresh_calculator_table_against_independent_expected",
+              "source_identity_verified": false,
+              "package_persistence_verified": false
+            },
+            "returned_schema": {
+              "passed": true
+            }
+          },
+          "scope": "replacement_single_operation",
+          "source_identity_verified": false,
+          "package_persistence_verified": false,
+          "autonomous_acceptance": false
+        },
+        "effective_settings_3": {
+          "passed": true
+        },
+        "output_node-preserved-mode-add-final-a862a34d": {
+          "passed": true,
+          "checks": {
+            "configuration": {
+              "passed": true,
+              "failures": [],
+              "scope": "replacement_raw_configuration"
+            },
+            "output": {
+              "passed": true,
+              "failures": [],
+              "execution_id": "1789291388339-lohyx1s2as:214:13",
+              "scope": "fresh_calculator_table_against_independent_expected",
+              "source_identity_verified": false,
+              "package_persistence_verified": false
+            },
+            "returned_schema": {
+              "passed": true
+            }
+          },
+          "scope": "replacement_single_operation",
+          "source_identity_verified": false,
+          "package_persistence_verified": false,
+          "autonomous_acceptance": false
+        },
+        "effective_settings_4": {
+          "passed": true
+        },
+        "two_deliveries": {
+          "passed": true
+        },
+        "owned_draft": {
+          "passed": true
+        },
+        "runtime_target": {
+          "passed": true
+        },
+        "import_contract_0": {
+          "passed": true
+        },
+        "import_config_0": {
+          "passed": true,
+          "failures": [],
+          "scope": "public_readback_raw_observations",
+          "package_persistence_verified": false
+        },
+        "delivery_0": {
+          "passed": true,
+          "failures": [],
+          "delivery": {
+            "operation_id": "deliver-main-a862a34d",
+            "state": "settled",
+            "outcome": {
+              "status": "SUCCEEDED",
+              "upload_operation_id": "deliver-main-a862a34d:upload",
+              "destination": "/test-2/Dock-node11-20260913-122247-a862a34d-input.csv",
+              "bytes": 124,
+              "sha256": "0e0151318f8307267dc1ed61b396c869303331dc8f1831cac8b7b5a73d2e2e4b",
+              "verification_id": "deliver-main-a862a34d:verify",
+              "cleanup_complete": true,
+              "upload_completion_verified": true
+            },
+            "error": null,
+            "phase": "completed",
+            "upload_operation_id": "deliver-main-a862a34d:upload"
+          },
+          "scope": "public_delivery_receipts",
+          "hermes_acceptance_verified": false
+        },
+        "source_0": {
+          "passed": true,
+          "failures": [],
+          "columns_verified": 5,
+          "scope": "integrated_delivery_to_fresh_import_output",
+          "execution_verified": true,
+          "package_persistence_verified": false,
+          "hermes_acceptance_verified": false,
+          "journal_authentication_verified": false,
+          "execution_id": "1789291388339-lohyx1s2as:214:1",
+          "output_data_verified": true,
+          "integrated_delivery_verified": true
+        },
+        "import_contract_1": {
+          "passed": true
+        },
+        "import_config_1": {
+          "passed": true,
+          "failures": [],
+          "scope": "public_readback_raw_observations",
+          "package_persistence_verified": false
+        },
+        "delivery_1": {
+          "passed": true,
+          "failures": [],
+          "delivery": {
+            "operation_id": "deliver-partial-a862a34d",
+            "state": "settled",
+            "outcome": {
+              "status": "SUCCEEDED",
+              "upload_operation_id": "deliver-partial-a862a34d:upload",
+              "destination": "/test-2/Dock-node11-20260913-122247-a862a34d-partial-input.csv",
+              "bytes": 67,
+              "sha256": "e195cdcbcc187601a822f31e26fc7d55f9507c66c51cb9e9d799d785649a1123",
+              "verification_id": "deliver-partial-a862a34d:verify",
+              "cleanup_complete": true,
+              "upload_completion_verified": true
+            },
+            "error": null,
+            "phase": "completed",
+            "upload_operation_id": "deliver-partial-a862a34d:upload"
+          },
+          "scope": "public_delivery_receipts",
+          "hermes_acceptance_verified": false
+        },
+        "source_1": {
+          "passed": true,
+          "failures": [],
+          "columns_verified": 4,
+          "scope": "integrated_delivery_to_fresh_import_output",
+          "execution_verified": true,
+          "package_persistence_verified": false,
+          "hermes_acceptance_verified": false,
+          "journal_authentication_verified": false,
+          "execution_id": "1789291388339-lohyx1s2as:214:3",
+          "output_data_verified": true,
+          "integrated_delivery_verified": true
+        },
+        "public_calls": {
+          "passed": true,
+          "failures": [],
+          "scope": "public_node_and_save_receipts",
+          "hermes_acceptance_verified": false,
+          "validation_refusals": []
+        },
+        "save_chain": {
+          "passed": true,
+          "failures": [],
+          "save_operation_ids": [
+            "save-checkpoint-a862a34d",
+            "save-reopen-a862a34d"
+          ],
+          "scope": "declared_save_stage_receipts",
+          "package_path": "/test-2/packages/Dock-acceptance-20260913-122247-a862a34d.lgp",
+          "settings_persistence_verified": false,
+          "hermes_acceptance_verified": false
+        },
+        "import_reopen_0": {
+          "passed": true,
+          "failures": [],
+          "scope": "real_prepare_binding_only",
+          "settings_persistence_verified": false,
+          "hermes_acceptance_verified": false
+        },
+        "import_persisted_0": {
+          "passed": true,
+          "failures": [],
+          "columns_verified": 5,
+          "scope": "existing_import_seed_patch_output",
+          "execution_verified": true,
+          "package_persistence_verified": false,
+          "hermes_acceptance_verified": false,
+          "journal_authentication_verified": false,
+          "execution_id": "1789291388339-lohyx1s2as:214:15",
+          "output_data_verified": true,
+          "seed_execution_id": "1789291388339-lohyx1s2as:214:1",
+          "expected_settings": {
+            "source": {
+              "source_path": "/test-2/Dock-node11-20260913-122247-a862a34d-input.csv",
+              "encoding": "UTF-8",
+              "rows_to_skip": 0,
+              "first_line_as_title": true
+            },
+            "format": {
+              "delimiter": ";",
+              "decimal_separator": ".",
+              "null_marker": "NULL",
+              "text_qualifier": "\""
+            },
+            "columns": [
+              {
+                "name": "Id",
+                "label": "Id",
+                "type": "integer",
+                "data_kind": "Дискретный",
+                "used": true
+              },
+              {
+                "name": "Category",
+                "label": "Category",
+                "type": "string",
+                "data_kind": "Дискретный",
+                "used": true
+              },
+              {
+                "name": "Code",
+                "label": "Code",
+                "type": "integer",
+                "data_kind": "Дискретный",
+                "used": true
+              },
+              {
+                "name": "Amount",
+                "label": "Amount",
+                "type": "real",
+                "data_kind": "Непрерывный",
+                "used": true
+              },
+              {
+                "name": "Keep",
+                "label": "Keep",
+                "type": "string",
+                "data_kind": "Дискретный",
+                "used": true
+              }
+            ]
+          },
+          "unrequested_settings_preserved": true,
+          "wizard_open_verified": true,
+          "deactivation_verified": false
+        },
+        "import_reopen_1": {
+          "passed": true,
+          "failures": [],
+          "scope": "real_prepare_binding_only",
+          "settings_persistence_verified": false,
+          "hermes_acceptance_verified": false
+        },
+        "import_persisted_1": {
+          "passed": true,
+          "failures": [],
+          "columns_verified": 4,
+          "scope": "existing_import_seed_patch_output",
+          "execution_verified": true,
+          "package_persistence_verified": false,
+          "hermes_acceptance_verified": false,
+          "journal_authentication_verified": false,
+          "execution_id": "1789291388339-lohyx1s2as:214:17",
+          "output_data_verified": true,
+          "seed_execution_id": "1789291388339-lohyx1s2as:214:3",
+          "expected_settings": {
+            "columns": [
+              {
+                "data_kind": "Дискретный",
+                "label": "A",
+                "name": "A",
+                "type": "string",
+                "used": true
+              },
+              {
+                "data_kind": "Дискретный",
+                "label": "A_Replace",
+                "name": "A_Replace",
+                "type": "string",
+                "used": true
+              },
+              {
+                "data_kind": "Дискретный",
+                "label": "B",
+                "name": "B",
+                "type": "string",
+                "used": true
+              },
+              {
+                "data_kind": "Дискретный",
+                "label": "C",
+                "name": "C",
+                "type": "string",
+                "used": true
+              }
+            ],
+            "format": {
+              "decimal_separator": ".",
+              "delimiter": ";",
+              "null_marker": "NULL",
+              "text_qualifier": "\""
+            },
+            "source": {
+              "encoding": "UTF-8",
+              "first_line_as_title": true,
+              "rows_to_skip": 0,
+              "source_path": "/test-2/Dock-node11-20260913-122247-a862a34d-partial-input.csv"
+            }
+          },
+          "unrequested_settings_preserved": true,
+          "wizard_open_verified": true,
+          "deactivation_verified": false
+        },
+        "persistence_expected-multi.json": {
+          "passed": true,
+          "failures": [],
+          "scope": "codex_replacement_save_reopen_reexecute",
+          "autonomous_acceptance": false
+        },
+        "persistence_expected-partial-add.json": {
+          "passed": true,
+          "failures": [],
+          "scope": "codex_replacement_save_reopen_reexecute",
+          "autonomous_acceptance": false
+        },
+        "required_gates": {
+          "passed": true
+        },
+        "harness_files": {
+          "passed": true,
+          "scope": "frozen_execution_harness_git_verified_with_explicit_reassessment_delta",
+          "baseline_commit": "5891dfdca2fcf94fe57739fca1a1b492df458513",
+          "execution_inputs": 252,
+          "full_inventory_inputs": 253,
+          "changed": {
+            "replacement_persistence_evidence.py": {
+              "execution_sha256": "2c636a9b20d83609b298072dcb24468bee13e05d5d02b7e1356b4abe2c245c5e",
+              "reassessment_sha256": "5449a8f2cad5b53a0aa46cf5003182f3fdc747456581618e75854d88e9037f33"
+            }
+          },
+          "added": {
+            "replacement_reassessment.py": "b2637f85d25acf80ef727ac726613110cadeb1038098cd139f82f97066ff633a",
+            "test_replacement_persistence_evidence.py": "41f4adeb2fe0e4f61e46642921f820a3892b832b180bb28b01540978b1a3ef27"
+          }
+        },
+        "current_runtime": {
+          "passed": true
+        },
+        "isolated_session_pins": {
+          "passed": true,
+          "checks": {
+            "working_session": {
+              "passed": true,
+              "session_id": "98ad4df2-15d1-437e-8d53-2890aa434abb"
+            },
+            "precheck_origin": {
+              "passed": true,
+              "session_id": "1bc29e49-d584-4c09-91b4-8f3dc7507a5d",
+              "pid": 92975
+            },
+            "geometry_0": {
+              "passed": true,
+              "session_id": "98ad4df2-15d1-437e-8d53-2890aa434abb",
+              "operation_id": "prep-node11-a862a34d",
+              "observed": {
+                "document_id": "1789291388339-lohyx1s2as",
+                "origin": "http://logi-test-plan.bg.local/",
+                "pathname": "/app/",
+                "visibility": "visible",
+                "inner_width": 1508,
+                "inner_height": 862,
+                "outer_width": 1508,
+                "outer_height": 949,
+                "screen_x": 4,
+                "screen_y": 33,
+                "available_left": 0,
+                "available_top": 33,
+                "available_width": 1512,
+                "available_height": 949
+              }
+            },
+            "geometry_1": {
+              "passed": true,
+              "session_id": "98ad4df2-15d1-437e-8d53-2890aa434abb",
+              "operation_id": "prep-reopened-a862a34d",
+              "observed": {
+                "document_id": "1789291388339-lohyx1s2as",
+                "origin": "http://logi-test-plan.bg.local/",
+                "pathname": "/app/",
+                "visibility": "visible",
+                "inner_width": 1508,
+                "inner_height": 862,
+                "outer_width": 1508,
+                "outer_height": 949,
+                "screen_x": 4,
+                "screen_y": 33,
+                "available_left": 0,
+                "available_top": 33,
+                "available_width": 1512,
+                "available_height": 949
+              }
+            }
+          }
+        }
+      },
+      "scope": "node11_typed_partial_mode_switch_and_persistence",
+      "autonomous_acceptance": true,
+      "subplan_complete": false
+    }
+  },
+  "artifacts": {
+    "reassessment": {
+      "path": ".dock/replacement/autonomous-v2/persistence-reassessment-v2.json",
+      "sha256": "8550439c1398bc60aaa6f181e3ce31fe674fa7d08127f77f5ea891cc3ac255eb",
+      "bytes": 22441
+    },
+    "tests": {
+      "path": ".dock/replacement/autonomous-v2/reassessment-tests.log",
+      "sha256": "5e91e0bb2aa66fa24a27e9518d4abfaa34b1a4711e1507f3f490cf6dc777da11",
+      "bytes": 4943
+    }
+  },
+  "older_preserved": {
+    "original_FAIL55_59_artifacts": 8,
+    "A1_A3_artifacts": 10,
+    "candidate_v2_preflight_artifacts": 8,
+    "all_sha_and_sizes_unchanged": true
+  },
+  "hermes_runs_this_phase": 0,
+  "live_browser_started": false,
+  "product_runtime_changed": false,
+  "goal_changed": false,
+  "execution_pins_changed": false,
+  "limitations": [
+    "Offline reassessment of one original execution; no new autonomous run.",
+    "Original FAIL57/59 remains immutable; new verifier identity and result are separate.",
+    "Candidate remains staged, not activated; coordinator acceptance/review/merge are separate."
+  ]
+}

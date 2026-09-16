@@ -1,0 +1,9 @@
+{
+  "status": "FAILED",
+  "reason": "node_not_selected_after_input_port_cancel",
+  "input_preserved": true,
+  "input_draft_cancelled": true,
+  "settings_applied": false,
+  "graph_unlocked": true,
+  "next_settings_open_not_attempted": true
+}

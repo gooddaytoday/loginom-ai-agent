@@ -1,0 +1,274 @@
+diff --git a/client/lib/node-apply.mjs b/client/lib/node-apply.mjs
+index 622efe8d..88edfe16 100644
+--- a/client/lib/node-apply.mjs
++++ b/client/lib/node-apply.mjs
+@@ -234,7 +234,22 @@ export async function applyNode({request, operation, handlers, drivers, record,
+     if(request.finish==='execute') {
+       state.execution={status:'pending',execution_id:finish.execution_id};
+       const execution=await phase('execute',ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
+-        verify:value=>requireValue(value.execution_id===state.execution.execution_id && ['completed','cancelled'].includes(value.status) && (value.status!=='cancelled'||stopSignal?.aborted===true&&value.stop_verified===true&&value.owner_verified===true), 'Execution is neither freshly completed nor verified cancelled')});
++        verify:value=>requireValue(value.execution_id===state.execution.execution_id && ['completed','cancelled','failed'].includes(value.status)
++          && (value.status!=='cancelled'||stopSignal?.aborted===true&&value.stop_verified===true&&value.owner_verified===true)
++          && (value.status!=='failed'||value.failure_verified===true&&value.output_refreshed===false
++            &&['document_id','workflow_id','node_id'].every(k=>value.node?.[k]===state.node[k])&&id(value.root_id)&&id(value.group_id)&&id(value.group_record_id)
++            &&value.execution_id===state.node.document_id+':'+value.root_id+':'+value.group_id
++            &&value.error?.code==='NODE_EXECUTION_FAILED'&&typeof value.error.message==='string'&&value.error.message.trim().length>0&&value.error.message.length<=1000), 'Execution has no verified terminal outcome')});
++      if(execution.status==='failed') {
++        state.execution={status:'failed',execution_id:execution.execution_id,failure_verified:true,
++          root_id:execution.root_id,group_id:execution.group_id,group_record_id:execution.group_record_id};
++        const result={operation_id:operation.id,status:'FAILED',effect_possible:state.effect_possible,
++          phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
++          package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:'applied'},
++          checkpoint_kind:'local_node_failed',persisted_package_verified:false,error:execution.error};
++        await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
++        return result;
++      }
+       if(execution.status==='cancelled') {
+         state.execution={status:'cancelled',execution_id:execution.execution_id,stop_verified:true};
+         const result={operation_id:operation.id,status:'FAILED',effect_possible:state.effect_possible,
+diff --git a/client/lib/node-execution-evidence.mjs b/client/lib/node-execution-evidence.mjs
+index ebbf954b..256bf96f 100644
+--- a/client/lib/node-execution-evidence.mjs
++++ b/client/lib/node-execution-evidence.mjs
+@@ -59,6 +59,21 @@ export function verifyCompletedExecution(execution,snapshot,owner) {
+     process_id:p.process_id,process_record_id:p.record_id,group_id:execution.group_id,owner_verified:true};
+ }
+ 
++// A dependency can fail before the requested child starts. This proves failure
++// of the uniquely identified launch group, not execution of that child.
++export function verifyFailedExecution(execution,snapshot) {
++  const ps=inventory(snapshot,execution.node,execution.root_id);
++  const group=ps.find(p=>p.parent_id===null&&p.process_id===execution.group_id&&p.record_id===execution.group_record_id);
++  requireValue(execution.execution_id===execution.node.document_id+':'+execution.root_id+':'+execution.group_id,
++    'Failed execution identity differs');
++  requireValue(group?.error===true&&group.progress_state?.verified===true&&group.progress_state.state==='failed'
++    &&group.progress_state.source==='native_progress_record'&&group.progress_state.terminal===true
++    &&group.progress_state.can_cancel===false&&nonempty(group.error_details?.trim()),'Same execution group must have a verified terminal failure and reason');
++  return {verified:true,status:'failed',execution_id:execution.execution_id,node:structuredClone(execution.node),
++    root_id:execution.root_id,group_id:execution.group_id,group_record_id:execution.group_record_id,
++    failure_verified:true,output_refreshed:false,error:{code:'NODE_EXECUTION_FAILED',message:group.error_details.slice(0,1000)}};
++}
++
+ // Upstream dependencies can add sibling processes to this launch. Their captions
+ // do not identify the requested child; use cached ModelNode object ownership.
+ // Show Node remains an independent check before accepting completion.
+diff --git a/client/lib/node-execution-procedure.mjs b/client/lib/node-execution-procedure.mjs
+index 6b25a35d..a327ccce 100644
+--- a/client/lib/node-execution-procedure.mjs
++++ b/client/lib/node-execution-procedure.mjs
+@@ -1,5 +1,5 @@
+ import {NodeReadinessTimeout} from './node-procedure.mjs';
+-import {captureExecutionBaseline,identifyNewExecution,verifyCompletedExecution,selectExecutionChild,expectedExecutionStopProof,verifyCancelledExecution} from './node-execution-evidence.mjs';
++import {captureExecutionBaseline,identifyNewExecution,verifyCompletedExecution,verifyFailedExecution,selectExecutionChild,expectedExecutionStopProof,verifyCancelledExecution} from './node-execution-evidence.mjs';
+ 
+ const requireValue=(v,m)=>{if(!v)throw new Error(m);};
+ const one=(xs,message)=>{requireValue(xs.length===1,message);return xs[0];};
+@@ -244,6 +244,7 @@ export function createNodeExecutionProcedure(channel,node) {
+                 &&p.record_id===execution.group_record_id);
+               requireValue(group,'Execution group replaced while waiting');
+               if(group.state==='completed'&&group.error===false)return true;
++              if(group.progress_state?.state==='failed') {verifyFailedExecution(execution,s.node_processes);return true;}
+               if(group.progress_state?.verified===true&&group.progress_state.terminal===true)
+                 throw Error('Node execution ended without success: '+group.progress_state.state);
+             }
+@@ -264,6 +265,13 @@ export function createNodeExecutionProcedure(channel,node) {
+         }
+       }
+       const group=one(s.node_processes.processes.filter(p=>p.process_id===execution.group_id&&p.record_id===execution.group_record_id),'Execution group replaced');
++      if(group.progress_state?.state==='failed') {
++        const receipt=verifyFailedExecution(execution,s.node_processes);
++        await act(s,'ConsoleForm;btnClose','click',fresh=>verifyFailedExecution(execution,fresh.node_processes));
++        await observe('failed execution console closed',s=>!consoleVisible(s));
++        await returnToExecutedWorkflow(channel,node);
++        return {...receipt,cleanup_complete:true,effect_possible:false};
++      }
+       s=await revealChildren(s,group);
+       const child=selectExecutionChild(execution,s.node_processes);
+       const childTid=processControl(child);
+diff --git a/client/lib/node-operation-runner.mjs b/client/lib/node-operation-runner.mjs
+index b80240a5..94d74969 100644
+--- a/client/lib/node-operation-runner.mjs
++++ b/client/lib/node-operation-runner.mjs
+@@ -32,7 +32,9 @@ export function createNodeOperationRunner({run,validate,progress}) {
+    const signature=digest({request,handler_revision:validate(request)}),old=jobs.get(request.operation_id);
+    if(old) {
+     if(old.signature!==signature)throw Error('Node operation ID was used with different parameters');
+-    if(!resume||old.state==='running'||old.outcome?.status==='SUCCEEDED'||old.outcome?.output?.execution?.status==='cancelled')return snapshot(old);
++    if(!resume||old.state==='running'||old.outcome?.status==='SUCCEEDED'||old.outcome?.output?.execution?.status==='cancelled'
++      ||old.outcome?.status==='FAILED'&&old.outcome.cleanup_complete===true&&old.outcome.output?.execution?.status==='failed'
++        &&old.outcome.output.execution.failure_verified===true)return snapshot(old);
+     if([...jobs.values()].some(job=>job.state==='running'))throw Error('Another node operation is running');
+     return launch(request,signature,old.attempt+1,true);
+    }
+diff --git a/client/lib/node-process-context.mjs b/client/lib/node-process-context.mjs
+index c032f4c3..0c84115a 100644
+--- a/client/lib/node-process-context.mjs
++++ b/client/lib/node-process-context.mjs
+@@ -69,7 +69,8 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo
+           &&(detailed==='completed')===(d.Status===3)&&!(terminal&&d.CanCancelProcess);
+         const progress_state=statusValid?{verified:true,state:detailed,terminal,can_cancel:d.CanCancelProcess,
+           source:'native_progress_record'}:{verified:false};
+-        processes.push({process_id:id,record_id:record,parent_id:parent,state,error,rendered,selected,process_tid:path,
++        processes.push({process_id:id,record_id:record,parent_id:parent,state,error,
++          ...(error&&typeof d.ErrorDetails==='string'?{error_details:d.ErrorDetails.trim().slice(0,1000)}:{}),rendered,selected,process_tid:path,
+           expander_tid,expanded,children_loaded:d.loaded===true,caption:typeof d.text==='string'?d.text.slice(0,240):null,progress_state,
+           ...(owner&&d.ModelNode===owner.data?{owner:{verified:true,node_id:nodeId,source:'native_process_model_identity'}}:{})});
+         if(Array.isArray(n.childNodes)&&n.childNodes.length)walk(n.childNodes,id);
+diff --git a/client/lib/node-result-schema.mjs b/client/lib/node-result-schema.mjs
+--- a/client/lib/node-result-schema.mjs
++++ b/client/lib/node-result-schema.mjs
+@@ -8,7 +8,8 @@
+ const ref=object({document_id:str,workflow_id:str,node_id:str});
+ const error=object({code:str,message:str,cause:object({code:str,message:str})},['code','message']);
+ const phase=values('validate','source','workflow','target','input_mapping','open','configure','node_finish','output_mapping','finish','execute','read');
+-const execution=object({status:values('not_requested','pending','completed','cancelled'),execution_id:nullable(str),stop_verified:bool},['status','execution_id']);
++const execution={anyOf:[object({status:values('not_requested','pending','completed','cancelled'),execution_id:nullable(str),stop_verified:bool},['status','execution_id']),
++ object({status:values('failed'),execution_id:str,failure_verified:{type:'boolean',const:true},root_id:str,group_id:str,group_record_id:str})]};
+ const receipt=object({phase,receipt_id:str,status:values('pending','verified','not_requested'),effect_possible:bool});
+ const cell=object({type:str,is_null:bool,value:{type:['string','number','boolean','null']},decimal:str,
+  representation:str,precision:str,display_text:str,timezone:str},['type','is_null','precision']);
+@@ -84,7 +85,7 @@
+  effect_possible:bool,phases:array(receipt),node:nullable(ref),execution,output,
+  package_saved:{type:'boolean',const:false},cleanup_complete:bool,warnings:array(str),
+  configuration:object({status:values('applied','discarded'),readback:configurationReadback},['status']),
+- checkpoint_kind:values('local_node_checkpoint','local_node_cancellation','local_node_stopped'),
++ checkpoint_kind:values('local_node_checkpoint','local_node_cancellation','local_node_stopped','local_node_failed'),
+  persisted_package_verified:{type:'boolean',const:false},pending_phase:nullable(phase),error},
+  ['operation_id','status','effect_possible','phases','node','execution','output','package_saved','cleanup_complete','warnings']);
+ const outcome=object({status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),action_key:{type:'string',const:'node.apply'},
+diff --git a/client/lib/node-contracts.d.ts b/client/lib/node-contracts.d.ts
+index 257c3a9a..446f4e5b 100644
+--- a/client/lib/node-contracts.d.ts
++++ b/client/lib/node-contracts.d.ts
+@@ -53,7 +53,7 @@ export interface NodeApplyResult {
+   /** A local node checkpoint never proves that the package was saved. */
+   package_saved: false; cleanup_complete: boolean; warnings: string[];
+   configuration?: {status: 'applied' | 'discarded'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | MissingValuesConfigurationReadback | JoinConfigurationReadback};
+-  checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped';
++  checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped' | 'local_node_failed';
+   persisted_package_verified?: false; pending_phase?: PhaseName | null; error?: NodeError;
+ }
+ export interface TextImportConfigurationReadback {
+@@ -117,7 +117,8 @@ export interface SortingConfigurationReadback {
+   output_mapping: GroupingConfigurationReadback['output_mapping'];
+ }
+ export interface NodeError {code: string; message: string; cause?: {code: string; message: string}}
+-export interface NodeExecution {status: 'not_requested' | 'pending' | 'completed' | 'cancelled'; execution_id: string | null; stop_verified?: boolean}
++export type NodeExecution = {status: 'not_requested' | 'pending' | 'completed' | 'cancelled'; execution_id: string | null; stop_verified?: boolean}
++  | {status: 'failed'; execution_id: string; failure_verified: true; root_id: string; group_id: string; group_record_id: string};
+ export interface TableCell {
+   type: string; is_null: boolean; precision: string;
+   /** Exact integers are decimal strings; real values retain canonical decimal text. */
+diff --git a/client/test/node-apply.test.mjs b/client/test/node-apply.test.mjs
+index 30f719dc..995062b4 100644
+--- a/client/test/node-apply.test.mjs
++++ b/client/test/node-apply.test.mjs
+@@ -68,7 +68,7 @@ for(const [name,alter] of Object.entries({doneRead:p=>{p.finish='done'},budget:p
+ for(const [phase,value,error] of [
+  ['target',{node:{document_id:'other',workflow_id:'workflow',node_id:'node1'}},/foreign node/],
+  ['finish',{mode:'done'},/finish mode/],['finish',{execution_id:null},/execution identity/],
+- ['execute',{execution_id:'previous'},/freshly completed/],['execute',{status:'running'},/freshly completed/],
++ ['execute',{execution_id:'previous'},/verified terminal outcome/],['execute',{status:'running'},/verified terminal outcome/],
+  ['read',{execution_id:'previous'},/bound/],['read',{ports:[{port:1,fresh:true}]},/bound/],['read',{ports:[{port:0,fresh:false}]},/bound/],
+  ['configure',{verified:false},/did not verify/],['finish',{cleanup_complete:false},/did not verify/]]){
+  test('reject bad '+phase+' fact '+JSON.stringify(value),async()=>{const f=fixture({badPhase:phase,badResult:value}),r=await f.run();assert.equal(r.status,'AMBIGUOUS');assert.match(r.error.message,error);assert.equal(r.pending_phase,phase);assert.ok(!f.records.some(e=>e.phase==='node_checkpoint'));assert.ok(!f.records.some(e=>e.phase==='node_phase_completed'&&e.receipt.phase===phase))});
+@@ -185,3 +185,21 @@ for(const verification of ['reform_mapped_preflight_completed','missing_values_p
+   const r=await f.run();assert.equal(r.status,'AMBIGUOUS');assert.equal(r.pending_phase,'target');assert.equal(r.cleanup_complete,false);
+  }
+ });
++
++test('verified failed execution settles once without output and refuses unproven failure receipts',async()=>{
++ const proof={verified:true,cleanup_complete:true,status:'failed',execution_id:'doc:root:1',node:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},
++  root_id:'root',group_id:'1',group_record_id:'record',failure_verified:true,output_refreshed:false,error:{code:'NODE_EXECUTION_FAILED',message:'Input file not found'}};
++ for(const mutate of [null,p=>p.failure_verified=false,p=>p.cleanup_complete=false,p=>p.node.node_id='foreign',p=>p.root_id='other',p=>p.error.message='',p=>p.output_refreshed=true]){
++  const f=fixture(),p=structuredClone(proof);mutate?.(p);
++  f.drivers.finish=async()=>({mode:'execute',verified:true,cleanup_complete:true,execution_id:'doc:root:1',execution_started:true});
++  f.drivers.waitExecution=async()=>p;
++  const result=await f.run();assert.equal(result.status,mutate?'AMBIGUOUS':'FAILED');assert.ok(!f.calls.includes('read'));
++  if(!mutate){assert.equal(result.execution.status,'failed');assert.equal(result.cleanup_complete,true);assert.equal(result.error.message,proof.error.message);
++   const calls=f.calls.length;assert.deepEqual(await f.run(),result);assert.equal(f.calls.length,calls);}
++ }
++ for(const failure of ['phase','checkpoint']) {
++  const f=fixture();f.drivers.finish=async()=>({mode:'execute',verified:true,cleanup_complete:true,execution_id:'doc:root:1'});f.drivers.waitExecution=async()=>proof;
++  const result=await f.run(request(),{record:async e=>{if(failure==='phase'&&e.phase==='node_phase_completed'&&e.receipt.phase==='execute'||failure==='checkpoint'&&e.phase==='node_checkpoint')throw Error('disk unavailable');return structuredClone(e);}});
++  assert.equal(result.status,'AMBIGUOUS');assert.equal(f.operation.nodeApply.result,undefined);
++ }
++});
+diff --git a/client/test/node-execution-evidence.test.mjs b/client/test/node-execution-evidence.test.mjs
+index 299f1276..7667cd58 100644
+--- a/client/test/node-execution-evidence.test.mjs
++++ b/client/test/node-execution-evidence.test.mjs
+@@ -82,3 +82,17 @@ test('one oldest completed eviction preserves the unique next execution identity
+  }
+  before.processes[0].state='pending_or_failed';assert.throws(()=>identifyNewExecution(captureExecutionBaseline(before,node),after));
+ });
++
++test('failed launch retains its native group and reason without claiming that the target child executed',async()=>{
++ const {verifyFailedExecution}=await import('../lib/node-execution-evidence.mjs');
++ const s=structuredClone(next),e=identifyNewExecution(captureExecutionBaseline(initial,node),s);
++ Object.assign(s.processes[1],{state:'pending_or_failed',error:true,error_details:'Input file not found',progress_state:{verified:true,state:'failed',terminal:true,can_cancel:false,source:'native_progress_record'}});
++ s.processes[2].state='pending_or_failed';
++ const r=verifyFailedExecution(e,s);assert.equal(r.status,'failed');assert.equal(r.group_record_id,'record-2');assert.equal(r.error.message,'Input file not found');assert.equal(r.output_refreshed,false);
++ for(const change of [x=>x.root_id='foreign',x=>x.node_context.node_id='foreign',x=>x.inventory_complete=false,
++  x=>x.processes[1].record_id='foreign',x=>x.processes[1].error=false,x=>x.processes[1].error_details='',
++  x=>x.processes[1].progress_state.verified=false,x=>x.processes[1].progress_state.state='parent_failed',
++  x=>x.processes[1].progress_state.terminal=false,x=>x.processes[1].progress_state.can_cancel=true,x=>x.processes[1].progress_state.source='caption']){
++  const bad=structuredClone(s);change(bad);assert.throws(()=>verifyFailedExecution(e,bad));
++ }
++});
+diff --git a/client/test/node-execution-focus.test.mjs b/client/test/node-execution-focus.test.mjs
+index 47e374d6..51a87e1c 100644
+--- a/client/test/node-execution-focus.test.mjs
++++ b/client/test/node-execution-focus.test.mjs
+@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
+ import {createNodeExecutionProcedure} from '../lib/node-execution-procedure.mjs';
+ const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
+ const button='MF;cntMain;tlbMainToolbar;btnProgress',grid='ConsoleForm;ProgressForm;trpProgress;grd;tbl';
+-async function fixture({hide=true,replace=false,lost=false}={}){
++async function fixture({hide=true,replace=false,lost=false,failure=false,closeFault=false}={}){
+  let opened=true,launched=false,selected=false,menu=false,shown=false;
+  const actions=[],el=(tid,allowed_actions=['click'])=>({tid,ref:tid,allowed_actions});
+  const state=()=>({prepared_node_context:{...node,verified:true,surface:'graph'},navigation_context:{status:'observed'},
+   node_outputs:{verified:true,node_selected:shown},
+   node_processes:{verified:opened,inventory_complete:true,show_completed:true,root_id:'root',node_context:{...node,verified:true},processes:launched?[
+-   {process_id:'1',record_id:'group',parent_id:null,state:'completed',error:false,children_loaded:true,expanded:true,rendered:true},
++   {process_id:'1',record_id:'group',parent_id:null,state:failure?'pending_or_failed':'completed',error:failure,children_loaded:true,expanded:true,rendered:true,...(failure?{error_details:'Missing own CSV',progress_state:{verified:true,state:'failed',terminal:true,can_cancel:false,source:'native_progress_record'}}:{})},
+    {process_id:'1.1',record_id:replace&&shown?'replaced':'child',parent_id:'1',state:'completed',error:false,rendered:true,selected,process_tid:'child-row'}]:[]},
+   ui:{elements:[el(button),...(opened?[el(grid,['right_click']),el('ConsoleForm;btnClose'),el('child-row',['right_click'])]:[]),
+    ...(menu?[el('mnContextMenu;mniShowCompletedProcesses',['click','press']),el('mnContextMenu;mniShowNodeToProcess',['show_process_node'])]:[])]}});
+@@ -19,7 +19,7 @@ async function fixture({hide=true,replace=false,lost=false}={}){
+   if(a.verb==='press')menu=false;
+   if(a.verb==='show_process_node'){shown=true;opened=!hide;menu=false;if(lost)throw Error('lost Show reply');}
+   if(a.ref===button)opened=true;
+-  if(a.ref==='ConsoleForm;btnClose')opened=false;
++  if(a.ref==='ConsoleForm;btnClose'){opened=false;if(launched&&closeFault)throw Error('Lost cleanup reply');}
+   return {status:'SUCCEEDED'};
+  }};
+  const driver=createNodeExecutionProcedure(channel,node);await driver.prepare();launched=true;await driver.identify();actions.length=0;
+@@ -52,3 +52,10 @@ test('long completed history refreshes before baseline and retains every server
+  assert.equal(actions.filter(a=>a.ref==='mnContextMenu;mniShowCompletedProcesses').length,2);
+  assert.equal(actions.some(a=>a.verb==='execute_graph_node'),false);
+ });
++
++for(const closeFault of [false,true])test('failed group cleans only its console and preserves uncertain cleanup: '+closeFault,async()=>{
++ const f=await fixture({failure:true,closeFault});
++ if(closeFault)await assert.rejects(f.driver.waitCompleted(),/Lost cleanup reply/);
++ else {const r=await f.driver.waitCompleted();assert.equal(r.status,'failed');assert.equal(r.cleanup_complete,true);assert.equal(r.error.message,'Missing own CSV');}
++ assert.deepEqual(f.actions.map(a=>a.ref),['ConsoleForm;btnClose']);
++});
+diff --git a/client/test/node-operation-failure.test.mjs b/client/test/node-operation-failure.test.mjs
+new file mode 100644
+index 00000000..afaa00c6
+--- /dev/null
++++ b/client/test/node-operation-failure.test.mjs
+@@ -0,0 +1,10 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import {createNodeOperationRunner} from '../lib/node-operation-runner.mjs';
++test('explicit resume of a settled terminal failure redelivers it without relaunch or attempt change',async()=>{
++ let calls=0;
++ const outcome={status:'FAILED',cleanup_complete:true,output:{execution:{status:'failed',failure_verified:true}}};
++ const r=createNodeOperationRunner({run:async()=>{calls++;return outcome;},validate:()=>1,progress:()=>null}),request={operation_id:'op'};
++ r.start(request);const first=await r.wait('op');
++ assert.equal(first.state,'settled');assert.deepEqual(r.start(request,{resume:true}),first);assert.equal(calls,1);
++});

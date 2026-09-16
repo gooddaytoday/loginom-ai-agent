@@ -1,0 +1,313 @@
+{
+  "operation_id": "readback",
+  "node": {
+    "document_id": "document",
+    "workflow_id": "workflow",
+    "node_id": "sales"
+  },
+  "phases": [
+    {
+      "phase": "configure",
+      "receipt_id": "readback:configure",
+      "status": "verified",
+      "effect_possible": true,
+      "value": {
+        "verified": true,
+        "cleanup_complete": true,
+        "effect_possible": true,
+        "source": {
+          "fields": {
+            "source_path": {
+              "status": "observed",
+              "value": "/storage/sales.csv",
+              "truncated": false
+            },
+            "connection": {
+              "status": "observed",
+              "value": "Локальное",
+              "truncated": false
+            },
+            "encoding": {
+              "status": "observed",
+              "value": "UTF-8 (65001)",
+              "truncated": false
+            },
+            "rows_to_skip": {
+              "status": "observed",
+              "value": "0",
+              "truncated": false
+            },
+            "first_line_as_title": {
+              "status": "observed",
+              "value": true
+            }
+          }
+        },
+        "format": {
+          "fields": {
+            "delimiter": {
+              "status": "observed",
+              "value": "Точка с запятой",
+              "truncated": false
+            },
+            "text_qualifier": {
+              "status": "observed",
+              "value": "Двойная кавычка (\")",
+              "truncated": false
+            },
+            "null_marker": {
+              "status": "observed",
+              "value": "\\N",
+              "truncated": false
+            },
+            "decimal_separator": {
+              "status": "observed",
+              "value": "Точка (.)",
+              "truncated": false
+            }
+          }
+        },
+        "columns": [
+          {
+            "status": "observed",
+            "index": 0,
+            "name": "Id",
+            "label": "Id",
+            "type": "integer",
+            "data_kind": "Непрерывный",
+            "used": true
+          },
+          {
+            "status": "observed",
+            "index": 1,
+            "name": "Region",
+            "label": "Region",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          },
+          {
+            "status": "observed",
+            "index": 2,
+            "name": "Quantity",
+            "label": "Quantity",
+            "type": "integer",
+            "data_kind": "Непрерывный",
+            "used": true
+          },
+          {
+            "status": "observed",
+            "index": 3,
+            "name": "UnitPrice",
+            "label": "UnitPrice",
+            "type": "real",
+            "data_kind": "Непрерывный",
+            "used": true
+          },
+          {
+            "status": "observed",
+            "index": 4,
+            "name": "Comment",
+            "label": "Comment",
+            "type": "string",
+            "data_kind": "Дискретный",
+            "used": true
+          }
+        ]
+      }
+    },
+    {
+      "phase": "output_mapping",
+      "receipt_id": "readback:output_mapping",
+      "status": "verified",
+      "effect_possible": true,
+      "value": {
+        "verified": true,
+        "cleanup_complete": true,
+        "effect_possible": true,
+        "native_mapping": {
+          "verified": true,
+          "source_identity_verified": true,
+          "inventory_complete": true,
+          "state_source": "cached_mapping_stores",
+          "autosync": false,
+          "source_fields": [
+            {
+              "record_id": "1286",
+              "field_id": "0",
+              "index": 0,
+              "name": "Id",
+              "label": "Id",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "record_id": "1287",
+              "field_id": "1",
+              "index": 1,
+              "name": "Region",
+              "label": "Region",
+              "type": "string",
+              "required": true
+            },
+            {
+              "record_id": "1288",
+              "field_id": "2",
+              "index": 2,
+              "name": "Quantity",
+              "label": "Quantity",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "record_id": "1289",
+              "field_id": "3",
+              "index": 3,
+              "name": "UnitPrice",
+              "label": "UnitPrice",
+              "type": "real",
+              "required": true
+            },
+            {
+              "record_id": "1290",
+              "field_id": "4",
+              "index": 4,
+              "name": "Comment",
+              "label": "Comment",
+              "type": "string",
+              "required": true
+            }
+          ],
+          "target_fields": [
+            {
+              "record_id": "1291",
+              "field_id": "0",
+              "index": 0,
+              "name": "Price",
+              "label": "Цена",
+              "type": "real",
+              "required": false,
+              "data_kind": "Непрерывный",
+              "source": {
+                "record_id": "1289",
+                "field_id": "3",
+                "index": 3,
+                "name": "UnitPrice",
+                "label": "UnitPrice",
+                "type": "real",
+                "required": true
+              }
+            },
+            {
+              "record_id": "1292",
+              "field_id": "1",
+              "index": 1,
+              "name": "Id",
+              "label": "Id",
+              "type": "integer",
+              "required": false,
+              "data_kind": "Непрерывный",
+              "source": {
+                "record_id": "1286",
+                "field_id": "0",
+                "index": 0,
+                "name": "Id",
+                "label": "Id",
+                "type": "integer",
+                "required": true
+              }
+            },
+            {
+              "record_id": "1293",
+              "field_id": "2",
+              "index": 2,
+              "name": "Region",
+              "label": "Region",
+              "type": "string",
+              "required": false,
+              "data_kind": "Дискретный",
+              "source": {
+                "record_id": "1287",
+                "field_id": "1",
+                "index": 1,
+                "name": "Region",
+                "label": "Region",
+                "type": "string",
+                "required": true
+              }
+            },
+            {
+              "record_id": "1294",
+              "field_id": "3",
+              "index": 3,
+              "name": "Quantity",
+              "label": "Quantity",
+              "type": "integer",
+              "required": false,
+              "data_kind": "Непрерывный",
+              "source": {
+                "record_id": "1288",
+                "field_id": "2",
+                "index": 2,
+                "name": "Quantity",
+                "label": "Quantity",
+                "type": "integer",
+                "required": true
+              }
+            },
+            {
+              "record_id": "1295",
+              "field_id": "4",
+              "index": 4,
+              "name": "Comment",
+              "label": "Comment",
+              "type": "string",
+              "required": false,
+              "data_kind": "Дискретный",
+              "source": {
+                "record_id": "1290",
+                "field_id": "4",
+                "index": 4,
+                "name": "Comment",
+                "label": "Comment",
+                "type": "string",
+                "required": true
+              }
+            }
+          ],
+          "rendered_indices": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "settings_applied": false,
+          "package_saved": false,
+          "node_context": {
+            "verified": true,
+            "document_id": "1788894234375-aszvr20jozb",
+            "workflow_id": "1788894234375-aszvr20jozb-2",
+            "node_id": "fc94c88b-6b37-451b-9d57-a9378122d8a3",
+            "surface": "wizard",
+            "tid": "MF;TF-4;WizrdMCF"
+          }
+        },
+        "source_identity_verified": true
+      }
+    },
+    {
+      "phase": "finish",
+      "receipt_id": "readback:finish",
+      "status": "verified",
+      "effect_possible": true,
+      "value": {
+        "verified": true,
+        "cleanup_complete": true,
+        "effect_possible": true,
+        "mode": "execute",
+        "settings_applied": true
+      }
+    }
+  ]
+}

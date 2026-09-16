@@ -1,0 +1,26 @@
+{$LOGINOM_DOCK_DOMAIN} {
+	encode zstd gzip
+	@connect path /studio/connect /studio/connect/
+	redir @connect "https://loginom-dock.duckdns.org/#install" 302
+	reverse_proxy openviking:1933
+}
+
+loginom-dock.duckdns.org {
+	root * /srv/loginom-dock-landing
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+	@pages not path /assets/*.woff2
+	header @pages Cache-Control "no-cache"
+	@fonts path /assets/*.woff2
+	header @fonts Cache-Control "public, max-age=31536000, immutable"
+	file_server
+	handle_errors {
+		rewrite * /404.html
+		file_server
+	}
+}

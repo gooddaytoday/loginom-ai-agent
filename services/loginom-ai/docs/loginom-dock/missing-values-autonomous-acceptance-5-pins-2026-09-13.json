@@ -1,0 +1,625 @@
+{
+  "assignment": "node14:autonomous-acceptance:5:611a9f0c",
+  "slot": "node14-hermes-20260913-run5-611a9f0c",
+  "run_id": "20260913-172045-ceabf472",
+  "source_commit": "611a9f0c2e159e7fe0f8f3e9b8b9c42d5908243c",
+  "launch_head": "c929fd81b3c62af7014cce0a8d97a6a8bd98bd63",
+  "runtime_revision": "68e8e7a7cac00b8afa45ac8f5b60bdcfa8832efc86ed34445f2bd4f1baf10e62",
+  "harness_inputs_sha256": "d1892694f20a8859efd5baa4f30ad1e1ea7849c256a7934323359c49c97fa0a7",
+  "manifest_sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad",
+  "result": "FAIL",
+  "summary": {
+    "run_id": "20260913-172045-ceabf472",
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning": "low",
+    "api_calls": 56,
+    "usage_completed": true,
+    "model_returncode": 0,
+    "model_timed_out": false,
+    "launcher_returncode": 0,
+    "counts": {
+      "calls": 63,
+      "replies": 63,
+      "events": 10016,
+      "prepared": 19,
+      "statuses": {
+        "SUCCEEDED": 17,
+        "NOT_APPLIED": 1,
+        "AMBIGUOUS": 1
+      },
+      "successful_imports": 9,
+      "successful_missing_values": 8,
+      "saves": 0
+    },
+    "pairing_errors": [],
+    "import_component_proofs": [
+      {
+        "operation_id": "import-120",
+        "scoped_proof": true,
+        "attempts": 3,
+        "full_goal_accepted": false
+      }
+    ],
+    "auth_guard": {
+      "policy": "existing-hermes-no-refresh-or-import-v1",
+      "installed": true,
+      "blocked_attempts": 0
+    },
+    "auth_connection_unchanged": true,
+    "runtime_unchanged": true,
+    "harness_unchanged": true,
+    "native_skill_unchanged": true,
+    "operations": [
+      {
+        "operation_id": "import-base",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 80
+        }
+      },
+      {
+        "operation_id": "import-precision",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 260
+        }
+      },
+      {
+        "operation_id": "import-skew",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 440
+        }
+      },
+      {
+        "operation_id": "import-boundary",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 620
+        }
+      },
+      {
+        "operation_id": "import-120",
+        "type": "imports.text",
+        "status": "NOT_APPLIED",
+        "effect_possible": false,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 800
+        }
+      },
+      {
+        "operation_id": "import-120-retry",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 500,
+          "y": 80
+        }
+      },
+      {
+        "operation_id": "import-allnull",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 500,
+          "y": 260
+        }
+      },
+      {
+        "operation_id": "import-empty",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 500,
+          "y": 440
+        }
+      },
+      {
+        "operation_id": "import-permutation",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 500,
+          "y": 620
+        }
+      },
+      {
+        "operation_id": "import-mutable",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 920,
+          "y": 80
+        }
+      },
+      {
+        "operation_id": "mv-main-create",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 300,
+          "y": 80
+        }
+      },
+      {
+        "operation_id": "mv-main-newnode",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": null
+      },
+      {
+        "operation_id": "mv-main-done",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": null
+      },
+      {
+        "operation_id": "mv-main-close-discard",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": null
+      },
+      {
+        "operation_id": "mv-main-reexecute-preserved",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": null
+      },
+      {
+        "operation_id": "mv-note-only",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 300,
+          "y": 170
+        }
+      },
+      {
+        "operation_id": "mv-precision",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 300,
+          "y": 260
+        }
+      },
+      {
+        "operation_id": "mv-skew",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 300,
+          "y": 440
+        }
+      },
+      {
+        "operation_id": "mv-boundary-40",
+        "type": "preprocessing.data_recovery",
+        "status": "AMBIGUOUS",
+        "effect_possible": true,
+        "cleanup_complete": false,
+        "pending_phase": "target",
+        "position": {
+          "x": 300,
+          "y": 620
+        },
+        "error": {
+          "code": "NODE_APPLY_STOPPED",
+          "message": "Node procedure step did not confirm completion; inspect before retry"
+        },
+        "last_target_checkpoint": null
+      }
+    ],
+    "full_goal_accepted": false,
+    "independent_reopen": false
+  },
+  "failure": {
+    "operation_id": "mv-boundary-40",
+    "result": {
+      "operation_id": "mv-boundary-40",
+      "status": "AMBIGUOUS",
+      "effect_possible": true,
+      "phases": [
+        {
+          "phase": "source",
+          "receipt_id": "mv-boundary-40:source",
+          "status": "verified",
+          "effect_possible": false
+        },
+        {
+          "phase": "workflow",
+          "receipt_id": "mv-boundary-40:workflow",
+          "status": "verified",
+          "effect_possible": false
+        }
+      ],
+      "node": null,
+      "execution": {
+        "status": "not_requested",
+        "execution_id": null
+      },
+      "output": {
+        "status": "not_refreshed",
+        "evidence_ref": null,
+        "ports": []
+      },
+      "package_saved": false,
+      "cleanup_complete": false,
+      "warnings": [],
+      "pending_phase": "target",
+      "error": {
+        "code": "NODE_APPLY_STOPPED",
+        "message": "Node procedure step did not confirm completion; inspect before retry"
+      }
+    },
+    "step": 14,
+    "internal_operation_id": "mv-boundary-40:n14",
+    "action": {
+      "verb": "click",
+      "ref": "ui-1789309288928-45stnyo6rkv-40789"
+    },
+    "step_status": "NOT_APPLIED",
+    "step_effect_possible": false,
+    "step_cleanup_complete": true,
+    "step_error": {
+      "code": "UI_REFERENCE_STALE",
+      "message": "Observed control is detached, hidden, disabled, or replaced"
+    },
+    "observed_control": [
+      {
+        "ref": "ui-1789309288928-45stnyo6rkv-40789",
+        "tid": "MF;TF-1;Graph;Граница",
+        "label": "",
+        "enabled": true,
+        "visible": true,
+        "scope": "graph"
+      },
+      {
+        "ref": "ui-1789309288928-45stnyo6rkv-40789",
+        "tid": "MF;TF-1;Graph;Граница",
+        "label": "",
+        "enabled": true,
+        "visible": true,
+        "scope": "graph"
+      },
+      {
+        "ref": "ui-1789309288928-45stnyo6rkv-40789",
+        "tid": "MF;TF-1;Graph;Граница",
+        "label": "",
+        "enabled": true,
+        "visible": true,
+        "scope": "graph"
+      }
+    ],
+    "target_event_count": 0,
+    "phase_counts": {
+      "prepared": 1,
+      "node_apply_prepared": 1,
+      "node_phase_prepared": 3,
+      "node_phase_completed": 2,
+      "node_observation_sample": 12,
+      "node_observation_completed": 9,
+      "node_step_prepared": 5,
+      "node_step_completed": 5,
+      "completed": 1,
+      "verification_delivered": 3
+    },
+    "live_root_cause_diagnosed": false
+  },
+  "audit": {
+    "passed": false,
+    "checks": {
+      "terminal_refusal_accounting": {
+        "passed": false,
+        "failures": [
+          "terminal_refusal_proof_mismatch"
+        ],
+        "scope": "missing_values_terminal_placement_refusals",
+        "full_goal_accepted": false
+      },
+      "incomplete_evidence": {
+        "passed": false,
+        "error": "Unproved prepared operation or refusal"
+      }
+    },
+    "scope": "full_missing_values_goal"
+  },
+  "slot_release": {
+    "slot": "node14-hermes-20260913-run5-611a9f0c",
+    "assignment": "node14:autonomous-acceptance:5:611a9f0c",
+    "run_id": "20260913-172045-ceabf472",
+    "released_at": "2026-09-13T14:48:04.575348+00:00",
+    "model_runs": 1,
+    "launcher_returncode": 0,
+    "model_returncode": 0,
+    "model_timed_out": false,
+    "audit": "FAIL",
+    "export_complete": true,
+    "independent_reopen_started": false,
+    "pre_reopen_gates_passed": false,
+    "process_count": 0,
+    "shared_auth_unchanged": true,
+    "disk_free_bytes": 99042947072,
+    "another_run_authorized": false
+  },
+  "old_evidence": {
+    "missing-values-acceptance5-preparation-pins-2026-09-13.json": {
+      "count": 62,
+      "unchanged": true,
+      "failures": []
+    },
+    "missing-values-remove-link-diagnosis-pins-2026-09-13.json": {
+      "count": 144,
+      "unchanged": true,
+      "failures": []
+    },
+    "missing-values-autonomous-acceptance-4-pins-2026-09-13.json": {
+      "count": 38,
+      "unchanged": true,
+      "failures": []
+    },
+    "missing-values-autonomous-acceptance-3-pins-2026-09-13.json": {
+      "count": 14,
+      "unchanged": true,
+      "failures": []
+    },
+    "missing-values-autonomous-acceptance-2-pins-2026-09-13.json": {
+      "count": 13,
+      "unchanged": true,
+      "failures": []
+    }
+  },
+  "receipts": {
+    ".dock/node14-autonomous-acceptance-5/authorization.json": {
+      "bytes": 464,
+      "sha256": "b5fe6eeb6f355d1e90e224e8d2f67c4cf8e3806809f0ed526d99347c2efda33c"
+    },
+    ".dock/node14-autonomous-acceptance-5/candidate/actions.json": {
+      "bytes": 34340,
+      "sha256": "d13b9342f913f4dbc3248b22d9d021a6ed4abdf178af3fb7d8d4f76a08f280da"
+    },
+    ".dock/node14-autonomous-acceptance-5/candidate/manifest.json": {
+      "bytes": 718,
+      "sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad"
+    },
+    ".dock/node14-autonomous-acceptance-5/candidate/selectors.json": {
+      "bytes": 23083,
+      "sha256": "03a83df5e2e5dc185ab1d6a985c3b6e23bf70ee7596786e99f5eaf32337c94a7"
+    },
+    ".dock/node14-autonomous-acceptance-5/candidate/source-index.json": {
+      "bytes": 3805,
+      "sha256": "b9e92ce80ffaf6bd8e19eb2fd62b61a926b898e5fe65deb75757833296da08ed"
+    },
+    ".dock/node14-autonomous-acceptance-5/candidate-readback.json": {
+      "bytes": 2154,
+      "sha256": "1ed4b4dec22536faee1bda907638ad56e2d867d659883a5ed2050c4e55546b62"
+    },
+    ".dock/node14-autonomous-acceptance-5/download.mjs": {
+      "bytes": 1689,
+      "sha256": "b49156fe55e2ce2355b448289463c6ee277b3ca30e5490cb3a629ed05f4ef321"
+    },
+    ".dock/node14-autonomous-acceptance-5/export-probe.json": {
+      "bytes": 41360,
+      "sha256": "d14cccf4c2e532e58803a45db4cb4f9da1e1ae913586088b3aa0b7596f1860ca"
+    },
+    ".dock/node14-autonomous-acceptance-5/failure-checkpoints.json": {
+      "bytes": 145587,
+      "sha256": "bec1f6ca6792af9fae9f57b07cf64d91a93b6db147c6efb2077f1c672d6f9c45"
+    },
+    ".dock/node14-autonomous-acceptance-5/failure-observed.json": {
+      "bytes": 244,
+      "sha256": "49aedbc945d3fadd1d4e47d956f4e3d623b091009cfa27e32d24877ff34a8bed"
+    },
+    ".dock/node14-autonomous-acceptance-5/failure-summary.json": {
+      "bytes": 2332,
+      "sha256": "49f6a8f3eafc2f6323fd79decbfb5755bf2b3ac99bf7baa0fbb8ab1839de9314"
+    },
+    ".dock/node14-autonomous-acceptance-5/launch-once.py": {
+      "bytes": 2144,
+      "sha256": "20853523dd906813dda189bafbf752ebcca6455122ab8fc990f49d68a7bda187"
+    },
+    ".dock/node14-autonomous-acceptance-5/launch-started.json": {
+      "bytes": 104,
+      "sha256": "71bccb671f894e946c42b5d63e99a37517c5f9ea7a7894fa43fa26e41a75cd12"
+    },
+    ".dock/node14-autonomous-acceptance-5/launcher-exit.json": {
+      "bytes": 75,
+      "sha256": "c3cf87c65f22aab04608d782ee3ab6f66c5daa3c5d1768f4d39c3652c8d32649"
+    },
+    ".dock/node14-autonomous-acceptance-5/launcher.log": {
+      "bytes": 469,
+      "sha256": "07bc94ef834a12591bd97273ba3faff6ed52e1a15d86ef815122eb61ffe4b2af"
+    },
+    ".dock/node14-autonomous-acceptance-5/old-evidence-check.json": {
+      "bytes": 657,
+      "sha256": "d6989c707a93a4ca30dc1d3622d0a477f8e236e64dc388e0a86e4f188a2f86d0"
+    },
+    ".dock/node14-autonomous-acceptance-5/parse-candidate.mjs": {
+      "bytes": 1022,
+      "sha256": "2945d62c7003537d76cd6f8202229a02b8bd5af171a999c36f5a4fd46e2bf4ee"
+    },
+    ".dock/node14-autonomous-acceptance-5/parser-receipt.json": {
+      "bytes": 856,
+      "sha256": "05cf701041180b59d1a9ea96a9a25fb24efe32a3c636b7ed4237e03dc482bcf1"
+    },
+    ".dock/node14-autonomous-acceptance-5/preflight-output.txt": {
+      "bytes": 242,
+      "sha256": "1887500892745d7edda40f11a7e9f294048c3f5b4a652ea8cd36028e35038a8d"
+    },
+    ".dock/node14-autonomous-acceptance-5/preflight.json": {
+      "bytes": 128312,
+      "sha256": "ace8874d0247183f2222056d584947b217049bd64b84f62c5c342da493ea03df"
+    },
+    ".dock/node14-autonomous-acceptance-5/prelaunch-receipt.json": {
+      "bytes": 3831,
+      "sha256": "4c56f79455cc14905483be831c97c6134cd4b7d89b523a7069038f11e8629997"
+    },
+    ".dock/node14-autonomous-acceptance-5/prelaunch.py": {
+      "bytes": 3144,
+      "sha256": "fae1252213ff1a82ae91b0dee83eae44abae392cfb61a24d0e79daf5a4e27028"
+    },
+    ".dock/node14-autonomous-acceptance-5/process-check.json": {
+      "bytes": 40,
+      "sha256": "c1b86f975689af938661812b2ff7535adf955f66c461c4137fd381011a62c590"
+    },
+    ".dock/node14-autonomous-acceptance-5/progress-v2.json": {
+      "bytes": 3023,
+      "sha256": "2135160c7d4818b6971dbbc45e74f4e3fce48b170c2db73538a076ac720f8485"
+    },
+    ".dock/node14-autonomous-acceptance-5/progress.json": {
+      "bytes": 477,
+      "sha256": "ad290fba5b67e451372189e45c99edfb9d4dda45fe499b54b2c47b35022240c8"
+    },
+    ".dock/node14-autonomous-acceptance-5/progress.py": {
+      "bytes": 1389,
+      "sha256": "93fe6d3de00d80de0b29ba076339afb168fb34cac9902ce1cf2a2810c3a91175"
+    },
+    ".dock/node14-autonomous-acceptance-5/result-summary.json": {
+      "bytes": 6294,
+      "sha256": "110eacbda5d5f147b142fa283cd7f6a458ede16781544f8f292baf147a71be54"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/attempt.json": {
+      "bytes": 106,
+      "sha256": "fde75188e4348b451b3239dea782d7962f33c2116de5ba4f5c0c2e9c3e6f6d65"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/efficiency.json": {
+      "bytes": 28974,
+      "sha256": "603890fb815683c9076c824c33325f7eb3bcb120dc1ea8cb0b0d0b1dcc43da85"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/evidence.json": {
+      "bytes": 664876936,
+      "sha256": "9ad31c9894d0b9757afc5eb232e52f87bf5d0fdc15f75f0ae1e20bd005e57f26"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/final-audit.json": {
+      "bytes": 427,
+      "sha256": "cd0b08214cf1e8c8a4e6a61e479cc1460a0337181f6682d0e9eeb0a5f2bedf17"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/geometry-d5cd7db9-104e-4e5f-bbfc-1754b955b1c2.json": {
+      "bytes": 617,
+      "sha256": "dd77d9b5d25bf44a542efc90fddb244047b0772314bf3696beb9cc9be1c5635d"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/private/auth-guard.json": {
+      "bytes": 95,
+      "sha256": "315569ba52cfa4d284c4760a7c8fedbcb629c95ed62afa9c54b39aac473811c8"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/private/dock-state/sessions/d5cd7db9-104e-4e5f-bbfc-1754b955b1c2/execution-events.jsonl": {
+      "bytes": 325636362,
+      "sha256": "89bb8e42615b35efa7275a949f78a13b3589ddd5ae6fb11efaf6ac18d6269aff"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/private/dock-state/sessions/d5cd7db9-104e-4e5f-bbfc-1754b955b1c2/session.json": {
+      "bytes": 27737,
+      "sha256": "fee35c12c86943e7b4f8c7c27a936c9b0bdafcacab425b381e93d2a29d403092"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/private/dock-state/sessions/edcb3382-2204-46fd-b626-cd7420b2bc7f/session.json": {
+      "bytes": 23611,
+      "sha256": "a61142b3eb05d74f49677640882b4c2e87eb112f52c6b66942a192a3564b76c0"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/private/hermes-home/state.db": {
+      "bytes": 851968,
+      "sha256": "ca175e411f505070bfdcc28708f2655faeaa74d0eb0c3e9b2b9a463c44cc26fb"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/private/hermes-home/state.db-shm": {
+      "bytes": 32768,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/private/hermes-home/state.db-wal": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/private/hermes-home/state.db.fts_rebuild.lock": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/private/usage.json": {
+      "bytes": 433,
+      "sha256": "03ebd09f3b9d4c029e502bf2b66bba0686774c47f92dd2c77c17db9a2eed52c7"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/request.json": {
+      "bytes": 130627,
+      "sha256": "57091c2346f5451d219b69ac5ac2b2454f2fd4f092ce209da861856c6be28ad9"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/scenario.txt": {
+      "bytes": 9657,
+      "sha256": "b88f9176c853f306f169e327a3b9495c7d8530eb66888dcae3ef59c152fe8f9d"
+    },
+    ".dock/node14-autonomous-acceptance-5/runs/20260913-172045-ceabf472/tool-precheck.json": {
+      "bytes": 1112,
+      "sha256": "1deb718120d86d3cde78ffa8f091aeb1dbefc1f0d2c48416af5b924c587ed26c"
+    },
+    ".dock/node14-autonomous-acceptance-5/slot-release.json": {
+      "bytes": 550,
+      "sha256": "8f7369be5200edb7ba44f28b87c1cdca07e66a784f06e99da6e5ad91026256a8"
+    },
+    ".dock/node14-autonomous-acceptance-5/summarize.py": {
+      "bytes": 3224,
+      "sha256": "7ef5194a10506c7ae9736a5df9028b4e3459e49fd56fe32d9eecd255fae6675f"
+    },
+    ".dock/node14-autonomous-acceptance-5/target-failure.json": {
+      "bytes": 410,
+      "sha256": "5a18e21e513250b4959f815b19c5ac9a183c18e71c22e520584abcaa79cc2745"
+    }
+  }
+}

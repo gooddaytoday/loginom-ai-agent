@@ -1,0 +1,640 @@
+{
+  "assignment": "node14:remove-link-diagnosis:1:67865596",
+  "source_commit": "611a9f0c2e159e7fe0f8f3e9b8b9c42d5908243c",
+  "runtime_revision": "68e8e7a7cac00b8afa45ac8f5b60bdcfa8832efc86ed34445f2bd4f1baf10e62",
+  "runtime_files": 156,
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node14-test4.2-candidate/manifest.json",
+  "manifest_sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad",
+  "focused_tests": {
+    "passed": 42,
+    "total": 42,
+    "new": 8
+  },
+  "live_verification": {
+    "checks": {
+      "live2_normal_exact_removal": true,
+      "live3_normal_exact_removal": true,
+      "live4_normal_exact_removal": true,
+      "old_controlled_transport_timeout": true,
+      "old_browser_completed_late": true,
+      "old_fault_no_deletion": true,
+      "fixed_controlled_receipt_returned": true,
+      "fixed_fault_no_deletion": true,
+      "fixed_receipt_read_only_match": true,
+      "live3_one_shot_fault_observed": true,
+      "live4_one_shot_fault_observed": true
+    },
+    "passed": 11,
+    "total": 11,
+    "session_id": "51947900-2534-42cb-9d56-c4be44cbc8e9",
+    "full_goal_accepted": false,
+    "original_failure_cause_reproduced": false,
+    "model_started": false
+  },
+  "original_run4_status": "FAIL",
+  "original_cleanup_complete": false,
+  "original_child_returncode": null,
+  "original_child_timed_out": null,
+  "original_failure_cause_reproduced": false,
+  "full_goal_accepted": false,
+  "model_runs": 0,
+  "old_evidence": {
+    "missing-values-autonomous-acceptance-4-pins-2026-09-13.json": {
+      "count": 38,
+      "all_unchanged": true,
+      "failures": []
+    },
+    "missing-values-autonomous-acceptance-3-pins-2026-09-13.json": {
+      "count": 14,
+      "all_unchanged": true,
+      "failures": []
+    },
+    "missing-values-autonomous-acceptance-2-pins-2026-09-13.json": {
+      "count": 13,
+      "all_unchanged": true,
+      "failures": []
+    }
+  },
+  "own_processes": {
+    "own_processes": [],
+    "count": 0
+  },
+  "receipts": {
+    ".dock/node14-remove-link-diagnosis/configured-run.mjs": {
+      "bytes": 9309,
+      "sha256": "81c17d0faf21c527187085dd82a4f31caee07d71de756b604449e3443d6a782f"
+    },
+    ".dock/node14-remove-link-diagnosis/focused-tests.log": {
+      "bytes": 3799,
+      "sha256": "95edddde21c0a9916d9f15c378be94a69ee5ed796a4045d0786ac2175b3fc73c"
+    },
+    ".dock/node14-remove-link-diagnosis/live-1/01-create.json": {
+      "bytes": 6920,
+      "sha256": "66fe8654d25145ddf39571f97eeee8fd52e526915dc3233f378138672ca32e16"
+    },
+    ".dock/node14-remove-link-diagnosis/live-1/02-rename.json": {
+      "bytes": 7590,
+      "sha256": "ee907887801635d2c15dffca995cbe4e0c34cf8e22e639ad65aab098e88e19d8"
+    },
+    ".dock/node14-remove-link-diagnosis/live-1/diagnostic-create-source-before.json": {
+      "bytes": 2116,
+      "sha256": "84c07c54da74d77feaba5b61661aac527f8de1ab456c9d62177af4d2580409e1"
+    },
+    ".dock/node14-remove-link-diagnosis/live-1/diagnostic-create-target-before.json": {
+      "bytes": 2701,
+      "sha256": "506eced8d7c3fa05148f1d2555edcfb10b03c64e3a8622cb778d0b31f74f32da"
+    },
+    ".dock/node14-remove-link-diagnosis/live-1/diagnostic-rename-source-before.json": {
+      "bytes": 2814,
+      "sha256": "0951a17f34b711267655a383af05d17689a804a1558872c560ca168c08582884"
+    },
+    ".dock/node14-remove-link-diagnosis/live-1/geometry.json": {
+      "bytes": 630,
+      "sha256": "386b026887c3df7cbeaae8f4b093123599c87c2b25a87ce102186020bf8dc7ba"
+    },
+    ".dock/node14-remove-link-diagnosis/live-1/prepare.json": {
+      "bytes": 20312,
+      "sha256": "04bd690f2cee6aa0eff63e50169a98c8b8179489ed4b03598a4a7989afa69522"
+    },
+    ".dock/node14-remove-link-diagnosis/live-1/public-evidence.json": {
+      "bytes": 27568,
+      "sha256": "121e51d6f18c821ee09262cda4209b8192d69b576333eb51732d469b6832a612"
+    },
+    ".dock/node14-remove-link-diagnosis/live-1/session.json": {
+      "bytes": 27502,
+      "sha256": "f383edd9b7739e594362d3cbedb8366ecd3122612fad1281f08faac66c870d1a"
+    },
+    ".dock/node14-remove-link-diagnosis/live-1/sessions/ada00472-29e3-4160-982f-7161711a401c/execution-events.jsonl": {
+      "bytes": 2066,
+      "sha256": "25d4015b23de1d7ef5d6f8edd20fb5ace1188b0ba6d2a606c9f686c016be99df"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/01-create.json": {
+      "bytes": 6920,
+      "sha256": "6e3af87c4c11b6d04a00a020011d36019353db6af17b29cc707ad50cae6f45d6"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/02-rename.json": {
+      "bytes": 7590,
+      "sha256": "a24f307a8a0eba1f2e438ffcf11441d09d66b4473229d1cb8e038e386be75ee7"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/03-create.json": {
+      "bytes": 699,
+      "sha256": "5383a5c77ddbc5da61a379e84260330e339b4ab1c941839e259867dea286e7ba"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/04-inspect.json": {
+      "bytes": 1042,
+      "sha256": "f07f306c283aa7d76b83813f22f3c34a6fedf7b2895851752aefe1d5b9f1b5cd"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/05-create.json": {
+      "bytes": 9006,
+      "sha256": "0c1dc1b7eccd83584bf86daa6d9a285deb60211017efe9b51273bce145c531ef"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/06-rename.json": {
+      "bytes": 9828,
+      "sha256": "9881718a5e2afd2f7914364348852f0cc7aa75c49e22f3ffb8bd4f2c5e3e96bc"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/07-remove.json": {
+      "bytes": 9402,
+      "sha256": "1e37373035a967f9f63fc0e925481a5460fa172acee53a40e1762140761f036e"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/08-inspect.json": {
+      "bytes": 3590,
+      "sha256": "aa536bf5e927ab0775c1d63f0c432ddfbbcac82bd9ba80b025dcfc588661fc45"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/after-remove.png": {
+      "bytes": 216223,
+      "sha256": "08b19b12fdb7a8a322edeeed2af6762f09e9dd9dc557f0dc939af6b3acdf437f"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/diagnostic-create-source-before.json": {
+      "bytes": 2116,
+      "sha256": "d1999534de57192a7ee21a6d26bdcf2f6db68a982c345a6e7359c6d9be016f48"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/diagnostic-create-target-stable-before.json": {
+      "bytes": 2708,
+      "sha256": "18f6dc4cac4aa790a0e7527ce6356917abd18e42866f1440a626168fa9493205"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/diagnostic-remove-link-before.json": {
+      "bytes": 3520,
+      "sha256": "e271ce72a38cf9fe0f7b7a76e58068213d793b1e1f650d23bdf2c413631ea3bd"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/diagnostic-rename-source-before.json": {
+      "bytes": 2814,
+      "sha256": "454df11070e4a0b4ae85a3ce446a02e2c002115858a3cad08607a13db4876927"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/diagnostic-rename-target-before.json": {
+      "bytes": 3578,
+      "sha256": "18196165e207da85053eeb5e956299e2c409ad327f97abf4590fe70992a7440a"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/geometry.json": {
+      "bytes": 630,
+      "sha256": "b6f40ac56d8134a328187bed958a492df70be9b3c930209066680ba48f81744a"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/prepare.json": {
+      "bytes": 20312,
+      "sha256": "9cb6c2a945e0c4cfc37912b36980468da04252f3e123e05aa00866f083aa231d"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/public-evidence.json": {
+      "bytes": 27568,
+      "sha256": "50f3f36c7abf36a8b0cb17faefff468c178bddee4072cc1ba6aff92952c080e2"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-1.json": {
+      "bytes": 32268,
+      "sha256": "e795c230a13bdbc356f9e031955ad57a70f2f744e37ccb33314c8e07734ab484"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-10.json": {
+      "bytes": 32624,
+      "sha256": "14f615c4d14aacf9b1145ee3ecdc0037ad861ee17db7f8f575c3c352dac19315"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-11.json": {
+      "bytes": 32626,
+      "sha256": "ae430a3faf89d35ddb38ffd4deac7769e8bcd4007611eb30f0ffb90196838427"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-12.json": {
+      "bytes": 816,
+      "sha256": "4524600324624b42be0b4db24ee087f238d161f87e765d42fb9901dca66bf924"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-13.json": {
+      "bytes": 900,
+      "sha256": "bc8660b848e455357b6ef4d58bf0edaa1feb0df4d8dc63c2aebe78e74fbb9e81"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-14.json": {
+      "bytes": 32626,
+      "sha256": "ae430a3faf89d35ddb38ffd4deac7769e8bcd4007611eb30f0ffb90196838427"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-15.json": {
+      "bytes": 816,
+      "sha256": "4524600324624b42be0b4db24ee087f238d161f87e765d42fb9901dca66bf924"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-16.json": {
+      "bytes": 1214,
+      "sha256": "a0dedc5cac01eba34893f9bff30c2f8cf3f073218eda91742e56e94e94f90f90"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-17.json": {
+      "bytes": 63644,
+      "sha256": "17356ab1e654bc6ecacaeb3244f719f2e87b77327b328f52fd731c927e5cb9dc"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-18.json": {
+      "bytes": 33127,
+      "sha256": "8f7b27b67014da81f18443a428097ff123b37718aef3238c1d5fe999d2a77c3c"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-19.json": {
+      "bytes": 33125,
+      "sha256": "b6d66a8220296a60eedabaeeae339b23cba3842d7d3c3e7af1ac5f68bfd508ce"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-2.json": {
+      "bytes": 816,
+      "sha256": "4524600324624b42be0b4db24ee087f238d161f87e765d42fb9901dca66bf924"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-20.json": {
+      "bytes": 816,
+      "sha256": "4524600324624b42be0b4db24ee087f238d161f87e765d42fb9901dca66bf924"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-21.json": {
+      "bytes": 1214,
+      "sha256": "a0dedc5cac01eba34893f9bff30c2f8cf3f073218eda91742e56e94e94f90f90"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-22.json": {
+      "bytes": 64581,
+      "sha256": "f943fe495a99d0d76bc14872019c6b385857988512100cfee2bc41fa94e38bac"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-23.json": {
+      "bytes": 33101,
+      "sha256": "d4087666b8aa82a09e9b6318985e13edbb9bea7f7801fc24e7e95105dbfcc987"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-24.json": {
+      "bytes": 33101,
+      "sha256": "d4087666b8aa82a09e9b6318985e13edbb9bea7f7801fc24e7e95105dbfcc987"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-25.json": {
+      "bytes": 816,
+      "sha256": "4524600324624b42be0b4db24ee087f238d161f87e765d42fb9901dca66bf924"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-26.json": {
+      "bytes": 1214,
+      "sha256": "a0dedc5cac01eba34893f9bff30c2f8cf3f073218eda91742e56e94e94f90f90"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-27.json": {
+      "bytes": 64315,
+      "sha256": "1bdfa8b9d1bb509aea6a95fc64503a1b58e41025e17fdeb2c6d65d240f6227dd"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-28.json": {
+      "bytes": 32971,
+      "sha256": "8515f70e595a21e4be9e2c7b5f5a72624647f54e02ac9136b4eaae661bc98cb9"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-3.json": {
+      "bytes": 1214,
+      "sha256": "a0dedc5cac01eba34893f9bff30c2f8cf3f073218eda91742e56e94e94f90f90"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-4.json": {
+      "bytes": 62399,
+      "sha256": "3e5d786696aa2c56b315c752eecd4a8e320159a10aded344ce9df3366e34b7e4"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-5.json": {
+      "bytes": 32638,
+      "sha256": "6155e550a3e396c310eae670f937f6867d17058574fcac18d3517f3c54024073"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-6.json": {
+      "bytes": 32638,
+      "sha256": "87264d118cc8f14d3bdc79d5fd5eeeafb62987ec0977aa82d55426554dc5dfb0"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-7.json": {
+      "bytes": 816,
+      "sha256": "4524600324624b42be0b4db24ee087f238d161f87e765d42fb9901dca66bf924"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-8.json": {
+      "bytes": 1214,
+      "sha256": "a0dedc5cac01eba34893f9bff30c2f8cf3f073218eda91742e56e94e94f90f90"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/raw-9.json": {
+      "bytes": 63154,
+      "sha256": "8a224ea83e51a69d13fdfd6b95c1efde56351ed75439489bddb4003d7c843ecd"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/screen.png": {
+      "bytes": 214926,
+      "sha256": "ff838062d05d4fb616e186b1c099d7029430eb45ebe011cbf65676c9e2c5541d"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/session.json": {
+      "bytes": 27502,
+      "sha256": "e6fa577ebba88fa00360c993ae070d7658746f941745dd591a9ff5c1ed91306c"
+    },
+    ".dock/node14-remove-link-diagnosis/live-2/sessions/949377cc-10ba-4e63-b19f-15c200174114/execution-events.jsonl": {
+      "bytes": 2066,
+      "sha256": "6c5f0552e1e6cc1a0c8be828573898072282e4420f0810f5b0962cb952ab4b82"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/01-create.json": {
+      "bytes": 11347,
+      "sha256": "a54f6246da798705a122efc19b1d8416116486ae2b6d9d628184c0b6b147f1e7"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/02-rename.json": {
+      "bytes": 12171,
+      "sha256": "eaddf428eedb91be18ea18d853671a0edf98981e96d6e5cb1d7c4cc8fd18ebc3"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/03-remove.json": {
+      "bytes": 11751,
+      "sha256": "a9b1157fd7a87fb3c73773896c7bf55b06bd24dd5ad6a66f3113bd2b4e6939f4"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/04-inspect.json": {
+      "bytes": 3821,
+      "sha256": "2c4b968c27c7bc82851bade674c961788b085d8893b097565aa78c546312cc75"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/05-restore-link.json": {
+      "bytes": 1152,
+      "sha256": "0c4130fffb1b65f55ae9481e97df2ad38915142d6ad2e2c2ebbe73c1e5c77061"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/06-observe.json": {
+      "bytes": 3424,
+      "sha256": "3cacf0b34c38cbbd51096345ed225f3e6dc760ec68dcbb943646848cca025e34"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/07-fault.json": {
+      "bytes": 386,
+      "sha256": "3939e71a519cc4874cebe3a461f43117318df19fb316dc6350bda13eff1f8d59"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/08-deadline.json": {
+      "bytes": 535,
+      "sha256": "b8b3aec2318386dbe568018dc7ebb38387321207d995fbee68902b2d3e944fdf"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/09-receipt.json": {
+      "bytes": 2679,
+      "sha256": "be31fe580c124428762132f372204f11cb27c26cb9b256b0576fa79be6d66de3"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/10-after-fault.json": {
+      "bytes": 3424,
+      "sha256": "3cacf0b34c38cbbd51096345ed225f3e6dc760ec68dcbb943646848cca025e34"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/11-selection.json": {
+      "bytes": 554,
+      "sha256": "98ad5ef5d884db0c7f575849dae4340e97e67e9dd7e259427b7c55113cba1d02"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/configured-create-target-before.json": {
+      "bytes": 3505,
+      "sha256": "f31fade5806281569c7c609f525ad556179471129d4f72208876ebfcb391863a"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/configured-remove-link-before.json": {
+      "bytes": 4319,
+      "sha256": "18c2e17378622ca28aaa3ef3ed54880cec1fc8ad47b39a2a78b78d10d7e8f8a1"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/configured-rename-target-before.json": {
+      "bytes": 4381,
+      "sha256": "bbc847c6b5de8a65452b2ab15e1261b360f8c97b0470f43ea294b575f373aba6"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/configured-source.json": {
+      "bytes": 10352,
+      "sha256": "2dd542fbc635d28bbed602666fa5cda56683bd50fefa7ea5121f62f91da3af07"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/controlled-selection-deadline-before.json": {
+      "bytes": 4326,
+      "sha256": "875d07101ca39104ba1039ab8cfb3d137824e0c75928b5eb470493b19ebe87ff"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/geometry.json": {
+      "bytes": 631,
+      "sha256": "d119b75208ce6a112c7f4962d1cc2ed27570fd077d0ec5a83c4aa4ff2efa61f2"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/prepare.json": {
+      "bytes": 20745,
+      "sha256": "299f0f1ecffa1ef21e12fdee3147f84d344eb6b9739dadff98fa912af9a47fb5"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/public-evidence.json": {
+      "bytes": 68940934,
+      "sha256": "a85933bbdee255e56984723d028f0c08e0286e5d8feeefb3937ab3411640e365"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-1.json": {
+      "bytes": 33136,
+      "sha256": "1e1124d02f373feb41fb746f24e60b0975d07305804545eaa76060d879522141"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-10.json": {
+      "bytes": 33613,
+      "sha256": "951d7a68853862c0a4cfe56fd518eada4ec8cbab3b07ffd75e772959ead0bd88"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-11.json": {
+      "bytes": 33867,
+      "sha256": "0d48d39d9a7a46d0e3a68cfeaf2321c592786099e47a807c09c274e62c4ca37c"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-12.json": {
+      "bytes": 66098,
+      "sha256": "b33bddf7800bb4a94e57b982301a46bb408c8257e0fca45a3761c78fe99d394f"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-13.json": {
+      "bytes": 33736,
+      "sha256": "554eac8bc8955af9950d5d93c5335ae928f95a33b65aa42287952b7a84eccd1d"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-14.json": {
+      "bytes": 33613,
+      "sha256": "951d7a68853862c0a4cfe56fd518eada4ec8cbab3b07ffd75e772959ead0bd88"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-15.json": {
+      "bytes": 33867,
+      "sha256": "0d48d39d9a7a46d0e3a68cfeaf2321c592786099e47a807c09c274e62c4ca37c"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-16.json": {
+      "bytes": 33613,
+      "sha256": "951d7a68853862c0a4cfe56fd518eada4ec8cbab3b07ffd75e772959ead0bd88"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-2.json": {
+      "bytes": 816,
+      "sha256": "4524600324624b42be0b4db24ee087f238d161f87e765d42fb9901dca66bf924"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-3.json": {
+      "bytes": 1214,
+      "sha256": "a0dedc5cac01eba34893f9bff30c2f8cf3f073218eda91742e56e94e94f90f90"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-4.json": {
+      "bytes": 65131,
+      "sha256": "86c525f336a4ef8e3bcd29d48349748ea109a66d597384d4a576fced1b52ff3a"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-5.json": {
+      "bytes": 33641,
+      "sha256": "78762564ff306718b03b17ee32ae4b754574edef8e374069ff9c22894c57c67b"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-6.json": {
+      "bytes": 33639,
+      "sha256": "f575d6c6a256c2f88090c7c75b931db00a74b098daa715aa462d94c564e38c19"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-7.json": {
+      "bytes": 816,
+      "sha256": "4524600324624b42be0b4db24ee087f238d161f87e765d42fb9901dca66bf924"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-8.json": {
+      "bytes": 1214,
+      "sha256": "a0dedc5cac01eba34893f9bff30c2f8cf3f073218eda91742e56e94e94f90f90"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/raw-9.json": {
+      "bytes": 66119,
+      "sha256": "ce6bbbfbb9b9bb9a6d2005cb90d63146f011df2ed185be42f3458388f88885a7"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/screen.png": {
+      "bytes": 230415,
+      "sha256": "c43fc3a38875ea5a3270abcca0e4523efceb3326d1e252fc0e5976fa119b83e6"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/session.json": {
+      "bytes": 27493,
+      "sha256": "99658530732abd4fd092b5449498a3dd8f0287784e4ecae5a371b64b458293d5"
+    },
+    ".dock/node14-remove-link-diagnosis/live-3/sessions/2b6c541b-79a1-4828-860b-b93f4c44264f/execution-events.jsonl": {
+      "bytes": 34250884,
+      "sha256": "62f7a4d8f523b511367ee154ba1afdd395e8436a09ab0204dfc8088e3a1a062d"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/01-create.json": {
+      "bytes": 11347,
+      "sha256": "b3bccecaaec0fdf1bb76289072f4863278f9d831c4589fa0c838037246edc29b"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/02-rename.json": {
+      "bytes": 12171,
+      "sha256": "baeb2573b2047e637422f3271aaf1437a1a714a78eb8f3db3cd4f7522f4ece7a"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/03-remove.json": {
+      "bytes": 11751,
+      "sha256": "d30b0b05b340aae2eb5bc6035121aaca780c6e406324a32502fee4845b5a3757"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/04-inspect.json": {
+      "bytes": 3821,
+      "sha256": "b47828a02f36fe73248ccf35ee1e9aa7e502e106ac8ec9309d784d0fff0fec32"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/05-restore-link.json": {
+      "bytes": 1152,
+      "sha256": "62ae85af9e811a7c75ad691b253a82e88c824807e90472cd05341477d97cc728"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/06-observe.json": {
+      "bytes": 731,
+      "sha256": "c88e42e55c200c2c6dd2ab58b557cebd124fc680debc4f7d852ee938e811c6fc"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/06b-observe.json": {
+      "bytes": 3424,
+      "sha256": "3289e28af138d93e1ad0dd3e8ab81ad32428d4d1b6333878cc449aabef3c76f6"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/07-fault.json": {
+      "bytes": 386,
+      "sha256": "3939e71a519cc4874cebe3a461f43117318df19fb316dc6350bda13eff1f8d59"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/08-deadline.json": {
+      "bytes": 8182,
+      "sha256": "6693b29e19856b88fa927a166a2e721896a9ad53cc8866381c20bb91d249339c"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/09-receipt.json": {
+      "bytes": 2516,
+      "sha256": "67d5cab59de045b00c1af4e4acbb7378d438f500c230e72a63ca656df9467df6"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/10-selection.json": {
+      "bytes": 554,
+      "sha256": "42c3dc8ace96840fa3cb0ebfedb600d0ad811bc13f2cae15960ed3564851f37d"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/11-inspect.json": {
+      "bytes": 4062,
+      "sha256": "a4fd8b3b800ae599b937f7db60715a6856f39d9d5a54a10cba28bba3f994b513"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/after-fault.png": {
+      "bytes": 229024,
+      "sha256": "0d19dfbe792adcf6c7be559011107e928c2822f4e00e4d8f59c72f4095d01775"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/configured-create-target-before.json": {
+      "bytes": 3505,
+      "sha256": "72429c328fbe344f2f2784b57215f5e9069e3ac2579b6d7dfadc5ac35fe89bff"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/configured-remove-link-before.json": {
+      "bytes": 4319,
+      "sha256": "8408f5e8df1c5d01d3f2c0077e2d8a14b378269cf7c3d32e0a3fbf7f1d77d761"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/configured-rename-target-before.json": {
+      "bytes": 4381,
+      "sha256": "d3e2b5b2dfafc59534bf7314e9f1ebbb022f763d8749ad8948c4c56fda71fb7a"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/configured-source.json": {
+      "bytes": 10351,
+      "sha256": "d1790529218a9461e3033aa2dff654e06044483b56fe1aa54f78a7192234bdb8"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/controlled-selection-deadline-before.json": {
+      "bytes": 4326,
+      "sha256": "2caf0060c13cb7d2f8ae989c1d6bc02d95cac98aff1d93c9a78de0020843832e"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/geometry.json": {
+      "bytes": 631,
+      "sha256": "9f5476f05afe2ab29e1e8606c92568d2915b5ad8207dcaed6d46ecbf596c155d"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/prepare.json": {
+      "bytes": 20745,
+      "sha256": "0fe5aed49d615c0a863b40e917310610cb84c7110b6a00cf88b5aca277f602bd"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/public-evidence.json": {
+      "bytes": 69015560,
+      "sha256": "5761f6999efbda13ece6ef3f504b5313bb000efcfdb76f404d7c7ece0f37774a"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-1.json": {
+      "bytes": 33136,
+      "sha256": "70d11643a9c92e10cd19d941993b1623908621cb4fdfd4ff789abb2544725c4a"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-10.json": {
+      "bytes": 66868,
+      "sha256": "3796b2e05d6aabe4f457a816f72c613a06e45bcf97cf6b4066c090e8591c791d"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-11.json": {
+      "bytes": 33736,
+      "sha256": "916a2a9d7aa9b7b3cd8223aea43a204b2a8d0d1cd943de3af00efdb1ae46d9b7"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-12.json": {
+      "bytes": 15827,
+      "sha256": "c521bcf5be039c4956f13398df78d9959a27a9c5ea85f332ca4777cdbc1336c8"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-13.json": {
+      "bytes": 33613,
+      "sha256": "3d37246b2a9a6f221b65ac0ca891dde3b8654fa6b422aeeaef011f27bc66ca69"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-14.json": {
+      "bytes": 33867,
+      "sha256": "88d5e5da16e5e15878e19c1566dd81f546fde05b4e34900ac7ed2d9f8253a955"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-15.json": {
+      "bytes": 64473,
+      "sha256": "40cbc1f938e8a2456d9c3f5a831a8ee9faf679b2274b154b478f7371b2f23f0d"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-16.json": {
+      "bytes": 33867,
+      "sha256": "88d5e5da16e5e15878e19c1566dd81f546fde05b4e34900ac7ed2d9f8253a955"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-2.json": {
+      "bytes": 816,
+      "sha256": "4524600324624b42be0b4db24ee087f238d161f87e765d42fb9901dca66bf924"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-3.json": {
+      "bytes": 1214,
+      "sha256": "a0dedc5cac01eba34893f9bff30c2f8cf3f073218eda91742e56e94e94f90f90"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-4.json": {
+      "bytes": 65901,
+      "sha256": "680b19760cfc597b6e3d77d0e0914dca38d8fa910ccd7a11d8c07ad60be55e57"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-5.json": {
+      "bytes": 33641,
+      "sha256": "89e4859904cc705f276214bcc466c52fe7f2292e99c2e73eb5b9fb47e0d35de9"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-6.json": {
+      "bytes": 33893,
+      "sha256": "fead4a612170937cfb704ea1b4c1ad75272b3c98b3cb6ac05ea2dbc29081109f"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-7.json": {
+      "bytes": 67143,
+      "sha256": "f6f7a0ff8c3a7c960d0f8758c3e52bfac93688eade55883b1c353618d65a0a8a"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-8.json": {
+      "bytes": 33867,
+      "sha256": "88d5e5da16e5e15878e19c1566dd81f546fde05b4e34900ac7ed2d9f8253a955"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/raw-9.json": {
+      "bytes": 33867,
+      "sha256": "88d5e5da16e5e15878e19c1566dd81f546fde05b4e34900ac7ed2d9f8253a955"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/screen.png": {
+      "bytes": 230415,
+      "sha256": "c43fc3a38875ea5a3270abcca0e4523efceb3326d1e252fc0e5976fa119b83e6"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/session.json": {
+      "bytes": 27493,
+      "sha256": "d80229afaa5342764d37ba855f39f208eb565df16e22b462b4fbeedff953bdcf"
+    },
+    ".dock/node14-remove-link-diagnosis/live-4/sessions/51947900-2534-42cb-9d56-c4be44cbc8e9/execution-events.jsonl": {
+      "bytes": 34162682,
+      "sha256": "32de6b426583c3a48b6a84b9a6791e9f47999c27030396b7017273b53944a394"
+    },
+    ".dock/node14-remove-link-diagnosis/live-verification.json": {
+      "bytes": 665,
+      "sha256": "d82ad88cb428a18aac5ad7bef8957b2b5cc955602191ef75983cd7fdcba3c6d6"
+    },
+    ".dock/node14-remove-link-diagnosis/process-check.json": {
+      "bytes": 40,
+      "sha256": "4fd69b8ba37cf88efd1f8020481604bbe4f828a47a591b6f94ff4f0280aa05f2"
+    },
+    ".dock/node14-remove-link-diagnosis/read-receipt.mjs": {
+      "bytes": 592,
+      "sha256": "88d81e2eb0daf6d6b506a5fa870bcfd0852880d7b065766453708e8f0f0a8779"
+    },
+    ".dock/node14-remove-link-diagnosis/run.mjs": {
+      "bytes": 6841,
+      "sha256": "af8b6b56b15f73d9ff9ff6103f3d86b260b7a2652b44f0943e55b1b68aff9220"
+    },
+    ".dock/node14-remove-link-diagnosis/source-verification.json": {
+      "bytes": 17689,
+      "sha256": "11ab569f33b40dd00708f4a2f92fdefb85a5605cf564bfd6fc40ed87a8f90f24"
+    },
+    ".dock/node14-remove-link-diagnosis/verify.mjs": {
+      "bytes": 2575,
+      "sha256": "4b4b7142db5665c4bc9fc3befb8ee0a42269c61c7d43863d4b8643e5eaaa9b64"
+    }
+  }
+}

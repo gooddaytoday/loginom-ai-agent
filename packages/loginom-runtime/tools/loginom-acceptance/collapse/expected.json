@@ -1,0 +1,54 @@
+{
+  "information": [
+    "Id",
+    "Zone"
+  ],
+  "transposed": [
+    "S",
+    "I",
+    "R",
+    "B",
+    "D"
+  ],
+  "output": [
+    {
+      "name": "Id",
+      "label": "Id",
+      "type": "integer",
+      "excluded": false
+    },
+    {
+      "name": "Zone",
+      "label": "Zone",
+      "type": "string",
+      "excluded": false
+    },
+    {
+      "name": "Names",
+      "label": "Имена",
+      "type": "string",
+      "excluded": false
+    },
+    {
+      "name": "DisplayNames",
+      "label": "Метки",
+      "type": "string",
+      "excluded": false
+    },
+    {
+      "name": "Values",
+      "label": "Значения",
+      "type": "variant",
+      "excluded": false
+    },
+    {
+      "name": "DataTypes",
+      "label": "DataTypes",
+      "type": "integer",
+      "excluded": true
+    }
+  ],
+  "rows_all": 15,
+  "rows_ignore": 9,
+  "variant_io": "blocked_native_numeric_subtype"
+}

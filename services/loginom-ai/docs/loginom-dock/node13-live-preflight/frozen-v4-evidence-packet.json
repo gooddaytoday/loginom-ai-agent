@@ -1,0 +1,52 @@
+{
+  "decision": "node13:source-vs-excluded-target-label:1",
+  "session_id": "9d3ccd0a-7196-495c-9179-a02cc2581032",
+  "operation_id": "node13-full-calendar-done",
+  "raw_file": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/execution-events.jsonl",
+  "raw_sha256": "86c3d8c19dd9cc41232ff35b28869fcbf8af3d91ccbbbc0e6eacc9950cdf9898",
+  "raw_observation": {
+    "line": 2759,
+    "target_path": "outcome.output.node_mapping.target_fields[27]",
+    "target": {
+      "name": "DateB",
+      "label": "DateB",
+      "type": "datetime",
+      "excluded": true
+    },
+    "source_path": "outcome.output.node_mapping.target_fields[27].exclusion_source",
+    "source": {
+      "record_id": "904",
+      "name": "DateB",
+      "label": "Дата",
+      "type": "datetime"
+    }
+  },
+  "public_checkpoint": {
+    "line": 2783,
+    "path": "result.configuration.readback.output_mapping.fields[27]",
+    "value": {
+      "index": 27,
+      "name": "DateB",
+      "label": "DateB",
+      "type": "datetime",
+      "data_kind": "Неопределенное",
+      "excluded": true,
+      "source_name": "DateB"
+    }
+  },
+  "effective_output_columns": 27,
+  "public_readback_contract": "observed_before_verified_finish; target metadata, source_name association",
+  "handler_sources": {
+    "client/lib/date-time-output.mjs": "aec4f2c7bbdbb431a8ffb07b3fd15b886e7b5439bdc467322402a42894d53e57",
+    "client/lib/date-time-readback.mjs": "cb4e32c8cbde39a30d5b077f3dcca3f990a724997268f6a0993277ae79090a73",
+    "client/lib/node-result-schema.mjs": "70e2ef6080fecb567af4c42865863e6997445c9cb4104dbdb0628fcdc9a13ff2"
+  },
+  "runtime_changed": false,
+  "model_started": false,
+  "resource_pause": true,
+  "public_outcome": {
+    "path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/calendar-done.json",
+    "sha256": "8e0bf804d162d4afcd88a77eaff817a8b3c418a84aad62d5d3898a7950d0ba5e",
+    "field_path": "output.configuration.readback.output_mapping.fields[27]"
+  }
+}

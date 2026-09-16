@@ -1,0 +1,32 @@
+{
+  "version": 4,
+  "decision": "node13:source-vs-excluded-target-label:1",
+  "parent_goal_sha256": "11b0f1668fbeadf44e4e1abf864246ed10e3d7c9f73144e99f34d5fa01f96ea1",
+  "parent_expected_sha256": "900df299dcef95c9cdc8a511d2f732664539c71a82ac400526310470e3bd6654",
+  "goal_sha256": "711d1cec738c444e9c90bc806218fe36dc1feeb877ee1f23d13f38e7c386e750",
+  "expected_sha256": "fec431104d290fd789d5076b78156c071825a7c84de63544721eb72a5cb804c6",
+  "csv_unchanged": true,
+  "all_effective_tables_unchanged": true,
+  "requests": {
+    "done": 2,
+    "execute": 7,
+    "total": 9
+  },
+  "source_invariant": {
+    "name": "DateB",
+    "label": "Дата",
+    "type": "datetime"
+  },
+  "excluded_target_metadata": {
+    "name": "DateB",
+    "label": "DateB",
+    "type": "datetime",
+    "excluded": true
+  },
+  "reassessment_only": true,
+  "prior_fail": "docs/loginom-dock/node13-live-preflight/frozen-v3-done-audit.json",
+  "prompt_revision": 2,
+  "previous_prompt_sha256": "33c5fe8f09590269815eb9cdf5d28524637ea83a8c23809f2f69dcaf005f9f89",
+  "prompt_clarification": "Exact excluded-source request omits name/label; frozen-v4 source/target invariants and all outputs unchanged",
+  "prompt_failure_run_id": "20260913-183818-3412861d"
+}

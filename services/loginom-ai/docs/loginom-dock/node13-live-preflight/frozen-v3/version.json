@@ -1,0 +1,15 @@
+{
+  "version": 3,
+  "decision": "node13:wide-calendar-timeout-split:1",
+  "parent_goal_sha256": "51dbe530f504c99444957db806efbae7d1a41463d82498df61171e364f9cfdf8",
+  "goal_sha256": "11b0f1668fbeadf44e4e1abf864246ed10e3d7c9f73144e99f34d5fa01f96ea1",
+  "expected_sha256": "900df299dcef95c9cdc8a511d2f732664539c71a82ac400526310470e3bd6654",
+  "csv_unchanged": true,
+  "expected_unchanged": true,
+  "requests": {
+    "done": 2,
+    "execute": 7,
+    "total": 9
+  },
+  "timeout_receipt": "docs/loginom-dock/node13-live-preflight/frozen-v2-timeout.json"
+}

@@ -1,0 +1,227 @@
+{
+  "assignment": "node14:import-configure-followup:1:b79da602",
+  "source_commit": "814f31467b8e93fa9bd27225edb3ec0074d4bd15",
+  "runtime_revision": "71f73d81d758c746bd2111c93de08691c85aebddf80a411f294b8ed3f56ab4ff",
+  "runtime_files": 156,
+  "source_files": 395,
+  "candidate_manifest_sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad",
+  "candidate_version": "2026.09.13-node14-test4.2-candidate",
+  "tests": {
+    "focused_marker": 16,
+    "import_ui_regression": 336
+  },
+  "live_exact_import": {
+    "passed": true,
+    "rows": 3,
+    "cells": 15,
+    "null_cells": 12,
+    "schema_fields": 5
+  },
+  "old_fail_receipts_unchanged": {
+    "acceptance2": 13,
+    "acceptance3": 14
+  },
+  "all_own_processes_stopped": true,
+  "model_started": false,
+  "full_goal_accepted": false,
+  "harness_pins_updated": false,
+  "import_refusal_allowance_implemented": false,
+  "proposal": "docs/loginom-dock/node14-import-placement-refusal-proposal-2026-09-13.md",
+  "evidence_index": ".dock/node14-import-followup/evidence-files.json",
+  "evidence_index_sha256": "2924c18bf43aebb7348e47ca792300faf8e0f5c789c3e4b8c9a990e1840deec4",
+  "evidence_files": 48,
+  "receipts": {
+    ".dock/node14-import-followup/exact-import-audit.json": {
+      "bytes": 307,
+      "sha256": "046eb404a1b9278e2b4aebaffe8fe99c0f6bd71acfd7cbac2fdd0167ae750825"
+    },
+    ".dock/node14-import-followup/focused-marker.log": {
+      "bytes": 1436,
+      "sha256": "68f9e00c80b3bee10d8fd9cc834da5e6890d118646bed83d4a9b4988d9623c5b"
+    },
+    ".dock/node14-import-followup/import-placement-extract.json": {
+      "bytes": 2527,
+      "sha256": "12d1b2972503dbaffb137e699be0d45ad1655cd70ddfc7ef08d443f713c32c13"
+    },
+    ".dock/node14-import-followup/import-regression-final.log": {
+      "bytes": 30747,
+      "sha256": "223561bf02e45db0fa1b35ddd5184f4924e7ac13a9d63aab34a25bc54208edbe"
+    },
+    ".dock/node14-import-followup/import-regression.log": {
+      "bytes": 30734,
+      "sha256": "3a140b172810accdb23b064d3ac5231b35b8a976612a0db683d2b0fb2160328d"
+    },
+    ".dock/node14-import-followup/live-1/geometry.json": {
+      "bytes": 631,
+      "sha256": "0607372ed7b1afdb72059c2739beba6ade47098366be42973388811731468ee2"
+    },
+    ".dock/node14-import-followup/live-1/public-evidence.json": {
+      "bytes": 1223756,
+      "sha256": "902d0e77ee25b62285a22241e170b074315be9e70a32e0b97a9a1c2fff403af5"
+    },
+    ".dock/node14-import-followup/live-1/request.json": {
+      "bytes": 3982,
+      "sha256": "1648d71a2d1a19f35ef7c4b5422080294cdf25047f3c967890a74dfbe9e7f084"
+    },
+    ".dock/node14-import-followup/live-1/result.json": {
+      "bytes": 1067,
+      "sha256": "2ba0c6a23fdeece547d13c89cb93e67e56e34a85d0905fbd3ea1633ef78fd8b3"
+    },
+    ".dock/node14-import-followup/live-1/session.json": {
+      "bytes": 27475,
+      "sha256": "9679f88f9f945c950fe220770e080e59f7335a10d45569e738592b0ec34511ff"
+    },
+    ".dock/node14-import-followup/live-1.log": {
+      "bytes": 373,
+      "sha256": "dfb62c3020416ec2e41def9fd31d0b7b61f7966a80ac60f238d966691012144f"
+    },
+    ".dock/node14-import-followup/live-2/01-dom.json": {
+      "bytes": 2954,
+      "sha256": "2b997b833d9f4481a694807c2207039418c69c541805564560c1f19482c86ebe"
+    },
+    ".dock/node14-import-followup/live-2/02-open.json": {
+      "bytes": 539,
+      "sha256": "bbbef6fcebb6b866b2f2c70399fc3c6c0af5fd9e96965bec9464dd4c009b7b04"
+    },
+    ".dock/node14-import-followup/live-2/03-state.json": {
+      "bytes": 4659,
+      "sha256": "734a2990fde98cc8ba89d0a9d2ee4d242a7683a8e3e3a80c17d194f36072176b"
+    },
+    ".dock/node14-import-followup/live-2/04-screen.json": {
+      "bytes": 351,
+      "sha256": "156df6596b57fb2a2cd14b339e21075c3d9956e40778f1d24ed1a45a3ad7afab"
+    },
+    ".dock/node14-import-followup/live-2/05-open-body.json": {
+      "bytes": 3426,
+      "sha256": "bf247b3ddd2fe36e814df29ca5cb70aee186bba04c2a29a23b10272bb394bc9a"
+    },
+    ".dock/node14-import-followup/live-2/06-dialog.json": {
+      "bytes": 3664,
+      "sha256": "4645f6c1cb4ef7b4c23a4ced04396624ce5274d821597572ddedbd6de10fd3fe"
+    },
+    ".dock/node14-import-followup/live-2/07-settings.json": {
+      "bytes": 1814,
+      "sha256": "a0ae02b23e2f2c811a6c7396042a8afde5422d45c5ff8ba71c563499074141a5"
+    },
+    ".dock/node14-import-followup/live-2/08-settings.json": {
+      "bytes": 3524,
+      "sha256": "00c7b560a25a6cfaaaa8966395a57f727f76ec11a37032539ed68eb8bc069e89"
+    },
+    ".dock/node14-import-followup/live-2/09-current.json": {
+      "bytes": 5056,
+      "sha256": "6f44528f665227833629c28f67810c19301cafe542a13a27b79690cd5a3c1eb4"
+    },
+    ".dock/node14-import-followup/live-2/10-format.json": {
+      "bytes": 14425,
+      "sha256": "669ba1e49e1f88c3778d09f38989651558eda921d84e91bf2448a70247a6644c"
+    },
+    ".dock/node14-import-followup/live-2/11-input-events.json": {
+      "bytes": 4258,
+      "sha256": "c0cd14a12fc42d64cefd7d67949dbc5145865c00b8194ed971495408bb28a805"
+    },
+    ".dock/node14-import-followup/live-2/12-options.json": {
+      "bytes": 1089,
+      "sha256": "41bb5a65d716103085faf83986ccdfa11e36fe6e30f014cb5d319960309d4a7e"
+    },
+    ".dock/node14-import-followup/live-2/13-exact-option.json": {
+      "bytes": 657,
+      "sha256": "59c47969c61a1eed48123ef4e9285cbef356d15c10e388a7b9ef60d20f673d00"
+    },
+    ".dock/node14-import-followup/live-2/geometry.json": {
+      "bytes": 631,
+      "sha256": "0bd88edb57ca26c9265cf374439c1fe328ae654897c19c74c77b317bcd9df310"
+    },
+    ".dock/node14-import-followup/live-2/public-evidence.json": {
+      "bytes": 40533275,
+      "sha256": "119e81ce480dbbb451f7e32d356757cb853c94311cb3206e3472593125e1ab38"
+    },
+    ".dock/node14-import-followup/live-2/request.json": {
+      "bytes": 3231,
+      "sha256": "87f3ddf2f28ff130dc7827af266ca613f1b62122de8ad30b26328ca3d496c78f"
+    },
+    ".dock/node14-import-followup/live-2/result.json": {
+      "bytes": 7989,
+      "sha256": "ee2964a0eee24e092b019bd709457e3ac8769589d5c1f1ce368ba236e3073969"
+    },
+    ".dock/node14-import-followup/live-2/screen.png": {
+      "bytes": 192872,
+      "sha256": "a4ec2ea7e3b2adec01800ac6764bb13ef2b4dcdc603b0efa922012e2c2459df7"
+    },
+    ".dock/node14-import-followup/live-2/session.json": {
+      "bytes": 27475,
+      "sha256": "ee7111d45a18588ed7eea80d4ff4bac7ba825fabec382335608a49a444a0519e"
+    },
+    ".dock/node14-import-followup/live-2.log": {
+      "bytes": 885,
+      "sha256": "8d1589c5eeaabb85154a2b9edb767030f064cd3af2a2fc557d4dbc4e9d077f73"
+    },
+    ".dock/node14-import-followup/live-3/geometry.json": {
+      "bytes": 631,
+      "sha256": "bd743819dc7bc0655e7dbdf465cfce38d4186468ac82f27b7e0d532f891c9ae9"
+    },
+    ".dock/node14-import-followup/live-3/public-evidence.json": {
+      "bytes": 5506289,
+      "sha256": "88e8359ac766f0f1d1bd53a1182ee42172fb3213f55b45d146dec08af4289407"
+    },
+    ".dock/node14-import-followup/live-3/request.json": {
+      "bytes": 3231,
+      "sha256": "1701cc2e043c5b03ee2f0b6eedf17f07a3c2c079cd95174a6ee36d8a685d3cba"
+    },
+    ".dock/node14-import-followup/live-3/result.json": {
+      "bytes": 804,
+      "sha256": "78456cb1e506c65622d309b63249cdd02445a574525f5c1f24bc8123c18d51ff"
+    },
+    ".dock/node14-import-followup/live-3/session.json": {
+      "bytes": 27475,
+      "sha256": "5b6f7018f57d6595e8370645d790eaab3224a148bf32703c9c4a75a9f2d564ae"
+    },
+    ".dock/node14-import-followup/live-3.log": {
+      "bytes": 415,
+      "sha256": "4fb7544fc67bbf1c6d582a570fcd838eb2dc636d24839061c6ba53b4330fbde7"
+    },
+    ".dock/node14-import-followup/live-4/geometry.json": {
+      "bytes": 630,
+      "sha256": "2bbb3a4caaa3f152a4c9abdac7faa9a2c1a6b7b7b90e7e693900cc337047c0bb"
+    },
+    ".dock/node14-import-followup/live-4/public-evidence.json": {
+      "bytes": 41184243,
+      "sha256": "d9f1ac5d125bead95babe86bd3f9f3a44598667f4f6bc6f6ba9f120c30cd79c2"
+    },
+    ".dock/node14-import-followup/live-4/request.json": {
+      "bytes": 3229,
+      "sha256": "dbcb4e96a0f496d719cb2545dc3c6d1a06b96c619ae4ab9a472d24d33ec4d68c"
+    },
+    ".dock/node14-import-followup/live-4/result.json": {
+      "bytes": 7982,
+      "sha256": "e948c4ed439b9d3b335e70eec7a391f45eb511e7b72e90489388a7db5c8f4ef6"
+    },
+    ".dock/node14-import-followup/live-4/session.json": {
+      "bytes": 27472,
+      "sha256": "facea729dc1dd63fb6a9fcd018fe42e76bbdfcf1d787530c185f9cd88432363f"
+    },
+    ".dock/node14-import-followup/live-4.log": {
+      "bytes": 415,
+      "sha256": "98881f597e46a60822bce64cf5a694e194adcbfd8de632bef3f1efe5e36b72c7"
+    },
+    ".dock/node14-import-followup/original-request.json": {
+      "bytes": 3999,
+      "sha256": "5ae32b426872788d8984995e5229bc6b62bea631c427936605b985f94105ba42"
+    },
+    ".dock/node14-import-followup/process-check.json": {
+      "bytes": 300,
+      "sha256": "7f89f15fe807632856189dc21c1effa96db45468cc16c3150f3dd8317bc8a72a"
+    },
+    ".dock/node14-import-followup/run.mjs": {
+      "bytes": 6544,
+      "sha256": "4aaf45383bcad1b0c33e672768e885cc2630ee614901b7c2746a17a148eb6df8"
+    },
+    ".dock/node14-import-followup/source-evidence.json": {
+      "bytes": 865,
+      "sha256": "eccaea517b0bd80905d668f5204c5ed739e0a143c2e22875118bf46b35a2c9a4"
+    },
+    ".dock/node14-import-followup/source-preflight.json": {
+      "bytes": 100327,
+      "sha256": "34ee7afedb3b7adab1dd1e815b8698594166add27e352dcd892895f22d475986"
+    }
+  }
+}

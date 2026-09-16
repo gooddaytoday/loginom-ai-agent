@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "source_commit": "36442231367ebef35d3101ef16921e56f328a464",
+  "files": {
+    "date-time-sales.txt": "a8681d5606d351b054f5d7aa9a338409d007de049997a4efdce47508bd472824",
+    "sales.csv": "2a74b48ca02f457c012d67db60582d1840731cf4463b8a276ad6626c6433bcf2",
+    "expected.json": "428187d7a064b1f7af0c675e340a4f831078bc7d171f8a242b3b7efc4899ceca",
+    "inputs.json": "d8033804cd5747d343b97b37246fef3ab1b37af9c76824463731777ba1e92e8c"
+  }
+}

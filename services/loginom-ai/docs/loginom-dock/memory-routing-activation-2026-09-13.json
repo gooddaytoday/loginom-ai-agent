@@ -1,0 +1,244 @@
+{
+  "version": 1,
+  "checked_at": "2026-09-13T01:13:59.602795+00:00",
+  "generation": "20260913.3",
+  "canonical_peer": "-Users-kartamyshev-Git-loginom-dock",
+  "canonical_root": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories",
+  "user_restart": true,
+  "node13_14_boundary": "explicit_user_interruption_not_development_completion",
+  "all_four_not_loaded_before_install": true,
+  "all_four_registered_actor_health_find_read": true,
+  "source_tests_previously_passed": 65,
+  "standby_events_previously_passed": 25,
+  "original_memory_hooks": {
+    "main": 5,
+    "node11": 0,
+    "node12": 0,
+    "node13": 0,
+    "node14": 0
+  },
+  "migration_cursors": {
+    "11": 1452,
+    "12": 1630,
+    "13": 1741,
+    "14": 1690
+  },
+  "tasks": [
+    {
+      "node": 11,
+      "thread_id": "01a0971e-804e-7f42-923a-4cdb1de181be",
+      "worktree": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-11-replacement",
+      "phase": "awaiting-shared-memory-transition-and-acceptance",
+      "actor_access": {
+        "health": "healthy",
+        "find": "passed",
+        "read": "passed",
+        "uri": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/11/.overview.md",
+        "reported_by": "developer_registered_mcp",
+        "checked_at": "2026-09-13T01:05:00.319185+00:00"
+      },
+      "resume": null
+    },
+    {
+      "node": 12,
+      "thread_id": "01a0971e-9324-7cd1-8610-cf343b3838b1",
+      "worktree": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates",
+      "phase": "awaiting-shared-memory-transition-and-acceptance-candidate",
+      "actor_access": {
+        "health": "healthy",
+        "find": "passed",
+        "read": "passed",
+        "uri": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/11/field_params_final_acceptance.md",
+        "reported_by": "developer_registered_mcp",
+        "checked_at": "2026-09-13T01:05:00.319185+00:00"
+      },
+      "resume": null
+    },
+    {
+      "node": 13,
+      "thread_id": "01a0971e-a2c3-7e21-898b-9b865527a484",
+      "worktree": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-13-date-time",
+      "phase": "development-resumed-shared-memory",
+      "actor_access": {
+        "health": "healthy",
+        "find": "passed",
+        "read": "passed",
+        "uri": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/06/output_port_distinction_fix.md",
+        "reported_by": "developer_registered_mcp"
+      },
+      "resume": {
+        "status": "running",
+        "idempotency_key": "node13-development-resume-shared-memory-20260913.3",
+        "checked_at": "2026-09-13T01:00:17.164701+00:00",
+        "turn_id": "01a09847-9289-7dc0-9097-ba7ef71063cd",
+        "cursor": "dd5a87df-c6e2-4d7e-8c11-56462bd2192b:2",
+        "verified_at": "2026-09-13T01:00:55.574995+00:00"
+      }
+    },
+    {
+      "node": 14,
+      "thread_id": "01a09738-2d64-7dc2-8cb3-634663d0b406",
+      "worktree": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-14-missing-values",
+      "phase": "development-resumed-shared-memory",
+      "actor_access": {
+        "health": "healthy",
+        "find": "passed",
+        "read": "passed",
+        "uri": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/12/fourth_stream_added.md",
+        "reported_by": "developer_registered_mcp",
+        "checked_at": "2026-09-13T01:05:00.319185+00:00"
+      },
+      "resume": {
+        "status": "running",
+        "idempotency_key": "node14-development-resume-shared-memory-20260913.3",
+        "checked_at": "2026-09-13T01:02:06.273823+00:00",
+        "turn_id": "01a09849-3e8c-7700-9f75-2df485ac3528",
+        "cursor": "4f0dcc79-84e0-463b-800e-056fbf45abe6:2",
+        "verified_at": "2026-09-13T01:02:44.431594+00:00"
+      }
+    }
+  ],
+  "cross_developer_read": {
+    "source_node": 12,
+    "reader_node": 11,
+    "turn": "01a0984e-d76a-7cf1-bf95-7485a0e382d4",
+    "uri": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node_12_auditor_fix.md",
+    "registered_mcp_actor_read": true
+  },
+  "next_node_enrollment": {
+    "implemented": false,
+    "blocking_coupling": "current workspaces list participates in routeHash",
+    "required": "independent route registration and fresh-task bootstrap, backward-compatible with active routes"
+  },
+  "limitations": [
+    "New capture of ongoing node13/14 phases awaits completion events",
+    "Extractor skipped one node12 event with invalid_ranges; the N12-R1 lesson was saved and retrieved",
+    "First node11 extraction saved access event, not distinct N11-R1 lesson",
+    "Official global User memory extraction remains enabled independently of project Peer events",
+    "Node handlers are not autonomously accepted by memory checks"
+  ],
+  "global_peer_changed": false,
+  "memory_deleted_by_coordinator": false,
+  "periodic_polling": false,
+  "merge_push_deploy_plugin_reinstall": false,
+  "completed_probe_capture": [
+    {
+      "node": 11,
+      "threadId": "01a0971e-804e-7f42-923a-4cdb1de181be",
+      "peer": "-Users-kartamyshev-Git-loginom-dock",
+      "newServerMessages": 12,
+      "allNewMessagesCanonicalPeer": true,
+      "confirmedLessonSha": "91dee921e9e17343d53bf20fd7ca5f3b19f8de7a",
+      "cursorBefore": 1464,
+      "cursorAfter": 1464,
+      "officialRoutedCommit": true,
+      "hookStderrBytes": 0,
+      "extractionVerified": false,
+      "checkedAt": "2026-09-13T01:05:16.198Z"
+    },
+    {
+      "node": 12,
+      "threadId": "01a0971e-9324-7cd1-8610-cf343b3838b1",
+      "peer": "-Users-kartamyshev-Git-loginom-dock",
+      "newServerMessages": 9,
+      "allNewMessagesCanonicalPeer": true,
+      "confirmedLessonSha": "ce10e177647ac27eb469832c14c6ff07e3325620",
+      "cursorBefore": 1644,
+      "cursorAfter": 1644,
+      "officialRoutedCommit": true,
+      "hookStderrBytes": 0,
+      "extractionVerified": false,
+      "checkedAt": "2026-09-13T01:04:32.499Z"
+    }
+  ],
+  "extraction": [
+    {
+      "node": 11,
+      "ok": true,
+      "status": 200,
+      "archive": "archive_009",
+      "keys": [
+        "archive_uri",
+        "trace_id",
+        "extracted_at",
+        "operations",
+        "skipped_operations",
+        "summary"
+      ],
+      "summary": {
+        "total_adds": 1,
+        "total_updates": 0,
+        "total_deletes": 0,
+        "total_skipped": 0
+      },
+      "extracted_at": "2026-09-13T01:05:31.447767Z",
+      "operations": {
+        "adds": [
+          {
+            "uri": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/shared_project_memory_access.md",
+            "memory_type": "events"
+          }
+        ],
+        "updates": [],
+        "deletes": []
+      }
+    },
+    {
+      "node": 12,
+      "ok": true,
+      "status": 200,
+      "archive": "archive_010",
+      "keys": [
+        "archive_uri",
+        "trace_id",
+        "extracted_at",
+        "operations",
+        "skipped_operations",
+        "summary"
+      ],
+      "summary": {
+        "total_adds": 3,
+        "total_updates": 2,
+        "total_deletes": 0,
+        "total_skipped": 1
+      },
+      "extracted_at": "2026-09-13T01:05:37.076360Z",
+      "operations": {
+        "adds": [
+          {
+            "uri": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node_12_auditor_fix.md",
+            "memory_type": "events"
+          },
+          {
+            "uri": "viking://user/kartamyshev/memories/cases/node_12_auditor_review.md",
+            "memory_type": "cases"
+          },
+          {
+            "uri": "viking://user/kartamyshev/memories/trajectories/n12_r1_independent_schema_validation_20260913005433.md",
+            "memory_type": "trajectories"
+          }
+        ],
+        "updates": [
+          {
+            "uri": "viking://user/kartamyshev/memories/profile.md",
+            "memory_type": "profile"
+          },
+          {
+            "uri": "viking://user/kartamyshev/memories/experiences/empty_schema_audit_fix.md",
+            "memory_type": "experiences"
+          }
+        ],
+        "deletes": []
+      }
+    }
+  ],
+  "project_lesson_readback": {
+    "uri": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node_12_auditor_fix.md",
+    "coordinator_exact_read": true,
+    "coordinator_scoped_find": true,
+    "scope": "actor",
+    "target": "events/2026/09/13",
+    "source_sha": "ce10e177647ac27eb469832c14c6ff07e3325620",
+    "hermes_acceptance": false
+  }
+}

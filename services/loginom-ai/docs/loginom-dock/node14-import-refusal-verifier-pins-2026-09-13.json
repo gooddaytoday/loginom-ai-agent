@@ -1,0 +1,165 @@
+{
+  "source_commit": "7bef361cf5320e553d68fc020493717c6e50683e",
+  "runtime_revision": "71f73d81d758c746bd2111c93de08691c85aebddf80a411f294b8ed3f56ab4ff",
+  "runtime_files": 156,
+  "source_files": 395,
+  "harness_files": 256,
+  "harness_inputs_sha256": "abda18113fd92027a3eac6e48c26bcc982875b8262991bc808fe092e1fe3b2c1",
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node14-test4.2-candidate/manifest.json",
+  "manifest_sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad",
+  "fixtures_verified": true,
+  "input_files": 8,
+  "cases": 14,
+  "final_results": 12,
+  "goal_sha256": "35a23e9aeb6a37c408e249aec54e12ca1f230cbc219392e5cabe9b6d4675a836",
+  "fixture_manifest_sha256": "0f2927617fe47e84db3ae3500f735a560002c509a091dd7611aa9ca7f455b1cf",
+  "required_successful_operations": 27,
+  "required_imports": 9,
+  "native_save_required": true,
+  "independent_reopen_required": true,
+  "session_id": "be958249-da06-4dbe-902a-dbb7dcc454fa",
+  "calls": 114,
+  "replies": 114,
+  "events": 1264,
+  "scoped_audit": "PASS",
+  "full_goal_accepted": false,
+  "model_started": false,
+  "launch_authorized": false,
+  "requires_coordinator_slot": true,
+  "own_processes_stopped": true,
+  "evidence_index_sha256": "45e05e50e6e48a9f11cae9230a228b990bec5d9768ec7df9cc927fc9b761cd30",
+  "receipts": {
+    ".dock/node14-import-refusal-verifier/acceptance-launch-plan.json": {
+      "bytes": 1680,
+      "sha256": "1730009e86d2f73f4783f22c9afb7c40451ebb8bbd1dc11d9cef72d9823a1f39"
+    },
+    ".dock/node14-import-refusal-verifier/candidate/actions.json": {
+      "bytes": 34340,
+      "sha256": "d13b9342f913f4dbc3248b22d9d021a6ed4abdf178af3fb7d8d4f76a08f280da"
+    },
+    ".dock/node14-import-refusal-verifier/candidate/coordinator-readback.json": {
+      "bytes": 2304,
+      "sha256": "9c96f7704b2cc578e50a33a583235c060d80a597415c94e75b14e1cf6225e229"
+    },
+    ".dock/node14-import-refusal-verifier/candidate/manifest.json": {
+      "bytes": 718,
+      "sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad"
+    },
+    ".dock/node14-import-refusal-verifier/candidate/selectors.json": {
+      "bytes": 23083,
+      "sha256": "03a83df5e2e5dc185ab1d6a985c3b6e23bf70ee7596786e99f5eaf32337c94a7"
+    },
+    ".dock/node14-import-refusal-verifier/candidate/source-index.json": {
+      "bytes": 3805,
+      "sha256": "b9e92ce80ffaf6bd8e19eb2fd62b61a926b898e5fe65deb75757833296da08ed"
+    },
+    ".dock/node14-import-refusal-verifier/candidate/stage-report.json": {
+      "bytes": 567,
+      "sha256": "1b3c16712f4e6b188afd77a495e4e986a62f8155b3565aa257dc99f617630202"
+    },
+    ".dock/node14-import-refusal-verifier/candidate-readback.json": {
+      "bytes": 2154,
+      "sha256": "2faf7b54103c1acb645bc18f61aa002dd6fb3f26271c5951fc29850776ddf82e"
+    },
+    ".dock/node14-import-refusal-verifier/download.mjs": {
+      "bytes": 1689,
+      "sha256": "462fded42f7ec9e769d84fde4dc71eb684952b2046c922d246bdca1c7f173954"
+    },
+    ".dock/node14-import-refusal-verifier/fixture-identity.json": {
+      "bytes": 335,
+      "sha256": "db8ebe7253eccaacd2d504b5422c65c0ac05a98d2397a2f3968936cfdcf6cb96"
+    },
+    ".dock/node14-import-refusal-verifier/freeze-check.json": {
+      "bytes": 83,
+      "sha256": "d86a25fcc8f2dbd037874f1e3bbc2ae61c64e39ae59ef2fe3350f941f819b4ad"
+    },
+    ".dock/node14-import-refusal-verifier/goal-inventory.json": {
+      "bytes": 408,
+      "sha256": "cfd7da0f81e7963928e5dec78accd80e79f7158c92fe8a28d577c974ccd550f4"
+    },
+    ".dock/node14-import-refusal-verifier/import-refusal-final-tests.txt": {
+      "bytes": 830,
+      "sha256": "f05712e67b63d2ff1b95dd5ab428472a3b696d9cc9507a95c3f3df063af19369"
+    },
+    ".dock/node14-import-refusal-verifier/import-refusal-final2-tests.txt": {
+      "bytes": 106,
+      "sha256": "cc94da2a291b22cc680f1bddbb320e1a561979d22fb1f863ccb21bc9584753fb"
+    },
+    ".dock/node14-import-refusal-verifier/live-1/geometry.json": {
+      "bytes": 631,
+      "sha256": "006d534b26068d82e5469f77cd4d13ce0c44f2e9817b1585f05b3b07bf646fc0"
+    },
+    ".dock/node14-import-refusal-verifier/live-1/public-evidence.json": {
+      "bytes": 79692030,
+      "sha256": "098e40ac4c9cd80563c5c6f0837dc8516d920744bf4d611127d9d504a1da0291"
+    },
+    ".dock/node14-import-refusal-verifier/live-1/result.json": {
+      "bytes": 12156,
+      "sha256": "d5ec4c82961d18c4ddd21efa0f4be15c74b4993c5025cb57ba5364b17f687d25"
+    },
+    ".dock/node14-import-refusal-verifier/live-1/session.json": {
+      "bytes": 27506,
+      "sha256": "8c92aad165a3c0f40929c311e03ee4430db0fe9428492d43f68e45dcd8006c79"
+    },
+    ".dock/node14-import-refusal-verifier/live-audit-final.json": {
+      "bytes": 15344,
+      "sha256": "cedb4e6aa951a6e206983928ac0afd7a5e25b1e02506e70d03e648b71ceff388"
+    },
+    ".dock/node14-import-refusal-verifier/live-audit.json": {
+      "bytes": 15344,
+      "sha256": "cedb4e6aa951a6e206983928ac0afd7a5e25b1e02506e70d03e648b71ceff388"
+    },
+    ".dock/node14-import-refusal-verifier/missing-values-tests.txt": {
+      "bytes": 118,
+      "sha256": "237cfad2214fd012e461bb8a857a03e29190f01328c48d3dfc0c1cafe296df73"
+    },
+    ".dock/node14-import-refusal-verifier/old-evidence-unchanged.json": {
+      "bytes": 2748,
+      "sha256": "22e66d2795d8f9710344255d23a9b470e4179c43b3202bafb444fdbf1be08ecf"
+    },
+    ".dock/node14-import-refusal-verifier/process-check.json": {
+      "bytes": 122,
+      "sha256": "e2cfee9328659bb8ec4d184a139da554202a6871dfc82a79c72a98f6dc128726"
+    },
+    ".dock/node14-import-refusal-verifier/projection-tests.txt": {
+      "bytes": 104,
+      "sha256": "62cfbeb2911bb226088bfb0918eb4b05008ea70b20bce854ee2ca8a564bd37a5"
+    },
+    ".dock/node14-import-refusal-verifier/public-tests.txt": {
+      "bytes": 106,
+      "sha256": "75ff54e727b57e4bd7b88956ed0c92c4b9a416e6f0976707e8fb54aa385ac0bd"
+    },
+    ".dock/node14-import-refusal-verifier/refusal-tests.txt": {
+      "bytes": 111,
+      "sha256": "b5f9f21eabaeb9827c7288e6e0823c8af313442fc05225e86908c5057532305f"
+    },
+    ".dock/node14-import-refusal-verifier/runtime-tests.txt": {
+      "bytes": 102,
+      "sha256": "e73c3805f810fdcf3d0167ced7085c48306c9482a952ffb710551d230cdb3e51"
+    },
+    ".dock/node14-import-refusal-verifier/source-preflight.json": {
+      "bytes": 100327,
+      "sha256": "495e00518a80d82c60da8e6cca9dcc1f43c5d626e6943f6f460ec2d826618b0c"
+    },
+    ".dock/node14-import-refusal-verifier/subscription-preflight-final-output.txt": {
+      "bytes": 242,
+      "sha256": "335cf0a5144644b738a4a5b0ca9f1970f894d560216cfa2ad40dff3a8ce2b3d6"
+    },
+    ".dock/node14-import-refusal-verifier/subscription-preflight-final.json": {
+      "bytes": 128097,
+      "sha256": "62ee925f561c3f8e4cf77ed5820bc8b35df6f55acafa9dc6373aa239f143f0a4"
+    },
+    ".dock/node14-import-refusal-verifier/subscription-preflight-output.txt": {
+      "bytes": 242,
+      "sha256": "335cf0a5144644b738a4a5b0ca9f1970f894d560216cfa2ad40dff3a8ce2b3d6"
+    },
+    ".dock/node14-import-refusal-verifier/subscription-preflight.json": {
+      "bytes": 128097,
+      "sha256": "54f4034c6e24e4815074dc4666a97cbe3fd384fb683f0ff589913459757d0bbe"
+    },
+    ".dock/node14-import-refusal-verifier/successful-import-output-audit.json": {
+      "bytes": 896,
+      "sha256": "1cd846680bc8bcfd1c2f9c02d6627c09264b526dcef3b20a4bfddcc8c5e919ac"
+    }
+  }
+}

@@ -1,0 +1,276 @@
+{
+  "assignment": "node14:stale-full-context-diagnosis:1:ad7cd14f",
+  "source_head": "51993beaa27726a7550d79ec3fb036063aae3620",
+  "runtime_revision": "68e8e7a7cac00b8afa45ac8f5b60bdcfa8832efc86ed34445f2bd4f1baf10e62",
+  "result": "BLOCKED_BEFORE_TARGET",
+  "source_changes": false,
+  "model_runs": 0,
+  "verification": {
+    "result": "BLOCKED_BEFORE_TARGET",
+    "checks": {
+      "14_preceding_successes": true,
+      "9_imports": true,
+      "stopped_before_boundary": true,
+      "last_inner_no_effect": true,
+      "last_stale": true,
+      "outer_preserved": true,
+      "same_source_tid_new_ref": true,
+      "no_target_events": true,
+      "no_stale_retry": true,
+      "viewport_null_maximized": true,
+      "bounded_trace": true,
+      "own_processes_stopped": true
+    },
+    "passed": 12,
+    "total": 12,
+    "journal_lines": 7918,
+    "before_control": [
+      {
+        "ref": "ui-1789314825018-913yrt06btc-28507",
+        "tid": "MF;TF-1;Graph;База",
+        "identity": {
+          "anchor_tid": "MF;TF-1;Graph;База",
+          "path": []
+        },
+        "signature": {
+          "tag": "g",
+          "tid": "MF;TF-1;Graph;База",
+          "role": null,
+          "type": null,
+          "name": null,
+          "label": "",
+          "dialog_ref": null,
+          "scroll": null,
+          "check_state": null
+        },
+        "interaction": {
+          "state": "point_observed",
+          "point": {
+            "x": 432,
+            "y": 218
+          }
+        }
+      }
+    ],
+    "after_control": [
+      {
+        "ref": "ui-1789314825018-913yrt06btc-28566",
+        "tid": "MF;TF-1;Graph;База",
+        "identity": {
+          "anchor_tid": "MF;TF-1;Graph;База",
+          "path": []
+        },
+        "signature": {
+          "tag": "g",
+          "tid": "MF;TF-1;Graph;База",
+          "role": null,
+          "type": null,
+          "name": null,
+          "label": "",
+          "dialog_ref": null,
+          "scroll": null,
+          "check_state": null
+        },
+        "interaction": {
+          "state": "point_observed",
+          "point": {
+            "x": 432,
+            "y": 218
+          }
+        }
+      }
+    ],
+    "source_trace": {
+      "checks": [
+        {
+          "at": 1789315017769,
+          "connected": true,
+          "identity": true,
+          "actual": "ui-1789314825018-913yrt06btc-4004",
+          "expected": "ui-1789314825018-913yrt06btc-4004",
+          "kind": "identity"
+        },
+        {
+          "at": 1789315017771,
+          "kind": "visible",
+          "value": true
+        },
+        {
+          "at": 1789315017772,
+          "kind": "enabled",
+          "value": true
+        },
+        {
+          "at": 1789315052475,
+          "connected": true,
+          "identity": true,
+          "actual": "ui-1789314825018-913yrt06btc-4835",
+          "expected": "ui-1789314825018-913yrt06btc-4835",
+          "kind": "identity"
+        },
+        {
+          "at": 1789315052476,
+          "kind": "visible",
+          "value": true
+        },
+        {
+          "at": 1789315052476,
+          "kind": "enabled",
+          "value": true
+        }
+      ],
+      "dropped": 0
+    },
+    "target_graph_comparison": "not_reached",
+    "failed_source_instrumented": false,
+    "root_cause_confirmed": false,
+    "full_goal_accepted": false,
+    "model_runs": 0
+  },
+  "receipts": {
+    ".dock/node14-stale-full-context-diagnosis/closure.json": {
+      "bytes": 237,
+      "sha256": "f77800992c7e41f8ecc856992167ac331f1923d46ac8dca83ad93f7d69a5296e"
+    },
+    ".dock/node14-stale-full-context-diagnosis/failure-sequence.json": {
+      "bytes": 5067,
+      "sha256": "33935af084d6127310e0562daa222129a4bf11a6f1c250a3104964c3a8defcaa"
+    },
+    ".dock/node14-stale-full-context-diagnosis/failure-steps.json": {
+      "bytes": 130443,
+      "sha256": "d0771bb6688a36e20ea4751b5372eded5f2f4729a8e7f9283b850e43a45318b3"
+    },
+    ".dock/node14-stale-full-context-diagnosis/failure-targets.json": {
+      "bytes": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    ".dock/node14-stale-full-context-diagnosis/last-observation.json": {
+      "bytes": 103517,
+      "sha256": "636126d1babc4946258101cfa31a2b9eb3002d2af54bcac14756a15a1cbdf9a2"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/built-nodes.json": {
+      "bytes": 191730,
+      "sha256": "a32e5eb4b53edda199a5d319c894d3c111e3b83049fceed16c89e50b2d3ad418"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/geometry.json": {
+      "bytes": 631,
+      "sha256": "e1eb8dd60209e3780abc5166171079ba6cec5e056238aed6b531cf4572053f1b"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/observer-install.json": {
+      "bytes": 1906,
+      "sha256": "5ce39d942b9d0ccd98a40817b1e309cce334cc0522a33a0803978608f42ef031"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/prepare.json": {
+      "bytes": 23900,
+      "sha256": "4f85588860ef1aa7625932d44f265a0efc29f98ffd3ea77cf11455e69fa62cf9"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/public-evidence.json": {
+      "bytes": 1422613,
+      "sha256": "c9c09dc497c9aceade2392403aad724248ba72ddae7b2dd24786f82c501d0225"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/session.json": {
+      "bytes": 27511,
+      "sha256": "3093cef2f0d35f8f3c54273b3112b3ecb5e0ec63128237791c4d37e9e6c144ef"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/sessions/a2148c98-22dc-49d9-a158-1862e5dd1e3b/execution-events.jsonl": {
+      "bytes": 261541701,
+      "sha256": "5691090cf80d0f32fa8da1928e65bf1352094f86edeefad638ebd9343ef6c654"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-import-120-retry.json": {
+      "bytes": 845,
+      "sha256": "f94320d2afcf165116e13ad3da75aca622b131ee434eba39b5a8eef2155b6590"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-import-allnull.json": {
+      "bytes": 845,
+      "sha256": "f94320d2afcf165116e13ad3da75aca622b131ee434eba39b5a8eef2155b6590"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-import-base.json": {
+      "bytes": 246,
+      "sha256": "55c194383bdb8bbd7265d23fa44484b001db36807988b04df467452217cb2522"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-import-boundary.json": {
+      "bytes": 845,
+      "sha256": "f94320d2afcf165116e13ad3da75aca622b131ee434eba39b5a8eef2155b6590"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-import-empty.json": {
+      "bytes": 845,
+      "sha256": "f94320d2afcf165116e13ad3da75aca622b131ee434eba39b5a8eef2155b6590"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-import-mutable.json": {
+      "bytes": 845,
+      "sha256": "f94320d2afcf165116e13ad3da75aca622b131ee434eba39b5a8eef2155b6590"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-import-permutation.json": {
+      "bytes": 845,
+      "sha256": "f94320d2afcf165116e13ad3da75aca622b131ee434eba39b5a8eef2155b6590"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-import-precision.json": {
+      "bytes": 246,
+      "sha256": "55c194383bdb8bbd7265d23fa44484b001db36807988b04df467452217cb2522"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-import-skew.json": {
+      "bytes": 246,
+      "sha256": "55c194383bdb8bbd7265d23fa44484b001db36807988b04df467452217cb2522"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-mv-main-close-discard.json": {
+      "bytes": 845,
+      "sha256": "f94320d2afcf165116e13ad3da75aca622b131ee434eba39b5a8eef2155b6590"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-mv-main-create.json": {
+      "bytes": 845,
+      "sha256": "f94320d2afcf165116e13ad3da75aca622b131ee434eba39b5a8eef2155b6590"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-mv-main-done.json": {
+      "bytes": 845,
+      "sha256": "f94320d2afcf165116e13ad3da75aca622b131ee434eba39b5a8eef2155b6590"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-mv-main-newnode.json": {
+      "bytes": 845,
+      "sha256": "f94320d2afcf165116e13ad3da75aca622b131ee434eba39b5a8eef2155b6590"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-mv-main-reexecute-preserved.json": {
+      "bytes": 845,
+      "sha256": "f94320d2afcf165116e13ad3da75aca622b131ee434eba39b5a8eef2155b6590"
+    },
+    ".dock/node14-stale-full-context-diagnosis/live-1/source-checks-mv-note-only.json": {
+      "bytes": 845,
+      "sha256": "f94320d2afcf165116e13ad3da75aca622b131ee434eba39b5a8eef2155b6590"
+    },
+    ".dock/node14-stale-full-context-diagnosis/observer.code": {
+      "bytes": 1584,
+      "sha256": "a51bb10f191aad3b2db24609e81839c91ba3d73bf4ec015246264b235eb20e51"
+    },
+    ".dock/node14-stale-full-context-diagnosis/old-evidence-verification.json": {
+      "bytes": 519,
+      "sha256": "4989843b0bf89ee5c3831a237db86ca2fd77deaf02842ff1400d165187b44f1e"
+    },
+    ".dock/node14-stale-full-context-diagnosis/original-labels.json": {
+      "bytes": 881,
+      "sha256": "5561fade2b07c10560e23715a9d4f2fcfa4179a7da0bf923145df44d5e8b9865"
+    },
+    ".dock/node14-stale-full-context-diagnosis/original-last-target.json": {
+      "bytes": 59624,
+      "sha256": "e9d3f1041b61cb44293e6345aebc50bcd8e02c9256db8a432690de8e818afcb1"
+    },
+    ".dock/node14-stale-full-context-diagnosis/original-requests.json": {
+      "bytes": 76156,
+      "sha256": "3f8ee1f44e72d81f034c6e2d4833da5b72e63620a033d407ff0050af1da5641b"
+    },
+    ".dock/node14-stale-full-context-diagnosis/pre-stop-events.json": {
+      "bytes": 1089,
+      "sha256": "ad4a2067a10e84390efd54bb092eae066a66e22b55ccc4383f4fca71515d20b7"
+    },
+    ".dock/node14-stale-full-context-diagnosis/run.mjs": {
+      "bytes": 8583,
+      "sha256": "e1d4d6e8b1b2940b5d07caa33061d8c7c08446bf703a25efced9f5951871cf89"
+    },
+    ".dock/node14-stale-full-context-diagnosis/verification.json": {
+      "bytes": 2810,
+      "sha256": "9c4c61b8ed804d3261a8b6b535cf5c5d3d96f7f835611f1f554ec8e55f8a1107"
+    },
+    ".dock/node14-stale-full-context-diagnosis/verify.py": {
+      "bytes": 2634,
+      "sha256": "3fa052bdf8916847b48249c683934a86724b0eb52f1a4f623acc54c709b94cfa"
+    }
+  }
+}

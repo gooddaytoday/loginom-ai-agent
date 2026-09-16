@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loginom-dock.duckdns.org/schemas/executor/catalog-manifest-v1.json",
+  "title": "Loginom Dock executor catalog manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "catalog_version",
+    "status",
+    "capability_abi",
+    "min_executor_revision",
+    "e2e_commit",
+    "created_at",
+    "files",
+    "compatibility"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "catalog_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "candidate"
+    },
+    "capability_abi": {
+      "const": 1
+    },
+    "min_executor_revision": {
+      "const": "1.0.0"
+    },
+    "e2e_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actions.json",
+        "selectors.json",
+        "source-index.json"
+      ],
+      "properties": {
+        "actions.json": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "selectors.json": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source-index.json": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "loginom_build",
+        "platform",
+        "browser"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "loginom_build": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "platform": {
+          "enum": ["macos", "linux", "windows"]
+        },
+        "browser": {
+          "const": "chromium"
+        }
+      }
+    }
+  }
+}

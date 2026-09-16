@@ -1,0 +1,27 @@
+{
+  "authorization": "node16:variant-prototype:1:direct-user-20260913",
+  "loginom": "7.4.2",
+  "account": "test-1",
+  "package": "/test-1/node16-20260913-a56c2488/Node16-variant-prototype.lgp",
+  "run_dir": ".dock/node16/live-1789292821504",
+  "public_runtime_pin": "7ed94630353fed483f53a029a3aea7828920235879569b83d303510213b3d239",
+  "frontend_sha256": {
+    "rpc.js": "afeb91811a02da1f7841fb8c03e3003686c98a051f09186af082a3c44a12b4cc",
+    "bg.rtl.rpc.js": "11ac2c63d2e8162b974f57d14e0f4f57b19cc80d3d39797be377e22eced6a973",
+    "bg.model.rpc.js": "53d043e4a7ee9dcc8006aa8915ca43d83a1df427fa0d73d8ea403357ec61a28f",
+    "SysUtils.js": "d9c9e13ec69d4676d41a661855c18e19bfb0c928a39d8c550435f18631362bd4",
+    "BitConverter.js": "03f051286c276608da7023ed91cc9ef5c3d61fcca69f75de390d4b72005f8100"
+  },
+  "prototype_sha256": {
+    "raw-read.mjs": "738af7c15bd39677ac1882aa1932a938c1efb319aef5b50b99cf4b06cca2df9d",
+    "decode.mjs": "c744b19210a294ebbddb2cd04e1ea9f67409ba80a208e09c568afb3d7883b15a",
+    "bounds.csv": "a095b5644b3e34cda15ef9f601898d7ec7eaf22f8273453abf8435c87ed3d044"
+  },
+  "method": 321,
+  "interface": 116,
+  "limits": {
+    "rows": 50,
+    "columns": 8
+  },
+  "integration": "not_authorized"
+}

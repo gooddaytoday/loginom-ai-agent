@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "snapshotSha256": "06ad2c58ea3144cdd283837c58926adfba682da50310843ddbfc291a29f81d18",
+  "manifestSha256": "108c7f9710c5559b12c2d67da4b9bbe11ccc2ee9bac5f60665b591f80d6f4835",
+  "refs": 45,
+  "roots": 97,
+  "worktrees": 4,
+  "verifiedFiles": 107
+}

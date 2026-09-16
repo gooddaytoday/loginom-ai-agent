@@ -1,0 +1,10 @@
+{
+  "edges.csv": {
+    "bytes": 80,
+    "sha256": "0d5892695e3a32c0ac0e68e241eda8119c01c05ee6d4f53c7cbf525036fd8475"
+  },
+  "empty.csv": {
+    "bytes": 12,
+    "sha256": "342006982c86f02b7919b415eabbd5e01793d2c02018209bb409a9ae7c1eed1b"
+  }
+}

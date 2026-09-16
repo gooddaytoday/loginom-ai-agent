@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "failures": [],
+  "columns_verified": 4,
+  "scope": "integrated_delivery_to_fresh_import_output",
+  "execution_verified": true,
+  "package_persistence_verified": false,
+  "hermes_acceptance_verified": false,
+  "journal_authentication_verified": false,
+  "execution_id": "1789302681255-tf0bm2d86zq:255:1",
+  "output_data_verified": true,
+  "integrated_delivery_verified": true
+}

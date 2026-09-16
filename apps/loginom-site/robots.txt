@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://loginom-dock.duckdns.org/sitemap.xml

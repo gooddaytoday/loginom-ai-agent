@@ -1,0 +1,3072 @@
+{
+  "schema_version": 1,
+  "loginom_build": "7.4.2",
+  "locale": "ru-RU",
+  "source_sha256": "351c5a12660a1a016a565a0e909e680a5b00eae9abecae10d0310b86bcf69334",
+  "scope": "Observed exploratory matrix, frozen before repeat QA; not yet a passed independent acceptance",
+  "parameters": {
+    "changes": [
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "S_to_S"
+        },
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "S_to_I"
+        },
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "S_to_R"
+        },
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "S_to_B"
+        },
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "S_to_D"
+        },
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "I_to_S"
+        },
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "I_to_I"
+        },
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "I_to_R"
+        },
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "I_to_B"
+        },
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "I_to_D"
+        },
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "R_to_S"
+        },
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "R_to_I"
+        },
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "R_to_R"
+        },
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "R_to_B"
+        },
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "R_to_D"
+        },
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "B_to_S"
+        },
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "B_to_I"
+        },
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "B_to_R"
+        },
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "B_to_B"
+        },
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "B_to_D"
+        },
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "D_to_S"
+        },
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "D_to_I"
+        },
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "D_to_R"
+        },
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "D_to_B"
+        },
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "field": {
+          "kind": "input_field",
+          "name": "D_to_D"
+        },
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      }
+    ]
+  },
+  "input": {
+    "schema": [
+      {
+        "name": "S_to_S",
+        "label": "Матрица",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "S_to_I",
+        "label": "Матрица",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "S_to_R",
+        "label": "Матрица",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "S_to_B",
+        "label": "Матрица",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "S_to_D",
+        "label": "Матрица",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "I_to_S",
+        "label": "Матрица",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "I_to_I",
+        "label": "Матрица",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "I_to_R",
+        "label": "Матрица",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "I_to_B",
+        "label": "Матрица",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "I_to_D",
+        "label": "Матрица",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "R_to_S",
+        "label": "Матрица",
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "R_to_I",
+        "label": "Матрица",
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "R_to_R",
+        "label": "Матрица",
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "R_to_B",
+        "label": "Матрица",
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "R_to_D",
+        "label": "Матрица",
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "B_to_S",
+        "label": "Матрица",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "B_to_I",
+        "label": "Матрица",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "B_to_R",
+        "label": "Матрица",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "B_to_B",
+        "label": "Матрица",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "B_to_D",
+        "label": "Матрица",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "D_to_S",
+        "label": "Матрица",
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "D_to_I",
+        "label": "Матрица",
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "D_to_R",
+        "label": "Матрица",
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "D_to_B",
+        "label": "Матрица",
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "D_to_D",
+        "label": "Матрица",
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      }
+    ],
+    "row_count": 10,
+    "rows": [
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "истина"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "истина"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "истина"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "истина"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "истина"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 3.545
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 3.545
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 3.545
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 3.545
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 3.545
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2024-02-29T23:59:58.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2024-02-29T23:59:58.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2024-02-29T23:59:58.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2024-02-29T23:59:58.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2024-02-29T23:59:58.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "FALSE"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "FALSE"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "FALSE"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "FALSE"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "FALSE"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -42.2
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -42.2
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -42.2
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -42.2
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -42.2
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2000-01-01T00:00:00.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2000-01-01T00:00:00.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2000-01-01T00:00:00.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2000-01-01T00:00:00.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2000-01-01T00:00:00.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "3,545"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "3,545"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "3,545"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "3,545"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "3,545"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-2"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-2"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-2"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-2"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-2"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-42,2"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-42,2"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-42,2"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-42,2"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-42,2"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "123"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "123"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "123"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "123"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "123"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1.5
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T12:00:00.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T12:00:00.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T12:00:00.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T12:00:00.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T12:00:00.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "29.02.2024 23:59:58"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "29.02.2024 23:59:58"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "29.02.2024 23:59:58"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "29.02.2024 23:59:58"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "29.02.2024 23:59:58"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "42"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "42"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "42"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "42"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "42"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -1.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -1.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -1.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -1.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -1.5
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": ""
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": ""
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": ""
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": ""
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": ""
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1900-01-01T01:02:03.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1900-01-01T01:02:03.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1900-01-01T01:02:03.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1900-01-01T01:02:03.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1900-01-01T01:02:03.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 123.875
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 123.875
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 123.875
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 123.875
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 123.875
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2026-09-12T13:14:15.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2026-09-12T13:14:15.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2026-09-12T13:14:15.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2026-09-12T13:14:15.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2026-09-12T13:14:15.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "東京"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "東京"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "東京"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "東京"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "東京"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 2.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 2.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 2.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 2.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 2.5
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2020-01-01T00:00:01.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2020-01-01T00:00:01.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2020-01-01T00:00:01.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2020-01-01T00:00:01.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2020-01-01T00:00:01.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-7"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-7"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-7"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-7"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-7"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -2.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -2.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -2.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -2.5
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -2.5
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2020-12-31T23:59:59.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2020-12-31T23:59:59.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2020-12-31T23:59:59.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2020-12-31T23:59:59.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2020-12-31T23:59:59.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-1"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-1"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-1"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-1"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-1"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "9"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "9"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "9"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "9"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "9"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0.0001234567890123456
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0.0001234567890123456
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0.0001234567890123456
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0.0001234567890123456
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0.0001234567890123456
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2001-01-01T12:34:56.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2001-01-01T12:34:56.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2001-01-01T12:34:56.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2001-01-01T12:34:56.000"
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2001-01-01T12:34:56.000"
+        }
+      ]
+    ]
+  },
+  "output": {
+    "schema": [
+      {
+        "name": "S_to_S",
+        "label": "Матрица",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "S_to_I",
+        "label": "Матрица",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "S_to_R",
+        "label": "Матрица",
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "S_to_B",
+        "label": "Матрица",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "S_to_D",
+        "label": "Матрица",
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "I_to_S",
+        "label": "Матрица",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "I_to_I",
+        "label": "Матрица",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "I_to_R",
+        "label": "Матрица",
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "I_to_B",
+        "label": "Матрица",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "I_to_D",
+        "label": "Матрица",
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "R_to_S",
+        "label": "Матрица",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "R_to_I",
+        "label": "Матрица",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "R_to_R",
+        "label": "Матрица",
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "R_to_B",
+        "label": "Матрица",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "R_to_D",
+        "label": "Матрица",
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "B_to_S",
+        "label": "Матрица",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "B_to_I",
+        "label": "Матрица",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "B_to_R",
+        "label": "Матрица",
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "B_to_B",
+        "label": "Матрица",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "B_to_D",
+        "label": "Матрица",
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "D_to_S",
+        "label": "Матрица",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "D_to_I",
+        "label": "Матрица",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "D_to_R",
+        "label": "Матрица",
+        "type": "real",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "D_to_B",
+        "label": "Матрица",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "D_to_D",
+        "label": "Матрица",
+        "type": "datetime",
+        "data_kind": "Непрерывный"
+      }
+    ],
+    "row_count": 10,
+    "rows": [
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "истина"
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "3,545"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "4"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 3.545
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1900-01-02T13:04:48.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "Истина"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "29.02.2024 23:59:58"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "45352"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 45351.999976851854
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2024-02-29T23:59:58.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "FALSE"
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-42,2"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-42"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -42.2
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-11-18T04:48:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "Ложь"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "01.01.2000"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "36526"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 36526
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2000-01-01T00:00:00.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "3,545"
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 3.545
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-2"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-2"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -2
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-28T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "Истина"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "00:00:00"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-42,2"
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -42.2
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "123"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "123"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 123
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1900-05-02T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "1,5"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "2"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1.5
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T12:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "Ложь"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "31.12.1899 12:00:00"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "2"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1.5
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T12:00:00.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "29.02.2024 23:59:58"
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2024-02-29T23:59:58.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "42"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "42"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 42
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1900-02-10T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-1,5"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-2"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -1.5
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-29T12:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": ""
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "Ложь"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "01.01.1900 01:02:03"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "2"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 2.043090277777778
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1900-01-01T01:02:03.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "123,875"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "124"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 123.875
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1900-05-02T21:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "Истина"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "12.09.2026 13:14:15"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "46278"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 46277.5515625
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2026-09-12T13:14:15.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "東京"
+        },
+        {
+          "type": "integer",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "real",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "boolean",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "2,5"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "2"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 2.5
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1900-01-01T12:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "Истина"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "01.01.2020 00:00:01"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "43831"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 43831.00001157408
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2020-01-01T00:00:01.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-7"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-7"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -7
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-23T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-2,5"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-2"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -2.5
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-28T12:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "Ложь"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": false
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "31.12.2020 23:59:59"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "44197"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 44196.99998842592
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2020-12-31T23:59:59.000"
+        }
+      ],
+      [
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "-1"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "-1"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": -1
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": true,
+          "value": null
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "9"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "9"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 9
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1900-01-08T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "0,0001234567890123456"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "0"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 0.0001234567890123456
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-30T00:00:10.667"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "Истина"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "1"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "1899-12-31T00:00:00.000"
+        },
+        {
+          "type": "string",
+          "is_null": false,
+          "value": "01.01.2001 12:34:56"
+        },
+        {
+          "type": "integer",
+          "is_null": false,
+          "value": "36893"
+        },
+        {
+          "type": "real",
+          "is_null": false,
+          "value": 36892.52425925926
+        },
+        {
+          "type": "boolean",
+          "is_null": false,
+          "value": true
+        },
+        {
+          "type": "datetime",
+          "is_null": false,
+          "value": "2001-01-01T12:34:56.000"
+        }
+      ]
+    ]
+  },
+  "evidence": {
+    "directory": ".dock/calculator-v3/live-1789098831600",
+    "source": "matrix-source-execute-read.json",
+    "converted": "matrix-reform-finish-output.json",
+    "runtime_at_start": "f9f8d809d758acce2eb4dd62e7213fa1982ebcb5b42f2b9f655cc81312e3344f",
+    "runtime_changed_during_diagnosis": true
+  }
+}

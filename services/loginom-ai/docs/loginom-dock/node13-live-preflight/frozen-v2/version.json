@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "decision": "node13:excluded-DateB-label:1",
+  "parent_expected_sha256": "428187d7a064b1f7af0c675e340a4f831078bc7d171f8a242b3b7efc4899ceca",
+  "expected_sha256": "900df299dcef95c9cdc8a511d2f732664539c71a82ac400526310470e3bd6654",
+  "goal_sha256": "51dbe530f504c99444957db806efbae7d1a41463d82498df61171e364f9cfdf8",
+  "semantic_change": {
+    "path": "excluded[0].label",
+    "before": "DateB",
+    "after": "Дата"
+  },
+  "csv_unchanged": true
+}

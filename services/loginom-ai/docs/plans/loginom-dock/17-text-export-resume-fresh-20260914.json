@@ -1,0 +1,111 @@
+{
+  "phase": "node17:resume-existing-phase:20260914",
+  "status": "FRESH_ORIGINAL_INCOMPLETE",
+  "full_goal_passed": false,
+  "model_checks_passed": 52,
+  "model_run": "20260914-000803-18fad485",
+  "fresh_directory": ".dock/text-export/live-1789375346043",
+  "session_id": "730b15ae-a1bc-4fd7-9d25-c9d41181fa05",
+  "original_package": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+  "original_readonly": false,
+  "opened_once": true,
+  "copies_created": false,
+  "package_saved": false,
+  "partial_checks": {
+    "passed": false,
+    "checks": {
+      "changed": {
+        "passed": true,
+        "bytes": 131,
+        "sha256": "290c4d0cec7895f80f95436030da5f4355dc47d0adbdd04ab17590274f8d4ff4",
+        "preserved": {
+          "passed": true,
+          "same_guid_mapping_settings": true,
+          "new_document_or_workflow": true
+        },
+        "native_graph_identity_equal": true,
+        "scope": "partial_bytes_settings_mapping_graph_diagnostic_not_full_acceptance"
+      },
+      "typed": {
+        "passed": true,
+        "bytes": 138,
+        "sha256": "f237ccfcd6d0861b3505f57a07066f2ac8f770d0068e5bc3e84b340f531095e5",
+        "preserved": {
+          "passed": true,
+          "same_guid_mapping_settings": true,
+          "new_document_or_workflow": true
+        },
+        "native_graph_identity_equal": true,
+        "scope": "partial_bytes_settings_mapping_graph_diagnostic_not_full_acceptance"
+      },
+      "wide": {
+        "passed": true,
+        "bytes": 3005,
+        "sha256": "496cc1705feb531fb6cef23415da079493ae7514c25b2c7d9800df4ed0536873",
+        "preserved": {
+          "passed": true,
+          "same_guid_mapping_settings": true,
+          "new_document_or_workflow": true
+        },
+        "native_graph_identity_equal": true,
+        "scope": "partial_bytes_settings_mapping_graph_diagnostic_not_full_acceptance"
+      },
+      "zero": {
+        "passed": false,
+        "status": "AMBIGUOUS",
+        "phase": "input_mapping"
+      }
+    },
+    "absence": {
+      "done.csv": true,
+      "closed.csv": true,
+      "external-zero.csv": true
+    },
+    "scope": "partial_fresh_original",
+    "full_acceptance": false
+  },
+  "failure": {
+    "operation": "external-zero",
+    "status": "AMBIGUOUS",
+    "phase": "input_mapping",
+    "native_step": "open_input_port",
+    "execution_started": false,
+    "condition": "Empty inactive before mapping; after native execution unchanged three-field mapping appeared",
+    "classification": "fresh harness omitted explicit Empty execution; not established product regression",
+    "runtime_pending_preserved": true
+  },
+  "full_reevaluation": {
+    "path": ".dock/node17/acceptance/runs/20260914-000803-18fad485/reevaluation-v4-fresh-20260914.json",
+    "sha256": "c2cfcee5912fbb434c6b9dcec1e67d907b88e45e13e238de7a5903ae11dc4f3c",
+    "passed": false,
+    "failed_checks": {
+      "incomplete_or_invalid": {
+        "passed": false,
+        "reason": "Missing prior session preparation"
+      }
+    }
+  },
+  "cleanup": {
+    "package_closed": true,
+    "unsaved_changes_discarded": true,
+    "logged_out": true,
+    "account": "test-2"
+  },
+  "remaining_pids": [],
+  "original_files_unchanged": true,
+  "evidence_sha256": {
+    ".dock/text-export/live-1789375346043/preparation.json": "1cfcd63781054bdb8597a38536bcc9aa18704fb4ca81d5c4f3c80f6e50156bcb",
+    ".dock/text-export/live-1789375346043/partial-independent-audit.json": "2f3b5f408ea9d52c686a9b1395d011e341cdaa53cce9743f49424dae819ae77b",
+    ".dock/text-export/live-1789375346043/external-zero.json": "7e059cc8bdbf225f363a6b859bb7c8d2a82050831fc1fb701263c502b232ad00",
+    ".dock/text-export/live-1789375346043/external-zero-ui-diagnosis.json": "296c2857bd0944f1af757afd44af62532c85a8bd6dfbbfc10f1a5ed8c16419a9",
+    ".dock/text-export/live-1789375346043/external-empty-mapping-after-source.json": "26d7c9a0fc88b6c488d3c0cd31e4abf38dbce0e15de55c9e11880ec166de7ddc",
+    ".dock/text-export/live-1789375346043/session-cleanup.json": "659f6f9872500b557da49c96cb69b1e7f809dc0897b26fe5b9f402a1c9e8fe1c",
+    ".dock/text-export/live-1789375346043/process-close-check.json": "f2a099e2c974f9fd9ecebb7d46ac60927c155896f82bc87f193bd3ccedc2f13b",
+    ".dock/text-export/live-1789375346043/external-inventory.json": "a24af68daa707d7a3030ab1539c54338c23d8b9ebe5a9dd6b9d68669d3d492ad"
+  },
+  "next_work": [
+    "Execute existing Empty with parameters={} before its fresh export; use distinct fresh destination names to preserve prior files",
+    "Bind actual fresh preparation browser receipt and native observations to original model package in versioned auditor; do not fabricate workspace_prepared events",
+    "Complete one properly prepared fresh audit under coordinator phase dispatch"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "status": "ACCEPTED_BRANCH_NOT_MERGED",
+  "source": "908c9b7d90eefd72fea2ae9a7e62bcf90b5469cf",
+  "runtime": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
+  "run": "20260914-000803-18fad485",
+  "full_audit_recomputed": true,
+  "checks_passed": 54,
+  "original_hashes_verified": 4,
+  "original_harness_verified": 283,
+  "external_evidence_hashes_verified": 2490,
+  "fresh_exports_bytes": [
+    131,
+    138,
+    3005,
+    0
+  ],
+  "old_failures_preserved": true,
+  "evidence": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs/20260914-000803-18fad485/reevaluation-v5-full-final.json"
+}

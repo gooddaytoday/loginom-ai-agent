@@ -1,0 +1,33 @@
+# Local development artifacts are not needed by the runtime image and make the
+# build context unnecessarily large.
+.git
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+target/
+src/build/
+docs/.vitepress/dist/
+web-studio/node_modules
+client/node_modules
+web-studio/dist
+openviking/web_studio/dist
+web-studio/.vite
+node_modules
+*.log
+*.tmp
+
+# Dock secrets and local state
+.env
+.env.*
+**/.env
+**/.env.*
+.dock/
+.openviking/
+*.state.json
+**/*.state.json
+output/
+landing/dist/

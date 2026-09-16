@@ -1,0 +1,8 @@
+# Apply only to the verified Stage 2 image with Python 3.13. Its native libraries,
+# CLI, Studio and dependencies remain unchanged; the regular Dockerfile includes
+# this Python source automatically on the next complete build.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+ARG LOGINOM_DOCK_REVISION
+LABEL org.opencontainers.image.revision="${LOGINOM_DOCK_REVISION}"
+COPY openviking/parse/accessors/git_accessor.py /app/.venv/lib/python3.13/site-packages/openviking/parse/accessors/git_accessor.py

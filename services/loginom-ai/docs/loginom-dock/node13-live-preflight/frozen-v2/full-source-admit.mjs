@@ -1,0 +1,1 @@
+ctx.artifact=await ctx.session.artifactStore.admit({sourcePath:process.cwd()+'/tools/loginom-acceptance/fixtures/date-time/sales.csv',name:'Dock-date-time-'+ctx.diagnosticRunId+'-sales.csv',bytes:413,sha256:'2a74b48ca02f457c012d67db60582d1840731cf4463b8a276ad6626c6433bcf2',upload:{directory:'/test-3',overwrite:'reject'}});return ctx.artifact;

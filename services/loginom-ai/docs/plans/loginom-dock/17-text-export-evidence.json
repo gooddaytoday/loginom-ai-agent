@@ -1,0 +1,290 @@
+{
+  "date": "2026-09-13",
+  "branch": "codex/node-17-text-export",
+  "accepted_base": "a3b419bde8a660e1905284ee62a46362d5a49e09",
+  "stage": "development_native_verification",
+  "autonomous_hermes_accepted": false,
+  "cases": [
+    {
+      "passed": true,
+      "bytes": 124,
+      "sha256": "9f9972ed174053d02745df8df0c3c2d44697b33f7fb6da2ce8463eb58cc5d13a",
+      "rows": 5,
+      "columns": 3,
+      "execution_id": "1789297665729-ild63d0svk:189:1",
+      "rejected_event_tamperings": 9,
+      "case": "csv",
+      "destination": "/test-2/node17-new-csv-20260913.csv",
+      "runtime": "8311356da6215b347ea506c9bb128952c558d893dda2d59781b3c4831bad82db",
+      "evidence_directory": ".dock/text-export/live-1789297661190",
+      "receipt": "new-csv.json",
+      "fixture": "escaping.json",
+      "settings": {
+        "delimiter": ";",
+        "header": "names",
+        "bom": false,
+        "line_ending": "\n",
+        "null_marker": "?"
+      }
+    },
+    {
+      "passed": true,
+      "bytes": 138,
+      "sha256": "f237ccfcd6d0861b3505f57a07066f2ac8f770d0068e5bc3e84b340f531095e5",
+      "rows": 3,
+      "columns": 5,
+      "execution_id": "1789297665729-ild63d0svk:189:2",
+      "rejected_event_tamperings": 9,
+      "case": "typed",
+      "destination": "/test-2/node17-typed-export-20260913.csv",
+      "runtime": "8311356da6215b347ea506c9bb128952c558d893dda2d59781b3c4831bad82db",
+      "evidence_directory": ".dock/text-export/live-1789297661190",
+      "receipt": "new-typed.json",
+      "fixture": "typed.json",
+      "settings": {
+        "delimiter": ";",
+        "header": "names",
+        "bom": false,
+        "line_ending": "\n",
+        "null_marker": "NULL"
+      }
+    },
+    {
+      "passed": true,
+      "bytes": 115,
+      "sha256": "160a40d736dc077faa832f9ed5d79186ee87143291b032416810dcdfefa300c3",
+      "rows": 5,
+      "columns": 3,
+      "execution_id": "1789297282138-y8bwk2ibj4e:380:1",
+      "rejected_event_tamperings": 9,
+      "case": "tsv",
+      "destination": "/test-2/node17-variant-tsv-20260913-2.tsv",
+      "runtime": "01d2406804353ec9f314bcddf9544246cc60c613965f5b94393d4cccb139c4d4",
+      "evidence_directory": ".dock/text-export/live-1789297277833",
+      "receipt": "variant-tsv.json",
+      "fixture": "escaping.json",
+      "settings": {
+        "delimiter": "\t",
+        "header": "none",
+        "bom": true,
+        "line_ending": "\r\n",
+        "null_marker": "?"
+      }
+    },
+    {
+      "passed": true,
+      "bytes": 3005,
+      "sha256": "496cc1705feb531fb6cef23415da079493ae7514c25b2c7d9800df4ed0536873",
+      "rows": 3,
+      "columns": 40,
+      "execution_id": "1789298557942-ct7r3i1vave:267:1",
+      "rejected_event_tamperings": 9,
+      "case": "wide",
+      "destination": "/test-2/node17-wide-export-final-20260913.tsv",
+      "runtime": "dcc8df45b13bbfd6bd68b9d558553eca2cb6ab843db04184893378da8a95ba7a",
+      "evidence_directory": ".dock/text-export/live-1789298553347",
+      "receipt": "final-wide.json",
+      "fixture": "wide.json",
+      "settings": {
+        "delimiter": "\t",
+        "header": "labels",
+        "bom": true,
+        "line_ending": "\r\n",
+        "null_marker": "?"
+      }
+    },
+    {
+      "passed": true,
+      "bytes": 15,
+      "sha256": "61c3e9d2df03cb9b755f8092142181f6757eeb78c6931a41e90dae7f7bf2283a",
+      "rows": 0,
+      "columns": 3,
+      "execution_id": "1789299538906-qle0optzbzl:195:4",
+      "rejected_event_tamperings": 9,
+      "case": "empty",
+      "destination": "/test-2/node17-empty-export-final-20260913.csv",
+      "runtime": "96f34c91eff1f908432c7ac417cc05dbfc920404ccf4825ba95fa510ab5cd78a",
+      "evidence_directory": ".dock/text-export/live-1789299534188",
+      "receipt": "final-empty.json",
+      "fixture": "empty.json",
+      "settings": {
+        "delimiter": ";",
+        "header": "names",
+        "bom": false,
+        "line_ending": "\n",
+        "null_marker": "?"
+      }
+    },
+    {
+      "passed": true,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rows": 0,
+      "columns": 3,
+      "execution_id": "1789299538906-qle0optzbzl:195:5",
+      "rejected_event_tamperings": 9,
+      "case": "zero",
+      "destination": "/test-2/node17-empty-noheader-final-20260913.csv",
+      "runtime": "96f34c91eff1f908432c7ac417cc05dbfc920404ccf4825ba95fa510ab5cd78a",
+      "evidence_directory": ".dock/text-export/live-1789299534188",
+      "receipt": "final-zero.json",
+      "fixture": "empty.json",
+      "settings": {
+        "delimiter": ";",
+        "header": "none",
+        "bom": false,
+        "line_ending": "\n",
+        "null_marker": "?"
+      }
+    },
+    {
+      "passed": true,
+      "bytes": 109,
+      "sha256": "e077d37b44116079268f49198cec415370dffa09cfdad3679258b3e781198361",
+      "rows": 5,
+      "columns": 3,
+      "execution_id": "1789299538906-qle0optzbzl:195:6",
+      "rejected_event_tamperings": 9,
+      "case": "replace",
+      "destination": "/test-2/node17-new-csv-20260913.csv",
+      "runtime": "96f34c91eff1f908432c7ac417cc05dbfc920404ccf4825ba95fa510ab5cd78a",
+      "evidence_directory": ".dock/text-export/live-1789299534188",
+      "receipt": "replace.json",
+      "fixture": "escaping.json",
+      "settings": {
+        "delimiter": ";",
+        "header": "none",
+        "bom": false,
+        "line_ending": "\n",
+        "null_marker": "?"
+      }
+    },
+    {
+      "passed": true,
+      "bytes": 109,
+      "sha256": "e077d37b44116079268f49198cec415370dffa09cfdad3679258b3e781198361",
+      "rows": 5,
+      "columns": 3,
+      "execution_id": "1789299947959-9kowh8suz:195:1",
+      "rejected_event_tamperings": 9,
+      "case": "reopen-csv",
+      "destination": "/test-2/node17-reopened-csv-20260913.csv",
+      "runtime": "afc199953de8a6a7e0d1e3a04247a98e69d85d832e26d0168a06b2c0bb6b8cab",
+      "evidence_directory": ".dock/text-export/live-1789299943232",
+      "receipt": "reopen-csv.json",
+      "fixture": "escaping.json",
+      "settings": {
+        "delimiter": ";",
+        "header": "none",
+        "bom": false,
+        "line_ending": "\n",
+        "null_marker": "?"
+      }
+    },
+    {
+      "passed": true,
+      "bytes": 138,
+      "sha256": "f237ccfcd6d0861b3505f57a07066f2ac8f770d0068e5bc3e84b340f531095e5",
+      "rows": 3,
+      "columns": 5,
+      "execution_id": "1789299947959-9kowh8suz:195:2",
+      "rejected_event_tamperings": 9,
+      "case": "reopen-typed",
+      "destination": "/test-2/node17-reopened-typed-20260913.csv",
+      "runtime": "afc199953de8a6a7e0d1e3a04247a98e69d85d832e26d0168a06b2c0bb6b8cab",
+      "evidence_directory": ".dock/text-export/live-1789299943232",
+      "receipt": "reopen-typed.json",
+      "fixture": "typed.json",
+      "settings": {
+        "delimiter": ";",
+        "header": "names",
+        "bom": false,
+        "line_ending": "\n",
+        "null_marker": "NULL"
+      }
+    },
+    {
+      "passed": true,
+      "bytes": 131,
+      "sha256": "290c4d0cec7895f80f95436030da5f4355dc47d0adbdd04ab17590274f8d4ff4",
+      "rows": 5,
+      "columns": 3,
+      "execution_id": "1789299947959-9kowh8suz:195:3",
+      "rejected_event_tamperings": 9,
+      "case": "reopen-done",
+      "destination": "/test-2/node17-reopened-done-20260913.csv",
+      "runtime": "afc199953de8a6a7e0d1e3a04247a98e69d85d832e26d0168a06b2c0bb6b8cab",
+      "evidence_directory": ".dock/text-export/live-1789299943232",
+      "receipt": "reopen-done.json",
+      "fixture": "escaping.json",
+      "settings": {
+        "delimiter": ",",
+        "header": "labels",
+        "bom": true,
+        "line_ending": "\r\n",
+        "null_marker": "?"
+      }
+    },
+    {
+      "passed": true,
+      "bytes": 131,
+      "sha256": "290c4d0cec7895f80f95436030da5f4355dc47d0adbdd04ab17590274f8d4ff4",
+      "rows": 5,
+      "columns": 3,
+      "execution_id": "1789299947959-9kowh8suz:195:4",
+      "rejected_event_tamperings": 9,
+      "case": "new-final",
+      "destination": "/test-2/node17-new-final-20260913.csv",
+      "runtime": "afc199953de8a6a7e0d1e3a04247a98e69d85d832e26d0168a06b2c0bb6b8cab",
+      "evidence_directory": ".dock/text-export/live-1789299943232",
+      "receipt": "new-final.json",
+      "fixture": "escaping.json",
+      "settings": {
+        "delimiter": ",",
+        "header": "names",
+        "bom": true,
+        "line_ending": "\r\n",
+        "null_marker": "?"
+      }
+    }
+  ],
+  "persistence_settings_and_mapping": [
+    "reopen-csv",
+    "reopen-typed"
+  ],
+  "preservation": {
+    "preserved_bytes": 124,
+    "sha256": "9f9972ed174053d02745df8df0c3c2d44697b33f7fb6da2ce8463eb58cc5d13a",
+    "done_file_absent": true,
+    "close_file_absent": true,
+    "inventory_count": 45
+  },
+  "idempotence": {
+    "operation_id": "export-replace-copy5",
+    "before": 929,
+    "after": 929,
+    "browser_calls": 0,
+    "same_result": true
+  },
+  "source_commit": "110da29abe5d247c76ed71b09f7e6b7f6d0b588b",
+  "source_tests": {
+    "suite": {
+      "tests": 1399,
+      "pass": 1398,
+      "skip": 1,
+      "fail": 0,
+      "evidence": ".dock/node17/source-tests-connect-final.log"
+    },
+    "final_guard_focused": {
+      "tests": 10,
+      "pass": 10,
+      "fail": 0,
+      "evidence": ".dock/node17/format-guard-tests.log"
+    },
+    "auditor_unittest": {
+      "tests": 1,
+      "negative_subcases": 14,
+      "pass": true
+    }
+  }
+}

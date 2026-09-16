@@ -1,0 +1,11 @@
+# Build the public landing on the Dock server; ship only static files with Caddy.
+FROM node@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df AS landing
+WORKDIR /build
+COPY landing/ ./landing/
+RUN node landing/build.mjs
+
+FROM caddy@sha256:df7f1c2fb114453b951de51a98efc010db1655a92c2e86be6706714e2417a78d
+ARG LOGINOM_DOCK_REVISION
+LABEL org.opencontainers.image.source="https://github.com/kartamyshev-dev/loginom-dock"
+LABEL org.opencontainers.image.revision="${LOGINOM_DOCK_REVISION}"
+COPY --from=landing /build/landing/dist/ /srv/loginom-dock-landing/

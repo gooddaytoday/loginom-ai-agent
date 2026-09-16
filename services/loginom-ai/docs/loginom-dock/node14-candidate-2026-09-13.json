@@ -1,0 +1,47 @@
+{
+  "data_recovery_admitted": true,
+  "current_unchanged": true,
+  "checked_at": "2026-09-13T04:01:47.906524+00:00",
+  "catalog_version": "2026.09.13-node14-test4.1-candidate",
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node14-test4.1-candidate/manifest.json",
+  "manifest_sha256": "921f5d51e78cd190f1352900ee755fee9c2b614759b46b04595e3dc34537a483",
+  "staged": true,
+  "activated": false,
+  "readback_files": {
+    "actions.json": "5dff5af1e7984febeb75787ee253f3b45e9ca80cdba457de297dad22c7301cb0",
+    "selectors.json": "ba4276945a6d05aa03ac97ba9be1d7569dca18d084701a053d812dacaf5d9b5c",
+    "source-index.json": "06208e2de2cc334fc6f07f4e0c157f188ad28ab96036974a24b2ee2540c2235d",
+    "manifest.json": "921f5d51e78cd190f1352900ee755fee9c2b614759b46b04595e3dc34537a483"
+  },
+  "allowed_roots": {
+    "package.save_as": [
+      "/test-4"
+    ],
+    "package.save_checkpoint": [
+      "/test-4"
+    ]
+  },
+  "compatibility": {
+    "profile_id": "loginom-7.4.2-macos-chromium-ru",
+    "loginom_build": "7.4.2",
+    "platform": "macos",
+    "browser": "chromium"
+  },
+  "e2e_commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+  "stale_actions": [],
+  "server_evidence_path": "/opt/loginom-dock/releases/20260913-node14-test4.1-candidate",
+  "current_server": "/opt/loginom-dock/releases/20260904-landing-7b711846",
+  "current_catalog_sha256": null,
+  "source_sha": "c32a5d5e163fe174afba59abce973ac405742cdc",
+  "runtime_revision": "a9db4113ac69d38d7227e971ece3652acf3e1bf836723e6e577917eda916406f",
+  "preparation_harness_commit": "2bb2bcd620626f06b965412e5e549e559b0d8440",
+  "preparation_report_commit": "db5cbdad460b32c7badc5045e05bdb821ca492b5",
+  "complete_source_archive_sha256": "ff8f6ae7433da30824dcf38c0c3ad60ffd495d36d1980216e7dd29a062223504",
+  "complete_source_manifest_sha256": "27429c044e785df32aee4a63e1bc5dfbd8d324e2ec17e374c82c7c3f3cde84d8",
+  "source_members_verified": 11,
+  "original_packet_missing_dependency": "executor/capability-abi.json",
+  "readback_verified": true,
+  "local_download": ".dock/node14-candidate-20260913/server-candidate",
+  "native_save_verified": false,
+  "hermes_started": false
+}

@@ -1,0 +1,6 @@
+# Loginom Dock local proxy; Compose publishes this on loopback only.
+# Studio, API and MCP are served by the same application.
+# Public HTTPS and authenticated access are a separate rollout gate.
+:1934 {
+	reverse_proxy openviking:1933
+}

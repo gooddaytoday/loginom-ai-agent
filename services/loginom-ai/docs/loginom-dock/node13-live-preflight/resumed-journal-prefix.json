@@ -1,0 +1,8 @@
+{
+  "append_only_journal": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/execution-events.jsonl",
+  "original_prefix_bytes": 101604331,
+  "original_prefix_lines": 2784,
+  "original_prefix_sha256": "86c3d8c19dd9cc41232ff35b28869fcbf8af3d91ccbbbc0e6eacc9950cdf9898",
+  "reason": "same_session_resume_appends_new_events",
+  "frozen_v3_v4_receipts_unchanged": true
+}

@@ -1,0 +1,153 @@
+{
+  "status": "SIX_BRANCHES_INTEGRATED_NOT_RELEASED",
+  "created_at": "2026-09-14T11:50:01.851748+00:00",
+  "branch": "codex/rc-six-nodes-20260914",
+  "base": "5e90c8ea87ec6f8f3306dfb0a0b3d34b00be0a93",
+  "accepted_heads": {
+    "codex/node-11-replacement": "dc0eadde4ede29cb9b548c53046a1be083ca8953",
+    "codex/node-12-duplicates": "e609e645fec2f3a86fa72f017c981799aa5598db",
+    "codex/node-13-date-time": "05bba35598b26a26c20978fbb40c4e84780c3b49",
+    "codex/node-14-missing-values": "d300239018ef9e0492652aa9d328629d6fcdcc68",
+    "codex/node-16-collapse-columns": "dd9d380820d3a10ea5b133dd09dc63d943f3bca2",
+    "codex/node-17-text-export": "a3b0373627a23b8b675b80b9dec1ab6c5ea35c36"
+  },
+  "handler_count": 14,
+  "verification": {
+    "client": {
+      "total": 1790,
+      "effective_pass": 1789,
+      "skip": 1,
+      "initial_fail": 13,
+      "addressed_by": [
+        "focused-merge.log",
+        "workspace-retest.log",
+        "system-retest.log"
+      ]
+    },
+    "python": {
+      "total": 693,
+      "effective_pass": 693,
+      "latest_full_run_pass": 691,
+      "latest_full_run_fail": 2,
+      "addressed_by": [
+        "import-refusal-retest.log"
+      ]
+    },
+    "syntax": "passed",
+    "live_integration": "not_run",
+    "hermes": "not_run",
+    "build": "not_run",
+    "whitespace": {
+      "status": "passed_except_preserved_historical_artifacts",
+      "excluded": [
+        "docs/loginom-dock/transfers/node13-r2/source-selected.patch",
+        "docs/loginom-dock/transfers/node13-r2/terminal-failure.patch",
+        "tools/node16-audit-reevaluation/auditor-node-projection-candidate.py",
+        "tools/loginom-acceptance/fixtures/text-export/expected/*.bin"
+      ],
+      "reason": "Preserve historical byte hashes and intentional CRLF/BOM fixture content"
+    }
+  },
+  "logs": {
+    "client-tests.log": {
+      "sha256": "baa48858a9c781b440c7f7b97d46c216e635c61a0107850ae727a9da3fc069d5",
+      "bytes": 171429,
+      "summary": [
+        "ℹ tests 1790",
+        "ℹ pass 1776",
+        "ℹ fail 13",
+        "ℹ skipped 1"
+      ]
+    },
+    "focused-merge.log": {
+      "sha256": "491860bbb4efd42296548a587bca6e829f90bb2b68aa5907ecebaabd50f6f287",
+      "bytes": 3476,
+      "summary": [
+        "ℹ tests 34",
+        "ℹ pass 34",
+        "ℹ fail 0",
+        "ℹ skipped 0"
+      ]
+    },
+    "workspace-retest.log": {
+      "sha256": "8811c904c6dcbbf8d55f766ad007f40a389216370070917d97638c222f6e95b9",
+      "bytes": 26237,
+      "summary": [
+        "ℹ tests 272",
+        "ℹ pass 272",
+        "ℹ fail 0",
+        "ℹ skipped 0"
+      ]
+    },
+    "system-retest.log": {
+      "sha256": "d50390263f24a8bb07d128acf9b4b8adba54f5afbc57c742a4edff1f7dbafdf3",
+      "bytes": 1542,
+      "summary": [
+        "ℹ tests 14",
+        "ℹ pass 14",
+        "ℹ fail 0",
+        "ℹ skipped 0"
+      ]
+    },
+    "python-tests.log": {
+      "sha256": "89dbcde3359953741bd31785ed9fc9c0e4b3b2a97965e2b946340cfaac29c69b",
+      "bytes": 4989,
+      "summary": [
+        "Ran 692 tests in 69.356s",
+        "FAILED (failures=2, errors=1)"
+      ]
+    },
+    "python-final.log": {
+      "sha256": "8097b9dce7947ebd6fef857341dc57a0d1d7a498b98e5987b1c651fe490d87bc",
+      "bytes": 12993,
+      "summary": [
+        "Ran 693 tests in 68.945s",
+        "FAILED (failures=2)"
+      ]
+    },
+    "missing-values-retest.log": {
+      "sha256": "09517d59b6f7f41a3b54a0a57dd9a9702e03790815319b74a5982eae95262fb5",
+      "bytes": 121,
+      "summary": [
+        "Ran 21 tests in 18.463s",
+        "OK"
+      ]
+    },
+    "import-refusal-retest.log": {
+      "sha256": "dcb14e8ded6b1ddc9a0af27f3f7a10ba712882b778671692676db580869baa5c",
+      "bytes": 106,
+      "summary": [
+        "Ran 7 tests in 38.329s",
+        "OK"
+      ]
+    }
+  },
+  "original_dirty_files": {
+    "AGENTS.md": "ccdf4f718d4be74e57a58d0287872021fc091726b7046a74359a8db760faefcb",
+    "docs/loginom-dock/agent-handoff.md": "586ab118b84e7b88e3abd39971e2f62e3fd9f1dec30ffde04e2e90f7be1f18da",
+    "docs/loginom-dock/coordinator-decisions-2026-09-13-afternoon.md": "6434e95bca970820411f25c0a51bca1b866678d84c294642d7a2a3549c83e1e0",
+    "docs/loginom-dock/operations.md": "fa6a43ba07997bb5f751cf11b172214e9ada3d44a485876c4a2ebbbe00251161",
+    "docs/plans/loginom-dock/automatic-node-workflow.md": "73fa150ad654d86e62ecb9aca31e50f177f61f2bac639de8a71d3317e25000cd",
+    "docs/plans/loginom-dock/node-workflow-runbook.md": "e022668199bd9fa73d0854eff00a924b9c990172a000972f6b9fe8bd27360447",
+    "docs/loginom-dock/node13-branch-acceptance-2026-09-14.json": "f8a0b76cfb1081447223435073561b4e6edd602b301bae1a06d6fbddad06391b",
+    "docs/loginom-dock/node13-read-performance-2026-09-14.md": "8636baba8e0ea19b1d76f1b84e63ee17b2cac9668f18942ad9f1611ec1eaf915",
+    "docs/loginom-dock/node14-branch-acceptance-2026-09-14.json": "ae9cd32e1f0753d92d2efc0bb79e5df4d6099bf597377aec3b926815e5f460fe",
+    "docs/loginom-dock/node16-branch-acceptance-2026-09-14.json": "8d75772b3b44b669b828aced439d3dc5443a1bbeef21ae0d0942c9654ea9dd78",
+    "docs/loginom-dock/node16-candidate-2026-09-13.json": "82e62bb559cad1c01cfe5e717ca94879acf99ccd4410b0f0eb54e45e5863b972",
+    "docs/loginom-dock/node16-candidate2-2026-09-13.json": "dc5be3e203ddc10a0fdc9a46486e5e0a9668346ff10cd71997f4a036a5d12440",
+    "docs/loginom-dock/node16-candidate3-2026-09-13.json": "356e8112e094ae707f09017d50effc9e43e301b828eb75cb874a88be75fccacd",
+    "docs/loginom-dock/node16-candidate4-2026-09-14.json": "0304af3f725c02ee1c97c3c88c9cf9ee2f845bca09552198791968db1a03a21e",
+    "docs/loginom-dock/node17-branch-acceptance-2026-09-14.json": "959637abddd0952e3a802894f60826a8d7f2626eab220be7a2c24d6fb80b75a8",
+    "docs/loginom-dock/node17-reevaluation-check-2026-09-14.json": "5d8c587402fa8ff2dae413d3266e77832d51dedccc911713ce4439b7bb2c2220",
+    "docs/loginom-dock/releases/rc-preparation-2026-09-14.md": "70fa23e35b597a9eb903d5efbc9413f84c164b7d00c9f226b932f81a3cc36761"
+  },
+  "limitations": [
+    "Known slow exact reading retained by user decision",
+    "Text export retains accepted /test-2 storage restriction",
+    "Historical acceptance pins remain branch-specific",
+    "Historical fixtures use explicit test-only legacy readers; current strict readers unchanged"
+  ],
+  "main_updated": false,
+  "pushed": false,
+  "published": false
+}

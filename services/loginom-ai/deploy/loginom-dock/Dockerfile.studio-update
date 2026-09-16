@@ -1,0 +1,14 @@
+# Build Studio on the server and reuse the verified Python/native Dock image.
+ARG BASE_IMAGE
+FROM node@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df AS studio
+WORKDIR /build
+COPY web-studio/package.json web-studio/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY web-studio/ ./
+RUN npm run build -- --base=/studio/ && test -f dist/index.html
+
+FROM ${BASE_IMAGE}
+ARG LOGINOM_DOCK_REVISION
+LABEL org.opencontainers.image.revision="${LOGINOM_DOCK_REVISION}"
+RUN rm -rf /app/.venv/lib/python3.13/site-packages/openviking/web_studio/dist
+COPY --from=studio /build/dist/ /app/.venv/lib/python3.13/site-packages/openviking/web_studio/dist/

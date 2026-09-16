@@ -1,0 +1,60 @@
+{
+  "authorization": "node16:variant-hardening:1:direct-user-20260913",
+  "based_on_commit": "bff616f3",
+  "loginom": "7.4.2",
+  "account": "test-1",
+  "package": "/test-1/node16-20260913-a56c2488/Node16-variant-hardening.lgp",
+  "public_runtime_pin": "7ed94630353fed483f53a029a3aea7828920235879569b83d303510213b3d239",
+  "frontend_sha256": {
+    "rpc.js": "afeb91811a02da1f7841fb8c03e3003686c98a051f09186af082a3c44a12b4cc",
+    "bg.rtl.rpc.js": "11ac2c63d2e8162b974f57d14e0f4f57b19cc80d3d39797be377e22eced6a973",
+    "bg.model.rpc.js": "53d043e4a7ee9dcc8006aa8915ca43d83a1df427fa0d73d8ea403357ec61a28f",
+    "SysUtils.js": "d9c9e13ec69d4676d41a661855c18e19bfb0c928a39d8c550435f18631362bd4",
+    "BitConverter.js": "03f051286c276608da7023ed91cc9ef5c3d61fcca69f75de390d4b72005f8100"
+  },
+  "prototype_sha256": {
+    "raw-read.mjs": "bbd32c90820c421228883da2ac29eaae5c87b0f97efc1bec251d8302d4abe1cf",
+    "raw-read.test.mjs": "755f0feda6ad58b817bfe0dd613b354578e815b62711ea2b0425d1b55a677af0",
+    "decode.mjs": "c744b19210a294ebbddb2cd04e1ea9f67409ba80a208e09c568afb3d7883b15a",
+    "decode.test.mjs": "7392a0ca0308fc3009ac2eb820193729f3a7baea77a7a71c9039d6ddbc0f9715",
+    "hardening.csv": "da17499dbeb066a1e621fbc0c8414243fd6923690c38ba86df501fcebde306c1",
+    "hardening-audit.py": "bc1f17ca1d8aef68b6aac484e30f6820b02094c91553c5e75bfbd246a8432b8f"
+  },
+  "evidence_sha256": {
+    ".dock/node16/live-1789294747254/hardening-live-deactivate-pinned.json": "1000400e65ca563f1cda7ed9099f7e5376b4dc3bde1ea2262792a5ce7567be59",
+    ".dock/node16/live-1789294747254/hardening-reexecution.json": "a1f6f985d6397f7003499b2b094c1c8c1fdf196ddee0aaae0e37f136af2dfca5",
+    ".dock/node16/live-1789294747254/hardening-after-reexecution.json": "257072921de438daac21c2eb54a82e521d68da4fe9ac96e38b63088118905e9a",
+    ".dock/node16/live-1789294747254/hardening-session1-logout.json": "a6dac78768795e1584973479f83f9bd249fb0028215541f97d717af4801d6742",
+    ".dock/node16/live-1789295696452/hardening-import.json": "19f5d1cd0aa544ed1e7b3595e87949140898ccf8a39341a0163d2f3b99ed3aaa",
+    ".dock/node16/live-1789295696452/hardening-collapse.json": "3d1713369ca2b6fcc6b5702fe21f74a767feb0984a09a5d2e68513e676ec8d2b",
+    ".dock/node16/live-1789295696452/hardening-raw-moscow.json": "345288673e6bb189814567e39385f54b46a2f25f2f40929b58d1c69db1c39747",
+    ".dock/node16/live-1789295696452/hardening-date-moscow.json": "94588481dda6d804a3b9060169504bc6babfe0366397cbd551f7a4ac7ba4c7af",
+    ".dock/node16/live-1789295696452/hardening-zones-final.json": "db819048388d94f38dbe61fc7244654c7952cd648738bdb91109602fb71f5b93",
+    ".dock/node16/live-1789295696452/hardening-newyork-execution.json": "fc55f243f41ed12a007c75a68eb26df2d8a4c8a201a1d25875be0f3fd49497df",
+    ".dock/node16/live-1789295696452/hardening-raw-newyork.json": "7f65d67eea4e2e5069e944d91d89c3f8a26d93f4578c2310641a36e285d5cbe2",
+    ".dock/node16/live-1789295696452/hardening-date-newyork.json": "1b58b1a3eb441d7ad722e39987dd5e14aa96d1ec0217a1b5f4d637509fb0338c",
+    ".dock/node16/live-1789295696452/hardening-live-cancel.json": "5be98d5f01e73f134c95961893eddbadcb94be21f1a7e9598a1d9567da492402",
+    ".dock/node16/live-1789295696452/hardening-save.json": "7b8bc4cc140035f15d109db7a5926d3b3e9ed86898c47011df06b855c1941252",
+    ".dock/node16/live-1789295696452/hardening-session3-logout.json": "a6dac78768795e1584973479f83f9bd249fb0028215541f97d717af4801d6742",
+    ".dock/node16/live-1789296218513/hardening-fault-execution.json": "196c4387c3863d31c6ed41712478f6508704b929f3faf8a0e4745a7904cfe640",
+    ".dock/node16/live-1789296218513/hardening-live-disconnect.json": "3609a13db8e227008686510e25651028e07583364fe8d39453cc175076551866",
+    ".dock/node16/live-1789296218513/hardening-session4-logout.json": "a6dac78768795e1584973479f83f9bd249fb0028215541f97d717af4801d6742"
+  },
+  "own_sessions_closed": [
+    "live-1789294747254",
+    "live-1789295519956",
+    "live-1789295696452",
+    "live-1789296218513"
+  ],
+  "method": 321,
+  "interface": 116,
+  "max_read_rows": 50,
+  "max_read_columns": 8,
+  "focused_tests": 19,
+  "independent_negative_substitutions": 14,
+  "atomic_snapshot": "unproven",
+  "server_cancellation": "unproven",
+  "live_int32_real32": "not_observed",
+  "full_variant": "blocked",
+  "integration": "not_authorized"
+}

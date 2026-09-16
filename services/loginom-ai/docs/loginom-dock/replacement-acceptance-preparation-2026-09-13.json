@@ -1,0 +1,65 @@
+{
+  "command_id": "node11:acceptance-preparation:1:91dee921e9e17343d53bf20fd7ca5f3b19f8de7a",
+  "status": "prepared_awaiting_candidate_stage_and_slot",
+  "code_commit": "91dee921e9e17343d53bf20fd7ca5f3b19f8de7a",
+  "branch": "codex/node-11-replacement",
+  "runtime_revision": "b99b922033e87b7580f14c2eec8cd0744c23bab29ee45b2548212cdac8c394ca",
+  "handler_revision": "replacement-v1-internal-2",
+  "pins": {
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "low",
+    "hermes_version": "0.21.0",
+    "dependencies": {
+      "node": "24.19.0",
+      "playwright": "1.63.0-alpha-2026-08-31",
+      "sdk": "1.30.0",
+      "playwright_mcp": "0.0.80",
+      "chromium_revision": "1243",
+      "chromium_version": "153.0.8010.12"
+    },
+    "native_skill": {
+      "name": "loginom",
+      "source": "plugins/loginom-dock-hermes/skills/loginom/SKILL.md",
+      "sha256": "b9c0c5a9d09cbcc2e1f6d93dc41206f0d3837c517fcf970d4d2d787f4edf4872",
+      "activation": "Hermes --skills loginom"
+    }
+  },
+  "proposed_catalog_version": "2026.09.13-node11.1-candidate",
+  "verified_manifest_uri": null,
+  "verified_manifest_sha256": null,
+  "server_stage_run": false,
+  "hermes_run": false,
+  "autonomous_acceptance": false,
+  "persisted_content_verified": false,
+  "account": "test-2",
+  "storage_root": "/test-2",
+  "source_archive": {
+    "path": ".dock/replacement/acceptance-preparation/client-source-91dee921.tar.gz",
+    "sha256": "8fe1faca81c16291fff2b704b7f20388edb3432fe0513243a3cdb2bae632096c",
+    "files": 389,
+    "build_inputs_match_commit": true
+  },
+  "checks": {
+    "source_preflight": true,
+    "runtime_preflight": true,
+    "tests_passed": 28,
+    "tests_failed": 0,
+    "saved_evidence_component_groups": 7,
+    "negative_cases_passed": 18,
+    "vps_script_syntax": true
+  },
+  "goal": "tools/loginom-acceptance/goals/replacement-node-complete.txt",
+  "auditor": "tools/loginom-acceptance/replacement_acceptance.py",
+  "launch": "tools/loginom-acceptance/replacement_launch.py",
+  "vps_stage": "tools/loginom-acceptance/replacement-stage-vps.sh",
+  "scope": "typed replacements, partial rule preservation, add/replace transitions, final reopening and fresh output; 4 nodes, 2 links, 11 node operations",
+  "pending": [
+    "coordinator immutable candidate stage/readback",
+    "Dock skill readback",
+    "Hermes slot",
+    "fresh subscription preflight",
+    "actual maximized viewport verification",
+    "ordinary Hermes and independent full audit"
+  ]
+}

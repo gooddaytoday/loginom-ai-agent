@@ -1,0 +1,44 @@
+{
+  "names": [
+    "A",
+    "A_Replace",
+    "B",
+    "B_Replaced",
+    "C",
+    "C_Replaced"
+  ],
+  "labels": [
+    "A",
+    "A_Replace",
+    "B Замена",
+    "B Заменен",
+    "C Замена",
+    "C Заменен"
+  ],
+  "types": [
+    "string",
+    "string",
+    "string",
+    "boolean",
+    "string",
+    "boolean"
+  ],
+  "rows": [
+    [
+      "north",
+      "retained",
+      "New",
+      true,
+      "Stayed",
+      true
+    ],
+    [
+      "other",
+      "untouched",
+      "other",
+      false,
+      "Stayed",
+      true
+    ]
+  ]
+}

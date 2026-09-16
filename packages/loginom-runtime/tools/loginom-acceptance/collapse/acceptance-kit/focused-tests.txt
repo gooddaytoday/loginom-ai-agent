@@ -1,0 +1,29 @@
+✔ completed private import resolves artifact provenance and cannot trust a path alone (0.986917ms)
+✔ static provenance rejects cleanup incomplete (0.0835ms)
+✔ static provenance rejects import pending (0.046791ms)
+✔ static provenance rejects configuration path changed (0.113625ms)
+✔ static provenance rejects dynamic connection (0.04575ms)
+✔ static provenance rejects foreign document (0.048958ms)
+✔ static provenance rejects foreign workflow (0.038833ms)
+✔ static provenance rejects byte proof missing (0.045ms)
+✔ static provenance rejects later unresolved source change (0.091375ms)
+✔ static provenance rejects later nonexecuted source change (0.107041ms)
+✔ requires complete ordered disjoint roles and explicit new empty policy (0.5865ms)
+✔ preserve is existing-only and cancellation cannot commit an input mapping (0.566958ms)
+✔ source resolution distinguishes duplicate labels and input order by exact name (0.221917ms)
+✔ one input/output only; unique output mapping names (0.089334ms)
+✔ homogeneous transposed fields preserve their scalar output schema, mixed fields require variant (0.069916ms)
+✔ lifecycle dispatch retains ID, local cancellation and independent server stop (0.749625ms)
+✔ invalid, unavailable and aborted API calls never dispatch work (0.28875ms)
+✔ delivery dispatch preserves grant and resume IDs without exposing a raw path (0.092375ms)
+✔ complete import and existing patch pass the public schema and installed handler together (1.02325ms)
+✔ Field Parameters dispatch uses the catalog scalar mode and rejects malformed changes (9.4415ms)
+✔ Filter dispatch accepts ordered conditions and two explicit outputs, refusing unsupported requests (0.397958ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 62.452084

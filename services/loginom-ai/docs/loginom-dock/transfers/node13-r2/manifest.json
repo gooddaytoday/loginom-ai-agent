@@ -1,0 +1,310 @@
+{
+  "source_commit": "a63586fe096f4fd7f17f346c391834d3e34bdaa4",
+  "source_parent": "23cb6dd2f946c33763e271dea8db6090fad11d0d",
+  "target_commit": "7d7f0bc2a23c8db5d57fbeb9ceb57d3a8ca29907",
+  "patch_sha256": "47830abe656d8a5abed35e27ee4ca54fb8d46bb4e5b45ce4f47b2b6dc833a182",
+  "source_selected_patch_sha256": "1b43387b8aea140978f41ef9104274721096cbc23f2e8997808703fd2a2ba994",
+  "files": [
+    {
+      "path": "client/lib/node-apply.mjs",
+      "source_parent_blob": "622efe8d453e8f18daa643d3d94bfbe22c4465f6",
+      "source_blob": "88edfe16713279906d858165435d1301e5586ed4",
+      "target_blob": "b7baa287ba2728e0d368213f197b668540ddd2ae",
+      "original_diff_sha256": "fc0fe1c092933bf1594afba293de0ac5cb0a67fe948a278f884f6b8a8dd8153a",
+      "source_selected_diff_sha256": "fc0fe1c092933bf1594afba293de0ac5cb0a67fe948a278f884f6b8a8dd8153a",
+      "selected_diff_sha256": "fc0fe1c092933bf1594afba293de0ac5cb0a67fe948a278f884f6b8a8dd8153a",
+      "source_selected_hunks": [
+        {
+          "header": "@@ -234,7 +234,22 @@ export async function applyNode({request, operation, handlers, drivers, record,",
+          "sha256": "3cf56b563f267f3a1bc3ac3c106f8ce9b55dd0521c2bb191450c9fb7a05e0e6b"
+        }
+      ],
+      "hunks": [
+        {
+          "header": "@@ -234,7 +234,22 @@ export async function applyNode({request, operation, handlers, drivers, record,",
+          "sha256": "3cf56b563f267f3a1bc3ac3c106f8ce9b55dd0521c2bb191450c9fb7a05e0e6b"
+        }
+      ]
+    },
+    {
+      "path": "client/lib/node-execution-evidence.mjs",
+      "source_parent_blob": "ebbf954b8d413f4fb8bf3b22ca3a8c1eb7ae8d0c",
+      "source_blob": "256bf96fc9d78caaba2e96bb0b664dd6b77fd737",
+      "target_blob": "ebbf954b8d413f4fb8bf3b22ca3a8c1eb7ae8d0c",
+      "original_diff_sha256": "0d6e508592c53bc9e8031c36080d1e174795144a5ee1952716a3737d3b91a69c",
+      "source_selected_diff_sha256": "0d6e508592c53bc9e8031c36080d1e174795144a5ee1952716a3737d3b91a69c",
+      "selected_diff_sha256": "0d6e508592c53bc9e8031c36080d1e174795144a5ee1952716a3737d3b91a69c",
+      "source_selected_hunks": [
+        {
+          "header": "@@ -59,6 +59,21 @@ export function verifyCompletedExecution(execution,snapshot,owner) {",
+          "sha256": "015b4932830548cb8e6f677292e5c24ef66264b5f1d7f1462687bf493b062d12"
+        }
+      ],
+      "hunks": [
+        {
+          "header": "@@ -59,6 +59,21 @@ export function verifyCompletedExecution(execution,snapshot,owner) {",
+          "sha256": "015b4932830548cb8e6f677292e5c24ef66264b5f1d7f1462687bf493b062d12"
+        }
+      ]
+    },
+    {
+      "path": "client/lib/node-execution-procedure.mjs",
+      "source_parent_blob": "6b25a35de8b82f15cd159e632c811ebca9b76e74",
+      "source_blob": "a327ccce949edffe0faed0cd24b06ef49833f5c9",
+      "target_blob": "6b25a35de8b82f15cd159e632c811ebca9b76e74",
+      "original_diff_sha256": "a5350c07ac03aeab91dbe497d11a34cfb8f0361d799d6712c7a70e1aeb0bb6ba",
+      "source_selected_diff_sha256": "a5350c07ac03aeab91dbe497d11a34cfb8f0361d799d6712c7a70e1aeb0bb6ba",
+      "selected_diff_sha256": "a5350c07ac03aeab91dbe497d11a34cfb8f0361d799d6712c7a70e1aeb0bb6ba",
+      "source_selected_hunks": [
+        {
+          "header": "@@ -1,5 +1,5 @@",
+          "sha256": "e0ce4ee244a9ab914bf88d4a41e3e4bee1d015deae79c14de666f70f4c17bb7e"
+        },
+        {
+          "header": "@@ -244,6 +244,7 @@ export function createNodeExecutionProcedure(channel,node) {",
+          "sha256": "5993ef812c2efa26943d662d0ef48269c72f2a010bb6191145cd708bd0cb16c2"
+        },
+        {
+          "header": "@@ -264,6 +265,13 @@ export function createNodeExecutionProcedure(channel,node) {",
+          "sha256": "43bbfd9c58bf0bf5900765c0552961a60a755efddfee4a1ff91ac68562568370"
+        }
+      ],
+      "hunks": [
+        {
+          "header": "@@ -1,5 +1,5 @@",
+          "sha256": "e0ce4ee244a9ab914bf88d4a41e3e4bee1d015deae79c14de666f70f4c17bb7e"
+        },
+        {
+          "header": "@@ -244,6 +244,7 @@ export function createNodeExecutionProcedure(channel,node) {",
+          "sha256": "5993ef812c2efa26943d662d0ef48269c72f2a010bb6191145cd708bd0cb16c2"
+        },
+        {
+          "header": "@@ -264,6 +265,13 @@ export function createNodeExecutionProcedure(channel,node) {",
+          "sha256": "43bbfd9c58bf0bf5900765c0552961a60a755efddfee4a1ff91ac68562568370"
+        }
+      ]
+    },
+    {
+      "path": "client/lib/node-operation-runner.mjs",
+      "source_parent_blob": "b80240a538aa1b1362985c609c11ffebda42ee1d",
+      "source_blob": "94d749691f5acfbbd9aa614b87e970812b127249",
+      "target_blob": "b80240a538aa1b1362985c609c11ffebda42ee1d",
+      "original_diff_sha256": "e974419a739ba6a1b40128eee87149745ad195605261dbeb516096e61cdd3c54",
+      "source_selected_diff_sha256": "e974419a739ba6a1b40128eee87149745ad195605261dbeb516096e61cdd3c54",
+      "selected_diff_sha256": "e974419a739ba6a1b40128eee87149745ad195605261dbeb516096e61cdd3c54",
+      "source_selected_hunks": [
+        {
+          "header": "@@ -32,7 +32,9 @@ export function createNodeOperationRunner({run,validate,progress}) {",
+          "sha256": "2cdad247c7e4e68d8023d0444f0599520fec9f5c638c0ff6f1aebb91b8f2f273"
+        }
+      ],
+      "hunks": [
+        {
+          "header": "@@ -32,7 +32,9 @@ export function createNodeOperationRunner({run,validate,progress}) {",
+          "sha256": "2cdad247c7e4e68d8023d0444f0599520fec9f5c638c0ff6f1aebb91b8f2f273"
+        }
+      ]
+    },
+    {
+      "path": "client/lib/node-process-context.mjs",
+      "source_parent_blob": "c032f4c32fa64ce7750a006f8c7419a7df154b74",
+      "source_blob": "0c84115a2199401e06e3186eae6994ceb0da8683",
+      "target_blob": "c032f4c32fa64ce7750a006f8c7419a7df154b74",
+      "original_diff_sha256": "d0b5d6c362ff1013c9b41aa3b3f101b3cf0c2666f1e9a49ba38ce73092014212",
+      "source_selected_diff_sha256": "d0b5d6c362ff1013c9b41aa3b3f101b3cf0c2666f1e9a49ba38ce73092014212",
+      "selected_diff_sha256": "d0b5d6c362ff1013c9b41aa3b3f101b3cf0c2666f1e9a49ba38ce73092014212",
+      "source_selected_hunks": [
+        {
+          "header": "@@ -69,7 +69,8 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo",
+          "sha256": "a3d32be1f22a09fe90d62702f352489a8cacd3a3fa91798dc0b17d5cda12cb7f"
+        }
+      ],
+      "hunks": [
+        {
+          "header": "@@ -69,7 +69,8 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo",
+          "sha256": "a3d32be1f22a09fe90d62702f352489a8cacd3a3fa91798dc0b17d5cda12cb7f"
+        }
+      ]
+    },
+    {
+      "path": "client/lib/node-result-schema.mjs",
+      "source_parent_blob": "953ceb8a95496640c21225b78d28a563ead0c8fb",
+      "source_blob": "65c139c440fc5acbe3d8ae66c3bc2f93be9227e3",
+      "target_blob": "47894ed995b9464dc5d3cc71a83c928ca5d391d0",
+      "original_diff_sha256": "2c499414a8ea091a4233c8b9e060e45143797dcf42d9af99a4efb3fd6553c1f1",
+      "source_selected_diff_sha256": "d4671c877cfb3f1f3d6b45f34990136f3b3299d3d9a4c664d51a649a678bc928",
+      "selected_diff_sha256": "d4671c877cfb3f1f3d6b45f34990136f3b3299d3d9a4c664d51a649a678bc928",
+      "source_selected_hunks": [
+        {
+          "header": "@@ -8,7 +8,8 @@",
+          "sha256": "7f737b7f5976cabbb188a24d0bc4b34df5b91d33bce9983199b4c3feafd51734"
+        },
+        {
+          "header": "@@ -84,7 +85,7 @@",
+          "sha256": "23b9f90dc46985588abb420967357435c67494d44ed0298e89491973674aa496"
+        }
+      ],
+      "hunks": [
+        {
+          "header": "@@ -8,7 +8,8 @@",
+          "sha256": "7f737b7f5976cabbb188a24d0bc4b34df5b91d33bce9983199b4c3feafd51734"
+        },
+        {
+          "header": "@@ -84,7 +85,7 @@",
+          "sha256": "23b9f90dc46985588abb420967357435c67494d44ed0298e89491973674aa496"
+        }
+      ]
+    },
+    {
+      "path": "client/lib/node-contracts.d.ts",
+      "source_parent_blob": "257c3a9ae8bc8bdc7934a1962549bc4328b54c53",
+      "source_blob": "446f4e5b580e2c7a42f815f79edc076b5d49baae",
+      "target_blob": "2ed172f8eb7dff5c44ba5bfe7de1a0bce956a94e",
+      "original_diff_sha256": "32c0d9f05a867b5ab6a3e04dc6252936d18b1f085cc7f697a8f6e4984ad189fa",
+      "source_selected_diff_sha256": "32c0d9f05a867b5ab6a3e04dc6252936d18b1f085cc7f697a8f6e4984ad189fa",
+      "selected_diff_sha256": "9aae21391b55de9270913fcdfaeec6750f53f7be125437ca587c38eaf0412969",
+      "source_selected_hunks": [
+        {
+          "header": "@@ -53,7 +53,7 @@ export interface NodeApplyResult {",
+          "sha256": "48be7c2dc1c5b8f0b99caf0c71c93785cfd75e80e24deab27880721eb750cbef"
+        },
+        {
+          "header": "@@ -117,7 +117,8 @@ export interface SortingConfigurationReadback {",
+          "sha256": "fecadee04042ba23f3bff8f5ea16874ced0dfcfae293764a4eb8f0b9502f3365"
+        }
+      ],
+      "hunks": [
+        {
+          "header": "@@ -53,7 +53,7 @@",
+          "sha256": "af0416e072bddd0d9698ac831af6ebdb193279df8d375f38e933c7fb43b47cac"
+        },
+        {
+          "header": "@@ -117,7 +117,8 @@",
+          "sha256": "c043e4eafc26be385fa2c835609e7df443d6a0f2e31369e239c57377715b8028"
+        }
+      ]
+    },
+    {
+      "path": "client/test/node-apply.test.mjs",
+      "source_parent_blob": "30f719dc4443dccae8cbeef4c206e02665bd394a",
+      "source_blob": "995062b44e0049e87b6a15af7e2e60c0869519ed",
+      "target_blob": "fd6b6edd3740be1556cf5a25eb92beb299ee2f28",
+      "original_diff_sha256": "ff294b8433718cdd473b3634d87bfd9bdb1c5d84304192a6f891ba15ff3a131a",
+      "source_selected_diff_sha256": "ff294b8433718cdd473b3634d87bfd9bdb1c5d84304192a6f891ba15ff3a131a",
+      "selected_diff_sha256": "fae5d94fadc53c4dc1b082e4465bce227e7f897c5c2e86536c22d74fb41b460c",
+      "source_selected_hunks": [
+        {
+          "header": "@@ -68,7 +68,7 @@ for(const [name,alter] of Object.entries({doneRead:p=>{p.finish='done'},budget:p",
+          "sha256": "749d98d7beea7cf3250389c0cf9b090fb721554e9e274dbe5a3500dd398707df"
+        },
+        {
+          "header": "@@ -185,3 +185,21 @@ for(const verification of ['reform_mapped_preflight_completed','missing_values_p",
+          "sha256": "1d04dbbd6d86d4997f6ddda432cb5717c50cd17024c655b2ab8c55a5a512fe14"
+        }
+      ],
+      "hunks": [
+        {
+          "header": "@@ -68,7 +68,7 @@",
+          "sha256": "983ed7f0b3a03257ee6dff12440212eeb1ff52752915b12a940a18d53931fee7"
+        },
+        {
+          "header": "@@ -203,3 +203,21 @@",
+          "sha256": "4a9e6431964d08d998a59929817b62b6772ed6a0516318c8c5334e4ba2094a23"
+        }
+      ]
+    },
+    {
+      "path": "client/test/node-execution-evidence.test.mjs",
+      "source_parent_blob": "299f12763268d6014541beaf9ae38b2328ab33a3",
+      "source_blob": "7667cd58050e3d79dcf8a0f8666bf1fb3b78dddf",
+      "target_blob": "299f12763268d6014541beaf9ae38b2328ab33a3",
+      "original_diff_sha256": "0ce45c9ebbebb84a48e6c0adf3eb6f492eed2b0dbb442b3a7c1ece43116ced50",
+      "source_selected_diff_sha256": "0ce45c9ebbebb84a48e6c0adf3eb6f492eed2b0dbb442b3a7c1ece43116ced50",
+      "selected_diff_sha256": "0ce45c9ebbebb84a48e6c0adf3eb6f492eed2b0dbb442b3a7c1ece43116ced50",
+      "source_selected_hunks": [
+        {
+          "header": "@@ -82,3 +82,17 @@ test('one oldest completed eviction preserves the unique next execution identity",
+          "sha256": "112b7fe232d554419a694354ca06a9072d84419d072036481e9976e43c2d664b"
+        }
+      ],
+      "hunks": [
+        {
+          "header": "@@ -82,3 +82,17 @@ test('one oldest completed eviction preserves the unique next execution identity",
+          "sha256": "112b7fe232d554419a694354ca06a9072d84419d072036481e9976e43c2d664b"
+        }
+      ]
+    },
+    {
+      "path": "client/test/node-execution-focus.test.mjs",
+      "source_parent_blob": "47e374d64eb2828b0bcbdb5b005b4fa64c2fe759",
+      "source_blob": "51a87e1c7db9c5b5171a3a837d35a022b4acf938",
+      "target_blob": "47e374d64eb2828b0bcbdb5b005b4fa64c2fe759",
+      "original_diff_sha256": "b679f1798ba478d9fbb1b04a78dd2750864399eca55375634389623cc0491e88",
+      "source_selected_diff_sha256": "b679f1798ba478d9fbb1b04a78dd2750864399eca55375634389623cc0491e88",
+      "selected_diff_sha256": "b679f1798ba478d9fbb1b04a78dd2750864399eca55375634389623cc0491e88",
+      "source_selected_hunks": [
+        {
+          "header": "@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';",
+          "sha256": "4c2ae451d1bab9dd48743474f8410916412d3dc0416eed7cfcb98541cce63f2a"
+        },
+        {
+          "header": "@@ -19,7 +19,7 @@ async function fixture({hide=true,replace=false,lost=false}={}){",
+          "sha256": "099028ab8df91fea2634a36d0372b332bd3abdbf8be53b96bf57cffbd28351ac"
+        },
+        {
+          "header": "@@ -52,3 +52,10 @@ test('long completed history refreshes before baseline and retains every server",
+          "sha256": "1d020618d7bffa19745165d5674a03a226ea048a33ca186d8d90dfe5556f97b2"
+        }
+      ],
+      "hunks": [
+        {
+          "header": "@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';",
+          "sha256": "4c2ae451d1bab9dd48743474f8410916412d3dc0416eed7cfcb98541cce63f2a"
+        },
+        {
+          "header": "@@ -19,7 +19,7 @@ async function fixture({hide=true,replace=false,lost=false}={}){",
+          "sha256": "099028ab8df91fea2634a36d0372b332bd3abdbf8be53b96bf57cffbd28351ac"
+        },
+        {
+          "header": "@@ -52,3 +52,10 @@ test('long completed history refreshes before baseline and retains every server",
+          "sha256": "1d020618d7bffa19745165d5674a03a226ea048a33ca186d8d90dfe5556f97b2"
+        }
+      ]
+    },
+    {
+      "path": "client/test/node-operation-failure.test.mjs",
+      "source_parent_blob": null,
+      "source_blob": "afaa00c69cea722af293c358e4031f21c361c25b",
+      "target_blob": null,
+      "original_diff_sha256": "7a79cf5197946578cd7325704ef1fef1a2ebe9c6731370ff6f851ef42f519d90",
+      "source_selected_diff_sha256": "7a79cf5197946578cd7325704ef1fef1a2ebe9c6731370ff6f851ef42f519d90",
+      "selected_diff_sha256": "7a79cf5197946578cd7325704ef1fef1a2ebe9c6731370ff6f851ef42f519d90",
+      "source_selected_hunks": [
+        {
+          "header": "@@ -0,0 +1,10 @@",
+          "sha256": "b43c7bf18eebfcbecf392dce7090f5cc5198a13d9f19120c1eb8acdc37ff983b"
+        }
+      ],
+      "hunks": [
+        {
+          "header": "@@ -0,0 +1,10 @@",
+          "sha256": "b43c7bf18eebfcbecf392dce7090f5cc5198a13d9f19120c1eb8acdc37ff983b"
+        }
+      ]
+    }
+  ],
+  "applicability": {
+    "command": "git apply --check terminal-failure.patch",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "working_files_unchanged": true
+  },
+  "applied": false,
+  "transfer_authorized": false,
+  "exclusions": [
+    "missing_values configuration schema/readback test",
+    "input_mapping recovery",
+    "new node14 target-placement fix"
+  ]
+}

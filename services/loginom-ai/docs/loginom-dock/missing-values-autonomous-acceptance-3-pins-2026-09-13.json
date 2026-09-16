@@ -1,0 +1,98 @@
+{
+  "source_commit": "83dc0db5c4d765706f9dd5271bfe5ecc46220cb4",
+  "runtime_revision": "bdddbd1b922f99b0f8db4a6fa47b7e7c89315b4f5632d914531fdd6befaea77e",
+  "runtime_files": 156,
+  "source_files": 395,
+  "harness_commit": "83dc0db5c4d765706f9dd5271bfe5ecc46220cb4",
+  "harness_files": 252,
+  "harness_inputs_sha256": "a07e20a505fbd578bf3f14f7d81f305fb13658ba6c6c3a691da789975428eea5",
+  "goal_sha256": "35a23e9aeb6a37c408e249aec54e12ca1f230cbc219392e5cabe9b6d4675a836",
+  "fixture_manifest_sha256": "0f2927617fe47e84db3ae3500f735a560002c509a091dd7611aa9ca7f455b1cf",
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node14-test4.2-candidate/manifest.json",
+  "manifest_sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad",
+  "run_id": "20260913-132939-0384fe0b",
+  "result": "FAIL",
+  "model_started": true,
+  "provider": "openai-codex",
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "api_calls": 25,
+  "model_exit_code": 0,
+  "launcher_exit_code": 0,
+  "timed_out": false,
+  "model_runs": 1,
+  "full_goal_accepted": false,
+  "independent_reopen": false,
+  "successful_operations": 5,
+  "successful_imports": 5,
+  "missing_values_prepared": 0,
+  "native_save_receipts": 0,
+  "evidence_calls": 31,
+  "evidence_replies": 31,
+  "evidence_events": 3396,
+  "old_fail_receipts_unchanged": 13,
+  "all_own_processes_stopped": true,
+  "authorization": {
+    "bytes": 549,
+    "sha256": "cdba2cab732718232d3c21befd751d142b7efa64b20a9d89a83cb0ce5f9ffaf8"
+  },
+  "receipts": {
+    ".dock/node14-autonomous-acceptance-3/authorization.json": {
+      "bytes": 549,
+      "sha256": "cdba2cab732718232d3c21befd751d142b7efa64b20a9d89a83cb0ce5f9ffaf8"
+    },
+    ".dock/node14-autonomous-acceptance-3/goal-inventory.json": {
+      "bytes": 2473,
+      "sha256": "48778a7695d2bb789e64549f03a226743cdaf69bf782258b7d7828dbeac2a386"
+    },
+    ".dock/node14-autonomous-acceptance-3/launch.log": {
+      "bytes": 469,
+      "sha256": "0efbe74acda6f76d1fd42b9aba24856009bc761c62f6a6a32906ee4315539d6f"
+    },
+    ".dock/node14-autonomous-acceptance-3/launcher-exit.json": {
+      "bytes": 17,
+      "sha256": "e89df0eae5ec7db81135aed16463968955c578bcc4f2ec43172eff351f080c17"
+    },
+    ".dock/node14-autonomous-acceptance-3/process-check.json": {
+      "bytes": 101,
+      "sha256": "1490b2e4c7962d563809671d070ef4893cc8fbb9718d74749856ee89bb951f21"
+    },
+    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/attempt.json": {
+      "bytes": 106,
+      "sha256": "4a8274edc8ea02321c70accaeea787beba28ac1c82da55ef6a5b6a9cd868d877"
+    },
+    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/efficiency.json": {
+      "bytes": 10390,
+      "sha256": "3bcdc38b925e6b44f86110d0ac8b3d22754b4e827084c21e8811437be3a43af9"
+    },
+    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/evidence.json": {
+      "bytes": 221053626,
+      "sha256": "5ab0cc93d3f2dbf6bcb17c64ce529fcd8f8e33755a5c4f91fb0241a1806df5da"
+    },
+    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/final-audit.json": {
+      "bytes": 427,
+      "sha256": "cd0b08214cf1e8c8a4e6a61e479cc1460a0337181f6682d0e9eeb0a5f2bedf17"
+    },
+    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/geometry-7f49e39f-3752-4a75-b6ef-be8b778e4f3e.json": {
+      "bytes": 614,
+      "sha256": "a93f9ba859e58903940fc513d334d361ad93d188ca1592e3046428cb7a8b8bd4"
+    },
+    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/pre-audit.json": {
+      "bytes": 427,
+      "sha256": "cd0b08214cf1e8c8a4e6a61e479cc1460a0337181f6682d0e9eeb0a5f2bedf17"
+    },
+    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/request.json": {
+      "bytes": 129971,
+      "sha256": "46617cc1ed3fedc703a69834c574d5f181301146c0bbc60a369ff64a69513fa6"
+    },
+    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/scenario.txt": {
+      "bytes": 9657,
+      "sha256": "57189307eddc1350a9db6462d826890aa8f75cf99f393a9af8b642eb7a318d78"
+    },
+    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/tool-precheck.json": {
+      "bytes": 1112,
+      "sha256": "1deb718120d86d3cde78ffa8f091aeb1dbefc1f0d2c48416af5b924c587ed26c"
+    }
+  },
+  "evidence_index_sha256": "0fff6fdbacad3350588ea0d6259cea4d71452f74aa35cc7690363a0a88108a4a"
+}

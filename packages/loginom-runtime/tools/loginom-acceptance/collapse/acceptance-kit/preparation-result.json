@@ -1,0 +1,48 @@
+{
+  "status": "KIT_CHECK_PASS",
+  "replay": [
+    {
+      "case": "mixed",
+      "cells": 60,
+      "status": "CASE_PASS",
+      "autonomous_acceptance": false
+    },
+    {
+      "case": "ignore",
+      "cells": 44,
+      "status": "CASE_PASS",
+      "autonomous_acceptance": false
+    },
+    {
+      "case": "mixed",
+      "cells": 60,
+      "status": "CASE_PASS",
+      "autonomous_acceptance": false
+    }
+  ],
+  "negative_mutations_rejected": 5,
+  "frozen_cases": 10,
+  "all_gates_open": true,
+  "ready": false,
+  "model_started": false,
+  "assignment": "node16:acceptance-preparation:1:77385e36",
+  "source_sha": "77385e36a969e61ade03ab072678b8fb6f00a27d",
+  "runtime": "db6d957169c50bcd5cb169db80d744fd846b8ffa4eee683178619c001fb22bab",
+  "local_tests": {
+    "pass": 21,
+    "fail": 0,
+    "skip": 0
+  },
+  "measured_kit_bytes": 99924,
+  "free_start_gib": 2.4,
+  "recommended_live_free_gib": 6,
+  "recommended_hermes_free_gib": 10,
+  "resource_estimate_is_guarantee": false,
+  "live_started": false,
+  "handler_changed": false,
+  "packet_created": false,
+  "stage_started": false,
+  "runner_goal_missing": true,
+  "default_catalog_compatibility_mismatch": true,
+  "hermes_admission": false
+}

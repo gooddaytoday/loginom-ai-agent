@@ -1,0 +1,26 @@
+{
+  "passed": true,
+  "checks": {
+    "journal_and_no_settings_mutations": {
+      "passed": true,
+      "failures": []
+    },
+    "input_preserved": {
+      "passed": true
+    },
+    "output_preserved": {
+      "passed": true
+    },
+    "excluded_source": {
+      "passed": true
+    },
+    "full_matrices_preserved": {
+      "passed": true
+    },
+    "three_cancelled_wizards": {
+      "passed": true
+    }
+  },
+  "scope": "read_only_existing_settings_before_resume_execute",
+  "execution_started": false
+}

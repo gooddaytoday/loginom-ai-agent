@@ -1,0 +1,6 @@
+const filtered=JSON.parse(await ctx.fs.readFile(ctx.dir+'/filter.json','utf8'));if(filtered.status!=='SUCCEEDED'||!filtered.cleanup_complete)throw Error('Filter incomplete');
+const previous=JSON.parse(await ctx.fs.readFile(ctx.dir+'/calendar-final.json','utf8'));if(previous.status!=='SUCCEEDED'||!previous.cleanup_complete)throw Error('Final calendar incomplete');
+const fields=structuredClone(ctx.calendarRequest.parameters.fields);for(const f of fields)for(const t of f.transformations)if(t.name==='A_year'){t.name='SavedYearA';t.label='Год сохранённой даты A';}
+const finalMapping=previous.output.configuration.readback.output_mapping;
+const request={...ctx.calendarRequest,operation_id:'node13-full-empty',target:{kind:'new',type:'transform.date_time',label:'Пустой календарь',position:{x:440,y:600}},inputs:[{source:filtered.output.node,input:0,output:0}],parameters:{fields},mappings:[ctx.calendarRequest.mappings[0],{direction:'output',port:0,autosync:false,fields:finalMapping.fields.map(f=>({source:{kind:'configured_field',name:f.name==='RowId'?'Id':f.name==='SalesAmount'?'Amount':f.name},...(f.excluded?{excluded:true,label:f.label}:{name:f.name,label:f.label})}))}]};
+return await ctx.runtime.runNodeApply(request);

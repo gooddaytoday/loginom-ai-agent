@@ -1,0 +1,1 @@
+return await ctx.execute(`async page=>{await page.locator('[data-tid="MF;TF-3;Graph;Node13-dates.csv;Label;Label"]').click();return await page.locator('[data-tid^="MF;TF-3;ModelForm;"]:visible').evaluateAll(es=>es.filter(e=>e.getAttribute('data-qtip')).map(e=>({tid:e.getAttribute('data-tid'),tip:e.getAttribute('data-qtip'),classes:e.className})));}`);

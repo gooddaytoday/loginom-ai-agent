@@ -1,0 +1,53 @@
+{
+  "run_id": "20260913-183818-3412861d",
+  "passed": false,
+  "source_commit": "c99bc9e2d07802b09c460d79eadb64f55584e3a5",
+  "reason": "Hermes copied excluded target label DateB into the excluded source request; source label is Дата",
+  "error": "Date/time output: excluded source cannot be renamed",
+  "operation_id": "node-02-calendar-done",
+  "status": "AMBIGUOUS",
+  "phase": "output_mapping",
+  "model_exit": -15,
+  "launcher_exit": 0,
+  "operator_stopped_after_confirmed_failure": true,
+  "all_known_processes_exited": true,
+  "saved": false,
+  "refs": {
+    "request.json": {
+      "path": ".dock/node13-acceptance/runs/20260913-183818-3412861d/request.json",
+      "sha256": "f7b60762130e152ed8e2d58e572a5c12c9c5bf2b7182ead7075c9426fab25310"
+    },
+    "scenario.txt": {
+      "path": ".dock/node13-acceptance/runs/20260913-183818-3412861d/scenario.txt",
+      "sha256": "a793af75fcac5a07071c0fb91cb11134d36caa30fe5fef63979b189db101e2e2"
+    },
+    "evidence.json": {
+      "path": ".dock/node13-acceptance/runs/20260913-183818-3412861d/evidence.json",
+      "sha256": "04a383ec609e8e27d47be5c717367e452d15ad4f7941d0001ca2cd5f272d3559"
+    },
+    "attempt.json": {
+      "path": ".dock/node13-acceptance/runs/20260913-183818-3412861d/attempt.json",
+      "sha256": "0b0d6310a86ab3e5904866b303e76b18eb1a34b3e7fbcd9c26a399f6053511a9"
+    },
+    "audit-before-reopen.json": {
+      "path": ".dock/node13-acceptance/runs/20260913-183818-3412861d/audit-before-reopen.json",
+      "sha256": "17de49a1c54131a2d81bafdaa37d8b822138582383c3388c9edd17cffb451649"
+    },
+    "admission.json": {
+      "path": ".dock/node13-acceptance/runs/20260913-183818-3412861d/admission.json",
+      "sha256": "f96b0e749032d23bd2cee83645f01e8502256d6b79110608971e7183abc4c211"
+    },
+    "operator-stop.json": {
+      "path": ".dock/node13-acceptance/runs/20260913-183818-3412861d/operator-stop.json",
+      "sha256": "4f057ab3aafabd2e86fe2feab5f25453637eca6a66eb2a5e997bc76c87f445b3"
+    },
+    "process-cleanup.json": {
+      "path": ".dock/node13-acceptance/runs/20260913-183818-3412861d/process-cleanup.json",
+      "sha256": "d5ce5c6e8c271b873615a5f73d8b2b9b8bd98456c75f4ea7bd187a54b6a186df"
+    },
+    "slot-assignment.json": {
+      "path": ".dock/node13-acceptance/runs/20260913-183818-3412861d/slot-assignment.json",
+      "sha256": "6f4d8a18235640ba9f7c2334c6bfe76234a879f27be6a59316f78fdbe90bf575"
+    }
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "status": "ready-for-Hermes-retry",
+  "previous_full_goal_passed": false,
+  "previous_run": "20260913-191856-fd729ed8",
+  "model_exit": 0,
+  "timed_out": false,
+  "cleanup": {
+    "returncode": 0,
+    "timed_out": false,
+    "remaining_pids": [],
+    "closed": true,
+    "slot": "node17-hermes-20260913-bdaea73b"
+  },
+  "previous_audit": {
+    "passed": false,
+    "scope": "node17_full_goal",
+    "checks": {
+      "projection": {
+        "passed": false,
+        "failures": [
+          "user_mixed_result_profile"
+        ]
+      },
+      "incomplete_or_invalid": {
+        "passed": false,
+        "reason": ""
+      }
+    }
+  },
+  "node_apply_prepared_count": 6,
+  "collision": {
+    "input": "/test-2/Dock-export-20260913-191856-fd729ed8-typed.csv",
+    "output": "/test-2/Dock-export-20260913-191856-fd729ed8-typed.csv",
+    "operation_id": "export-typed-create-20260913-191856",
+    "cleanup_complete": true,
+    "execution_started": false
+  },
+  "fix": "Only input descriptor names gain input-; fixtures, output paths, node behavior and full goal unchanged",
+  "python_tests_passed": 21,
+  "runtime": "347615cbae29323d80b57488b794ecce607b5b9e0d2fbe86aa88b7460241311c",
+  "runtime_inputs": 155,
+  "harness_inputs": 281,
+  "manifest_sha256": "993a3ed4707964280331caaf80766428276d295dafd2eaedfcecd86990bfe33c",
+  "goal_sha256": "5db16d49554a80afceedcbad2f9a836378377650bcec1d27c4768638a29b46b6",
+  "full_goal": {
+    "nodeops": 22,
+    "deliveries": 3,
+    "all_save_reopen_required": true
+  },
+  "preflight_sha256": "e52fa94b277879f8258c14b48d4caf7150ea77d3a6c3285482f78f2518f3831b",
+  "launch": {
+    "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export",
+    "argv": [
+      "python3",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/tools/loginom-acceptance/run.py",
+      "--run",
+      "--goal",
+      "text-export-node-complete",
+      "--model-profile",
+      "chatgpt-sol",
+      "--runs-root",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs",
+      "--node",
+      "/Users/kartamyshev/.loginom-dock/releases/0.1.0-dev.20260910.3-80ca61417ec7/runtime/node",
+      "--hermes-home",
+      "/Users/kartamyshev/.hermes",
+      "--hermes",
+      "/Users/kartamyshev/.local/bin/hermes",
+      "--hermes-python",
+      "/Users/kartamyshev/.hermes/hermes-agent/venv/bin/python",
+      "--hermes-source",
+      "/Users/kartamyshev/.hermes/hermes-agent",
+      "--dock-config",
+      "/Users/kartamyshev/.loginom-dock/config.json",
+      "--browsers",
+      "/Users/kartamyshev/.loginom-dock/runtime/browsers",
+      "--loginom-user",
+      "test-2",
+      "--loginom-url",
+      "http://logi-test-plan.bg.local/app/?testable=true",
+      "--storage-directory",
+      "/test-2",
+      "--manifest-uri",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node11.2-candidate/manifest.json",
+      "--manifest-sha256",
+      "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "--timeout",
+      "3600",
+      "--max-turns",
+      "100"
+    ],
+    "requires_coordinator_slot": true,
+    "model_started": false
+  },
+  "requires_new_coordinator_slot": true,
+  "retry_model_started": false,
+  "free_disk_bytes": 88526729216,
+  "evidence_sha256": {
+    "request.json": "401a567eab6fbd18958e24a4a2e5f31ad8ccb3c140fde94cca23a07339b236d3",
+    "scenario.txt": "0f8189a35635518223ced5a00ded212b27531e7c1ca934730dd2bbf4c0dcefdd",
+    "evidence.json": "062bd297384add9c5a333ca8c91e9b7a5a1fb47e9bce75724d743c689dbc2901",
+    "attempt.json": "88d43cc2505fd4a32b05df064b5827036dc5520311005689e3b6276fdf3f5611",
+    "full-audit.json": "f230146936bbe780f5ee21b1357077e5dd091b79776646d96e5ea07471372fed",
+    "process-close-check.json": "d528c044ec166165b8eaec7b44ad930ec92dd420ccda9d4b87ebf33d5b84a9c5"
+  }
+}

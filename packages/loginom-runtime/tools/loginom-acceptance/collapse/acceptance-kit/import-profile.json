@@ -1,0 +1,112 @@
+{
+  "format": {
+    "delimiter": "Точка с запятой",
+    "text_qualifier": "Двойная кавычка (\")",
+    "null_marker": "NULL",
+    "decimal_separator": "Точка (.)"
+  },
+  "columns": [
+    {
+      "index": 0,
+      "name": "Id",
+      "label": "Id",
+      "type": "integer",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "index": 1,
+      "name": "I",
+      "label": "I",
+      "type": "integer",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "index": 2,
+      "name": "R",
+      "label": "R",
+      "type": "real",
+      "data_kind": "Непрерывный",
+      "used": true
+    },
+    {
+      "index": 3,
+      "name": "S",
+      "label": "S",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "index": 4,
+      "name": "B",
+      "label": "B",
+      "type": "boolean",
+      "data_kind": "Дискретный",
+      "used": true
+    },
+    {
+      "index": 5,
+      "name": "D",
+      "label": "D",
+      "type": "datetime",
+      "data_kind": "Дискретный",
+      "used": true
+    }
+  ],
+  "output_mapping": {
+    "port": 0,
+    "autosync": true,
+    "fields": [
+      {
+        "index": 0,
+        "name": "Id",
+        "label": "Id",
+        "type": "integer",
+        "data_kind": "Дискретный",
+        "source_name": "Id"
+      },
+      {
+        "index": 1,
+        "name": "I",
+        "label": "I",
+        "type": "integer",
+        "data_kind": "Дискретный",
+        "source_name": "I"
+      },
+      {
+        "index": 2,
+        "name": "R",
+        "label": "R",
+        "type": "real",
+        "data_kind": "Непрерывный",
+        "source_name": "R"
+      },
+      {
+        "index": 3,
+        "name": "S",
+        "label": "S",
+        "type": "string",
+        "data_kind": "Дискретный",
+        "source_name": "S"
+      },
+      {
+        "index": 4,
+        "name": "B",
+        "label": "B",
+        "type": "boolean",
+        "data_kind": "Дискретный",
+        "source_name": "B"
+      },
+      {
+        "index": 5,
+        "name": "D",
+        "label": "D",
+        "type": "datetime",
+        "data_kind": "Дискретный",
+        "source_name": "D"
+      }
+    ]
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "phase": "node17:fresh-harness-correction-and-completion:20260914",
+  "status": "FULL_DECLARED_GOAL_PASSED",
+  "full_goal_passed": true,
+  "evaluation_kind": "versioned_reevaluation_not_original_frozen_audit",
+  "evaluation_version": "node17-fresh-original-contract-v5",
+  "model_run": "20260914-000803-18fad485",
+  "model_source_revision": "908c9b7d90eefd72fea2ae9a7e62bcf90b5469cf",
+  "runtime": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
+  "original_package": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+  "fresh_directory": ".dock/text-export/live-1789376572763",
+  "fresh_session_id": "f8cc0bda-0b80-4b29-b9c0-a1d8a0aad27c",
+  "full_evaluation": {
+    "path": ".dock/node17/acceptance/runs/20260914-000803-18fad485/reevaluation-v5-full-final.json",
+    "sha256": "0bd2163e07d518efa36a1f750838216bce6a35cce86d0b59188cd36b5430ecf5",
+    "passed": true,
+    "checks_passed": 54,
+    "external": {
+      "passed": true,
+      "checks": {
+        "changed": {
+          "passed": true,
+          "bytes": 131,
+          "sha256": "290c4d0cec7895f80f95436030da5f4355dc47d0adbdd04ab17590274f8d4ff4",
+          "rows": 5,
+          "columns": 3,
+          "execution_id": "1789376575056-2yc667dx18:199:1",
+          "persistence": {
+            "passed": true,
+            "same_guid_mapping_settings": true,
+            "new_document_or_workflow": true
+          }
+        },
+        "typed": {
+          "passed": true,
+          "bytes": 138,
+          "sha256": "f237ccfcd6d0861b3505f57a07066f2ac8f770d0068e5bc3e84b340f531095e5",
+          "rows": 3,
+          "columns": 5,
+          "execution_id": "1789376575056-2yc667dx18:199:2",
+          "persistence": {
+            "passed": true,
+            "same_guid_mapping_settings": true,
+            "new_document_or_workflow": true
+          }
+        },
+        "wide": {
+          "passed": true,
+          "bytes": 3005,
+          "sha256": "496cc1705feb531fb6cef23415da079493ae7514c25b2c7d9800df4ed0536873",
+          "rows": 3,
+          "columns": 40,
+          "execution_id": "1789376575056-2yc667dx18:199:3",
+          "persistence": {
+            "passed": true,
+            "same_guid_mapping_settings": true,
+            "new_document_or_workflow": true
+          }
+        },
+        "zero": {
+          "passed": true,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "rows": 0,
+          "columns": 3,
+          "execution_id": "1789376575056-2yc667dx18:199:7",
+          "persistence": {
+            "passed": true,
+            "same_guid_mapping_settings": true,
+            "new_document_or_workflow": true
+          }
+        },
+        "empty_configuration": {
+          "passed": true,
+          "failures": [],
+          "scope": "filter_raw_configuration"
+        },
+        "empty_output": {
+          "passed": true,
+          "failures": [],
+          "execution_id": "1789376575056-2yc667dx18:199:4",
+          "scope": "both_fresh_native_filter_outputs_against_independent_expected",
+          "source_identity_verified": false,
+          "package_persistence_verified": false
+        }
+      },
+      "absence_done_close": true,
+      "session": "f8cc0bda-0b80-4b29-b9c0-a1d8a0aad27c",
+      "actual_preparation_browser_receipt": true,
+      "original_graph_guid_verified": true,
+      "original_not_saved": true,
+      "session_cleanup_verified": true
+    }
+  },
+  "original_harness_verified_files": 283,
+  "original_files_sha256": {
+    "request.json": "fadee131be6f33342f3887d33008de47d9d88079511dbc331946ec32645c42b7",
+    "scenario.txt": "fe73c3c0a149c44918b96d3112f8aa6f94754db6145cc6a320b1bcab73fdba30",
+    "evidence.json": "9b2048aa47865d64c926602e15ed1b2eb56ba4556205d4dfdc51e3d338a94d1d",
+    "full-audit.json": "0080f676dd0c0e715e49d86366299459a77a3d4f221d66c8025b1a5bcb722f3e"
+  },
+  "original_files_unchanged": true,
+  "evaluation_source_sha256": {
+    "text_export_import_contract.py": "d78f39bc9ec59ec7377aee216a82f271ff1beae30527d0d79607624f58e63c65",
+    "text_export_reevaluation_v5.py": "3bd287f9d282a3a020effa1728a146e53cd3233203f05323f3c3c4d3bdb8c3f4",
+    "text_export_origin.py": "da85df60c512cd055a888d8084a825857190bf4b403f129526c6ee6926f0a50a",
+    "text_export_reopen_owner.py": "05a61b59d186140a35202a66a5bf3ac78a42b6787ccbf28f0289ac665d0ca405",
+    "text_export_fresh_evidence.py": "b388864a2babb17226465cc324512f2cb762c6f143a5b50dce8054acaf6b1838",
+    "text-export-fresh.mjs": "32355f16cc0846190b6481fe0891a8785e137bc750a4daddef89915b477ed269",
+    "text-export-fresh-case.js": "9994ffb64eb0f09ea7df8b15bfaad63582ee385bd5b28713d50e58437e3a1dfe"
+  },
+  "external_evidence_files": 2490,
+  "outputs": {
+    "changed": {
+      "artifact_id": "134ff3fa-da0d-4de5-a477-3e4a2c2946af",
+      "destination": "/test-2/Dock-export-20260914-000803-18fad485-external-f8cc0bda-0b80-4b29-b9c0-a1d8a0aad27c-changed.csv",
+      "bytes": 131,
+      "sha256": "290c4d0cec7895f80f95436030da5f4355dc47d0adbdd04ab17590274f8d4ff4",
+      "execution_id": "1789376575056-2yc667dx18:199:1",
+      "verification_id": "external-changed:export-download",
+      "freshness_basis": "native_absence_check_and_completed_execution"
+    },
+    "typed": {
+      "artifact_id": "efab005a-5680-4273-a166-9e49f2c5a398",
+      "destination": "/test-2/Dock-export-20260914-000803-18fad485-external-f8cc0bda-0b80-4b29-b9c0-a1d8a0aad27c-typed.csv",
+      "bytes": 138,
+      "sha256": "f237ccfcd6d0861b3505f57a07066f2ac8f770d0068e5bc3e84b340f531095e5",
+      "execution_id": "1789376575056-2yc667dx18:199:2",
+      "verification_id": "external-typed:export-download",
+      "freshness_basis": "native_absence_check_and_completed_execution"
+    },
+    "wide": {
+      "artifact_id": "4290f144-7a24-4430-8347-b5909856da8a",
+      "destination": "/test-2/Dock-export-20260914-000803-18fad485-external-f8cc0bda-0b80-4b29-b9c0-a1d8a0aad27c-wide.tsv",
+      "bytes": 3005,
+      "sha256": "496cc1705feb531fb6cef23415da079493ae7514c25b2c7d9800df4ed0536873",
+      "execution_id": "1789376575056-2yc667dx18:199:3",
+      "verification_id": "external-wide:export-download",
+      "freshness_basis": "native_absence_check_and_completed_execution"
+    },
+    "zero": {
+      "artifact_id": "84b0091b-2eee-4097-8b0d-b4e91b97f990",
+      "destination": "/test-2/Dock-export-20260914-000803-18fad485-external-f8cc0bda-0b80-4b29-b9c0-a1d8a0aad27c-zero.csv",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "execution_id": "1789376575056-2yc667dx18:199:7",
+      "verification_id": "external-zero:export-download",
+      "freshness_basis": "native_absence_check_and_completed_execution"
+    }
+  },
+  "cleanup": {
+    "package_closed": true,
+    "unsaved_changes_discarded": true,
+    "logged_out": true,
+    "account": "test-2"
+  },
+  "process_cleanup": {
+    "session_id": "f8cc0bda-0b80-4b29-b9c0-a1d8a0aad27c",
+    "remaining_pids": [],
+    "closed": true
+  },
+  "tests": {
+    "passed": 41,
+    "fresh_negative_mutations": 21,
+    "command": "python3 -m unittest discover -s tools/loginom-acceptance -p 'test_text_export_*.py'",
+    "syntax_check": "node --check tools/loginom-acceptance/text-export-fresh.mjs",
+    "diff_check_passed": true
+  },
+  "new_hermes_run": false,
+  "old_failures_preserved": true,
+  "original_saved_by_diagnostic": false,
+  "product_runtime_changed": false,
+  "merge_performed": false,
+  "deployment_performed": false,
+  "remaining_scope_limitations": [
+    "Acceptance applies to candidate runtime c9972b58 on Loginom7.4.2 and the declared Node17 contract",
+    "Merge/release/install remain coordinator actions requiring separate user authorization"
+  ]
+}

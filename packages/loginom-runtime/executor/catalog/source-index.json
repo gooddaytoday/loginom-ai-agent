@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "catalog_version": "2026.09.13-node14.1-candidate",
+  "e2e_commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+  "source_files": {
+    "bg/helpers/filedialog.ts": "a6f7aa54eb48a3d1e330820c5322e03d7d139a172f82f344253b534e48897696",
+    "bg/helpers/packages.ts": "203d7002abdfc8c88bb59bc500a21ff3003f5dc537b500c2f9802afba21d4a8f",
+    "bg/helpers/workflow/links.ts": "9718090ce0ccaa5c0f266ad1672d39678ffd2cae07fe8e0b5ce85522990883a8",
+    "bg/helpers/workflow/node.ts": "c50802326ad3b32bcceb35e892606bae5726eaaafab0fd5d833f26dfb6ebea64",
+    "bg/selectors.ts": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3",
+    "bg/utils/selectors.ts": "2185dcdb6785091fc3f04da7e49d1c9cc2207430a43afd37d504710409503477",
+    "tests/acceptance/workflow/linking.ts": "0caa96babcd94a826be73a6251047561a916ca4abd5c73355361f1f390b9f357",
+    "bg/helpers/wizard.ts": "700b25194c65dd0d729c76598d2dcfd49f7d8604c1c6f4b9d96995fd4c9e4335",
+    "bg/sels/import/sImportTxt.ts": "88e1e86bd904233b93d54872b0ac6199c4939bafcacfd39c0c88252576d11eff"
+  },
+  "dependencies": {
+    "node.add": {
+      "selectors": [
+        "loginom.ready_avatar",
+        "workspace.active_tab",
+        "workflow.graph",
+        "workflow.workarea",
+        "workflow.node",
+        "workflow.node_label",
+        "component.preprocessing.data_recovery",
+        "component.imports.text",
+        "component.imports.lgd",
+        "component.transform.group_data",
+        "component.transform.calculator",
+        "component.transform.union_data",
+        "component.transform.col_union_data",
+        "component.transform.reform_columns"
+      ],
+      "files": [
+        "bg/helpers/workflow/node.ts",
+        "bg/selectors.ts",
+        "bg/utils/selectors.ts"
+      ]
+    },
+    "link.create": {
+      "selectors": [
+        "loginom.ready_avatar",
+        "workspace.active_tab",
+        "workflow.graph",
+        "workflow.port.output.data",
+        "workflow.port.output.var",
+        "workflow.port.output.order",
+        "workflow.port.output.tree",
+        "workflow.port.output.connection",
+        "workflow.port.input.data",
+        "workflow.port.input.var",
+        "workflow.port.input.order",
+        "workflow.port.input.tree",
+        "workflow.port.input.connection",
+        "workflow.port.input.control_var",
+        "workflow.port.input.add"
+      ],
+      "files": [
+        "bg/helpers/workflow/links.ts",
+        "bg/selectors.ts",
+        "bg/utils/selectors.ts",
+        "tests/acceptance/workflow/linking.ts"
+      ]
+    },
+    "package.save_as": {
+      "selectors": [
+        "loginom.ready_avatar",
+        "workspace.active_tab",
+        "workflow.graph",
+        "packages.menu",
+        "packages.save_as",
+        "packages.close",
+        "packages.open",
+        "file_dialog.file_name",
+        "file_dialog.confirm",
+        "message.text",
+        "message.error",
+        "message.yes",
+        "message.no"
+      ],
+      "files": [
+        "bg/helpers/packages.ts",
+        "bg/helpers/filedialog.ts",
+        "bg/selectors.ts"
+      ]
+    },
+    "node.configure_text_import": {
+      "selectors": [
+        "workflow.graph"
+      ],
+      "files": [
+        "bg/helpers/wizard.ts",
+        "bg/sels/import/sImportTxt.ts",
+        "bg/selectors.ts"
+      ]
+    },
+    "package.save_checkpoint": {
+      "selectors": [
+        "loginom.ready_avatar",
+        "workspace.active_tab",
+        "workflow.graph",
+        "packages.menu",
+        "packages.save_as",
+        "file_dialog.file_name",
+        "file_dialog.confirm",
+        "message.text",
+        "message.error",
+        "message.yes",
+        "message.no"
+      ],
+      "files": [
+        "bg/helpers/packages.ts",
+        "bg/helpers/filedialog.ts",
+        "bg/selectors.ts"
+      ]
+    }
+  }
+}

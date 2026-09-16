@@ -1,0 +1,82 @@
+{
+  "scope": "join_subplan_09_source_runtime",
+  "status": "implemented / live_verified",
+  "run_id": "20260912-030137-87f5043f",
+  "runtime_revision": "c684d6c8d049fff0b7f8739f33443c5313852337c1e4997d1d216fb22e3ee1d2",
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.11-parallel-pilot.1-candidate/manifest.json",
+  "manifest_sha256": "4ac827fc9e0cefa609bf2cb8fd7d3d79318dd3fe92999decc7e385fae51fc6e2",
+  "model": {
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning": "low"
+  },
+  "package_path": "/test-1/packages/Dock-acceptance-20260912-030137-87f5043f.lgp",
+  "audit": {
+    "passed": true,
+    "checks": 56,
+    "failed": 0
+  },
+  "matrix": {
+    "passed": true,
+    "cases": 6
+  },
+  "negative_evidence": {
+    "configuration_tampering_rejected": 11,
+    "full_audit_tampering_rejected": 6,
+    "live_refusals": 4
+  },
+  "tests": {
+    "client_pass": 1337,
+    "client_skip": 1,
+    "python_pass": 487,
+    "skill_pass": 6
+  },
+  "metrics": {
+    "scope": "reported_usage_and_journal_timing",
+    "usage_counts": {
+      "input_tokens": 75821,
+      "output_tokens": 6702,
+      "total_tokens": 1278555,
+      "cache_read_tokens": 1196032,
+      "cache_write_tokens": 0,
+      "reasoning_tokens": 1400
+    },
+    "usage_complete": true,
+    "model_api_calls": 29,
+    "public_calls": 31,
+    "public_calls_by_tool": {
+      "mcp__loginom_dock__dock_action_describe": 2,
+      "mcp__loginom_dock__dock_action_run": 2,
+      "mcp__loginom_dock__dock_artifact_deliver": 2,
+      "mcp__loginom_dock__dock_node_apply": 9,
+      "mcp__loginom_dock__dock_node_wait": 9,
+      "mcp__loginom_dock__dock_prepare": 2,
+      "mcp__loginom_dock__dock_workspace_observe": 5
+    },
+    "phase_measurement_errors": [],
+    "phases_complete": true,
+    "timing_note": "Journal wall-clock intervals include local waits and transport; phases are not model latency.",
+    "counter_note": "Provider-reported counters; cache and reasoning counters may overlap other token counts."
+  },
+  "phase_totals_ms": {
+    "source": 40.0,
+    "workflow": 189.0,
+    "target": 12449.0,
+    "input_mapping": 33014.0,
+    "open": 31703.0,
+    "configure": 38791.0,
+    "output_mapping": 32929.0,
+    "finish": 18584.0,
+    "execute": 12893.0,
+    "read": 67558.0,
+    "node_finish": 6251.0
+  },
+  "evidence_sha256": {
+    "request.json": "0b7d14943acace7a2a74e081f7801509a39d6d509a9d02213a4526a7c1533051",
+    "evidence.json": "5f74e6bd1d85eff1154ddba790d00a0cea68e805fb9622a8c018821f6fdc06d1",
+    "join-node-audit.json": "f3f8a3353b2c6fbf7a44a5047ad50f5ddba915713f1637feccb7661630c419ce",
+    "scenario.txt": "e4dc96ea47259a6f255043924d3db5b75605d3883b4cde8702cee6c97abe323d"
+  },
+  "deployed": false,
+  "overall_v4_v5_complete": false
+}

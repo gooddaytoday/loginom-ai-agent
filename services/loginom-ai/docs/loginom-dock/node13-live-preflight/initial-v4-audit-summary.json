@@ -1,0 +1,49 @@
+{
+  "passed": true,
+  "scope": "live_initial_calendar_execute_full_10x27_and_done_retention",
+  "hermes_acceptance": false,
+  "checks": {
+    "output": true,
+    "retention": true,
+    "public": true,
+    "negatives": true
+  },
+  "negative_cases": [
+    {
+      "case": "done_not_successful",
+      "rejected": true
+    },
+    {
+      "case": "done_unresolved_cleanup",
+      "rejected": true
+    },
+    {
+      "case": "done_started_execution",
+      "rejected": true
+    },
+    {
+      "case": "foreign_guid",
+      "rejected": true
+    },
+    {
+      "case": "changed_matrix",
+      "rejected": true
+    },
+    {
+      "case": "changed_mapping",
+      "rejected": true
+    },
+    {
+      "case": "execute_repairs_mapping",
+      "rejected": true
+    },
+    {
+      "case": "execute_repairs_parameters",
+      "rejected": true
+    },
+    {
+      "case": "missing_done_checkpoint",
+      "rejected": true
+    }
+  ]
+}

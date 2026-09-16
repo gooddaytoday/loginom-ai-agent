@@ -1,0 +1,382 @@
+{
+  "assignment": "node13:manual-output-followup:1:b01f2e83ca6253087bba71150f078b9d9083f612",
+  "source_base": "b01f2e83ca6253087bba71150f078b9d9083f612",
+  "runtime": "25706c0215637218f61d5c89cc47ded2dd2636e635e66ac79843152b154513cc",
+  "loginom_build": "7.4.2",
+  "account": "test-3",
+  "package_path": "/test-3/N13-bafafea6.lgp",
+  "node_id": "6b840be2-3723-4dc4-9e06-098016b76e60",
+  "configure_session": "bafafea6-df03-4bce-b438-1c4c1579a98c",
+  "reopen_session": "df361bf1-66a2-4dae-9283-f74c8caa39d7",
+  "configuration_request": "node13-manual-add",
+  "reopen_request": "node13-manual-reopen",
+  "reopen_parameters": {},
+  "reopen_mappings": [],
+  "output": {
+    "rows": 4,
+    "columns": 8
+  },
+  "repeat": {
+    "before": 991,
+    "middle": 991,
+    "after": 991,
+    "repeat": "SUCCEEDED",
+    "resume": "SUCCEEDED"
+  },
+  "manual_output": {
+    "passed": true,
+    "failures": [],
+    "scope": "existing_manual_date_time_output",
+    "hermes_acceptance": false
+  },
+  "negative_checks": {
+    "passed": true,
+    "rejected": 7,
+    "cases": [
+      {
+        "case": "autosync",
+        "rejected": true,
+        "failures": [
+          "independent_configuration_or_values_failed",
+          "manual_autosync_not_preserved"
+        ]
+      },
+      {
+        "case": "retained_name",
+        "rejected": true,
+        "failures": [
+          "creation_changed_retained_definition",
+          "independent_configuration_or_values_failed"
+        ]
+      },
+      {
+        "case": "retained_exclusion",
+        "rejected": true,
+        "failures": [
+          "creation_changed_retained_definition",
+          "independent_configuration_or_values_failed"
+        ]
+      },
+      {
+        "case": "added_source",
+        "rejected": true,
+        "failures": [
+          "creation_changed_retained_definition",
+          "independent_configuration_or_values_failed"
+        ]
+      },
+      {
+        "case": "selection",
+        "rejected": true,
+        "failures": [
+          "",
+          "independent_configuration_or_values_failed"
+        ]
+      },
+      {
+        "case": "missing_create",
+        "rejected": true,
+        "failures": [
+          "independent_configuration_or_values_failed",
+          "two_exact_source_creations_required"
+        ]
+      },
+      {
+        "case": "repeat_effect",
+        "rejected": true,
+        "failures": [
+          "repeat_has_effects"
+        ]
+      }
+    ]
+  },
+  "persistence": {
+    "passed": true,
+    "failures": [],
+    "scope": "independent_date_time_save_reopen_execute",
+    "package_persistence_verified": true,
+    "hermes_acceptance": false
+  },
+  "evidence": [
+    {
+      "path": ".dock/stream-runtime/sessions/bafafea6-df03-4bce-b438-1c4c1579a98c/node13-manual-add-audit.json",
+      "sha256": "7099cb7477aa5abe7f6ff112e47c02490a085473b4e984c80471ed925d37a590",
+      "result": {
+        "passed": true,
+        "checks": {
+          "configuration": {
+            "passed": true,
+            "failures": [],
+            "projection": [
+              {
+                "name": "SmallMonthEnd",
+                "label": "Конец месяца B",
+                "type": "datetime",
+                "input": "DateB",
+                "operation": "month_end"
+              },
+              {
+                "name": "Id",
+                "label": "Id",
+                "type": "integer",
+                "input": "Id"
+              },
+              {
+                "name": "DateA",
+                "label": "Дата",
+                "type": "datetime",
+                "input": "DateA"
+              },
+              {
+                "name": "DateB",
+                "label": "Дата",
+                "type": "datetime",
+                "input": "DateB"
+              },
+              {
+                "name": "SmallMonthStart",
+                "label": "Начало месяца A",
+                "type": "datetime",
+                "input": "DateA",
+                "operation": "month_start"
+              },
+              {
+                "name": "SmallYear",
+                "label": "Год A",
+                "type": "integer",
+                "input": "DateA",
+                "operation": "year"
+              },
+              {
+                "name": "SmallQuarter",
+                "label": "Квартал B",
+                "type": "integer",
+                "input": "DateB",
+                "operation": "quarter"
+              },
+              {
+                "name": "SmallHour",
+                "label": "Час B",
+                "type": "integer",
+                "input": "DateB",
+                "operation": "hour"
+              }
+            ],
+            "scope": "date_time_raw_configuration"
+          },
+          "raw_output": {
+            "passed": true,
+            "failures": [],
+            "execution_id": "1789293581835-ql7iextt6l:454:3",
+            "scope": "fresh_calculator_table_against_independent_expected",
+            "source_identity_verified": false,
+            "package_persistence_verified": false
+          },
+          "values": {
+            "passed": true,
+            "rows": 4,
+            "columns": 8,
+            "full_values_verified": true
+          }
+        },
+        "scope": "source_diagnostic_operation",
+        "hermes_acceptance": false,
+        "package_persistence_verified": false,
+        "fixture": "boundaries"
+      }
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/bafafea6-df03-4bce-b438-1c4c1579a98c/date-time-manual-output-audit.json",
+      "sha256": "e73855abc84ea8464a13bd97b0cf1a320e2f03ea6107cd95cab7f6972c33d09d",
+      "result": {
+        "passed": true,
+        "failures": [],
+        "scope": "existing_manual_date_time_output",
+        "hermes_acceptance": false
+      }
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/bafafea6-df03-4bce-b438-1c4c1579a98c/manual-negative-audit.json",
+      "sha256": "ea6339e17ef097c78444c462aac86088495bba4cd3b434dd89683b43dc6f21f4",
+      "result": {
+        "passed": true,
+        "rejected": 7,
+        "cases": [
+          {
+            "case": "autosync",
+            "rejected": true,
+            "failures": [
+              "independent_configuration_or_values_failed",
+              "manual_autosync_not_preserved"
+            ]
+          },
+          {
+            "case": "retained_name",
+            "rejected": true,
+            "failures": [
+              "creation_changed_retained_definition",
+              "independent_configuration_or_values_failed"
+            ]
+          },
+          {
+            "case": "retained_exclusion",
+            "rejected": true,
+            "failures": [
+              "creation_changed_retained_definition",
+              "independent_configuration_or_values_failed"
+            ]
+          },
+          {
+            "case": "added_source",
+            "rejected": true,
+            "failures": [
+              "creation_changed_retained_definition",
+              "independent_configuration_or_values_failed"
+            ]
+          },
+          {
+            "case": "selection",
+            "rejected": true,
+            "failures": [
+              "",
+              "independent_configuration_or_values_failed"
+            ]
+          },
+          {
+            "case": "missing_create",
+            "rejected": true,
+            "failures": [
+              "independent_configuration_or_values_failed",
+              "two_exact_source_creations_required"
+            ]
+          },
+          {
+            "case": "repeat_effect",
+            "rejected": true,
+            "failures": [
+              "repeat_has_effects"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/df361bf1-66a2-4dae-9283-f74c8caa39d7/node13-manual-reopen-audit.json",
+      "sha256": "8ebf498e2abfe97e21f5ae1a079e2254af31b6f4b1de682fd4ce36aac0d28717",
+      "result": {
+        "passed": true,
+        "checks": {
+          "configuration": {
+            "passed": true,
+            "failures": [],
+            "projection": [
+              {
+                "name": "SmallMonthEnd",
+                "label": "Конец месяца B",
+                "type": "datetime",
+                "input": "DateB",
+                "operation": "month_end"
+              },
+              {
+                "name": "Id",
+                "label": "Id",
+                "type": "integer",
+                "input": "Id"
+              },
+              {
+                "name": "DateA",
+                "label": "Дата",
+                "type": "datetime",
+                "input": "DateA"
+              },
+              {
+                "name": "DateB",
+                "label": "Дата",
+                "type": "datetime",
+                "input": "DateB"
+              },
+              {
+                "name": "SmallMonthStart",
+                "label": "Начало месяца A",
+                "type": "datetime",
+                "input": "DateA",
+                "operation": "month_start"
+              },
+              {
+                "name": "SmallYear",
+                "label": "Год A",
+                "type": "integer",
+                "input": "DateA",
+                "operation": "year"
+              },
+              {
+                "name": "SmallQuarter",
+                "label": "Квартал B",
+                "type": "integer",
+                "input": "DateB",
+                "operation": "quarter"
+              },
+              {
+                "name": "SmallHour",
+                "label": "Час B",
+                "type": "integer",
+                "input": "DateB",
+                "operation": "hour"
+              }
+            ],
+            "scope": "date_time_raw_configuration"
+          },
+          "raw_output": {
+            "passed": true,
+            "failures": [],
+            "execution_id": "1789294407980-opsvpw0qby:215:3",
+            "scope": "fresh_calculator_table_against_independent_expected",
+            "source_identity_verified": false,
+            "package_persistence_verified": false
+          },
+          "values": {
+            "passed": true,
+            "rows": 4,
+            "columns": 8,
+            "full_values_verified": true
+          }
+        },
+        "scope": "source_diagnostic_operation",
+        "hermes_acceptance": false,
+        "package_persistence_verified": false,
+        "fixture": "boundaries"
+      }
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/df361bf1-66a2-4dae-9283-f74c8caa39d7/date-time-persistence.json",
+      "sha256": "c5ea8a2db5a299dfe82b47bef791ff6ce15f6ad28827ca7ccaf73c6b5bf2cd49",
+      "result": {
+        "passed": true,
+        "failures": [],
+        "scope": "independent_date_time_save_reopen_execute",
+        "package_persistence_verified": true,
+        "hermes_acceptance": false
+      }
+    }
+  ],
+  "journals": [
+    {
+      "path": ".dock/stream-runtime/sessions/bafafea6-df03-4bce-b438-1c4c1579a98c/execution-events.jsonl",
+      "sha256": "ced55a56f9253ac91de23426929442de65d7b747b9d2836e43b2138e85964092"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/bafafea6-df03-4bce-b438-1c4c1579a98c/public-api.jsonl",
+      "sha256": "51c66946329c195dce45f8abeb7550429f29b46ae5d0575cf522f0aa795d4b36"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/df361bf1-66a2-4dae-9283-f74c8caa39d7/execution-events.jsonl",
+      "sha256": "c5c99d2cfc34d61abd0249c20829d999f9c217ebe7ead5bdf2a6bd9f30650542"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/df361bf1-66a2-4dae-9283-f74c8caa39d7/public-api.jsonl",
+      "sha256": "83ee03e2a51a97a72202ab93ecb429345c84929389daf236f0d67490ee4a0112"
+    }
+  ],
+  "hermes_acceptance": false,
+  "r2_applied": false
+}

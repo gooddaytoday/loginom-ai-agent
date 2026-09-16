@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Loginom Dock health without recording secrets
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/loginom-dock/tools/monitor-server.py
+User=root
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true

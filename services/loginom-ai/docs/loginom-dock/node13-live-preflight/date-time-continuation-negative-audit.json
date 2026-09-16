@@ -1,0 +1,68 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "case": "duplicate_receipt",
+      "rejected": true,
+      "failures": [
+        "completion_without_preparation",
+        "original_receipt_not_acknowledged_once"
+      ]
+    },
+    {
+      "case": "missing_receipt",
+      "rejected": true,
+      "failures": [
+        "mutation_without_fresh_observation",
+        "observation_interleaving",
+        "observation_sequence",
+        "original_receipt_not_acknowledged_once"
+      ]
+    },
+    {
+      "case": "short_matrix",
+      "rejected": true,
+      "failures": [
+        "complete_original_draft_proof_missing"
+      ]
+    },
+    {
+      "case": "foreign_proof_receipt",
+      "rejected": true,
+      "failures": [
+        "complete_original_draft_proof_missing"
+      ]
+    },
+    {
+      "case": "unknown_original_gesture",
+      "rejected": true,
+      "failures": [
+        "complete_original_draft_proof_missing",
+        "lost_browser_receipt_unverified",
+        "original_receipt_not_acknowledged_once",
+        "unknown_flag_replayed"
+      ]
+    },
+    {
+      "case": "uncompleted_resume",
+      "rejected": true,
+      "failures": [
+        "same_operation_not_completed"
+      ]
+    },
+    {
+      "case": "replayed_effect",
+      "rejected": true,
+      "failures": [
+        "completed_operation_replayed_effects"
+      ]
+    },
+    {
+      "case": "no_negative_refusal",
+      "rejected": true,
+      "failures": [
+        "foreign_selection_not_refused"
+      ]
+    }
+  ]
+}

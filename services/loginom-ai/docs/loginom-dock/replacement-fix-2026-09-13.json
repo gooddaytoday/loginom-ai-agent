@@ -1,0 +1,272 @@
+{
+  "node": 11,
+  "finding": "N11-R1",
+  "scope": "codex_targeted_live_regression",
+  "session": "c6874c61-d27b-41b6-a618-00074f6c9bf4",
+  "runtime_revision": "b99b922033e87b7580f14c2eec8cd0744c23bab29ee45b2548212cdac8c394ca",
+  "passed": true,
+  "complete": true,
+  "checks": {
+    "fixed-before1": {
+      "passed": true,
+      "checks": {
+        "configuration": {
+          "passed": true,
+          "failures": [],
+          "scope": "replacement_raw_configuration"
+        },
+        "output": {
+          "passed": true,
+          "failures": [],
+          "execution_id": "1789256771595-9sxu098vxqt:192:6",
+          "scope": "fresh_calculator_table_against_independent_expected",
+          "source_identity_verified": false,
+          "package_persistence_verified": false
+        },
+        "returned_schema": {
+          "passed": true
+        }
+      },
+      "scope": "replacement_single_operation",
+      "source_identity_verified": false,
+      "package_persistence_verified": false,
+      "autonomous_acceptance": false
+    },
+    "fixed-after1": {
+      "passed": true,
+      "checks": {
+        "configuration": {
+          "passed": true,
+          "failures": [],
+          "scope": "replacement_raw_configuration"
+        },
+        "output": {
+          "passed": true,
+          "failures": [],
+          "execution_id": "1789256771595-9sxu098vxqt:192:8",
+          "scope": "fresh_calculator_table_against_independent_expected",
+          "source_identity_verified": false,
+          "package_persistence_verified": false
+        },
+        "returned_schema": {
+          "passed": true
+        }
+      },
+      "scope": "replacement_single_operation",
+      "source_identity_verified": false,
+      "package_persistence_verified": false,
+      "autonomous_acceptance": false
+    },
+    "fixed-before2": {
+      "passed": true,
+      "checks": {
+        "configuration": {
+          "passed": true,
+          "failures": [],
+          "scope": "replacement_raw_configuration"
+        },
+        "output": {
+          "passed": true,
+          "failures": [],
+          "execution_id": "1789256771595-9sxu098vxqt:192:2",
+          "scope": "fresh_calculator_table_against_independent_expected",
+          "source_identity_verified": false,
+          "package_persistence_verified": false
+        },
+        "returned_schema": {
+          "passed": true
+        }
+      },
+      "scope": "replacement_single_operation",
+      "source_identity_verified": false,
+      "package_persistence_verified": false,
+      "autonomous_acceptance": false
+    },
+    "fixed-after2": {
+      "passed": true,
+      "checks": {
+        "configuration": {
+          "passed": true,
+          "failures": [],
+          "scope": "replacement_raw_configuration"
+        },
+        "output": {
+          "passed": true,
+          "failures": [],
+          "execution_id": "1789256771595-9sxu098vxqt:192:4",
+          "scope": "fresh_calculator_table_against_independent_expected",
+          "source_identity_verified": false,
+          "package_persistence_verified": false
+        },
+        "returned_schema": {
+          "passed": true
+        }
+      },
+      "scope": "replacement_single_operation",
+      "source_identity_verified": false,
+      "package_persistence_verified": false,
+      "autonomous_acceptance": false
+    },
+    "fixed-partial-c": {
+      "passed": true,
+      "checks": {
+        "configuration": {
+          "passed": true,
+          "failures": [],
+          "scope": "replacement_raw_configuration"
+        },
+        "output": {
+          "passed": true,
+          "failures": [],
+          "execution_id": "1789256771595-9sxu098vxqt:192:10",
+          "scope": "fresh_calculator_table_against_independent_expected",
+          "source_identity_verified": false,
+          "package_persistence_verified": false
+        },
+        "returned_schema": {
+          "passed": true
+        }
+      },
+      "scope": "replacement_single_operation",
+      "source_identity_verified": false,
+      "package_persistence_verified": false,
+      "autonomous_acceptance": false
+    },
+    "fixed-to-replace": {
+      "passed": true,
+      "checks": {
+        "configuration": {
+          "passed": true,
+          "failures": [],
+          "scope": "replacement_raw_configuration"
+        },
+        "output": {
+          "passed": true,
+          "failures": [],
+          "execution_id": "1789256771595-9sxu098vxqt:192:12",
+          "scope": "fresh_calculator_table_against_independent_expected",
+          "source_identity_verified": false,
+          "package_persistence_verified": false
+        },
+        "returned_schema": {
+          "passed": true
+        }
+      },
+      "scope": "replacement_single_operation",
+      "source_identity_verified": false,
+      "package_persistence_verified": false,
+      "autonomous_acceptance": false
+    },
+    "fixed-to-add": {
+      "passed": true,
+      "checks": {
+        "configuration": {
+          "passed": true,
+          "failures": [],
+          "scope": "replacement_raw_configuration"
+        },
+        "output": {
+          "passed": true,
+          "failures": [],
+          "execution_id": "1789256771595-9sxu098vxqt:192:14",
+          "scope": "fresh_calculator_table_against_independent_expected",
+          "source_identity_verified": false,
+          "package_persistence_verified": false
+        },
+        "returned_schema": {
+          "passed": true
+        }
+      },
+      "scope": "replacement_single_operation",
+      "source_identity_verified": false,
+      "package_persistence_verified": false,
+      "autonomous_acceptance": false
+    },
+    "refusal1": {
+      "passed": true,
+      "failures": [],
+      "scope": "codex_replacement_partial_refusal",
+      "autonomous_acceptance": false
+    },
+    "negative1": {
+      "passed": true,
+      "checks": {
+        "unclean_result": true,
+        "foreign_close": true,
+        "not_discarded": true,
+        "changed_saved_rule": true,
+        "foreign_session": true,
+        "missing_raw_close": true
+      },
+      "count": 6
+    },
+    "refusal2": {
+      "passed": true,
+      "failures": [],
+      "scope": "codex_replacement_partial_refusal",
+      "autonomous_acceptance": false
+    },
+    "negative2": {
+      "passed": true,
+      "checks": {
+        "unclean_result": true,
+        "foreign_close": true,
+        "not_discarded": true,
+        "changed_saved_rule": true,
+        "foreign_session": true,
+        "missing_raw_close": true
+      },
+      "count": 6
+    },
+    "runtime_pin": {
+      "passed": true,
+      "files": 155,
+      "changed": [],
+      "revision": "b99b922033e87b7580f14c2eec8cd0744c23bab29ee45b2548212cdac8c394ca"
+    },
+    "inventory_refresh_negative": {
+      "passed": true,
+      "checks": {
+        "missing_refresh": true,
+        "changed_field": true,
+        "foreign_policy": true,
+        "changed_after_id": true
+      },
+      "count": 4
+    }
+  },
+  "autonomous_acceptance": false,
+  "reviewed_sha": "8aaf6a8a425d94974d65b5bd8b27a55f362fac4d",
+  "status": "fixes_complete_awaiting_coordinator",
+  "client_tests": {
+    "total": 1406,
+    "passed": 1405,
+    "skipped": 1,
+    "failed": 0,
+    "log": ".dock/replacement/client-tests-r1-refresh-20260913.log"
+  },
+  "targeted_tests": {
+    "passed": 75,
+    "failed": 0
+  },
+  "negative_evidence_cases": 16,
+  "diagnostic_package": "/test-2/Node11-R1-0d961a54.lgp",
+  "original_package": "/test-2/Node11-Handler-90de4e18.lgp",
+  "save": {
+    "status": "SUCCEEDED",
+    "graph_matches_baseline": true,
+    "nodes": 12,
+    "links": 7,
+    "reopened": false,
+    "persisted_content_verified": false
+  },
+  "cleanup": {
+    "home_verified": true,
+    "harness_exit_code": 0
+  },
+  "evidence_root": ".dock/stream-runtime/sessions/c6874c61-d27b-41b6-a618-00074f6c9bf4",
+  "limitations": [
+    "Hermes openai-codex / gpt-5.6-sol / low requires coordinator slot",
+    "Final diagnostic save was not reopened; earlier development persistence evidence remains historical"
+  ]
+}

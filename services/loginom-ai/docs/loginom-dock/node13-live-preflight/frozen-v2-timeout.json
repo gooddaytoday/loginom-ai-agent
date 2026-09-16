@@ -1,0 +1,23 @@
+{
+  "original_operation_id": "node13-full-calendar-initial",
+  "session_id": "a0ce4c75-57a5-4703-9328-114d17a23070",
+  "status": "AMBIGUOUS",
+  "phase": "read",
+  "operation_cleanup_complete": false,
+  "original_pending_preserved": true,
+  "original_replayed": false,
+  "started_at": "2026-09-13T12:38:06.412Z",
+  "completed_at": "2026-09-13T13:08:06.424Z",
+  "elapsed_ms": 1800012,
+  "deadline_ms": 1800000,
+  "own_session_closed": true,
+  "unsaved_package_discarded": true,
+  "package_saved": false,
+  "receipts": {
+    "calendar-initial.json": "5ca1b3f852b3fed586fb556b95c30008217274ce510e9e043cfd05d855196620",
+    "execution-events.jsonl": "28081bd9722dc4a9123f7071acc64e6288da3060566ff21429f5f166980222e5",
+    "timeout-capture.json": "45eb8968875a457e6475c89dde188b6756a2483f299f2c8b0c2c38249c439f3f",
+    "cancel-timeout-dialog.json": "337bec6794e0cbef94a75784ff965ca1425c06501648cdff58f6ff601f43d9e4",
+    "discard-timeout.json": "b1d6eb77c6a7442c7b7b7465f29c3fb2b0838dbeba6956e675ab5afdf6370045"
+  }
+}

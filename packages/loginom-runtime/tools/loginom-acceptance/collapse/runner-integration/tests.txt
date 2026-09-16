@@ -1,0 +1,6 @@
+........
+----------------------------------------------------------------------
+Ran 8 tests in 0.151s
+
+OK
+{"goal_id": "collapse-node-complete", "status": "BLOCKED", "ready": false, "model_started": false, "source_sha": "77385e36a969e61ade03ab072678b8fb6f00a27d", "runtime": "db6d957169c50bcd5cb169db80d744fd846b8ffa4eee683178619c001fb22bab", "provider": "openai-codex", "model": "gpt-5.6-sol", "reasoning_effort": "low", "fallback_allowed": false, "gates": {"resource": "OPEN_INSUFFICIENT_10_GIB", "header-only": "OPEN", "empty-ignore": "OPEN", "all-null": "OPEN", "all-null-ignore": "OPEN", "other-full-scope-live": "OPEN", "new-session-readonly-source-proof": "OPEN_NO_PRODUCER", "runner-collapse-goal-integration": "IMPLEMENTED_NOT_ADMITTED", "candidate-stage-and-readback": "OPEN_NO_ADMITTED_ATTESTATION", "candidate-source-rehearsal": "OPEN", "coordinator-hermes-slot": "OPEN", "independent-topology-readback-producers": "OPEN", "loss-native-evidence-bridge": "OPEN"}, "errors": [], "free_bytes": 1770950656, "minimum_hermes_free_bytes": 10737418240, "readonly_producer": null}

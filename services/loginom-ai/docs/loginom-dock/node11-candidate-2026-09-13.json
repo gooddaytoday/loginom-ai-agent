@@ -1,0 +1,51 @@
+{
+  "checked_at": "2026-09-13T02:37:34.674786+00:00",
+  "catalog_version": "2026.09.13-node11.1-candidate",
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node11.1-candidate/manifest.json",
+  "manifest_sha256": "28434c4b61305eaa08c76db1dad470599852b48f333f734ad3e946687941ab37",
+  "staged": true,
+  "activated": false,
+  "readback_files": {
+    "actions.json": "1efb3b3196a5f57691abbbc3a86547e82e5cc58cdcae1458e962ee11e2c1d173",
+    "selectors.json": "ade5b4cea4bd85b8042e76de7666a090af9d5fe9e57b74e6aab8a03e4a91c5c9",
+    "source-index.json": "4c259346fd3ee1182c4f3348fad753b9b93bd493600a5d16f8929e669e38cc76",
+    "manifest.json": "28434c4b61305eaa08c76db1dad470599852b48f333f734ad3e946687941ab37"
+  },
+  "allowed_roots": {
+    "package.save_as": [
+      "/test-2"
+    ],
+    "package.save_checkpoint": [
+      "/test-2"
+    ]
+  },
+  "save_revisions": {
+    "package.save_as": "2",
+    "package.save_checkpoint": "2"
+  },
+  "skill_revision": "afa295bf48dc48da5d3c995665a06ef2190ff620bae3243d46557e0371536790",
+  "skill_manifest_verified": true,
+  "skill_files": 8,
+  "compatibility": {
+    "profile_id": "loginom-7.4.2-macos-chromium-ru",
+    "loginom_build": "7.4.2",
+    "platform": "macos",
+    "browser": "chromium"
+  },
+  "e2e_commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+  "stale_actions": [],
+  "server_evidence_path": "/opt/loginom-dock/releases/20260913-node11-1-91dee921",
+  "current_server": "/opt/loginom-dock/releases/20260904-landing-7b711846",
+  "current_catalog_sha256": null,
+  "source_commit": "91dee921e9e17343d53bf20fd7ca5f3b19f8de7a",
+  "source_archive_sha256": "8fe1faca81c16291fff2b704b7f20388edb3432fe0513243a3cdb2bae632096c",
+  "source_members_verified_against_git": 389,
+  "archive_bytes": 1017271,
+  "source_manifest_sha256": "87bbd9c8ba82bd1bac0592e7a552d2a6f044a05948225769a47d569684d11202",
+  "readback_verified": true,
+  "code_commit": "91dee921e9e17343d53bf20fd7ca5f3b19f8de7a",
+  "runtime_revision": "b99b922033e87b7580f14c2eec8cd0744c23bab29ee45b2548212cdac8c394ca",
+  "preparation_commit": "be4d31bf9e15e1ea4ab4e1868010871927c34d8b",
+  "existing_server_and_current_preserved": true,
+  "autonomous_acceptance_passed": false
+}

@@ -1,0 +1,6 @@
+{
+  "profile_id": "loginom-7.4.2-macos-chromium",
+  "loginom_build": "7.4.2",
+  "platform": "macos",
+  "browser": "chromium"
+}

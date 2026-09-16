@@ -1,0 +1,13 @@
+[Unit]
+Description=Create a consistent Loginom Dock backup
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/loginom-dock/tools/backup-server.sh
+User=root
+UMask=0077
+TimeoutStartSec=2h
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

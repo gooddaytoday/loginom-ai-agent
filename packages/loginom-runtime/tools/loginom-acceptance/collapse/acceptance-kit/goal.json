@@ -1,0 +1,75 @@
+{
+  "assignment": "node16:acceptance-preparation:1:77385e36",
+  "source_sha": "77385e36a969e61ade03ab072678b8fb6f00a27d",
+  "runtime": "db6d957169c50bcd5cb169db80d744fd846b8ffa4eee683178619c001fb22bab",
+  "status": "PREPARED_NOT_READY",
+  "scope_document": "docs/plans/loginom-dock/16-collapse-columns.md",
+  "requirements": {
+    "roles-single": [
+      "mixed"
+    ],
+    "roles-multiple": [
+      "mapped"
+    ],
+    "ordered-transpose": [
+      "mapped"
+    ],
+    "same-label-cyrillic-permuted-input": [
+      "mapped"
+    ],
+    "mixed-types-and-native-values": [
+      "mixed"
+    ],
+    "null-empty-zero-false": [
+      "ignore"
+    ],
+    "excluded-types-preserve-native-tag": [
+      "mixed"
+    ],
+    "empty-input": [
+      "header-only",
+      "header-only-ignore"
+    ],
+    "all-null": [
+      "all-null",
+      "all-null-ignore"
+    ],
+    "replace-existing-roles": [
+      "reconfigured"
+    ],
+    "wide-schema": [
+      "wide"
+    ],
+    "done-close": [
+      "OPEN: configuration and execution receipts needed"
+    ],
+    "unknown-conflicting-fields": [
+      "OPEN: no-effect negative requests"
+    ],
+    "partial-operation-loss": [
+      "historical audit_loss + OPEN final-source diagnostic"
+    ],
+    "save-new-session": [
+      "OPEN: independent graph/source/settings/all-cell audit per saved case"
+    ]
+  },
+  "provider": "openai-codex",
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "fallback": false,
+  "future_runs": 1,
+  "gates": {
+    "resource": "OPEN",
+    "header-only": "OPEN",
+    "empty-ignore": "OPEN",
+    "all-null": "OPEN",
+    "all-null-ignore": "OPEN",
+    "other-full-scope-live": "OPEN",
+    "new-session-readonly-source-proof": "OPEN",
+    "runner-collapse-goal-integration": "OPEN",
+    "candidate-stage-and-readback": "OPEN",
+    "candidate-source-rehearsal": "OPEN",
+    "coordinator-hermes-slot": "OPEN",
+    "autonomous-audit": "OPEN"
+  }
+}

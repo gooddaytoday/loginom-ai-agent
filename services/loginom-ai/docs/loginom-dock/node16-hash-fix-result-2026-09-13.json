@@ -1,0 +1,58 @@
+{
+  "node": 16,
+  "phase": "post-failure focused diagnosis and fix",
+  "source_sha": "b0709ec0f6f820a8988f4683297388894813935e",
+  "runtime": "e4e9ecbea5242cd403351fb5e4d5feaec38d18edfb7355f520985b752bed78a3",
+  "live_directory": ".dock/node16/live-1789325659001",
+  "live_build": "7.4.2",
+  "live_own_account": "test-1",
+  "checks": {
+    "done": true,
+    "close_discarded_no_execution": true,
+    "readback_unchanged": true,
+    "wide_exact_cells": 192,
+    "existing_negatives": 3,
+    "new_negative_preview_no_mutation": true,
+    "save_completed": true,
+    "independent_reopen_this_copy": false,
+    "native_queues_empty": true,
+    "logout": true,
+    "own_processes_absent": true,
+    "client_focused": 22,
+    "client_pass": 1525,
+    "client_skip": 1,
+    "future_verifier_counterexamples": 28,
+    "runner_tests": 14
+  },
+  "raw_sha256": {
+    "hash-new-done-internal.json": "be6a3ef36f0cd74cef441d4e764996b06d92ba2f197e640aa6e08c9289a17724",
+    "hash-close-internal.json": "44f30c501e93e5a2b1b5b90f189fd5fad8456c12dc3e7b8f11931e2b970e3b51",
+    "hash-close-readback-internal.json": "769c8eb428e8fa4c757da260f61f121e7626bb18f8a18d508053266e25b17e05",
+    "hash-wide-internal.json": "f711562148827373ec26649c56d05a23d10ebfea7813d8225c671c6a61aca958",
+    "hash-wide-operator-projection.json": "f1e702c6209c5728704b1f2ca6088b821ab8678bb5df12f88abb8dbd491ca77a",
+    "hash-negatives.json": "3f467f9505c74b280e9ccb68c83c406bbf9e0a4965865adf89da3460bac1bd29",
+    "hash-new-negative-internal.json": "5e65cff74cdef3fb74a31355a9a27c8b32d06df676f58e0c87ea8eced7a0beac",
+    "save-wide-fixed.json": "b6c00ebeac44ffa8aea746b716817377a6412eaa89641d8b2b147340b866d693",
+    "cleanup-fixed.json": "67158b448279e261f0954e42109c7ef45300e0190b9346743631326686ea7a42",
+    "logout-fixed.json": "a6dac78768795e1584973479f83f9bd249fb0028215541f97d717af4801d6742",
+    "execution-events.jsonl": "544b42321a44eed435771530a168e2f333b02bbfbc70ddad3244722bf551b9c5",
+    "public-api.jsonl": "c5cf534eb78f39df2b3b830cdbb5e21791d95031201d741d2cbe7bc780342815"
+  },
+  "model_started": false,
+  "autonomous_acceptance": false,
+  "subplan_complete": false,
+  "pending": [
+    "new candidate stage/readback",
+    "fresh actual user-v1 rehearsal",
+    "coordinator exclusive slot",
+    "full model goal",
+    "10 independent fresh reopen cases",
+    "current-run loss audit"
+  ],
+  "packet": {
+    "directory": ".dock/node16/candidate-b0709ec0",
+    "entries": 184,
+    "manifest_sha256": "b9d4db257d419c997171f1bbdd58a5908ebefe536659b7967910b17e1c61e82a",
+    "tar_sha256": "d795ee74825b270d152d9ba253e4b6218047af5a2ca91e17efb192b0677e6a08"
+  }
+}

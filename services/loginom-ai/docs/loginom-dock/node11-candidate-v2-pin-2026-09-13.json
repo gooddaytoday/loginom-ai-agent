@@ -1,0 +1,49 @@
+{
+  "checked_at": "2026-09-13T09:18:03.802986+00:00",
+  "catalog_version": "2026.09.13-node11.2-candidate",
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node11.2-candidate/manifest.json",
+  "manifest_sha256": "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+  "staged": true,
+  "activated": false,
+  "readback_files": {
+    "actions.json": "900120d38011fa9af46d030f1d2ff77712fee953f50d6177aa08a8ed501e0105",
+    "selectors.json": "92959534f0039392ee7dc65731ba7e0ca277df764aa480e5a068d10c4ecd98d1",
+    "source-index.json": "522000feea2c6aa7b40f4217ba7872d458d86e6a6e521e1970e771728f93e493",
+    "manifest.json": "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a"
+  },
+  "readback_verified": true,
+  "save_revisions": {
+    "package.save_as": "2",
+    "package.save_checkpoint": "2"
+  },
+  "allowed_roots": {
+    "package.save_as": [
+      "/test-2"
+    ],
+    "package.save_checkpoint": [
+      "/test-2"
+    ]
+  },
+  "skill_revision": "afa295bf48dc48da5d3c995665a06ef2190ff620bae3243d46557e0371536790",
+  "skill_manifest_verified": true,
+  "skill_files": 8,
+  "compatibility": {
+    "profile_id": "loginom-7.4.2-macos-chromium-ru",
+    "loginom_build": "7.4.2",
+    "platform": "macos",
+    "browser": "chromium"
+  },
+  "e2e_commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+  "stale_actions": [],
+  "code_commit": "b05715340937f9c828e03bc6ec7a88f3adf086da",
+  "source_commit": "b05715340937f9c828e03bc6ec7a88f3adf086da",
+  "runtime_revision": "8d6d4b3cd7f5d19a3ac1e9ac6537ff8219f97f9898326227df3f3ae55dcb1380",
+  "preparation_commit": "165bc5e5b63d3095d7f41405a1ff02b1c7bfcedd",
+  "source_archive_sha256": "396026de516792499c9d21f00981ea0044d9d47fced7f052b65c307150ebbf50",
+  "source_members_verified_against_git": 392,
+  "server_evidence_path": "/opt/loginom-dock/releases/20260913-node11.2-candidate",
+  "current_server": "/opt/loginom-dock/releases/20260904-landing-7b711846",
+  "current_catalog_sha256": null,
+  "existing_server_and_current_preserved": true,
+  "autonomous_acceptance_passed": false
+}

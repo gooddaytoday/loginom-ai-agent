@@ -1,0 +1,4 @@
+if(ctx.sourceActivatedByOperator===true)throw Error('Fixture already activated in this session');
+const label="Node13-dates.csv";const node=ctx.graph.nodes.filter(n=>n.label===label);if(node.length!==1)throw Error('Unique fixture required');
+await ctx.execute(`async page=>{const prefix=${JSON.stringify(ctx.prep.workflow_ref.prefix)};const base=prefix+';Graph;'+${JSON.stringify(label.replaceAll(' ','_'))};await page.locator('[data-tid='+JSON.stringify(base+';Label;Label')+']').click();await page.locator('[data-tid='+JSON.stringify(base)+']').click();const button=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;btnToggleActivateCurrent')+']');if(!(await button.getAttribute('data-qtip')).startsWith('Выполнить узел'))throw Error('Fixture is not inactive');await button.click();return true;}`);
+ctx.sourceActivatedByOperator=true;return {scope:'manual_fixture_activation',node:node[0].ref,clicked_once:true,output_verification:'required'};

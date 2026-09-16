@@ -1,0 +1,27 @@
+{
+  "assignment": "node16:exact-wiring:1:7e1bbab9",
+  "status": "PASS",
+  "scope": "bounded_exact_full_source_wiring",
+  "branch": "codex/node-16-collapse-columns",
+  "base_sha": "7e1bbab9acf6361bf2efd5d399080b5e251b8b30",
+  "runtime_revision": "72c76df421d15424ea3a6ef289a6a1af23566b46a22c5a483bb6aa1c7cd241fc",
+  "client_tests": {
+    "pass": 1477,
+    "fail": 0,
+    "skip": 1
+  },
+  "focused_tests": {
+    "pass": 78
+  },
+  "public_cases": 7,
+  "native_cells": 244,
+  "save_new_session_full_equality": true,
+  "native_change_negatives": 3,
+  "browsers_closed": true,
+  "hermes_acceptance": false,
+  "subplan_complete": false,
+  "installed_plugin_acceptance": false,
+  "enospc_uncertain_operation": "preserved_not_replayed",
+  "report": "docs/loginom-dock/node16-exact-wiring-result-2026-09-13.md",
+  "provenance": "tools/loginom-acceptance/collapse/exact-wiring/provenance.json"
+}

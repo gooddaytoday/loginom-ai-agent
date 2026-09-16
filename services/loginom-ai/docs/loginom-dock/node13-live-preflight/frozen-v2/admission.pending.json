@@ -1,0 +1,64 @@
+{
+  "scope": "preparation_only",
+  "run_id": null,
+  "inputs_sha256": null,
+  "loginom_user": "test-3",
+  "storage_directory": "/test-3",
+  "model": {
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning": "low",
+    "fallback": false
+  },
+  "source_commit": null,
+  "runtime_source_pin": null,
+  "source_archive": null,
+  "catalog": null,
+  "slot_command_id": null,
+  "diagnostic_open_mode": "direct_existing",
+  "save_as_dependency": null,
+  "gates": {
+    "R1_configure_positive": {
+      "status": "open",
+      "path": null,
+      "sha256": null
+    },
+    "R1_configure_negative": {
+      "status": "open",
+      "path": null,
+      "sha256": null
+    },
+    "R2_terminal_live": {
+      "status": "open",
+      "path": null,
+      "sha256": null
+    },
+    "targeted_regression": {
+      "status": "open",
+      "path": null,
+      "sha256": null
+    },
+    "catalog_readback": {
+      "status": "open",
+      "path": null,
+      "sha256": null
+    },
+    "isolated_environment": {
+      "status": "open",
+      "path": null,
+      "sha256": null
+    },
+    "runner_adapter": {
+      "status": "open",
+      "path": null,
+      "sha256": null
+    },
+    "coordinator_slot": {
+      "status": "open",
+      "path": null,
+      "sha256": null
+    }
+  },
+  "loginom_url": "http://logi-test-plan.bg.local/app/?testable=true",
+  "budget": null
+}

@@ -1,0 +1,72 @@
+{
+  "status": "TARGETED_FIX_VERIFIED_READY_FOR_CANDIDATE",
+  "source_sha": "8cd5c2811a216b45ae50a16a4ed1930e4e87fa59",
+  "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+  "autonomous_acceptance": false,
+  "model_started": false,
+  "original_run": {
+    "run_id": "20260913-234616-4ac1a433",
+    "status": "FAIL",
+    "exit_code": 0,
+    "hashes": {
+      "request.json": "fdd847d909b60c08f02018741c290611635f0d1007e8e684d315828df269e8ab",
+      "scenario.txt": "2dfd07f1419dff0bceaed00c8af228b5f25067251d6c8d6d7b146f5cc14018dd",
+      "evidence.json": "202eb0f8039d712395aa4b2d7c357b4bb67eb115423f7cf0d82155f33ca3f802",
+      "collapse-audit.json": "fa8e1b47beeb9cb9dc8ffedc13300cd20181caf6f5ccf21f0dd9cfd1a415508c"
+    }
+  },
+  "live": {
+    "directory": ".dock/node16/live-1789334154742",
+    "hashes": {
+      "source-change-reproduction.json": "c8e4ddb896e507362da7b17930001097dc23b722ea3a19cd91ca53298d950093",
+      "source-change-mapped-result.json": "01711114cde60355080c5abd95372a96264d503bdba6d4be0bddd9a0256f8218",
+      "source-change-mapped-new-result.json": "af9c294c540e34d1dc949f0734ed161badd19135ada562ade5fe7da7ddab7b6c",
+      "source-change-mapped-operator-projection.json": "420a666338f787fc16bf71fa40d5f3a2258a91627313398b789812932925e2c9",
+      "source-change-save-final.json": "92c22302e1cfaac8824ce5d7e77fc615797ec79a4280377e1db19d35a5367dd4",
+      "source-fixed-cleanup.json": "c1677d96166be47463579d724a44bbabb78d7c801c76d22498466413b68504db",
+      "source-fixed-logout.json": "a6dac78768795e1584973479f83f9bd249fb0028215541f97d717af4801d6742"
+    },
+    "source_replacement": "SUCCEEDED",
+    "source_columns": 7,
+    "collapse_mapped_cells": 75,
+    "case_oracle": "CASE_PASS",
+    "projection": "diagnostic_only",
+    "existing_collapse_old_input_refused": true,
+    "saved_path": "/test-1/node16-20260913-a56c2488/Node16-source-fixed-complete-20260914-4ac1a433.lgp",
+    "save_completed": true,
+    "persisted_content_verified": false,
+    "logout": true,
+    "queues_empty": true,
+    "processes_absent": true
+  },
+  "tests": {
+    "client_pass": 1533,
+    "client_skip": 1,
+    "client_fail": 0,
+    "new_source_tests": 8,
+    "delivery_methods": 2,
+    "delivery_counterexamples": 20,
+    "future_auditor_methods": 5,
+    "future_counterexamples": 28,
+    "runner_methods": 14
+  },
+  "packet": {
+    "directory": ".dock/node16/candidate-8cd5c281",
+    "files": 184,
+    "source_bytes": 1958721,
+    "manifest_sha256": "f434cf802b196b0939bc93e6d5b7208be6f183cbd6624e59851889981333e3e7",
+    "tar_sha256": "51ed89fd470839c6931c49f17a2f22a52f1b9249c09821f7e814a61b23a12cb2",
+    "changed_paths": [
+      "client/lib/text-import-procedure.mjs",
+      "docs/plans/loginom-dock/16-collapse-columns.md"
+    ],
+    "harness_sha256": "bb80a1a432c99aaede5818e21ef12ee0a1fadc9288a05d9ad60e42e84f7d28f6"
+  },
+  "remaining": [
+    "coordinator candidate stage/readback",
+    "fresh actual user-v1 source rehearsal",
+    "new exclusive Hermes slot",
+    "complete 10-case 470-cell model goal",
+    "10 independent fresh package reopen checks and current-run lost reply audit"
+  ]
+}

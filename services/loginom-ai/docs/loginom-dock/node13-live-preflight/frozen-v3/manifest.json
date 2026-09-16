@@ -1,0 +1,9 @@
+{
+  "version": 3,
+  "files": {
+    "date-time-sales.txt": "11b0f1668fbeadf44e4e1abf864246ed10e3d7c9f73144e99f34d5fa01f96ea1",
+    "expected.json": "900df299dcef95c9cdc8a511d2f732664539c71a82ac400526310470e3bd6654",
+    "inputs.json": "320f7d6769388b946a75183562a3dec9c5bcea5d1e7aacc4665d96f0254d0c2f",
+    "version.json": "885e6e26635d281382f1ed3d2fd8089713439db37d7b88e914c50506956467c1"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-12",
+  "scope": "union_confirmed_review_defects",
+  "status": "fixed_live_and_autonomously_verified_source_runtime",
+  "production_released": false,
+  "source_pin": "c475d504d9d81f54807c6a3b272351b6fbbe0959d434465e384dc3e0caca190a",
+  "autonomous": {
+    "run_id": "20260912-202024-3ae2302f",
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "low",
+    "node_operations": 11,
+    "checks_passed": 84,
+    "checks_total": 84,
+    "package_path": "/test-1/packages/Dock-acceptance-20260912-202024-3ae2302f.lgp",
+    "fixture_ui_clicks": 3,
+    "configuration_ui_fallback": false
+  },
+  "tests": {
+    "client_passed": 1384,
+    "client_skipped": 1,
+    "python_passed": 505,
+    "negative_evidence_rejections": 54
+  },
+  "confirmed_fixes": [
+    "existing_free_input_schema_origin",
+    "bounded_long_choice_scroll",
+    "partially_visible_check_and_field_columns",
+    "native_editor_binding_per_joined_input",
+    "center_visible_scroll_anchors"
+  ],
+  "artifacts": {
+    "request.json": {
+      "path": ".dock/union-review-20260912/runs/20260912-202024-3ae2302f/request.json",
+      "sha256": "642cf7d6e08d6b5922aa0b59ed0e1d8b02006be5a302609afa6ae490b33e0635"
+    },
+    "union-review-audit.json": {
+      "path": ".dock/union-review-20260912/runs/20260912-202024-3ae2302f/union-review-audit.json",
+      "sha256": "cbd54c9a719c7088d9a700fd291a6eeef056f4cdcd5c3af17271ce40c88c2018"
+    },
+    "union-review-negative-audit.json": {
+      "path": ".dock/union-review-20260912/runs/20260912-202024-3ae2302f/union-review-negative-audit.json",
+      "sha256": "82fa39a6be88c148c26f09417a2447c77c213c57c473fc00a00f4d03cb54bdbd"
+    }
+  },
+  "limitations": [
+    "Source runtime only; installed client unchanged",
+    "No production build, deployment, publication, commit or push",
+    "Prior two review runs retain their failed frozen audit verdicts"
+  ]
+}

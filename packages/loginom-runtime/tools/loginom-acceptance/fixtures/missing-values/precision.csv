@@ -1,0 +1,4 @@
+Id;Amount;Count;Note;Untouched
+1;-2.12345678901234;-1;alpha;0
+2;NULL;NULL;NULL;NULL
+3;4.23456789012345;-2;null;10

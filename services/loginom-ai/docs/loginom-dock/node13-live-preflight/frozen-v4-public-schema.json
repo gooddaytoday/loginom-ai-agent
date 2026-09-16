@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "schema": "client/lib/node-result-schema.mjs#dateTimeConfigurationReadback",
+  "receipt": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/calendar-done.json",
+  "scope": "existing_public_result_schema_offline",
+  "ui_calls": 0,
+  "errors": null
+}

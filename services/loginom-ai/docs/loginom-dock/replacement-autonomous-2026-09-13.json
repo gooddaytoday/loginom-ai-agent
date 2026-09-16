@@ -1,0 +1,362 @@
+{
+  "command_id": "node11:autonomous-acceptance:1:28434c4b61305eaa08c76db1dad470599852b48f333f734ad3e946687941ab37",
+  "slot": "node11-hermes-20260913-28434c4b",
+  "status": "failed_acceptance_diagnosed_slot_released",
+  "run_id": "20260913-054024-fef0b53e",
+  "run_directory": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e",
+  "code_commit": "91dee921e9e17343d53bf20fd7ca5f3b19f8de7a",
+  "preparation_commit": "be4d31bf9e15e1ea4ab4e1868010871927c34d8b",
+  "branch": "codex/node-11-replacement",
+  "runtime_revision": "b99b922033e87b7580f14c2eec8cd0744c23bab29ee45b2548212cdac8c394ca",
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node11.1-candidate/manifest.json",
+  "manifest_sha256": "28434c4b61305eaa08c76db1dad470599852b48f333f734ad3e946687941ab37",
+  "handler_revision": "replacement-v1-internal-2",
+  "autonomous_acceptance": false,
+  "persisted_content_verified": false,
+  "hermes_runs": 1,
+  "process": {
+    "returncode": 0,
+    "timed_out": false,
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "low",
+    "api_calls": 31
+  },
+  "model_completed": true,
+  "node_operations": {
+    "expected": 11,
+    "observed": 11,
+    "succeeded": 11
+  },
+  "graph": {
+    "nodes": 4,
+    "links": 2
+  },
+  "package_path": "/test-2/packages/Dock-acceptance-20260913-054024-fef0b53e.lgp",
+  "audit": {
+    "passed": false,
+    "total_checks": 59,
+    "passed_checks": 55,
+    "checks": {
+      "public_projection": {
+        "passed": true,
+        "failures": []
+      },
+      "coordinator_stage_pin": {
+        "passed": true,
+        "failures": []
+      },
+      "goal": {
+        "passed": true,
+        "failures": []
+      },
+      "model": {
+        "passed": true,
+        "failures": []
+      },
+      "frozen_export": {
+        "passed": true,
+        "failures": []
+      },
+      "native_skill": {
+        "passed": true,
+        "failures": []
+      },
+      "artifacts": {
+        "passed": true,
+        "failures": []
+      },
+      "ordinary_dock_only": {
+        "passed": true,
+        "failures": []
+      },
+      "eleven_operations": {
+        "passed": true,
+        "failures": []
+      },
+      "initial_labels": {
+        "passed": true,
+        "failures": []
+      },
+      "exact_reads": {
+        "passed": true,
+        "failures": []
+      },
+      "requested_parameters_0": {
+        "passed": true,
+        "failures": []
+      },
+      "replacement_contract_0": {
+        "passed": true,
+        "failures": []
+      },
+      "requested_parameters_1": {
+        "passed": true,
+        "failures": []
+      },
+      "replacement_contract_1": {
+        "passed": true,
+        "failures": []
+      },
+      "requested_parameters_2": {
+        "passed": true,
+        "failures": []
+      },
+      "replacement_contract_2": {
+        "passed": true,
+        "failures": []
+      },
+      "requested_parameters_3": {
+        "passed": true,
+        "failures": []
+      },
+      "replacement_contract_3": {
+        "passed": true,
+        "failures": []
+      },
+      "requested_parameters_4": {
+        "passed": true,
+        "failures": []
+      },
+      "replacement_contract_4": {
+        "passed": true,
+        "failures": []
+      },
+      "link_Typed": {
+        "passed": true,
+        "failures": []
+      },
+      "link_Preserved": {
+        "passed": true,
+        "failures": []
+      },
+      "partial_identity_preserved-add-c-exec": {
+        "passed": true,
+        "failures": []
+      },
+      "partial_identity_preserved-mode-replace-exec": {
+        "passed": true,
+        "failures": []
+      },
+      "partial_identity_preserved-mode-add-final-exec": {
+        "passed": true,
+        "failures": []
+      },
+      "output_typed-create-exec": {
+        "passed": true,
+        "failures": []
+      },
+      "effective_settings_0": {
+        "passed": true,
+        "failures": []
+      },
+      "output_preserved-create-b-exec": {
+        "passed": true,
+        "failures": []
+      },
+      "effective_settings_1": {
+        "passed": true,
+        "failures": []
+      },
+      "output_preserved-add-c-exec": {
+        "passed": true,
+        "failures": []
+      },
+      "effective_settings_2": {
+        "passed": true,
+        "failures": []
+      },
+      "output_preserved-mode-replace-exec": {
+        "passed": true,
+        "failures": []
+      },
+      "effective_settings_3": {
+        "passed": true,
+        "failures": []
+      },
+      "output_preserved-mode-add-final-exec": {
+        "passed": true,
+        "failures": []
+      },
+      "effective_settings_4": {
+        "passed": true,
+        "failures": []
+      },
+      "two_deliveries": {
+        "passed": true,
+        "failures": []
+      },
+      "owned_draft": {
+        "passed": true,
+        "failures": []
+      },
+      "runtime_target": {
+        "passed": true,
+        "failures": []
+      },
+      "import_contract_0": {
+        "passed": true,
+        "failures": []
+      },
+      "import_config_0": {
+        "passed": true,
+        "failures": []
+      },
+      "delivery_0": {
+        "passed": true,
+        "failures": []
+      },
+      "source_0": {
+        "passed": true,
+        "failures": []
+      },
+      "import_contract_1": {
+        "passed": true,
+        "failures": []
+      },
+      "import_config_1": {
+        "passed": true,
+        "failures": []
+      },
+      "delivery_1": {
+        "passed": true,
+        "failures": []
+      },
+      "source_1": {
+        "passed": true,
+        "failures": []
+      },
+      "public_calls": {
+        "passed": true,
+        "failures": []
+      },
+      "save_chain": {
+        "passed": false,
+        "failures": [
+          "save_chain_stage_count"
+        ]
+      },
+      "import_reopen_0": {
+        "passed": true,
+        "failures": []
+      },
+      "import_persisted_0": {
+        "passed": true,
+        "failures": []
+      },
+      "import_reopen_1": {
+        "passed": true,
+        "failures": []
+      },
+      "import_persisted_1": {
+        "passed": true,
+        "failures": []
+      },
+      "persistence_expected-multi.json": {
+        "passed": false,
+        "failures": [
+          "two_unique_saves"
+        ]
+      },
+      "persistence_expected-partial-add.json": {
+        "passed": false,
+        "failures": [
+          "two_unique_saves"
+        ]
+      },
+      "required_gates": {
+        "passed": true,
+        "failures": []
+      },
+      "harness_files": {
+        "passed": true,
+        "failures": []
+      },
+      "current_runtime": {
+        "passed": true,
+        "failures": []
+      },
+      "isolated_session_pins": {
+        "passed": false,
+        "failures": []
+      }
+    }
+  },
+  "diagnostic_session": "c8a8405c-c68e-4c1b-a795-1bbba83e7da0",
+  "diagnostic_geometry": {
+    "viewport": null,
+    "inner": [
+      1508,
+      862
+    ],
+    "outer": [
+      1508,
+      949
+    ],
+    "scope": "separate postrun Codex diagnosis only"
+  },
+  "diagnostic_package_read_only": true,
+  "cleanup": {
+    "owned_processes": [],
+    "hermes_exit_code": 0,
+    "diagnostic_harness_exit_code": 0,
+    "slot_released": true,
+    "diagnostic_home_verified": true,
+    "original_hermes_window_geometry_verified": false
+  },
+  "artifacts": {
+    "request.json": {
+      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/request.json",
+      "sha256": "a667efea6824a6deadbdf086357bea3962a3eeaababc56b3c4d17a90dfc0fdea",
+      "bytes": 126813
+    },
+    "scenario.txt": {
+      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/scenario.txt",
+      "sha256": "eec482c065d238456ab9525fe72f3e3b08d57e0f59b5ac984cebbfc46c848315",
+      "bytes": 5339
+    },
+    "candidate-pin.json": {
+      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/candidate-pin.json",
+      "sha256": "3f1654e0219170c540fc235171c8027107cc7fccf930643f330c2d4aa3b85994",
+      "bytes": 2220
+    },
+    "evidence.json": {
+      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/evidence.json",
+      "sha256": "8954736ade6843a381462110536eb752e81855207ced4d9c1fa14cde5b65a0b4",
+      "bytes": 316565541
+    },
+    "replacement-acceptance-audit.json": {
+      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/replacement-acceptance-audit.json",
+      "sha256": "2ec24614fc37c9dd9e86866d422c950451d3b42cd16af6e9926caf7b70c66a40",
+      "bytes": 14494
+    },
+    "postrun-diagnosis.json": {
+      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/postrun-diagnosis.json",
+      "sha256": "3c42fb8d218468171c2e0a132e048e7e5817a499f1e073a4182ddc7de498aebf",
+      "bytes": 2351
+    },
+    "operator-observation.json": {
+      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/operator-observation.json",
+      "sha256": "619445842e36076c7663c98b250fd7ca006e9a77ed204da0a974eb35aea478cb",
+      "bytes": 672
+    },
+    "process-cleanup.json": {
+      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/process-cleanup.json",
+      "sha256": "813705b1dd80a3f68b0db24df6c80f3843fe8ca32482c3e536e206c872b37b2e",
+      "bytes": 204
+    }
+  },
+  "limitations": [
+    "Required package.save_checkpoint missing; one actual package.save_as reopening observed",
+    "Audit counted side-effect-free MCP precheck session together with actual Hermes session",
+    "Actual original Hermes window geometry not independently verified; CUA ScreenCaptureKit -3811 failed",
+    "Separate diagnostic open was read-only; server session lock cleanup not verified",
+    "No repeated Hermes, no code/goal/auditor changes, no merge/push/deploy/activation"
+  ],
+  "slot_control": {
+    "idempotency_key": "node11:slot-release-control:20260913-054024-fef0b53e",
+    "revoked_by_coordinator": true,
+    "next_owner": "node12",
+    "new_hermes_started": false
+  }
+}

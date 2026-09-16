@@ -1,0 +1,82 @@
+import test, {mock} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {Client as AgentClient} from '@modelcontextprotocol/sdk/client/index.js';
+import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
+import * as executor from '../../lib/executor.mjs';
+import * as catalog from '../../lib/action-catalog.mjs';
+import * as skill from '../../lib/skill.mjs';
+import * as workspace from '../../lib/workspace.mjs';
+
+// Bridge lifecycle test: external services and the action executor are fixtures.
+// The serialized Loginom close body is exercised separately in package-cleanup.test.
+let current;
+const target={profile_id:'test',loginom_build:'7.4.2',platform:'macos',browser:'chromium'};
+const path='/test-2/packages/result.lgp';
+class ExternalClient {
+  constructor(identity){this.browser=identity.name==='loginom-dock-browser';this.f=current;}
+  async connect(t){this.transport=t;}
+  async close(){this.f.events.push(this.browser?'browser-close':'remote-close');this.transport?.onclose?.();}
+  async listTools(){return {tools:[{name:this.browser?'browser_run_code_unsafe':'read',inputSchema:{type:'object'}}]};}
+  async callTool({arguments:{code}}){
+    let value;
+    if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
+      target,document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
+    else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
+    else if(code.includes('async function closeOwnedPackage')){
+      this.f.events.push('package-cleanup');
+      value={version:1,session_id:'own-session',document_id:'own-doc',status:this.f.scenario==='native-blocked'?'BLOCKED':'SUCCEEDED',package_closed:this.f.scenario!=='native-blocked',
+        logged_out:this.f.scenario!=='native-blocked',account:'test-2',package_path:path,unsaved_changes_discarded:false,packages_before:1,packages_after:0,reason:null};
+    } else throw Error('Unexpected browser code');
+    return {content:[{type:'text',text:JSON.stringify(value)}]};
+  }
+}
+class ExternalTransport{}
+mock.module('@modelcontextprotocol/sdk/client/index.js',{namedExports:{Client:ExternalClient}});
+mock.module('@modelcontextprotocol/sdk/client/stdio.js',{namedExports:{StdioClientTransport:ExternalTransport,getDefaultEnvironment:()=>({})}});
+mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js',{namedExports:{StreamableHTTPClientTransport:ExternalTransport}});
+mock.module(new URL('../../lib/action-catalog.mjs',import.meta.url).href,{namedExports:{...catalog,pinActionCatalog:async()=>({pins:{},compatibility:target,manifest:{compatibility:target},actions:new Map()})}});
+mock.module(new URL('../../lib/skill.mjs',import.meta.url).href,{namedExports:{...skill,skillTransport:()=>({}),createSkillLoader:()=>({prepare:async()=>({main:'/test/skill',directory:'/test',detail:{revision:'test',source:'test',content:'test'}})})}});
+mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExports:{...workspace,
+  makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
+mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>{
+  const f=current;return {tools:[],describe:()=>({}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},
+    run:async(key,parameters,{operationId})=>({status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}}),
+  };
+}}});
+const {createBridge}=await import('../../lib/bridge.mjs');
+
+for(const scenario of ['success','unprepared','no-save','native-blocked','busy'])test('isolated shutdown lifecycle: '+scenario,async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-bridge-'));
+  const f=current={scenario,events:[],busy:false};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>[],async releaseUploads(){f.events.push('release-uploads');}}};
+  let bridge,client;
+  try{
+    bridge=await createBridge({mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+      loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',acceptanceCleanupPackage:path},session);
+    client=new AgentClient({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+    if(scenario!=='unprepared'){
+      const prep=await client.callTool({name:'dock_prepare',arguments:{}});assert.notEqual(prep.isError,true,JSON.stringify(prep));
+      if(scenario!=='no-save')await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'own-save'}});
+    }
+    f.busy=scenario==='busy';
+    const first=bridge.close();assert.equal(bridge.close(),first);const result=await first;
+    const receipt=JSON.parse(await readFile(join(directory,'package-cleanup.json'),'utf8'));
+    if(['success','unprepared'].includes(scenario)){
+      assert.equal(result.browser_transport_closed,true);assert.equal(result.clipboard_leases_retained,0);
+      assert.equal(receipt.status,scenario==='success'?'SUCCEEDED':'SKIPPED_UNPREPARED');
+      if(scenario==='success')assert.ok(f.events.indexOf('package-cleanup')<f.events.indexOf('browser-close'));
+      else assert.equal(f.events.includes('package-cleanup'),false);
+      assert.ok(f.events.indexOf('browser-close')<f.events.indexOf('release-uploads'));
+    }else{
+      assert.equal(result.browser_transport_closed,false);assert.equal(receipt.status,'BLOCKED');
+      assert.equal(f.events.includes('browser-close'),false);assert.equal(f.events.includes('release-uploads'),false);
+      assert.equal(f.events.includes('package-cleanup'),scenario==='native-blocked');
+    }
+    assert.equal(f.events.filter(e=>e==='package-cleanup').length,scenario==='success'||scenario==='native-blocked'?1:0);
+  }finally{await client?.close();await bridge?.close();await rm(directory,{recursive:true,force:true});}
+});

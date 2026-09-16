@@ -1,0 +1,160 @@
+{
+  "phase": "node17:hermes-full:8:908c9b7d",
+  "run_id": "20260914-000803-18fad485",
+  "candidate_sha": "908c9b7d90eefd72fea2ae9a7e62bcf90b5469cf",
+  "full_goal_passed": false,
+  "status": "BLOCKED_ACCEPTANCE_CONTRACT_AND_ORIGINAL_READONLY",
+  "original_audit": ".dock/node17/acceptance/runs/20260914-000803-18fad485/full-audit.json",
+  "original_audit_sha256": "0080f676dd0c0e715e49d86366299459a77a3d4f221d66c8025b1a5bcb722f3e",
+  "model_cleanup": {
+    "run_id": "20260914-000803-18fad485",
+    "returncode": 0,
+    "timed_out": false,
+    "remaining_pids": [],
+    "closed": true,
+    "slot": "node17-hermes-20260914-1b1f55b4"
+  },
+  "frozen": {
+    "runtime_source_unchanged": true,
+    "harness_unchanged": true,
+    "native_skill_unchanged": true,
+    "auth_connection_unchanged": true
+  },
+  "reopened_import_requests": [
+    {
+      "budgets": {
+        "configure_ms": 1800000,
+        "execute_ms": 1800000,
+        "total_ms": 1800000
+      },
+      "contract_revision": "1.0.0",
+      "document_id": "1789333704071-ce1ixtopgrg",
+      "finish": "execute",
+      "inputs": [],
+      "mappings": [],
+      "mode": "delimited",
+      "operation_id": "reopen-import-main-execute",
+      "parameters": {
+        "settings": {},
+        "source": {
+          "artifact_id": "927eb636-590f-4972-80c0-571713b2fa6c",
+          "upload_operation_id": "deliver-main-20260914-000803:upload"
+        }
+      },
+      "read": {
+        "ports": [
+          0
+        ],
+        "require_exact_numbers": true,
+        "sample_rows": 10
+      },
+      "target": {
+        "kind": "existing",
+        "ref": {
+          "document_id": "1789333704071-ce1ixtopgrg",
+          "node_id": "4ac8e753-5388-4850-b424-89d13bbf92db",
+          "workflow_id": "1789333704071-ce1ixtopgrg-2"
+        },
+        "type": "imports.text"
+      },
+      "workflow_ref": {
+        "workflow_id": "1789333704071-ce1ixtopgrg-2"
+      }
+    },
+    {
+      "budgets": {
+        "configure_ms": 1800000,
+        "execute_ms": 1800000,
+        "total_ms": 1800000
+      },
+      "contract_revision": "1.0.0",
+      "document_id": "1789333704071-ce1ixtopgrg",
+      "finish": "execute",
+      "inputs": [],
+      "mappings": [],
+      "mode": "delimited",
+      "operation_id": "reopen-import-typed-execute",
+      "parameters": {
+        "settings": {},
+        "source": {
+          "artifact_id": "03571688-81fb-4867-95d7-4dc29e7f71c2",
+          "upload_operation_id": "deliver-typed-20260914-000803:upload"
+        }
+      },
+      "read": {
+        "ports": [
+          0
+        ],
+        "require_exact_numbers": true,
+        "sample_rows": 10
+      },
+      "target": {
+        "kind": "existing",
+        "ref": {
+          "document_id": "1789333704071-ce1ixtopgrg",
+          "node_id": "a7ad9761-0cd9-4d82-8704-41ce3015f298",
+          "workflow_id": "1789333704071-ce1ixtopgrg-2"
+        },
+        "type": "imports.text"
+      },
+      "workflow_ref": {
+        "workflow_id": "1789333704071-ce1ixtopgrg-2"
+      }
+    },
+    {
+      "budgets": {
+        "configure_ms": 1800000,
+        "execute_ms": 1800000,
+        "total_ms": 1800000
+      },
+      "contract_revision": "1.0.0",
+      "document_id": "1789333704071-ce1ixtopgrg",
+      "finish": "execute",
+      "inputs": [],
+      "mappings": [],
+      "mode": "delimited",
+      "operation_id": "reopen-import-wide-execute",
+      "parameters": {
+        "settings": {},
+        "source": {
+          "artifact_id": "5d5dc114-d614-4334-97e5-c6afe7fb38d0",
+          "upload_operation_id": "deliver-wide-20260914-000803:upload"
+        }
+      },
+      "read": {
+        "ports": [
+          0
+        ],
+        "require_exact_numbers": true,
+        "sample_rows": 3
+      },
+      "target": {
+        "kind": "existing",
+        "ref": {
+          "document_id": "1789333704071-ce1ixtopgrg",
+          "node_id": "ae8d19c3-6d6f-4c43-bb0c-e335df1cbb6b",
+          "workflow_id": "1789333704071-ce1ixtopgrg-2"
+        },
+        "type": "imports.text"
+      },
+      "workflow_ref": {
+        "workflow_id": "1789333704071-ce1ixtopgrg-2"
+      }
+    }
+  ],
+  "contract_mismatch": {
+    "auditor": "tools/loginom-acceptance/text_export_acceptance.py:108 requires parameters == {}",
+    "runtime": "client/lib/text-import-node.mjs:22 requires exact keys settings,source for existing and new nodes",
+    "observed": "All three existing import calls supplied verified source identity and empty settings; no claim that source settings were rewritten"
+  },
+  "fresh_original": {
+    "directory": ".dock/text-export/live-1789334851665",
+    "package": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+    "readonly": true,
+    "preparation": ".dock/text-export/live-1789334851665/preparation.json",
+    "remaining_pids": [],
+    "external_execution_started": false,
+    "copy_substituted": false
+  },
+  "next_trigger": "Coordinator decision on incompatible import acceptance contract and original package server lock; no further model assigned"
+}

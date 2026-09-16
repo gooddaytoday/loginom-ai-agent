@@ -1,0 +1,8 @@
+# Small Python-only update on the verified Dock Stage 2 image. Native libraries,
+# preserved Git/LFS sources, Studio and model dependencies stay at their pins.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+ARG LOGINOM_DOCK_REVISION
+LABEL org.opencontainers.image.revision="${LOGINOM_DOCK_REVISION}"
+COPY openviking/server/routers/sessions.py /app/.venv/lib/python3.13/site-packages/openviking/server/routers/sessions.py
+COPY openviking/session/session.py /app/.venv/lib/python3.13/site-packages/openviking/session/session.py

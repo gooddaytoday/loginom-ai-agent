@@ -1,0 +1,1290 @@
+{
+  "source_run": "20260914-000803-18fad485",
+  "purpose": "Curated native receipt subset; acceptance reads complete original evidence",
+  "events": [
+    {
+      "recorded_at": "2026-09-13T21:08:30.167Z",
+      "session_id": "66eebdb6-8a9c-4129-a7cb-1ec565f2ab16",
+      "runtime_revision": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
+      "manifest_sha256": "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "target": {
+        "profile_id": "loginom-7.4.2-macos-chromium-ru",
+        "loginom_build": "7.4.2",
+        "platform": "macos",
+        "browser": "chromium"
+      },
+      "event": "workspace_prepared",
+      "state": {
+        "status": "READY",
+        "reason": null,
+        "phase": "exact_workflow_ready",
+        "target": {
+          "profile_id": "loginom-7.4.2-macos-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "macos",
+          "browser": "chromium"
+        },
+        "authenticated": true,
+        "created_draft": true,
+        "effect_possible": true,
+        "operation_id": "prepare-20260914-000803-18fad485",
+        "session_id": "66eebdb6-8a9c-4129-a7cb-1ec565f2ab16",
+        "trace": [
+          {
+            "condition": "ui_build",
+            "satisfied": true
+          },
+          {
+            "condition": "login_or_workspace",
+            "satisfied": true
+          },
+          {
+            "condition": "login_result",
+            "satisfied": true
+          },
+          {
+            "condition": "workspace_entry_ready",
+            "satisfied": true
+          },
+          {
+            "condition": "package_menu_ready",
+            "satisfied": true
+          },
+          {
+            "condition": "exact_workflow_ready",
+            "satisfied": true
+          }
+        ],
+        "document_id": "1789333704071-ce1ixtopgrg",
+        "workflow_ref": {
+          "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+          "prefix": "MF;TF-1",
+          "navigation_path": [
+            {
+              "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+              "label": ""
+            },
+            {
+              "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+              "label": "Пакеты"
+            },
+            {
+              "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+              "label": "Package1"
+            },
+            {
+              "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+              "label": "Модуль1"
+            },
+            {
+              "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+              "label": "Сценарий"
+            }
+          ],
+          "workflow_id": "1789333704071-ce1ixtopgrg-1"
+        },
+        "package_ref": {
+          "path": null,
+          "name": "Package1",
+          "persisted": false
+        },
+        "preserved_workflows": [],
+        "ownership_verified": true,
+        "target_verified": true,
+        "interaction_readiness": "driver_verification_required",
+        "window": {
+          "width": 1508,
+          "height": 862,
+          "outer_width": 1508,
+          "outer_height": 949,
+          "available_width": 1512,
+          "available_height": 949
+        },
+        "replayed": false
+      }
+    },
+    {
+      "recorded_at": "2026-09-13T21:17:34.463Z",
+      "session_id": "66eebdb6-8a9c-4129-a7cb-1ec565f2ab16",
+      "runtime_revision": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
+      "manifest_sha256": "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "target": {
+        "profile_id": "loginom-7.4.2-macos-chromium-ru",
+        "loginom_build": "7.4.2",
+        "platform": "macos",
+        "browser": "chromium"
+      },
+      "operation_id": "node-export-csv-close",
+      "phase": "node_target_checkpoint",
+      "internal_provenance": "node_target_v1",
+      "target_state": {
+        "completed": true,
+        "final_graph": {
+          "complete": true,
+          "document_id": "1789333704071-ce1ixtopgrg",
+          "workflow_ref": {
+            "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+            "prefix": "MF;TF-1",
+            "navigation_path": [
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                "label": ""
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                "label": "Пакеты"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                "label": "Package1"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                "label": "Модуль1"
+              },
+              {
+                "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                "label": "Сценарий"
+              }
+            ],
+            "workflow_id": "1789333704071-ce1ixtopgrg-1"
+          },
+          "dom_epoch": 1,
+          "nodes": [
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-1",
+                "node_id": "4ac8e753-5388-4850-b424-89d13bbf92db"
+              },
+              "type": "imports.text",
+              "label": "Main",
+              "dom_epoch": 100,
+              "position": {
+                "x": 104,
+                "y": 104
+              },
+              "inputs": [],
+              "outputs": [
+                0
+              ],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-1"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-1",
+                "node_id": "548084c0-60c3-48e8-bf6d-6c0af38382a2"
+              },
+              "type": "exports.text",
+              "label": "ExportEmpty",
+              "dom_epoch": 154,
+              "position": {
+                "x": 648,
+                "y": 200
+              },
+              "inputs": [
+                0
+              ],
+              "outputs": [],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-2"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-1",
+                "node_id": "6620f9de-e585-39c7-88a9-35255088ebb7"
+              },
+              "type": "bg-vendor-icon-modelvariables",
+              "label": "Переменные сценария",
+              "dom_epoch": 147,
+              "position": {
+                "x": 16,
+                "y": 164
+              },
+              "inputs": [],
+              "outputs": [],
+              "other_ports": [
+                "Output_Var-0",
+                "Output_Var-1",
+                "Output_Var-2",
+                "Output_Var-3",
+                "Output_Var-4"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-1",
+                "node_id": "7bb590ea-b6b4-4813-8dfb-252d70ec1257"
+              },
+              "type": "exports.text",
+              "label": "ExportTyped",
+              "dom_epoch": 152,
+              "position": {
+                "x": 648,
+                "y": 352
+              },
+              "inputs": [
+                0
+              ],
+              "outputs": [],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-2"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-1",
+                "node_id": "a78bb66a-e48a-4985-949a-a560aad5f953"
+              },
+              "type": "transform.filter_data",
+              "label": "Empty",
+              "dom_epoch": 150,
+              "position": {
+                "x": 352,
+                "y": 104
+              },
+              "inputs": [
+                0
+              ],
+              "outputs": [
+                0,
+                1
+              ],
+              "other_ports": [],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-1",
+                "node_id": "a7ad9761-0cd9-4d82-8704-41ce3015f298"
+              },
+              "type": "imports.text",
+              "label": "Typed",
+              "dom_epoch": 148,
+              "position": {
+                "x": 104,
+                "y": 352
+              },
+              "inputs": [],
+              "outputs": [
+                0
+              ],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-1"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-1",
+                "node_id": "a7bbe1bc-ae95-4bcb-92e1-ebedc05201b1"
+              },
+              "type": "exports.text",
+              "label": "ExportWide",
+              "dom_epoch": 153,
+              "position": {
+                "x": 648,
+                "y": 600
+              },
+              "inputs": [
+                0
+              ],
+              "outputs": [],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-2"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-1",
+                "node_id": "ae8d19c3-6d6f-4c43-bb0c-e335df1cbb6b"
+              },
+              "type": "imports.text",
+              "label": "Wide",
+              "dom_epoch": 149,
+              "position": {
+                "x": 104,
+                "y": 600
+              },
+              "inputs": [],
+              "outputs": [
+                0
+              ],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-1"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-1",
+                "node_id": "b35cdaf3-80e1-4019-be5a-b6ae55986c7f"
+              },
+              "type": "exports.text",
+              "label": "ExportCSV",
+              "dom_epoch": 151,
+              "position": {
+                "x": 648,
+                "y": 104
+              },
+              "inputs": [
+                0
+              ],
+              "outputs": [],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-2"
+              ],
+              "locked": false
+            }
+          ],
+          "links": [
+            {
+              "source": "4ac8e753-5388-4850-b424-89d13bbf92db",
+              "output": 0,
+              "target": "a78bb66a-e48a-4985-949a-a560aad5f953",
+              "input": 0
+            },
+            {
+              "source": "4ac8e753-5388-4850-b424-89d13bbf92db",
+              "output": 0,
+              "target": "b35cdaf3-80e1-4019-be5a-b6ae55986c7f",
+              "input": 0
+            },
+            {
+              "source": "a78bb66a-e48a-4985-949a-a560aad5f953",
+              "output": 0,
+              "target": "548084c0-60c3-48e8-bf6d-6c0af38382a2",
+              "input": 0
+            },
+            {
+              "source": "a7ad9761-0cd9-4d82-8704-41ce3015f298",
+              "output": 0,
+              "target": "7bb590ea-b6b4-4813-8dfb-252d70ec1257",
+              "input": 0
+            },
+            {
+              "source": "ae8d19c3-6d6f-4c43-bb0c-e335df1cbb6b",
+              "output": 0,
+              "target": "a7bbe1bc-ae95-4bcb-92e1-ebedc05201b1",
+              "input": 0
+            }
+          ],
+          "foreign_links": [],
+          "interaction_ready": true
+        }
+      }
+    },
+    {
+      "recorded_at": "2026-09-13T21:18:02.214Z",
+      "session_id": "66eebdb6-8a9c-4129-a7cb-1ec565f2ab16",
+      "runtime_revision": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
+      "manifest_sha256": "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "target": {
+        "profile_id": "loginom-7.4.2-macos-chromium-ru",
+        "loginom_build": "7.4.2",
+        "platform": "macos",
+        "browser": "chromium"
+      },
+      "operation_id": "package-reopen-audit",
+      "action_key": "package.save_as",
+      "action_revision": "2",
+      "phase": "prepared",
+      "parameters": {
+        "conflict_policy": "replace",
+        "path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp"
+      },
+      "checkpoint": {
+        "workflow_ref": {
+          "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+          "prefix": "MF;TF-1"
+        },
+        "path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+        "identity": "Сценарий\nЗакрыть эту вкладку",
+        "package_identity": {
+          "path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+          "name": "Dock_acceptance_20260914_000803_18fad485"
+        },
+        "graph": {
+          "nodes": [
+            "Empty",
+            "ExportCSV",
+            "ExportEmpty",
+            "ExportTyped",
+            "ExportWide",
+            "Main",
+            "Typed",
+            "Wide"
+          ],
+          "ports": [
+            {
+              "node_label": "Empty",
+              "tids": [
+                "Empty;Input_Data[0]",
+                "Empty;Output_Data[0]",
+                "Empty;Output_Data[1]"
+              ]
+            },
+            {
+              "node_label": "ExportCSV",
+              "tids": [
+                "ExportCSV;Input_Connection[0]",
+                "ExportCSV;Input_Data[0]",
+                "ExportCSV;Input_Var[0]"
+              ]
+            },
+            {
+              "node_label": "ExportEmpty",
+              "tids": [
+                "ExportEmpty;Input_Connection[0]",
+                "ExportEmpty;Input_Data[0]",
+                "ExportEmpty;Input_Var[0]"
+              ]
+            },
+            {
+              "node_label": "ExportTyped",
+              "tids": [
+                "ExportTyped;Input_Connection[0]",
+                "ExportTyped;Input_Data[0]",
+                "ExportTyped;Input_Var[0]"
+              ]
+            },
+            {
+              "node_label": "ExportWide",
+              "tids": [
+                "ExportWide;Input_Connection[0]",
+                "ExportWide;Input_Data[0]",
+                "ExportWide;Input_Var[0]"
+              ]
+            },
+            {
+              "node_label": "Main",
+              "tids": [
+                "Main;Input_Connection[0]",
+                "Main;Input_Var[0]",
+                "Main;Output_Data[0]"
+              ]
+            },
+            {
+              "node_label": "Typed",
+              "tids": [
+                "Typed;Input_Connection[0]",
+                "Typed;Input_Var[0]",
+                "Typed;Output_Data[0]"
+              ]
+            },
+            {
+              "node_label": "Wide",
+              "tids": [
+                "Wide;Input_Connection[0]",
+                "Wide;Input_Var[0]",
+                "Wide;Output_Data[0]"
+              ]
+            }
+          ],
+          "links": [
+            "Empty|Output_Data[0]|ExportEmpty|Input_Data[0]",
+            "Main|Output_Data[0]|Empty|Input_Data[0]",
+            "Main|Output_Data[0]|ExportCSV|Input_Data[0]",
+            "Typed|Output_Data[0]|ExportTyped|Input_Data[0]",
+            "Wide|Output_Data[0]|ExportWide|Input_Data[0]"
+          ]
+        }
+      },
+      "deadline_at": 1789334462214
+    },
+    {
+      "recorded_at": "2026-09-13T21:18:09.250Z",
+      "session_id": "66eebdb6-8a9c-4129-a7cb-1ec565f2ab16",
+      "runtime_revision": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
+      "manifest_sha256": "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "target": {
+        "profile_id": "loginom-7.4.2-macos-chromium-ru",
+        "loginom_build": "7.4.2",
+        "platform": "macos",
+        "browser": "chromium"
+      },
+      "operation_id": "package-reopen-audit",
+      "action_key": "package.save_as",
+      "action_revision": "2",
+      "phase": "completed",
+      "parameters": {
+        "conflict_policy": "replace",
+        "path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp"
+      },
+      "checkpoint": {
+        "workflow_ref": {
+          "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+          "prefix": "MF;TF-1"
+        },
+        "path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+        "identity": "Сценарий\nЗакрыть эту вкладку",
+        "package_identity": {
+          "path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+          "name": "Dock_acceptance_20260914_000803_18fad485"
+        },
+        "graph": {
+          "nodes": [
+            "Empty",
+            "ExportCSV",
+            "ExportEmpty",
+            "ExportTyped",
+            "ExportWide",
+            "Main",
+            "Typed",
+            "Wide"
+          ],
+          "ports": [
+            {
+              "node_label": "Empty",
+              "tids": [
+                "Empty;Input_Data[0]",
+                "Empty;Output_Data[0]",
+                "Empty;Output_Data[1]"
+              ]
+            },
+            {
+              "node_label": "ExportCSV",
+              "tids": [
+                "ExportCSV;Input_Connection[0]",
+                "ExportCSV;Input_Data[0]",
+                "ExportCSV;Input_Var[0]"
+              ]
+            },
+            {
+              "node_label": "ExportEmpty",
+              "tids": [
+                "ExportEmpty;Input_Connection[0]",
+                "ExportEmpty;Input_Data[0]",
+                "ExportEmpty;Input_Var[0]"
+              ]
+            },
+            {
+              "node_label": "ExportTyped",
+              "tids": [
+                "ExportTyped;Input_Connection[0]",
+                "ExportTyped;Input_Data[0]",
+                "ExportTyped;Input_Var[0]"
+              ]
+            },
+            {
+              "node_label": "ExportWide",
+              "tids": [
+                "ExportWide;Input_Connection[0]",
+                "ExportWide;Input_Data[0]",
+                "ExportWide;Input_Var[0]"
+              ]
+            },
+            {
+              "node_label": "Main",
+              "tids": [
+                "Main;Input_Connection[0]",
+                "Main;Input_Var[0]",
+                "Main;Output_Data[0]"
+              ]
+            },
+            {
+              "node_label": "Typed",
+              "tids": [
+                "Typed;Input_Connection[0]",
+                "Typed;Input_Var[0]",
+                "Typed;Output_Data[0]"
+              ]
+            },
+            {
+              "node_label": "Wide",
+              "tids": [
+                "Wide;Input_Connection[0]",
+                "Wide;Input_Var[0]",
+                "Wide;Output_Data[0]"
+              ]
+            }
+          ],
+          "links": [
+            "Empty|Output_Data[0]|ExportEmpty|Input_Data[0]",
+            "Main|Output_Data[0]|Empty|Input_Data[0]",
+            "Main|Output_Data[0]|ExportCSV|Input_Data[0]",
+            "Typed|Output_Data[0]|ExportTyped|Input_Data[0]",
+            "Wide|Output_Data[0]|ExportWide|Input_Data[0]"
+          ]
+        }
+      },
+      "deadline_at": 1789334462214,
+      "outcome": {
+        "status": "SUCCEEDED",
+        "action_key": "package.save_as",
+        "action_revision": "2",
+        "operation_id": "package-reopen-audit",
+        "phase": "verified",
+        "effect_possible": true,
+        "output": {
+          "package_ref": {
+            "kind": "package",
+            "path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+            "active_identity": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp"
+          },
+          "reopened": true
+        },
+        "error": null,
+        "trace": [
+          {
+            "at_ms": 0,
+            "event": "action_started",
+            "capability": "package.save_as.v1",
+            "mode": "apply"
+          },
+          {
+            "at_ms": 11,
+            "event": "preconditions_verified",
+            "active_tab": "MF;TF-1"
+          },
+          {
+            "at_ms": 1582,
+            "event": "save_requested",
+            "path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp"
+          },
+          {
+            "at_ms": 1699,
+            "event": "save_conflict_observed",
+            "path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+            "message": "\"/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp\" уже существует. Вы хотите заменить его?"
+          },
+          {
+            "at_ms": 1789,
+            "event": "overwrite_confirmed"
+          },
+          {
+            "at_ms": 1908,
+            "event": "save_flow_completed",
+            "path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp"
+          },
+          {
+            "at_ms": 2003,
+            "event": "package_close_command_ready"
+          },
+          {
+            "at_ms": 2195,
+            "event": "saved_package_closed"
+          },
+          {
+            "at_ms": 2524,
+            "event": "package_open_command_ready"
+          },
+          {
+            "at_ms": 7008,
+            "event": "preconditions_verified",
+            "active_tab": "MF;TF-5"
+          },
+          {
+            "at_ms": 7024,
+            "event": "reopened_package_observed",
+            "requested_path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+            "actual_path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+            "tab_caption": "Сценарий\nЗакрыть эту вкладку",
+            "path_matches": true,
+            "graph_matches": true,
+            "graph": {
+              "nodes": [
+                "Empty",
+                "ExportCSV",
+                "ExportEmpty",
+                "ExportTyped",
+                "ExportWide",
+                "Main",
+                "Typed",
+                "Wide"
+              ],
+              "ports": [
+                {
+                  "node_label": "Empty",
+                  "tids": [
+                    "Empty;Input_Data[0]",
+                    "Empty;Output_Data[0]",
+                    "Empty;Output_Data[1]"
+                  ]
+                },
+                {
+                  "node_label": "ExportCSV",
+                  "tids": [
+                    "ExportCSV;Input_Connection[0]",
+                    "ExportCSV;Input_Data[0]",
+                    "ExportCSV;Input_Var[0]"
+                  ]
+                },
+                {
+                  "node_label": "ExportEmpty",
+                  "tids": [
+                    "ExportEmpty;Input_Connection[0]",
+                    "ExportEmpty;Input_Data[0]",
+                    "ExportEmpty;Input_Var[0]"
+                  ]
+                },
+                {
+                  "node_label": "ExportTyped",
+                  "tids": [
+                    "ExportTyped;Input_Connection[0]",
+                    "ExportTyped;Input_Data[0]",
+                    "ExportTyped;Input_Var[0]"
+                  ]
+                },
+                {
+                  "node_label": "ExportWide",
+                  "tids": [
+                    "ExportWide;Input_Connection[0]",
+                    "ExportWide;Input_Data[0]",
+                    "ExportWide;Input_Var[0]"
+                  ]
+                },
+                {
+                  "node_label": "Main",
+                  "tids": [
+                    "Main;Input_Connection[0]",
+                    "Main;Input_Var[0]",
+                    "Main;Output_Data[0]"
+                  ]
+                },
+                {
+                  "node_label": "Typed",
+                  "tids": [
+                    "Typed;Input_Connection[0]",
+                    "Typed;Input_Var[0]",
+                    "Typed;Output_Data[0]"
+                  ]
+                },
+                {
+                  "node_label": "Wide",
+                  "tids": [
+                    "Wide;Input_Connection[0]",
+                    "Wide;Input_Var[0]",
+                    "Wide;Output_Data[0]"
+                  ]
+                }
+              ],
+              "links": [
+                "Empty|Output_Data[0]|ExportEmpty|Input_Data[0]",
+                "Main|Output_Data[0]|Empty|Input_Data[0]",
+                "Main|Output_Data[0]|ExportCSV|Input_Data[0]",
+                "Typed|Output_Data[0]|ExportTyped|Input_Data[0]",
+                "Wide|Output_Data[0]|ExportWide|Input_Data[0]"
+              ]
+            }
+          },
+          {
+            "at_ms": 7024,
+            "event": "postcondition_verified",
+            "reopened": true,
+            "package_path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+            "tab_caption": "Сценарий\nЗакрыть эту вкладку",
+            "graph": {
+              "nodes": [
+                "Empty",
+                "ExportCSV",
+                "ExportEmpty",
+                "ExportTyped",
+                "ExportWide",
+                "Main",
+                "Typed",
+                "Wide"
+              ],
+              "ports": [
+                {
+                  "node_label": "Empty",
+                  "tids": [
+                    "Empty;Input_Data[0]",
+                    "Empty;Output_Data[0]",
+                    "Empty;Output_Data[1]"
+                  ]
+                },
+                {
+                  "node_label": "ExportCSV",
+                  "tids": [
+                    "ExportCSV;Input_Connection[0]",
+                    "ExportCSV;Input_Data[0]",
+                    "ExportCSV;Input_Var[0]"
+                  ]
+                },
+                {
+                  "node_label": "ExportEmpty",
+                  "tids": [
+                    "ExportEmpty;Input_Connection[0]",
+                    "ExportEmpty;Input_Data[0]",
+                    "ExportEmpty;Input_Var[0]"
+                  ]
+                },
+                {
+                  "node_label": "ExportTyped",
+                  "tids": [
+                    "ExportTyped;Input_Connection[0]",
+                    "ExportTyped;Input_Data[0]",
+                    "ExportTyped;Input_Var[0]"
+                  ]
+                },
+                {
+                  "node_label": "ExportWide",
+                  "tids": [
+                    "ExportWide;Input_Connection[0]",
+                    "ExportWide;Input_Data[0]",
+                    "ExportWide;Input_Var[0]"
+                  ]
+                },
+                {
+                  "node_label": "Main",
+                  "tids": [
+                    "Main;Input_Connection[0]",
+                    "Main;Input_Var[0]",
+                    "Main;Output_Data[0]"
+                  ]
+                },
+                {
+                  "node_label": "Typed",
+                  "tids": [
+                    "Typed;Input_Connection[0]",
+                    "Typed;Input_Var[0]",
+                    "Typed;Output_Data[0]"
+                  ]
+                },
+                {
+                  "node_label": "Wide",
+                  "tids": [
+                    "Wide;Input_Connection[0]",
+                    "Wide;Input_Var[0]",
+                    "Wide;Output_Data[0]"
+                  ]
+                }
+              ],
+              "links": [
+                "Empty|Output_Data[0]|ExportEmpty|Input_Data[0]",
+                "Main|Output_Data[0]|Empty|Input_Data[0]",
+                "Main|Output_Data[0]|ExportCSV|Input_Data[0]",
+                "Typed|Output_Data[0]|ExportTyped|Input_Data[0]",
+                "Wide|Output_Data[0]|ExportWide|Input_Data[0]"
+              ]
+            }
+          }
+        ],
+        "cleanup_complete": true
+      }
+    },
+    {
+      "recorded_at": "2026-09-13T21:18:13.980Z",
+      "session_id": "66eebdb6-8a9c-4129-a7cb-1ec565f2ab16",
+      "runtime_revision": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
+      "manifest_sha256": "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "target": {
+        "profile_id": "loginom-7.4.2-macos-chromium-ru",
+        "loginom_build": "7.4.2",
+        "platform": "macos",
+        "browser": "chromium"
+      },
+      "event": "workspace_prepared",
+      "state": {
+        "status": "READY",
+        "reason": null,
+        "phase": "exact_workflow_ready",
+        "target": {
+          "profile_id": "loginom-7.4.2-macos-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "macos",
+          "browser": "chromium"
+        },
+        "authenticated": true,
+        "created_draft": false,
+        "effect_possible": false,
+        "operation_id": "prepare-reopened-package",
+        "session_id": "66eebdb6-8a9c-4129-a7cb-1ec565f2ab16",
+        "trace": [
+          {
+            "condition": "ui_build",
+            "satisfied": true
+          },
+          {
+            "condition": "login_or_workspace",
+            "satisfied": true
+          },
+          {
+            "condition": "workspace_entry_ready",
+            "satisfied": true
+          },
+          {
+            "condition": "exact_workflow_ready",
+            "satisfied": true
+          }
+        ],
+        "document_id": "1789333704071-ce1ixtopgrg",
+        "workflow_ref": {
+          "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-5",
+          "prefix": "MF;TF-5",
+          "navigation_path": [
+            {
+              "tid": "MF;TF-5;cnrNaviMode;b.s_Сервер",
+              "label": ""
+            },
+            {
+              "tid": "MF;TF-5;cnrNaviMode;b.s_Сервер>Пакеты",
+              "label": "Пакеты"
+            },
+            {
+              "tid": "MF;TF-5;cnrNaviMode;b.s_Сервер>Пакеты>Dock_acceptance_20260914_000803_18fad485",
+              "label": "Dock_acceptance_20260914_000803_18fad485"
+            },
+            {
+              "tid": "MF;TF-5;cnrNaviMode;b.s_Сервер>Пакеты>Dock_acceptance_20260914_000803_18fad485>Модуль1",
+              "label": "Модуль1"
+            },
+            {
+              "tid": "MF;TF-5;cnrNaviMode;b.s_Сервер>Пакеты>Dock_acceptance_20260914_000803_18fad485>Модуль1>Сценарий",
+              "label": "Сценарий"
+            }
+          ],
+          "workflow_id": "1789333704071-ce1ixtopgrg-2"
+        },
+        "package_ref": {
+          "path": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
+          "name": "Dock_acceptance_20260914_000803_18fad485",
+          "persisted": true
+        },
+        "preserved_workflows": [
+          {
+            "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-5",
+            "graph_unchanged": true
+          }
+        ],
+        "ownership_verified": false,
+        "target_verified": true,
+        "interaction_readiness": "driver_verification_required",
+        "window": {
+          "width": 1508,
+          "height": 862,
+          "outer_width": 1508,
+          "outer_height": 949,
+          "available_width": 1512,
+          "available_height": 949
+        },
+        "replayed": false
+      }
+    },
+    {
+      "recorded_at": "2026-09-13T21:21:57.495Z",
+      "session_id": "66eebdb6-8a9c-4129-a7cb-1ec565f2ab16",
+      "runtime_revision": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
+      "manifest_sha256": "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "target": {
+        "profile_id": "loginom-7.4.2-macos-chromium-ru",
+        "loginom_build": "7.4.2",
+        "platform": "macos",
+        "browser": "chromium"
+      },
+      "operation_id": "reopen-export-csv-execute",
+      "phase": "node_target_checkpoint",
+      "internal_provenance": "node_target_v1",
+      "target_state": {
+        "completed": true,
+        "final_graph": {
+          "complete": true,
+          "document_id": "1789333704071-ce1ixtopgrg",
+          "workflow_ref": {
+            "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-5",
+            "prefix": "MF;TF-5",
+            "navigation_path": [
+              {
+                "tid": "MF;TF-5;cnrNaviMode;b.s_Сервер",
+                "label": ""
+              },
+              {
+                "tid": "MF;TF-5;cnrNaviMode;b.s_Сервер>Пакеты",
+                "label": "Пакеты"
+              },
+              {
+                "tid": "MF;TF-5;cnrNaviMode;b.s_Сервер>Пакеты>Dock_acceptance_20260914_000803_18fad485",
+                "label": "Dock_acceptance_20260914_000803_18fad485"
+              },
+              {
+                "tid": "MF;TF-5;cnrNaviMode;b.s_Сервер>Пакеты>Dock_acceptance_20260914_000803_18fad485>Модуль1",
+                "label": "Модуль1"
+              },
+              {
+                "tid": "MF;TF-5;cnrNaviMode;b.s_Сервер>Пакеты>Dock_acceptance_20260914_000803_18fad485>Модуль1>Сценарий",
+                "label": "Сценарий"
+              }
+            ],
+            "workflow_id": "1789333704071-ce1ixtopgrg-2"
+          },
+          "dom_epoch": 155,
+          "nodes": [
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-2",
+                "node_id": "4ac8e753-5388-4850-b424-89d13bbf92db"
+              },
+              "type": "imports.text",
+              "label": "Main",
+              "dom_epoch": 184,
+              "position": {
+                "x": 104,
+                "y": 104
+              },
+              "inputs": [],
+              "outputs": [
+                0
+              ],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-1"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-2",
+                "node_id": "548084c0-60c3-48e8-bf6d-6c0af38382a2"
+              },
+              "type": "exports.text",
+              "label": "ExportEmpty",
+              "dom_epoch": 199,
+              "position": {
+                "x": 648,
+                "y": 200
+              },
+              "inputs": [
+                0
+              ],
+              "outputs": [],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-2"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-2",
+                "node_id": "6620f9de-e585-39c7-88a9-35255088ebb7"
+              },
+              "type": "bg-vendor-icon-modelvariables",
+              "label": "Переменные сценария",
+              "dom_epoch": 192,
+              "position": {
+                "x": 16,
+                "y": 164
+              },
+              "inputs": [],
+              "outputs": [],
+              "other_ports": [
+                "Output_Var-0",
+                "Output_Var-1",
+                "Output_Var-2",
+                "Output_Var-3",
+                "Output_Var-4"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-2",
+                "node_id": "7bb590ea-b6b4-4813-8dfb-252d70ec1257"
+              },
+              "type": "exports.text",
+              "label": "ExportTyped",
+              "dom_epoch": 197,
+              "position": {
+                "x": 648,
+                "y": 352
+              },
+              "inputs": [
+                0
+              ],
+              "outputs": [],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-2"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-2",
+                "node_id": "a78bb66a-e48a-4985-949a-a560aad5f953"
+              },
+              "type": "transform.filter_data",
+              "label": "Empty",
+              "dom_epoch": 195,
+              "position": {
+                "x": 352,
+                "y": 104
+              },
+              "inputs": [
+                0
+              ],
+              "outputs": [
+                0,
+                1
+              ],
+              "other_ports": [],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-2",
+                "node_id": "a7ad9761-0cd9-4d82-8704-41ce3015f298"
+              },
+              "type": "imports.text",
+              "label": "Typed",
+              "dom_epoch": 193,
+              "position": {
+                "x": 104,
+                "y": 352
+              },
+              "inputs": [],
+              "outputs": [
+                0
+              ],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-1"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-2",
+                "node_id": "a7bbe1bc-ae95-4bcb-92e1-ebedc05201b1"
+              },
+              "type": "exports.text",
+              "label": "ExportWide",
+              "dom_epoch": 198,
+              "position": {
+                "x": 648,
+                "y": 600
+              },
+              "inputs": [
+                0
+              ],
+              "outputs": [],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-2"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-2",
+                "node_id": "ae8d19c3-6d6f-4c43-bb0c-e335df1cbb6b"
+              },
+              "type": "imports.text",
+              "label": "Wide",
+              "dom_epoch": 194,
+              "position": {
+                "x": 104,
+                "y": 600
+              },
+              "inputs": [],
+              "outputs": [
+                0
+              ],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-1"
+              ],
+              "locked": false
+            },
+            {
+              "ref": {
+                "document_id": "1789333704071-ce1ixtopgrg",
+                "workflow_id": "1789333704071-ce1ixtopgrg-2",
+                "node_id": "b35cdaf3-80e1-4019-be5a-b6ae55986c7f"
+              },
+              "type": "exports.text",
+              "label": "ExportCSV",
+              "dom_epoch": 196,
+              "position": {
+                "x": 648,
+                "y": 104
+              },
+              "inputs": [
+                0
+              ],
+              "outputs": [],
+              "other_ports": [
+                "Input_Connection-0",
+                "Input_Var-2"
+              ],
+              "locked": false
+            }
+          ],
+          "links": [
+            {
+              "source": "4ac8e753-5388-4850-b424-89d13bbf92db",
+              "output": 0,
+              "target": "a78bb66a-e48a-4985-949a-a560aad5f953",
+              "input": 0
+            },
+            {
+              "source": "4ac8e753-5388-4850-b424-89d13bbf92db",
+              "output": 0,
+              "target": "b35cdaf3-80e1-4019-be5a-b6ae55986c7f",
+              "input": 0
+            },
+            {
+              "source": "a78bb66a-e48a-4985-949a-a560aad5f953",
+              "output": 0,
+              "target": "548084c0-60c3-48e8-bf6d-6c0af38382a2",
+              "input": 0
+            },
+            {
+              "source": "a7ad9761-0cd9-4d82-8704-41ce3015f298",
+              "output": 0,
+              "target": "7bb590ea-b6b4-4813-8dfb-252d70ec1257",
+              "input": 0
+            },
+            {
+              "source": "ae8d19c3-6d6f-4c43-bb0c-e335df1cbb6b",
+              "output": 0,
+              "target": "a7bbe1bc-ae95-4bcb-92e1-ebedc05201b1",
+              "input": 0
+            }
+          ],
+          "foreign_links": [],
+          "interaction_ready": true
+        }
+      }
+    }
+  ],
+  "preparation_index": 4,
+  "operation": "reopen-export-csv-execute",
+  "node": {
+    "document_id": "1789333704071-ce1ixtopgrg",
+    "workflow_id": "1789333704071-ce1ixtopgrg-2",
+    "node_id": "b35cdaf3-80e1-4019-be5a-b6ae55986c7f"
+  }
+}

@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "catalog_version": "2026.09.13-node14.1-candidate",
+  "e2e_commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+  "selectors": [
+    {
+      "symbol": "component.preprocessing.data_recovery",
+      "strategy": "data_tid",
+      "match": "suffix",
+      "value": "ModelForm;colVendors_Компоненты>Предобработка>Заполнение_пропусков",
+      "scope": "activeWorkflow",
+      "cardinality": "one",
+      "visibility": "visible",
+      "state": [
+        "enabled"
+      ],
+      "parameters": {},
+      "provenance": {
+        "path": "bg/selectors.ts",
+        "line_start": 470,
+        "line_end": 474,
+        "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+        "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3",
+        "role": "selector"
+      }
+    },
+    {
+      "symbol": "loginom.ready_avatar", "strategy": "data_tid", "match": "exact", "value": "MF;cntMain;tlbMainToolbar;btnAvatar",
+      "scope": "global", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 36, "line_end": 36, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workspace.active_tab", "strategy": "data_tid", "match": "prefix", "value": "MF;cntMain;cntWorkspace;Workspace;t.br;tb",
+      "scope": "global", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {}, "required_class": "x-tab-active",
+      "provenance": { "path": "bg/selectors.ts", "line_start": 70, "line_end": 80, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.graph", "strategy": "data_tid", "match": "suffix", "value": "ModelForm;cmpDiagram",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 158, "line_end": 161, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.workarea", "strategy": "data_tid", "match": "suffix", "value": "ModelForm;pnlWorkarea",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 158, "line_end": 161, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.node", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label}",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1027, "line_end": 1034, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.node_label", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Label;Label",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1050, "line_end": 1053, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "component.imports.text", "strategy": "data_tid", "match": "suffix", "value": "ModelForm;colVendors_Компоненты>Импорт>Текстовый_файл",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 302, "line_end": 306, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "component.imports.lgd", "strategy": "data_tid", "match": "suffix", "value": "ModelForm;colVendors_Компоненты>Импорт>Loginom_Data_файл",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 322, "line_end": 326, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "component.transform.group_data", "strategy": "data_tid", "match": "suffix", "value": "ModelForm;colVendors_Компоненты>Трансформация>Группировка",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 335, "line_end": 339, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "component.transform.calculator", "strategy": "data_tid", "match": "suffix", "value": "ModelForm;colVendors_Компоненты>Трансформация>Калькулятор",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 355, "line_end": 359, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "component.transform.union_data", "strategy": "data_tid", "match": "suffix", "value": "ModelForm;colVendors_Компоненты>Трансформация>Объединение",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 365, "line_end": 369, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "component.transform.col_union_data", "strategy": "data_tid", "match": "suffix", "value": "ModelForm;colVendors_Компоненты>Трансформация>Соединение",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 395, "line_end": 399, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "component.transform.reform_columns", "strategy": "data_tid", "match": "suffix", "value": "ModelForm;colVendors_Компоненты>Трансформация>Параметры_полей",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 370, "line_end": 374, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.port.input.add", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Input_Add",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1135, "line_end": 1142, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.port.input.control_var", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Input_ControlVar",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1163, "line_end": 1167, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.port.input.data", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Input_Data-{port_index}",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid", "port_index": "integer" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1169, "line_end": 1173, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.port.input.order", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Input_Order",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1174, "line_end": 1178, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.port.input.tree", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Input_DataTree-{port_index}",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid", "port_index": "integer" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1179, "line_end": 1184, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.port.input.var", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Input_Var-{port_index}",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid", "port_index": "integer" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1185, "line_end": 1190, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.port.input.connection", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Input_Connection-{port_index}",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid", "port_index": "integer" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1157, "line_end": 1162, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.port.output.data", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Output_Data-{port_index}",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid", "port_index": "integer" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1203, "line_end": 1208, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.port.output.order", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Output_Order",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1209, "line_end": 1214, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.port.output.tree", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Output_DataTree-{port_index}",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid", "port_index": "integer" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1215, "line_end": 1220, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.port.output.var", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Output_Var-{port_index}",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid", "port_index": "integer" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1221, "line_end": 1226, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "workflow.port.output.connection", "strategy": "data_tid", "match": "suffix", "value": "Graph;{node_label};Output_Connection-{port_index}",
+      "scope": "activeWorkflow", "cardinality": "one", "visibility": "visible", "state": [], "parameters": { "node_label": "loginom_tid", "port_index": "integer" },
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1197, "line_end": 1202, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "packages.menu", "strategy": "data_tid", "match": "exact", "value": "MF;cntMain;tlbMainToolbar;btnPackagesMenu",
+      "scope": "global", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 35, "line_end": 38, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "packages.save_as", "strategy": "data_tid", "match": "exact", "value": "MF;MainMenuForm;btnSaveAsPackage",
+      "scope": "global", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1358, "line_end": 1373, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "packages.close", "strategy": "data_tid", "match": "exact", "value": "MF;MainMenuForm;btnClosePackage",
+      "scope": "global", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1358, "line_end": 1373, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "packages.open", "strategy": "data_tid", "match": "exact", "value": "MF;MainMenuForm;btnOpenPackage",
+      "scope": "global", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1358, "line_end": 1373, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "file_dialog.file_name", "strategy": "data_tid", "match": "suffix", "value": "DialogForm;edtFileName",
+      "scope": "modal", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1419, "line_end": 1434, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "file_dialog.confirm", "strategy": "data_tid", "match": "suffix", "value": "DialogForm;btnOpen",
+      "scope": "modal", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1435, "line_end": 1439, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "message.text", "strategy": "data_tid", "match": "suffix", "value": "cnt;cnt;cmp",
+      "scope": "modal", "cardinality": "zeroOrOne", "visibility": "visible", "state": [], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1618, "line_end": 1630, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "message.error", "strategy": "data_tid", "match": "suffix", "value": "cnt;cnt;MessagesView",
+      "scope": "modal", "cardinality": "zeroOrOne", "visibility": "visible", "state": [], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1630, "line_end": 1632, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "message.yes", "strategy": "data_tid", "match": "suffix", "value": "tlb;yes",
+      "scope": "modal", "cardinality": "one", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1618, "line_end": 1624, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    },
+    {
+      "symbol": "message.no", "strategy": "data_tid", "match": "suffix", "value": "tlb;no",
+      "scope": "modal", "cardinality": "zeroOrOne", "visibility": "visible", "state": ["enabled"], "parameters": {},
+      "provenance": { "path": "bg/selectors.ts", "line_start": 1618, "line_end": 1626, "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2", "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3", "role": "selector" }
+    }
+  ]
+}

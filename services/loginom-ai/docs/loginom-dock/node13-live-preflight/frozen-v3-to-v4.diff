@@ -1,0 +1,151 @@
+--- frozen-v3/fixtures/date-time/expected.json
++++ frozen-v4/fixtures/date-time/expected.json
+@@ -1093 +1093 @@
+-      "label": "Дата",
++      "label": "DateB",
+@@ -1209 +1209,8 @@
+-  }
++  },
++  "excluded_sources": [
++    {
++      "name": "DateB",
++      "label": "Дата",
++      "type": "datetime"
++    }
++  ]
+--- frozen-v3/goals/date-time-sales.txt
++++ frozen-v4/goals/date-time-sales.txt
+@@ -7 +7 @@
+-Сначала сформируй выход в точном порядке: Id, Amount; затем для DateA — A_date, A_month_end, A_month_start, A_quarter_end, A_quarter_start, A_year_end, A_year_start, A_hour, A_day_of_month, A_month, A_quarter, A_year; затем аналогичные 12 имён с префиксом B для DateB; последним активным полем оставь DateA с меткой «Дата». Метки вычисленных полей — их имена с первым подчёркиванием, заменённым пробелом (например A_month_end → «A month_end»). DateB исключи из выхода, сохрани имя DateB и его служебную метку «Дата». Год, квартал, месяц, день месяца и час — целые; остальные результаты — Дата/Время. Выполни и проверь все 10 строк и 27 активных столбцов.
++Сначала сформируй выход в точном порядке: Id, Amount; затем для DateA — A_date, A_month_end, A_month_start, A_quarter_end, A_quarter_start, A_year_end, A_year_start, A_hour, A_day_of_month, A_month, A_quarter, A_year; затем аналогичные 12 имён с префиксом B для DateB; последним активным полем оставь DateA с меткой «Дата». Метки вычисленных полей — их имена с первым подчёркиванием, заменённым пробелом (например A_month_end → «A month_end»). DateB исключи из выхода. У источника исключения сохрани имя DateB и метку «Дата»; переименовывать исключённый источник нельзя. Отдельная служебная запись исключённого выходного поля должна иметь имя DateB, метку DateB и excluded=true. Эта запись не входит в 27 активных столбцов результата. Год, квартал, месяц, день месяца и час — целые; остальные результаты — Дата/Время. Выполни и проверь все 10 строк и 27 активных столбцов.
+--- frozen-v3/fixtures/date-time/version.json
++++ frozen-v4/fixtures/date-time/version.json
+@@ -2,5 +2,6 @@
+-  "version": 3,
+-  "decision": "node13:wide-calendar-timeout-split:1",
+-  "parent_goal_sha256": "51dbe530f504c99444957db806efbae7d1a41463d82498df61171e364f9cfdf8",
+-  "goal_sha256": "11b0f1668fbeadf44e4e1abf864246ed10e3d7c9f73144e99f34d5fa01f96ea1",
+-  "expected_sha256": "900df299dcef95c9cdc8a511d2f732664539c71a82ac400526310470e3bd6654",
++  "version": 4,
++  "decision": "node13:source-vs-excluded-target-label:1",
++  "parent_goal_sha256": "11b0f1668fbeadf44e4e1abf864246ed10e3d7c9f73144e99f34d5fa01f96ea1",
++  "parent_expected_sha256": "900df299dcef95c9cdc8a511d2f732664539c71a82ac400526310470e3bd6654",
++  "goal_sha256": "33c5fe8f09590269815eb9cdf5d28524637ea83a8c23809f2f69dcaf005f9f89",
++  "expected_sha256": "fec431104d290fd789d5076b78156c071825a7c84de63544721eb72a5cb804c6",
+@@ -8 +9 @@
+-  "expected_unchanged": true,
++  "all_effective_tables_unchanged": true,
+@@ -14 +15,13 @@
+-  "timeout_receipt": "docs/loginom-dock/node13-live-preflight/frozen-v2-timeout.json"
++  "source_invariant": {
++    "name": "DateB",
++    "label": "Дата",
++    "type": "datetime"
++  },
++  "excluded_target_metadata": {
++    "name": "DateB",
++    "label": "DateB",
++    "type": "datetime",
++    "excluded": true
++  },
++  "reassessment_only": true,
++  "prior_fail": "docs/loginom-dock/node13-live-preflight/frozen-v3-done-audit.json"
+--- frozen-v3/date_time_goal_evidence.py
++++ frozen-v4/date_time_goal_evidence.py
+@@ -9,0 +10 @@
++from date_time_excluded_evidence import verify_excluded
+@@ -85,0 +87 @@
++                checks['excluded_source_and_target'] = verify_excluded(events, request, expected)
+@@ -155 +157 @@
+-    checks = dict(raw_configuration=config,
++    checks = dict(raw_configuration=config, excluded_source_and_target=verify_excluded(events, request, expected),
+--- frozen-v3/date_time_goal_oracle.py
++++ frozen-v4/date_time_goal_oracle.py
+@@ -59 +59,2 @@
+-                  empty=table(projection(), []), excluded=[dict(name='DateB', label='Дата', type='datetime', excluded=True)])
++                  empty=table(projection(), []), excluded=[dict(name='DateB', label='DateB', type='datetime', excluded=True)],
++                  excluded_sources=[dict(name='DateB', label='Дата', type='datetime')])
+--- /dev/null
++++ frozen-v4/date_time_excluded_evidence.py
+@@ -0,0 +1,44 @@
++"""Frozen-v4 distinguishes excluded source identity from native target metadata."""
++
++
++def verify_excluded(events, request, expected):
++    failures=[]; refs=[]
++    try:
++        own=[(i+1,e) for i,e in enumerate(events) if e.get('operation_id')==request['operation_id']]
++        phases=[(i,e['receipt']) for i,e in own if e.get('phase')=='node_phase_completed'
++                and e.get('receipt',{}).get('phase')=='output_mapping']
++        checkpoints=[e['result'] for _,e in own if e.get('phase')=='node_checkpoint']
++        if len(phases)!=1 or len(checkpoints)!=1: raise ValueError('one_excluded_mapping_checkpoint')
++        line,receipt=phases[0]; result=checkpoints[0];native=receipt['value']['native_mapping']
++        raw=[(i,e['outcome']['output']['node_mapping']) for i,e in own if e.get('phase')=='node_observation_completed'
++             and e.get('outcome',{}).get('output',{}).get('node_mapping')]
++        matching=[i for i,m in raw if m==native]
++        if (receipt['status']!='verified' or receipt['receipt_id']!=request['operation_id']+':output_mapping'
++                or not matching or native.get('verified') is not True or native.get('inventory_complete') is not True
++                or native.get('source_identity_verified') is not True or native['node_context'].get('verified') is not True
++                or any(native['node_context'].get(k)!=v for k,v in result['node'].items())):
++            raise ValueError('excluded_raw_binding')
++        fields=[f for f in native['target_fields'] if f.get('excluded')]
++        sources=[f.get('source') or f.get('exclusion_source') for f in fields]
++        target=[{k:f[k] for k in ('name','label','type','excluded')} for f in fields]
++        source=[{k:s[k] for k in ('name','label','type')} for s in sources]
++        if target!=expected['excluded']: failures.append('excluded_target_metadata_changed')
++        if source!=expected['excluded_sources']: failures.append('excluded_source_identity_or_label_changed')
++        if any(s not in native['source_fields'] for s in sources): failures.append('excluded_source_not_in_native_inventory')
++        rb=[f for f in result['configuration']['readback']['output_mapping']['fields'] if f.get('excluded')]
++        if ([{k:f[k] for k in ('name','label','type','excluded')} for f in rb]!=target
++                or [f['source_name'] for f in rb]!=[s['name'] for s in sources]):
++            failures.append('excluded_readback_differs_from_raw')
++        for mapping in request['mappings']:
++            if mapping['direction']!='output':continue
++            for field in mapping.get('fields',[]):
++                if not field.get('excluded'):continue
++                matches=[s for s in expected['excluded_sources'] if field['source']==dict(kind='configured_field',name=s['name'])]
++                if (len(matches)!=1 or field.get('name',matches[0]['name'])!=matches[0]['name']
++                        or field.get('label',matches[0]['label'])!=matches[0]['label']):
++                    failures.append('requested_excluded_source_rename')
++        refs=[dict(event_line=line,path='receipt.value.native_mapping'),
++              dict(event_line=matching[-1],path='outcome.output.node_mapping')]
++    except (KeyError,ValueError,TypeError,IndexError) as error:failures.append(str(error))
++    return dict(passed=not failures,failures=sorted(set(failures)),raw_refs=refs,
++                scope='exact_excluded_source_and_target_metadata',effective_output_column=False)
+--- /dev/null
++++ frozen-v4/date_time_excluded_negative.py
+@@ -0,0 +1,34 @@
++"""Small mutations of actual saved raw mappings; never launches a browser."""
++import copy
++from date_time_excluded_evidence import verify_excluded
++
++
++def verify(events, request, expected):
++    baseline=verify_excluded(events,request,expected)
++    if not baseline['passed']:return dict(passed=False,baseline=baseline)
++    op=request['operation_id']
++    phase=next(e for e in events if e.get('operation_id')==op and e.get('phase')=='node_phase_completed'
++               and e.get('receipt',{}).get('phase')=='output_mapping')
++    native=phase['receipt']['value']['native_mapping']
++    raw=next(e for e in events if e.get('operation_id')==op and e.get('phase')=='node_observation_completed'
++             and e.get('outcome',{}).get('output',{}).get('node_mapping')==native)
++    checkpoint=next(e for e in events if e.get('operation_id')==op and e.get('phase')=='node_checkpoint')
++    compact=[raw,phase,checkpoint];cases=[]
++    for case in ('source_name','source_label','source_record_id','excluded_flag','unexpected_target_label',
++                 'readback_target_label','requested_source_label','requested_source_name'):
++        rows=copy.deepcopy(compact);new=copy.deepcopy(request)
++        for m in [rows[0]['outcome']['output']['node_mapping'],rows[1]['receipt']['value']['native_mapping']]:
++            f=next(f for f in m['target_fields'] if f.get('excluded'));s=f.get('source') or f['exclusion_source']
++            if case=='source_name':s['name']='Other'
++            elif case=='source_label':s['label']='Other'
++            elif case=='source_record_id':s['record_id']='foreign'
++            elif case=='excluded_flag':f['excluded']=False
++            elif case=='unexpected_target_label':f['label']='Other'
++        if case=='readback_target_label':
++            next(f for f in rows[2]['result']['configuration']['readback']['output_mapping']['fields'] if f.get('excluded'))['label']='Other'
++        elif case in ('requested_source_label','requested_source_name'):
++            f=next(f for m in new['mappings'] if m['direction']=='output' for f in m['fields'] if f.get('excluded'))
++            f['label' if case=='requested_source_label' else 'name']='Other'
++        result=verify_excluded(rows,new,expected)
++        cases.append(dict(case=case,rejected=not result['passed'],failures=result['failures']))
++    return dict(passed=all(c['rejected'] for c in cases),cases=cases,scope='offline_saved_raw_exclusion_reassessment_negatives')

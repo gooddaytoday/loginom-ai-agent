@@ -1,0 +1,109 @@
+{
+  "scope": "fresh_session_reuse_of_previous_upload_ids_source_preflight_only",
+  "before": 7,
+  "after": 7,
+  "request": {
+    "operation_id": "node13-fresh-source-receipt-probe",
+    "contract_revision": "1.0.0",
+    "document_id": "1789301996111-y3gxcs7lbzc",
+    "workflow_ref": {
+      "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+      "prefix": "MF;TF-1",
+      "navigation_path": [
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+          "label": ""
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+          "label": "Пакеты"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>N13_d95e3c46",
+          "label": "N13_d95e3c46"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>N13_d95e3c46>Модуль1",
+          "label": "Модуль1"
+        },
+        {
+          "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>N13_d95e3c46>Модуль1>Сценарий",
+          "label": "Сценарий"
+        }
+      ],
+      "workflow_id": "1789301996111-y3gxcs7lbzc-1"
+    },
+    "target": {
+      "kind": "existing",
+      "type": "imports.text",
+      "ref": {
+        "document_id": "1789301996111-y3gxcs7lbzc",
+        "workflow_id": "1789301996111-y3gxcs7lbzc-1",
+        "node_id": "2254a2ce-5d0c-402d-8c0b-3f15a7588bba"
+      }
+    },
+    "inputs": [],
+    "mode": "delimited",
+    "parameters": {
+      "source": {
+        "artifact_id": "369632c3-af68-48b4-b1cf-b7cd168f9672",
+        "upload_operation_id": "node13-source-delivery:upload",
+        "bytes": 413,
+        "sha256": "2a74b48ca02f457c012d67db60582d1840731cf4463b8a276ad6626c6433bcf2"
+      },
+      "settings": {}
+    },
+    "mappings": [],
+    "finish": "execute",
+    "read": {
+      "ports": [
+        0
+      ],
+      "sample_rows": 10,
+      "require_exact_numbers": true
+    },
+    "budgets": {
+      "configure_ms": 1800000,
+      "execute_ms": 180000,
+      "total_ms": 1800000
+    }
+  },
+  "result": {
+    "status": "NOT_APPLIED",
+    "action_key": "node.apply",
+    "action_revision": "1.0.0",
+    "operation_id": "node13-fresh-source-receipt-probe",
+    "phase": "node_incomplete",
+    "effect_possible": false,
+    "cleanup_complete": true,
+    "output": {
+      "operation_id": "node13-fresh-source-receipt-probe",
+      "status": "NOT_APPLIED",
+      "effect_possible": false,
+      "phases": [],
+      "node": null,
+      "execution": {
+        "status": "not_requested",
+        "execution_id": null
+      },
+      "output": {
+        "status": "not_refreshed",
+        "evidence_ref": null,
+        "ports": []
+      },
+      "package_saved": false,
+      "cleanup_complete": true,
+      "warnings": [],
+      "pending_phase": null,
+      "error": {
+        "code": "NODE_APPLY_STOPPED",
+        "message": "Verified upload operation is missing or ambiguous"
+      }
+    },
+    "error": {
+      "code": "NODE_APPLY_STOPPED",
+      "message": "Verified upload operation is missing or ambiguous"
+    },
+    "trace": []
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "assignment": "node17:user-v1-component:1:e14c8211",
+  "run_directory": ".dock/node17/user-v1-component/20260913-154255-92bfd3b3",
+  "session_id": "3b238204-8e1e-42c3-91f6-45e28900ff02",
+  "harness_commit": "e14c8211",
+  "result_profile": "user-v1",
+  "passed": false,
+  "full_goal_accepted": false,
+  "hermes_started": false,
+  "attempts": 1,
+  "legacy_runner_tag": "node17:user-v1-account-preflight:1:0f37df75",
+  "account": {
+    "passed": true,
+    "scope": "visible_native_account_line_same_prepared_document",
+    "account": "test-2",
+    "elapsed_ms": 115
+  },
+  "baseline": {
+    "passed": true,
+    "bytes": 124,
+    "sha256": "9f9972ed174053d02745df8df0c3c2d44697b33f7fb6da2ce8463eb58cc5d13a",
+    "rows": 5,
+    "columns": 3,
+    "execution_id": "1789314183773-m6gq048ox8g:294:3"
+  },
+  "reject_terminal_clean_no_execution": true,
+  "projection": {
+    "passed": false,
+    "failures": [
+      "user_public_pairing"
+    ]
+  },
+  "audit": {
+    "passed": false,
+    "reason": "AssertionError: {'passed': False, 'failures': ['user_public_pairing']}"
+  },
+  "boundary": {
+    "completed_native_steps": 15,
+    "last_prepared_step": "download",
+    "last_prepared_seq": 16,
+    "native_download_reply_persisted": false,
+    "download_gesture_confirmed": false,
+    "download_gesture_count": null,
+    "observer_files": 0,
+    "actual_replace_dispatch_count": 0,
+    "replace_journal_events": 0,
+    "return_to_graph_confirmed": false,
+    "elapsed_ms": 1287.6895420000073,
+    "timed_out": false,
+    "root_cause": "Unknown native download invocation/result boundary; current logger discards non-success reply before recording it. Do not infer context mismatch or download gesture from absent evidence."
+  },
+  "runtime": "347615cbae29323d80b57488b794ecce607b5b9e0d2fbe86aa88b7460241311c",
+  "runtime_inputs_count": 155,
+  "harness_inputs_count": 275,
+  "pins_unchanged": true,
+  "manifest_sha256": "47e8a6e14a9b43a98e8399cdba2f1ebc013b775475c10fecab368adcaddda00b",
+  "component_prerequisite_gate": {
+    "ready": true,
+    "purpose": "user-v1-component",
+    "manifest_sha256": "47e8a6e14a9b43a98e8399cdba2f1ebc013b775475c10fecab368adcaddda00b",
+    "runtime": "347615cbae29323d80b57488b794ecce607b5b9e0d2fbe86aa88b7460241311c",
+    "scope": "private_acceptance_observer",
+    "full_goal_accepted": false
+  },
+  "full_gate_blocker": "TEXT_EXPORT_REJECT_BASELINE_READER_UNAVAILABLE: Native user-v1 component evidence pending",
+  "session_close": {
+    "browser_transport_closed": true,
+    "logged_out": false,
+    "global_config_unchanged": true
+  },
+  "process_close": {
+    "session_id": "3b238204-8e1e-42c3-91f6-45e28900ff02",
+    "closed": true,
+    "browser_pids": []
+  },
+  "pre_run_checks": {
+    "focused_node_tests_passed": 6,
+    "text_export_python_tests_passed": 20
+  },
+  "next_trigger": {
+    "owner": "coordinator",
+    "action": "Assign bounded capture of sanitized native failure reply before success assertions; no retry or Hermes authorized in this phase."
+  },
+  "free_disk_bytes": 93833797632,
+  "evidence_sha256": {
+    "account-independent-audit.json": "7cfaa16a7e85c1bdd3bccb20198d9971afd0dc5940b8bfb50b15f2a12a19e7db",
+    "smoke-original.json": "569d8f593935413c5a27c85555fc2f93280fb493c7c7b4af4bed0d52c8ffe689",
+    "request.json": "785bafc95909feb2e963c3bd05819bb74a73424cf89f682519ef7696d92a7147",
+    "geometry.json": "9191ef0bc033d53b301fbefb4ace780d9d06fa9a3b6c5690380cf9db389978a5",
+    "preparation.json": "f77980f03fa0223acaf2f17daf74584b9ed92e7138f7b3f713a0e3ade81d2a08",
+    "account-probe-prepared.json": "6557798c4bbadd30d28ff99a5dbfbc0d0459965cf5cfceb7d2a310a49d288402",
+    "account-transport.json": "6380d49f9de4c1c5045f5a5edf560f3e26f25b57591dde2e63a6200bdc253c3c",
+    "user-v1-audit.json": "8ecfc9f7b4866b8e952a945dc93990688a492fa6a184b16d83bc2bf023e3e07f",
+    "public-wire.jsonl": "746c7f767ac2ec01baba3d967f97e300652f41986f3734d946009b38e4b3f1aa",
+    "delivery.json": "cb6b39c2370827902b1c2f9ecb0b721e8cd619a1552169e3420268631c741d1c",
+    "entry-launch.json": "303711cb6f1ea975aa19615710f6d33b8a32c396892d85beb78c83762689cc5e",
+    "one-smoke-marker.json": "c8a7b85a8b0f585d35b1e4d40ce4e0a45ea70daaf1b94dbf65077d8d6b4a313b",
+    "smoke-reject.json": "41c5e941f4a3663220caaa3b554dd752d608826a0a58e7c6b2ff42a943e4f97e",
+    "smoke-source.json": "51220335a054e4671b5206c551b89140f10ef2cd8d5bf0e5ae2fbe25bebbc861",
+    "session-close.json": "701c7f6c6e83a3a96aa4ac8b9d82a01fe91d0662f75d9e1900974d9ebc4b7d33",
+    "replace-body.json": "ef18c11e06bfae85518f08086bb9ef4754c52b1ec3c8dc1eeaebde7fbe3e35bb",
+    "failure.json": "84f171837407f9d043abbd8edd73e98a3048416d57b22c46fa834c3f88f55ac0",
+    "smoke-state.json": "13958ae8ef76ba74e342f6c945c181c8acb894de308dcb5d902c7233c431e2dc",
+    "account-probe.json": "1dfe1dd68906d50bcbb54b0109d0bedbfa8ea6392ba4ed07265212e57d49b898",
+    "process-close-check.json": "3d2b6dc43d112405f6a251eb10075df1b80cc32c1229cce3920fca409d9c2359",
+    "observer/observer.jsonl": "1138e771a228440108dea2b5169f987e6c6b4390d963a8b4640fdd8b96f877b4",
+    "observer/observer-actions.jsonl": "37d1c16202e27e781c6796a036116f71b6903519263a5bf7f5b6653e1a04e6cb",
+    "private/dock-state/sessions/3b238204-8e1e-42c3-91f6-45e28900ff02/session.json": "58513910be2164e04cbc48a24a07db094a6078a93bb18cc1ebee5e3399622567",
+    "private/dock-state/sessions/3b238204-8e1e-42c3-91f6-45e28900ff02/execution-events.jsonl": "cddf32972d21ef21ca2eaa5f2b3edddf88e4b284727158e3acffa704732d0da3",
+    "private/dock-state/sessions/3b238204-8e1e-42c3-91f6-45e28900ff02/playwright.json": "076352d9aee8bbb8bb62568c393e24f946b8b4a337a28b938205c53fd26ee43c"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "source": "/Users/kartamyshev/Git/openviking/integrations/codex-mcp-adapter",
+  "description": "Existing local OpenViking MCP adapter; vendor attribution retained",
+  "files": {
+    "adapter.mjs": "53aa77c3fb94590fbcffd35ba8de841f2252fb00c9e6335fbac3038d7f1368c9",
+    "server.mjs": "18c7cd2ce7315fcaca6ff0bd9476a50a99257c66cf40d0adc889241032307aa1",
+    "package.json": "d2284f02922b4f988dea5b06b416cd79419182753419bf61f87749da27128a37",
+    "vendor/LICENSE": "1bd87fa6d9a5c79daf0c2af042b6725c9773bf095cc3d1bdf3656e66d1c3e5b1",
+    "vendor/mcp-proxy-core.mjs": "c18a3c6cedb2b71ff78d3f252c29209b18293dd8541f6c3f0bc5a195b03572c1",
+    "vendor/provenance.json": "f808b15abd37983e10aabac00c2c39e23d61129c95eb994edbd9a9070f036d5d",
+    "vendor/workspace-peer.mjs": "075d47f71fc757d2e62fbe2b63dc945a2d227d8cb1aa47b698281373f55a7fab",
+    "test/adapter.test.mjs": "14d6419d4e0b11519d4c6b659ab061297a16657d8a8df4533d8580ab84324f77",
+    "test/provenance.test.mjs": "54f20fefb1c6d14d87f0c80dc7bc5626d128644b6cccbf9283877621eef7a7f2",
+    "test/timeouts.test.mjs": "21fd55af8587c03c3bdf02ed358e8b15f443e891aa7d082ead4652bad688aa1d",
+    "test/timeout-fixture.mjs": "6bb1cb967d8c06e8974145a8884a256977c3369e5c7fefc01792d411a50e3879"
+  }
+}

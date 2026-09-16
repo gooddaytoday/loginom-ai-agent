@@ -1,0 +1,125 @@
+/* The opening scene is isolated from the installation and documentation UI. */
+.site-header {
+  color: #f4f0ed;
+  background: #101012f5;
+  border-bottom-color: #ffffff0d;
+}
+.site-header .wordmark strong, .site-header .header-cta { color: #edaaa0; }
+.site-header .desktop-nav a:hover { color: #edaaa0; }
+.site-header .mobile-menu nav { background: #1b191b; border-color: #ffffff24; }
+.hero.hero-immersive {
+  --hero-muted: #b7adb0;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  min-height: min(900px, calc(100svh - 83px));
+  padding: 0;
+  overflow: hidden;
+  color: #f8f2ee;
+  background: #101012;
+}
+.hero-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(ellipse at 77% 46%, #6c292517, transparent 58%),
+    radial-gradient(ellipse at 30% 100%, #42222b21, transparent 65%);
+  pointer-events: none;
+}
+.hero-inner {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-height: 540px;
+  padding-top: 40px;
+  padding-bottom: 40px;
+}
+.hero-immersive .hero-copy { position: relative; z-index: 2; width: 57%; pointer-events: none; }
+.hero-copy a { pointer-events: auto; }
+.hero-immersive .eyebrow { color: #e9aaa0; font-size: 11px; letter-spacing: .19em; margin-bottom: 24px; }
+.hero-immersive .small-line { background: #d68d80; width: 22px; height: 1px; }
+.hero-immersive h1 { font-size: clamp(56px, 5.5vw, 80px); font-weight: 400; line-height: 1.04; letter-spacing: -.045em; }
+.hero-immersive h1 span { color: #edaaa0; }
+.hero-immersive .hero-description { color: #c3b9bc; font-size: 20px; line-height: 1.5; margin-top: 25px; max-width: 450px; }
+.hero-immersive .hero-actions { gap: 25px; margin-top: 34px; }
+.hero-immersive .button { background: #a23938; border: 1px solid #cb69634d; border-radius: 5px; padding: 17px 22px; font-size: 17px; box-shadow: 0 3px 25px #a239381c; }
+.hero-immersive .button:hover { background: #b84a46; }
+.hero-immersive .text-link { font-size: 16px; font-weight: 400; }
+.hero-immersive .text-link:hover { color: #edaaa0; }
+.hero-agents { color: var(--hero-muted); font-size: 13px; margin-top: 20px; }
+.hero-agents span { color: #6c6266; padding: 0 9px; }
+.data-flow { position: absolute; width: 64%; height: 104%; right: -1%; top: -2%; }
+.data-flow-canvas, .data-flow-fallback { position: absolute; width: 100%; height: 100%; inset: 0; object-fit: contain; mask-image: linear-gradient(to right, transparent, #000 22%); }
+.data-flow-canvas { opacity: 0; transition: opacity .7s; }
+.data-flow[data-rendered] .data-flow-canvas { opacity: 1; }
+.data-flow[data-rendered] .data-flow-fallback { visibility: hidden; }
+.flow-next { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 20px; background: transparent; cursor: pointer; touch-action: pan-y; }
+.flow-next:focus-visible { outline: 1px solid #f0b5a2; outline-offset: -12px; }
+.data-flow[data-click-cycle] .flow-caption { pointer-events: none; }
+.flow-caption { position: absolute; top: 8%; left: 29%; color: #d0b5ae; font-size: 9px; letter-spacing: .23em; display: flex; align-items: center; gap: 10px; }
+.flow-cross { color: #e1a48d; font-size: 21px; font-weight: 400; }
+.flow-controls { position: absolute; bottom: 7%; right: 16%; display: flex; align-items: center; gap: 8px; }
+.flow-hint { color: var(--hero-muted); font-size: 11px; margin-right: 9px; }
+.flow-control { display: grid; place-items: center; border: 1px solid #ffffff24; border-radius: 50%; width: 44px; height: 44px; padding: 12px; background: #171416b3; color: #dfc8c2; transition: background .2s, border-color .2s; }
+.flow-control:hover { background: #3b292b; border-color: #c99487; }
+.flow-control svg { width: 18px; height: 18px; }
+.flow-play-icon { display: none; }
+[data-flow-pause][aria-pressed="true"] .flow-play-icon { display: block; }
+[data-flow-pause][aria-pressed="true"] .flow-pause-icon { display: none; }
+.data-flow[data-reduced-motion] [data-flow-replay], .data-flow[data-reduced-motion] .flow-hint { display: none; }
+.hero-foot { position: relative; z-index: 2; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-top: 19px; padding-bottom: 23px; }
+.hero-foot::before { content: ''; position: absolute; top: 0; left: 40px; right: 40px; height: 1px; background: #ffffff16; }
+.hero-scroll { display: flex; align-items: center; gap: 14px; color: #c5b6b8; font-size: 12px; letter-spacing: .035em; }
+.hero-scroll>span { color: #d39183; font-size: 21px; }
+.hero-immersive .hero-meta { color: #b7adb0; margin: 0; font-size: 12px; gap: 11px; }
+.hero-immersive .hero-meta>span { color: #6c6266; }
+.hero-immersive .hero-meta a { color: #dbc1ba; margin-left: 15px; text-decoration: none; }
+.hero-immersive a:focus-visible, .hero-immersive button:focus-visible, .site-header a:focus-visible { outline-color: #f0b5a2; }
+@media (min-width: 1600px) {
+  .hero-inner { max-width: 1440px; }
+  .hero-immersive h1 { font-size: 90px; }
+}
+@media (max-width: 1050px) {
+  .hero-immersive h1 { font-size: clamp(48px, 5.5vw, 62px); }
+  .hero-inner { min-height: 630px; }
+  .data-flow { width: 63%; right: 0; }
+  .hero-immersive .hero-actions { gap: 18px; }
+  .hero-foot::before { left: 28px; right: 28px; }
+}
+@media (max-width: 760px) {
+  .hero.hero-immersive { min-height: 0; }
+  .hero-inner { display: grid; grid-template-columns: 1fr; min-height: 0; padding-top: 35px; padding-bottom: 23px; }
+  .hero-immersive .hero-copy { display: contents; }
+  .hero-immersive .hero-copy>* { position: relative; z-index: 2; }
+  .hero-immersive .eyebrow { order: 1; font-size: 10px; margin-bottom: 20px; }
+  .hero-immersive h1 { order: 2; font-size: clamp(42px, 11vw, 65px); }
+  .hero-immersive .hero-description { order: 4; font-size: 17px; max-width: 350px; margin-top: 4px; }
+  .hero-immersive .hero-actions { order: 5; margin-top: 23px; gap: 10px; flex-wrap: nowrap; }
+  .hero-immersive .button { padding: 15px 12px; gap: 10px; font-size: 14px; white-space: nowrap; }
+  .hero-immersive .text-link { font-size: 13px; gap: 5px; white-space: nowrap; min-height: 44px; }
+  .hero-agents { order: 6; font-size: 12px; margin-top: 16px; }
+  .data-flow { order: 3; position: relative; width: calc(100% + 44px); height: clamp(270px, 72vw, 390px); right: auto; top: auto; margin: -12px -22px 0; }
+  .data-flow-canvas, .data-flow-fallback { mask-image: none; }
+  .flow-caption { display: none; }
+  .flow-controls { bottom: 5%; right: 7%; }
+  .flow-hint { display: none; }
+  .hero-foot { gap: 10px; align-items: flex-start; padding-top: 17px; padding-bottom: 19px; }
+  .hero-foot::before { left: 22px; right: 22px; }
+  .hero-scroll { font-size: 10px; gap: 8px; }
+  .hero-immersive .hero-meta { gap: 6px; font-size: 10px; justify-content: flex-end; max-width: 160px; }
+  .hero-immersive .hero-meta a { margin-left: 0; }
+}
+@media (max-width: 370px) {
+  .hero-immersive h1 { font-size: 40px; }
+  .hero-immersive .hero-actions { gap: 14px; flex-wrap: wrap; }
+  .hero-immersive .text-link { font-size: 13px; }
+  .data-flow { width: calc(100% + 34px); margin-left: -17px; margin-right: -17px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .data-flow-canvas { transition: none; }
+}

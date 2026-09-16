@@ -1,0 +1,451 @@
+{
+  "main10": {
+    "name": "Node12-main10.csv",
+    "bytes": 136,
+    "sha256": "28b9a20dc5a493833ae830c80fe82af19752a1d98c39d04abb7bbab13331aa8a",
+    "rows": [
+      {
+        "Id": 1,
+        "Key": "A",
+        "Sub": 1,
+        "Value": "x",
+        "Amount": 10
+      },
+      {
+        "Id": 2,
+        "Key": "A",
+        "Sub": 1,
+        "Value": "x",
+        "Amount": 10
+      },
+      {
+        "Id": 3,
+        "Key": "A",
+        "Sub": 1,
+        "Value": "y",
+        "Amount": 10
+      },
+      {
+        "Id": 4,
+        "Key": "B",
+        "Sub": 1,
+        "Value": "z",
+        "Amount": 20
+      },
+      {
+        "Id": 5,
+        "Key": "B",
+        "Sub": 1,
+        "Value": "z",
+        "Amount": 20
+      },
+      {
+        "Id": 6,
+        "Key": "B",
+        "Sub": 1,
+        "Value": "z",
+        "Amount": 20
+      },
+      {
+        "Id": 7,
+        "Key": "A",
+        "Sub": 2,
+        "Value": "x",
+        "Amount": 10
+      },
+      {
+        "Id": 8,
+        "Key": "C",
+        "Sub": 1,
+        "Value": "solo",
+        "Amount": 30
+      },
+      {
+        "Id": 9,
+        "Key": "D",
+        "Sub": 1,
+        "Value": "",
+        "Amount": 40
+      },
+      {
+        "Id": 10,
+        "Key": "D",
+        "Sub": 1,
+        "Value": "",
+        "Amount": 40
+      }
+    ],
+    "columns": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "Key",
+        "label": "Key",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Sub",
+        "label": "Sub",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "Value",
+        "label": "Value",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      }
+    ],
+    "parameters": {
+      "input_fields": [
+        "Key",
+        "Sub"
+      ],
+      "output_fields": [
+        "Value",
+        "Amount"
+      ]
+    },
+    "duplicate_groups": [
+      [
+        1,
+        2
+      ],
+      [
+        4,
+        5,
+        6
+      ],
+      [
+        9,
+        10
+      ]
+    ],
+    "contradiction_groups": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "output_schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "Key",
+        "label": "Key",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Sub",
+        "label": "Sub",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "Value",
+        "label": "Value",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "Duplicate",
+        "label": "Дубликат",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "DuplicateGroup",
+        "label": "Группа дубликата",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Contradiction",
+        "label": "Противоречие",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "ContradictionGroup",
+        "label": "Группа противоречия",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "output_row_count": 10
+  },
+  "null8": {
+    "name": "Node12-null8.csv",
+    "bytes": 81,
+    "sha256": "d961110e6db0d744ab5c56ccbd730df74b1435dc2b6b847d2ac569d0c6d4ad61",
+    "rows": [
+      {
+        "Id": 1,
+        "Key": "A",
+        "Value": null
+      },
+      {
+        "Id": 2,
+        "Key": "A",
+        "Value": null
+      },
+      {
+        "Id": 3,
+        "Key": "A",
+        "Value": ""
+      },
+      {
+        "Id": 4,
+        "Key": "A",
+        "Value": "null"
+      },
+      {
+        "Id": 5,
+        "Key": "B",
+        "Value": ""
+      },
+      {
+        "Id": 6,
+        "Key": "B",
+        "Value": ""
+      },
+      {
+        "Id": 7,
+        "Key": "C",
+        "Value": "null"
+      },
+      {
+        "Id": 8,
+        "Key": "C",
+        "Value": "null"
+      }
+    ],
+    "columns": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "Key",
+        "label": "Key",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Value",
+        "label": "Value",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "parameters": {
+      "input_fields": [
+        "Key"
+      ],
+      "output_fields": [
+        "Value"
+      ]
+    },
+    "duplicate_groups": [
+      [
+        1,
+        2
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        7,
+        8
+      ]
+    ],
+    "contradiction_groups": [
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    "output_schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "Key",
+        "label": "Key",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Value",
+        "label": "Value",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Duplicate",
+        "label": "Дубликат",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "DuplicateGroup",
+        "label": "Группа дубликата",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Contradiction",
+        "label": "Противоречие",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "ContradictionGroup",
+        "label": "Группа противоречия",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "output_row_count": 8
+  },
+  "empty": {
+    "name": "Node12-empty.csv",
+    "bytes": 13,
+    "sha256": "f00af412b983e5a12151b8d095da2ecf9cb618cf8037a258290ec91e5b077275",
+    "rows": [],
+    "columns": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "Key",
+        "label": "Key",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Value",
+        "label": "Value",
+        "type": "string",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "parameters": {
+      "input_fields": [
+        "Key"
+      ],
+      "output_fields": [
+        "Value"
+      ]
+    },
+    "duplicate_groups": [],
+    "contradiction_groups": [],
+    "output_schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": "integer",
+        "data_kind": "Непрерывный"
+      },
+      {
+        "name": "Key",
+        "label": "Key",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Value",
+        "label": "Value",
+        "type": "string",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Duplicate",
+        "label": "Дубликат",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "DuplicateGroup",
+        "label": "Группа дубликата",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "Contradiction",
+        "label": "Противоречие",
+        "type": "boolean",
+        "data_kind": "Дискретный"
+      },
+      {
+        "name": "ContradictionGroup",
+        "label": "Группа противоречия",
+        "type": "integer",
+        "data_kind": "Дискретный"
+      }
+    ],
+    "output_row_count": 0
+  },
+  "main10_key_only": {
+    "source": "main10",
+    "parameters": {
+      "input_fields": [
+        "Key",
+        "Sub"
+      ],
+      "output_fields": []
+    },
+    "duplicate_groups": [
+      [
+        1,
+        2,
+        3
+      ],
+      [
+        4,
+        5,
+        6
+      ],
+      [
+        9,
+        10
+      ]
+    ],
+    "contradiction_groups": [],
+    "output_row_count": 10
+  }
+}

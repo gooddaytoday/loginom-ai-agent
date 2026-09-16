@@ -1,0 +1,183 @@
+{
+  "passed": true,
+  "result_profile": "user-v1",
+  "scope": "real_stdio_user_v1_component_only",
+  "account": {
+    "passed": true,
+    "scope": "visible_native_account_line_same_prepared_document",
+    "account": "test-2",
+    "elapsed_ms": 130
+  },
+  "projection": {
+    "passed": true,
+    "scope": "real_user_v1_component_only",
+    "projection": {
+      "passed": true,
+      "scope": "user_v1_exact_projection_and_prepared_workflow"
+    },
+    "outer": {
+      "passed": true,
+      "scope": "node17_contract2_run_binding",
+      "settings_verified": false,
+      "global_atomicity_verified": false,
+      "proof": {
+        "passed": true,
+        "scope": "unadmitted_observer_proof",
+        "bytes": 124,
+        "sha256": "9f9972ed174053d02745df8df0c3c2d44697b33f7fb6da2ce8463eb58cc5d13a",
+        "global_atomicity_verified": false,
+        "settings_verified": false
+      }
+    },
+    "public_calls": 16,
+    "replace_request": {
+      "contract_revision": "1.0.0",
+      "document_id": "1789320738903-bdjpj5bi86o",
+      "workflow_ref": {
+        "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+        "prefix": "MF;TF-1",
+        "navigation_path": [
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+            "label": ""
+          },
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+            "label": "Пакеты"
+          },
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+            "label": "Package1"
+          },
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+            "label": "Модуль1"
+          },
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+            "label": "Сценарий"
+          }
+        ],
+        "workflow_id": "1789320738903-bdjpj5bi86o-1"
+      },
+      "mode": "delimited",
+      "inputs": [],
+      "mappings": [],
+      "finish": "execute",
+      "read": {
+        "ports": [],
+        "sample_rows": 0,
+        "require_exact_numbers": false
+      },
+      "budgets": {
+        "configure_ms": 180000,
+        "execute_ms": 60000,
+        "total_ms": 240000
+      },
+      "operation_id": "smoke-replace",
+      "target": {
+        "kind": "existing",
+        "type": "exports.text",
+        "ref": {
+          "document_id": "1789320738903-bdjpj5bi86o",
+          "node_id": "3eb97839-a410-403e-8d4b-8d7c4de7c0ce",
+          "workflow_id": "1789320738903-bdjpj5bi86o-1"
+        }
+      },
+      "parameters": {
+        "destination": "/test-2/Dock-export-20260913-173210-2776aeab-csv.csv",
+        "encoding": "UTF-8",
+        "delimiter": ";",
+        "header": "names",
+        "bom": false,
+        "line_ending": "LF",
+        "decimal_separator": ".",
+        "null_marker": "?",
+        "text_qualifier": "\"",
+        "overwrite": "replace"
+      }
+    },
+    "full_goal_accepted": false
+  },
+  "native": {
+    "scope": "native diagnostic smoke, not user-v1 or Hermes acceptance",
+    "original": {
+      "passed": true,
+      "bytes": 124,
+      "sha256": "9f9972ed174053d02745df8df0c3c2d44697b33f7fb6da2ce8463eb58cc5d13a",
+      "rows": 5,
+      "columns": 3,
+      "execution_id": "1789320738903-bdjpj5bi86o:364:3"
+    },
+    "replace": {
+      "passed": true,
+      "bytes": 124,
+      "sha256": "9f9972ed174053d02745df8df0c3c2d44697b33f7fb6da2ce8463eb58cc5d13a",
+      "rows": 5,
+      "columns": 3,
+      "execution_id": "1789320738903-bdjpj5bi86o:364:4"
+    },
+    "reject_no_execution": true,
+    "outer": {
+      "passed": true,
+      "scope": "node17_contract2_run_binding",
+      "settings_verified": false,
+      "global_atomicity_verified": false,
+      "proof": {
+        "passed": true,
+        "scope": "unadmitted_observer_proof",
+        "bytes": 124,
+        "sha256": "9f9972ed174053d02745df8df0c3c2d44697b33f7fb6da2ce8463eb58cc5d13a",
+        "global_atomicity_verified": false,
+        "settings_verified": false
+      }
+    },
+    "observer_elapsed_ms": 1807.5992090000072,
+    "observer_downloads": 1,
+    "actual_dispatch_count": 1,
+    "replace_prepared_count": 1,
+    "baseline_event_negatives": 9,
+    "rejected_native_origin_tamperings": 12,
+    "rejected_native_proof_tamperings": 24,
+    "runtime_unchanged": true,
+    "harness_unchanged": true,
+    "passed": true,
+    "candidate_evidence_ready": true,
+    "settings_verified": false,
+    "global_atomicity_verified": false,
+    "hermes_acceptance": false
+  },
+  "public_projection_negatives": [
+    "wrong_public_hash",
+    "wrong_public_error",
+    "wrong_public_workflow",
+    "wrong_public_profile",
+    "missing_response"
+  ],
+  "full_goal_accepted": false,
+  "hermes_started": false,
+  "evidence_sha256": {
+    "request.json": "da1a3332854e78df9c90467d8ad0f14528115fa05a265c333c7900c86b5fd80f",
+    "one-smoke-marker.json": "8ec12b5d1ce2698e2e3e31942b782c544a197070ae5a1ac90b7749ca5fc4efda",
+    "preparation.json": "5c147da6f5a5bde85091cf9e304310c9837254753efc8da2e94375960b70eca3",
+    "entry-launch.json": "a151913814732e959e84b79621a9bd7ca0e41c4b6c00b51b405b178ea911696b",
+    "geometry.json": "9f719f2d8765f22468d2402a4339094710d97b2df18fac3c86d45d4a3237c4a9",
+    "account-probe.json": "4a718a31932bce92720d76fa51978e4eab33792546bedd120ca2fd57bb920859",
+    "account-probe-prepared.json": "8c2d50341a558f0f8b360d3b752bc0a05699762f9066d89c234b5e2acacb474e",
+    "smoke-source.json": "27d96ada03a15eed63f5c30211d0d1576c48f534e47f7f2a3b8e94b1febdaf29",
+    "smoke-original.json": "2bb91f3c0d4f38118554a87d11b1cb64d9f1b056aacff24ab79cb48ff4c1025a",
+    "smoke-reject.json": "09eaf77af4944b1c2318b1e8942f9521380d578d2b6a2f55965f437e2c58df58",
+    "smoke-replace.json": "a0b2c99290b20e0cebb996c04428aadefef9902161e9dca5050792276a1f0c74",
+    "replace-body.json": "245893224c84be3bc57a1f963bab99cc740dd4bdd212ca14864d59b869a4a507",
+    "public-wire.jsonl": "9679382ff7b852b98a2d1e68e70e9f32bb669ef428579b2d56578f580fdd838d",
+    "observer/observer.jsonl": "558617b6d9ca1a155e2f62f4f58bcf0e7ac4ef08b37a56958dff2359bc5fa5d1",
+    "observer/observer-actions.jsonl": "8e950bec2727fe89d4e22aebede6755d9b3dab8b5e6a4a55dce6aeea1b21bd93",
+    "observer/actual-dispatch.jsonl": "afd23d87e8f6e0d385aa0cda2394b7dfd087fd43c562fb5670785d5f53ae71f8",
+    "session-close.json": "701c7f6c6e83a3a96aa4ac8b9d82a01fe91d0662f75d9e1900974d9ebc4b7d33",
+    "process-close-check.json": "bca81a8f44bd2bbba8e41d60a9fa0913a36b5f337cdc218c4751f9dbe5c1ad4b",
+    "private/dock-state/sessions/d7d68d23-4868-4006-bea8-34c92e9f7b6c/session.json": "541a9bbc71dac43657ef4f50305570767a4b9406855788f773fcf48b3ee10ad0",
+    "private/dock-state/sessions/d7d68d23-4868-4006-bea8-34c92e9f7b6c/execution-events.jsonl": "689a85a316d1cd006f6bc8c3ebfb79f34ef391f7b1cea5f0e51ea13efe7d1483",
+    "private/dock-state/sessions/d7d68d23-4868-4006-bea8-34c92e9f7b6c/playwright.json": "4cd82e0f0797e5331e9bf88a4a95b30241534f89b8ddd9108e73f9cda7cf0de1",
+    "observer/reject-baseline/3814a442-9715-44c0-aded-eafb10cb8b3b/Dock-export-20260913-173210-2776aeab-csv.csv": "9f9972ed174053d02745df8df0c3c2d44697b33f7fb6da2ce8463eb58cc5d13a"
+  }
+}

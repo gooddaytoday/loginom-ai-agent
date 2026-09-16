@@ -1,0 +1,1163 @@
+{
+  "schema_version": 1,
+  "catalog_version": "2026.09.13-node14.1-candidate",
+  "e2e_commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+  "capability_abi": 1,
+  "actions": [
+    {
+      "action_key": "node.add",
+      "revision": "4",
+      "status": "candidate",
+      "capability": "node.add.v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "component_key": {
+            "type": "string",
+            "enum": [
+              "preprocessing.data_recovery",
+              "imports.text",
+              "imports.lgd",
+              "transform.group_data",
+              "transform.calculator",
+              "transform.union_data",
+              "transform.col_union_data",
+              "transform.reform_columns"
+            ]
+          },
+          "target_position": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number",
+                "minimum": 8,
+                "maximum": 10000
+              },
+              "y": {
+                "type": "number",
+                "minimum": 8,
+                "maximum": 10000
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ],
+            "additionalProperties": false
+          },
+          "expected_label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^;|<>\\\"'\\\\\\r\\n]+$"
+          }
+        },
+        "required": [
+          "component_key",
+          "target_position"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "auto_created_links": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          },
+          "goal_verified": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "node_ref": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "node"
+                ]
+              },
+              "node_label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "workflow_ref": {
+                "type": "object",
+                "properties": {
+                  "tab_tid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "prefix": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "tab_tid",
+                  "prefix"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "node_label",
+              "workflow_ref"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "auto_created_links",
+          "goal_verified",
+          "node_ref"
+        ],
+        "additionalProperties": false
+      },
+      "selector_symbols": [
+        "loginom.ready_avatar",
+        "workspace.active_tab",
+        "workflow.graph",
+        "workflow.workarea",
+        "workflow.node",
+        "workflow.node_label",
+        "component.preprocessing.data_recovery",
+        "component.imports.text",
+        "component.imports.lgd",
+        "component.transform.group_data",
+        "component.transform.calculator",
+        "component.transform.union_data",
+        "component.transform.col_union_data",
+        "component.transform.reform_columns"
+      ],
+      "evidence": [
+        {
+          "path": "bg/helpers/workflow/node.ts",
+          "line_start": 77,
+          "line_end": 120,
+          "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+          "sha256": "c50802326ad3b32bcceb35e892606bae5726eaaafab0fd5d833f26dfb6ebea64",
+          "role": "helper"
+        },
+        {
+          "path": "bg/selectors.ts",
+          "line_start": 285,
+          "line_end": 408,
+          "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+          "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3",
+          "role": "selectors"
+        }
+      ],
+      "preconditions": [
+        "selected workspace tab resolves to one active workflow",
+        "component and workarea resolve to one stable visible element",
+        "Loginom mask is absent"
+      ],
+      "postconditions": [
+        "graph snapshot contains exactly one new root node",
+        "returned node_ref resolves in the active workflow",
+        "requested label and target geometry are verified when supplied",
+        "preexisting graph content is preserved; automatic links incident to the new node are returned for agent review"
+      ],
+      "effect": {
+        "kind": "create",
+        "resource": "workflow.node"
+      },
+      "idempotency": {
+        "policy": "reconcile_before_retry",
+        "reconcile": "graph node snapshot diff"
+      },
+      "timeout_ms": 60000,
+      "retry_budget": 0,
+      "required_capabilities": [
+        "node.add.v1"
+      ],
+      "min_executor_revision": "1.1.0",
+      "cleanup": [
+        "release mouse input",
+        "leave the newly created node selected only if Loginom selected it"
+      ]
+    },
+    {
+      "action_key": "link.create",
+      "revision": "1",
+      "status": "candidate",
+      "capability": "link.create.v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "source_node": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "node"
+                ]
+              },
+              "node_label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "^[^;|<>\\\"'\\\\\\r\\n]+$"
+              },
+              "workflow_ref": {
+                "type": "object",
+                "properties": {
+                  "tab_tid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "prefix": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "tab_tid",
+                  "prefix"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "node_label",
+              "workflow_ref"
+            ],
+            "additionalProperties": false
+          },
+          "target_node": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "node"
+                ]
+              },
+              "node_label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "^[^;|<>\\\"'\\\\\\r\\n]+$"
+              },
+              "workflow_ref": {
+                "type": "object",
+                "properties": {
+                  "tab_tid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "prefix": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "tab_tid",
+                  "prefix"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "node_label",
+              "workflow_ref"
+            ],
+            "additionalProperties": false
+          },
+          "source_port": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "data",
+                  "var",
+                  "order",
+                  "tree",
+                  "connection"
+                ]
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 999
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "additionalProperties": false
+          },
+          "target_port": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "data",
+                  "var",
+                  "order",
+                  "tree",
+                  "connection",
+                  "control_var",
+                  "add"
+                ]
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 999
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "source_node",
+          "target_node",
+          "source_port",
+          "target_port"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "link_ref": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "link"
+                ]
+              },
+              "tid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "kind",
+              "tid"
+            ],
+            "additionalProperties": false
+          },
+          "reconciled": {
+            "type": "boolean"
+          },
+          "target_port_tid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "link_ref"
+        ],
+        "additionalProperties": false
+      },
+      "selector_symbols": [
+        "loginom.ready_avatar",
+        "workspace.active_tab",
+        "workflow.graph",
+        "workflow.port.output.data",
+        "workflow.port.output.var",
+        "workflow.port.output.order",
+        "workflow.port.output.tree",
+        "workflow.port.output.connection",
+        "workflow.port.input.data",
+        "workflow.port.input.var",
+        "workflow.port.input.order",
+        "workflow.port.input.tree",
+        "workflow.port.input.connection",
+        "workflow.port.input.control_var",
+        "workflow.port.input.add"
+      ],
+      "evidence": [
+        {
+          "path": "bg/helpers/workflow/links.ts",
+          "line_start": 38,
+          "line_end": 170,
+          "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+          "sha256": "9718090ce0ccaa5c0f266ad1672d39678ffd2cae07fe8e0b5ce85522990883a8",
+          "role": "helper"
+        },
+        {
+          "path": "tests/acceptance/workflow/linking.ts",
+          "line_start": 18,
+          "line_end": 122,
+          "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+          "sha256": "0caa96babcd94a826be73a6251047561a916ca4abd5c73355361f1f390b9f357",
+          "role": "acceptance"
+        }
+      ],
+      "preconditions": [
+        "source and target node refs resolve in the selected workflow",
+        "both fresh port locators have stable geometry",
+        "Loginom mask is absent"
+      ],
+      "postconditions": [
+        "exactly the requested link exists",
+        "Input_Add creates one compatible port identified by snapshot diff",
+        "viewport and zoom are restored"
+      ],
+      "effect": {
+        "kind": "create",
+        "resource": "workflow.link"
+      },
+      "idempotency": {
+        "policy": "reconcile_before_retry",
+        "reconcile": "link and target port snapshot diff"
+      },
+      "timeout_ms": 90000,
+      "retry_budget": 9,
+      "required_capabilities": [
+        "link.create.v1"
+      ],
+      "min_executor_revision": "1.0.0",
+      "cleanup": [
+        "restore graph scroll position",
+        "do not change graph zoom",
+        "release mouse input"
+      ]
+    },
+    {
+      "action_key": "package.save_as",
+      "revision": "1",
+      "status": "candidate",
+      "capability": "package.save_as.v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "^[^\\u0000\\r\\n]+$"
+          },
+          "conflict_policy": {
+            "type": "string",
+            "enum": [
+              "fail",
+              "replace"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "conflict_policy"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "package_ref": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "package"
+                ]
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "active_identity": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000,
+                "description": "Exact normalized package storage path read from the active package cache of the pinned Loginom UI build"
+              }
+            },
+            "required": [
+              "kind",
+              "path",
+              "active_identity"
+            ],
+            "additionalProperties": false
+          },
+          "reopened": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "package_ref",
+          "reopened"
+        ],
+        "additionalProperties": false
+      },
+      "selector_symbols": [
+        "loginom.ready_avatar",
+        "workspace.active_tab",
+        "workflow.graph",
+        "packages.menu",
+        "packages.save_as",
+        "packages.close",
+        "packages.open",
+        "file_dialog.file_name",
+        "file_dialog.confirm",
+        "message.text",
+        "message.error",
+        "message.yes",
+        "message.no"
+      ],
+      "evidence": [
+        {
+          "path": "bg/helpers/packages.ts",
+          "line_start": 215,
+          "line_end": 342,
+          "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+          "sha256": "203d7002abdfc8c88bb59bc500a21ff3003f5dc537b500c2f9802afba21d4a8f",
+          "role": "helper"
+        },
+        {
+          "path": "bg/helpers/filedialog.ts",
+          "line_start": 42,
+          "line_end": 58,
+          "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+          "sha256": "a6f7aa54eb48a3d1e330820c5322e03d7d139a172f82f344253b534e48897696",
+          "role": "helper"
+        }
+      ],
+      "preconditions": [
+        "active package and Packages menu resolve",
+        "path is normalized below an allowed Loginom storage root",
+        "conflict policy is explicit"
+      ],
+      "postconditions": [
+        "Loginom reports no save error",
+        "saved package is closed and reopened by normalized path",
+        "the build-pinned read-only PackageFileName cache equals the complete normalized requested path",
+        "the reopened graph has the same normalized node and link identities as the saved checkpoint"
+      ],
+      "effect": {
+        "kind": "save",
+        "resource": "package",
+        "allowed_roots": [
+          "/user/data/packages"
+        ]
+      },
+      "idempotency": {
+        "policy": "reconcile_before_retry",
+        "reconcile": "file conflict dialog and active package identity"
+      },
+      "timeout_ms": 180000,
+      "retry_budget": 0,
+      "required_capabilities": [
+        "package.save_as.v1"
+      ],
+      "min_executor_revision": "1.0.0",
+      "cleanup": [
+        "close transient menu and dialog on a conclusive conflict",
+        "leave the reopened package active after success"
+      ]
+    },
+    {
+      "action_key": "node.configure_text_import",
+      "revision": "1",
+      "status": "candidate",
+      "capability": "node.configure_text_import.v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "node_ref": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "node"
+                ]
+              },
+              "node_label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "workflow_ref": {
+                "type": "object",
+                "properties": {
+                  "tab_tid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "prefix": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "tab_tid",
+                  "prefix"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "node_label",
+              "workflow_ref"
+            ],
+            "additionalProperties": false
+          },
+          "source_transfer_operation_id": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "object",
+                "properties": {
+                  "source_path": {
+                    "type": "string",
+                    "maxLength": 2048
+                  },
+                  "encoding": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "rows_to_skip": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "first_line_as_title": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "source_path",
+                  "encoding",
+                  "rows_to_skip",
+                  "first_line_as_title"
+                ],
+                "additionalProperties": false
+              },
+              "format": {
+                "type": "object",
+                "properties": {
+                  "delimiter": {
+                    "type": "string",
+                    "maxLength": 1
+                  },
+                  "decimal_separator": {
+                    "type": "string",
+                    "maxLength": 1
+                  },
+                  "text_qualifier": {
+                    "type": "string",
+                    "maxLength": 1
+                  },
+                  "null_marker": {
+                    "type": "string",
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "delimiter",
+                  "decimal_separator",
+                  "text_qualifier",
+                  "null_marker"
+                ],
+                "additionalProperties": false
+              },
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "maxLength": 120
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 120
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "real",
+                        "string",
+                        "boolean",
+                        "datetime"
+                      ]
+                    },
+                    "data_kind": {
+                      "type": "string",
+                      "enum": [
+                        "Неопределенное",
+                        "Непрерывный",
+                        "Дискретный"
+                      ]
+                    },
+                    "used": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "label",
+                    "type",
+                    "data_kind",
+                    "used"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "source",
+              "format",
+              "columns"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "node_ref",
+          "source_transfer_operation_id",
+          "settings"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "node_ref": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "node"
+                ]
+              },
+              "node_label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "workflow_ref": {
+                "type": "object",
+                "properties": {
+                  "tab_tid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "prefix": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "tab_tid",
+                  "prefix"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "node_label",
+              "workflow_ref"
+            ],
+            "additionalProperties": false
+          },
+          "settings_readback_verified": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "package_saved": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "execution_started": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "internal_steps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 96
+          }
+        },
+        "required": [
+          "node_ref",
+          "settings_readback_verified",
+          "package_saved",
+          "execution_started",
+          "internal_steps"
+        ],
+        "additionalProperties": false
+      },
+      "selector_symbols": [
+        "workflow.graph"
+      ],
+      "evidence": [
+        {
+          "path": "bg/helpers/wizard.ts",
+          "line_start": 1,
+          "line_end": 80,
+          "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+          "sha256": "700b25194c65dd0d729c76598d2dcfd49f7d8604c1c6f4b9d96995fd4c9e4335",
+          "role": "helper"
+        },
+        {
+          "path": "bg/sels/import/sImportTxt.ts",
+          "line_start": 1,
+          "line_end": 71,
+          "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+          "sha256": "88e1e86bd904233b93d54872b0ac6199c4939bafcacfd39c0c88252576d11eff",
+          "role": "selectors"
+        }
+      ],
+      "preconditions": [
+        "the exact text import node wizard is open at its source page",
+        "the source is a completed byte-verified upload in this session",
+        "one explicit file and one to eight fully visible columns; existing names labels and selection match"
+      ],
+      "postconditions": [
+        "Done saves the node without starting execution",
+        "source format schema and output mapping match after reopening the same node"
+      ],
+      "effect": {
+        "kind": "configure",
+        "resource": "workflow.node"
+      },
+      "idempotency": {
+        "policy": "reconcile_before_retry",
+        "reconcile": "inspect the last child receipt; a partial procedure is never automatically restarted"
+      },
+      "timeout_ms": 300000,
+      "retry_budget": 0,
+      "required_capabilities": [
+        "node.configure_text_import.v1"
+      ],
+      "min_executor_revision": "1.2.0",
+      "cleanup": [
+        "release held input; do not discard a partial wizard as automatic rollback"
+      ]
+    },
+    {
+      "action_key": "package.save_checkpoint",
+      "revision": "1",
+      "status": "candidate",
+      "capability": "package.save_checkpoint.v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "^[^\\u0000\\r\\n]+$"
+          },
+          "conflict_policy": {
+            "type": "string",
+            "enum": [
+              "fail",
+              "replace"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "conflict_policy"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "package_ref": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "package"
+                ]
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "active_identity": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000,
+                "description": "Exact normalized package storage path read from the active package cache of the pinned Loginom UI build"
+              }
+            },
+            "required": [
+              "kind",
+              "path",
+              "active_identity"
+            ],
+            "additionalProperties": false
+          },
+          "reopened": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "workflow_preserved": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "save_completed": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "persisted_content_verified": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "workflow_continuations": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "properties": {
+                "document_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "workflow_ref": {
+                  "type": "object",
+                  "properties": {
+                    "tab_tid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "prefix": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "workflow_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "navigation_path": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 32,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tid": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                          },
+                          "label": {
+                            "type": "string",
+                            "maxLength": 240
+                          }
+                        },
+                        "required": [
+                          "tid",
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "tab_tid",
+                    "prefix",
+                    "workflow_id",
+                    "navigation_path"
+                  ],
+                  "additionalProperties": false
+                },
+                "previous_workflow_ref": {
+                  "type": "object",
+                  "properties": {
+                    "tab_tid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "prefix": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "workflow_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "navigation_path": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 32,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tid": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                          },
+                          "label": {
+                            "type": "string",
+                            "maxLength": 240
+                          }
+                        },
+                        "required": [
+                          "tid",
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "tab_tid",
+                    "prefix",
+                    "workflow_id",
+                    "navigation_path"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "document_id",
+                "workflow_ref",
+                "previous_workflow_ref"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "package_ref",
+          "reopened",
+          "workflow_preserved",
+          "save_completed",
+          "persisted_content_verified"
+        ],
+        "additionalProperties": false
+      },
+      "selector_symbols": [
+        "loginom.ready_avatar",
+        "workspace.active_tab",
+        "workflow.graph",
+        "packages.menu",
+        "packages.save_as",
+        "file_dialog.file_name",
+        "file_dialog.confirm",
+        "message.text",
+        "message.error",
+        "message.yes",
+        "message.no"
+      ],
+      "evidence": [
+        {
+          "path": "bg/helpers/packages.ts",
+          "line_start": 215,
+          "line_end": 342,
+          "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+          "sha256": "203d7002abdfc8c88bb59bc500a21ff3003f5dc537b500c2f9802afba21d4a8f",
+          "role": "helper"
+        },
+        {
+          "path": "bg/helpers/filedialog.ts",
+          "line_start": 42,
+          "line_end": 58,
+          "commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+          "sha256": "a6f7aa54eb48a3d1e330820c5322e03d7d139a172f82f344253b534e48897696",
+          "role": "helper"
+        }
+      ],
+      "preconditions": [
+        "active package and Packages menu resolve",
+        "path is normalized below an allowed Loginom storage root",
+        "conflict policy is explicit"
+      ],
+      "postconditions": [
+        "the awaited native Save As flow completed without an error",
+        "exact normalized destination path is observed in the same active workflow",
+        "the same graph remains open; no package close or reopen",
+        "persisted content requires separate final reopen acceptance"
+      ],
+      "effect": {
+        "kind": "persist",
+        "resource": "package",
+        "allowed_roots": [
+          "/user/data/packages"
+        ]
+      },
+      "idempotency": {
+        "policy": "reconcile_before_retry",
+        "reconcile": "completed browser receipt only; never repeat an unknown save"
+      },
+      "timeout_ms": 180000,
+      "retry_budget": 0,
+      "required_capabilities": [
+        "package.save_checkpoint.v1"
+      ],
+      "min_executor_revision": "1.0.0",
+      "cleanup": [
+        "close transient menu and dialog on a conclusive conflict",
+        "preserve the active workflow after success"
+      ]
+    }
+  ]
+}

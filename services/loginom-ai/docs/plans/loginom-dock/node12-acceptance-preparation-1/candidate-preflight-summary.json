@@ -1,0 +1,18 @@
+{
+  "command_id": "node12:candidate-preflight:1:1a5a46312501d20ec7e23a2db12ed95bf34d784ead45628b12cdcf1492a276ce",
+  "preflight": "passed",
+  "manifest_readback_sha256": "1a5a46312501d20ec7e23a2db12ed95bf34d784ead45628b12cdcf1492a276ce",
+  "registered_dock_read": true,
+  "runtime_unchanged": true,
+  "harness_unchanged": true,
+  "native_skill_sha256": "b9c0c5a9d09cbcc2e1f6d93dc41206f0d3837c517fcf970d4d2d787f4edf4872",
+  "provider": "openai-codex",
+  "model": "gpt-5.6-sol",
+  "reasoning": "low",
+  "hermes_version": "0.21.0",
+  "model_started": false,
+  "browser_started": false,
+  "slot_granted": false,
+  "preflight_report": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-acceptance-preparation-1/candidate-preflight.json",
+  "preflight_report_sha256": "0003c315158004ac41a9f3d0b61e49bc541e462e050ee56e626877b64f1358b5"
+}

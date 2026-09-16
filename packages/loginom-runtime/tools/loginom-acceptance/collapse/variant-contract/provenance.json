@@ -1,0 +1,21 @@
+{
+  "assignment": "node16:variant-contract-design:1:dc93af3f",
+  "base_commit": "dc93af3f07fde3950717c4aa4e0e5cda71af4954",
+  "diagnostic_only": true,
+  "new_live_calls": 0,
+  "public_wiring": false,
+  "fixture_cells": 38,
+  "source_artifacts": 3,
+  "focused_tests": 27,
+  "source_sha256": {
+    "adapter.mjs": "fb67af5c19c81656155986d8a8f650b3cb90b43d7b9884b108dd0ef804480a14",
+    "adapter.test.mjs": "0ea2f2c665b69dda60fc52a509a139755bad0cce4202aff443ecd4e1c0d3ddaf",
+    "observed.json": "9626efa4bb74efa5196c3812d0b90a1af24ebe58a287d1c928d3fcedf25063c1",
+    "replay.mjs": "65cf05949500a6e0981c6043feb3410154c0b9115add930043f71bf4b35a16be",
+    "audit.py": "2bcefaa45a7d1b507a10ae5c141d961039d0075c571620a0f9f576b8302561c7",
+    "README.md": "7b7064930bdcc38f9353778df1ffa9b438061729400692140add0bfd2e757375"
+  },
+  "decoder_sha256": "c744b19210a294ebbddb2cd04e1ea9f67409ba80a208e09c568afb3d7883b15a",
+  "serialized_sha256": "72914a3cca0e4ab9ee3af13b1b99f9a6806d4343ff33297dd5047e6f1f8116d2",
+  "acceptance": "scalar_serialization_only; live complete public table pending"
+}

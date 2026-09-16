@@ -1,0 +1,116 @@
+{
+  "assignment": "node17:final-admission-preflight:1:79e648b2",
+  "status": "blocked_before_user_v1_node_component",
+  "candidate_admission": "implemented; validates pins and native raw evidence, full gate closed",
+  "component_preflight_admission": {
+    "ready": true,
+    "purpose": "user-v1-component",
+    "manifest_sha256": "d809165a8f1c005e096130ab7e8c2c4fb721595a60387cbf81d4f338d86d91fe",
+    "runtime": "347615cbae29323d80b57488b794ecce607b5b9e0d2fbe86aa88b7460241311c",
+    "scope": "private_acceptance_observer",
+    "full_goal_accepted": false
+  },
+  "full_admission": {
+    "ready": false,
+    "blocker": "TEXT_EXPORT_REJECT_BASELINE_READER_UNAVAILABLE: Native user-v1 component evidence pending"
+  },
+  "manifest_sha256": "d809165a8f1c005e096130ab7e8c2c4fb721595a60387cbf81d4f338d86d91fe",
+  "runs": [
+    {
+      "run_id": "20260913-150839-21b24b59",
+      "session_id": "d9044f27-7f19-4bba-93cb-59c1444451eb",
+      "result_profile": "user-v1",
+      "source_mcp_entry": "text-export-observer-client.mjs via StdioClientTransport",
+      "node_apply_calls": 0,
+      "node_apply_prepared": 0,
+      "observer_started": false,
+      "failure": {
+        "phase": "starting",
+        "error": "Observed test-2 account required",
+        "smoke_used": false
+      },
+      "session_close": {
+        "browser_transport_closed": true,
+        "logged_out": false,
+        "global_config_unchanged": true
+      },
+      "process_close": {
+        "owned_session_id": "d9044f27-7f19-4bba-93cb-59c1444451eb",
+        "browser_process_ids": [],
+        "closed": true
+      },
+      "evidence_sha256": {
+        "request.json": "c553e9b1f79e45283ebdd9fb3dfba0e48b357136e3976ac07d5ce80f235ba884",
+        "preparation.json": "8c4770f119b0194946ba20ad85f3909949956872064c9c3caafb4482b2f636ee",
+        "entry-launch.json": "65c54dd83a72cca03ad6bab4736ed4d7be3702ebf529fb35252105fe81d15b41",
+        "geometry.json": "56f3ca2621b13c445d80310ae37c6ca30c77e205f4c154366b8159da7ee2fef9",
+        "public-wire.jsonl": "1d517becbf92351ea2d928cff73250b4d3e4bf13ec9360f88c030ef15e75ea64",
+        "failure.json": "f3097748808887f03302ca5197c7cad0f1240c958d419f7fa15f3b96e2558870",
+        "session-close.json": "701c7f6c6e83a3a96aa4ac8b9d82a01fe91d0662f75d9e1900974d9ebc4b7d33",
+        "process-close-check.json": "d0643d0ce2f87564d3dcbde8cd968d8876d747042f6fb287fb78774997f7d853",
+        "diagnosis.json": "97a9a191015de19489d901d94bc7a65035c70c02b8caafae890ace6042d3013f",
+        "private/dock-state/sessions/d9044f27-7f19-4bba-93cb-59c1444451eb/session.json": "26d93a4963bc341ebf32efb157a327a72b863ac6142eb25630e64c54cc6c50f7",
+        "private/dock-state/sessions/d9044f27-7f19-4bba-93cb-59c1444451eb/execution-events.jsonl": "c93354308ec7f5a2720edefc2685f77cb8e8f4b97edf5d7823ddf50eb800fe69",
+        "private/dock-state/sessions/d9044f27-7f19-4bba-93cb-59c1444451eb/playwright.json": "7afe17ae1e458c298621d1f943e72bb0ebdfccdba70ca59b6a4d8a17a9f0a757"
+      }
+    },
+    {
+      "run_id": "20260913-151004-11ecca67",
+      "session_id": "c562fc39-763e-46c3-bbc3-62c58f13a597",
+      "result_profile": "user-v1",
+      "source_mcp_entry": "text-export-observer-client.mjs via StdioClientTransport",
+      "node_apply_calls": 0,
+      "node_apply_prepared": 0,
+      "observer_started": false,
+      "failure": {
+        "phase": "starting",
+        "error": "Account observation changed",
+        "smoke_used": false
+      },
+      "session_close": {
+        "browser_transport_closed": true,
+        "logged_out": false,
+        "global_config_unchanged": true
+      },
+      "process_close": {
+        "owned_session_id": "c562fc39-763e-46c3-bbc3-62c58f13a597",
+        "browser_process_ids": [],
+        "closed": true,
+        "free_bytes": 97027256320
+      },
+      "diagnosis": {
+        "public_result_status": "FAILED",
+        "public_error": {
+          "code": "REQUEST_REJECTED",
+          "message": "Workspace changed between observation pages; begin a new observation. If this repeats in a wizard, use scope roots, then read its freshly delivered WizrdMCF root_ref and observation_id. Do not reuse refs from the invalidated observation"
+        },
+        "complete_internal_observation_account_label_matches": 0,
+        "bounded_correction_consumed": true
+      },
+      "evidence_sha256": {
+        "request.json": "15fdf4d9645b9b60b24c3d29e792fe8aac0bf594c9be187cf2c75559fd205831",
+        "preparation.json": "a83b64cb6f4c95d9e5a523c80f20ddad68bc4e061fa2e7e44f9ab004971a6623",
+        "entry-launch.json": "6dfcfebc6fcef506698cd8d2c8c4f83b9e0b4944da5bd280b7a3af99febdd35f",
+        "geometry.json": "5077d2eddb446c19fb5068450e1413c409d01f2a8207c4873fec857fbf46b38f",
+        "public-wire.jsonl": "f5932b45d850ef3cfbf6ca933b8486743868d95f426c97d9206a526624d93bb6",
+        "failure.json": "45bffe4e2d0ab76e69c4b3b57bd44501ad65de72dbdaa0d4f3e753694099be92",
+        "session-close.json": "701c7f6c6e83a3a96aa4ac8b9d82a01fe91d0662f75d9e1900974d9ebc4b7d33",
+        "process-close-check.json": "cb067b599e842c0b475768e178959b55377ebf18e413b53156d61c530dcbe9c2",
+        "diagnosis.json": "8978935675a724494f82a13dd024dd1db0e20e3ad911cf87c6753a99d14b4579",
+        "private/dock-state/sessions/c562fc39-763e-46c3-bbc3-62c58f13a597/session.json": "7420d0b816b1489178379a29801943e0fd9457c9080d75aa1f98b11bb24b1d74",
+        "private/dock-state/sessions/c562fc39-763e-46c3-bbc3-62c58f13a597/execution-events.jsonl": "61d58abf18d86b37446b1ea2123367a6e0ecb046bf147b69374bb946458f42b2",
+        "private/dock-state/sessions/c562fc39-763e-46c3-bbc3-62c58f13a597/playwright.json": "77a1cf639e56a746344fde9039a70f584147c8f95b9a8b3282faad835231a8d9"
+      }
+    }
+  ],
+  "user_v1_component_pass": false,
+  "full_goal_pass": false,
+  "hermes_started": false,
+  "tests": {
+    "node": 19,
+    "text_export_python": 20,
+    "user_projection_python": 6
+  },
+  "next_owner": "coordinator",
+  "next_trigger": "bounded account-observation method for real stdio entry before any further user-v1 native component attempt; private fixed native account probe was already observed to work in the earlier diagnostic harness, whereas public bounded UI output omits the plain account label and full-snapshot cursor invalidated"
+}

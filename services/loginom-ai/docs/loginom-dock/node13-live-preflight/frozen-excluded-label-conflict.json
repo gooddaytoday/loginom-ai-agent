@@ -1,0 +1,52 @@
+{
+  "source_DateB": [
+    {
+      "record_id": "1112",
+      "field_id": "26",
+      "index": 14,
+      "name": "DateB",
+      "label": "Дата",
+      "type": "datetime",
+      "required": false
+    }
+  ],
+  "target_DateB": [
+    {
+      "record_id": "1140",
+      "field_id": "14",
+      "index": 14,
+      "name": "DateB",
+      "label": "Дата",
+      "type": "datetime",
+      "required": false,
+      "group_index": 14,
+      "excluded": false,
+      "inherited": false,
+      "exclusion_source": null,
+      "data_kind": "Непрерывный",
+      "source": {
+        "record_id": "1112",
+        "field_id": "26",
+        "index": 14,
+        "name": "DateB",
+        "label": "Дата",
+        "type": "datetime",
+        "required": false
+      }
+    }
+  ],
+  "mapping_wizard": "DerivedDataSourceOutputSocketWizard",
+  "autosync": true,
+  "required_frozen_excluded": [
+    {
+      "name": "DateB",
+      "label": "DateB",
+      "type": "datetime",
+      "excluded": true
+    }
+  ],
+  "failure": {
+    "code": "NODE_APPLY_STOPPED",
+    "message": "Date/time output: excluded source cannot be renamed"
+  }
+}

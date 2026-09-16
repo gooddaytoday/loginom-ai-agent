@@ -1,0 +1,4156 @@
+{
+  "assignment": "node14:hermes-full:6:138712ff",
+  "slot": "node14-hermes-20260913-3499a38b",
+  "run_id": "20260913-221602-99120ff2",
+  "head": "138712ffe3c5a799f0c9141a49f83c17df565bb7",
+  "runtime_revision": "4111dfed253d484003d5fb48c09006ec70e3057d0a9cfacd8f025b189884fc31",
+  "harness_inputs_sha256": "0da2ccdcad484d92ee70bf3b1cb229cdc95e12752799e4f7a0a099be85213264",
+  "result": "FAIL",
+  "summary": {
+    "run_id": "20260913-221602-99120ff2",
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning": "low",
+    "api_calls": 83,
+    "usage_completed": true,
+    "model_returncode": 0,
+    "model_timed_out": false,
+    "launcher_returncode": 0,
+    "counts": {
+      "calls": 90,
+      "replies": 90,
+      "events": 15416,
+      "prepared": 27,
+      "statuses": {
+        "SUCCEEDED": 24,
+        "NOT_APPLIED": 1,
+        "FAILED": 1,
+        "AMBIGUOUS": 1
+      },
+      "successful_imports": 9,
+      "successful_missing_values": 15,
+      "saves": 0
+    },
+    "pairing_errors": [],
+    "import_component_proofs": [
+      {
+        "operation_id": "import-120-001",
+        "scoped_proof": true,
+        "attempts": 3,
+        "full_goal_accepted": false
+      }
+    ],
+    "auth_guard": {
+      "policy": "existing-hermes-no-refresh-or-import-v1",
+      "installed": true,
+      "blocked_attempts": 0
+    },
+    "auth_connection_unchanged": true,
+    "runtime_unchanged": true,
+    "harness_unchanged": true,
+    "native_skill_unchanged": true,
+    "operations": [
+      {
+        "operation_id": "import-base-001",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 80
+        }
+      },
+      {
+        "operation_id": "import-precision-001",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 260
+        }
+      },
+      {
+        "operation_id": "import-skew-001",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 440
+        }
+      },
+      {
+        "operation_id": "import-boundary-001",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 620
+        }
+      },
+      {
+        "operation_id": "import-120-001",
+        "type": "imports.text",
+        "status": "NOT_APPLIED",
+        "effect_possible": false,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 80,
+          "y": 980
+        }
+      },
+      {
+        "operation_id": "import-120-002",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 400,
+          "y": 80
+        }
+      },
+      {
+        "operation_id": "import-allnull-001",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 400,
+          "y": 260
+        }
+      },
+      {
+        "operation_id": "import-empty-001",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 400,
+          "y": 440
+        }
+      },
+      {
+        "operation_id": "import-permutation-001",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 400,
+          "y": 620
+        }
+      },
+      {
+        "operation_id": "import-mutable-001",
+        "type": "imports.text",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 700,
+          "y": 80
+        }
+      },
+      {
+        "operation_id": "impute-main-001",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 700,
+          "y": 260
+        }
+      },
+      {
+        "operation_id": "impute-main-newnode-002",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": null
+      },
+      {
+        "operation_id": "impute-main-done-003",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": null
+      },
+      {
+        "operation_id": "impute-main-close-004",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": null
+      },
+      {
+        "operation_id": "impute-main-recheck-005",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": null
+      },
+      {
+        "operation_id": "impute-noteonly-001",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 700,
+          "y": 440
+        }
+      },
+      {
+        "operation_id": "impute-precision-001",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 700,
+          "y": 620
+        }
+      },
+      {
+        "operation_id": "impute-skew-001",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 1000,
+          "y": 80
+        }
+      },
+      {
+        "operation_id": "impute-th40-001",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 1000,
+          "y": 260
+        }
+      },
+      {
+        "operation_id": "impute-th41-001",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 1000,
+          "y": 260
+        }
+      },
+      {
+        "operation_id": "impute-th42-001",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 1000,
+          "y": 440
+        }
+      },
+      {
+        "operation_id": "impute-120-001",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 1000,
+          "y": 620
+        }
+      },
+      {
+        "operation_id": "impute-allnull-001",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 1000,
+          "y": 620
+        }
+      },
+      {
+        "operation_id": "impute-empty-001",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 1000,
+          "y": 620
+        }
+      },
+      {
+        "operation_id": "impute-permuted-001",
+        "type": "preprocessing.data_recovery",
+        "status": "FAILED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 1200,
+          "y": 80
+        }
+      },
+      {
+        "operation_id": "impute-permuted-002",
+        "type": "preprocessing.data_recovery",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "pending_phase": null,
+        "position": {
+          "x": 1000,
+          "y": 620
+        }
+      },
+      {
+        "operation_id": "impute-sourcechange-001",
+        "type": "preprocessing.data_recovery",
+        "status": "AMBIGUOUS",
+        "effect_possible": true,
+        "cleanup_complete": false,
+        "pending_phase": "finish",
+        "position": {
+          "x": 1000,
+          "y": 620
+        },
+        "error": {
+          "code": "NODE_APPLY_STOPPED",
+          "message": "Node procedure step did not confirm completion; inspect before retry"
+        },
+        "last_target_checkpoint": {
+          "signature": "bc2f25a91ce2f4ebae5e6b527ba07adac20ee4833b13549fbd1afcc97127f159",
+          "receipts": [
+            {
+              "id": "impute-sourcechange-001:graph:0",
+              "kind": "create",
+              "parameters": {
+                "kind": "new",
+                "label": "Смена источника",
+                "position": {
+                  "x": 1000,
+                  "y": 620
+                },
+                "type": "preprocessing.data_recovery"
+              },
+              "verified": true,
+              "receipt": {
+                "status": "SUCCEEDED",
+                "effect_possible": true,
+                "after": {
+                  "complete": true,
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_ref": {
+                    "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+                    "prefix": "MF;TF-1",
+                    "navigation_path": [
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                        "label": ""
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                        "label": "Пакеты"
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                        "label": "Package1"
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                        "label": "Модуль1"
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                        "label": "Сценарий"
+                      }
+                    ],
+                    "workflow_id": "1789326980820-lynmcicijf-1"
+                  },
+                  "dom_epoch": 1,
+                  "nodes": [
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "0e3179a6-1165-4915-a3ab-971dfb2a40c8"
+                      },
+                      "type": "imports.text",
+                      "label": "Перестановка",
+                      "dom_epoch": 776,
+                      "position": {
+                        "x": 400,
+                        "y": 624
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "11d4815c-b38d-4abf-9764-53cd0428e795"
+                      },
+                      "type": "imports.text",
+                      "label": "Точные числа",
+                      "dom_epoch": 770,
+                      "position": {
+                        "x": 80,
+                        "y": 264
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "415c2a39-3d36-411f-91c1-f91a94b147cb"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Округлённый ноль",
+                      "dom_epoch": 785,
+                      "position": {
+                        "x": 1000,
+                        "y": 624
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "476f6117-7d95-4838-8c61-b73d593368e0"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Пустой результат",
+                      "dom_epoch": 787,
+                      "position": {
+                        "x": 1000,
+                        "y": 624
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "5a8fc5a4-83ea-42da-9881-dd0efb234f32"
+                      },
+                      "type": "imports.text",
+                      "label": "Все пропуски",
+                      "dom_epoch": 774,
+                      "position": {
+                        "x": 400,
+                        "y": 264
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Заполнение пропусков",
+                      "dom_epoch": 790,
+                      "position": {
+                        "x": 1000,
+                        "y": 624
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "61cddcab-7bb9-44c3-91d5-ef916d37bd88"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Порог 40",
+                      "dom_epoch": 782,
+                      "position": {
+                        "x": 1000,
+                        "y": 264
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "62e42535-d3eb-4876-9565-d6507e0aeab8"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Среднее не медиана",
+                      "dom_epoch": 781,
+                      "position": {
+                        "x": 1000,
+                        "y": 80
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "6344065d-db01-4457-b047-566c6e08b242"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Полностью пустые поля",
+                      "dom_epoch": 786,
+                      "position": {
+                        "x": 1000,
+                        "y": 624
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "6620f9de-e585-39c7-88a9-35255088ebb7"
+                      },
+                      "type": "bg-vendor-icon-modelvariables",
+                      "label": "Переменные сценария",
+                      "dom_epoch": 768,
+                      "position": {
+                        "x": 16,
+                        "y": 164
+                      },
+                      "inputs": [],
+                      "outputs": [],
+                      "other_ports": [
+                        "Output_Var-0",
+                        "Output_Var-1",
+                        "Output_Var-2",
+                        "Output_Var-3",
+                        "Output_Var-4"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "7e062cfd-2e47-4b66-a59c-21c5ef23f8e9"
+                      },
+                      "type": "imports.text",
+                      "label": "Без строк",
+                      "dom_epoch": 775,
+                      "position": {
+                        "x": 400,
+                        "y": 440
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "7fa562ab-3ff5-415a-8983-29352fc1e18a"
+                      },
+                      "type": "imports.text",
+                      "label": "База",
+                      "dom_epoch": 769,
+                      "position": {
+                        "x": 80,
+                        "y": 80
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "858da7e7-414d-4e2e-ad62-20d26afae8dd"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Порог 41",
+                      "dom_epoch": 783,
+                      "position": {
+                        "x": 1000,
+                        "y": 264
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "97613265-ccf5-4fae-900c-841eb4e53104"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Основной",
+                      "dom_epoch": 778,
+                      "position": {
+                        "x": 704,
+                        "y": 264
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "a2633840-7b5b-43cb-9364-5a029f2aff3e"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Порог 42",
+                      "dom_epoch": 784,
+                      "position": {
+                        "x": 1000,
+                        "y": 440
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "a5b11211-7ce2-4162-b452-d5a851408b7b"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Только строка",
+                      "dom_epoch": 779,
+                      "position": {
+                        "x": 704,
+                        "y": 440
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "bb45d8ca-d6f1-4b00-99db-ad9c4f145dae"
+                      },
+                      "type": "imports.text",
+                      "label": "Изменяемый источник",
+                      "dom_epoch": 789,
+                      "position": {
+                        "x": 704,
+                        "y": 80
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "bc1aec08-36f1-43f1-a75b-53ac34830593"
+                      },
+                      "type": "imports.text",
+                      "label": "Сто двадцать",
+                      "dom_epoch": 773,
+                      "position": {
+                        "x": 400,
+                        "y": 80
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "bf88d020-711a-4368-baac-15a056406486"
+                      },
+                      "type": "imports.text",
+                      "label": "Асимметрия",
+                      "dom_epoch": 771,
+                      "position": {
+                        "x": 80,
+                        "y": 440
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "d48f72aa-f11f-4ff0-a5fa-75d018d51564"
+                      },
+                      "type": "imports.text",
+                      "label": "Граница",
+                      "dom_epoch": 772,
+                      "position": {
+                        "x": 80,
+                        "y": 624
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "d7dea9a3-9b7c-4514-a14a-a2a6474ba17e"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Переставленные поля",
+                      "dom_epoch": 788,
+                      "position": {
+                        "x": 1000,
+                        "y": 624
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "f7879193-2f27-40f9-8346-c5b5a3bad5f5"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Точность",
+                      "dom_epoch": 780,
+                      "position": {
+                        "x": 704,
+                        "y": 624
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    }
+                  ],
+                  "links": [
+                    {
+                      "source": "0e3179a6-1165-4915-a3ab-971dfb2a40c8",
+                      "output": 0,
+                      "target": "d7dea9a3-9b7c-4514-a14a-a2a6474ba17e",
+                      "input": 0
+                    },
+                    {
+                      "source": "11d4815c-b38d-4abf-9764-53cd0428e795",
+                      "output": 0,
+                      "target": "f7879193-2f27-40f9-8346-c5b5a3bad5f5",
+                      "input": 0
+                    },
+                    {
+                      "source": "5a8fc5a4-83ea-42da-9881-dd0efb234f32",
+                      "output": 0,
+                      "target": "6344065d-db01-4457-b047-566c6e08b242",
+                      "input": 0
+                    },
+                    {
+                      "source": "7e062cfd-2e47-4b66-a59c-21c5ef23f8e9",
+                      "output": 0,
+                      "target": "476f6117-7d95-4838-8c61-b73d593368e0",
+                      "input": 0
+                    },
+                    {
+                      "source": "7fa562ab-3ff5-415a-8983-29352fc1e18a",
+                      "output": 0,
+                      "target": "97613265-ccf5-4fae-900c-841eb4e53104",
+                      "input": 0
+                    },
+                    {
+                      "source": "7fa562ab-3ff5-415a-8983-29352fc1e18a",
+                      "output": 0,
+                      "target": "a5b11211-7ce2-4162-b452-d5a851408b7b",
+                      "input": 0
+                    },
+                    {
+                      "source": "bc1aec08-36f1-43f1-a75b-53ac34830593",
+                      "output": 0,
+                      "target": "415c2a39-3d36-411f-91c1-f91a94b147cb",
+                      "input": 0
+                    },
+                    {
+                      "source": "bf88d020-711a-4368-baac-15a056406486",
+                      "output": 0,
+                      "target": "62e42535-d3eb-4876-9565-d6507e0aeab8",
+                      "input": 0
+                    },
+                    {
+                      "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                      "output": 0,
+                      "target": "61cddcab-7bb9-44c3-91d5-ef916d37bd88",
+                      "input": 0
+                    },
+                    {
+                      "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                      "output": 0,
+                      "target": "858da7e7-414d-4e2e-ad62-20d26afae8dd",
+                      "input": 0
+                    },
+                    {
+                      "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                      "output": 0,
+                      "target": "a2633840-7b5b-43cb-9364-5a029f2aff3e",
+                      "input": 0
+                    }
+                  ],
+                  "foreign_links": [],
+                  "interaction_ready": true
+                },
+                "cleanup_complete": true
+              }
+            },
+            {
+              "id": "impute-sourcechange-001:graph:1",
+              "kind": "rename",
+              "parameters": {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd"
+                },
+                "label": "Смена источника"
+              },
+              "verified": true,
+              "receipt": {
+                "status": "SUCCEEDED",
+                "effect_possible": true,
+                "after": {
+                  "complete": true,
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_ref": {
+                    "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+                    "prefix": "MF;TF-1",
+                    "navigation_path": [
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                        "label": ""
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                        "label": "Пакеты"
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                        "label": "Package1"
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                        "label": "Модуль1"
+                      },
+                      {
+                        "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                        "label": "Сценарий"
+                      }
+                    ],
+                    "workflow_id": "1789326980820-lynmcicijf-1"
+                  },
+                  "dom_epoch": 1,
+                  "nodes": [
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "0e3179a6-1165-4915-a3ab-971dfb2a40c8"
+                      },
+                      "type": "imports.text",
+                      "label": "Перестановка",
+                      "dom_epoch": 799,
+                      "position": {
+                        "x": 400,
+                        "y": 624
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "11d4815c-b38d-4abf-9764-53cd0428e795"
+                      },
+                      "type": "imports.text",
+                      "label": "Точные числа",
+                      "dom_epoch": 793,
+                      "position": {
+                        "x": 80,
+                        "y": 264
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "415c2a39-3d36-411f-91c1-f91a94b147cb"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Округлённый ноль",
+                      "dom_epoch": 808,
+                      "position": {
+                        "x": 1000,
+                        "y": 624
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "476f6117-7d95-4838-8c61-b73d593368e0"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Пустой результат",
+                      "dom_epoch": 810,
+                      "position": {
+                        "x": 1000,
+                        "y": 624
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "5a8fc5a4-83ea-42da-9881-dd0efb234f32"
+                      },
+                      "type": "imports.text",
+                      "label": "Все пропуски",
+                      "dom_epoch": 797,
+                      "position": {
+                        "x": 400,
+                        "y": 264
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Смена источника",
+                      "dom_epoch": 812,
+                      "position": {
+                        "x": 1000,
+                        "y": 624
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "61cddcab-7bb9-44c3-91d5-ef916d37bd88"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Порог 40",
+                      "dom_epoch": 805,
+                      "position": {
+                        "x": 1000,
+                        "y": 264
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "62e42535-d3eb-4876-9565-d6507e0aeab8"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Среднее не медиана",
+                      "dom_epoch": 804,
+                      "position": {
+                        "x": 1000,
+                        "y": 80
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "6344065d-db01-4457-b047-566c6e08b242"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Полностью пустые поля",
+                      "dom_epoch": 809,
+                      "position": {
+                        "x": 1000,
+                        "y": 624
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "6620f9de-e585-39c7-88a9-35255088ebb7"
+                      },
+                      "type": "bg-vendor-icon-modelvariables",
+                      "label": "Переменные сценария",
+                      "dom_epoch": 791,
+                      "position": {
+                        "x": 16,
+                        "y": 164
+                      },
+                      "inputs": [],
+                      "outputs": [],
+                      "other_ports": [
+                        "Output_Var-0",
+                        "Output_Var-1",
+                        "Output_Var-2",
+                        "Output_Var-3",
+                        "Output_Var-4"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "7e062cfd-2e47-4b66-a59c-21c5ef23f8e9"
+                      },
+                      "type": "imports.text",
+                      "label": "Без строк",
+                      "dom_epoch": 798,
+                      "position": {
+                        "x": 400,
+                        "y": 440
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "7fa562ab-3ff5-415a-8983-29352fc1e18a"
+                      },
+                      "type": "imports.text",
+                      "label": "База",
+                      "dom_epoch": 792,
+                      "position": {
+                        "x": 80,
+                        "y": 80
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "858da7e7-414d-4e2e-ad62-20d26afae8dd"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Порог 41",
+                      "dom_epoch": 806,
+                      "position": {
+                        "x": 1000,
+                        "y": 264
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "97613265-ccf5-4fae-900c-841eb4e53104"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Основной",
+                      "dom_epoch": 801,
+                      "position": {
+                        "x": 704,
+                        "y": 264
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "a2633840-7b5b-43cb-9364-5a029f2aff3e"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Порог 42",
+                      "dom_epoch": 807,
+                      "position": {
+                        "x": 1000,
+                        "y": 440
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "a5b11211-7ce2-4162-b452-d5a851408b7b"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Только строка",
+                      "dom_epoch": 802,
+                      "position": {
+                        "x": 704,
+                        "y": 440
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "bb45d8ca-d6f1-4b00-99db-ad9c4f145dae"
+                      },
+                      "type": "imports.text",
+                      "label": "Изменяемый источник",
+                      "dom_epoch": 800,
+                      "position": {
+                        "x": 704,
+                        "y": 80
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "bc1aec08-36f1-43f1-a75b-53ac34830593"
+                      },
+                      "type": "imports.text",
+                      "label": "Сто двадцать",
+                      "dom_epoch": 796,
+                      "position": {
+                        "x": 400,
+                        "y": 80
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "bf88d020-711a-4368-baac-15a056406486"
+                      },
+                      "type": "imports.text",
+                      "label": "Асимметрия",
+                      "dom_epoch": 794,
+                      "position": {
+                        "x": 80,
+                        "y": 440
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "d48f72aa-f11f-4ff0-a5fa-75d018d51564"
+                      },
+                      "type": "imports.text",
+                      "label": "Граница",
+                      "dom_epoch": 795,
+                      "position": {
+                        "x": 80,
+                        "y": 624
+                      },
+                      "inputs": [],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [
+                        "Input_Connection-0",
+                        "Input_Var-1"
+                      ],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "d7dea9a3-9b7c-4514-a14a-a2a6474ba17e"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Переставленные поля",
+                      "dom_epoch": 811,
+                      "position": {
+                        "x": 1000,
+                        "y": 624
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    },
+                    {
+                      "ref": {
+                        "document_id": "1789326980820-lynmcicijf",
+                        "workflow_id": "1789326980820-lynmcicijf-1",
+                        "node_id": "f7879193-2f27-40f9-8346-c5b5a3bad5f5"
+                      },
+                      "type": "preprocessing.data_recovery",
+                      "label": "Точность",
+                      "dom_epoch": 803,
+                      "position": {
+                        "x": 704,
+                        "y": 624
+                      },
+                      "inputs": [
+                        0
+                      ],
+                      "outputs": [
+                        0
+                      ],
+                      "other_ports": [],
+                      "locked": false
+                    }
+                  ],
+                  "links": [
+                    {
+                      "source": "0e3179a6-1165-4915-a3ab-971dfb2a40c8",
+                      "output": 0,
+                      "target": "d7dea9a3-9b7c-4514-a14a-a2a6474ba17e",
+                      "input": 0
+                    },
+                    {
+                      "source": "11d4815c-b38d-4abf-9764-53cd0428e795",
+                      "output": 0,
+                      "target": "f7879193-2f27-40f9-8346-c5b5a3bad5f5",
+                      "input": 0
+                    },
+                    {
+                      "source": "5a8fc5a4-83ea-42da-9881-dd0efb234f32",
+                      "output": 0,
+                      "target": "6344065d-db01-4457-b047-566c6e08b242",
+                      "input": 0
+                    },
+                    {
+                      "source": "7e062cfd-2e47-4b66-a59c-21c5ef23f8e9",
+                      "output": 0,
+                      "target": "476f6117-7d95-4838-8c61-b73d593368e0",
+                      "input": 0
+                    },
+                    {
+                      "source": "7fa562ab-3ff5-415a-8983-29352fc1e18a",
+                      "output": 0,
+                      "target": "97613265-ccf5-4fae-900c-841eb4e53104",
+                      "input": 0
+                    },
+                    {
+                      "source": "7fa562ab-3ff5-415a-8983-29352fc1e18a",
+                      "output": 0,
+                      "target": "a5b11211-7ce2-4162-b452-d5a851408b7b",
+                      "input": 0
+                    },
+                    {
+                      "source": "bc1aec08-36f1-43f1-a75b-53ac34830593",
+                      "output": 0,
+                      "target": "415c2a39-3d36-411f-91c1-f91a94b147cb",
+                      "input": 0
+                    },
+                    {
+                      "source": "bf88d020-711a-4368-baac-15a056406486",
+                      "output": 0,
+                      "target": "62e42535-d3eb-4876-9565-d6507e0aeab8",
+                      "input": 0
+                    },
+                    {
+                      "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                      "output": 0,
+                      "target": "61cddcab-7bb9-44c3-91d5-ef916d37bd88",
+                      "input": 0
+                    },
+                    {
+                      "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                      "output": 0,
+                      "target": "858da7e7-414d-4e2e-ad62-20d26afae8dd",
+                      "input": 0
+                    },
+                    {
+                      "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                      "output": 0,
+                      "target": "a2633840-7b5b-43cb-9364-5a029f2aff3e",
+                      "input": 0
+                    }
+                  ],
+                  "foreign_links": [],
+                  "interaction_ready": true
+                },
+                "cleanup_complete": true
+              }
+            },
+            {
+              "id": "impute-sourcechange-001:graph:2",
+              "kind": "connect",
+              "parameters": {
+                "edge": {
+                  "source": "bb45d8ca-d6f1-4b00-99db-ad9c4f145dae",
+                  "output": 0,
+                  "target": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd",
+                  "input": 0
+                }
+              },
+              "verified": true,
+              "receipt": {
+                "status": "SUCCEEDED",
+                "action_key": "link.create",
+                "action_revision": "1",
+                "operation_id": "impute-sourcechange-001:graph:2",
+                "phase": "verified",
+                "effect_possible": true,
+                "output": {
+                  "link_ref": {
+                    "kind": "link",
+                    "tid": "MF;TF-1;Graph;Изменяемый_источник|Output_Data-0|Смена_источника|Input_Data-0"
+                  },
+                  "reconciled": false
+                },
+                "error": null,
+                "trace": [
+                  {
+                    "at_ms": 0,
+                    "event": "action_started",
+                    "capability": "link.create.v1",
+                    "mode": "apply"
+                  },
+                  {
+                    "at_ms": 225,
+                    "event": "preconditions_verified",
+                    "active_tab": "MF;TF-1"
+                  },
+                  {
+                    "at_ms": 447,
+                    "event": "preconditions_verified",
+                    "active_tab": "MF;TF-1"
+                  },
+                  {
+                    "at_ms": 500,
+                    "event": "link_observation",
+                    "stage": "initial",
+                    "attempt": 0,
+                    "baseline": {
+                      "ports": [
+                        "MF;TF-1;Graph;Смена_источника;Input_Data-0",
+                        "MF;TF-1;Graph;Смена_источника;Output_Data-0"
+                      ],
+                      "links": [
+                        "MF;TF-1;Graph;Асимметрия|Output_Data-0|Среднее_не_медиана|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Основной|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Только_строка|Input_Data-0",
+                        "MF;TF-1;Graph;Без_строк|Output_Data-0|Пустой_результат|Input_Data-0",
+                        "MF;TF-1;Graph;Все_пропуски|Output_Data-0|Полностью_пустые_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_40|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_41|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_42|Input_Data-0",
+                        "MF;TF-1;Graph;Перестановка|Output_Data-0|Переставленные_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Сто_двадцать|Output_Data-0|Округлённый_ноль|Input_Data-0",
+                        "MF;TF-1;Graph;Точные_числа|Output_Data-0|Точность|Input_Data-0"
+                      ]
+                    },
+                    "current": {
+                      "ports": [
+                        "MF;TF-1;Graph;Смена_источника;Input_Data-0",
+                        "MF;TF-1;Graph;Смена_источника;Output_Data-0"
+                      ],
+                      "links": [
+                        "MF;TF-1;Graph;Асимметрия|Output_Data-0|Среднее_не_медиана|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Основной|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Только_строка|Input_Data-0",
+                        "MF;TF-1;Graph;Без_строк|Output_Data-0|Пустой_результат|Input_Data-0",
+                        "MF;TF-1;Graph;Все_пропуски|Output_Data-0|Полностью_пустые_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_40|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_41|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_42|Input_Data-0",
+                        "MF;TF-1;Graph;Перестановка|Output_Data-0|Переставленные_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Сто_двадцать|Output_Data-0|Округлённый_ноль|Input_Data-0",
+                        "MF;TF-1;Graph;Точные_числа|Output_Data-0|Точность|Input_Data-0"
+                      ]
+                    },
+                    "delta": {
+                      "added_ports": [],
+                      "removed_ports": [],
+                      "added_links": [],
+                      "removed_links": []
+                    }
+                  },
+                  {
+                    "at_ms": 523,
+                    "event": "preconditions_verified",
+                    "active_tab": "MF;TF-1"
+                  },
+                  {
+                    "at_ms": 576,
+                    "event": "link_observation",
+                    "stage": "before_drag",
+                    "attempt": 1,
+                    "baseline": {
+                      "ports": [
+                        "MF;TF-1;Graph;Смена_источника;Input_Data-0",
+                        "MF;TF-1;Graph;Смена_источника;Output_Data-0"
+                      ],
+                      "links": [
+                        "MF;TF-1;Graph;Асимметрия|Output_Data-0|Среднее_не_медиана|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Основной|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Только_строка|Input_Data-0",
+                        "MF;TF-1;Graph;Без_строк|Output_Data-0|Пустой_результат|Input_Data-0",
+                        "MF;TF-1;Graph;Все_пропуски|Output_Data-0|Полностью_пустые_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_40|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_41|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_42|Input_Data-0",
+                        "MF;TF-1;Graph;Перестановка|Output_Data-0|Переставленные_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Сто_двадцать|Output_Data-0|Округлённый_ноль|Input_Data-0",
+                        "MF;TF-1;Graph;Точные_числа|Output_Data-0|Точность|Input_Data-0"
+                      ]
+                    },
+                    "current": {
+                      "ports": [
+                        "MF;TF-1;Graph;Смена_источника;Input_Data-0",
+                        "MF;TF-1;Graph;Смена_источника;Output_Data-0"
+                      ],
+                      "links": [
+                        "MF;TF-1;Graph;Асимметрия|Output_Data-0|Среднее_не_медиана|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Основной|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Только_строка|Input_Data-0",
+                        "MF;TF-1;Graph;Без_строк|Output_Data-0|Пустой_результат|Input_Data-0",
+                        "MF;TF-1;Graph;Все_пропуски|Output_Data-0|Полностью_пустые_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_40|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_41|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_42|Input_Data-0",
+                        "MF;TF-1;Graph;Перестановка|Output_Data-0|Переставленные_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Сто_двадцать|Output_Data-0|Округлённый_ноль|Input_Data-0",
+                        "MF;TF-1;Graph;Точные_числа|Output_Data-0|Точность|Input_Data-0"
+                      ]
+                    },
+                    "delta": {
+                      "added_ports": [],
+                      "removed_ports": [],
+                      "added_links": [],
+                      "removed_links": []
+                    }
+                  },
+                  {
+                    "at_ms": 733,
+                    "event": "port_drag_attempt",
+                    "attempt": 1,
+                    "correction": {
+                      "x": 0,
+                      "y": 0
+                    },
+                    "source_point": {
+                      "x": 1092.5,
+                      "y": 218
+                    },
+                    "target_point": {
+                      "x": 1315.5,
+                      "y": 754
+                    }
+                  },
+                  {
+                    "at_ms": 825,
+                    "event": "mouse_released"
+                  },
+                  {
+                    "at_ms": 995,
+                    "event": "preconditions_verified",
+                    "active_tab": "MF;TF-1"
+                  },
+                  {
+                    "at_ms": 1046,
+                    "event": "link_observation",
+                    "stage": "after_drag",
+                    "attempt": 1,
+                    "baseline": {
+                      "ports": [
+                        "MF;TF-1;Graph;Смена_источника;Input_Data-0",
+                        "MF;TF-1;Graph;Смена_источника;Output_Data-0"
+                      ],
+                      "links": [
+                        "MF;TF-1;Graph;Асимметрия|Output_Data-0|Среднее_не_медиана|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Основной|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Только_строка|Input_Data-0",
+                        "MF;TF-1;Graph;Без_строк|Output_Data-0|Пустой_результат|Input_Data-0",
+                        "MF;TF-1;Graph;Все_пропуски|Output_Data-0|Полностью_пустые_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_40|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_41|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_42|Input_Data-0",
+                        "MF;TF-1;Graph;Перестановка|Output_Data-0|Переставленные_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Сто_двадцать|Output_Data-0|Округлённый_ноль|Input_Data-0",
+                        "MF;TF-1;Graph;Точные_числа|Output_Data-0|Точность|Input_Data-0"
+                      ]
+                    },
+                    "current": {
+                      "ports": [
+                        "MF;TF-1;Graph;Смена_источника;Input_Data-0",
+                        "MF;TF-1;Graph;Смена_источника;Output_Data-0"
+                      ],
+                      "links": [
+                        "MF;TF-1;Graph;Асимметрия|Output_Data-0|Среднее_не_медиана|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Основной|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Только_строка|Input_Data-0",
+                        "MF;TF-1;Graph;Без_строк|Output_Data-0|Пустой_результат|Input_Data-0",
+                        "MF;TF-1;Graph;Все_пропуски|Output_Data-0|Полностью_пустые_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_40|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_41|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_42|Input_Data-0",
+                        "MF;TF-1;Graph;Перестановка|Output_Data-0|Переставленные_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Сто_двадцать|Output_Data-0|Округлённый_ноль|Input_Data-0",
+                        "MF;TF-1;Graph;Точные_числа|Output_Data-0|Точность|Input_Data-0"
+                      ]
+                    },
+                    "delta": {
+                      "added_ports": [],
+                      "removed_ports": [],
+                      "added_links": [],
+                      "removed_links": []
+                    }
+                  },
+                  {
+                    "at_ms": 1216,
+                    "event": "preconditions_verified",
+                    "active_tab": "MF;TF-1"
+                  },
+                  {
+                    "at_ms": 1270,
+                    "event": "link_observation",
+                    "stage": "settled_after_drag",
+                    "attempt": 1,
+                    "baseline": {
+                      "ports": [
+                        "MF;TF-1;Graph;Смена_источника;Input_Data-0",
+                        "MF;TF-1;Graph;Смена_источника;Output_Data-0"
+                      ],
+                      "links": [
+                        "MF;TF-1;Graph;Асимметрия|Output_Data-0|Среднее_не_медиана|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Основной|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Только_строка|Input_Data-0",
+                        "MF;TF-1;Graph;Без_строк|Output_Data-0|Пустой_результат|Input_Data-0",
+                        "MF;TF-1;Graph;Все_пропуски|Output_Data-0|Полностью_пустые_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_40|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_41|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_42|Input_Data-0",
+                        "MF;TF-1;Graph;Перестановка|Output_Data-0|Переставленные_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Сто_двадцать|Output_Data-0|Округлённый_ноль|Input_Data-0",
+                        "MF;TF-1;Graph;Точные_числа|Output_Data-0|Точность|Input_Data-0"
+                      ]
+                    },
+                    "current": {
+                      "ports": [
+                        "MF;TF-1;Graph;Смена_источника;Input_Data-0",
+                        "MF;TF-1;Graph;Смена_источника;Output_Data-0"
+                      ],
+                      "links": [
+                        "MF;TF-1;Graph;Асимметрия|Output_Data-0|Среднее_не_медиана|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Основной|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Только_строка|Input_Data-0",
+                        "MF;TF-1;Graph;Без_строк|Output_Data-0|Пустой_результат|Input_Data-0",
+                        "MF;TF-1;Graph;Все_пропуски|Output_Data-0|Полностью_пустые_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_40|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_41|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_42|Input_Data-0",
+                        "MF;TF-1;Graph;Перестановка|Output_Data-0|Переставленные_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Сто_двадцать|Output_Data-0|Округлённый_ноль|Input_Data-0",
+                        "MF;TF-1;Graph;Точные_числа|Output_Data-0|Точность|Input_Data-0"
+                      ]
+                    },
+                    "delta": {
+                      "added_ports": [],
+                      "removed_ports": [],
+                      "added_links": [],
+                      "removed_links": []
+                    }
+                  },
+                  {
+                    "at_ms": 1281,
+                    "event": "preconditions_verified",
+                    "active_tab": "MF;TF-1"
+                  },
+                  {
+                    "at_ms": 1333,
+                    "event": "link_observation",
+                    "stage": "before_drag",
+                    "attempt": 2,
+                    "baseline": {
+                      "ports": [
+                        "MF;TF-1;Graph;Смена_источника;Input_Data-0",
+                        "MF;TF-1;Graph;Смена_источника;Output_Data-0"
+                      ],
+                      "links": [
+                        "MF;TF-1;Graph;Асимметрия|Output_Data-0|Среднее_не_медиана|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Основной|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Только_строка|Input_Data-0",
+                        "MF;TF-1;Graph;Без_строк|Output_Data-0|Пустой_результат|Input_Data-0",
+                        "MF;TF-1;Graph;Все_пропуски|Output_Data-0|Полностью_пустые_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_40|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_41|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_42|Input_Data-0",
+                        "MF;TF-1;Graph;Перестановка|Output_Data-0|Переставленные_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Сто_двадцать|Output_Data-0|Округлённый_ноль|Input_Data-0",
+                        "MF;TF-1;Graph;Точные_числа|Output_Data-0|Точность|Input_Data-0"
+                      ]
+                    },
+                    "current": {
+                      "ports": [
+                        "MF;TF-1;Graph;Смена_источника;Input_Data-0",
+                        "MF;TF-1;Graph;Смена_источника;Output_Data-0"
+                      ],
+                      "links": [
+                        "MF;TF-1;Graph;Асимметрия|Output_Data-0|Среднее_не_медиана|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Основной|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Только_строка|Input_Data-0",
+                        "MF;TF-1;Graph;Без_строк|Output_Data-0|Пустой_результат|Input_Data-0",
+                        "MF;TF-1;Graph;Все_пропуски|Output_Data-0|Полностью_пустые_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_40|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_41|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_42|Input_Data-0",
+                        "MF;TF-1;Graph;Перестановка|Output_Data-0|Переставленные_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Сто_двадцать|Output_Data-0|Округлённый_ноль|Input_Data-0",
+                        "MF;TF-1;Graph;Точные_числа|Output_Data-0|Точность|Input_Data-0"
+                      ]
+                    },
+                    "delta": {
+                      "added_ports": [],
+                      "removed_ports": [],
+                      "added_links": [],
+                      "removed_links": []
+                    }
+                  },
+                  {
+                    "at_ms": 1489,
+                    "event": "port_drag_attempt",
+                    "attempt": 2,
+                    "correction": {
+                      "x": -1,
+                      "y": 0
+                    },
+                    "source_point": {
+                      "x": 1092.5,
+                      "y": 218
+                    },
+                    "target_point": {
+                      "x": 1314.5,
+                      "y": 754
+                    }
+                  },
+                  {
+                    "at_ms": 1617,
+                    "event": "mouse_released"
+                  },
+                  {
+                    "at_ms": 2136,
+                    "event": "preconditions_verified",
+                    "active_tab": "MF;TF-1"
+                  },
+                  {
+                    "at_ms": 2195,
+                    "event": "link_observation",
+                    "stage": "after_drag",
+                    "attempt": 2,
+                    "baseline": {
+                      "ports": [
+                        "MF;TF-1;Graph;Смена_источника;Input_Data-0",
+                        "MF;TF-1;Graph;Смена_источника;Output_Data-0"
+                      ],
+                      "links": [
+                        "MF;TF-1;Graph;Асимметрия|Output_Data-0|Среднее_не_медиана|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Основной|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Только_строка|Input_Data-0",
+                        "MF;TF-1;Graph;Без_строк|Output_Data-0|Пустой_результат|Input_Data-0",
+                        "MF;TF-1;Graph;Все_пропуски|Output_Data-0|Полностью_пустые_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_40|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_41|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_42|Input_Data-0",
+                        "MF;TF-1;Graph;Перестановка|Output_Data-0|Переставленные_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Сто_двадцать|Output_Data-0|Округлённый_ноль|Input_Data-0",
+                        "MF;TF-1;Graph;Точные_числа|Output_Data-0|Точность|Input_Data-0"
+                      ]
+                    },
+                    "current": {
+                      "ports": [
+                        "MF;TF-1;Graph;Смена_источника;Input_Data-0",
+                        "MF;TF-1;Graph;Смена_источника;Output_Data-0"
+                      ],
+                      "links": [
+                        "MF;TF-1;Graph;Асимметрия|Output_Data-0|Среднее_не_медиана|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Основной|Input_Data-0",
+                        "MF;TF-1;Graph;База|Output_Data-0|Только_строка|Input_Data-0",
+                        "MF;TF-1;Graph;Без_строк|Output_Data-0|Пустой_результат|Input_Data-0",
+                        "MF;TF-1;Graph;Все_пропуски|Output_Data-0|Полностью_пустые_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_40|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_41|Input_Data-0",
+                        "MF;TF-1;Graph;Граница|Output_Data-0|Порог_42|Input_Data-0",
+                        "MF;TF-1;Graph;Изменяемый_источник|Output_Data-0|Смена_источника|Input_Data-0",
+                        "MF;TF-1;Graph;Перестановка|Output_Data-0|Переставленные_поля|Input_Data-0",
+                        "MF;TF-1;Graph;Сто_двадцать|Output_Data-0|Округлённый_ноль|Input_Data-0",
+                        "MF;TF-1;Graph;Точные_числа|Output_Data-0|Точность|Input_Data-0"
+                      ]
+                    },
+                    "delta": {
+                      "added_ports": [],
+                      "removed_ports": [],
+                      "added_links": [
+                        "MF;TF-1;Graph;Изменяемый_источник|Output_Data-0|Смена_источника|Input_Data-0"
+                      ],
+                      "removed_links": []
+                    }
+                  },
+                  {
+                    "at_ms": 2195,
+                    "event": "postcondition_verified",
+                    "exact_link": true,
+                    "reconciled": false
+                  },
+                  {
+                    "at_ms": 2198,
+                    "event": "cleanup_completed",
+                    "resource": "viewport"
+                  }
+                ],
+                "cleanup_complete": true
+              }
+            }
+          ],
+          "baseline": {
+            "complete": true,
+            "document_id": "1789326980820-lynmcicijf",
+            "workflow_ref": {
+              "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+              "prefix": "MF;TF-1",
+              "navigation_path": [
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                  "label": ""
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                  "label": "Пакеты"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                  "label": "Package1"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                  "label": "Модуль1"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                  "label": "Сценарий"
+                }
+              ],
+              "workflow_id": "1789326980820-lynmcicijf-1"
+            },
+            "dom_epoch": 1,
+            "nodes": [
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "0e3179a6-1165-4915-a3ab-971dfb2a40c8"
+                },
+                "type": "imports.text",
+                "label": "Перестановка",
+                "dom_epoch": 776,
+                "position": {
+                  "x": 400,
+                  "y": 624
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "11d4815c-b38d-4abf-9764-53cd0428e795"
+                },
+                "type": "imports.text",
+                "label": "Точные числа",
+                "dom_epoch": 770,
+                "position": {
+                  "x": 80,
+                  "y": 264
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "415c2a39-3d36-411f-91c1-f91a94b147cb"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Округлённый ноль",
+                "dom_epoch": 785,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "476f6117-7d95-4838-8c61-b73d593368e0"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Пустой результат",
+                "dom_epoch": 787,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "5a8fc5a4-83ea-42da-9881-dd0efb234f32"
+                },
+                "type": "imports.text",
+                "label": "Все пропуски",
+                "dom_epoch": 774,
+                "position": {
+                  "x": 400,
+                  "y": 264
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "61cddcab-7bb9-44c3-91d5-ef916d37bd88"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Порог 40",
+                "dom_epoch": 782,
+                "position": {
+                  "x": 1000,
+                  "y": 264
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "62e42535-d3eb-4876-9565-d6507e0aeab8"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Среднее не медиана",
+                "dom_epoch": 781,
+                "position": {
+                  "x": 1000,
+                  "y": 80
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "6344065d-db01-4457-b047-566c6e08b242"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Полностью пустые поля",
+                "dom_epoch": 786,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "6620f9de-e585-39c7-88a9-35255088ebb7"
+                },
+                "type": "bg-vendor-icon-modelvariables",
+                "label": "Переменные сценария",
+                "dom_epoch": 768,
+                "position": {
+                  "x": 16,
+                  "y": 164
+                },
+                "inputs": [],
+                "outputs": [],
+                "other_ports": [
+                  "Output_Var-0",
+                  "Output_Var-1",
+                  "Output_Var-2",
+                  "Output_Var-3",
+                  "Output_Var-4"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "7e062cfd-2e47-4b66-a59c-21c5ef23f8e9"
+                },
+                "type": "imports.text",
+                "label": "Без строк",
+                "dom_epoch": 775,
+                "position": {
+                  "x": 400,
+                  "y": 440
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "7fa562ab-3ff5-415a-8983-29352fc1e18a"
+                },
+                "type": "imports.text",
+                "label": "База",
+                "dom_epoch": 769,
+                "position": {
+                  "x": 80,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "858da7e7-414d-4e2e-ad62-20d26afae8dd"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Порог 41",
+                "dom_epoch": 783,
+                "position": {
+                  "x": 1000,
+                  "y": 264
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "97613265-ccf5-4fae-900c-841eb4e53104"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Основной",
+                "dom_epoch": 778,
+                "position": {
+                  "x": 704,
+                  "y": 264
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "a2633840-7b5b-43cb-9364-5a029f2aff3e"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Порог 42",
+                "dom_epoch": 784,
+                "position": {
+                  "x": 1000,
+                  "y": 440
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "a5b11211-7ce2-4162-b452-d5a851408b7b"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Только строка",
+                "dom_epoch": 779,
+                "position": {
+                  "x": 704,
+                  "y": 440
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "bb45d8ca-d6f1-4b00-99db-ad9c4f145dae"
+                },
+                "type": "imports.text",
+                "label": "Изменяемый источник",
+                "dom_epoch": 777,
+                "position": {
+                  "x": 704,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "bc1aec08-36f1-43f1-a75b-53ac34830593"
+                },
+                "type": "imports.text",
+                "label": "Сто двадцать",
+                "dom_epoch": 773,
+                "position": {
+                  "x": 400,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "bf88d020-711a-4368-baac-15a056406486"
+                },
+                "type": "imports.text",
+                "label": "Асимметрия",
+                "dom_epoch": 771,
+                "position": {
+                  "x": 80,
+                  "y": 440
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "d48f72aa-f11f-4ff0-a5fa-75d018d51564"
+                },
+                "type": "imports.text",
+                "label": "Граница",
+                "dom_epoch": 772,
+                "position": {
+                  "x": 80,
+                  "y": 624
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "d7dea9a3-9b7c-4514-a14a-a2a6474ba17e"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Переставленные поля",
+                "dom_epoch": 788,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "f7879193-2f27-40f9-8346-c5b5a3bad5f5"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Точность",
+                "dom_epoch": 780,
+                "position": {
+                  "x": 704,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              }
+            ],
+            "links": [
+              {
+                "source": "0e3179a6-1165-4915-a3ab-971dfb2a40c8",
+                "output": 0,
+                "target": "d7dea9a3-9b7c-4514-a14a-a2a6474ba17e",
+                "input": 0
+              },
+              {
+                "source": "11d4815c-b38d-4abf-9764-53cd0428e795",
+                "output": 0,
+                "target": "f7879193-2f27-40f9-8346-c5b5a3bad5f5",
+                "input": 0
+              },
+              {
+                "source": "5a8fc5a4-83ea-42da-9881-dd0efb234f32",
+                "output": 0,
+                "target": "6344065d-db01-4457-b047-566c6e08b242",
+                "input": 0
+              },
+              {
+                "source": "7e062cfd-2e47-4b66-a59c-21c5ef23f8e9",
+                "output": 0,
+                "target": "476f6117-7d95-4838-8c61-b73d593368e0",
+                "input": 0
+              },
+              {
+                "source": "7fa562ab-3ff5-415a-8983-29352fc1e18a",
+                "output": 0,
+                "target": "97613265-ccf5-4fae-900c-841eb4e53104",
+                "input": 0
+              },
+              {
+                "source": "7fa562ab-3ff5-415a-8983-29352fc1e18a",
+                "output": 0,
+                "target": "a5b11211-7ce2-4162-b452-d5a851408b7b",
+                "input": 0
+              },
+              {
+                "source": "bc1aec08-36f1-43f1-a75b-53ac34830593",
+                "output": 0,
+                "target": "415c2a39-3d36-411f-91c1-f91a94b147cb",
+                "input": 0
+              },
+              {
+                "source": "bf88d020-711a-4368-baac-15a056406486",
+                "output": 0,
+                "target": "62e42535-d3eb-4876-9565-d6507e0aeab8",
+                "input": 0
+              },
+              {
+                "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                "output": 0,
+                "target": "61cddcab-7bb9-44c3-91d5-ef916d37bd88",
+                "input": 0
+              },
+              {
+                "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                "output": 0,
+                "target": "858da7e7-414d-4e2e-ad62-20d26afae8dd",
+                "input": 0
+              },
+              {
+                "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                "output": 0,
+                "target": "a2633840-7b5b-43cb-9364-5a029f2aff3e",
+                "input": 0
+              }
+            ],
+            "foreign_links": [],
+            "interaction_ready": true
+          },
+          "targetId": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd",
+          "effect_possible": true,
+          "pending": null,
+          "auto_created_links": [],
+          "last_graph": {
+            "complete": true,
+            "document_id": "1789326980820-lynmcicijf",
+            "workflow_ref": {
+              "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+              "prefix": "MF;TF-1",
+              "navigation_path": [
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                  "label": ""
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                  "label": "Пакеты"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                  "label": "Package1"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                  "label": "Модуль1"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                  "label": "Сценарий"
+                }
+              ],
+              "workflow_id": "1789326980820-lynmcicijf-1"
+            },
+            "dom_epoch": 1,
+            "nodes": [
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "0e3179a6-1165-4915-a3ab-971dfb2a40c8"
+                },
+                "type": "imports.text",
+                "label": "Перестановка",
+                "dom_epoch": 799,
+                "position": {
+                  "x": 400,
+                  "y": 624
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "11d4815c-b38d-4abf-9764-53cd0428e795"
+                },
+                "type": "imports.text",
+                "label": "Точные числа",
+                "dom_epoch": 793,
+                "position": {
+                  "x": 80,
+                  "y": 264
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "415c2a39-3d36-411f-91c1-f91a94b147cb"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Округлённый ноль",
+                "dom_epoch": 808,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "476f6117-7d95-4838-8c61-b73d593368e0"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Пустой результат",
+                "dom_epoch": 810,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "5a8fc5a4-83ea-42da-9881-dd0efb234f32"
+                },
+                "type": "imports.text",
+                "label": "Все пропуски",
+                "dom_epoch": 797,
+                "position": {
+                  "x": 400,
+                  "y": 264
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Смена источника",
+                "dom_epoch": 812,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "61cddcab-7bb9-44c3-91d5-ef916d37bd88"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Порог 40",
+                "dom_epoch": 805,
+                "position": {
+                  "x": 1000,
+                  "y": 264
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "62e42535-d3eb-4876-9565-d6507e0aeab8"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Среднее не медиана",
+                "dom_epoch": 804,
+                "position": {
+                  "x": 1000,
+                  "y": 80
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "6344065d-db01-4457-b047-566c6e08b242"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Полностью пустые поля",
+                "dom_epoch": 809,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "6620f9de-e585-39c7-88a9-35255088ebb7"
+                },
+                "type": "bg-vendor-icon-modelvariables",
+                "label": "Переменные сценария",
+                "dom_epoch": 791,
+                "position": {
+                  "x": 16,
+                  "y": 164
+                },
+                "inputs": [],
+                "outputs": [],
+                "other_ports": [
+                  "Output_Var-0",
+                  "Output_Var-1",
+                  "Output_Var-2",
+                  "Output_Var-3",
+                  "Output_Var-4"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "7e062cfd-2e47-4b66-a59c-21c5ef23f8e9"
+                },
+                "type": "imports.text",
+                "label": "Без строк",
+                "dom_epoch": 798,
+                "position": {
+                  "x": 400,
+                  "y": 440
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "7fa562ab-3ff5-415a-8983-29352fc1e18a"
+                },
+                "type": "imports.text",
+                "label": "База",
+                "dom_epoch": 792,
+                "position": {
+                  "x": 80,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "858da7e7-414d-4e2e-ad62-20d26afae8dd"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Порог 41",
+                "dom_epoch": 806,
+                "position": {
+                  "x": 1000,
+                  "y": 264
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "97613265-ccf5-4fae-900c-841eb4e53104"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Основной",
+                "dom_epoch": 801,
+                "position": {
+                  "x": 704,
+                  "y": 264
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "a2633840-7b5b-43cb-9364-5a029f2aff3e"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Порог 42",
+                "dom_epoch": 807,
+                "position": {
+                  "x": 1000,
+                  "y": 440
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "a5b11211-7ce2-4162-b452-d5a851408b7b"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Только строка",
+                "dom_epoch": 802,
+                "position": {
+                  "x": 704,
+                  "y": 440
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "bb45d8ca-d6f1-4b00-99db-ad9c4f145dae"
+                },
+                "type": "imports.text",
+                "label": "Изменяемый источник",
+                "dom_epoch": 800,
+                "position": {
+                  "x": 704,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "bc1aec08-36f1-43f1-a75b-53ac34830593"
+                },
+                "type": "imports.text",
+                "label": "Сто двадцать",
+                "dom_epoch": 796,
+                "position": {
+                  "x": 400,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "bf88d020-711a-4368-baac-15a056406486"
+                },
+                "type": "imports.text",
+                "label": "Асимметрия",
+                "dom_epoch": 794,
+                "position": {
+                  "x": 80,
+                  "y": 440
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "d48f72aa-f11f-4ff0-a5fa-75d018d51564"
+                },
+                "type": "imports.text",
+                "label": "Граница",
+                "dom_epoch": 795,
+                "position": {
+                  "x": 80,
+                  "y": 624
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "d7dea9a3-9b7c-4514-a14a-a2a6474ba17e"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Переставленные поля",
+                "dom_epoch": 811,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "f7879193-2f27-40f9-8346-c5b5a3bad5f5"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Точность",
+                "dom_epoch": 803,
+                "position": {
+                  "x": 704,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              }
+            ],
+            "links": [
+              {
+                "source": "0e3179a6-1165-4915-a3ab-971dfb2a40c8",
+                "output": 0,
+                "target": "d7dea9a3-9b7c-4514-a14a-a2a6474ba17e",
+                "input": 0
+              },
+              {
+                "source": "11d4815c-b38d-4abf-9764-53cd0428e795",
+                "output": 0,
+                "target": "f7879193-2f27-40f9-8346-c5b5a3bad5f5",
+                "input": 0
+              },
+              {
+                "source": "5a8fc5a4-83ea-42da-9881-dd0efb234f32",
+                "output": 0,
+                "target": "6344065d-db01-4457-b047-566c6e08b242",
+                "input": 0
+              },
+              {
+                "source": "7e062cfd-2e47-4b66-a59c-21c5ef23f8e9",
+                "output": 0,
+                "target": "476f6117-7d95-4838-8c61-b73d593368e0",
+                "input": 0
+              },
+              {
+                "source": "7fa562ab-3ff5-415a-8983-29352fc1e18a",
+                "output": 0,
+                "target": "97613265-ccf5-4fae-900c-841eb4e53104",
+                "input": 0
+              },
+              {
+                "source": "7fa562ab-3ff5-415a-8983-29352fc1e18a",
+                "output": 0,
+                "target": "a5b11211-7ce2-4162-b452-d5a851408b7b",
+                "input": 0
+              },
+              {
+                "source": "bb45d8ca-d6f1-4b00-99db-ad9c4f145dae",
+                "output": 0,
+                "target": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd",
+                "input": 0
+              },
+              {
+                "source": "bc1aec08-36f1-43f1-a75b-53ac34830593",
+                "output": 0,
+                "target": "415c2a39-3d36-411f-91c1-f91a94b147cb",
+                "input": 0
+              },
+              {
+                "source": "bf88d020-711a-4368-baac-15a056406486",
+                "output": 0,
+                "target": "62e42535-d3eb-4876-9565-d6507e0aeab8",
+                "input": 0
+              },
+              {
+                "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                "output": 0,
+                "target": "61cddcab-7bb9-44c3-91d5-ef916d37bd88",
+                "input": 0
+              },
+              {
+                "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                "output": 0,
+                "target": "858da7e7-414d-4e2e-ad62-20d26afae8dd",
+                "input": 0
+              },
+              {
+                "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                "output": 0,
+                "target": "a2633840-7b5b-43cb-9364-5a029f2aff3e",
+                "input": 0
+              }
+            ],
+            "foreign_links": [],
+            "interaction_ready": true
+          },
+          "completed": true,
+          "final_graph": {
+            "complete": true,
+            "document_id": "1789326980820-lynmcicijf",
+            "workflow_ref": {
+              "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+              "prefix": "MF;TF-1",
+              "navigation_path": [
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+                  "label": ""
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+                  "label": "Пакеты"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+                  "label": "Package1"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+                  "label": "Модуль1"
+                },
+                {
+                  "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+                  "label": "Сценарий"
+                }
+              ],
+              "workflow_id": "1789326980820-lynmcicijf-1"
+            },
+            "dom_epoch": 1,
+            "nodes": [
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "0e3179a6-1165-4915-a3ab-971dfb2a40c8"
+                },
+                "type": "imports.text",
+                "label": "Перестановка",
+                "dom_epoch": 799,
+                "position": {
+                  "x": 400,
+                  "y": 624
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "11d4815c-b38d-4abf-9764-53cd0428e795"
+                },
+                "type": "imports.text",
+                "label": "Точные числа",
+                "dom_epoch": 793,
+                "position": {
+                  "x": 80,
+                  "y": 264
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "415c2a39-3d36-411f-91c1-f91a94b147cb"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Округлённый ноль",
+                "dom_epoch": 808,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "476f6117-7d95-4838-8c61-b73d593368e0"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Пустой результат",
+                "dom_epoch": 810,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "5a8fc5a4-83ea-42da-9881-dd0efb234f32"
+                },
+                "type": "imports.text",
+                "label": "Все пропуски",
+                "dom_epoch": 797,
+                "position": {
+                  "x": 400,
+                  "y": 264
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Смена источника",
+                "dom_epoch": 812,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "61cddcab-7bb9-44c3-91d5-ef916d37bd88"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Порог 40",
+                "dom_epoch": 805,
+                "position": {
+                  "x": 1000,
+                  "y": 264
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "62e42535-d3eb-4876-9565-d6507e0aeab8"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Среднее не медиана",
+                "dom_epoch": 804,
+                "position": {
+                  "x": 1000,
+                  "y": 80
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "6344065d-db01-4457-b047-566c6e08b242"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Полностью пустые поля",
+                "dom_epoch": 809,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "6620f9de-e585-39c7-88a9-35255088ebb7"
+                },
+                "type": "bg-vendor-icon-modelvariables",
+                "label": "Переменные сценария",
+                "dom_epoch": 791,
+                "position": {
+                  "x": 16,
+                  "y": 164
+                },
+                "inputs": [],
+                "outputs": [],
+                "other_ports": [
+                  "Output_Var-0",
+                  "Output_Var-1",
+                  "Output_Var-2",
+                  "Output_Var-3",
+                  "Output_Var-4"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "7e062cfd-2e47-4b66-a59c-21c5ef23f8e9"
+                },
+                "type": "imports.text",
+                "label": "Без строк",
+                "dom_epoch": 798,
+                "position": {
+                  "x": 400,
+                  "y": 440
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "7fa562ab-3ff5-415a-8983-29352fc1e18a"
+                },
+                "type": "imports.text",
+                "label": "База",
+                "dom_epoch": 792,
+                "position": {
+                  "x": 80,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "858da7e7-414d-4e2e-ad62-20d26afae8dd"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Порог 41",
+                "dom_epoch": 806,
+                "position": {
+                  "x": 1000,
+                  "y": 264
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "97613265-ccf5-4fae-900c-841eb4e53104"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Основной",
+                "dom_epoch": 801,
+                "position": {
+                  "x": 704,
+                  "y": 264
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "a2633840-7b5b-43cb-9364-5a029f2aff3e"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Порог 42",
+                "dom_epoch": 807,
+                "position": {
+                  "x": 1000,
+                  "y": 440
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "a5b11211-7ce2-4162-b452-d5a851408b7b"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Только строка",
+                "dom_epoch": 802,
+                "position": {
+                  "x": 704,
+                  "y": 440
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "bb45d8ca-d6f1-4b00-99db-ad9c4f145dae"
+                },
+                "type": "imports.text",
+                "label": "Изменяемый источник",
+                "dom_epoch": 800,
+                "position": {
+                  "x": 704,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "bc1aec08-36f1-43f1-a75b-53ac34830593"
+                },
+                "type": "imports.text",
+                "label": "Сто двадцать",
+                "dom_epoch": 796,
+                "position": {
+                  "x": 400,
+                  "y": 80
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "bf88d020-711a-4368-baac-15a056406486"
+                },
+                "type": "imports.text",
+                "label": "Асимметрия",
+                "dom_epoch": 794,
+                "position": {
+                  "x": 80,
+                  "y": 440
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "d48f72aa-f11f-4ff0-a5fa-75d018d51564"
+                },
+                "type": "imports.text",
+                "label": "Граница",
+                "dom_epoch": 795,
+                "position": {
+                  "x": 80,
+                  "y": 624
+                },
+                "inputs": [],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [
+                  "Input_Connection-0",
+                  "Input_Var-1"
+                ],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "d7dea9a3-9b7c-4514-a14a-a2a6474ba17e"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Переставленные поля",
+                "dom_epoch": 811,
+                "position": {
+                  "x": 1000,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              },
+              {
+                "ref": {
+                  "document_id": "1789326980820-lynmcicijf",
+                  "workflow_id": "1789326980820-lynmcicijf-1",
+                  "node_id": "f7879193-2f27-40f9-8346-c5b5a3bad5f5"
+                },
+                "type": "preprocessing.data_recovery",
+                "label": "Точность",
+                "dom_epoch": 803,
+                "position": {
+                  "x": 704,
+                  "y": 624
+                },
+                "inputs": [
+                  0
+                ],
+                "outputs": [
+                  0
+                ],
+                "other_ports": [],
+                "locked": false
+              }
+            ],
+            "links": [
+              {
+                "source": "0e3179a6-1165-4915-a3ab-971dfb2a40c8",
+                "output": 0,
+                "target": "d7dea9a3-9b7c-4514-a14a-a2a6474ba17e",
+                "input": 0
+              },
+              {
+                "source": "11d4815c-b38d-4abf-9764-53cd0428e795",
+                "output": 0,
+                "target": "f7879193-2f27-40f9-8346-c5b5a3bad5f5",
+                "input": 0
+              },
+              {
+                "source": "5a8fc5a4-83ea-42da-9881-dd0efb234f32",
+                "output": 0,
+                "target": "6344065d-db01-4457-b047-566c6e08b242",
+                "input": 0
+              },
+              {
+                "source": "7e062cfd-2e47-4b66-a59c-21c5ef23f8e9",
+                "output": 0,
+                "target": "476f6117-7d95-4838-8c61-b73d593368e0",
+                "input": 0
+              },
+              {
+                "source": "7fa562ab-3ff5-415a-8983-29352fc1e18a",
+                "output": 0,
+                "target": "97613265-ccf5-4fae-900c-841eb4e53104",
+                "input": 0
+              },
+              {
+                "source": "7fa562ab-3ff5-415a-8983-29352fc1e18a",
+                "output": 0,
+                "target": "a5b11211-7ce2-4162-b452-d5a851408b7b",
+                "input": 0
+              },
+              {
+                "source": "bb45d8ca-d6f1-4b00-99db-ad9c4f145dae",
+                "output": 0,
+                "target": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd",
+                "input": 0
+              },
+              {
+                "source": "bc1aec08-36f1-43f1-a75b-53ac34830593",
+                "output": 0,
+                "target": "415c2a39-3d36-411f-91c1-f91a94b147cb",
+                "input": 0
+              },
+              {
+                "source": "bf88d020-711a-4368-baac-15a056406486",
+                "output": 0,
+                "target": "62e42535-d3eb-4876-9565-d6507e0aeab8",
+                "input": 0
+              },
+              {
+                "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                "output": 0,
+                "target": "61cddcab-7bb9-44c3-91d5-ef916d37bd88",
+                "input": 0
+              },
+              {
+                "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                "output": 0,
+                "target": "858da7e7-414d-4e2e-ad62-20d26afae8dd",
+                "input": 0
+              },
+              {
+                "source": "d48f72aa-f11f-4ff0-a5fa-75d018d51564",
+                "output": 0,
+                "target": "a2633840-7b5b-43cb-9364-5a029f2aff3e",
+                "input": 0
+              }
+            ],
+            "foreign_links": [],
+            "interaction_ready": true
+          },
+          "result": {
+            "status": "SUCCEEDED",
+            "phase": "target_ready",
+            "node": {
+              "ref": {
+                "document_id": "1789326980820-lynmcicijf",
+                "workflow_id": "1789326980820-lynmcicijf-1",
+                "node_id": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd"
+              },
+              "type": "preprocessing.data_recovery",
+              "label": "Смена источника",
+              "dom_epoch": 812,
+              "position": {
+                "x": 1000,
+                "y": 624
+              },
+              "inputs": [
+                0
+              ],
+              "outputs": [
+                0
+              ],
+              "other_ports": [],
+              "locked": false
+            },
+            "created": true,
+            "links": [
+              {
+                "source": "bb45d8ca-d6f1-4b00-99db-ad9c4f145dae",
+                "output": 0,
+                "target": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd",
+                "input": 0
+              }
+            ],
+            "auto_created_links": [],
+            "effects": [
+              {
+                "id": "impute-sourcechange-001:graph:0",
+                "kind": "create",
+                "verified": true
+              },
+              {
+                "id": "impute-sourcechange-001:graph:1",
+                "kind": "rename",
+                "verified": true
+              },
+              {
+                "id": "impute-sourcechange-001:graph:2",
+                "kind": "connect",
+                "verified": true
+              }
+            ],
+            "configured": false,
+            "executed": false,
+            "package_saved": false
+          }
+        }
+      }
+    ],
+    "full_goal_accepted": false,
+    "independent_reopen": false
+  },
+  "failure": {
+    "step": 144,
+    "tid": "MF;TF-1;Graph;Смена_источника",
+    "kind": "graph",
+    "graph_node": {
+      "node_label": "Смена_источника",
+      "part": "body"
+    },
+    "before_wizard": null,
+    "after_wizard": null,
+    "before_ref": "ui-1789327010033-tmxekqumo1-75810",
+    "after_refs": [
+      "ui-1789327010033-tmxekqumo1-75895"
+    ],
+    "before_context": {
+      "verified": true,
+      "document_id": "1789326980820-lynmcicijf",
+      "workflow_id": "1789326980820-lynmcicijf-1",
+      "node_id": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd",
+      "surface": "graph",
+      "tid": "MF;TF-1;Graph;Смена_источника",
+      "locked": false
+    },
+    "after_context": {
+      "verified": true,
+      "document_id": "1789326980820-lynmcicijf",
+      "workflow_id": "1789326980820-lynmcicijf-1",
+      "node_id": "5fed7f6c-cd5f-4d1a-96a3-d839608d09cd",
+      "surface": "graph",
+      "tid": "MF;TF-1;Graph;Смена_источника",
+      "locked": false
+    }
+  },
+  "audit": {
+    "passed": false,
+    "checks": {
+      "terminal_refusal_accounting": {
+        "passed": false,
+        "failures": [
+          "terminal_refusal_proof_mismatch"
+        ],
+        "scope": "missing_values_terminal_placement_refusals",
+        "full_goal_accepted": false
+      },
+      "incomplete_evidence": {
+        "passed": false,
+        "error": "Unproved prepared operation or refusal"
+      }
+    },
+    "scope": "full_missing_values_goal"
+  },
+  "slot_release": {
+    "slot": "node14-hermes-20260913-3499a38b",
+    "assignment": "node14:hermes-full:6:138712ff",
+    "run_id": "20260913-221602-99120ff2",
+    "released_at": "2026-09-13T19:53:55.994293+00:00",
+    "model_runs": 1,
+    "own_process_count": 0,
+    "model_returncode": 0,
+    "timed_out": false,
+    "launcher_returncode": 0,
+    "audit": "FAIL",
+    "coordinator_event_transfer": "blocked by auto-review; no workaround"
+  },
+  "receipts": {
+    ".dock/node14-autonomous-acceptance-6/actual-config-check.json": {
+      "bytes": 331,
+      "sha256": "17c6eabea2a962c396dfeadc6542c458fa017633d4ab75e07c781afe2d163436"
+    },
+    ".dock/node14-autonomous-acceptance-6/authorization.json": {
+      "bytes": 449,
+      "sha256": "04b972b2c4524e2aab5057a75f34248344089f27edfcdc47bb47807a493f16de"
+    },
+    ".dock/node14-autonomous-acceptance-6/candidate/actions.json": {
+      "bytes": 34340,
+      "sha256": "d13b9342f913f4dbc3248b22d9d021a6ed4abdf178af3fb7d8d4f76a08f280da"
+    },
+    ".dock/node14-autonomous-acceptance-6/candidate/manifest.json": {
+      "bytes": 718,
+      "sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad"
+    },
+    ".dock/node14-autonomous-acceptance-6/candidate/selectors.json": {
+      "bytes": 23083,
+      "sha256": "03a83df5e2e5dc185ab1d6a985c3b6e23bf70ee7596786e99f5eaf32337c94a7"
+    },
+    ".dock/node14-autonomous-acceptance-6/candidate/source-index.json": {
+      "bytes": 3805,
+      "sha256": "b9e92ce80ffaf6bd8e19eb2fd62b61a926b898e5fe65deb75757833296da08ed"
+    },
+    ".dock/node14-autonomous-acceptance-6/candidate-readback.json": {
+      "bytes": 2154,
+      "sha256": "ce444306ac888fd3632c50d98ddcb8f989ea5af86cf9ee5995a740bdda885999"
+    },
+    ".dock/node14-autonomous-acceptance-6/config-check.json": {
+      "bytes": 224,
+      "sha256": "cb91f0932fd52eaf653a9ff09d69903c0a94c109e2e08aee5ac60f311243c77a"
+    },
+    ".dock/node14-autonomous-acceptance-6/download.mjs": {
+      "bytes": 1689,
+      "sha256": "2d8bd010f2e6a323a7cf1d344385850e54858dfad203ff2963e18da8bd4b1c33"
+    },
+    ".dock/node14-autonomous-acceptance-6/export-probe.json": {
+      "bytes": 41360,
+      "sha256": "83b2c381be065264d74341479ddab5243db667893e0b0f9f48cc592b50e7f6ff"
+    },
+    ".dock/node14-autonomous-acceptance-6/failure-action.json": {
+      "bytes": 1017,
+      "sha256": "cc0833ccb0e77a34062c923d891fb56b6acaabd6fb9a41792a6993d1800e06de"
+    },
+    ".dock/node14-autonomous-acceptance-6/failure-before-observation.json": {
+      "bytes": 200798,
+      "sha256": "4c1e2e1863d0c68229db8453a8f06c1cdd5efaecdc5db7c1b2903b2fb56bab74"
+    },
+    ".dock/node14-autonomous-acceptance-6/failure-checkpoints.json": {
+      "bytes": 932939,
+      "sha256": "fb181b22852573f2a57d106067e4dd501084730e3d434df90a145986548846b6"
+    },
+    ".dock/node14-autonomous-acceptance-6/failure-summary.json": {
+      "bytes": 954,
+      "sha256": "0903906ba1bb779a769e47f40cc23c7597ee0b377fe09894839985558c0380f4"
+    },
+    ".dock/node14-autonomous-acceptance-6/launch-once.py": {
+      "bytes": 2691,
+      "sha256": "58d93a0343b7fc398a1640b187a8008db3d5e5097cd028365fc70d4da49cd0ed"
+    },
+    ".dock/node14-autonomous-acceptance-6/launch-started.json": {
+      "bytes": 104,
+      "sha256": "cffcf4eac02ce7a21e275f8930cdcd41b02c47eeb641cebd265680a4df7ac1d0"
+    },
+    ".dock/node14-autonomous-acceptance-6/launcher-exit.json": {
+      "bytes": 75,
+      "sha256": "287a940ea157387e061944b3fcbdc6e83ac9a5bdb46366b7c77518a503f90499"
+    },
+    ".dock/node14-autonomous-acceptance-6/launcher-start.json": {
+      "bytes": 71,
+      "sha256": "78aa7a1a66b648938426a1d0645d5569893e8962374542af99b96dd86c6055f5"
+    },
+    ".dock/node14-autonomous-acceptance-6/launcher.log": {
+      "bytes": 469,
+      "sha256": "07c7b396e9fdc64767ea13d66e919c2c69380b51e3178de25f38cf85709e75bc"
+    },
+    ".dock/node14-autonomous-acceptance-6/model-process.json": {
+      "bytes": 141,
+      "sha256": "bf81b85d4e225188bb24c4a49cef970eb4ce2f299eba934651749f1e18d908fc"
+    },
+    ".dock/node14-autonomous-acceptance-6/model-started.json": {
+      "bytes": 214,
+      "sha256": "f4606c483f7feb7a0577187ac9cdd92525d1cac56d8d0eb4366a75169c278dd0"
+    },
+    ".dock/node14-autonomous-acceptance-6/parse-candidate.mjs": {
+      "bytes": 1022,
+      "sha256": "cf8808fa44ec57565379f9f587d7a19aabee87a0c1da84980f467589420ea1d1"
+    },
+    ".dock/node14-autonomous-acceptance-6/parser-receipt.json": {
+      "bytes": 856,
+      "sha256": "05cf701041180b59d1a9ea96a9a25fb24efe32a3c636b7ed4237e03dc482bcf1"
+    },
+    ".dock/node14-autonomous-acceptance-6/preflight-output.txt": {
+      "bytes": 242,
+      "sha256": "c91be89d15819f7d41f2b3c3fc7fde71e4142488035e8ea2a94b3a20c70da694"
+    },
+    ".dock/node14-autonomous-acceptance-6/preflight.json": {
+      "bytes": 128312,
+      "sha256": "c5408d06db565a217ae2a41b290108dfa1ab14b40d5c0cce8e9d29a3dbc6abfe"
+    },
+    ".dock/node14-autonomous-acceptance-6/prelaunch-receipt.json": {
+      "bytes": 3830,
+      "sha256": "fd301b0d8ebcd1b9841d409a405cea9432c0fd81ca487c2711b128f1b347f5e2"
+    },
+    ".dock/node14-autonomous-acceptance-6/prelaunch.py": {
+      "bytes": 3144,
+      "sha256": "7fabdb40f2caabb050bd3516d4d2bc875abf6a53d080b79912e8e2137e06eeba"
+    },
+    ".dock/node14-autonomous-acceptance-6/process-check.json": {
+      "bytes": 111,
+      "sha256": "aa8470c6086a060b0b4bf05e52861a056251e7fddc8967f2bcf5b3ac18162867"
+    },
+    ".dock/node14-autonomous-acceptance-6/progress-v2.json": {
+      "bytes": 4386,
+      "sha256": "14645acab8c938b890b6b90d446085022972efc5e56e5a4bccd3d6c86f82d30a"
+    },
+    ".dock/node14-autonomous-acceptance-6/progress.py": {
+      "bytes": 1582,
+      "sha256": "2388eb360b8057b09d4613eb9db2fcd547cd5ff7840cee937abfdf4ea8b8b5f9"
+    },
+    ".dock/node14-autonomous-acceptance-6/result-summary.json": {
+      "bytes": 137965,
+      "sha256": "77b57a25e72d08cde76921a8b27091a58df7e99fa855b0169636154284f38c26"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/attempt.json": {
+      "bytes": 106,
+      "sha256": "ead01d975216bc26dd8623843df385c83872d6dbdae021df8a71aa61845e2382"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/efficiency.json": {
+      "bytes": 44362,
+      "sha256": "cdaed07c4233ef5d7e39ec90c46b1cf2b3adde650c91c71c2d3b6791e126cf92"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/evidence.json": {
+      "bytes": 1031353836,
+      "sha256": "f823c326a1d26e44ee8f4a1bcfa13ab61e4ac11af4a897326f1eafcbb35a01e5"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/final-audit.json": {
+      "bytes": 427,
+      "sha256": "cd0b08214cf1e8c8a4e6a61e479cc1460a0337181f6682d0e9eeb0a5f2bedf17"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/geometry-6e208cc3-6528-4074-841e-4791a7367b80.json": {
+      "bytes": 634,
+      "sha256": "214184c878912115da8c374aaa962d60f755b1fd35068f808777d25b7ef5d155"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/private/auth-guard.json": {
+      "bytes": 95,
+      "sha256": "315569ba52cfa4d284c4760a7c8fedbcb629c95ed62afa9c54b39aac473811c8"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/private/dock-state/sessions/6e208cc3-6528-4074-841e-4791a7367b80/execution-events.jsonl": {
+      "bytes": 502303306,
+      "sha256": "370038d96a69cf0661446521324b1c31a0d0ed975a2000848eec83ce1de4be5d"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/private/hermes-home/state.db": {
+      "bytes": 1048576,
+      "sha256": "43c75fb34712d53a1074098457ed998bfeebd3c1ffeb1d7c678101f32bc197f2"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/private/hermes-home/state.db-shm": {
+      "bytes": 32768,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/private/hermes-home/state.db-wal": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/private/hermes-home/state.db.fts_rebuild.lock": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/private/usage.json": {
+      "bytes": 433,
+      "sha256": "42326d5c62181c3f2109e26e955dcfd3804423614c810254b904dd00c727de24"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/request.json": {
+      "bytes": 130627,
+      "sha256": "1fc6dea958a1d6fa9fd3c7ded1f834c36e8dc785d29b5e2dd17c81efd649382d"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/scenario.txt": {
+      "bytes": 9657,
+      "sha256": "f814a43ad07e59db411433dd6850799d2c506803140a88a0fc33acbd3dfe67ac"
+    },
+    ".dock/node14-autonomous-acceptance-6/runs/20260913-221602-99120ff2/tool-precheck.json": {
+      "bytes": 1112,
+      "sha256": "1deb718120d86d3cde78ffa8f091aeb1dbefc1f0d2c48416af5b924c587ed26c"
+    },
+    ".dock/node14-autonomous-acceptance-6/slot-release.json": {
+      "bytes": 402,
+      "sha256": "7c26518daa68094062d68bc9c4047d6f02bf5ddffc56db2636215579d6fa11ca"
+    },
+    ".dock/node14-autonomous-acceptance-6/start-event-transfer-blocked.json": {
+      "bytes": 248,
+      "sha256": "2a7078f95be0cefc49c380b712182ae542bfd8c2e5431335cc90b2638fd0e8ab"
+    },
+    ".dock/node14-autonomous-acceptance-6/summarize.py": {
+      "bytes": 3330,
+      "sha256": "0bfe62d9be8edb1503c2bdf7a1ad6461be85c2519e69474b21efc6820cf0e6c8"
+    },
+    ".dock/node14-autonomous-acceptance-6/target-failures.json": {
+      "bytes": 122713,
+      "sha256": "79b24ac41884c5da2399353f359e4163ed337693fb1d506baef210746759b22a"
+    }
+  }
+}

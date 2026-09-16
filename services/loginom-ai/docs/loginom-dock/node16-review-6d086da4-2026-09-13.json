@@ -1,0 +1,60 @@
+{
+  "assignment": "node16:review:1:6d086da4",
+  "reviewed_sha": "6d086da4be8439679ae351ce2a25c57cca42c19f",
+  "accepted_base": "a3b419bde8a660e1905284ee62a46362d5a49e09",
+  "status": "review_completed_with_findings",
+  "review_type": "single_full_same_task_review",
+  "findings": [
+    {
+      "id": "R16-1",
+      "priority": 2,
+      "file": "client/lib/collapse-native-source.mjs",
+      "start": 18,
+      "end": 21,
+      "title": "Старое доказательство загрузки остаётся допустимым после замены файла"
+    },
+    {
+      "id": "R16-2",
+      "priority": 2,
+      "file": "client/lib/collapse-native-output.mjs",
+      "start": 22,
+      "end": 33,
+      "title": "Frontend SHA не связан с уже исполняемым кодом документа"
+    },
+    {
+      "id": "R16-3",
+      "priority": 3,
+      "file": "client/lib/node-contracts.d.ts",
+      "start": 26,
+      "end": 26,
+      "title": "Декларации TypeScript не включают новый exact-full контракт"
+    }
+  ],
+  "verification": {
+    "focused_tests_passed": 137,
+    "focused_tests_failed": 0,
+    "exact_verifier": "PASS",
+    "public_cases": 7,
+    "public_cells": 244,
+    "native_full_cells": 60,
+    "public_negative_mutations_rejected": 13,
+    "new_live_probes": false,
+    "typescript_compiler_run": false
+  },
+  "hermes_acceptance": false,
+  "subplan_complete": false,
+  "production_code_changed": false,
+  "historical_evidence_changed": false,
+  "report": "docs/loginom-dock/node16-review-6d086da4-2026-09-13.md",
+  "evidence_sha256": {
+    ".dock/node16/review-6d086da4/exact-verifier.json": "99474720c436bb124ad13018e2b7457d190df879030dea2e719d2744210af373",
+    ".dock/node16/review-6d086da4/focused-tests.txt": "d59206e300414988fa09c6dbbe2e3e73a6ea59a912d44dcf128cd811d48e1f1c",
+    ".dock/node16/review-6d086da4/full-native-audit.json": "98e4d53cb51d1825c3e87ae7d614362719fdadbfa3aed4ca47d2240d89e38f18",
+    ".dock/node16/review-6d086da4/probes.json": "239d9888b4f96e73e67112e7ffcc61c84329feaab22c7b6e1bf77fdf4fb52710",
+    ".dock/node16/review-6d086da4/probes.mjs": "31a44fbfa207bcce5ebd83ca4d50d69ef076e66e9a9185716821e5ae7af45f47",
+    ".dock/node16/review-6d086da4/public-negative-audit.json": "5bdd29fc628515146dece1bbd095ca722df0649ff2d93d2f7f4e5425751a99d4",
+    ".dock/node16/review-6d086da4/reopen-phase-inspection.json": "52961d361ba248de46c9aee43f5f30612447b139f5f3d914751b280884b44240",
+    ".dock/node16/review-6d086da4/reopen-requests.json": "a0e8600a81faecd64f7798446ef3c7060779c5523e96891cceaa99d9e8ea1b8d",
+    ".dock/node16/review-6d086da4/type-contract-inspection.json": "f0b4f77b4fdbd6ca22d2adacdd3b93d780adb8f4f0deb575e42219df28afa66b"
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loginom.ai/schemas/source-map.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "files"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceRepo",
+          "ref",
+          "commit",
+          "tree",
+          "sourcePath",
+          "destination",
+          "disposition",
+          "hash",
+          "object",
+          "mode"
+        ],
+        "properties": {
+          "sourceRepo": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sourcePath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1
+          },
+          "commit": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "tree": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "object": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "disposition": {
+            "enum": [
+              "active",
+              "archive",
+              "excluded"
+            ]
+          },
+          "mode": {
+            "enum": [
+              "100644",
+              "100755",
+              "120000"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

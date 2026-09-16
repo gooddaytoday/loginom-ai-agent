@@ -1,0 +1,4 @@
+const previous=JSON.parse(await ctx.fs.readFile(ctx.dir+'/calendar-initial.json','utf8'));if(previous.status!=='SUCCEEDED'||!previous.cleanup_complete)throw Error('Initial calendar incomplete');
+const names=previous.output.configuration.readback.output_mapping.fields;const changed={Id:['RowId','Идентификатор строки'],Amount:['SalesAmount','Сумма продаж'],A_year:['SavedYearA','Год сохранённой даты A']};
+const request={...ctx.calendarRequest,operation_id:'node13-full-calendar-final',target:{kind:'existing',type:'transform.date_time',ref:previous.output.node},inputs:[],parameters:{},mappings:[{direction:'output',port:0,autosync:false,fields:names.map(f=>({source:{kind:'configured_field',name:f.name},...(f.excluded?{excluded:true,label:f.label}:changed[f.name]?{name:changed[f.name][0],label:changed[f.name][1]}:{})}))]};
+return await ctx.runtime.runNodeApply(request);

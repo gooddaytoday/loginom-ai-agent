@@ -1,0 +1,64 @@
+{
+  "checked_at": "2026-09-13T11:35:14.525092+00:00",
+  "build_directory": "/opt/loginom-dock/releases/20260913-node13-acceptance1-candidate",
+  "source_commit": "5a4c46fc3a9eb19c0fb440c19decdd1931df7b82",
+  "stage": {
+    "catalog_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node13-acceptance.1-5a4c46fc-candidate",
+    "catalog_version": "2026.09.13-node13-acceptance.1-5a4c46fc-candidate",
+    "manifest_sha256": "db38f7f249c0c051d8b77a22e0ac80a817ecb96a9820bfb0f74b8199a496c634",
+    "action_catalog_sha256": "3627aea90455e2079c768af369b5c8d9827bd650d3016b07a7d055f883eb9921",
+    "selector_catalog_sha256": "104eafb750526e6ea94f7ad3b95a710d4fe5b6413cdf29b04c356aa128d7c6e8",
+    "e2e_commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+    "staged": true,
+    "activated": false
+  },
+  "files": [
+    {
+      "name": "actions.json",
+      "uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node13-acceptance.1-5a4c46fc-candidate/actions.json",
+      "bytes": 34260,
+      "sha256": "3627aea90455e2079c768af369b5c8d9827bd650d3016b07a7d055f883eb9921",
+      "readback_equal": true
+    },
+    {
+      "name": "selectors.json",
+      "uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node13-acceptance.1-5a4c46fc-candidate/selectors.json",
+      "bytes": 22393,
+      "sha256": "104eafb750526e6ea94f7ad3b95a710d4fe5b6413cdf29b04c356aa128d7c6e8",
+      "readback_equal": true
+    },
+    {
+      "name": "source-index.json",
+      "uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node13-acceptance.1-5a4c46fc-candidate/source-index.json",
+      "bytes": 3770,
+      "sha256": "741d78b0e7dbb3fdb691751e859103cfda3e95146c67c0ac6ee4a8664dd9d6c8",
+      "readback_equal": true
+    },
+    {
+      "name": "manifest.json",
+      "uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node13-acceptance.1-5a4c46fc-candidate/manifest.json",
+      "bytes": 732,
+      "sha256": "db38f7f249c0c051d8b77a22e0ac80a817ecb96a9820bfb0f74b8199a496c634",
+      "readback_equal": true
+    }
+  ],
+  "server_current": "/opt/loginom-dock/releases/20260904-landing-7b711846",
+  "preview_current": {
+    "status": 404,
+    "sha256": null
+  },
+  "health_status": 200,
+  "activated": false,
+  "full_autonomous_acceptance_passed": false,
+  "source_packet": {
+    "archive_sha256": "3daf75bb171c4297b9f7b2b013b4310555640ca9810ac07413fde923a7a5903e",
+    "source_manifest_sha256": "772f5f873dbe6a95c851e258e40992540e7e3c0c9a24fc4eed11026e5b88752a",
+    "builder_files": 9,
+    "publisher_additions": {
+      "source_commit": "5a4c46fc3a9eb19c0fb440c19decdd1931df7b82",
+      "deploy/loginom-dock/publish-action-catalog.py": "4b5a7ce16f32a55b3c7f4f49693f89233781448c0a45a42516b67406b3b8a90b",
+      "executor/capability-abi.json": "a5c7601faba918c2e68d3ada81628a3138ca90737ad2e474e41a2900adc3ca3f"
+    },
+    "first_publish_attempt": "failed before publication because publisher was outside expected directory tree; exact publisher+ABI added in original relative structure, no rebuild"
+  }
+}

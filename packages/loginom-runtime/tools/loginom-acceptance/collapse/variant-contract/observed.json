@@ -1,0 +1,830 @@
+[
+  {
+    "label": "mixed",
+    "source": ".dock/node16/live-1789292821504/prototype-complete-15.json",
+    "sha256": "84f27928ff25bc25f766aac16485902bc9cb84d38c0ebfbf1b1a8f13d37570b2",
+    "schema": [
+      {
+        "name": "Metric",
+        "label": "Показатель",
+        "type": 5
+      },
+      {
+        "name": "Scalar",
+        "label": "Значение",
+        "type": 6
+      },
+      {
+        "name": "Key",
+        "label": "Ключ",
+        "type": 4
+      },
+      {
+        "name": "Zone",
+        "label": "Zone",
+        "type": 5
+      },
+      {
+        "name": "DisplayNames",
+        "label": "Метки",
+        "type": 5
+      }
+    ],
+    "cells": [
+      {
+        "row": 0,
+        "column": 1,
+        "tag": 7,
+        "payload": [
+          7,
+          0,
+          186,
+          112,
+          210,
+          255,
+          255,
+          36,
+          230,
+          64
+        ],
+        "frame_size": 60,
+        "message_id": 1104
+      },
+      {
+        "row": 1,
+        "column": 1,
+        "tag": 11,
+        "payload": [
+          11,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1105
+      },
+      {
+        "row": 2,
+        "column": 1,
+        "tag": 8,
+        "payload": [
+          8,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          233,
+          253,
+          49
+        ],
+        "frame_size": 60,
+        "message_id": 1106
+      },
+      {
+        "row": 3,
+        "column": 1,
+        "tag": 20,
+        "payload": [
+          20,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1107
+      },
+      {
+        "row": 4,
+        "column": 1,
+        "tag": 5,
+        "payload": [
+          5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          240,
+          63
+        ],
+        "frame_size": 60,
+        "message_id": 1108
+      },
+      {
+        "row": 5,
+        "column": 1,
+        "tag": 1,
+        "payload": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1109
+      },
+      {
+        "row": 6,
+        "column": 1,
+        "tag": 11,
+        "payload": [
+          11,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1110
+      },
+      {
+        "row": 7,
+        "column": 1,
+        "tag": 8,
+        "payload": [
+          8,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1111
+      },
+      {
+        "row": 8,
+        "column": 1,
+        "tag": 20,
+        "payload": [
+          20,
+          0,
+          255,
+          255,
+          255,
+          127,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1112
+      },
+      {
+        "row": 9,
+        "column": 1,
+        "tag": 5,
+        "payload": [
+          5,
+          0,
+          251,
+          89,
+          140,
+          66,
+          202,
+          192,
+          243,
+          63
+        ],
+        "frame_size": 60,
+        "message_id": 1113
+      },
+      {
+        "row": 10,
+        "column": 1,
+        "tag": 1,
+        "payload": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1114
+      },
+      {
+        "row": 11,
+        "column": 1,
+        "tag": 1,
+        "payload": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1115
+      },
+      {
+        "row": 12,
+        "column": 1,
+        "tag": 1,
+        "payload": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1116
+      },
+      {
+        "row": 13,
+        "column": 1,
+        "tag": 1,
+        "payload": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1117
+      },
+      {
+        "row": 14,
+        "column": 1,
+        "tag": 1,
+        "payload": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1118
+      }
+    ],
+    "normalization": "unused variant slot bytes zeroed; significant bytes unchanged"
+  },
+  {
+    "label": "bounds",
+    "source": ".dock/node16/live-1789292821504/prototype-bounds-raw.json",
+    "sha256": "08c02cba8ad14355c0a1dcbb84369f60e001a3755510b55bdff0e67ad6e79424",
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Names",
+        "label": "Имена",
+        "type": 5
+      },
+      {
+        "name": "DisplayNames",
+        "label": "Метки",
+        "type": 5
+      },
+      {
+        "name": "Values",
+        "label": "Значения",
+        "type": 6
+      }
+    ],
+    "cells": [
+      {
+        "row": 0,
+        "column": 3,
+        "tag": 20,
+        "payload": [
+          20,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          32,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 2308
+      },
+      {
+        "row": 1,
+        "column": 3,
+        "tag": 5,
+        "payload": [
+          5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          128
+        ],
+        "frame_size": 60,
+        "message_id": 2309
+      },
+      {
+        "row": 2,
+        "column": 3,
+        "tag": 20,
+        "payload": [
+          20,
+          0,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          127
+        ],
+        "frame_size": 60,
+        "message_id": 2310
+      },
+      {
+        "row": 3,
+        "column": 3,
+        "tag": 5,
+        "payload": [
+          5,
+          0,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          239,
+          127
+        ],
+        "frame_size": 60,
+        "message_id": 2311
+      },
+      {
+        "row": 4,
+        "column": 3,
+        "tag": 20,
+        "payload": [
+          20,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          128
+        ],
+        "frame_size": 60,
+        "message_id": 2312
+      },
+      {
+        "row": 5,
+        "column": 3,
+        "tag": 5,
+        "payload": [
+          5,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 2313
+      },
+      {
+        "row": 6,
+        "column": 3,
+        "tag": 20,
+        "payload": [
+          20,
+          0,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          223,
+          255
+        ],
+        "frame_size": 60,
+        "message_id": 2314
+      },
+      {
+        "row": 7,
+        "column": 3,
+        "tag": 5,
+        "payload": [
+          5,
+          0,
+          0,
+          0,
+          0,
+          32,
+          0,
+          0,
+          240,
+          63
+        ],
+        "frame_size": 60,
+        "message_id": 2315
+      }
+    ],
+    "normalization": "unused variant slot bytes zeroed; significant bytes unchanged"
+  },
+  {
+    "label": "dates",
+    "source": ".dock/node16/live-1789295696452/hardening-raw-moscow.json",
+    "sha256": "345288673e6bb189814567e39385f54b46a2f25f2f40929b58d1c69db1c39747",
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Names",
+        "label": "Имена",
+        "type": 5
+      },
+      {
+        "name": "DisplayNames",
+        "label": "Метки",
+        "type": 5
+      },
+      {
+        "name": "Values",
+        "label": "Значения",
+        "type": 6
+      }
+    ],
+    "cells": [
+      {
+        "row": 0,
+        "column": 3,
+        "tag": 20,
+        "payload": [
+          20,
+          0,
+          255,
+          255,
+          255,
+          127,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1469
+      },
+      {
+        "row": 1,
+        "column": 3,
+        "tag": 5,
+        "payload": [
+          5,
+          0,
+          0,
+          0,
+          0,
+          32,
+          0,
+          0,
+          240,
+          63
+        ],
+        "frame_size": 60,
+        "message_id": 1470
+      },
+      {
+        "row": 2,
+        "column": 3,
+        "tag": 7,
+        "payload": [
+          7,
+          0,
+          85,
+          85,
+          85,
+          85,
+          35,
+          38,
+          230,
+          64
+        ],
+        "frame_size": 60,
+        "message_id": 1471
+      },
+      {
+        "row": 3,
+        "column": 3,
+        "tag": 20,
+        "payload": [
+          20,
+          0,
+          0,
+          0,
+          0,
+          128,
+          255,
+          255,
+          255,
+          255
+        ],
+        "frame_size": 60,
+        "message_id": 1472
+      },
+      {
+        "row": 4,
+        "column": 3,
+        "tag": 5,
+        "payload": [
+          5,
+          0,
+          0,
+          0,
+          0,
+          224,
+          255,
+          255,
+          239,
+          71
+        ],
+        "frame_size": 60,
+        "message_id": 1473
+      },
+      {
+        "row": 5,
+        "column": 3,
+        "tag": 7,
+        "payload": [
+          7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          226,
+          67,
+          230,
+          64
+        ],
+        "frame_size": 60,
+        "message_id": 1474
+      },
+      {
+        "row": 6,
+        "column": 3,
+        "tag": 20,
+        "payload": [
+          20,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1475
+      },
+      {
+        "row": 7,
+        "column": 3,
+        "tag": 5,
+        "payload": [
+          5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          160,
+          54
+        ],
+        "frame_size": 60,
+        "message_id": 1476
+      },
+      {
+        "row": 8,
+        "column": 3,
+        "tag": 7,
+        "payload": [
+          7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          52,
+          16,
+          36,
+          193
+        ],
+        "frame_size": 60,
+        "message_id": 1477
+      },
+      {
+        "row": 9,
+        "column": 3,
+        "tag": 20,
+        "payload": [
+          20,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1478
+      },
+      {
+        "row": 10,
+        "column": 3,
+        "tag": 5,
+        "payload": [
+          5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          128
+        ],
+        "frame_size": 60,
+        "message_id": 1479
+      },
+      {
+        "row": 11,
+        "column": 3,
+        "tag": 7,
+        "payload": [
+          7,
+          0,
+          231,
+          255,
+          255,
+          255,
+          64,
+          146,
+          70,
+          65
+        ],
+        "frame_size": 60,
+        "message_id": 1480
+      },
+      {
+        "row": 12,
+        "column": 3,
+        "tag": 20,
+        "payload": [
+          20,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "frame_size": 60,
+        "message_id": 1481
+      },
+      {
+        "row": 13,
+        "column": 3,
+        "tag": 5,
+        "payload": [
+          5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          240,
+          63
+        ],
+        "frame_size": 60,
+        "message_id": 1482
+      },
+      {
+        "row": 14,
+        "column": 3,
+        "tag": 7,
+        "payload": [
+          7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          208,
+          63
+        ],
+        "frame_size": 60,
+        "message_id": 1483
+      }
+    ],
+    "normalization": "unused variant slot bytes zeroed; significant bytes unchanged"
+  }
+]

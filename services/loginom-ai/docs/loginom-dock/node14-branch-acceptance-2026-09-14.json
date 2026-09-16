@@ -1,0 +1,21 @@
+{
+  "status": "ACCEPTED_BRANCH_NOT_MERGED",
+  "accepted_at": "2026-09-14T11:26:21.692047+00:00",
+  "report_commit": "d300239018ef9e0492652aa9d328629d6fcdcc68",
+  "run": "20260914-124616-9e88066c",
+  "source": "408738126465c9ba143452be7d7ad4b1b62aa127",
+  "runtime": "e909a974f924fe2be856eb9508cd85c42ac18245ea16df01c6bb75d8b4e874fc",
+  "checks_passed": 206,
+  "independent_results": 12,
+  "coordinator_full_audit_recomputed": true,
+  "exact_full_report_match": true,
+  "receipts_verified": 103,
+  "report": ".worktrees/node-14-missing-values/docs/loginom-dock/missing-values-run8-reevaluation-v2-pins-2026-09-14.json",
+  "report_sha256": "cbfda2f51cb5486d4b837ec5825cc787abffe5f90654c07a5ecb9734a33b7da8",
+  "audit_sha256": "737d95084c78f6015f6b25a2e43db95909b9fb032ec701bb5c8d1cdcd88b90ea",
+  "historical_frozen_fail_preserved": true,
+  "source_bytes_reverified_after_reopen": false,
+  "scope": "Exact source bytes verified before save; saved source path/format/schema, dependency execution and all output values verified after independent reopen",
+  "merged": false,
+  "published": false
+}

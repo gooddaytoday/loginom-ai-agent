@@ -1,0 +1,93 @@
+{
+  "command": "node12:candidate-preflight:2:d0c9a5bedc170754dd251c982508e0ad8568d300091eda0027962c496df62adf",
+  "status": "PASS_READY_FOR_SEPARATE_SLOT",
+  "model_started": false,
+  "source_commit": "0e11a3fb24ca40a9f855008d2b0d1856d6f771ad",
+  "preflight_head": "14c1c71ff461ddbc9e065d9772dee334831d5981",
+  "runtime_sha256": "1459a3d10e84a0f4742933f68333cb5843f27347b0062656d090a306446e4248",
+  "harness_sha256": "b8d5b9ced1725cbbb64da0d92d93a74cd2f90bf9b8f8ff0efbf1a4a2f434b9d3",
+  "goal_sha256": "eeb7594606862826a86e21c9defeaa9bd30ecccade23177b4be26b1438bbcb78",
+  "native_skill_sha256": "b9c0c5a9d09cbcc2e1f6d93dc41206f0d3837c517fcf970d4d2d787f4edf4872",
+  "candidate_manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node12.2-candidate/manifest.json",
+  "candidate_manifest_sha256": "d0c9a5bedc170754dd251c982508e0ad8568d300091eda0027962c496df62adf",
+  "catalog_files": {
+    "actions.json": "8d395a70cf6613390a693d570df58c7e57cbf401e1d8a6069ceb2d044bf1f584",
+    "selectors.json": "6d7da442ed90d588997eb39bad262ddd6bacc06fb680148d9a36397827513da2",
+    "source-index.json": "bb7f919275dcbabd45667c36fc34015a1a94572a1cb3837f2f881e6adee5a844"
+  },
+  "compatibility": {
+    "profile_id": "loginom-7.4.2-macos-chromium-ru",
+    "loginom_build": "7.4.2",
+    "platform": "macos",
+    "browser": "chromium"
+  },
+  "provider": "openai-codex",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "low",
+  "auth_policy": "existing-hermes-no-refresh-or-import-v1",
+  "dependencies": {
+    "node": "24.19.0",
+    "playwright": "1.63.0-alpha-2026-08-31",
+    "sdk": "1.30.0",
+    "playwright_mcp": "0.0.80",
+    "chromium_revision": "1243",
+    "chromium_version": "153.0.8010.12"
+  },
+  "checks": {
+    "runtime_inputs": 153,
+    "harness_inputs": 243,
+    "source_build_inputs": 386,
+    "registered_dock_manifest_exact_sha": true,
+    "server_catalog_hashes": 4,
+    "mcp_initialize_list_tools": true,
+    "required_tools": 11,
+    "missing_tools": []
+  },
+  "session_id": "8bb2ccf0-03fb-4b0e-a74e-debffda7b097",
+  "loginom_user": "test-1",
+  "loginom_url": "http://logi-test-plan.bg.local/app/?testable=true",
+  "storage_directory": "/test-1",
+  "save_roots": [
+    "/test-1/packages"
+  ],
+  "staged": true,
+  "activated": false,
+  "diagnostic_setup_failure": "First standalone MCP check rejected own 0755 state directory; changed own directory to ordinary-run 0700; unchanged stock check passed. Original failure retained. No approval rejection.",
+  "effective_usage_identity": "Provider/model selected explicitly and existing subscription validated locally; actual model usage identity can only be checked after authorized run.",
+  "receipts": {
+    ".dock/node12-followup-1/candidate-preflight.json": {
+      "sha256": "8a579da5c1e668177158ae545dbd3e043dbb373cfee8a14e361c7b3e036586f8"
+    },
+    ".dock/node12-candidate-preflight-2/manifest-mcp-readback.json": {
+      "sha256": "d0c9a5bedc170754dd251c982508e0ad8568d300091eda0027962c496df62adf"
+    },
+    ".dock/node12-candidate-preflight-2/tool-precheck.json": {
+      "sha256": "69ad3486c60157a164ec2ba9e1b979e5eb78cf0cdabe73db2a5428f4666c9d34"
+    },
+    ".dock/node12-candidate-preflight-2/tool-precheck-private-mode.json": {
+      "sha256": "55c27c3876e8af15ecff0f0b10e4b7445067ac8001013d7ffd3bd96d9cded33c"
+    },
+    ".dock/node12-candidate-preflight-2/private/config.json": {
+      "sha256": "d93e82a1a7eed854f23c21ebc7d95b5cff8498ef118d1d6276aeb1e3df47c0e6"
+    },
+    ".dock/node12-candidate-preflight-2/private/dock-state/sessions/8bb2ccf0-03fb-4b0e-a74e-debffda7b097/session.json": {
+      "sha256": "0668c952fa15bf0240bffe26926c6ade688e39cfce5e92c593de90ff1c11728b"
+    },
+    ".dock/node12-candidate-preflight-2/process-check.json": {
+      "sha256": "000638f2b3e0bb751efbccfb3817a7ed08c18b47a7a4dfea3e6e945ebff7c23e"
+    }
+  },
+  "pending": "Separate coordinator slot for a new full 16-operation Hermes run; do not repeat preflight into existing output.",
+  "effective_mcp_session": {
+    "agent": "hermes",
+    "adapterRevision": "0.1.0-rc.4-acceptance",
+    "mode": "executor-replay",
+    "resultProfile": "diagnostic",
+    "clientRevision": "1459a3d10e84a0f4742933f68333cb5843f27347b0062656d090a306446e4248",
+    "archiveActive": false,
+    "workspaceReady": false,
+    "actionManifestDigest": "d0c9a5bedc170754dd251c982508e0ad8568d300091eda0027962c496df62adf",
+    "actionCatalogVersion": "2026.09.13-node12.2-candidate"
+  },
+  "own_processes_remaining": false
+}

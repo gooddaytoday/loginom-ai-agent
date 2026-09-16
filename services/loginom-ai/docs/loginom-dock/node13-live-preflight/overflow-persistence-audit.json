@@ -1,0 +1,313 @@
+{
+  "passed": true,
+  "scope": "independent_original_package_empty_calendar_persistence_after_overflow_fix",
+  "full_hermes_acceptance": false,
+  "old_runtime": "2488fdaa08e4d6da9b7a31fb7598f675a8ad972efd65640b34cbc851feb16e2b",
+  "diagnostic_runtime": "d5fd1ba79586069c27b9f5c8626cf885f9a5fe7e28e6274b01bc0081ada9558f",
+  "original_run": "20260913-195531-1f2bd245",
+  "diagnostic_session": "b357b29f-4948-4f2d-891c-8905d1418492",
+  "checks": {
+    "original_single_awaited_save": {
+      "passed": true
+    },
+    "independent_exact_original_open": {
+      "passed": true
+    },
+    "new_runtime_separately_bound": {
+      "passed": true
+    },
+    "same_saved_node": {
+      "passed": true
+    },
+    "no_settings_supplied": {
+      "passed": true
+    },
+    "saved_configuration_unchanged": {
+      "passed": true
+    },
+    "fresh_public_success": {
+      "passed": true
+    },
+    "full_empty_output_and_native_configuration": {
+      "passed": true,
+      "checks": {
+        "ports": {
+          "passed": true
+        },
+        "full": {
+          "passed": true
+        },
+        "date_configuration_and_values": {
+          "passed": true,
+          "checks": {
+            "configuration": {
+              "passed": true,
+              "failures": [],
+              "projection": [
+                {
+                  "name": "RowId",
+                  "label": "Идентификатор строки",
+                  "type": "integer",
+                  "input": "Id"
+                },
+                {
+                  "name": "SalesAmount",
+                  "label": "Сумма продаж",
+                  "type": "integer",
+                  "input": "Amount"
+                },
+                {
+                  "name": "A_date",
+                  "label": "A date",
+                  "type": "datetime",
+                  "input": "DateA",
+                  "operation": "date"
+                },
+                {
+                  "name": "A_month_end",
+                  "label": "A month_end",
+                  "type": "datetime",
+                  "input": "DateA",
+                  "operation": "month_end"
+                },
+                {
+                  "name": "A_month_start",
+                  "label": "A month_start",
+                  "type": "datetime",
+                  "input": "DateA",
+                  "operation": "month_start"
+                },
+                {
+                  "name": "A_quarter_end",
+                  "label": "A quarter_end",
+                  "type": "datetime",
+                  "input": "DateA",
+                  "operation": "quarter_end"
+                },
+                {
+                  "name": "A_quarter_start",
+                  "label": "A quarter_start",
+                  "type": "datetime",
+                  "input": "DateA",
+                  "operation": "quarter_start"
+                },
+                {
+                  "name": "A_year_end",
+                  "label": "A year_end",
+                  "type": "datetime",
+                  "input": "DateA",
+                  "operation": "year_end"
+                },
+                {
+                  "name": "A_year_start",
+                  "label": "A year_start",
+                  "type": "datetime",
+                  "input": "DateA",
+                  "operation": "year_start"
+                },
+                {
+                  "name": "A_hour",
+                  "label": "A hour",
+                  "type": "integer",
+                  "input": "DateA",
+                  "operation": "hour"
+                },
+                {
+                  "name": "A_day_of_month",
+                  "label": "A day_of_month",
+                  "type": "integer",
+                  "input": "DateA",
+                  "operation": "day_of_month"
+                },
+                {
+                  "name": "A_month",
+                  "label": "A month",
+                  "type": "integer",
+                  "input": "DateA",
+                  "operation": "month"
+                },
+                {
+                  "name": "A_quarter",
+                  "label": "A quarter",
+                  "type": "integer",
+                  "input": "DateA",
+                  "operation": "quarter"
+                },
+                {
+                  "name": "SavedYearA",
+                  "label": "Год сохранённой даты A",
+                  "type": "integer",
+                  "input": "DateA",
+                  "operation": "year"
+                },
+                {
+                  "name": "B_date",
+                  "label": "B date",
+                  "type": "datetime",
+                  "input": "DateB",
+                  "operation": "date"
+                },
+                {
+                  "name": "B_month_end",
+                  "label": "B month_end",
+                  "type": "datetime",
+                  "input": "DateB",
+                  "operation": "month_end"
+                },
+                {
+                  "name": "B_month_start",
+                  "label": "B month_start",
+                  "type": "datetime",
+                  "input": "DateB",
+                  "operation": "month_start"
+                },
+                {
+                  "name": "B_quarter_end",
+                  "label": "B quarter_end",
+                  "type": "datetime",
+                  "input": "DateB",
+                  "operation": "quarter_end"
+                },
+                {
+                  "name": "B_quarter_start",
+                  "label": "B quarter_start",
+                  "type": "datetime",
+                  "input": "DateB",
+                  "operation": "quarter_start"
+                },
+                {
+                  "name": "B_year_end",
+                  "label": "B year_end",
+                  "type": "datetime",
+                  "input": "DateB",
+                  "operation": "year_end"
+                },
+                {
+                  "name": "B_year_start",
+                  "label": "B year_start",
+                  "type": "datetime",
+                  "input": "DateB",
+                  "operation": "year_start"
+                },
+                {
+                  "name": "B_hour",
+                  "label": "B hour",
+                  "type": "integer",
+                  "input": "DateB",
+                  "operation": "hour"
+                },
+                {
+                  "name": "B_day_of_month",
+                  "label": "B day_of_month",
+                  "type": "integer",
+                  "input": "DateB",
+                  "operation": "day_of_month"
+                },
+                {
+                  "name": "B_month",
+                  "label": "B month",
+                  "type": "integer",
+                  "input": "DateB",
+                  "operation": "month"
+                },
+                {
+                  "name": "B_quarter",
+                  "label": "B quarter",
+                  "type": "integer",
+                  "input": "DateB",
+                  "operation": "quarter"
+                },
+                {
+                  "name": "B_year",
+                  "label": "B year",
+                  "type": "integer",
+                  "input": "DateB",
+                  "operation": "year"
+                },
+                {
+                  "name": "DateA",
+                  "label": "Дата",
+                  "type": "datetime",
+                  "input": "DateA"
+                }
+              ],
+              "scope": "date_time_raw_configuration"
+            },
+            "raw_output": {
+              "passed": true,
+              "failures": [],
+              "execution_id": "1789335842485-l9ozd28k1v:197:2",
+              "scope": "fresh_calculator_table_against_independent_expected",
+              "source_identity_verified": false,
+              "package_persistence_verified": false
+            },
+            "values": {
+              "passed": true,
+              "rows": 0,
+              "columns": 27,
+              "full_values_verified": true
+            }
+          },
+          "scope": "source_diagnostic_operation",
+          "hermes_acceptance": false,
+          "package_persistence_verified": false
+        },
+        "frozen_projection": {
+          "passed": true
+        },
+        "excluded_source_and_target": {
+          "passed": true,
+          "failures": [],
+          "raw_refs": [
+            {
+              "event_line": 231,
+              "path": "receipt.value.native_mapping"
+            },
+            {
+              "event_line": 216,
+              "path": "outcome.output.node_mapping"
+            }
+          ],
+          "scope": "exact_excluded_source_and_target_metadata",
+          "effective_output_column": false
+        },
+        "date_mapping": {
+          "passed": true
+        },
+        "raw": {
+          "passed": true,
+          "failures": [],
+          "execution_id": "1789335842485-l9ozd28k1v:197:2",
+          "scope": "fresh_calculator_table_against_independent_expected",
+          "source_identity_verified": false,
+          "package_persistence_verified": false
+        }
+      }
+    },
+    "read_only_configuration_sequence": {
+      "passed": true
+    },
+    "exact_overflow_edge_and_native_binding": {
+      "passed": true
+    },
+    "actual_read_only_preserved": {
+      "passed": true
+    },
+    "upstream_executed_without_configuration": {
+      "passed": true
+    },
+    "one_target_no_save": {
+      "passed": true
+    },
+    "original_evidence_unchanged": {
+      "passed": true
+    },
+    "closed_without_save": {
+      "passed": true
+    }
+  },
+  "overflow_observations_with_actionable_done": 5,
+  "source_evidence_sha256": "f91cf7974e178efe95dd946242e5184d87315474165535a98309a591ae8308b6",
+  "diagnostic_events_sha256": "8999d2087dd1d39dcc02a976337d43b2531bbec0802697b354032595a9ce2d73",
+  "public_api_sha256": "e5ca06bba4a34d4e8bbd4670e030ce91848feae4b068b4317fc956c0490868a6"
+}

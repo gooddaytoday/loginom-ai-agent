@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loginom-dock.duckdns.org/schemas/executor/selector-catalog-v1.json",
+  "title": "Loginom Dock selector catalog v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "catalog_version", "e2e_commit", "selectors"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "catalog_version": { "type": "string", "minLength": 1 },
+    "e2e_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "selectors": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["symbol", "strategy", "match", "value", "scope", "cardinality", "visibility", "state", "parameters", "provenance"],
+        "properties": {
+          "symbol": { "type": "string", "pattern": "^[a-z][a-z0-9_.]+$" },
+          "strategy": { "const": "data_tid" },
+          "match": { "enum": ["exact", "prefix", "suffix"] },
+          "value": { "type": "string", "minLength": 1 },
+          "scope": { "enum": ["global", "activeTab", "activeWorkflow", "modal"] },
+          "cardinality": { "enum": ["one", "zeroOrOne", "many"] },
+          "visibility": { "enum": ["visible", "hidden", "any"] },
+          "state": { "type": "array", "uniqueItems": true, "items": { "enum": ["enabled", "masked"] } },
+          "parameters": { "type": "object", "additionalProperties": { "enum": ["loginom_tid", "integer"] } },
+          "required_class": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+          "provenance": {
+            "type": "object", "additionalProperties": false,
+            "required": ["path", "line_start", "line_end", "commit", "sha256", "role"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "line_start": { "type": "integer", "minimum": 1 },
+              "line_end": { "type": "integer", "minimum": 1 },
+              "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "role": { "const": "selector" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

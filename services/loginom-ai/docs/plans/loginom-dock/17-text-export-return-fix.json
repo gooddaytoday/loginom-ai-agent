@@ -1,0 +1,144 @@
+{
+  "status": "ready-for-Hermes-retry",
+  "base_commit": "fb3653d2",
+  "full_goal_passed": false,
+  "previous_run": "20260913-201620-8a46e7fa",
+  "previous_audit": {
+    "passed": false,
+    "scope": "node17_full_goal",
+    "checks": {
+      "projection": {
+        "passed": false,
+        "failures": [
+          "user_mixed_result_profile"
+        ]
+      },
+      "incomplete_or_invalid": {
+        "passed": false,
+        "reason": ""
+      }
+    }
+  },
+  "previous_cleanup": {
+    "returncode": 0,
+    "timed_out": false,
+    "remaining_pids": [],
+    "closed": true,
+    "slot": "node17-hermes-20260913-73c911c6"
+  },
+  "previous_runtime_and_harness_unchanged": true,
+  "failure": {
+    "step": 19,
+    "kind": "return",
+    "safe_native_receipt": {
+      "status": "NOT_APPLIED",
+      "phase": "preconditions",
+      "code": null,
+      "error_present": true,
+      "effect_possible": false,
+      "cleanup_complete": true,
+      "pending_ui_actions": null,
+      "download_count": null,
+      "listener_registered": null,
+      "download_completed": null,
+      "context_checks": [],
+      "trace_count": 2,
+      "trace_omitted": true
+    },
+    "actual_replace_dispatches": 0,
+    "exact_error_code_retained": false,
+    "root_cause_confirmed": false,
+    "limit": "Previous safe logger omitted non-download error codes; do not label the historical failure UI_EPOCH_CHANGED."
+  },
+  "changes": [
+    "Retain known UI failure codes and bounded gesture/precondition trace flags without UI text or secrets.",
+    "Allow at most two fresh return attempts only for NOT_APPLIED/preconditions/UI_EPOCH_CHANGED/effect=false/cleanup=true and trace without verified preconditions or gesture.",
+    "Every fresh return must preserve document, workspace, active identity, package and exact target; one successful return and one download/dispatch are independently audited.",
+    "Full launch requires a completed current native component; component diagnostics run directly with current frozen sources, without an additional admission layer."
+  ],
+  "runtime": "2897649a8d2120d25e4c80af8af2c6cdd834023b5bda1a1bd5baf073c6e9ba32",
+  "product_runtime_changed": false,
+  "manifest_sha256": "ad77871c884adf62c4e1f46ea89d3b81191f788ffe331040b26f22469d51bea8",
+  "goal_sha256": "5db16d49554a80afceedcbad2f9a836378377650bcec1d27c4768638a29b46b6",
+  "full_goal": {
+    "nodeops": 22,
+    "deliveries": 3,
+    "all_save_reopen_required": true
+  },
+  "tests": {
+    "node_passed": 30,
+    "python_passed": 22,
+    "native_component_passed": true,
+    "negative_evidence_mutations_rejected": 50,
+    "return_refusal_recovery": "synthetic fault injection only; live return succeeded without retry"
+  },
+  "live": {
+    "run_directory": ".dock/node17/user-v1-component/20260913-173210-2776aeab",
+    "report": "docs/plans/loginom-dock/17-text-export-return-component-success.json",
+    "report_sha256": "aa486e409189a7d73e94dc4219d8feba04939176f98588850ded722622faa4b3",
+    "observer_elapsed_ms": 1807.5992090000072,
+    "downloads": 1,
+    "actual_dispatches": 1,
+    "replace_prepared": 1,
+    "bytes": 124,
+    "closed": true,
+    "global_config_unchanged": true
+  },
+  "previous_evidence_sha256": {
+    "request.json": "5b84d06b62ca71d4b41dceb80684807f16a62aa9254af202d3f5108c108b924e",
+    "evidence.json": "e534122376082ce18877f451e800624129b643872ee101ed2639e282970ddfc6",
+    "attempt.json": "59ad10bc0b817fece95dd96eade637127f7517fe244a444a57b0edea76954f8a",
+    "full-audit.json": "f230146936bbe780f5ee21b1357077e5dd091b79776646d96e5ea07471372fed",
+    "process-close-check.json": "fdafc069f11dba53715ce1a2efa9724a23978713abbece459795d48ad090bf94",
+    "observer/observer.jsonl": "38d8a80fb82f6ed63f6437970f5b44a14ef262fbb3034806fac979d50bee5517",
+    "observer/observer-actions.jsonl": "6ea778df272d8796529156115c0e604e9731caeb408746b97376734b245f43da",
+    "observer/observer-responses.jsonl": "f99b1b7be3d7b0689a0bc23235aa3d8e6635469be3d7c68502993bede1239315"
+  },
+  "launch": {
+    "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export",
+    "argv": [
+      "python3",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/tools/loginom-acceptance/run.py",
+      "--run",
+      "--goal",
+      "text-export-node-complete",
+      "--model-profile",
+      "chatgpt-sol",
+      "--runs-root",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs",
+      "--node",
+      "/Users/kartamyshev/.loginom-dock/releases/0.1.0-dev.20260910.3-80ca61417ec7/runtime/node",
+      "--hermes-home",
+      "/Users/kartamyshev/.hermes",
+      "--hermes",
+      "/Users/kartamyshev/.local/bin/hermes",
+      "--hermes-python",
+      "/Users/kartamyshev/.hermes/hermes-agent/venv/bin/python",
+      "--hermes-source",
+      "/Users/kartamyshev/.hermes/hermes-agent",
+      "--dock-config",
+      "/Users/kartamyshev/.loginom-dock/config.json",
+      "--browsers",
+      "/Users/kartamyshev/.loginom-dock/runtime/browsers",
+      "--loginom-user",
+      "test-2",
+      "--loginom-url",
+      "http://logi-test-plan.bg.local/app/?testable=true",
+      "--storage-directory",
+      "/test-2",
+      "--manifest-uri",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node11.2-candidate/manifest.json",
+      "--manifest-sha256",
+      "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "--timeout",
+      "3600",
+      "--max-turns",
+      "100"
+    ],
+    "requires_coordinator_slot": true,
+    "model_started": false
+  },
+  "requires_new_coordinator_slot": true,
+  "retry_model_started": false,
+  "preflight_sha256": "b381c6f1e849e8e57c02050a8d6435dd718e18b1e4ab1150f942ede1deb09532"
+}

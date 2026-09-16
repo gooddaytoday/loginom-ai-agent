@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "abi": 1,
+  "executor_revision": "1.3.0",
+  "outcomes": [
+    "SUCCEEDED",
+    "NOT_APPLIED",
+    "FAILED",
+    "AMBIGUOUS"
+  ],
+  "capabilities": {
+    "node.add.v1": {
+      "mutates": [
+        "workflow.node",
+        "workflow.link"
+      ],
+      "reconciliation": "one added node plus observed automatic incident links; all preexisting graph content is preserved",
+      "action_key": "node.add",
+      "effect_kind": "create",
+      "effect_resource": "workflow.node"
+    },
+    "link.create.v1": {
+      "mutates": [
+        "workflow.link",
+        "workflow.port"
+      ],
+      "reconciliation": "link and target port snapshot diff",
+      "action_key": "link.create",
+      "effect_kind": "create",
+      "effect_resource": "workflow.link"
+    },
+    "package.save_as.v1": {
+      "mutates": [
+        "package.storage",
+        "workspace.active_package"
+      ],
+      "reconciliation": "conflict dialog and active package identity",
+      "action_key": "package.save_as",
+      "effect_kind": "save",
+      "effect_resource": "package"
+    },
+    "node.configure_text_import.v1": {
+      "mutates": [
+        "workflow.node.settings"
+      ],
+      "reconciliation": "completed child receipt plus original and current wizard state; no automatic restart of a partial procedure",
+      "action_key": "node.configure_text_import",
+      "effect_kind": "configure",
+      "effect_resource": "workflow.node"
+    },
+    "package.save_checkpoint.v1": {
+      "mutates": [
+        "package.storage",
+        "workspace.active_package"
+      ],
+      "reconciliation": "completed browser receipt; no automatic retry or close/reopen",
+      "action_key": "package.save_checkpoint",
+      "effect_kind": "persist",
+      "effect_resource": "package"
+    }
+  },
+  "effect_contract_version": 1,
+  "effect_contracts": {
+    "create": {
+      "precondition": "owned_context_and_snapshot",
+      "postcondition": "exact_created_object_diff",
+      "reconciliation": "snapshot_diff_before_retry",
+      "ownership": "created_objects_and_declared_incident_edges"
+    },
+    "save": {
+      "precondition": "owned_package_path_and_conflict_policy",
+      "postcondition": "same_path_reopened_content",
+      "reconciliation": "completed_save_receipt",
+      "ownership": "exact_package_destination"
+    },
+    "configure": {
+      "precondition": "owned_settings_identity_and_original_values",
+      "postcondition": "applied_typed_settings_readback",
+      "reconciliation": "original_expected_actual_settings",
+      "ownership": "declared_fields_and_mappings"
+    },
+    "delete": {
+      "precondition": "owned_object_and_dependency_snapshot",
+      "postcondition": "object_absent_unrelated_objects_preserved",
+      "reconciliation": "identity_and_dependency_diff",
+      "ownership": "selected_object_and_declared_dependencies"
+    },
+    "execute": {
+      "precondition": "owned_node_and_graph_revision",
+      "postcondition": "new_execution_identity_and_terminal_status",
+      "reconciliation": "same_execution_status_without_restart",
+      "ownership": "declared_execution"
+    },
+    "inspect": {
+      "precondition": "scoped_identity_and_revision",
+      "postcondition": "readout_with_revision_and_completeness",
+      "reconciliation": "fresh_read_same_revision_or_restart_observation",
+      "ownership": "no_mutation"
+    },
+    "transfer": {
+      "precondition": "authorized_artifact_digest_and_destination_policy",
+      "postcondition": "destination_bytes_digest_and_size",
+      "reconciliation": "partial_destination_and_transfer_receipt",
+      "ownership": "exact_artifact_destination"
+    },
+    "persist": {
+      "precondition": "owned_package_path_and_conflict_policy",
+      "postcondition": "awaited_save_flow_same_path_and_open_workflow",
+      "reconciliation": "completed_save_receipt_without_retry",
+      "ownership": "exact_package_destination"
+    }
+  }
+}

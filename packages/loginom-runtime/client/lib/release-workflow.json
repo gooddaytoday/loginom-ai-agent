@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "platforms": {
+    "darwin": {
+      "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-macos-candidate/manifest.json",
+      "manifest_sha256": "d26ce18ab9ef3285d5bac7aff1d17d4968defb1d41ebd7cbbda8d9cbede07255"
+    },
+    "linux": {
+      "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-linux-candidate/manifest.json",
+      "manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4"
+    },
+    "win32": {
+      "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-windows-candidate/manifest.json",
+      "manifest_sha256": "174258527893d1d8d5491407630b33ffdeef677aa83ad686945cc000f819beb8"
+    }
+  }
+}

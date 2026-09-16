@@ -1,0 +1,30 @@
+{
+	admin off
+	auto_https disable_redirects
+}
+
+https://git.basegroup.ru {
+	tls internal
+
+	@push path */git-receive-pack
+	respond @push 403
+	@pushDiscovery query service=git-receive-pack
+	respond @pushDiscovery 403
+
+	@lfsBatch path */info/lfs/objects/batch
+	handle @lfsBatch {
+		reverse_proxy gitlab-lfs-proxy:8080
+	}
+
+	@repositories path /testing/ai-skills.git/* /testing/e2e-tests.git/* /support/loginom-help.git/*
+	handle @repositories {
+		reverse_proxy unix//run/dock-tunnel/gitlab.sock {
+			header_up Host git.basegroup.ru
+			header_up X-Forwarded-Proto https
+			header_up X-Forwarded-Port 443
+		}
+	}
+	handle {
+		respond 404
+	}
+}

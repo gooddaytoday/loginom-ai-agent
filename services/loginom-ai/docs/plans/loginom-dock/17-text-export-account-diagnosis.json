@@ -1,0 +1,84 @@
+{
+  "assignment": "node17:account-probe-diagnosis:1:95a8105c",
+  "diagnostic_harness_commit": "3a38af33",
+  "run_id": "20260913-153521-37ca4f5b",
+  "session_id": "4d3d1826-3d57-47c7-8fb2-ccfae855fbb8",
+  "diagnostic_sessions": 1,
+  "diagnostic_probes": 1,
+  "actual_result_profile": "user-v1",
+  "diagnosis": {
+    "partial_evidence_verified": true,
+    "native_account_verified": true,
+    "account": "test-2",
+    "menu_closure_verified": false,
+    "close_gesture": "Escape",
+    "post_close_visible_observations": 29,
+    "native_elapsed_ms": 3132,
+    "host_elapsed_ms": 3137.6127499999984,
+    "nested_browser_response_received": true,
+    "pending_ui_actions": 0,
+    "source_code_sha_matches_checkpoint": true,
+    "runtime_unchanged": true,
+    "post_diagnosis_candidate_changes": [
+      "text-export-account-probe.mjs",
+      "text-export-account-probe.test.mjs",
+      "text-export-account-transport.test.mjs"
+    ],
+    "old_timeout_substep_remains_unobserved": true,
+    "full_goal_pass": false
+  },
+  "confirmed_issue": "Escape completed but did not hide the owned visible AppMenuForm in this diagnostic run; bounded close_wait ended with ACCOUNT_EVIDENCE_LIMIT",
+  "old_timeout_reason": "historical FAIL; exact old substep still unobserved",
+  "transport_hypothesis": "not reproduced: source gate released before callback probe; real SDK local test and returned native partial response rule out a deadlock in this run",
+  "fix": "one click on the fresh unique visible Avatar after confirming the same document/session/workflow and menu_count=1; no automatic close retry",
+  "fix_native_closure_verified": false,
+  "candidate_ready_for_separate_minimal_attempt": true,
+  "user_v1_component_pass": false,
+  "full_goal_pass": false,
+  "hermes_started": false,
+  "counts": {
+    "baseline": 0,
+    "upload": 0,
+    "node_apply": 0,
+    "observer": 0,
+    "replace": 0
+  },
+  "tests": {
+    "focused_node": 6,
+    "text_export_python": 20
+  },
+  "next_owner": "coordinator",
+  "next_trigger": "separately assign one minimal user-v1 baseline/reject/observer/replace; verify new close gesture live before baseline; no automatic launch",
+  "full_admission": {
+    "ready": false,
+    "reason": "TEXT_EXPORT_REJECT_BASELINE_READER_UNAVAILABLE: Native user-v1 component evidence pending"
+  },
+  "candidate_manifest_sha256": "47e8a6e14a9b43a98e8399cdba2f1ebc013b775475c10fecab368adcaddda00b",
+  "session_close": {
+    "browser_transport_closed": true,
+    "logged_out": false,
+    "global_config_unchanged": true
+  },
+  "process_close": {
+    "session_id": "4d3d1826-3d57-47c7-8fb2-ccfae855fbb8",
+    "browser_pids": [],
+    "closed": true,
+    "free_bytes": 95360319488
+  },
+  "evidence_sha256": {
+    "request.json": "3a1484cc624375fa98c12b913e9145ba3ed0593380cf09105276ad7f5456c897",
+    "entry-launch.json": "4db5effe388950af218d7170f455827e10c4e9519ae099e8505c57635a1037f4",
+    "one-smoke-marker.json": "645507fc8924682dad3def7ced13e555b8189709c12a51f8da8d341cf6055e06",
+    "public-wire.jsonl": "2f1e08643970cd08102f1961aea3af0eef85326acb01574b8f102d309a0d95ae",
+    "account-probe-prepared.json": "30950da91f6db197effd0852f0a08fb7842e5d2fadee15a8fad8d1f3939bc7eb",
+    "account-transport.json": "cfcaa9ae57dea9c7a6c0dbc7666f558f778f37deba666da0ea73dfeb8a6fca3d",
+    "account-probe.json": "befdd254704db5b4e9777943b61ea73f6a841ce3caeb8bc6e3d3415d9844a42a",
+    "diagnosis-audit.json": "5dc99f3a76666b15de6e28b94e87db0da924c003aa2d7fad12d073066401d04f",
+    "failure.json": "98fbf94799da033fb72e8924a6362899da73731784f745fbbde57b19d3607636",
+    "session-close.json": "701c7f6c6e83a3a96aa4ac8b9d82a01fe91d0662f75d9e1900974d9ebc4b7d33",
+    "process-close-check.json": "8d1580611851506ba0a79299d21a12c48d20a7aaef6efecf106b5def21379175",
+    "private/dock-state/sessions/4d3d1826-3d57-47c7-8fb2-ccfae855fbb8/session.json": "6a40f1fcd1d43492111fdff59aacf11c2bacee5b92d69b713b2716564c511efc",
+    "private/dock-state/sessions/4d3d1826-3d57-47c7-8fb2-ccfae855fbb8/execution-events.jsonl": "caf0d35992571dd6e7be8be3945b3aa559b7d3a6be6f01ba1edf4ad87d8666b9",
+    "private/dock-state/sessions/4d3d1826-3d57-47c7-8fb2-ccfae855fbb8/playwright.json": "a03d88127a588b7bec29b947561c54ca3a82331e7ccaded27ceda997d43b8387"
+  }
+}

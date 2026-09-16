@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "subplan": "10-union",
+  "status": "implemented_live_verified_source_runtime",
+  "subplan_complete": true,
+  "production_released": false,
+  "date": "2026-09-12",
+  "autonomous": {
+    "run_id": "20260912-174232-0449c132",
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "low",
+    "operations_succeeded": 12,
+    "audit_passed": true,
+    "checks_passed": 71,
+    "checks_total": 71,
+    "ui_fallback": false,
+    "source_pin": "c5c6a69e69d91b64231617833f7f97354fcd04a4ff0986ad8d4766766270348c",
+    "manifest_sha256": "4ac827fc9e0cefa609bf2cb8fd7d3d79318dd3fe92999decc7e385fae51fc6e2",
+    "package_path": "/test-1/packages/Dock-acceptance-20260912-174232-0449c132.lgp",
+    "evidence_directory": ".dock/union-20260912/runs/20260912-174232-0449c132"
+  },
+  "tests": {
+    "client_passed": 1378,
+    "client_skipped": 1,
+    "python_passed": 499
+  },
+  "efficiency": {
+    "model_api_calls": 32,
+    "public_calls": 34,
+    "public_calls_by_tool": {
+      "mcp__loginom_dock__dock_action_describe": 2,
+      "mcp__loginom_dock__dock_action_run": 2,
+      "mcp__loginom_dock__dock_artifact_deliver": 3,
+      "mcp__loginom_dock__dock_node_apply": 12,
+      "mcp__loginom_dock__dock_node_wait": 12,
+      "mcp__loginom_dock__dock_prepare": 2,
+      "mcp__loginom_dock__dock_workspace_observe": 1
+    },
+    "usage_counts": {
+      "input_tokens": 97037,
+      "output_tokens": 10119,
+      "total_tokens": 1829524,
+      "cache_read_tokens": 1722368,
+      "cache_write_tokens": 0,
+      "reasoning_tokens": 835
+    },
+    "usage_complete": true
+  },
+  "evidence_files": {
+    ".dock/union-20260912/runs/20260912-174232-0449c132/request.json": "b667fb03e681062fd175dfa246ea7eae9e04321eb2fe0723bc5604bf8b54812f",
+    ".dock/union-20260912/runs/20260912-174232-0449c132/evidence.json": "ef49dddb27e3d10cdaeae85c6922c6b4b9ab9308cba04875bdce2644b2da2eee",
+    ".dock/union-20260912/runs/20260912-174232-0449c132/efficiency.json": "933d0facf3f1850c367e9c496321bd355c06a53bab1ac18650dad9d8ae5f3c83",
+    ".dock/union-20260912/runs/20260912-174232-0449c132/union-node-audit.json": "1d5dfef229f9f89eab8604f8bade674711e1e07d4e96bc574b6c608010972545"
+  },
+  "additional_live_reports": [
+    ".dock/union-20260912/live-1789217551256/union-negative-audit.json",
+    ".dock/union-20260912/live-1789218432011/prefix-empty-audit.json",
+    ".dock/union-20260912/live-1789218432011/persisted-toggle-audit.json",
+    ".dock/union-20260912/live-1789219323954/final-negative-prefix-audit.json",
+    ".dock/union-20260912/live-1789219323954/final-persistence-audit.json",
+    ".dock/union-20260912/live-1789222933291/process-fresh-audit.json"
+  ],
+  "limitations": [
+    "Live verified on Loginom 7.4.2 with two/three inputs; maximum 15 is contract tested.",
+    "Cancellation and lost-reply paths covered by fault-injection tests, not a live long-running Union cancellation.",
+    "No build, deployment, installation, commit or push performed.",
+    "Global V4/V5 and further nodes remain separate work."
+  ]
+}

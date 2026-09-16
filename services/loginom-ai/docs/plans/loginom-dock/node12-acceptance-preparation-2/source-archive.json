@@ -1,0 +1,12 @@
+{
+  "source_commit": "0e11a3fb24ca40a9f855008d2b0d1856d6f771ad",
+  "archive_path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/source-0e11a3fb.tar",
+  "archive_sha256": "39876dd6a497762bf1ea2f8626d6d3dde2b2c279c564f964448c3adec4939192",
+  "source_files": 628,
+  "runtime_inputs": 153,
+  "runtime_sha256": "1459a3d10e84a0f4742933f68333cb5843f27347b0062656d090a306446e4248",
+  "harness_files": 243,
+  "harness_sha256": "b8d5b9ced1725cbbb64da0d92d93a74cd2f90bf9b8f8ff0efbf1a4a2f434b9d3",
+  "goal_sha256": "eeb7594606862826a86e21c9defeaa9bd30ecccade23177b4be26b1438bbcb78",
+  "native_skill_sha256": "b9c0c5a9d09cbcc2e1f6d93dc41206f0d3837c517fcf970d4d2d787f4edf4872"
+}

@@ -1,0 +1,6 @@
+{
+  "max_columns": 1000,
+  "base_steps": 2048,
+  "steps_per_column": 64,
+  "steps_per_mapping_pair": 8
+}

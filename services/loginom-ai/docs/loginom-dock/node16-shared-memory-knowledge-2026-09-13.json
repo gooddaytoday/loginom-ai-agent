@@ -1,0 +1,62 @@
+{
+  "checked_at": "2026-09-13T08:19:55.751741+00:00",
+  "node": 16,
+  "thread_id": "01a0992c-6ce0-7f10-bd53-9bf92ed7ae8a",
+  "generation": "20260913.5",
+  "shared_peer": "-Users-kartamyshev-Git-loginom-dock",
+  "cursor_before": 29,
+  "cursor_observed": 194,
+  "archived_messages": {
+    "archive_001": 21,
+    "archive_002": 173,
+    "all_archive_002_messages_shared_peer": true
+  },
+  "extraction_task_id": "eb0957b9-bf9a-4105-a505-7883c9e32bd9",
+  "extraction_status": "completed",
+  "memory_diff_uri": "viking://user/kartamyshev/sessions/cx-01a0992c-6ce0-7f10-bd53-9bf92ed7ae8a/history/archive_002/memory_diff.json",
+  "extracted_at": "2026-09-13T05:39:30.069663Z",
+  "memory_changes": {
+    "project_additions": 5,
+    "global_profile_updates": 1,
+    "deletions": 0
+  },
+  "project_add_uris": [
+    "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node16_development_started.md",
+    "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node16_env_setup.md",
+    "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node16_harness_launched.md",
+    "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node16_master_feature_found.md",
+    "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node16_native_result_checked.md"
+  ],
+  "exact_readback": {
+    "peer_scope": "actor",
+    "verified": true,
+    "uris": [
+      "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node16_master_feature_found.md",
+      "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node16_native_result_checked.md"
+    ],
+    "facts": [
+      "Developer observation recorded: totals rows repeat the last selected field data-tid; distinguish fields by native record.",
+      "Developer observation recorded: native output had 9 rows; ignoring empty values removed Null but retained empty string, zero and false."
+    ]
+  },
+  "scoped_retrieval": {
+    "peer_scope": "actor",
+    "target_uri": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories",
+    "read_content": false,
+    "query": "Узел16 Свертка столбцов native результат 9 строк игнорирование Null сохраняются пустая строка ноль false",
+    "matched_exact_uri": true,
+    "uris": [
+      "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node16_native_result_checked.md",
+      "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/06/text_import_config_diagnostic.md",
+      "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node16_master_feature_found.md",
+      "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/08/table_reader_created.md"
+    ]
+  },
+  "coordinator_registered_mcp_readback_verified": true,
+  "coordinator_read_uri": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node16_native_result_checked.md",
+  "memory_write_transport_and_knowledge_gate_passed": true,
+  "manual_capture_commit_remember": false,
+  "route_or_cursor_changed": false,
+  "node_acceptance_proven": false,
+  "limitation": "Read-back/retrieval verifies durable memory records, not a new independent live acceptance of node16. No manual capture, commit, remember, route or cursor changes."
+}

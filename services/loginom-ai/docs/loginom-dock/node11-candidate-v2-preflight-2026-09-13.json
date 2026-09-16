@@ -1,0 +1,89 @@
+{
+  "command_id": "node11:candidate-preflight:2:bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+  "status": "candidate_preflight_passed_awaiting_hermes_slot",
+  "session_id": "8d0c37ed-22e9-4469-b7eb-201252c4200a",
+  "source_commit": "b05715340937f9c828e03bc6ec7a88f3adf086da",
+  "runtime_revision": "8d6d4b3cd7f5d19a3ac1e9ac6537ff8219f97f9898326227df3f3ae55dcb1380",
+  "goal_sha256": "d283e683fe61298a9273365ca485d63e16fb582d08b45d42dfefb70c65952a9c",
+  "harness_inputs_verified": 253,
+  "harness_input_map_sha256": "427cf196518020fed8be9f72076e76cdca61bc498763e1e0f32a2fe9e0c98b0b",
+  "manifest_sha256": "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+  "preflight_passed": true,
+  "model_started": false,
+  "hermes_runs": 0,
+  "prepare_status": "READY",
+  "geometry": {
+    "passed": true,
+    "session_id": "8d0c37ed-22e9-4469-b7eb-201252c4200a",
+    "operation_id": "prepare",
+    "observed": {
+      "document_id": "1789290917454-xq1bxkfcct",
+      "origin": "http://logi-test-plan.bg.local/",
+      "pathname": "/app/",
+      "visibility": "visible",
+      "inner_width": 1508,
+      "inner_height": 862,
+      "outer_width": 1508,
+      "outer_height": 949,
+      "screen_x": 4,
+      "screen_y": 33,
+      "available_left": 0,
+      "available_top": 33,
+      "available_width": 1512,
+      "available_height": 949
+    }
+  },
+  "skill_bundle_verified": true,
+  "save_revisions": {
+    "package.save_as": "2",
+    "package.save_checkpoint": "2"
+  },
+  "allowed_roots": {
+    "package.save_as": [
+      "/test-2"
+    ],
+    "package.save_checkpoint": [
+      "/test-2"
+    ]
+  },
+  "draft_closed": true,
+  "bridge_exit_code": 0,
+  "cleanup_note": "First close helper encountered an observation pagination shape error before action; refreshed observation and retry succeeded; final native Home observed.",
+  "autonomous_acceptance_passed": false,
+  "slot_id": null,
+  "artifacts": {
+    ".dock/replacement/candidate-v2-preflight/coordinator-receipt.json": {
+      "sha256": "9e5f286ca3760424ab7b63f4408bb6a1e0ac4af0012125cc71da1f3f1752a0b1",
+      "bytes": 3301
+    },
+    ".dock/replacement/candidate-v2-preflight/preflight.json": {
+      "sha256": "9dc02f3fcf71a82b3566b5a19c631db9cd66625056b9b233cac21aaf472e40fe",
+      "bytes": 127159
+    },
+    ".dock/stream-runtime/sessions/8d0c37ed-22e9-4469-b7eb-201252c4200a/prepare.json": {
+      "sha256": "3d2086b241280ec4ecee02f33db19d126e706e7f2ca9b54e9fb821cc837442c1",
+      "bytes": 16549
+    },
+    ".dock/stream-runtime/sessions/8d0c37ed-22e9-4469-b7eb-201252c4200a/remote-pins.json": {
+      "sha256": "1571aead50bedf66155bbecc0164cc040cf602f49ab0790f763d802a06fa8216",
+      "bytes": 61982
+    },
+    ".dock/stream-runtime/sessions/8d0c37ed-22e9-4469-b7eb-201252c4200a/session.json": {
+      "sha256": "00e9b347af368a7c3ee5373ecb8b174c977009e3582629772d7d0fde8e0b76ad",
+      "bytes": 29598
+    },
+    ".dock/stream-runtime/sessions/8d0c37ed-22e9-4469-b7eb-201252c4200a/execution-events.jsonl": {
+      "sha256": "d30ceda67edff8ef3db435ad6143884be1ca4ade243c47f4186d239bdbe0d5c1",
+      "bytes": 3960689
+    },
+    ".dock/stream-runtime/sessions/8d0c37ed-22e9-4469-b7eb-201252c4200a/candidate-save-describe.json": {
+      "sha256": "c16be34c41217bbd25a43001511f5fcd1df912dd1241a1480e92afb77c07b82e",
+      "bytes": 8227
+    },
+    ".dock/stream-runtime/sessions/8d0c37ed-22e9-4469-b7eb-201252c4200a/candidate-final-observe.json": {
+      "sha256": "8b2cb1c6ad359bfc8f08569697ed8a8343ea8d80fca6a17c8cb5fbdc963a5a0b",
+      "bytes": 4288
+    }
+  },
+  "own_session_processes_remaining": 0
+}

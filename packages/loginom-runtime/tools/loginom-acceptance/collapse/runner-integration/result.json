@@ -1,0 +1,48 @@
+{
+  "assignment": "node16:acceptance-runner-integration:1:1d6cdc31",
+  "status": "TOOLING_INTEGRATED_NOT_ADMITTED",
+  "source_sha": "77385e36a969e61ade03ab072678b8fb6f00a27d",
+  "runtime": "db6d957169c50bcd5cb169db80d744fd846b8ffa4eee683178619c001fb22bab",
+  "handler_changed": false,
+  "tests": {
+    "new": 8,
+    "history": 13,
+    "export": 2,
+    "runtime": 4,
+    "total_pass": 27
+  },
+  "component_replay": {
+    "status": "COMPONENT_REPLAY_PASS",
+    "cells": 60,
+    "negative_mutations_rejected": 6,
+    "synthetic_transport": true,
+    "model_run": false,
+    "acceptance": false
+  },
+  "preflight": "BLOCKED",
+  "run_guard_tested_before_credentials_processes": true,
+  "ready": false,
+  "hermes_acceptance": false,
+  "subplan_complete": false,
+  "live_started": false,
+  "model_started": false,
+  "vps_changed": false,
+  "raw_byte_producer": null,
+  "open_gates": {
+    "resource": "OPEN_INSUFFICIENT_10_GIB",
+    "header-only": "OPEN",
+    "empty-ignore": "OPEN",
+    "all-null": "OPEN",
+    "all-null-ignore": "OPEN",
+    "other-full-scope-live": "OPEN",
+    "new-session-readonly-source-proof": "OPEN_NO_PRODUCER",
+    "runner-collapse-goal-integration": "IMPLEMENTED_NOT_ADMITTED",
+    "candidate-stage-and-readback": "OPEN_NO_ADMITTED_ATTESTATION",
+    "candidate-source-rehearsal": "OPEN",
+    "coordinator-hermes-slot": "OPEN",
+    "independent-topology-readback-producers": "OPEN",
+    "loss-native-evidence-bridge": "OPEN"
+  },
+  "memory_manual_changes": false,
+  "incorrect_memory_uri": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-dock/memories/events/2026/09/13/node_16_acceptance_complete.md"
+}

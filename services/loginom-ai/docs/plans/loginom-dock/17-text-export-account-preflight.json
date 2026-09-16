@@ -1,0 +1,66 @@
+{
+  "assignment": "node17:user-v1-account-preflight:1:0f37df75",
+  "checkpoint_commit": "0bda0f6e",
+  "run_id": "20260913-152128-6b736e15",
+  "session_id": "a6869b09-6f05-44d1-b777-c3db49aaf4e7",
+  "status": "failed_before_baseline_account_probe_timeout",
+  "checks": {
+    "internal_workspace_prepared_count": 1,
+    "public_prepare_reply_count": 0,
+    "node_apply_calls": 0,
+    "node_apply_prepared_count": 0,
+    "artifact_delivery_count": 0,
+    "account_probe_budget_ms": 30000.0,
+    "account_raw_reply_present": false,
+    "observer_started": false,
+    "actual_dispatch_present": false,
+    "browser_artifacts_besides_local_input": [
+      "console-2026-09-13T15-21-33-905Z.log"
+    ],
+    "runtime_unchanged": true,
+    "harness_unchanged": true
+  },
+  "failure": {
+    "phase": "starting",
+    "error": "MCP error -32001: MCP error -32001: TimeoutError: The operation was aborted due to timeout",
+    "smoke_used": false
+  },
+  "session_close": {
+    "browser_transport_closed": true,
+    "logged_out": false,
+    "global_config_unchanged": true
+  },
+  "process_close": {
+    "session_id": "a6869b09-6f05-44d1-b777-c3db49aaf4e7",
+    "browser_process_ids": [],
+    "closed": true,
+    "free_bytes": 95967227904
+  },
+  "account_identity_verified": false,
+  "user_v1_component_pass": false,
+  "full_goal_pass": false,
+  "hermes_started": false,
+  "attempts_this_assignment": 1,
+  "native_probe_step_at_timeout": "unobserved; no raw reply returned",
+  "diagnosis": "The real preparation handler recorded READY. The following owned browser account probe was issued with a 30-second host deadline. Its browser call timed out before raw return, so neither observed account nor menu closure is attested. No statement distinguishes click/open/read/close substeps. No trace/screenshot exists to resolve that uncertainty offline.",
+  "next_owner": "coordinator",
+  "next_trigger": "targeted probe diagnosis with a browser-side deadline shorter than host deadline and bounded step evidence before another separately assigned attempt; no automatic new session",
+  "full_admission": {
+    "ready": false,
+    "reason": "TEXT_EXPORT_REJECT_BASELINE_READER_UNAVAILABLE: Native user-v1 component evidence pending"
+  },
+  "manifest_sha256": "6187aaa5c1381d65d63623b9d79e55033f42a065fff0b7c3ebfc1236db70377a",
+  "evidence_sha256": {
+    "request.json": "06d6b66849c991740f49819b40b14e7cad2bbfe6d5e2cd554ac37bd940cd0ced",
+    "one-smoke-marker.json": "8a0bdd984974225f4fc6eee62ee2322078042de08f09f8562ca48d20f202aa82",
+    "entry-launch.json": "4cd72084a8e2af52c0cda42a414f47975c052f2a133157e2861dd05906c929aa",
+    "public-wire.jsonl": "2f1e08643970cd08102f1961aea3af0eef85326acb01574b8f102d309a0d95ae",
+    "account-probe-prepared.json": "5948dbf817ef02247d2cef747069a77612564e001fac30071d31e05598408e6e",
+    "failure.json": "31afbfa025a106e9664e000723298d633c34aafef96308908493a4317f088e11",
+    "session-close.json": "701c7f6c6e83a3a96aa4ac8b9d82a01fe91d0662f75d9e1900974d9ebc4b7d33",
+    "process-close-check.json": "5b0325224fac9a32e8dbe18b8743d1429ecda25fbe8aae00bdc716feb22c349a",
+    "private/dock-state/sessions/a6869b09-6f05-44d1-b777-c3db49aaf4e7/session.json": "c7cbf33b0c3846b31df0fcddc6e79c964cf67db72e5b9636787ae6f91f051987",
+    "private/dock-state/sessions/a6869b09-6f05-44d1-b777-c3db49aaf4e7/execution-events.jsonl": "32af383c4ec42f835c63f16d04c91086f73a662c7ef96427fd06deb9954ba0ce",
+    "private/dock-state/sessions/a6869b09-6f05-44d1-b777-c3db49aaf4e7/playwright.json": "d4959647ba9106e008b0df9924b76b2d02b59c6f01c9b8c7a8bfd73bf8c359de"
+  }
+}

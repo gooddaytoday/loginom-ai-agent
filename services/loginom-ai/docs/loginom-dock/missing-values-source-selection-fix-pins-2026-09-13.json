@@ -1,0 +1,561 @@
+{
+  "source_commit": "ad8a1a0962ebac21a44e2b5bbf9508a1db55a6e1",
+  "runtime_revision": "4111dfed253d484003d5fb48c09006ec70e3057d0a9cfacd8f025b189884fc31",
+  "harness_inputs_sha256": "0da2ccdcad484d92ee70bf3b1cb229cdc95e12752799e4f7a0a099be85213264",
+  "status": "READY_FOR_HERMES_SLOT",
+  "full_goal_accepted": false,
+  "model_runs": 0,
+  "live": {
+    "checks": {
+      "40_success": true,
+      "40_data": true,
+      "40_configuration": true,
+      "41_success": true,
+      "41_data": true,
+      "41_configuration": true,
+      "runtime": true,
+      "preflights": true
+    },
+    "passed": 8,
+    "total": 8,
+    "outputs": {
+      "40": {
+        "rows": 12,
+        "sample_rows": 10,
+        "oracle_match": true
+      },
+      "41": {
+        "rows": 12,
+        "sample_rows": 10,
+        "oracle_match": true
+      }
+    },
+    "journal_lines": 1996,
+    "preflight_events": [
+      {
+        "recorded_at": "2026-09-13T16:31:23.334Z",
+        "session_id": "53de37ab-60e3-49a3-afde-f19b3ee71b34",
+        "runtime_revision": "4111dfed253d484003d5fb48c09006ec70e3057d0a9cfacd8f025b189884fc31",
+        "manifest_sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad",
+        "target": {
+          "profile_id": "loginom-7.4.2-macos-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "macos",
+          "browser": "chromium"
+        },
+        "operation_id": "refusal-import",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "node_step_refresh_authorized",
+        "internal_provenance": "client_node_procedure_v1",
+        "step": 143,
+        "internal_operation_id": "refusal-import:n143",
+        "rejected_operation_id": "refusal-import:n143",
+        "retry": 1,
+        "condition": "select Table format field 0",
+        "binding_sha256": "29a24a3c161f5e9ab20d9521fe2bbf3ad05cac0f92035d89bb95cd7fdaaa4a45",
+        "intent_sha256": "09b592cfb1f11d636eee30325089ba239c07090b66d11a1268910c31a66dbf9d",
+        "effect_possible": false
+      },
+      {
+        "recorded_at": "2026-09-13T16:32:13.660Z",
+        "session_id": "53de37ab-60e3-49a3-afde-f19b3ee71b34",
+        "runtime_revision": "4111dfed253d484003d5fb48c09006ec70e3057d0a9cfacd8f025b189884fc31",
+        "manifest_sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad",
+        "target": {
+          "profile_id": "loginom-7.4.2-macos-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "macos",
+          "browser": "chromium"
+        },
+        "phase": "missing_values_preflight_completed",
+        "operation_id": "fixed-threshold40",
+        "proof": {
+          "verified": true,
+          "cleanup_complete": true,
+          "effect_possible": true,
+          "settings_changed": false,
+          "source": {
+            "document_id": "1789317033620-ipkna28y74",
+            "workflow_id": "1789317033620-ipkna28y74-1",
+            "node_id": "72786f06-56d1-47a3-a18a-46b99180aa67"
+          },
+          "port": 0,
+          "port_guid": "58f7e6c3-511e-39d7-8853-036e0a1a7612",
+          "schema": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "type": "real",
+              "data_kind": "Непрерывный"
+            },
+            {
+              "name": "Count",
+              "label": "Count",
+              "type": "integer",
+              "data_kind": "Непрерывный"
+            },
+            {
+              "name": "Note",
+              "label": "Note",
+              "type": "string",
+              "data_kind": "Дискретный"
+            },
+            {
+              "name": "Untouched",
+              "label": "Untouched",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            }
+          ],
+          "source_activity": {
+            "before": true,
+            "after": false,
+            "changed": true
+          },
+          "cancellation": {
+            "verified": true,
+            "cleanup_complete": true,
+            "effect_possible": true,
+            "mode": "close",
+            "execution_started": false,
+            "settings_applied": false,
+            "draft_discarded": true,
+            "confirmation_required": true,
+            "node_context": {
+              "verified": true,
+              "document_id": "1789317033620-ipkna28y74",
+              "workflow_id": "1789317033620-ipkna28y74-1",
+              "node_id": "72786f06-56d1-47a3-a18a-46b99180aa67",
+              "surface": "graph",
+              "tid": "MF;TF-1;Graph;Граница",
+              "locked": false
+            },
+            "package_saved": false,
+            "reopen_performed": false
+          },
+          "parameters_valid": true
+        }
+      },
+      {
+        "recorded_at": "2026-09-13T16:32:17.557Z",
+        "session_id": "53de37ab-60e3-49a3-afde-f19b3ee71b34",
+        "runtime_revision": "4111dfed253d484003d5fb48c09006ec70e3057d0a9cfacd8f025b189884fc31",
+        "manifest_sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad",
+        "target": {
+          "profile_id": "loginom-7.4.2-macos-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "macos",
+          "browser": "chromium"
+        },
+        "operation_id": "fixed-threshold40",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "node_step_refresh_authorized",
+        "internal_provenance": "client_node_procedure_v1",
+        "step": 29,
+        "internal_operation_id": "fixed-threshold40:n29",
+        "rejected_operation_id": "fixed-threshold40:n29",
+        "retry": 1,
+        "condition": "calculator done",
+        "binding_sha256": "2b024d26f4619f7ab867988c984dacb9e52266ae4f047efe73caac3923e12cc2",
+        "intent_sha256": "fa1682bcb5b53327cf6ce395b24949634cbc4c06ef5e9588aaf1e52f4fa3b49a",
+        "effect_possible": false
+      },
+      {
+        "recorded_at": "2026-09-13T16:32:37.036Z",
+        "session_id": "53de37ab-60e3-49a3-afde-f19b3ee71b34",
+        "runtime_revision": "4111dfed253d484003d5fb48c09006ec70e3057d0a9cfacd8f025b189884fc31",
+        "manifest_sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad",
+        "target": {
+          "profile_id": "loginom-7.4.2-macos-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "macos",
+          "browser": "chromium"
+        },
+        "operation_id": "fixed-threshold40",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "node_step_refresh_authorized",
+        "internal_provenance": "client_node_procedure_v1",
+        "step": 138,
+        "internal_operation_id": "fixed-threshold40:n138",
+        "rejected_operation_id": "fixed-threshold40:n138",
+        "retry": 1,
+        "condition": "calculator done",
+        "binding_sha256": "c7acd043e8c5ae8598419b4d0693a48e0908d359e751e32f61a930aede298cad",
+        "intent_sha256": "fa1682bcb5b53327cf6ce395b24949634cbc4c06ef5e9588aaf1e52f4fa3b49a",
+        "effect_possible": false
+      },
+      {
+        "recorded_at": "2026-09-13T16:33:24.847Z",
+        "session_id": "53de37ab-60e3-49a3-afde-f19b3ee71b34",
+        "runtime_revision": "4111dfed253d484003d5fb48c09006ec70e3057d0a9cfacd8f025b189884fc31",
+        "manifest_sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad",
+        "target": {
+          "profile_id": "loginom-7.4.2-macos-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "macos",
+          "browser": "chromium"
+        },
+        "phase": "missing_values_preflight_completed",
+        "operation_id": "fixed-threshold41",
+        "proof": {
+          "verified": true,
+          "cleanup_complete": true,
+          "effect_possible": true,
+          "settings_changed": false,
+          "source": {
+            "document_id": "1789317033620-ipkna28y74",
+            "workflow_id": "1789317033620-ipkna28y74-1",
+            "node_id": "72786f06-56d1-47a3-a18a-46b99180aa67"
+          },
+          "port": 0,
+          "port_guid": "58f7e6c3-511e-39d7-8853-036e0a1a7612",
+          "schema": [
+            {
+              "name": "Id",
+              "label": "Id",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            },
+            {
+              "name": "Amount",
+              "label": "Amount",
+              "type": "real",
+              "data_kind": "Непрерывный"
+            },
+            {
+              "name": "Count",
+              "label": "Count",
+              "type": "integer",
+              "data_kind": "Непрерывный"
+            },
+            {
+              "name": "Note",
+              "label": "Note",
+              "type": "string",
+              "data_kind": "Дискретный"
+            },
+            {
+              "name": "Untouched",
+              "label": "Untouched",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            }
+          ],
+          "source_activity": {
+            "before": true,
+            "after": false,
+            "changed": true
+          },
+          "cancellation": {
+            "verified": true,
+            "cleanup_complete": true,
+            "effect_possible": true,
+            "mode": "close",
+            "execution_started": false,
+            "settings_applied": false,
+            "draft_discarded": true,
+            "confirmation_required": true,
+            "node_context": {
+              "verified": true,
+              "document_id": "1789317033620-ipkna28y74",
+              "workflow_id": "1789317033620-ipkna28y74-1",
+              "node_id": "72786f06-56d1-47a3-a18a-46b99180aa67",
+              "surface": "graph",
+              "tid": "MF;TF-1;Graph;Граница",
+              "locked": false
+            },
+            "package_saved": false,
+            "reopen_performed": false
+          },
+          "parameters_valid": true
+        }
+      },
+      {
+        "recorded_at": "2026-09-13T16:33:30.580Z",
+        "session_id": "53de37ab-60e3-49a3-afde-f19b3ee71b34",
+        "runtime_revision": "4111dfed253d484003d5fb48c09006ec70e3057d0a9cfacd8f025b189884fc31",
+        "manifest_sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad",
+        "target": {
+          "profile_id": "loginom-7.4.2-macos-chromium-ru",
+          "loginom_build": "7.4.2",
+          "platform": "macos",
+          "browser": "chromium"
+        },
+        "operation_id": "fixed-threshold41",
+        "action_key": "node.apply",
+        "action_revision": "1.0.0",
+        "phase": "node_step_refresh_authorized",
+        "internal_provenance": "client_node_procedure_v1",
+        "step": 29,
+        "internal_operation_id": "fixed-threshold41:n29",
+        "rejected_operation_id": "fixed-threshold41:n29",
+        "retry": 1,
+        "condition": "calculator done",
+        "binding_sha256": "c953abdd9ab0977647519f5b84459a92ea12801510ebaf6bf861b2f7886e80c6",
+        "intent_sha256": "fa1682bcb5b53327cf6ce395b24949634cbc4c06ef5e9588aaf1e52f4fa3b49a",
+        "effect_possible": false
+      }
+    ],
+    "body_refreshes": 0,
+    "session_id": "53de37ab-60e3-49a3-afde-f19b3ee71b34",
+    "model_runs": 0,
+    "full_goal_accepted": false
+  },
+  "readiness": {
+    "checked_at": "2026-09-13T16:38:12.497858+00:00",
+    "source_commit": "ad8a1a0962ebac21a44e2b5bbf9508a1db55a6e1",
+    "runtime_revision": "4111dfed253d484003d5fb48c09006ec70e3057d0a9cfacd8f025b189884fc31",
+    "harness_inputs_sha256": "0da2ccdcad484d92ee70bf3b1cb229cdc95e12752799e4f7a0a099be85213264",
+    "files_verified": 412,
+    "frozen_goal_equal": true,
+    "harness_changes_only_runtime_pins": [
+      "missing_values_goal.py",
+      "missing-values-reopen.mjs"
+    ],
+    "manifest_sha256": "3499a38b776ad6e1c2774c173f8f0803659fdcbddc0e0bd5d5c04d0e2a2b77f9",
+    "launch_plan_sha256": "4ac21e5bad45290cda3aa8dd748b8f046d8ce05f0feecb56e212cba8f301e303",
+    "disk_free_bytes": 87190745088,
+    "auth_valid_beyond_4200_seconds": true,
+    "model_started": false,
+    "slot": null
+  },
+  "receipts": {
+    ".dock/node14-source-selection-fix/acceptance-tests.log": {
+      "bytes": 118,
+      "sha256": "15a43c08151d9b8d3acaab8d6f128ba78693d3296eed45afd8eb8916f558ab8d"
+    },
+    ".dock/node14-source-selection-fix/baseline-tests.tap": {
+      "bytes": 6366,
+      "sha256": "38ad7d634855c98bd3721dc5ee193dd5d915d9b90bba7439d8c3990788beb30b"
+    },
+    ".dock/node14-source-selection-fix/closure.json": {
+      "bytes": 316,
+      "sha256": "339638cacc60e6f5b586362fa55418a93b8dfede4d71f43592faf51c5e2dabce"
+    },
+    ".dock/node14-source-selection-fix/diagnose.mjs": {
+      "bytes": 8618,
+      "sha256": "9e265ee3954a0bcf32b874c4c20f1777f10ea9f9dfe642090dceb056b42d35c9"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/built-nodes.json": {
+      "bytes": 234727,
+      "sha256": "58ad180042880c9a8535f1880c961b3daf5277b13c2d1eb91ebda398788efd31"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/geometry.json": {
+      "bytes": 630,
+      "sha256": "c61d8aa7919c780b7e15da25029c33a11cc290b4b5b1c3551eb223009a0e4af8"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/observer-install.json": {
+      "bytes": 1939,
+      "sha256": "b52e76e739cb01be13095261d341ffffd4a98b4d557645183458e406207a3f14"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/prepare.json": {
+      "bytes": 23898,
+      "sha256": "bab57ea35f62fb603c80ae496def2f6d19509079fc7d8806b6698c30ef93a4f7"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/public-evidence.json": {
+      "bytes": 1650696,
+      "sha256": "98bf043d41e154169a71fead5c2b2b16bb34e4fb3e1703c70e46188261ff7550"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/session.json": {
+      "bytes": 27511,
+      "sha256": "7e30659f105b49b89cb9355ecc4eeccdc67c0bac4911c8c1cb4f2723a6860006"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/sessions/364cc542-a466-435d-9b32-3759eebaefdc/execution-events.jsonl": {
+      "bytes": 323992768,
+      "sha256": "a9c626cb363dd529e4cf52555cbefc02ed9cac16aaef1c39121c3851bd8f4367"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-import-120-retry.json": {
+      "bytes": 5281,
+      "sha256": "163f87a10ecbe1a5fd397b12c4a282efdb02160894595bc20055c613ff5697c2"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-import-allnull.json": {
+      "bytes": 6321,
+      "sha256": "9cfa470aa4e6e397b72721f242d70cb6f71af4a3d4ca4547c899e19a43c4a58d"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-import-base.json": {
+      "bytes": 1193,
+      "sha256": "6fdaf6fdd29e3129d990c662ef95bc6df2c104cb429229a7dd6c2ad0ba388490"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-import-boundary.json": {
+      "bytes": 4241,
+      "sha256": "04601f7ffb183c93c82ee0e81dbafa1686c002c942dc4d7c64672ea9d4f14fb1"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-import-empty.json": {
+      "bytes": 7325,
+      "sha256": "f25fe885c3817d6bbf455b4527708bdbcd413a6b1b166bdd18a47abd017e7e24"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-import-mutable.json": {
+      "bytes": 9503,
+      "sha256": "f007d4690609bc364fd0a2c2a367fae7274bb10660ad0ed8f11a351a8f45985d"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-import-permutation.json": {
+      "bytes": 8375,
+      "sha256": "6c6ed4aa570b9bc58796e2da92123a277343e4a720578606afa05766a2dc136c"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-import-precision.json": {
+      "bytes": 2233,
+      "sha256": "701d00efd5ead7818b6da05381a7be5a5834617eb297d62e1b227dc68323f780"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-import-skew.json": {
+      "bytes": 3255,
+      "sha256": "73f24b898e4e7c4631dbf09ed9020f17ff8f097f1e3c7e9f81030d32e6538d50"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-mv-main-close-discard.json": {
+      "bytes": 14966,
+      "sha256": "6dd7ebf1cc6e20d0b7be8a1cbcf786a475dad004abfcb490d5484377e2b48141"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-mv-main-create.json": {
+      "bytes": 11960,
+      "sha256": "fad15d6e17d873993d4c0af0f1afbb5a9d6c518a6731dfbf9bf82308ed3b2142"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-mv-main-done.json": {
+      "bytes": 14465,
+      "sha256": "45b7336bd75afccd5d955844ffd91ccf62b2deaf7774d5d5051cafbcaf0529ff"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-mv-main-newnode.json": {
+      "bytes": 13463,
+      "sha256": "993da66111f88d84da191e5a0daf5e5401c7dd41a8f6d5388ac0e6da3fb01a10"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-mv-main-reexecute-preserved.json": {
+      "bytes": 16469,
+      "sha256": "4675c8174d65fad3f90ecd807fbfb7c9732da5ea4b66a743624d9a61d3f2d5a2"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-mv-note-only.json": {
+      "bytes": 19007,
+      "sha256": "49f3fd33f06f9d2a18b9992059145d1ffc3fa30bf88143e424ee78f46a4c3b32"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-mv-precision.json": {
+      "bytes": 21554,
+      "sha256": "1f6ba30670d9da1c17a764e038b18bd0a98a6b6810c3a281ab81c32e34ce25b5"
+    },
+    ".dock/node14-source-selection-fix/diagnosis-1/source-checks-mv-skew.json": {
+      "bytes": 24245,
+      "sha256": "eccd224c15abd3fd4394af89ed2a1c4cd5bdd0fab34ea86d320fa0c424079cb6"
+    },
+    ".dock/node14-source-selection-fix/focused-tests.tap": {
+      "bytes": 7447,
+      "sha256": "9bdb1d10e834b8350565d012935e86bf87b0284e29697056da6100671477663e"
+    },
+    ".dock/node14-source-selection-fix/live-fixed-1/01-observer.json": {
+      "bytes": 1939,
+      "sha256": "b52e76e739cb01be13095261d341ffffd4a98b4d557645183458e406207a3f14"
+    },
+    ".dock/node14-source-selection-fix/live-fixed-1/02-apply.json": {
+      "bytes": 14603,
+      "sha256": "a0aacda79a5126b23cba083a25ed9d80f4bc628c633277695df646f608d36669"
+    },
+    ".dock/node14-source-selection-fix/live-fixed-1/03-apply.json": {
+      "bytes": 14903,
+      "sha256": "c39a5fa262065948afefff30feaa6daa013516dd3aa8fd01cbbf7381b8ef899c"
+    },
+    ".dock/node14-source-selection-fix/live-fixed-1/04-trace.json": {
+      "bytes": 5177,
+      "sha256": "fc6ecc8a2b8616cfba93996a31a638556141a96b33940bfcfe72aa452d55cc20"
+    },
+    ".dock/node14-source-selection-fix/live-fixed-1/configured-source.json": {
+      "bytes": 12973,
+      "sha256": "bd92b0577cce30281320e428633d3d022188ece90d0b032cb1ca19e4035195ee"
+    },
+    ".dock/node14-source-selection-fix/live-fixed-1/geometry.json": {
+      "bytes": 630,
+      "sha256": "ce16f54db9c4ffc598dc868c7c249b9188526bd88d2d5a0ccabc2430b8adcb14"
+    },
+    ".dock/node14-source-selection-fix/live-fixed-1/prepare.json": {
+      "bytes": 20743,
+      "sha256": "4beded87e3e818a37c4573faa85756783cd15a6baf4f08cf47ad73515c9ebd17"
+    },
+    ".dock/node14-source-selection-fix/live-fixed-1/public-evidence.json": {
+      "bytes": 353776,
+      "sha256": "ae6ca57ac16ee32a7ee02408e882dae581d700087639317c9202a74ad34f3dce"
+    },
+    ".dock/node14-source-selection-fix/live-fixed-1/session.json": {
+      "bytes": 27506,
+      "sha256": "92753b7328dc3c4184a8749e5e94b99d06a03c17b0b8f9c8f2ba3712120a6a9c"
+    },
+    ".dock/node14-source-selection-fix/live-fixed-1/sessions/53de37ab-60e3-49a3-afde-f19b3ee71b34/execution-events.jsonl": {
+      "bytes": 53562557,
+      "sha256": "42e73ff28d26268e6bace304b8d76914ee4dcd5c81a0cec51f587b77b0dacda3"
+    },
+    ".dock/node14-source-selection-fix/live-verification.json": {
+      "bytes": 10543,
+      "sha256": "5919cf123816b69c1010a9a199b16326c0e754f6877d53068f97b80449eafe25"
+    },
+    ".dock/node14-source-selection-fix/live.mjs": {
+      "bytes": 8886,
+      "sha256": "a878735f9733221308412ae0ccc65d9e62d1c739c9ee313c1c9c9b8fd925aa80"
+    },
+    ".dock/node14-source-selection-fix/missing-values-tests.tap": {
+      "bytes": 6961,
+      "sha256": "3644d6f08920de5e487385e5f456578a22cd09a79d1d2ed5088a640f7160cb9d"
+    },
+    ".dock/node14-source-selection-fix/observer.code": {
+      "bytes": 1618,
+      "sha256": "59324e6bf2409fc26058ce320725cbd0a4e05f31df6d770d76934f58bd1a7b56"
+    },
+    ".dock/node14-source-selection-fix/old-evidence-check.json": {
+      "bytes": 598,
+      "sha256": "0543de66ce834652ec5655c8e693685d1f0b85de9e654c9ce68a4f95e97dbb8d"
+    },
+    ".dock/node14-source-selection-fix/original-labels.json": {
+      "bytes": 881,
+      "sha256": "5561fade2b07c10560e23715a9d4f2fcfa4179a7da0bf923145df44d5e8b9865"
+    },
+    ".dock/node14-source-selection-fix/original-last-target.json": {
+      "bytes": 59624,
+      "sha256": "e9d3f1041b61cb44293e6345aebc50bcd8e02c9256db8a432690de8e818afcb1"
+    },
+    ".dock/node14-source-selection-fix/original-requests.json": {
+      "bytes": 76156,
+      "sha256": "3f8ee1f44e72d81f034c6e2d4833da5b72e63620a033d407ff0050af1da5641b"
+    },
+    ".dock/node14-source-selection-fix/recorded-proof-check.json": {
+      "bytes": 135,
+      "sha256": "e9446998da44d75254238719b1b80256186b9f7e3a250d0a2d1ad2c08d61f02d"
+    },
+    ".dock/node14-source-selection-fix/runtime-pin.json": {
+      "bytes": 16889,
+      "sha256": "f1edbb369e9dffcdfbf038195fcf701219b05d90d10cc00a90c1a08b9c1bfb88"
+    },
+    ".dock/node14-source-selection-fix/startup-tests.tap": {
+      "bytes": 301,
+      "sha256": "40bebaf4fd14617033b67955f532d9a5da9740de147f8f7d6824bee4e21f4943"
+    },
+    ".dock/node14-acceptance6-preparation/kit-2026.09.13-node14-acceptance6.1/launch-plan.json": {
+      "bytes": 1761,
+      "sha256": "4ac21e5bad45290cda3aa8dd748b8f046d8ce05f0feecb56e212cba8f301e303"
+    },
+    ".dock/node14-acceptance6-preparation/kit-2026.09.13-node14-acceptance6.1/manifest.json": {
+      "bytes": 43729,
+      "sha256": "3499a38b776ad6e1c2774c173f8f0803659fdcbddc0e0bd5d5c04d0e2a2b77f9"
+    },
+    ".dock/node14-acceptance6-preparation/preflight-final-output.txt": {
+      "bytes": 242,
+      "sha256": "c91be89d15819f7d41f2b3c3fc7fde71e4142488035e8ea2a94b3a20c70da694"
+    },
+    ".dock/node14-acceptance6-preparation/preflight-final.json": {
+      "bytes": 128312,
+      "sha256": "3ccf81101c54e7b26181b85e09cc19c9c1e97f32d53b625f155ff6e8d568f2b5"
+    },
+    ".dock/node14-acceptance6-preparation/preflight-output.txt": {
+      "bytes": 242,
+      "sha256": "c91be89d15819f7d41f2b3c3fc7fde71e4142488035e8ea2a94b3a20c70da694"
+    },
+    ".dock/node14-acceptance6-preparation/preflight.json": {
+      "bytes": 128821,
+      "sha256": "f776b5ad1b3afef1d615c4b9dd4763f10100da0bb0b461d1ee316874e5d75140"
+    },
+    ".dock/node14-acceptance6-preparation/readiness.json": {
+      "bytes": 764,
+      "sha256": "19cdfc110e3eadd989778388ba84e61fef2d93dd8cd0c205e6cd6d39b24bc3d4"
+    }
+  }
+}

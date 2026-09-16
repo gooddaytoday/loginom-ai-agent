@@ -1,0 +1,23 @@
+{
+  "status": "ACCEPTED_BRANCH_NOT_MERGED",
+  "run": "20260914-091807-4289644a",
+  "source": "77e9cf5067871cb619b8580045c8ac3f55132ee5",
+  "runtime": "d5fd1ba79586069c27b9f5c8626cf885f9a5fe7e28e6274b01bc0081ada9558f",
+  "full_audit_recomputed": true,
+  "checks_passed": 45,
+  "independent_persistence_passed": true,
+  "fresh_operations": 6,
+  "node_admitted_raw": false,
+  "node_admitted_semantics": "constant false in report(checks); coordinator branch admission is separate",
+  "original_evidence_sha256": "bfc391763cb74698f4ff874d850be006f3786cda2af5f647e1eacfe0bef67a7c",
+  "audit_sha256": "2dbfab71d920da39026e401171fabfbeab4e21d7696767a14652cb518b501f7c",
+  "diagnostics_sha256": "3b0e2e30c62b8c30191610f21680b229a92e8a46b50244432174f59a5cb34696",
+  "resolver_references": 5,
+  "accepted_at": "2026-09-14T11:11:16.971737+00:00",
+  "report_commit": "05bba35598b26a26c20978fbb40c4e84780c3b49",
+  "final_report_verified": true,
+  "independent_persistence_checks_passed": 30,
+  "own_cleanup_verified": true,
+  "merged": false,
+  "published": false
+}

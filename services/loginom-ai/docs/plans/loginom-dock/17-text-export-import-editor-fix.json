@@ -1,0 +1,174 @@
+{
+  "status": "ready-for-Hermes-retry",
+  "full_goal_passed": false,
+  "previous_run": "20260913-193235-fa902eea",
+  "previous_runtime": "347615cbae29323d80b57488b794ecce607b5b9e0d2fbe86aa88b7460241311c",
+  "previous_full_audit": {
+    "passed": false,
+    "scope": "node17_full_goal",
+    "checks": {
+      "projection": {
+        "passed": false,
+        "failures": [
+          "user_node_error"
+        ]
+      },
+      "incomplete_or_invalid": {
+        "passed": false,
+        "reason": ""
+      }
+    }
+  },
+  "initial_audit_limitation": "Initial post-run audit was stopped by the changed local import source pin; preserved separately in full-audit.json. After pin refresh the same failed run is still rejected as user_node_error. Neither audit establishes acceptance.",
+  "cleanup": {
+    "returncode": 0,
+    "timed_out": false,
+    "remaining_pids": [],
+    "closed": true,
+    "slot": "node17-hermes-20260913-993a3ed4"
+  },
+  "failure": {
+    "operation_id": "node-typed-create-20260913-193235-fa902eea",
+    "step": 74,
+    "status": "NOT_APPLIED",
+    "phase": "preconditions",
+    "error": "UI_EPOCH_CHANGED",
+    "effect_possible": false,
+    "cleanup_complete": true,
+    "trace_events": [
+      "ui_observation_started",
+      "ui_action_failed"
+    ],
+    "field": "stamp",
+    "property": "data_kind",
+    "actual": "Дискретный",
+    "requested": "Непрерывный",
+    "node_level_status": "AMBIGUOUS",
+    "node_level_cleanup_complete": false
+  },
+  "fix": "Use existing channel.perform recovery for type/data_kind editor opening; bind unchanged wizard owner, field semantics, page and cell; at most two proven no-effect refreshes. Global epoch checks unchanged.",
+  "runtime": "2897649a8d2120d25e4c80af8af2c6cdd834023b5bda1a1bd5baf073c6e9ba32",
+  "runtime_inputs": 155,
+  "runtime_changes_since_diagnostic": [
+    "client/lib/text-import-procedure.mjs"
+  ],
+  "manifest_sha256": "d86f72c478cd23ad49fdc31a0a5ef2b50894f6e51bb13664851be7e07f5e7380",
+  "goal_sha256": "5db16d49554a80afceedcbad2f9a836378377650bcec1d27c4768638a29b46b6",
+  "full_goal": {
+    "nodeops": 22,
+    "deliveries": 3,
+    "all_save_reopen_required": true
+  },
+  "node_tests_passed": 98,
+  "python_tests_passed": 21,
+  "live": {
+    "directory": ".dock/text-import-v3/execute-1789318005470",
+    "configuration": {
+      "passed": true,
+      "failures": [],
+      "scope": "public_readback_raw_observations",
+      "package_persistence_verified": false
+    },
+    "output": {
+      "passed": true,
+      "failures": [],
+      "columns_verified": 5,
+      "scope": "integrated_delivery_to_fresh_import_output",
+      "execution_verified": true,
+      "package_persistence_verified": false,
+      "hermes_acceptance_verified": false,
+      "journal_authentication_verified": false,
+      "execution_id": "1789318009846-41wo94cgy1s:322:1",
+      "output_data_verified": true,
+      "integrated_delivery_verified": true
+    },
+    "geometry": {
+      "viewport": null,
+      "window": {
+        "width": 1508,
+        "height": 862,
+        "outerWidth": 1508,
+        "outerHeight": 949,
+        "availableWidth": 1512,
+        "availableHeight": 949
+      }
+    },
+    "cleanup": {
+      "session_id": "c1812031-05e0-4855-94a2-3828278b283f",
+      "remaining_pids": [],
+      "closed": true
+    },
+    "evidence_sha256": {
+      "session.json": "27ef51b65ccc405b73dab31954269ece2b25d4d2e20c6d305042bef05595943a",
+      "request.json": "cac9915585cc25f9f2e11e48682aeb872051e8cbd09f0c4e7958461d15569fc9",
+      "result.json": "b2a255f03e313d3013ef9f4e00aa327473e3944c0219f71e9cc2053852812716",
+      "execution-events.jsonl": "3fe8ac2a9ce67abf576c939d67b2bfa6f198e072650a60fc0da9b5271ad1c548",
+      "delivery-result.json": "cceaf327708e1c9d0d119c6bb5127d1196ff268475ecae3c5458b822e63ef8d0",
+      "delivery-replay.json": "1acda390bf05c6177034a3285e7444d8cd7b6101a9ee3f26b0105b5ef878c00c",
+      "configuration-audit.json": "fc4414abeda3e8fd5515cd9ee5a42a2b567e481005349c05f36859816b8726e9",
+      "independent-output-audit.json": "7cedace57c3fda1b6981f76bd8f24957cdd710de5539e9e6d413217cf13bedab",
+      "browser-geometry.json": "f396a98b2b403936811d947b672ecbd46e8bd0fbd1f61f867e21ec1b76dc2743",
+      "process-close-check.json": "35315d3e6f265da3de8a6c986d4f44e3558334344e7ed6f588e525033e4f2704",
+      "focused-tests.txt": "cb7a9cd521dfcca29f6308b24cd0882101c49f6fef30a54f56f2a5d449f8e877",
+      "python-tests.txt": "6d68cfe42e3c4e52a63dee078920c06dfd12123a4a9772b87fe56f95a832034b"
+    },
+    "diagnostic_harness_sha256": "7f2b23f8604d9c658f320651a2dcbbc7fd5b43afeb1560cbb69b78c774cf0f8e",
+    "package_persistence_verified": false,
+    "hermes_acceptance": false
+  },
+  "preflight_sha256": "6b954396987dffa37594d5a84cc1358bb848676525e4b2743ae3facb2a333e8f",
+  "launch": {
+    "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export",
+    "argv": [
+      "python3",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/tools/loginom-acceptance/run.py",
+      "--run",
+      "--goal",
+      "text-export-node-complete",
+      "--model-profile",
+      "chatgpt-sol",
+      "--runs-root",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs",
+      "--node",
+      "/Users/kartamyshev/.loginom-dock/releases/0.1.0-dev.20260910.3-80ca61417ec7/runtime/node",
+      "--hermes-home",
+      "/Users/kartamyshev/.hermes",
+      "--hermes",
+      "/Users/kartamyshev/.local/bin/hermes",
+      "--hermes-python",
+      "/Users/kartamyshev/.hermes/hermes-agent/venv/bin/python",
+      "--hermes-source",
+      "/Users/kartamyshev/.hermes/hermes-agent",
+      "--dock-config",
+      "/Users/kartamyshev/.loginom-dock/config.json",
+      "--browsers",
+      "/Users/kartamyshev/.loginom-dock/runtime/browsers",
+      "--loginom-user",
+      "test-2",
+      "--loginom-url",
+      "http://logi-test-plan.bg.local/app/?testable=true",
+      "--storage-directory",
+      "/test-2",
+      "--manifest-uri",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node11.2-candidate/manifest.json",
+      "--manifest-sha256",
+      "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "--timeout",
+      "3600",
+      "--max-turns",
+      "100"
+    ],
+    "requires_coordinator_slot": true,
+    "model_started": false
+  },
+  "requires_new_coordinator_slot": true,
+  "retry_model_started": false,
+  "previous_evidence_sha256": {
+    "request.json": "3168c95d26c0986b5b700fe357f2744a9b23c49a604de52f52dc70da5c6e8ff4",
+    "evidence.json": "3b53b9cdde5ba94af9231e5c9f4ca5eb963d076240164a58e965ebab80f8fc9d",
+    "attempt.json": "5ab58a597824cb14804a8ebd73b7b2904b2effe2c0400f85096c921daa141d6a",
+    "process-close-check.json": "633dd7e33c301147d586dcc4a8bb28f982676245c369994c00420d4e0bd8eeb8",
+    "full-audit.json": "7ff32a2fc872d06f8b75ef2409a994c1192943ce17350b7aa079eea4211b5b55",
+    "full-audit-after-pin-refresh.json": "91411fd7b9a241e8a144e5bf0296c37b9a153f3006073f57280286f0ce2556d2"
+  }
+}

@@ -1,0 +1,3158 @@
+{
+  "grids": [
+    {
+      "attributes": {
+        "data-tid": "ConsoleForm;ProgressForm;trpProgress;treepanel;tree",
+        "id": "treeview-7903"
+      },
+      "rect": {
+        "x": 50,
+        "y": 457,
+        "width": 310,
+        "height": 541
+      },
+      "scroll": {
+        "top": 0,
+        "left": 0,
+        "clientHeight": 541,
+        "scrollHeight": 541,
+        "clientWidth": 310,
+        "scrollWidth": 310
+      },
+      "containers": [
+        {
+          "rect": {
+            "x": 50,
+            "y": 457,
+            "width": 310,
+            "height": 457
+          }
+        }
+      ],
+      "rows": [
+        {
+          "attributes": {
+            "id": "treeview-7903-record-1425",
+            "data-recordid": "1425",
+            "data-recordindex": "0",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 457,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов"
+              },
+              "text": "1",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 458,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов",
+                "id": "ext-element-2725"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 458,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-1427",
+            "data-recordid": "1427",
+            "data-recordindex": "1",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 481,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-1"
+              },
+              "text": "2",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 482,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-1",
+                "id": "ext-element-2726"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 482,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-1429",
+            "data-recordid": "1429",
+            "data-recordindex": "2",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 505,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-2"
+              },
+              "text": "3",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 506,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-2",
+                "id": "ext-element-2727"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 506,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-1431",
+            "data-recordid": "1431",
+            "data-recordindex": "3",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 529,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-3"
+              },
+              "text": "4",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 530,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-3",
+                "id": "ext-element-2728"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 530,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-1433",
+            "data-recordid": "1433",
+            "data-recordindex": "4",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 553,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-4"
+              },
+              "text": "5",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 554,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-4",
+                "id": "ext-element-2729"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 554,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-1436",
+            "data-recordid": "1436",
+            "data-recordindex": "5",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 577,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-5"
+              },
+              "text": "6",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 578,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-5",
+                "id": "ext-element-2730"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 578,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-1461",
+            "data-recordid": "1461",
+            "data-recordindex": "6",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 601,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-6"
+              },
+              "text": "7",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 602,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-6",
+                "id": "ext-element-2731"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 602,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-2828",
+            "data-recordid": "2828",
+            "data-recordindex": "7",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 625,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-7"
+              },
+              "text": "8",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 626,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-7",
+                "id": "ext-element-2732"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 626,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-2830",
+            "data-recordid": "2830",
+            "data-recordindex": "8",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 649,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-8"
+              },
+              "text": "9",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 650,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-8",
+                "id": "ext-element-2733"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 650,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-2836",
+            "data-recordid": "2836",
+            "data-recordindex": "9",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 673,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-9"
+              },
+              "text": "10",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 674,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-9",
+                "id": "ext-element-2734"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 674,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-2838",
+            "data-recordid": "2838",
+            "data-recordindex": "10",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 697,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Таблица"
+              },
+              "text": "11",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 698,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Таблица"
+              },
+              "text": "Таблица",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 698,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-2839",
+            "data-recordid": "2839",
+            "data-recordindex": "11",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 721,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-11"
+              },
+              "text": "12",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 722,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-11",
+                "id": "ext-element-2735"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 722,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-2845",
+            "data-recordid": "2845",
+            "data-recordindex": "12",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 745,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-12"
+              },
+              "text": "13",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 746,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-12",
+                "id": "ext-element-2736"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 746,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-2849",
+            "data-recordid": "2849",
+            "data-recordindex": "13",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 769,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-13"
+              },
+              "text": "14",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 770,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-13"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 770,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-2850",
+            "data-recordid": "2850",
+            "data-recordindex": "14",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 793,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-14"
+              },
+              "text": "15",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 794,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-14"
+              },
+              "text": "Активация узлов",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 794,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-2851",
+            "data-recordid": "2851",
+            "data-recordindex": "15",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 817,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-14>Dock-upload-20260906-145935-332513ca.csv"
+              },
+              "text": "15.1",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 818,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-14>Dock-upload-20260906-145935-332513ca.csv"
+              },
+              "text": "Dock-upload-20260906-145935-332513ca.csv",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess  bg-progress-grid-cell-process x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 818,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-2852",
+            "data-recordid": "2852",
+            "data-recordindex": "16",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 841,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-14>Revenue"
+              },
+              "text": "15.2",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 842,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-14>Revenue"
+              },
+              "text": "Revenue",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess  bg-progress-grid-cell-process x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 842,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-2853",
+            "data-recordid": "2853",
+            "data-recordindex": "17",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 865,
+            "width": 310,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-14>Quantity_Revenue_Id_по_Region"
+              },
+              "text": "15.3",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 866,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-14>Quantity_Revenue_Id_по_Region"
+              },
+              "text": "Quantity, Revenue, Id по Region",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess  bg-progress-grid-cell-process x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 866,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "treeview-7903-record-2854",
+            "data-recordid": "2854",
+            "data-recordindex": "18",
+            "data-boundview": "treeview-7903"
+          },
+          "rect": {
+            "x": 50,
+            "y": 889,
+            "width": 310,
+            "height": 25
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colId_Root>Активация_узлов-14>Изменение"
+              },
+              "text": "15.4",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colId x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 50,
+                "y": 890,
+                "width": 60,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-14>Изменение"
+              },
+              "text": "Изменение",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcess  bg-progress-grid-cell-process x-grid-cell-treecolumn x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 110,
+                "y": 890,
+                "width": 250,
+                "height": 23
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "attributes": {
+        "data-tid": "ConsoleForm;ProgressForm;trpProgress;grd;tbl",
+        "id": "tableview-7905"
+      },
+      "rect": {
+        "x": 361,
+        "y": 457,
+        "width": 1077,
+        "height": 541
+      },
+      "scroll": {
+        "top": 0,
+        "left": 0,
+        "clientHeight": 541,
+        "scrollHeight": 541,
+        "clientWidth": 1077,
+        "scrollWidth": 1077
+      },
+      "containers": [
+        {
+          "rect": {
+            "x": 361,
+            "y": 457,
+            "width": 1077,
+            "height": 457
+          }
+        }
+      ],
+      "rows": [
+        {
+          "attributes": {
+            "id": "tableview-7905-record-1425",
+            "data-recordid": "1425",
+            "data-recordindex": "0",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 457,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 458,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 458,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 458,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 458,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 458,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов"
+              },
+              "text": "06.09.2026, 16:14:24,818",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 458,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов"
+              },
+              "text": "06.09.2026, 16:14:24,818",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 458,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов"
+              },
+              "text": "00с 000мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 458,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-1427",
+            "data-recordid": "1427",
+            "data-recordindex": "1",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 481,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-1"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 482,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-1"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 482,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-1"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 482,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-1"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 482,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-1"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 482,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-1"
+              },
+              "text": "06.09.2026, 16:17:39,553",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 482,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-1"
+              },
+              "text": "06.09.2026, 16:17:39,553",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 482,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-1"
+              },
+              "text": "00с 000мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 482,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-1429",
+            "data-recordid": "1429",
+            "data-recordindex": "2",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 505,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-2"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 506,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-2"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 506,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-2"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 506,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-2"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 506,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-2"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 506,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-2"
+              },
+              "text": "06.09.2026, 16:31:10,886",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 506,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-2"
+              },
+              "text": "06.09.2026, 16:31:10,886",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 506,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-2"
+              },
+              "text": "00с 000мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 506,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-1431",
+            "data-recordid": "1431",
+            "data-recordindex": "3",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 529,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-3"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 530,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-3"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 530,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-3"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 530,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-3"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 530,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-3"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 530,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-3"
+              },
+              "text": "06.09.2026, 16:32:18,392",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 530,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-3"
+              },
+              "text": "06.09.2026, 16:32:18,392",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 530,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-3"
+              },
+              "text": "00с 000мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 530,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-1433",
+            "data-recordid": "1433",
+            "data-recordindex": "4",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 553,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-4"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 554,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-4"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 554,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-4"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 554,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-4"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 554,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-4"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 554,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-4"
+              },
+              "text": "06.09.2026, 16:35:44,012",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 554,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-4"
+              },
+              "text": "06.09.2026, 16:35:44,013",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 554,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-4"
+              },
+              "text": "00с 001мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 554,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-1436",
+            "data-recordid": "1436",
+            "data-recordindex": "5",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 577,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-5"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 578,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-5"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 578,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-5"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 578,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-5"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 578,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-5"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 578,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-5"
+              },
+              "text": "06.09.2026, 17:30:02,778",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 578,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-5"
+              },
+              "text": "06.09.2026, 17:30:02,781",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 578,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-5"
+              },
+              "text": "00с 003мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 578,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-1461",
+            "data-recordid": "1461",
+            "data-recordindex": "6",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 601,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-6"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 602,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-6"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 602,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-6"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 602,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-6"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 602,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-6"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 602,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-6"
+              },
+              "text": "06.09.2026, 17:43:39,346",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 602,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-6"
+              },
+              "text": "06.09.2026, 17:43:39,347",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 602,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-6"
+              },
+              "text": "00с 001мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 602,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-2828",
+            "data-recordid": "2828",
+            "data-recordindex": "7",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 625,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-7"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 626,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-7"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 626,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-7"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 626,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-7"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 626,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-7"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 626,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-7"
+              },
+              "text": "06.09.2026, 17:47:29,561",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 626,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-7"
+              },
+              "text": "06.09.2026, 17:47:29,561",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 626,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-7"
+              },
+              "text": "00с 000мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 626,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-2830",
+            "data-recordid": "2830",
+            "data-recordindex": "8",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 649,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-8"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 650,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-8"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 650,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-8"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 650,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-8"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 650,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-8"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 650,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-8"
+              },
+              "text": "06.09.2026, 18:20:06,657",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 650,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-8"
+              },
+              "text": "06.09.2026, 18:20:06,661",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 650,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-8"
+              },
+              "text": "00с 004мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 650,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-2836",
+            "data-recordid": "2836",
+            "data-recordindex": "9",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 673,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-9"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 674,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-9"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 674,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-9"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 674,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-9"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 674,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-9"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 674,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-9"
+              },
+              "text": "06.09.2026, 18:20:25,383",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 674,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-9"
+              },
+              "text": "06.09.2026, 18:20:25,383",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 674,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-9"
+              },
+              "text": "00с 000мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 674,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-2838",
+            "data-recordid": "2838",
+            "data-recordindex": "10",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 697,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Таблица"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 698,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Таблица"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 698,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Таблица"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 698,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Таблица"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 698,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Таблица"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 698,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Таблица"
+              },
+              "text": "06.09.2026, 18:24:25,735",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 698,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Таблица"
+              },
+              "text": "06.09.2026, 18:24:25,735",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 698,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Таблица"
+              },
+              "text": "00с 000мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 698,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-2839",
+            "data-recordid": "2839",
+            "data-recordindex": "11",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 721,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-11"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 722,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-11"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 722,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-11"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 722,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-11"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 722,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-11"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 722,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-11"
+              },
+              "text": "06.09.2026, 19:05:53,098",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 722,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-11"
+              },
+              "text": "06.09.2026, 19:05:53,101",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 722,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-11"
+              },
+              "text": "00с 003мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 722,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-2845",
+            "data-recordid": "2845",
+            "data-recordindex": "12",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 745,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-12"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 746,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-12"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 746,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-12"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 746,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-12"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 746,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-12"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 746,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-12"
+              },
+              "text": "06.09.2026, 19:15:13,069",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 746,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-12"
+              },
+              "text": "06.09.2026, 19:15:13,070",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 746,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-12"
+              },
+              "text": "00с 001мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 746,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-2849",
+            "data-recordid": "2849",
+            "data-recordindex": "13",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 769,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-13"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 770,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-13"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 770,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-13"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 770,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-13"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 770,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-13"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 770,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-13"
+              },
+              "text": "06.09.2026, 19:22:44,922",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 770,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-13"
+              },
+              "text": "06.09.2026, 19:22:44,922",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 770,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-13"
+              },
+              "text": "00с 000мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 770,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-2850",
+            "data-recordid": "2850",
+            "data-recordindex": "14",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 793,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-14"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 794,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-14"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 794,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-14"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 794,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-14"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 794,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-14"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 794,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-14"
+              },
+              "text": "06.09.2026, 19:25:11,365",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 794,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-14"
+              },
+              "text": "06.09.2026, 19:25:11,368",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 794,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-14"
+              },
+              "text": "00с 003мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 794,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-2851",
+            "data-recordid": "2851",
+            "data-recordindex": "15",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 817,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-14>Dock-upload-20260906-145935-332513ca.csv"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 818,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-14>Dock-upload-20260906-145935-332513ca.csv"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 818,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-14>Dock-upload-20260906-145935-332513ca.csv"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 818,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-14>Dock-upload-20260906-145935-332513ca.csv"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 818,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-14>Dock-upload-20260906-145935-332513ca.csv"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 818,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-14>Dock-upload-20260906-145935-332513ca.csv"
+              },
+              "text": "06.09.2026, 19:25:11,365",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 818,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-14>Dock-upload-20260906-145935-332513ca.csv"
+              },
+              "text": "06.09.2026, 19:25:11,365",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 818,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-14>Dock-upload-20260906-145935-332513ca.csv"
+              },
+              "text": "00с 000мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 818,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-2852",
+            "data-recordid": "2852",
+            "data-recordindex": "16",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 841,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-14>Revenue"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 842,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-14>Revenue"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 842,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-14>Revenue"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 842,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-14>Revenue"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 842,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-14>Revenue"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 842,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-14>Revenue"
+              },
+              "text": "06.09.2026, 19:25:11,366",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 842,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-14>Revenue"
+              },
+              "text": "06.09.2026, 19:25:11,366",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 842,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-14>Revenue"
+              },
+              "text": "00с 000мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 842,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-2853",
+            "data-recordid": "2853",
+            "data-recordindex": "17",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 865,
+            "width": 1077,
+            "height": 24
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-14>Quantity_Revenue_Id_по_Region"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 866,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-14>Quantity_Revenue_Id_по_Region"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 866,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-14>Quantity_Revenue_Id_по_Region"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 866,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-14>Quantity_Revenue_Id_по_Region"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 866,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-14>Quantity_Revenue_Id_по_Region"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 866,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-14>Quantity_Revenue_Id_по_Region"
+              },
+              "text": "06.09.2026, 19:25:11,367",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 866,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-14>Quantity_Revenue_Id_по_Region"
+              },
+              "text": "06.09.2026, 19:25:11,367",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 866,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-14>Quantity_Revenue_Id_по_Region"
+              },
+              "text": "00с 000мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 866,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "id": "tableview-7905-record-2854",
+            "data-recordid": "2854",
+            "data-recordindex": "18",
+            "data-boundview": "tableview-7905"
+          },
+          "rect": {
+            "x": 361,
+            "y": 889,
+            "width": 1077,
+            "height": 25
+          },
+          "cells": [
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colPercent_Root>Активация_узлов-14>Изменение"
+              },
+              "text": "100",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colPercent x-grid-cell-first x-unselectable",
+              "rect": {
+                "x": 361,
+                "y": 890,
+                "width": 50,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgress_Root>Активация_узлов-14>Изменение"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgress bg-progress-ptpsCompleted x-progressbarwidget-default-cell x-unselectable",
+              "rect": {
+                "x": 411,
+                "y": 890,
+                "width": 160,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionStop_Root>Активация_узлов-14>Изменение"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionStop  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 571,
+                "y": 890,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colActionDelete_Root>Активация_узлов-14>Изменение"
+              },
+              "text": "",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colActionDelete  x-action-col-cell x-unselectable",
+              "rect": {
+                "x": 601,
+                "y": 890,
+                "width": 30,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colErrorDetails_Root>Активация_узлов-14>Изменение"
+              },
+              "text": " ",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colErrorDetails x-unselectable",
+              "rect": {
+                "x": 631,
+                "y": 890,
+                "width": 317,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressStart_Root>Активация_узлов-14>Изменение"
+              },
+              "text": "06.09.2026, 19:25:11,367",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressStart x-unselectable",
+              "rect": {
+                "x": 948,
+                "y": 890,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProgressFinish_Root>Активация_узлов-14>Изменение"
+              },
+              "text": "06.09.2026, 19:25:11,367",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProgressFinish x-unselectable",
+              "rect": {
+                "x": 1113,
+                "y": 890,
+                "width": 165,
+                "height": 23
+              }
+            },
+            {
+              "attributes": {
+                "data-tid": "ConsoleForm;ProgressForm;colProcessTime_Root>Активация_узлов-14>Изменение"
+              },
+              "text": "00с 000мс",
+              "classes": "x-grid-cell x-grid-td x-grid-cell-colProcessTime x-grid-cell-last x-unselectable",
+              "rect": {
+                "x": 1278,
+                "y": 890,
+                "width": 160,
+                "height": 23
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

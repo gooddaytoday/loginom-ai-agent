@@ -1,0 +1,57 @@
+{
+  "passed": true,
+  "scope": "full_model_free_nine_requests_and_one_save",
+  "checks": {
+    "Продажи0": true,
+    "Продажи0_identity_links": true,
+    "Календарь0": true,
+    "Календарь0_identity_links": true,
+    "Календарь1": true,
+    "Календарь1_identity_links": true,
+    "Календарь2": true,
+    "Календарь2_identity_links": true,
+    "Месяцы0": true,
+    "Месяцы0_identity_links": true,
+    "Кварталы0": true,
+    "Кварталы0_identity_links": true,
+    "Нет продаж0": true,
+    "Нет продаж0_identity_links": true,
+    "Пустой календарь0": true,
+    "Пустой календарь0_identity_links": true,
+    "Пустой календарь1": true,
+    "Пустой календарь1_identity_links": true,
+    "source_bytes": true,
+    "full_nine_operations": true,
+    "Календарь_retention": true,
+    "Пустой календарь_retention": true,
+    "save": true
+  },
+  "refs": {
+    "full-business-audit.json": {
+      "path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/full-business-audit.json",
+      "sha256": "d1a3aa0245fa10c2b2591c5d0af0b78b9f4a26685e5588beec001c7cbbca49c9",
+      "passed": true,
+      "status": null
+    },
+    "node13-full-empty-done-split-negative.json": {
+      "path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/node13-full-empty-done-split-negative.json",
+      "sha256": "f732a4f64d4cd9978ebd75cf7b460bbb1abb4c691e7849a13e10c9c2a6c708d4",
+      "passed": true,
+      "status": null
+    },
+    "full-save.json": {
+      "path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/full-save.json",
+      "sha256": "5a46830740666e0139c105b9bfb7229f8de4326160c32b6eff0fb36125fba777",
+      "passed": null,
+      "status": "SUCCEEDED"
+    },
+    "inspect-close-full.json": {
+      "path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/inspect-close-full.json",
+      "sha256": "efe745e16dbbf9731483dec8faa4cb7db72616804caddeea1a7c24fa079b4fa0",
+      "passed": null,
+      "status": null
+    }
+  },
+  "independent_reopen_pending": true,
+  "hermes_acceptance": false
+}

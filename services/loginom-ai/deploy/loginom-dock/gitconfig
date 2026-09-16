@@ -1,0 +1,13 @@
+# Preserve the image's Git LFS filters and other system settings.
+[include]
+    path = /etc/gitconfig
+
+# GitLab supplies Authorization in each LFS download action. Clear the native
+# importer's extraHeader only for object downloads to avoid sending it twice.
+# Git discovery, Git packs and the LFS batch endpoint retain their credentials.
+[http "https://git.basegroup.ru/testing/ai-skills.git/gitlab-lfs/objects/"]
+    extraHeader =
+[http "https://git.basegroup.ru/testing/e2e-tests.git/gitlab-lfs/objects/"]
+    extraHeader =
+[http "https://git.basegroup.ru/support/loginom-help.git/gitlab-lfs/objects/"]
+    extraHeader =

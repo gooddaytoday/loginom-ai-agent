@@ -1,0 +1,32 @@
+{
+  "assignment": "node16:acceptance-preparation:1:77385e36",
+  "kit_files": {
+    "README.md": "104761aa923e8532a0ccf2be8bab8d5a077b089144112b6f4c8753a9c172dd00",
+    "audit.py": "dd899962fdc8f61a1b1ec6a1887ea8120e4eb4c4346d5abc5b594672c21cfd75",
+    "check.py": "550544b57551923a89e24c3951fbc4ce4dba24c5b79f1ec0a110c48ba2ddd706",
+    "compatibility-7.4.2.json": "97d69955f10cc5fc13c78af050933ac90acb83cfd60c895612548f1967702fb7",
+    "expected.json": "32bfcd36473ab5d64f4b9ec72c34e60983998d7b5105da8a0d3610e71f51867e",
+    "fixtures/all-null.csv": "3a696bcd77a04740348021406555f1ad1959596f98e5613d1f055bebaf6ed557",
+    "fixtures/header-only.csv": "8bbdffa02bdd41d3a46a893d76ba9de5e9708fef76d0d7d6e8e62acd33978225",
+    "fixtures/mapped.csv": "da7ff890d2e6d4b6797eb661c0a570f3085af7ca222d4bbe8e067531866c2c79",
+    "fixtures/mixed.csv": "9aac5a16b49e7123637c2bef05bf5d5d41e5a1e4d7ed2df9eb3490afefab38e5",
+    "fixtures/wide.csv": "b85900722bf6d14fc6bde566b2f3a0fbd39bd795ff86d33c221dffd0c1c755b0",
+    "focused-tests.txt": "1ec19b7d1fb648c6895b4f1b86124b21b67c120c6c735b22cafb235f3934091f",
+    "goal.json": "4dde736a90189dcff15783103220a6d78366bca7388facb185a7a780a043ff95",
+    "hermes-goal.md": "1da0265da9fcd10c462bfd09bd8c2cf9de3e66cc5740b7c4ef621517be8175bb",
+    "import-profile.json": "e82bedd3f024e7b51837675dea96b9bb7cd1d8142bb4591c5dc411b5bfc6f24e",
+    "source-packet.json": "4a57c70375a88fd1a5ec70d1e80e358c99a4ae258e75906b90cdc93687146cb8"
+  },
+  "replay": {
+    "mixed": ".dock/node16/live-1789304119268/public-user-mixed.json",
+    "ignore": ".dock/node16/live-1789304119268/public-user-ignore.json",
+    "reopened": ".dock/node16/live-1789304875513/public-user-reopened.json"
+  },
+  "source_runtime": "db6d957169c50bcd5cb169db80d744fd846b8ffa4eee683178619c001fb22bab",
+  "ready": false,
+  "replay_sha256": {
+    ".dock/node16/live-1789304119268/public-user-mixed.json": "7fb55180e43eb5b1320d3fc90b75f0567d27a0f597c706547d8c9ffda473d5c9",
+    ".dock/node16/live-1789304119268/public-user-ignore.json": "c9bd6b4477834c9464a70e61d79b70a37ccbed971798d7bf877a5aebd3de1ba9",
+    ".dock/node16/live-1789304875513/public-user-reopened.json": "18fa20399d3864c3ff51d53ad171761ad5acfbddcef96a05c75b4442343e5e3d"
+  }
+}

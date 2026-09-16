@@ -1,0 +1,8 @@
+const imported=JSON.parse(await ctx.fs.readFile(ctx.dir+'/import.json','utf8'));if(imported.status!=='SUCCEEDED'||!imported.cleanup_complete)throw Error('Import must succeed first');
+ctx.graph=await ctx.adapter.observe(ctx.prep,Date.now()+30000);const source=ctx.graph.nodes.filter(n=>n.label==='Продажи'&&n.type==='imports.text');if(source.length!==1)throw Error('Owned source required');
+const ops=['date','month_end','month_start','quarter_end','quarter_start','year_end','year_start','hour','day_of_month','month','quarter','year'];
+const fields=['DateA','DateB'].map((name,i)=>({field:{kind:'input_field',name},transformations:ops.map(operation=>({operation,name:(i?'B_':'A_')+operation,label:(i?'B ':'A ')+operation}))}));
+const order=['Id','Amount',...fields.flatMap(f=>f.transformations.map(t=>t.name)),'DateA','DateB'];
+ctx.calendarRequest={operation_id:'node13-full-calendar-initial',contract_revision:'1.0.0',document_id:ctx.prep.document_id,workflow_ref:ctx.prep.workflow_ref,target:{kind:'new',type:'transform.date_time',label:'Календарь',position:{x:384,y:288}},inputs:[{source:source[0].ref,output:0,input:0}],mode:'calendar',parameters:{fields},mappings:[{direction:'input',port:0,autosync:false,fields:['Id','DateA','DateB','Amount'].map(name=>({source:{kind:'configured_field',name},name,label:name.startsWith('Date')?'Дата':name}))},{direction:'output',port:0,autosync:false,fields:order.map(name=>({source:{kind:'configured_field',name},...(name==='DateB'?{excluded:true,label:'Дата'}:{})}))}],finish:'execute',read:{ports:[0],sample_rows:10,require_exact_numbers:true},budgets:{configure_ms:1800000,execute_ms:180000,total_ms:1800000}};
+
+return await ctx.runtime.runNodeApply(ctx.calendarRequest);

@@ -1,0 +1,1 @@
+return await ctx.execute(`async page=>({title:await page.title(),body:(await page.locator('body').innerText()).slice(0,3500),controls:await page.locator('[data-tid$=";btnClose"]:visible,[data-tid$=";btnDone"]:visible,[data-tid*=cnrNaviMode]:visible').evaluateAll(es=>es.map(e=>({tid:e.getAttribute('data-tid'),text:e.innerText.slice(0,200)})))})`);

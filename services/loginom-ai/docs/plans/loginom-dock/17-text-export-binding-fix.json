@@ -1,0 +1,200 @@
+{
+  "status": "ready-for-Hermes-retry",
+  "base_commit": "b6e68170",
+  "full_goal_passed": false,
+  "previous_run": "20260913-195328-a78a7b64",
+  "previous_audit": {
+    "passed": false,
+    "scope": "node17_full_goal",
+    "checks": {
+      "projection": {
+        "passed": false,
+        "failures": [
+          "user_public_pairing"
+        ]
+      },
+      "incomplete_or_invalid": {
+        "passed": false,
+        "reason": ""
+      }
+    }
+  },
+  "previous_cleanup": {
+    "returncode": 0,
+    "timed_out": false,
+    "remaining_pids": [],
+    "closed": true,
+    "slot": "node17-hermes-20260913-d86f72c4",
+    "operator_termination_applied": false
+  },
+  "previous_runtime_and_harness_unchanged": true,
+  "node_operations_completed": 11,
+  "succeeded": 10,
+  "expected_reject": 1,
+  "replace_dispatched": false,
+  "failure": "Node/workflow owner changed before observer native actions and before product replacement; subsequent observer gate errors prevented continuation. Model exited itself before the attempted operator stop.",
+  "binding_before": {
+    "same_values": true,
+    "same_json": false,
+    "wire_keys": [
+      "document_id",
+      "node_id",
+      "workflow_id"
+    ],
+    "journal_keys": [
+      "document_id",
+      "workflow_id",
+      "node_id"
+    ],
+    "bound": false,
+    "error": "Node/workflow owner changed"
+  },
+  "binding_after": {
+    "same_values": true,
+    "same_json": false,
+    "wire_keys": [
+      "document_id",
+      "node_id",
+      "workflow_id"
+    ],
+    "journal_keys": [
+      "document_id",
+      "workflow_id",
+      "node_id"
+    ],
+    "bound": true,
+    "identity": {
+      "document_id": "1789318428218-q1eep5hkt1",
+      "workflow_id": "1789318428218-q1eep5hkt1-1",
+      "node_id": "6614461f-bdae-4dc8-8af3-442753c8049a",
+      "source_node_id": "812e79ec-59b3-4fd6-b722-5f856cb41ac2"
+    }
+  },
+  "fix": "Observer binder uses deep strict structural equality instead of JSON string equality; key order is immaterial, values and exact key set remain guarded. Other observer and product guards unchanged.",
+  "runtime": "2897649a8d2120d25e4c80af8af2c6cdd834023b5bda1a1bd5baf073c6e9ba32",
+  "runtime_unchanged_by_this_fix": true,
+  "manifest_sha256": "73c911c6bf1ba70f70a933339febaf53cd13e07f5fc06fd09adde7de153abffc",
+  "goal_sha256": "5db16d49554a80afceedcbad2f9a836378377650bcec1d27c4768638a29b46b6",
+  "full_goal": {
+    "nodeops": 22,
+    "deliveries": 3,
+    "all_save_reopen_required": true
+  },
+  "tests": {
+    "node_passed": 27,
+    "python_passed": 21,
+    "live_component_passed": true,
+    "negative_evidence_mutations_rejected": 50
+  },
+  "live": {
+    "run_directory": ".dock/node17/user-v1-component/20260913-170842-59abc360",
+    "report": "docs/plans/loginom-dock/17-text-export-binding-component-success.json",
+    "report_sha256": "5cc446e96f1f24d7781dacb19cd7b0b2ab25cbc37abf475267415f16c2b26ff3",
+    "observer_elapsed_ms": 1784.7036660000158,
+    "downloads": 1,
+    "actual_dispatches": 1,
+    "replace_prepared": 1,
+    "bytes": 124,
+    "closed": true,
+    "global_config_unchanged": true
+  },
+  "earlier_commentary_correction": "Typed passed full autonomous creation; its three real refreshes were in Table formatting, not the corrected import editor. Import editor refusal recovery is verified by focused fault-injection tests, and normal import is verified live.",
+  "actual_safe_refresh_conditions": [
+    {
+      "operation_id": "import-typed-create-20260913",
+      "condition": "select Table format field 0",
+      "retry": 1
+    },
+    {
+      "operation_id": "import-typed-create-20260913",
+      "condition": "select exact empty-default datetime",
+      "retry": 1
+    },
+    {
+      "operation_id": "import-typed-create-20260913",
+      "condition": "select exact empty-default datetime",
+      "retry": 1
+    },
+    {
+      "operation_id": "import-wide-create-20260913",
+      "condition": "open bound Table filter",
+      "retry": 1
+    },
+    {
+      "operation_id": "import-wide-create-20260913",
+      "condition": "reveal Table output column 13",
+      "retry": 1
+    },
+    {
+      "operation_id": "filter-empty-create-20260913",
+      "condition": "calculator done",
+      "retry": 1
+    },
+    {
+      "operation_id": "export-csv-create-20260913",
+      "condition": "export done",
+      "retry": 1
+    },
+    {
+      "operation_id": "export-csv-conflict-reject-20260913",
+      "condition": "confirm cancellation of this wizard draft",
+      "retry": 1
+    }
+  ],
+  "previous_evidence_sha256": {
+    "request.json": "7352614013f4ac04e6fc85223af8676112a8d4901600e430fe7f333da252cb11",
+    "evidence.json": "6a628afead0b931f50c756831967109108ed3f34ed2fcc8f1f3d12714848ae7b",
+    "attempt.json": "666dfb3596c18506dc5c25c951283b600fd9c0fd766ba708ff929de38c773188",
+    "full-audit.json": "8ef88fa6a0fa9d13e3af37bc96b61dc9dd7c2621d705ffea69bb9e96238bc2c1",
+    "process-close-check.json": "6a721eeb6aef6575123c50cc551a62375913ece1894b9084f1361d5385f30847",
+    "binding-before.json": "7bfab049ec2b20ff7ebbfee248cea267500507d4cdbf8267f84188db60432d5f",
+    "binding-after.json": "221ba00c867a919f0782d0d322f347bce49424bea9bdb769a7802e836a2276c7"
+  },
+  "launch": {
+    "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export",
+    "argv": [
+      "python3",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/tools/loginom-acceptance/run.py",
+      "--run",
+      "--goal",
+      "text-export-node-complete",
+      "--model-profile",
+      "chatgpt-sol",
+      "--runs-root",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs",
+      "--node",
+      "/Users/kartamyshev/.loginom-dock/releases/0.1.0-dev.20260910.3-80ca61417ec7/runtime/node",
+      "--hermes-home",
+      "/Users/kartamyshev/.hermes",
+      "--hermes",
+      "/Users/kartamyshev/.local/bin/hermes",
+      "--hermes-python",
+      "/Users/kartamyshev/.hermes/hermes-agent/venv/bin/python",
+      "--hermes-source",
+      "/Users/kartamyshev/.hermes/hermes-agent",
+      "--dock-config",
+      "/Users/kartamyshev/.loginom-dock/config.json",
+      "--browsers",
+      "/Users/kartamyshev/.loginom-dock/runtime/browsers",
+      "--loginom-user",
+      "test-2",
+      "--loginom-url",
+      "http://logi-test-plan.bg.local/app/?testable=true",
+      "--storage-directory",
+      "/test-2",
+      "--manifest-uri",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node11.2-candidate/manifest.json",
+      "--manifest-sha256",
+      "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "--timeout",
+      "3600",
+      "--max-turns",
+      "100"
+    ],
+    "requires_coordinator_slot": true,
+    "model_started": false
+  },
+  "requires_new_coordinator_slot": true,
+  "retry_model_started": false,
+  "preflight_sha256": "39855ca84a81fc1279ffa0eba5c942a84172b5e484590c986310e78dfd876b65"
+}

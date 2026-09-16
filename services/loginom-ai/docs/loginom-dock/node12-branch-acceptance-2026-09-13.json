@@ -1,0 +1,35 @@
+{
+  "status": "accepted_scoped_unmerged_branch",
+  "accepted_at": "2026-09-13T05:06:51.860573+00:00",
+  "coordinator_decision": "Accepted separately versioned independent reassessment of immutable autonomous run evidence",
+  "source_run_id": "20260913-072904-3cc4ad0e",
+  "source_sha": "0e11a3fb24ca40a9f855008d2b0d1856d6f771ad",
+  "branch_head": "e609e645fec2f3a86fa72f017c981799aa5598db",
+  "reassessment_sha256": "a6b30d50d951e8033b24c43e814737ea1c59d27051953c9e2ddf06eeac5e53e6",
+  "checks_passed": 122,
+  "checks_total": 122,
+  "original_frozen_audit": "FAIL112/118 preserved",
+  "scope": "integer/string duplicate and contradiction marking; NULL/empty/literal null in Value; key-only and mixed groups",
+  "limits": [
+    "boolean/real/datetime live input matrix not accepted",
+    "NULL key comparison unverified",
+    "no separate node12 live lost-reply injection; shared regression/replay checks only"
+  ],
+  "merged": false,
+  "deployed": false,
+  "shared_plugin_updated": false,
+  "verifier_commit": "fbc83762b3de0fe805fa0b9e8bac3d12fbb009c2",
+  "verifier_sha256": "b165204ae1c7403f25e648425bb13c2f2ecec003fd64148dcf6a5d80094013ae",
+  "verifier_files": 246,
+  "original_artifacts_verified": 12,
+  "original_execution_harness_files": 243,
+  "original_execution_runtime_files": 153,
+  "skipped_checks_now_passed": 9,
+  "persisted_composite_checks": {
+    "main10": 7,
+    "null8": 7,
+    "empty": 7
+  },
+  "live_evidence_negative_rejections": 19,
+  "provenance_negative_rejections": 3
+}

@@ -1,0 +1,10 @@
+{
+  "status": "FAILED",
+  "reason": "diagnostic_record_wrapper_did_not_return_journal_ack",
+  "ui_mutations": 0,
+  "evidence_phases": [
+    "diagnostic_resume_settings_prepared",
+    "node_observation_sample",
+    "node_observation_completed"
+  ]
+}

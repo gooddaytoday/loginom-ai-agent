@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "source_commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+  "attribution": "Loginom E2E test sources; original repository and authors retain attribution. No source text copied.",
+  "files": [
+    {
+      "path": "bg/lib.ts",
+      "sha256": "0a98ab6a1cf6b148e5250822d70a9974d19ed93dd5be434a27245c3bfcbf7bcb"
+    },
+    {
+      "path": "bg/selectors.ts",
+      "sha256": "59f5ed385076a5ca4cb97827647bbbca49da9380717fb44f204aa415e4b4e9e3"
+    },
+    {
+      "path": "bg/utils/workflow.ts",
+      "sha256": "6e476f5de5bd7599332eb544c029918974e144d2905fe39422d925ebe980d9c6"
+    },
+    {
+      "path": "bg/helpers/main.ts",
+      "sha256": "04a684b0cc0d29541c91c4c2ddb1b465c021c79d7cc3d9770da16aef45546b2e"
+    },
+    {
+      "path": "bg/helpers/wizard.ts",
+      "sha256": "700b25194c65dd0d729c76598d2dcfd49f7d8604c1c6f4b9d96995fd4c9e4335"
+    },
+    {
+      "path": "bg/helpers/packages.ts",
+      "sha256": "203d7002abdfc8c88bb59bc500a21ff3003f5dc537b500c2f9802afba21d4a8f"
+    },
+    {
+      "path": "bg/helpers/filedialog.ts",
+      "sha256": "a6f7aa54eb48a3d1e330820c5322e03d7d139a172f82f344253b534e48897696"
+    },
+    {
+      "path": "bg/helpers/filestorage.ts",
+      "sha256": "307c58e7cdc4c465d0cc76dfd07134ad0968949e3bd64a9de84971a16122b5c6"
+    },
+    {
+      "path": "bg/helpers/connections.ts",
+      "sha256": "46d00c63a6d2b7538e5e63f91a3e0574ff55fbc6402948fec0dc4e7f5c4f4b2c"
+    },
+    {
+      "path": "bg/helpers/progressForm.ts",
+      "sha256": "c07af36194822d5486ab07bd29e620d22545b02d861e7e094505a0ddf4aa2129"
+    },
+    {
+      "path": "bg/helpers/workflow/node.ts",
+      "sha256": "c50802326ad3b32bcceb35e892606bae5726eaaafab0fd5d833f26dfb6ebea64"
+    },
+    {
+      "path": "bg/helpers/workflow/nodeWf.ts",
+      "sha256": "c466eed0d3fd0d1b51ef7dfdfabb62e68117f6d966608405e9bcde298dfb6dd6"
+    },
+    {
+      "path": "bg/helpers/workflow/workflow.ts",
+      "sha256": "749b1fdb1fe582f7134c3aa43bca621cf279691ec71f1292d63116de169a74e8"
+    },
+    {
+      "path": "bg/helpers/workflow/links.ts",
+      "sha256": "9718090ce0ccaa5c0f266ad1672d39678ffd2cae07fe8e0b5ce85522990883a8"
+    },
+    {
+      "path": "bg/helpers/workflow/ports.ts",
+      "sha256": "e3e2ed764af45157b3dd72b9d53052255184a67edb0023238caabee28ec112be"
+    },
+    {
+      "path": "bg/helpers/workflow/variables.ts",
+      "sha256": "62ea19e38a2105899a40eace96ea808e3db7f53553db29879d4c2fd7f60f4526"
+    },
+    {
+      "path": "bg/helpers/workflow/previewTable.ts",
+      "sha256": "edc89eda1ad0f8c4ac4dc4f95135cba2abfccb578c377f97743f9ceacd8fb8ac"
+    },
+    {
+      "path": "bg/helpers/workflow/previewTree.ts",
+      "sha256": "66e2abe1ae004bb77b4df11458b0d2de0218172b52967085cf39b78c391c0ad0"
+    },
+    {
+      "path": "bg/helpers/workflow/components/supernode.ts",
+      "sha256": "e5e99f27ba03ec1164aea3e52d9e9d017f81f2fecfdfa15a2ffef0be14850b33"
+    },
+    {
+      "path": "bg/helpers/workflow/components/import/dbImport.ts",
+      "sha256": "958c167fbf9195039202fa984452d2b6dbf7de9aee8b1a6e9b96490a91de6841"
+    },
+    {
+      "path": "bg/helpers/views/viewsForm.ts",
+      "sha256": "a40828cd6b0a0a0b7952bd6fc6a7894af36b8e1f520bd87819053a3359c61709"
+    },
+    {
+      "path": "bg/helpers/wizards/portWizard.ts",
+      "sha256": "c7170ec4108d0abb2d2f7452fee877cabe9c2ac7a770c062449d90705d37d3f0"
+    },
+    {
+      "path": "bg/helpers/wizards/import/importExcel.ts",
+      "sha256": "40c71056584035633dfd83db663a9e1722f27c27139d39d31fe43aab34ffc0df"
+    },
+    {
+      "path": "bg/helpers/wizards/transform/calculator_helpers.ts",
+      "sha256": "b51129b4b78a5dfdea38bb64373fe8c8ec41b2cd5bb53aa3f2968b126fba85b3"
+    },
+    {
+      "path": "bg/helpers/wizards/transform/uniondata_helpers.ts",
+      "sha256": "67eb3ddd337d317af5279056a8f5f7498a71055687834a5f0649955eb25b2f16"
+    },
+    {
+      "path": "bg/sels/import/sImportTxt.ts",
+      "sha256": "88e1e86bd904233b93d54872b0ac6199c4939bafcacfd39c0c88252576d11eff"
+    },
+    {
+      "path": "bg/sels/import/sImportExcel.ts",
+      "sha256": "41e55ae358f4d7a8a495d7048cf9f1e6470d84eb765cdff978f93d8f5b7ca57c"
+    },
+    {
+      "path": "bg/sels/import/sDbImport.ts",
+      "sha256": "7729e0fcac069897294f5f790ca64514c06c927839f4d28ecae641660fc3e05b"
+    },
+    {
+      "path": "bg/sels/control/sSupernode.ts",
+      "sha256": "289665e9efdb4edda4c34fb5d95a9e3df2c9c67cf65f6d3c0aee6cf2ebf68b79"
+    },
+    {
+      "path": "bg/sels/sForms.ts",
+      "sha256": "538484ca361ae2c07a21c809b3ffa04e506e438e627ecd562d1bb4290e05c63c"
+    },
+    {
+      "path": "bg/sels/sProgressForm.ts",
+      "sha256": "bc6cfaeadfb52c8eaf24c99f5f86d03b5d7cea3d87f18db47513254fd6448e39"
+    },
+    {
+      "path": "bg/sels/variables/sVariablesMapping.ts",
+      "sha256": "0a9dd9680d3a2057bd713259fcb031a8e446a2b0697d781b83e21f003b8ea92e"
+    },
+    {
+      "path": "tests/acceptance/packages/base_package_actions.ts",
+      "sha256": "480719532d4063c9c23f1947d9e88d8f41b5ab0babf9b17a2a24a86b1f9226ba"
+    },
+    {
+      "path": "tests/acceptance/workflow/linking.ts",
+      "sha256": "0caa96babcd94a826be73a6251047561a916ca4abd5c73355361f1f390b9f357"
+    },
+    {
+      "path": "tests/acceptance/workflow/node_run_finish/run_finish_node.ts",
+      "sha256": "37d21f11346f459c5c77465746a9bfee56b058620841385f6e4672d947c43793"
+    },
+    {
+      "path": "tests/acceptance/workflow/node_run_finish/run_nodes.ts",
+      "sha256": "856c2220346a61eb88efdfa297aa5c66bc26da0a8cef2c33487bf2c7870eadbb"
+    },
+    {
+      "path": "tests/acceptance/wizards/import_lgd.ts",
+      "sha256": "598117ea0db59527a67c6ac246f793ee64ed2e750f6523c66f0fd7f7f1ceffa1"
+    },
+    {
+      "path": "tests/acceptance/wizards/imports/txt/format_settings.ts",
+      "sha256": "ee92863819c1ed1ff464d5064f2c67e91dbe1a5fe5eb12c8fb623dce08df77dd"
+    },
+    {
+      "path": "tests/acceptance/wizards/transform/calculator/input_variables_and_fields.ts",
+      "sha256": "54af54b7272d7dc3e92894090d2299ea7618be3379f58b728ebaf69738644058"
+    },
+    {
+      "path": "tests/acceptance/wizards/transform/uniondata/autolink.ts",
+      "sha256": "947894e737c6a265c6fd833a94cd6f1911171a4c30e41a016e013a3bba5094c8"
+    },
+    {
+      "path": "tests/acceptance/wizards/control/supernode/supernode_saving_settings.ts",
+      "sha256": "61c0d16543d49cc08ef9d6c662fa4434d3365a0b3a2201c225c2f87eaa4d1d6e"
+    },
+    {
+      "path": "tests/acceptance/connections/connection_buttons_state.ts",
+      "sha256": "fc51e838e030bae03190a26a3ee122b318464b691780eab1d685c37ac5f572e3"
+    },
+    {
+      "path": "tests/helpers/workflow/components/supernode_tests.ts",
+      "sha256": "9039ea67af786305c1689162ac9cc30173a78b201bae222db933e8d683f329cd"
+    },
+    {
+      "path": "tests/helpers/wizards/variables/package_variables_helpers_tests.ts",
+      "sha256": "84b04a57503db63a2df884940fbdcb52f41de9baae2e8cc421a03bfc47534cd1"
+    },
+    {
+      "path": "tests/toreview/helpers/wizards/textimport.ts",
+      "sha256": "1cf5624533ca7c16f4ec1cecb3244e2de83a3bf8f07e3d16ae6cdee12acf0c60"
+    },
+    {
+      "path": "tests/toreview/helpers/wizards/variables/variables_helpers.ts",
+      "sha256": "d62bdf7230f7bd63ec13e45ce3f078289791b552fe9f1a9360015a7469380007"
+    }
+  ]
+}

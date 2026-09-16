@@ -1,0 +1,463 @@
+{
+  "url": "http://logi-test-plan.bg.local/app/?testable=true",
+  "title": "Сценарий · NodeRoadmap_20260912_d06b5179/Модуль1 · Loginom",
+  "viewport": null,
+  "geometry": {
+    "outerWidth": 1508,
+    "outerHeight": 949,
+    "innerWidth": 1508,
+    "innerHeight": 862
+  },
+  "palette": [
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Быстрый_доступ;TreeText",
+      "label": "Быстрый доступ"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Импорт;TreeText",
+      "label": "Импорт"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Импорт>База_данных;TreeText",
+      "label": "База данных"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Импорт>Текстовый_файл;TreeText",
+      "label": "Текстовый файл"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Импорт>Deductor_Warehouse;TreeText",
+      "label": "Deductor Warehouse"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Импорт>Excel_файл;TreeText",
+      "label": "Excel файл"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Импорт>Kafka;TreeText",
+      "label": "Kafka"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Импорт>Loginom_Data_файл;TreeText",
+      "label": "Loginom Data файл"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Импорт>XML_файл;TreeText",
+      "label": "XML файл"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация;TreeText",
+      "label": "Трансформация"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Группировка;TreeText",
+      "label": "Группировка"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Дата_и_время;TreeText",
+      "label": "Дата и время"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Дополнение_данных;TreeText",
+      "label": "Дополнение данных"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Замена;TreeText",
+      "label": "Замена"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Калькулятор;TreeText",
+      "label": "Калькулятор"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Кросс-таблица;TreeText",
+      "label": "Кросс-таблица"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Объединение;TreeText",
+      "label": "Объединение"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Параметры_полей;TreeText",
+      "label": "Параметры полей"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Разгруппировка;TreeText",
+      "label": "Разгруппировка"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Свертка_столбцов;TreeText",
+      "label": "Свертка столбцов"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Скользящее_окно;TreeText",
+      "label": "Скользящее окно"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Слияние;TreeText",
+      "label": "Слияние"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Соединение;TreeText",
+      "label": "Соединение"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Сортировка;TreeText",
+      "label": "Сортировка"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Трансформация>Фильтр_строк;TreeText",
+      "label": "Фильтр строк"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Управление;TreeText",
+      "label": "Управление"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Управление>Выполнение_узла;TreeText",
+      "label": "Выполнение узла"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Управление>Подмодель;TreeText",
+      "label": "Подмодель"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Управление>Узел-ссылка;TreeText",
+      "label": "Узел-ссылка"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Управление>Условие;TreeText",
+      "label": "Условие"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Управление>Цикл;TreeText",
+      "label": "Цикл"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Исследование;TreeText",
+      "label": "Исследование"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Исследование>Автокорреляция;TreeText",
+      "label": "Автокорреляция"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Исследование>Дубликаты_и_противоречия;TreeText",
+      "label": "Дубликаты и противоречия"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Исследование>Качество_данных;TreeText",
+      "label": "Качество данных"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Исследование>Корреляционный_анализ;TreeText",
+      "label": "Корреляционный анализ"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Исследование>Факторный_анализ;TreeText",
+      "label": "Факторный анализ"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Предобработка;TreeText",
+      "label": "Предобработка"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Предобработка>Заполнение_пропусков;TreeText",
+      "label": "Заполнение пропусков"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Предобработка>Квантование;TreeText",
+      "label": "Квантование"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Предобработка>Конечные_классы;TreeText",
+      "label": "Конечные классы"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Предобработка>Разбиение_на_множества;TreeText",
+      "label": "Разбиение на множества"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Предобработка>Редактирование_выбросов;TreeText",
+      "label": "Редактирование выбросов"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Предобработка>Сглаживание;TreeText",
+      "label": "Сглаживание"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Предобработка>Сэмплинг;TreeText",
+      "label": "Сэмплинг"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Data_Mining;TreeText",
+      "label": "Data Mining"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Data_Mining>Ассоциативные_правила;TreeText",
+      "label": "Ассоциативные правила"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Data_Mining>Кластеризация;TreeText",
+      "label": "Кластеризация"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Data_Mining>Кластеризация_транзакций;TreeText",
+      "label": "Кластеризация транзакций"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Data_Mining>Линейная_регрессия;TreeText",
+      "label": "Линейная регрессия"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Data_Mining>Логистическая_регрессия;TreeText",
+      "label": "Логистическая регрессия"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Data_Mining>Нейросеть_(классификация);TreeText",
+      "label": "Нейросеть (классификация)"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Data_Mining>Нейросеть_(регрессия);TreeText",
+      "label": "Нейросеть (регрессия)"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Data_Mining>Самоорганизующаяся_сеть;TreeText",
+      "label": "Самоорганизующаяся сеть"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Data_Mining>ARIMAX;TreeText",
+      "label": "ARIMAX"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Data_Mining>EM_Кластеризация;TreeText",
+      "label": "EM Кластеризация"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Программирование;TreeText",
+      "label": "Программирование"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Программирование>JavaScript;TreeText",
+      "label": "JavaScript"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Программирование>Python;TreeText",
+      "label": "Python"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Переменные;TreeText",
+      "label": "Переменные"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Переменные>Замена_(переменные);TreeText",
+      "label": "Замена (переменные)"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Переменные>Калькулятор_(переменные);TreeText",
+      "label": "Калькулятор (переменные)"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Переменные>Переменные_в_таблицу;TreeText",
+      "label": "Переменные в таблицу"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Переменные>Соединение_(переменные);TreeText",
+      "label": "Соединение (переменные)"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Переменные>Таблица_в_переменные;TreeText",
+      "label": "Таблица в переменные"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Дерево_данных;TreeText",
+      "label": "Дерево данных"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Дерево_данных>Дерево_в_таблицу;TreeText",
+      "label": "Дерево в таблицу"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Дерево_данных>Дерево_в_JSON;TreeText",
+      "label": "Дерево в JSON"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Дерево_данных>Калькулятор_(дерево);TreeText",
+      "label": "Калькулятор (дерево)"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Дерево_данных>Объединение_(дерево);TreeText",
+      "label": "Объединение (дерево)"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Дерево_данных>Слияние_(дерево);TreeText",
+      "label": "Слияние (дерево)"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Дерево_данных>Таблица_в_дерево;TreeText",
+      "label": "Таблица в дерево"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Дерево_данных>JSON_в_дерево;TreeText",
+      "label": "JSON в дерево"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Интеграция;TreeText",
+      "label": "Интеграция"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Интеграция>Разбор_XML;TreeText",
+      "label": "Разбор XML"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Интеграция>Формирование_XML;TreeText",
+      "label": "Формирование XML"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Интеграция>REST-запрос;TreeText",
+      "label": "REST-запрос"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Интеграция>SOAP-запрос;TreeText",
+      "label": "SOAP-запрос"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Интеграция>SQL-скрипт;TreeText",
+      "label": "SQL-скрипт"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Экспорт;TreeText",
+      "label": "Экспорт"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Экспорт>База_данных;TreeText",
+      "label": "База данных"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Экспорт>Текстовый_файл;TreeText",
+      "label": "Текстовый файл"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Экспорт>Deductor_Warehouse;TreeText",
+      "label": "Deductor Warehouse"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Экспорт>Excel_файл;TreeText",
+      "label": "Excel файл"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Экспорт>Kafka;TreeText",
+      "label": "Kafka"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Экспорт>Loginom_Data_файл;TreeText",
+      "label": "Loginom Data файл"
+    },
+    {
+      "tid": "MF;TF-2;ModelForm;colVendors_Компоненты>Экспорт>XML_файл;TreeText",
+      "label": "XML файл"
+    }
+  ],
+  "checked_at": "2026-09-12",
+  "loginom_version": "7.4.2",
+  "account": "orcestrator",
+  "storage_root": "/orcestrator",
+  "package": "/orcestrator/NodeRoadmap-20260912-d06b5179.lgp",
+  "session_id": "d06b5179-2f58-4209-a938-222e8e295ef6",
+  "proof_scope": "palette_and_selected_wizards_only",
+  "component_count": 75,
+  "group_count": 12,
+  "inventory_component_count": 78,
+  "not_observed_component_ids": [
+    "component.exports.Tableau",
+    "component.imports.OneCRequest",
+    "component.integration.ExecCmd"
+  ],
+  "runtime": {
+    "client_release": "0.1.0-dev.20260910.3-80ca61417ec7",
+    "source_base_commit": "b22b73b23afd501440b4d31fd97c7dedc8e93b2b",
+    "note": "Установленный клиент отличается от main и рабочих веток. Использован для исследования UI, не для приёмки новых handlers."
+  },
+  "observations": [
+    {
+      "component_id": "component.research.Quality",
+      "added": true,
+      "table_inputs": 1,
+      "table_outputs": 5,
+      "wizard": "DerivedDataSourceMappingEngineOutputPortWizard",
+      "visible_properties": [
+        "Признак упорядоченной выборки",
+        "Максимально допустимый процент пропусков"
+      ],
+      "help_identity": "unresolved"
+    },
+    {
+      "component_id": "component.imports.Excel",
+      "added": true,
+      "wizard": "ImportExcelFilePreviewWizard",
+      "visible_controls": [
+        "Имя файла / URL",
+        "Выбор объекта",
+        "Имя объекта",
+        "Весь лист",
+        "Диапазон",
+        "Пустые строки",
+        "Количество строк заголовка"
+      ],
+      "file_picker_filter": "Книги Excel 2007 (*.xlsx)",
+      "executed": false
+    },
+    {
+      "component_id": "component.exports.Excel",
+      "added": true,
+      "wizard": "ExportExcelFilePreviewWizard",
+      "visible_controls": [
+        "Имя файла",
+        "Имя листа",
+        "Тип файла Excel",
+        "Строка заголовков",
+        "Формат вещественных значений"
+      ],
+      "observed_file_type": "Excel 2007",
+      "executed": false
+    },
+    {
+      "component_id": "component.preprocessing.Sampling",
+      "added": true,
+      "wizard": "SamplingComponentWizard",
+      "observed_methods": [
+        "Случайный",
+        "Равномерный случайный",
+        "Стратифицированный",
+        "Последовательный",
+        "Отбор со смещением"
+      ],
+      "random_seed_control_observed": true,
+      "seed_reproducibility_tested": false,
+      "executed": false
+    },
+    {
+      "component_id": "component.exports.Text",
+      "added": true,
+      "table_inputs": 1,
+      "connection_inputs": 1,
+      "variable_inputs": 1,
+      "configuration_tested": false
+    },
+    {
+      "component_id": "component.transform.ColumnFlipping",
+      "added": true,
+      "table_inputs": 1,
+      "table_outputs": 1,
+      "configuration_tested": false
+    }
+  ],
+  "limitations": [
+    "Наличие в палитре не подтверждает лицензирование и выполнение каждого режима.",
+    "XLSX включён по явному уточнению пользователя и наблюдаемым мастерам; чтение/запись реального XLSX этой инвентаризацией не принимались.",
+    "При исследовании возник разрыв связи; собственная сессия восстановлена кнопкой UI. Причина разрыва не установлена.",
+    "Собственный исследовательский пакет создан; после добавления узлов нажато Сохранить, независимое переоткрытие не выполнялось.",
+    "Кросс-таблица наблюдалась в палитре; добавление в исследовательский граф не подтверждено.",
+    "Все узлы исследования оставлены ненастроенными; приёмка существующих четырёх веток отдельно."
+  ]
+}

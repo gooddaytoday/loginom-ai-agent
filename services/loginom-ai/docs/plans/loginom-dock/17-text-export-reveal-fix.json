@@ -1,0 +1,203 @@
+{
+  "status": "ready-for-Hermes-retry",
+  "base_commit": "415694fa",
+  "full_goal_passed": false,
+  "previous_run": "20260913-204004-6fd42af3",
+  "previous_audit": {
+    "passed": false,
+    "scope": "node17_full_goal",
+    "checks": {
+      "projection": {
+        "passed": false,
+        "failures": [
+          "user_public_pairing"
+        ]
+      },
+      "incomplete_or_invalid": {
+        "passed": false,
+        "reason": ""
+      }
+    }
+  },
+  "previous_cleanup": {
+    "returncode": -15,
+    "timed_out": false,
+    "remaining_pids": [],
+    "closed": true,
+    "slot": "node17-hermes-20260913-ad77871c",
+    "operator_stop_requested": true
+  },
+  "previous_runtime_and_harness_unchanged": true,
+  "failure": {
+    "step": 15,
+    "kind": "root",
+    "root_cause_confirmed": true,
+    "cause": "Exact CSV row found with correct size, outside viewport; observer rejected before any download or replacement",
+    "file": {
+      "tid": "MF;TF-3;FileStorageForm;colName_Dock-export-20260913-204004-6fd42af3-csv.csv",
+      "label": "Dock-export-20260913-204004-6fd42af3-csv.csv",
+      "storage_entry": {
+        "row_ref": "ui-1789321239300-z4oj6ym16pm-13382",
+        "selected": false,
+        "kind": "unknown",
+        "bytes": 124
+      },
+      "interaction": {
+        "state": "outside_viewport",
+        "point": null
+      },
+      "scroll": {
+        "ref": "ui-1789321239300-z4oj6ym16pm-13286",
+        "top": 0,
+        "max_top": 2075
+      },
+      "bounding_box": {
+        "x": 379,
+        "y": 1113,
+        "width": 628,
+        "height": 23
+      }
+    },
+    "masks": 0,
+    "dialogs": 0,
+    "downloads": 0,
+    "actual_replace_dispatches": 0,
+    "distinct_from_full4_unknown_return": true
+  },
+  "fix": "Explicit reveal declaration binds exact observed file and scroll owner, initial top and extent, limit1000. Reuse existing one-scroll native download helper; independently require reveal/visibility/owner/gesture proof. No arbitrary or implicit scroll, no repeated download. Product unchanged.",
+  "runtime": "2897649a8d2120d25e4c80af8af2c6cdd834023b5bda1a1bd5baf073c6e9ba32",
+  "product_runtime_changed": false,
+  "manifest_sha256": "7b021d743bfdb65e45567b12ac3882e30b18d8b987613a2fd713b617e03d57a1",
+  "goal_sha256": "5db16d49554a80afceedcbad2f9a836378377650bcec1d27c4768638a29b46b6",
+  "full_goal": {
+    "nodeops": 22,
+    "deliveries": 3,
+    "all_save_reopen_required": true
+  },
+  "tests": {
+    "node_passed": 32,
+    "python_passed": 23,
+    "native_component_passed": true,
+    "negative_evidence_mutations_rejected": 50
+  },
+  "live": {
+    "run_directory": ".dock/node17/user-v1-component/20260913-205523-3f16316a",
+    "report": "docs/plans/loginom-dock/17-text-export-reveal-component-success.json",
+    "report_sha256": "17efde63ab50a4fef91204c659732156adb27658258bd2703f4aacf11dcc6929",
+    "initial_interaction": {
+      "state": "outside_viewport",
+      "point": null
+    },
+    "explicit_reveal": {
+      "file_ref": "ui-1789322168991-hlndc0o6fdo-2054",
+      "owner_ref": "ui-1789322168991-hlndc0o6fdo-1951",
+      "from": 0,
+      "max_top": 2123,
+      "limit": 1000
+    },
+    "native_reveal_trace": [
+      {
+        "event": "download_file_revealed",
+        "applied": true,
+        "file_ref": "ui-1789322168991-hlndc0o6fdo-2054",
+        "owner_ref": "ui-1789322168991-hlndc0o6fdo-1951",
+        "from": 0,
+        "to": 491,
+        "max_top": 2123,
+        "delta": 491,
+        "document": "1789322168991-hlndc0o6fdo"
+      },
+      {
+        "event": "download_reveal_confirmed",
+        "file_ref": "ui-1789322168991-hlndc0o6fdo-2054",
+        "owner_ref": "ui-1789322168991-hlndc0o6fdo-1951",
+        "max_top_before": 2123,
+        "max_top_after": 2123,
+        "document": "1789322168991-hlndc0o6fdo",
+        "interaction": "point_observed",
+        "file_tid": "MF;TF-2;FileStorageForm;colName_Dock-export-20260913-205523-3f16316a-csv.csv",
+        "origin": "http://logi-test-plan.bg.local",
+        "loginom_build": "7.4.2",
+        "workflow_ref": {
+          "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-2",
+          "prefix": "MF;TF-2"
+        },
+        "active_tab_ref": "ui-1789322168991-hlndc0o6fdo-109",
+        "package_identity": null,
+        "directory": "/test-2"
+      },
+      {
+        "event": "download_gesture_result",
+        "status": "SUCCEEDED",
+        "effect_possible": true,
+        "cleanup_complete": true,
+        "error_code": null
+      }
+    ],
+    "observer_elapsed_ms": 2353.376250000001,
+    "downloads": 1,
+    "actual_dispatches": 1,
+    "replace_prepared": 1,
+    "bytes": 124,
+    "closed": true,
+    "global_config_unchanged": true
+  },
+  "previous_evidence_sha256": {
+    "request.json": "88295a68e42781f64b59dc0424cea78767cb7722c9479062340f1ce11a49642a",
+    "evidence.json": "b0e9cbbaa421bb64351bbaa57793ea418a00835f7aa981802506ba0c56bf55f1",
+    "attempt.json": "e3ef714b1807bc7262c6304119bb93e8e805418bb46be6b3204eb56f7d7440d0",
+    "full-audit.json": "8ef88fa6a0fa9d13e3af37bc96b61dc9dd7c2621d705ffea69bb9e96238bc2c1",
+    "process-close-check.json": "42ba3def0d7c3e9af409f22044081ffb8c0d454938017bfe0fc521af7444df12",
+    "operator-stop.json": "d8ed199701ef765323f93d6c80b468fe753b5b4fdcf27e3ddd55eb306fd6c3ca",
+    "observer/observer.jsonl": "1ed9aadbd9d787df23b2f83d5683066ffd58be787e0de38d11b19db21f60e29d",
+    "observer/observer-actions.jsonl": "b06d9471811c43c95a01f49ae19b9915f12c87a6294fb950a88a87b6fa97953e",
+    "observer/observer-responses.jsonl": "2254b3c241328ceb05e01c7bf366459959aedaeb99b5d99a35c83dba42e59e7e"
+  },
+  "launch": {
+    "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export",
+    "argv": [
+      "python3",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/tools/loginom-acceptance/run.py",
+      "--run",
+      "--goal",
+      "text-export-node-complete",
+      "--model-profile",
+      "chatgpt-sol",
+      "--runs-root",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs",
+      "--node",
+      "/Users/kartamyshev/.loginom-dock/releases/0.1.0-dev.20260910.3-80ca61417ec7/runtime/node",
+      "--hermes-home",
+      "/Users/kartamyshev/.hermes",
+      "--hermes",
+      "/Users/kartamyshev/.local/bin/hermes",
+      "--hermes-python",
+      "/Users/kartamyshev/.hermes/hermes-agent/venv/bin/python",
+      "--hermes-source",
+      "/Users/kartamyshev/.hermes/hermes-agent",
+      "--dock-config",
+      "/Users/kartamyshev/.loginom-dock/config.json",
+      "--browsers",
+      "/Users/kartamyshev/.loginom-dock/runtime/browsers",
+      "--loginom-user",
+      "test-2",
+      "--loginom-url",
+      "http://logi-test-plan.bg.local/app/?testable=true",
+      "--storage-directory",
+      "/test-2",
+      "--manifest-uri",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node11.2-candidate/manifest.json",
+      "--manifest-sha256",
+      "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "--timeout",
+      "3600",
+      "--max-turns",
+      "100"
+    ],
+    "requires_coordinator_slot": true,
+    "model_started": false
+  },
+  "requires_new_coordinator_slot": true,
+  "retry_model_started": false,
+  "preflight_sha256": "ebb198056846788c0a23bdaa531c50aea595bab15ebcd631aea4ad7b63105b4d"
+}

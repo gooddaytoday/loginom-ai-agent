@@ -1,0 +1,83 @@
+{
+  "scope": "current_remote_skill_and_frontend_entry_assets",
+  "model_started": false,
+  "browser_started": false,
+  "skill": {
+    "revision": "afa295bf48dc48da5d3c995665a06ef2190ff620bae3243d46557e0371536790",
+    "content_sha256": "95caedf3a803ce71f10dbbcd4ed39c9580bb412fd874a99b051145d2b953c14c",
+    "files": [
+      {
+        "path": "references",
+        "sha256": null,
+        "size": null,
+        "is_dir": true
+      },
+      {
+        "path": ".abstract.md",
+        "sha256": "7a15ce5e28bd946ceaa465510a6174304167c8484a121000fe4060b22e5e1138",
+        "size": 578,
+        "is_dir": false
+      },
+      {
+        "path": ".overview.md",
+        "sha256": "2bfd447ced38020954ec1b743b18da89c5387d2d77186b972798aea8f94283cf",
+        "size": 3387,
+        "is_dir": false
+      },
+      {
+        "path": "SKILL.md",
+        "sha256": "95caedf3a803ce71f10dbbcd4ed39c9580bb412fd874a99b051145d2b953c14c",
+        "size": 8173,
+        "is_dir": false
+      },
+      {
+        "path": "references/browser.md",
+        "sha256": "e7d22269d1cd0c405a351a1ac5364e54c8e463566b73c28c64ec571e4f9f7c79",
+        "size": 6953,
+        "is_dir": false
+      },
+      {
+        "path": "references/canvas.md",
+        "sha256": "3038df86030641f5b04b2552ae9e62c6f4490f64de7633e0739e6f8091299c9c",
+        "size": 5999,
+        "is_dir": false
+      },
+      {
+        "path": "references/sources.md",
+        "sha256": "aaeb63c94a7c5a38cfd8880a37f45defe0c23395100b85cc9c93b056c0be905f",
+        "size": 3514,
+        "is_dir": false
+      },
+      {
+        "path": "references/workflow.md",
+        "sha256": "a43862d340aae90097fbf16d88a47aa2c9f73a5150359774e1134830490affe3",
+        "size": 6520,
+        "is_dir": false
+      }
+    ]
+  },
+  "frontend": {
+    "url": "http://logi-test-plan.bg.local/app/",
+    "files": {
+      "http://logi-test-plan.bg.local/app/": "404535b2db30fe9788bdfc329ae332bf5f52e25d2d15b753ab3ddc86358173a7",
+      "http://logi-test-plan.bg.local/app/app.ico": "cedf2bed9a3679274aea422dba773786a1ad2d5a9430107bc554a407347c158d",
+      "http://logi-test-plan.bg.local/app/ext/build/ext-all-debug.js": "5b8f534947c4396d72aa6f264721ab8e5bf190b3284969baf8aad9785798e2c5",
+      "http://logi-test-plan.bg.local/app/packages/deductor-theme/build/resources/deductor-theme-all-debug.css": "755c38d8e231a5f77173eb065a95ab19cb651f5037669c259cbcffeff5fb1dd2",
+      "http://logi-test-plan.bg.local/app/packages/deductor-theme/build/deductor-theme-debug.js": "fffee7250edeb7f6847d49698b466f154606dc41e99bd3c2fafbc9585039eb99",
+      "http://logi-test-plan.bg.local/app/ext/packages/ext-locale/build/ext-locale-ru.js": "4599aff68d6fc564d934a6ed54bc109bbb96d013590da83b073adbcccbfdbc2a",
+      "http://logi-test-plan.bg.local/app/ext/overrides/ext-locale-ru-patch.js": "6d064fd2f3f3871ae4c3e7337e5f9470040ce014dacbf652a13738fb1d642518",
+      "http://logi-test-plan.bg.local/app/bg/ext/LocaleLoader.js": "e9fcd28b374de4a00996d61ea8e799c8aa6ef636300196a0c6cc3ecaeeb79e1d",
+      "http://logi-test-plan.bg.local/app/ext/overrides/ext-patch.js": "048c247b63f9e458974a3a2c97cbeb2dbb31d97d123132cf5924dd20c585c118",
+      "http://logi-test-plan.bg.local/app/ext/overrides/ext-patch-debug.js": "6814875c57198468bca2d2acef1916166aa1b765dede3922cb7af0ae1e791bbb",
+      "http://logi-test-plan.bg.local/app/ext/DateTimeField.js": "f5c34fa6fddab1d933a9149c64b483ee44aae1da504105cbacb232212d91aaac",
+      "http://logi-test-plan.bg.local/app/ext/ext-override.js": "33859873011f117ded82756c58e90e17ecd063d2691f865927c7384d17430a70",
+      "http://logi-test-plan.bg.local/app/ext/packages/ext-ux/build/ext-ux-debug.js": "3a746d2b1f9d8774f1c52f07b1aac31df82456eae4b60c1f456521173b8bb39a",
+      "http://logi-test-plan.bg.local/app/ext/packages/ext-ux/build/classic/resources/ext-ux-all.css": "b3c2b4d65f698026881b40f672b043a136ca186a1d493b7bc05f2c8760cc41a2",
+      "http://logi-test-plan.bg.local/app/ext/packages/sencha-draw/build/sencha-draw.js": "d6c03f2ce812b88c1ab2d8a75a9afcf7f60165939309ed00149acf7ba10a8342",
+      "http://logi-test-plan.bg.local/app/bg/lib/Loader.js": "543fc4c07ef270ab55f1055fcaf97f8f471d308a0877a3b3aef029ac0fa61f3b",
+      "http://logi-test-plan.bg.local/app/bg/css/StylesheetLoader.js": "f60e664198f0b1c159464689f99c42b18bc22315df9ae24a72184a348916aea6",
+      "http://logi-test-plan.bg.local/app/bg/app/Uses.js": "2b8598cddfd5f224b9e75806c9ba475cf1ff2ed6c37b599feb5b035be9a3dfb8"
+    },
+    "coverage": "HTML and statically linked entry assets; dynamically loaded modules require live prepared build verification"
+  }
+}

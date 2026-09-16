@@ -1,0 +1,33 @@
+# Apply after the root Compose file, from the repository root.
+services:
+  openviking:
+    volumes:
+      - /opt/loginom-dock/config/ov.conf:/app/.openviking/ov.conf:ro
+    depends_on:
+      ollama:
+        condition: service_started
+
+  ollama:
+    image: ollama/ollama@sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
+    profiles: [server]
+    environment:
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  caddy:
+    image: ${LOGINOM_DOCK_CADDY_IMAGE:?Set a verified Caddy image digest}
+    profiles: [server]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/loginom-dock/Caddyfile.server:/etc/caddy/Caddyfile:ro
+    environment:
+      LOGINOM_DOCK_DOMAIN: ${LOGINOM_DOCK_DOMAIN:?Set the Dock public domain}
+
+volumes:
+  ollama_data:

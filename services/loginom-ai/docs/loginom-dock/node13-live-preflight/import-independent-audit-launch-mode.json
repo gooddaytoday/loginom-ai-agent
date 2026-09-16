@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "checks": {
+    "ports": {
+      "passed": true
+    },
+    "full": {
+      "passed": true
+    },
+    "raw": {
+      "passed": true,
+      "failures": [],
+      "execution_id": "1789299484905-h2u7fhwofo:249:1",
+      "scope": "fresh_calculator_table_against_independent_expected",
+      "source_identity_verified": false,
+      "package_persistence_verified": false
+    },
+    "configuration": {
+      "passed": true,
+      "failures": [],
+      "scope": "public_readback_raw_observations",
+      "package_persistence_verified": false
+    }
+  }
+}

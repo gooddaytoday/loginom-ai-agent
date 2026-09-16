@@ -1,0 +1,51 @@
+{
+  "checked_at": "2026-09-13T02:28:52.278101+00:00",
+  "catalog_version": "2026.09.13-node12.1-candidate",
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node12.1-candidate/manifest.json",
+  "manifest_sha256": "1a5a46312501d20ec7e23a2db12ed95bf34d784ead45628b12cdcf1492a276ce",
+  "staged": true,
+  "activated": false,
+  "readback_files": {
+    "actions.json": "d87a8099d80ec3b0472663f9c26d015e1dfe8c76f8c7b90524e049495692d9ae",
+    "selectors.json": "f15e9d89af9eed201b182792edb5cd38369268b3e43e965a11a81cfe2ed717a1",
+    "source-index.json": "ec07073a4b8ed69d0226ce5aca7d7f34c1ae0cf968bc16ef992002c13289f738",
+    "manifest.json": "1a5a46312501d20ec7e23a2db12ed95bf34d784ead45628b12cdcf1492a276ce"
+  },
+  "allowed_roots": {
+    "package.save_as": [
+      "/test-1/packages"
+    ],
+    "package.save_checkpoint": [
+      "/test-1/packages"
+    ]
+  },
+  "compatibility": {
+    "profile_id": "loginom-7.4.2-macos-chromium-ru",
+    "loginom_build": "7.4.2",
+    "platform": "macos",
+    "browser": "chromium"
+  },
+  "e2e_commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+  "stale_actions": [],
+  "server_evidence_path": "/opt/loginom-dock/releases/20260913-node12.1-candidate",
+  "current_server": "/opt/loginom-dock/releases/20260904-landing-7b711846",
+  "current_catalog_sha256": null,
+  "version": "2026.09.13-node12.1-candidate",
+  "source_commit": "7bf88255562c59cd32397be3f68c4ec85cb55b38",
+  "source_archive_sha256": "b42eaa33f903b68d88e8cbe05416fd1bd430aae181cc4d3994da199bbff8be56",
+  "source_members_verified_against_git": 624,
+  "packet_sha256": "c6c3f1d60f23b8c80f2a4e75a9fac6c5530368b2adfeb7aef1845544f5db9b97",
+  "coordinator_adjustment": "build-stage-vps.sh: --validate-only requires explicit --stage even for validation; runtime source unchanged",
+  "existing_server_and_current_preserved": true,
+  "autonomous_acceptance_passed": false,
+  "hermes_launched": false,
+  "shared_client_updated": false,
+  "candidate_preflight": {
+    "developer_reported_result": "PASSED",
+    "report_hash_and_model_manifest_fields_verified": true,
+    "report_sha256": "0003c315158004ac41a9f3d0b61e49bc541e462e050ee56e626877b64f1358b5",
+    "model_started": false,
+    "documents_commit": "8475e8adc78a8812054af250627dcb8fc4d7c93f",
+    "hermes_slot_granted": false
+  }
+}

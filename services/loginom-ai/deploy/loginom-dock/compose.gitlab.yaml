@@ -1,0 +1,50 @@
+# Apply after docker-compose.yml and compose.server.yaml.
+services:
+  openviking:
+    networks: [default, gitlab]
+    environment:
+      SSL_CERT_FILE: /etc/loginom-dock/ca-bundle.crt
+      REQUESTS_CA_BUNDLE: /etc/loginom-dock/ca-bundle.crt
+      GIT_SSL_CAINFO: /etc/loginom-dock/ca-bundle.crt
+      GIT_CONFIG_SYSTEM: /etc/loginom-dock/gitconfig
+      OPENVIKING_CLI_CONFIG_FILE: /etc/loginom-dock/ovcli.conf
+      OPENVIKING_ASSETS_CREDENTIALS_FILE: /etc/loginom-dock/assets-credentials.json
+    volumes:
+      - /opt/loginom-dock/config/ca-bundle.crt:/etc/loginom-dock/ca-bundle.crt:ro
+      - /opt/loginom-dock/config/gitconfig:/etc/loginom-dock/gitconfig:ro
+      - /opt/loginom-dock/config/ovcli.conf:/etc/loginom-dock/ovcli.conf:ro
+      - /opt/loginom-dock/config/ovcli.settings.conf:/app/.openviking/ovcli.settings.conf:ro
+      - /opt/loginom-dock/config/assets-credentials.json:/etc/loginom-dock/assets-credentials.json:ro
+      - /opt/loginom-dock/assets:/opt/loginom-dock/assets
+
+  gitlab-gateway:
+    image: ${LOGINOM_DOCK_CADDY_IMAGE:?Set a verified Caddy image digest}
+    networks:
+      gitlab:
+        aliases: [git.basegroup.ru]
+    volumes:
+      - /opt/loginom-dock/config/Caddyfile.gitlab:/etc/caddy/Caddyfile:ro
+      - /opt/loginom-dock/tunnel:/run/dock-tunnel:ro
+      - gitlab_tls:/data
+    restart: unless-stopped
+
+  gitlab-lfs-proxy:
+    image: ${LOGINOM_DOCK_IMAGE:?Set the verified Dock image}
+    entrypoint: [python, -I, /opt/loginom-dock/gitlab-lfs-proxy.py]
+    networks: [gitlab]
+    volumes:
+      - /opt/loginom-dock/deploy-stage2/gitlab-lfs-proxy.py:/opt/loginom-dock/gitlab-lfs-proxy.py:ro
+      - /opt/loginom-dock/tunnel:/run/dock-tunnel:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+
+networks:
+  gitlab:
+    internal: true
+
+volumes:
+  gitlab_tls:

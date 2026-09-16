@@ -1,0 +1,29 @@
+{
+  "status": "accepted_in_branch",
+  "accepted_at": "2026-09-13T09:55:08.599513+00:00",
+  "source_run_id": "20260913-122247-a862a34d",
+  "source_sha": "b05715340937f9c828e03bc6ec7a88f3adf086da",
+  "branch_head": "dc0eadde4ede29cb9b548c53046a1be083ca8953",
+  "verifier_commit": "9ddb33edf973264e90222f16f75fb832c7dcb2ff",
+  "verifier_version": "replacement-persistence-draft-overwrite-v2",
+  "verifier_sha256": "5449a8f2cad5b53a0aa46cf5003182f3fdc747456581618e75854d88e9037f33",
+  "checks_passed": 59,
+  "checks_total": 59,
+  "original_frozen_audit": "FAIL57/59 preserved",
+  "original_artifacts_verified": 11,
+  "original_harness_files": 252,
+  "full_harness_inventory_files": 253,
+  "source_files_verified": 392,
+  "focused_tests": 17,
+  "family_tests": 36,
+  "tests_repeated_by_coordinator": false,
+  "scope": "Original declared Replacement full goal, including typed multi/partial-add, settings and fresh results after native checkpoint/overwrite/close/reopen",
+  "limits": [
+    "Separate reassessment of unchanged frozen run; no new model or full review",
+    "Historical55/59 and A1-A3 not rehashed by final helper; earlier checks retained",
+    "Unmerged branch does not describe main or installed plugin"
+  ],
+  "merged": false,
+  "deployed": false,
+  "shared_plugin_updated": false
+}

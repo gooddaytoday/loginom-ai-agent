@@ -1,0 +1,339 @@
+{
+  "status": "ready-for-Hermes-retry",
+  "base_commit": "5226aab7",
+  "full_goal_passed": false,
+  "previous_run": "20260913-215018-6e242f0e",
+  "previous_audit": {
+    "passed": false,
+    "scope": "node17_full_goal",
+    "checks": {
+      "projection": {
+        "passed": false,
+        "failures": [
+          "user_node_error"
+        ]
+      },
+      "incomplete_or_invalid": {
+        "passed": false,
+        "reason": ""
+      }
+    }
+  },
+  "previous_cleanup": {
+    "returncode": 0,
+    "timed_out": false,
+    "remaining_pids": [],
+    "closed": true,
+    "slot": "node17-hermes-20260913-7b021d74"
+  },
+  "failure": {
+    "action": "package.save_as",
+    "status": "AMBIGUOUS",
+    "error": "Selector packages.close cardinality 0, expected one",
+    "historic_timing_proven": false,
+    "delayed_menu_fixture_reproduced_before_fix": true,
+    "related_node12_fix": "0e11a3fb24ca40a9f855008d2b0d1856d6f771ad"
+  },
+  "original_fresh_audit": {
+    "status": "incomplete_read_only",
+    "directory": ".dock/text-export/live-1789326618235",
+    "original_package": "/test-2/packages/Dock-acceptance-20260913-215018-6e242f0e.lgp",
+    "administration_hidden_for_test2": true,
+    "further_unlock_attempts_stopped_by_coordinator": true
+  },
+  "live_fix": {
+    "directory": ".dock/text-export/live-1789327048922",
+    "diagnostic_copy_only": true,
+    "path": "/test-2/node17-save-reopen-fixed-full6.lgp",
+    "save_close_reopen": true,
+    "graph_nodes": 8,
+    "graph_links": 5,
+    "evidence_sha256": {
+      "save-as-after-fix.json": "87e70278eb0499317db229d7d6104c6e5d28e4e20e23143cdc3b840a24f4deb6"
+    },
+    "process_cleanup": {
+      "session_id": "32b72d65-3084-41c0-8bc5-40f055e6b398",
+      "remaining_pids": [],
+      "closed": true
+    }
+  },
+  "tests": {
+    "executor_passed": 38,
+    "readiness_passed": 4,
+    "delayed_cases": [
+      "save-menu",
+      "close-command"
+    ],
+    "client_passed": 66,
+    "virtual_storage_passed": 9,
+    "python_passed": 24,
+    "node_total_passed": 80,
+    "search_policy_negative_mutations": 16,
+    "native_component_passed": true
+  },
+  "runtime": "cd471237bdf5bc67bc668a02b3c5d1ad118b3e9fcfc74a235f10449ac5c1e01f",
+  "manifest_sha256": "ac814f07b0e670c25a8afdba89aadfe1a934f2bd94cef58188a818c54eaf5728",
+  "launch": {
+    "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export",
+    "argv": [
+      "python3",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/tools/loginom-acceptance/run.py",
+      "--run",
+      "--goal",
+      "text-export-node-complete",
+      "--model-profile",
+      "chatgpt-sol",
+      "--runs-root",
+      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs",
+      "--node",
+      "/Users/kartamyshev/.loginom-dock/releases/0.1.0-dev.20260910.3-80ca61417ec7/runtime/node",
+      "--hermes-home",
+      "/Users/kartamyshev/.hermes",
+      "--hermes",
+      "/Users/kartamyshev/.local/bin/hermes",
+      "--hermes-python",
+      "/Users/kartamyshev/.hermes/hermes-agent/venv/bin/python",
+      "--hermes-source",
+      "/Users/kartamyshev/.hermes/hermes-agent",
+      "--dock-config",
+      "/Users/kartamyshev/.loginom-dock/config.json",
+      "--browsers",
+      "/Users/kartamyshev/.loginom-dock/runtime/browsers",
+      "--loginom-user",
+      "test-2",
+      "--loginom-url",
+      "http://logi-test-plan.bg.local/app/?testable=true",
+      "--storage-directory",
+      "/test-2",
+      "--manifest-uri",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node11.2-candidate/manifest.json",
+      "--manifest-sha256",
+      "bb2fe2207e01d594108efb591d1c25036adc12f67168ef895dfde755d391ac2a",
+      "--timeout",
+      "3600",
+      "--max-turns",
+      "100"
+    ],
+    "requires_coordinator_slot": true,
+    "model_started": false
+  },
+  "limits": [
+    "Original full6 FAIL retained unchanged",
+    "No model reopen proof in full6",
+    "No Hermes slot assigned",
+    "No repeat full review, merge, deploy or shared plugin update"
+  ],
+  "virtual_grid": {
+    "failed_run": ".dock/node17/user-v1-component/20260913-222625-513785bc",
+    "failure": {
+      "phase": "baseline_source_ready",
+      "error": "Baseline export failed",
+      "smoke_used": false
+    },
+    "failed_result": {
+      "result_version": "user-v1",
+      "operation_id": "smoke-original",
+      "attempt": 1,
+      "state": "settled",
+      "cancel_requested": false,
+      "server_stop_requested": false,
+      "status": "AMBIGUOUS",
+      "action_key": "node.apply",
+      "phase": "read",
+      "effect_possible": true,
+      "cleanup_complete": false,
+      "node": {
+        "document_id": "1789327596092-fbnsenayyla",
+        "workflow_id": "1789327596092-fbnsenayyla-1",
+        "node_id": "84690ff9-7729-4245-9274-27055fcdb1ed"
+      },
+      "execution": {
+        "status": "completed",
+        "execution_id": "1789327596092-fbnsenayyla:424:3"
+      },
+      "package_saved": false,
+      "output": {
+        "status": "not_refreshed",
+        "evidence_ref": null,
+        "ports": []
+      },
+      "error": {
+        "code": "NODE_APPLY_STOPPED",
+        "message": "Export storage did not settle"
+      },
+      "limitations": []
+    },
+    "process_cleanup": {
+      "session_id": "7c69389e-c770-4054-b227-638ee2587cd3",
+      "remaining_pids": [],
+      "closed": true
+    },
+    "diagnosis_directory": ".dock/text-export/live-1789327789787",
+    "native_store_count": 138,
+    "target_exists_bytes": 124,
+    "initial_exact_dom_observation_elements": 0,
+    "toolbar_search_available": false,
+    "fix": "Bounded native scrolling within the same observed folder; exact label verified after rendering; no export retry",
+    "limits": {
+      "gestures": 12,
+      "delta_max": 1000,
+      "checks": [
+        "folder/workflow",
+        "scroll owner",
+        "progress",
+        "end",
+        "deadline",
+        "cancel"
+      ]
+    },
+    "proof": {
+      "path": ".dock/text-export/live-1789327789787/virtual-search-proof.json",
+      "sha256": "378af8b635d6bfa9f3f999fb8e025734b92b53e1e12b4a853319b313b7414d41"
+    },
+    "diagnostic_helper_initial_attempt": "Stopped at folder end because roots intentionally omit row labels; corrected to verify label only in addressed detail observation; original evidence retained",
+    "native_runtime_diagnostic": "f49e81858f84820dbdb97917efc43beaa05321f154c35c0b737d67a270e9e247 plus separately imported current helper; integrated fresh runtime component is pending",
+    "integrated_retry_failure": {
+      "run": ".dock/node17/user-v1-component/20260913-223512-4afee206",
+      "failure": {
+        "phase": "baseline_source_ready",
+        "error": "Baseline export failed",
+        "smoke_used": false
+      },
+      "result": {
+        "result_version": "user-v1",
+        "operation_id": "smoke-original",
+        "attempt": 1,
+        "state": "settled",
+        "cancel_requested": false,
+        "server_stop_requested": false,
+        "status": "AMBIGUOUS",
+        "action_key": "node.apply",
+        "phase": "read",
+        "effect_possible": true,
+        "cleanup_complete": false,
+        "node": {
+          "document_id": "1789328122589-8sav8xk2j8n",
+          "workflow_id": "1789328122589-8sav8xk2j8n-1",
+          "node_id": "f64e873e-2d8f-4e81-ab3c-fed3b92db49e"
+        },
+        "execution": {
+          "status": "completed",
+          "execution_id": "1789328122589-8sav8xk2j8n:428:3"
+        },
+        "package_saved": false,
+        "output": {
+          "status": "not_refreshed",
+          "evidence_ref": null,
+          "ports": []
+        },
+        "error": {
+          "code": "NODE_APPLY_STOPPED",
+          "message": "Export storage gesture requires inspection"
+        },
+        "limitations": []
+      },
+      "cleanup": {
+        "session_id": "531ddef2-e837-4b9d-95bb-80e00ff02510",
+        "remaining_pids": [],
+        "closed": true
+      },
+      "diagnosis": "After safe UI_EPOCH_CHANGED, retry addressed the row as root; scroll 0->1000 succeeded but row detached and post-observation failed UI_ROOT_STALE",
+      "fix": "Preserve original observed table root during scroll refresh"
+    },
+    "observer_missing_row_failure": {
+      "run": ".dock/node17/user-v1-component/20260913-223756-bb4f0e85",
+      "product_export_status": "SUCCEEDED",
+      "reject_status": "FAILED",
+      "failure": {
+        "phase": "observer_interval_started",
+        "error": "MCP error -32603: OBSERVER_INCOMPLETE_REPLACE_NOT_DISPATCHED",
+        "smoke_used": true
+      },
+      "cleanup": {
+        "session_id": "17277a11-100d-4b2f-b399-b13ae1ab2483",
+        "remaining_pids": [],
+        "closed": true
+      },
+      "diagnosis": "Observer row step14 returned zero DOM rows before download or replace",
+      "fix": "Acceptance observer reuses bounded native row search; JS policy and independent Python audit validate declared folder/table/name, owner, motion, count and no post-download search"
+    },
+    "replace_read_failure": {
+      "run": ".dock/node17/user-v1-component/20260913-224418-246a09ef",
+      "original": "SUCCEEDED",
+      "replace_result": {
+        "result_version": "user-v1",
+        "operation_id": "smoke-replace",
+        "attempt": 1,
+        "state": "settled",
+        "cancel_requested": false,
+        "server_stop_requested": false,
+        "status": "AMBIGUOUS",
+        "action_key": "node.apply",
+        "phase": "read",
+        "effect_possible": true,
+        "cleanup_complete": false,
+        "node": {
+          "document_id": "1789328668029-emggdst0is",
+          "workflow_id": "1789328668029-emggdst0is-1",
+          "node_id": "9c577458-d7ac-42fd-8563-056a89713bdf"
+        },
+        "execution": {
+          "status": "completed",
+          "execution_id": "1789328668029-emggdst0is:436:4"
+        },
+        "package_saved": false,
+        "output": {
+          "status": "not_refreshed",
+          "evidence_ref": null,
+          "ports": []
+        },
+        "error": {
+          "code": "NODE_APPLY_STOPPED",
+          "message": "Export storage observation failed"
+        },
+        "limitations": []
+      },
+      "cleanup": {
+        "session_id": "98122399-5193-4ef0-b25a-6e961b8c75ac",
+        "remaining_pids": [],
+        "closed": true
+      },
+      "observer_download_and_dispatch_completed": true,
+      "root_cause": "Not yet known: original read wrapper omitted the observation error code",
+      "next_change": "Preserve native observation error code/message for diagnosis",
+      "followup": "Next current-runtime component PASS; earlier observation failure did not recur. Exact historical error code remains unknown; no claim of confirmed root cause."
+    }
+  },
+  "component": {
+    "run": "20260913-224754-cbf8ef54",
+    "directory": ".dock/node17/user-v1-component/20260913-224754-cbf8ef54",
+    "audit_path": "docs/plans/loginom-dock/17-text-export-save-virtual-component-success.json",
+    "audit_sha256": "f76440c403731d24b26beb9a7e590ee91e75a936d20bb0c578bbab1ca4f55469",
+    "passed": true,
+    "actual_downloads": 1,
+    "replace_dispatches": 1,
+    "successful_replacements": 1,
+    "bytes": 124,
+    "search_scrolls": [
+      {
+        "delta_y": 1000,
+        "status": "SUCCEEDED"
+      }
+    ],
+    "cleanup": {
+      "session_id": "52b4b574-262b-442f-91f6-303de5bb0702",
+      "remaining_pids": [],
+      "closed": true
+    },
+    "global_config_unchanged": true
+  },
+  "preflight": {
+    "path": ".dock/node17/save-virtual-preflight.json",
+    "sha256": "deb0a630f3c3fe72d522d2c4bd857b7042a3282d8a670c444a6896d141fee296",
+    "passed": true,
+    "model_started": false,
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "low"
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "scope": "model_free_partial_graph",
+  "hermes_acceptance": false,
+  "stages": {
+    "calendar-final": {
+      "passed": true,
+      "status": "SUCCEEDED",
+      "cleanup_complete": true,
+      "audit_path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/node13-full-calendar-final-component-audit.json",
+      "audit_sha256": "333468d71cfd5d300c710f04d32fc21d41e2d7c0d048f0da42fc4c210a936d0b",
+      "result_path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/calendar-final.json",
+      "result_sha256": "f395d76e592c80dbb02d7b6b4922e30790053a29b042687a780ac34742550e70",
+      "checks": {
+        "ports": true,
+        "full": true,
+        "date_configuration_and_values": true,
+        "frozen_projection": true,
+        "excluded_source_and_target": true,
+        "date_mapping": true,
+        "raw": true
+      }
+    },
+    "month": {
+      "passed": true,
+      "status": "SUCCEEDED",
+      "cleanup_complete": true,
+      "audit_path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/node13-full-month-component-audit.json",
+      "audit_sha256": "08bde7ed9bd5de004395942cf4f9d8426395e811129f1887cdd08416a3ea4fd2",
+      "result_path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/month.json",
+      "result_sha256": "bac0d0ad212a3c9b71de8491aa4fad21f8ccb8ca9f369872e714540093e50c83",
+      "checks": {
+        "ports": true,
+        "full": true,
+        "configuration": true,
+        "grouping_contract": true,
+        "raw": true
+      }
+    },
+    "quarter": {
+      "passed": true,
+      "status": "SUCCEEDED",
+      "cleanup_complete": true,
+      "audit_path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/node13-full-quarter-component-audit.json",
+      "audit_sha256": "276c20c07e26d676cb358ebb10fcbe18d07cc650f13fd90431138dfdc67f68ab",
+      "result_path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/quarter.json",
+      "result_sha256": "d949137f2c1a91c9c70d179fc881e70c47cfc74e525d9ec08f5514ff46eaec49",
+      "checks": {
+        "ports": true,
+        "full": true,
+        "configuration": true,
+        "grouping_contract": true,
+        "raw": true
+      }
+    },
+    "filter": {
+      "passed": true,
+      "status": "SUCCEEDED",
+      "cleanup_complete": true,
+      "audit_path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/node13-full-filter-component-audit.json",
+      "audit_sha256": "7befbd5bdd64a0d484f876c5d2f2e6dd16db6bdecb5746b589bc63e88cae5981",
+      "result_path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/filter.json",
+      "result_sha256": "8c7db83154d544147b01828a526cfe231ce8212f8d2c3c05e4515ab79f1bae63",
+      "checks": {
+        "ports": true,
+        "full": true,
+        "raw": true,
+        "configuration": true
+      }
+    }
+  }
+}

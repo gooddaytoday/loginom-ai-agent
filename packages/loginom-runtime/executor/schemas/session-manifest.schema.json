@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loginom-dock.duckdns.org/schemas/executor/session-manifest-v1.json",
+  "title": "Loginom Dock executor session pins v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capabilityAbi",
+    "executorRevision",
+    "actionCatalogVersion",
+    "actionCatalogDigest",
+    "selectorCatalogDigest",
+    "e2eCommit",
+    "actionManifestDigest",
+    "catalogLifecycleStatus",
+    "acceptanceVerified",
+    "acceptanceDigest",
+    "compatibilityProfile"
+  ],
+  "properties": {
+    "capabilityAbi": {
+      "const": 1
+    },
+    "executorRevision": {
+      "const": "1.0.0"
+    },
+    "actionCatalogVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actionCatalogDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "selectorCatalogDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "e2eCommit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "actionManifestDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "catalogLifecycleStatus": {
+      "enum": [
+        "production",
+        "candidate"
+      ]
+    },
+    "acceptanceVerified": {
+      "type": "boolean"
+    },
+    "acceptanceDigest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "compatibilityProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "loginom_build",
+        "platform",
+        "browser"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "loginom_build": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "platform": {
+          "const": "macos"
+        },
+        "browser": {
+          "const": "chromium"
+        }
+      }
+    }
+  }
+}

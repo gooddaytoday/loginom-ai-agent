@@ -1,0 +1,205 @@
+{
+  "node": "node17",
+  "component": "component.exports.Text",
+  "source": "2524921058b29db0e79e9a188ec7bb8fa9ef9d8c",
+  "runtime": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
+  "platform": "Loginom 7.4.2 Linux",
+  "storage": "/test-2",
+  "cases": [
+    {
+      "case": "csv",
+      "fixture": "escaping.json",
+      "types": [
+        "integer",
+        "string",
+        "real"
+      ],
+      "settings": {
+        "delimiter": ";",
+        "header": "names",
+        "bom": false,
+        "line_ending": "\n",
+        "null_marker": "?"
+      },
+      "expected_path": "expected/csv.bin",
+      "bytes": 124,
+      "sha256": "9f9972ed174053d02745df8df0c3c2d44697b33f7fb6da2ce8463eb58cc5d13a"
+    },
+    {
+      "case": "tsv",
+      "fixture": "escaping.json",
+      "types": [
+        "integer",
+        "string",
+        "real"
+      ],
+      "settings": {
+        "delimiter": "\t",
+        "header": "none",
+        "bom": true,
+        "line_ending": "\r\n",
+        "null_marker": "?"
+      },
+      "expected_path": "expected/tsv.bin",
+      "bytes": 115,
+      "sha256": "160a40d736dc077faa832f9ed5d79186ee87143291b032416810dcdfefa300c3"
+    },
+    {
+      "case": "typed",
+      "fixture": "typed.json",
+      "types": [
+        "integer",
+        "string",
+        "real",
+        "boolean",
+        "datetime"
+      ],
+      "settings": {
+        "delimiter": ";",
+        "header": "names",
+        "bom": false,
+        "line_ending": "\n",
+        "null_marker": "NULL"
+      },
+      "expected_path": "expected/typed.bin",
+      "bytes": 138,
+      "sha256": "f237ccfcd6d0861b3505f57a07066f2ac8f770d0068e5bc3e84b340f531095e5"
+    },
+    {
+      "case": "wide",
+      "fixture": "wide.json",
+      "types": [
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string"
+      ],
+      "settings": {
+        "delimiter": "\t",
+        "header": "labels",
+        "bom": true,
+        "line_ending": "\r\n",
+        "null_marker": "?"
+      },
+      "expected_path": "expected/wide.bin",
+      "bytes": 3005,
+      "sha256": "496cc1705feb531fb6cef23415da079493ae7514c25b2c7d9800df4ed0536873"
+    },
+    {
+      "case": "empty",
+      "fixture": "empty.json",
+      "types": [
+        "integer",
+        "string",
+        "real"
+      ],
+      "settings": {
+        "delimiter": ";",
+        "header": "names",
+        "bom": false,
+        "line_ending": "\n",
+        "null_marker": "?"
+      },
+      "expected_path": "expected/empty.bin",
+      "bytes": 15,
+      "sha256": "61c3e9d2df03cb9b755f8092142181f6757eeb78c6931a41e90dae7f7bf2283a"
+    },
+    {
+      "case": "zero",
+      "fixture": "empty.json",
+      "types": [
+        "integer",
+        "string",
+        "real"
+      ],
+      "settings": {
+        "delimiter": ";",
+        "header": "none",
+        "bom": false,
+        "line_ending": "\n",
+        "null_marker": "?"
+      },
+      "expected_path": "expected/zero.bin",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "case": "changed",
+      "fixture": "escaping.json",
+      "types": [
+        "integer",
+        "string",
+        "real"
+      ],
+      "settings": {
+        "delimiter": ",",
+        "header": "labels",
+        "bom": true,
+        "line_ending": "\r\n",
+        "null_marker": "?"
+      },
+      "expected_path": "expected/changed.bin",
+      "bytes": 131,
+      "sha256": "290c4d0cec7895f80f95436030da5f4355dc47d0adbdd04ab17590274f8d4ff4"
+    }
+  ],
+  "inputs": {
+    "main.csv": {
+      "bytes": 124,
+      "sha256": "9f9972ed174053d02745df8df0c3c2d44697b33f7fb6da2ce8463eb58cc5d13a"
+    },
+    "typed.csv": {
+      "bytes": 148,
+      "sha256": "f203eb6aeaa19efe66f1f81a6f5af636e4ec4d17a21a149592b0d5362a851c5f"
+    },
+    "wide.csv": {
+      "bytes": 2964,
+      "sha256": "c106b1287d098b5b1905cccb3fd9bbb0c92213f384408eee3c1242ad2fb09d55"
+    }
+  },
+  "limits": {
+    "encoding": [
+      "UTF-8"
+    ],
+    "max_file_bytes": 16777216,
+    "one_table_input": true,
+    "requested_mappings": false
+  },
+  "autonomous_accepted": false
+}

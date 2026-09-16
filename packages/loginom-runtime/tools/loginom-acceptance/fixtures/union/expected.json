@@ -1,0 +1,62 @@
+{
+  "columns": [
+    "Code",
+    "Amount",
+    "Note",
+    "Extra"
+  ],
+  "types": [
+    "string",
+    "integer",
+    "string",
+    "string"
+  ],
+  "rows": [
+    [
+      "A",
+      10,
+      "repeat",
+      null
+    ],
+    [
+      "A",
+      10,
+      "repeat",
+      null
+    ],
+    [
+      "B",
+      20,
+      null,
+      null
+    ],
+    [
+      "A",
+      10,
+      "repeat",
+      null
+    ],
+    [
+      "C",
+      30,
+      "",
+      null
+    ],
+    [
+      "D",
+      40,
+      "third",
+      "solo"
+    ],
+    [
+      "A",
+      10,
+      "repeat",
+      null
+    ]
+  ],
+  "row_count_two": 5,
+  "row_count_three": 7,
+  "duplicate_A_count_two": 3,
+  "duplicate_A_count_three": 4
+}

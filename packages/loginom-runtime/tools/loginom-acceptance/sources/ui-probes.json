@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "profile": "loginom-7.5.0-alpha-build49202-macos-chromium-ru",
+  "attribution": "Loginom frontend sources and bundled Ext JS. Original authors retain attribution. Only symbol locators and assertions are copied; full source bytes stay outside Git.",
+  "limitations": "Static source assertions explain known UI behavior; they do not prove live hit testing, dialog ownership or product compatibility with another build.",
+  "files": [
+    {
+      "path": "bg/ext/Mask.js",
+      "sha256": "60ecabc17c86df4a034bbace02e8d1f80ad7bbcf88f4a3a4721ebd656e858051",
+      "assertions": [
+        {"line": 296, "symbol": "AfterElementTextMaskContext.prototype.DoCreate", "meaning": "Text mask is associated with its context element."},
+        {"line": 303, "symbol": "FElement.setAttribute", "meaning": "Mask text is an element attribute, not proof of a full workspace overlay."},
+        {"line": 327, "symbol": "AfterElementTextMaskContext.prototype.Create", "meaning": "Repeated mask requests use the context sequence."}
+      ]
+    },
+    {
+      "path": "bg/ext/Lock.js",
+      "sha256": "e321d140d5da0ef14ab24435e9a6562c1042f2e5f789424de6d1c3dfa2af23bd",
+      "assertions": [
+        {"line": 11, "symbol": "LS_Loading", "meaning": "Loading is the default lock text."},
+        {"line": 220, "symbol": "ext.MaskAfterElementText", "meaning": "MethodLock defaults to the element text mask."},
+        {"line": 274, "symbol": "this.FMaskFn(Views[i]", "meaning": "Mask ownership follows the specific Views collection."}
+      ]
+    },
+    {
+      "path": "ext/build/ext-all-debug.js",
+      "sha256": "5b8f534947c4396d72aa6f264721ab8e5bf190b3284969baf8aad9785798e2c5",
+      "assertions": [
+        {"line": 99679, "symbol": "makeButton: function", "meaning": "MessageBox builds Ext button instances."},
+        {"line": 99681, "symbol": "new Ext.button.Button", "meaning": "Discovery must consider Ext button rendering."},
+        {"line": 81400, "symbol": "getElConfig: function", "meaning": "Button anchor configuration is conditional."},
+        {"line": 81405, "symbol": "config.tag === 'a'", "meaning": "The rendered button may be an anchor."},
+        {"line": 81627, "symbol": "getHref: function", "meaning": "The href getter may return false, so a button need not have href."}
+      ]
+    }
+  ]
+}

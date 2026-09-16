@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "acceptance_status": "fixture_only_not_live_accepted",
+  "input": {
+    "file": "sales.csv",
+    "sha256": "f628434c20873f7dd9a8ee142c17af7c0b99f447114fcf60e983f6ed6b357eb3",
+    "bytes": 230,
+    "encoding": "UTF-8",
+    "delimiter": ";",
+    "quote": "\"",
+    "header": true,
+    "decimal_separator": ".",
+    "null_literal": "\\N"
+  },
+  "schema": [
+    {
+      "name": "Id",
+      "type": "integer"
+    },
+    {
+      "name": "Region",
+      "type": "string"
+    },
+    {
+      "name": "Quantity",
+      "type": "integer"
+    },
+    {
+      "name": "UnitPrice",
+      "type": "real"
+    },
+    {
+      "name": "Comment",
+      "type": "string"
+    }
+  ],
+  "import": {
+    "row_count": 6,
+    "sort_key": [
+      "Id"
+    ],
+    "rows": [
+      {
+        "Id": 1,
+        "Region": "Север",
+        "Quantity": 3,
+        "UnitPrice": 12.5,
+        "Comment": ""
+      },
+      {
+        "Id": 2,
+        "Region": "Север",
+        "Quantity": 2,
+        "UnitPrice": 7.25,
+        "Comment": null
+      },
+      {
+        "Id": 3,
+        "Region": "Юг",
+        "Quantity": 4,
+        "UnitPrice": 2.5,
+        "Comment": "поставка; срочно"
+      },
+      {
+        "Id": 4,
+        "Region": "Юг",
+        "Quantity": 0,
+        "UnitPrice": 99.0,
+        "Comment": "нулевое количество"
+      },
+      {
+        "Id": 5,
+        "Region": "Запад",
+        "Quantity": -1,
+        "UnitPrice": 8.0,
+        "Comment": "возврат"
+      },
+      {
+        "Id": 6,
+        "Region": "Запад",
+        "Quantity": 2,
+        "UnitPrice": 4.0,
+        "Comment": null
+      }
+    ]
+  },
+  "calculator": {
+    "output_field": "Amount",
+    "operation": "Quantity * UnitPrice",
+    "type": "real",
+    "row_count": 6,
+    "sort_key": [
+      "Id"
+    ],
+    "rows": [
+      {
+        "Id": 1,
+        "Region": "Север",
+        "Quantity": 3,
+        "UnitPrice": 12.5,
+        "Comment": "",
+        "Amount": 37.5
+      },
+      {
+        "Id": 2,
+        "Region": "Север",
+        "Quantity": 2,
+        "UnitPrice": 7.25,
+        "Comment": null,
+        "Amount": 14.5
+      },
+      {
+        "Id": 3,
+        "Region": "Юг",
+        "Quantity": 4,
+        "UnitPrice": 2.5,
+        "Comment": "поставка; срочно",
+        "Amount": 10.0
+      },
+      {
+        "Id": 4,
+        "Region": "Юг",
+        "Quantity": 0,
+        "UnitPrice": 99.0,
+        "Comment": "нулевое количество",
+        "Amount": 0.0
+      },
+      {
+        "Id": 5,
+        "Region": "Запад",
+        "Quantity": -1,
+        "UnitPrice": 8.0,
+        "Comment": "возврат",
+        "Amount": -8.0
+      },
+      {
+        "Id": 6,
+        "Region": "Запад",
+        "Quantity": 2,
+        "UnitPrice": 4.0,
+        "Comment": null,
+        "Amount": 8.0
+      }
+    ]
+  },
+  "group": {
+    "row_count": 3,
+    "sort_key": [
+      "Region"
+    ],
+    "rows": [
+      {
+        "Region": "Запад",
+        "QuantitySum": 1,
+        "AmountSum": 0,
+        "RowCount": 2
+      },
+      {
+        "Region": "Север",
+        "QuantitySum": 5,
+        "AmountSum": 52,
+        "RowCount": 2
+      },
+      {
+        "Region": "Юг",
+        "QuantitySum": 4,
+        "AmountSum": 10,
+        "RowCount": 2
+      }
+    ],
+    "schema": [
+      {
+        "name": "Region",
+        "type": "string"
+      },
+      {
+        "name": "QuantitySum",
+        "type": "integer"
+      },
+      {
+        "name": "AmountSum",
+        "type": "real"
+      },
+      {
+        "name": "RowCount",
+        "type": "integer"
+      }
+    ]
+  },
+  "comparison": {
+    "all_rows_required": true,
+    "distinguish_null_from_empty_string": true,
+    "exact_numbers": true,
+    "notes": "Binary-exact quarter/half values avoid a floating-point tolerance masking errors. UI strings must be parsed with an explicit locale; screenshots alone do not prove types."
+  }
+}

@@ -1,0 +1,937 @@
+{
+  "assignment": "node13:r2-integration:1:47830abe656d8a5abed35e27ee4ca54fb8d46bb4e5b45ce4f47b2b6dc833a182",
+  "source_parent": "c4d9c9354b8ff74d019c8ffb214397301b5a35d8",
+  "preflight": {
+    "passed": true,
+    "assignment": "node13:r2-integration:1:47830abe656d8a5abed35e27ee4ca54fb8d46bb4e5b45ce4f47b2b6dc833a182",
+    "head": "c4d9c9354b8ff74d019c8ffb214397301b5a35d8",
+    "source": "a63586fe096f4fd7f17f346c391834d3e34bdaa4",
+    "target": "7d7f0bc2a23c8db5d57fbeb9ceb57d3a8ca29907",
+    "patch_sha256": "47830abe656d8a5abed35e27ee4ca54fb8d46bb4e5b45ce4f47b2b6dc833a182",
+    "files": [
+      "client/lib/node-apply.mjs",
+      "client/lib/node-execution-evidence.mjs",
+      "client/lib/node-execution-procedure.mjs",
+      "client/lib/node-operation-runner.mjs",
+      "client/lib/node-process-context.mjs",
+      "client/lib/node-result-schema.mjs",
+      "client/lib/node-contracts.d.ts",
+      "client/test/node-apply.test.mjs",
+      "client/test/node-execution-evidence.test.mjs",
+      "client/test/node-execution-focus.test.mjs",
+      "client/test/node-operation-failure.test.mjs"
+    ],
+    "dry_check": {
+      "exit_code": 0,
+      "stderr": ""
+    },
+    "applied": false
+  },
+  "integration": {
+    "passed": true,
+    "patch_sha256": "47830abe656d8a5abed35e27ee4ca54fb8d46bb4e5b45ce4f47b2b6dc833a182",
+    "files": [
+      {
+        "path": "client/lib/node-apply.mjs",
+        "sha256": "49ca062f6f4b44c312fabff83259e61328948f02d0036811450cdcedb17c7a80",
+        "blob": "191c237c6d3df24476f1d04eac223aecf9a29419"
+      },
+      {
+        "path": "client/lib/node-execution-evidence.mjs",
+        "sha256": "3f08a2a88599d255091bc9db9fac969f4344d7a109d185bd5b84edc824830833",
+        "blob": "256bf96fc9d78caaba2e96bb0b664dd6b77fd737"
+      },
+      {
+        "path": "client/lib/node-execution-procedure.mjs",
+        "sha256": "d0543083eee5502e8d1ec06fd5622c6509b57cce1fa9c63f9cb093f37e06d8a6",
+        "blob": "a327ccce949edffe0faed0cd24b06ef49833f5c9"
+      },
+      {
+        "path": "client/lib/node-operation-runner.mjs",
+        "sha256": "f7147d382223980f226fc9004a058defb94592ba128ec0345480376a62987418",
+        "blob": "94d749691f5acfbbd9aa614b87e970812b127249"
+      },
+      {
+        "path": "client/lib/node-process-context.mjs",
+        "sha256": "4e3f28dc36c8d0c2d4e43f3af3e9e26fa42de1a5269ba61b6738050e09a45b7c",
+        "blob": "0c84115a2199401e06e3186eae6994ceb0da8683"
+      },
+      {
+        "path": "client/lib/node-result-schema.mjs",
+        "sha256": "70e2ef6080fecb567af4c42865863e6997445c9cb4104dbdb0628fcdc9a13ff2",
+        "blob": "6486d74f1d1d5caae5df1f7ea7691719db8ace00"
+      },
+      {
+        "path": "client/lib/node-contracts.d.ts",
+        "sha256": "1fab8c35503e175874745ff7e7f5adadbe5324380d5f945fd309fb8f01fc4db1",
+        "blob": "e56912de9453372d1b16ac1bf065c7112d9203b9"
+      },
+      {
+        "path": "client/test/node-apply.test.mjs",
+        "sha256": "82b95dd38e34fb71ce7915572f1f6166ce3d72a2f3b5ee5904ac30f8dbb43078",
+        "blob": "d169afcbb2916e3fa5dcb5466cf83f0f2c9e7820"
+      },
+      {
+        "path": "client/test/node-execution-evidence.test.mjs",
+        "sha256": "2d3ff68cd501f67feb08f607cabc58b882df7ec6e95dca3bacb66bb3bdea3d8d",
+        "blob": "7667cd58050e3d79dcf8a0f8666bf1fb3b78dddf"
+      },
+      {
+        "path": "client/test/node-execution-focus.test.mjs",
+        "sha256": "49a1896d72031f4d8ab6cbc4b19ab1c9228b76815472e8b4b8b1d6b2475de9a1",
+        "blob": "51a87e1c7db9c5b5171a3a837d35a022b4acf938"
+      },
+      {
+        "path": "client/test/node-operation-failure.test.mjs",
+        "sha256": "2735834ca0989d4407b7605be9ba51cfccb8bfcc53e34754912cc9a952e99566",
+        "blob": "afaa00c69cea722af293c358e4031f21c361c25b"
+      }
+    ],
+    "exact_added_removed_payload": true
+  },
+  "runtime": "2488fdaa08e4d6da9b7a31fb7598f675a8ad972efd65640b34cbc851feb16e2b",
+  "session": "aa03cb93-8df3-4b1c-808e-6a13e835caf4",
+  "geometry": {
+    "viewport": null,
+    "window": {
+      "width": 1508,
+      "height": 862,
+      "outerWidth": 1508,
+      "outerHeight": 949,
+      "availableWidth": 1512,
+      "availableHeight": 949
+    },
+    "version": "Версия: 7.4.2"
+  },
+  "gate": {
+    "passed": true,
+    "failures": [],
+    "terminal": true,
+    "restored_output": {
+      "passed": true,
+      "checks": {
+        "configuration": {
+          "passed": true,
+          "failures": [],
+          "projection": [
+            {
+              "name": "SmallMonthEnd",
+              "label": "Конец месяца B",
+              "type": "datetime",
+              "input": "DateB",
+              "operation": "month_end"
+            },
+            {
+              "name": "Id",
+              "label": "Id",
+              "type": "integer",
+              "input": "Id"
+            },
+            {
+              "name": "DateA",
+              "label": "Дата",
+              "type": "datetime",
+              "input": "DateA"
+            },
+            {
+              "name": "DateB",
+              "label": "Дата",
+              "type": "datetime",
+              "input": "DateB"
+            },
+            {
+              "name": "SmallMonthStart",
+              "label": "Начало месяца A",
+              "type": "datetime",
+              "input": "DateA",
+              "operation": "month_start"
+            },
+            {
+              "name": "SmallYear",
+              "label": "Год A",
+              "type": "integer",
+              "input": "DateA",
+              "operation": "year"
+            },
+            {
+              "name": "SmallQuarter",
+              "label": "Квартал B",
+              "type": "integer",
+              "input": "DateB",
+              "operation": "quarter"
+            },
+            {
+              "name": "SmallHour",
+              "label": "Час B",
+              "type": "integer",
+              "input": "DateB",
+              "operation": "hour"
+            }
+          ],
+          "scope": "date_time_raw_configuration"
+        },
+        "raw_output": {
+          "passed": true,
+          "failures": [],
+          "execution_id": "1789296062410-1q7bqmxwhy6:457:6",
+          "scope": "fresh_calculator_table_against_independent_expected",
+          "source_identity_verified": false,
+          "package_persistence_verified": false
+        },
+        "values": {
+          "passed": true,
+          "rows": 4,
+          "columns": 8,
+          "full_values_verified": true
+        }
+      },
+      "scope": "source_diagnostic_operation",
+      "hermes_acceptance": false,
+      "package_persistence_verified": false
+    },
+    "negative_count": 15,
+    "repeat_browser_sequence": [
+      1057,
+      1057,
+      1057
+    ],
+    "manual_configuration_preserved": true,
+    "source_restored": {
+      "restored": "/test-3/node13-r2-aa03cb93.csv",
+      "held_absent": true
+    },
+    "hermes_acceptance": false,
+    "new_persistence_check": false
+  },
+  "terminal": {
+    "passed": true,
+    "failures": [],
+    "proof": {
+      "root_id": "457",
+      "group": {
+        "process_id": "5",
+        "record_id": "1343",
+        "parent_id": null,
+        "state": "pending_or_failed",
+        "error": true,
+        "error_details": "Файл \"/test-3/node13-r2-aa03cb93.csv\" не найден",
+        "rendered": true,
+        "selected": false,
+        "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-4",
+        "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-4;TreeExpander",
+        "expanded": true,
+        "children_loaded": true,
+        "caption": "Активация узлов",
+        "progress_state": {
+          "verified": true,
+          "state": "failed",
+          "terminal": true,
+          "can_cancel": false,
+          "source": "native_progress_record"
+        }
+      },
+      "native_reason": "Файл \"/test-3/node13-r2-aa03cb93.csv\" не найден",
+      "node": {
+        "document_id": "1789296062410-1q7bqmxwhy6",
+        "workflow_id": "1789296062410-1q7bqmxwhy6-2",
+        "node_id": "6b840be2-3723-4dc4-9e06-098016b76e60"
+      },
+      "execution": {
+        "status": "failed",
+        "execution_id": "1789296062410-1q7bqmxwhy6:457:5",
+        "failure_verified": true,
+        "root_id": "457",
+        "group_id": "5",
+        "group_record_id": "1343"
+      },
+      "baseline": {
+        "verified": true,
+        "inventory_complete": true,
+        "root_id": "457",
+        "show_completed": true,
+        "filter_source": "cached_native_menu_check_state",
+        "processes": [
+          {
+            "process_id": "1",
+            "record_id": "458",
+            "parent_id": null,
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов;TreeExpander",
+            "expanded": true,
+            "children_loaded": true,
+            "caption": "Активация узлов",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "1.1",
+            "record_id": "459",
+            "parent_id": "1",
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов>Node13-dates.csv",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов>Node13-dates.csv;TreeExpander",
+            "expanded": false,
+            "children_loaded": false,
+            "caption": "Node13-dates.csv",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "2",
+            "record_id": "460",
+            "parent_id": null,
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-1",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-1;TreeExpander",
+            "expanded": true,
+            "children_loaded": true,
+            "caption": "Активация узлов",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "2.1",
+            "record_id": "461",
+            "parent_id": "2",
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": true,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-1>Пустой_источник",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-1>Пустой_источник;TreeExpander",
+            "expanded": false,
+            "children_loaded": false,
+            "caption": "Пустой источник",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "3",
+            "record_id": "666",
+            "parent_id": null,
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-2",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-2;TreeExpander",
+            "expanded": true,
+            "children_loaded": true,
+            "caption": "Активация узлов",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "3.1",
+            "record_id": "667",
+            "parent_id": "3",
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-2>Пустой_календарь",
+            "expander_tid": null,
+            "expanded": null,
+            "children_loaded": false,
+            "caption": "Пустой календарь",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            },
+            "owner": {
+              "verified": true,
+              "node_id": "6b840be2-3723-4dc4-9e06-098016b76e60",
+              "source": "native_process_model_identity"
+            }
+          },
+          {
+            "process_id": "4",
+            "record_id": "1139",
+            "parent_id": null,
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-3",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-3;TreeExpander",
+            "expanded": true,
+            "children_loaded": true,
+            "caption": "Активация узлов",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "4.1",
+            "record_id": "1140",
+            "parent_id": "4",
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-3>Таблица",
+            "expander_tid": null,
+            "expanded": null,
+            "children_loaded": false,
+            "caption": "Таблица",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          }
+        ],
+        "execution_freshness_verified": false,
+        "node_context": {
+          "verified": true,
+          "document_id": "1789296062410-1q7bqmxwhy6",
+          "workflow_id": "1789296062410-1q7bqmxwhy6-2",
+          "node_id": "6b840be2-3723-4dc4-9e06-098016b76e60",
+          "surface": "graph",
+          "tid": "MF;TF-3;Graph;Пустой_календарь",
+          "locked": false
+        }
+      },
+      "snapshot": {
+        "verified": true,
+        "inventory_complete": true,
+        "root_id": "457",
+        "show_completed": true,
+        "filter_source": "cached_native_menu_check_state",
+        "processes": [
+          {
+            "process_id": "1",
+            "record_id": "458",
+            "parent_id": null,
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов;TreeExpander",
+            "expanded": true,
+            "children_loaded": true,
+            "caption": "Активация узлов",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "1.1",
+            "record_id": "459",
+            "parent_id": "1",
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов>Node13-dates.csv",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов>Node13-dates.csv;TreeExpander",
+            "expanded": false,
+            "children_loaded": false,
+            "caption": "Node13-dates.csv",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "2",
+            "record_id": "460",
+            "parent_id": null,
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-1",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-1;TreeExpander",
+            "expanded": true,
+            "children_loaded": true,
+            "caption": "Активация узлов",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "2.1",
+            "record_id": "461",
+            "parent_id": "2",
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": true,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-1>Пустой_источник",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-1>Пустой_источник;TreeExpander",
+            "expanded": false,
+            "children_loaded": false,
+            "caption": "Пустой источник",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "3",
+            "record_id": "666",
+            "parent_id": null,
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-2",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-2;TreeExpander",
+            "expanded": true,
+            "children_loaded": true,
+            "caption": "Активация узлов",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "3.1",
+            "record_id": "667",
+            "parent_id": "3",
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-2>Пустой_календарь",
+            "expander_tid": null,
+            "expanded": null,
+            "children_loaded": false,
+            "caption": "Пустой календарь",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            },
+            "owner": {
+              "verified": true,
+              "node_id": "6b840be2-3723-4dc4-9e06-098016b76e60",
+              "source": "native_process_model_identity"
+            }
+          },
+          {
+            "process_id": "4",
+            "record_id": "1139",
+            "parent_id": null,
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-3",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-3;TreeExpander",
+            "expanded": true,
+            "children_loaded": true,
+            "caption": "Активация узлов",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "4.1",
+            "record_id": "1140",
+            "parent_id": "4",
+            "state": "completed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-3>Таблица",
+            "expander_tid": null,
+            "expanded": null,
+            "children_loaded": false,
+            "caption": "Таблица",
+            "progress_state": {
+              "verified": true,
+              "state": "completed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "5",
+            "record_id": "1343",
+            "parent_id": null,
+            "state": "pending_or_failed",
+            "error": true,
+            "error_details": "Файл \"/test-3/node13-r2-aa03cb93.csv\" не найден",
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-4",
+            "expander_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-4;TreeExpander",
+            "expanded": true,
+            "children_loaded": true,
+            "caption": "Активация узлов",
+            "progress_state": {
+              "verified": true,
+              "state": "failed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "5.1",
+            "record_id": "1344",
+            "parent_id": "5",
+            "state": "pending_or_failed",
+            "error": true,
+            "error_details": "Файл \"/test-3/node13-r2-aa03cb93.csv\" не найден",
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-4>node13-r2-aa03cb93.csv",
+            "expander_tid": null,
+            "expanded": null,
+            "children_loaded": false,
+            "caption": "node13-r2-aa03cb93.csv",
+            "progress_state": {
+              "verified": true,
+              "state": "failed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "5.2",
+            "record_id": "1345",
+            "parent_id": "5",
+            "state": "pending_or_failed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-4>Пустой_источник",
+            "expander_tid": null,
+            "expanded": null,
+            "children_loaded": false,
+            "caption": "Пустой источник",
+            "progress_state": {
+              "verified": true,
+              "state": "parent_failed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            }
+          },
+          {
+            "process_id": "5.3",
+            "record_id": "1346",
+            "parent_id": "5",
+            "state": "pending_or_failed",
+            "error": false,
+            "rendered": true,
+            "selected": false,
+            "process_tid": "ConsoleForm;ProgressForm;colProcess_Root>Активация_узлов-4>Пустой_календарь",
+            "expander_tid": null,
+            "expanded": null,
+            "children_loaded": false,
+            "caption": "Пустой календарь",
+            "progress_state": {
+              "verified": true,
+              "state": "parent_failed",
+              "terminal": true,
+              "can_cancel": false,
+              "source": "native_progress_record"
+            },
+            "owner": {
+              "verified": true,
+              "node_id": "6b840be2-3723-4dc4-9e06-098016b76e60",
+              "source": "native_process_model_identity"
+            }
+          }
+        ],
+        "execution_freshness_verified": false,
+        "node_context": {
+          "verified": true,
+          "document_id": "1789296062410-1q7bqmxwhy6",
+          "workflow_id": "1789296062410-1q7bqmxwhy6-2",
+          "node_id": "6b840be2-3723-4dc4-9e06-098016b76e60",
+          "surface": "graph",
+          "tid": "MF;TF-3;Graph;Пустой_календарь",
+          "locked": false
+        }
+      }
+    },
+    "scope": "date_time_terminal_failure",
+    "hermes_acceptance": false
+  },
+  "negative": {
+    "passed": true,
+    "rejected": 15,
+    "cases": [
+      {
+        "case": "root",
+        "rejected": true,
+        "reason": "old_or_changed_history"
+      },
+      {
+        "case": "group_record",
+        "rejected": true,
+        "reason": "execution_identity"
+      },
+      {
+        "case": "old_group",
+        "rejected": true,
+        "reason": "one_fresh_group_required"
+      },
+      {
+        "case": "incomplete",
+        "rejected": true,
+        "reason": "incomplete_history"
+      },
+      {
+        "case": "reason",
+        "rejected": true,
+        "reason": "missing_native_reason"
+      },
+      {
+        "case": "cancellable",
+        "rejected": true,
+        "reason": "not_terminal_failure"
+      },
+      {
+        "case": "group_not_loaded",
+        "rejected": true,
+        "reason": "group_children_not_loaded"
+      },
+      {
+        "case": "owner",
+        "rejected": true,
+        "reason": "requested_child_not_parent_failed"
+      },
+      {
+        "case": "missing_source_child",
+        "rejected": true,
+        "reason": "failed_source_child_missing"
+      },
+      {
+        "case": "child_completed",
+        "rejected": true,
+        "reason": "requested_child_not_parent_failed"
+      },
+      {
+        "case": "foreign_context",
+        "rejected": true,
+        "reason": "foreign_owner"
+      },
+      {
+        "case": "cleanup",
+        "rejected": true,
+        "reason": [
+          "terminal_checkpoint"
+        ]
+      },
+      {
+        "case": "stale_output",
+        "rejected": true,
+        "reason": [
+          "stale_output"
+        ]
+      },
+      {
+        "case": "read_phase",
+        "rejected": true,
+        "reason": [
+          "output_read_after_failure"
+        ]
+      },
+      {
+        "case": "unverified_failure",
+        "rejected": true,
+        "reason": [
+          "terminal_checkpoint"
+        ]
+      }
+    ]
+  },
+  "cleanup": {
+    "package": {
+      "closed": true,
+      "diagnostic_changes_discarded": true
+    },
+    "source": {
+      "restored": true,
+      "held_absent": true,
+      "row": "\t\nnode13-r2-aa03cb93.csv\n\t\nCSV файл\n\t\n164\n\t\n13.09.2026, 10:44\n\t",
+      "dialogs": 0
+    },
+    "harness_exit_code": 0
+  },
+  "tests": {
+    "focused": 135,
+    "client_pass": 1477,
+    "client_skip": 1,
+    "python_pass": 533
+  },
+  "files": [
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-baseline.json",
+      "sha256": "72186d73348e21d6e016f7acc84935c87f426ae47caa87013426a7703af527c3"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-upload.json",
+      "sha256": "dbee8602d2ed0955f130339ac1f67b6aacbcbabdd018257f8ea897f63577da3b"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-import-path.json",
+      "sha256": "961eedb8565d10b3210067ae462a0eda36964fb0b52c3558d5fb72a5527a0223"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-import-next.json",
+      "sha256": "1c195672171b16e77f85bac4ad59cb05dbd5754e0e167fc6755c8544a404c88b"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-import-finish.json",
+      "sha256": "c9a556b2c9654640190a9276e3f1e5179df361fcd17f3c4eb0940b0dfe827791"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-hide-source.json",
+      "sha256": "ed2bfa0485fd56451b444cdc6737bb20974b5a307729d909b2b79216f4617a0c"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-failure.json",
+      "sha256": "0d332805123e1d53a1efd28551a57d8d4124c5ab7f534990c9257e6ddb59050a"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-repeat.json",
+      "sha256": "20d40cff5078154bcae7410071fcff52f4b852ac157677001cb79b5ae63355af"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-restore-source.json",
+      "sha256": "474993dcd5c79ceab2f48442ad262cb74989b62c506bd0bc6e413df4f7bfb6d4"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-restored.json",
+      "sha256": "9d07e709d5d8b7148b27a79178cbf95d11c90b96f9443b24eeb9d95b1c4f3ae0"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-terminal-audit.json",
+      "sha256": "c9dd85a7cbf23715a122de4ec8f51e8e14a065edeb0f4999fddd9a2066ff2daf"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-terminal-negatives.json",
+      "sha256": "70a387eaa3fe20a9c4317a90df547c564297c6eaa2f4e09de6d6857ac9850968"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/node13-r2-restored-audit.json",
+      "sha256": "16565a5978865d16a33046048aa02bcba2ef46c695bad015ef9c80b89e428be5"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-gate.json",
+      "sha256": "e4c1546eebb0f764c76bdaab35977c1d59c5eb67be23d4394a250b4f6a3b8925"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-discard-copy.json",
+      "sha256": "62783ac064d33ceaa6cb92cf61ccdc8c7a18161e9dbcdb182ae807162491b507"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/r2-final-files.json",
+      "sha256": "31aafa1b279bd2fb542e4ea21578a9043980fd7dc07edccb42fd46807f97f41e"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/execution-events.jsonl",
+      "sha256": "7c4bdd7b247f3d8b3fb24f3a805698faef37efe9e9f696bd9092356210123332"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/public-api.jsonl",
+      "sha256": "467b6dae7a054bcb6580efc3c5cc23036d985c7f26a3e1ec38f45c2ced2f6a9f"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/public-tools.json",
+      "sha256": "395e3fa8f60d1aa8e923b224eacf136f3077acc7d94e49fe44b27c4788120ef4"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/remote-pins.json",
+      "sha256": "95a356e426aa67e57b4319b0d78020a8c54eb0254d3cf14f340144799e07cce9"
+    },
+    {
+      "path": ".dock/stream-runtime/sessions/aa03cb93-8df3-4b1c-808e-6a13e835caf4/geometry.json",
+      "sha256": "58eeb0a77017cd6e884a8fc9b7310ecca92c984e3d4848188dd7b0c610cee30a"
+    }
+  ],
+  "harness": [
+    {
+      "path": "tools/loginom-acceptance/date-time-live.mjs",
+      "sha256": "bf6a15bd12644ef936bf8b64aa848b384d55aa32d00c3a4f5c9aa16fc0243fc8"
+    },
+    {
+      "path": "tools/loginom-acceptance/public-node-wire.mjs",
+      "sha256": "37215bc5b9563433cb45c98f6798d3798fdc966ffcee6c839180d60703822b26"
+    },
+    {
+      "path": "tools/loginom-acceptance/node13-r2-snapshot/manifest.json",
+      "sha256": "80894711de68b778ea917cc9c0e5a5dcffa307a1e7f1c2e72c78489c1d657261"
+    }
+  ],
+  "hermes_acceptance": false,
+  "full_review": false,
+  "published": false
+}

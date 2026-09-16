@@ -1,0 +1,1 @@
+{"status": "PASS", "runtime_revision": "db6d957169c50bcd5cb169db80d744fd846b8ffa4eee683178619c001fb22bab", "public_cases": 3, "native_cells": 164, "loaded_functions": 53, "R16_1": "PASS", "R16_2": "PASS", "R16_3": "PASS", "save_new_session_full_equality": true, "hermes_acceptance": false, "subplan_complete": false}

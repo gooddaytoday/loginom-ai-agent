@@ -1,0 +1,22 @@
+{
+  "orders.csv": {
+    "sha256": "16b6acbef9bb23e4d87deaa9d16eb72e37bb8dd61fa74c1c48282bdf7d175152",
+    "bytes": 56
+  },
+  "lookup.csv": {
+    "sha256": "f55e06983434e3b060e8d458c549087df3db183edce5f559ac2eae6ff91abeaa",
+    "bytes": 38
+  },
+  "sales.csv": {
+    "sha256": "632f2032ff9daec19b5051166b59574cdcbbf1cb35dbbb6573a9b57cf590e40b",
+    "bytes": 121
+  },
+  "wide.csv": {
+    "sha256": "502af42fb2c78d54e1ccbf72faf5ca7bf411a68e09cff2e47a10d77b0d08aa7a",
+    "bytes": 44
+  },
+  "expected.json": {
+    "sha256": "279da09e63ad3d22cc845807427b2cda8f8654aff4092329c350aca6fff93170",
+    "bytes": 13565
+  }
+}

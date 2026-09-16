@@ -1,0 +1,1 @@
+return await ctx.execute(`async page=>{await page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnPackagesMenu"]').click();await page.locator('[data-tid="MF;MainMenuForm;btnClosePackage"]').click();return true;}`);

@@ -1,0 +1,114 @@
+{
+  "node": 11,
+  "name": "Замена",
+  "stage": "development",
+  "status": "completed",
+  "next_stage": "review",
+  "next_stage_ready": true,
+  "review_completed": false,
+  "autonomous_acceptance_completed": false,
+  "branch": "codex/node-11-replacement",
+  "base_commit": "e4ae106842293d65fa10399284fe0deab2762898",
+  "runtime_revision": "8ff2de3c4e5e35dc4a2f02af1b2e1d6608ef7448e91ce72a9a67653a9005690f",
+  "package_path": "/test-2/Node11-Handler-90de4e18.lgp",
+  "checks": {
+    "public_multi": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/961f9801-0b4f-4eae-bde1-156bf3a1224e/multi-audit.json"
+    },
+    "new_replace_aliases": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/961f9801-0b4f-4eae-bde1-156bf3a1224e/qa-new-audit.json"
+    },
+    "unchanged_reopen": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/7809ab9a-c36e-44cf-b5b7-bf8f38de7347/qa-reopen-audit.json"
+    },
+    "partial_done": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/7809ab9a-c36e-44cf-b5b7-bf8f38de7347/qa-update-config-audit.json"
+    },
+    "partial_output": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/7809ab9a-c36e-44cf-b5b7-bf8f38de7347/qa-updated-audit.json"
+    },
+    "wide_rules": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/wide-audit.json"
+    },
+    "wide_fresh_source": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/wide-refreshed-audit.json"
+    },
+    "empty_import": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/empty-source-audit.json"
+    },
+    "empty_replace": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/empty-audit.json"
+    },
+    "persisted_import": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/import-persistence-audit.json"
+    },
+    "save_reopen_reexecute": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/persistence-audit-v2.json"
+    },
+    "dropped_mcp_response": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/lost-response-audit.json"
+    },
+    "source": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/source-audit.json"
+    },
+    "close_rollback": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/7809ab9a-c36e-44cf-b5b7-bf8f38de7347/qa-close-audit.json"
+    },
+    "idempotent_replay": {
+      "passed": true,
+      "evidence": ".dock/stream-runtime/sessions/961f9801-0b4f-4eae-bde1-156bf3a1224e/replay-multi.json"
+    },
+    "pre_ui_refusals": {
+      "passed": true,
+      "count": 4,
+      "evidence": ".dock/stream-runtime/sessions/7809ab9a-c36e-44cf-b5b7-bf8f38de7347/refusals.json"
+    },
+    "negative_evidence": {
+      "passed": true,
+      "count": 26,
+      "evidence": [
+        ".dock/stream-runtime/sessions/961f9801-0b4f-4eae-bde1-156bf3a1224e/multi-negative-bound.json",
+        ".dock/stream-runtime/sessions/7809ab9a-c36e-44cf-b5b7-bf8f38de7347/close-negative.json",
+        ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/persistence-negative.json",
+        ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/lost-response-negative.json"
+      ]
+    },
+    "runtime_unchanged": {
+      "passed": true,
+      "files": 155,
+      "revision": "8ff2de3c4e5e35dc4a2f02af1b2e1d6608ef7448e91ce72a9a67653a9005690f"
+    },
+    "client_suite": {
+      "passed": true,
+      "tests": 1403,
+      "pass": 1402,
+      "skip": 1,
+      "fail": 0,
+      "evidence": ".dock/replacement/client-tests-20260913.log"
+    }
+  },
+  "limitations": [
+    "Only exact internal same-type string/integer/real rules; numeric precision zero.",
+    "Case-insensitive non-ASCII keys are refused.",
+    "Remaining-value real editor is limited to values unchanged by rounding to two decimal places.",
+    "Live long-table coverage: 24 string pairs; contract resource caps are not exhaustive live coverage.",
+    "Hermes Sol/low autonomous acceptance and one review remain separate coordinator stages.",
+    "Candidate catalog is the pinned development profile, not a published accepted release.",
+    "archiveActive=false does not establish global native-hook isolation."
+  ],
+  "production_changed": false
+}

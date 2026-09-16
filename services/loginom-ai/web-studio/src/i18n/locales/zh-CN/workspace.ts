@@ -1,0 +1,848 @@
+const workspace = {
+  appShell: {
+    connect: {
+      title: '将智能体连接到 Loginom',
+      description:
+        '使用 Codex 或 Hermes，借助共享文档和本机浏览器创建并运行 Loginom 工作流。',
+      choose: '选择智能体',
+      codexDescription: '通过 Codex 插件目录安装',
+      hermesDescription: '安装到所选 Hermes 配置',
+      stepsTitle: '开始第一个任务',
+      requirements:
+        '需要 Apple 芯片的 macOS 或带桌面的 Linux x64、受支持的智能体，以及 Loginom 网络访问权限。',
+      codexStep1: '下载当前版本并运行连接向导，准备 Dock 运行环境和浏览器。',
+      codexStep2:
+        '在向导中输入 Dock 客户端密钥和 Loginom 地址，通过 Codex 插件管理器安装 Loginom Dock，并检查其钩子。',
+      codexStep3:
+        '新建任务并让 Codex 操作 Loginom；如有需要，在 Dock 浏览器中登录。',
+      hermesStep1: '下载当前版本，为所选 Hermes 配置运行连接向导。',
+      hermesStep2:
+        '输入 Dock 客户端密钥和 Loginom 地址，向导将通过 Hermes 安装固定版本的插件和连接。',
+      hermesStep3:
+        '如使用 Hermes 网关，请重启网关，然后新建会话并让 Hermes 操作 Loginom。如有需要，在 Dock 浏览器中登录。',
+      download: '下载 {{version}}',
+      pending: '首个版本正在进行验收测试。通过验证的下载将在准备就绪后显示。',
+      addressTitle: 'Dock 地址',
+      addressDescription: '在连接向导中使用此地址。客户端密钥仅在本机输入。',
+      copy: '复制地址',
+      copied: '已复制',
+      copyFailed: '请选择并复制上方地址。',
+      sharedTitle: '共享知识库',
+      sharedDescription:
+        'Dock 准备成功后，Loginom 任务将被归档。消息和工具结果经敏感信息清理后与其他 Dock 参与者共享。',
+      localDescription:
+        '浏览器配置和二进制文件保留在本机。每个任务使用独立的浏览器配置，个人记忆提供方保持不变。',
+    },
+    footer: {
+      agentIntegrations: 'Agent 接入',
+      connection: '连接设置',
+      docs: '文档站',
+      github: 'GitHub',
+      sdkApi: 'SDK 与 API',
+      users: '用户管理',
+    },
+    header: {
+      currentUser: {
+        account: '账号',
+        accountSummary: '账号 · {{account}}',
+        loadingUsers: '正在加载用户',
+        loadUsersFailed: '用户列表加载失败',
+        noUsers: '当前账号暂无用户',
+        openMenu: '查看当前用户 {{user}}',
+        retry: '重试',
+        signedInAs: '当前数据访问身份',
+        switchSuccess: '用户切换成功',
+        switchAction: '切换用户',
+        switchUser: '切换用户',
+        unset: '未设置',
+        user: '用户',
+        userId: '用户 ID',
+        userIdPlaceholder: '输入用户 ID',
+      },
+      defaultTitle: 'Loginom Dock',
+    },
+    navigation: {
+      connect: { title: '连接' },
+      home: {
+        title: '首页',
+      },
+      crossDeviceVerify: {
+        title: 'OAuth 验证',
+      },
+      operations: {
+        title: '运维',
+      },
+      requestLogs: {
+        title: '请求日志',
+      },
+      monitoring: {
+        title: '监控',
+      },
+      skills: {
+        title: '技能',
+      },
+      tasks: {
+        title: '任务中心',
+      },
+      watches: {
+        title: '定时同步',
+      },
+      retrieval: {
+        title: '检索',
+      },
+      sessions: {
+        title: '会话',
+      },
+      playground: {
+        title: '工作台',
+      },
+    },
+    sidebar: {
+      groups: {
+        operations: '活动',
+        resources: '资源',
+        settings: '设置',
+        workspace: '工作区',
+      },
+      loadingSessions: '加载中...',
+      noSessions: '暂无会话',
+      workspaceGroupLabel: 'Loginom Dock',
+    },
+  },
+  monitoringPage: {
+    title: '监控',
+    description: '查看 Loginom Dock 各组件的实时健康状态。',
+    version: 'v{{version}}',
+    refresh: '刷新',
+    updatedAt: '更新于 {{time}}',
+    loading: '正在加载监控数据...',
+    loadFailed: '监控数据加载失败',
+    health: {
+      healthy: '正常',
+      unhealthy: '异常',
+    },
+    summary: {
+      healthy: '所有组件运行正常',
+      unhealthy: '部分组件需要关注',
+      components: '{{healthy}} / {{total}} 个组件正常',
+    },
+    queue: {
+      title: '任务队列',
+      noData: '暂无队列数据',
+      queueName: '队列',
+      processing: '处理中',
+      pending: '等待中',
+      completed: '已完成',
+      processed: '已处理',
+      requeued: '重新入队',
+      errors: '错误',
+      totalRow: '合计',
+      embedding: 'Embedding',
+      semanticNodes: '语义节点',
+      semantic: '语义处理',
+      externalParse: '外部解析',
+      addResource: '添加资源',
+      sessionCommit: '会话提交',
+      userDeletion: '删除用户',
+    },
+    tabs: {
+      label: '监控类型',
+      overview: '总览',
+      queue: '任务队列',
+      vikingdb: '向量数据库',
+      models: '模型',
+      filesystem: '文件系统',
+      lock: '锁',
+      retrieval: '检索',
+    },
+    detail: {
+      noData: '暂无监控数据',
+      columns: {
+        averageMs: '平均耗时（毫秒）',
+        calls: '调用次数',
+        collection: '集合',
+        completion: '输出 Token',
+        contextType: '上下文类型',
+        count: '次数',
+        indexCount: '索引数',
+        lastUpdated: '最后更新时间',
+        maximumMs: '最长耗时（毫秒）',
+        metric: '指标',
+        minimumMs: '最短耗时（毫秒）',
+        model: '模型',
+        operation: '操作',
+        prompt: '输入 Token',
+        provider: '供应商',
+        queries: '查询次数',
+        status: '状态',
+        total: '合计',
+        value: '数值',
+        vectorCount: '向量数',
+      },
+      descriptions: {
+        queue: '资源处理、语义生成和会话提交队列。',
+        vikingdb: '向量数据存储与索引服务。',
+        models: 'VLM、Embedding 和 Rerank 模型服务。',
+        filesystem: 'Loginom Dock 文件系统与挂载点。',
+        lock: '事务锁与并发控制服务。',
+        retrieval: '上下文检索服务。',
+      },
+      metrics: {
+        averageLatency: '平均延迟（毫秒）',
+        averageResults: '平均每次查询结果数',
+        averageScore: '平均相关度',
+        maximumLatency: '最长延迟（毫秒）',
+        overallAverage: '总体平均耗时（毫秒）',
+        rerankFallback: 'Rerank 回退次数',
+        rerankUsed: 'Rerank 使用次数',
+        scoreRange: '相关度范围',
+        totalOperations: '操作总数',
+        totalQueries: '查询总数',
+        totalResults: '结果总数',
+        totalTime: '总耗时（秒）',
+        zeroResultQueries: '无结果查询次数',
+        zeroResultRate: '无结果查询占比',
+      },
+      statusText: {
+        activeLocks: '活动锁：{{count}}',
+        conflicts: '冲突：{{count}}',
+        embeddingModels: 'Embedding 模型：',
+        filesystemError: '获取文件系统统计数据失败：{{error}}',
+        filesystemUnavailable: '暂无文件系统统计数据。',
+        modelUsageUnavailable: '暂无模型用量数据。',
+        mount: '挂载点：{{path}}（插件：{{plugin}}）',
+        noCollections: '未找到集合。',
+        noFilesystemOperations: '尚未记录文件系统操作。',
+        notInitialized: '尚未初始化。',
+        queueUnavailable: '暂无队列状态数据。',
+        rerankModels: 'Rerank 模型：',
+        retrievalUnavailable: '尚未记录检索请求。',
+        staleLocksRemoved: '已清理的过期锁：{{count}}',
+        vikingdbUnavailable: 'VikingDB 管理器尚未初始化。',
+        vlmModels: 'VLM 模型：',
+        waitingLocks: '等待中的锁：{{count}}',
+      },
+      values: {
+        configured: '已配置',
+        error: '错误',
+        ok: '正常',
+        total: '合计',
+        unknown: '未知',
+      },
+    },
+    offline: {
+      title: '尚未连接 Loginom Dock 服务',
+      description: '配置服务地址和访问凭证后即可查看监控数据。',
+      action: '打开连接设置',
+    },
+  },
+  skillsPage: {
+    title: '技能',
+    description: '查看当前用户和当前空间可用的 Agent 技能。',
+    refresh: '刷新',
+    loading: '正在加载技能...',
+    empty: '暂无可用技能',
+    emptyDescription: '添加技能后，会按用户技能和共享技能分开展示。',
+    emptyScope: '暂无{{scope}}',
+    emptyScopeDescription: '添加对应作用域的技能后，会在这里展示。',
+    loadFailed: '技能加载失败',
+    networkError: '无法连接 Loginom Dock 服务，请检查服务地址和连接状态。',
+    connectionSettings: '打开连接设置',
+    detail: '详情',
+    openPlayground: '在工作台中打开',
+    viewDetail: '查看 {{name}} 详情',
+    detailLoading: '正在加载技能详情...',
+    detailLoadFailed: '技能详情加载失败',
+    directory: '目录',
+    none: '无',
+    metrics: {
+      files: '文件',
+      scope: '作用域',
+    },
+    sections: {
+      allowedTools: '允许工具',
+      content: 'SKILL.md',
+      description: '简介',
+      files: '文件',
+      overview: '概览',
+      tags: '标签',
+    },
+    scopes: {
+      user: '用户技能',
+      agent: '共享技能',
+    },
+    tabs: {
+      agent: '共享技能',
+      label: '技能作用域',
+      user: '用户技能',
+    },
+  },
+  tasksPage: {
+    title: '任务中心',
+    description: '集中查看资源处理、会话提交和重建索引等后台任务。',
+    refresh: '刷新',
+    loading: '正在加载任务...',
+    empty: '暂无后台任务',
+    emptyDescription: '异步任务启动后，会在这里显示执行状态和更新时间。',
+    emptyFiltered: '没有匹配的任务',
+    emptyFilteredDescription: '可以调整或清除筛选条件后重新查看。',
+    loadFailed: '任务加载失败',
+    detail: {
+      title: '任务详情',
+      loading: '正在加载任务详情...',
+      loadFailed: '任务详情加载失败',
+      retry: '重试',
+      openLabel: '查看任务 {{taskId}} 的详情',
+      fields: {
+        status: '任务状态',
+        type: '任务类型',
+        stage: '当前阶段',
+        resource: '关联资源',
+        createdAt: '创建时间',
+        updatedAt: '更新时间',
+      },
+      error: '失败原因',
+      result: '执行结果',
+      noResult: '暂无执行结果',
+      noResultDescription: '任务完成后，接口返回的结果会显示在这里。',
+      noResultFailedDescription: '该任务未返回结果，请查看上方失败原因。',
+      noResultCancelledDescription: '该任务已取消，未返回执行结果。',
+    },
+    filters: {
+      label: '筛选',
+      type: '任务类型',
+      status: '任务状态',
+      allTypes: '全部类型',
+      allStatuses: '全部状态',
+      clear: '清除筛选',
+    },
+    pagination: {
+      next: '下一页',
+      page: '第 {{page}} 页',
+      pageSize: '每页条数',
+      pageSizeValue: '每页 {{count}} 条',
+      previous: '上一页',
+      scope: '当前展示最近 {{count}} 条任务（接口最多返回 {{limit}} 条）',
+    },
+    table: {
+      task: '任务',
+      type: '类型',
+      resource: '关联资源',
+      createdAt: '创建时间',
+      status: '状态',
+    },
+    status: {
+      cancelled: '已取消',
+      cancelling: '取消中',
+      completed: '已完成',
+      failed: '失败',
+      pending: '等待中',
+      running: '进行中',
+      unknown: '未知',
+    },
+    types: {
+      session_commit: '会话提交',
+      add_resource: '资源处理',
+      add_skill: '技能导入',
+      connector_import: '连接器导入',
+      admin_reindex: '重建索引',
+      snapshot_restore_reindex: '快照恢复索引',
+      legacy_migration: '旧数据迁移',
+      legacy_cleanup: '旧数据清理',
+    },
+  },
+  watchesPage: {
+    title: '定时同步',
+    description: '通过定时同步任务检查远程资源更新，并集中管理同步计划。',
+    refresh: '刷新',
+    add: '添加',
+    adding: '添加中...',
+    loading: '正在加载定时同步...',
+    loadFailed: '定时同步加载失败',
+    empty: '暂无定时同步',
+    emptyDescription: '添加远程资源并开启定时同步后，会在这里显示。',
+    never: '尚未同步',
+    cancel: '取消',
+    save: '保存',
+    creation: {
+      title: '正在创建定时同步',
+      description: '资源已提交到后台，列表会自动刷新，请稍候。',
+    },
+    columns: {
+      resource: '资源',
+      source: '来源',
+      status: '状态',
+      interval: '同步周期',
+      lastRun: '上次同步',
+      nextRun: '下次同步',
+      actions: '操作',
+    },
+    status: {
+      active: '已启用',
+      disabled: '已关闭',
+    },
+    actions: {
+      trigger: '立即同步',
+      syncing: '同步中...',
+      disable: '关闭',
+      enable: '启用',
+      more: '更多',
+      history: '处理记录',
+      edit: '编辑',
+      delete: '删除',
+    },
+    interval: {
+      minutes_one: '每分钟',
+      minutes_other: '每 {{count}} 分钟',
+      hours_one: '每小时',
+      hours_other: '每 {{count}} 小时',
+      days_one: '每天',
+      days_other: '每 {{count}} 天',
+    },
+    addDialog: {
+      title: '添加定时同步',
+      description: '添加远程资源，并设置 Loginom Dock 检查更新的周期。',
+    },
+    editDialog: {
+      title: '编辑定时同步',
+      interval: '同步周期（分钟）',
+      intervalHint: '例如每小时填写 60，每天填写 1440。',
+      reason: '添加原因（可选）',
+      reasonPlaceholder: '为什么要持续同步这个资源？',
+      instruction: '处理指令（可选）',
+      instructionPlaceholder: '针对该资源的特殊处理指令。',
+    },
+    deleteDialog: {
+      title: '删除定时同步？',
+      description: '资源 {{uri}} 会继续保留，但不会再自动同步更新。',
+    },
+    history: {
+      title: '处理记录',
+      description:
+        '按当前资源筛选后台处理任务，其中可能包含首次导入、手动处理和定时同步。',
+      loading: '正在加载处理记录...',
+      loadFailed: '处理记录加载失败',
+      empty: '暂无处理记录',
+      emptyDescription: '该资源暂时没有可查询的后台处理任务。',
+      stage: '处理阶段',
+    },
+    toast: {
+      creating: '正在创建定时同步，请稍候...',
+      created: '定时同步已添加',
+      createTimeout: '暂未查询到新任务，请稍后手动刷新',
+      updated: '定时同步已更新',
+      triggered: '同步任务已调度',
+      deleted: '定时同步已删除',
+    },
+  },
+  accountSwitcher: {
+    create: '新建账号',
+    dialog: {
+      accountLabel: '账号',
+      accountPlaceholder: 'team-account',
+      adminLabel: '初始管理员用户',
+      cancel: '取消',
+      description:
+        '创建一个新的空间和首个管理员。创建完成后将自动切换到该空间。',
+      submit: '创建并切换',
+      title: '新建账号',
+    },
+    empty: '没有匹配的账号',
+    errors: {
+      loadAccounts: '账号加载失败',
+      noCreatedKey: '账号已创建，但服务端没有返回可用于切换的数据凭证。',
+      noUsableKey: '该账号没有可用于数据访问的明文用户 API 密钥。',
+      noUsers: '该账号下没有可用用户。',
+    },
+    loading: '正在加载账号...',
+    manualSwitch: {
+      description:
+        '服务端没有返回 {{account}} 下的明文凭证。请输入该账号中任意用户的用户 API 密钥。',
+      hint: 'API 密钥只用于校验并切换当前数据身份，不会修改或重新生成服务端凭证。',
+      keyLabel: '用户 API 密钥',
+      keyPlaceholder: '粘贴目标账号的用户 API 密钥',
+      manageOnly: '仅管理该账号',
+      submit: '验证并切换',
+      title: '输入用户 API 密钥',
+    },
+    memberCount: '{{count}} 个用户',
+    searchPlaceholder: '搜索账号',
+    toast: {
+      created: '已创建并切换到 {{account}}',
+      createdSwitchFailed:
+        '{{account}} 已创建，但数据身份切换失败：{{error}}。仍可进入该账号管理用户。',
+      managementSwitched:
+        '管理空间已切换到 {{account}}。访问租户数据前，请先选择或创建用户密钥。',
+      switched: '已切换到 {{account}}',
+    },
+    unset: '未选择账号',
+  },
+  common: {
+    action: {
+      cancel: '取消',
+      saveConnection: '保存连接',
+      showAdvancedIdentityFields: '显示高级身份字段',
+    },
+    errorBoundary: {
+      description:
+        '路由渲染过程中出现未处理异常。可以先重试一次；如果问题持续，查看下方错误信息继续排查。',
+      reload: '刷新页面',
+      retry: '重试',
+      title: '页面发生错误',
+    },
+    language: {
+      current: '当前',
+      label: '语言',
+    },
+    theme: {
+      toggle: '切换主题',
+    },
+  },
+  connection: {
+    devMode: {
+      description:
+        '当前服务会自动提供身份，通常不需要填写账号、用户和 API 密钥。',
+      title: '服务端托管身份',
+    },
+    dialog: {
+      title: '连接设置',
+    },
+    identitySummary: {
+      dev: '服务端隐式身份',
+      named: '{{identity}}',
+      unset: '未设置身份',
+    },
+    fields: {
+      accountId: {
+        label: '账号',
+        placeholder: 'default',
+      },
+      apiKey: {
+        label: 'API 密钥',
+        placeholder: '输入 X-API-Key 或 Bearer 令牌',
+      },
+      adminApiKey: {
+        label: '管理员 API 密钥',
+        placeholder: 'Root 或账号管理员 API 密钥',
+      },
+      baseUrl: {
+        label: '服务地址',
+        placeholder: 'http://127.0.0.1:1933',
+      },
+      credentials: {
+        title: '身份与凭证',
+      },
+      dataApiKey: {
+        label: '用户 API 密钥',
+      },
+      userId: {
+        label: '用户',
+        placeholder: 'default',
+      },
+    },
+    errors: {
+      identitySwitchUnsupported: '当前服务器模式不支持切换身份。',
+      credentialMismatch: '所选凭证与目标账号和用户不匹配。',
+      rootRequired: '只有通过校验的 Root 凭证才能切换管理账号。',
+    },
+  },
+  settings: {
+    actions: {
+      addAccount: '新增账号',
+      addUser: '新增用户',
+      cancel: '取消',
+      changeRole: '修改 {{user}} 的角色',
+      confirmDeleteAccount: '永久删除账号',
+      confirmRemoveUser: '删除用户',
+      confirmRoleChange: '确认修改',
+      copy: '复制',
+      currentIdentity: '当前身份',
+      deleteAccount: '删除账号',
+      refresh: '刷新',
+      regenerate: '重新生成',
+      removeUser: '删除 {{user}}',
+      save: '保存',
+      switchIdentity: '切换身份',
+      use: '使用',
+    },
+    connection: {
+      accountListLimited:
+        '当前密钥不能列出所有账号；如果它有账号管理员权限，仍可管理选中的账号。',
+      adminError: 'Root API 密钥校验失败：{{message}}',
+      description:
+        '租户数据 API 使用用户 API 密钥；控制 API 可另行使用 Root 或账号管理员 API 密钥。',
+      devMode: '当前为开发模式，身份会自动确定，无需 API 密钥。',
+      keyGuide: {
+        control: {
+          primary:
+            '当前用户 API 密钥已可用于工作台和数据访问，普通用户无需配置控制凭证。',
+          secondary:
+            '如需切换账号或管理用户，请向部署管理员索取 Root API 密钥，或向当前账号管理员索取管理员 API 密钥。Root API 密钥位于服务端 ov.conf 的 server.root_api_key。',
+          title: '需要管理账号或用户？',
+        },
+        data: {
+          primary:
+            'Root 或管理员 API 密钥主要用于管理操作；工作台和租户数据 API 需要绑定用户身份的用户 API 密钥。',
+          secondary:
+            '请在“用户管理”中选择或创建用户，或者重新生成用户密钥，然后将其用作用户 API 密钥。',
+          title: '还缺少用户 API 密钥',
+        },
+        empty: {
+          primary: '普通用户：请向当前账号管理员索取用户 API 密钥。',
+          secondary:
+            '部署管理员：Root API 密钥位于服务端 ov.conf 的 server.root_api_key；填入后可在“用户管理”中创建或重新生成用户密钥。',
+          title: '还没有 Loginom Dock API 密钥？',
+        },
+        learnMore: '查看 API 密钥获取方式',
+        trusted: {
+          primary:
+            '当前 Trusted 服务启用了 Root API 密钥校验。浏览器需要配置相同的密钥，才能访问管理接口和租户数据接口。',
+          secondary:
+            '请向部署管理员索取 Root API 密钥；它位于服务端 ov.conf 的 server.root_api_key。Trusted 模式的数据身份由账号和用户断言确定，不需要用户 API 密钥。',
+          title: 'Trusted 服务需要 Root API 密钥',
+        },
+      },
+      rootHint: '用于列出账号和用户，以及生成或轮换密钥。',
+      title: '连接设置',
+      unsupportedAuthMode: {
+        description:
+          'Web Studio 不支持 {{mode}} 认证模式。请使用 {{ov}} CLI 或 Python SDK 连接此服务器。',
+        primary: '该服务器配置了 {{mode}} 认证。',
+        title: '不支持的认证模式',
+      },
+      userHint: '供工作台和租户数据 API 使用。',
+    },
+    connectionPage: {
+      description: '配置 Loginom Dock 服务连接、控制面凭证和当前数据访问凭证。',
+      title: '连接设置',
+    },
+    dialogs: {
+      addAccount: {
+        description:
+          '创建一个工作区账号和首位管理员用户。新密钥只会在创建后展示一次。',
+        title: '新增账号',
+      },
+      addUser: {
+        currentAccountDescription:
+          '在 {{accountId}} 空间下创建用户。生成的密钥只会在创建后展示一次。',
+        description: '在已有账号下注册用户。生成的密钥只会在创建后展示一次。',
+        title: '新增用户',
+      },
+      changeRole: {
+        description:
+          '将 {{account}} / {{user}} 的角色修改为 {{role}}。新的权限会立即生效。',
+        title: '修改用户角色？',
+      },
+      deleteAccount: {
+        confirmHint: '账号名称必须完全一致。',
+        confirmLabel: '请输入 {{account}} 以确认',
+        description:
+          '此操作将永久删除 {{account}}，之后将无法再访问该账号，且无法撤销。',
+        title: '删除这个账号？',
+      },
+      regenerate: {
+        description:
+          '要重新生成 {{account}} / {{user}} 的 API 密钥吗？当前密钥会立即失效。',
+        title: '重新生成 API 密钥？',
+      },
+      removeUser: {
+        description:
+          '确定从 {{account}} 空间移除 {{user}} 吗？该用户的 API 密钥会立即失效，此操作不可撤销。',
+        title: '删除用户？',
+      },
+    },
+    empty: {
+      adminDescription:
+        '使用 Root 或账号管理员 API 密钥后，可以列出用户、复制密钥、新增身份或轮换凭证。',
+      adminTitle: '需要管理员权限',
+      usersDescription: '创建一个用户以生成第一个 API 密钥。',
+      usersTitle: '选中的账号下没有用户',
+    },
+    fields: {
+      account: '账号',
+      adminUser: '管理员用户',
+      adminApiKey: '管理员 API 密钥',
+      apiKey: 'API 密钥',
+      baseUrl: '服务地址',
+      dataApiKey: '用户 API 密钥',
+      rootApiKey: 'Root 或管理员 API 密钥',
+      userApiKey: '用户 API 密钥',
+      role: '角色',
+      user: '用户',
+    },
+    health: {
+      admin: '控制面权限',
+      data: '数据访问',
+      detail: {
+        accountAdminAvailable: '账号管理员权限可用',
+        adminModeRequired: '管理 API 需要使用 API 密钥模式或 Trusted 模式',
+        controlKeyRequired: '需要 Root 或账号管理员 API 密钥',
+        dataKeyRequired: '需要用户或账号管理员 API 密钥',
+        rootAvailable: 'Root 管理权限可用',
+        tenantDataAvailable: '租户数据访问可用',
+        trustedIdentityRequired: 'Trusted 模式的数据访问需要账号和用户信息',
+      },
+      state: {
+        checking: '检查中',
+        error: '异常',
+        ok: '正常',
+        skipped: '未检查',
+      },
+    },
+    keyResult: {
+      description:
+        '请现在复制保存。离开当前状态后，Loginom Dock 可能只展示前缀。',
+      dismiss: '收起',
+      title: '新的 API 密钥',
+    },
+    loading: '正在加载身份...',
+    management: {
+      accountFilter: '账号',
+      accessDeniedDescription:
+        '只有配置并通过校验的 Root 或账号管理员 API 密钥才能管理用户。',
+      accessDeniedTitle: '无用户管理权限',
+      currentAccountDescription: '管理 {{account}} 空间下的用户和访问凭证。',
+      description: '查看选中账号下的用户和凭证，并在网页端新增用户或轮换密钥。',
+      memberListDescription:
+        '“切换身份”会将该用户设为工作台、检索等数据页面的访问身份，不会改变当前 Root 或管理员凭证。',
+      memberListDescriptionRoot:
+        '可直接修改成员角色。“切换身份”只会改变工作台、检索等数据页面的访问身份，不会改变当前 Root 管理凭证。',
+      memberListTitle: '空间成员',
+      cannotRemoveCurrentIdentity: '不能删除当前正在使用的身份。',
+      cannotRemoveLastManager: '不能删除空间内最后一个管理员。',
+      noUsableKey: '该用户没有可用于数据访问的明文 API 密钥。',
+      openConnection: '打开连接设置',
+      title: '用户管理',
+    },
+    page: {
+      adminDescription:
+        '配置当前 Loginom Dock 身份，并管理账号、用户和 API 密钥。',
+      description:
+        '配置当前 Loginom Dock 的服务地址和 API 密钥，查看当前身份下的数据。',
+      title: '连接设置',
+    },
+    placeholders: {
+      account: 'team-account',
+      adminApiKey: 'Root 或账号管理员 API 密钥',
+      apiKey: '输入 X-API-Key 或 Bearer 令牌',
+      baseUrl: 'http://127.0.0.1:1933',
+      devModeApiKey: '[开发模式，无需 API 密钥]',
+      userApiKey: '用户 API 密钥',
+      user: 'default',
+    },
+    roles: {
+      admin: '管理员',
+      root: 'Root',
+      user: '用户',
+    },
+    serverMode: {
+      api_key: 'API 密钥模式',
+      checking: '检查中...',
+      dev: '开发模式',
+      ldap: 'LDAP 模式',
+      offline: '离线',
+      oidc: 'OIDC 模式',
+      trusted: 'Trusted 模式',
+    },
+    stats: {
+      accounts: '账号总数',
+      apiKeys: '可见 API 密钥',
+      users: '用户数',
+    },
+    table: {
+      account: '账号',
+      actions: '操作',
+      apiKey: 'API 密钥',
+      role: '角色',
+      user: '用户',
+    },
+    toast: {
+      accountCreated: '账号已创建',
+      accountDeleted: '{{account}} 已删除',
+      accountDeletedRecoveryFailed:
+        '账号已删除，但无法加载剩余账号列表：{{error}}',
+      connectionSaved: '连接已保存',
+      copyFailed: '复制失败',
+      copied: '已复制',
+      dataKeySelected: '已切换数据访问身份',
+      keyRegenerated: 'API 密钥已重新生成',
+      roleUpdated: '{{user}} 的角色已修改为 {{role}}',
+      userCreated: '用户已创建',
+      userRemoved: '{{user}} 已删除',
+    },
+  },
+  home: {
+    contextCommits: {
+      description:
+        '按 4 小时聚合资源、技能、会话消息和提交写入，鼠标悬停可查看明细。',
+      empty: '过去一年暂无上下文提交',
+      hourRange: '{{start}}-{{end}}',
+      legend: {
+        high: '高',
+        intense: '密集',
+        low: '低',
+        medium: '中',
+        more: '多',
+        none: '少',
+        title: '提交强度',
+      },
+      operations: {
+        addResource: '资源写入',
+        addSkill: '技能写入',
+        sessionAddMessage: '会话消息',
+        sessionCommit: '会话提交',
+      },
+      stats: {
+        activeDays: '活跃天数',
+        peakDay: '峰值单日',
+        recentDay: '最近提交',
+      },
+      title: '上下文提交统计',
+      yearlyEmpty: '暂无上下文提交',
+      yearlyTotal: '{{count}} 次上下文提交',
+      tooltip: {
+        total: '总提交',
+      },
+    },
+    contextData: {
+      description: '包含文件、技能与用户记忆，用于衡量当前上下文资源规模。',
+      files: '文件',
+      memories: '记忆',
+      skills: '技能',
+      title: '上下文数据量',
+    },
+    page: {
+      description:
+        '汇总上下文数据、今日检索、Token 用量和上下文提交等运行数据。',
+      eyebrow: 'Loginom Dock',
+      settings: '连接与设置',
+      title: '概览',
+    },
+    requestFailed: '请求失败',
+    todayRetrievals: {
+      description:
+        '展示今日基础检索（find()）和增强检索（search()）的成功调用次数，每天零点刷新。',
+      find: '基础检索',
+      search: '增强检索',
+      title: '今日检索次数',
+    },
+    todayTokens: {
+      description: '展示今日实时 Token 用量，每天零点刷新。',
+      embeddingInput: 'Embedding 输入 Token',
+      title: '今日 Token 用量',
+      vlmInput: 'VLM 输入 Token',
+      vlmOutput: 'VLM 输出 Token',
+    },
+    tokenTrend: {
+      description:
+        '展示最近 14 天的每日 Token 用量，包括 VLM 输入、VLM 输出和 Embedding 输入。',
+      empty: '最近 14 天暂无 Token 用量',
+      title: 'Token 总用量统计',
+    },
+    usageDisabled: '用量和审计功能尚未初始化，暂无实时统计。',
+    usageAccessRequired:
+      '当前连接没有管理员或 Root 权限，无法显示用量和审计数据。请在“连接设置”中配置具备控制台用量和审计权限的 API 密钥。',
+  },
+} as const
+
+export default workspace

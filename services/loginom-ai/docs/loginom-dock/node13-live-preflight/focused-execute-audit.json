@@ -1,0 +1,82 @@
+{
+  "passed": true,
+  "checks": {
+    "configuration": {
+      "passed": true,
+      "failures": [],
+      "projection": [
+        {
+          "name": "SmallMonthEnd",
+          "label": "Конец месяца B",
+          "type": "datetime",
+          "input": "DateB",
+          "operation": "month_end"
+        },
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "integer",
+          "input": "Id"
+        },
+        {
+          "name": "DateA",
+          "label": "Дата",
+          "type": "datetime",
+          "input": "DateA"
+        },
+        {
+          "name": "DateB",
+          "label": "Дата",
+          "type": "datetime",
+          "input": "DateB"
+        },
+        {
+          "name": "SmallMonthStart",
+          "label": "Начало месяца A",
+          "type": "datetime",
+          "input": "DateA",
+          "operation": "month_start"
+        },
+        {
+          "name": "SmallYear",
+          "label": "Год A",
+          "type": "integer",
+          "input": "DateA",
+          "operation": "year"
+        },
+        {
+          "name": "SmallQuarter",
+          "label": "Квартал B",
+          "type": "integer",
+          "input": "DateB",
+          "operation": "quarter"
+        },
+        {
+          "name": "SmallHour",
+          "label": "Час B",
+          "type": "integer",
+          "input": "DateB",
+          "operation": "hour"
+        }
+      ],
+      "scope": "date_time_raw_configuration"
+    },
+    "raw_output": {
+      "passed": true,
+      "failures": [],
+      "execution_id": "1789300984856-r5mjflbx9s:460:3",
+      "scope": "fresh_calculator_table_against_independent_expected",
+      "source_identity_verified": false,
+      "package_persistence_verified": false
+    },
+    "values": {
+      "passed": true,
+      "rows": 4,
+      "columns": 8,
+      "full_values_verified": true
+    }
+  },
+  "scope": "source_diagnostic_operation",
+  "hermes_acceptance": false,
+  "package_persistence_verified": false
+}

@@ -1,0 +1,123 @@
+{
+  "command": "node12:autonomous-acceptance:3:d0c9a5bedc170754dd251c982508e0ad8568d300091eda0027962c496df62adf",
+  "slot": "node12-hermes-20260913-d0c9a5be-candidate2",
+  "run_id": "20260913-072904-3cc4ad0e",
+  "result": "FAIL",
+  "passed_checks": 112,
+  "total_checks": 118,
+  "failed_checks": [
+    "main10_import_contract",
+    "main10_persisted_import",
+    "null8_import_contract",
+    "null8_persisted_import",
+    "empty_import_contract",
+    "empty_persisted_import"
+  ],
+  "node_apply_operations": 16,
+  "package_path": "/test-1/packages/Dock-acceptance-20260913-072904-3cc4ad0e.lgp",
+  "source_commit": "0e11a3fb24ca40a9f855008d2b0d1856d6f771ad",
+  "run_head": "b4853c97a09a12096b44475587274681ee285350",
+  "runtime": "1459a3d10e84a0f4742933f68333cb5843f27347b0062656d090a306446e4248",
+  "harness": "b8d5b9ced1725cbbb64da0d92d93a74cd2f90bf9b8f8ff0efbf1a4a2f434b9d3",
+  "goal": "eeb7594606862826a86e21c9defeaa9bd30ecccade23177b4be26b1438bbcb78",
+  "native_skill": "b9c0c5a9d09cbcc2e1f6d93dc41206f0d3837c517fcf970d4d2d787f4edf4872",
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node12.2-candidate/manifest.json",
+  "manifest_sha256": "d0c9a5bedc170754dd251c982508e0ad8568d300091eda0027962c496df62adf",
+  "process": {
+    "returncode": 0,
+    "timed_out": false,
+    "usage": {
+      "provider": "openai-codex",
+      "model": "gpt-5.6-sol",
+      "api_calls": 42,
+      "completed": true,
+      "failed": false,
+      "input_tokens": 158332,
+      "output_tokens": 12070,
+      "total_tokens": 3161506,
+      "cache_read_tokens": 2991104,
+      "cache_write_tokens": 0,
+      "reasoning_tokens": 1548
+    }
+  },
+  "reasoning_effort": "low",
+  "actual_session_identity": [
+    [
+      "gpt-5.6-sol",
+      "openai-codex",
+      "subscription_included"
+    ]
+  ],
+  "auth_guard": {
+    "policy": "existing-hermes-no-refresh-or-import-v1",
+    "installed": true,
+    "blocked_attempts": 0
+  },
+  "auth_connection_unchanged": true,
+  "window": {
+    "screens": [
+      {
+        "frame": [
+          0,
+          0,
+          1512,
+          982
+        ],
+        "visibleFrame": [
+          0,
+          0,
+          1512,
+          949
+        ]
+      }
+    ],
+    "windows": [
+      {
+        "bounds": {
+          "Height": 949,
+          "Width": 1508,
+          "X": 4,
+          "Y": 33
+        },
+        "layer": 0,
+        "number": 2971,
+        "pid": 66848
+      }
+    ]
+  },
+  "viewport": null,
+  "browser_session_id": "10f5ae4f-860b-483d-ba80-4d49b69e87e3",
+  "precheck_session_id": "92e432a8-69c1-4292-94a9-8092b4e16a54",
+  "diagnosis": "All three imports used exact identity output mappings. All other import_contract clauses match; frozen contract requires mappings==[]. Persisted composite fails closed before schema/native parameter verification because seed mappings are outside its admitted scope. Goal text preserves names and labels but does not explicitly prohibit identity mappings. This does not turn frozen FAIL into PASS.",
+  "confirmed_passes": [
+    "save_chain",
+    "reopen_binding_0..5",
+    "all 14 full_read checks",
+    "8 Duplicates output/schema/value/group checks",
+    "source bytes",
+    "persisted Duplicates roles",
+    "public_calls",
+    "frozen_harness",
+    "current_runtime_pin"
+  ],
+  "limitations": [
+    "Persisted import settings/schema composite remains unaccepted; not inferred from successful outputs.",
+    "Only integer/string inputs and NULL in Value scope; no boolean/real/datetime inputs, NULL keys, or standalone live lost-reply acceptance.",
+    "No full repeat review; no second model run authorized."
+  ],
+  "own_processes_remaining": false,
+  "receipts": {
+    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/request.json": "afc9fe20984a1dfb63cb288e9c9338676e9f85758ae474abbabfd40c4b47cee8",
+    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/scenario.txt": "af05fa83d742f92bcac1ff4c4f306de94abcca5b6d3d0ede588daee299cc798f",
+    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/evidence.json": "c9a358b46a8db72067b87a754efb8f8db8e7057a65e7a3f38314df14bc69ca28",
+    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/attempt.json": "838311a7f485851dac9b9e8495a6722f55c4026e41a8650979ef8c73ba359d96",
+    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/duplicates-node-audit.json": "1270695cd955d80d4e9505220a6136167cbbab150e1c236b58752af029327fc7",
+    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/efficiency.json": "c3f994812b8ac3396ac2aab67ae03ea5c4b583ef63070b8b367a43adfb16394b",
+    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/tool-precheck.json": "1deb718120d86d3cde78ffa8f091aeb1dbefc1f0d2c48416af5b924c587ed26c",
+    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/window-process-actual.json": "8cd78d98a43a19ec9c9024ebb8843491e5ec4e76ac18bd77e97919a4323f35b5",
+    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/window-geometry.json": "1e5ffcc6733d173345c42049dbfcf69482fa9395198c53d5dae3690a04e6beca",
+    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/model-identity-live.json": "f60a3ec450c120e805eb9c35df1b4892a175571ec13503ee74d0f98ef5f42e03",
+    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/import-contract-diagnosis.json": "6faff88409c137639f4393f6ed69c75090f1ac9352cbc5ae1bc9bf26f2e7da8b",
+    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/final-process-check.json": "71047a384f251072800b05269912159671915ec3abe26ab318c6a40507a4517a"
+  }
+}

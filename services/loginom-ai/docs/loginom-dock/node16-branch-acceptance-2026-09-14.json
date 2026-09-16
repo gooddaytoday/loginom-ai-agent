@@ -1,0 +1,13 @@
+{
+  "status": "ACCEPTED_BRANCH_NOT_MERGED",
+  "source": "8cd5c2811a216b45ae50a16a4ed1930e4e87fa59",
+  "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+  "run": "20260914-004604-475bb0c8",
+  "original_hashes_verified": 4,
+  "full_audit_recomputed": true,
+  "audit_groups_passed": 14,
+  "fresh_sessions": 10,
+  "fresh_cells": 470,
+  "original_failure_preserved": true,
+  "evidence": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/docs/loginom-dock/node16-final-acceptance-2026-09-14.json"
+}

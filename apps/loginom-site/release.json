@@ -1,0 +1,24 @@
+{
+  "version": "0.1.0-rc.8",
+  "tag": "loginom-dock@0.1.0-rc.8",
+  "repository": "https://github.com/kartamyshev-dev/loginom-dock",
+  "sourceCommit": "2712a9a9cf006c39e007eab3898cf6dcf100e140",
+  "endpoint": "https://loginom.duckdns.org/mcp",
+  "platforms": {
+    "darwin-arm64": {
+      "label": "macOS · Apple Silicon",
+      "bytes": 47894051,
+      "sha256": "21346e6e4445671b8b280d85de559403e91b16001eefd7a9d9cc6e6508afe399"
+    },
+    "linux-x64": {
+      "label": "Linux · x64",
+      "bytes": 53028467,
+      "sha256": "7f07585de23ddefc225afde00b46a4b89d125f24125cbda585d471f5c2b336f5"
+    },
+    "win32-x64": {
+      "label": "Windows 11 · x64",
+      "bytes": 45433302,
+      "sha256": "b58bc6ee3efc290b252167795f3e7b775a75ae1001ca04e973cf214d7d9bbe98"
+    }
+  }
+}

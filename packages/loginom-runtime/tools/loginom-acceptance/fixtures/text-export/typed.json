@@ -1,0 +1,40 @@
+{
+  "names": [
+    "id",
+    "text",
+    "number",
+    "flag",
+    "stamp"
+  ],
+  "labels": [
+    "id",
+    "text",
+    "number",
+    "flag",
+    "stamp"
+  ],
+  "rows": [
+    [
+      "1",
+      "Привет",
+      "1,25",
+      "Да",
+      "2024-02-29 13:14:15"
+    ],
+    [
+      "2",
+      "Сказал \"да\"",
+      "-2,5",
+      "Нет",
+      "2000-01-01"
+    ],
+    [
+      "3",
+      "",
+      null,
+      null,
+      null
+    ]
+  ],
+  "native_semantics": "Loginom 7.4.2 omits midnight time, observed in native exported bytes and source UI readback; time_format controls the nonzero time component."
+}

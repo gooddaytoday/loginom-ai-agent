@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {nodeApplyInputSchema} from '../lib/node-api.mjs';
+import {validateActionParameters} from '../lib/action-catalog.mjs';
+import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
+import {createCandidateNodeSupport} from '../lib/node-support.mjs';
+const request=()=>({operation_id:'union-op',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'flow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},target:{kind:'new',type:'transform.union_data',label:'Union',position:{x:400,y:200}},inputs:[0,1,2].map(input=>({input,output:0,source:{document_id:'doc',workflow_id:'flow',node_id:'source'+input}})),mode:'append_all',parameters:{prefixes:{enabled:false,name:'Union',label:'Объединение'},tables:[1,2].map(port=>({port,fields:[{source:'Field'+port,main:'Main'}]}))},mappings:[{direction:'input',port:2,autosync:false}],finish:'execute',read:{ports:[0],sample_rows:10,require_exact_numbers:true},budgets:{configure_ms:60000,execute_ms:60000,total_ms:180000}});
+const handlers=createCandidateNodeSupport({}).nodeApplyHandlers;
+test('public Union contract admits three sources and the installed typed handler',()=>{const r=request();assert.doesNotThrow(()=>validateActionParameters(nodeApplyInputSchema,r));assert.doesNotThrow(()=>validateNodeApplyRequest(r,handlers));assert.equal(typeof handlers.get('transform.union_data').configurationReadback,'function');});
+test('public Union contract refuses foreign, missing, unordered and unsupported inputs',()=>{for(const change of [r=>r.inputs[2].source.workflow_id='foreign',r=>r.inputs.pop(),r=>r.parameters.tables.reverse(),r=>r.mode='distinct',r=>r.mappings[0].port=3]){const r=request();change(r);assert.throws(()=>{validateActionParameters(nodeApplyInputSchema,r);validateNodeApplyRequest(r,handlers);});}});

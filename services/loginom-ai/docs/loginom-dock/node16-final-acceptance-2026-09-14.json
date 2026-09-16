@@ -1,0 +1,305 @@
+{
+  "status": "FULL_INDEPENDENT_AUDIT_PASS",
+  "source_sha": "8cd5c2811a216b45ae50a16a4ed1930e4e87fa59",
+  "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+  "execution_harness_commit": "ef6ba6b09c8d0aaf0744648deae493d6c5a7aee3",
+  "run_id": "20260914-004604-475bb0c8",
+  "model": {
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoning": "low",
+    "returncode": 0,
+    "timed_out": false
+  },
+  "wrapper_original": {
+    "status": "FAILED_MODEL_OR_EXPORT",
+    "returncode": 2,
+    "cause": "AttributeError on original string dedup/spillover tool result",
+    "original_audit_created": false
+  },
+  "original_export_hashes": {
+    "request.json": "35c5661b018e3967e6334508b180d3b5a02db42cd4a97e78f226b7b98afc12cf",
+    "scenario.txt": "86cee609e4320a38f6e3276cbe8c09cd347662e7b5a1790e297fea7fb868ee45",
+    "evidence.json": "a0f2378dd29fd577df2aa2a9dd6357baac8d5d3e0fd0aa2fa39a59b57982be85",
+    "attempt.json": "b2e91114c55820e5301ddf6209c99c1c984b307cd0b1c1f702547b09bbf9bea3"
+  },
+  "versioned_audit": {
+    "verifier_version": "node16-model5-transport-v1",
+    "verifier_sha256": "47ca8d60c140296f159b3bef845cc7b7d905e1087bde97bd69a37717c48e7629",
+    "original_export_preserved": true,
+    "original_harness_unchanged": true,
+    "run_id": "20260914-004604-475bb0c8",
+    "loss_verifier_delta": "Operator helper absent-outcome text checked exactly; original native NODE_WORKER_REJECTED/unresolved-phase proof and all no-work checks retained",
+    "recovered_transports": [
+      {
+        "kind": "duplicate",
+        "tool_call_id": "call_yYc0JhTogljqQKdd5g17FqQu@109:0",
+        "original_tool_call_id": "call_QJeD8JEMh0vLH5LwHuEgJWGe@107:0"
+      },
+      {
+        "kind": "duplicate",
+        "tool_call_id": "call_qAApFnzJmXZfWeHXJqs28xuN@111:0",
+        "original_tool_call_id": "call_QJeD8JEMh0vLH5LwHuEgJWGe@107:0"
+      },
+      {
+        "kind": "spill",
+        "tool_call_id": "call_ds4RRqm9WyhkDdxTCDHkwWaG@135:0",
+        "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/hermes-runs/20260914-004604-475bb0c8/private/hermes-home/cache/spillover/call_ds4RRqm9WyhkDdxTCDHkwWaG.txt",
+        "sha256": "28da00b7020e6be17c3e74400d81c3913c9bdcd02b98ddb4b85d7e86fc3352b5",
+        "characters": 66209
+      },
+      {
+        "kind": "spill",
+        "tool_call_id": "call_M1Tu1ESGFE6XGjOgL5SNocHo@143:0",
+        "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/hermes-runs/20260914-004604-475bb0c8/private/hermes-home/cache/spillover/call_M1Tu1ESGFE6XGjOgL5SNocHo.txt",
+        "sha256": "5b132fe3e5b32b9511ffec124981f7a90642323d9e36cbcced61552026e5dd77",
+        "characters": 69332
+      }
+    ],
+    "result": {
+      "scope": "collapse-node-complete FULL goal",
+      "passed": true,
+      "subplan_complete": true,
+      "hermes_acceptance": true,
+      "checks": {
+        "current_model_run": {
+          "passed": true
+        },
+        "case:mixed": {
+          "passed": true
+        },
+        "case:ignore": {
+          "passed": true
+        },
+        "case:header-only": {
+          "passed": true
+        },
+        "case:header-only-ignore": {
+          "passed": true
+        },
+        "case:all-null": {
+          "passed": true
+        },
+        "case:all-null-ignore": {
+          "passed": true
+        },
+        "case:mapped": {
+          "passed": true
+        },
+        "case:mapped-ignore": {
+          "passed": true
+        },
+        "case:reconfigured": {
+          "passed": true
+        },
+        "case:wide": {
+          "passed": true
+        },
+        "negatives_done_close_loss": {
+          "passed": true
+        },
+        "full_new_session_persistence_source": {
+          "passed": true
+        },
+        "admission": {
+          "passed": true
+        }
+      },
+      "prepared_cases_are_acceptance": false
+    }
+  },
+  "audit_file_sha256": "e62105116a62ce7a2dd8d7fdf06ac602ffdee956b46a93310b69858e9ba3125c",
+  "independent_bundle_sha256": "eb09cf538e5913affe69595195bedebeeaf0dcaa728690f66b2d31746427832e",
+  "fresh_sessions": [
+    {
+      "case": "header-only",
+      "status": "FRESH_NATIVE_CASE_PASS",
+      "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+      "document_id": "1789375537588-bskk4nowfqu",
+      "session_id": "864f4154-076a-46fe-ad8f-17cd96c85bde",
+      "before_document_id": "1789335987934-i9hf7ftzp2g",
+      "operation_id": "20260914-004604-475bb0c8:header-only:reopen",
+      "cells": 0,
+      "readonly_first": true,
+      "topology": true,
+      "persisted_settings": true,
+      "model_run": false,
+      "autonomous_acceptance": false,
+      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375534983"
+    },
+    {
+      "case": "header-only-ignore",
+      "status": "FRESH_NATIVE_CASE_PASS",
+      "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+      "document_id": "1789375574450-wczaml6m45r",
+      "session_id": "cdee2c66-5945-4a12-9ed6-71dcb6f6b012",
+      "before_document_id": "1789335987934-i9hf7ftzp2g",
+      "operation_id": "20260914-004604-475bb0c8:header-only-ignore:reopen",
+      "cells": 0,
+      "readonly_first": true,
+      "topology": true,
+      "persisted_settings": true,
+      "model_run": false,
+      "autonomous_acceptance": false,
+      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375572152"
+    },
+    {
+      "case": "all-null",
+      "status": "FRESH_NATIVE_CASE_PASS",
+      "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+      "document_id": "1789375610976-jrqec7r0wz",
+      "session_id": "ba9fcf0b-9e88-4f61-92f5-9ad3c7c27102",
+      "before_document_id": "1789335987934-i9hf7ftzp2g",
+      "operation_id": "20260914-004604-475bb0c8:all-null:reopen",
+      "cells": 20,
+      "readonly_first": true,
+      "topology": true,
+      "persisted_settings": true,
+      "model_run": false,
+      "autonomous_acceptance": false,
+      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375608725"
+    },
+    {
+      "case": "all-null-ignore",
+      "status": "FRESH_NATIVE_CASE_PASS",
+      "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+      "document_id": "1789375647234-6mak9940us",
+      "session_id": "e2418232-52c6-4572-ad62-5e467de08dde",
+      "before_document_id": "1789335987934-i9hf7ftzp2g",
+      "operation_id": "20260914-004604-475bb0c8:all-null-ignore:reopen",
+      "cells": 0,
+      "readonly_first": true,
+      "topology": true,
+      "persisted_settings": true,
+      "model_run": false,
+      "autonomous_acceptance": false,
+      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375644772"
+    },
+    {
+      "case": "mixed",
+      "status": "FRESH_NATIVE_CASE_PASS",
+      "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+      "document_id": "1789375683275-dwf2dx6etak",
+      "session_id": "27666a7a-3033-4229-8617-09050757836c",
+      "before_document_id": "1789335987934-i9hf7ftzp2g",
+      "operation_id": "20260914-004604-475bb0c8:mixed:reopen",
+      "cells": 60,
+      "readonly_first": true,
+      "topology": true,
+      "persisted_settings": true,
+      "model_run": false,
+      "autonomous_acceptance": false,
+      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375681094"
+    },
+    {
+      "case": "ignore",
+      "status": "FRESH_NATIVE_CASE_PASS",
+      "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+      "document_id": "1789375721476-6k7fndpocxj",
+      "session_id": "b37ee778-6a3e-410f-ab82-16f96f414886",
+      "before_document_id": "1789335987934-i9hf7ftzp2g",
+      "operation_id": "20260914-004604-475bb0c8:ignore:reopen",
+      "cells": 44,
+      "readonly_first": true,
+      "topology": true,
+      "persisted_settings": true,
+      "model_run": false,
+      "autonomous_acceptance": false,
+      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375719375"
+    },
+    {
+      "case": "mapped",
+      "status": "FRESH_NATIVE_CASE_PASS",
+      "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+      "document_id": "1789375758342-0khn268x5cv",
+      "session_id": "4336dc92-09bc-48ad-86e5-644c0c5d23a0",
+      "before_document_id": "1789335987934-i9hf7ftzp2g",
+      "operation_id": "20260914-004604-475bb0c8:mapped:reopen",
+      "cells": 75,
+      "readonly_first": true,
+      "topology": true,
+      "persisted_settings": true,
+      "model_run": false,
+      "autonomous_acceptance": false,
+      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375756181"
+    },
+    {
+      "case": "mapped-ignore",
+      "status": "FRESH_NATIVE_CASE_PASS",
+      "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+      "document_id": "1789375796195-beaqp4y9lio",
+      "session_id": "353accca-dbc3-4169-ac67-3ceef8b222b7",
+      "before_document_id": "1789335987934-i9hf7ftzp2g",
+      "operation_id": "20260914-004604-475bb0c8:mapped-ignore:reopen",
+      "cells": 55,
+      "readonly_first": true,
+      "topology": true,
+      "persisted_settings": true,
+      "model_run": false,
+      "autonomous_acceptance": false,
+      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375793818"
+    },
+    {
+      "case": "reconfigured",
+      "status": "FRESH_NATIVE_CASE_PASS",
+      "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+      "document_id": "1789375833650-wdlwkw506ec",
+      "session_id": "5d3fde11-2a5c-42f8-9f94-7508b15a3a07",
+      "before_document_id": "1789335987934-i9hf7ftzp2g",
+      "operation_id": "20260914-004604-475bb0c8:reconfigured:reopen",
+      "cells": 24,
+      "readonly_first": true,
+      "topology": true,
+      "persisted_settings": true,
+      "model_run": false,
+      "autonomous_acceptance": false,
+      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375831259"
+    },
+    {
+      "case": "wide",
+      "status": "FRESH_NATIVE_CASE_PASS",
+      "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+      "document_id": "1789375870759-g7b1ybl52qu",
+      "session_id": "cf6cf76b-746d-4a5d-a2c5-33115fd94b70",
+      "before_document_id": "1789335987934-i9hf7ftzp2g",
+      "operation_id": "20260914-004604-475bb0c8:wide:reopen",
+      "cells": 192,
+      "readonly_first": true,
+      "topology": true,
+      "persisted_settings": true,
+      "model_run": false,
+      "autonomous_acceptance": false,
+      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375868256"
+    }
+  ],
+  "loss": {
+    "status": "POST_GESTURE_LOSS_PASS",
+    "operation_id": "20260914-004604-475bb0c8:independent:lost-flag",
+    "browser_sequence": 576,
+    "native_flag": false,
+    "public_replay_no_browser_work": true,
+    "resume": "REFUSED_UNRESOLVED_PHASE",
+    "done_close": "PASS_WITH_PUBLIC_READBACK",
+    "runtime": "17b0ede0035452a2e9481a3ba007b97a8d1b1b47fdd13ffd4e9153b90dc8daed",
+    "model_run": false
+  },
+  "cleanup": {
+    "logged_out": true,
+    "queues_empty": true,
+    "own_processes_absent": true
+  },
+  "tests": {
+    "model_cases": 10,
+    "model_cells": 470,
+    "fresh_sessions": 10,
+    "fresh_cells": 470,
+    "audit_groups": 14,
+    "versioned_verifier_methods": 4,
+    "counterexamples": 11
+  },
+  "limitations": [
+    "Original wrapper failure retained; separate versioned full audit passed",
+    "No repeated model or production change in resumed audit",
+    "Branch not merged; no server/current/shared-plugin release"
+  ]
+}

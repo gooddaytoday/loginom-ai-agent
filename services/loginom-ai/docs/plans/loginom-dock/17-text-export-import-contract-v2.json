@@ -1,0 +1,82 @@
+{
+  "version": "node17-import-contract-v2",
+  "run_id": "20260914-000803-18fad485",
+  "passed": false,
+  "original_revision": "908c9b7d90eefd72fea2ae9a7e62bcf90b5469cf",
+  "reevaluation_path": ".dock/node17/acceptance/runs/20260914-000803-18fad485/reevaluation-v2-model-03.json",
+  "reevaluation_sha256": "7cfda95e105c4b336b61c772e8cca3d68eda2d5c0c70c1324d1c0914e987ff95",
+  "original_files_sha256": {
+    "request.json": "fadee131be6f33342f3887d33008de47d9d88079511dbc331946ec32645c42b7",
+    "scenario.txt": "fe73c3c0a149c44918b96d3112f8aa6f94754db6145cc6a320b1bcab73fdba30",
+    "evidence.json": "9b2048aa47865d64c926602e15ed1b2eb56ba4556205d4dfdc51e3d338a94d1d",
+    "full-audit.json": "0080f676dd0c0e715e49d86366299459a77a3d4f221d66c8025b1a5bcb722f3e"
+  },
+  "original_harness_verified_files": 283,
+  "correction": {
+    "old": ";assert again['parameters']=={} and again['mappings']==[]",
+    "new": "\n            checks['persisted_request_'+name]=verify_unchanged_import_request(ev,r,again,outcomes[r['operation_id']]['output']['node'],(WORK/'fixtures/text-export/input'/name).read_bytes())"
+  },
+  "v2_sources_sha256": {
+    "text_export_import_contract.py": "d78f39bc9ec59ec7377aee216a82f271ff1beae30527d0d79607624f58e63c65",
+    "text_export_reevaluation_v2.py": "a035f592ddf01a5d763c9329860024758c347777374b56dd26a59a9a1f8c2d5f"
+  },
+  "checks": {
+    "persisted_request_main.csv": {
+      "passed": true,
+      "same_native_node": true,
+      "same_verified_source": true,
+      "empty_settings_inputs_mappings": true
+    },
+    "persisted_request_typed.csv": {
+      "passed": true,
+      "same_native_node": true,
+      "same_verified_source": true,
+      "empty_settings_inputs_mappings": true
+    },
+    "persisted_request_wide.csv": {
+      "passed": true,
+      "same_native_node": true,
+      "same_verified_source": true,
+      "empty_settings_inputs_mappings": true
+    },
+    "incomplete_or_invalid": {
+      "passed": false,
+      "reason": "Missing/ambiguous session preparation"
+    }
+  },
+  "persisted_imports": {
+    "persisted_source_main.csv": {
+      "passed": true,
+      "failures": [],
+      "execution_id": "1789333704071-ce1ixtopgrg:789:17",
+      "seed_execution_id": "1789333704071-ce1ixtopgrg:789:1",
+      "unrequested_settings_preserved": true,
+      "output_data_verified": true
+    },
+    "persisted_source_typed.csv": {
+      "passed": true,
+      "failures": [],
+      "execution_id": "1789333704071-ce1ixtopgrg:789:19",
+      "seed_execution_id": "1789333704071-ce1ixtopgrg:789:3",
+      "unrequested_settings_preserved": true,
+      "output_data_verified": true
+    },
+    "persisted_source_wide.csv": {
+      "passed": true,
+      "failures": [],
+      "execution_id": "1789333704071-ce1ixtopgrg:789:21",
+      "seed_execution_id": "1789333704071-ce1ixtopgrg:789:5",
+      "unrequested_settings_preserved": true,
+      "output_data_verified": true
+    }
+  },
+  "tests": {
+    "command": "python3 -m unittest discover -s tools/loginom-acceptance -p 'test_text_export_*.py'",
+    "passed": 30
+  },
+  "remaining_blockers": [
+    "Unchanged frozen observed_origin rejects the two native workspace_prepared events in the model session",
+    "Independent original persistence pending; coordinator owns investigation of read-only original"
+  ],
+  "original_artifacts_unchanged": true
+}
