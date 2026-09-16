@@ -1,7 +1,8 @@
 import { app, dialog } from "electron"
 import { Product } from "@loginom-ai-agent/product"
 import pkg from "electron-updater"
-import { UPDATER_ENABLED } from "./constants"
+import { CHANNEL, UPDATER_ENABLED } from "./constants"
+import { validateUpdate } from "./update-policy"
 import { createUpdaterController, type UpdaterReadyRecord } from "./updater-controller"
 import { getLogger } from "./logging"
 import { getStore } from "./store"
@@ -14,9 +15,9 @@ const key = "ready"
 export function setupAutoUpdater(stop: () => Promise<void>) {
   const logger = getLogger()
   autoUpdater.logger = logger
-  autoUpdater.channel = "latest"
-  autoUpdater.allowPrerelease = false
-  autoUpdater.allowDowngrade = true
+  autoUpdater.channel = CHANNEL === "beta" ? "beta" : "latest"
+  autoUpdater.allowPrerelease = CHANNEL === "beta"
+  autoUpdater.allowDowngrade = false
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = false
   if (Product.updateFeed) autoUpdater.setFeedURL({ provider: "generic", url: Product.updateFeed })
@@ -32,7 +33,14 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
     enabled: UPDATER_ENABLED,
     currentVersion: app.getVersion(),
     backend: {
-      checkForUpdates: () => autoUpdater.checkForUpdates(),
+      async checkForUpdates() {
+        const result = await autoUpdater.checkForUpdates()
+        if (result?.isUpdateAvailable) {
+          if (!Product.updateFeed) throw Error("LOGINOM_UPDATE_FEED_UNAVAILABLE")
+          validateUpdate(result.updateInfo, Product.updateFeed, CHANNEL)
+        }
+        return result
+      },
       downloadUpdate: () => autoUpdater.downloadUpdate(),
       quitAndInstall: () => {
         // quitAndInstall closes all windows before emitting before-quit, so

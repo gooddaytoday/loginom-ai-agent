@@ -165,3 +165,96 @@ it.effect("preserves running tool start time across metadata updates", () =>
     }
   }),
 )
+
+for (const rejectAdmission of [false, true]) {
+  it.effect(`Loginom binds original user bytes and isolates admission failure (${rejectAdmission})`, () =>
+    Effect.gen(function* () {
+      const original = MessageID.ascending()
+      const admitted: { message: string; files: { name: string; data: string }[] }[] = []
+      const called: string[] = []
+      const assistant: SessionV1.Assistant = {
+        id: messageID,
+        sessionID,
+        role: "assistant",
+        parentID: original,
+        agent: "build",
+        mode: "build",
+        path: { cwd: "/tmp", root: "/tmp" },
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        modelID: ModelV2.ID.make("test-model"),
+        providerID: ProviderV2.ID.make("test"),
+        time: { created: 2 },
+      }
+      const attachment = (message: typeof original, url: string): SessionV1.FilePart => ({
+        id: PartID.ascending(),
+        sessionID,
+        messageID: message,
+        type: "file",
+        filename: "sales.csv",
+        mime: "text/csv",
+        url,
+      })
+      const tools = yield* SessionTools.resolve({
+        agent,
+        model,
+        session: { id: sessionID, permission: [] } as unknown as Session.Info,
+        processor: {
+          message: assistant,
+          updateToolCall: () => Effect.die("Unexpected metadata write"),
+          completeToolCall: () => Effect.void,
+        },
+        bypassAgentCheck: false,
+        promptOps: {} as never,
+        messages: [
+          {
+            info: {
+              id: original,
+              sessionID,
+              role: "user",
+              agent: "build",
+              model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test-model") },
+              time: { created: 1 },
+            },
+            parts: [
+              attachment(original, "data:text/csv;base64,QTsxCg=="),
+              attachment(original, "file:///private/key.json"),
+            ],
+          },
+          { info: assistant, parts: [attachment(messageID, "data:text/csv;base64,Zm9yZ2Vk")] },
+        ],
+        loginom: {
+          generation: 7,
+          async tools() {
+            return { tools: [{ name: "dock_prepare", inputSchema: { type: "object", properties: {} } }] }
+          },
+          async admit(message, files) {
+            admitted.push({ message, files })
+            if (rejectAdmission) throw Error("Input storage unavailable")
+          },
+          async call(_name, _args, message) {
+            called.push(message)
+            return { content: [{ type: "text", text: "ok" }] }
+          },
+          async release() {},
+        },
+      })
+      expect(admitted).toEqual([{ message: original, files: [{ name: "sales.csv", data: "QTsxCg==" }] }])
+      expect(tools.timing).toBeDefined()
+      if (rejectAdmission) {
+        expect(tools.loginom_dock_prepare).toBeUndefined()
+        expect(called).toEqual([])
+        return
+      }
+      const execute = tools.loginom_dock_prepare.execute
+      if (!execute) throw Error("Loginom tool unavailable")
+      yield* Effect.promise(() =>
+        execute(
+          { userMessage: "model-forged-message", files: ["/private/key.json"] },
+          { toolCallId: callID, messages: [], abortSignal: new AbortController().signal },
+        ),
+      )
+      expect(called).toEqual([original])
+    }),
+  )
+}
