@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "version": "0.1.2",
+  "model": "gpt-5.6-sol",
+  "reply": "OK",
+  "toolCalls": 0,
+  "isolatedProfile": true,
+  "credentialsRefreshed": false
+}

@@ -1,0 +1,6 @@
+{
+  "version": "0.1.2",
+  "applicationSha256": "a61e5926c69e0bc66db5b82ca1412f44e0537b2a45b04eca0a3059f396e57926",
+  "packagedBackendAcceptance": "PASS",
+  "installedPayloadMatches": true
+}
