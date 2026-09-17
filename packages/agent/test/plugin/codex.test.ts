@@ -9,6 +9,7 @@ import {
   extractAccountId,
   extractResidency,
   renderOAuthError,
+  oauthResponseError,
   type IdTokenClaims,
 } from "../../src/plugin/openai/codex"
 
@@ -19,6 +20,26 @@ function createTestJwt(payload: object): string {
 }
 
 describe("plugin.codex", () => {
+  test("OAuth diagnostics expose status and known errors without response secrets", async () => {
+    const error = await oauthResponseError(
+      Response.json(
+        { error: { code: "unsupported_country_region_territory", message: "private-token" } },
+        { status: 403 },
+      ),
+      "Token exchange failed",
+    )
+    expect(error.message).toBe("Token exchange failed: HTTP 403 (unsupported_country_region_territory)")
+    const unknown = await oauthResponseError(
+      Response.json({ error: { code: "private-token" } }, { status: 401 }),
+      "Device authorization failed",
+    )
+    expect(unknown.message).toBe("Device authorization failed: HTTP 401")
+    const html = await oauthResponseError(
+      new Response("<html>private-token</html>", { status: 502 }),
+      "Token exchange failed",
+    )
+    expect(html.message).toBe("Token exchange failed: HTTP 502")
+  })
   test("escapes provider errors in callback HTML", () => {
     const error = `</div><script>alert("xss" & 'more')</script>`
     const html = renderOAuthError(error)

@@ -18,15 +18,52 @@ export type Launch = {
   headless?: boolean
 }
 
+export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = process.platform) {
+  const env: NodeJS.ProcessEnv = {}
+  const keys = [
+    "HOME",
+    "USERPROFILE",
+    "SYSTEMROOT",
+    "WINDIR",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+    "NODE_USE_ENV_PROXY",
+  ]
+  if (platform === "linux")
+    keys.push(
+      "DISPLAY",
+      "XAUTHORITY",
+      "XDG_RUNTIME_DIR",
+      "WAYLAND_DISPLAY",
+      "XDG_SESSION_TYPE",
+      "XDG_CURRENT_DESKTOP",
+      "DBUS_SESSION_BUS_ADDRESS",
+      "XDG_CONFIG_HOME",
+    )
+  keys.forEach((key) => {
+    if (environment[key]) env[key] = environment[key]
+  })
+  return env
+}
+
 // One child per generation/chat. Credentials travel only through Node's private IPC pipe.
 export async function supervise(input: Launch) {
   if (![input.node, input.entry, input.resources, input.stateDir].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   await mkdir(input.stateDir, { recursive: true, mode: 0o700 })
-  const env: NodeJS.ProcessEnv = {}
-  const keys = ["HOME", "USERPROFILE", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR"]
-  if (process.platform === "linux") keys.push("DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "WAYLAND_DISPLAY", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP")
-  keys.forEach((key) => { if (process.env[key]) env[key] = process.env[key] })
-  const child = fork(input.entry, [], { execPath: input.node, execArgv: [], cwd: input.stateDir, env, stdio: ["ignore", "ignore", "ignore", "ipc"] })
+  const child = fork(input.entry, [], { execPath: input.node, execArgv: [], cwd: input.stateDir, env: runtimeEnvironment(process.env), stdio: ["ignore", "ignore", "ignore", "ipc"] })
   const pending = new Map<string, { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }>()
   const exited = new Promise<void>((resolve) => { child.once("exit", () => resolve()) })
   function fail() {

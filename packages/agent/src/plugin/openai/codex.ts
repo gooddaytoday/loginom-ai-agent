@@ -114,6 +114,22 @@ interface CodexAuthPluginOptions {
   experimentalWebSockets?: boolean
 }
 
+export async function oauthResponseError(response: Response, operation: string) {
+  const body: unknown = await response.json().catch(() => undefined)
+  const error = body && typeof body === "object" && "error" in body ? body.error : undefined
+  const code = error && typeof error === "object" && "code" in error ? error.code : error
+  // Never include raw provider responses: they can echo authorization codes or tokens.
+  const allowed = [
+    "unsupported_country_region_territory",
+    "invalid_grant",
+    "invalid_client",
+    "token_expired",
+    "access_denied",
+  ]
+  const detail = typeof code === "string" && allowed.includes(code) ? ` (${code})` : ""
+  return new Error(`${operation}: HTTP ${response.status}${detail}`)
+}
+
 async function exchangeCodeForTokens(code: string, redirectUri: string, pkce: PkceCodes): Promise<TokenResponse> {
   const response = await fetch(`${ISSUER}/oauth/token`, {
     method: "POST",
@@ -127,7 +143,7 @@ async function exchangeCodeForTokens(code: string, redirectUri: string, pkce: Pk
     }).toString(),
   })
   if (!response.ok) {
-    throw new Error(`Token exchange failed: ${response.status}`)
+    throw await oauthResponseError(response, "Token exchange failed")
   }
   return response.json()
 }
@@ -143,7 +159,7 @@ async function refreshAccessToken(refreshToken: string, issuer = ISSUER): Promis
     }).toString(),
   })
   if (!response.ok) {
-    throw new Error(`Token refresh failed: ${response.status}`)
+    throw await oauthResponseError(response, "Token refresh failed")
   }
   return response.json()
 }
@@ -480,7 +496,8 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
               body: JSON.stringify({ client_id: CLIENT_ID }),
             })
 
-            if (!deviceResponse.ok) throw new Error("Failed to initiate device authorization")
+            if (!deviceResponse.ok)
+              throw await oauthResponseError(deviceResponse, "Failed to initiate device authorization")
 
             const deviceData = (await deviceResponse.json()) as {
               device_auth_id: string
@@ -526,7 +543,7 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
                     })
 
                     if (!tokenResponse.ok) {
-                      throw new Error(`Token exchange failed: ${tokenResponse.status}`)
+                      throw await oauthResponseError(tokenResponse, "Token exchange failed")
                     }
 
                     const tokens: TokenResponse = await tokenResponse.json()
