@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "artifact": "loginom-ai-agent-linux-amd64.deb",
+  "sha256": "6267bdee1535f0cccd7240f4dbd06c8772e7b510a3b2971e4931ebc2e1c40884",
+  "files": 4365,
+  "node": "bin/node",
+  "browser": "browsers/chromium-1243/chrome-linux64/chrome",
+  "executableNotRun": true
+}

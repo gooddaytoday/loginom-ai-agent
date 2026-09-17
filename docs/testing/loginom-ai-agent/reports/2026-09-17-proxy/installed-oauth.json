@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "systemProxy": {
+    "http": true,
+    "https": true
+  },
+  "deviceAuthorization": 200,
+  "browserTokenExchange": 401,
+  "browserTokenError": "token_expired",
+  "invalidCodeOnly": true,
+  "accountLoginPerformed": false
+}
