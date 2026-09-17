@@ -1809,6 +1809,69 @@ describe("ProviderTransform.schema - openai supported schema subset", () => {
     },
   } as any
 
+  test("keeps the actual Dock wizard stage array constant compatible with its inferred type", async () => {
+    const source = (await import(
+      new URL("../../../loginom-runtime/client/lib/workspace-ui.mjs", import.meta.url).href
+    )) as {
+      uiActionSchema: import("ai").JSONSchema7
+      validateUiAction(action: unknown): unknown
+    }
+    const before = structuredClone(source.uiActionSchema)
+    const result = ProviderTransform.schema(openaiModel, source.uiActionSchema)
+    expect(result.properties?.expected_stage).toMatchObject({
+      oneOf: [
+        { type: "string" },
+        {
+          type: "array",
+          minItems: 2,
+          maxItems: 2,
+          items: { type: "string", enum: ["output_mapping", "done"] },
+          description: 'Allowed values (validated by the tool): [["output_mapping","done"]].',
+        },
+      ],
+    })
+    expect(source.uiActionSchema).toEqual(before)
+    expect(JSON.stringify(result)).not.toContain('"enum":[[')
+    expect(() =>
+      source.validateUiAction({
+        verb: "wizard_step",
+        ref: "ui-observed",
+        expected_stage: ["output_mapping", "done"],
+      }),
+    ).not.toThrow()
+    expect(() =>
+      source.validateUiAction({
+        verb: "wizard_step",
+        ref: "ui-observed",
+        expected_stage: ["done", "output_mapping"],
+      }),
+    ).toThrow()
+  })
+
+  test.each([
+    [42, "number"],
+    [true, "boolean"],
+    [null, "null"],
+    ["done", "string"],
+    [[1, 2], "array"],
+  ] as const)("infers the JSON type of const %j", (value, type) => {
+    const literal = value !== null && typeof value === "object" ? [...value] : value
+    const result = ProviderTransform.schema(openaiModel, { const: literal })
+    expect(result.type).toBe(type)
+    if (type !== "array") expect(result.enum).toEqual([literal])
+    if (type === "array") expect(result.enum).toBeUndefined()
+    if (type === "array") expect(result.items).toEqual({ type: "number", enum: [1, 2] })
+  })
+
+  test("infers mixed enum types instead of forcing strings", () => {
+    expect(ProviderTransform.schema(openaiModel, { enum: ["done", 42, null, true] }).type).toEqual([
+      "string",
+      "number",
+      "null",
+      "boolean",
+    ])
+  })
+
   test("removes unsupported JSON Schema keywords recursively", () => {
     const result = ProviderTransform.schema(openaiModel, {
       $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -2366,7 +2429,12 @@ describe("ProviderTransform.message - surrogate sanitization", () => {
         content: [
           { type: "text", text: text("assistant text") },
           { type: "reasoning", text: text("assistant reasoning") },
-          { type: "tool-call", toolCallId: "call-1", toolName: "Read", input: { filePath: ".loginom-ai-agent/tool/emoji.ts" } },
+          {
+            type: "tool-call",
+            toolCallId: "call-1",
+            toolName: "Read",
+            input: { filePath: ".loginom-ai-agent/tool/emoji.ts" },
+          },
           {
             type: "tool-result",
             toolCallId: "call-2",

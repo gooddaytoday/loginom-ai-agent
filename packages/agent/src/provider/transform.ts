@@ -1538,6 +1538,11 @@ function sanitizeOpenAISchema(value: unknown): unknown {
 
   // MCP schemas may omit `type` while still using keywords that imply one.
   // Keep the schema usable after unsupported keywords are dropped.
+  const enumTypes = Array.isArray(result.enum)
+    ? [
+        ...new Set(result.enum.map((item) => (item === null ? "null" : Array.isArray(item) ? "array" : typeof item))),
+      ].filter((type) => types.includes(type))
+    : []
   const inferredTypes =
     schemaTypes.length > 0
       ? schemaTypes
@@ -1545,17 +1550,34 @@ function sanitizeOpenAISchema(value: unknown): unknown {
         ? ["object"]
         : ["items", "prefixItems"].some((key) => key in value)
           ? ["array"]
-          : "enum" in result || "format" in value
-            ? ["string"]
-            : ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"].some((key) => key in value)
-              ? ["number"]
-              : []
+          : enumTypes.length > 0
+            ? enumTypes
+            : "format" in value
+              ? ["string"]
+              : ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"].some((key) => key in value)
+                ? ["number"]
+                : []
 
   if (inferredTypes.length === 0) return {}
 
   result.type = inferredTypes.length === 1 ? inferredTypes[0] : inferredTypes
   if (inferredTypes.includes("object") && !("properties" in result)) result.properties = {}
-  if (inferredTypes.includes("array") && !("items" in result)) result.items = { type: "string" }
+  if (inferredTypes.includes("array") && !("items" in result)) {
+    const items = Array.isArray(result.enum) ? result.enum.flatMap((item) => (Array.isArray(item) ? item : [])) : []
+    result.items = items.length ? sanitizeOpenAISchema({ enum: items }) : { type: "string" }
+  }
+  // OpenAI rejects structured enum values, including Dock's array-valued const.
+  // Keep the shape and explain the exact choices; the tool validates the original schema.
+  if (Array.isArray(result.enum) && result.enum.some((item) => item !== null && typeof item === "object")) {
+    result.description = [result.description, `Allowed values (validated by the tool): ${JSON.stringify(result.enum)}.`]
+      .filter(Boolean)
+      .join("\n")
+    if (result.enum.every(Array.isArray) && new Set(result.enum.map((item) => item.length)).size === 1) {
+      result.minItems = result.enum[0].length
+      result.maxItems = result.enum[0].length
+    }
+    delete result.enum
+  }
   return result
 }
 
