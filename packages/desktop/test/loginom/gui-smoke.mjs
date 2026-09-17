@@ -74,16 +74,27 @@ try {
     await wordmark.waitFor({ timeout: 30_000 })
     const brand = await wordmark.evaluate((svg) => {
       const text = svg.querySelector("text")
+      const accent = svg.querySelector("tspan")
       const bounds = text.getBBox()
       return {
         label: svg.getAttribute("aria-label"),
         text: text.textContent.trim(),
+        accent: accent.textContent.trim(),
+        accentFill: getComputedStyle(accent).fill,
+        accentOpacity: getComputedStyle(accent).fillOpacity,
         bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
         fits: bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 720 && bounds.y + bounds.height <= 129,
       }
     })
     await page.screenshot({ path: "/tmp/loginom-gui-evidence/new-chat.png" })
-    if (brand.label !== "Loginom AI" || brand.text !== "Loginom AI" || !brand.fits)
+    if (
+      brand.label !== "Loginom AI" ||
+      brand.text !== "Loginom AI" ||
+      brand.accent !== "AI" ||
+      brand.accentFill !== "rgb(199, 146, 146)" ||
+      brand.accentOpacity !== "0.32" ||
+      !brand.fits
+    )
       throw Error(`NEW_CHAT_BRANDING_INVALID: ${JSON.stringify(brand)}`)
     console.log(JSON.stringify({ status: "PASS", newChatBrand: brand }))
     const safe = await page.evaluate(() => window.api.loginom.read())

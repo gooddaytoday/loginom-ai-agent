@@ -11,7 +11,7 @@
 
 ## Loginom branding
 
-- `src/v2/components/wordmark-v2.tsx` supplies the new-chat wordmark: visible text and accessible label must both be `Loginom AI`. Use currentColor and a scalable viewBox so dark/light themes and narrow windows work.
+- `src/v2/components/wordmark-v2.tsx` supplies the new-chat wordmark: visible text and accessible label must both be `Loginom AI`. Keep `Loginom` in currentColor at 12% fill opacity; render `AI` in the muted red `#C79292` at 32% fill opacity from the [official Loginom brandbook](https://brandbook.loginom.ru/color/index.html). Use fill-opacity on text/tspan, not parent opacity, so the accent opacity is independent. Preserve the scalable viewBox and uninterrupted accessible name.
 - `src/components/logo.tsx` supplies the full `Loginom AI Agent` logo and mark/splash. These are separate components; inspect the actual caller when replacing branding.
 - Product names are intentional, untranslated brand text. Do not rename licensing/attribution references while changing visible branding.
 - Run `bun typecheck` here after component changes, and inspect the packaged desktop new-chat screen for visible spelling, clipping and contrast. See [desktop acceptance](../desktop/AGENTS.md).
