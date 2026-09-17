@@ -8,3 +8,10 @@
 - Translate whole UI phrases in context rather than substituting glossary words. Audit recurring concepts for consistency and review every exact-English value; retain it only when it is an intentional product/provider/tool name, URL, code token, keyboard legend, acronym, asset name, or established borrowing.
 - Record the corpora used and flag uncertain or regional terminology in review notes.
 - Also use the relevant language authority or official dictionary for the locale (for example RAE/Fundéu, FranceTerme, Duden, TDK, Kotus/Kielitoimiston sanakirja, Språkrådet/Bokmålsordboka, Rada Języka Polskiego/PWN, the Russian and Arabic language academies, the Ukrainian Orthography, Taiwan MOE dictionaries, or the Royal Society of Thailand). Treat the English dictionary as the semantic source of truth and preserve placeholders, code identifiers, product names, and keyboard labels.
+
+## Loginom branding
+
+- `src/v2/components/wordmark-v2.tsx` supplies the new-chat wordmark: visible text and accessible label must both be `Loginom AI`. Use currentColor and a scalable viewBox so dark/light themes and narrow windows work.
+- `src/components/logo.tsx` supplies the full `Loginom AI Agent` logo and mark/splash. These are separate components; inspect the actual caller when replacing branding.
+- Product names are intentional, untranslated brand text. Do not rename licensing/attribution references while changing visible branding.
+- Run `bun typecheck` here after component changes, and inspect the packaged desktop new-chat screen for visible spelling, clipping and contrast. See [desktop acceptance](../desktop/AGENTS.md).

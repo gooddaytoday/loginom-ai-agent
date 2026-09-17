@@ -159,3 +159,16 @@ const table = sqliteTable("session", {
 - Keep delivery vocabulary explicit. Prompts steer by default and promote at the next safe provider-turn boundary while the current drain requires continuation. An explicit `queue` input remains pending until the Session would otherwise become idle; promote one queued input at that boundary, then reevaluate continuation before promoting another. Promoting any new user input resets the selected agent's provider-turn allowance; a batch of steers resets it once.
 - Keep EventV2 replay owner claims separate from clustered Session execution ownership.
 - Keep the System Context algebra, registry, and built-ins in `src/system-context`; keep Context Source producers with their observed domains, and keep Session History selection plus Context Epoch persistence Session-owned.
+
+## Loginom AI Agent: module map and current state
+
+- [Product identity and release pins](packages/product/AGENTS.md)
+- [Desktop packaging, installation and acceptance](packages/desktop/AGENTS.md)
+- [Connection generations, credentials and recovery](packages/desktop/src/main/loginom/AGENTS.md)
+- [Runtime host and attachment admission](packages/loginom-host/AGENTS.md)
+- [Migrated Loginom client and browser runtime](packages/loginom-runtime/AGENTS.md)
+- [Application settings and onboarding](packages/app/AGENTS.md)
+- [Shared UI and new-chat branding](packages/ui/AGENTS.md)
+- [Model/backend integration](packages/agent/AGENTS.md)
+
+Before resuming release work, read the [canonical Linux checkpoint](docs/migration/linux-implementation-checkpoint.md) and [platform runbooks](docs/testing/loginom-ai-agent/README.md). Reports distinguish tested installed artifacts from source-only checks. Keep durable decisions here or in the owning module; keep secrets and raw diagnostic logs out of git. Historical release reports retain the paths/version that were actually tested.

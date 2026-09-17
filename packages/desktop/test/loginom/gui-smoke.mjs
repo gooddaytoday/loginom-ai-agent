@@ -69,6 +69,22 @@ try {
       )
       throw Error("ONBOARDING_DID_NOT_CLOSE")
     })
+    await page.locator('[data-action="home-new-session"]').first().click()
+    const wordmark = page.locator('[data-component="wordmark-v2"]')
+    await wordmark.waitFor({ timeout: 30_000 })
+    const brand = await wordmark.evaluate((svg) => {
+      const text = svg.querySelector("text")
+      const bounds = text.getBBox()
+      return {
+        label: svg.getAttribute("aria-label"),
+        text: text.textContent.trim(),
+        fits: bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 720 && bounds.y + bounds.height <= 129,
+      }
+    })
+    if (brand.label !== "Loginom AI" || brand.text !== "Loginom AI" || !brand.fits)
+      throw Error("NEW_CHAT_BRANDING_INVALID")
+    await page.screenshot({ path: "/tmp/loginom-gui-evidence/new-chat.png" })
+    console.log(JSON.stringify({ status: "PASS", newChatBrand: brand }))
     const safe = await page.evaluate(() => window.api.loginom.read())
     if (!safe.hasApiKey || JSON.stringify(safe).includes(config.api_key)) throw Error("SECRET_READBACK_INVALID")
     const file = join(profile, "desktop/loginom/connection/connection.json")

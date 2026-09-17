@@ -55,7 +55,7 @@ try {
     if (offsets.length !== 1) throw Error("RELEASE_SQUASHFS_INVALID")
     await $`unsquashfs -no-progress -d ${root} -offset ${offsets[0]} ${resolve(args.artifact)}`.quiet()
   } else throw Error("Only Linux installer artifacts can be statically extracted")
-  const application = artifact.kind === "deb" ? join(root, "opt", manifest.product.name) : root
+  const application = artifact.kind === "deb" ? join(root, "opt", manifest.product.executable) : root
   const result = await verifyResourceTree(join(application, "resources/loginom"), manifest.runtime.resourcesSha256)
   const desktop = await readFile(
     artifact.kind === "deb"
@@ -68,6 +68,11 @@ try {
     !desktop.includes(`StartupWMClass=${manifest.product.appId}`)
   )
     throw Error("RELEASE_DESKTOP_IDENTITY_INVALID")
+  if (
+    artifact.kind === "deb" &&
+    !desktop.includes(`Exec=/opt/${manifest.product.executable}/${manifest.product.executable} %U`)
+  )
+    throw Error("RELEASE_DESKTOP_EXEC_INVALID")
   await Bun.write(
     args.report,
     JSON.stringify(

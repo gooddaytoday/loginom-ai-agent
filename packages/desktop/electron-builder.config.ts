@@ -26,7 +26,8 @@ const channel = productChannel(process.env.LOGINOM_AI_AGENT_CHANNEL)
 const appId = Product.channels[channel]
 const config: Configuration = {
   appId,
-  productName: productName(channel),
+  // electron-builder uses productName for /opt, while desktop metadata keeps the display name.
+  productName: process.platform === "linux" ? productSlug(channel) : productName(channel),
   artifactName: Product.artifactName,
   publish: Product.updateFeed ? { provider: "generic", url: Product.updateFeed } : null,
   async afterPack(context) {
@@ -38,7 +39,7 @@ const config: Configuration = {
     )
   },
   directories: { output: "dist", buildResources: "resources" },
-  extraMetadata: { desktopName: `${appId}.desktop` },
+  extraMetadata: { productName: productName(channel), desktopName: `${appId}.desktop` },
   files: ["out/**/*", "resources/icons/**/*"],
   extraResources: [
     { from: "resources/loginom", to: "loginom" },
@@ -82,7 +83,7 @@ const config: Configuration = {
     icon: "resources/icons",
     category: "Office",
     executableName: productSlug(channel),
-    desktop: { entry: { StartupWMClass: appId } },
+    desktop: { entry: { Name: productName(channel), StartupWMClass: appId } },
     target: ["AppImage", "deb"],
   },
   deb: {

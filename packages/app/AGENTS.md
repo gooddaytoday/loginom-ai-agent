@@ -48,3 +48,11 @@ Core workflow:
 2. `agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)
 3. `agent-browser click @e1` / `fill @e2 "text"` - Interact using refs
 4. Re-snapshot after page changes
+
+## Loginom application integration
+
+- `src/components/settings-loginom.tsx` is the shared first-run/settings form; `loginom-button.tsx` keeps access prominent. Desktop operations go through the platform/preload contract.
+- Ask API key, URL, username and password only. Default URL/username come from Product; password is empty and has no placeholder. Never add a folder input or folder availability check; use `/<username>` in runtime. Keep provider/model connection in the existing settings flow.
+- Never render stored secrets back from main. Connection changes may be pending until the active generation is released; display the actual state rather than treating save as immediate activation.
+- New-chat branding comes from `@loginom-ai-agent/ui/v2/wordmark-v2`, used by `src/pages/new-session/new-session-view.tsx`. The requested text is `Loginom AI`; changing the legacy Logo alone does not update this screen.
+- Validate UI in an isolated test application/profile, preserving the user's running session. See [desktop checks](../desktop/AGENTS.md) and [connection ownership](../desktop/src/main/loginom/AGENTS.md).

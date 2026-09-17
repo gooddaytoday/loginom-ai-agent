@@ -2,7 +2,7 @@ import { createRequire } from "node:module"
 import { mkdtemp, rm, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-const root = process.env.LOGINOM_AI_AGENT_INSTALL_ROOT ?? "/opt/Loginom AI Agent"
+const root = process.env.LOGINOM_AI_AGENT_INSTALL_ROOT ?? "/opt/loginom-ai-agent"
 const resources = join(root, "resources/loginom")
 const require = createRequire(join(resources, "runtime/client/package.json"))
 const { _electron, chromium } = require("playwright-core")

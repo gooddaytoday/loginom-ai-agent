@@ -7,4 +7,4 @@ RUN useradd --create-home --uid 1200 tester
 USER tester
 WORKDIR /home/tester
 ENV HOME=/home/tester
-CMD ["xvfb-run", "-a", "/opt/Loginom AI Agent/resources/loginom/bin/node", "/test/installed-smoke.mjs"]
+CMD ["xvfb-run", "-a", "/opt/loginom-ai-agent/resources/loginom/bin/node", "/test/installed-smoke.mjs"]

@@ -129,3 +129,11 @@ Use `Effect.cached` when multiple concurrent callers should share a single in-fl
 Use `EffectBridge` for native or external callbacks (`@parcel/watcher`, `node-pty`, native `fs.watch`, plugin callbacks, etc.) that need to re-enter Effect services with instance/workspace context.
 
 Plain async code should pass explicit context or stay inside an Effect fiber; do not add ambient instance context shims.
+
+## Loginom tools and ChatGPT compatibility
+
+- `src/session/tools.ts` admits host-owned `loginom_` tools. Keep host credentials/context tokens out of model parameters and preserve original-user attachment admission; see [host contracts](../loginom-host/AGENTS.md).
+- `src/provider/transform.ts` adapts provider-facing JSON Schema. OpenAI rejects structured array/object values inside enums: retain usable types/items and describe allowed structured values while leaving original Dock execution validation intact. Do not infer every nonnumeric const as string.
+- Run `bun test test/provider/transform.test.ts` and `bun typecheck` here after schema changes. Real installed ChatGPT acceptance uses desktop `test/loginom/chatgpt-schema.mjs`, all actual Dock tools and an isolated profile; do not expose OAuth data.
+- OAuth errors in `src/plugin/openai/codex.ts` expose only status and allowlisted error codes. System proxy initialization belongs to desktop/bootstrap before backend imports; do not bypass it in individual OAuth requests.
+- See [schema acceptance report](../../docs/testing/loginom-ai-agent/reports/2026-09-17-schema/report.md) and [proxy acceptance](../../docs/testing/loginom-ai-agent/reports/2026-09-17-proxy/report.md).

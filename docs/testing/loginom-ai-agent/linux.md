@@ -20,6 +20,8 @@ bun test src/main/loginom electron-builder.config.test.ts scripts/release/artifa
 
 Результат: `dist/loginom-ai-agent-linux-amd64.deb` и `dist/loginom-ai-agent-linux-x86_64.AppImage`. Runtime вне ASAR включает собственные Node, Playwright/MCP, Chromium и исходники клиента Dock. Ресурсы проверяются по `resource-manifest.json`. При первом запуске не выполняется установка npm или браузера.
 
+Начиная с 0.1.3, production DEB устанавливает файлы в `/opt/loginom-ai-agent`; название в меню остаётся `Loginom AI Agent`. При обновлении dpkg удаляет старый `/opt/Loginom AI Agent`, профиль пользователя не переносится и не удаляется.
+
 DEB устанавливается через `apt install ./loginom-ai-agent-linux-amd64.deb`: apt разрешает системные зависимости, включая GTK, NSS, GBM и ALSA. AppImage требует эти системные библиотеки и рабочий FUSE либо предварительное извлечение. Для ALSA нужна настоящая библиотека: `libasound2t64` на Ubuntu 24+/Debian 13, `libasound2` на Ubuntu 22/Debian 12; OSS shim её не заменяет. Sandbox Chromium остаётся включённым; запуск root и `--no-sandbox` не являются допустимыми обходами ошибок приёмки.
 
 Исходный архив создавать из того же проверенного commit:
