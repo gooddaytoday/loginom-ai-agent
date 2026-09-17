@@ -17,7 +17,7 @@ export function WordmarkV2(props: Pick<ComponentProps<"svg">, "class">) {
         fill="currentColor"
         opacity="0.12"
         font-family="system-ui, sans-serif"
-        font-size="110"
+        font-size="100"
         font-weight="600"
       >
         Loginom AI
