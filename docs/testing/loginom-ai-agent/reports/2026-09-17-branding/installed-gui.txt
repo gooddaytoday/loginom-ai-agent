@@ -1,0 +1,4 @@
+{"status":"PASS","fields":4,"passwordPlaceholders":[null,null],"urlDefault":true,"usernameDefault":true,"secretValuesEmpty":true}
+{"status":"PASS","newChatBrand":{"label":"Loginom AI","text":"Loginom AI","bounds":{"x":44.1015625,"y":7,"width":631.796875,"height":117},"fits":true}}
+PASS: GUI connection check/save, safe IPC readback and Linux plaintext permissions
+PASS: saved connection restored without repeating first-launch wizard
