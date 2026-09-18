@@ -8,11 +8,15 @@ from sources import build_map
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--archive", required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--archive")
+    # A live repository (or its .git dir) has no manifest: only the archive path is verified before reading.
+    source.add_argument("--repository")
     parser.add_argument("--ref", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
-    verify_archive(args.archive)
-    value = build_map(Path(args.archive) / "history.git", args.ref)
+    if args.archive:
+        verify_archive(args.archive)
+    value = build_map(Path(args.archive) / "history.git" if args.archive else args.repository, args.ref)
     write_json(args.output, value)
     print(json.dumps({"entries": len(value["files"]), "commit": value["files"][0]["commit"]}))

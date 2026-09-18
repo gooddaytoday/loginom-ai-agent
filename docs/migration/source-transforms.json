@@ -1,13 +1,48 @@
 {
+  "packages/loginom-runtime/client/lib/artifact-delivery.mjs": {
+    "baseHash": "ba2efc6163025322f0d10e699648767b8980abcbba10c274578d2570fb6b0ba6",
+    "hash": "3df600f0d5ff302d8440746a2a827526fe863f8872a67a2cf3cbf472bf323351",
+    "reason": "Expose unsettled execution and ambiguous artifact delivery state to the managed desktop recovery lease; preserve runtime execution semantics."
+  },
+  "packages/loginom-runtime/client/lib/bridge.mjs": {
+    "baseHash": "c56450b8f4db74c4ccfbf3162d1a7d6dc7422bab3ac35704f7d45923282630c3",
+    "hash": "e253ada2bb5df51dacb9b6797815f861f7474c99f2b9e8295d078ca6f1c414ae",
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account."
+  },
+  "packages/loginom-runtime/client/lib/executor.mjs": {
+    "baseHash": "df21720858bb89bb40d6c4fe46620728b1d6e86b0d9d7aafa4992c8f2cf93a6e",
+    "hash": "cf44c98e294acf0069d7f8079da5fe49e390723e68438968daafdc777c888441",
+    "reason": "Expose unsettled execution and ambiguous artifact delivery state to the managed desktop recovery lease; preserve runtime execution semantics."
+  },
+  "packages/loginom-runtime/client/lib/session.mjs": {
+    "baseHash": "db89431390466874ef7ea709f5e8c866d1558dd54fc776c9ea1befd3bf286ef3",
+    "hash": "687de9f3d6829f0ba79a9e0f5fcdd43c8b77a69d7f7a36bd1a16cf85304284d6",
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events."
+  },
+  "packages/loginom-runtime/client/lib/workspace-ui.mjs": {
+    "baseHash": "cd5898556ca838c2a00e9b5a5a717c614de72f7962c034d95fcdc26b832a7624",
+    "hash": "7348572b2822fa122a51c3bc888751d9230ed9201db40c0765cfd77e7e27511f",
+    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance."
+  },
   "packages/loginom-runtime/client/test/action-catalog-lifecycle.test.mjs": {
     "baseHash": "6004e3b91aa6afd3eff0a3f36d3d054ae840e6c432d57853320033b3fc59389a",
     "hash": "003998adfac46f66717657d08f741c9e6c391a6a0f855c4c8437422d7ba97605",
     "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
   },
   "packages/loginom-runtime/client/test/action-catalog.test.mjs": {
-    "baseHash": "0c9669279108f71871bbdeaaec81ab8a3f8a6580dde63a703abec0f68a8905d7",
-    "hash": "5d9f1965fe60eb22d3723fc31e6508978497cf0d89fa5f9c653acbedd50fdd00",
+    "baseHash": "f6564ff7f91d63d7df541649c176de22dfd79410df9864bfd0e752e63326cc7b",
+    "hash": "186c6c45109e93cabd5c246c8203d9f689ad7edf3b32f7add40cee91f1ec3e08",
     "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "packages/loginom-runtime/client/test/artifact-delivery.test.mjs": {
+    "baseHash": "85fedc595920ebeb86878d38d7180e7eb626565b2abe944710bac8942fed28a0",
+    "hash": "26a4157fad9f9b8ed5d6065d95b11216d2eff385b57e4451cbde93d1a6cb413f",
+    "reason": "Cover the local host lifecycle: retry the artifact folder search after UI_EPOCH_CHANGED (allowStaleFolder) and expose unsettled delivery state; upstream assertions retained."
+  },
+  "packages/loginom-runtime/client/test/executor.test.mjs": {
+    "baseHash": "45efb45e922f9a347a6ce56763280d5edf8dde4d3a9840816bb8f4df44b7d519",
+    "hash": "bb4bddfae59b9a6979c889e5943872f0d62f211b2b77f3d98540805de20ac633",
+    "reason": "Cover the local host lifecycle: hasActiveWork/hasUnsettledWork on the runtime facade and unsettled artifact delivery exposure; upstream assertions retained."
   },
   "packages/loginom-runtime/client/test/hooks.test.mjs": {
     "baseHash": "5eec1e38bd6b401eaf5c3b3a36fb06ab723ca1330013ba246621e60a6de6b290",
@@ -49,6 +84,26 @@
     "hash": "929d06a244b0fcf4ee007f88626c8206156e593e84f6d4706a8805a4790e3657",
     "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
   },
+  "packages/loginom-runtime/client/test/user-results.test.mjs": {
+    "baseHash": "ceaeda7fc36aa403837bbbd4424be0a870995fa0088a51143168521e5eef2ae9",
+    "hash": "930a53af5740d06e03086a0a7b3d2c083a599879650061d44cc7e1f636d410d3",
+    "reason": "Align the stale upstream assertion with RC9 behaviour: the compact prepare bundle lists installed node types without inline parameter schemas, which dock_action_describe supplies for the selected type; remaining assertions unchanged."
+  },
+  "packages/loginom-runtime/client/test/workspace-ui.test.mjs": {
+    "baseHash": "2c3fa72c098e439a19b4a309e4acb244d34816aa6891926f3e9ae897cfad5a49",
+    "hash": "0480d8adc1affb76c89945471d183f2f3b2d907b9e2d1b56b9d3ce6e304784fd",
+    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/date-time-public-fixture-schema.mjs": {
+    "baseHash": "27c57585cd3f391ebc2ae30115f2f4bb3f8414c614f07204460bb5f1a77ba461",
+    "hash": "1fad978652f2651661289e815632cc2212c7baf7ae8c381405087cfc733ac35c",
+    "reason": "Probe oversize samples above the RC9 public bound of 100 rows enforced by node-result-schema and node-api read; the upstream gate still rejects at the pre-RC9 limit of 10."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/test_provenance.py": {
+    "baseHash": "937824198d7c084ca10d000fbefdba30b53f02855f768fe2e40e52ed13d50707",
+    "hash": "f0db86dee8377e3a20b6d5b27e1d9e31bbc41d21f8b0c7c8eea1a351947c8ea4",
+    "reason": "Repair the upstream syntax error (duplicate loginom_user keyword argument) so the provenance tests import under unittest discovery; assertions unchanged."
+  },
   "services/loginom-ai/deploy/loginom-dock/build-action-catalog.mjs": {
     "baseHash": "8a4c29d40d4c86dccea28598907a4c88e6fc8ab072b81ae0de8b93ae55e9bd6d",
     "hash": "c1eca0b6c48fd84d11d9ee03ab925a33d1f71eb5d020004f85245d786a51836f",
@@ -58,35 +113,5 @@
     "baseHash": "98b9dc45b781a9e50c73c60f2b6d52e63def4fdcee6e3a03e566e47e134655c0",
     "hash": "e162f6f66c2ff594a1797fee8fb93d6e852df0314bbdbf9eeb70650ed596ea5d",
     "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
-  },
-  "packages/loginom-runtime/client/lib/session.mjs": {
-    "baseHash": "db89431390466874ef7ea709f5e8c866d1558dd54fc776c9ea1befd3bf286ef3",
-    "hash": "687de9f3d6829f0ba79a9e0f5fcdd43c8b77a69d7f7a36bd1a16cf85304284d6",
-    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events."
-  },
-  "packages/loginom-runtime/client/lib/artifact-delivery.mjs": {
-    "baseHash": "da9cbb8f3e56aff85dd67748cfeafb6621646b1b894ccf9726ece2db381ef4b7",
-    "hash": "86cdd771a84808444833ac24941a0b6eb4c03ec379e36e0707376121bfff43f5",
-    "reason": "Expose unsettled execution and ambiguous artifact delivery state to the managed desktop recovery lease; preserve runtime execution semantics."
-  },
-  "packages/loginom-runtime/client/lib/bridge.mjs": {
-    "baseHash": "320d3b5bd4ae32801ebc9aee717f59ac877fadfbc2c88790c0ca3f86d60568b6",
-    "hash": "04532251f97ba7845fedc6a3d817b8ac46eb8c9af18753d639b9c8e6ff3fa12c",
-    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events."
-  },
-  "packages/loginom-runtime/client/lib/executor.mjs": {
-    "baseHash": "7aba17d9f7c87b965c3681f9d3676f29ec0902d2d04390ee256c5ef050811c9c",
-    "hash": "656e3380f37fbcc26a47e46a8cb3e05309eebcf2b685a00925aa7b05b0ca3a10",
-    "reason": "Expose unsettled execution and ambiguous artifact delivery state to the managed desktop recovery lease; preserve runtime execution semantics."
-  },
-  "packages/loginom-runtime/client/lib/workspace-ui.mjs": {
-    "baseHash": "9502b06f52383cdf9998e7b3215667e0c0d348257b74b11bce4228f85048d225",
-    "hash": "944340cdacb8db425c11a83b6f3cb98bd3733ca9e64402c760d453bc338a5dc7",
-    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance."
-  },
-  "packages/loginom-runtime/client/test/workspace-ui.test.mjs": {
-    "baseHash": "ba842620009a57cda3c852178cc44548f4eb126b012e6418eff2089e76afa756",
-    "hash": "4466202b9c8f40b9a06774357a2c33631d18483eee795e19a05fdd9933832d93",
-    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance."
   }
 }
