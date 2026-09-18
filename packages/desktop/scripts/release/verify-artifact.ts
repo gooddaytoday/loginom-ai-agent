@@ -34,7 +34,8 @@ try {
     ).trim()
     if (
       !metadata.includes(`Package: ${manifest.product.executable}\n`) ||
-      !metadata.includes(`Version: ${manifest.version}\n`) ||
+      // FPM represents a SemVer prerelease with Debian's lower-sorting tilde.
+      !metadata.includes(`Version: ${manifest.version.replace("-", "~")}\n`) ||
       !metadata.includes("Architecture: amd64\n") ||
       !metadata.includes("libasound2") ||
       !metadata.includes("libgbm1")
