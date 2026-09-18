@@ -55,6 +55,7 @@ export async function main(argv: string[]) {
         signal: controller.signal,
         profileRecovered: state.recovered,
         judge: settings,
+        skipJudge: config.skipJudge,
       })
       attempts.push(result)
       console.error(`[${task.id}#${attempt}] ${result.status} score=${result.score ?? "—"} ${Math.round(result.duration_ms / 1000)}s`)
@@ -131,6 +132,7 @@ export async function runAttempt(input: {
   runDir: string
   signal: AbortSignal
   profileRecovered: boolean
+  skipJudge: boolean
   judge?: JudgeSettings
 }): Promise<{ result: AttemptResult; stop: boolean }> {
   const base = emptyResult(input.task.id, input.attempt, input.profileRecovered)
@@ -202,7 +204,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
       : null
   const noJudge = status === "harness_error" || status === "interrupted"
   const judged =
-    artifact && !noJudge && !input.signal.aborted && input.judge
+    artifact && !noJudge && !input.signal.aborted && input.judge && !input.skipJudge
       ? await judgeTask({
           task,
           run,
@@ -211,14 +213,15 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
           outDir: path.join(outDir, "judge"),
           judge: input.judge,
           signal: input.signal,
-        })
+        }).catch((error) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
       : undefined
+  const skippedJudge = input.skipJudge || artifact || noJudge
   const judgeFields = judged
     ? judgedFields(judged)
     : {
-        score: artifact || noJudge ? null : 0,
-        pass: artifact || noJudge ? null : false,
-        judge_status: (artifact || noJudge ? "skipped" : "no_artifact") as AttemptResult["judge_status"],
+        score: skippedJudge ? null : 0,
+        pass: skippedJudge ? null : false,
+        judge_status: (skippedJudge ? "skipped" : "no_artifact") as AttemptResult["judge_status"],
         judge_attempts: 0,
         judge_confidence: null,
         judge_summary: null,

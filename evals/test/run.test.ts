@@ -27,8 +27,8 @@ test("main --dry-run --repeat 2: статусы по фикстурам, поп�
     expect(attempts[0]!.artifact_origin).toBe("receipt")
     expect(attempts[0]!.judge_status).toBe("skipped")
     expect(Object.keys(attempts[0]!).includes("stop")).toBe(false)
-    expect(byTask["filter-active-rows"]!.attempts[0]).toMatchObject({ status: "failed", exit_code: 1, failure_kind: "tool", score: 0, judge_status: "no_artifact" })
-    expect(byTask["calc-data-double"]!.attempts[0]).toMatchObject({ status: "no_artifact", score: 0, pass: false })
+    expect(byTask["filter-active-rows"]!.attempts[0]).toMatchObject({ status: "failed", exit_code: 1, failure_kind: "tool", score: null, judge_status: "skipped" })
+    expect(byTask["calc-data-double"]!.attempts[0]).toMatchObject({ status: "no_artifact", score: null, pass: null, judge_status: "skipped" })
     expect(await Bun.file(path.join(runDir!, "group-sum-qty", "2", "artifact", "package.lgp")).exists()).toBe(true)
     expect(await Bun.file(path.join(runDir!, "group-sum-qty", "1", "prompt.txt")).text()).toContain("Сохрани готовый пакет как")
     expect(await Bun.file(path.join(runDir!, "report.md")).exists()).toBe(true)
@@ -121,6 +121,7 @@ test("runAttempt: ошибка артефакта сохраняет телем�
       runDir,
       signal: new AbortController().signal,
       profileRecovered: false,
+      skipJudge: true,
     })
     expect(result.status).toBe("harness_error")
     expect(result.harness_error).toMatch(/ENOENT|\/nonexistent\/xyz/)
@@ -132,24 +133,66 @@ test("runAttempt: ошибка артефакта сохраняет телем�
   }
 }, 30_000)
 
+test("runAttempt: сбой подготовки судьи сохраняет телеметрию и judge_status=error", async () => {
+  const tasksDir = await mkdtemp(path.join(os.tmpdir(), "evals-judge-fail-tasks-"))
+  const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-judge-fail-"))
+  try {
+    await cp(path.join(evalsRoot, "tasks", "group-sum-qty"), path.join(tasksDir, "group-sum-qty"), { recursive: true })
+    await cp(path.join(evalsRoot, "fixtures", "storage", "not-a-package.lgp"), path.join(tasksDir, "group-sum-qty", "reference.lgp"))
+    const [task] = await loadTasks(tasksDir)
+    const config = { ...loadConfig(["--dry-run"], {}), skipJudge: false }
+    const { result } = await runAttempt({
+      config,
+      command: agentCommand(config),
+      source: parseArtifactSource(config.artifactSource, config.loginom),
+      task: task!,
+      attempt: 1,
+      runId: "bad-ref",
+      runDir,
+      signal: new AbortController().signal,
+      profileRecovered: false,
+      skipJudge: false,
+      judge: {
+        command: ["bun", path.join(evalsRoot, "fixtures", "fake-codex.ts")],
+        model: "fake",
+        reasoning: "high",
+        timeoutMs: 30_000,
+        passThreshold: 70,
+      },
+    })
+    expect(result.status).toBe("completed")
+    expect(result.judge_status).toBe("error")
+    expect(result.judge_summary).toContain(task!.id)
+    expect(result.exit_code).toBe(0)
+    expect(result.cost).toBeGreaterThan(0)
+  } finally {
+    await rm(runDir, { recursive: true, force: true })
+    await rm(tasksDir, { recursive: true, force: true })
+  }
+}, 60_000)
+
 test("runAttempt: с судьёй completed получает score и judge_status=scored", async () => {
   const config = { ...loadConfig(["--dry-run"], {}), skipJudge: false }
   const [task] = await loadTasks(config.tasksDir, ["group-sum-qty"])
   const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-run-"))
-  const { result } = await runAttempt({
-    config,
-    command: agentCommand(config),
-    source: parseArtifactSource(config.artifactSource, config.loginom),
-    task: task!,
-    attempt: 1,
-    runId: "test-run",
-    runDir,
-    signal: new AbortController().signal,
-    profileRecovered: false,
-    judge: { command: ["bun", path.join(evalsRoot, "fixtures", "fake-codex.ts")], model: "fake", reasoning: "high", timeoutMs: 30_000, passThreshold: 70 },
-  })
-  expect(result).toMatchObject({ status: "completed", score: 100, pass: true, judge_status: "scored", judge_attempts: 1, judge_confidence: "high" })
-  expect(result.checklist?.length).toBe(7)
-  expect(await Bun.file(path.join(runDir, "group-sum-qty", "1", "judge", "verdict.json")).exists()).toBe(true)
-  await rm(runDir, { recursive: true, force: true })
+  try {
+    const { result } = await runAttempt({
+      config,
+      command: agentCommand(config),
+      source: parseArtifactSource(config.artifactSource, config.loginom),
+      task: task!,
+      attempt: 1,
+      runId: "test-run",
+      runDir,
+      signal: new AbortController().signal,
+      profileRecovered: false,
+      skipJudge: false,
+      judge: { command: ["bun", path.join(evalsRoot, "fixtures", "fake-codex.ts")], model: "fake", reasoning: "high", timeoutMs: 30_000, passThreshold: 70 },
+    })
+    expect(result).toMatchObject({ status: "completed", score: 100, pass: true, judge_status: "scored", judge_attempts: 1, judge_confidence: "high" })
+    expect(result.checklist?.length).toBe(7)
+    expect(await Bun.file(path.join(runDir, "group-sum-qty", "1", "judge", "verdict.json")).exists()).toBe(true)
+  } finally {
+    await rm(runDir, { recursive: true, force: true })
+  }
 }, 60_000)

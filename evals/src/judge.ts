@@ -5,6 +5,7 @@ import { evalsRoot } from "./config"
 import type { ChecklistItem, Task } from "./task"
 import type { AgentRun } from "./cli"
 import { unzip } from "./artifact"
+import { EvalFailure } from "./fail"
 
 export const judgePromptFile = path.join(evalsRoot, "src", "judge-prompt.md")
 export const verdictSchemaFile = path.join(evalsRoot, "src", "verdict.schema.json")
@@ -50,6 +51,7 @@ export function scoreVerdict(checklist: ChecklistItem[], verdict: Verdict, thres
     return { id: item.id, passed: answer?.passed === true, evidence: answer?.evidence ?? "" }
   })
   const total = checklist.reduce((sum, item) => sum + item.weight, 0)
+  if (total === 0) return { ok: false as const, error: "checklist пуст" }
   const passed = checklist.reduce(
     (sum, item) => sum + (items.find((candidate) => candidate.id === item.id)?.passed ? item.weight : 0),
     0,
@@ -131,9 +133,10 @@ export async function prepareJudgeDir(input: {
     Bun.write(path.join(input.dir, "tools-summary.md"), input.run ? toolsSummary(input.run) : stub),
     Bun.write(path.join(input.dir, "node-readbacks.md"), input.run ? nodeReadbacks(input.run) : stub),
     cp(verdictSchemaFile, path.join(input.dir, "verdict.schema.json")),
-    unzip(path.join(input.task.dir, input.task.reference), path.join(input.dir, "reference")),
     cp(input.artifactDir, path.join(input.dir, "artifact"), { recursive: true }),
   ])
+  if (!(await unzip(path.join(input.task.dir, input.task.reference), path.join(input.dir, "reference"))))
+    throw new EvalFailure(`${input.task.id}: эталон ${input.task.reference} не распакован или не содержит Unit.xml`, 1)
 }
 
 function toolsSummary(run: RunView) {
@@ -169,7 +172,7 @@ export async function judgeTask(input: {
     ? { ...second, attempts: 2 as const }
     : { ok: false as const, error: `${first.error}; повтор: ${second.error}`, attempts: 2 as const }
 }
-export type Judged = Awaited<ReturnType<typeof judgeTask>>
+export type Judged = Awaited<ReturnType<typeof judgeTask>> | { ok: false; error: string; attempts: 0 }
 
 export function judgedFields(judged: Judged) {
   if (judged.ok)
@@ -206,13 +209,14 @@ async function invoke(
       cwd: input.outDir,
       env: { ...process.env, ...input.judge.env },
       stdin: Bun.file(path.join(input.outDir, "PROMPT.md")),
-      stdout: Bun.file(path.join(input.outDir, `events-${attempt}.jsonl`)),
-      stderr: Bun.file(path.join(input.outDir, `stderr-${attempt}.txt`)),
+      stdout: Bun.file(path.join(path.dirname(input.outDir), `judge-events-${attempt}.jsonl`)),
+      stderr: Bun.file(path.join(path.dirname(input.outDir), `judge-stderr-${attempt}.txt`)),
     },
   )
   const timer = setTimeout(() => proc.kill("SIGKILL"), input.judge.timeoutMs)
   const onAbort = () => proc.kill("SIGKILL")
   input.signal?.addEventListener("abort", onAbort, { once: true })
+  if (input.signal?.aborted) proc.kill("SIGKILL")
   const exitCode = await proc.exited
   clearTimeout(timer)
   input.signal?.removeEventListener("abort", onAbort)
