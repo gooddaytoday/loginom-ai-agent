@@ -19,12 +19,16 @@ test.skipIf(process.platform === "win32")(
       await Bun.write(join(nested, "dist/package.json"), JSON.stringify({ type: "module" }))
       await Bun.write(join(nested, "dist/index.js"), "export const value = 41")
       await Bun.write(join(nested, "LICENSE"), "Fixture copyright and license\n")
+      await Bun.write(join(nested, "CopyrightNotice.txt"), "Additional attribution\n")
+      await Bun.write(join(nested, "dist/vendor/LICENSE"), "Vendor attribution\n")
+      await Bun.write(join(nested, "dist/license.js"), "export default 1")
       await Bun.write(
         join(missing, "package.json"),
         JSON.stringify({ name: "readme-only", version: "2.0.0", license: "MIT" }),
       )
       await Bun.write(join(missing, "index.js"), "export const other = 1")
       await Bun.write(join(missing, "README.md"), "# License\nMIT\n")
+      await Bun.write(join(missing, "vendor/COPYING.txt"), "Separate vendor notice\n")
       await Bun.write(
         join(root, "entry.js"),
         'import { value } from "./node_modules/@sample/nested/dist/index.js"; import { other } from "./node_modules/readme-only/index.js"; console.log(value + other)',
@@ -39,9 +43,18 @@ test.skipIf(process.platform === "win32")(
       expect(inventory.status).toBe("incomplete")
       const licensed = inventory.packages.find((pkg) => pkg.name === "@sample/nested")!
       expect(licensed.version).toBe("1.2.3")
-      expect(await Bun.file(join(output, licensed.files[0].path)).text()).toBe("Fixture copyright and license\n")
+      expect(
+        await Bun.file(
+          join(output, licensed.files.find((file) => file.path.endsWith("/LICENSE") && file.scope === "package")!.path),
+        ).text(),
+      ).toBe("Fixture copyright and license\n")
       const documented = inventory.packages.find((pkg) => pkg.name === "readme-only")!
-      expect(documented.files).toHaveLength(0)
+      expect(documented.files).toHaveLength(1)
+      expect(documented.files[0].scope).toBe("nested")
+      expect(licensed.files).toHaveLength(3)
+      const vendor = licensed.files.find((file) => file.scope === "nested")!
+      expect(vendor.path).toEndWith("/dist/vendor/LICENSE")
+      expect(await Bun.file(join(output, vendor.path)).text()).toBe("Vendor attribution\n")
       expect(documented.documentation).toHaveLength(1)
       expect(documented.documentation[0].sha256).toBe(createHash("sha256").update("# License\nMIT\n").digest("hex"))
 

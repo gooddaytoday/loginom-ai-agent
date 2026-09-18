@@ -391,3 +391,25 @@ An initial ad-hoc hash verifier passed ArrayBuffer to createHash.update and fail
 it was corrected to Uint8Array and all 932 checks passed. No product code changed.
 The installed 0.1.4-cli.20260918review artifact predates these supplements; a new
 full archive is required before claiming their inclusion in a distribution.
+
+## Nested npm notices — 2026-09-18
+
+The build collector now includes nested LICENSE/NOTICE/COPYING/COPYRIGHT files
+under package-relative paths. Directory symlinks are not traversed; nested
+node_modules belong to separately selected package roots. Code files such as
+bin/license.js are excluded. CopyrightNotice.txt remains recognized.
+
+Records distinguish package and nested scope. A vendored component's license does
+not satisfy the containing package's missing own license or suppress its pinned
+supplement. Existing canonical-path escape checks also apply to nested files.
+
+Against the final edc68138d artifact's real build graphs: 467 packages, 483 notices
+(15 nested) plus 464 README files, all 947 hashes independently verified; missing
+own-package texts remains empty. Vendor files include zod-to-json-schema, qs and
+cp attribution. One actual-build fixture test/16 assertions and host typecheck
+PASS. An initial filename boundary incorrectly excluded CopyrightNotice.txt; the
+actual inventory comparison caught this and the corrected test/collector preserves it.
+
+This closes regular-directory nested npm notice collection, not all embedded
+native/per-file attribution or corresponding-source/relinking requirements. The
+prior final archive is unchanged; these additions require a new complete build.

@@ -2940,3 +2940,14 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   сохранив 35205 файлов профилей/evidence. Архивы сохранены в /tmp.
 
 [Артефакты, результаты и границы проверки](../../testing/loginom-ai-agent/reports/2026-09-18-cli-final-linux/report.md).
+
+### Linux notices: вложенные npm-компоненты
+
+- [x] Сборщик сохраняет вложенные LICENSE/NOTICE/COPYING/COPYRIGHT с относительными
+  путями и scope. Лицензия vendor не закрывает отсутствие собственной лицензии
+  пакета; code-файлы license.js не считаются notices. Symlink escape отклоняется.
+- [x] Реальный build graph edc68138d: 467 packages, 483 notices (15 nested),
+  464 README; проверены все 947 hashes, missing own-package texts=0.
+- [x] Actual-build fixture test: 1 PASS/16 assertions; host typecheck PASS.
+- [ ] Новый полный архив ещё не собран; attribution/native/source/relinking audit
+  не объявляется завершённым. Старый final artifact сохранён без изменений.
