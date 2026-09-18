@@ -1,0 +1,182 @@
+import path from "node:path"
+
+export type Status = "completed" | "failed" | "timeout" | "interrupted" | "no_artifact" | "harness_error"
+export type JudgeStatus = "scored" | "no_artifact" | "skipped" | "error"
+
+export function statusFor(
+  run: { exitCode: number; timedOut: boolean; interrupted: boolean },
+  hasArtifact: boolean,
+): { status: Status; stop: boolean } {
+  if (run.interrupted) return { status: "interrupted", stop: true }
+  if (run.timedOut) return { status: "timeout", stop: false }
+  if (run.exitCode === 0) return { status: hasArtifact ? "completed" : "no_artifact", stop: false }
+  // Коды 2/3 — конфигурация или профиль: следующие попытки получили бы то же самое.
+  if (run.exitCode === 2 || run.exitCode === 3) return { status: "harness_error", stop: true }
+  return { status: "failed", stop: false }
+}
+
+export type AttemptResult = {
+  task_id: string
+  attempt: number
+  status: Status
+  exit_code: number | null
+  timed_out: boolean
+  interrupted: boolean
+  failure_kind: string | null
+  score: number | null
+  pass: boolean | null
+  judge_status: JudgeStatus
+  judge_attempts: number
+  judge_confidence: string | null
+  judge_summary: string | null
+  checklist: { id: string; passed: boolean; evidence: string }[] | null
+  duration_ms: number
+  cost: number
+  tokens: { input: number; output: number; reasoning: number }
+  counters: { toolCalls: number; loginomToolCalls: number; toolErrors: number; memoryToolCalls: number }
+  package_path: string | null
+  artifact_origin: string | null
+  artifact_ambiguous: string[]
+  cleanup_error: string | null
+  action_manifest_sha256: string | null
+  session_id: string | null
+  profile_recovered: boolean
+  errors: string[]
+  harness_error: string | null
+}
+
+const round = (value: number, digits: number) => Math.round(value * 10 ** digits) / 10 ** digits
+const mean = (values: number[]) =>
+  values.length ? round(values.reduce((sum, value) => sum + value, 0) / values.length, 1) : null
+const scoresOf = (list: AttemptResult[]) => list.flatMap((item) => (typeof item.score === "number" ? [item.score] : []))
+
+export function aggregate(attempts: AttemptResult[], skipJudge: boolean) {
+  const counted = attempts.filter((item) => item.status !== "interrupted")
+  const total = counted.length
+  const completed = counted.filter((item) => item.status === "completed")
+  const scored = counted.filter((item) => typeof item.score === "number")
+  const sum = (pick: (item: AttemptResult) => number) => counted.reduce((acc, item) => acc + pick(item), 0)
+  return {
+    total,
+    completed: completed.length,
+    completion_rate: total ? round(completed.length / total, 3) : 0,
+    mean_score: skipJudge ? null : mean(scoresOf(scored)),
+    mean_score_completed: skipJudge ? null : mean(scoresOf(completed)),
+    pass_rate: skipJudge ? null : total ? round(counted.filter((item) => item.pass === true).length / total, 3) : 0,
+    scored_count: scored.length,
+    excluded_count: total - scored.length,
+    failure_kinds: counted.reduce<Record<string, number>>(
+      (acc, item) => (item.failure_kind ? { ...acc, [item.failure_kind]: (acc[item.failure_kind] ?? 0) + 1 } : acc),
+      {},
+    ),
+    tool_calls: sum((item) => item.counters.toolCalls),
+    tool_errors: sum((item) => item.counters.toolErrors),
+    memory_tool_calls: sum((item) => item.counters.memoryToolCalls),
+    total_cost: round(sum((item) => item.cost), 4),
+    total_duration_ms: sum((item) => item.duration_ms),
+  }
+}
+export type Metrics = ReturnType<typeof aggregate>
+
+export function aggregateTask(attempts: AttemptResult[], skipJudge: boolean) {
+  const base = aggregate(attempts, skipJudge)
+  const scores = scoresOf(attempts.filter((item) => item.status !== "interrupted"))
+  return {
+    attempts: base.total,
+    completed: base.completed,
+    completion_rate: base.completion_rate,
+    mean_score: base.mean_score,
+    min_score: scores.length ? Math.min(...scores) : null,
+    max_score: scores.length ? Math.max(...scores) : null,
+    pass_rate: base.pass_rate,
+  }
+}
+export type TaskMetrics = ReturnType<typeof aggregateTask>
+
+export type RunSummary = {
+  run_id: string
+  label: string | null
+  started_at: string
+  finished_at: string
+  interrupted: boolean
+  interrupted_cleanup: { recovered: boolean } | null
+  stopped_reason: string | null
+  agent: { cli_mode: string; git_sha: string | null; dirty: boolean | null; model: string }
+  judge: { backend: "codex"; codex_version: string | null; model: string; reasoning: string; prompt_sha256: string } | null
+  dock: { skill_revision: string | null; action_manifest_sha256: string[] }
+  loginom: { image_digest: string | null }
+  agent_inputs_hash: string
+  rubric_hash: string
+  task_ids: string[]
+  config: { repeat: number; timeout_ms: number; judge_timeout_ms: number; pass_threshold: number; keep_storage: boolean }
+  metrics: Metrics
+  tasks: { id: string; metrics: TaskMetrics; attempts: AttemptResult[] }[]
+  storage_leftovers: string[]
+}
+
+export async function writeSummary(runDir: string, summary: RunSummary) {
+  await Bun.write(path.join(runDir, "summary.json"), JSON.stringify(summary, null, 2))
+  await Bun.write(path.join(runDir, "report.md"), renderReport(summary))
+}
+
+const fmt = (value: number | null, digits = 1) => (value === null ? "—" : value.toFixed(digits))
+const pct = (value: number | null) => (value === null ? "—" : `${(value * 100).toFixed(1)}%`)
+
+export function renderReport(summary: RunSummary) {
+  const m = summary.metrics
+  const head = [
+    `# Eval ${summary.run_id}${summary.label ? ` (${summary.label})` : ""}`,
+    "",
+    `Агент: ${summary.agent.model} · ${summary.agent.cli_mode} · git ${summary.agent.git_sha ?? "nogit"}${summary.agent.dirty ? "-dirty" : ""}. Судья: ${summary.judge ? `${summary.judge.model}/${summary.judge.reasoning}` : "пропущен"}. Повторов: ${summary.config.repeat}.`,
+    summary.interrupted ? "**Прогон прерван (Ctrl+C): метрики по завершённым попыткам.**" : "",
+    summary.stopped_reason ? `**Прогон остановлен: ${summary.stopped_reason}**` : "",
+    "",
+    "## Метрики",
+    "",
+    `- completion_rate: ${pct(m.completion_rate)} (${m.completed}/${m.total})`,
+    `- mean_score: ${fmt(m.mean_score)} (scored ${m.scored_count}, excluded ${m.excluded_count})`,
+    `- mean_score_completed: ${fmt(m.mean_score_completed)}`,
+    `- pass_rate: ${pct(m.pass_rate)}`,
+    `- failure_kinds: ${Object.entries(m.failure_kinds).map(([kind, count]) => `${kind}=${count}`).join(", ") || "—"}`,
+    `- tool_calls: ${m.tool_calls}, tool_errors: ${m.tool_errors}, memory_tool_calls: ${m.memory_tool_calls}${m.memory_tool_calls > 0 ? " **(агент писал в память Dock)**" : ""}`,
+    `- total_cost: ${m.total_cost}, total_duration: ${Math.round(m.total_duration_ms / 60000)} мин`,
+    "",
+    "## Задачи",
+    "",
+    "| Задача | completed/attempts | mean | min–max | pass_rate |",
+    "|---|---|---|---|---|",
+    ...summary.tasks.map(
+      (task) =>
+        `| ${task.id} | ${task.metrics.completed}/${task.metrics.attempts} | ${fmt(task.metrics.mean_score)} | ${fmt(task.metrics.min_score, 0)}–${fmt(task.metrics.max_score, 0)} | ${pct(task.metrics.pass_rate)} |`,
+    ),
+    "",
+    "## Попытки",
+    "",
+    "| Задача | # | Статус | Код | failure_kind | score | pass | Время | Стоимость | Судья |",
+    "|---|---|---|---|---|---|---|---|---|---|",
+    ...summary.tasks.flatMap((task) =>
+      task.attempts.map(
+        (item) =>
+          `| ${task.id} | ${item.attempt} | ${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${item.judge_summary ?? item.judge_status} |`,
+      ),
+    ),
+  ]
+  const failures = summary.tasks.flatMap((task) =>
+    task.attempts
+      .filter((item) => item.status !== "completed")
+      .map((item) => `- ${task.id}#${item.attempt}: ${item.status}${item.failure_kind ? ` (${item.failure_kind})` : ""} — ${[...item.errors, item.harness_error ?? ""].filter(Boolean).join(", ") || "без событий error"}`),
+  )
+  const leftovers = summary.storage_leftovers.length
+    ? [
+        "",
+        "## Остатки в хранилище",
+        "",
+        ...summary.storage_leftovers.map((name) => `- ${name}`),
+        "",
+        "```bash",
+        `docker exec loginom-server-master sh -c 'rm -f /workdir/UserStorage/user/eval-${summary.run_id}-*'`,
+        "```",
+      ]
+    : []
+  return [...head, "", "## Отказы", "", ...(failures.length ? failures : ["— нет"]), ...leftovers, ""].join("\n")
+}
