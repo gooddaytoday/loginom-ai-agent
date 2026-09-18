@@ -1,10 +1,12 @@
+import { rename } from "node:fs/promises"
 import path from "node:path"
 
 export type Status = "completed" | "failed" | "timeout" | "interrupted" | "no_artifact" | "harness_error"
 export type JudgeStatus = "scored" | "no_artifact" | "skipped" | "error"
+export type FailureKind = "permission" | "recovery" | "cancelled" | "provider" | "tool" | "other"
 
 export function statusFor(
-  run: { exitCode: number; timedOut: boolean; interrupted: boolean },
+  run: { exitCode: number | null; timedOut: boolean; interrupted: boolean },
   hasArtifact: boolean,
 ): { status: Status; stop: boolean } {
   if (run.interrupted) return { status: "interrupted", stop: true }
@@ -22,7 +24,7 @@ export type AttemptResult = {
   exit_code: number | null
   timed_out: boolean
   interrupted: boolean
-  failure_kind: string | null
+  failure_kind: FailureKind | null
   score: number | null
   pass: boolean | null
   judge_status: JudgeStatus
@@ -43,6 +45,7 @@ export type AttemptResult = {
   profile_recovered: boolean
   errors: string[]
   harness_error: string | null
+  stderr_head: string | null
 }
 
 const round = (value: number, digits: number) => Math.round(value * 10 ** digits) / 10 ** digits
@@ -104,7 +107,7 @@ export type RunSummary = {
   agent: { cli_mode: string; git_sha: string | null; dirty: boolean | null; model: string }
   judge: { backend: "codex"; codex_version: string | null; model: string; reasoning: string; prompt_sha256: string } | null
   dock: { skill_revision: string | null; action_manifest_sha256: string[] }
-  loginom: { image_digest: string | null }
+  loginom: { image_digest: string | null; container: string | null; storage_dir: string | null }
   agent_inputs_hash: string
   rubric_hash: string
   task_ids: string[]
@@ -115,12 +118,15 @@ export type RunSummary = {
 }
 
 export async function writeSummary(runDir: string, summary: RunSummary) {
-  await Bun.write(path.join(runDir, "summary.json"), JSON.stringify(summary, null, 2))
-  await Bun.write(path.join(runDir, "report.md"), renderReport(summary))
+  await Bun.write(path.join(runDir, "summary.json.tmp"), JSON.stringify(summary, null, 2))
+  await rename(path.join(runDir, "summary.json.tmp"), path.join(runDir, "summary.json"))
+  await Bun.write(path.join(runDir, "report.md.tmp"), renderReport(summary))
+  await rename(path.join(runDir, "report.md.tmp"), path.join(runDir, "report.md"))
 }
 
 const fmt = (value: number | null, digits = 1) => (value === null ? "—" : value.toFixed(digits))
 const pct = (value: number | null) => (value === null ? "—" : `${(value * 100).toFixed(1)}%`)
+const cell = (text: string) => text.replaceAll("|", "\\|").replace(/(?:\r?\n)+/g, " ")
 
 export function renderReport(summary: RunSummary) {
   const m = summary.metrics
@@ -129,7 +135,7 @@ export function renderReport(summary: RunSummary) {
     "",
     `Агент: ${summary.agent.model} · ${summary.agent.cli_mode} · git ${summary.agent.git_sha ?? "nogit"}${summary.agent.dirty ? "-dirty" : ""}. Судья: ${summary.judge ? `${summary.judge.model}/${summary.judge.reasoning}` : "пропущен"}. Повторов: ${summary.config.repeat}.`,
     summary.interrupted ? "**Прогон прерван (Ctrl+C): метрики по завершённым попыткам.**" : "",
-    summary.stopped_reason ? `**Прогон остановлен: ${summary.stopped_reason}**` : "",
+    summary.stopped_reason ? `**Прогон остановлен: ${cell(summary.stopped_reason)}**` : "",
     "",
     "## Метрики",
     "",
@@ -157,14 +163,18 @@ export function renderReport(summary: RunSummary) {
     ...summary.tasks.flatMap((task) =>
       task.attempts.map(
         (item) =>
-          `| ${task.id} | ${item.attempt} | ${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${item.judge_summary ?? item.judge_status} |`,
+          `| ${task.id} | ${item.attempt} | ${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${cell(item.judge_summary ?? item.judge_status)} |`,
       ),
     ),
   ]
   const failures = summary.tasks.flatMap((task) =>
     task.attempts
       .filter((item) => item.status !== "completed")
-      .map((item) => `- ${task.id}#${item.attempt}: ${item.status}${item.failure_kind ? ` (${item.failure_kind})` : ""} — ${[...item.errors, item.harness_error ?? ""].filter(Boolean).join(", ") || "без событий error"}`),
+      .map((item) => {
+        const names = [...item.errors.map(cell), item.harness_error ? cell(item.harness_error) : ""].filter(Boolean).join(", ") || "без событий error"
+        const stderr = (item.stderr_head ?? "").split(/\r?\n/).find((line) => line.trim())?.slice(0, 200)
+        return `- ${task.id}#${item.attempt}: ${item.status}${item.failure_kind ? ` (${item.failure_kind})` : ""} — ${names}${stderr ? ` — stderr: ${cell(stderr)}` : ""}`
+      }),
   )
   const leftovers = summary.storage_leftovers.length
     ? [
@@ -172,10 +182,14 @@ export function renderReport(summary: RunSummary) {
         "## Остатки в хранилище",
         "",
         ...summary.storage_leftovers.map((name) => `- ${name}`),
-        "",
-        "```bash",
-        `docker exec loginom-server-master sh -c 'rm -f /workdir/UserStorage/user/eval-${summary.run_id}-*'`,
-        "```",
+        ...(summary.loginom.container && summary.loginom.storage_dir
+          ? [
+              "",
+              "```bash",
+              `docker exec ${summary.loginom.container} sh -c 'rm -f ${summary.loginom.storage_dir}/eval-${summary.run_id}-*'`,
+              "```",
+            ]
+          : []),
       ]
     : []
   return [...head, "", "## Отказы", "", ...(failures.length ? failures : ["— нет"]), ...leftovers, ""].join("\n")

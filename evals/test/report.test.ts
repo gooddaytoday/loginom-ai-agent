@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test"
-import { mkdtemp } from "node:fs/promises"
+import { mkdtemp, readdir } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "../src/report"
 
 test("statusFor: таблица кодов выхода и приоритет timed_out/interrupted", () => {
-  const run = (exitCode: number, extra: Partial<{ timedOut: boolean; interrupted: boolean }> = {}) => ({
+  const run = (exitCode: number | null, extra: Partial<{ timedOut: boolean; interrupted: boolean }> = {}) => ({
     exitCode,
     timedOut: false,
     interrupted: false,
@@ -20,6 +20,7 @@ test("statusFor: таблица кодов выхода и приоритет ti
   expect(statusFor(run(3), false)).toEqual({ status: "harness_error", stop: true })
   expect(statusFor(run(130, { timedOut: true }), true)).toEqual({ status: "timeout", stop: false })
   expect(statusFor(run(0, { interrupted: true }), true)).toEqual({ status: "interrupted", stop: true })
+  expect(statusFor(run(null), false)).toEqual({ status: "failed", stop: false })
 })
 
 const attempt = (over: Partial<AttemptResult>): AttemptResult => ({
@@ -50,6 +51,7 @@ const attempt = (over: Partial<AttemptResult>): AttemptResult => ({
   profile_recovered: false,
   errors: [],
   harness_error: null,
+  stderr_head: null,
   ...over,
 })
 
@@ -101,7 +103,7 @@ const summary = (): RunSummary => {
     agent: { cli_mode: "source", git_sha: "abc1234", dirty: false, model: "openai/gpt-5.6-sol" },
     judge: { backend: "codex", codex_version: "codex-cli 0.153.4", model: "gpt-6-astra", reasoning: "high", prompt_sha256: "p" },
     dock: { skill_revision: "r1", action_manifest_sha256: [] },
-    loginom: { image_digest: "sha256:x" },
+    loginom: { image_digest: "sha256:x", container: null, storage_dir: null },
     agent_inputs_hash: "a",
     rubric_hash: "r",
     task_ids: ["group-sum-qty"],
@@ -119,7 +121,45 @@ test("renderReport: метрики, задачи, попытки, отказы �
   expect(report).toContain("provider")
   expect(report).toContain("APIError")
   expect(report).toContain("Остатки в хранилище")
-  expect(report).toContain("docker exec loginom-server-master")
+})
+
+test("renderReport: экранирует свободный текст в ячейках markdown", () => {
+  const scored = attempt({ task_id: "group-sum-qty", judge_summary: "a|b\nc" })
+  const report = renderReport({
+    ...summary(),
+    tasks: [{ id: "group-sum-qty", metrics: aggregateTask([scored], false), attempts: [scored] }],
+    storage_leftovers: [],
+  })
+  const row = report.split("\n").find((line) => line.includes("a\\|b c"))
+  expect(row).toBeDefined()
+  expect(row).toContain("group-sum-qty")
+})
+
+test("renderReport: в отказах первая строка stderr_head", () => {
+  const failed = attempt({
+    task_id: "group-sum-qty",
+    status: "failed",
+    stderr_head: "LOGINOM_CONNECTION_NOT_READY\nmore",
+    score: null,
+    pass: null,
+    judge_status: "error",
+  })
+  const report = renderReport({
+    ...summary(),
+    tasks: [{ id: "group-sum-qty", metrics: aggregateTask([failed], false), attempts: [failed] }],
+    storage_leftovers: [],
+  })
+  expect(report).toContain("stderr: LOGINOM_CONNECTION_NOT_READY")
+  expect(report).not.toContain("more")
+})
+
+test("renderReport: команда очистки из loginom.container и storage_dir", () => {
+  const report = renderReport({
+    ...summary(),
+    loginom: { image_digest: "sha256:x", container: "c-test", storage_dir: "/s/test" },
+  })
+  expect(report).toContain("docker exec c-test sh -c 'rm -f /s/test/eval-20260918-120000-abc1234-*'")
+  expect(report).not.toContain("loginom-server-master")
 })
 
 test("writeSummary: пишет summary.json и report.md", async () => {
@@ -128,4 +168,5 @@ test("writeSummary: пишет summary.json и report.md", async () => {
   const written = (await Bun.file(path.join(dir, "summary.json")).json()) as RunSummary
   expect(written.run_id).toBe("20260918-120000-abc1234")
   expect(await Bun.file(path.join(dir, "report.md")).exists()).toBe(true)
+  expect((await readdir(dir)).filter((name) => name.endsWith(".tmp"))).toEqual([])
 })
