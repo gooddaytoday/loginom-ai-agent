@@ -26,7 +26,9 @@ for (const port of ports) {
   assert.equal(read.valid,true,read.errorMessage);
 }
 let rejected = 0;
-for (const size of [11,12]) {
+// RC9 public limit: sample/sample_rows are bounded by 100 in node-result-schema
+// and node-api read; the first two oversize values must still be refused.
+for (const size of [101,102]) {
   const bad = structuredClone(ports.find(p => p.sample.length));
   bad.sample = Array.from({length:size},()=>structuredClone(bad.sample[0]));
   bad.sample_rows = bad.row_count = size;

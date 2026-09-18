@@ -74,7 +74,6 @@ class ProvenanceTest(unittest.TestCase):
             config = root / "dock.json"
             config.write_text('{"api_key":"synthetic-not-real"}')
             args = SimpleNamespace(run=False, timeout=1200, max_turns=60, manifest_uri=None, manifest_sha256=None,
-                                   loginom_user=None,
                                    hermes_home=root, dock_config=config, node=root / "node", browsers=root / "browsers",
                                    hermes=root / "hermes", hermes_python=root / 'python', hermes_source=root / 'source',
                                    output=root / "preflight.json", loginom_user='mimo')

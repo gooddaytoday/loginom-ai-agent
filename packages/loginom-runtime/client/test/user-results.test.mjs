@@ -96,15 +96,18 @@ test('export result retains byte evidence but excludes host paths and private bi
  assert.equal(r.output.file_artifacts[0].path,undefined);assert.equal(r.output.file_artifacts[0].session_id,undefined);assert.equal(validate(r).valid,true);
 });
 
-test('installed import discovery supplies its complete parameter vocabulary in compact knowledge', async () => {
+test('installed import discovery supplies its complete parameter vocabulary on the selected-type route', async () => {
   const { createCandidateNodeSupport } = await import('../lib/node-support.mjs');
   const { describeNodeTypes } = await import('../lib/node-contracts.mjs');
   const { nodeApplyInputSchema } = await import('../lib/node-api.mjs');
   const support = createCandidateNodeSupport({ targetOrigin: 'http://example.test', targetBuild: '7.4.2' });
   const cards = describeNodeTypes([...support.nodeApplyHandlers.keys()], { runtime: 'pin' }, new Map(), support.nodeApplyHandlers);
+  // The initial prepare bundle only lists installed types; the schema of a
+  // selected type comes from dock_action_describe({node_types:[type]}).
   const knowledge = compactKnowledgeBundle({ session_manifest: { runtime: 'pin' }, actions: [], node_types: cards });
-  for (const card of knowledge.node_types) assert.ok(card.parameter_schema, card.type);
-  const schema = knowledge.node_types.find(card => card.type === 'imports.text').parameter_schema;
+  for (const card of knowledge.node_types) { assert.equal(card.candidate_node_apply_available, true, card.type); assert.equal(card.parameter_schema, undefined, card.type); }
+  for (const card of cards) assert.ok(card.parameter_schema, card.type);
+  const schema = cards.find(card => card.type === 'imports.text').parameter_schema;
   assert.deepEqual(schema.required, ['source', 'settings']);
   for (const key of ['source', 'settings']) {
     const { description, ...shape } = schema.properties[key];
