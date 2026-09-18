@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - dev
+      # TEMPORARY dry run without API access; revert before merging.
+      - ci-release
   pull_request:
   workflow_dispatch:
   # release.yml runs this workflow as a release gate.

@@ -2,7 +2,8 @@ name: typecheck
 
 on:
   push:
-    branches: [dev]
+    # TEMPORARY dry run without API access; revert before merging.
+    branches: [dev, ci-release]
   pull_request:
     branches: [dev]
   workflow_dispatch:
