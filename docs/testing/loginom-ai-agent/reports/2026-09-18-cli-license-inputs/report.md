@@ -444,3 +444,26 @@ an attribution selection based solely on those markers. This is complete src/js
 source collection, not proof of the native Bun/WebKit dependency closure, exact
 binary linkage or relinking. Native/per-file and corresponding-source audit remains
 incomplete. The prior nested-notices archive has not been modified or relabelled.
+
+## Bun SQLite and Node compatibility headers
+
+The pinned Bun runtime reports Node compatibility 24.3.0 and SQLite 3.53.0.
+Its sqlite_source_id() matches SQLITE_SOURCE_ID in the exact Bun archive's
+sqlite3.c. Added all six regular files from src/jsc/bindings/sqlite, including
+Bun bindings and unchanged original notices. Compressed archive SHA256
+`1a4b45f175379c175da44ec340a82d77546bcc65de04418abfb582c1fc552a4a`
+(2632576 bytes); every entry hash verified against original bytes.
+
+Bun's nodejs-headers.ts pins 24.3.0 and removes openssl/uv headers. Downloaded
+that official headers archive and source archive; both SHA256s match the official
+SHASUMS256.txt. The supplied archive follows those exclusions and adds the exact
+source LICENSE: 111 files, 316504 compressed bytes, SHA256
+`ef0ba45f7a6facbf6cd87dc9da750ae3621e998ead6482ecd6c8edde1b7e725f`.
+Paired inventory records origin URLs, source/checksum hashes and transformation.
+This is Bun compatibility material; the independent host still uses Node 24.19.0.
+
+All 23 default dependency recipe files under Bun scripts/build/deps now have
+component records in the notice inputs. This is source recipe coverage, not an
+emitted binary linker map. Existing WebKit nested/per-file and corresponding
+source/relinking limitations remain. All 41 native/source file hashes verified;
+host typecheck PASS. No archive with these new inputs has yet been built.

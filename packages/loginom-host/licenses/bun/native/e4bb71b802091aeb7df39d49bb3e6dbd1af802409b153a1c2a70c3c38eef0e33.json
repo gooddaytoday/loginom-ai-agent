@@ -1,0 +1,44 @@
+{
+  "scope": "Complete Bun SQLite amalgamation and bindings directory, including original notices; version/source ID verified against pinned Bun runtime",
+  "sourceCommit": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+  "sourceUrl": "https://codeload.github.com/oven-sh/bun/tar.gz/0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+  "sourceArchiveSha256": "aa045c1f3ddd3eb41ed8452d8a73eaab3b3322386416ebb1b160a6af6978d3e5",
+  "runtime": {
+    "version": "3.53.0",
+    "sourceID": "2026-04-09 11:41:38 4525003a53a7fc63ca75c59b22c79608659ca12f0131f52c18637f829977f20b"
+  },
+  "archiveSha256": "1a4b45f175379c175da44ec340a82d77546bcc65de04418abfb582c1fc552a4a",
+  "transform": "Sorted USTAR regular files, uid/gid/mtime=0, mode=0644, gzip mtime=0; contents unchanged",
+  "entries": [
+    {
+      "path": "src/jsc/bindings/sqlite/JSSQLStatement.cpp",
+      "bytes": 112416,
+      "sha256": "34da7cf679641925af888afd4f52023762d908de085cfa06da038a70351dd268"
+    },
+    {
+      "path": "src/jsc/bindings/sqlite/JSSQLStatement.h",
+      "bytes": 3101,
+      "sha256": "fc3b412eacc2c845b31cfe085d0977ad3a08faede06162f6589053fd37dfb1f5"
+    },
+    {
+      "path": "src/jsc/bindings/sqlite/lazy_sqlite3.h",
+      "bytes": 18509,
+      "sha256": "06956827477b626f27e104eca37849c95726573478b61cc9fd3c480f32e3f194"
+    },
+    {
+      "path": "src/jsc/bindings/sqlite/sqlite3.c",
+      "bytes": 9489710,
+      "sha256": "f502afd2ece6c219e3595d7554602adacb06ab737f79bbdf26ab7eb84e5212fe"
+    },
+    {
+      "path": "src/jsc/bindings/sqlite/sqlite3_error_codes.h",
+      "bytes": 15505,
+      "sha256": "a0d2e85a5114d994fbc86bf35500dfc632dac48fab423301b227ca3f46b2dd30"
+    },
+    {
+      "path": "src/jsc/bindings/sqlite/sqlite3_local.h",
+      "bytes": 690075,
+      "sha256": "c88261eede85e6a381bedcbafaa9b995a3c2232fec60e15dfb282da1474ce8d8"
+    }
+  ]
+}

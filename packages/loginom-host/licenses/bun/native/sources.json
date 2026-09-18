@@ -391,6 +391,66 @@
           "sha256": "e0535426b621b9a8efea2de3e52dabb173a50454d6fc23fdfdb2b4571114644b"
         }
       ]
+    },
+    "sqlite": {
+      "scope": "Complete Bun SQLite amalgamation and bindings directory, including original notices; version/source ID verified against pinned Bun runtime",
+      "files": [
+        {
+          "path": "sources.tar.gz",
+          "file": "1a4b45f175379c175da44ec340a82d77546bcc65de04418abfb582c1fc552a4a.tar.gz",
+          "sha256": "1a4b45f175379c175da44ec340a82d77546bcc65de04418abfb582c1fc552a4a"
+        },
+        {
+          "path": "inventory.json",
+          "file": "e4bb71b802091aeb7df39d49bb3e6dbd1af802409b153a1c2a70c3c38eef0e33.json",
+          "sha256": "e4bb71b802091aeb7df39d49bb3e6dbd1af802409b153a1c2a70c3c38eef0e33"
+        }
+      ]
+    },
+    "nodejs-headers": {
+      "scope": "Bun Node 24.3.0 compatibility headers after its documented openssl/uv exclusions, plus exact Node source LICENSE; separate from the Node 24.19.0 host",
+      "files": [
+        {
+          "path": "sources.tar.gz",
+          "file": "ef0ba45f7a6facbf6cd87dc9da750ae3621e998ead6482ecd6c8edde1b7e725f.tar.gz",
+          "sha256": "ef0ba45f7a6facbf6cd87dc9da750ae3621e998ead6482ecd6c8edde1b7e725f"
+        },
+        {
+          "path": "inventory.json",
+          "file": "47133b9dd8c2cb1bf92d07983fb2a38afd5f914a72b83f72a2ecbed791243364.json",
+          "sha256": "47133b9dd8c2cb1bf92d07983fb2a38afd5f914a72b83f72a2ecbed791243364"
+        }
+      ]
     }
+  },
+  "sourceDependencyCoverage": {
+    "sourceCommit": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+    "defaultBuildDependencyFiles": [
+      "boringssl",
+      "brotli",
+      "cares",
+      "hdrhistogram",
+      "highway",
+      "libarchive",
+      "libdeflate",
+      "libjpeg-turbo",
+      "libspng",
+      "libuv",
+      "libwebp",
+      "lolhtml",
+      "lshpack",
+      "lsqpack",
+      "lsquic",
+      "mimalloc",
+      "nodejs-headers",
+      "picohttpparser",
+      "sqlite",
+      "tinycc",
+      "webkit",
+      "zlib",
+      "zstd"
+    ],
+    "missingComponentRecords": [],
+    "scope": "Source-declared default dependency recipes only; not an emitted native linker map"
   }
 }

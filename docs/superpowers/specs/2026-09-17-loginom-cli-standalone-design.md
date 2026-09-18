@@ -2991,3 +2991,14 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   и вложенные npm notices. Прежние individual JS supplements сохранены.
 - [ ] Новый архив с src/js ещё не собран. Native dependency source closure и
   relinking остаются отдельными неподтверждёнными требованиями; это не release PASS.
+
+### Bun: SQLite и Node compatibility sources
+
+- [x] SQLite: сохранены все 6 файлов amalgamation/bindings; версия 3.53.0 и
+  sqlite_source_id совпали между точным source archive и закреплённым Bun runtime.
+- [x] Node headers 24.3.0 и source archive проверены по официальным SHA256.
+  Взяты 111 файлов с штатными exclusions openssl/uv и точным LICENSE.
+- [x] Все 23 default dependency recipes Bun имеют component records;
+  проверены 41 native/source input hashes и host typecheck.
+- [ ] Это source recipe coverage, не binary linker map. WebKit per-file и
+  corresponding-source/relinking audit ещё не закрыты; новый архив ожидает сборки.

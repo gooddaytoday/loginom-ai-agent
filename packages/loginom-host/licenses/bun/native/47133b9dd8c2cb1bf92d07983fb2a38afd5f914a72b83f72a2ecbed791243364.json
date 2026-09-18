@@ -1,0 +1,576 @@
+{
+  "scope": "Bun Node 24.3.0 compatibility headers after its documented openssl/uv exclusions, plus exact Node source LICENSE; separate from the Node 24.19.0 host",
+  "sourceArchives": [
+    {
+      "url": "https://nodejs.org/dist/v24.3.0/node-v24.3.0-headers.tar.gz",
+      "sha256": "045e9bf477cd5db0ec67f8c1a63ba7f784dedfe2c581e3d0ed09b88e9115dd07"
+    },
+    {
+      "url": "https://nodejs.org/dist/v24.3.0/node-v24.3.0.tar.gz",
+      "sha256": "f8cc1dcde9b76fa380765204fefbb98e51123e52c919ba4adcf4ccd235bbf70b"
+    }
+  ],
+  "checksumUrl": "https://nodejs.org/dist/v24.3.0/SHASUMS256.txt",
+  "checksumSha256": "814f49e510b0f72dda1b4a23d537c6d85aeac0c56d728e1544337f331b71300c",
+  "buildScript": "https://raw.githubusercontent.com/oven-sh/bun/0d9b296af33f2b851fcbf4df3e9ec89751734ba4/scripts/build/deps/nodejs-headers.ts",
+  "reportedNodeVersion": "24.3.0",
+  "archiveSha256": "ef0ba45f7a6facbf6cd87dc9da750ae3621e998ead6482ecd6c8edde1b7e725f",
+  "transform": "Sorted USTAR regular files, uid/gid/mtime=0, mode=0644, gzip mtime=0; contents unchanged",
+  "entries": [
+    {
+      "path": "LICENSE",
+      "bytes": 142088,
+      "sha256": "4da25aaf0146d7f16c275f93306ce7e88d5e6fbe7d29eb1ba00067868021dee6"
+    },
+    {
+      "path": "include/node/common.gypi",
+      "bytes": 26606,
+      "sha256": "c65e0163ee2420931e0f2ae6ca73451ed4ad77bbe725bb3c49fd16bbd09cf7f8"
+    },
+    {
+      "path": "include/node/config.gypi",
+      "bytes": 32438,
+      "sha256": "6b56c718df13d2f353b26c7398049165863bd3d895924ec2011c0ee2000dd10d"
+    },
+    {
+      "path": "include/node/cppgc/allocation.h",
+      "bytes": 11610,
+      "sha256": "c694f793b748b67e8c3869f05ee7ae83aaed1c59e01a1bf6891e9c921d4255a9"
+    },
+    {
+      "path": "include/node/cppgc/common.h",
+      "bytes": 643,
+      "sha256": "3c64e8f6eb258720401ec5079869c2148213f72f6d4d4df6df89d546b07a2c1a"
+    },
+    {
+      "path": "include/node/cppgc/cross-thread-persistent.h",
+      "bytes": 15170,
+      "sha256": "35cb3964217662a99e9c3cefaf75127a049fb50160cd6292cb1f09039df8c936"
+    },
+    {
+      "path": "include/node/cppgc/custom-space.h",
+      "bytes": 2454,
+      "sha256": "e07586be071fa0bc194efd585b0c9e483bb332049ee12693de27801879b9c868"
+    },
+    {
+      "path": "include/node/cppgc/default-platform.h",
+      "bytes": 2268,
+      "sha256": "8b19c860a0a7a2fcb635f728831b10c3c2dd1870c5b3f35f76bcd61b8b600901"
+    },
+    {
+      "path": "include/node/cppgc/explicit-management.h",
+      "bytes": 3370,
+      "sha256": "17772b2437ac8463b95dd331c2e7be371f3bb89c933c7cff0bfc09a254d94106"
+    },
+    {
+      "path": "include/node/cppgc/garbage-collected.h",
+      "bytes": 3528,
+      "sha256": "d8f031f6fc0b0fea3a32c5f9cfe2e423246898f5985316856c25d5c37b6f3b82"
+    },
+    {
+      "path": "include/node/cppgc/heap-consistency.h",
+      "bytes": 12019,
+      "sha256": "0df4c398bbe23e984fc552ffc6193483d1766eaa99057e9e318a7d51b4c7d836"
+    },
+    {
+      "path": "include/node/cppgc/heap-handle.h",
+      "bytes": 1289,
+      "sha256": "29e12945e9bc2b6382e97d1527b19d858e54c75149a09107c29bffa53f3c8ad9"
+    },
+    {
+      "path": "include/node/cppgc/heap-state.h",
+      "bytes": 2632,
+      "sha256": "9e4ac38fc7e351a3138c3c99e5ea6a09e61e6ddd8b02b4fc2e48100199e9dadc"
+    },
+    {
+      "path": "include/node/cppgc/heap-statistics.h",
+      "bytes": 4095,
+      "sha256": "5dd7fe151cc31777d88418f7ccfd44e9affe3570ef04fd59f34a568100147313"
+    },
+    {
+      "path": "include/node/cppgc/heap.h",
+      "bytes": 5834,
+      "sha256": "2afd83536f15879b859f9f12ca341aff9c462aa541769d0744025daefd92f5a9"
+    },
+    {
+      "path": "include/node/cppgc/internal/api-constants.h",
+      "bytes": 2537,
+      "sha256": "74cb3158b7013379627b3740ab7d077fc4eb240c8b944106e1d8c0e7f5bbbe2d"
+    },
+    {
+      "path": "include/node/cppgc/internal/atomic-entry-flag.h",
+      "bytes": 1763,
+      "sha256": "270e86353643206f2a15023f7c8b9d0d6f16393f8407b48b006fba1e45068ff9"
+    },
+    {
+      "path": "include/node/cppgc/internal/base-page-handle.h",
+      "bytes": 1393,
+      "sha256": "fe5fee5093005e6a1f2eaf408a324d558c58c1a382f5fa3512c7ec6a1fc8f3bc"
+    },
+    {
+      "path": "include/node/cppgc/internal/caged-heap-local-data.h",
+      "bytes": 3584,
+      "sha256": "1c3db27ea1b6996400a501fb61901ae6ec6f425f1261dc4f99d9ebf7b21d937d"
+    },
+    {
+      "path": "include/node/cppgc/internal/caged-heap.h",
+      "bytes": 2086,
+      "sha256": "2416fb184f0e202c79937ec646f5327a790adf7e88f9a0cfd4a8c5bb7692d8cc"
+    },
+    {
+      "path": "include/node/cppgc/internal/compiler-specific.h",
+      "bytes": 1532,
+      "sha256": "b2d551452c8ac212b56712341d3c5c4238a56c2aed77e646e9a8580fcc2ce809"
+    },
+    {
+      "path": "include/node/cppgc/internal/conditional-stack-allocated.h",
+      "bytes": 1229,
+      "sha256": "bdf7c12a28ab8042f1144cc2012f7427e6c425361132f2daad7d9aa3b46bc746"
+    },
+    {
+      "path": "include/node/cppgc/internal/finalizer-trait.h",
+      "bytes": 2656,
+      "sha256": "249dc1add987c14d9f94d342828d3341192656557a5603eb3259bde07e808b80"
+    },
+    {
+      "path": "include/node/cppgc/internal/gc-info.h",
+      "bytes": 6394,
+      "sha256": "250ea5b06fb3198dc86b8678896311a06bf73d21e0f54bac7db922e586484797"
+    },
+    {
+      "path": "include/node/cppgc/internal/logging.h",
+      "bytes": 1732,
+      "sha256": "e36812e64ebf940bc427894397121e261867d6088d6573635b0fc78a1a5e8381"
+    },
+    {
+      "path": "include/node/cppgc/internal/member-storage.h",
+      "bytes": 11221,
+      "sha256": "060bdec6d59781942ff8757763807692b3433d8f7c92695594c93dc3590d1d36"
+    },
+    {
+      "path": "include/node/cppgc/internal/name-trait.h",
+      "bytes": 4442,
+      "sha256": "84c247ea3a06588574a5f78bf6191e381dfbb4b10fcf5294704b1d713a118e67"
+    },
+    {
+      "path": "include/node/cppgc/internal/persistent-node.h",
+      "bytes": 6206,
+      "sha256": "295ca9840be82bdfe276b452ae97ea86e085ef7541dea3bbf2228f983d4d4f54"
+    },
+    {
+      "path": "include/node/cppgc/internal/pointer-policies.h",
+      "bytes": 10016,
+      "sha256": "8e059e6804edde2e17df758345c4c968a12956f2f5c7bfa8fcc37c2542cdefdb"
+    },
+    {
+      "path": "include/node/cppgc/internal/write-barrier.h",
+      "bytes": 19548,
+      "sha256": "25444565b9c2f4dae373cc25b69e72ca411cffe87e7a4a985c4f8e5b310144dd"
+    },
+    {
+      "path": "include/node/cppgc/liveness-broker.h",
+      "bytes": 2396,
+      "sha256": "4390c573e7a792598e1f7d4d000ba345d0d3d627cf98c6f9f4094ef106084ccb"
+    },
+    {
+      "path": "include/node/cppgc/macros.h",
+      "bytes": 2053,
+      "sha256": "c9b0848f9493424ddea9c1ebf968c9ffefe0ebe0998c0acbf1d22488cb70007b"
+    },
+    {
+      "path": "include/node/cppgc/member.h",
+      "bytes": 25552,
+      "sha256": "3533e2b31b6bae4cf7280ee34675a69e80d4477f594b1bf65081b8c3f1d32dc4"
+    },
+    {
+      "path": "include/node/cppgc/name-provider.h",
+      "bytes": 2629,
+      "sha256": "6eb0507058fa913e5f7d16e9057cf7cbc1749af9c1b83ad3a8d878628c2640d4"
+    },
+    {
+      "path": "include/node/cppgc/object-size-trait.h",
+      "bytes": 1643,
+      "sha256": "b595c4cb82e4923f67cf207382b518751667be55ee86086b6b8eedaf5baa1b35"
+    },
+    {
+      "path": "include/node/cppgc/persistent.h",
+      "bytes": 13937,
+      "sha256": "4c02f981125fd501d7f58d841da94cbb8015ebe1847966c2339db4e311b50dce"
+    },
+    {
+      "path": "include/node/cppgc/platform.h",
+      "bytes": 6368,
+      "sha256": "1b965dd49cf734030909913a27d8a9da4f4a8ed6638e1b511fdaedd330b06b5f"
+    },
+    {
+      "path": "include/node/cppgc/prefinalizer.h",
+      "bytes": 2944,
+      "sha256": "a166ad493a02e382acb093bfd56425ac177504aedcc650ac4dd37f7de38ce56b"
+    },
+    {
+      "path": "include/node/cppgc/process-heap-statistics.h",
+      "bytes": 1009,
+      "sha256": "97831f0ab6b7b7932fcf045b15ca66289eaf9a3218850a6672b7253e59846d44"
+    },
+    {
+      "path": "include/node/cppgc/sentinel-pointer.h",
+      "bytes": 1208,
+      "sha256": "13f78abbe810a9959bb2126a5ca4de7795fe0c7b21c18a261cd278bfa4035fd7"
+    },
+    {
+      "path": "include/node/cppgc/source-location.h",
+      "bytes": 414,
+      "sha256": "aadb7df97fbe5320787b16ae01d0de46f95054846908406b3ec72914b48942fa"
+    },
+    {
+      "path": "include/node/cppgc/testing.h",
+      "bytes": 3033,
+      "sha256": "d7e6d067eb779d41fc790854dcb2d8e8f58af3a7595979000c8929c83bde86e1"
+    },
+    {
+      "path": "include/node/cppgc/trace-trait.h",
+      "bytes": 3479,
+      "sha256": "950993565adb04dba8c6a991c62f5f4878325258b3801853577b4f44e97a5aec"
+    },
+    {
+      "path": "include/node/cppgc/type-traits.h",
+      "bytes": 8675,
+      "sha256": "493513a2ef75e6e7c80ae3f425f7b88966b020e9a7068c464179b49cd730c48f"
+    },
+    {
+      "path": "include/node/cppgc/visitor.h",
+      "bytes": 19114,
+      "sha256": "1089fc76f82b5791c9add90a58b71dd5d6aaf92f76e6198c3beff3c0e7c247ad"
+    },
+    {
+      "path": "include/node/js_native_api.h",
+      "bytes": 32028,
+      "sha256": "048b4efdcd823f30afd323d61c8aba5be285077f9d790feb52a6fa6382df2541"
+    },
+    {
+      "path": "include/node/js_native_api_types.h",
+      "bytes": 7033,
+      "sha256": "0410c31e227f81e2981363c4d543f4832ac3df785343ec64cee621742ff8a034"
+    },
+    {
+      "path": "include/node/libplatform/libplatform-export.h",
+      "bytes": 886,
+      "sha256": "3c488969cd90904d8b201c0a2492e9a354f0acf251e3b1e78a5447b47c4cf39a"
+    },
+    {
+      "path": "include/node/libplatform/libplatform.h",
+      "bytes": 4506,
+      "sha256": "505c159596da96cdffa0d8f6467061b4218bb86a1de37133b96b88bf2d106253"
+    },
+    {
+      "path": "include/node/libplatform/v8-tracing.h",
+      "bytes": 11054,
+      "sha256": "57c1d3c4ea4db2e0af7790105a82c21719dd48cbc4b17232981645ab981dfccc"
+    },
+    {
+      "path": "include/node/node.h",
+      "bytes": 70233,
+      "sha256": "2dcd893941993db78a571da3953fc0249e1950d2ce182cdba504693951c8148e"
+    },
+    {
+      "path": "include/node/node_api.h",
+      "bytes": 10592,
+      "sha256": "d14db85d16f182045c42745a6e44b96e932dfe6e3bfcaac7a1096fae8412c579"
+    },
+    {
+      "path": "include/node/node_api_types.h",
+      "bytes": 1603,
+      "sha256": "8d5d854088d5725fec9775510e0aeeeb790a41ad083c49bb721d950b86e6bd61"
+    },
+    {
+      "path": "include/node/node_buffer.h",
+      "bytes": 3684,
+      "sha256": "48077ade87e863a88e75a74c61fd948cb9ae16d7546cc5d61e1207fc95a7ac48"
+    },
+    {
+      "path": "include/node/node_object_wrap.h",
+      "bytes": 3867,
+      "sha256": "c16090af77c11039e6982761b71ad555f08cceb9bf800791048d4311bd839e99"
+    },
+    {
+      "path": "include/node/node_version.h",
+      "bytes": 4239,
+      "sha256": "a57193a0c6fb1ff6682b9ff2ae2c2496c34baf6c35d4d6f7dd3166f5dfd6d1f3"
+    },
+    {
+      "path": "include/node/v8-array-buffer.h",
+      "bytes": 22006,
+      "sha256": "5ab664c31420db10083db3efb9712666eb0fa1c14c71f4bbbf9c11f9e3ae991e"
+    },
+    {
+      "path": "include/node/v8-callbacks.h",
+      "bytes": 19515,
+      "sha256": "8fe95d3b62906b8b5ff5c7c7cfb02d10dcc71e1a8328728422d3887634926eb4"
+    },
+    {
+      "path": "include/node/v8-container.h",
+      "bytes": 5959,
+      "sha256": "30c8fce13776a8b02e0268f55ba604a0cc359f28b91bcda84c07e7d87343e1e6"
+    },
+    {
+      "path": "include/node/v8-context.h",
+      "bytes": 19737,
+      "sha256": "8059e175eea93b622aae4d4dbd796b39fcdd5d15fa502bfb2aa86019fa5a8e8e"
+    },
+    {
+      "path": "include/node/v8-cppgc.h",
+      "bytes": 5966,
+      "sha256": "112b01dbcd87a407e1e4efe467641a1da2cce2d233b2c1fe9582998205a9ba19"
+    },
+    {
+      "path": "include/node/v8-data.h",
+      "bytes": 1725,
+      "sha256": "e2755bf6e3ddab5fd36176b0c79ff3ac9cf01c85502a74f2973b60ff1d8d910f"
+    },
+    {
+      "path": "include/node/v8-date.h",
+      "bytes": 1439,
+      "sha256": "bcb25002ce911e826fe66fc8f788d3c70b17d77713cce8a43851c3fcf1390130"
+    },
+    {
+      "path": "include/node/v8-debug.h",
+      "bytes": 5384,
+      "sha256": "2c5776228c8a010d10e920e153c4368d35dec80a97a671c2789cca6321ab6ea8"
+    },
+    {
+      "path": "include/node/v8-embedder-heap.h",
+      "bytes": 1654,
+      "sha256": "94317e3b040d721f21867d5a5333fa5aa2850d0228df4c2301ac93070fa1aa61"
+    },
+    {
+      "path": "include/node/v8-embedder-state-scope.h",
+      "bytes": 1493,
+      "sha256": "8ac9da5d0502946981ecadec567a9e6658bb97591da5e585a3247cc7ccf924c3"
+    },
+    {
+      "path": "include/node/v8-exception.h",
+      "bytes": 9744,
+      "sha256": "a56b9a825bd5a95e3a091f16e1f49c9e56b0aa7392fd584d34e3bf3452b4f6f3"
+    },
+    {
+      "path": "include/node/v8-extension.h",
+      "bytes": 1870,
+      "sha256": "ad2783655342544e49ad5323e04aefd112facbf5f6630d2f3050fbee1da4bcd0"
+    },
+    {
+      "path": "include/node/v8-external.h",
+      "bytes": 924,
+      "sha256": "234042362502bc29d2e5fa652b3ca50aeff60bbacbb045a3e9e4ca10b3bb59fd"
+    },
+    {
+      "path": "include/node/v8-forward.h",
+      "bytes": 1688,
+      "sha256": "13a977a548417301d77359e6116a9a06a27d3b60cdeefed2614bf832aa95fc37"
+    },
+    {
+      "path": "include/node/v8-function-callback.h",
+      "bytes": 24413,
+      "sha256": "0a04fb5fe15f0956db82c286cee3ab21a5630b37b1c89249a5beda79358a5064"
+    },
+    {
+      "path": "include/node/v8-function.h",
+      "bytes": 4879,
+      "sha256": "335c745cdc90804e34ea3694da3bd5db88492e73c4e94c5169c55b67a8604b74"
+    },
+    {
+      "path": "include/node/v8-handle-base.h",
+      "bytes": 4921,
+      "sha256": "a39ce35b295ac1225e6842ab5f3a422384a5c5dbe13b5c5f384a245252670b14"
+    },
+    {
+      "path": "include/node/v8-initialization.h",
+      "bytes": 11287,
+      "sha256": "734f5c485554509a9fa62d8aea6a548d3439cb0be26d7f90f6574b486bf505af"
+    },
+    {
+      "path": "include/node/v8-internal.h",
+      "bytes": 70804,
+      "sha256": "eb74fc0740b7f858a03e319e077c1698d2083325f3154c67771b120fb48f8520"
+    },
+    {
+      "path": "include/node/v8-isolate.h",
+      "bytes": 66966,
+      "sha256": "db213aa2a3c1e381588583ab3fbae8c282be4384d57fa498863a0065f1c8aa29"
+    },
+    {
+      "path": "include/node/v8-json.h",
+      "bytes": 1356,
+      "sha256": "7ac22ac74ebac312a5901478e398ef1d3a29f0ef56accb6d6736d47e0dbb4cdc"
+    },
+    {
+      "path": "include/node/v8-local-handle.h",
+      "bytes": 24937,
+      "sha256": "f2d45e5b71ebde65715bd08460ca1a19ac7d096f95257df33e15cea23694ba4d"
+    },
+    {
+      "path": "include/node/v8-locker.h",
+      "bytes": 3956,
+      "sha256": "a3f67133e57b85f46482e312ec1400ba00cf831fe4fe4556872d270b000a72e9"
+    },
+    {
+      "path": "include/node/v8-maybe.h",
+      "bytes": 4725,
+      "sha256": "4b34196e6643c7b0757ea2fb1179a15c031ac2961ea6f99bbeab2df816b11b00"
+    },
+    {
+      "path": "include/node/v8-memory-span.h",
+      "bytes": 10756,
+      "sha256": "294c6c5271329d65fcc1253f4a6c72b36fbada6eb8ac85b407ae5e583c3ba824"
+    },
+    {
+      "path": "include/node/v8-message.h",
+      "bytes": 6685,
+      "sha256": "ce6fcfeeafa8d6528e7be5c5b9d58f09927b88a110a0bfacb5fbb0dc9ad0aa96"
+    },
+    {
+      "path": "include/node/v8-microtask-queue.h",
+      "bytes": 4908,
+      "sha256": "4616dbb7376a61a1c0643e8006c14642b7c78c78e314fdf6651ddd51c961d285"
+    },
+    {
+      "path": "include/node/v8-microtask.h",
+      "bytes": 861,
+      "sha256": "e055cf06808240053f30672c424716db7d87cd15029a1dbd1cf2a2f9a3b3dc3b"
+    },
+    {
+      "path": "include/node/v8-object.h",
+      "bytes": 41059,
+      "sha256": "fa891650c8d9279a552136e76d416ef6fafbbc73dca9db4d981644b0d42fca15"
+    },
+    {
+      "path": "include/node/v8-persistent-handle.h",
+      "bytes": 17502,
+      "sha256": "0e1ac75d57c93f27c979a0b4378f78104a69764d5b315842511fb3401f755300"
+    },
+    {
+      "path": "include/node/v8-platform.h",
+      "bytes": 50231,
+      "sha256": "44a7fb139483b65dd5e962665d79d25fdf632910690632222991bda5e063f326"
+    },
+    {
+      "path": "include/node/v8-primitive-object.h",
+      "bytes": 2591,
+      "sha256": "d9c187b42f7ee96ec20ad4d9ac91a9a1eed3efc227a831736bba362f9c2b22ba"
+    },
+    {
+      "path": "include/node/v8-primitive.h",
+      "bytes": 37462,
+      "sha256": "aef8a95a8e40e6a6045332f9043d22cdcd02b5e0845fede076c54d1a3c405629"
+    },
+    {
+      "path": "include/node/v8-profiler.h",
+      "bytes": 44311,
+      "sha256": "5e4e427164d4c886edcd978100a9b43851cf754a28576a3884b9a853d43eecf6"
+    },
+    {
+      "path": "include/node/v8-promise.h",
+      "bytes": 5287,
+      "sha256": "d9e1d89bde1ba8998d3d9aea60f1c5635ad9b36714b91a48bf0bde9b14410908"
+    },
+    {
+      "path": "include/node/v8-proxy.h",
+      "bytes": 1254,
+      "sha256": "0883885e2477071a1176151443b38754edde22b04a0a05d05fe3764ae44622b5"
+    },
+    {
+      "path": "include/node/v8-regexp.h",
+      "bytes": 3170,
+      "sha256": "8bdbcbb83463c77495973fe30294273d00a5c5cff90e8428415f5d2f034d0a8a"
+    },
+    {
+      "path": "include/node/v8-sandbox.h",
+      "bytes": 7647,
+      "sha256": "e3831b68766d59f1bfeeed2f629b1d0085c02fe2543175b1acdee63dcd1aeb82"
+    },
+    {
+      "path": "include/node/v8-script.h",
+      "bytes": 33138,
+      "sha256": "d753f702cf724070eaa683a8314313995535384dd74ca7b5a54a3f06152d5b0a"
+    },
+    {
+      "path": "include/node/v8-snapshot.h",
+      "bytes": 11878,
+      "sha256": "4228f27fc7794598efdc0d465268d70707212155b12a7c347d5fd8a0c137c779"
+    },
+    {
+      "path": "include/node/v8-source-location.h",
+      "bytes": 2722,
+      "sha256": "4e7890937c1d3de89bce3ff8749f9e6560994251385acf927b599f1f77a66a66"
+    },
+    {
+      "path": "include/node/v8-statistics.h",
+      "bytes": 7627,
+      "sha256": "f9547cff9044e7a8a518287ff20867a29a2c198a87ec070fd8b252825d997dac"
+    },
+    {
+      "path": "include/node/v8-template.h",
+      "bytes": 42988,
+      "sha256": "3527a7124e8fdb555102f1d9616a6010aa8de2bd94cfbb07496332b6afaacbc7"
+    },
+    {
+      "path": "include/node/v8-traced-handle.h",
+      "bytes": 12332,
+      "sha256": "c190953ea39cdfed8058e67b23c74255376c065c8c565c9f821fa467997756f8"
+    },
+    {
+      "path": "include/node/v8-typed-array.h",
+      "bytes": 11424,
+      "sha256": "4af778470c542677ea099ca334a042c448ce3b9f4d3b96a7fa6d599492651c64"
+    },
+    {
+      "path": "include/node/v8-unwinder.h",
+      "bytes": 4763,
+      "sha256": "2e27b3e40167e2eeb3d2ba53ad4723ed41d12dd5a1fe2d572344ab0062ca7756"
+    },
+    {
+      "path": "include/node/v8-value-serializer.h",
+      "bytes": 10815,
+      "sha256": "bc1d30d03ee47dd548b3ce30609a66fc47d252b3454603dffa28a3a9c1dd1cb6"
+    },
+    {
+      "path": "include/node/v8-value.h",
+      "bytes": 17636,
+      "sha256": "4bdb297358d309e003ea09279f2cf0e94024dbdafdd34a106513344b70d1685c"
+    },
+    {
+      "path": "include/node/v8-version.h",
+      "bytes": 773,
+      "sha256": "9252bc587d72e52343b4dc65ae9f9617310d411b74cd5012ace543ec7ad09ec7"
+    },
+    {
+      "path": "include/node/v8-wasm.h",
+      "bytes": 6992,
+      "sha256": "f6e41223234a00ea662b8706cc080acccca476a9c5d253e9ad2347eb3fcf12c1"
+    },
+    {
+      "path": "include/node/v8-weak-callback-info.h",
+      "bytes": 2781,
+      "sha256": "ffe109dcb5b0364c7d0653470c845f01c10573e6a5ab369f4dc7a0ccedc689d8"
+    },
+    {
+      "path": "include/node/v8.h",
+      "bytes": 3775,
+      "sha256": "e27a005daa45f342845ffb9b33409686c380b1d5a97f46f3ab4749517a213d25"
+    },
+    {
+      "path": "include/node/v8config.h",
+      "bytes": 35211,
+      "sha256": "7454d35a34b52b23a50f9ef2742dc0c57025cd9eb1f85c27b7618fe2b269bacf"
+    },
+    {
+      "path": "include/node/zconf.h",
+      "bytes": 16995,
+      "sha256": "3f928c8266fadd24f1f351422e68d2dfb8944ae35d8a8c51b7d591ab9ec962ef"
+    },
+    {
+      "path": "include/node/zlib.h",
+      "bytes": 97454,
+      "sha256": "71e0dcf4cacb6b1674550a3d9407344746d27cdce739e6e25189d0b620b005ed"
+    }
+  ]
+}
