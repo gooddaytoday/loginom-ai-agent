@@ -3002,3 +3002,17 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   проверены 41 native/source input hashes и host typecheck.
 - [ ] Это source recipe coverage, не binary linker map. WebKit per-file и
   corresponding-source/relinking audit ещё не закрыты; новый архив ожидает сборки.
+
+### Linux archive с Bun JS/SQLite/Node source materials — PASS
+
+- [x] Чистый `0.1.4-cli.20260918sources` из d391443be: native version,
+  source stability, manifest и extracted archive PASS.
+- [x] Установленная проверка: 41 native/source hashes, 306 entries внутри
+  source archives, 947 npm notice/README hashes совпали. Help/version/status PASS.
+- [x] Uninstall сохранил профиль и удалил launcher/payload; source archive точно
+  соответствует 11926 git-tree entries. Runtime-код продукта не изменялся.
+- [ ] Конкретный остаток: Bun native src за пределами JS/SQLite (527 файлов с
+  attribution markers найдены), WebKit/nested per-file material и проверка
+  corresponding-source/relinking. Marker scan не считается полным attribution audit.
+
+[Архив, установка и остаток аудита](../../testing/loginom-ai-agent/reports/2026-09-18-cli-bun-sources/report.md).

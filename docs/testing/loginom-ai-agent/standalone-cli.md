@@ -28,6 +28,11 @@ forced=false, по одному видимому окну Chromium и remaining=
 Два чата в одном native TUI и файловая трассировка также выполнены:
 [итог](reports/2026-09-18-cli-final-linux/tui-multichat-summary.json).
 
+Последний notice/source candidate: `0.1.4-cli.20260918sources` из d391443be.
+Installed manifest/source inventories PASS: 41 native/source hashes, 306 archived
+entries и 947 npm notice/README hashes; штатное удаление сохранило профиль.
+[Артефакт и конкретный остаток аудита](reports/2026-09-18-cli-bun-sources/report.md).
+
 ## Исправления ревью a7d812e4a — исходная проверка 2026-09-18
 
 - Dock business failures без MCP `isError` дают ошибку tool/код 1; успешное
