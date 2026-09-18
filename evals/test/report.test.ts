@@ -153,6 +153,12 @@ test("renderReport: в отказах первая строка stderr_head", ()
   expect(report).not.toContain("more")
 })
 
+test("renderReport: storage_leftovers null — не удалось получить листинг", () => {
+  const report = renderReport({ ...summary(), storage_leftovers: null })
+  expect(report).toContain("Остатки в хранилище: не удалось получить листинг")
+  expect(report).not.toContain("eval-20260918-120000-abc1234-group-sum-qty-2.~lgp")
+})
+
 test("renderReport: команда очистки из loginom.container и storage_dir", () => {
   const report = renderReport({
     ...summary(),

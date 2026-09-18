@@ -14,9 +14,15 @@ if (command === "loginom") {
       path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE, "cli-profile.json"),
       JSON.stringify({ format: "loginom-cli", version: 1, channel: "dev" }),
     )
+    await Bun.write(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE, "setup-called"), "1")
   }
-  const next = sub === "recover" ? { ...view, recoveries: [] } : view
-  if (stateFile && sub === "recover") await Bun.write(stateFile, JSON.stringify(next))
+  const next =
+    sub === "setup" && stateFile
+      ? { state: "ready", hasApiKey: true }
+      : sub === "recover"
+        ? { ...view, recoveries: [] }
+        : view
+  if (stateFile && (sub === "recover" || sub === "setup")) await Bun.write(stateFile, JSON.stringify(next))
   process.stdout.write(JSON.stringify(next) + "\n")
   process.exit(0)
 }

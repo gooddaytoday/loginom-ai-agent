@@ -92,9 +92,11 @@ export function failureKind(input: { exitCode: number; errors: string[]; errorTe
 }
 export type FailureKind = ReturnType<typeof failureKind>
 
+const droppedChildEnv = /^(LOGINOM_|EVAL_|JUDGE_|FAKE_CODEX_)/
+
 export function agentCommand(config: EvalConfig, env: Record<string, string | undefined> = process.env) {
   const inherited = Object.entries(env).flatMap(([key, value]) =>
-    value === undefined || key.startsWith("LOGINOM_AI_AGENT_") ? [] : [[key, value] as const],
+    value === undefined || droppedChildEnv.test(key) ? [] : [[key, value] as const],
   )
   const isolated: Record<string, string> = {
     ...Object.fromEntries(inherited),

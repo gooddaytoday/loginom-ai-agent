@@ -58,6 +58,37 @@ test("loadConfig: --judge-only требует только JUDGE_MODEL", () => {
   expect(() => loadConfig(["--judge-only", "run-1"], {})).toThrow("JUDGE_MODEL")
 })
 
+test("loadConfig: неизвестный флаг — EvalFailure с кодом 2", () => {
+  expect(() => loadConfig(["--bogus"], full)).toThrow(EvalFailure)
+  try {
+    loadConfig(["--bogus"], full)
+  } catch (error) {
+    expect(error).toBeInstanceOf(EvalFailure)
+    expect((error as EvalFailure).exitCode).toBe(2)
+    expect((error as EvalFailure).message).toContain("Неверные аргументы")
+  }
+})
+
+test("loadConfig: несовместимые пары флагов — EvalFailure", () => {
+  const pairs = [
+    ["--judge-only", "run-1", "--skip-judge"],
+    ["--judge-only", "run-1", "--dry-run"],
+    ["--calibrate", "--skip-judge"],
+    ["--calibrate", "--dry-run"],
+    ["--judge-only", "run-1", "--calibrate"],
+  ]
+  for (const argv of pairs) {
+    expect(() => loadConfig(argv, full)).toThrow(EvalFailure)
+    try {
+      loadConfig(argv, full)
+    } catch (error) {
+      expect(error).toBeInstanceOf(EvalFailure)
+      expect((error as EvalFailure).exitCode).toBe(2)
+      expect((error as EvalFailure).message).toContain("Несовместимые флаги")
+    }
+  }
+})
+
 test("loadConfig: EVAL_JUDGE_COMMAND разбивается по пробелам", () => {
   expect(loadConfig([], { ...full, EVAL_JUDGE_COMMAND: "bun fixtures/fake-codex.ts" }).judge.command).toEqual([
     "bun",

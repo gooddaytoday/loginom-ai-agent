@@ -100,7 +100,7 @@ export async function main(argv: string[]) {
     judge,
     dock: {
       skill_revision: environment.dock?.skillRevision ?? null,
-      action_manifest_sha256: [...new Set(attempts.flatMap((item) => (item.action_manifest_sha256 ? [item.action_manifest_sha256] : [])))],
+      action_manifest_sha256: [...new Set(attempts.flatMap((item) => (item.action_manifest_sha256 ? [item.action_manifest_sha256] : [])))].sort(),
     },
     loginom: {
       image_digest: environment.loginom?.imageDigest ?? null,
@@ -313,7 +313,14 @@ function firstNonEmptyLine(text: string) {
 }
 
 async function leftovers(source: ArtifactSource, runId: string) {
-  const entries = await listStorage(source).catch(() => [])
+  const entries = await listStorage(source).then(
+    (listed) => listed,
+    (error: unknown) => {
+      console.error(`Не удалось получить листинг хранилища: ${describe(error)}`)
+      return null
+    },
+  )
+  if (!entries) return null
   return entries
     .map((entry) => entry.name)
     .filter((name) => name.startsWith(`eval-${runId}-`))

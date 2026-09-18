@@ -68,6 +68,18 @@ test("agentCommand: fake-режим указывает на fixtures/fake-cli.ts
   ])
 })
 
+test("agentCommand: из env-override выкидывает LOGINOM_/EVAL_/JUDGE_/FAKE_CODEX_ и оставляет PATH", () => {
+  const command = agentCommand(loadConfig(["--dry-run"], {}), {
+    ...process.env,
+    LOGINOM_DOCK_API_KEY: "leak",
+    EVAL_X: "leak",
+    PATH: "p",
+  })
+  expect(command.env.LOGINOM_DOCK_API_KEY).toBeUndefined()
+  expect(command.env.EVAL_X).toBeUndefined()
+  expect(command.env.PATH).toBe("p")
+})
+
 test("agentCommand: source-режим запускает standalone.ts из packages/agent с bundle", () => {
   const command = agentCommand(loadConfig([], { LOGINOM_DOCK_API_KEY: "k", EVAL_AGENT_MODEL: "m/x", JUDGE_MODEL: "j" }))
   expect(command.cmd).toEqual(["bun", "run", "src/standalone.ts"])

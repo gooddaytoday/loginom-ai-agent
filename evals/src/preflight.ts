@@ -4,7 +4,7 @@ import { mkdir, stat } from "node:fs/promises"
 import type { EvalConfig } from "./config"
 import { evalsRoot, repoRoot } from "./config"
 import { EvalFailure } from "./fail"
-import type { ArtifactSource } from "./artifact"
+import { listStorage, type ArtifactSource } from "./artifact"
 
 export type Environment = {
   git: { sha: string; dirty: boolean } | null
@@ -29,6 +29,7 @@ export async function preflight(config: EvalConfig, source: ArtifactSource): Pro
   if (page?.status !== 200)
     throw new EvalFailure(`Loginom недоступен: ${config.loginom.url} → ${page?.status ?? "нет ответа"}`, 2)
   if (source.kind === "docker") environment.loginom = { imageDigest: await containerDigest(source.container) }
+  await checkStorage(source)
   environment.dock = { skillRevision: await dockSkillRevision(config.dock) }
   if (config.agent.cliMode === "source") {
     for (const file of ["bin/node", "host/node-host.mjs"]) {
@@ -95,6 +96,15 @@ export async function dockSkillRevision(dock: { apiKey: string; baseUrl: string 
   const revision = body?.revision ?? body?.result?.revision
   if (typeof revision === "string" || typeof revision === "number") return String(revision)
   throw new EvalFailure(`Манифест skill без revision: status=${String(body?.status)} error=${String(body?.error ?? "—")}`, 2)
+}
+
+export async function checkStorage(source: ArtifactSource) {
+  const listed = await listStorage(source).then(
+    () => undefined,
+    (error: unknown) => error,
+  )
+  if (listed === undefined) return
+  throw new EvalFailure(`Хранилище Loginom недоступно: ${listed instanceof Error ? listed.message : String(listed)}`, 2)
 }
 
 async function requireFixtures() {

@@ -37,6 +37,14 @@ test("compare: разный судья — предупреждение о не�
   expect(text).toContain("dock.skill_revision")
 })
 
+test("compare: action_manifest_sha256 сравнивается после сортировки", () => {
+  const text = compare(
+    summary([attempt({})], { dock: { skill_revision: "r1", action_manifest_sha256: ["b", "a"] } }),
+    summary([attempt({})], { dock: { skill_revision: "r1", action_manifest_sha256: ["a", "b"] } }),
+  )
+  expect(text).not.toContain("изменилось окружение")
+})
+
 test("compare: прерванный прогон — предупреждение о неполном покрытии", () => {
   const text = compare(summary([attempt({})]), summary([attempt({})], { interrupted: true }))
   expect(text).toContain("неполное покрытие")

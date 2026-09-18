@@ -1,9 +1,11 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
+import { mkdtemp } from "node:fs/promises"
+import os from "node:os"
 import { evalsRoot, loadConfig } from "../src/config"
 import { parseArtifactSource } from "../src/artifact"
 import { EvalFailure } from "../src/fail"
-import { dockSkillRevision, preflight } from "../src/preflight"
+import { checkStorage, dockSkillRevision, preflight } from "../src/preflight"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
 
@@ -21,6 +23,17 @@ test("preflight: --judge-only проверяет только судью и не
   const environment = await preflight(config, parseArtifactSource("docker", config.loginom))
   expect(environment.codex?.version).toBe("fake-codex 0.0.0")
   expect(environment.loginom).toBeNull()
+})
+
+test("checkStorage: существующий dir: проходит, отсутствующий — EvalFailure с кодом 2", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-storage-"))
+  const docker = { container: "c", storageDir: "/s" }
+  await checkStorage(parseArtifactSource(`dir:${dir}`, docker))
+  const missing = `dir:${path.join(dir, "missing")}`
+  const rejected = await checkStorage(parseArtifactSource(missing, docker)).catch((error: unknown) => error)
+  expect(rejected).toBeInstanceOf(EvalFailure)
+  expect((rejected as EvalFailure).exitCode).toBe(2)
+  expect((rejected as EvalFailure).message).toContain("Хранилище Loginom недоступно")
 })
 
 test("preflight: недоступный судья — EvalFailure", async () => {

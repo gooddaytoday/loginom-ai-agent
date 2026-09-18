@@ -207,7 +207,14 @@ async function invoke(
     judgeCommand({ command: input.judge.command, dir: input.outDir, model: input.judge.model, reasoning: input.judge.reasoning }),
     {
       cwd: input.outDir,
-      env: { ...process.env, ...input.judge.env },
+      env: {
+        ...Object.fromEntries(
+          Object.entries(process.env).flatMap(([key, value]) =>
+            value === undefined || /^(LOGINOM_|EVAL_|JUDGE_|FAKE_CODEX_)/.test(key) ? [] : [[key, value] as const],
+          ),
+        ),
+        ...input.judge.env,
+      },
       stdin: Bun.file(path.join(input.outDir, "PROMPT.md")),
       stdout: Bun.file(path.join(path.dirname(input.outDir), `judge-events-${attempt}.jsonl`)),
       stderr: Bun.file(path.join(path.dirname(input.outDir), `judge-stderr-${attempt}.txt`)),
