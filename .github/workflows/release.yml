@@ -1,0 +1,368 @@
+name: release
+
+run-name: ${{ github.event_name == 'push' && format('release {0}', github.ref_name) || format('release {0} from {1}', inputs.mode, github.ref_name) }}
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "candidate builds and tests this ref without publishing; cut bumps the version, commits and pushes a tag from dev"
+        type: choice
+        options:
+          - candidate
+          - cut
+        default: candidate
+      bump:
+        description: "cut: semver part to bump relative to the root package.json version (ignored when version is set)"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        required: false
+      version:
+        description: "cut: explicit version X.Y.Z[-pre.N]; overrides bump"
+        type: string
+        required: false
+        default: ""
+      channel:
+        description: "candidate: release channel of the build"
+        type: choice
+        options:
+          - prod
+          - beta
+        default: prod
+
+# Distinct from the tests- group of the reusable test workflow so a called run can never cancel this one.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  cut:
+    name: cut
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'cut'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Require dev
+        if: github.ref != 'refs/heads/dev'
+        run: |
+          echo "::error::Release cuts must be dispatched from dev, not $GITHUB_REF"
+          exit 1
+
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      # The App token makes the tag push emit a push event; GITHUB_TOKEN pushes would not start the release run.
+      - name: Setup git committer
+        uses: ./.github/actions/setup-git-committer
+        with:
+          opencode-app-id: ${{ vars.LOGINOM_AI_AGENT_APP_ID }}
+          opencode-app-secret: ${{ secrets.LOGINOM_AI_AGENT_APP_SECRET }}
+
+      - name: Set version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "$VERSION" ]; then
+            bun script/set-version.ts --version "$VERSION"
+          elif [ -n "$BUMP" ]; then
+            bun script/set-version.ts --bump "$BUMP"
+          else
+            echo "::error::Provide bump or version for a release cut"
+            exit 1
+          fi
+
+      - name: Commit, tag and push
+        env:
+          TAG: v${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag $TAG already exists"
+            exit 1
+          fi
+          # The bumped manifests and lockfile must still install frozen, exactly as the release build will.
+          bun install --frozen-lockfile
+          git add package.json packages/desktop/package.json bun.lock
+          if git diff --cached --quiet; then
+            echo "Version ${TAG#v} is already committed"
+          else
+            git commit -m "chore(release): $TAG"
+          fi
+          git tag -a "$TAG" -m "$TAG"
+          git push --atomic --no-verify origin HEAD:dev "refs/tags/$TAG"
+          echo "Pushed \`$TAG\` to dev; the tag push starts the release build." >> "$GITHUB_STEP_SUMMARY"
+
+  verify:
+    name: verify
+    if: github.event_name == 'push' || inputs.mode == 'candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      channel: ${{ steps.release.outputs.channel }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Resolve version and channel
+        id: release
+        env:
+          CHANNEL_INPUT: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          root=$(jq -er .version package.json)
+          desktop=$(jq -er .version packages/desktop/package.json)
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            version="${GITHUB_REF_NAME#v}"
+            if [ "$version" != "$root" ] || [ "$version" != "$desktop" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match package.json ($root) and packages/desktop/package.json ($desktop); commit script/set-version.ts output before tagging"
+              exit 1
+            fi
+            case "$version" in
+              *-*) channel=beta; prerelease=true ;;
+              *) channel=prod; prerelease=false ;;
+            esac
+          else
+            # electron-builder versions the Desktop from packages/desktop/package.json; candidates follow it.
+            version="$desktop"
+            channel="${CHANNEL_INPUT:-prod}"
+            prerelease=false
+            if [ "$root" != "$desktop" ]; then
+              echo "::warning::package.json ($root) and packages/desktop/package.json ($desktop) differ; the candidate uses $desktop"
+            fi
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Version '$version' is not X.Y.Z[-pre.N]"
+            exit 1
+          fi
+          if [ "$channel" != "prod" ]; then
+            echo "::warning::The Docker matrix installs /opt/loginom-ai-agent (prod slug); the $channel channel fails linux-matrix until run-matrix.ts is channel-aware"
+          fi
+          {
+            echo "version=$version"
+            echo "channel=$channel"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+          echo "Building version \`$version\` on channel \`$channel\` (prerelease: $prerelease)" >> "$GITHUB_STEP_SUMMARY"
+
+  tests:
+    name: tests
+    needs: verify
+    uses: ./.github/workflows/test.yml
+    secrets: inherit
+    permissions:
+      contents: read
+
+  build:
+    name: build (${{ matrix.name }})
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            runner: ubuntu-24.04
+            target: linux-x64
+            experimental: false
+          - name: windows
+            runner: windows-2025
+            target: win32-x64
+            experimental: true
+          - name: macos
+            runner: macos-15
+            target: darwin-arm64
+            experimental: true
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.experimental }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    env:
+      LOGINOM_AI_AGENT_VERSION: ${{ needs.verify.outputs.version }}
+      LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # Electron runs as Node for write-manifest.ts; dpkg-deb and unsquashfs extract the installers.
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-3-0t64 libnss3 libgbm1 libasound2t64 squashfs-tools
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      - name: Setup pinned Node and Chromium
+        uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Build desktop
+        working-directory: packages/desktop
+        run: |
+          bun run build
+          bun typecheck
+
+      - name: Package desktop
+        working-directory: packages/desktop
+        env:
+          # No Apple identity in CI: electron-builder skips signing and notarization instead of failing.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          case "$RUNNER_OS" in
+            Linux) bun run package:linux --x64 --publish never ;;
+            Windows) bun run package:win --x64 --publish never ;;
+            macOS) bun run package:mac --arm64 --publish never ;;
+          esac
+
+      - name: Build CLI
+        run: |
+          mkdir -p "$RUNNER_TEMP/cli"
+          bun packages/loginom-host/script/build-cli.ts "$RUNNER_TEMP/cli/loginom-ai-agent-cli-${{ matrix.target }}"
+
+      - name: Write release manifest and verify Linux installers
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+            echo "::error::The build left the tree dirty; write-manifest.ts requires committed inputs"
+            git status --porcelain --untracked-files=all
+            exit 1
+          fi
+          git archive --format=tar.gz --output="packages/desktop/dist/loginom-ai-agent-${LOGINOM_AI_AGENT_VERSION}-source.tar.gz" HEAD
+          cd packages/desktop
+          bun scripts/release/write-manifest.ts --target linux-x64 --version "$LOGINOM_AI_AGENT_VERSION" --channel "$LOGINOM_AI_AGENT_CHANNEL" --dist dist --resources resources/loginom --output dist/release-manifest.json
+          bun scripts/release/verify-artifact.ts --manifest dist/release-manifest.json --artifact dist/loginom-ai-agent-linux-amd64.deb --report dist/static-deb.json
+          bun scripts/release/verify-artifact.ts --manifest dist/release-manifest.json --artifact dist/loginom-ai-agent-linux-x86_64.AppImage --report dist/static-appimage.json
+
+      # Flatten installers, reports and CLI archives so downloads have predictable top-level names.
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/upload"
+          find packages/desktop/dist "$RUNNER_TEMP/cli" -maxdepth 1 -type f ! -name 'builder-*' -exec cp {} "$RUNNER_TEMP/upload/" \;
+          ls -la "$RUNNER_TEMP/upload"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-${{ matrix.name }}
+          path: ${{ runner.temp }}/upload
+          if-no-files-found: error
+          retention-days: 14
+
+  linux-matrix:
+    name: linux-matrix
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: loginom-linux
+          path: ${{ runner.temp }}/linux
+
+      - name: Run offline non-root OS matrix
+        run: bun packages/desktop/test/loginom/docker/run-matrix.ts --artifact "$RUNNER_TEMP/linux/loginom-ai-agent-linux-amd64.deb" --output "$RUNNER_TEMP/linux-matrix"
+
+      - name: Upload matrix report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-linux-matrix
+          path: ${{ runner.temp }}/linux-matrix
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: release
+    needs: [verify, tests, build, linux-matrix]
+    if: always() && github.event_name == 'push' && needs.verify.result == 'success' && needs.tests.result == 'success' && needs.build.result == 'success' && needs.linux-matrix.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      CHANNEL: ${{ needs.verify.outputs.channel }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Download artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: loginom-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/assets
+
+      - name: Write SHA256SUMS and release notes
+        run: |
+          set -euo pipefail
+          # Only linux-matrix.json from the matrix artifact is published; its logs stay in the workflow artifact.
+          find "$RUNNER_TEMP/assets" -name '*.log' -delete
+          bun script/release-notes.ts --tag "$TAG" --channel "$CHANNEL" --assets "$RUNNER_TEMP/assets" --output "$RUNNER_TEMP/notes.md"
+
+      - name: Create draft release
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --json isDraft >/dev/null 2>&1; then
+            echo "::error::A release for $TAG already exists; delete the stale draft before re-running"
+            exit 1
+          fi
+          args=(--draft --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md")
+          if [ "$PRERELEASE" = "true" ]; then
+            args+=(--prerelease)
+          fi
+          url=$(gh release create "$TAG" "${args[@]}" "$RUNNER_TEMP"/assets/*)
+          {
+            echo "Draft release: $url"
+            echo
+            cat "$RUNNER_TEMP/notes.md"
+          } >> "$GITHUB_STEP_SUMMARY"
