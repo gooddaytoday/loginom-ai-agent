@@ -2799,3 +2799,21 @@ Linux x64 среда; native Windows/macOS hosts и отдельный real-prov
 Это исправление исходников. Установленные артефакты не пересобирались, native
 Windows/macOS, live OAuth и реальный provider не проверялись; ранее отмеченные
 внешние release gates остаются открытыми.
+
+### Возобновление: Linux-only и настоящий Xiaomi provider — 2026-09-18
+
+Актуальный объём по указанию пользователя: завершить доступную на этой машине
+Linux-часть; Windows/macOS выполняются отдельно и не блокируют эту цель. Прежний
+BLOCKED относится к прежнему объёму и условиям. Пользователь разрешил использовать
+Xiaomi token из Desktop для отдельного CLI test profile; наличие проверено без
+вывода значения. Предыдущий шаг — progress: исправления ревью закоммичены.
+
+- [x] Новый полный Linux archive из чистого `1657a6c07`, version
+  `0.1.4-cli.20260918review`: build, native version, source stability,
+  manifest и extracted archive verification PASS.
+- [ ] Установленная сборка с настоящим Xiaomi provider: CSV 55/101,
+  save/cold reopen и независимый readback; затем сверка остальных Linux gates.
+- [ ] Оставшиеся Linux notices/source-distribution gaps и доступные проверки
+  окружения; отсутствие signing credentials означает dev-only, не release PASS.
+
+[Артефакт и результаты](../../testing/loginom-ai-agent/reports/2026-09-18-cli-real-provider/report.md).
