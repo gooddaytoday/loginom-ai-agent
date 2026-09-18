@@ -73,16 +73,18 @@ try {
     },
   ])
   const bunLicense = await readFile(join(import.meta.dir, "../licenses/bun/LICENSE.md"))
-  if (createHash("sha256").update(bunLicense).digest("hex") !== bunNotice.sha256)
-    throw Error("LOGINOM_BUN_NOTICE_HASH_MISMATCH")
-  await Bun.write(join(artifact, "licenses/bun/LICENSE.md"), bunLicense)
+  await Bun.write(
+    join(artifact, "licenses/bun/LICENSE.md"),
+    verifiedText(bunLicense, bunNotice.sha256, "LOGINOM_BUN_NOTICE_HASH_MISMATCH"),
+  )
   await Bun.write(join(artifact, "licenses/bun/source.json"), JSON.stringify(bunNotice, null, 2) + "\n")
   for (const [component, notice] of Object.entries(bunNativeNotices.components)) {
     for (const file of notice.files) {
       const contents = await readFile(join(import.meta.dir, "../licenses/bun/native", file.file))
-      if (createHash("sha256").update(contents).digest("hex") !== file.sha256)
-        throw Error("LOGINOM_BUN_NATIVE_NOTICE_HASH_MISMATCH")
-      await Bun.write(join(artifact, "licenses/bun/native", component, file.path), contents)
+      await Bun.write(
+        join(artifact, "licenses/bun/native", component, file.path),
+        verifiedText(contents, file.sha256, "LOGINOM_BUN_NATIVE_NOTICE_HASH_MISMATCH"),
+      )
     }
   }
   await Bun.write(join(artifact, "licenses/bun/native/sources.json"), JSON.stringify(bunNativeNotices, null, 2) + "\n")
@@ -198,4 +200,11 @@ async function snapshot() {
     sourceTreeSha256: hash.digest("hex"),
     sourceDirty: !!(await $`git status --porcelain`.cwd(repo).text()).trim(),
   }
+}
+
+function verifiedText(contents: Buffer, expected: string, error: string) {
+  if (createHash("sha256").update(contents).digest("hex") === expected) return contents
+  const normalized = Buffer.from(contents.toString("utf8").replaceAll("\r\n", "\n"))
+  if (createHash("sha256").update(normalized).digest("hex") === expected) return normalized
+  throw Error(error)
 }

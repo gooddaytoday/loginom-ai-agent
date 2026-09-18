@@ -14,7 +14,7 @@ const args = parseArgs({
   strict: true,
 }).values
 if (
-  args.target !== "linux-x64" ||
+  !["linux-x64", "win32-x64"].includes(args.target ?? "") ||
   !args.version ||
   !["dev", "beta", "prod"].includes(args.channel ?? "") ||
   !args.dist ||
@@ -22,16 +22,22 @@ if (
   !args.output
 )
   throw Error(
-    "Required: --target linux-x64 --version <version> --channel dev|beta|prod --dist <directory> --resources <directory> --output <file>",
+    "Required: --target linux-x64|win32-x64 --version <version> --channel dev|beta|prod --dist <directory> --resources <directory> --output <file>",
   )
 const channel = args.channel as "dev" | "beta" | "prod"
+const target = args.target as "linux-x64" | "win32-x64"
 const root = resolve(import.meta.dir, "../../../..")
 const dirty = !!(await $`git status --porcelain --untracked-files=all`.cwd(root).text()).trim()
 // A published candidate must be reproducible, including every previously untracked build input.
 if (dirty) throw Error("Commit the complete build inputs before writing the release manifest")
 const resources = resolve(args.resources)
+const resourceManifest = await Bun.file(join(resources, "resource-manifest.json")).json()
+if (resourceManifest.target !== target) throw Error("RELEASE_RESOURCES_TARGET_MISMATCH")
 const catalog = await Bun.file(join(resources, "runtime/client/node_modules/playwright-core/browsers.json")).json()
-const electron = resolve(import.meta.dir, "../../node_modules/electron/dist/electron")
+const electron = resolve(
+  import.meta.dir,
+  `../../node_modules/electron/dist/electron${process.platform === "win32" ? ".exe" : ""}`,
+)
 const electronVersions = JSON.parse(
   await $`${electron} -p ${"JSON.stringify(process.versions)"}`
     .env({ ...process.env, ELECTRON_RUN_AS_NODE: "1" })
@@ -39,16 +45,32 @@ const electronVersions = JSON.parse(
 )
 const artifacts = await Promise.all(
   (await readdir(args.dist))
-    .filter((name) => name.endsWith(".deb") || name.endsWith(".AppImage") || name.endsWith("-source.tar.gz"))
+    .filter((name) =>
+      target === "linux-x64"
+        ? name.endsWith(".deb") || name.endsWith(".AppImage") || name.endsWith("-source.tar.gz")
+        : name.endsWith(".exe") || name.endsWith("-source.tar.gz"),
+    )
     .sort()
     .map(async (file) => ({
       file,
-      kind: file.endsWith(".deb") ? "deb" : file.endsWith(".AppImage") ? "appimage" : "source",
+      kind: file.endsWith(".deb")
+        ? "deb"
+        : file.endsWith(".AppImage")
+          ? "appimage"
+          : file.endsWith(".exe")
+            ? "nsis"
+            : "source",
       bytes: Bun.file(join(args.dist!, file)).size,
       sha256: await fileHash(join(args.dist!, file)),
     })),
 )
 if (!artifacts.some((file) => file.kind === "source")) throw Error("Corresponding source archive is required")
+if (
+  !artifacts.some((file) =>
+    target === "linux-x64" ? file.kind === "deb" || file.kind === "appimage" : file.kind === "nsis",
+  )
+)
+  throw Error("Target installer artifact is required")
 const source = await fileHash(join(root, "docs/migration/source-map.json"))
 const manifest = decodeManifest({
   schemaVersion: 1,
@@ -62,7 +84,12 @@ const manifest = decodeManifest({
     inputsManifestSha256: hash(JSON.stringify(pins)),
     importSha256: source,
   },
-  target: { platform: "linux", arch: "x64", minimumOS: "Ubuntu 22.04; Debian 12", backend: "v1" },
+  target: {
+    platform: target === "linux-x64" ? "linux" : "win32",
+    arch: "x64",
+    minimumOS: target === "linux-x64" ? "Ubuntu 22.04; Debian 12" : "Windows 11 x64",
+    backend: "v1",
+  },
   build: {
     os: process.platform,
     arch: process.arch,
@@ -86,24 +113,45 @@ const manifest = decodeManifest({
     executable: productSlug(channel),
     uriScheme: Product.scheme,
   },
-  paths: {
-    executor: "resources/loginom/runtime/src/managed-entry.mjs",
-    node: "resources/loginom/bin/node",
-    chromium: `resources/loginom/browsers/chromium-${pins.chromiumRevision}/chrome-linux64/chrome`,
-    config: `${"${XDG_CONFIG_HOME:-~/.config}"}/${Product.channels[channel]}`,
-    data: "${XDG_DATA_HOME:-~/.local/share}/" + productSlug(channel),
-    cache: "${XDG_CACHE_HOME:-~/.cache}/" + productSlug(channel),
-    state: "${XDG_STATE_HOME:-${XDG_CONFIG_HOME:-~/.config}/" + Product.channels[channel] + "}/" + productSlug(channel),
-    logs: `${"${XDG_CONFIG_HOME:-~/.config}"}/${Product.channels[channel]}/logs`,
-    profiles: `${"${XDG_CONFIG_HOME:-~/.config}"}/${Product.channels[channel]}/loginom/runtime`,
-    secretStore: "plaintext-private-0600",
-  },
+  paths:
+    target === "linux-x64"
+      ? {
+          executor: "resources/loginom/runtime/src/managed-entry.mjs",
+          node: "resources/loginom/bin/node",
+          chromium: `resources/loginom/browsers/chromium-${pins.chromiumRevision}/chrome-linux64/chrome`,
+          config: `${"${XDG_CONFIG_HOME:-~/.config}"}/${Product.channels[channel]}`,
+          data: "${XDG_DATA_HOME:-~/.local/share}/" + productSlug(channel),
+          cache: "${XDG_CACHE_HOME:-~/.cache}/" + productSlug(channel),
+          state:
+            "${XDG_STATE_HOME:-${XDG_CONFIG_HOME:-~/.config}/" +
+            Product.channels[channel] +
+            "}/" +
+            productSlug(channel),
+          logs: `${"${XDG_CONFIG_HOME:-~/.config}"}/${Product.channels[channel]}/logs`,
+          profiles: `${"${XDG_CONFIG_HOME:-~/.config}"}/${Product.channels[channel]}/loginom/runtime`,
+          secretStore: "plaintext-private-0600",
+        }
+      : {
+          executor: "resources/loginom/runtime/src/managed-entry.mjs",
+          node: "resources/loginom/bin/node.exe",
+          chromium: `resources/loginom/browsers/chromium-${pins.chromiumRevision}/chrome-win64/chrome.exe`,
+          config: `%APPDATA%/${Product.channels[channel]}`,
+          data: `%APPDATA%/${Product.channels[channel]}`,
+          cache: `%APPDATA%/${Product.channels[channel]}/Cache`,
+          state: `%APPDATA%/${Product.channels[channel]}`,
+          logs: `%APPDATA%/${Product.channels[channel]}/logs`,
+          profiles: `%APPDATA%/${Product.channels[channel]}/loginom/runtime`,
+          secretStore: "electron-safeStorage-dpapi-current-user",
+        },
   connection: { schemaVersion: 1, generationProtocol: 1, knowledgeEndpoint: pins.endpoint },
   updater: { feed: Product.updateFeed, channel, previousVersion: null },
   signing: { status: "unsigned", identity: null, notarized: false },
   installation: {
-    scope: "machine",
-    uninstallPolicy: "DEB removes application files and retains user data. AppImage is a portable user-owned file.",
+    scope: target === "linux-x64" ? "machine" : "user",
+    uninstallPolicy:
+      target === "linux-x64"
+        ? "DEB removes application files and retains user data. AppImage is a portable user-owned file."
+        : "NSIS removes application files for the current user and retains application profiles and history.",
     preservesUserData: true,
   },
   validation: {
@@ -119,7 +167,10 @@ const manifest = decodeManifest({
         ],
       },
     ],
-    reportFiles: ["static-deb.json", "static-appimage.json", "linux-matrix/linux-matrix.json"],
+    reportFiles:
+      target === "linux-x64"
+        ? ["static-deb.json", "static-appimage.json", "linux-matrix/linux-matrix.json"]
+        : ["static-nsis.json", "windows-native.json"],
   },
   provenance: {
     licensesSha256: await fileHash(join(resources, "THIRD_PARTY_NOTICES.md")),

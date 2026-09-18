@@ -45,8 +45,9 @@ describe("Linux system proxy", () => {
   test("unconfigured systems keep existing environment", () => {
     expect(systemProxyEnvironment("", {})).toBeUndefined()
     expect(systemProxyEnvironment(settings.replace("mode 'manual'", "mode 'none'"), {})).toBeUndefined()
-    expect(loadSystemProxyEnvironment({}, "darwin")).toBeUndefined()
-    expect(loadSystemProxyEnvironment({}, "win32")).toBeUndefined()
+    const foreignNative = process.platform === "win32" ? "darwin" : "win32"
+    expect(loadSystemProxyEnvironment({}, foreignNative)).toBeUndefined()
+    expect(loadSystemProxyEnvironment({}, "freebsd")).toBeUndefined()
   })
 
   test("does not silently bypass an authenticated system proxy", () => {

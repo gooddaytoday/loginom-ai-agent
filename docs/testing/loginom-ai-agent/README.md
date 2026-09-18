@@ -5,7 +5,14 @@
 [standalone CLI](../../superpowers/specs/2026-09-17-loginom-cli-standalone-design.md);
 проверки установленного Desktop ниже остаются историческими доказательствами своих сборок.
 
-Статус на 2026-09-16: Windows/macOS — **план нативных проверок**; выполненные Linux-проверки описаны в [отдельном отчёте](reports/2026-09-16-linux/report.md). Нативную отладку Windows и macOS выполняют отдельные агенты на соответствующих машинах. Здесь определены входные материалы, порядок проверки и формат доказательств. Эти документы не разрешают публикацию релиза или изменение рабочего сервера Loginom.
+Статус на 2026-09-18: для Windows есть локальный неподписанный build candidate и
+отдельный CI сборки/статических package-проверок; установленная Windows 11
+приёмка и release signing ещё не пройдены. macOS остаётся планом нативных
+проверок; выполненные Linux-проверки описаны в
+[отдельном отчёте](reports/2026-09-16-linux/report.md). Нативную отладку Windows
+и macOS выполняют отдельные агенты на соответствующих машинах. Здесь определены
+входные материалы, порядок проверки и формат доказательств. Эти документы не
+разрешают публикацию релиза или изменение рабочего сервера Loginom.
 
 Согласованное поведение описано в [спецификации](../../superpowers/specs/2026-09-16-loginom-ai-agent-desktop-design.md), этапы работ — в [плане реализации](../../superpowers/plans/2026-09-16-loginom-ai-agent.md). Инструкции платформ: [Windows](windows.md), [macOS](macos.md), [Linux](linux.md). Результат каждого запуска оформляется по [шаблону отчёта](report-template.md).
 
@@ -128,10 +135,23 @@ REC-01/CON-07 выполняются на одноразовом тестово�
 Это проверка существования файлов и объявлений команд; сборки и нативные тесты здесь не запускались.
 
 - [Desktop package](../../../packages/desktop/package.json): `bun run build`, `bun run package:win`, `bun run package:mac`, `bun typecheck`.
-- [Текущая конфигурация упаковки](../../../packages/desktop/electron-builder.config.ts): NSIS, DMG/ZIP, DEB/AppImage; пока имена OpenCode и feed `anomalyco`.
-- [Prebuild](../../../packages/desktop/scripts/prebuild.ts): сборка Node sidecar; в dev также загрузка существующего CLI. Это не будущая упаковка Loginom runtime.
-- [Prepare](../../../packages/desktop/scripts/prepare.ts): меняет `package.json` версии; не запускать автоматически для чтения/проверки.
-- [Текущий CI](../../../.github/workflows/publish.yml) и [setup-bun](../../../.github/actions/setup-bun/action.yml): Node 24, Bun из корневого `packageManager`, Windows hoisted linker; upstream release job ограничен чужим репозиторием.
+- [Текущая конфигурация упаковки](../../../packages/desktop/electron-builder.config.ts):
+  Loginom app ID/имена по channel, NSIS x64 per-user, DMG/ZIP и DEB/AppImage;
+  package command обязан использовать `--publish never` для кандидата.
+- [Prebuild](../../../packages/desktop/scripts/prebuild.ts): копирует фирменные иконки,
+  собирает sidecar и через общий staging включает явно переданные pinned
+  Node/Chromium resources. Отсутствующие inputs должны завершать сборку ошибкой.
+- [Prepare](../../../packages/desktop/scripts/prepare.ts): меняет release metadata;
+  не запускать автоматически для чтения/проверки и не использовать в CI
+  неподписанного development candidate.
+- [Windows candidate CI](../../../.github/workflows/loginom-windows.yml) на
+  `windows-2022` закрепляет Node 24.19.0, Bun 1.3.14 и Chromium revision 1243,
+  передаёт Node/browser в сборку явными путями и создаёт только неподписанные
+  краткоживущие workflow artifacts. Он не публикует release и не заменяет
+  установленную приёмку на Windows 11.
+- [Linux candidate CI](../../../.github/workflows/loginom-desktop.yml) и
+  [setup-bun](../../../.github/actions/setup-bun/action.yml) остаются отдельными
+  путями сборки; успешная проверка одной платформы не подтверждает другую.
 - [Desktop entry](../../../packages/desktop/src/main/index.ts), [sidecar](../../../packages/desktop/src/main/sidecar.ts), [logging](../../../packages/desktop/src/main/logging.ts): точки выбора backend, пути профиля и экспорт логов.
 
 Все эти ссылки — отправные точки для адаптации. Наличие существующего build script не означает готовность Loginom дистрибутива или правильное включение перенесённого Dock. В Linux-реализации backend уже перемещён из `packages/opencode` в `packages/agent`, namespace пакетов — `@loginom-ai-agent/*`, переменные — `LOGINOM_AI_AGENT_*`. Целевые app ID: `com.loginom.aiagent`, `com.loginom.aiagent.beta`, `com.loginom.aiagent.dev`. Manifest должен отражать итоговые пути и имена проверяемой сборки.

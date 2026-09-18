@@ -10,7 +10,7 @@ export async function protectWindowsProfile(root: string) {
   const script = `
 $ErrorActionPreference = 'Stop'
 try {
-  $path = [Console]::In.ReadToEnd()
+  $path = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String([Console]::In.ReadToEnd()))
   $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
   $item = Get-Item -LiteralPath $path -Force
   if (!$item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { exit 1 }
@@ -64,6 +64,6 @@ try {
       },
     )
     child.stdin?.on("error", () => reject(Error("PROFILE_PERMISSIONS_INVALID")))
-    child.stdin?.end(root)
+    child.stdin?.end(Buffer.from(root, "utf16le").toString("base64"))
   })
 }

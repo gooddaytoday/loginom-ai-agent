@@ -52,10 +52,13 @@ export async function collectBuildNotices(
     const upstream = Object.entries(upstreamSources).find(([name]) => name === `${pkg.name}@${pkg.version}`)?.[1]
     if (!files.some((file) => file.scope === "package") && upstream) {
       const contents = await readFile(join(import.meta.dir, "../licenses/upstream", upstream.file))
-      if (createHash("sha256").update(contents).digest("hex") !== upstream.sha256)
+      const normalized = Buffer.from(contents.toString("utf8").replaceAll("\r\n", "\n"))
+      const canonical =
+        createHash("sha256").update(contents).digest("hex") === upstream.sha256 ? contents : normalized
+      if (createHash("sha256").update(canonical).digest("hex") !== upstream.sha256)
         throw Error("LOGINOM_UPSTREAM_NOTICE_HASH_MISMATCH")
       const path = `${directory}/UPSTREAM-LICENSE.txt`
-      await Bun.write(join(output, path), contents)
+      await Bun.write(join(output, path), canonical)
       files.push({ path, scope: "package", sha256: upstream.sha256 })
     }
     packages.push({

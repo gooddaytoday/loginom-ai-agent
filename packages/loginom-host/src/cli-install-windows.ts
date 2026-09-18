@@ -61,17 +61,23 @@ export async function uninstallWindowsCli(localAppData: string) {
     )
       throw Error("CLI_INSTALL_RECEIPT_INVALID")
     const destination = join(paths.base, receipt.name)
-    if (!(await lstat(destination)).isDirectory() || (await lstat(destination)).isSymbolicLink())
+    const destinationInfo = await lstat(destination)
+    if (!destinationInfo.isDirectory() || destinationInfo.isSymbolicLink())
       throw Error("CLI_INSTALL_PATH_INVALID")
+    const launcherInfo = await lstat(paths.launcher)
     if (
-      !(await lstat(paths.launcher)).isFile() ||
+      !launcherInfo.isFile() ||
+      launcherInfo.isSymbolicLink() ||
       (await readFile(paths.launcher, "utf8")) !== launcherText(receipt.name)
     )
       throw Error("CLI_INSTALL_LAUNCHER_CONFLICT")
     await verifyCliManifest(destination, { platform: "win32", arch: process.arch })
     await requireStopped(await realpath(destination))
     // Delete payload first: locked executables must not remove the launcher/receipt.
-    await rm(destination, { recursive: true })
+    await rm(destination, { recursive: true }).catch((error: NodeJS.ErrnoException) => {
+      if (["EACCES", "EBUSY", "EPERM"].includes(error.code ?? "")) throw Error("CLI_INSTALL_BUSY")
+      throw error
+    })
     await rm(paths.launcher)
     await rm(paths.receipt)
   } finally {
@@ -93,7 +99,8 @@ async function directories(localAppData: string, create: boolean) {
       await mkdir(path).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== "EEXIST") throw error
       })
-    if (!(await lstat(path)).isDirectory()) throw Error("CLI_INSTALL_PATH_INVALID")
+    const info = await lstat(path)
+    if (!info.isDirectory() || info.isSymbolicLink()) throw Error("CLI_INSTALL_PATH_INVALID")
   }
   return {
     base,
@@ -121,9 +128,13 @@ async function requireStopped(destination: string) {
   const script = `
 $ErrorActionPreference = 'Stop'
 try {
-  $root = [Console]::In.ReadToEnd().TrimEnd('\\') + '\\'
+  $root = [IO.Path]::GetFullPath([Console]::In.ReadToEnd().Trim()).TrimEnd('\\')
+  if ($root.StartsWith('\\\\?\\')) { $root = $root.Substring(4) }
   foreach ($item in Get-Process) {
-    if ($item.Path -and $item.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { exit 2 }
+    if (-not $item.Path) { continue }
+    $path = [IO.Path]::GetFullPath($item.Path).TrimEnd('\\')
+    if ($path.StartsWith('\\\\?\\')) { $path = $path.Substring(4) }
+    if ($path.Equals($root, [StringComparison]::OrdinalIgnoreCase) -or $path.StartsWith($root + '\\', [StringComparison]::OrdinalIgnoreCase)) { exit 2 }
   }
   [Console]::Out.Write('OK')
 } catch { exit 1 }

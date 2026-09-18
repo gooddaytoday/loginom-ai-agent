@@ -45,6 +45,11 @@ export function systemProxyEnvironment(settings: string, environment: NodeJS.Pro
 }
 
 export function loadSystemProxyEnvironment(environment: NodeJS.ProcessEnv, platform = process.platform) {
+  // Desktop and the standalone CLI share this entrypoint before either starts
+  // its Node/Bun backend. Chromium can discover native proxy settings itself,
+  // but the bundled backend cannot, so propagate the same route explicitly.
+  if (platform === "win32" || platform === "darwin")
+    return process.platform === platform ? loadNativeProxy(environment, platform) : undefined
   if (platform !== "linux") return undefined
   const result = spawnSync("gsettings", ["list-recursively", "org.gnome.system.proxy"], {
     env: environment,
@@ -57,9 +62,6 @@ export function loadSystemProxyEnvironment(environment: NodeJS.ProcessEnv, platf
   return systemProxyEnvironment(result.stdout, environment)
 }
 
-// Native CLI adaptation is opt-in here; Desktop retains its existing platform integration.
 export function loadCliProxyEnvironment(environment: NodeJS.ProcessEnv) {
-  if (process.platform === "win32" || process.platform === "darwin")
-    return loadNativeProxy(environment, process.platform)
   return loadSystemProxyEnvironment(environment)
 }

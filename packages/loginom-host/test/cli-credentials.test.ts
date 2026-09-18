@@ -22,7 +22,7 @@ test("async CLI codec persists a private versioned format separate from Desktop"
     await store.activate(1)
     expect(await store.read()).toMatchObject({ apiKey: "test-key", password: "" })
     const file = join(root, "connection.json")
-    expect((await stat(file)).mode & 0o777).toBe(0o600)
+    if (process.platform !== "win32") expect((await stat(file)).mode & 0o777).toBe(0o600)
     expect(JSON.parse(await readFile(file, "utf8")).secrets).toMatchObject({
       format: "loginom-cli-secrets-v1",
       protection: "plaintext",

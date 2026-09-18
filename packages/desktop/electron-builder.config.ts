@@ -34,6 +34,9 @@ const config: Configuration = {
   productName: process.platform === "linux" ? productSlug(channel) : productName(channel),
   artifactName: Product.artifactName,
   publish: Product.updateFeed ? { provider: "generic", url: Product.updateFeed } : null,
+  // Native backend dependencies run in the bundled Node sidecar. Renderer/main
+  // dependencies use N-API or platform packages already selected by the lockfile.
+  npmRebuild: false,
   async afterPack(context) {
     if (context.electronPlatformName !== "linux") return
     await linuxPermissions(context.appOutDir)
@@ -73,15 +76,19 @@ const config: Configuration = {
   dmg: { sign: true },
   win: {
     icon: "resources/icons/icon.ico",
+    executableName: productSlug(channel),
+    requestedExecutionLevel: "asInvoker",
     signtoolOptions: { sign: signWindows },
-    target: ["nsis"],
+    target: [{ target: "nsis", arch: ["x64"] }],
     verifyUpdateCodeSignature: true,
   },
   nsis: {
     oneClick: true,
     perMachine: false,
+    deleteAppDataOnUninstall: false,
     installerIcon: "resources/icons/icon.ico",
     installerHeaderIcon: "resources/icons/icon.ico",
+    shortcutName: productName(channel),
   },
   linux: {
     syncDesktopName: true,

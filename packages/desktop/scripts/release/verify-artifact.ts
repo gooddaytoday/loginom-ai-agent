@@ -4,16 +4,21 @@ import { basename, join, resolve } from "node:path"
 import { mkdtemp, rm, readFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { $ } from "bun"
-import { decodeManifest, fileHash, verifyResourceTree } from "./manifest"
+import { decodeManifest, fileHash, verifyResourceTree, verifyWindowsApplication } from "./manifest"
 import { Product, productName, productSlug } from "@loginom-ai-agent/product"
 
 const args = parseArgs({
   args: process.argv.slice(2),
-  options: { manifest: { type: "string" }, artifact: { type: "string" }, report: { type: "string" } },
+  options: {
+    manifest: { type: "string" },
+    artifact: { type: "string" },
+    unpacked: { type: "string" },
+    report: { type: "string" },
+  },
   strict: true,
 }).values
 if (!args.manifest || !args.artifact || !args.report)
-  throw Error("Required: --manifest <json> --artifact <deb|AppImage> --report <json>")
+  throw Error("Required: --manifest <json> --artifact <deb|AppImage|exe> [--unpacked <directory>] --report <json>")
 const manifest = decodeManifest(await Bun.file(args.manifest).json())
 if (
   manifest.product.name !== productName(manifest.channel) ||
@@ -25,6 +30,28 @@ if (
 const artifact = manifest.artifacts.find((item) => item.file === basename(args.artifact!))
 if (!artifact || artifact.bytes !== Bun.file(args.artifact).size || (await fileHash(args.artifact)) !== artifact.sha256)
   throw Error("RELEASE_ARTIFACT_HASH_MISMATCH")
+
+if (manifest.target.platform === "win32") {
+  if (artifact.kind !== "nsis" || !args.unpacked) throw Error("RELEASE_WINDOWS_PAYLOAD_REQUIRED")
+  const installer = await readFile(args.artifact)
+  if (installer.length < 64 || installer.subarray(0, 2).toString() !== "MZ") throw Error("RELEASE_INSTALLER_INVALID")
+  const result = await verifyWindowsApplication(
+    args.unpacked,
+    manifest.product.executable,
+    manifest.runtime.resourcesSha256,
+  )
+  await Bun.write(
+    args.report,
+    JSON.stringify(
+      { status: "PASS", artifact: artifact.file, sha256: artifact.sha256, ...result, executableNotRun: true },
+      null,
+      2,
+    ) + "\n",
+  )
+  console.log(`PASS static ${artifact.file}: ${result.files} resources`)
+  process.exit(0)
+}
+
 const directory = await mkdtemp(join(tmpdir(), "loginom-static-"))
 try {
   const root = join(directory, "extracted")
@@ -63,7 +90,11 @@ try {
       ? join(root, "usr/share/applications", `${manifest.product.appId}.desktop`)
       : join(root, `${manifest.product.appId}.desktop`),
   )
-  const result = await verifyResourceTree(join(application, "resources/loginom"), manifest.runtime.resourcesSha256)
+  const result = await verifyResourceTree(
+    join(application, "resources/loginom"),
+    manifest.runtime.resourcesSha256,
+    "linux-x64",
+  )
   const desktop = await readFile(
     artifact.kind === "deb"
       ? join(root, "usr/share/applications", `${manifest.product.appId}.desktop`)

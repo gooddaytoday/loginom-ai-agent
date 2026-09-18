@@ -11,7 +11,7 @@ const exists = (path: string) =>
     .catch(() => false)
 
 export function checkAppExists(appName: string) {
-  if (process.platform === "win32") return true
+  if (process.platform === "win32") return resolveWindowsAppPath(appName).then(Boolean)
   if (process.platform === "linux") return true
   return checkMacosApp(appName)
 }
@@ -39,7 +39,7 @@ async function checkMacosApp(appName: string) {
 async function resolveWindowsAppPath(appName: string): Promise<string | null> {
   let output: string
   try {
-    output = await execFilePromise("where", [appName]).then((r) => r.stdout.toString())
+    output = await execFilePromise("where.exe", [appName], { windowsHide: true }).then((r) => r.stdout.toString())
   } catch {
     return null
   }
@@ -132,5 +132,5 @@ async function resolveWindowsAppPath(appName: string): Promise<string | null> {
     }
   }
 
-  return paths[0] ?? null
+  return null
 }

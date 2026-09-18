@@ -21,9 +21,12 @@
 | Версия / канал / backend | |
 | Git commit / clean или dirty | |
 | Patch SHA256 / untracked build inputs | |
+| CI workflow / run ID / URL или локальная команда | |
+| CI runner image или build OS / arch | |
 | Commit/архив перенесённого Dock | |
-| EXE/DMG: имя / размер / SHA256 | |
-| Manifest: имя / SHA256 | |
+| Desktop EXE/DMG: имя / размер / SHA256 | |
+| CLI ZIP/tar.gz: имя / размер / SHA256 | |
+| Manifest/CI summary: имя / SHA256 | |
 | Feed / metadata hash / предыдущая версия | |
 | Electron / встроенный Node | |
 | Отдельный Node исполнителя, если есть | |
@@ -31,6 +34,12 @@
 | Build OS / arch / timestamp | |
 | Подпись: issuer / Team ID / status | |
 | Config/data/log/profile paths по manifest | |
+
+Для Windows CI отдельно указать, что `windows-2022` означает GitHub-hosted
+Windows Server, а не Windows 11. `NotSigned` у development candidate записывается
+как ожидаемое свойство конкретной CI-сборки, но release signing gate остаётся
+`NOT_RUN`; его нельзя превращать в `PASS`. Workflow artifact не считается
+публикацией релиза и не доказывает установку или runtime-поведение.
 
 ## Окружение
 
@@ -118,6 +127,12 @@
 | Cwd | Команда | Результат / exit code | Артефакт/вывод |
 | --- | --- | --- | --- |
 | | | | |
+
+Если использовался CI, дополнительно приложить `ci-summary.json`, SHA256
+скачанного workflow artifact и ссылку на точный run. Разнести доказательства по
+границам: `source/typecheck`, `build`, `package/static`, `installed/native`.
+Зелёная строка первых трёх границ не заполняет сценарии матрицы приёмки без
+соответствующего installed/native прогона.
 
 ## Передача результата
 

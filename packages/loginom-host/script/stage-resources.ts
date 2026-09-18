@@ -61,16 +61,17 @@ export async function stageResources(input: {
   }
   const version = (await $`${node} --version`.text()).trim()
   if (version !== `v${release.nodeVersion}`) throw new Error("LOGINOM_NODE_VERSION_MISMATCH")
-  for (const [path, expected] of [
-    [node, pins.nodeSha256],
-    [join(browsers, pins.browser), pins.browserSha256],
-    [join(source, "client/package-lock.json"), release.runtimeLockSha256],
-    [resolve(source, "../product/models.json"), release.modelsSha256],
+  for (const input of [
+    { path: node, expected: pins.nodeSha256, text: false },
+    { path: join(browsers, pins.browser), expected: pins.browserSha256, text: false },
+    { path: join(source, "client/package-lock.json"), expected: release.runtimeLockSha256, text: true },
+    { path: resolve(source, "../product/models.json"), expected: release.modelsSha256, text: true },
   ]) {
+    const contents = await readFile(input.path)
     if (
       createHash("sha256")
-        .update(await readFile(path))
-        .digest("hex") !== expected
+        .update(input.text ? normalizeText(contents) : contents)
+        .digest("hex") !== input.expected
     )
       throw new Error("LOGINOM_BUILD_INPUT_HASH_MISMATCH")
   }
@@ -208,4 +209,8 @@ async function canonicalBuildPath(path: string): Promise<string> {
     if (error.code !== "ENOENT" || dirname(path) === path) throw error
     return join(await canonicalBuildPath(dirname(path)), basename(path))
   })
+}
+
+function normalizeText(contents: Buffer) {
+  return Buffer.from(contents.toString("utf8").replaceAll("\r\n", "\n"))
 }

@@ -69,7 +69,55 @@ Get-AuthenticodeSignature -LiteralPath $AgentInstaller |
 
 ## 6. Если агенту потребуется собрать исправление
 
-Следующие команды **существуют в текущем репозитории**, но до реализации переноса/ребрендинга собирают OpenCode. Они не создают автоматически согласованный Loginom пакет. Актуальный release manifest должен содержать окончательные команды для своего commit.
+Текущая Windows-ветка предоставляет единый сценарий `script/build-windows.ps1`.
+Он принимает `-Product Desktop`, `Cli` или `Both`, обязательный абсолютный
+`-OutputDirectory`, закреплённые `-NodeSource` и `-BrowserSource`, а также
+необязательные `-BunPath`, `-Channel` и `-SkipInstall`. Сценарий не изменяет
+пользовательский `PATH` и запрещает перезапись существующего CLI payload.
+
+Пример после подготовки portable runtime:
+
+```powershell
+& .\script\build-windows.ps1 `
+  -Product Both `
+  -OutputDirectory C:\build\loginom-ai-agent `
+  -NodeSource C:\cache\node-v24.19.0-win-x64\node.exe `
+  -BrowserSource C:\cache\browsers `
+  -BunPath C:\cache\bun-windows-x64\bun.exe `
+  -Channel prod
+```
+
+`BrowserSource` должен содержать
+`chromium-1243\chrome-win64\chrome.exe`. Для повторного локального запуска с
+уже установленными зависимостями допустим `-SkipInstall`; release-проверка из
+чистого checkout должна выполнять установку по lockfile.
+
+### CI-кандидат без публикации
+
+Workflow [loginom-windows.yml](../../../.github/workflows/loginom-windows.yml)
+запускается вручную и для затрагивающих Windows-сборку pull request. Он работает
+на `windows-2022`, использует portable Node 24.19.0 и Bun 1.3.14 из закреплённых
+setup actions, отдельно готовит Chromium revision 1243 и передаёт абсолютные
+пути `-NodeSource`, `-BrowserSource` и `-BunPath` в единый сценарий.
+
+CI выполняет clean-checkout `-Product Both`, package-local typecheck/тесты,
+повторную проверку ZIP checksum и проверяет, что NSIS development installer не
+подписан. На семь дней сохраняются только EXE, CLI ZIP с checksum и
+`ci-summary.json`; GitHub Release, feed, подпись и другие каналы публикации не
+создаются. Имя workflow artifact содержит `github.run_id`, а commit и SHA256
+находятся в summary.
+
+GitHub-hosted `windows-2022` — Windows Server, а не чистая Windows 11. Зелёный CI
+подтверждает сборку и статическую целостность пакетов, но не закрывает PKG-01/02,
+GUI, DPAPI/safeStorage, ConPTY, lifecycle, proxy, Dock/ChatGPT или CSV-сценарии.
+Для них нужно распаковать конкретный CI artifact, сверить его с
+`ci-summary.json` и пройти разделы 1–5 на отдельной Windows 11 VM. Поскольку
+кандидат намеренно неподписан, его можно обозначать только как development или
+exploratory artifact; release gate подписи остаётся непройденным.
+
+Ниже сохранены package-local команды для диагностики отдельных стадий. Для
+кандидата результата предпочтителен единый сценарий выше; manifest и отчёт
+должны относиться к тому же source snapshot.
 
 На отдельной build-машине: Node 24 согласно CI; Bun версии из корневого `packageManager` (при подготовке документа — 1.3.14). Для нативных зависимостей использовать требования установщиков из lockfile/CI; Python и Visual Studio Build Tools понадобятся при компиляции соответствующих native модулей. Установка этих инструментов не является частью пользовательского установщика.
 

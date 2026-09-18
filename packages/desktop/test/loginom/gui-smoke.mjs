@@ -6,6 +6,7 @@ const require = createRequire(new URL("../../../loginom-runtime/client/package.j
 const { _electron } = require("playwright-core")
 const directory = resolve(import.meta.dirname, "../..")
 const profile = await mkdtemp(join(tmpdir(), "loginom-gui-"))
+const evidence = join(tmpdir(), "loginom-gui-evidence")
 const launch = () =>
   _electron.launch({
     executablePath:
@@ -47,8 +48,8 @@ try {
   const viewport = await page.evaluate(() => ({ height: innerHeight, width: innerWidth }))
   if (!bounds || bounds.y < 0 || bounds.y + bounds.height > (viewport?.height ?? 800))
     throw Error("ONBOARDING_ACTIONS_CLIPPED")
-  await mkdir("/tmp/loginom-gui-evidence", { recursive: true })
-  await page.screenshot({ path: "/tmp/loginom-gui-evidence/first-launch.png" })
+  await mkdir(evidence, { recursive: true })
+  await page.screenshot({ path: join(evidence, "first-launch.png") })
   console.log(JSON.stringify({ status: "PASS", ...result }))
   if (process.env.LOGINOM_AI_AGENT_TEST_CONFIG) {
     const config = JSON.parse(await readFile(process.env.LOGINOM_AI_AGENT_TEST_CONFIG, "utf8"))
@@ -86,7 +87,7 @@ try {
         fits: bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 720 && bounds.y + bounds.height <= 129,
       }
     })
-    await page.screenshot({ path: "/tmp/loginom-gui-evidence/new-chat.png" })
+    await page.screenshot({ path: join(evidence, "new-chat.png") })
     if (
       brand.label !== "Loginom AI" ||
       brand.text !== "Loginom AI" ||

@@ -19,7 +19,7 @@ export const Manifest = Schema.Struct({
     importSha256: text,
   }),
   target: Schema.Struct({
-    platform: Schema.Literal("linux"),
+    platform: Schema.Literals(["linux", "win32"]),
     arch: Schema.Literal("x64"),
     minimumOS: text,
     backend: Schema.Literal("v1"),
@@ -60,7 +60,11 @@ export const Manifest = Schema.Struct({
     identity: Schema.Null,
     notarized: Schema.Literal(false),
   }),
-  installation: Schema.Struct({ scope: Schema.Literal("machine"), uninstallPolicy: text, preservesUserData: flag }),
+  installation: Schema.Struct({
+    scope: Schema.Literals(["machine", "user"]),
+    uninstallPolicy: text,
+    preservesUserData: flag,
+  }),
   validation: Schema.Struct({
     commands: Schema.Array(Schema.Struct({ cwd: text, argv: Schema.Array(text) })),
     reportFiles: Schema.Array(text),
@@ -69,7 +73,7 @@ export const Manifest = Schema.Struct({
   artifacts: Schema.Array(
     Schema.Struct({
       file: text,
-      kind: Schema.Literals(["deb", "appimage", "source", "updater-metadata"]),
+      kind: Schema.Literals(["deb", "appimage", "nsis", "source", "updater-metadata"]),
       bytes: Schema.Number,
       sha256: text,
     }),
@@ -94,7 +98,14 @@ export function decodeManifest(value: unknown) {
     !/^[a-f0-9]{40}$/.test(manifest.source.commit) ||
     !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(manifest.version) ||
     !manifest.artifacts.length ||
-    (manifest.source.dirty && !manifest.source.patchSha256)
+    (manifest.source.dirty && !manifest.source.patchSha256) ||
+    (manifest.target.platform === "linux" && manifest.installation.scope !== "machine") ||
+    (manifest.target.platform === "win32" && manifest.installation.scope !== "user") ||
+    (manifest.target.platform === "linux" && manifest.artifacts.some((item) => item.kind === "nsis")) ||
+    (manifest.target.platform === "win32" &&
+      manifest.artifacts.some((item) => item.kind === "deb" || item.kind === "appimage")) ||
+    (manifest.target.platform === "win32" &&
+      (!manifest.paths.node.endsWith(".exe") || !manifest.paths.chromium.endsWith(".exe")))
   )
     throw Error("RELEASE_MANIFEST_INVALID")
   const seen = new Set<string>()
@@ -114,14 +125,15 @@ export function decodeManifest(value: unknown) {
 }
 
 // Static inspection: never import or execute code from the extracted artifact.
-export async function verifyResourceTree(root: string, expected: string) {
+export async function verifyResourceTree(root: string, expected: string, expectedTarget?: "linux-x64" | "win32-x64") {
   const directory = await realpath(root)
   const bytes = await readFile(join(directory, "resource-manifest.json"))
   if (hash(bytes) !== expected) throw Error("RELEASE_RESOURCES_MANIFEST_MISMATCH")
   const manifest = JSON.parse(bytes.toString())
   if (
     manifest.protocol !== 1 ||
-    manifest.target !== "linux-x64" ||
+    !["linux-x64", "win32-x64"].includes(manifest.target) ||
+    (expectedTarget !== undefined && manifest.target !== expectedTarget) ||
     !Array.isArray(manifest.files) ||
     !manifest.files.length
   )
@@ -140,13 +152,52 @@ export async function verifyResourceTree(root: string, expected: string) {
   for (const entry of [manifest.node, manifest.browser]) {
     if (!seen.has(entry)) throw Error("RELEASE_EXECUTABLE_MISSING")
     const bytes = await readFile(join(directory, entry))
+    verifyExecutable(bytes, manifest.target)
+    // NTFS does not expose the executable bits stored by Linux archives.
+    if (manifest.target === "linux-x64" && process.platform !== "win32") {
+      if (!((await stat(join(directory, entry))).mode & 0o111)) throw Error("RELEASE_EXECUTABLE_INVALID")
+    }
+  }
+  return { target: manifest.target, files: seen.size, node: manifest.node, browser: manifest.browser }
+}
+
+export function verifyExecutable(bytes: Buffer, target: "linux-x64" | "win32-x64") {
+  if (target === "linux-x64") {
     if (
+      bytes.length < 20 ||
       bytes.subarray(0, 4).toString() !== "\x7fELF" ||
       bytes[4] !== 2 ||
-      bytes.readUInt16LE(18) !== 62 ||
-      !((await stat(join(directory, entry))).mode & 0o111)
+      bytes.readUInt16LE(18) !== 62
     )
       throw Error("RELEASE_EXECUTABLE_INVALID")
+    return
   }
-  return { files: seen.size, node: manifest.node, browser: manifest.browser }
+
+  if (bytes.length < 64 || bytes.subarray(0, 2).toString() !== "MZ") throw Error("RELEASE_EXECUTABLE_INVALID")
+  const offset = bytes.readUInt32LE(0x3c)
+  if (
+    offset > bytes.length - 6 ||
+    bytes.subarray(offset, offset + 4).toString("binary") !== "PE\0\0" ||
+    bytes.readUInt16LE(offset + 4) !== 0x8664
+  )
+    throw Error("RELEASE_EXECUTABLE_INVALID")
+}
+
+export async function verifyWindowsApplication(root: string, executable: string, expectedResources: string) {
+  const directory = await realpath(root)
+  verifyExecutable(await readFile(await containedFile(directory, `${executable}.exe`)), "win32-x64")
+  await Promise.all(
+    ["resources/app.asar", "resources/icons/icon.ico", "LICENSE.electron.txt", "LICENSES.chromium.html"].map((path) =>
+      containedFile(directory, path),
+    ),
+  )
+  return verifyResourceTree(join(directory, "resources/loginom"), expectedResources, "win32-x64")
+}
+
+async function containedFile(root: string, path: string) {
+  const resolved = await realpath(join(root, path))
+  const local = relative(root, resolved)
+  if (local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local) || !(await stat(resolved)).isFile())
+    throw Error("RELEASE_RESOURCE_ESCAPE")
+  return resolved
 }
