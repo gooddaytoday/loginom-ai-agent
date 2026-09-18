@@ -1,0 +1,8 @@
+{
+  "status": "PASS",
+  "desktopDebianVersion": "0.1.4~local.20260918.697cc2e5a",
+  "installedAsarSha256": "2c7be603961d796955b8c7d01dc4e9302ccfeabb1d1665fdc693685ca6244396",
+  "profileCredentialFilesUnchanged": 1,
+  "launcher": "/opt/loginom-ai-agent/loginom-ai-agent",
+  "desktopEntry": true
+}

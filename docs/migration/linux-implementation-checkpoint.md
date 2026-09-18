@@ -1,5 +1,12 @@
 # Linux: завершение реализации — 2026-09-16
 
+**Актуальная пользовательская установка — 2026-09-18:** Desktop и CLI
+`0.1.4-local.20260918.697cc2e5a` собраны из чистого snapshot и установлены.
+Desktop GUI/ASAR/4365 runtime hashes и CLI help/version/status PASS.
+Профили сохранены; CLI оставлен установленным.
+[Отчёт о текущей установке](../testing/loginom-ai-agent/reports/2026-09-18-installed-desktop-cli/report.md).
+Записи ниже описывают предыдущие проверки и установки.
+
 **Закрытие технической standalone Linux-цели — 2026-09-18.**
 Этапы 1–5 выполнены и проверены в рамках Linux-only scope. Пользователь отложил
 полный юридический third-party/source/relinking audit как отдельную работу

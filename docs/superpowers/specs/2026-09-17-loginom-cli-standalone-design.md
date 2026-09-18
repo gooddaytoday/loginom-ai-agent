@@ -616,8 +616,9 @@ Linux-scope, принятому пользователем, и к описанн
 - [x] IND-13: Linux proxy/CA/loopback, credentials, headed environment и sandbox;
   Ubuntu22/Debian12 контейнеры проверяют startup/libraries, не GUI sandbox.
 - [x] IND-14: archive/manifest/install/uninstall и установленный Desktop regression.
-- [x] Последний packaging-only candidate 0.1.4-cli.20260918native-src:
-  clean build, extracted manifest, 47 native/source hashes и help/version PASS.
+- [x] Актуальные Desktop и CLI 0.1.4-local.20260918.697cc2e5a:
+  clean build и установка; Desktop GUI/ASAR/4365 hashes, CLI manifest/help/version/status PASS.
+  [Отчёт](../../testing/loginom-ai-agent/reports/2026-09-18-installed-desktop-cli/report.md).
 
 #### Отдельная незавершённая работа — вне текущей Linux-цели
 
