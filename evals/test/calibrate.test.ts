@@ -30,7 +30,9 @@ test("--calibrate: positive/negative для каждой задачи, пред�
     expect(calibration.warnings).toHaveLength(3)
     expect(await Bun.file(path.join(result.runDir, "calibration.md")).exists()).toBe(true)
     expect(await Bun.file(path.join(result.runDir, "summary.json")).exists()).toBe(false)
-    expect(await Bun.file(path.join(result.runDir, "group-sum-qty", "positive", "judge", "checklist.json")).json()).not.toContainEqual(expect.objectContaining({ id: "result-rows" }))
+    const checklist = await Bun.file(path.join(result.runDir, "group-sum-qty", "positive", "judge", "checklist.json")).json()
+    expect(checklist).not.toContainEqual(expect.objectContaining({ id: "result-rows" }))
+    expect(checklist).not.toContainEqual(expect.objectContaining({ id: "honest-report" }))
   } finally {
     if (originalModel === undefined) delete process.env.JUDGE_MODEL
     else process.env.JUDGE_MODEL = originalModel
