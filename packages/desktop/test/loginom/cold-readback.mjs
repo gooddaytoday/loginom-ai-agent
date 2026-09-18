@@ -22,6 +22,11 @@ const root = resolve(args.resources)
 const load = (name) => import(pathToFileURL(join(root, "runtime", name)).href)
 const { verifyResources } = await load("src/resources.mjs")
 const resources = await verifyResources(root)
+const compatibilityPlatform = resources.manifest.target?.startsWith("win32-")
+  ? "windows"
+  : resources.manifest.target?.startsWith("darwin-")
+    ? "macos"
+    : "linux"
 const { loginBrowser } = await load("src/connection-check.mjs")
 const { makeWorkspacePrepareCode } = await load("client/lib/workspace.mjs")
 const { createNodeTargetBrowserAdapter } = await load("client/lib/node-target-browser.mjs")
@@ -61,7 +66,7 @@ try {
   const prepared = await execute(
     makeWorkspacePrepareCode({
       loginomUrl: page.url(),
-      compatibility: { loginom_build: "7.4.2", platform: "linux", browser: "chromium" },
+      compatibility: { loginom_build: "7.4.2", platform: compatibilityPlatform, browser: "chromium" },
       sessionId: session,
       operationId: "cold-open",
       intent: "open_package",
