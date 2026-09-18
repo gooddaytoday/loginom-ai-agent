@@ -794,8 +794,12 @@ export const RunCommand = effectCmd({
                 err = String(props.error.data.message)
               }
               error = error ? error + EOL + err : err
-              if (emit("error", { error: props.error })) continue
-              UI.error(err)
+              // Stop on the error event. Waiting for idle is the #27371 hang:
+              // getModel dies, the SDK call may still be pending, and idle
+              // never arrives. JSON errors come from the prompt result so this
+              // path does not emit a second record.
+              if (args.format !== "json") UI.error(err)
+              break
             }
 
             if (
@@ -869,6 +873,7 @@ export const RunCommand = effectCmd({
             const error = await completed
             if (error) process.exitCode = 1
           }
+          let rejected = false
 
           try {
             if (standaloneCancellation()?.aborted) {
@@ -887,6 +892,7 @@ export const RunCommand = effectCmd({
               if (result.error) {
                 if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
                 process.exitCode = 1
+                rejected = true
                 return
               }
               await finish()
@@ -904,6 +910,7 @@ export const RunCommand = effectCmd({
             if (result.error) {
               if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
               process.exitCode = 1
+              rejected = true
               return
             }
             await finish()
@@ -911,7 +918,9 @@ export const RunCommand = effectCmd({
           } finally {
             try {
               subscription.abort()
-              await completed
+              // A rejected prompt already has a nonzero exit. Do not wait for
+              // idle or SSE close — that wait is how #27371 hung in CI.
+              if (!rejected) await completed
               if (cancellation.pending) {
                 await cancellation.pending
                 process.exitCode = 130
@@ -921,6 +930,12 @@ export const RunCommand = effectCmd({
               process.off("SIGINT", interrupt)
             }
           }
+          // Legacy CLI owns the process. Leave after a rejected prompt so
+          // instance dispose / worker teardown cannot outlive the error.
+          if (rejected && !process.env.LOGINOM_AI_AGENT_CLI_ROOT) {
+            exitCli(1)
+          }
+          return
         }
 
         const model = pick(args.model)
