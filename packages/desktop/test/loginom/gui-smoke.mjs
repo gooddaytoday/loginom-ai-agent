@@ -9,7 +9,9 @@ const profile = await mkdtemp(join(tmpdir(), "loginom-gui-"))
 const launch = () =>
   _electron.launch({
     executablePath:
-      process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE ?? resolve(directory, "node_modules/electron/dist/electron"),
+      process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE ?? resolve(directory, process.platform === "darwin"
+        ? "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron"
+        : "node_modules/electron/dist/electron"),
     args: [
       ...(process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE ? [] : [directory]),
       ...(process.env.LOGINOM_AI_AGENT_TEST_WAYLAND === "1" ? ["--ozone-platform=wayland"] : []),
@@ -100,10 +102,16 @@ try {
     const safe = await page.evaluate(() => window.api.loginom.read())
     if (!safe.hasApiKey || JSON.stringify(safe).includes(config.api_key)) throw Error("SECRET_READBACK_INVALID")
     const file = join(profile, "desktop/loginom/connection/connection.json")
-    if ((await stat(file)).mode % 512 !== 0o600) throw Error("SECRET_PERMISSIONS_INVALID")
-    if (!JSON.stringify(JSON.parse(await readFile(file, "utf8"))).includes(config.api_key))
-      throw Error("PLAINTEXT_POLICY_NOT_APPLIED")
-    console.log("PASS: GUI connection check/save, safe IPC readback and Linux plaintext permissions")
+    if (process.platform !== "win32" && (await stat(file)).mode % 512 !== 0o600)
+      throw Error("SECRET_PERMISSIONS_INVALID")
+    const stored = JSON.parse(await readFile(file, "utf8"))
+    if (process.platform === "linux") {
+      if (stored.secrets?.apiKey !== config.api_key) throw Error("PLAINTEXT_POLICY_NOT_APPLIED")
+    } else {
+      if (!stored.secrets?.encrypted || JSON.stringify(stored).includes(config.api_key))
+        throw Error("SECRET_PROTECTION_INVALID")
+    }
+    console.log("PASS: GUI connection check/save, safe IPC readback and platform credential storage")
     await application.close()
     const again = await launch()
     try {

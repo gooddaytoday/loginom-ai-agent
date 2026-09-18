@@ -55,6 +55,12 @@ try {
     `native/loginom-ai-agent-cli-${process.platform === "win32" ? "windows" : process.platform}-${process.arch}`,
   )
   const resources = join(artifact, "resources/loginom")
+  if (process.platform === "darwin") {
+    // Bun supplies its JSC runtime entitlements. Retain them while signing our
+    // compiled executable, and never re-sign vendor Node or Chromium resources.
+    await $`/usr/bin/codesign --force --sign - --timestamp=none --identifier com.loginom.aiagent.cli --preserve-metadata=entitlements ${join(artifact, "bin/loginom-ai-agent-cli")}`
+    await $`/usr/bin/codesign --verify --strict ${join(artifact, "bin/loginom-ai-agent-cli")}`
+  }
   await stageResources({
     destination: resources,
     node,
@@ -152,8 +158,14 @@ try {
   // The manifest includes modes; the build caller's private umask must not rewrite them.
   const extraction =
     process.platform === "linux" ? ["--same-permissions", "-xzf"] : process.platform === "win32" ? ["-xf"] : ["-xpf"]
-  await $`${archiver} ${extraction} ${join(work, name)} -C ${extracted}`
+  if (process.platform === "win32") await $`${archiver} ${extraction} ${join(work, name)} -C ${extracted}`
+  if (process.platform !== "win32")
+    await $`/bin/sh -c ${'umask 077; exec "$@"'} -- ${archiver} ${extraction} ${join(work, name)} -C ${extracted}`
   await verifyCliManifest(extracted, { platform: process.platform, arch: process.arch, version: pkg.version })
+  if (process.platform === "darwin") {
+    await $`/usr/bin/codesign --verify --strict ${join(extracted, "bin/loginom-ai-agent-cli")}`
+    await $`/usr/bin/codesign --verify --strict ${join(extracted, "resources/loginom/bin/loginom-keychain")}`
+  }
   // Exclusive hard links publish complete files without replacing an earlier candidate.
   const published: string[] = []
   try {

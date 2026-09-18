@@ -1,5 +1,35 @@
 import { describe, expect, test } from "bun:test"
-import { loadSystemProxyEnvironment, systemProxyEnvironment } from "./system-proxy"
+import { loadDesktopProxyEnvironment, systemProxyEnvironment } from "./system-proxy"
+import { loadNativeProxy, macProxyEnvironment } from "@loginom-ai-agent/loginom-host/native-proxy"
+
+describe("macOS system proxy", () => {
+  test.skipIf(process.platform !== "darwin")("Desktop uses the native system adapter", () => {
+    expect(loadDesktopProxyEnvironment({}, "darwin")).toEqual(loadNativeProxy({}, "darwin"))
+  })
+
+  test("manual routes override shell values and bypass loopback", () => {
+    const result = macProxyEnvironment(`<dictionary> {
+  HTTPEnable : 1
+  HTTPProxy : proxy.internal
+  HTTPPort : 3128
+  HTTPSEnable : 1
+  HTTPSProxy : secure.internal
+  HTTPSPort : 8080
+}`, { ALL_PROXY: "socks5://stale:1", NO_PROXY: "*" })!
+    expect(result.HTTP_PROXY).toBe("http://proxy.internal:3128")
+    expect(result.HTTPS_PROXY).toBe("http://secure.internal:8080")
+    expect(result.ALL_PROXY).toBe("")
+    expect(result.NO_PROXY).toBe("localhost,127.0.0.1,::1")
+    expect(result.NODE_USE_ENV_PROXY).toBe("1")
+  })
+
+  test("automatic and SOCKS routes fail explicitly", () => {
+    expect(() => macProxyEnvironment("<dictionary> {\n  ProxyAutoConfigEnable : 1\n}", {}))
+      .toThrow("SYSTEM_PROXY_AUTOMATIC_UNSUPPORTED")
+    expect(() => macProxyEnvironment("<dictionary> {\n  SOCKSEnable : 1\n}", {}))
+      .toThrow("SYSTEM_PROXY_PROTOCOL_UNSUPPORTED")
+  })
+})
 
 const settings = `org.gnome.system.proxy mode 'manual'
 org.gnome.system.proxy use-same-proxy false
@@ -45,8 +75,7 @@ describe("Linux system proxy", () => {
   test("unconfigured systems keep existing environment", () => {
     expect(systemProxyEnvironment("", {})).toBeUndefined()
     expect(systemProxyEnvironment(settings.replace("mode 'manual'", "mode 'none'"), {})).toBeUndefined()
-    expect(loadSystemProxyEnvironment({}, "darwin")).toBeUndefined()
-    expect(loadSystemProxyEnvironment({}, "win32")).toBeUndefined()
+    expect(loadDesktopProxyEnvironment({}, "win32")).toBeUndefined()
   })
 
   test("does not silently bypass an authenticated system proxy", () => {

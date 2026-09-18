@@ -23,3 +23,17 @@ for (const channel of ["dev", "beta", "prod"] as const) {
     expect(config.linux?.target).toEqual(["AppImage", "deb"])
   })
 }
+
+test("macOS test packages use explicit ad-hoc arm64 signing without rewriting vendor resources", async () => {
+  const config = (await import("./electron-builder.config")).default
+  expect(config.mac?.minimumSystemVersion).toBe("14.0")
+  expect(config.mac?.identity).toBe("-")
+  expect(config.mac?.notarize).toBe(false)
+  expect(config.dmg?.sign).toBe(false)
+  expect(config.mac?.target).toEqual([
+    { target: "dmg", arch: ["arm64"] },
+    { target: "zip", arch: ["arm64"] },
+  ])
+  expect(config.mac?.signIgnore).toEqual(["/Contents/Resources/loginom/bin/", "/Contents/Resources/loginom/browsers/"])
+  expect(JSON.stringify(config.extraResources)).not.toContain("native/")
+})

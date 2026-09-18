@@ -1,5 +1,11 @@
 # Linux: завершение реализации — 2026-09-16
 
+**Отдельное macOS-продолжение — 2026-09-19.** Ветка `macos-build` реализует
+тестовый dev pipeline macOS14+ arm64: Desktop DMG/ZIP, самостоятельный CLI
+TAR.GZ, ad-hoc подписи и общий CI. Ход работы и точные границы проверок:
+[macOS report](../testing/loginom-ai-agent/reports/2026-09-19-macos/report.md),
+[план](../../plan.md). Это не изменяет исторические Linux-результаты ниже.
+
 **Закрытие технической standalone Linux-цели — 2026-09-18.**
 Этапы 1–5 выполнены и проверены в рамках Linux-only scope. Пользователь отложил
 полный юридический third-party/source/relinking audit как отдельную работу

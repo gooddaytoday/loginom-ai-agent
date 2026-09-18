@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { decodeManifest, hash, relativePath, verifyResourceTree } from "./manifest"
@@ -49,4 +49,73 @@ test("release paths and unsupported targets cannot enter the static verifier", (
     expect(() => relativePath(path)).toThrow()
   expect(relativePath("resources/loginom/bin/node")).toBe("resources/loginom/bin/node")
   expect(() => decodeManifest({ schemaVersion: 1, target: { platform: "linux", arch: "arm64" } })).toThrow()
+})
+
+test("macOS resources preserve framework links and reject foreign architecture and lost executable bits", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-mac-static-test-"))
+  const executable = Buffer.alloc(64)
+  executable.writeUInt32LE(0xfeedfacf)
+  executable.writeUInt32LE(0x0100000c, 4)
+  try {
+    await mkdir(join(directory, "Framework/Versions/A"), { recursive: true })
+    await writeFile(join(directory, "Framework/Versions/A/chrome"), executable, { mode: 0o755 })
+    await writeFile(join(directory, "node"), executable, { mode: 0o755 })
+    await symlink("A", join(directory, "Framework/Versions/Current"))
+    const resource = {
+      protocol: 1,
+      target: "darwin-arm64",
+      node: "node",
+      browser: "Framework/Versions/A/chrome",
+      files: [
+        { path: "node", sha256: hash(executable) },
+        { path: "Framework/Versions/A/chrome", sha256: hash(executable) },
+        { path: "Framework/Versions/Current", link: "A", directory: true, sha256: hash("A") },
+      ],
+    }
+    const manifest = JSON.stringify(resource)
+    await writeFile(join(directory, "resource-manifest.json"), manifest)
+    expect((await verifyResourceTree(directory, hash(manifest), "darwin-arm64")).files).toBe(3)
+    await chmod(join(directory, "node"), 0o644)
+    await expect(verifyResourceTree(directory, hash(manifest), "darwin-arm64")).rejects.toThrow(
+      "RELEASE_EXECUTABLE_INVALID",
+    )
+    await chmod(join(directory, "node"), 0o755)
+    executable.writeUInt32LE(0x01000007, 4)
+    await writeFile(join(directory, "node"), executable)
+    resource.files[0].sha256 = hash(executable)
+    const foreign = JSON.stringify(resource)
+    await writeFile(join(directory, "resource-manifest.json"), foreign)
+    await expect(verifyResourceTree(directory, hash(foreign), "darwin-arm64")).rejects.toThrow(
+      "RELEASE_EXECUTABLE_INVALID",
+    )
+    await symlink("/tmp", join(directory, "escape"))
+    await expect(verifyResourceTree(directory, hash(foreign), "darwin-arm64")).rejects.toThrow(
+      "RELEASE_RESOURCE_ESCAPE",
+    )
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test("schema version 1 reads the released Linux manifest and accepts the macOS extension", async () => {
+  const linux = await Bun.file(
+    new URL(
+      "../../../../docs/testing/loginom-ai-agent/reports/2026-09-17-proxy/release-manifest.json",
+      import.meta.url,
+    ),
+  ).json()
+  expect(decodeManifest(linux).target).toMatchObject({ platform: "linux", arch: "x64" })
+  const mac = {
+    ...linux,
+    target: { platform: "darwin", arch: "arm64", minimumOS: "14.0", backend: "v1" },
+    signing: { status: "ad-hoc", identity: "-", notarized: false },
+    artifacts: linux.artifacts.map((file: { kind: string; file: string }) => ({
+      ...file,
+      kind: file.kind === "deb" ? "dmg" : file.kind === "appimage" ? "zip" : file.kind,
+      file: file.file.replace(/\.deb$/, ".dmg").replace(/\.AppImage$/, ".zip"),
+    })),
+  }
+  expect(decodeManifest(mac).target.platform).toBe("darwin")
+  expect(() => decodeManifest({ ...mac, signing: linux.signing })).toThrow("RELEASE_MAC_POLICY_INVALID")
+  expect(() => decodeManifest({ ...mac, target: { ...mac.target, arch: "x64" } })).toThrow("RELEASE_TARGET_INVALID")
 })

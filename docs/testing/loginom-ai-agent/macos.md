@@ -1,4 +1,65 @@
-# macOS 14+ Apple Silicon: передача агенту нативной приёмки
+# macOS 14+ Apple Silicon: сборка и нативная приёмка
+
+## Тестовый канал dev — 2026-09-19
+
+Текущая реализация и проверки: [отчёт](reports/2026-09-19-macos/report.md),
+[план выполнения](../../../plan.md). Результаты macOS27 и macOS14 учитываются
+раздельно. Ниже приведена процедура для ad-hoc кандидата: Developer ID,
+notarization, Gatekeeper trust и auto-update не входят в этот этап.
+
+Требуются arm64, macOS14+, Command Line Tools, Bun1.3.14, полный Node24.19.0
+с npm и LICENSE. Инструменты можно распаковать в отдельный каталог и добавить
+в PATH только для команд сборки. Не менять системные установки ради сборки.
+
+Из корня чистого зафиксированного checkout:
+
+```sh
+bun install --frozen-lockfile --filter '@loginom-ai-agent/desktop' --filter '@loginom-ai-agent/agent' --filter '@loginom-ai-agent/loginom-host' --filter '@loginom-ai-agent/product'
+node packages/desktop/node_modules/electron/install.js
+export LOGINOM_AI_AGENT_NODE_SOURCE="$(command -v node)"
+export LOGINOM_AI_AGENT_TEST_NODE="$LOGINOM_AI_AGENT_NODE_SOURCE"
+export PLAYWRIGHT_BROWSERS_PATH="$PWD/.codex/macos-browsers"
+export LOGINOM_AI_AGENT_BROWSER_SOURCE="$PLAYWRIGHT_BROWSERS_PATH"
+```
+
+В `packages/loginom-runtime/client` установить runtime по отдельному lock:
+
+```sh
+npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
+node node_modules/playwright/cli.js install chromium
+```
+
+Из корня проекта выполнить проверки и общую локальную/CI-сборку:
+
+```sh
+bun packages/desktop/scripts/check-macos.ts "$PWD/.codex/source-checks.json"
+bun packages/desktop/scripts/build-macos.ts --output "$PWD/.codex/candidate-01" --version 0.1.4-macos.1
+```
+
+Каталог кандидата должен отсутствовать. Скрипт использует dev по умолчанию,
+передаёт единую версию backend/Desktop/CLI, вызывает `--publish never`,
+сохраняет исходники того же commit, манифесты, SHA256 и отчёты проверки.
+Node/Chromium сохраняют upstream подписи; собственные бинарники подписываются
+ad-hoc до манифестов. CLI payload находится в `cli/`, TAR.GZ — рядом с DMG/ZIP.
+Не запускайте `scripts/prepare.ts`: legacy script изменяет package.json.
+
+Статические проверки: DMG подключается readonly, ZIP распаковывается,
+проверяются хеши, framework symlinks, arm64, подписи и минимальная ОС.
+Автономный smoke использует встроенные Node/Chromium, отдельные HOME/profiles
+и системный PATH. Он не подключается к Loginom и не заменяет полную приёмку.
+CI `.github/workflows/loginom-macos.yml` повторяет этот процесс на `macos-14`
+и сохраняет результаты в Actions artifacts; секреты сервисов не нужны.
+
+Устанавливайте `.app` из DMG в отдельный тестовый каталог Applications,
+сохраняя bundle целиком; CLI — через `install.sh` из полного распакованного
+архива. Для тестов задайте отдельные Desktop `LOGINOM_AI_AGENT_TEST_ROOT`
+и CLI `LOGINOM_AI_AGENT_CLI_PROFILE`. Не заменяйте работающий пользовательский
+продукт. Пользовательские данные сохраняются при удалении bundle/payload.
+Доступ Keychain после изменённой ad-hoc подписи требует отдельной проверки;
+успешная замена идентичными signed bytes этого не доказывает.
+
+Дальнейший протокол сохраняет release-требования как справочные. Требования
+Developer ID/notarization/update feed оцениваются только при отдельном релизе.
 
 Прочитать [общий протокол и сценарии](README.md), вести [отчёт](report-template.md). При отсутствии Loginom DMG/release manifest нативная приёмка имеет статус **BLOCKED**. Документ не означает, что macOS-проверки уже выполнялись.
 

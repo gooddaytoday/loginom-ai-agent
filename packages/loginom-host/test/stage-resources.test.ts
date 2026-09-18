@@ -4,10 +4,11 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { stageResources } from "../script/stage-resources"
 
-// These fixtures use Linux absolute paths and symlink semantics.
-const linuxTest = test.skipIf(process.platform !== "linux")
+// These fixtures exercise POSIX paths and symlink semantics before input execution.
+const posixTest = test.skipIf(process.platform !== "linux" && process.platform !== "darwin")
+const target = { platform: process.platform, arch: process.arch }
 
-linuxTest("resource staging fails closed for unpinned native targets and unsafe output paths", async () => {
+posixTest("resource staging fails closed for unpinned native targets and unsafe output paths", async () => {
   const input = {
     destination: "/tmp/loginom-resource-test",
     node: "/missing/node",
@@ -17,14 +18,14 @@ linuxTest("resource staging fails closed for unpinned native targets and unsafe 
   }
   await expect(stageResources(input)).rejects.toThrow("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
   await expect(
-    stageResources({ ...input, target: { platform: "linux", arch: "x64" }, destination: "relative" }),
+    stageResources({ ...input, target, destination: "relative" }),
   ).rejects.toThrow("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   await expect(
-    stageResources({ ...input, target: { platform: "linux", arch: "x64" }, destination: "/" }),
+    stageResources({ ...input, target, destination: "/" }),
   ).rejects.toThrow("LOGINOM_BUILD_OUTPUT_OVERLAP")
 })
 
-linuxTest.each([
+posixTest.each([
   { destination: "/missing/browser/output", browsers: "/missing/browser" },
   { destination: "/missing/browser/..nested", browsers: "/missing/browser" },
   { destination: "/missing/output", browsers: "/missing/output.staging/browser" },
@@ -35,13 +36,13 @@ linuxTest.each([
     stageResources({
       ...paths,
       node: "/missing/node",
-      target: { platform: "linux", arch: "x64" },
+      target,
       flavor: "cli",
     }),
   ).rejects.toThrow("LOGINOM_BUILD_OUTPUT_OVERLAP")
 })
 
-linuxTest("resource staging rejects existing aliases before touching inputs", async () => {
+posixTest("resource staging rejects existing aliases before touching inputs", async () => {
   const root = await mkdtemp(join(tmpdir(), "loginom-stage-alias-"))
   try {
     const browsers = join(root, "browsers")
@@ -55,7 +56,7 @@ linuxTest("resource staging rejects existing aliases before touching inputs", as
           destination,
           browsers,
           node: "/bin/true",
-          target: { platform: "linux", arch: "x64" },
+          target,
           flavor: "cli",
         }),
       ).rejects.toThrow("LOGINOM_BUILD_OUTPUT_OVERLAP")

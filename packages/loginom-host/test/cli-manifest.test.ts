@@ -46,7 +46,7 @@ test("CLI manifest verifies complete payload and rejects mutation, extras and es
   }
 })
 
-test.skipIf(process.platform !== "linux")(
+test.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
   "archive verification preserves manifest modes under a private umask",
   async () => {
     const root = await mkdtemp(join(tmpdir(), "cli-archive-modes-"))
@@ -58,6 +58,7 @@ test.skipIf(process.platform !== "linux")(
         "resources/loginom/host/node-host.mjs",
         "resources/loginom/resource-manifest.json",
         "resources/loginom/bin/node",
+        ...(process.platform === "darwin" ? ["resources/loginom/bin/loginom-keychain"] : []),
       ]) {
         await mkdir(dirname(join(source, path)), { recursive: true })
         await writeFile(join(source, path), path)
@@ -66,8 +67,8 @@ test.skipIf(process.platform !== "linux")(
       const info = {
         version: "test",
         channel: "dev",
-        platform: "linux",
-        arch: "x64",
+        platform: process.platform,
+        arch: process.arch,
         sourceCommit: "a".repeat(40),
         sourceTreeSha256: "b".repeat(64),
         sourceDirty: true,
@@ -85,8 +86,7 @@ test.skipIf(process.platform !== "linux")(
         "-c",
         'umask 077; exec tar "$@"',
         "tar",
-        "--same-permissions",
-        "-xzf",
+        ...(process.platform === "darwin" ? ["-xpf"] : ["--same-permissions", "-xzf"]),
         archive,
         "-C",
         extracted,

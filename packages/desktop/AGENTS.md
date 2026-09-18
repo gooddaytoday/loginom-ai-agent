@@ -27,3 +27,7 @@
 - Update [checkpoint](../../docs/migration/linux-implementation-checkpoint.md) with the new report. Container checks cover system libraries and bundled runtime, not physical GPU, portals or host AppArmor. Current packages are unsigned and the public update feed is disabled.
 
 - `scripts/bundle-loginom.ts` is the Desktop wrapper for the shared Host resource staging helper. Keep target/output explicit and preserve Desktop resource paths when adding CLI packaging.
+
+- macOS dev candidates use `scripts/build-macos.ts --output <new directory> --version <version>` from a clean committed tree, Bun1.3.14 and pinned complete Node/Chromium inputs. It builds Desktop DMG/ZIP and CLI TAR.GZ from the same commit/version without editing package versions; do not use legacy `scripts/prepare.ts` for this workflow. macOS14 arm64 CI uses the same entry.
+- macOS own code is explicitly ad-hoc signed; preserve upstream Node/Chromium signatures and staged hashes. No certificate discovery, notarization, DMG signing or publication. Validate DMG readonly and ZIP extraction using the platform-aware release verifier. Artifact smoke is separate from installed GUI/Keychain/Loginom acceptance.
+- `before-quit` must prevent the initial exit until backend and Host cleanup finish. macOS closing the final window keeps the app alive; Cmd+Q runs awaited cleanup. Desktop uses the native macOS proxy adapter before backend startup.

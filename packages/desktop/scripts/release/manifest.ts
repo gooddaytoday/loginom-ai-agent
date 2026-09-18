@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { createHash } from "node:crypto"
-import { readFile, realpath, stat } from "node:fs/promises"
+import { lstat, readdir, readFile, readlink, realpath, stat } from "node:fs/promises"
 import { isAbsolute, join, relative, sep } from "node:path"
 
 const text = Schema.String
@@ -19,8 +19,8 @@ export const Manifest = Schema.Struct({
     importSha256: text,
   }),
   target: Schema.Struct({
-    platform: Schema.Literal("linux"),
-    arch: Schema.Literal("x64"),
+    platform: Schema.Literals(["linux", "darwin"]),
+    arch: Schema.Literals(["x64", "arm64"]),
     minimumOS: text,
     backend: Schema.Literal("v1"),
   }),
@@ -56,11 +56,15 @@ export const Manifest = Schema.Struct({
   }),
   updater: Schema.Struct({ feed: nullable, channel: text, previousVersion: nullable }),
   signing: Schema.Struct({
-    status: Schema.Literal("unsigned"),
-    identity: Schema.Null,
+    status: Schema.Literals(["unsigned", "ad-hoc"]),
+    identity: nullable,
     notarized: Schema.Literal(false),
   }),
-  installation: Schema.Struct({ scope: Schema.Literal("machine"), uninstallPolicy: text, preservesUserData: flag }),
+  installation: Schema.Struct({
+    scope: Schema.Literals(["machine", "user"]),
+    uninstallPolicy: text,
+    preservesUserData: flag,
+  }),
   validation: Schema.Struct({
     commands: Schema.Array(Schema.Struct({ cwd: text, argv: Schema.Array(text) })),
     reportFiles: Schema.Array(text),
@@ -69,7 +73,7 @@ export const Manifest = Schema.Struct({
   artifacts: Schema.Array(
     Schema.Struct({
       file: text,
-      kind: Schema.Literals(["deb", "appimage", "source", "updater-metadata"]),
+      kind: Schema.Literals(["deb", "appimage", "dmg", "zip", "source", "updater-metadata"]),
       bytes: Schema.Number,
       sha256: text,
     }),
@@ -97,6 +101,13 @@ export function decodeManifest(value: unknown) {
     (manifest.source.dirty && !manifest.source.patchSha256)
   )
     throw Error("RELEASE_MANIFEST_INVALID")
+  if (manifest.target.platform === "linux" ? manifest.target.arch !== "x64" : manifest.target.arch !== "arm64")
+    throw Error("RELEASE_TARGET_INVALID")
+  if (
+    manifest.target.platform === "darwin" &&
+    (manifest.signing.status !== "ad-hoc" || manifest.signing.identity !== "-" || manifest.target.minimumOS !== "14.0")
+  )
+    throw Error("RELEASE_MAC_POLICY_INVALID")
   const seen = new Set<string>()
   for (const item of manifest.artifacts) {
     relativePath(item.file)
@@ -114,17 +125,13 @@ export function decodeManifest(value: unknown) {
 }
 
 // Static inspection: never import or execute code from the extracted artifact.
-export async function verifyResourceTree(root: string, expected: string) {
+export async function verifyResourceTree(root: string, expected: string, target = "linux-x64") {
   const directory = await realpath(root)
+  await verifyContainedLinks(directory)
   const bytes = await readFile(join(directory, "resource-manifest.json"))
   if (hash(bytes) !== expected) throw Error("RELEASE_RESOURCES_MANIFEST_MISMATCH")
   const manifest = JSON.parse(bytes.toString())
-  if (
-    manifest.protocol !== 1 ||
-    manifest.target !== "linux-x64" ||
-    !Array.isArray(manifest.files) ||
-    !manifest.files.length
-  )
+  if (manifest.protocol !== 1 || manifest.target !== target || !Array.isArray(manifest.files) || !manifest.files.length)
     throw Error("RELEASE_RESOURCES_INVALID")
   const seen = new Set<string>()
   for (const item of manifest.files) {
@@ -133,20 +140,44 @@ export async function verifyResourceTree(root: string, expected: string) {
     seen.add(item.path)
     const path = await realpath(join(directory, item.path))
     const local = relative(directory, path)
-    if (local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local) || !(await stat(path)).isFile())
-      throw Error("RELEASE_RESOURCE_ESCAPE")
-    if ((await fileHash(path)) !== item.sha256) throw Error("RELEASE_RESOURCE_HASH_MISMATCH")
+    if (local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local)) throw Error("RELEASE_RESOURCE_ESCAPE")
+    const metadata = await lstat(join(directory, item.path))
+    if (metadata.isSymbolicLink() !== (typeof item.link === "string")) throw Error("RELEASE_RESOURCE_LINK_INVALID")
+    if (metadata.isSymbolicLink() && (await readlink(join(directory, item.path))) !== item.link)
+      throw Error("RELEASE_RESOURCE_LINK_INVALID")
+    if (item.directory === true ? !(await stat(path)).isDirectory() : !(await stat(path)).isFile())
+      throw Error("RELEASE_RESOURCE_TYPE_INVALID")
+    if ((item.directory === true ? hash(item.link) : await fileHash(path)) !== item.sha256)
+      throw Error("RELEASE_RESOURCE_HASH_MISMATCH")
   }
   for (const entry of [manifest.node, manifest.browser]) {
     if (!seen.has(entry)) throw Error("RELEASE_EXECUTABLE_MISSING")
     const bytes = await readFile(join(directory, entry))
-    if (
-      bytes.subarray(0, 4).toString() !== "\x7fELF" ||
-      bytes[4] !== 2 ||
-      bytes.readUInt16LE(18) !== 62 ||
-      !((await stat(join(directory, entry))).mode & 0o111)
-    )
-      throw Error("RELEASE_EXECUTABLE_INVALID")
+    const native =
+      target === "darwin-arm64"
+        ? bytes.length >= 32 && bytes.readUInt32LE(0) === 0xfeedfacf && bytes.readUInt32LE(4) === 0x0100000c
+        : bytes.length >= 20 &&
+          bytes.subarray(0, 4).toString() === "\x7fELF" &&
+          bytes[4] === 2 &&
+          bytes.readUInt16LE(18) === 62
+    if (!native || !((await stat(join(directory, entry))).mode & 0o111)) throw Error("RELEASE_EXECUTABLE_INVALID")
   }
   return { files: seen.size, node: manifest.node, browser: manifest.browser }
+}
+
+// Resolve every link, including framework directory aliases, without following it during traversal.
+export async function verifyContainedLinks(root: string) {
+  const directory = await realpath(root)
+  async function visit(parent: string): Promise<void> {
+    for (const entry of await readdir(parent, { withFileTypes: true })) {
+      const file = join(parent, entry.name)
+      if (entry.isSymbolicLink()) {
+        const local = relative(directory, await realpath(file))
+        if (isAbsolute(await readlink(file)) || local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local))
+          throw Error("RELEASE_RESOURCE_ESCAPE")
+      }
+      if (entry.isDirectory()) await visit(file)
+    }
+  }
+  await visit(directory)
 }

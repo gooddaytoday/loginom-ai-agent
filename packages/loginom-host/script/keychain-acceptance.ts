@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, symlink } from "node:fs/promises"
+import { cp, mkdtemp, mkdir, rename, symlink } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { cliCredentials } from "../src/connection/cli-credentials"
 import { cliKeychain } from "../src/connection/cli-keychain"
@@ -47,6 +47,24 @@ await rejects(
   () => cliCredentials("darwin", { root, resources: join(directory, "missing") }).decode(first),
   "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE",
 )
+const installed = join(directory, "test installation/resources")
+await mkdir(join(installed, "bin"), { recursive: true })
+await cp(join(resources, "bin/loginom-keychain"), join(installed, "bin/loginom-keychain"))
+if (JSON.stringify(await cliCredentials("darwin", { root, resources: installed }).decode(first)) !== JSON.stringify(value))
+  throw Error("KEYCHAIN_INSTALLED_HELPER_FAILED")
+await cp(join(resources, "bin/loginom-keychain"), join(installed, "bin/loginom-keychain.next"))
+await rename(join(installed, "bin/loginom-keychain.next"), join(installed, "bin/loginom-keychain"))
+if (JSON.stringify(await cliCredentials("darwin", { root, resources: installed }).decode(first)) !== JSON.stringify(value))
+  throw Error("KEYCHAIN_REPLACED_HELPER_FAILED")
+// Simulate unavailable protected storage without locking or reconfiguring the
+// user's Keychain. The substitute exits unsuccessfully and cannot read secrets.
+const unavailable = join(directory, "unavailable/resources")
+await mkdir(join(unavailable, "bin"), { recursive: true })
+await cp("/usr/bin/false", join(unavailable, "bin/loginom-keychain"))
+await rejects(
+  () => cliCredentials("darwin", { root, resources: unavailable }).encode(value),
+  "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE",
+)
 await Bun.write(join(root, "test-envelope.json"), JSON.stringify(first), { mode: 0o600 })
 await Bun.write(
   join(directory, "summary.json"),
@@ -65,6 +83,9 @@ await Bun.write(
       "profile-isolation",
       "tamper",
       "missing-helper",
+      "installed-helper-copy",
+      "replacement-with-identical-signed-helper",
+      "unavailable-helper-no-plaintext-fallback",
     ],
   }),
 )

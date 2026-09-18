@@ -33,7 +33,7 @@ test("Linux persists plaintext with private permissions and a staged generation 
 test("rejects generation path traversal and corrupt records without including contents in errors", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-store-"))
   try {
-    const store = connectionStore(directory)
+    const store = connectionStore(directory, credentials("linux"))
     await expect(store.activate(NaN)).rejects.toThrow("LOGINOM_GENERATION_INVALID")
     await writeFile(join(directory, "connection.json"), 'private-content-not-json', { mode: 0o600 })
     await expect(store.read()).rejects.toThrow(/^LOGINOM_STORE_INVALID$/)
@@ -45,6 +45,6 @@ test("does not follow a symlink for the generation directory", async () => {
   const target = await mkdtemp(join(tmpdir(), "loginom-target-"))
   try {
     await symlink(target, join(directory, "generations"))
-    await expect(connectionStore(directory).stage(initial)).rejects.toThrow("LOGINOM_STORE_OWNER_INVALID")
+    await expect(connectionStore(directory, credentials("linux")).stage(initial)).rejects.toThrow("LOGINOM_STORE_OWNER_INVALID")
   } finally { await rm(directory, { recursive: true, force: true }); await rm(target, { recursive: true, force: true }) }
 })

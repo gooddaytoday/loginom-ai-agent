@@ -12,6 +12,15 @@ for (const platform of ["darwin", "win32"] as const) {
     expect(() => credentials(platform).encode(secret)).toThrow("LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE")
     expect(() => credentials(platform).decode(secret)).toThrow("LOGINOM_CREDENTIAL_FORMAT_INVALID")
   })
+  test(`${platform} refuses an unavailable OS storage adapter`, () => {
+    const codec = credentials(platform, {
+      isEncryptionAvailable: () => false,
+      encryptString() { throw Error("UNEXPECTED_ENCRYPT") },
+      decryptString() { throw Error("UNEXPECTED_DECRYPT") },
+    })
+    expect(() => codec.encode(secret)).toThrow("LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE")
+    expect(() => codec.decode({ encrypted: "protected" })).toThrow("LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE")
+  })
   test(`${platform} calls the OS protection adapter`, () => {
     const calls: string[] = []
     const codec = credentials(platform, {
