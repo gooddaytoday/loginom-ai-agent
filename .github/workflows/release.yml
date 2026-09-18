@@ -1,6 +1,6 @@
 name: release
 
-run-name: ${{ github.event_name == 'push' && format('release {0}', github.ref_name) || format('release {0} from {1}', inputs.mode, github.ref_name) }}
+run-name: ${{ github.ref_type == 'tag' && format('release {0}', github.ref_name) || format('release {0} from {1}', inputs.mode || 'candidate', github.ref_name) }}
 
 on:
   push:
@@ -118,6 +118,7 @@ jobs:
 
   verify:
     name: verify
+    # Any push (a tag, or a branch if a push trigger is ever added) and candidate dispatches build; only tags release.
     if: github.event_name == 'push' || inputs.mode == 'candidate'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -137,7 +138,7 @@ jobs:
           set -euo pipefail
           root=$(jq -er .version package.json)
           desktop=$(jq -er .version packages/desktop/package.json)
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             version="${GITHUB_REF_NAME#v}"
             if [ "$version" != "$root" ] || [ "$version" != "$desktop" ]; then
               echo "::error::Tag $GITHUB_REF_NAME does not match package.json ($root) and packages/desktop/package.json ($desktop); commit script/set-version.ts output before tagging"
@@ -314,7 +315,7 @@ jobs:
   release:
     name: release
     needs: [verify, tests, build, linux-matrix]
-    if: always() && github.event_name == 'push' && needs.verify.result == 'success' && needs.tests.result == 'success' && needs.build.result == 'success' && needs.linux-matrix.result == 'success'
+    if: always() && github.event_name == 'push' && github.ref_type == 'tag' && needs.verify.result == 'success' && needs.tests.result == 'success' && needs.build.result == 'success' && needs.linux-matrix.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
