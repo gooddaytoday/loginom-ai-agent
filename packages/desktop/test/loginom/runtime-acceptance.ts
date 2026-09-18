@@ -1,3 +1,4 @@
+import { clickObserved } from "./observed-click"
 import { supervise } from "@loginom-ai-agent/loginom-host/supervisor"
 import { inputStore } from "@loginom-ai-agent/loginom-host/inputs"
 import { createHash, randomUUID } from "node:crypto"
@@ -105,48 +106,7 @@ async function waitNode(child: Child, operation: string) {
   }
   throw Error("NODE_DEADLINE_EXCEEDED")
 }
-async function clickObserved(child: Child, tid: string, operation: string) {
-  const roots = []
-  let observation = await call(child, "dock_workspace_observe", { scope: "all" })
-  for (let page = 0; page < 40; page++) {
-    if (observation.status !== "SUCCEEDED") {
-      observation = await call(child, "dock_workspace_observe", { scope: "all" })
-      continue
-    }
-    const output = observation.output
-    const element = output.ui.elements.find(
-      (item: { tid?: string; allowed_actions?: string[] }) =>
-        item.tid === tid && item.allowed_actions?.includes("click"),
-    )
-    if (element) {
-      const clicked = await call(child, "dock_ui_action", {
-        observation_id: output.observation_id,
-        operation_id: operation,
-        action: { verb: "click", ref: element.ref },
-      })
-      if (clicked.status !== "SUCCEEDED") throw Error("PACKAGE_CLOSE_GESTURE_FAILED")
-      await Bun.sleep(600)
-      return
-    }
-    for (const element of output.ui.elements) {
-      if (output.observation_kind === "roots" && element.tid && tid.startsWith(element.tid + ";"))
-        roots.push({ root_ref: element.ref, observation_id: output.observation_id })
-    }
-    const ancestor = roots.shift()
-    if (ancestor) {
-      observation = await call(child, "dock_workspace_observe", ancestor)
-      continue
-    }
-    if (output.page.next_cursor) {
-      observation = await call(child, "dock_workspace_observe", { cursor: output.page.next_cursor })
-      continue
-    }
-    const root = roots.shift()
-    if (!root) break
-    observation = await call(child, "dock_workspace_observe", root)
-  }
-  throw Error(`PACKAGE_CONTROL_NOT_OBSERVED_${tid}`)
-}
+
 function verify(
   body: {
     output: {
@@ -259,8 +219,14 @@ async function dataset(label: "A" | "B") {
       parameters: { path, conflict_policy: "fail" },
     })
     if (saved.status !== "SUCCEEDED") throw Error("PACKAGE_NOT_SAVED")
-    await clickObserved(child, "MF;cntMain;tlbMainToolbar;btnPackagesMenu", `menu-${label}`)
-    await clickObserved(child, "MF;MainMenuForm;btnClosePackage", `close-${label}`)
+    await clickObserved(
+      (name, args) => call(child, name, args),
+      "MF;cntMain;tlbMainToolbar;btnPackagesMenu",
+      `menu-${label}`,
+    )
+    await Bun.sleep(600)
+    await clickObserved((name, args) => call(child, name, args), "MF;MainMenuForm;btnClosePackage", `close-${label}`)
+    await Bun.sleep(600)
     const closed = await call(child, "dock_workspace_observe", { scope: "roots" })
     if (closed.output.package_identity?.path === path) throw Error("PACKAGE_STILL_OPEN")
     console.log(JSON.stringify({ status: "PASS", phase: "import_group_save", dataset: label, ...values }))

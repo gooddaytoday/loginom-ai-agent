@@ -2893,3 +2893,17 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   missing/extra=0.
 - [ ] Установленный TUI final artifact с видимым Chromium проверяется тем же
   oracle. Активный лог /tmp/loginom-final-tui-oracle.log; итог PASS ещё не заявлен.
+
+### TUI acceptance: безопасное обновление observation в драйвере
+
+- [x] Разобран отказ первого final TUI: A cold readback 55 PASS; B сохранён с 101,
+  но close отклонён до dispatch (`UI_EPOCH_CHANGED`, effect_possible=false).
+  Полный PASS этому прогону не присвоен.
+- [x] Драйвер принимает только доказанный pre-dispatch refusal, обновляет observation,
+  проверяет identity и создаёт новый operation ID; uncertain gesture не повторяется.
+  Четыре focused tests/20 assertions и Desktop typecheck PASS; runtime boundary
+  tests — 2 PASS в каждом из трёх прогонов.
+- [ ] Новый installed headed TUI oracle: `/tmp/loginom-linux-oracle-uwsU99`,
+  лог `/tmp/loginom-final-tui-oracle-retry.log`. Итог ожидается.
+
+[Диагностика и границы исправления](../../testing/loginom-ai-agent/reports/2026-09-18-cli-final-linux/tui-driver-diagnosis.md).
