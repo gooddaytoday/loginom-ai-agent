@@ -55,6 +55,8 @@ jobs:
       - name: Build and verify both products
         env:
           CANDIDATE_VERSION: ${{ inputs.version || format('0.1.4-macos.{0}', github.run_number) }}
+          # Bundling the backend into Electron exceeds Node's default 2 GiB heap on this runner.
+          NODE_OPTIONS: --max-old-space-size=4096
         run: bun packages/desktop/scripts/build-macos.ts --output "$RUNNER_TEMP/candidate" --version "$CANDIDATE_VERSION"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
