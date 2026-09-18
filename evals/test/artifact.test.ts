@@ -1,12 +1,28 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { cp, mkdtemp, utimes } from "node:fs/promises"
+import { cp, mkdtemp, utimes, writeFile } from "node:fs/promises"
 import os from "node:os"
-import { cleanupArtifact, fetchArtifact, parseArtifactSource } from "../src/artifact"
+import { cleanupArtifact, fetchArtifact, findListing, parseArtifactSource, parseFindOutput } from "../src/artifact"
 import { evalsRoot } from "../src/config"
 
 const docker = { container: "c", storageDir: "/s" }
 const storage = parseArtifactSource(`dir:${path.join(evalsRoot, "fixtures", "storage")}`, docker)
+
+test("parseFindOutput: режет строки по табуляции и считает mtimeMs из секунд", () => {
+  expect(parseFindOutput("a.lgp\t1758190000.123\nb.csv\t1758190001\n")).toEqual([
+    { name: "a.lgp", mtimeMs: 1758190000.123 * 1000 },
+    { name: "b.csv", mtimeMs: 1758190001 * 1000 },
+  ])
+  expect(parseFindOutput("")).toEqual([])
+})
+
+test("findListing: Bun.$ передаёт -printf одним аргументом", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-find-"))
+  await writeFile(path.join(dir, "one.lgp"), "a")
+  await writeFile(path.join(dir, "two.csv"), "b")
+  const names = parseFindOutput(await findListing(dir)).map((entry) => entry.name)
+  expect(names.sort()).toEqual(["one.lgp", "two.csv"])
+})
 
 test("fetchArtifact: по квитанции копирует .lgp, распаковывает Unit.xml, собирает файлы результата", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-artifact-"))
@@ -67,6 +83,25 @@ test("fetchArtifact: scan берёт новейший .lgp после старт
   expect(artifact?.ambiguous).toEqual(["older.lgp"])
 })
 
+test("fetchArtifact: файлы результата только с префиксом и точкой", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-storage-"))
+  const lgp = path.join(evalsRoot, "fixtures", "storage", "fixture-group-sum-qty.lgp")
+  await cp(lgp, path.join(dir, "p.lgp"))
+  await writeFile(path.join(dir, "p.result.csv"), "ok")
+  await writeFile(path.join(dir, "p1.result.csv"), "no")
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-artifact-"))
+  const artifact = await fetchArtifact({
+    source: parseArtifactSource(`dir:${dir}`, docker),
+    username: "user",
+    receipts: ["/user/p.lgp"],
+    instructed: "x.lgp",
+    resultPrefix: "p",
+    since: Date.now(),
+    outDir,
+  })
+  expect(artifact?.resultFiles).toEqual(["p.result.csv"])
+})
+
 test("fetchArtifact: ZIP без Unit.xml — артефакта нет", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-artifact-"))
   const artifact = await fetchArtifact({
@@ -83,6 +118,7 @@ test("fetchArtifact: ZIP без Unit.xml — артефакта нет", async (
 
 test("parseArtifactSource: неверное значение — EvalFailure; cleanup для dir ничего не удаляет", async () => {
   expect(() => parseArtifactSource("s3://x", docker)).toThrow("EVAL_ARTIFACT_SOURCE")
+  expect(() => parseArtifactSource("s3://x", docker)).toThrow(expect.objectContaining({ exitCode: 2 }))
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-artifact-"))
   const artifact = await fetchArtifact({
     source: storage,

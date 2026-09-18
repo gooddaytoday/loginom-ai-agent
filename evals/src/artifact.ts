@@ -10,6 +10,27 @@ export function parseArtifactSource(value: string, docker: { container: string; 
 }
 export type ArtifactSource = ReturnType<typeof parseArtifactSource>
 
+export function parseFindOutput(text: string) {
+  return text
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [name = "", seconds = "0"] = line.split("\t")
+      return { name, mtimeMs: Number(seconds) * 1000 }
+    })
+}
+
+function findArgs(dir: string) {
+  const format = "%f\\t%T@\\n"
+  return ["find", dir, "-maxdepth", "1", "-type", "f", "-printf", format]
+}
+
+export async function findListing(dir: string) {
+  const listed = await Bun.$`${findArgs(dir)}`.quiet().nothrow()
+  if (listed.exitCode !== 0) throw new Error(`find: ${listed.stderr.toString().trim()}`)
+  return listed.text()
+}
+
 export async function listStorage(source: ArtifactSource) {
   if (source.kind === "dir") {
     const names = await readdir(source.dir)
@@ -17,19 +38,9 @@ export async function listStorage(source: ArtifactSource) {
       names.map(async (name) => ({ name, mtimeMs: (await stat(path.join(source.dir, name))).mtimeMs })),
     )
   }
-  const listed =
-    await Bun.$`docker exec ${source.container} find ${source.storageDir} -maxdepth 1 -type f -printf '%f\\t%T@\\n'`
-      .quiet()
-      .nothrow()
+  const listed = await Bun.$`docker exec ${source.container} ${findArgs(source.storageDir)}`.quiet().nothrow()
   if (listed.exitCode !== 0) throw new Error(`docker exec find: ${listed.stderr.toString().trim()}`)
-  return listed
-    .text()
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => {
-      const [name = "", mtime = "0"] = line.split("\t")
-      return { name, mtimeMs: Number(mtime) * 1000 }
-    })
+  return parseFindOutput(listed.text())
 }
 
 async function copyOut(source: ArtifactSource, name: string, dest: string) {
@@ -41,7 +52,7 @@ async function copyOut(source: ArtifactSource, name: string, dest: string) {
 export async function unzip(lgp: string, dest: string) {
   await rm(dest, { recursive: true, force: true })
   const result = await Bun.$`unzip -o -q ${lgp} -d ${dest}`.quiet().nothrow()
-  if (result.exitCode !== 0) return false
+  if (result.exitCode !== 0 && result.exitCode !== 1) return false
   const units = await Array.fromAsync(new Bun.Glob("Unit_*/Unit.xml").scan(dest))
   return units.length > 0
 }
@@ -73,7 +84,7 @@ export async function fetchArtifact(input: {
   if (!(await unzip(localLgp, unpackedDir))) return undefined
   const resultFiles = entries
     .map((entry) => entry.name)
-    .filter((name) => name.startsWith(input.resultPrefix) && !name.endsWith(".lgp") && !name.endsWith(".~lgp"))
+    .filter((name) => name.startsWith(`${input.resultPrefix}.`) && !name.endsWith(".lgp") && !name.endsWith(".~lgp"))
   await mkdir(path.join(input.outDir, "results"), { recursive: true })
   for (const name of resultFiles) await copyOut(input.source, name, path.join(input.outDir, "results", name))
   return {
