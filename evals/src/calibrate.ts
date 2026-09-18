@@ -24,7 +24,7 @@ export async function calibrate(config: EvalConfig) {
   }
   const rows: { task: string; kind: "positive" | "negative"; reference: string; score: number | null; failed: string[]; error: string | null }[] = []
   for (const [index, task] of tasks.entries()) {
-    const checklist = task.checklist.filter((item) => !item.requiresResultFile)
+    const checklist = task.checklist.filter((item) => !item.requiresResultFile && !item.requiresRun)
     if (!checklist.length) {
       rows.push({
         task: task.id,
@@ -32,7 +32,7 @@ export async function calibrate(config: EvalConfig) {
         reference: task.id,
         score: null,
         failed: [],
-        error: "чеклист пуст после исключения пунктов requires_result_file — судья не вызывался",
+        error: "чеклист пуст после исключения пунктов requires_result_file/requires_run — судья не вызывался",
       })
       continue
     }
@@ -77,7 +77,7 @@ export async function calibrate(config: EvalConfig) {
   }
   const { positiveMin, negativeMax } = config.calibration
   const warnings = rows.flatMap((row) => {
-    if (row.score === null && row.error === "чеклист пуст после исключения пунктов requires_result_file — судья не вызывался")
+    if (row.score === null && row.error === "чеклист пуст после исключения пунктов requires_result_file/requires_run — судья не вызывался")
       return [`${row.task}/${row.kind}: ${row.error}`]
     if (row.score === null) return [`${row.task}/${row.kind}: судья не дал вердикт (${row.error})`]
     if (row.kind === "positive" && row.score < positiveMin)
