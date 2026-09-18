@@ -30,7 +30,7 @@ await Bun.write(
   out,
   JSON.stringify({
     checklist: checklist.map((item, index) => ({ id: item.id, passed: passed(index), evidence: `fake ${mode}` })),
-    summary: `fake verdict (${mode})`,
+    summary: `fake verdict (${mode})${process.env.FAKE_CODEX_ECHO ?? ""}`,
     confidence: "high",
   }),
 )

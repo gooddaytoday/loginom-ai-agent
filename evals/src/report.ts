@@ -114,7 +114,7 @@ export type RunSummary = {
   config: { repeat: number; timeout_ms: number; judge_timeout_ms: number; pass_threshold: number; keep_storage: boolean }
   metrics: Metrics
   tasks: { id: string; metrics: TaskMetrics; attempts: AttemptResult[] }[]
-  storage_leftovers: string[]
+  storage_leftovers: string[] | null
 }
 
 export async function writeSummary(runDir: string, summary: RunSummary) {
@@ -176,21 +176,24 @@ export function renderReport(summary: RunSummary) {
         return `- ${task.id}#${item.attempt}: ${item.status}${item.failure_kind ? ` (${item.failure_kind})` : ""} — ${names}${stderr ? ` — stderr: ${cell(stderr)}` : ""}`
       }),
   )
-  const leftovers = summary.storage_leftovers.length
-    ? [
-        "",
-        "## Остатки в хранилище",
-        "",
-        ...summary.storage_leftovers.map((name) => `- ${name}`),
-        ...(summary.loginom.container && summary.loginom.storage_dir
-          ? [
-              "",
-              "```bash",
-              `docker exec ${summary.loginom.container} sh -c 'rm -f ${summary.loginom.storage_dir}/eval-${summary.run_id}-*'`,
-              "```",
-            ]
-          : []),
-      ]
-    : []
+  const leftovers =
+    summary.storage_leftovers === null
+      ? ["", "Остатки в хранилище: не удалось получить листинг"]
+      : summary.storage_leftovers.length
+        ? [
+            "",
+            "## Остатки в хранилище",
+            "",
+            ...summary.storage_leftovers.map((name) => `- ${name}`),
+            ...(summary.loginom.container && summary.loginom.storage_dir
+              ? [
+                  "",
+                  "```bash",
+                  `docker exec ${summary.loginom.container} sh -c 'rm -f ${summary.loginom.storage_dir}/eval-${summary.run_id}-*'`,
+                  "```",
+                ]
+              : []),
+          ]
+        : []
   return [...head, "", "## Отказы", "", ...(failures.length ? failures : ["— нет"]), ...leftovers, ""].join("\n")
 }

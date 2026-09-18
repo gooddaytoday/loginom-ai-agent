@@ -21,7 +21,7 @@ export function compare(a: RunSummary, b: RunSummary) {
   ]
   const environment: [string, unknown, unknown][] = [
     ["dock.skill_revision", a.dock.skill_revision, b.dock.skill_revision],
-    ["dock.action_manifest_sha256", a.dock.action_manifest_sha256.join(","), b.dock.action_manifest_sha256.join(",")],
+    ["dock.action_manifest_sha256", [...a.dock.action_manifest_sha256].sort().join(","), [...b.dock.action_manifest_sha256].sort().join(",")],
     ["loginom.image_digest", a.loginom.image_digest, b.loginom.image_digest],
   ]
   const mismatches = identity.filter(([, x, y]) => x !== y)

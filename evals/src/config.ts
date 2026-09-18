@@ -9,26 +9,15 @@ const cliModes = ["source", "binary", "fake"] as const
 type Env = Record<string, string | undefined>
 
 export function loadConfig(argv: string[], env: Env = process.env) {
-  const { values } = parseArgs({
-    args: argv,
-    strict: true,
-    options: {
-      only: { type: "string" },
-      tasks: { type: "string" },
-      label: { type: "string" },
-      repeat: { type: "string" },
-      "timeout-ms": { type: "string" },
-      "skip-judge": { type: "boolean", default: false },
-      "keep-storage": { type: "boolean", default: false },
-      "judge-only": { type: "string" },
-      calibrate: { type: "boolean", default: false },
-      "reset-profile": { type: "boolean", default: false },
-      "dry-run": { type: "boolean", default: false },
-    },
-  })
+  const values = parseEvalArgs(argv)
   const dryRun = values["dry-run"]
   const judgeOnly = values["judge-only"]
   const calibrate = values.calibrate
+  if (judgeOnly !== undefined && values["skip-judge"]) throw new EvalFailure("Несовместимые флаги: --judge-only и --skip-judge", 2)
+  if (judgeOnly !== undefined && dryRun) throw new EvalFailure("Несовместимые флаги: --judge-only и --dry-run", 2)
+  if (calibrate && values["skip-judge"]) throw new EvalFailure("Несовместимые флаги: --calibrate и --skip-judge", 2)
+  if (calibrate && dryRun) throw new EvalFailure("Несовместимые флаги: --calibrate и --dry-run", 2)
+  if (judgeOnly !== undefined && calibrate) throw new EvalFailure("Несовместимые флаги: --judge-only и --calibrate", 2)
   // Режимы без агента не требуют Loginom/Dock/модели агента.
   const agentless = dryRun || judgeOnly !== undefined || calibrate
   const needsJudge = !dryRun && !values["skip-judge"]
@@ -111,3 +100,27 @@ export function loadConfig(argv: string[], env: Env = process.env) {
 }
 
 export type EvalConfig = ReturnType<typeof loadConfig>
+
+function parseEvalArgs(argv: string[]) {
+  try {
+    return parseArgs({
+      args: argv,
+      strict: true,
+      options: {
+        only: { type: "string" },
+        tasks: { type: "string" },
+        label: { type: "string" },
+        repeat: { type: "string" },
+        "timeout-ms": { type: "string" },
+        "skip-judge": { type: "boolean", default: false },
+        "keep-storage": { type: "boolean", default: false },
+        "judge-only": { type: "string" },
+        calibrate: { type: "boolean", default: false },
+        "reset-profile": { type: "boolean", default: false },
+        "dry-run": { type: "boolean", default: false },
+      },
+    }).values
+  } catch (error) {
+    throw new EvalFailure(`Неверные аргументы: ${error instanceof Error ? error.message : String(error)}`, 2)
+  }
+}
