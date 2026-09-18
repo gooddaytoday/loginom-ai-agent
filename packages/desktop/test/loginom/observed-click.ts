@@ -23,6 +23,8 @@ type Reply = {
 
 // Acceptance helper: a pre-dispatch refusal permits a fresh observation, never
 // replay of an uncertain gesture. The exact package/workflow/document must survive.
+// dock_ui_action exists only in the diagnostic profile; the managed user-v1 runtime
+// does not publish it, so runtime-acceptance.ts closes packages via shutdown cleanup.
 export async function clickObserved(
   call: (name: string, args: Record<string, unknown>) => Promise<Reply>,
   tid: string,

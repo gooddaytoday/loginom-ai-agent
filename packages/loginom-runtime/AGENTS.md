@@ -23,6 +23,8 @@
 
 - `dock_node_read` builds a `read_existing_output` request from a completed local node receipt (`source_operation_id` with confirmed cleanup and verified output schemas); it never accepts caller-provided formulas or node identities, cannot create nodes, configure ports or export files, and always executes freshly and compares table schemas.
 
+- The managed `start` input accepts an acceptance-only `acceptanceCleanupPackage` (exact absolute `.lgp` path, validated in `src/start-input.mjs` like `client/lib/config.mjs`). The bridge then closes that saved package and logs out during its own shutdown, bound to the account observed at workspace preparation, and writes `package-cleanup.json` into the attempt directory. Product code never sets it; the managed profile keeps `replayBootstrap: false` and `replayLoginUser: null`.
+
 - After a successful `package.save_checkpoint`/`package.save_as`, the bridge reads the saved package dirty state and appends `dock_saved_package_state` advice. A failed read keeps the save receipt valid but must not be reported as confirmed cleanup.
 
 - Resource manifests may describe internal directory symlinks with link text and directory:true, hashing the link text. Verify the actual symlink, canonical containment and directory type; target files remain individually hashed. Legacy files-only manifests remain supported.

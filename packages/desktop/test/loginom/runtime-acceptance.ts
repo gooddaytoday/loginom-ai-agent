@@ -1,9 +1,8 @@
-import { clickObserved } from "./observed-click"
 import { supervise } from "@loginom-ai-agent/loginom-host/supervisor"
 import { inputStore } from "@loginom-ai-agent/loginom-host/inputs"
 import { createHash, randomUUID } from "node:crypto"
 import { createRequire } from "node:module"
-import { mkdtemp } from "node:fs/promises"
+import { mkdtemp, readdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import fixtures from "./fixtures/standalone-cli/manifest.json"
@@ -29,9 +28,16 @@ const policy = {
   read: { ports: [0], sample_rows: 10, require_exact_numbers: true, coverage: "sample" },
   budgets: { configure_ms: 120000, execute_ms: 60000, total_ms: 180000 },
 }
+// The user-v1 profile publishes no UI gesture tool, so the package is closed by the
+// runtime's own shutdown cleanup. Only the direct runtime transport can request it.
+const transport = process.env.LOGINOM_AI_AGENT_TEST_DESKTOP_EXECUTABLE
+  ? "desktop"
+  : process.env.LOGINOM_AI_AGENT_TEST_CLI_EXECUTABLE
+    ? "cli"
+    : "runtime"
 console.log(`Private acceptance evidence: ${directory}`)
 
-async function launch(chat: string, csv: string): Promise<Child> {
+async function launch(chat: string, csv: string, cleanupPackage: string): Promise<Child> {
   if (process.env.LOGINOM_AI_AGENT_TEST_DESKTOP_EXECUTABLE) {
     const { desktopOracleTransport } = await import("../../../loginom-host/script/desktop-oracle-transport")
     return desktopOracleTransport({
@@ -82,19 +88,78 @@ async function launch(chat: string, csv: string): Promise<Child> {
     endpoint: manifest.endpoint,
     actionManifestUri: manifest.actionManifestUri,
     actionManifestSha256: manifest.actionManifestSha256,
+    acceptanceCleanupPackage: cleanupPackage,
   })
 }
-async function call(child: Child, name: string, args: Record<string, unknown>) {
+type ToolResult = { isError?: boolean; structuredContent?: unknown; content: { type: string; text?: string }[] }
+async function invoke(child: Child, name: string, args: Record<string, unknown>) {
   const envelope = await child.request("call", { name, arguments: args })
   if (!envelope || typeof envelope !== "object" || !("result" in envelope)) throw Error("REPLY_INVALID")
-  const result = CallToolResultSchema.parse(envelope.result)
+  const result: ToolResult = CallToolResultSchema.parse(envelope.result)
   const text = JSON.stringify(result)
   if (text.includes(config.api_key)) throw Error("SECRET_IN_TOOL_RESULT")
   await Bun.write(join(directory, `${++receipts.sequence}-${name}.json`), text)
-  const body =
-    result.structuredContent ?? JSON.parse(result.content.find((item: { type: string }) => item.type === "text").text)
+  const body = result.structuredContent ?? JSON.parse(result.content.find((item) => item.type === "text")!.text!)
   if (result.isError) throw Error(`TOOL_FAILED_${name}`)
-  return body
+  return { result, body }
+}
+async function call(child: Child, name: string, args: Record<string, unknown>) {
+  return (await invoke(child, name, args)).body
+}
+// The bridge appends a read-only dirty-state advice block after a confirmed save.
+// Desktop/CLI oracle transports forward only the first block, so it may be absent.
+function savedPackageState(result: ToolResult, path: string) {
+  return result.content
+    .filter((block) => block.type === "text" && block.text)
+    .map((block) => JSON.parse(block.text!))
+    .find((value) => value?.kind === "dock_saved_package_state" && value.package_path === path)
+}
+async function save(child: Child, label: string, path: string) {
+  // RC9 user route: checkpoint the open scenario; save_as would reopen the package.
+  const saved = await invoke(child, "dock_action_run", {
+    action_key: "package.save_checkpoint",
+    operation_id: `save-${label}`,
+    parameters: { path, conflict_policy: "fail" },
+  })
+  if (
+    saved.body.status !== "SUCCEEDED" ||
+    saved.body.output?.package_ref?.path !== path ||
+    saved.body.output.save_completed !== true ||
+    saved.body.output.workflow_preserved !== true
+  )
+    throw Error("PACKAGE_NOT_SAVED")
+  const state = savedPackageState(saved.result, path)
+  if (state?.modified !== true) return `save-${label}`
+  // Follow the runtime's own next_step with a new ID; never discard or repeat save_as.
+  const next = state.next_step
+  if (next?.tool !== "dock_action_run" || next.arguments?.action_key !== "package.save_checkpoint")
+    throw Error("PACKAGE_DIRTY_NEXT_STEP_UNEXPECTED")
+  const checkpoint = await invoke(child, "dock_action_run", { ...next.arguments, operation_id: `checkpoint-${label}` })
+  if (checkpoint.body.status !== "SUCCEEDED" || checkpoint.body.output?.package_ref?.path !== path)
+    throw Error("PACKAGE_CHECKPOINT_FAILED")
+  if (savedPackageState(checkpoint.result, path)?.modified !== false) throw Error("PACKAGE_DIRTY_STATE_UNVERIFIED")
+  return `checkpoint-${label}`
+}
+// Shutdown cleanup runs inside the managed runtime after its last tool call. Its bound
+// receipt is the only evidence that this session closed the package and logged out.
+async function packageCleanup(chat: string, path: string, saveOperation: string) {
+  if (transport !== "runtime") return { status: "UNVERIFIED", reason: `${transport}_transport_has_no_cleanup_route` }
+  const attempts = join(directory, "generations/1/chats", chat, "attempts")
+  const names = await readdir(attempts)
+  if (names.length !== 1) throw Error("ATTEMPT_DIRECTORY_AMBIGUOUS")
+  const file = Bun.file(join(attempts, names[0], "package-cleanup.json"))
+  if (!(await file.exists())) throw Error("PACKAGE_CLEANUP_RECEIPT_MISSING")
+  const receipt = await file.json()
+  if (
+    receipt.status !== "SUCCEEDED" ||
+    receipt.package_closed !== true ||
+    receipt.logged_out !== true ||
+    receipt.unsaved_changes_discarded !== false ||
+    receipt.package_path !== path ||
+    receipt.save_operation_id !== saveOperation
+  )
+    throw Error(`PACKAGE_NOT_CLOSED_${receipt.status ?? "UNKNOWN"}_${receipt.reason ?? ""}`)
+  return receipt
 }
 async function waitNode(child: Child, operation: string) {
   const deadline = Date.now() + 240_000
@@ -138,8 +203,9 @@ async function dataset(label: "A" | "B") {
   if (inputSha256 !== fixtures[label].sha256) throw Error(`FIXTURE_HASH_MISMATCH_${label}`)
   const expected = fixtures[label].expected
   const chat = `${run}-${label}`
-  const child = await launch(chat, csv)
-  try {
+  const path = `/${config.workflow_profile.loginom_user}/loginom-ai-agent-acceptance-${chat}.lgp`
+  const child = await launch(chat, csv, path)
+  const outcome = await (async () => {
     const bytes = Buffer.from(csv)
     const files = await inputStore(join(directory, "inputs")).admit(
       chat,
@@ -212,28 +278,20 @@ async function dataset(label: "A" | "B") {
     })
     const grouped = await waitNode(child, `group-${label}`)
     const values = verify(grouped, expected)
-    const path = `/${config.workflow_profile.loginom_user}/loginom-ai-agent-acceptance-${chat}.lgp`
-    const saved = await call(child, "dock_action_run", {
-      action_key: "package.save_as",
-      operation_id: `save-${label}`,
-      parameters: { path, conflict_policy: "fail" },
-    })
-    if (saved.status !== "SUCCEEDED") throw Error("PACKAGE_NOT_SAVED")
-    await clickObserved(
-      (name, args) => call(child, name, args),
-      "MF;cntMain;tlbMainToolbar;btnPackagesMenu",
-      `menu-${label}`,
-    )
-    await Bun.sleep(600)
-    await clickObserved((name, args) => call(child, name, args), "MF;MainMenuForm;btnClosePackage", `close-${label}`)
-    await Bun.sleep(600)
-    const closed = await call(child, "dock_workspace_observe", { scope: "roots" })
-    if (closed.output.package_identity?.path === path) throw Error("PACKAGE_STILL_OPEN")
-    console.log(JSON.stringify({ status: "PASS", phase: "import_group_save", dataset: label, ...values }))
-    return { label, path, node: grouped.node.node_id, expected, source: artifact.upload.destination, inputSha256 }
-  } finally {
-    await child.close()
-  }
+    const saveOperation = await save(child, label, path)
+    return { values, saveOperation, node: grouped.node.node_id, source: artifact.upload.destination }
+  })().finally(() => child.close())
+  const cleanup = await packageCleanup(chat, path, outcome.saveOperation)
+  console.log(
+    JSON.stringify({
+      status: "PASS",
+      phase: "import_group_save_close",
+      dataset: label,
+      ...outcome.values,
+      package_close: cleanup.status,
+    }),
+  )
+  return { label, path, node: outcome.node, expected, source: outcome.source, inputSha256, packageClose: cleanup }
 }
 async function reopen(saved: Awaited<ReturnType<typeof dataset>>) {
   const path = join(directory, `saved-${saved.label}.json`)

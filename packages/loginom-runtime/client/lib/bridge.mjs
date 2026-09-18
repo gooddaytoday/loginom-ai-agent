@@ -446,7 +446,9 @@ export async function createBridge(config, session, { browserTransport: managedB
                 actionRuntime.assertPreparationAllowed();
                 const cleanupOptions = {
                   sessionId:session.metadata.sessionId, documentId:prepared.state.document_id,
-                  tabTid:prepared.state.workflow_ref.tab_tid, account:config.replayLoginUser,
+                  // Managed runtimes have no replay login account; the cleanup
+                  // binds to the account observed at workspace preparation.
+                  tabTid:prepared.state.workflow_ref.tab_tid, account:prepared.state.loginom_account??config.replayLoginUser,
                   packagePath:config.acceptanceCleanupPackage, loginomUrl:config.loginomUrl,
                   loginomBuild:session.metadata.targetIdentity.loginom_build,
                 };

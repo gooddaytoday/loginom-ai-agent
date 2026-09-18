@@ -1,8 +1,9 @@
 import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
-import { isAbsolute, join } from "node:path"
+import { join } from "node:path"
 import { mkdir, readFile } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
+import { validateStartInput } from "./start-input.mjs"
 import { loginBrowser, checkConnection } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts } from "../client/lib/artifacts.mjs"
@@ -66,15 +67,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      if (
-        input.protocol !== 1 ||
-        !Number.isSafeInteger(input.generation) ||
-        input.generation < 1 ||
-        typeof input.chat !== "string" ||
-        !/^[a-zA-Z0-9_-]{1,160}$/.test(input.chat) ||
-        !isAbsolute(input.stateDir)
-      )
-        throw Error("LOGINOM_START_INVALID")
+      const { acceptanceCleanupPackage } = validateStartInput(input)
       const resources = await verifyResources(input.resources)
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(
@@ -113,6 +106,9 @@ async function handle(message) {
         actionManifestSha256: input.actionManifestSha256,
         replayBootstrap: false,
         replayLoginUser: null,
+        // Acceptance-only shutdown cleanup; the bridge binds it to the observed
+        // prepared account, so no replay login account is needed here.
+        acceptanceCleanupPackage,
         storageDirectories: {
           inputs: `/${input.connection.username}`,
           exports: `/${input.connection.username}`,
