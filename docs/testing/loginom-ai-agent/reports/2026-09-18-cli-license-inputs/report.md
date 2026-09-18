@@ -364,3 +364,30 @@ credential environment variables were absent (values were not inspected or print
 This does not exclude a nondefault user profile, whose path is still requested.
 Desktop auth was not read or copied. Available execution remains Linux x86_64;
 native Windows/macOS and real-provider evidence still cannot be claimed.
+
+## Remaining declared-license text supplements — 2026-09-18
+
+Verified registry gitHead trees for @npmcli/agent 4.0.2, opencode-poe-auth 0.0.1,
+and opentui-spinner 0.0.7. They do not contain their own root license file;
+agent's only license file belongs to a test fixture and was not misattributed.
+Downloaded each published tarball, verified registry SHA512 integrity, and compared
+package.json/README bytes with all installed copies (1, 4, and 1 respectively).
+
+Added the exact published metadata and README followed by the unmodified standard
+ISC/MIT text from SPDX commit 31ba1a50e5397e00a304dbadc76531740e89ee48. Package
+license declarations are preserved, as are standard-text placeholders. No author,
+year, or missing copyright notice was invented. sources.json pins URLs, gitHead,
+tarball integrity, individual hashes, transformation and attributionReview.
+These are declared-license supplements, not upstream-authored package LICENSEs.
+
+Collection against the clean 1657a6c07 build graph: 467 package records,
+468 notice files plus 464 README files; all 932 output hashes verified,
+missing-text list empty. Collector regression: 1 passed / 12 assertions;
+package bun typecheck PASS. Inventory status remains incomplete: this closes
+standard-text collection, not missing attribution review, nested/native auditing,
+AGPL corresponding-source or LGPL relinking/distribution obligations.
+
+An initial ad-hoc hash verifier passed ArrayBuffer to createHash.update and failed;
+it was corrected to Uint8Array and all 932 checks passed. No product code changed.
+The installed 0.1.4-cli.20260918review artifact predates these supplements; a new
+full archive is required before claiming their inclusion in a distribution.

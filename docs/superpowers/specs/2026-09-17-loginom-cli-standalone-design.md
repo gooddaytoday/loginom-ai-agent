@@ -2835,3 +2835,16 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   сверка Linux IND-01…14; Windows/macOS по-прежнему вне текущей цели.
 
 Результаты и границы проверки: [real-provider report](../../testing/loginom-ai-agent/reports/2026-09-18-cli-real-provider/report.md).
+
+### Linux notices: оставшиеся три standard-text supplement — 2026-09-18
+
+- [x] Для npmcli/agent, poe-auth и opentui-spinner сверены registry tarball integrity
+  и опубликованные metadata/README со всеми установленными копиями. В точных
+  gitHead деревьях собственные LICENSE не найдены; чужая fixture license не взята.
+- [x] Добавлены неизменённые SPDX ISC/MIT тексты с metadata/README, hashes и явным
+  attributionReview. Авторство/год не выдумывались; placeholders сохранены.
+- [x] На фактическом build graph: 467 package records, 468 notices + 464 README,
+  все 932 hashes PASS; missing-text list пуст. Collector test 1/12 и host typecheck PASS.
+- [ ] Новый полный архив с этими supplements и установленная сверка inventory.
+  Юридическая полнота attribution/nested/native/source/relinking всё ещё не доказана;
+  пустой missing-text list не означает release compliance PASS.

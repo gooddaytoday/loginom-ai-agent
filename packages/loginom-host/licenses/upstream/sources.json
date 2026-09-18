@@ -157,6 +157,21 @@
     "registry": "https://registry.npmjs.org/@ff-labs%2ffff-bun/0.9.4",
     "gitHead": "7d7910b6ba78ea8406671eaac8cdb5eb9850d9d1"
   },
+  "@npmcli/agent@4.0.2": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/ISC.txt",
+    "sha256": "5dfcdf1e8bf5b493cc7adda76c95ba703e646f3e636a2c1e57844f20452d4282",
+    "file": "5dfcdf1e8bf5b493cc7adda76c95ba703e646f3e636a2c1e57844f20452d4282.txt",
+    "registry": "https://registry.npmjs.org/@npmcli%2fagent/4.0.2",
+    "gitHead": "db7852869c74ceb8985d7c36b291a2e7a866741c",
+    "tarball": "https://registry.npmjs.org/@npmcli/agent/-/agent-4.0.2.tgz",
+    "tarballIntegrity": "sha512-EUEuWAxnL07Sp5/iC/1X6Xj+XThUvnbei9zfRWZdEXa7lss9RTHMhAHBeg+MZ5To9s/gGaSI+UwZTPdYMvKSeg==",
+    "packageMetadataSha256": "3612c09c2741e44541faddecee97c4618794909ecf0e3555e56ebabf38a379a8",
+    "readmeSha256": "838746c5f90e2560312ec35c4a83928027d94fe5bcdf8a80451eb9d73ed95ebe",
+    "standardTextSha256": "521c6f0ed8e64736684f89843d16a4df6b4b7449acbcfc6ca6630a3037ca8c53",
+    "standardSourceCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+    "transformation": "Integrity-verified published package.json and README, byte-identical to installed dependencies, concatenated with unmodified SPDX text matching declared license. Standard placeholders retained; no missing copyright attribution inferred.",
+    "attributionReview": "Package-specific license/copyright statement not available; standard-text collection is not legal clearance."
+  },
   "@sigstore/verify@3.1.1": {
     "url": "https://raw.githubusercontent.com/sigstore/sigstore-js/c1dc7d4778a450787fc72b083f2490ad02b714c6/LICENSE",
     "sha256": "364a130d2ca340bd56eb1e6d045fc6929bb0f9d0aa018f2c1949b29517e1cdd0",
@@ -184,6 +199,36 @@
     "attestation": "https://registry.npmjs.org/-/npm/v1/attestations/drizzle-orm@1.0.0-rc.2",
     "tarballSha512": "51760391ba65179c17d21c31965fbcd10844c14bc024b06efad00afdde1f9dad7c90b13a56e962033b9f17f89e0c42097929cb45882d9ac5c3eb1d57bb2d6422",
     "verification": "Registry integrity and downloaded tarball match attested subject; provenance signature not independently verified"
+  },
+  "opencode-poe-auth@0.0.1": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+    "sha256": "c44e3667c34c0b7d88aa273d2e86279c0e35afe8b81032901347a1a7fb4285bc",
+    "file": "c44e3667c34c0b7d88aa273d2e86279c0e35afe8b81032901347a1a7fb4285bc.txt",
+    "registry": "https://registry.npmjs.org/opencode-poe-auth/0.0.1",
+    "gitHead": "6f2a7e9c43f7a75e3f1130b821f738083da0f685",
+    "tarball": "https://registry.npmjs.org/opencode-poe-auth/-/opencode-poe-auth-0.0.1.tgz",
+    "tarballIntegrity": "sha512-cXqTlS6AXHzo1oBdosnxbT47ZJEZ9WXn050X8Re6wZ1vaNnTpB/l2fMQt90evT7RBK0fB8UjXQUDMKyd7bbiqg==",
+    "packageMetadataSha256": "757bf77f3e18a47f847808b88dd60c2d477d81e37e7d6650bacc920a5fee9fbd",
+    "readmeSha256": "3dbf188e437381868216beaea55b6a2a9dc6a0266b16d96cdaadfdbf4e25b062",
+    "standardTextSha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+    "standardSourceCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+    "transformation": "Integrity-verified published package.json and README, byte-identical to installed dependencies, concatenated with unmodified SPDX text matching declared license. Standard placeholders retained; no missing copyright attribution inferred.",
+    "attributionReview": "Package-specific license/copyright statement not available; standard-text collection is not legal clearance."
+  },
+  "opentui-spinner@0.0.7": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+    "sha256": "9bf1f9bc9bc66229335e1b7af60deaaf51c2b07281448d5fdbbf1cd4363bdfd8",
+    "file": "9bf1f9bc9bc66229335e1b7af60deaaf51c2b07281448d5fdbbf1cd4363bdfd8.txt",
+    "registry": "https://registry.npmjs.org/opentui-spinner/0.0.7",
+    "gitHead": "7cd88909048a6ca435d468e77ae12ec0e21fa88c",
+    "tarball": "https://registry.npmjs.org/opentui-spinner/-/opentui-spinner-0.0.7.tgz",
+    "tarballIntegrity": "sha512-nPzwAvJG+y9rVEwwHLHqbsMzLnIk2zw+F9LqwA7aYJvpM5gsrKC2rrGi36A+tZpA+1RnWxXeWEgVZMchnaH18Q==",
+    "packageMetadataSha256": "aee6569494c9944ebc2a70b7244ad685564910a36d8f575309384f5035039333",
+    "readmeSha256": "99b1d72bd7a298c02f939c56c9d73c8037d74519edb44635ad4618438e53f604",
+    "standardTextSha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+    "standardSourceCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+    "transformation": "Integrity-verified published package.json and README, byte-identical to installed dependencies, concatenated with unmodified SPDX text matching declared license. Standard placeholders retained; no missing copyright attribution inferred.",
+    "attributionReview": "Package-specific license/copyright statement not available; standard-text collection is not legal clearance."
   },
   "remeda@2.26.0": {
     "url": "https://raw.githubusercontent.com/remeda/remeda/0fde627fc4ca8a19ab93f000fe931f22d4472338/LICENSE",

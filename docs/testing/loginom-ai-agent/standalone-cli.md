@@ -1,5 +1,18 @@
 # Самостоятельный CLI: checkpoint и приёмка
 
+## Linux-only продолжение и real provider — 2026-09-18
+
+Текущий объём пользователя исключает Windows/macOS. Новый чистый Linux artifact
+`0.1.4-cli.20260918review` из `1657a6c07` установлен отдельно от Desktop.
+Xiaomi MiMo успешно вызвал Dock, доставил CSV и настроил импорт. Пользователь
+явно принял этот smoke как достаточную проверку реального provider; полный
+сценарий этой моделью не завершён, старые scripted 55/101 oracle не подменяются.
+[Артефакт, результат и ограничения](reports/2026-09-18-cli-real-provider/report.md).
+
+В исходниках добавлены последние три declared-license supplements: actual graph
+inventory больше не имеет missing-text entries, но status остаётся incomplete
+для attribution/nested/native/source/relinking audit. Новый архив ещё требуется.
+
 ## Исправления ревью a7d812e4a — source-only, 2026-09-18
 
 - Dock business failures без MCP `isError` дают ошибку tool/код 1; успешное
