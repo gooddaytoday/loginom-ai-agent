@@ -140,3 +140,30 @@ The CLI test installation was removed with its own uninstall script; 35205
 files in the three evidence/profile roots were preserved byte-for-byte.
 [Cleanup](post-oracle-cleanup.json). Archives and unpacked test artifacts remain
 in /tmp; the user's Desktop installation was not modified.
+
+## Two chats in one native TUI and file access audit
+
+Final acceptance `/tmp/loginom-tui-multichat-yhWkiU` used one headless TUI process
+and one private profile from the final native payload. The actual TUI attached
+sales.csv in the first chat, then /new created another chat and attached changed
+bytes under the same filename. Real Dock prepare/deliver verified each SHA256;
+runtime session IDs, artifact IDs and remote paths differ. SQLite contains exactly
+two chats with two completed tools each. Exit 0, forced=false, guard=false.
+[Summary and hashes](tui-multichat-summary.json). This is attachment/delivery
+isolation, not another full grouping/save oracle or a parallel chat scheduling test.
+Permissions were explicitly skipped by this manual fixture as in the existing
+oracle; separate permission evidence is not replaced by this check.
+
+Two earlier attempts remain in `/tmp/loginom-tui-multichat-cNf1ca` and
+`/tmp/loginom-tui-multichat-5RhSm0`. Both completed first-chat prepare/delivery but
+failed to advance to another chat and were cancelled; neither is a PASS.
+Investigation identified a possible scripted-provider finish/next-action race,
+then terminal tracing showed /new still in its menu after a combined text+Enter
+write. The driver now awaits provider onFinish and sends Enter only after a
+separate /new write and observed New session menu. The final two-chat transcript
+verifies the transition; no old delivery was replayed. Host typecheck PASS.
+
+All three attempts were traced over their setup/TUI/prepare/delivery/new-chat/exit
+paths: 2434 files, 1362347 syscall lines, zero references to the four checked
+Desktop global roots. This is a concrete end-to-end TUI path audit, not proof for
+all imaginable commands or timing. Raw traces and terminal text remain private.

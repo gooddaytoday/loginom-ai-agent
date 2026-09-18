@@ -39,6 +39,10 @@ always_selected_at = None
 always_confirmed = False
 selected_at = None
 finishing = None
+next_chat = False
+next_chat_at = None
+new_command_at = None
+submitted_chats = 0
 exit_step = 0
 screen = bytearray()
 forced = False
@@ -49,6 +53,8 @@ try:
             command = sys.stdin.readline()
             if command.strip() == "finish":
                 finishing = time.monotonic()
+            elif command.strip() == "next-chat":
+                next_chat = True
             elif command.strip() == "reject-next":
                 reject_next = True
                 screen.clear()
@@ -67,9 +73,8 @@ try:
             sys.stdout.buffer.write(chunk)
             sys.stdout.buffer.flush()
             screen.extend(chunk)
-            if resume.get("permission"):
-                with open(pathlib.Path(evidence, "terminal-progress.txt"), "ab") as trace:
-                    trace.write(chunk)
+            with open(pathlib.Path(evidence, "terminal-progress.txt"), "ab") as trace:
+                trace.write(chunk)
             if b"\x1b[6n" in chunk:
                 os.write(master, b"\x1b[1;1R")
             if b"\x1b[c" in chunk:
@@ -96,6 +101,20 @@ try:
             always_pending = False
             always_confirmed = True
             permission_approved = True
+        if next_chat and next_chat_at is None and b"CLI oracle completed" in screen:
+            next_chat_at = time.monotonic()
+        if next_chat_at is not None and time.monotonic() - next_chat_at > 0.5:
+            next_chat_at = None
+            os.write(master, b"/new")
+            screen.clear()
+            selected = -1
+            next_chat = False
+            new_command_at = time.monotonic()
+        if new_command_at is not None and time.monotonic() - new_command_at > 0.5 and b"New session" in screen:
+            screen.clear()
+            os.write(master, b"\r")
+            selected = 0
+            new_command_at = None
         if selected == 0 and resume and b"CLI oracle completed" in screen:
             os.write(master, (resume["prompt"] + "\r").encode())
             selected = 3
@@ -110,6 +129,7 @@ try:
         elif selected == 2 and time.monotonic() - selected_at > 2:
             os.write(master, b" Import the attached sales.csv, aggregate its numeric values, save the package, and close it.\r")
             selected = 3
+            submitted_chats += 1
         if finishing is not None and time.monotonic() - finishing > 3 and exit_step == 0:
             os.write(master, b"\x1b")
             exit_step = 1
@@ -129,6 +149,6 @@ finally:
         child.wait()
     os.close(master)
     pathlib.Path(evidence, "tui-exit.json").write_text(json.dumps({
-        "code": child.returncode, "forced": forced, "input_submitted": selected == 3, "permission_rejected": permission_rejected, "permission_approved": permission_approved, "always_confirmed": always_confirmed,
+        "code": child.returncode, "forced": forced, "submitted_chats": submitted_chats, "input_submitted": selected == 3, "permission_rejected": permission_rejected, "permission_approved": permission_approved, "always_confirmed": always_confirmed,
     }))
 sys.exit(child.returncode if child.returncode is not None and child.returncode >= 0 and not forced else 1)

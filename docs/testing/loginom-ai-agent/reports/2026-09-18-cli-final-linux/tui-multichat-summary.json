@@ -1,0 +1,32 @@
+{
+  "status": "PASS",
+  "oneTuiProcess": true,
+  "chats": [
+    {
+      "session": "fd9b47c0-ee10-4717-9e73-46bcb05cca1d",
+      "artifact": "b1367da0-5d8d-4a69-bc6b-0534e634fa42",
+      "source": "/user/8c4444b42af0e0c0003e8fd222261cbe529a9165ee7eb360ebe70db1ca22a5b6-0-sales.csv",
+      "sha256": "9a9e878ada65f540a453c9625ec70755a11c7e8ca44300968d7646b7c2d6f463"
+    },
+    {
+      "session": "07456c4f-5f99-4865-b4cb-ad79fa28e893",
+      "artifact": "1b45ee61-e9b5-4ca3-a18b-876bbc4aacf0",
+      "source": "/user/8a2872ce3de278770314ef0060199fe199f753d824aa2b57f7fca546dc6608b1-0-sales.csv",
+      "sha256": "53992915788c2ce43b2dcc1889bf2fd5247d18b7044a1d3545c6108a3d5088f6"
+    }
+  ],
+  "code": 0,
+  "guarded": false,
+  "forced": false,
+  "fileAudit": {
+    "attempts": 3,
+    "traceFiles": 2434,
+    "syscallLines": 1362347,
+    "desktopReferences": {
+      "/home/kiselev/.config/com.loginom.aiagent": 0,
+      "/home/kiselev/.config/loginom-ai-agent": 0,
+      "/home/kiselev/.local/share/loginom-ai-agent": 0,
+      "/home/kiselev/.local/state/loginom-ai-agent": 0
+    }
+  }
+}

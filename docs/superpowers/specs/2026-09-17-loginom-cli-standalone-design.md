@@ -2951,3 +2951,17 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
 - [x] Actual-build fixture test: 1 PASS/16 assertions; host typecheck PASS.
 - [ ] Новый полный архив ещё не собран; attribution/native/source/relinking audit
   не объявляется завершённым. Старый final artifact сохранён без изменений.
+
+### Два чата в одном TUI и файловая изоляция — PASS
+
+- [x] Один native TUI/profile: первый sales.csv → /new → другой sales.csv.
+  Реальные prepare/deliver подтвердили исходные hashes; runtime session IDs,
+  artifact IDs и remote paths различаются. SQLite: 2 чата, по 2 completed tools.
+- [x] Exit 0, forced=false, guard=false. Предыдущие два неудачных перехода /new
+  сохранены отдельно; повторной доставки старых операций не было.
+- [x] Драйвер ждёт onFinish и наблюдаемое меню New session перед отдельным Enter;
+  host typecheck PASS. Новая проверка не подменяет permission acceptance.
+- [x] File trace всех трёх попыток: 1362347 syscall lines, 0 references к четырём
+  Desktop global roots. Проверен полный путь данного сценария, не все команды.
+
+[Результат и диагностика драйвера](../../testing/loginom-ai-agent/reports/2026-09-18-cli-final-linux/report.md).
