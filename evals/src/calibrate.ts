@@ -5,7 +5,7 @@ import { loadTasks, rubricHash } from "./task"
 import { parseArtifactSource, unzip } from "./artifact"
 import { preflight } from "./preflight"
 import { judgeInfo, judgeTask, type JudgeSettings } from "./judge"
-import { redact, stamp } from "./run"
+import { describe, redact, stamp } from "./run"
 
 export async function calibrate(config: EvalConfig) {
   const tasks = await loadTasks(config.tasksDir, config.only)
@@ -32,7 +32,7 @@ export async function calibrate(config: EvalConfig) {
         reference: task.id,
         score: null,
         failed: [],
-        error: "checklist пуст",
+        error: "чеклист пуст после исключения пунктов requires_result_file — судья не вызывался",
       })
       continue
     }
@@ -44,8 +44,26 @@ export async function calibrate(config: EvalConfig) {
       const artifactDir = path.join(attemptDir, "artifact")
       await mkdir(path.join(artifactDir, "results"), { recursive: true })
       await cp(path.join(reference.dir, reference.reference), path.join(artifactDir, "package.lgp"))
-      await unzip(path.join(artifactDir, "package.lgp"), path.join(artifactDir, "unpacked"))
-      const judged = await judgeTask({ task, artifactDir, prompt: task.prompt, outDir: path.join(attemptDir, "judge"), judge: settings, checklist })
+      if (!(await unzip(path.join(artifactDir, "package.lgp"), path.join(artifactDir, "unpacked")))) {
+        rows.push({
+          task: task.id,
+          kind,
+          reference: reference.id,
+          score: null,
+          failed: [],
+          error: `эталон ${reference.id} не распакован`,
+        })
+        console.error(`[calibrate ${task.id}/${kind}] score=error`)
+        continue
+      }
+      const judged = await judgeTask({
+        task,
+        artifactDir,
+        prompt: task.prompt,
+        outDir: path.join(attemptDir, "judge"),
+        judge: settings,
+        checklist,
+      }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
       rows.push({
         task: task.id,
         kind,
@@ -59,6 +77,8 @@ export async function calibrate(config: EvalConfig) {
   }
   const { positiveMin, negativeMax } = config.calibration
   const warnings = rows.flatMap((row) => {
+    if (row.score === null && row.error === "чеклист пуст после исключения пунктов requires_result_file — судья не вызывался")
+      return [`${row.task}/${row.kind}: ${row.error}`]
     if (row.score === null) return [`${row.task}/${row.kind}: судья не дал вердикт (${row.error})`]
     if (row.kind === "positive" && row.score < positiveMin)
       return [`${row.task}/positive: ${row.score} < ${positiveMin}; непройдены: ${row.failed.join(", ") || "—"}`]

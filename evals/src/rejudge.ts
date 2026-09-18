@@ -8,7 +8,7 @@ import { parseArtifactSource } from "./artifact"
 import { preflight } from "./preflight"
 import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { aggregate, aggregateTask, renderReport, writeSummary, type AttemptResult, type RunSummary } from "./report"
-import { installSigint } from "./run"
+import { describe, installSigint } from "./run"
 
 export async function rejudge(config: EvalConfig, runId: string) {
   const runDir = path.join(config.resultsDir, runId)
@@ -59,11 +59,18 @@ export async function rejudge(config: EvalConfig, runId: string) {
         continue
       }
       const previous = path.join(dir, "judge", "verdict.json")
-      const previousVerdict = (await Bun.file(previous).exists()) ? await Bun.file(previous).text() : undefined
+      if (await Bun.file(previous).exists()) await cp(previous, path.join(dir, "verdict.prev.json"))
       const run = (await Bun.file(path.join(dir, "run.json")).json()) as AgentRun
       const prompt = await Bun.file(path.join(dir, "prompt.txt")).text()
-      const judged = await judgeTask({ task, run, artifactDir, prompt, outDir: path.join(dir, "judge"), judge: settings, signal: controller.signal })
-      if (previousVerdict !== undefined) await Bun.write(path.join(dir, "judge", "verdict.prev.json"), previousVerdict)
+      const judged = await judgeTask({
+        task,
+        run,
+        artifactDir,
+        prompt,
+        outDir: path.join(dir, "judge"),
+        judge: settings,
+        signal: controller.signal,
+      }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
       const updated: AttemptResult = { ...attempt, ...judgedFields(judged) }
       await Bun.write(path.join(dir, "result.json"), JSON.stringify(updated, null, 2))
       attempts.push(updated)
@@ -72,7 +79,7 @@ export async function rejudge(config: EvalConfig, runId: string) {
   const summary: RunSummary = {
     ...prev,
     finished_at: new Date().toISOString(),
-    interrupted: controller.signal.aborted,
+    interrupted: prev.interrupted || controller.signal.aborted,
     judge,
     rubric_hash: await rubricHash(tasks),
     metrics: aggregate(attempts, false),
