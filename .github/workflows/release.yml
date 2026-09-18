@@ -231,6 +231,10 @@ jobs:
 
       - name: Build desktop
         working-directory: packages/desktop
+        env:
+          # electron-vite bundles the whole backend into the main process; the default
+          # V8 heap (about 2 GB on the arm64 macOS runner) is not enough for that bundle.
+          NODE_OPTIONS: --max-old-space-size=6144
         run: |
           bun run build
           bun typecheck
@@ -251,6 +255,14 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/cli"
           bun packages/loginom-host/script/build-cli.ts "$RUNNER_TEMP/cli/loginom-ai-agent-cli-${{ matrix.target }}"
+
+      # write-manifest.ts runs node_modules/electron/dist/electron as Node to record the bundled
+      # Electron versions; bun install does not leave that binary behind, and electron-builder
+      # keeps its own copy, so fetch it explicitly (reuses the electron download cache).
+      - name: Install Electron binary for the release manifest
+        if: runner.os == 'Linux'
+        working-directory: packages/desktop
+        run: node node_modules/electron/install.js
 
       - name: Write release manifest and verify Linux installers
         if: runner.os == 'Linux'

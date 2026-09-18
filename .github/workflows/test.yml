@@ -64,10 +64,12 @@ jobs:
             turbo-${{ runner.os }}-
 
       # Runs the `test` script of every workspace package; packages/desktop has none
-      # and is covered by the `desktop` job below.
+      # and is covered by the `desktop` job below. `--continue` reports every failing
+      # package instead of stopping at the first one; without it turbo 2.10 segfaults
+      # while terminating the remaining tasks on GitHub-hosted runners.
       - name: Run unit tests
         timeout-minutes: 30
-        run: GITHUB_ACTIONS=false bun turbo test
+        run: GITHUB_ACTIONS=false bun turbo test --continue
 
       - name: Check generated client
         working-directory: packages/client
