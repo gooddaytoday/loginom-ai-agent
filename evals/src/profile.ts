@@ -57,13 +57,16 @@ export async function waitProfileIdle(profileDir: string, timeoutMs = 60_000) {
 
 // Matching is by argv substring; CLI children that receive the profile only via env are invisible to this check (known limitation).
 async function profileProcesses(profileDir: string) {
-  const pattern = `${profileDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|$)`
-  return (await Bun.$`pgrep -u ${process.getuid?.() ?? ""} -f -- ${pattern}`.quiet().nothrow()).text()
+  const pattern = `${profileDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|[[:space:]]|$)`
+  const result = await Bun.$`pgrep -u ${process.getuid?.() ?? ""} -f -- ${pattern}`.quiet().nothrow()
+  if (result.exitCode > 1) throw new EvalFailure(`pgrep завершился кодом ${result.exitCode}`, 2)
+  return result.text()
 }
 
 async function terminateProfileProcesses(profileDir: string) {
-  const pattern = `${profileDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|$)`
-  await Bun.$`pkill -TERM -u ${process.getuid?.() ?? ""} -f -- ${pattern}`.quiet().nothrow()
+  const pattern = `${profileDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|[[:space:]]|$)`
+  const result = await Bun.$`pkill -TERM -u ${process.getuid?.() ?? ""} -f -- ${pattern}`.quiet().nothrow()
+  if (result.exitCode > 1) throw new EvalFailure(`pkill завершился кодом ${result.exitCode}`, 2)
 }
 
 function parseJson(text: string): unknown {
@@ -110,7 +113,8 @@ export function agentConfigJson(config: EvalConfig) {
 
 export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
   await mkdir(config.profileDir, { recursive: true, mode: 0o700 })
-  const fresh = !(await exists(path.join(config.profileDir, "cli-profile.json")))
+  const view = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
+  const fresh = !view || view.state === "unconfigured" || view.hasApiKey === false
   if (fresh) {
     const setup = await management(
       command,
@@ -164,7 +168,8 @@ export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2) {
   const view = await settle(command, acknowledged ? await status(command, exitCode) : first, exitCode)
   if (view.state !== "ready" || view.recoveries?.length)
     throw new EvalFailure(
-      `Профиль Loginom не готов: state=${view.state} failure=${view.failure ?? "—"} recoveries=${view.recoveries?.length ?? 0}`,
+      `Профиль Loginom не готов: state=${view.state} failure=${view.failure ?? "—"} recoveries=${view.recoveries?.length ?? 0}` +
+        (view.state === "unconfigured" ? " — выполните `--reset-profile` или проверьте LOGINOM_DOCK_API_KEY" : ""),
       exitCode,
     )
   return { recovered: acknowledged, view }

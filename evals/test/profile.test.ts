@@ -46,13 +46,34 @@ test("agentConfigJson: разрешает loginom_* и описывает OpenAI
   expect(Object.keys(json.provider.xiaomi?.models ?? {})).toEqual(["mimo"])
 })
 
-test("ensureProfile: первый вызов делает setup и пишет config, второй — только config", async () => {
-  const { config, command, profileDir } = await fakeProfile()
+test("ensureProfile: unconfigured при существующем cli-profile.json запускает setup", async () => {
+  const file = await stateFile({ state: "unconfigured", hasApiKey: false })
+  const { config, command, profileDir } = await fakeProfile({ EVAL_FAKE_STATE_FILE: file })
+  await Bun.write(path.join(profileDir, "cli-profile.json"), JSON.stringify({ leftover: true }))
+  const before = await Bun.file(path.join(profileDir, "cli-profile.json")).text()
   expect((await ensureProfile(config, command)).fresh).toBe(true)
-  expect(await Bun.file(path.join(profileDir, "cli-profile.json")).exists()).toBe(true)
+  expect(await Bun.file(path.join(profileDir, "setup-called")).exists()).toBe(true)
+  expect(await Bun.file(path.join(profileDir, "cli-profile.json")).text()).not.toBe(before)
+  expect((await Bun.file(file).json()).state).toBe("ready")
   const written = await Bun.file(path.join(profileDir, "config", "loginom-ai-agent.json")).json()
   expect(written.permission).toEqual({ "loginom_*": "allow" })
+})
+
+test("ensureProfile: ready с hasApiKey не вызывает setup и пишет config", async () => {
+  const { config, command, profileDir } = await fakeProfile({
+    EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", hasApiKey: true }),
+  })
   expect((await ensureProfile(config, command)).fresh).toBe(false)
+  expect(await Bun.file(path.join(profileDir, "setup-called")).exists()).toBe(false)
+  expect(await Bun.file(path.join(profileDir, "config", "loginom-ai-agent.json")).exists()).toBe(true)
+})
+
+test("recoverIfNeeded: unconfigured — EvalFailure с подсказкой reset-profile", async () => {
+  const { command } = await fakeProfile({
+    EVAL_FAKE_STATE_FILE: await stateFile({ state: "unconfigured", hasApiKey: false }),
+  })
+  await expect(recoverIfNeeded(command, 1)).rejects.toThrow("--reset-profile")
+  await expect(recoverIfNeeded(command, 1)).rejects.toThrow("LOGINOM_DOCK_API_KEY")
 })
 
 test("assertAuth: без auth.json — EvalFailure с командой providers login; с записью провайдера — ок", async () => {

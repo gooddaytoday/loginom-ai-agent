@@ -9,9 +9,9 @@ import { judgeCommand, judgeInfo, judgeTask, prepareJudgeDir, scoreVerdict, type
 import { loadTasks } from "../src/task"
 
 const checklist = [
-  { id: "a", text: "A", weight: 1, requiresResultFile: false },
-  { id: "b", text: "B", weight: 1, requiresResultFile: false },
-  { id: "c", text: "C", weight: 2, requiresResultFile: true },
+  { id: "a", text: "A", weight: 1, requiresResultFile: false, requiresRun: false },
+  { id: "b", text: "B", weight: 1, requiresResultFile: false, requiresRun: false },
+  { id: "c", text: "C", weight: 2, requiresResultFile: true, requiresRun: false },
 ]
 const verdict = (passed: Record<string, boolean>): Verdict => ({
   checklist: Object.entries(passed).map(([id, ok]) => ({ id, passed: ok, evidence: "e" })),
@@ -138,6 +138,29 @@ test("judgeTask: fail → 0; half → округлённая доля", async ()
 test("judgeTask: постоянный отказ → error после двух попыток", async () => {
   expect(await judgeFixture({ FAKE_CODEX_EXIT: "1" })).toMatchObject({ ok: false, attempts: 2 })
   expect(await judgeFixture({ FAKE_CODEX_VERDICT: "invalid" })).toMatchObject({ ok: false, attempts: 2 })
+})
+
+test("judgeTask: judge.env проходит в процесс, EVAL_* из process.env — нет", async () => {
+  const previousProbe = process.env.EVAL_SECRET_PROBE
+  const previousEcho = process.env.FAKE_CODEX_ECHO
+  process.env.EVAL_SECRET_PROBE = "leak"
+  process.env.FAKE_CODEX_ECHO = "should-not-inherit"
+  try {
+    const passed = await judgeFixture({ FAKE_CODEX_ECHO: "from-judge", FAKE_CODEX_VERDICT: "pass" })
+    expect(passed).toMatchObject({ ok: true })
+    if (passed.ok) expect(passed.verdict.summary).toContain("from-judge")
+    const inherited = await judgeFixture()
+    expect(inherited).toMatchObject({ ok: true })
+    if (inherited.ok) {
+      expect(inherited.verdict.summary).not.toContain("leak")
+      expect(inherited.verdict.summary).not.toContain("should-not-inherit")
+    }
+  } finally {
+    if (previousProbe === undefined) delete process.env.EVAL_SECRET_PROBE
+    else process.env.EVAL_SECRET_PROBE = previousProbe
+    if (previousEcho === undefined) delete process.env.FAKE_CODEX_ECHO
+    else process.env.FAKE_CODEX_ECHO = previousEcho
+  }
 })
 
 test("judgeTask: первый отказ, второй успех → ok, attempts 2", async () => {
