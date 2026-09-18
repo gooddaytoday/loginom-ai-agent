@@ -22,7 +22,7 @@ export async function preflight(config: EvalConfig, source: ArtifactSource): Pro
   if (!config.skipJudge) environment.codex = await codexInfo(config.judge.command)
   // --judge-only и --calibrate не запускают агента: Loginom, docker, Dock и bundle не нужны.
   if (config.judgeOnly !== undefined || config.calibrate) return environment
-  for (const tool of ["unzip", "git", "pgrep"]) {
+  for (const tool of source.kind === "docker" ? ["unzip", "git", "pgrep", "docker"] : ["unzip", "git", "pgrep"]) {
     if (!Bun.which(tool)) throw new EvalFailure(`Не найдена команда ${tool}`, 2)
   }
   const page = await fetch(config.loginom.url, { signal: AbortSignal.timeout(5_000) }).catch(() => undefined)
@@ -57,7 +57,7 @@ async function codexInfo(command: string[]) {
   if (version.exitCode !== 0)
     throw new EvalFailure(`Судья недоступен: ${command.join(" ")} --version → код ${version.exitCode}`, 2)
   const home = process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex")
-  if (command[0] === "codex" && !(await Bun.file(path.join(home, "auth.json")).exists()))
+  if (path.basename(command[0] ?? "") === "codex" && !(await Bun.file(path.join(home, "auth.json")).exists()))
     throw new EvalFailure(`Нет входа Codex: отсутствует ${path.join(home, "auth.json")}. Выполните: codex login`, 2)
   return { version: version.text().trim() }
 }
@@ -72,7 +72,7 @@ async function containerDigest(container: string) {
   return image ?? null
 }
 
-async function dockSkillRevision(dock: { apiKey: string; baseUrl: string }) {
+export async function dockSkillRevision(dock: { apiKey: string; baseUrl: string }): Promise<string> {
   const health = await fetch(`${dock.baseUrl}/health`, { signal: AbortSignal.timeout(5_000) }).catch(() => undefined)
   if (health?.status !== 200)
     throw new EvalFailure(`Dock недоступен: ${dock.baseUrl}/health → ${health?.status ?? "нет ответа"}`, 2)
@@ -85,10 +85,11 @@ async function dockSkillRevision(dock: { apiKey: string; baseUrl: string }) {
   if (manifest?.status !== 200)
     throw new EvalFailure(`Манифест skill недоступен: ${manifest?.status ?? "нет ответа"}`, 2)
   const body = (await manifest.json().catch(() => undefined)) as
-    | { revision?: unknown; result?: { revision?: unknown } }
+    | { revision?: unknown; result?: { revision?: unknown }; status?: unknown; error?: unknown }
     | undefined
   const revision = body?.revision ?? body?.result?.revision
-  return typeof revision === "string" || typeof revision === "number" ? String(revision) : null
+  if (typeof revision === "string" || typeof revision === "number") return String(revision)
+  throw new EvalFailure(`Манифест skill без revision: status=${String(body?.status)} error=${String(body?.error ?? "—")}`, 2)
 }
 
 async function requireFixtures() {

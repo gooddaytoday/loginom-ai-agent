@@ -39,21 +39,31 @@ export function parseView(text: string): View | undefined {
 export async function releaseStaleWriter(profileDir: string) {
   const writer = path.join(profileDir, ".writer")
   if (!(await exists(writer))) return false
-  const busy = await Bun.$`pgrep -f ${profileDir}`.quiet().nothrow()
-  if (busy.exitCode === 0) throw new EvalFailure(`Профиль ${profileDir} занят процессами:\n${busy.text().trim()}`, 2)
+  const busy = await profileProcesses(profileDir)
+  if (busy.trim()) throw new EvalFailure(`Профиль ${profileDir} занят процессами:\n${busy.trim()}`, 2)
   await rm(writer, { recursive: true, force: true })
   return true
 }
 
 export async function waitProfileIdle(profileDir: string, timeoutMs = 60_000) {
-  await Bun.$`pkill -TERM -f ${profileDir}`.quiet().nothrow()
+  await terminateProfileProcesses(profileDir)
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    const busy = await Bun.$`pgrep -f ${profileDir}`.quiet().nothrow()
-    if (busy.exitCode !== 0) return true
+    if (!(await profileProcesses(profileDir)).trim()) return true
     await Bun.sleep(2_000)
   }
   return false
+}
+
+// Matching is by argv substring; CLI children that receive the profile only via env are invisible to this check (known limitation).
+async function profileProcesses(profileDir: string) {
+  const pattern = `${profileDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|$)`
+  return (await Bun.$`pgrep -u ${process.getuid?.() ?? ""} -f -- ${pattern}`.quiet().nothrow()).text()
+}
+
+async function terminateProfileProcesses(profileDir: string) {
+  const pattern = `${profileDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|$)`
+  await Bun.$`pkill -TERM -u ${process.getuid?.() ?? ""} -f -- ${pattern}`.quiet().nothrow()
 }
 
 function parseJson(text: string): unknown {
@@ -112,7 +122,8 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
         apiKey: config.dock.apiKey,
       }),
     )
-    if (setup.stdout.includes(config.dock.apiKey) || setup.stderr.includes(config.dock.apiKey))
+    const secrets = [config.dock.apiKey, config.loginom.password].filter((s) => s.length > 0)
+    if (secrets.some((secret) => setup.stdout.includes(secret) || setup.stderr.includes(secret)))
       throw new EvalFailure("Секрет попал в вывод loginom setup", 2)
     if (setup.exitCode !== 0)
       throw new EvalFailure(`loginom setup завершился кодом ${setup.exitCode}:\n${setup.stderr.trim()}`, 2)
@@ -160,9 +171,8 @@ export async function recoverIfNeeded(command: AgentCommand, exitCode: 1 | 2) {
 }
 
 export async function resetProfile(config: EvalConfig) {
-  const busy = await Bun.$`pgrep -f ${config.profileDir}`.quiet().nothrow()
-  if (busy.exitCode === 0)
-    throw new EvalFailure(`Нельзя сбросить профиль: занят процессами\n${busy.text().trim()}`, 2)
+  const busy = await profileProcesses(config.profileDir)
+  if (busy.trim()) throw new EvalFailure(`Нельзя сбросить профиль: занят процессами\n${busy.trim()}`, 2)
   await rm(config.profileDir, { recursive: true, force: true })
 }
 
