@@ -1,7 +1,12 @@
 import { createRequire } from "node:module"
 import { mkdir } from "node:fs/promises"
+import { join } from "node:path"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
+
+export function browserEnvironment(profile, environment = process.env) {
+  return { ...environment, CHROME_LOG_FILE: join(profile, "chrome-debug.log") }
+}
 
 export function loginomAddress(value) {
   const url = new URL(value)
@@ -68,7 +73,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       // Chrome for Testing otherwise writes debug.log beside chrome.exe on
       // Windows, mutating the signed/manifested application payload. Keep all
       // browser state and diagnostics inside the disposable session profile.
-      env: { ...process.env, CHROME_LOG_FILE: join(profile, "chrome-debug.log") },
+      env: browserEnvironment(profile),
       ...(!headless
         ? {
             args: [
