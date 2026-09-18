@@ -65,6 +65,10 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       executablePath: browserPath,
       headless,
       chromiumSandbox: true,
+      // Chrome for Testing otherwise writes debug.log beside chrome.exe on
+      // Windows, mutating the signed/manifested application payload. Keep all
+      // browser state and diagnostics inside the disposable session profile.
+      env: { ...process.env, CHROME_LOG_FILE: join(profile, "chrome-debug.log") },
       ...(!headless
         ? {
             args: [
