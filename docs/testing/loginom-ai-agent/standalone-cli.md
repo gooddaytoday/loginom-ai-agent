@@ -1,5 +1,14 @@
 # Самостоятельный CLI: checkpoint и приёмка
 
+**2026-09-18: техническая Linux-цель завершена.** Пользователь отдельно отложил
+полный юридический third-party/source/relinking audit (его ориентир: 2–5 рабочих
+дней). Он не блокирует эту техническую цель, но не считается пройденным.
+Windows/macOS, signing/notarization и production publication вне scope.
+Запущенные контейнеры аудита остановлены; материалы и частичная сборка сохранены.
+Последний audit checkpoint — 27 source archives в
+`/tmp/loginom-cli-bun-source-companion-std`; это не legal/relinking PASS.
+
+
 ## Linux-only продолжение и real provider — 2026-09-18
 
 Текущий объём пользователя исключает Windows/macOS. Новый чистый Linux artifact

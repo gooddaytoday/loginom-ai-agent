@@ -526,6 +526,15 @@ SDK/Client; если HTTP contract не меняется, новый control API
 
 ### Текущая сводка — 2026-09-18
 
+**Техническая Linux-цель завершена.** По явному решению пользователя полный
+юридический third-party/source/relinking audit отложен в отдельную работу
+(пользовательский ориентир 2–5 рабочих дней) и не является условием завершения
+этой цели. Это не юридический PASS и не разрешение production release.
+Windows/macOS, signing/notarization и публикация остаются за её пределами.
+Функциональные доказательства и их версии перечислены ниже и в acceptance audit;
+runtime-код после проверенного edc68138d не менялся.
+
+
 Текущая цель ограничена Linux; Windows/macOS пользователь вынес в отдельную
 работу. Незакрытый пункт раннего checkpoint не отменяет последующую проверку;
 старые evidence сохраняют собственную версию и границы.
@@ -544,9 +553,9 @@ SDK/Client; если HTTP contract не меняется, новый control API
   runtime/pins равны. Full git snapshots различаются docs/test changes.
   Оба порядка закрытия Desktop/CLI подтвердили независимость. Пользовательская
   установка Desktop не изменялась; тестовая установка CLI удалена.
-- Npm graph inventory: 467 packages, 468 notices + 464 README, missing texts=0.
-  Attribution/nested/native/corresponding-source/relinking audit остаётся
-  incomplete. Это неподписанный dev artifact, не production release.
+- Npm graph inventory: 467 packages, 483 notices + 464 README, missing texts=0.
+  Attribution/native/corresponding-source/relinking audit остаётся
+  incomplete и отложен по решению пользователя. Это неподписанный dev artifact, не production release.
 - Остаток Linux приёмки и точные границы текущих/исторических доказательств
   фиксируются в audit ниже. Native Windows/macOS, signing/notarization и
   публикация не объявляются выполненными.
@@ -3112,3 +3121,18 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   поэтому byte-identical upstream reproduction не заявляется.
 
 [Toolchain и текущая проверка](../../testing/loginom-ai-agent/reports/2026-09-18-cli-bun-relink/report.md).
+
+### Закрытие технической Linux-цели и перенос аудита
+
+- [x] Этапы 1–5 технической Linux-реализации и приёмки завершены в описанном
+  scope; матрица IND-01…14 проверена по текущим и явно версионированным отчётам.
+- [x] Реальный Xiaomi smoke принят пользователем; повторный model-generated
+  oracle не требуется. Runtime diff от проверенного edc68138d отсутствует.
+- [x] Юридический third-party/source/relinking audit исключён пользователем
+  из текущей цели и отложен отдельно; уже собранные материалы сохранены.
+- [x] WebKit build остановлен по запросу (exit 137, не PASS); Cargo vendor завершился
+  до остановки (exit 0). Контейнеров аудита не осталось. Toolchain/логи сохранены.
+- [x] Последний checkpoint source companion: 27 архивов, включая rust-src и
+  40 crate sources std, проверенных по upstream checksum/lock; host typecheck PASS.
+- [ ] Отдельная будущая работа: полный юридический аудит и actual relinking.
+  Native Windows/macOS и production release также не объявляются выполненными.

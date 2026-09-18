@@ -3,8 +3,8 @@
   "status": "incomplete",
   "scope": "Complete upstream archives for direct native dependencies and full Bun build recipes; not an offline rebuild closure or relinking proof",
   "remaining": [
-    "Rust standard-library build dependencies and toolchain prerequisites",
-    "Verification of actual rebuild/relinking; upstream test submodules are not included"
+    "Verification of actual rebuild/relinking and build prerequisites; this collection does not claim an offline toolchain closure",
+    "Upstream test submodules are not included"
   ],
   "archives": [
     {
@@ -230,6 +230,25 @@
       "sha256": "637ff2ab6f5c7f7e05a5b5dc393d5cf2fea8d4754fcaceaaf935ffff5c1323ee",
       "entries": 15,
       "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "rust-src",
+      "version": "nightly-2025-12-10",
+      "file": "rust-src-nightly-2025-12-10.tar.xz",
+      "bytes": 3712304,
+      "sha256": "531d3f9150bb3dfacca3c30ca4c64a356b47e68b653b730c87a9df22104602a4",
+      "entries": 2274,
+      "url": "https://static.rust-lang.org/dist/2025-12-10/rust-src-nightly.tar.xz",
+      "checksumUrl": "https://static.rust-lang.org/dist/2025-12-10/rust-src-nightly.tar.xz.sha256"
+    },
+    {
+      "component": "rust-std-crates",
+      "version": "nightly-2025-12-10",
+      "file": "rust-std-nightly-2025-12-10-crates.tar.gz",
+      "bytes": 11924517,
+      "sha256": "e0f59ccb3d3be519cfa80af84dfc5aeccd540dc86b3fbd72cc675213d5a69b34",
+      "entries": 42,
+      "scope": "40 unmodified crate archives checked against installed rust-src library/Cargo.lock, plus original lock and URL/hash inventory"
     },
     {
       "component": "tinycc",

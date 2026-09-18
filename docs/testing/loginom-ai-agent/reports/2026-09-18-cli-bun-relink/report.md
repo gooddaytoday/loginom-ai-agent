@@ -40,3 +40,20 @@ Live work paths: `/tmp/loginom-bun-relink-toolchain/webkit.log`,
 `/tmp/loginom-bun-relink-src/build/release`; container `loginom-bun-relink-webkit`.
 Revalidate container/process state before resuming; a log file alone is not proof
 that a build is still running.
+
+## User scope decision — audit deferred
+
+The user explicitly deferred the full third-party legal/source/relinking audit
+as separate work (their estimate: 2–5 working days), outside the current technical
+Linux goal. WebKit compilation was stopped at that request; its command exited
+137 and is not a rebuild PASS. Cargo vendor completed with exit 0 before the
+stop request. No audit containers remain running. The prepared image, sources,
+partial build and logs are retained for later resumption; no new audit work is
+scheduled by this technical goal.
+
+Before deferral, the source companion was expanded to 27 archives at
+`/tmp/loginom-cli-bun-source-companion-std`: the official nightly-2025-12-10
+rust-src component matched its upstream SHA256 and the installed library lock;
+all 40 external standard-library crates matched that lock. The builder verified
+all 27 input and copied archives; host typecheck PASS. These materials are saved
+as an unfinished audit checkpoint, not a legal or full relinking approval.

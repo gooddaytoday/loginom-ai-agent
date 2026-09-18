@@ -34,7 +34,8 @@ try {
       "Other archives preserve upstream source and notices for the pinned direct dependencies, including WebKit. " +
       "Use the build scripts in this exact Bun revision; historical LICENSE commands may be outdated. " +
       "The lol-html crate bundle includes its locked transitive crate archives and checksum inventory. " +
-      "Rust standard-library build dependencies and toolchain prerequisites remain separate; this is not yet a verified offline build closure. " +
+      "The pinned rust-src component and its locked standard-library crate sources are also included. " +
+      "Compiler binaries and other build prerequisites remain separate; this is not an offline toolchain closure. " +
       "See source-companion.json for coverage and remaining rebuild/relinking checks.\n",
   )
   console.log(JSON.stringify({ destination, archives: catalog.archives.length, status: "PASS" }))

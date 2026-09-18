@@ -1,4 +1,11 @@
-# Linux completion audit — current evidence and remaining work
+# Linux completion audit — technical scope complete
+
+The user explicitly deferred the full third-party legal/source/relinking audit
+as separate work on 2026-09-18. It does not gate the current technical Linux goal.
+The technical requirements below are complete within their recorded Linux scenarios;
+Windows/macOS and production publication are excluded. Current runtime sources
+match the tested edc68138d candidate; later changes affect tests, packaging/notices
+and documentation. No historical artifact is relabelled as the latest binary.
 
 This audit applies the user's Linux-only scope and explicitly accepted Xiaomi
 smoke criterion. Historical evidence is retained with its own artifact version;
@@ -30,3 +37,9 @@ Release limitations remain explicit: unsigned development channel, no production
 publication, missing upstream-specific attribution review and full third-party
 source/relinking clearance. The project source archive and standard-text supplements
 are evidence of supplied material, not a declaration of complete legal compliance.
+
+The remaining release limitations above are deferred work, not unfinished
+technical Linux acceptance under the user's clarified scope. WebKit audit build
+was stopped, Cargo vendor had already completed, and no audit containers remain.
+The latest packaged source candidate remains the separately verified
+0.1.4-cli.20260918native-src; no new full functional oracle is attributed to it.

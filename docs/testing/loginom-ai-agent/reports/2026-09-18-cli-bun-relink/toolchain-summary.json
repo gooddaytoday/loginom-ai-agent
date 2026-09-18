@@ -14,12 +14,15 @@
   "offlineConfigure": "PASS",
   "offlineTinycc": "PASS",
   "tinyccObjects": 10,
-  "fullWebkitRebuild": "RUNNING",
-  "fullBunRelink": "NOT_RUN",
+  "fullWebkitRebuild": "DEFERRED_BY_USER",
+  "fullBunRelink": "DEFERRED_BY_USER",
   "limits": {
     "cpus": 2,
     "cpuset": "0,1",
     "memoryGiB": 12,
     "swapGiB": 0
-  }
+  },
+  "webkitStop": "Stopped at user request; command exit 137, not a successful rebuild",
+  "cargoVendor": "Completed exit 0 before stop; offline build not verified",
+  "auditContainersRemaining": []
 }

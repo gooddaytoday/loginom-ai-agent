@@ -1,0 +1,365 @@
+{
+  "source": "rust-src nightly-2025-12-10 library/Cargo.lock",
+  "crates": [
+    {
+      "name": "addr2line",
+      "version": "0.25.1",
+      "file": "addr2line-0.25.1.crate",
+      "url": "https://static.crates.io/crates/addr2line/addr2line-0.25.1.crate",
+      "sha256": "1b5d307320b3181d6d7954e663bd7c774a838b8220fe0593c86d9fb09f498b4b",
+      "bytes": 43134,
+      "entries": 16
+    },
+    {
+      "name": "adler2",
+      "version": "2.0.1",
+      "file": "adler2-2.0.1.crate",
+      "url": "https://static.crates.io/crates/adler2/adler2-2.0.1.crate",
+      "sha256": "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa",
+      "bytes": 13366,
+      "entries": 13
+    },
+    {
+      "name": "cc",
+      "version": "1.2.0",
+      "file": "cc-1.2.0.crate",
+      "url": "https://static.crates.io/crates/cc/cc-1.2.0.crate",
+      "sha256": "1aeb932158bd710538c73702db6945cb68a8fb08c519e6e12706b94263b36db8",
+      "bytes": 92640,
+      "entries": 34
+    },
+    {
+      "name": "cfg-if",
+      "version": "1.0.4",
+      "file": "cfg-if-1.0.4.crate",
+      "url": "https://static.crates.io/crates/cfg-if/cfg-if-1.0.4.crate",
+      "sha256": "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801",
+      "bytes": 9360,
+      "entries": 14
+    },
+    {
+      "name": "dlmalloc",
+      "version": "0.2.11",
+      "file": "dlmalloc-0.2.11.crate",
+      "url": "https://static.crates.io/crates/dlmalloc/dlmalloc-0.2.11.crate",
+      "sha256": "06cdfe340b16dd990c54cce79743613fa09fbb16774f33a77c9fd196f8f3fa30",
+      "bytes": 86742,
+      "entries": 21
+    },
+    {
+      "name": "foldhash",
+      "version": "0.2.0",
+      "file": "foldhash-0.2.0.crate",
+      "url": "https://static.crates.io/crates/foldhash/foldhash-0.2.0.crate",
+      "sha256": "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb",
+      "bytes": 23329,
+      "entries": 12
+    },
+    {
+      "name": "fortanix-sgx-abi",
+      "version": "0.6.1",
+      "file": "fortanix-sgx-abi-0.6.1.crate",
+      "url": "https://static.crates.io/crates/fortanix-sgx-abi/fortanix-sgx-abi-0.6.1.crate",
+      "sha256": "5efc85edd5b83e8394f4371dd0da6859dff63dd387dab8568fece6af4cde6f84",
+      "bytes": 13691,
+      "entries": 6
+    },
+    {
+      "name": "getopts",
+      "version": "0.2.24",
+      "file": "getopts-0.2.24.crate",
+      "url": "https://static.crates.io/crates/getopts/getopts-0.2.24.crate",
+      "sha256": "cfe4fbac503b8d1f88e6676011885f34b7174f46e59956bba534ba83abded4df",
+      "bytes": 21467,
+      "entries": 15
+    },
+    {
+      "name": "gimli",
+      "version": "0.32.3",
+      "file": "gimli-0.32.3.crate",
+      "url": "https://static.crates.io/crates/gimli/gimli-0.32.3.crate",
+      "sha256": "e629b9b98ef3dd8afe6ca2bd0f89306cec16d43d907889945bc5d6687f2f13c7",
+      "bytes": 289789,
+      "entries": 53
+    },
+    {
+      "name": "hashbrown",
+      "version": "0.16.1",
+      "file": "hashbrown-0.16.1.crate",
+      "url": "https://static.crates.io/crates/hashbrown/hashbrown-0.16.1.crate",
+      "sha256": "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100",
+      "bytes": 147785,
+      "entries": 48
+    },
+    {
+      "name": "hermit-abi",
+      "version": "0.5.2",
+      "file": "hermit-abi-0.5.2.crate",
+      "url": "https://static.crates.io/crates/hermit-abi/hermit-abi-0.5.2.crate",
+      "sha256": "fc0fef456e4baa96da950455cd02c081ca953b141298e41db3fc7e36b1da849c",
+      "bytes": 17435,
+      "entries": 9
+    },
+    {
+      "name": "libc",
+      "version": "0.2.178",
+      "file": "libc-0.2.178.crate",
+      "url": "https://static.crates.io/crates/libc/libc-0.2.178.crate",
+      "sha256": "37c93d8daa9d8a012fd8ab92f088405fb202ea0b6ab73ee2482ae66af4f42091",
+      "bytes": 783720,
+      "entries": 327
+    },
+    {
+      "name": "memchr",
+      "version": "2.7.6",
+      "file": "memchr-2.7.6.crate",
+      "url": "https://static.crates.io/crates/memchr/memchr-2.7.6.crate",
+      "sha256": "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273",
+      "bytes": 97616,
+      "entries": 57
+    },
+    {
+      "name": "miniz_oxide",
+      "version": "0.8.9",
+      "file": "miniz_oxide-0.8.9.crate",
+      "url": "https://static.crates.io/crates/miniz_oxide/miniz_oxide-0.8.9.crate",
+      "sha256": "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316",
+      "bytes": 67132,
+      "entries": 23
+    },
+    {
+      "name": "moto-rt",
+      "version": "0.15.2",
+      "file": "moto-rt-0.15.2.crate",
+      "url": "https://static.crates.io/crates/moto-rt/moto-rt-0.15.2.crate",
+      "sha256": "0bf4bc387d3b3502cb92c09ec980cca909b94978e144c61da8319ecf4bc8d031",
+      "bytes": 25382,
+      "entries": 22
+    },
+    {
+      "name": "object",
+      "version": "0.37.3",
+      "file": "object-0.37.3.crate",
+      "url": "https://static.crates.io/crates/object/object-0.37.3.crate",
+      "sha256": "ff76201f031d8863c38aa7f905eca4f53abbfa15f609db4277d44cd8938f33fe",
+      "bytes": 344032,
+      "entries": 106
+    },
+    {
+      "name": "r-efi",
+      "version": "5.3.0",
+      "file": "r-efi-5.3.0.crate",
+      "url": "https://static.crates.io/crates/r-efi/r-efi-5.3.0.crate",
+      "sha256": "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f",
+      "bytes": 64532,
+      "entries": 69
+    },
+    {
+      "name": "r-efi-alloc",
+      "version": "2.1.0",
+      "file": "r-efi-alloc-2.1.0.crate",
+      "url": "https://static.crates.io/crates/r-efi-alloc/r-efi-alloc-2.1.0.crate",
+      "sha256": "dc2f58ef3ca9bb0f9c44d9aa8537601bcd3df94cc9314a40178cadf7d4466354",
+      "bytes": 14475,
+      "entries": 14
+    },
+    {
+      "name": "rand",
+      "version": "0.9.2",
+      "file": "rand-0.9.2.crate",
+      "url": "https://static.crates.io/crates/rand/rand-0.9.2.crate",
+      "sha256": "6db2770f06117d490610c7488547d543617b21bfa07796d7a12f6f1bd53850d1",
+      "bytes": 99930,
+      "entries": 40
+    },
+    {
+      "name": "rand_core",
+      "version": "0.9.3",
+      "file": "rand_core-0.9.3.crate",
+      "url": "https://static.crates.io/crates/rand_core/rand_core-0.9.3.crate",
+      "sha256": "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38",
+      "bytes": 24543,
+      "entries": 14
+    },
+    {
+      "name": "rand_xorshift",
+      "version": "0.4.0",
+      "file": "rand_xorshift-0.4.0.crate",
+      "url": "https://static.crates.io/crates/rand_xorshift/rand_xorshift-0.4.0.crate",
+      "sha256": "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a",
+      "bytes": 10262,
+      "entries": 11
+    },
+    {
+      "name": "rustc-demangle",
+      "version": "0.1.26",
+      "file": "rustc-demangle-0.1.26.crate",
+      "url": "https://static.crates.io/crates/rustc-demangle/rustc-demangle-0.1.26.crate",
+      "sha256": "56f7d92ca342cea22a06f2121d944b4fd82af56988c270852495420f961d4ace",
+      "bytes": 30340,
+      "entries": 16
+    },
+    {
+      "name": "rustc-literal-escaper",
+      "version": "0.0.5",
+      "file": "rustc-literal-escaper-0.0.5.crate",
+      "url": "https://static.crates.io/crates/rustc-literal-escaper/rustc-literal-escaper-0.0.5.crate",
+      "sha256": "e4ee29da77c5a54f42697493cd4c9b9f31b74df666a6c04dfc4fde77abe0438b",
+      "bytes": 14220,
+      "entries": 14
+    },
+    {
+      "name": "shlex",
+      "version": "1.3.0",
+      "file": "shlex-1.3.0.crate",
+      "url": "https://static.crates.io/crates/shlex/shlex-1.3.0.crate",
+      "sha256": "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64",
+      "bytes": 18713,
+      "entries": 12
+    },
+    {
+      "name": "unwinding",
+      "version": "0.2.8",
+      "file": "unwinding-0.2.8.crate",
+      "url": "https://static.crates.io/crates/unwinding/unwinding-0.2.8.crate",
+      "sha256": "60612c845ef41699f39dc8c5391f252942c0a88b7d15da672eff0d14101bbd6d",
+      "bytes": 27968,
+      "entries": 37
+    },
+    {
+      "name": "vex-sdk",
+      "version": "0.27.1",
+      "file": "vex-sdk-0.27.1.crate",
+      "url": "https://static.crates.io/crates/vex-sdk/vex-sdk-0.27.1.crate",
+      "sha256": "79e5fe15afde1305478b35e2cb717fff59f485428534cf49cfdbfa4723379bf6",
+      "bytes": 11762,
+      "entries": 34
+    },
+    {
+      "name": "wasi",
+      "version": "0.11.1+wasi-snapshot-preview1",
+      "file": "wasi-0.11.1+wasi-snapshot-preview1.crate",
+      "url": "https://static.crates.io/crates/wasi/wasi-0.11.1+wasi-snapshot-preview1.crate",
+      "sha256": "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b",
+      "bytes": 28477,
+      "entries": 17
+    },
+    {
+      "name": "wasi",
+      "version": "0.14.4+wasi-0.2.4",
+      "file": "wasi-0.14.4+wasi-0.2.4.crate",
+      "url": "https://static.crates.io/crates/wasi/wasi-0.14.4+wasi-0.2.4.crate",
+      "sha256": "88a5f4a424faf49c3c2c344f166f0662341d470ea185e939657aaff130f0ec4a",
+      "bytes": 145408,
+      "entries": 64
+    },
+    {
+      "name": "windows-link",
+      "version": "0.2.1",
+      "file": "windows-link-0.2.1.crate",
+      "url": "https://static.crates.io/crates/windows-link/windows-link-0.2.1.crate",
+      "sha256": "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5",
+      "bytes": 6133,
+      "entries": 8
+    },
+    {
+      "name": "windows-sys",
+      "version": "0.60.2",
+      "file": "windows-sys-0.60.2.crate",
+      "url": "https://static.crates.io/crates/windows-sys/windows-sys-0.60.2.crate",
+      "sha256": "f2f500e4d28234f72040990ec9d39e3a6b950f9f22d3dba18416c35882612bcb",
+      "bytes": 2518479,
+      "entries": 257
+    },
+    {
+      "name": "windows-targets",
+      "version": "0.53.5",
+      "file": "windows-targets-0.53.5.crate",
+      "url": "https://static.crates.io/crates/windows-targets/windows-targets-0.53.5.crate",
+      "sha256": "4945f9f551b88e0d65f3db0bc25c33b8acea4d9e41163edf90dcd0b19f9069f3",
+      "bytes": 7126,
+      "entries": 8
+    },
+    {
+      "name": "windows_aarch64_gnullvm",
+      "version": "0.53.1",
+      "file": "windows_aarch64_gnullvm-0.53.1.crate",
+      "url": "https://static.crates.io/crates/windows_aarch64_gnullvm/windows_aarch64_gnullvm-0.53.1.crate",
+      "sha256": "a9d8416fa8b42f5c947f8482c43e7d89e73a173cead56d044f6a56104a6d1b53",
+      "bytes": 787748,
+      "entries": 10
+    },
+    {
+      "name": "windows_aarch64_msvc",
+      "version": "0.53.1",
+      "file": "windows_aarch64_msvc-0.53.1.crate",
+      "url": "https://static.crates.io/crates/windows_aarch64_msvc/windows_aarch64_msvc-0.53.1.crate",
+      "sha256": "b9d782e804c2f632e395708e99a94275910eb9100b2114651e04744e9b125006",
+      "bytes": 838009,
+      "entries": 10
+    },
+    {
+      "name": "windows_i686_gnu",
+      "version": "0.53.1",
+      "file": "windows_i686_gnu-0.53.1.crate",
+      "url": "https://static.crates.io/crates/windows_i686_gnu/windows_i686_gnu-0.53.1.crate",
+      "sha256": "960e6da069d81e09becb0ca57a65220ddff016ff2d6af6a223cf372a506593a3",
+      "bytes": 939775,
+      "entries": 10
+    },
+    {
+      "name": "windows_i686_gnullvm",
+      "version": "0.53.1",
+      "file": "windows_i686_gnullvm-0.53.1.crate",
+      "url": "https://static.crates.io/crates/windows_i686_gnullvm/windows_i686_gnullvm-0.53.1.crate",
+      "sha256": "fa7359d10048f68ab8b09fa71c3daccfb0e9b559aed648a8f95469c27057180c",
+      "bytes": 857396,
+      "entries": 10
+    },
+    {
+      "name": "windows_i686_msvc",
+      "version": "0.53.1",
+      "file": "windows_i686_msvc-0.53.1.crate",
+      "url": "https://static.crates.io/crates/windows_i686_msvc/windows_i686_msvc-0.53.1.crate",
+      "sha256": "1e7ac75179f18232fe9c285163565a57ef8d3c89254a30685b57d83a38d326c2",
+      "bytes": 907688,
+      "entries": 10
+    },
+    {
+      "name": "windows_x86_64_gnu",
+      "version": "0.53.1",
+      "file": "windows_x86_64_gnu-0.53.1.crate",
+      "url": "https://static.crates.io/crates/windows_x86_64_gnu/windows_x86_64_gnu-0.53.1.crate",
+      "sha256": "9c3842cdd74a865a8066ab39c8a7a473c0778a3f29370b5fd6b4b9aa7df4a499",
+      "bytes": 903712,
+      "entries": 10
+    },
+    {
+      "name": "windows_x86_64_gnullvm",
+      "version": "0.53.1",
+      "file": "windows_x86_64_gnullvm-0.53.1.crate",
+      "url": "https://static.crates.io/crates/windows_x86_64_gnullvm/windows_x86_64_gnullvm-0.53.1.crate",
+      "sha256": "0ffa179e2d07eee8ad8f57493436566c7cc30ac536a3379fdf008f47f6bb7ae1",
+      "bytes": 787739,
+      "entries": 10
+    },
+    {
+      "name": "windows_x86_64_msvc",
+      "version": "0.53.1",
+      "file": "windows_x86_64_msvc-0.53.1.crate",
+      "url": "https://static.crates.io/crates/windows_x86_64_msvc/windows_x86_64_msvc-0.53.1.crate",
+      "sha256": "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650",
+      "bytes": 837950,
+      "entries": 10
+    },
+    {
+      "name": "wit-bindgen",
+      "version": "0.45.1",
+      "file": "wit-bindgen-0.45.1.crate",
+      "url": "https://static.crates.io/crates/wit-bindgen/wit-bindgen-0.45.1.crate",
+      "sha256": "5c573471f125075647d03df72e026074b7203790d41351cd6edc96f46bcccd36",
+      "bytes": 60395,
+      "entries": 35
+    }
+  ]
+}
