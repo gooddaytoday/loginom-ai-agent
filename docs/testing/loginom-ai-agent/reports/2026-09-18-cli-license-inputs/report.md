@@ -413,3 +413,34 @@ actual inventory comparison caught this and the corrected test/collector preserv
 This closes regular-directory nested npm notice collection, not all embedded
 native/per-file attribution or corresponding-source/relinking requirements. The
 prior final archive is unchanged; these additions require a new complete build.
+
+## Complete Bun src/js source and embedded notices
+
+Downloaded the official Bun source archive for pinned commit
+`0d9b296af33f2b851fcbf4df3e9ec89751734ba4`; SHA256
+`aa045c1f3ddd3eb41ed8452d8a73eaab3b3322386416ebb1b160a6af6978d3e5`.
+Its LICENSE.md exactly matches the already pinned upstream notice hash.
+The complete source download remains at
+`/tmp/loginom-bun-source-audit/bun-0d9b296af.tar.gz`.
+
+Added a deterministic compressed archive of every src/js entry: 188 regular files
+(2259119 bytes) and the internal AGENTS.md -> CLAUDE.md link. Link target remains
+inside the included tree. All file bytes and the link target are unchanged;
+paths, file hashes, source URL/hash and normalization are in the paired inventory.
+No source instructions from this archive were applied to the project.
+
+Compressed source SHA256:
+`05472737c62a7029151c1307f379b97bbf81f5094dadff112be7da43cbc0a82d`.
+Inventory SHA256:
+`e0535426b621b9a8efea2de3e52dabb173a50454d6fc23fdfdb2b4571114644b`.
+The archive is 519500 bytes. Its entry/hash set was compared with the source
+archive; all 189 match. Existing individual assert/events/url supplements remain.
+All 37 native/source notice input file hashes and host typecheck PASS.
+
+The build copies this as licenses/bun/native/bun-js-sources/src-js.tar.gz with an
+inventory and explains it in the notices README. It includes unmarked files as
+well as 31 files containing explicit copyright/SPDX/permission markers, avoiding
+an attribution selection based solely on those markers. This is complete src/js
+source collection, not proof of the native Bun/WebKit dependency closure, exact
+binary linkage or relinking. Native/per-file and corresponding-source audit remains
+incomplete. The prior nested-notices archive has not been modified or relabelled.

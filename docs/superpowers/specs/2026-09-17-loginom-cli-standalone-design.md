@@ -2980,3 +2980,14 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   прежние live oracle сохраняют собственные artifact versions.
 
 [Новый архив и install evidence](../../testing/loginom-ai-agent/reports/2026-09-18-cli-nested-notices/report.md).
+
+### Bun: полный src/js с исходными notices
+
+- [x] Получен официальный source archive точного Bun commit; LICENSE.md совпал
+  с закреплённым hash. Полный src/js сохранён: 188 файлов и одна внутренняя ссылка.
+- [x] Все 189 entries/hash сверены с исходным архивом; 37 native/source notice
+  input hashes и host typecheck PASS. В inventory записаны origin/hash/transform.
+- [x] Build включает компактный src-js.tar.gz и inventory; README описывает его
+  и вложенные npm notices. Прежние individual JS supplements сохранены.
+- [ ] Новый архив с src/js ещё не собран. Native dependency source closure и
+  relinking остаются отдельными неподтверждёнными требованиями; это не release PASS.

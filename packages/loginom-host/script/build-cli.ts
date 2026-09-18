@@ -100,9 +100,10 @@ try {
   await Bun.write(
     join(artifact, "licenses/README.md"),
     "# Bundled dependency notices\n\n" +
-      "bundled-npm/inventory.json records emitted npm packages and the copied root-level license/notice texts. " +
+      "bundled-npm/inventory.json records emitted npm packages and the copied package and nested license/notice texts. " +
       "Its missing list and exclusions are unresolved release audit items; this development inventory is incomplete. " +
       "bun/ contains the exact runtime revision's upstream notice and its remaining audit items. " +
+      "bun/native/bun-js-sources/src-js.tar.gz preserves all src/js files and their original notices; inventory.json records each file hash. " +
       "On Linux, chromium/ contains credits exported from the pinned browser binary. " +
       "Runtime, Node, Dock and browser notices are described in resources/loginom/THIRD_PARTY_NOTICES.md.\n",
   )
