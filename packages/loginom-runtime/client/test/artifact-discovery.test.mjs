@@ -13,17 +13,15 @@ function fixture(fault) {
  const state={observer:{takeRecords:()=>[]},epoch:'doc',revision:1};
  const context=vm.createContext({document:{querySelectorAll:()=>fault==='owner'?[{}]:[owner],elementFromPoint:()=>fault==='blocked'?{}:owner},getComputedStyle:()=>({display:'block',visibility:'visible'})});
  context[Symbol.for('loginom-dock.workspace-ui.identity.v1')]=state;
- const page={waitForTimeout:async()=>{waits++},locator:()=>({count:async()=>1,isVisible:async()=>true,elementHandle:async()=>({dispose:async()=>{},evaluate:async(fn,arg)=>{
+ const page={waitForTimeout:async()=>{waits++},locator:selector=>({count:async()=>1,isVisible:async()=>true,isEnabled:async()=>true,
+  click:async()=>{if(selector.includes('btnRefresh'))refreshes++;},elementHandle:async()=>({dispose:async()=>{},evaluate:async(fn,arg)=>{
    const result=vm.runInContext('('+fn.toString()+')',context)(owner,arg);
    if(fault==='lost_scroll')throw Error('Transport lost after movement');return result;
  }})})};
  const ui=async(p,options)=>{
   const s=structuredClone(snapshot);
   if(fault==='directory'&&moves.length)s.file_storage.directory='/foreign';
-  const refreshTid=prefix+';FileStorageForm;btnRefresh';
-  if(options.discover_roots)s.ui.elements=[{tid:refreshTid,ref:'refresh'},...(top>=1400&&fault!=='absent'?[{tid:fileTid,ref:'file'}]:[])];
-  if(options.root_ref==='refresh')s.ui.elements=[{tid:refreshTid,ref:'refresh',allowed_actions:['click']}];
-  if(options.mode==='act'&&options.action?.ref==='refresh'){refreshes++;return {status:'SUCCEEDED',cleanup_complete:true,output:{}};}
+  if(options.discover_roots&&top>=1400&&fault!=='absent')s.ui.elements=[{tid:fileTid,ref:'file'}];
   if(options.root_ref==='file')s.ui.elements=[{tid:fileTid,ref:'file',label:name,storage_entry:{bytes:fault==='pending_size'&&refreshes===0?0:42}}];
   return {status:'SUCCEEDED',output:s};
  };

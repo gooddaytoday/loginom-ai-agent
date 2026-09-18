@@ -21,22 +21,19 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal) 
  const deadline=Date.now()+55000;
  let refreshes=0;
  const refreshDirectory=async()=>{
-  const roots=await ui(page,{...base,mode:'observe',discover_roots:true});
-  if(roots.status!=='SUCCEEDED'||!context(roots.output))return false;
-  const tid=roots.output.workflow_ref.prefix+';FileStorageForm;btnRefresh';
-  const candidates=roots.output.ui.elements.filter(e=>e.tid===tid);
-  if(candidates.length!==1)return false;
-  const details=await ui(page,{...base,mode:'observe',root_ref:candidates[0].ref});
-  if(details.status!=='SUCCEEDED'||!context(details.output))return false;
-  const controls=details.output.ui.elements.filter(e=>e.tid===tid&&e.allowed_actions?.includes('click'));
-  if(controls.length!==1)return false;
+  const before=await readDirectory();
+  if(before.status!=='SUCCEEDED'||!context(before.output))return false;
+  const tid=before.output.workflow_ref.prefix+';FileStorageForm;btnRefresh';
+  const control=page.locator('[data-tid='+JSON.stringify(tid)+']');
+  if(await control.count()!==1||!await control.isVisible()||!await control.isEnabled())return false;
   uncertain=true;
-  const action=await ui(page,{...base,mode:'act',snapshot:details.output,action:{verb:'click',ref:controls[0].ref}});
+  await control.click({timeout:10000});
+  await page.waitForTimeout(250);
+  const after=await readDirectory();
   uncertain=false;
-  if(action.status!=='SUCCEEDED'||action.cleanup_complete!==true)return false;
+  if(after.status!=='SUCCEEDED'||!context(after.output))return false;
   moved=true;refreshes++;
   trace.push({event:'artifact_directory_refreshed',attempt:refreshes});
-  await page.waitForTimeout(250);
   return true;
  };
  try {
