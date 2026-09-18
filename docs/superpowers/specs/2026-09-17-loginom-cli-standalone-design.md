@@ -3098,3 +3098,17 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   host typecheck PASS.
 - [ ] Rust std build dependencies, toolchain и actual rebuild/relink остаются
   открыты. Подготовка отдельного Docker toolchain начата, успех пока не заявляется.
+
+### Изолированный toolchain и первая native rebuild проверка
+
+- [x] Собран Docker image с LLVM 21.1.8 и закреплённым Rust nightly-2025-12-10
+  с rust-src. Версии проверены; пакеты хоста/Desktop не изменены.
+- [x] Bun release-local configure без сети PASS: 22 dependencies/1130 objects.
+- [x] TinyCC по настоящему Bun recipe собран без сети из сохранённого source,
+  с upstream patch и десятью object files; exit 0.
+- [x] Ограничения native rebuild: non-root, 2 CPU, 12 GiB, без дополнительного swap.
+- [ ] WebKit CMake configure/generate PASS, компиляция запущена и ещё выполняется;
+  полный Bun relink не выполнен. Local recipe использует ICU 78.2 из контейнера,
+  поэтому byte-identical upstream reproduction не заявляется.
+
+[Toolchain и текущая проверка](../../testing/loginom-ai-agent/reports/2026-09-18-cli-bun-relink/report.md).

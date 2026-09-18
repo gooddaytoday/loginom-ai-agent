@@ -1,0 +1,25 @@
+{
+  "toolchain": "PASS",
+  "image": "loginom-cli-bun-relink:20260918",
+  "imageId": "sha256:2dc56396b12b691b1a20e13c5d9d854ad2cc554656b58dad7f16913b9143fbad",
+  "baseImage": "ubuntu@sha256:cd21a4f68a617580279d4b091cb18e3af9fa8a87500665f0ae5f7f757d17d367",
+  "clang": "21.1.8",
+  "cargo": "1.94.0-nightly (2c283a9a5 2025-12-04)",
+  "rustc": "1.94.0-nightly (c61a3a44d 2025-12-09)",
+  "rustToolchain": "nightly-2025-12-10",
+  "rustSrc": true,
+  "systemIcu": "78.2",
+  "cmake": "4.2.3",
+  "ninja": "1.13.2",
+  "offlineConfigure": "PASS",
+  "offlineTinycc": "PASS",
+  "tinyccObjects": 10,
+  "fullWebkitRebuild": "RUNNING",
+  "fullBunRelink": "NOT_RUN",
+  "limits": {
+    "cpus": 2,
+    "cpuset": "0,1",
+    "memoryGiB": 12,
+    "swapGiB": 0
+  }
+}
