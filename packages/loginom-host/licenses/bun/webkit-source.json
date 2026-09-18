@@ -1,0 +1,14 @@
+{
+  "repo": "https://github.com/oven-sh/WebKit",
+  "commit": "5488984d20e0dbfe4be2c3ba8fb18eb81a5e0e8b",
+  "tree": "a7212e5d3aeb41afb46db3f955fb77b60900cfd6",
+  "bunCommit": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+  "file": "webkit-5488984d20e0dbfe4be2c3ba8fb18eb81a5e0e8b-source.tar.gz",
+  "bytes": 1976235831,
+  "sha256": "19b89496c4d39570ecad80ca6ac99c37a77c95179a0463f8a1b85fc48a276df1",
+  "entries": 464897,
+  "symlinks": 40,
+  "generation": "git archive --format=tar.gz HEAD with .git/info/attributes: * -text -eol -filter -ident -working-tree-encoding -export-subst -export-ignore",
+  "verification": "Every file and link matched the pinned Git tree's blob hash and executable mode",
+  "scope": "Complete WebKit source tree; not proof of rebuild or relinking"
+}

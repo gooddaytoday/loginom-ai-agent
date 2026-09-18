@@ -11,6 +11,7 @@ import { writeCliManifest, verifyCliManifest } from "../src/cli-manifest"
 import release from "../../product/loginom-release.json"
 import bunNotice from "../licenses/bun/source.json"
 import bunNativeNotices from "../licenses/bun/native/sources.json"
+import webkitSource from "../licenses/bun/webkit-source.json"
 import chromiumNotice from "../licenses/chromium/source.json"
 
 const repo = resolve(import.meta.dir, "../../..")
@@ -85,6 +86,9 @@ try {
     }
   }
   await Bun.write(join(artifact, "licenses/bun/native/sources.json"), JSON.stringify(bunNativeNotices, null, 2) + "\n")
+  if (webkitSource.bunCommit !== bunNotice.commit || webkitSource.commit !== bunNativeNotices.components.webkit.commit)
+    throw Error("LOGINOM_WEBKIT_SOURCE_REVISION_MISMATCH")
+  await Bun.write(join(artifact, "licenses/bun/webkit-source.json"), JSON.stringify(webkitSource, null, 2) + "\n")
   if (process.platform === "linux" && process.arch === "x64") {
     if (release.browserSha256 !== chromiumNotice.browserSha256 || release.chromiumRevision !== chromiumNotice.revision)
       throw Error("LOGINOM_CHROMIUM_NOTICE_REVISION_MISMATCH")
@@ -104,6 +108,7 @@ try {
       "Its missing list and exclusions are unresolved release audit items; this development inventory is incomplete. " +
       "bun/ contains the exact runtime revision's upstream notice and its remaining audit items. " +
       "The bun-js-sources, sqlite and bun-native-sources archives together preserve Bun's complete src tree with original notices; each inventory.json records its entry hashes. " +
+      "WebKit source is supplied separately: bun/webkit-source.json identifies the required source companion archive and its SHA256. " +
       "On Linux, chromium/ contains credits exported from the pinned browser binary. " +
       "Runtime, Node, Dock and browser notices are described in resources/loginom/THIRD_PARTY_NOTICES.md.\n",
   )

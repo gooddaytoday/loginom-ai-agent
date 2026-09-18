@@ -33,6 +33,29 @@ Installed manifest/source inventories PASS: 41 native/source hashes, 306 archive
 entries и 947 npm notice/README hashes; штатное удаление сохранило профиль.
 [Артефакт и конкретный остаток аудита](reports/2026-09-18-cli-bun-sources/report.md).
 
+## WebKit source companion
+
+Большой WebKit archive поставляется отдельным каталогом рядом с CLI archive.
+Его точные commit/tree/size/SHA256 закреплены в
+`packages/loginom-host/licenses/bun/webkit-source.json`; сборщик CLI также
+включает эту запись в `licenses/bun/webkit-source.json` установленного payload.
+Сборка комплекта из заранее полученного канонического архива:
+
+```sh
+# Из packages/loginom-host, закреплённым Bun 1.3.14:
+bun script/build-webkit-source-companion.ts /absolute/webkit-source.tar.gz /absolute/new-source-companion
+# В созданном каталоге:
+sha256sum -c SHA256SUMS
+```
+
+Сборщик проверяет исходный архив и доставленную копию потоковым SHA256,
+отклоняет неверный размер/hash и не заменяет существующий каталог.
+Проверен `/tmp/loginom-cli-webkit-source-companion`: 1976235831 bytes,
+SHA256 `19b89496c4d39570ecad80ca6ac99c37a77c95179a0463f8a1b85fc48a276df1`.
+Проверки повреждения и сохранения существующего каталога PASS; host typecheck PASS.
+Это комплект одного компонента: остальные external sources и фактическая
+перелинковка остаются отдельными задачами. Публикация не выполнялась.
+
 ## Исправления ревью a7d812e4a — исходная проверка 2026-09-18
 
 - Dock business failures без MCP `isError` дают ошибку tool/код 1; успешное

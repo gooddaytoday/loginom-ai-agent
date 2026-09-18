@@ -3049,3 +3049,16 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   прочие external sources, relinking и новый binary archive остаются открыты.
 
 [Результаты проверки](../../testing/loginom-ai-agent/reports/2026-09-18-cli-license-inputs/report.md).
+
+### Отдельная поставка WebKit source
+
+- [x] Добавлен сборщик source companion: закреплённые commit/tree/hash/size,
+  потоковая проверка исходника и копии, запрет замены существующего каталога.
+- [x] Реальный комплект `/tmp/loginom-cli-webkit-source-companion` собран;
+  независимый sha256sum, отклонение неверного размера/hash и сохранение
+  существующего каталога PASS. Host typecheck PASS.
+- [x] CLI build включает WebKit source metadata и ссылку на companion в notices.
+- [ ] Новый Linux binary archive с полным набором последних source additions
+  ещё предстоит собрать; external sources/relinking audit остаётся открытым.
+
+[Команды поставки](../../testing/loginom-ai-agent/standalone-cli.md#webkit-source-companion).
