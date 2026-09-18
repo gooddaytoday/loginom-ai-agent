@@ -92,7 +92,7 @@ test("actual standalone status launches bundled Node and releases the isolated p
     expect(await child.exited).toBe(0)
     expect(await errors).toBe("")
     expect(JSON.parse(await out)).toMatchObject({ state: "unconfigured", hasApiKey: false, generation: 0 })
-    expect(await readdir(directory)).toEqual(["bundle", "profile"])
+    expect((await readdir(directory)).sort()).toEqual(["bundle", "profile"])
     expect(await readdir(join(directory, "profile"))).not.toContain(".writer")
     expect(await readdir(join(directory, "profile", "loginom"))).not.toContain("runtime")
     const run = Bun.spawn(
