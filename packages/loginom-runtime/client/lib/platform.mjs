@@ -41,7 +41,14 @@ export function grantWindowsChromiumUploadRead(path, platform = process.platform
   if (!isWindows(platform) || process.platform !== 'win32') return;
   const root = process.env.SystemRoot ?? process.env.SYSTEMROOT;
   if (!root || !win32.isAbsolute(root) || !win32.isAbsolute(path)) throw new Error('Cannot authorize the Windows upload staging directory');
-  const result = spawnSync(win32.join(root, 'System32', 'icacls.exe'), [path, '/grant:r', `*${chromiumAppContainerSid}:(OI)(CI)RX`], {
+  const icacls = win32.join(root, 'System32', 'icacls.exe');
+  // The store root contains opaque admitted files. Chromium receives traverse
+  // only there; readable inheritance begins at the random transfer directory.
+  const parent = win32.dirname(path);
+  const traverse = spawnSync(icacls, [parent, '/grant:r', `*${chromiumAppContainerSid}:(X)`], {
+    encoding: 'utf8', windowsHide: true,
+  });
+  const result = traverse.error || traverse.status !== 0 ? traverse : spawnSync(icacls, [path, '/grant:r', `*${chromiumAppContainerSid}:(OI)(CI)RX`], {
     encoding: 'utf8', windowsHide: true,
   });
   if (result.error || result.status !== 0) throw new Error('Cannot authorize the Windows upload staging directory');
