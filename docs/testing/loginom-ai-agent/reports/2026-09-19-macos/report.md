@@ -53,11 +53,11 @@ Helper собран clang с minimum macOS 14.0 и подписан ad-hoc.
 ad-hoc identity; эта граница проверяется отдельно на конечном кандидате.
 Локальное доказательство: `/tmp/loginom-keychain-acceptance-AIXteb/summary.json`.
 
-## Пока не подтверждено
+## Граница приёмки
 
-Предварительная Desktop source-сборка прошла, staged resources: 4432 файла.
-Настоящие Desktop DMG/ZIP и полный CLI TAR.GZ, installed GUI/CLI acceptance,
-Loginom/model/CSV 55/101, совместный lifecycle, CI macOS14 и скачанные CI artifacts.
+Приведённые ниже source, artifact и installed проверки учитываются отдельно.
+Полная приёмка CSV, совместного lifecycle и CI остаётся незавершённой до появления
+явных результатов в соответствующих разделах.
 Gatekeeper trust, Developer ID, notarization, public release и auto-update
 исключены согласованным планом. Полная GUI-приёмка на чистой macOS14 не входит в этап.
 
@@ -96,3 +96,113 @@ lock unchanged, неиспользуемый Solid Start не установле
 Локальный pre-push hook запускал общий typecheck всех upstream workspaces и
 остановился на отсутствующем Solid Start в console-support. После успешных
 package-local проверок push выполнен без этого hook; сам hook не изменялся.
+
+## Кандидат 02: единая локальная сборка
+
+Версия `0.1.4-macos.20260919.2`, чистый commit
+`6650b6d017ce805eb4e6b2e250e612ac55856f16`, macOS27 arm64.
+Общий build завершился PASS: DMG/ZIP, CLI TAR.GZ, source archive, manifest,
+финальные SHA256, статическая проверка обоих Desktop архивов и автономный smoke.
+Доказательства: [build](candidate-02-build.json), [manifest](candidate-02-manifest.json),
+[SHA256](candidate-02-SHA256SUMS), [offline](candidate-02-offline.json).
+[Package-local source checks](source-checks-02.json) — PASS для всех восьми групп.
+Локальный каталог артефактов: `~/.cache/loginom-macos-build/candidate-02`.
+
+Desktop02 скопирован целым bundle из readonly DMG в изолированный
+`~/.cache/loginom-macos-build/installed-02/Applications`. Runtime не скачивается
+при установке. Полная установленная приёмка продолжается.
+
+CI03 (`35404061216`) прошёл provisioning и source checks, но electron-vite
+исчерпал стандартный Node heap около 2 GiB. В CI build step установлен лимит
+4096 MiB; повторный run `35404497837` выполняется. Это ещё не CI PASS.
+
+Установленный Desktop02: onboarding, реальное подключение Loginom, safe IPC,
+safeStorage и повторный запуск без мастера — PASS. Реальный Xiaomi Token Plan
+Singapore `mimo-v2.5` вернул `OK` без вызовов инструментов
+([sanitized model evidence](candidate-02-model.json)).
+
+Первый Desktop CSV02 остановился на import A со статусом `AMBIGUOUS`,
+`NODE_APPLY_STOPPED: Graph changed after refused gesture`, cleanup incomplete.
+Данные восстановления сохранены; результат CSV не считается успешным.
+Приёмка повторяется в свежем черновике после завершения других live-прогонов.
+
+Установленный CLI02: три active-import сценария прошли на macOS27
+([recovery evidence](candidate-02-cli-recovery.json)). При SIGINT и потере browser
+сохранена recovery-запись, состояние `recoverable-error`, guard снят. При SIGKILL
+владельца recovery и guard сохранены, повторный доступ закрыт с `PROFILE_BUSY`
+(автоматическое продолжение опасной операции не выполняется). В каждом случае
+18 отслеживаемых процессов завершились; дополнительный поиск по уникальному
+install root не обнаружил reparented crashpad или другие остаточные процессы.
+
+CLI02 CSV55/101 — PASS: A=35+20, B=100+1; оба пакета сохранены
+и независимо открыты заново без повторной настройки
+([CSV and cold-readback evidence](candidate-02-cli-csv.json)).
+Первый cold A обнаружил hardcoded Linux в тестовом reader; исправлена только
+проверка platform по реальной ОС. Затем cold A повторён, B выполнен отдельным
+продолжением теми же операциями. Runtime артефакта не изменялся.
+[Upgrade evidence](candidate-02-cli-upgrade.json): старый payload удалён штатным
+uninstall, новый установлен по прежнему пути профиля; ciphertext прочитан новым
+helper. История отдельно прочитана через SQLite readonly: session/message/part IDs и полное содержимое шести частей совпали с сохранёнными событиями candidate01 ([exact history evidence](candidate-02-cli-history.json)). Это подтверждает сохранённую историю; продолжение модельного диалога после upgrade не проверялось.
+
+Desktop02 two-chat Unicode admission — PASS
+([live receipts verification](candidate-02-multichat.json)): один Desktop process,
+два независимых чата, реальные файлы `Данные продаж/Продажи А.csv` и
+`Продажи Б.csv`, разные session/artifact/upload пути и проверенные исходные SHA256.
+Возврат в A сохранил его исходный artifact, hash, destination и document epoch.
+Файлы прочитаны с диска и переданы через backend API; native picker не проверялся.
+Первичный combined harness остановился после успешного multichat на неверном
+предположении о отдельном Host PID (в Desktop Host встроен в main).
+Оригинальный FAIL не переписан: независимая проверка восьми сохранённых live receipts
+подтвердила только multichat-область, а window lifecycle учитывается отдельно.
+
+Desktop02 полный повторный CSV-прогон — PASS: 55 и 101, сохранение обоих
+пакетов, завершение процесса и независимое холодное открытие без повторной
+настройки узлов ([Desktop CSV evidence](candidate-02-desktop-csv.json)).
+Первый AMBIGUOUS прогон не повторял незавершённую операцию: созданы новые
+изолированные черновики. Приёмочный scripted provider выбирает инструменты;
+Desktop/backend/Host и Loginom выполняют реальные операции.
+
+Desktop01→02 upgrade — PASS
+([persistence evidence](candidate-02-desktop-upgrade.json)): один isolated userData,
+дисковая SQLite, совпавшие session/user-message IDs и содержимое, настройки через
+штатный IPC, прежний safeStorage ciphertext. Для этого теста обычный onboarding
+test mode не использовался (он включает in-memory DB). До старта main через
+Inspector задан отдельный appData, все XDG paths изолированы; настоящий HOME
+сохранён только для доступного пользовательского Keychain. Production-код и
+подписанные bundles не менялись. Содержимое тестового диалога синтетическое,
+модель/сеть Loginom в upgrade-прогоне не вызывались.
+
+Нативный Finder/window/Cmd+Q — PASS
+([evidence](candidate-02-finder-lifecycle.json)): Desktop02 действительно открыт
+двойным щелчком в Finder из установленного каталога. PATH системный
+`/usr/bin:/bin:/usr/sbin:/sbin`, TEST_ROOT изолированный. Две временные
+app-specific launchctl-переменные восстановлены сразу после запуска.
+Закрытие последнего окна оставило тот же main PID без renderer; активация
+восстановила окно в том же процессе. Настоящий Cmd+Q через native UI завершил
+все процессы установленного пути. Этот прогон использовал onboarding без Loginom.
+
+Совместная работа Desktop/CLI — PASS
+([process evidence](candidate-02-independence.json)): одновременно наблюдались
+разные runtime/browser trees; после закрытия Desktop CLI выполнил новое
+authenticated observation, и наоборот. По окончании в обоих installed paths
+осталось 0 процессов, включая reparented crashpad.
+
+CI04 (`35404497837`, source `870356d33`) после увеличения heap прошёл
+source checks, сборку обоих продуктов и static DMG/ZIP verification. Offline
+smoke подтвердил встроенные Node/Chromium обоих продуктов и CLI help/version,
+но Desktop probe завершился ошибкой. Старый probe скрывал stderr; добавлены
+ограниченные diagnostics (`949c30414`) и выполняется CI05 `35405764130`.
+Полный CI PASS пока не заявляется. Downloaded CI04 artifacts отделены от
+локального candidate02: исходники отличаются CI memory setting; побайтовое
+равенство независимых сборок не предполагается.
+
+CI05 отменён до сборки после обнаружения различия Playwright launch flags:
+при explicit packaged executable Desktop не получает `--use-mock-keychain`,
+а Chromium probe получает. При пустом HOME native Electron Keychain init
+может вызвать системный диалог (такой stack отдельно наблюдался в локальном
+upgrade harness). Точная причина предыдущего CI timeout без stderr не установлена.
+Только no-credentials offline Desktop probe теперь явно получает mock-keychain;
+это не production-настройка. Настоящие safeStorage/Keychain проверки выше
+выполнялись без этого флага. Следующий CI должен подтвердить исправление.
+[Downloaded CI04 hashes](ci-35404497837-download.json) совпали; это PASS_HASHES_ONLY,
+не замена успешному CI smoke.

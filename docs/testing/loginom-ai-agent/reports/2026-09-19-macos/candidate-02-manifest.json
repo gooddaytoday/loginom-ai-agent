@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "version": "0.1.4-macos.20260919.2",
+  "channel": "dev",
+  "builtAt": "2026-09-18T23:05:01.172Z",
+  "source": {
+    "commit": "6650b6d017ce805eb4e6b2e250e612ac55856f16",
+    "dirty": false,
+    "patchSha256": null,
+    "inputsManifestSha256": "de09a0423015249fd2bf22b9f94af04b269aacea8b9fbdb2b983cb3b0d60676f",
+    "importSha256": "9d5b100cc002ab43c3a3eca11113a1afa10d8407af6dd292bb04f372cf1c4bd7"
+  },
+  "target": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "minimumOS": "14.0",
+    "backend": "v1"
+  },
+  "build": {
+    "os": "darwin",
+    "arch": "arm64",
+    "bun": "1.3.14",
+    "lockSha256": "c100ad76bab6113400e086dff9646435edfedc779fe9888843a9603df035aded"
+  },
+  "runtime": {
+    "electron": "42.3.3",
+    "electronNode": "24.15.0",
+    "node": "24.19.0",
+    "playwright": "1.63.0-alpha-2026-08-31",
+    "playwrightMcp": "0.0.80",
+    "chromiumVersion": "153.0.8010.12",
+    "chromiumRevision": "1243",
+    "catalogSha256": "d26ce18ab9ef3285d5bac7aff1d17d4968defb1d41ebd7cbbda8d9cbede07255",
+    "resourcesSha256": "2eb5950446f28641e2adb76a9e366ec9309cc61427722541c03e608308e1cd17"
+  },
+  "product": {
+    "name": "Loginom AI Agent Dev",
+    "appId": "com.loginom.aiagent.dev",
+    "executable": "loginom-ai-agent-dev",
+    "uriScheme": "loginom-ai-agent"
+  },
+  "paths": {
+    "executor": "Contents/Resources/loginom/runtime/src/managed-entry.mjs",
+    "node": "Contents/Resources/loginom/bin/node",
+    "chromium": "Contents/Resources/loginom/browsers/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+    "config": "~/Library/Application Support/com.loginom.aiagent.dev",
+    "data": "${XDG_DATA_HOME:-~/.local/share}/loginom-ai-agent-dev",
+    "cache": "${XDG_CACHE_HOME:-~/.cache}/loginom-ai-agent-dev",
+    "state": "${XDG_STATE_HOME:-~/Library/Application Support/com.loginom.aiagent.dev}/loginom-ai-agent-dev",
+    "logs": "~/Library/Application Support/com.loginom.aiagent.dev/logs",
+    "profiles": "~/Library/Application Support/com.loginom.aiagent.dev/loginom/runtime",
+    "secretStore": "electron-safeStorage-keychain"
+  },
+  "connection": {
+    "schemaVersion": 1,
+    "generationProtocol": 1,
+    "knowledgeEndpoint": "https://loginom.duckdns.org/mcp"
+  },
+  "updater": {
+    "feed": null,
+    "channel": "dev",
+    "previousVersion": null
+  },
+  "signing": {
+    "status": "ad-hoc",
+    "identity": "-",
+    "notarized": false
+  },
+  "installation": {
+    "scope": "user",
+    "uninstallPolicy": "Remove the application bundle; user profiles and credentials are retained.",
+    "preservesUserData": true
+  },
+  "validation": {
+    "commands": [
+      {
+        "cwd": "packages/desktop",
+        "argv": [
+          "bun",
+          "test",
+          "src/main/loginom",
+          "electron-builder.config.test.ts",
+          "scripts/release/artifact.test.ts"
+        ]
+      }
+    ],
+    "reportFiles": [
+      "static-dmg.json",
+      "static-zip.json"
+    ]
+  },
+  "provenance": {
+    "licensesSha256": "668d68cc42db444e278a1fd1fee8bc6701179d9c3bd4d3e2abdb7920d7cb58a1",
+    "migrationManifestSha256": "9d5b100cc002ab43c3a3eca11113a1afa10d8407af6dd292bb04f372cf1c4bd7"
+  },
+  "artifacts": [
+    {
+      "file": "loginom-ai-agent-0.1.4-macos.20260919.2-source.tar.gz",
+      "kind": "source",
+      "bytes": 172666422,
+      "sha256": "8367829ddc8b51a3b7f1fe7bad5fa72e985682d3f15b372303bfd08a42662237"
+    },
+    {
+      "file": "loginom-ai-agent-mac-arm64.dmg",
+      "kind": "dmg",
+      "bytes": 483680299,
+      "sha256": "dde8c6542bf6e0bf23f7a0e8043931486f90e0c222e3cdd79f3d56d9f1e8448b"
+    },
+    {
+      "file": "loginom-ai-agent-mac-arm64.zip",
+      "kind": "zip",
+      "bytes": 485132778,
+      "sha256": "87527a2ccdd46e9b017f9215fd1868450ca17ea05e556f16b8dc905770722998"
+    }
+  ]
+}

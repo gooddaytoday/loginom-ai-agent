@@ -46,7 +46,11 @@ ad-hoc до манифестов. CLI payload находится в `cli/`, TAR.
 Статические проверки: DMG подключается readonly, ZIP распаковывается,
 проверяются хеши, framework symlinks, arm64, подписи и минимальная ОС.
 Автономный smoke использует встроенные Node/Chromium, отдельные HOME/profiles
-и системный PATH. Он не подключается к Loginom и не заменяет полную приёмку.
+и системный PATH. Desktop probe передаёт `--use-mock-keychain`, чтобы
+пустой временный HOME не вызывал интерактивный Keychain UI на CI. Эта настройка
+относится только к smoke без credentials; реальный safeStorage/Keychain проверяется
+отдельно на установленном продукте. Smoke не подключается к Loginom и не заменяет
+полную приёмку.
 CI `.github/workflows/loginom-macos.yml` повторяет этот процесс на `macos-14`
 и сохраняет результаты в Actions artifacts; секреты сервисов не нужны.
 
@@ -61,7 +65,7 @@ CI `.github/workflows/loginom-macos.yml` повторяет этот проце�
 Дальнейший протокол сохраняет release-требования как справочные. Требования
 Developer ID/notarization/update feed оцениваются только при отдельном релизе.
 
-Прочитать [общий протокол и сценарии](README.md), вести [отчёт](report-template.md). При отсутствии Loginom DMG/release manifest нативная приёмка имеет статус **BLOCKED**. Документ не означает, что macOS-проверки уже выполнялись.
+Прочитать [общий протокол и сценарии](README.md), вести [отчёт](report-template.md). При отсутствии Loginom DMG и manifest нативная приёмка конкретного кандидата имеет статус **BLOCKED**. Выполненные проверки и ограничения приведены в датированном отчёте выше; процедура сама по себе не подтверждает их выполнение.
 
 ## 1. Машина и входные материалы
 
@@ -92,10 +96,9 @@ command -v node bun python python3 npm chromium google-chrome
 read -r 'agent_dmg?Путь к DMG из release manifest: '
 shasum -a 256 "$agent_dmg"
 hdiutil verify "$agent_dmg"
-xcrun stapler validate "$agent_dmg"
 ```
 
-Сравнить SHA256 с manifest. `stapler` требует developer tools: при их отсутствии проверку stapling выполнить на отдельной build-машине, а нативную clean-install проверку Gatekeeper — на чистом Mac. Не устанавливать developer tools в середине теста отсутствия runtime.
+Сравнить SHA256 с manifest. Только для будущего нотариализованного release-пакета выполнить `xcrun stapler validate "$agent_dmg"`; для текущего ad-hoc кандидата отсутствие stapling ожидаемо. `stapler` требует developer tools: при их отсутствии проверку stapling выполнить на отдельной build-машине, а нативную clean-install проверку Gatekeeper — на чистом Mac. Не устанавливать developer tools в середине теста отсутствия runtime.
 
 Неправильный hash блокирует использование артефакта. Для release-пакета отсутствие ожидаемой подписи/нотариализации — дефект packaging; для dev-пакета это ограничение exploratory run, не подтверждение release gate.
 
@@ -115,10 +118,9 @@ xcrun stapler validate "$agent_dmg"
 read -r 'agent_app?Путь к установленному .app из release manifest: '
 codesign --verify --deep --strict --verbose=2 "$agent_app"
 codesign -dv --verbose=4 "$agent_app"
-spctl --assess --type execute --verbose=4 "$agent_app"
 ```
 
-Проверить `Identifier`, `TeamIdentifier` и подпись вложенных helper/runtime/Chromium. Для бинарных файлов из manifest выполнить `file <точный путь>`; при необходимости `lipo -archs <точный путь>` на build-машине. Не сканировать все пользовательские каталоги и не включать секретные paths в общедоступный отчёт.
+Для будущего Developer ID release дополнительно выполнить `spctl --assess --type execute --verbose=4 "$agent_app"`. Ad-hoc подпись текущего кандидата не подтверждает Gatekeeper trust. Проверить `Identifier`, ожидаемый тип подписи и подписи вложенных helper/runtime/Chromium; `TeamIdentifier` собственного ad-hoc кода отсутствует. Для бинарных файлов из manifest выполнить `file <точный путь>`; при необходимости `lipo -archs <точный путь>` на build-машине. Не сканировать все пользовательские каталоги и не включать секретные paths в общедоступный отчёт.
 
 Если старт неудачен: зафиксировать stage, время и сведения из Console/Crash Reports, затем сопоставить с desktop logs. Отделить signature/quarantine/entitlements от отсутствующего runtime, неверной архитектуры и network/auth failure. Успех после отключения защит ОС не закрывает дефект штатного запуска.
 
@@ -140,30 +142,32 @@ UPDATE-01 требует версии N/N+1 и собственного feed. Д
 
 Для REMOVE-01 закрыть приложение, удалить только его bundle и компоненты согласно release-инструкции. Сохранение/удаление пользовательских config, данных и Keychain записей сверить с политикой manifest. Не удалять целиком `~/Library/Application Support`, Keychain или данные чужого OpenCode. Проверить отсутствие дочерних процессов и результат повторной установки.
 
-## 6. Если требуется нативная сборка исправления
+## 6. Нативная сборка исправления
 
-Следующие команды подтверждены текущими package scripts, но **пока собирают исходный OpenCode**. Они не заменяют будущий Loginom pipeline. Исполнитель берёт окончательные команды из manifest соответствующего commit.
+Использовать общий `packages/desktop/scripts/build-macos.ts` и закреплённые
+в начале документа инструменты. Скрипт собирает Loginom AI Agent Desktop
+и независимый CLI из чистого зафиксированного checkout. Результаты помещаются
+в новый явно указанный каталог; предыдущие кандидаты сохраняются.
 
-На отдельной build-машине установить Node 24, Bun версии корневого `packageManager` (при подготовке документа — 1.3.14), Xcode Command Line Tools и native prerequisites из lockfile/CI. Проверить arm64 Terminal. Подпись/нотариализация требуют предоставленных release credentials; их нельзя подставлять из upstream или хранить в репозитории.
+Перед сборкой выполнить `packages/desktop/scripts/check-macos.ts`. Он запускает
+package-local проверки Desktop, Host, Product и Agent. После изменений
+renderer дополнительно выполнить `bun typecheck` из `packages/app`.
+Тесты запускаются из package directories, никогда из корня; прямой `tsc`
+не используется.
 
-Из корня checkout:
+На машине с ограниченной памятью Node может выбрать недостаточный для
+Electron/backend bundling предел heap. CI задаёт только шагу сборки
+`NODE_OPTIONS=--max-old-space-size=4096`; тот же параметр можно передать
+локальной команде при аналогичном ограничении. Это настройка процесса сборки,
+а не установленного приложения.
 
-```sh
-bun install --os=darwin --cpu=arm64
-```
+Текущий packaging использует Loginom product identity, arm64 DMG/ZIP,
+минимальную macOS 14.0 и ad-hoc подпись без notarization и публикации.
+Неиспользуемые ссылки на отсутствующий `packages/desktop/native` удалены.
+Исторические указания о сборке OpenCode, backend в `packages/opencode`,
+старом update feed и необходимости создать каталог `native` к этому
+pipeline не применяются. Developer ID, notarization, N/N+1 и update feed
+остаются отдельными требованиями будущей release-приёмки из разделов выше.
 
-Из `packages/desktop`:
-
-```sh
-bun typecheck
-bun run build
-bun run package:mac --arm64 --publish never
-```
-
-Результат текущего pipeline — `packages/desktop/dist/`. Lifecycle `prebuild` собирает backend и в dev может загружать CLI. Packaging config включает notarization/hardened runtime и пока старые product ID/feed. Отказ сборки из-за отсутствующих release credentials записать отдельно от поведения приложения. `--publish never` исключает публикацию, но не превращает пакет автоматически в неподписанный.
-
-После изменений app/backend запустить `bun typecheck` из `packages/app`/текущего `packages/opencode` соответственно; **после согласованного переименования backend — из `packages/agent`**. Конкретные тесты запускаются из package directories, никогда из корня; прямой `tsc` запрещён. Новые Loginom тесты и их команды должны быть перечислены в manifest, когда они появятся.
-
-На момент подготовки документа каталога `packages/desktop/native` нет, хотя config/scripts его упоминают. Сборка не запускалась; возможный связанный отказ требует исправления build input, а не создания пустого placeholder-каталога.
-
-Передать исправление с commit/patch, новыми hash и протоколом повторных проверок. Прогон прежнего DMG не подтверждает новый DMG даже при одинаковой видимой версии.
+Передать исправление с commit/patch, новыми hash и протоколом повторных проверок.
+Прогон прежнего DMG не подтверждает новый DMG даже при одинаковой видимой версии.

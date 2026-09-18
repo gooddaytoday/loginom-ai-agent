@@ -61,7 +61,11 @@ try {
   const prepared = await execute(
     makeWorkspacePrepareCode({
       loginomUrl: page.url(),
-      compatibility: { loginom_build: "7.4.2", platform: "linux", browser: "chromium" },
+      compatibility: {
+        loginom_build: "7.4.2",
+        platform: { darwin: "macos", linux: "linux", win32: "windows" }[process.platform],
+        browser: "chromium",
+      },
       sessionId: session,
       operationId: "cold-open",
       intent: "open_package",

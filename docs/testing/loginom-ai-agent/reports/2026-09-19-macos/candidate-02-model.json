@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "version": "0.1.4-macos.20260919.2",
+  "provider": "xiaomi-token-plan-sgp",
+  "model": "mimo-v2.5",
+  "reply": "OK",
+  "toolCalls": 0,
+  "isolatedProfile": true,
+  "credentialsRefreshed": false
+}

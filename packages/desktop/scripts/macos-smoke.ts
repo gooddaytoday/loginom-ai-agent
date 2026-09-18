@@ -95,6 +95,9 @@ try {
     console.error("SMOKE_DESKTOP_LAUNCH");
     const application = await _electron.launch({
       executablePath: ${JSON.stringify(join(desktop, "Contents/MacOS", name))},
+      // Packaged launches skip Playwright's default Electron loader flags.
+      // This no-credentials smoke must not open the runner's login Keychain UI.
+      args: ["--use-mock-keychain"],
       env: process.env,
       timeout: 120000,
     });
@@ -156,6 +159,7 @@ try {
         limitations: [
           "No Loginom or model connection; no credentials supplied",
           "Not a network sandbox",
+          "Desktop uses --use-mock-keychain only for this credential-free offline probe",
           "Does not validate Gatekeeper, Keychain persistence, or installed GUI acceptance",
         ],
       },

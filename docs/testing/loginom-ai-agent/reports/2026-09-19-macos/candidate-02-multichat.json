@@ -1,0 +1,157 @@
+{
+  "status": "PASS",
+  "scope": "Independent verification of installed Desktop multichat live receipts",
+  "version": "0.1.4-macos.20260919.2",
+  "executable": "/Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/MacOS/Loginom AI Agent Dev",
+  "desktopPid": 81329,
+  "oneDesktopProcess": true,
+  "chats": [
+    {
+      "session": "ses_f4931301cffedszHAgABbLJIoZ",
+      "dockSession": "045b0508-a31b-49ef-95bb-d7ba1d8f366b",
+      "artifact": "6b182afc-17d9-49c0-b70a-b886e037b297",
+      "destination": "/user/3036f96f8b35c4722ad3c89e9f0159de2c29bcd51c4d6d95aa3ac65943aa99dc-0-Продажи А.csv",
+      "filename": "Продажи А.csv",
+      "admittedName": "3036f96f8b35c4722ad3c89e9f0159de2c29bcd51c4d6d95aa3ac65943aa99dc-0-Продажи А.csv",
+      "observationDocument": "1789773412269-yiwzck5iy3t",
+      "observedWorkflow": {
+        "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-2",
+        "prefix": "MF;TF-2"
+      },
+      "localPath": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-macos-multichat-kMFvBz/Данные продаж/Продажи А.csv",
+      "sha256": "98aa522befcb544089edf626c2713e1cf69aaf54f93a0a92a0df7e3e4a10fcd5",
+      "document": "1789773408185-bjnnydi6rxf",
+      "workflow": {
+        "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+        "prefix": "MF;TF-1",
+        "navigation_path": [
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+            "label": ""
+          },
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+            "label": "Пакеты"
+          },
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+            "label": "Package1"
+          },
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+            "label": "Модуль1"
+          },
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+            "label": "Сценарий"
+          }
+        ],
+        "workflow_id": "1789773408185-bjnnydi6rxf-1"
+      }
+    },
+    {
+      "session": "ses_f4930f57effemxYyBxe1iboZYo",
+      "dockSession": "de8f5f37-c1b0-4506-a328-61ee646c77f5",
+      "artifact": "dd07f4c1-757d-460a-9d41-7f8b1d4b2018",
+      "destination": "/user/72a3107b077284d18196eb3198fbfbf351fb78b835cb54501bc1191eec682b9d-0-Продажи Б.csv",
+      "filename": "Продажи Б.csv",
+      "admittedName": "72a3107b077284d18196eb3198fbfbf351fb78b835cb54501bc1191eec682b9d-0-Продажи Б.csv",
+      "observationDocument": "1789773427962-efc8qmteeo4",
+      "observedWorkflow": {
+        "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-2",
+        "prefix": "MF;TF-2"
+      },
+      "localPath": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-macos-multichat-kMFvBz/Данные продаж/Продажи Б.csv",
+      "sha256": "71566126acfc907717a41ba31ef83d8867ca6080979f62948bd906a811492f4c",
+      "document": "1789773424065-tbsqyyndcdc",
+      "workflow": {
+        "tab_tid": "MF;cntMain;cntWorkspace;Workspace;t.br;tb-1",
+        "prefix": "MF;TF-1",
+        "navigation_path": [
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер",
+            "label": ""
+          },
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты",
+            "label": "Пакеты"
+          },
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1",
+            "label": "Package1"
+          },
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1",
+            "label": "Модуль1"
+          },
+          {
+            "tid": "MF;TF-1;cnrNaviMode;b.s_Сервер>Пакеты>Package1>Модуль1>Сценарий",
+            "label": "Сценарий"
+          }
+        ],
+        "workflow_id": "1789773424065-tbsqyyndcdc-1"
+      }
+    }
+  ],
+  "returnToFirst": {
+    "sameArtifact": true,
+    "sameHash": true,
+    "sameDestination": true,
+    "sameDocumentEpoch": true,
+    "sameObservedWorkflow": true
+  },
+  "checks": [
+    "local-unicode-paths-and-filenames",
+    "original-fixture-byte-equality",
+    "independent-chat-session-artifact-destination-hash",
+    "live-verified-upload-both-files",
+    "return-to-first-original-artifact",
+    "return-to-first-original-workspace",
+    "normal-exit-no-tracked-descendants"
+  ],
+  "cleanExit": true,
+  "remainingTrackedPids": [],
+  "originalReport": "/Users/kartamyshev/.cache/loginom-macos-build/candidate-02/multichat-installed.json",
+  "originalReportSha256": "8574df2ebfccdd789212214f42ff11c3d11057bcb38fdb1798133d35fdea7bbd",
+  "receipts": [
+    {
+      "path": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-macos-multichat-kMFvBz/tool-1-dock_prepare.txt",
+      "sha256": "cecd8cc54ad308355c3c9d37c9c8c766faab684342ee3210c74cf0490178dc4c"
+    },
+    {
+      "path": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-macos-multichat-kMFvBz/tool-2-dock_artifact_deliver.txt",
+      "sha256": "edeefcaa1d68b337f2675840a7fb52e82473f0de9ad60a6ce4157f26facee029"
+    },
+    {
+      "path": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-macos-multichat-kMFvBz/tool-3-dock_workspace_observe.txt",
+      "sha256": "ca0f76f7feb88684d83c5c3aaf9f076dff5d2224f8cac8a081eddf2289b43364"
+    },
+    {
+      "path": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-macos-multichat-kMFvBz/tool-4-dock_prepare.txt",
+      "sha256": "2fcb6ca3cb2ed78ad11f1641b79247a426ac235a98dbb89bd1690ed28df5012a"
+    },
+    {
+      "path": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-macos-multichat-kMFvBz/tool-5-dock_artifact_deliver.txt",
+      "sha256": "250a9d5ff061dc5fb66c33da7a685c03a83f92054a9ab5fcca08aaf3cc791d2c"
+    },
+    {
+      "path": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-macos-multichat-kMFvBz/tool-6-dock_workspace_observe.txt",
+      "sha256": "7a4d1bfc4596ea35ae20519a452cdd2fdacaa4305fefd4e23a57de99d313d8ff"
+    },
+    {
+      "path": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-macos-multichat-kMFvBz/tool-7-dock_action_describe.txt",
+      "sha256": "6b509b23754dee6774235711538370faabb056f28b69803d97c52fe9c09e3148"
+    },
+    {
+      "path": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-macos-multichat-kMFvBz/tool-8-dock_workspace_observe.txt",
+      "sha256": "d0dc4cf023b349d68d42e9aff37372c4dfa4e40d6db5a7cf97062584cdfdc8f8"
+    }
+  ],
+  "limitations": [
+    "Scripted provider selected tools; real Desktop/Host/Loginom executed them",
+    "Attachment bytes read from actual Unicode local files and submitted via API; native file picker not tested",
+    "Original combined run failed only at optional lifecycle harness assumption: Desktop Host is embedded in main, not a node-host.mjs process",
+    "Last-window/activate/CmdQ behavior not verified by this report",
+    "New acceptance harness is not part of candidate02 source manifest"
+  ]
+}

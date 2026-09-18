@@ -1,0 +1,41 @@
+{
+  "status": "PASS_HASHES_ONLY",
+  "run": 35404497837,
+  "sourceCommit": "870356d336ab850cac5925fd829dca3b77907410",
+  "target": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "minimumOS": "14.0",
+    "backend": "v1"
+  },
+  "checks": [
+    {
+      "file": "loginom-ai-agent-0.1.4-macos.4-source.tar.gz",
+      "sha256": "cf9991d637b8c0cd6efb9404c444bbe6b24a2e295166333fa5ef2264a6eb0c64",
+      "status": "PASS"
+    },
+    {
+      "file": "loginom-ai-agent-mac-arm64.dmg",
+      "sha256": "e5c84f6825a13d971597601ad245d3f0003518e39823afe85a578e87cd8b7639",
+      "status": "PASS"
+    },
+    {
+      "file": "loginom-ai-agent-mac-arm64.zip",
+      "sha256": "cddffe4036ef76cc1483a305a7eda8db0fb229913264f5bb3b3e955e9a0d0112",
+      "status": "PASS"
+    },
+    {
+      "checksum": "release-manifest.json.sha256",
+      "sha256": "14573663f7c5b1c3bbcebaefd81f49a75115fffa4626a22b0b924af0552bb112",
+      "status": "PASS"
+    },
+    {
+      "checksum": "loginom-ai-agent-cli-0.1.4-macos.4-darwin-arm64.tar.gz.sha256",
+      "sha256": "71adbb5d57419abe50221c5bfd99370d4bbebf8d1bf83163f5f52754a6c28d8d",
+      "status": "PASS"
+    }
+  ],
+  "ciOfflineStatus": "FAIL_DESKTOP_PROBE",
+  "ciStaticDmg": "PASS",
+  "ciStaticZip": "PASS"
+}

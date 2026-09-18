@@ -1,0 +1,58 @@
+{
+  "status": "PASS",
+  "method": "SQLite mode=ro exact retrieval after installed candidate02 upgrade, matched to preserved original candidate01 emitted events",
+  "profile": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-linux-oracle-AUc1Nm/cli/17874155-93fa-4a61-b45b-c82710c73ef6-A/profile",
+  "sourceEventsSha256": "b55f6b2848d4159f85330b8a1dec28b915b05dd2e90db59a83b6088392c31db7",
+  "sessionID": "ses_f49428198ffeTv35fjN9oa6UTl",
+  "sessionRecordedVersion": "0.1.4-macos.20260919.1",
+  "checkedParts": [
+    {
+      "sessionID": "ses_f49428198ffeTv35fjN9oa6UTl",
+      "messageID": "msg_0b6bd7f9e001rNRwsDG8IYHRBX",
+      "partID": "prt_0b6bd987c001svN3FwVAQw223U",
+      "type": "step-start",
+      "exactContentMatch": true
+    },
+    {
+      "sessionID": "ses_f49428198ffeTv35fjN9oa6UTl",
+      "messageID": "msg_0b6bd7f9e001rNRwsDG8IYHRBX",
+      "partID": "prt_0b6bd987e001OyZ5a30h1aqhCp",
+      "type": "tool",
+      "exactContentMatch": true
+    },
+    {
+      "sessionID": "ses_f49428198ffeTv35fjN9oa6UTl",
+      "messageID": "msg_0b6bd7f9e001rNRwsDG8IYHRBX",
+      "partID": "prt_0b6bd98960018iGXpjSJ9XKHWv",
+      "type": "step-finish",
+      "exactContentMatch": true
+    },
+    {
+      "sessionID": "ses_f49428198ffeTv35fjN9oa6UTl",
+      "messageID": "msg_0b6bd989a001UlUiQJpID1ldX1",
+      "partID": "prt_0b6bd9940001HgY4kG6oJTlxza",
+      "type": "step-start",
+      "exactContentMatch": true
+    },
+    {
+      "sessionID": "ses_f49428198ffeTv35fjN9oa6UTl",
+      "messageID": "msg_0b6bd989a001UlUiQJpID1ldX1",
+      "partID": "prt_0b6bd9941001BhuWjEVXvZbHNt",
+      "type": "text",
+      "exactContentMatch": true
+    },
+    {
+      "sessionID": "ses_f49428198ffeTv35fjN9oa6UTl",
+      "messageID": "msg_0b6bd989a001UlUiQJpID1ldX1",
+      "partID": "prt_0b6bd9942001ral3dYtNQ969IF",
+      "type": "step-finish",
+      "exactContentMatch": true
+    }
+  ],
+  "totalSessionMessages": 3,
+  "limitations": [
+    "Standalone CLI exposes no session list/export command; retrieval used read-only SQLite, not CLI export",
+    "No complete pre-upgrade database snapshot; exact equality covers six parts emitted by candidate01 and their two assistant messages, not all database bytes",
+    "No session resume/model continuation performed"
+  ]
+}
