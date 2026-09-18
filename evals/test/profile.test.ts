@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import { mkdir, mkdtemp, stat, writeFile } from "node:fs/promises"
 import os from "node:os"
-import { loadConfig } from "../src/config"
+import { loadConfig, repoRoot } from "../src/config"
 import { agentCommand } from "../src/cli"
 import { agentConfigJson, assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile } from "../src/profile"
 import { EvalFailure } from "../src/fail"
@@ -66,6 +66,26 @@ test("ensureProfile: ready с hasApiKey не вызывает setup и пише�
   expect((await ensureProfile(config, command)).fresh).toBe(false)
   expect(await Bun.file(path.join(profileDir, "setup-called")).exists()).toBe(false)
   expect(await Bun.file(path.join(profileDir, "config", "loginom-ai-agent.json")).exists()).toBe(true)
+})
+
+test("ensureProfile: source без cache/models.json засевает каталог из product snapshot", async () => {
+  const { config, command, profileDir } = await fakeProfile({
+    EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", hasApiKey: true }),
+  })
+  const source = { ...config, agent: { ...config.agent, cliMode: "source" as const } }
+  await ensureProfile(source, command)
+  const seeded = await Bun.file(path.join(profileDir, "cache", "models.json")).json()
+  const product = await Bun.file(path.join(repoRoot, "packages", "product", "models.json")).json()
+  expect(seeded).toEqual(product)
+  expect("xiaomi-token-plan-sgp" in seeded).toBe(true)
+})
+
+test("ensureProfile: fake не засевает cache/models.json", async () => {
+  const { config, command, profileDir } = await fakeProfile({
+    EVAL_FAKE_STATE_FILE: await stateFile({ state: "ready", hasApiKey: true }),
+  })
+  await ensureProfile(config, command)
+  expect(await Bun.file(path.join(profileDir, "cache", "models.json")).exists()).toBe(false)
 })
 
 test("recoverIfNeeded: unconfigured — EvalFailure с подсказкой reset-profile", async () => {

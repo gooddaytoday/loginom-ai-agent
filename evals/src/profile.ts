@@ -1,6 +1,6 @@
 import path from "node:path"
 import { mkdir, rm, stat } from "node:fs/promises"
-import type { EvalConfig } from "./config"
+import { repoRoot, type EvalConfig } from "./config"
 import type { AgentCommand } from "./cli"
 import { EvalFailure } from "./fail"
 
@@ -113,6 +113,12 @@ export function agentConfigJson(config: EvalConfig) {
 
 export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
   await mkdir(config.profileDir, { recursive: true, mode: 0o700 })
+  // Native embeds the product snapshot; source mode has no catalogue without this seed.
+  const modelsCache = path.join(config.profileDir, "cache", "models.json")
+  if (config.agent.cliMode === "source" && !(await exists(modelsCache))) {
+    await mkdir(path.join(config.profileDir, "cache"), { recursive: true, mode: 0o700 })
+    await Bun.write(modelsCache, Bun.file(path.join(repoRoot, "packages", "product", "models.json")))
+  }
   const view = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
   const fresh = !view || view.state === "unconfigured" || view.hasApiKey === false
   if (fresh) {
