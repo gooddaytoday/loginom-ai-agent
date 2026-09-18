@@ -20,7 +20,9 @@ import type { Argv } from "yargs"
 import path from "path"
 import { pathToFileURL } from "url"
 import { fileSnapshot } from "@/util/file-snapshot"
-import { Effect } from "effect"
+import { Cause, Effect, Exit } from "effect"
+import { ProviderV2 } from "@loginom-ai-agent/core/provider"
+import { ModelV2 } from "@loginom-ai-agent/core/model"
 import { UI } from "../ui"
 import { effectCmd } from "../effect-cmd"
 import { EOL } from "os"
@@ -266,9 +268,33 @@ export const RunCommand = effectCmd({
     const { RuntimeFlags } = yield* Effect.promise(() => import("@/effect/runtime-flags"))
     const { InstanceRef } = yield* Effect.promise(() => import("@/effect/instance-ref"))
     const { ServerAuth } = yield* Effect.promise(() => import("@/server/auth"))
+    const { Provider } = yield* Effect.promise(() => import("@/provider/provider"))
     const agentSvc = yield* Agent.Service
     const flags = yield* RuntimeFlags.Service
     const localInstance = yield* InstanceRef
+    const provider = yield* Provider.Service
+    const requested = pick(args.model)
+    if (requested && !args.attach && !args.mini) {
+      const resolved = yield* provider
+        .getModel(ProviderV2.ID.make(requested.providerID), ModelV2.ID.make(requested.modelID))
+        .pipe(Effect.exit)
+      if (Exit.isFailure(resolved)) {
+        const err = Cause.squash(resolved.cause)
+        if (args.format === "json") {
+          process.stdout.write(
+            JSON.stringify({
+              type: "error",
+              timestamp: Date.now(),
+              sessionID: "",
+              error: err,
+            }) + EOL,
+          )
+        } else {
+          UI.error(formatRunError(err))
+        }
+        exitCli(1)
+      }
+    }
     yield* Effect.promise(async () => {
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
       const interactive = args.mini
