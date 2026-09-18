@@ -46,9 +46,16 @@ try {
         # Chromium grants its restricted AppContainer capability modify access
         # to cache/network directories. Accept that narrow SID class only
         # inside browser-profile and never with FullControl.
-        $browserCapability = @($entry.FullName.Split([IO.Path]::DirectorySeparatorChar)) -contains 'browser-profile' -and
+        $segments = @($entry.FullName.Split([IO.Path]::DirectorySeparatorChar))
+        $artifactIndex = [Array]::IndexOf($segments, 'artifacts')
+        $uploadCapability = $artifactIndex -ge 0 -and $artifactIndex + 1 -lt $segments.Count -and
+          $segments[$artifactIndex + 1] -match '^transfer-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' -and
+          $access.IdentityReference.Value -eq 'S-1-15-3-1024-1528657515-1944437972-2795272136-1227674495-293963776-353393192-4060142787-1908764039' -and
+          ($access.FileSystemRights -band ([Security.AccessControl.FileSystemRights]::Write -bor [Security.AccessControl.FileSystemRights]::Delete -bor [Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor [Security.AccessControl.FileSystemRights]::ChangePermissions -bor [Security.AccessControl.FileSystemRights]::TakeOwnership)) -eq 0
+        $browserCapability = (@($segments) -contains 'browser-profile' -and
           $access.IdentityReference.Value -match '^S-1-15-3-1024-(?:[0-9]+-){7}[0-9]+$' -and
           ($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne [Security.AccessControl.FileSystemRights]::FullControl
+        ) -or $uploadCapability
         if (!$browserCapability) { exit 1 }
       }
       if ($access.IdentityReference.Value -eq $sid.Value -and ($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -eq [Security.AccessControl.FileSystemRights]::FullControl) { $userFull = $true }

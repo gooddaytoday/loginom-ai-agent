@@ -4,6 +4,7 @@ import {constants} from 'node:fs';
 import {join, resolve, isAbsolute} from 'node:path';
 import {createHash, randomUUID} from 'node:crypto';
 import {requireExportDestination,requireStorageDestination} from './storage-policy.mjs';
+import {grantWindowsChromiumUploadRead} from './platform.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const validName = name => typeof name==='string' && name.length>0 && name.length<=200
@@ -95,6 +96,7 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
         file=await open(path,'wx',0o600);
         await file.writeFile(buffer);await file.sync();await file.close();file=null;
         await chmod(path,0o400);await chmod(directory,0o500);
+        grantWindowsChromiumUploadRead(directory);
         }
       } catch(error) {
         await file?.close();await chmod(directory,0o700);
