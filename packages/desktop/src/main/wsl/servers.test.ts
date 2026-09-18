@@ -154,7 +154,7 @@ test("probes addable distros in parallel before checking Loginom AI Agent", asyn
   persistedServers = []
   const started: string[] = []
   const release = new Map<string, () => void>()
-  const loginom-ai-agent: string[] = []
+  const opencode: string[] = []
   const controller = createWslServersController("1.16.2", async () => new Promise<never>(() => undefined), {
     ...testControllerOptions(),
     probeDistro: async (distro) => {
@@ -183,7 +183,7 @@ test("probes addable distros in parallel before checking Loginom AI Agent", asyn
 
 test("does not check Loginom AI Agent in addable distros that cannot execute commands", async () => {
   persistedServers = []
-  const loginom-ai-agent: string[] = []
+  const opencode: string[] = []
   const controller = createWslServersController("1.16.2", async () => new Promise<never>(() => undefined), {
     ...testControllerOptions(),
     probeDistro: async (distro) => ({
