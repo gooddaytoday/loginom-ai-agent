@@ -5,8 +5,9 @@ import { createRequire } from "node:module"
 import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import fixtures from "./fixtures/standalone-cli/manifest.json"
 
-type Child = Awaited<ReturnType<typeof supervise>>
+type Child = Pick<Awaited<ReturnType<typeof supervise>>, "request" | "close">
 const configPath = process.env.LOGINOM_AI_AGENT_TEST_CONFIG
 if (!configPath) throw Error("LOGINOM_AI_AGENT_TEST_CONFIG is required")
 const config = await Bun.file(configPath).json()
@@ -20,6 +21,7 @@ const { CallToolResultSchema } = require("@modelcontextprotocol/sdk/types.js")
 const directory = await mkdtemp(join(tmpdir(), "loginom-linux-oracle-"))
 const run = randomUUID()
 const receipts = { sequence: 0 }
+const valueField = "amount"
 const policy = {
   mappings: [],
   finish: "execute",
@@ -28,7 +30,38 @@ const policy = {
 }
 console.log(`Private acceptance evidence: ${directory}`)
 
-async function launch(chat: string) {
+async function launch(chat: string, csv: string): Promise<Child> {
+  if (process.env.LOGINOM_AI_AGENT_TEST_DESKTOP_EXECUTABLE) {
+    const { desktopOracleTransport } = await import("../../../loginom-host/script/desktop-oracle-transport")
+    return desktopOracleTransport({
+      executable: process.env.LOGINOM_AI_AGENT_TEST_DESKTOP_EXECUTABLE,
+      node: join(resources, "bin/node"),
+      directory: join(directory, "desktop", chat),
+      csv,
+      connection: {
+        apiKey: config.api_key,
+        password: "",
+        url: config.loginom_url,
+        username: config.workflow_profile.loginom_user,
+      },
+    })
+  }
+  if (process.env.LOGINOM_AI_AGENT_TEST_CLI_EXECUTABLE) {
+    const { cliOracleTransport } = await import("../../../loginom-host/script/cli-oracle-transport")
+    return cliOracleTransport({
+      executable: process.env.LOGINOM_AI_AGENT_TEST_CLI_EXECUTABLE,
+      mode: process.env.LOGINOM_AI_AGENT_TEST_CLI_INTERFACE === "tui" ? "tui" : "run",
+      headed: process.env.LOGINOM_AI_AGENT_TEST_CLI_HEADED === "1",
+      directory: join(directory, "cli", chat),
+      csv,
+      connection: {
+        apiKey: config.api_key,
+        password: "",
+        url: config.loginom_url,
+        username: config.workflow_profile.loginom_user,
+      },
+    })
+  }
   return supervise({
     node: join(resources, "bin/node"),
     entry: join(resources, "runtime/src/managed-entry.mjs"),
@@ -139,9 +172,13 @@ function verify(
     throw Error("SEMANTIC_VALUES_MISMATCH")
   return { groups: values, total: expected.Alpha + expected.Beta }
 }
-async function dataset(label: string, csv: string, expected: { Alpha: number; Beta: number }) {
+async function dataset(label: "A" | "B") {
+  const csv = await Bun.file(join(import.meta.dir, "fixtures/standalone-cli", label, "sales.csv")).text()
+  const inputSha256 = createHash("sha256").update(csv).digest("hex")
+  if (inputSha256 !== fixtures[label].sha256) throw Error(`FIXTURE_HASH_MISMATCH_${label}`)
+  const expected = fixtures[label].expected
   const chat = `${run}-${label}`
-  const child = await launch(chat)
+  const child = await launch(chat, csv)
   try {
     const bytes = Buffer.from(csv)
     const files = await inputStore(join(directory, "inputs")).admit(
@@ -193,7 +230,7 @@ async function dataset(label: string, csv: string, expected: { Alpha: number; Be
           format: { delimiter: ";", decimal_separator: ".", null_marker: "", text_qualifier: '"' },
           columns: [
             { name: "Category", label: "Category", type: "string", data_kind: "Дискретный", used: true },
-            { name: "Value", label: "Value", type: "integer", data_kind: "Непрерывный", used: true },
+            { name: valueField, label: valueField, type: "integer", data_kind: "Непрерывный", used: true },
           ],
         },
       },
@@ -208,7 +245,9 @@ async function dataset(label: string, csv: string, expected: { Alpha: number; Be
       mode: "aggregate",
       parameters: {
         group_by: [{ kind: "input_field", name: "Category" }],
-        measures: [{ field: { kind: "input_field", name: "Value" }, function: "sum", name: "Total", label: "Total" }],
+        measures: [
+          { field: { kind: "input_field", name: valueField }, function: "sum", name: "Total", label: "Total" },
+        ],
       },
     })
     const grouped = await waitNode(child, `group-${label}`)
@@ -225,7 +264,7 @@ async function dataset(label: string, csv: string, expected: { Alpha: number; Be
     const closed = await call(child, "dock_workspace_observe", { scope: "roots" })
     if (closed.output.package_identity?.path === path) throw Error("PACKAGE_STILL_OPEN")
     console.log(JSON.stringify({ status: "PASS", phase: "import_group_save", dataset: label, ...values }))
-    return { label, path, node: grouped.node.node_id, expected, source: artifact.upload.destination }
+    return { label, path, node: grouped.node.node_id, expected, source: artifact.upload.destination, inputSha256 }
   } finally {
     await child.close()
   }
@@ -251,9 +290,9 @@ async function reopen(saved: Awaited<ReturnType<typeof dataset>>) {
   if ((await child.exited) !== 0) throw Error(`INDEPENDENT_READBACK_FAILED_${saved.label}`)
 }
 
-const first = await dataset("A", "Category;Value\nAlpha;10\nAlpha;25\nBeta;20\n", { Alpha: 35, Beta: 20 })
+const first = await dataset("A")
 await reopen(first)
-const second = await dataset("B", "Category;Value\nAlpha;100\nBeta;1\n", { Alpha: 100, Beta: 1 })
+const second = await dataset("B")
 if (first.source === second.source) throw Error("SAME_NAME_INPUT_COLLISION")
 await reopen(second)
 await Bun.write(join(directory, "summary.json"), JSON.stringify({ status: "PASS", first, second }, null, 2))

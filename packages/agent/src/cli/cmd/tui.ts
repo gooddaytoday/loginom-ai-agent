@@ -12,8 +12,15 @@ import type { GlobalEvent } from "@loginom-ai-agent/sdk/v2"
 import type { EventSource } from "@loginom-ai-agent/tui/context/sdk"
 import { writeHeapSnapshot } from "v8"
 import { ServerAuth } from "@/server/auth"
-import { validateSession } from "../tui/validate-session"
+import { InvalidSessionError, validateSession } from "../tui/validate-session"
 import { win32InstallCtrlCGuard } from "@loginom-ai-agent/tui/terminal-win32"
+import type { Port } from "@loginom-ai-agent/loginom-host/transport"
+import { parentLoginomBridge } from "../tui/loginom-bridge"
+
+const loginom = { port: undefined as Port | undefined }
+export function setTuiLoginomHost(port?: Port) {
+  loginom.port = port
+}
 
 declare global {
   const LOGINOM_AI_AGENT_WORKER_PATH: string
@@ -203,6 +210,7 @@ export const TuiThreadCommand = cmd({
         process.chdir(next)
       } catch {
         UI.error("Failed to change directory to " + next)
+        process.exitCode = 1
         return
       }
       const cwd = Filesystem.resolve(process.cwd())
@@ -213,6 +221,12 @@ export const TuiThreadCommand = cmd({
         ),
       })
       const client = Rpc.client<typeof rpc>(worker)
+      const bridge = loginom.port
+        ? parentLoginomBridge(loginom.port, {
+            send: (input) => client.call("loginomReply", input),
+            subscribe: (listener) => client.on("loginom.request", listener),
+          })
+        : undefined
       const reload = () => {
         client.call("reload", undefined).catch(() => {})
       }
@@ -223,50 +237,59 @@ export const TuiThreadCommand = cmd({
         if (stopped) return
         stopped = true
         process.off("SIGUSR2", reload)
-        await withTimeout(client.call("shutdown", undefined), 5000).catch(() => {})
-        worker.terminate()
+        try {
+          await withTimeout(client.call("shutdown", undefined), 5000).catch((error) => {
+            if (process.env.LOGINOM_AI_AGENT_CLI_ROOT) throw new Error("LOGINOM_TUI_CLEANUP_FAILED")
+          })
+        } finally {
+          bridge?.close()
+          client.close()
+          await worker.terminate()
+        }
       }
 
-      const prompt = await input(args.prompt)
-      const config = await TuiConfig.get()
+      try {
+        if (bridge) await client.call("loginomStart", undefined)
+        const prompt = await input(args.prompt)
+        const config = await TuiConfig.get()
 
-      const network = resolveNetworkOptionsNoConfig(args)
-      const external = hasArg("--port") || hasArg("--hostname") || network.mdns === true
+        const network = resolveNetworkOptionsNoConfig(args)
+        const external = hasArg("--port") || hasArg("--hostname") || network.mdns === true
 
-      const headers = external ? ServerAuth.headers() : undefined
+        const headers = external ? ServerAuth.headers() : undefined
 
-      const transport = external
-        ? {
-            url: (await client.call("server", network)).url,
-            fetch: undefined,
-            events: undefined,
+        const transport = external
+          ? {
+              url: (await client.call("server", network)).url,
+              fetch: undefined,
+              events: undefined,
+              headers,
+            }
+          : {
+              url: "http://opencode.internal",
+              fetch: createWorkerFetch(client),
+              events: createEventSource(client),
+            }
+
+        try {
+          await validateSession({
+            url: transport.url,
+            sessionID: args.session,
+            directory: cwd,
+            fetch: transport.fetch,
             headers,
-          }
-        : {
-            url: "http://opencode.internal",
-            fetch: createWorkerFetch(client),
-            events: createEventSource(client),
-          }
+          })
+        } catch (error) {
+          const invalid = process.env.LOGINOM_AI_AGENT_CLI_ROOT && error instanceof InvalidSessionError
+          UI.error(invalid ? "CLI_ARGUMENT_INVALID" : errorMessage(error))
+          process.exitCode = invalid ? 2 : 1
+          return
+        }
 
-      try {
-        await validateSession({
-          url: transport.url,
-          sessionID: args.session,
-          directory: cwd,
-          fetch: transport.fetch,
-          headers,
-        })
-      } catch (error) {
-        UI.error(errorMessage(error))
-        process.exitCode = 1
-        return
-      }
+        setTimeout(() => {
+          client.call("checkUpgrade", { directory: cwd }).catch(() => {})
+        }, 1000).unref?.()
 
-      setTimeout(() => {
-        client.call("checkUpgrade", { directory: cwd }).catch(() => {})
-      }, 1000).unref?.()
-
-      try {
         const { Effect } = await import("effect")
         const { run } = await import("../tui/layer")
         const { createLegacyTuiPluginHost } = await import("@/plugin/tui/runtime")
@@ -303,7 +326,7 @@ export const TuiThreadCommand = cmd({
         unguard?.()
       } catch {}
     }
-    process.exit()
+    if (!process.env.LOGINOM_AI_AGENT_CLI_ROOT) process.exit()
   },
 })
 // scratch

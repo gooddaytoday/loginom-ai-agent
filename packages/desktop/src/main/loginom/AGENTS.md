@@ -1,7 +1,7 @@
 # Desktop connection lifecycle
 
 - Electron main owns connection credentials, durable generations, private host IPC and recovery. Renderer uses the typed preload API and receives redacted status, never stored secret values.
-- `connection-store.ts` persists configuration and pending changes; `credentials.ts` implements secret storage policy; `connection-service.ts` coordinates checks/activation; `desktop-service.ts` connects runtime ownership; `host-port.ts` guards private backend requests; `recovery-store.ts` persists uncertain outcomes.
+- `connection-store.ts`, `credentials.ts`, `connection-service.ts` and `recovery-store.ts` re-export the common implementations in `packages/loginom-host/src/connection`. `desktop-service.ts` supplies Electron paths and safeStorage to `createLoginomHost`; `host-port.ts` re-exports the common handler over the structural HostPort contract. Existing connection tests here exercise those common implementations through the Desktop exports.
 - Linux intentionally stores secrets as plaintext configuration with files `0600`, directories `0700`. Production profile is `${XDG_CONFIG_HOME:-~/.config}/com.loginom.aiagent`; do not relocate it when changing the installation directory. Other channels have separate profiles.
 - Lease a connection generation for the whole active drain. Save pending changes durably and activate only at a safe boundary. Attempts use isolated UUIDs; retain receipts across recovery.
 - Persist/fsync recovery intent before tool dispatch. Interrupted or ambiguous operations require explicit acknowledgement; never replay them automatically.

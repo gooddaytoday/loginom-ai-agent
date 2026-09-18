@@ -2,6 +2,41 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createArtifactDelivery} from '../lib/artifact-delivery.mjs';
 const request={operation_id:'delivery',artifact_id:'artifact',upload_grant_id:'grant',budget_ms:120000};
+
+test('folder navigation reobserves after a proven no-effect stale epoch with a new action ID',async()=>{
+ const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let stale=true,reads=0;const attempts=[];
+ f.runtime.observe=async options=>{reads++;const r=await observe(options);r.output.observation_id='obs-'+reads;r.output.ui.elements.forEach(e=>{e.ref+=':read-'+reads;});return r;};
+ f.runtime.uiAct=async(a,o)=>{
+  attempts.push({id:o.operationId,observation:o.observationId,ref:a.ref});
+  if(stale){stale=false;return {operation_id:o.operationId,status:'NOT_APPLIED',phase:'preconditions',effect_possible:false,cleanup_complete:true,error:{code:'UI_EPOCH_CHANGED'}};}
+  return act({...a,ref:a.ref.replace(/:read-\d+$/,'')},o);
+ };
+ const result=await f.service.deliver(request);
+ assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(f.calls.filter(x=>x==='upload').length,1);
+ assert.equal(attempts.length,3);assert.notEqual(attempts[0].id,attempts[1].id);
+ assert.notEqual(attempts[0].observation,attempts[1].observation);assert.notEqual(attempts[0].ref,attempts[1].ref);
+});
+
+for(const fault of ['ambiguous','effect','missing_effect','cleanup','foreign','phase','code','throw','owner','tab','directory','kind','persistent'])test('stale folder navigation refuses unsafe or unbounded continuation: '+fault,async()=>{
+ const f=fixture(),observe=f.runtime.observe;let attempts=0;
+ f.runtime.observe=async options=>{const r=await observe(options);if(attempts&&fault==='owner')r.output.dom_epoch.document='foreign';if(attempts&&fault==='tab')r.output.active_tab_ref='foreign';if(attempts&&fault==='directory')r.output.file_storage.directory='/foreign';if(attempts&&fault==='kind')r.output.ui.elements.forEach(e=>{if(e.storage_entry)e.storage_entry.kind='file';});return r;};
+ f.runtime.uiAct=async(a,o)=>{
+  attempts++;if(fault==='throw')throw Error('Browser reply lost');
+  return {operation_id:fault==='foreign'?'foreign':o.operationId,status:fault==='ambiguous'?'AMBIGUOUS':'NOT_APPLIED',
+   phase:fault==='phase'?'execution':'preconditions',effect_possible:fault==='missing_effect'?undefined:fault==='effect',cleanup_complete:fault!=='cleanup',
+   error:{code:fault==='code'?'BROWSER_CALL_UNCERTAIN':'UI_EPOCH_CHANGED'}};
+ };
+ const result=await f.service.deliver(request);
+ assert.equal(result.outcome.status,'AMBIGUOUS');assert.equal(result.outcome.upload_submitted_or_unknown,false);
+ assert.equal(attempts,fault==='persistent'?3:1);assert.ok(!f.calls.includes('upload'));
+});
+
+test('cancellation after a no-effect stale refusal prevents the next navigation attempt',async()=>{
+ const f=fixture(),controller=new AbortController();let attempts=0;
+ f.runtime.uiAct=async(a,o)=>{attempts++;controller.abort();return {operation_id:o.operationId,status:'NOT_APPLIED',phase:'preconditions',effect_possible:false,cleanup_complete:true,error:{code:'UI_EPOCH_CHANGED'}};};
+ const result=await f.service.deliver(request,{signal:controller.signal});
+ assert.equal(attempts,1);assert.equal(result.outcome.status,'AMBIGUOUS');assert.ok(!f.calls.includes('upload'));
+});
 function fixture(fault,initialDirectory='/') {
  const artifact={artifact_id:'artifact',name:'input.csv',bytes:3,sha256:'a'.repeat(64),upload:{grant_id:'grant',directory:'/user/dock-p3',destination:'/user/dock-p3/input.csv',overwrite:'replace'}};
  const calls=[],events=[];let directory=initialDirectory,verified=false;

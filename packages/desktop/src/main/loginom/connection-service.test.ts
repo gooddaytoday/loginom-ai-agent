@@ -228,7 +228,7 @@ test("replacing pending settings preserves the new private key and commits only 
   }
 })
 
-test("recovery continuation can resume while ordinary admission is closed", async () => {
+test("released recovery leases cannot resume ordinary execution", async () => {
   const f = await fixture()
   try {
     await save(f.service)
@@ -237,10 +237,9 @@ test("recovery continuation can resume while ordinary admission is closed", asyn
     run.release()
     await save(f.service, { ...candidate, revision: 1, username: "Second" })
     expect(f.service.acquire("new-run")).toBeUndefined()
-    expect(run.resume()).toBe(true)
-    run.reconciled()
+    expect(Object.hasOwn(run, "resume")).toBe(false)
     expect((await f.service.api.status()).state).toBe("pending")
-    run.release()
+    run.reconciled()
     await f.service.settled()
     expect((await f.service.api.status()).generation).toBe(2)
   } finally {

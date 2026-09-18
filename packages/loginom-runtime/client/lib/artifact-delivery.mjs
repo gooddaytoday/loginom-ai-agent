@@ -50,10 +50,15 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    }
   };
   const roots=()=>observe({scope:'roots'});
-  const click=async(s,element,verb='click',extra={})=>{
+  const click=async(s,element,verb='click',extra={},allowStaleFolder=false)=>{
    check();const id=job.id+':nav'+(++step);
    effectPossible=true;const r=await runtime.uiAct({verb,ref:element.ref,...extra},{operationId:id,observationId:s.observation_id,signal});
+   // Only a matched, cleaned-up precondition refusal permits a fresh folder lookup.
+   // Never reuse its ref/observation or repeat an uncertain child operation.
+   if(allowStaleFolder&&r.operation_id===id&&r.status==='NOT_APPLIED'&&r.phase==='preconditions'
+     &&r.effect_possible===false&&r.cleanup_complete===true&&r.error?.code==='UI_EPOCH_CHANGED')return false;
    requireValue(r.status==='SUCCEEDED'&&r.cleanup_complete===true,'Delivery navigation requires inspection: '+id);
+   return true;
   };
   const detail=async(r,element)=>observe({rootRef:element.ref,observationId:r.observation_id});
   const ready=async(condition,read,predicate)=>{
@@ -124,10 +129,15 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     let current=s.file_storage.directory==='/'?'':s.file_storage.directory;
     requireValue(artifact.upload.directory.startsWith(current+'/'),'Files root did not open');
     for(const part of artifact.upload.directory.slice(current.length).split('/').filter(Boolean)) {
-     check();const rowRead=await readRow(part,s),folder=one(rowRead.ui.elements.filter(e=>e.tid===rowRead.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(part)&&e.label===part
-       &&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')),'Destination segment is not a verified folder');
-     requireValue(rowRead.file_storage?.directory===(current||'/'),'Storage parent changed');
-     await click(rowRead,folder,'double_click');current+='/'+part;s=await directory(current);
+     for(let attempt=0;;attempt++) {
+      check();const rowRead=await readRow(part,s),folder=one(rowRead.ui.elements.filter(e=>e.tid===rowRead.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(part)&&e.label===part
+        &&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')),'Destination segment is not a verified folder');
+      requireValue(rowRead.file_storage?.directory===(current||'/'),'Storage parent changed');
+      if(await click(rowRead,folder,'double_click',{},true))break;
+      requireValue(attempt<2,'Delivery folder navigation remained stale; inspection required');
+      await new Promise(resolve=>setTimeout(resolve,100));
+     }
+     current+='/'+part;s=await directory(current);
      requireValue(s.file_storage?.directory===current,'Opened folder differs from authorized path');
     }
    }

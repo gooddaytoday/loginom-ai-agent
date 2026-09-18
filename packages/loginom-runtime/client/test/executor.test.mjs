@@ -508,3 +508,23 @@ test('save/reopen waits for Save As completion before toggling the menu and for 
   assert.equal(saveClicks,1);assert.equal(closeClicks,1);assert.deepEqual(page.events.filter(e=>e.startsWith('package_')),['package_closed','package_reopened']);
  }
 });
+
+test('host lifecycle distinguishes an active operation from retained uncertainty', async () => {
+  for (const ambiguous of [false, true]) {
+    const page = new Page(); page.failDrag = ambiguous;
+    const entered = Promise.withResolvers(), resume = Promise.withResolvers();
+    const engine = runtime(page, { onRecord: async record => {
+      if (record.phase === 'prepared') { entered.resolve(); await resume.promise; }
+    } });
+    assert.equal(engine.hasActiveWork(), false);
+    assert.equal(engine.hasUnsettledWork(), false);
+    const work = engine.run('node.add', nodeParameters, { operationId: 'host-lifecycle' });
+    await entered.promise;
+    assert.equal(engine.hasActiveWork(), true);
+    assert.equal(engine.hasUnsettledWork(), true);
+    resume.resolve();
+    assert.equal((await work).status, ambiguous ? 'AMBIGUOUS' : 'SUCCEEDED');
+    assert.equal(engine.hasActiveWork(), false);
+    assert.equal(engine.hasUnsettledWork(), ambiguous);
+  }
+});

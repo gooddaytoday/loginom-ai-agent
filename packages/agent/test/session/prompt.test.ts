@@ -8,7 +8,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { expect } from "bun:test"
 import { Cause, Deferred, Duration, Effect, Exit, Fiber, Layer } from "effect"
 import path from "path"
-import { fileURLToPath } from "url"
+import { fileURLToPath, pathToFileURL } from "url"
 import { NamedError } from "@loginom-ai-agent/core/util/error"
 import { Agent as AgentSvc } from "../../src/agent/agent"
 import { BackgroundJob } from "@/background/job"
@@ -2467,4 +2467,47 @@ noLLMServer.instance(
       }
     }),
   30_000,
+)
+
+noLLMServer.instance(
+  "standalone stores full user file bytes but does not admit a line reference as a whole file",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const session = yield* sessions.create({})
+      const filename = path.join(instance.directory, "sales.csv")
+      const csv = "amount\n10\n20\n25\n"
+      yield* writeText(filename, csv)
+      const previous = process.env.LOGINOM_AI_AGENT_CLI_ROOT
+      process.env.LOGINOM_AI_AGENT_CLI_ROOT = instance.directory
+      try {
+        for (const query of ["", "?start=2&end=2"]) {
+          const message = yield* prompt.prompt({
+            sessionID: session.id,
+            agent: "build",
+            noReply: true,
+            parts: [
+              { type: "file", mime: "text/plain", filename: "sales.csv", url: pathToFileURL(filename).href + query },
+            ],
+          })
+          const stored = yield* MessageV2.get({ sessionID: session.id, messageID: message.info.id })
+          const files = stored.parts.filter((part) => part.type === "file")
+          const text = stored.parts.filter((part) => part.type === "text")
+          if (!query) expect(text.some((part) => part.synthetic && part.text === csv)).toBe(true)
+          expect(files).toHaveLength(1)
+          expect(files[0].url).toBe(
+            query
+              ? pathToFileURL(filename).href + query
+              : "data:text/plain;base64," + Buffer.from(csv).toString("base64"),
+          )
+        }
+      } finally {
+        if (previous === undefined) delete process.env.LOGINOM_AI_AGENT_CLI_ROOT
+        else process.env.LOGINOM_AI_AGENT_CLI_ROOT = previous
+        yield* sessions.remove(session.id)
+      }
+    }),
+  { config: cfg },
 )

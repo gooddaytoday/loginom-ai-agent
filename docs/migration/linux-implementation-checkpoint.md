@@ -1,5 +1,53 @@
 # Linux: завершение реализации — 2026-09-16
 
+Текущий standalone checkpoint 2026-09-18: source поддерживает native Windows/macOS
+build branches, но они не исполнены; Linux candidate 02:10 прошёл полный build,
+archive verification и installed network-loss acceptance после running import
+receipt (code 4, durable recovery, все 24 процесса завершены). Active-import SIGKILL/SIGINT и блокировка нового run до
+model dispatch подтверждены на 00:38. **Общая CLI-цель не завершена**: настоящий
+model provider,
+native OS и signing gates перечислены в [текущем CLI checkpoint](../testing/loginom-ai-agent/standalone-cli.md).
+Installed Desktop regression 02:25 также PASS: GUI, CSV 55/101, save и cold
+reopen/readback; после теста восстановлена 0.1.4. Исправлена упаковка прав при
+umask 077. Подробности — в текущем CLI checkpoint.
+Исторические Desktop результаты ниже не расширяются этой записью.
+
+
+Отдельная работа 2026-09-17, ветка `loginom-cli` от `c37913ab5`: начата реализация
+[самостоятельного CLI](../superpowers/specs/2026-09-17-loginom-cli-standalone-design.md).
+Её текущие исходники и проверки учитываются отдельно в
+[CLI runbook](../testing/loginom-ai-agent/standalone-cli.md). Приведённые ниже
+исторические результаты установленного Desktop не подтверждают новую CLI-сборку.
+
+Проверка CLI-ветки 2026-09-17: текущий Desktop успешно собран и упакован в
+`linux-unpacked`; live GUI onboarding/save/restore прошёл в development Electron
+и packaged executable с отдельными профилями. 43 теста, typecheck, реальный proxy
+и 4365 resource hashes PASS. [Отчёт и ограничения](../testing/loginom-ai-agent/reports/2026-09-17-cli-desktop-regression/report.md).
+Это не новая установка DEB/AppImage; пользовательский Desktop не изменялся.
+Сравнение CSV-сценария Desktop/TUI/run одного snapshot ещё не выполнено.
+
+Позднее в той же CLI-ветке packaged Desktop прошёл канонический CSV oracle
+через свой backend API: независимое холодное readback 55/101, совпавшие hashes
+вложений, отдельные profiles/packages. Такой же набор прошёл native TUI;
+фактические schemas/bootstrap instructions и runtime pins совпали.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-09-17-desktop-cli-oracle/report.md).
+Это по-прежнему разные snapshots и не installed DEB acceptance.
+
+Последующий checkpoint CLI-ветки: Desktop/CLI 0.1.4-cli.202609171930 собраны
+из одного snapshot. [Отчёт](../testing/loginom-ai-agent/reports/2026-09-17-unified-cli-build/report.md):
+contracts/pins совпали; Desktop и installed TUI cold oracle PASS, installed
+run B остановился на UI_EPOCH_CHANGED с сохранённым recovery. CLI install/uninstall
+и native early SIGINT PASS; пользовательский Desktop не обновлялся, CLI после
+проверки удалён. Это не полный Linux release PASS и не завершённый IND-03.
+
+Следующая общая сборка CLI-ветки 0.1.4-cli.202609171958 содержит исправление
+подтверждённого stale-folder precondition. Desktop/headless run/headed TUI
+прошли canonical cold oracle 55/101; contracts/pins совпали, IND-02/03 для
+этого scripted-provider Linux сценария PASS.
+[Новый отчёт](../testing/loginom-ai-agent/reports/2026-09-17-native-folder-fix/report.md).
+Installed Desktop и весь release/platform набор по-прежнему не закрыты;
+старый failed run/recovery сохранён, пользовательское приложение не обновлялось.
+
 Обновление 2026-09-17: установлен DEB **0.1.4**. В новом чате буквы **AI** используют приглушённый фирменный красный `#C79292` с непрозрачностью 32%; [отчёт, проверки и хеши сборок](../testing/loginom-ai-agent/reports/2026-09-17-brand-accent/report.md). Настройки Loginom и ChatGPT auth сохранены. Для уже открытого приложения требуется полный перезапуск.
 
 Обновление 2026-09-17: установлен DEB **0.1.3** в `/opt/loginom-ai-agent`, новый чат показывает **Loginom AI**. Инструкции модулей связаны из корневого AGENTS.md. [Отчёт, проверка обновления и актуальные сборки](../testing/loginom-ai-agent/reports/2026-09-17-branding/report.md). Настройки подключения и ChatGPT auth сохранены; текущий пользовательский сеанс нужно полностью перезапустить.
@@ -38,3 +86,10 @@ Windows/macOS требуют нативной реализации платфо�
 Известное ограничение: apply с пустыми параметрами для холодного существующего Grouping может завершиться timeout на input mapping. Проверенное открытие и выполнение сохранённого графа не перенастраивает этот узел.
 
 Старые OpenCode wrapper/desktop и репозиторий Dock не удалялись. Архив переноса: `/home/kiselev/backups/loginom-migration/20260916-source-01`. Приватные диагностические материалы остаются вне git; публичные сводки находятся в итоговом отчёте. Дополнительные подтверждения пользователя для завершённой Linux-реализации не требуются.
+
+
+Дополнительная CLI-проверка: native 19:58 продолжил одну реальную сессию через
+headed TUI `--session`, затем headless `run --continue`; два новых tools на запуск,
+exit=0, guard=false, окна закрыты. Evidence `/tmp/loginom-live-resume-jAOvyh`;
+подробности в `docs/testing/loginom-ai-agent/reports/2026-09-17-cli-live-resume/report.md`.
+Это частичное покрытие resume matrix со scripted provider; общие release gates открыты.

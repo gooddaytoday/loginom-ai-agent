@@ -1,3 +1,4 @@
+import { verifyLinuxPermissions } from "../linux-permissions"
 import { parseArgs } from "node:util"
 import { basename, join, resolve } from "node:path"
 import { mkdtemp, rm, readFile } from "node:fs/promises"
@@ -56,6 +57,12 @@ try {
     await $`unsquashfs -no-progress -d ${root} -offset ${offsets[0]} ${resolve(args.artifact)}`.quiet()
   } else throw Error("Only Linux installer artifacts can be statically extracted")
   const application = artifact.kind === "deb" ? join(root, "opt", manifest.product.executable) : root
+  await verifyLinuxPermissions(application)
+  await verifyLinuxPermissions(
+    artifact.kind === "deb"
+      ? join(root, "usr/share/applications", `${manifest.product.appId}.desktop`)
+      : join(root, `${manifest.product.appId}.desktop`),
+  )
   const result = await verifyResourceTree(join(application, "resources/loginom"), manifest.runtime.resourcesSha256)
   const desktop = await readFile(
     artifact.kind === "deb"

@@ -42,6 +42,7 @@ import { FSUtil } from "@loginom-ai-agent/core/fs-util"
 import { Truncate } from "@/tool/truncate"
 import { Image } from "@/image/image"
 import { decodeDataUrl } from "@/util/data-url"
+import { fileSnapshot } from "@/util/file-snapshot"
 import { Process } from "@/util/process"
 import { Cause, Effect, Exit, Latch, Layer, Option, Scope, Context, Schema, Types } from "effect"
 import { InstanceState } from "@/effect/instance-state"
@@ -868,12 +869,22 @@ const layer = Layer.effect(
                 )
                 if (Exit.isSuccess(exit)) {
                   const result = exit.value
+                  // Use the same original-user snapshot for model context and admission.
+                  // Line references never authorize transferring the rest of the file.
+                  const bytes =
+                    process.env.LOGINOM_AI_AGENT_CLI_ROOT &&
+                    !url.search &&
+                    !url.hash &&
+                    part.filename &&
+                    !result.attachments?.length
+                      ? yield* Effect.promise(() => fileSnapshot(filepath))
+                      : undefined
                   pieces.push({
                     messageID: info.id,
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: result.output,
+                    text: bytes ? bytes.toString("utf8") : result.output,
                   })
                   if (result.attachments?.length) {
                     pieces.push(
@@ -886,7 +897,13 @@ const layer = Layer.effect(
                       })),
                     )
                   } else {
-                    pieces.push({ ...part, mime, messageID: info.id, sessionID: input.sessionID })
+                    pieces.push({
+                      ...part,
+                      mime,
+                      url: bytes ? `data:${mime};base64,${bytes.toString("base64")}` : part.url,
+                      messageID: info.id,
+                      sessionID: input.sessionID,
+                    })
                   }
                 } else {
                   const error = Cause.squash(exit.cause)

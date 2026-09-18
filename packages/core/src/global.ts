@@ -7,13 +7,17 @@ import { Flock } from "./util/flock"
 import { Flag } from "./flag/flag"
 import { makeGlobalNode } from "./effect/app-node"
 import { productChannel, productSlug } from "@loginom-ai-agent/product"
+import { profilePaths } from "@loginom-ai-agent/product/cli-profile"
 
 const app = productSlug(productChannel(process.env.LOGINOM_AI_AGENT_CHANNEL ?? "prod"))
-const data = path.join(xdgData!, app)
-const cache = path.join(xdgCache!, app)
-const config = path.join(xdgConfig!, app)
-const state = path.join(xdgState!, app)
-const tmp = path.join(os.tmpdir(), app)
+// Only the standalone bootstrap sets CLI_ROOT, after acquiring its profile guard.
+// The public CLI_PROFILE selector has no effect on Desktop imports.
+const cli = process.env.LOGINOM_AI_AGENT_CLI_ROOT ? profilePaths(process.env.LOGINOM_AI_AGENT_CLI_ROOT) : undefined
+const data = cli?.data ?? path.join(xdgData!, app)
+const cache = cli?.cache ?? path.join(xdgCache!, app)
+const config = cli?.config ?? path.join(xdgConfig!, app)
+const state = cli?.state ?? path.join(xdgState!, app)
+const tmp = cli?.tmp ?? path.join(os.tmpdir(), app)
 
 const paths = {
   get home() {

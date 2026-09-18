@@ -378,7 +378,8 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
     });
-    return { server, catalog, hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
+    return { server, catalog, hasActiveWork: () => !clipboardUncertain && !!actionRuntime?.hasActiveWork(),
+      hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {
         if (config.acceptanceCleanupPackage) {

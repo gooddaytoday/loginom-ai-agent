@@ -31,11 +31,13 @@ export const directories = Effect.fn("ConfigPaths.directories")(function* (direc
           stop: worktree,
         })
       : []),
-    ...(yield* afs.up({
-      targets: [".loginom-ai-agent"],
-      start: Global.Path.home,
-      stop: Global.Path.home,
-    })),
+    ...(!process.env.LOGINOM_AI_AGENT_CLI_ROOT
+      ? yield* afs.up({
+          targets: [".loginom-ai-agent"],
+          start: Global.Path.home,
+          stop: Global.Path.home,
+        })
+      : []),
     ...(Flag.LOGINOM_AI_AGENT_CONFIG_DIR ? [Flag.LOGINOM_AI_AGENT_CONFIG_DIR] : []),
   ])
 })

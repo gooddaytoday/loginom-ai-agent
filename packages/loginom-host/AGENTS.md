@@ -1,9 +1,47 @@
 # Loginom runtime host
 
-- This package owns runtime supervision (`src/supervisor.ts`), private transport (`transport.ts`), the backend adapter (`adapter.ts`) and original-user input admission (`inputs.ts`). Desktop owns credentials and connection generations; the model must not become their authority.
+- This package owns runtime supervision (`src/supervisor.ts`), private transport (`transport.ts`), the backend adapter (`adapter.ts`), original-user input admission (`inputs.ts`), and extracted connection/recovery logic (`src/connection`). `createLoginomHost` in `src/host.ts` composes these with explicit paths, credential codec, environment and browser mode. Desktop supplies Electron paths and safeStorage; the model must never become their authority.
+- `host-port.ts` owns the common request handler. Retain generation leases for all admitted call/list/admit/interrupt requests; ordinary acquire must never resume a recovery lease. `journal.pending()` includes live uncertainty, and a later successful call cannot erase an earlier uncertain one. Explicit acknowledgement requires idle leases and runtime reset; shutdown wins before journal commit.
+- `node-entry.ts` and `node-client.ts` implement one private child host per CLI invocation, with protocol handshake, management requests and awaited shutdown. Build its Node dependency closure with `script/build-node-host.ts`; do not launch TypeScript sources with a global runtime in the product. Environment is filtered separately from IPC payloads. The caller retains its profile guard until host exit is confirmed.
+- Handshake waits for restored connection startup to settle; otherwise immediate setup/check races readiness with `LOGINOM_APPLICATION_PENDING`. Management save waits for activation to settle and returns a redacted status. `errors.ts` is the exact allowlist of cross-process errors; arbitrary runtime messages never reach stdout/stderr.
+- `system-proxy.ts` is shared with Desktop (Linux/GNOME policy). Bundled Node supports and uses `--use-system-ca`; explicit `NODE_EXTRA_CA_CERTS` is forwarded. CLI native-proxy source collectors read Windows current-user WinHTTP settings and macOS scutil output; only manual HTTP/HTTPS routing is represented. Automatic/scoped/auth/CIDR/<local> policies fail explicitly; native execution remains unverified. Desktop retains its existing loader. Known CLI policy errors before host startup release the guard with exit 2.
+- Credential store accepts asynchronous codecs. `connection/cli-credentials.ts` uses its own versioned Linux plaintext envelope; Desktop retains existing plaintext/Electron ciphertext records. Windows DPAPI source adapter uses system Windows PowerShell with private stdin, CurrentUser scope and a versioned CLI entropy label; native Windows acceptance remains pending. Keychain source integration uses a bundled native helper with one key per canonical profile and an AES-GCM envelope; native compilation, signing and macOS acceptance remain pending. Missing/locked/unavailable helper access fails closed. Never put secrets in PowerShell argv, environment, files or diagnostic errors.
+- Standalone extraction is in progress: full owner-loss cancellation and Chromium cleanup acceptance remain pending. Preserve existing Desktop record compatibility; do not treat a killed Node process as proof of Chromium cleanup.
 - Start the bundled Node/runtime for the selected connection generation and chat. Do not use a globally installed Dock, Node or browser as a runtime dependency.
 - Credentials travel through private IPC. Forward only the allowed environment, including HTTP/HTTPS/NO_PROXY and required Linux desktop session variables. Do not forward provider credentials or log secrets.
 - Dataset admission must bind the bytes to the original user attachment. Model-generated paths, filenames or tokens cannot authorize filesystem access. Never expose `host_context_token` as a model parameter.
 - Keep cancellation, parent death and runtime cleanup reliable. An uncertain operation must be surfaced for recovery, never retried silently.
-- Run `bun test` and `bun typecheck` from this directory. Desktop integration tests live in `../desktop/test/loginom`; real runtime/browser acceptance needs the pinned resources.
+- Run `LOGINOM_AI_AGENT_TEST_NODE=/absolute/path/to/pinned/node bun test` and `bun typecheck` from this directory. Process/host tests require the explicit pinned Node executable; an unset variable is a test configuration failure. Desktop integration tests live in `../desktop/test/loginom`; real runtime/browser acceptance needs the pinned resources.
 - See [desktop connection ownership](../desktop/src/main/loginom/AGENTS.md), [runtime contracts](../loginom-runtime/AGENTS.md), and [canonical checkpoint](../../docs/migration/linux-implementation-checkpoint.md).
+
+- `script/stage-resources.ts` owns shared build-time staging for Desktop/CLI. Callers supply explicit target/output and pinned Node/browser inputs; unsupported native targets fail closed. Never import this installer into runtime code.
+
+- `src/cli-manifest.ts` shares artifact inventory/integrity verification between build and installed resolver. Manifests must describe the actually built source snapshot; do not label an older binary with current dirty source identity. Development bundle override is separate from installed verification.
+
+- `script/build-cli.ts` builds a new development artifact directory and verifies source snapshot stability before writing its manifest. It requires the pinned Bun and explicit pinned resource inputs; existing output is never replaced. Dirty candidates are not release artifacts.
+
+- Runtime shutdown succeeds only with a `closed: true` acknowledgement and exit code 0 without a signal. A killed or disconnected child is not successful cleanup; repeated close preserves the original outcome.
+
+- The Linux build also emits a versioned tar.gz and .sha256 beside the payload, verifies the extracted archive manifest, and refuses to overwrite existing archive/checksum files. Include build scripts in package typecheck.
+
+- A successful runtime reply can retain active asynchronous work. Keep its journal records durable but permit the same run to poll while `activeWork` is true. Clear that run's records only when its runtime reports no unsettled work. Losing/releasing the owner or receiving inactive uncertainty moves all retained records to recovery. Never acquire a second run for the same chat while the first owns it; unrelated runs cannot reconcile its records.
+
+- Manual CSV acceptance shares `script/oracle-provider.ts` across Desktop and CLI transports. It queues scripted model tool calls, captures the actually advertised Loginom contract and never supplies synthetic attachment admission. Each interface must send its own original-user attachment. `compare-oracle-contracts.ts` compares captured schemas and the bootstrap Loginom instruction; it does not prove all dynamic instructions or same-build provenance. Desktop acceptance uses a private GUI profile and its real backend API, not direct Host dispatch.
+
+- Windows runtime environment matching is case-insensitive even for ordinary objects from IPC. Emit one uppercase name per allowed key with sorted-key precedence; retain case-sensitive Linux behavior and never inherit provider secrets or user PATH.
+
+- Resource staging must reject lexical and canonical overlap in either direction between every input and both destination and its staging directory before executing input Node or changing files. Resolve the existing ancestor of missing output paths without creating directories. This preflight handles existing symlink aliases but does not establish protection against concurrent path replacement.
+
+- Supervisor must reject pending requests on IPC `disconnect`, even if the child process remains alive. Transport loss is separate from confirmed process cleanup; a forced exit cannot satisfy the close acknowledgement contract.
+
+- Shared host launches `resources/bin/node.exe` on Windows and `resources/bin/node` on POSIX, matching standalone resolver and manifest requirements. Never fall back to a PATH-resolved Node.
+
+- `cli-install-windows.ts` is the Windows user installer source: versioned payload under LOCALAPPDATA/Programs/loginom-ai-agent-cli, owned cmd launcher, explicit user PATH setup. Do not rewrite registry PATH or remove profiles. Native installer/launcher/process checks remain pending. ZIP build integration is not yet complete.
+
+- CLI artifact inventory records internal directory symlinks (macOS frameworks) by link text/hash without following them recursively. Real target files remain separately inventoried. Reject the exact parent path `..` as well as longer parent escapes. File-symlink hashing retains its existing semantics.
+
+- Unix installer source supports darwin with system /usr/sbin/lsof payload-use detection; Linux keeps /proc checks. Native macOS lsof/install/launch/uninstall acceptance is pending. macOS uninstall is run from the original extracted archive, outside the installed versioned payload.
+
+- Resource staging supports native target layouts only on the matching OS/arch. Windows/macOS build candidates use independently inventoried hashes in script/native-resource-candidates.ts and emit platformAcceptance=pending; these are not Product release acceptance. Native execution remains required. Preserve directory symlink text and resource-manifest link verification; never substitute Linux hashes.
+
+- `collect-build-notices.ts` copies root-level npm license/notice texts for positive Bun output contributions into CLI licenses/bundled-npm. Its inventory remains explicitly incomplete: missing package texts, nested notices and Bun/native resources require separate release audit. Do not treat metadata license declarations or successful copying as compliance approval.

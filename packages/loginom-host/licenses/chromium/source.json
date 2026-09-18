@@ -1,0 +1,16 @@
+{
+  "platform": "linux",
+  "arch": "x64",
+  "revision": "1243",
+  "version": "153.0.8010.12",
+  "browserSha256": "8c599d43aec53f2460a31ae2f4af6bd863f8258b34ff519564bc5d4726bfaa1e",
+  "source": "chrome://credits/",
+  "sections": 757,
+  "sha256": "8b987ad57787fd07888c7d2bed64db3a05b3bebee62a4632c9ea2614bb4ab240",
+  "gzipSha256": "41ea4d6d36756c8a7ce314e512b0ec139e7617f3e78979c0c234511884b70852",
+  "status": "captured",
+  "limitations": [
+    "Does not establish source-distribution compliance",
+    "Other platform browser credits not captured"
+  ]
+}

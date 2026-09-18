@@ -1,11 +1,14 @@
 import { supervise } from "@loginom-ai-agent/loginom-host/supervisor"
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
-import { join } from "node:path"
-const resources = join(import.meta.dir, "../../resources/loginom")
+import { join, resolve } from "node:path"
+const resources = resolve(
+  process.env.LOGINOM_AI_AGENT_TEST_RESOURCES ?? join(import.meta.dir, "../../resources/loginom"),
+)
 if (process.platform !== "linux") throw Error("LINUX_ONLY_TEST")
 if (!process.env.LOGINOM_AI_AGENT_TEST_CONFIG) throw Error("PRIVATE_TEST_CONFIG_REQUIRED")
 if (process.argv[2] === "child") {
   const config = await Bun.file(process.env.LOGINOM_AI_AGENT_TEST_CONFIG!).json()
+  if (config.workflow_profile?.passwordless_login !== true) throw Error("TEST_PASSWORD_UNAVAILABLE")
   const manifest = await Bun.file(join(resources, "resource-manifest.json")).json()
   const runtime = await supervise({
     node: join(resources, "bin/node"),

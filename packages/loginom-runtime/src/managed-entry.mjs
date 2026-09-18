@@ -12,6 +12,7 @@ const require = createRequire(new URL("../client/package.json", import.meta.url)
 process.umask(0o077)
 const state = {
   starting: false,
+  closing: undefined,
   bridge: undefined,
   client: undefined,
   controller: undefined,
@@ -20,26 +21,47 @@ const state = {
   browserServer: undefined,
   inputs: new Map(),
 }
-const send = (message) => {
-  if (process.connected) process.send(message)
+const requests = new Set()
+const send = (message, disconnect = false) => {
+  if (process.connected)
+    process.send(message, () => {
+      if (disconnect && process.connected) process.disconnect()
+    })
 }
-async function close() {
+function close() {
+  if (state.closing) return state.closing
   state.controller?.abort()
-  await state.client?.close().catch(() => undefined)
-  await state.bridge?.close().catch(() => undefined)
-  await state.browserServer?.close().catch(() => undefined)
-  await state.browser?.close().catch(() => undefined)
-  process.disconnect?.()
+  state.closing = (async () => {
+    await Promise.allSettled([...requests])
+    const results = []
+    for (const handle of [state.client, state.bridge, state.browserServer, state.browser]) {
+      results.push(...(await Promise.allSettled([Promise.resolve().then(() => handle?.close())])))
+    }
+    if (results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+  })()
+  return state.closing
 }
-process.on("disconnect", () => {
-  close().finally(() => process.exit(0))
+const stop = () => {
+  void close().then(
+    () => process.exit(0),
+    () => process.exit(1),
+  )
+}
+process.on("disconnect", stop)
+process.on("SIGTERM", stop)
+process.on("message", (message) => {
+  const request = handle(message)
+  requests.add(request)
+  void request
+    .finally(() => requests.delete(request))
+    .catch(() => {
+      process.exitCode = 1
+    })
 })
-process.on("SIGTERM", () => {
-  close().finally(() => process.exit(0))
-})
-process.on("message", async (message) => {
+async function handle(message) {
   if (!message || typeof message !== "object" || typeof message.id !== "string") return
   try {
+    if (state.closing && message.operation !== "close") throw Error("LOGINOM_RUNTIME_CLOSING")
     if (message.operation === "start") {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
@@ -132,10 +154,11 @@ process.on("message", async (message) => {
       return
     }
     if (message.operation === "close") {
-      send({ id: message.id, result: { closed: true } })
       await close()
+      send({ id: message.id, result: { closed: true } }, true)
       return
     }
+    if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
     if (message.operation === "admit") {
       if (typeof message.input.userMessage !== "string" || !message.input.userMessage)
@@ -169,13 +192,21 @@ process.on("message", async (message) => {
         signal: controller.signal,
         timeout: 105_000,
       })
-      send({ id: message.id, result: { result, recoveryPending: state.bridge.hasUnsettledWork() } })
+      send({ id: message.id, result: {
+        result, recoveryPending: state.bridge.hasUnsettledWork(), activeWork: state.bridge.hasActiveWork(),
+      } })
     } finally {
       state.controller = undefined
     }
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
-    send({ id: message.id, error: code })
-    if (message.operation === "start") await close()
+    send({ id: message.id, error: code }, message.operation === "close")
+    if (message.operation === "start") {
+      // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
+      // close() retains a rejection so that the later close request reports cleanup failure.
+      setImmediate(() => {
+        void close().catch(() => undefined)
+      })
+    }
   }
-})
+}

@@ -2,6 +2,8 @@
 
 import { $ } from "bun"
 import path from "path"
+import { mkdir } from "node:fs/promises"
+import { Product } from "@loginom-ai-agent/product"
 import { fileURLToPath } from "url"
 import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
 
@@ -11,6 +13,24 @@ const dir = path.resolve(__dirname, "..")
 
 process.chdir(dir)
 
+const standaloneFlag = process.argv.includes("--standalone")
+const targetFlags = process.argv.filter((arg) => arg.startsWith("--target"))
+const selectedTarget = targetFlags[0]?.slice("--target=".length)
+if (
+  targetFlags.length > 1 ||
+  (targetFlags.length &&
+    (!standaloneFlag ||
+      !targetFlags[0].startsWith("--target=") ||
+      !["linux-x64", "darwin-arm64", "win32-x64"].includes(selectedTarget!) ||
+      process.argv.includes("--single") ||
+      process.argv.includes("--baseline")))
+)
+  throw new Error("Invalid standalone --target; use linux-x64, darwin-arm64 or win32-x64 without --single/--baseline")
+const output = standaloneFlag ? (process.env.LOGINOM_AI_AGENT_BUILD_OUTPUT ?? "dist-standalone") : "dist"
+if (standaloneFlag && process.env.LOGINOM_AI_AGENT_BUILD_OUTPUT && !path.isAbsolute(output))
+  throw new Error("Standalone build output must be absolute")
+const executable = standaloneFlag ? Product.cliExecutable : Product.executable
+if (standaloneFlag) process.env.MODELS_DEV_API_JSON ??= path.join(dir, "../product/models.json")
 const generated = await import("./generate.ts")
 
 import { Script } from "@loginom-ai-agent/script"
@@ -21,7 +41,7 @@ const baselineFlag = process.argv.includes("--baseline")
 const skipInstall = process.argv.includes("--skip-install")
 const sourcemapsFlag = process.argv.includes("--sourcemaps")
 const plugin = createSolidTransformPlugin()
-const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
+const skipEmbedWebUi = standaloneFlag || process.argv.includes("--skip-embed-web-ui")
 
 const createEmbeddedWebUIBundle = async () => {
   console.log(`Building Web UI to embed in the binary`)
@@ -113,28 +133,31 @@ const allTargets: {
   },
 ]
 
-const targets = singleFlag
-  ? allTargets.filter((item) => {
-      if (item.os !== process.platform || item.arch !== process.arch) {
-        return false
-      }
+const targets = selectedTarget
+  ? allTargets.filter((item) => `${item.os}-${item.arch}` === selectedTarget && item.avx2 !== false && !item.abi)
+  : singleFlag
+    ? allTargets.filter((item) => {
+        if (item.os !== process.platform || item.arch !== process.arch) {
+          return false
+        }
 
-      // When building for the current platform, prefer a single native binary by default.
-      // Baseline binaries require additional Bun artifacts and can be flaky to download.
-      if (item.avx2 === false) {
-        return baselineFlag
-      }
+        // When building for the current platform, prefer a single native binary by default.
+        // Baseline binaries require additional Bun artifacts and can be flaky to download.
+        if (item.avx2 === false) {
+          return baselineFlag
+        }
 
-      // also skip abi-specific builds for the same reason
-      if (item.abi !== undefined) {
-        return false
-      }
+        // also skip abi-specific builds for the same reason
+        if (item.abi !== undefined) {
+          return false
+        }
 
-      return true
-    })
-  : allTargets
+        return true
+      })
+    : allTargets
 
-await $`rm -rf dist`
+if (standaloneFlag && process.env.LOGINOM_AI_AGENT_BUILD_OUTPUT) await mkdir(output)
+else await $`rm -rf ${output}`
 
 const binaries: Record<string, string> = {}
 if (!skipInstall) {
@@ -144,7 +167,7 @@ if (!skipInstall) {
 }
 for (const item of targets) {
   const name = [
-    "loginom-ai-agent",
+    executable,
     // changing to win32 flags npm for some reason
     item.os === "win32" ? "windows" : item.os,
     item.arch,
@@ -154,13 +177,14 @@ for (const item of targets) {
     .filter(Boolean)
     .join("-")
   console.log(`building ${name}`)
-  await $`mkdir -p dist/${name}/bin`
+  await $`mkdir -p ${output}/${name}/bin`
 
   const workerPath = "./src/cli/tui/worker.ts"
   const treeSitterWorkerPath = "opentui-tree-sitter-worker.js"
   const bunfsRoot = item.os === "win32" ? "B:/~BUN/root/" : "/$bunfs/root/"
 
-  await Bun.build({
+  const result = await Bun.build({
+    metafile: standaloneFlag,
     conditions: ["bun", "node"],
     tsconfig: "./tsconfig.json",
     plugins: [plugin],
@@ -174,8 +198,8 @@ for (const item of targets) {
       autoloadDotenv: false,
       autoloadTsconfig: true,
       autoloadPackageJson: true,
-      target: name.replace("loginom-ai-agent", "bun") as any,
-      outfile: `dist/${name}/bin/loginom-ai-agent`,
+      target: name.replace(executable, "bun") as any,
+      outfile: `${output}/${name}/bin/${executable}`,
       execArgv: [`--user-agent=loginom-ai-agent/${Script.version}`, "--use-system-ca", "--"],
       windows: {},
     },
@@ -184,7 +208,7 @@ for (const item of targets) {
       ...(embeddedFileMap ? { "opencode-web-ui.gen.ts": embeddedFileMap } : {}),
     },
     entrypoints: [
-      "./src/index.ts",
+      standaloneFlag ? "./src/standalone.ts" : "./src/index.ts",
       workerPath,
       treeSitterWorkerPath,
       ...(embeddedFileMap ? ["opencode-web-ui.gen.ts"] : []),
@@ -201,9 +225,15 @@ for (const item of targets) {
     },
   })
 
+  if (!result.success) throw new AggregateError(result.logs, "LOGINOM_CLI_BUILD_FAILED")
+  if (standaloneFlag) {
+    if (!result.metafile) throw new Error("LOGINOM_CLI_BUILD_METADATA_MISSING")
+    await Bun.write(`${output}/${name}/build-inputs.json`, JSON.stringify(result.metafile, null, 2))
+  }
+
   // Smoke test: only run if binary is for current platform
   if (item.os === process.platform && item.arch === process.arch && !item.abi) {
-    const binaryPath = `dist/${name}/bin/loginom-ai-agent`
+    const binaryPath = `${output}/${name}/bin/${executable}`
     console.log(`Running smoke test: ${binaryPath} --version`)
     try {
       const versionOutput = await $`${binaryPath} --version`.text()
@@ -214,8 +244,8 @@ for (const item of targets) {
     }
   }
 
-  await $`rm -rf ./dist/${name}/bin/tui`
-  await Bun.file(`dist/${name}/package.json`).write(
+  await $`rm -rf ./${output}/${name}/bin/tui`
+  await Bun.file(`${output}/${name}/package.json`).write(
     JSON.stringify(
       {
         name,
@@ -232,12 +262,12 @@ for (const item of targets) {
   binaries[name] = Script.version
 }
 
-if (Script.release) {
+if (Script.release && !standaloneFlag) {
   for (const key of Object.keys(binaries)) {
     if (key.includes("linux")) {
-      await $`tar -czf ../../${key}.tar.gz *`.cwd(`dist/${key}/bin`)
+      await $`tar -czf ../../${key}.tar.gz *`.cwd(`${output}/${key}/bin`)
     } else {
-      await $`zip -r ../../${key}.zip *`.cwd(`dist/${key}/bin`)
+      await $`zip -r ../../${key}.zip *`.cwd(`${output}/${key}/bin`)
     }
   }
   await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz --clobber --repo ${process.env.GH_REPO}`

@@ -1,4 +1,4 @@
-import type { Port } from "@loginom-ai-agent/loginom-host/transport"
+import type { HostPort } from "@loginom-ai-agent/loginom-host/host-port"
 
 import * as http from "node:http"
 import * as tls from "node:tls"
@@ -30,7 +30,7 @@ type SidecarMessage =
 
 type ParentPort = {
   postMessage(message: SidecarMessage): void
-  on(event: "message", listener: (event: { data: unknown; ports?: Port[] }) => void): void
+  on(event: "message", listener: (event: { data: unknown; ports?: HostPort[] }) => void): void
 }
 
 type Listener = {
@@ -50,14 +50,20 @@ parentPort.on("message", (event) => {
   void start(command, event.ports?.[0])
 })
 
-async function start(command: StartCommand, loginomPort?: Port) {
+async function start(command: StartCommand, loginomPort?: HostPort) {
   try {
     prepareSidecarEnv(command.password, command.userDataPath)
     ensureLoopbackNoProxy()
     useSystemCertificates()
     useEnvProxy()
     const { Server, LoginomHost } = await import("virtual:loginom-ai-agent-server")
-    if (loginomPort) LoginomHost.connect(loginomPort)
+    if (loginomPort)
+      LoginomHost.connect({
+        postMessage: (value) => loginomPort.postMessage(value),
+        on: (event, listener) => loginomPort.on(event, listener),
+        onClose: (listener) => loginomPort.on("close", listener),
+        start: () => loginomPort.start(),
+      })
 
     listener = await Server.listen({
       port: command.port,

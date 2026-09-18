@@ -9,6 +9,10 @@ export function connect(port: Port) {
   state.connection?.close()
   state.connection = transport(port)
 }
+export function disconnect() {
+  state.connection?.close()
+  state.connection = undefined
+}
 export async function acquire(session: string) {
   const connection = state.connection
   if (!connection) return

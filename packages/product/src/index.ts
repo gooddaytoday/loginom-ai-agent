@@ -5,6 +5,7 @@ export const Product = Object.freeze({
   envPrefix: "LOGINOM_AI_AGENT_",
   scheme: "loginom-ai-agent",
   executable: "loginom-ai-agent",
+  cliExecutable: "loginom-ai-agent-cli",
   database: "loginom-ai-agent.db",
   updateFeed: null as string | null,
   changelogFeed: null as string | null,

@@ -1,0 +1,221 @@
+{
+  "@ai-sdk/provider-utils@4.0.21": {
+    "url": "https://raw.githubusercontent.com/vercel/ai/415b07afd7c6b8409ae16a2f28cf9b68f4b5233b/LICENSE",
+    "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+    "file": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529.txt",
+    "registry": "https://registry.npmjs.org/@ai-sdk%2fprovider-utils/4.0.21",
+    "commit": "415b07afd7c6b8409ae16a2f28cf9b68f4b5233b",
+    "tag": "refs/tags/@ai-sdk/provider-utils@4.0.21",
+    "packageMetadata": "https://raw.githubusercontent.com/vercel/ai/415b07afd7c6b8409ae16a2f28cf9b68f4b5233b/packages/provider-utils/package.json"
+  },
+  "@ai-sdk/provider-utils@4.0.23": {
+    "url": "https://raw.githubusercontent.com/vercel/ai/c3a057d9dc97a9e74d83955c7a105359aa5c229c/LICENSE",
+    "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+    "file": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529.txt",
+    "registry": "https://registry.npmjs.org/@ai-sdk%2fprovider-utils/4.0.23",
+    "commit": "c3a057d9dc97a9e74d83955c7a105359aa5c229c",
+    "tag": "refs/tags/@ai-sdk/provider-utils@4.0.23",
+    "packageMetadata": "https://raw.githubusercontent.com/vercel/ai/c3a057d9dc97a9e74d83955c7a105359aa5c229c/packages/provider-utils/package.json"
+  },
+  "@ai-sdk/provider-utils@4.0.27": {
+    "url": "https://raw.githubusercontent.com/vercel/ai/02882860df29ae2aa8140003c87a493af80bef08/LICENSE",
+    "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+    "file": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529.txt",
+    "registry": "https://registry.npmjs.org/@ai-sdk%2fprovider-utils/4.0.27",
+    "commit": "02882860df29ae2aa8140003c87a493af80bef08",
+    "tag": "refs/tags/@ai-sdk/provider-utils@4.0.27",
+    "packageMetadata": "https://raw.githubusercontent.com/vercel/ai/02882860df29ae2aa8140003c87a493af80bef08/packages/provider-utils/package.json"
+  },
+  "@ai-sdk/provider-utils@4.0.32": {
+    "url": "https://raw.githubusercontent.com/vercel/ai/74b496882c8b67a33969f3847bac11000c4f691f/LICENSE",
+    "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+    "file": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529.txt",
+    "registry": "https://registry.npmjs.org/@ai-sdk%2fprovider-utils/4.0.32",
+    "commit": "74b496882c8b67a33969f3847bac11000c4f691f",
+    "tag": "refs/tags/@ai-sdk/provider-utils@4.0.32",
+    "packageMetadata": "https://raw.githubusercontent.com/vercel/ai/74b496882c8b67a33969f3847bac11000c4f691f/packages/provider-utils/package.json"
+  },
+  "@ai-sdk/provider-utils@4.0.33": {
+    "url": "https://raw.githubusercontent.com/vercel/ai/a2d8be2aa0c024f1e3d275d94b67cc17c9159043/LICENSE",
+    "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+    "file": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529.txt",
+    "registry": "https://registry.npmjs.org/@ai-sdk%2fprovider-utils/4.0.33",
+    "commit": "a2d8be2aa0c024f1e3d275d94b67cc17c9159043",
+    "tag": "refs/tags/@ai-sdk/provider-utils@4.0.33",
+    "packageMetadata": "https://raw.githubusercontent.com/vercel/ai/a2d8be2aa0c024f1e3d275d94b67cc17c9159043/packages/provider-utils/package.json"
+  },
+  "@ai-sdk/provider-utils@4.0.35": {
+    "url": "https://raw.githubusercontent.com/vercel/ai/6aedb774d31194164c176f5a07b78a9ee42c2b13/LICENSE",
+    "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+    "file": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529.txt",
+    "registry": "https://registry.npmjs.org/@ai-sdk%2fprovider-utils/4.0.35",
+    "commit": "6aedb774d31194164c176f5a07b78a9ee42c2b13",
+    "tag": "refs/tags/@ai-sdk/provider-utils@4.0.35",
+    "packageMetadata": "https://raw.githubusercontent.com/vercel/ai/6aedb774d31194164c176f5a07b78a9ee42c2b13/packages/provider-utils/package.json"
+  },
+  "@ai-sdk/provider-utils@4.0.38": {
+    "url": "https://raw.githubusercontent.com/vercel/ai/46dca7c5632e300e4ff7a2032abe5b7a2625b48a/LICENSE",
+    "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+    "file": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529.txt",
+    "registry": "https://registry.npmjs.org/@ai-sdk%2fprovider-utils/4.0.38",
+    "commit": "46dca7c5632e300e4ff7a2032abe5b7a2625b48a",
+    "tag": "refs/tags/@ai-sdk/provider-utils@4.0.38",
+    "packageMetadata": "https://raw.githubusercontent.com/vercel/ai/46dca7c5632e300e4ff7a2032abe5b7a2625b48a/packages/provider-utils/package.json"
+  },
+  "@ai-sdk/provider-utils@4.0.40": {
+    "url": "https://raw.githubusercontent.com/vercel/ai/da5fbd2703c54dfbaea7ec725757da5b121beef0/LICENSE",
+    "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+    "file": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529.txt",
+    "registry": "https://registry.npmjs.org/@ai-sdk%2fprovider-utils/4.0.40",
+    "commit": "da5fbd2703c54dfbaea7ec725757da5b121beef0",
+    "tag": "refs/tags/@ai-sdk/provider-utils@4.0.40",
+    "packageMetadata": "https://raw.githubusercontent.com/vercel/ai/da5fbd2703c54dfbaea7ec725757da5b121beef0/packages/provider-utils/package.json"
+  },
+  "@ai-sdk/provider-utils@4.0.45": {
+    "url": "https://raw.githubusercontent.com/vercel/ai/2d10c353e9ac2c0d598fd8e1145fdf750d3bf265/LICENSE",
+    "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+    "file": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529.txt",
+    "registry": "https://registry.npmjs.org/@ai-sdk%2fprovider-utils/4.0.45",
+    "commit": "2d10c353e9ac2c0d598fd8e1145fdf750d3bf265",
+    "tag": "refs/tags/@ai-sdk/provider-utils@4.0.45",
+    "packageMetadata": "https://raw.githubusercontent.com/vercel/ai/2d10c353e9ac2c0d598fd8e1145fdf750d3bf265/packages/provider-utils/package.json"
+  },
+  "@ai-sdk/provider-utils@4.0.46": {
+    "url": "https://raw.githubusercontent.com/vercel/ai/85464f4e2026d9fc0274424c0171a25742836411/LICENSE",
+    "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+    "file": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529.txt",
+    "registry": "https://registry.npmjs.org/@ai-sdk%2fprovider-utils/4.0.46",
+    "commit": "85464f4e2026d9fc0274424c0171a25742836411",
+    "tag": "refs/tags/@ai-sdk/provider-utils@4.0.46",
+    "packageMetadata": "https://raw.githubusercontent.com/vercel/ai/85464f4e2026d9fc0274424c0171a25742836411/packages/provider-utils/package.json"
+  },
+  "@ai-sdk/provider-utils@4.0.50": {
+    "url": "https://raw.githubusercontent.com/vercel/ai/f8367cd6466d646c510a541c6beb8ef49ac66821/LICENSE",
+    "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+    "file": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529.txt",
+    "registry": "https://registry.npmjs.org/@ai-sdk%2fprovider-utils/4.0.50",
+    "commit": "f8367cd6466d646c510a541c6beb8ef49ac66821",
+    "tag": "refs/tags/@ai-sdk/provider-utils@4.0.50",
+    "packageMetadata": "https://raw.githubusercontent.com/vercel/ai/f8367cd6466d646c510a541c6beb8ef49ac66821/packages/provider-utils/package.json"
+  },
+  "@ai-sdk/provider-utils@4.0.51": {
+    "url": "https://raw.githubusercontent.com/vercel/ai/6fabd709198fa0f98f4d2262bd099b52ca6a0bc6/LICENSE",
+    "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+    "file": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529.txt",
+    "registry": "https://registry.npmjs.org/@ai-sdk%2fprovider-utils/4.0.51",
+    "commit": "6fabd709198fa0f98f4d2262bd099b52ca6a0bc6",
+    "tag": "refs/tags/@ai-sdk/provider-utils@4.0.51",
+    "packageMetadata": "https://raw.githubusercontent.com/vercel/ai/6fabd709198fa0f98f4d2262bd099b52ca6a0bc6/packages/provider-utils/package.json"
+  },
+  "@aws-sdk/credential-provider-http@3.972.43": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/Apache-2.0.txt",
+    "sha256": "cff6cb8aa05207b494e73a24b6d296adf1fa4001a4deff9a464252cdf1b6b4c7",
+    "file": "cff6cb8aa05207b494e73a24b6d296adf1fa4001a4deff9a464252cdf1b6b4c7.txt",
+    "registry": "https://registry.npmjs.org/@aws-sdk%2fcredential-provider-http/3.972.43",
+    "tarball": "https://registry.npmjs.org/@aws-sdk/credential-provider-http/-/credential-provider-http-3.972.43.tgz",
+    "tarballIntegrity": "sha512-TT76RN1NkI9WoyZqCNxOw6/WBMF7pYOTJcXbMokNFU+euSG40Kaf/t/FhDACVZWP+43wEM6ZynIPIkzS1wR1iA==",
+    "packageMetadataSha256": "74e082623906ef6abd4ca20fd3b1b96336f2a0282c3d52bc618021961a85e673",
+    "readmeSha256": "27ef1d7518b40bb68d188dc925e6499fa5fc403e89b3c44eb8b61554980163e3",
+    "standardTextSha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+    "transformation": "Verified npm tarball package.json and README, byte-identical to installed dependency, concatenated with declared Apache-2.0 SPDX text. No git commit or copyright attribution inferred."
+  },
+  "@aws-sdk/credential-provider-login@3.972.45": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/Apache-2.0.txt",
+    "sha256": "cf926d7767f1c9a276905628ec9fffc0010c9a5f13fcf16243b811936f283376",
+    "file": "cf926d7767f1c9a276905628ec9fffc0010c9a5f13fcf16243b811936f283376.txt",
+    "registry": "https://registry.npmjs.org/@aws-sdk%2fcredential-provider-login/3.972.45",
+    "tarball": "https://registry.npmjs.org/@aws-sdk/credential-provider-login/-/credential-provider-login-3.972.45.tgz",
+    "tarballIntegrity": "sha512-MZQv4SNjByk1iOKmrqmzcUF/uCB05wjvEHyXKxmGQTUANTIVayX6HPUF0bzkWLvtnkH7sAn9kUCfkXbSpj9sDA==",
+    "packageMetadataSha256": "47a60282dbbec85642d60861183fd570126459a7cf2dc716cfaeee8ec7314275",
+    "readmeSha256": "a33261115ded62f80ada337b9ed2193392837a6dd49d3ce89ec81fc48fbe33fd",
+    "standardTextSha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+    "transformation": "Verified npm tarball package.json and README, byte-identical to installed dependency, concatenated with declared Apache-2.0 SPDX text. No git commit or copyright attribution inferred."
+  },
+  "@aws-sdk/nested-clients@3.997.13": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/Apache-2.0.txt",
+    "sha256": "63a93b83f8fc6ca2f1e2f018898fd4575449edecfd7fa6e8b45f42f5f4710054",
+    "file": "63a93b83f8fc6ca2f1e2f018898fd4575449edecfd7fa6e8b45f42f5f4710054.txt",
+    "registry": "https://registry.npmjs.org/@aws-sdk%2fnested-clients/3.997.13",
+    "tarball": "https://registry.npmjs.org/@aws-sdk/nested-clients/-/nested-clients-3.997.13.tgz",
+    "tarballIntegrity": "sha512-2pA6eyb5nSo/ZD2cayhOTEMoGQYgspq0RI05GDLkzQ3ajZ6isS6waV6E92Am/hz4LIlLUTrbwPLurJ/fuiHvkg==",
+    "packageMetadataSha256": "8dee7e7c804508d263e3be2c0bff71959baf20f38a5c882ff7716307cdfde3e8",
+    "readmeSha256": "92cdad5ce2f6c085d7b65ee8c701340a75799ae6045f1b526b49a28caad27c30",
+    "standardTextSha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+    "transformation": "Verified npm tarball package.json and README, byte-identical to installed dependency, concatenated with declared Apache-2.0 SPDX text. No git commit or copyright attribution inferred."
+  },
+  "@ff-labs/fff-bin-linux-x64-gnu@0.9.4": {
+    "url": "https://raw.githubusercontent.com/dmtrKovalenko/fff/7d7910b6ba78ea8406671eaac8cdb5eb9850d9d1/LICENSE",
+    "sha256": "f8264de82db188834a5711d7e348dc08c33db14f79bb587ccb42616fd694ee81",
+    "file": "f8264de82db188834a5711d7e348dc08c33db14f79bb587ccb42616fd694ee81.txt",
+    "registry": "https://registry.npmjs.org/@ff-labs%2ffff-bin-linux-x64-gnu/0.9.4",
+    "gitHead": "7d7910b6ba78ea8406671eaac8cdb5eb9850d9d1"
+  },
+  "@ff-labs/fff-bun@0.9.4": {
+    "url": "https://raw.githubusercontent.com/dmtrKovalenko/fff/7d7910b6ba78ea8406671eaac8cdb5eb9850d9d1/LICENSE",
+    "sha256": "f8264de82db188834a5711d7e348dc08c33db14f79bb587ccb42616fd694ee81",
+    "file": "f8264de82db188834a5711d7e348dc08c33db14f79bb587ccb42616fd694ee81.txt",
+    "registry": "https://registry.npmjs.org/@ff-labs%2ffff-bun/0.9.4",
+    "gitHead": "7d7910b6ba78ea8406671eaac8cdb5eb9850d9d1"
+  },
+  "@sigstore/verify@3.1.1": {
+    "url": "https://raw.githubusercontent.com/sigstore/sigstore-js/c1dc7d4778a450787fc72b083f2490ad02b714c6/LICENSE",
+    "sha256": "364a130d2ca340bd56eb1e6d045fc6929bb0f9d0aa018f2c1949b29517e1cdd0",
+    "file": "364a130d2ca340bd56eb1e6d045fc6929bb0f9d0aa018f2c1949b29517e1cdd0.txt",
+    "registry": "https://registry.npmjs.org/@sigstore%2fverify/3.1.1",
+    "gitHead": "c1dc7d4778a450787fc72b083f2490ad02b714c6"
+  },
+  "abstract-logging@2.0.1": {
+    "url": "https://raw.githubusercontent.com/remy/mit-license/73ebb8ca1e2280883e92498e18fcdb1c633c226c/licenses/MIT.ejs",
+    "sha256": "885c5494558153ded7d61d8c843619ec5789be416d0cb29fba42f64de8462a69",
+    "file": "885c5494558153ded7d61d8c843619ec5789be416d0cb29fba42f64de8462a69.txt",
+    "registry": "https://registry.npmjs.org/abstract-logging/2.0.1",
+    "commit": "73ebb8ca1e2280883e92498e18fcdb1c633c226c",
+    "authorSource": "https://raw.githubusercontent.com/remy/mit-license/73ebb8ca1e2280883e92498e18fcdb1c633c226c/users/jsumners.json",
+    "packageReference": "https://raw.githubusercontent.com/jsumners/abstract-logging/80dfaef91ee87008f4ed2b6e78921d383bccd406/README.md",
+    "transformation": "MIT template paragraphs converted to plain text; info replaced only with explicit copyright field James Sumners, no year inferred. Linked live endpoint returned HTTP 403. This is a derived supplement, not a verbatim LICENSE download.",
+    "templateSha256": "75bd0d442091ebfb2ab8f7e3a1d507686fc7c9e87a1579558e2537e7b2b447a4"
+  },
+  "drizzle-orm@1.0.0-rc.2": {
+    "url": "https://raw.githubusercontent.com/drizzle-team/drizzle-orm/eec7260841c468ab4c2f2dc9d8ebb69105da0c34/LICENSE",
+    "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "file": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4.txt",
+    "registry": "https://registry.npmjs.org/drizzle-orm/1.0.0-rc.2",
+    "commit": "eec7260841c468ab4c2f2dc9d8ebb69105da0c34",
+    "attestation": "https://registry.npmjs.org/-/npm/v1/attestations/drizzle-orm@1.0.0-rc.2",
+    "tarballSha512": "51760391ba65179c17d21c31965fbcd10844c14bc024b06efad00afdde1f9dad7c90b13a56e962033b9f17f89e0c42097929cb45882d9ac5c3eb1d57bb2d6422",
+    "verification": "Registry integrity and downloaded tarball match attested subject; provenance signature not independently verified"
+  },
+  "remeda@2.26.0": {
+    "url": "https://raw.githubusercontent.com/remeda/remeda/0fde627fc4ca8a19ab93f000fe931f22d4472338/LICENSE",
+    "sha256": "acf30083045d768ce20640237313ee31a45d548d66ef76df5bb5fb0745479535",
+    "file": "acf30083045d768ce20640237313ee31a45d548d66ef76df5bb5fb0745479535.txt",
+    "registry": "https://registry.npmjs.org/remeda/2.26.0",
+    "gitHead": "0fde627fc4ca8a19ab93f000fe931f22d4472338"
+  },
+  "spdx-exceptions@2.5.0": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/CC-BY-3.0.txt",
+    "sha256": "ee447d3b2ec7e820ca2b3d55e07a957d67e6cb1dcfb219ec6c0ae3b126931ea9",
+    "file": "ee447d3b2ec7e820ca2b3d55e07a957d67e6cb1dcfb219ec6c0ae3b126931ea9.txt",
+    "registry": "https://registry.npmjs.org/spdx-exceptions/2.5.0",
+    "gitHead": "3aa64bec339abc6a3eca00c3436aaa7e154b8799",
+    "readmeSource": "https://raw.githubusercontent.com/kemitchell/spdx-exceptions.json/3aa64bec339abc6a3eca00c3436aaa7e154b8799/README.md",
+    "readmeSha256": "554b19eee11d2964e9f7b244e47944c08d52ca75539260a04f3227e6c0144513",
+    "standardLicense": "CC-BY-3.0",
+    "standardTextSha256": "e6bc9e9c474700b708f568bac9e5a8a9bcb2b1dad53442f5ba449fcb848b8e76",
+    "standardSourceCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+    "transformation": "Verbatim published-commit README concatenated with the full SPDX standard text matching npm license metadata, separated by descriptive headings. No attribution was synthesized."
+  },
+  "spdx-license-ids@3.0.23": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/CC0-1.0.txt",
+    "sha256": "11e44f9c1ee3069b668cb551bdf92d4acefb3c7d426e5e45b03cf1fa5756fb24",
+    "file": "11e44f9c1ee3069b668cb551bdf92d4acefb3c7d426e5e45b03cf1fa5756fb24.txt",
+    "registry": "https://registry.npmjs.org/spdx-license-ids/3.0.23",
+    "gitHead": "a2a975daf48bbc2afdc8e7c304405b44c656fd53",
+    "readmeSource": "https://raw.githubusercontent.com/jslicense/spdx-license-ids/a2a975daf48bbc2afdc8e7c304405b44c656fd53/README.md",
+    "readmeSha256": "b4807793db6058c819f76c023362b7d522b3d19c9b41563fcc01c2b2c5b1ccd3",
+    "standardLicense": "CC0-1.0",
+    "standardTextSha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+    "standardSourceCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+    "transformation": "Verbatim published-commit README concatenated with the full SPDX standard text matching npm license metadata, separated by descriptive headings. No attribution was synthesized."
+  }
+}

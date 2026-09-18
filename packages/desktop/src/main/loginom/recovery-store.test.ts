@@ -36,8 +36,11 @@ test("an unconfirmed dispatch survives process recreation; concurrent calls are 
       "id",
     ])
     await journal.settle(second, false)
+    expect(journal.pending()).toEqual([second])
     const third = await journal.begin("a".repeat(64), 1)
     await journal.settle(third, true)
+    expect((await recoveryStore(directory)).pending()).toEqual([second])
+    await journal.acknowledge([second])
     expect((await recoveryStore(directory)).pending()).toEqual([])
   } finally {
     await rm(directory, { recursive: true, force: true })

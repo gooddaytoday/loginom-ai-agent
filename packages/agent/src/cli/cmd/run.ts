@@ -1,3 +1,6 @@
+import { standaloneCancellation } from "../standalone-cancellation"
+import { exitCli } from "../exit"
+import { runToolOutcome } from "../run-outcome"
 import type { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
 import { FSUtil } from "@loginom-ai-agent/core/fs-util"
 // CLI entry point for `opencode run` and `opencode --mini`.
@@ -16,7 +19,7 @@ import { FSUtil } from "@loginom-ai-agent/core/fs-util"
 import type { Argv } from "yargs"
 import path from "path"
 import { pathToFileURL } from "url"
-import { open } from "node:fs/promises"
+import { fileSnapshot } from "@/util/file-snapshot"
 import { Effect } from "effect"
 import { UI } from "../ui"
 import { effectCmd } from "../effect-cmd"
@@ -24,7 +27,7 @@ import { EOL } from "os"
 import { Filesystem } from "@/util/filesystem"
 import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@loginom-ai-agent/sdk/v2"
 import { FormatError, FormatUnknownError } from "../error"
-import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
+import { INTERACTIVE_INPUT_ERROR, readPromptStdin, resolveInteractiveStdin } from "./run/runtime.stdin"
 
 type ModelInput = Parameters<OpencodeClient["session"]["prompt"]>[0]["model"]
 
@@ -55,8 +58,6 @@ type FilePart = {
   filename: string
   mime: string
 }
-
-const ATTACH_FILE_MAX_BYTES = 10 * 1024 * 1024
 
 type Inline = {
   icon: string
@@ -275,7 +276,7 @@ export const RunCommand = effectCmd({
       const thinking = interactive ? (args.thinking ?? true) : (args.thinking ?? false)
       const die = (message: string): never => {
         UI.error(message)
-        process.exit(1)
+        exitCli(1)
       }
       const dieInteractive = (error: unknown): never => {
         if (error instanceof Error && error.message === INTERACTIVE_INPUT_ERROR) {
@@ -340,7 +341,7 @@ export const RunCommand = effectCmd({
           return process.cwd()
         } catch {
           UI.error("Failed to change directory to " + args.dir)
-          process.exit(1)
+          exitCli(1)
         }
       })()
       const attachHeaders = args.attach
@@ -362,47 +363,33 @@ export const RunCommand = effectCmd({
           const resolvedPath = path.resolve(args.attach ? root : (directory ?? root), filePath)
           if (!(await Filesystem.exists(resolvedPath))) {
             UI.error(`File not found: ${filePath}`)
-            process.exit(1)
+            exitCli(1)
           }
 
           const stat = Filesystem.stat(resolvedPath)
           const isDirectory = stat?.isDirectory() ?? false
-          if (args.attach && isDirectory) {
+          if ((args.attach || process.env.LOGINOM_AI_AGENT_CLI_ROOT) && isDirectory) {
             UI.error(`Cannot attach local directory without a shared filesystem: ${filePath}`)
-            process.exit(1)
+            exitCli(1)
           }
 
           const content = await (async () => {
-            if (!args.attach) return
-            const handle = await open(resolvedPath, "r")
-            try {
-              const opened = await handle.stat()
-              if (!opened.isFile() || Number(opened.size) > ATTACH_FILE_MAX_BYTES) {
-                UI.error(`Cannot attach local file larger than 10 MiB or a special file: ${filePath}`)
-                process.exit(1)
-              }
-              if (opened.size === 0) return Buffer.alloc(0)
-              const buffer = Buffer.alloc(Number(opened.size))
-              let offset = 0
-              while (offset < buffer.length) {
-                const read = await handle.read(buffer, offset, buffer.length - offset, offset)
-                if (read.bytesRead === 0) break
-                offset += read.bytesRead
-              }
-              return buffer.subarray(0, offset)
-            } finally {
-              await handle.close()
-            }
+            if (!args.attach && !process.env.LOGINOM_AI_AGENT_CLI_ROOT) return
+            return fileSnapshot(resolvedPath).catch((error: Error) => {
+              UI.error(`${error.message}: ${filePath}`)
+              return exitCli(1)
+            })
           })()
           const detected = FSUtil.mimeType(resolvedPath)
           const text = content?.toString("utf8")
-          const mime = !args.attach
-            ? isDirectory
-              ? "application/x-directory"
-              : "text/plain"
-            : content && text !== undefined && Buffer.from(text, "utf8").equals(content)
-              ? "text/plain"
-              : detected
+          const mime =
+            content === undefined
+              ? isDirectory
+                ? "application/x-directory"
+                : "text/plain"
+              : content && text !== undefined && Buffer.from(text, "utf8").equals(content)
+                ? "text/plain"
+                : detected
 
           files.push({
             type: "file",
@@ -413,18 +400,29 @@ export const RunCommand = effectCmd({
         }
       }
 
-      const piped = process.stdin.isTTY ? undefined : await Bun.stdin.text()
+      const stdin = await readPromptStdin(!!process.env.LOGINOM_AI_AGENT_CLI_ROOT)
+      if (stdin.cancelled) {
+        process.exitCode = 130
+        if (args.format === "json")
+          process.stdout.write(
+            JSON.stringify({ type: "error", error: { name: "CLI_CANCELLED", data: { message: "CLI_CANCELLED" } } }) +
+              "\n",
+          )
+        process.stderr.write("CLI_CANCELLED\n")
+        return
+      }
+      const piped = stdin.text
       message = resolveRunInput(message, piped) ?? ""
       const initialInput = resolveRunInput(rawMessage, piped)
 
       if (message.trim().length === 0 && !args.command && !interactive) {
         UI.error("You must provide a message or a command")
-        process.exit(1)
+        exitCli(1)
       }
 
       if (args.fork && !args.continue && !args.session) {
         UI.error("--fork requires --continue or --session")
-        process.exit(1)
+        exitCli(1)
       }
 
       const rules: PermissionV1.Ruleset = interactive
@@ -463,7 +461,7 @@ export const RunCommand = effectCmd({
 
           if (!current?.data) {
             UI.error("Session not found")
-            process.exit(1)
+            exitCli(1)
           }
 
           if (args.fork) {
@@ -589,7 +587,7 @@ export const RunCommand = effectCmd({
         }
 
         UI.error("Failed to resolve remote directory")
-        process.exit(1)
+        exitCli(1)
       }
 
       async function localAgent() {
@@ -671,7 +669,7 @@ export const RunCommand = effectCmd({
         const sess = await session(sdk)
         if (!sess?.id) {
           UI.error("Session not found")
-          process.exit(1)
+          exitCli(1)
         }
         const sessionID = sess.id
 
@@ -696,6 +694,7 @@ export const RunCommand = effectCmd({
         // created, and replies issued from inside the loop must use that client.
         async function loop(client: OpencodeClient, events: Awaited<ReturnType<typeof sdk.event.subscribe>>) {
           const toggles = new Map<string, boolean>()
+          const outcome = runToolOutcome()
           const sessions = new Set([sessionID])
           let error: string | undefined
 
@@ -722,6 +721,15 @@ export const RunCommand = effectCmd({
               if (part.sessionID !== sessionID) continue
 
               if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) {
+                if (process.env.LOGINOM_AI_AGENT_CLI_ROOT) outcome.observe(part)
+                if (
+                  process.env.LOGINOM_AI_AGENT_CLI_ROOT &&
+                  part.state.status === "error" &&
+                  part.state.metadata?.permissionDenied === true
+                ) {
+                  error = "CLI_PERMISSION_REJECTED"
+                  emit("error", { error: { name: error, data: { message: error } } })
+                }
                 if (emit("tool_use", { part })) continue
                 if (part.state.status === "completed") {
                   await tool(part)
@@ -808,6 +816,10 @@ export const RunCommand = effectCmd({
                   reply: "once",
                 })
               } else {
+                if (process.env.LOGINOM_AI_AGENT_CLI_ROOT) {
+                  error = "CLI_PERMISSION_REJECTED"
+                  emit("error", { error: { name: error, data: { message: error } } })
+                }
                 UI.println(
                   UI.Style.TEXT_WARNING_BOLD + "!",
                   UI.Style.TEXT_NORMAL +
@@ -820,6 +832,10 @@ export const RunCommand = effectCmd({
               }
             }
           }
+          if (process.env.LOGINOM_AI_AGENT_CLI_ROOT && outcome.failed() && !error) {
+            error = "CLI_TOOL_FAILED"
+            if (!emit("error", { error: { name: error, data: { message: error } } })) UI.error(error)
+          }
           return error
         }
         const cwd = args.attach ? (directory ?? sess.directory ?? (await current(sdk))) : (directory ?? root)
@@ -831,25 +847,59 @@ export const RunCommand = effectCmd({
         await share(client, sessionID)
 
         if (!interactive) {
-          const events = await client.event.subscribe()
+          const subscription = new AbortController()
+          const events = await client.event.subscribe(undefined, { signal: subscription.signal })
           const completed = loop(client, events).catch((e) => {
+            if (subscription.signal.aborted) return
             console.error(e)
             process.exitCode = 1
           })
+          const cancellation: { pending?: Promise<void> } = {}
+          const interrupt = () => {
+            if (cancellation.pending) return
+            cancellation.pending = client.session.abort({ sessionID }).then((result) => {
+              if (result.error) throw new Error("CLI_CANCEL_FAILED")
+            })
+            // Await and report failure from finally; never leak an unhandled rejection.
+            void cancellation.pending.catch(() => {})
+          }
+          if (process.env.LOGINOM_AI_AGENT_CLI_ROOT) process.on("SIGINT", interrupt)
           async function finish() {
             if (args.attach) return
             const error = await completed
             if (error) process.exitCode = 1
           }
 
-          if (args.command) {
-            const result = await client.session.command({
+          try {
+            if (standaloneCancellation()?.aborted) {
+              interrupt()
+              return
+            }
+            if (args.command) {
+              const result = await client.session.command({
+                sessionID,
+                agent,
+                model: args.model,
+                command: args.command,
+                arguments: message,
+                variant: args.variant,
+              })
+              if (result.error) {
+                if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
+                process.exitCode = 1
+                return
+              }
+              await finish()
+              return
+            }
+
+            const model = pick(args.model)
+            const result = await client.session.prompt({
               sessionID,
               agent,
-              model: args.model,
-              command: args.command,
-              arguments: message,
+              model,
               variant: args.variant,
+              parts: [...files, { type: "text", text: message }],
             })
             if (result.error) {
               if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
@@ -858,23 +908,19 @@ export const RunCommand = effectCmd({
             }
             await finish()
             return
+          } finally {
+            try {
+              subscription.abort()
+              await completed
+              if (cancellation.pending) {
+                await cancellation.pending
+                process.exitCode = 130
+                emit("error", { error: { name: "CLI_CANCELLED", data: { message: "CLI_CANCELLED" } } })
+              }
+            } finally {
+              process.off("SIGINT", interrupt)
+            }
           }
-
-          const model = pick(args.model)
-          const result = await client.session.prompt({
-            sessionID,
-            agent,
-            model,
-            variant: args.variant,
-            parts: [...files, { type: "text", text: message }],
-          })
-          if (result.error) {
-            if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
-            process.exitCode = 1
-            return
-          }
-          await finish()
-          return
         }
 
         const model = pick(args.model)

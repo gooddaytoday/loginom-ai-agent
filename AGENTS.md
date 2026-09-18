@@ -162,6 +162,9 @@ const table = sqliteTable("session", {
 
 ## Loginom AI Agent: module map and current state
 
+- In `loginom-cli`, implement the [standalone CLI design](docs/superpowers/specs/2026-09-17-loginom-cli-standalone-design.md), starting from `c37913ab5`. Desktop and CLI own independent backend v1 processes and profiles. The earlier shared-service CLI design is historical; do not introduce service discovery, client leases, or Desktop profile migration.
+- Standalone executable: `loginom-ai-agent-cli`; keep the GUI launcher `loginom-ai-agent`. Track implementation and checks in the design's progress section and [standalone runbook](docs/testing/loginom-ai-agent/standalone-cli.md).
+
 - [Product identity and release pins](packages/product/AGENTS.md)
 - [Desktop packaging, installation and acceptance](packages/desktop/AGENTS.md)
 - [Connection generations, credentials and recovery](packages/desktop/src/main/loginom/AGENTS.md)

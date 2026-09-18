@@ -69,3 +69,49 @@ describe("run interactive stdin", () => {
     ).toThrow(INTERACTIVE_INPUT_ERROR)
   })
 })
+
+test.each([false, true])("standalone prompt stdin releases its signal handler; cancel=%s", async (cancel) => {
+  const module = new URL("../../../src/cli/cmd/run/runtime.stdin.ts", import.meta.url).pathname
+  const child = Bun.spawn(
+    [
+      process.execPath,
+      "--eval",
+      `
+    import { readPromptStdin } from ${JSON.stringify(module)};
+    const before = process.listenerCount('SIGINT');
+    const reading = readPromptStdin(true);
+    await Bun.write(Bun.stdout, 'READY\\n');
+    const result = await reading;
+    await Bun.write(Bun.stdout, JSON.stringify({ result, released: process.listenerCount('SIGINT') === before }));
+    process.exit(result.cancelled ? 130 : 0);
+  `,
+    ],
+    { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
+  )
+  const timer = setTimeout(() => child.kill("SIGKILL"), 5000)
+  try {
+    const reader = child.stdout.getReader()
+    const ready = await reader.read()
+    expect(Buffer.from(ready.value!).toString()).toBe("READY\n")
+    if (cancel) child.kill("SIGINT")
+    if (!cancel) {
+      child.stdin.write("строка\n")
+      child.stdin.end()
+    }
+    expect(await child.exited).toBe(cancel ? 130 : 0)
+    const chunks: Uint8Array[] = []
+    while (true) {
+      const next = await reader.read()
+      if (next.done) break
+      chunks.push(next.value)
+    }
+    expect(JSON.parse(Buffer.concat(chunks).toString())).toEqual({
+      result: cancel ? { cancelled: true } : { cancelled: false, text: "строка\n" },
+      released: true,
+    })
+    expect(await new Response(child.stderr).text()).toBe("")
+  } finally {
+    clearTimeout(timer)
+    child.kill()
+  }
+})

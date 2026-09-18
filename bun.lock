@@ -704,6 +704,11 @@
     "packages/loginom-host": {
       "name": "@loginom-ai-agent/loginom-host",
       "version": "0.1.0",
+      "dependencies": {
+        "@loginom-ai-agent/product": "workspace:*",
+        "@loginom-ai-agent/schema": "workspace:*",
+        "effect": "catalog:",
+      },
       "devDependencies": {
         "@tsconfig/node22": "catalog:",
         "@types/bun": "catalog:",

@@ -1,5 +1,16 @@
 # opencode database guide
 
+## Standalone CLI implementation
+
+- `src/standalone.ts` is the new early CLI entry; `src/cli/standalone.ts` selects and guards the profile before importing backend code. Do not route the standalone binary directly through the legacy eager `src/index.ts`.
+- `LOGINOM_AI_AGENT_CLI_PROFILE` selects an absolute profile; only the bootstrap sets internal `LOGINOM_AI_AGENT_CLI_ROOT` for Global and worker inheritance. Clear inherited Desktop auth/config/DB overrides before backend imports. Keep project config discovery, but omit the implicit home `.loginom-ai-agent` global fallback.
+- Hold `.writer` until backend and private host cleanup completes. Never steal a guard based on age/PID, and leave it after unconfirmed cleanup. `loginom recover` must not remove it.
+- The current entry handles help/version and Loginom setup/check/status/cancel-pending/recover through the private Node host. `setup --stdin-json` preserves absent secrets and treats an explicit empty password separately. Interactive prompts send output to stderr and mask secrets; noninteractive setup requires stdin JSON, recovery requires `--acknowledge`. Never route prompt stdin into setup. TTY acceptance remains pending.
+- `providers` (`auth`) and `models` use existing backend commands in the guarded CLI profile without starting a Loginom host. Live OAuth/TTY acceptance remains pending.
+- Development runs require `LOGINOM_AI_AGENT_CLI_BUNDLE` with `bin/node` and built `host/node-host.mjs`; automatic installed bundle resolution remains pending. Default TUI dispatch and the private worker Loginom bridge are wired; PTY/TUI acceptance remains pending. `run` now performs Loginom preflight before the existing v1 RunCommand. Cleanup must abort the event subscription, dispose the loaded HttpApiApp web handler scope, dispose AppRuntime, disconnect the adapter and await Node host exit before releasing the guard. The standalone executable flushes stdout/stderr and explicitly exits only after that successful cleanup path; failed cleanup must retain the guard. Common system proxy loading runs before importing commands/starting host. Do not report installed CLI acceptance from source process tests.
+
+- Build standalone native entry with `bun script/build.ts --standalone --single --skip-install` using the project-pinned Bun. Output is isolated in `dist-standalone`; this is not the complete Loginom resource archive. Model snapshot is embedded from Product pins.
+
 ## Database
 
 - **Schema**: Drizzle schema lives in `packages/core/src/**/*.sql.ts`.
@@ -137,3 +148,21 @@ Plain async code should pass explicit context or stay inside an Effect fiber; do
 - Run `bun test test/provider/transform.test.ts` and `bun typecheck` here after schema changes. Real installed ChatGPT acceptance uses desktop `test/loginom/chatgpt-schema.mjs`, all actual Dock tools and an isolated profile; do not expose OAuth data.
 - OAuth errors in `src/plugin/openai/codex.ts` expose only status and allowlisted error codes. System proxy initialization belongs to desktop/bootstrap before backend imports; do not bypass it in individual OAuth requests.
 - See [schema acceptance report](../../docs/testing/loginom-ai-agent/reports/2026-09-17-schema/report.md) and [proxy acceptance](../../docs/testing/loginom-ai-agent/reports/2026-09-17-proxy/report.md).
+
+- Preserve typed permission rejection as tool-state `metadata.permissionDenied` before provider serialization. Standalone noninteractive run must return 1 for this marker even without `permission.asked`; explicit auto-approval never overrides a policy deny.
+
+- Loginom MCP `isError` must become a tool error, matching ordinary MCP catalog behavior. Preserve the bounded error text and generation/isError metadata; do not record it as a successful completed tool part.
+
+- Loginom preflight is mandatory for standalone run, while TUI without setup offers the shared interactive wizard and can continue an ordinary chat. Resume stdin after Clack/readline prompts before starting the TUI. Do not advertise Loginom tools without an active connection.
+
+- Standalone run must evaluate terminal tool outcomes before idle success. Correlate Loginom repairs by tool + operation_id, otherwise by tool + exact canonical arguments. Unrelated success must not clear failures; invalid remains unresolved without an explicit repair relationship. Keep permission/session errors independent and legacy exit behavior unchanged.
+
+- Standalone full-file user references are persisted as byte snapshots before Loginom admission; references with URL query/range or fragment remain references and do not authorize whole-file transfer. `util/file-snapshot.ts` supplies bounded regular-file reads for this path and `run --file`, rejects FIFO without waiting for a writer, and detects size/mtime changes during the read. Do not snapshot paths returned by model tools as original user attachments.
+
+- For standalone run, bootstrap owns the SIGINT handler through profile release. The shared cancellation signal survives startup/import boundaries; stdin admission and provider dispatch check it before starting work. Command-specific interruption still aborts active sessions. Repeated signals must not force an exit during acknowledged host cleanup, and failed cleanup must still retain the guard.
+
+- Standalone native builds can select exactly one `--target=linux-x64`, `--target=darwin-arm64` or `--target=win32-x64`; do not combine with --single/--baseline. Cross-compilation requires matching optional native build packages from the existing lockfile. A produced PE/Mach-O binary alone is not a complete Loginom resource distribution or native runtime acceptance.
+
+- Windows profile admission calls `profile-windows.ts` before creating `.writer`: empty directories get a protected current-user ACL; existing descendants require current-user ownership/full access and reject other ACEs or reparse points. Existing profile permissions are never recursively repaired. Native PowerShell/NTFS acceptance remains pending; Linux tests prove only platform rejection and unchanged Linux admission.
+
+- POSIX profile admission rejects a root or primary storage directory owned by another UID or accessible to group/others. Root is checked before guard creation; storage is checked before backend admission. Do not silently chmod an existing shared profile. This checks Unix mode bits, not extended ACLs or concurrent same-UID replacement.

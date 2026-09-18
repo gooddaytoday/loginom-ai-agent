@@ -1,4 +1,4 @@
-import { readFile, realpath, stat } from 'node:fs/promises';
+import { readFile, readlink, lstat, realpath, stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { isAbsolute, join, relative, sep } from 'node:path';
 
@@ -15,8 +15,14 @@ export async function verifyResources(root) {
     seen.add(item.path);
     const file = await realpath(join(directory, item.path));
     const local = relative(directory, file);
-    if (local === '..' || local.startsWith('..' + sep) || isAbsolute(local) || !(await stat(file)).isFile()) throw Error('LOGINOM_RESOURCES_INVALID');
-    if (createHash('sha256').update(await readFile(file)).digest('hex') !== item.sha256) throw Error('LOGINOM_RESOURCE_HASH_MISMATCH');
+    if (local === '..' || local.startsWith('..' + sep) || isAbsolute(local)) throw Error('LOGINOM_RESOURCES_INVALID');
+    if (item.link !== undefined && (typeof item.link !== 'string' || !(await lstat(join(directory, item.path))).isSymbolicLink()
+      || await readlink(join(directory, item.path)) !== item.link)) throw Error('LOGINOM_RESOURCES_INVALID');
+    if (item.directory !== undefined && item.directory !== true) throw Error('LOGINOM_RESOURCES_INVALID');
+    if (item.directory === true ? typeof item.link !== 'string' || !(await stat(file)).isDirectory() : !(await stat(file)).isFile())
+      throw Error('LOGINOM_RESOURCES_INVALID');
+    if (createHash('sha256').update(item.directory === true ? item.link : await readFile(file)).digest('hex') !== item.sha256)
+      throw Error('LOGINOM_RESOURCE_HASH_MISMATCH');
   }
   if (!seen.has(manifest.node) || !seen.has(manifest.browser)) throw Error('LOGINOM_RESOURCES_INVALID');
   if (await realpath(process.execPath) !== await realpath(join(directory, manifest.node))) throw Error('LOGINOM_NODE_PATH_MISMATCH');

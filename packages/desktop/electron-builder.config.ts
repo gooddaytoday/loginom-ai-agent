@@ -3,6 +3,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 import { chmod } from "node:fs/promises"
+import { linuxPermissions } from "./scripts/linux-permissions"
 import type { Configuration } from "electron-builder"
 import { Product, productChannel, productName, productSlug } from "@loginom-ai-agent/product"
 
@@ -22,6 +23,9 @@ async function signWindows(configuration: { path: string }) {
   )
 }
 
+// FPM also creates desktop entries outside appOutDir; their modes must not inherit a private shell umask.
+if (process.platform === "linux") process.umask(0o022)
+
 const channel = productChannel(process.env.LOGINOM_AI_AGENT_CHANNEL)
 const appId = Product.channels[channel]
 const config: Configuration = {
@@ -32,6 +36,7 @@ const config: Configuration = {
   publish: Product.updateFeed ? { provider: "generic", url: Product.updateFeed } : null,
   async afterPack(context) {
     if (context.electronPlatformName !== "linux") return
+    await linuxPermissions(context.appOutDir)
     // Resource copying normalizes modes. Restore the Chromium fallback before DEB ownership becomes root.
     await chmod(
       path.join(context.appOutDir, "resources/loginom/browsers/chromium-1243/chrome-linux64/chrome-sandbox"),

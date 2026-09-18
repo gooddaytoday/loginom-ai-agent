@@ -10,6 +10,11 @@ import { Heap } from "@/cli/heap"
 import { AppRuntime } from "@/effect/app-runtime"
 import { Effect } from "effect"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
+import { HttpApiApp } from "@/server/routes/instance/httpapi/server"
+import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
+import { workerLoginomBridge } from "./loginom-bridge"
+
+const loginom = workerLoginomBridge((data) => Rpc.emit("loginom.request", data))
 
 Heap.start()
 
@@ -28,6 +33,12 @@ GlobalBus.on("event", (event) => {
 let server: Awaited<ReturnType<typeof Server.listen>> | undefined
 
 export const rpc = {
+  loginomStart() {
+    LoginomHost.connect(loginom.port)
+  },
+  loginomReply(input: { data?: unknown; closed?: boolean }) {
+    loginom.receive(input)
+  },
   async fetch(input: { url: string; method: string; headers: Record<string, string>; body?: string }) {
     const headers = { ...input.headers }
     const auth = ServerAuth.header()
@@ -70,10 +81,16 @@ export const rpc = {
     )
   },
   async shutdown() {
-    await InstanceRuntime.disposeAllInstances()
-    if (server) await server.stop(true)
-    process.off("unhandledRejection", onUnhandledRejection)
-    process.off("uncaughtException", onUncaughtException)
+    try {
+      await InstanceRuntime.disposeAllInstances()
+      if (server) await server.stop(true)
+      if (HttpApiApp.webHandler.loaded()) await HttpApiApp.webHandler().dispose()
+    } finally {
+      await AppRuntime.dispose()
+      LoginomHost.disconnect()
+      process.off("unhandledRejection", onUnhandledRejection)
+      process.off("uncaughtException", onUncaughtException)
+    }
   },
 }
 

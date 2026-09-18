@@ -19,7 +19,9 @@ export async function loginPage(page, candidate) {
   await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })
   if (!(await avatar.isVisible())) {
     await field("edtUsername").locator("input").fill(candidate.username)
-    await field("edtPassword").locator("input").fill(candidate.password)
+    const password = field("edtPassword").locator("input")
+    // Passwordless accounts may make an already empty field readonly after username lookup.
+    if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password)
     await field("btnLogin").click()
     await avatar.waitFor({ state: "visible", timeout: 30_000 }).catch(() => {
       throw Error("LOGINOM_LOGIN_REJECTED")

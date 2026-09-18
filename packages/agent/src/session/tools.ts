@@ -7,6 +7,7 @@ import { ProviderTransform } from "@/provider/transform"
 import { MCP } from "@/mcp"
 import { McpCatalog } from "@/mcp/catalog"
 import { Permission } from "@/permission"
+import { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
 import { Tool } from "@/tool/tool"
 import { ToolJsonSchema } from "@/tool/json-schema"
 import { ToolRegistry } from "@/tool/registry"
@@ -89,7 +90,21 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           tool: { messageID: input.processor.message.id, callID: options.toolCallId },
           ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
         })
-        .pipe(Effect.orDie),
+        .pipe(
+          Effect.tapError((error) => {
+            if (!(error instanceof PermissionV1.DeniedError) && !(error instanceof PermissionV1.RejectedError))
+              return Effect.void
+            // Preserve the typed rejection before the provider stream serializes the error.
+            return input.processor.updateToolCall(options.toolCallId, (match) => {
+              if (match.state.status !== "running") return match
+              return {
+                ...match,
+                state: { ...match.state, metadata: { ...match.state.metadata, permissionDenied: true } },
+              }
+            })
+          }),
+          Effect.orDie,
+        ),
   })
 
   for (const item of yield* registry.tools({
@@ -555,6 +570,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 )
                 const text = result.content.flatMap((block) => (block.type === "text" ? [block.text] : []))
                 const truncated = yield* truncate.output(text.join("\n\n"), {}, input.agent)
+                if (result.isError === true) {
+                  yield* ctx.metadata({
+                    title: definition.name,
+                    metadata: { generation: loginom.generation, isError: true },
+                  })
+                  throw new Error(truncated.content || "LOGINOM_TOOL_FAILED")
+                }
                 const output = {
                   title: definition.name,
                   output: truncated.content,
