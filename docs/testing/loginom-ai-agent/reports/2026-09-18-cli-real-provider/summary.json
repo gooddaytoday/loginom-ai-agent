@@ -1,0 +1,22 @@
+{
+  "model": "xiaomi-token-plan-sgp/mimo-v2.5-pro",
+  "tools": {
+    "loginom_dock_prepare": 1,
+    "loginom_dock_artifact_deliver": 1,
+    "loginom_dock_workspace_observe": 1,
+    "loginom_dock_node_apply": 4,
+    "loginom_dock_node_wait": 2
+  },
+  "toolStates": {
+    "completed": 6,
+    "error": 3
+  },
+  "exit": {
+    "code": 4,
+    "writerRetained": false
+  },
+  "csvSha256": "9a9e878ada65f540a453c9625ec70755a11c7e8ca44300968d7646b7c2d6f463",
+  "recoveryPreserved": true,
+  "acceptance": "PASS under user-revised real-provider smoke criterion; full model-driven oracle not completed",
+  "remainingRuntimePids": []
+}

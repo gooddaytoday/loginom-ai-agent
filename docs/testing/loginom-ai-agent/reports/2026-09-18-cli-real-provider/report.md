@@ -22,3 +22,30 @@ included in this report or committed fixtures.
 This is an unsigned development candidate with known license/source-distribution
 review gaps. A clean source tree does not imply release approval.
 Real-provider and installed acceptance results follow as they complete.
+
+## Installed real-provider smoke — PASS under user-revised criterion
+
+Installed with the archive's own install.sh; launcher
+`/home/kiselev/.local/bin/loginom-ai-agent-cli --version` returned the exact version.
+Desktop installation and its auth file were not modified. Only the authorized
+Xiaomi entry was copied into a private CLI profile, with credentials file mode 0600.
+
+Real model: `xiaomi-token-plan-sgp/mimo-v2.5-pro`. Headless installed run, no
+bundle override; permission allows Loginom tools and denies other tools. The model
+successfully called dock_prepare, delivered the original 16-byte sales.csv with
+SHA256 `9a9e878ada65f540a453c9625ec70755a11c7e8ca44300968d7646b7c2d6f463`,
+and configured a numeric import through node.apply / node.wait. This proves real
+LLM → backend → private host → Chromium → Loginom operation and continuation.
+
+The broader prompt did not complete: two parameter validation failures were
+followed by an ambiguous graph connection, preserved as recovery. Exit was 4,
+`.writer` was released. No success/cold-reopen/55 result is claimed for this run.
+Private evidence: `/tmp/loginom-real-1657a6c07`; sanitized counters: summary.json.
+No browser/runtime processes matching these test profiles remained after cleanup.
+
+The user then explicitly accepted successful real model tool activity as sufficient
+and asked to move on. Therefore the real-provider gate is PASS to that revised
+criterion; earlier scripted-provider CSV 55/101 evidence remains separate.
+The independent second attempt `/tmp/loginom-real-1657a6c07-a2` was cancelled via
+SIGINT on that instruction: exit 130, writer released. Its unfinished work is not
+counted as a completed oracle. No uncertain operation from the first run was replayed.

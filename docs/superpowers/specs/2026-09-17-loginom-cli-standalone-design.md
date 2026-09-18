@@ -2817,3 +2817,21 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   окружения; отсутствие signing credentials означает dev-only, не release PASS.
 
 [Артефакт и результаты](../../testing/loginom-ai-agent/reports/2026-09-18-cli-real-provider/report.md).
+
+### Настоящий provider: критерий уточнён пользователем — 2026-09-18
+
+- [x] Installed Xiaomi MiMo вызвал реальные Loginom tools, доставил исходный CSV
+  (bytes/hash совпали), создал и настроил числовой импорт; tool pipeline и model
+  continuation подтверждены. По явному указанию пользователя этого достаточно:
+  real-provider gate закрыт, качество завершения всего сценария Xiaomi не блокирует
+  переход к следующим этапам. Требование нового полного 55/101 oracle с Xiaomi
+  из предыдущей записи отменено этим уточнением.
+- [x] Честно сохранён исход первого широкого запроса: ошибка схемы и неоднозначный
+  graph connect, exit 4 с recovery, guard освобождён. Это не PASS полного oracle;
+  ранее выполненные scripted-provider readbacks остаются самостоятельным evidence.
+- [x] Дополнительный живой прогон остановлен SIGINT: exit 130, guard освобождён;
+  тестовые runtime/browser процессы завершились. Desktop не изменён.
+- [ ] Следующий этап: оставшиеся Linux packaging/notices/source gaps и итоговая
+  сверка Linux IND-01…14; Windows/macOS по-прежнему вне текущей цели.
+
+Результаты и границы проверки: [real-provider report](../../testing/loginom-ai-agent/reports/2026-09-18-cli-real-provider/report.md).
