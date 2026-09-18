@@ -68,10 +68,21 @@ if (-not $SkipInstall) {
     "install",
     "--frozen-lockfile",
     "--linker", "hoisted",
+    "--ignore-scripts",
     "--filter", "@loginom-ai-agent/desktop",
     "--filter", "@loginom-ai-agent/loginom-host",
     "--filter", "@loginom-ai-agent/agent"
   )
+
+  # The filtered graph contains optional editor grammars whose generic install
+  # scripts try to compile with node-gyp even though neither Windows product
+  # consumes those builds. Run only the two installation steps required by the
+  # release graph, using the explicitly pinned runtimes above.
+  & $node (Join-Path $repo "node_modules/electron/install.js")
+  if ($LASTEXITCODE -ne 0) {
+    throw "Electron installation failed with exit code $LASTEXITCODE"
+  }
+  Invoke-Bun -WorkingDirectory (Join-Path $repo "packages/core") -Arguments @("run", "fix-node-pty")
 }
 
 $previousChannel = $env:LOGINOM_AI_AGENT_CHANNEL
