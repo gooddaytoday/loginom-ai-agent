@@ -2965,3 +2965,18 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   Desktop global roots. Проверен полный путь данного сценария, не все команды.
 
 [Результат и диагностика драйвера](../../testing/loginom-ai-agent/reports/2026-09-18-cli-final-linux/report.md).
+
+### Linux nested-notices archive — PASS
+
+- [x] Чистая сборка `0.1.4-cli.20260918nested` из c6eceef90: native version,
+  source stability, manifest и extracted archive PASS.
+- [x] Установлены и проверены 947 notice/README hashes, включая 15 вложенных
+  notices. Help/version без global runtime в PATH; bundled host status PASS.
+- [x] Uninstall удалил launcher/payload, сохранил созданный профиль.
+- [x] Source archive точно соответствует 11918 git-tree files; hashes и пути
+  записаны в отчёте. Это project source, не полный third-party source bundle.
+- [ ] Attribution/native/per-file/source/relinking audit остаётся incomplete;
+  отсутствие signing credentials означает dev-only. Runtime источники не менялись,
+  прежние live oracle сохраняют собственные artifact versions.
+
+[Новый архив и install evidence](../../testing/loginom-ai-agent/reports/2026-09-18-cli-nested-notices/report.md).

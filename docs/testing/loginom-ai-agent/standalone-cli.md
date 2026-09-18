@@ -21,6 +21,13 @@ Final native headless run и installed headed TUI прошли CSV 55/101, save/
 forced=false, по одному видимому окну Chromium и remaining=[] после закрытия.
 [Безопасное обновление observation в тестовом драйвере](reports/2026-09-18-cli-final-linux/tui-driver-diagnosis.md).
 
+Новый чистый archive `0.1.4-cli.20260918nested` добавляет 15 вложенных npm notices:
+947 installed hashes, help/version/status и install/uninstall PASS. Runtime sources
+не менялись; предыдущие oracle не переименовываются в проверку этого архива.
+[Архив, source и ограничения](reports/2026-09-18-cli-nested-notices/report.md).
+Два чата в одном native TUI и файловая трассировка также выполнены:
+[итог](reports/2026-09-18-cli-final-linux/tui-multichat-summary.json).
+
 ## Исправления ревью a7d812e4a — исходная проверка 2026-09-18
 
 - Dock business failures без MCP `isError` дают ошибку tool/код 1; успешное

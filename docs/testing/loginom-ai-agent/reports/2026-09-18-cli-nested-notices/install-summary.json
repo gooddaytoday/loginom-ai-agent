@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "version": "0.1.4-cli.20260918nested",
+  "helpVersionNoProfile": true,
+  "statusBundledHost": true,
+  "verifiedHashes": 947,
+  "nestedNotices": 15,
+  "missingTexts": [],
+  "licenseAuditStatus": "incomplete",
+  "preservedProfileFiles": 1,
+  "launcherAndPayloadRemoved": true
+}
