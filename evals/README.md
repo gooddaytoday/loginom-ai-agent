@@ -19,17 +19,22 @@ cp .env.example .env   # заполнить LOGINOM_DOCK_API_KEY
 bun run prepare-bundle
 ```
 
-Целевой путь продукта — OAuth-модель `openai/gpt-5.6-sol` (`EVAL_AGENT_MODEL` как в `.env.example`). На этом стенде живой прогон идёт запасным путём: API-ключ провайдера `xiaomi-token-plan-sgp` и модель `xiaomi-token-plan-sgp/mimo-v2.5-pro` (раскомментировать `EVAL_AGENT_PROVIDER_*` в `.env`).
+Если симлинки отклоняются, запасной путь: `bun run prepare-bundle --copy`.
 
-`assertAuth` пропускает вход, если блок `EVAL_AGENT_PROVIDER_*` совпадает с префиксом модели. Иначе провайдер должен быть в `$PROFILE/data/auth.json`. Два способа закрыть вход:
+Текущий стенд использует `EVAL_AGENT_MODEL=xiaomi-token-plan-sgp/mimo-v2.5-pro`. Это провайдер из каталога моделей агента, поэтому `EVAL_AGENT_PROVIDER_*` не нужен. `assertAuth` закрывается копированием **только** записи `"xiaomi-token-plan-sgp"` из `~/.local/share/loginom-ai-agent/auth.json` в `evals/.profile/agent/data/auth.json` (создать `data/`, если нет; режим `0600`; никогда не коммитить). Профиль eval появляется после первого запуска: прогон один раз, получить ошибку `assertAuth`, затем скопировать из корня репозитория:
 
-1. Скопировать запись нужного провайдера из Desktop `~/.local/share/loginom-ai-agent/auth.json` в `evals/.profile/agent/data/auth.json` (только нужный ключ провайдера, режим файла `0600`, никогда не коммитить).
-2. Одноразовый `providers login` командой, которую harness печатает при первом запуске:
+```bash
+mkdir -p evals/.profile/agent/data && jq '{"xiaomi-token-plan-sgp": .["xiaomi-token-plan-sgp"]}' ~/.local/share/loginom-ai-agent/auth.json > evals/.profile/agent/data/auth.json && chmod 600 evals/.profile/agent/data/auth.json
+```
+
+Целевой путь продукта — OAuth-модель `openai/gpt-5.6-sol`: одноразовый `providers login` командой, которую harness печатает при первом запуске:
 
 ```bash
 LOGINOM_AI_AGENT_CLI_PROFILE=$PWD/.profile/agent LOGINOM_AI_AGENT_CLI_BUNDLE=$PWD/.bundle \
   bun run --cwd ../packages/agent dev:cli providers login
 ```
+
+Третий путь — `EVAL_AGENT_PROVIDER_*` для произвольного OpenAI-совместимого endpoint: раскомментировать **и** заполнить все четыре значения, затем задать `EVAL_AGENT_MODEL=<EVAL_AGENT_PROVIDER_ID>/<EVAL_AGENT_PROVIDER_MODEL_ID>`.
 
 ## Команды
 
