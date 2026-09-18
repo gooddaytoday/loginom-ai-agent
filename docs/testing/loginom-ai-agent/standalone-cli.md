@@ -33,6 +33,11 @@ Installed manifest/source inventories PASS: 41 native/source hashes, 306 archive
 entries и 947 npm notice/README hashes; штатное удаление сохранило профиль.
 [Артефакт и конкретный остаток аудита](reports/2026-09-18-cli-bun-sources/report.md).
 
+Новый clean candidate `0.1.4-cli.20260918native-src` из `1feb99775` включает
+все 47 актуальных native/source inputs и WebKit companion metadata.
+Build/extracted manifest, 47 hashes, native help/version без создания профиля PASS.
+[Архив и ограничения](reports/2026-09-18-cli-native-sources/report.md).
+
 ## WebKit source companion
 
 Большой WebKit archive поставляется отдельным каталогом рядом с CLI archive.

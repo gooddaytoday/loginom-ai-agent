@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "version": "0.1.4-cli.20260918native-src",
+  "sourceCommit": "1feb99775e023775af8fdfeb8ffa5793e6571aec",
+  "nativeSourceHashes": 47,
+  "webkitCompanionPinMatch": true,
+  "helpVersionNoProfile": true,
+  "scope": "Built and extracted archive verification; not a new installed functional scenario"
+}

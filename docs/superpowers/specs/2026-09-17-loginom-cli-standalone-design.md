@@ -3062,3 +3062,15 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   ещё предстоит собрать; external sources/relinking audit остаётся открытым.
 
 [Команды поставки](../../testing/loginom-ai-agent/standalone-cli.md#webkit-source-companion).
+
+### Пересборка Linux с native/source additions
+
+- [x] Чистый `0.1.4-cli.20260918native-src` из `1feb99775` собран;
+  source stability, native version smoke и extracted manifest PASS.
+- [x] Все 47 доставленных native/source hashes совпали; WebKit companion pin
+  совпал. Help/version: exit 0, профиль не создаётся.
+- [ ] Corresponding-source build recipes/patches и external dependencies,
+  фактический rebuild/relinking остаются открыты. Новый installed oracle
+  на этом packaging-only этапе не заявляется; версия остаётся dev-only.
+
+[Артефакт и результаты](../../testing/loginom-ai-agent/reports/2026-09-18-cli-native-sources/report.md).
