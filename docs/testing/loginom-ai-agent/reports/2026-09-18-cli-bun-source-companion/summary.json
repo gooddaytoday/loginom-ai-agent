@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "destination": "/tmp/loginom-cli-bun-source-companion",
+  "archives": 24,
+  "bytes": 2167407693,
+  "independentSha256sum": "24/24 PASS",
+  "verifiedExternalNotices": 27,
+  "bunBuildModules": 53,
+  "bunPatchFiles": 15,
+  "missingInputRejectedBeforeOutput": true,
+  "hostTypecheck": "PASS",
+  "scope": "Complete upstream archives for direct native dependencies and full Bun build recipes; not an offline rebuild closure or relinking proof",
+  "remaining": [
+    "Rust transitive crates and toolchain/build prerequisites",
+    "Verification of actual rebuild/relinking; upstream test submodules are not included"
+  ]
+}

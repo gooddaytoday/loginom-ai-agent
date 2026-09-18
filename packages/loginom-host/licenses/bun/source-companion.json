@@ -1,0 +1,272 @@
+{
+  "bunCommit": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+  "status": "incomplete",
+  "scope": "Complete upstream archives for direct native dependencies and full Bun build recipes; not an offline rebuild closure or relinking proof",
+  "remaining": [
+    "Rust transitive crates and toolchain/build prerequisites",
+    "Verification of actual rebuild/relinking; upstream test submodules are not included"
+  ],
+  "archives": [
+    {
+      "component": "boringssl",
+      "repo": "oven-sh/boringssl",
+      "commit": "0c5fce43b7ed5eb6001487ee48ac65766f5ddcd1",
+      "url": "https://codeload.github.com/oven-sh/boringssl/tar.gz/0c5fce43b7ed5eb6001487ee48ac65766f5ddcd1",
+      "file": "boringssl-0c5fce43b7ed5eb6001487ee48ac65766f5ddcd1-source.tar.gz",
+      "bytes": 70116554,
+      "sha256": "a414b1d105fef105697b7428c0be5f7fc67489849eaa276931ae8344d78a99b8",
+      "entries": 8560,
+      "verifiedNoticeFiles": 2
+    },
+    {
+      "component": "brotli",
+      "repo": "google/brotli",
+      "commit": "ed738e842d2fbdf2d6459e39267a633c4a9b2f5d",
+      "url": "https://codeload.github.com/google/brotli/tar.gz/ed738e842d2fbdf2d6459e39267a633c4a9b2f5d",
+      "file": "brotli-ed738e842d2fbdf2d6459e39267a633c4a9b2f5d-source.tar.gz",
+      "bytes": 512305,
+      "sha256": "aaa739962a45b508b2e783b915e6b2b57ed3b12bd4b0feac73acfb144dffa54f",
+      "entries": 135,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "bun",
+      "file": "bun-0d9b296af33f2b851fcbf4df3e9ec89751734ba4-source.tar.gz",
+      "bytes": 54914493,
+      "sha256": "aa045c1f3ddd3eb41ed8452d8a73eaab3b3322386416ebb1b160a6af6978d3e5",
+      "entries": 13093,
+      "repo": "oven-sh/bun",
+      "commit": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+      "url": "https://codeload.github.com/oven-sh/bun/tar.gz/0d9b296af33f2b851fcbf4df3e9ec89751734ba4"
+    },
+    {
+      "component": "cares",
+      "repo": "c-ares/c-ares",
+      "commit": "3ac47ee46edd8ea40370222f91613fc16c434853",
+      "url": "https://codeload.github.com/c-ares/c-ares/tar.gz/3ac47ee46edd8ea40370222f91613fc16c434853",
+      "file": "cares-3ac47ee46edd8ea40370222f91613fc16c434853-source.tar.gz",
+      "bytes": 589009,
+      "sha256": "8c94116cb366ae4a44e487da4d9f7e736287d329efa6f88fdf077cd2d0a2e4b8",
+      "entries": 559,
+      "verifiedNoticeFiles": 2
+    },
+    {
+      "component": "hdrhistogram",
+      "repo": "HdrHistogram/HdrHistogram_c",
+      "commit": "be60a9987ee48d0abf0d7b6a175bad8d6c1585d1",
+      "url": "https://codeload.github.com/HdrHistogram/HdrHistogram_c/tar.gz/be60a9987ee48d0abf0d7b6a175bad8d6c1585d1",
+      "file": "hdrhistogram-be60a9987ee48d0abf0d7b6a175bad8d6c1585d1-source.tar.gz",
+      "bytes": 306742,
+      "sha256": "811c5e5ae5303a75ade50688880af6aad5d2f951ec5785f68186bd18635cdfc9",
+      "entries": 63,
+      "verifiedNoticeFiles": 2
+    },
+    {
+      "component": "highway",
+      "repo": "google/highway",
+      "commit": "2607d3b5b0113992fe84d3848859eae13b3b52c1",
+      "url": "https://codeload.github.com/google/highway/tar.gz/2607d3b5b0113992fe84d3848859eae13b3b52c1",
+      "file": "highway-2607d3b5b0113992fe84d3848859eae13b3b52c1-source.tar.gz",
+      "bytes": 3692133,
+      "sha256": "741d705781e0b3e406beda8f1f994fbae01321237ce8023a1ad90fbaf7940c25",
+      "entries": 278,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "icu",
+      "file": "icu-75.1-source.tar.gz",
+      "bytes": 26568378,
+      "sha256": "cb968df3e4d2e87e8b11c49a5d01c787bd13b9545280fc6642f826527618caef",
+      "entries": 2473,
+      "version": "75.1",
+      "url": "https://github.com/unicode-org/icu/releases/download/release-75-1/icu4c-75_1-src.tgz"
+    },
+    {
+      "component": "libarchive",
+      "repo": "libarchive/libarchive",
+      "commit": "ded82291ab41d5e355831b96b0e1ff49e24d8939",
+      "url": "https://codeload.github.com/libarchive/libarchive/tar.gz/ded82291ab41d5e355831b96b0e1ff49e24d8939",
+      "file": "libarchive-ded82291ab41d5e355831b96b0e1ff49e24d8939-source.tar.gz",
+      "bytes": 6134289,
+      "sha256": "042f0efe7147063ff9ba10f1a38ed080e949bcbd04bdbf3592b8846dd11b1da2",
+      "entries": 1341,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "libdeflate",
+      "repo": "ebiggers/libdeflate",
+      "commit": "c8c56a20f8f621e6a966b716b31f1dedab6a41e3",
+      "url": "https://codeload.github.com/ebiggers/libdeflate/tar.gz/c8c56a20f8f621e6a966b716b31f1dedab6a41e3",
+      "file": "libdeflate-c8c56a20f8f621e6a966b716b31f1dedab6a41e3-source.tar.gz",
+      "bytes": 197522,
+      "sha256": "1e5cc06bdbf3e1245d8b89c9e3588f507e3c8bc53fe8b8229770a9e8661dea81",
+      "entries": 94,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "libjpeg-turbo",
+      "repo": "libjpeg-turbo/libjpeg-turbo",
+      "commit": "e352b02f794f701407b39af08576035ba3360d60",
+      "url": "https://codeload.github.com/libjpeg-turbo/libjpeg-turbo/tar.gz/e352b02f794f701407b39af08576035ba3360d60",
+      "file": "libjpeg-turbo-e352b02f794f701407b39af08576035ba3360d60-source.tar.gz",
+      "bytes": 2529165,
+      "sha256": "440f3a94390c78eab88f74b92944d2f6b248e592e984412e389885dfb5796bf0",
+      "entries": 633,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "libspng",
+      "repo": "randy408/libspng",
+      "commit": "fb768002d4288590083a476af628e51c3f1d47cd",
+      "url": "https://codeload.github.com/randy408/libspng/tar.gz/fb768002d4288590083a476af628e51c3f1d47cd",
+      "file": "libspng-fb768002d4288590083a476af628e51c3f1d47cd-source.tar.gz",
+      "bytes": 159282,
+      "sha256": "d656813290d70a750b69e768323ff3b3875adf8c2e8c2fdb4e57ca1467abf86a",
+      "entries": 262,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "libuv",
+      "repo": "oven-sh/libuv",
+      "commit": "4dcfac4780d394e0dc2d3fb30335ca01b553eb46",
+      "url": "https://codeload.github.com/oven-sh/libuv/tar.gz/4dcfac4780d394e0dc2d3fb30335ca01b553eb46",
+      "file": "libuv-4dcfac4780d394e0dc2d3fb30335ca01b553eb46-source.tar.gz",
+      "bytes": 1358372,
+      "sha256": "2b6626b3df296494deee71c2e3000fac8a5032fa2b2018f1317753e3bcb30f59",
+      "entries": 467,
+      "verifiedNoticeFiles": 4
+    },
+    {
+      "component": "libwebp",
+      "repo": "webmproject/libwebp",
+      "commit": "b7e29b9d75bd31422b00c2a446d49d7af06c328d",
+      "url": "https://codeload.github.com/webmproject/libwebp/tar.gz/b7e29b9d75bd31422b00c2a446d49d7af06c328d",
+      "file": "libwebp-b7e29b9d75bd31422b00c2a446d49d7af06c328d-source.tar.gz",
+      "bytes": 3834595,
+      "sha256": "76fb89b4454ff2161bb0cca2cf832e19b8b4001b0ef42fbcc2b4a437c945b2b6",
+      "entries": 339,
+      "verifiedNoticeFiles": 0
+    },
+    {
+      "component": "lolhtml",
+      "repo": "cloudflare/lol-html",
+      "commit": "77127cd2b8545998756e8d64e36ee2313c4bb312",
+      "url": "https://codeload.github.com/cloudflare/lol-html/tar.gz/77127cd2b8545998756e8d64e36ee2313c4bb312",
+      "file": "lolhtml-77127cd2b8545998756e8d64e36ee2313c4bb312-source.tar.gz",
+      "bytes": 554793,
+      "sha256": "2c53161edf633fa99acfc4eafddbafd5d9b8199f0918a1cc9152cb6c2c9bf379",
+      "entries": 3238,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "lshpack",
+      "repo": "litespeedtech/ls-hpack",
+      "commit": "8905c024b6d052f083a3d11d0a169b3c2735c8a1",
+      "url": "https://codeload.github.com/litespeedtech/ls-hpack/tar.gz/8905c024b6d052f083a3d11d0a169b3c2735c8a1",
+      "file": "lshpack-8905c024b6d052f083a3d11d0a169b3c2735c8a1-source.tar.gz",
+      "bytes": 952726,
+      "sha256": "07d8bf901bb1b15543f38eabd23938519e1210eebadb52f3d651d6ef130ef973",
+      "entries": 26,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "lsqpack",
+      "repo": "litespeedtech/ls-qpack",
+      "commit": "1e9c5b8e59f8161c54f168a570c8bfdc59ded0c3",
+      "url": "https://codeload.github.com/litespeedtech/ls-qpack/tar.gz/1e9c5b8e59f8161c54f168a570c8bfdc59ded0c3",
+      "file": "lsqpack-1e9c5b8e59f8161c54f168a570c8bfdc59ded0c3-source.tar.gz",
+      "bytes": 710309,
+      "sha256": "e9d8abe5b7c1e35b9908a9521e2acd7c1d17547babc01d73c7297e02aebbcc2d",
+      "entries": 79,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "lsquic",
+      "repo": "litespeedtech/lsquic",
+      "commit": "3181911301b1aa4f54c1ed690901abc674ee08fb",
+      "url": "https://codeload.github.com/litespeedtech/lsquic/tar.gz/3181911301b1aa4f54c1ed690901abc674ee08fb",
+      "file": "lsquic-3181911301b1aa4f54c1ed690901abc674ee08fb-source.tar.gz",
+      "bytes": 1952886,
+      "sha256": "f8cb90fb327eb91597c23163bf596c0d1882560be35b661d9ba84891cc461735",
+      "entries": 326,
+      "verifiedNoticeFiles": 2
+    },
+    {
+      "component": "mimalloc",
+      "repo": "oven-sh/mimalloc",
+      "commit": "f15aecb94fc8096008bf87b90c53ed682026914a",
+      "url": "https://codeload.github.com/oven-sh/mimalloc/tar.gz/f15aecb94fc8096008bf87b90c53ed682026914a",
+      "file": "mimalloc-f15aecb94fc8096008bf87b90c53ed682026914a-source.tar.gz",
+      "bytes": 1423696,
+      "sha256": "d98b7f315f16b82cd43b7e36a7e1f73ceae9422f8bba8ebb99899c78a54277fc",
+      "entries": 374,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "nodejs-headers",
+      "file": "node-v24.3.0-headers.tar.gz",
+      "bytes": 8747815,
+      "sha256": "045e9bf477cd5db0ec67f8c1a63ba7f784dedfe2c581e3d0ed09b88e9115dd07",
+      "entries": 2368,
+      "version": "24.3.0",
+      "url": "https://nodejs.org/dist/v24.3.0/node-v24.3.0-headers.tar.gz"
+    },
+    {
+      "component": "picohttpparser",
+      "repo": "h2o/picohttpparser",
+      "commit": "066d2b1e9ab820703db0837a7255d92d30f0c9f5",
+      "url": "https://codeload.github.com/h2o/picohttpparser/tar.gz/066d2b1e9ab820703db0837a7255d92d30f0c9f5",
+      "file": "picohttpparser-066d2b1e9ab820703db0837a7255d92d30f0c9f5-source.tar.gz",
+      "bytes": 15163,
+      "sha256": "637ff2ab6f5c7f7e05a5b5dc393d5cf2fea8d4754fcaceaaf935ffff5c1323ee",
+      "entries": 15,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "tinycc",
+      "repo": "oven-sh/tinycc",
+      "commit": "12882eee073cfe5c7621bcfadf679e1372d4537b",
+      "url": "https://codeload.github.com/oven-sh/tinycc/tar.gz/12882eee073cfe5c7621bcfadf679e1372d4537b",
+      "file": "tinycc-12882eee073cfe5c7621bcfadf679e1372d4537b-source.tar.gz",
+      "bytes": 998268,
+      "sha256": "6b50485fcbbfa90a99c56e8e2b6a92014dcd34377d5edb23e1938dc9ec96f0aa",
+      "entries": 523,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "webkit",
+      "repo": "https://github.com/oven-sh/WebKit",
+      "commit": "5488984d20e0dbfe4be2c3ba8fb18eb81a5e0e8b",
+      "tree": "a7212e5d3aeb41afb46db3f955fb77b60900cfd6",
+      "file": "webkit-5488984d20e0dbfe4be2c3ba8fb18eb81a5e0e8b-source.tar.gz",
+      "bytes": 1976235831,
+      "sha256": "19b89496c4d39570ecad80ca6ac99c37a77c95179a0463f8a1b85fc48a276df1",
+      "entries": 464897,
+      "symlinks": 40,
+      "generation": "git archive --format=tar.gz HEAD with .git/info/attributes: * -text -eol -filter -ident -working-tree-encoding -export-subst -export-ignore",
+      "verification": "Every file and link matched the pinned Git tree's blob hash and executable mode"
+    },
+    {
+      "component": "zlib",
+      "repo": "zlib-ng/zlib-ng",
+      "commit": "12731092979c6d07f42da27da673a9f6c7b13586",
+      "url": "https://codeload.github.com/zlib-ng/zlib-ng/tar.gz/12731092979c6d07f42da27da673a9f6c7b13586",
+      "file": "zlib-12731092979c6d07f42da27da673a9f6c7b13586-source.tar.gz",
+      "bytes": 2450038,
+      "sha256": "a0d2a5d122c84b56a793a1553a9c3327fb2eb7469bf7a86b79e3c7be5d92e8d6",
+      "entries": 355,
+      "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "zstd",
+      "repo": "facebook/zstd",
+      "commit": "f8745da6ff1ad1e7bab384bd1f9d742439278e99",
+      "url": "https://codeload.github.com/facebook/zstd/tar.gz/f8745da6ff1ad1e7bab384bd1f9d742439278e99",
+      "file": "zstd-f8745da6ff1ad1e7bab384bd1f9d742439278e99-source.tar.gz",
+      "bytes": 2453329,
+      "sha256": "4b0bd1f0cfb25e61b9103c35f27395530ff5b4c0d2513a00fd745849e85ea52c",
+      "entries": 639,
+      "verifiedNoticeFiles": 2
+    }
+  ]
+}

@@ -38,6 +38,22 @@ entries и 947 npm notice/README hashes; штатное удаление сох�
 Build/extracted manifest, 47 hashes, native help/version без создания профиля PASS.
 [Архив и ограничения](reports/2026-09-18-cli-native-sources/report.md).
 
+## Полный Bun source companion
+
+Сборщик `packages/loginom-host/script/build-bun-source-companion.ts` принимает
+каталог входных архивов с именами из `licenses/bun/source-companion.json` и новый
+абсолютный путь результата. Из `packages/loginom-host`:
+
+```sh
+bun script/build-bun-source-companion.ts /absolute/source-inputs /absolute/new-bun-source-companion
+```
+
+Проверен `/tmp/loginom-cli-bun-source-companion`: 24 архива, включая полный Bun
+с актуальными build scripts/patches, WebKit, ICU, Node headers и 20 native dependencies.
+Все 24 SHA256 прошли независимую проверку. Этот комплект включает WebKit companion,
+поэтому отдельно дублировать его архив при поставке не требуется.
+[Покрытие и оставшиеся входные данные сборки](reports/2026-09-18-cli-bun-source-companion/report.md).
+
 ## WebKit source companion
 
 Большой WebKit archive поставляется отдельным каталогом рядом с CLI archive.

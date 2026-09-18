@@ -3074,3 +3074,16 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   на этом packaging-only этапе не заявляется; версия остаётся dev-only.
 
 [Артефакт и результаты](../../testing/loginom-ai-agent/reports/2026-09-18-cli-native-sources/report.md).
+
+### Full Bun recipes и direct dependency source companion
+
+- [x] Собран отдельный комплект из 24 закреплённых архивов: полный Bun с 53
+  build modules/15 patch files, WebKit, ICU, Node headers и 20 native dependencies.
+- [x] Все 27 собранных external notices совпали с файлами полных архивов;
+  source/copy SHA256 и независимый sha256sum для 24 архивов PASS.
+- [x] Добавлен воспроизводимый сборщик комплекта с отказом при missing/corrupt
+  input и запретом замены каталога; missing-input check и host typecheck PASS.
+- [ ] Транзитивные Rust crates, toolchain prerequisites и фактическая
+  пересборка/перелинковка ещё не проверены; complete offline closure не заявляется.
+
+[Состав и ограничения](../../testing/loginom-ai-agent/reports/2026-09-18-cli-bun-source-companion/report.md).
