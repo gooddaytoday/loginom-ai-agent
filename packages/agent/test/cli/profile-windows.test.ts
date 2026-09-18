@@ -21,6 +21,26 @@ test.skipIf(process.platform !== "win32")(
       await protectWindowsProfile(root)
       const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
       if (!systemRoot) throw Error("SystemRoot required")
+      const cache = join(root, "browser-profile", "Default", "Cache")
+      await mkdir(cache, { recursive: true })
+      const capability = Bun.spawn(
+        [
+          join(systemRoot, "System32/icacls.exe"),
+          cache,
+          "/grant",
+          "*S-1-15-3-1024-1528657515-1944437972-2795272136-1227674495-293963776-353393192-4060142787-1908764039:(OI)(CI)M",
+        ],
+        { stdout: "ignore", stderr: "ignore" },
+      )
+      expect(await capability.exited).toBe(0)
+      const database = join(root, "browser-profile", "Default", "CURRENT")
+      await writeFile(database, "test")
+      const denyTraverse = Bun.spawn(
+        [join(systemRoot, "System32/icacls.exe"), database, "/deny", "*S-1-1-0:(X)"],
+        { stdout: "ignore", stderr: "ignore" },
+      )
+      expect(await denyTraverse.exited).toBe(0)
+      await protectWindowsProfile(root)
       const system = Bun.spawn([join(systemRoot, "System32/icacls.exe"), root, "/grant", "*S-1-5-18:(OI)(CI)F"], {
         stdout: "ignore",
         stderr: "ignore",

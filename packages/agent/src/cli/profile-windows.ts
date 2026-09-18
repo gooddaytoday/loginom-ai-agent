@@ -35,10 +35,22 @@ try {
     $rules = $security.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])
     $userFull = $false
     foreach ($access in $rules) {
+      # Deny entries only reduce access. Chromium adds an Everyone/Traverse
+      # deny to some LevelDB files, so rejecting denials makes a valid profile
+      # impossible to reopen without weakening its confidentiality.
+      if ($access.AccessControlType -eq [Security.AccessControl.AccessControlType]::Deny) { continue }
       if ($access.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) { exit 1 }
       # Loginom runtime directories deliberately retain LocalSystem so that
-      # Windows can service Chromium files. No other principal is accepted.
-      if ($access.IdentityReference.Value -ne $sid.Value -and $access.IdentityReference.Value -ne 'S-1-5-18') { exit 1 }
+      # Windows can service Chromium files. Other allows are handled narrowly.
+      if ($access.IdentityReference.Value -ne $sid.Value -and $access.IdentityReference.Value -ne 'S-1-5-18') {
+        # Chromium grants its restricted AppContainer capability modify access
+        # to cache/network directories. Accept that narrow SID class only
+        # inside browser-profile and never with FullControl.
+        $browserCapability = @($entry.FullName.Split([IO.Path]::DirectorySeparatorChar)) -contains 'browser-profile' -and
+          $access.IdentityReference.Value -match '^S-1-15-3-1024-(?:[0-9]+-){7}[0-9]+$' -and
+          ($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne [Security.AccessControl.FileSystemRights]::FullControl
+        if (!$browserCapability) { exit 1 }
+      }
       if ($access.IdentityReference.Value -eq $sid.Value -and ($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -eq [Security.AccessControl.FileSystemRights]::FullControl) { $userFull = $true }
     }
     if (!$userFull) { exit 1 }
