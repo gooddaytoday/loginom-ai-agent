@@ -137,8 +137,11 @@ evals/
     artifact.ts              получение, распаковка и очистка .lgp
     judge.ts                 подготовка папки судьи, codex exec, scoring
     report.ts                агрегация, summary.json, report.md
-    run.ts                   entry: прогон, --judge-only, --calibrate
+    run.ts                   entry: прогон (диспетчер режимов --judge-only / --calibrate)
+    rejudge.ts               режим --judge-only
+    calibrate.ts             режим --calibrate
     compare.ts               entry: сравнение двух прогонов
+    fail.ts                  EvalFailure с кодом выхода
     judge-prompt.md          шаблон инструкции судьи
     verdict.schema.json      JSON-схема ответа судьи
   script/prepare-bundle.ts   сборка dev-bundle
