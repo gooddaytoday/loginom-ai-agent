@@ -131,3 +131,25 @@ test("runAttempt: ошибка артефакта сохраняет телем�
     await rm(runDir, { recursive: true, force: true })
   }
 }, 30_000)
+
+test("runAttempt: с судьёй completed получает score и judge_status=scored", async () => {
+  const config = { ...loadConfig(["--dry-run"], {}), skipJudge: false }
+  const [task] = await loadTasks(config.tasksDir, ["group-sum-qty"])
+  const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-run-"))
+  const { result } = await runAttempt({
+    config,
+    command: agentCommand(config),
+    source: parseArtifactSource(config.artifactSource, config.loginom),
+    task: task!,
+    attempt: 1,
+    runId: "test-run",
+    runDir,
+    signal: new AbortController().signal,
+    profileRecovered: false,
+    judge: { command: ["bun", path.join(evalsRoot, "fixtures", "fake-codex.ts")], model: "fake", reasoning: "high", timeoutMs: 30_000, passThreshold: 70 },
+  })
+  expect(result).toMatchObject({ status: "completed", score: 100, pass: true, judge_status: "scored", judge_attempts: 1, judge_confidence: "high" })
+  expect(result.checklist?.length).toBe(7)
+  expect(await Bun.file(path.join(runDir, "group-sum-qty", "1", "judge", "verdict.json")).exists()).toBe(true)
+  await rm(runDir, { recursive: true, force: true })
+}, 60_000)
