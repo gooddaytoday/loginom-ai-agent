@@ -280,19 +280,26 @@ export const RunCommand = effectCmd({
         .pipe(Effect.exit)
       if (Exit.isFailure(resolved)) {
         const err = Cause.squash(resolved.cause)
+        const message = formatRunError(err) ?? (err instanceof Error ? err.message : String(err))
         if (args.format === "json") {
           process.stdout.write(
             JSON.stringify({
               type: "error",
               timestamp: Date.now(),
               sessionID: "",
-              error: err,
+              error: {
+                name: Provider.ModelNotFoundError.isInstance(err) ? "ProviderModelNotFoundError" : "Unknown",
+                data: { message: Provider.ModelNotFoundError.isInstance(err) ? err.message : message },
+              },
             }) + EOL,
           )
         } else {
-          UI.error(formatRunError(err))
+          UI.error(message)
         }
-        exitCli(1)
+        process.exitCode = 1
+        // Standalone must return so host cleanup can run; do not throw into CLI_RUN_FAILED.
+        if (!process.env.LOGINOM_AI_AGENT_CLI_ROOT) exitCli(1)
+        return
       }
     }
     yield* Effect.promise(async () => {
