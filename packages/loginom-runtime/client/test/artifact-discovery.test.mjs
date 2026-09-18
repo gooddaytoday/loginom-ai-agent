@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {discoverArtifactAndDownload} from '../lib/artifact-discovery.mjs';
 function fixture(fault) {
- const moves=[];let top=0,downloads=0,fileReads=0,waits=0;
+ const moves=[];let top=0,downloads=0,refreshes=0,waits=0;
  const prefix='MF;TF-2',name='source.csv',fileTid=prefix+';FileStorageForm;colName_'+name;
  const snapshot={authenticated:true,origin:'https://test',loginom_build:'7.4.2',workflow_ref:{prefix},dom_epoch:{document:'doc',revision:1},
   active_tab_ref:'tab',package_identity:null,file_storage:{status:'observed',directory:'/user/dock-p3'},observation_root:{ref:'nav'},ui:{elements:[],masks:[],dialogs:[]}};
@@ -20,22 +20,25 @@ function fixture(fault) {
  const ui=async(p,options)=>{
   const s=structuredClone(snapshot);
   if(fault==='directory'&&moves.length)s.file_storage.directory='/foreign';
-  if(options.discover_roots&&top>=1400&&fault!=='absent')s.ui.elements=[{tid:fileTid,ref:'file'}];
-  if(options.root_ref==='file')s.ui.elements=[{tid:fileTid,ref:'file',label:name,storage_entry:{bytes:fault==='pending_size'&&fileReads++<100?0:42}}];
+  const refreshTid=prefix+';FileStorageForm;btnRefresh';
+  if(options.discover_roots)s.ui.elements=[{tid:refreshTid,ref:'refresh'},...(top>=1400&&fault!=='absent'?[{tid:fileTid,ref:'file'}]:[])];
+  if(options.root_ref==='refresh')s.ui.elements=[{tid:refreshTid,ref:'refresh',allowed_actions:['click']}];
+  if(options.mode==='act'&&options.action?.ref==='refresh'){refreshes++;return {status:'SUCCEEDED',cleanup_complete:true,output:{}};}
+  if(options.root_ref==='file')s.ui.elements=[{tid:fileTid,ref:'file',label:name,storage_entry:{bytes:fault==='pending_size'&&refreshes===0?0:42}}];
   return {status:'SUCCEEDED',output:s};
  };
  const download=async(p,t)=>{downloads++;assert.equal(t.file_ref,'file');assert.equal(t.snapshot.ui.elements[0].label,name);
   if(fault==='lost_download')throw Error('Lost downloader response');
   return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true,trace:[{event:'download_saved'}]};};
- return {run:()=>discoverArtifactAndDownload(page,task,ui,download,()=>{}),moves,get downloads(){return downloads;},get waits(){return waits;}};
+ return {run:()=>discoverArtifactAndDownload(page,task,ui,download,()=>{}),moves,get downloads(){return downloads;},get refreshes(){return refreshes;},get waits(){return waits;}};
 }
 test('private discovery reveals a buffered authorized row and delegates exactly one download',async()=>{
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.deepEqual(f.moves,[700,1400]);assert.equal(f.downloads,1);
  assert.equal(r.trace.filter(e=>e.event==='artifact_discovery_scroll').length,2);assert.equal(r.trace.at(-1).event,'download_saved');
 });
-test('private discovery waits beyond the old eight-second sample cap for the exact server-side byte count before downloading',async()=>{
+test('private discovery refreshes a cached pending row before downloading exact server-side bytes',async()=>{
  const f=fixture('pending_size'),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.equal(f.downloads,1);assert.ok(f.waits>=1);
- assert.ok(f.waits>80);
+ assert.equal(f.refreshes,1);
  assert.ok(r.trace.some(e=>e.event==='artifact_file_size_verified'&&e.bytes===42));
 });
 for(const fault of ['owner','blocked','directory','absent','lost_scroll','lost_download'])test('discovery preserves '+fault+' without another download',async()=>{
