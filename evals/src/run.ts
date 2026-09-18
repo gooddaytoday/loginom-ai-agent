@@ -33,7 +33,7 @@ export async function main(argv: string[]) {
   outer: for (const attempt of Array.from({ length: config.repeat }, (_, index) => index + 1)) {
     for (const task of tasks) {
       if (controller.signal.aborted) break outer
-      const result = await runAttempt({
+      const { result, stop } = await runAttempt({
         config,
         command,
         source,
@@ -46,7 +46,7 @@ export async function main(argv: string[]) {
       })
       attempts.push(result)
       console.error(`[${task.id}#${attempt}] ${result.status} score=${result.score ?? "—"} ${Math.round(result.duration_ms / 1000)}s`)
-      if (result.status === "harness_error" && result.stop) {
+      if (result.status === "harness_error" && stop) {
         state.stopped = result.harness_error ?? "harness_error"
         break outer
       }
@@ -119,18 +119,20 @@ export async function runAttempt(input: {
   runDir: string
   signal: AbortSignal
   profileRecovered: boolean
-}): Promise<AttemptResult & { stop: boolean }> {
+}): Promise<{ result: AttemptResult; stop: boolean }> {
   const base = emptyResult(input.task.id, input.attempt, input.profileRecovered)
   return attemptBody(input, base).catch((error: unknown) => ({
-    ...base,
-    status: "harness_error" as const,
-    judge_status: "skipped" as const,
-    harness_error: describe(error),
+    result: {
+      ...base,
+      status: "harness_error" as const,
+      judge_status: "skipped" as const,
+      harness_error: describe(error),
+    },
     stop: false,
   }))
 }
 
-async function attemptBody(input: Parameters<typeof runAttempt>[0], base: AttemptResult): Promise<AttemptResult & { stop: boolean }> {
+async function attemptBody(input: Parameters<typeof runAttempt>[0], base: AttemptResult): Promise<{ result: AttemptResult; stop: boolean }> {
   const { config, task, attempt } = input
   const outDir = path.join(input.runDir, task.id, String(attempt))
   const workdir = path.join(config.agent.workspaceRoot, input.runId, task.id, String(attempt))
@@ -163,7 +165,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     signal: input.signal,
   })
   const early = statusFor(run, false)
-  const artifact =
+  const fetched =
     early.status === "interrupted" || early.status === "harness_error"
       ? undefined
       : await fetchArtifact({
@@ -174,8 +176,10 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
           resultPrefix: name,
           since,
           outDir: path.join(outDir, "artifact"),
-        })
-  const { status, stop } = statusFor(run, artifact !== undefined)
+        }).catch((error: unknown) => ({ error: describe(error) }))
+  const artifactError = fetched && "error" in fetched ? fetched.error : undefined
+  const artifact = fetched && !("error" in fetched) ? fetched : undefined
+  const { status, stop } = artifactError ? { status: "harness_error" as const, stop: false } : statusFor(run, artifact !== undefined)
   const cleanupError =
     artifact && !config.keepStorage
       ? await cleanupArtifact(input.source, artifact).then(
@@ -184,10 +188,9 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         )
       : null
   const noJudge = status === "harness_error" || status === "interrupted"
-  const result: AttemptResult & { stop: boolean } = {
+  const result: AttemptResult = {
     ...base,
     status,
-    stop,
     exit_code: run.exitCode,
     timed_out: run.timedOut,
     interrupted: run.interrupted,
@@ -207,9 +210,14 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     session_id: run.sessionId ?? null,
     errors: run.errors,
     stderr_head: run.stderrHead.trim() ? run.stderrHead : null,
+    harness_error:
+      artifactError ??
+      (status === "harness_error"
+        ? `CLI exit ${run.exitCode}: ${firstNonEmptyLine(run.stderrHead) ?? run.errors.join(", ") ?? "—"}`
+        : null),
   }
   await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
-  return result
+  return { result, stop }
 }
 
 async function prepareProfile(config: EvalConfig, command: AgentCommand) {
@@ -247,12 +255,17 @@ export const stamp = (date: Date) =>
 export function redact(config: EvalConfig) {
   return {
     ...config,
-    dock: { ...config.dock, apiKey: config.dryRun || !config.dock.apiKey ? "<unset>" : "<set>" },
+    loginom: { ...config.loginom, password: config.loginom.password ? "<set>" : "<unset>" },
+    dock: { ...config.dock, apiKey: config.dock.apiKey ? "<set>" : "<unset>" },
     agent: { ...config.agent, provider: config.agent.provider ? { ...config.agent.provider, apiKey: "<set>" } : undefined },
   }
 }
 
 export const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
+
+function firstNonEmptyLine(text: string) {
+  return text.split(/\r?\n/).find((line) => line.trim())
+}
 
 async function leftovers(source: ArtifactSource, runId: string) {
   const entries = await listStorage(source).catch(() => [])
