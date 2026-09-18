@@ -2773,3 +2773,29 @@ Linux x64 среда; native Windows/macOS hosts и отдельный real-prov
 доступа; signing и отмеченные license/source-distribution gaps остаются открытыми.
 Последний сохранённый и проверенный development archive — 05:00; evidence и
 незакоммиченные исходники сохранены, активной CLI-установки нет.
+
+### Исправления по ревью a7d812e4a — 2026-09-18
+
+- [x] Ошибки Dock распознаются в первом receipt/structuredContent, включая
+  FAILED/AMBIGUOUS/NOT_APPLIED, failed и settled с ошибкой worker. Ошибки вложенных
+  пользовательских данных не интерпретируются как статус операции. Успешное
+  исправление той же операции снимает ошибку; running не подтверждает исправление.
+- [x] Ctrl+C для providers/auth/models передаётся в Effect и HTTP-запрос metadata.
+  Очистка Instance/AppRuntime выполняется без отменённого signal; завершение
+  credential subprocess ожидается перед освобождением профиля.
+- [x] Текстовые вложения file/data URL сохраняют полный исходный snapshot для
+  admission в Dock; текст для модели ограничен 2000 строками / 50 KiB с ограничением
+  длины отдельной строки 2000 символов и явным уведомлением о сокращении.
+- [x] Ошибки run `--fork` без `--continue`/`--session` и отсутствующего сообщения
+  возвращают CLI_ARGUMENT_INVALID / 2; standalone finally продолжает освобождать
+  host и профиль. Legacy CLI сохраняет прежний код.
+- Проверки исходников: первый интеграционный проход — 70 passed, 1 existing skip,
+  0 failed (standalone, standalone-status, session/prompt); package typecheck прошёл.
+  Финальный проход standalone, standalone-status, run-outcome, loginom-result,
+  attachment-preview — 20 passed, 0 failed, включая отмену credential subprocess.
+  Повторный `bun typecheck` из packages/agent и `git diff --check` — PASS.
+  В совокупности проверено 80 разных тестов, 1 existing skip; ошибок нет.
+
+Это исправление исходников. Установленные артефакты не пересобирались, native
+Windows/macOS, live OAuth и реальный provider не проверялись; ранее отмеченные
+внешние release gates остаются открытыми.

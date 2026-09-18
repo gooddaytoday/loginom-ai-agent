@@ -2511,3 +2511,44 @@ noLLMServer.instance(
     }),
   { config: cfg },
 )
+
+noLLMServer.instance(
+  "standalone bounds large file and data URL previews but retains the exact admitted snapshot",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const session = yield* sessions.create({})
+      const filename = path.join(instance.directory, "large.csv")
+      const csv = "amount\n" + "1234567890\n".repeat(10000) + "HIDDEN_END"
+      yield* writeText(filename, csv)
+      const data = "data:text/plain;base64," + Buffer.from(csv).toString("base64")
+      const previous = process.env.LOGINOM_AI_AGENT_CLI_ROOT
+      process.env.LOGINOM_AI_AGENT_CLI_ROOT = instance.directory
+      try {
+        for (const url of [pathToFileURL(filename).href, data]) {
+          const message = yield* prompt.prompt({
+            sessionID: session.id,
+            agent: "build",
+            noReply: true,
+            parts: [{ type: "file", mime: "text/plain", filename: "large.csv", url }],
+          })
+          const stored = yield* MessageV2.get({ sessionID: session.id, messageID: message.info.id })
+          const text = stored.parts
+            .filter((part) => part.type === "text")
+            .map((part) => part.text)
+            .join("\n")
+          expect(Buffer.byteLength(text)).toBeLessThan(52 * 1024)
+          expect(text).not.toContain("HIDDEN_END")
+          expect(text).toContain("preview truncated")
+          expect(stored.parts.filter((part) => part.type === "file").map((part) => part.url)).toEqual([data])
+        }
+      } finally {
+        if (previous === undefined) delete process.env.LOGINOM_AI_AGENT_CLI_ROOT
+        else process.env.LOGINOM_AI_AGENT_CLI_ROOT = previous
+        yield* sessions.remove(session.id)
+      }
+    }),
+  { config: cfg },
+)

@@ -16,6 +16,7 @@ export function runToolOutcome() {
         unresolved.add(key)
         return
       }
+      if (part.tool.startsWith("loginom_") && part.state.metadata?.loginomPending === true) return
       unresolved.delete(key)
     },
     failed: () => unresolved.size > 0,

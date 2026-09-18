@@ -1,3 +1,4 @@
+import { loginomResultState } from "./loginom-result"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Agent } from "@/agent/agent"
@@ -570,7 +571,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 )
                 const text = result.content.flatMap((block) => (block.type === "text" ? [block.text] : []))
                 const truncated = yield* truncate.output(text.join("\n\n"), {}, input.agent)
-                if (result.isError === true) {
+                const state = loginomResultState(result)
+                if (state === "failed") {
                   yield* ctx.metadata({
                     title: definition.name,
                     metadata: { generation: loginom.generation, isError: true },
@@ -583,6 +585,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                   metadata: {
                     generation: loginom.generation,
                     truncated: truncated.truncated,
+                    ...(state === "pending" ? { loginomPending: true } : {}),
                     ...(truncated.truncated ? { outputPath: truncated.outputPath } : {}),
                   },
                   attachments: result.content.flatMap((block) =>

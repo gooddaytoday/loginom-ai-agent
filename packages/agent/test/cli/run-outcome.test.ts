@@ -57,3 +57,15 @@ test("an arbitrary MCP operation_id does not imply the Loginom operation contrac
   outcome.observe(part("generic_mcp", { value: 1, operation_id: "one" }, false))
   expect(outcome.failed()).toBe(false)
 })
+
+test("a running retry is not evidence that the failed operation was repaired", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(part("loginom_apply", { operation_id: "one" }, true))
+  const pending = part("loginom_apply", { operation_id: "one" }, false)
+  if (pending.state.status !== "completed") throw Error("invalid fixture")
+  pending.state.metadata.loginomPending = true
+  outcome.observe(pending)
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("loginom_apply", { operation_id: "one" }, false))
+  expect(outcome.failed()).toBe(false)
+})

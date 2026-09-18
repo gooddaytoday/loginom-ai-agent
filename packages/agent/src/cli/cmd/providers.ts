@@ -1,3 +1,4 @@
+import { standaloneCancellation } from "../standalone-cancellation"
 import type { Argv } from "yargs"
 import { Auth } from "../../auth"
 import { cmd } from "./cmd"
@@ -30,7 +31,7 @@ const put = Effect.fn("Cli.providers.put")(function* (key: string, info: Auth.In
   yield* Effect.orDie(auth.set(key, info))
 })
 
-const cliTry = <Value>(message: string, fn: () => PromiseLike<Value>) =>
+const cliTry = <Value>(message: string, fn: (signal: AbortSignal) => PromiseLike<Value>) =>
   Effect.tryPromise({
     try: fn,
     catch: (error) => new CliError({ message: message + errorMessage(error) }),
@@ -246,6 +247,7 @@ export const ProvidersCommand = cmd({
 })
 
 export const ProvidersListCommand = effectCmd({
+  cancellation: standaloneCancellation,
   command: "list",
   aliases: ["ls"],
   describe: "list providers and credentials",
@@ -297,6 +299,7 @@ export const ProvidersListCommand = effectCmd({
 })
 
 export const ProvidersLoginCommand = effectCmd({
+  cancellation: standaloneCancellation,
   command: "login [url]",
   describe: "log in to a provider",
   // URL login skips instance bootstrap, which would load remote config with the stale token and crash before re-auth.
@@ -324,8 +327,8 @@ export const ProvidersLoginCommand = effectCmd({
     yield* Prompt.intro("Add credential")
     if (args.url) {
       const url = args.url.replace(/\/+$/, "")
-      const wellknown = (yield* cliTry(`Failed to load auth provider metadata from ${url}: `, () =>
-        fetch(`${url}/.well-known/opencode`).then((x) => x.json()),
+      const wellknown = (yield* cliTry(`Failed to load auth provider metadata from ${url}: `, (signal) =>
+        fetch(`${url}/.well-known/opencode`, { signal }).then((x) => x.json()),
       )) as {
         auth: { command: string[]; env: string }
       }
@@ -339,7 +342,14 @@ export const ProvidersLoginCommand = effectCmd({
       }
       const [exit, token] = yield* cliTry("Failed to run auth provider command: ", () =>
         Promise.all([proc.exited, text(proc.stdout!)]),
-      ).pipe(Effect.ensuring(Effect.sync(() => abort.abort())))
+      ).pipe(
+        Effect.ensuring(
+          Effect.promise(async () => {
+            abort.abort()
+            await proc.exited
+          }),
+        ),
+      )
       if (exit !== 0) {
         yield* Prompt.log.error("Failed")
         yield* Prompt.outro("Done")
@@ -489,6 +499,7 @@ export const ProvidersLoginCommand = effectCmd({
 })
 
 export const ProvidersLogoutCommand = effectCmd({
+  cancellation: standaloneCancellation,
   command: "logout [provider]",
   describe: "log out from a configured provider",
   builder: (yargs) =>

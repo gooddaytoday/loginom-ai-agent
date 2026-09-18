@@ -3,7 +3,7 @@
 export function exitCli(code: number): never {
   if (process.env.LOGINOM_AI_AGENT_CLI_ROOT) {
     process.exitCode = code
-    throw new Error("CLI_COMMAND_FAILED")
+    throw new Error(code === 2 ? "CLI_ARGUMENT_INVALID" : "CLI_COMMAND_FAILED")
   }
   process.exit(code)
 }

@@ -1,5 +1,23 @@
 # Самостоятельный CLI: checkpoint и приёмка
 
+## Исправления ревью a7d812e4a — source-only, 2026-09-18
+
+- Dock business failures без MCP `isError` дают ошибку tool/код 1; успешное
+  исправление той же операции возвращает 0, running не снимает прежнюю ошибку.
+- Ctrl+C в providers/auth/models проходит через отмену Effect и очистку профиля.
+  Проверены зависший HTTP metadata request и дочерняя credential command:
+  код 130, `.writer` освобождён после cleanup, следующая команда работает.
+- Вложения file/data URL: полный snapshot остаётся для Dock, модель получает
+  ограниченный текст (2000 строк / 50 KiB, до 2000 символов на строку).
+- Неверный `run --fork` и пустой ввод дают `CLI_ARGUMENT_INVALID` / 2.
+- Проверки packages/agent: 70 passed + 1 existing skip в первом проходе
+  standalone/standalone-status/session-prompt; 20 passed в финальном проходе
+  standalone/standalone-status/run-outcome/loginom-result/attachment-preview.
+  Повторный package `bun typecheck` и `git diff --check` — PASS.
+  Всего 80 разных прошедших тестов, 1 existing skip.
+- Установленные артефакты не пересобирались. Live provider/OAuth и native
+  Windows/macOS не проверялись; историческая приёмка ниже остаётся отдельной.
+
 ## Текущий checkpoint — 2026-09-18
 
 Полная цель **не завершена**. Ниже идут исторические checkpoint-записи: их PASS

@@ -1,3 +1,4 @@
+import { standaloneCancellation } from "../standalone-cancellation"
 import { EOL } from "os"
 import { Effect } from "effect"
 import { ModelsDev } from "@loginom-ai-agent/core/models-dev"
@@ -6,6 +7,7 @@ import { UI } from "../ui"
 import { ProviderV2 } from "@loginom-ai-agent/core/provider"
 
 export const ModelsCommand = effectCmd({
+  cancellation: standaloneCancellation,
   command: "models [provider]",
   describe: "list all available models",
   builder: (yargs) =>

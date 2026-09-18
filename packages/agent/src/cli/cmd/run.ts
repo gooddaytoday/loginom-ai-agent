@@ -417,12 +417,12 @@ export const RunCommand = effectCmd({
 
       if (message.trim().length === 0 && !args.command && !interactive) {
         UI.error("You must provide a message or a command")
-        exitCli(1)
+        exitCli(process.env.LOGINOM_AI_AGENT_CLI_ROOT ? 2 : 1)
       }
 
       if (args.fork && !args.continue && !args.session) {
         UI.error("--fork requires --continue or --session")
-        exitCli(1)
+        exitCli(process.env.LOGINOM_AI_AGENT_CLI_ROOT ? 2 : 1)
       }
 
       const rules: PermissionV1.Ruleset = interactive

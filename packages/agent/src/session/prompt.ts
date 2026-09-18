@@ -1,3 +1,4 @@
+import { attachmentPreview } from "@/util/attachment-preview"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
@@ -801,7 +802,9 @@ const layer = Layer.effect(
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: decodeDataUrl(part.url),
+                    text: process.env.LOGINOM_AI_AGENT_CLI_ROOT
+                      ? attachmentPreview(decodeDataUrl(part.url))
+                      : decodeDataUrl(part.url),
                   },
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
@@ -884,7 +887,7 @@ const layer = Layer.effect(
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: bytes ? bytes.toString("utf8") : result.output,
+                    text: bytes ? attachmentPreview(bytes.toString("utf8")) : result.output,
                   })
                   if (result.attachments?.length) {
                     pieces.push(

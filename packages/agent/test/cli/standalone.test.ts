@@ -173,3 +173,119 @@ test("bootstrap carries an early signal into stdin admission and releases its ha
   expect(result.out).toBe('{"cancelled":true}\ntrue\n')
   expect(await fs.readdir(path.join(root, "profile"))).not.toContain(".writer")
 })
+
+test("Ctrl+C during provider metadata fetch drains cleanup and releases the writer", async () => {
+  const root = await temporary()
+  const received = Promise.withResolvers<void>()
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch() {
+      received.resolve()
+      return new Promise<Response>(() => {})
+    },
+  })
+  const child = Bun.spawn([process.execPath, "run", "./src/standalone.ts", "providers", "login", server.url.href], {
+    cwd: path.resolve(import.meta.dir, "../.."),
+    env: {
+      ...process.env,
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+      LOGINOM_AI_AGENT_PURE: "1",
+      LOGINOM_AI_AGENT_CHANNEL: "dev",
+      LOGINOM_AI_AGENT_CLI_PROFILE: path.join(root, "profile"),
+    },
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const out = new Response(child.stdout).text()
+  const error = new Response(child.stderr).text()
+  const timer = setTimeout(() => child.kill("SIGKILL"), 20_000)
+  try {
+    await Promise.race([
+      received.promise,
+      child.exited.then(() => {
+        throw Error("Provider exited before request")
+      }),
+    ])
+    child.kill("SIGINT")
+    expect(await child.exited).toBe(130)
+    expect(await error).toContain("CLI_CANCELLED")
+    await out
+    expect(await fs.readdir(path.join(root, "profile"))).not.toContain(".writer")
+    const retry = await run(
+      root,
+      `process.argv = ["bun", "standalone", "providers", "list"]; await import("./src/standalone.ts")`,
+    )
+    expect(retry.code).toBe(0)
+    expect(retry.error).not.toContain("PROFILE_BUSY")
+  } finally {
+    clearTimeout(timer)
+    child.kill("SIGKILL")
+    await child.exited
+    server.stop(true)
+  }
+}, 30_000)
+
+test("provider cancellation waits for its credential command to exit", async () => {
+  const root = await temporary()
+  const ready = path.join(root, "ready")
+  const closed = path.join(root, "closed")
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch() {
+      return Response.json({
+        auth: {
+          env: "TEST_TOKEN",
+          command: [
+            process.execPath,
+            "--eval",
+            `
+      const fs = await import("node:fs/promises");
+      process.on("SIGTERM", () => setTimeout(async () => {
+        await fs.writeFile(${JSON.stringify(closed)}, "closed"); process.exit(0);
+      }, 200));
+      setInterval(() => {}, 1000);
+      await fs.writeFile(${JSON.stringify(ready)}, "ready");
+    `,
+          ],
+        },
+      })
+    },
+  })
+  const child = Bun.spawn([process.execPath, "run", "./src/standalone.ts", "auth", "login", server.url.href], {
+    cwd: path.resolve(import.meta.dir, "../.."),
+    env: {
+      ...process.env,
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+      LOGINOM_AI_AGENT_PURE: "1",
+      LOGINOM_AI_AGENT_CHANNEL: "dev",
+      LOGINOM_AI_AGENT_CLI_PROFILE: path.join(root, "profile"),
+    },
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const output = new Response(child.stdout).text()
+  const errors = new Response(child.stderr).text()
+  const timer = setTimeout(() => child.kill("SIGKILL"), 20_000)
+  try {
+    while (!(await Bun.file(ready).exists())) {
+      if (child.exitCode !== null) throw Error("Provider exited before credential command")
+      await Bun.sleep(20)
+    }
+    child.kill("SIGINT")
+    expect(await child.exited).toBe(130)
+    expect(await Bun.file(closed).text()).toBe("closed")
+    expect(await errors).toContain("CLI_CANCELLED")
+    await output
+    expect(await fs.readdir(path.join(root, "profile"))).not.toContain(".writer")
+    expect(await Bun.file(path.join(root, "profile/data/auth.json")).exists()).toBe(false)
+  } finally {
+    clearTimeout(timer)
+    child.kill("SIGKILL")
+    await child.exited
+    server.stop(true)
+  }
+}, 30_000)

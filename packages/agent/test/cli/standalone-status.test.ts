@@ -148,8 +148,16 @@ test("management commands share durable setup and recovery semantics through the
           checked: true, ready: true
         }});
         if (message.operation === 'interrupt') process.send({ id: message.id, result: { interrupted: true } });
-        if (message.operation === 'list') process.send({ id: message.id, result: { tools: [{ name: 'probe', description: 'Test the private host path', inputSchema: { type: 'object', properties: { fail: { type: 'boolean' }, operation_id: { type: 'string' } } } }] } });
-        if (message.operation === 'call') process.send({ id: message.id, result: { recoveryPending: false, result: { isError: message.input.arguments?.fail === true, content: [{ type: 'text', text: message.input.arguments?.fail ? 'private host probe failed' : 'private host probe completed' }] } } });
+        if (message.operation === 'list') process.send({ id: message.id, result: { tools: [{ name: 'probe', description: 'Test the private host path', inputSchema: { type: 'object', properties: { fail: { type: 'boolean' }, reply: { type: 'string' }, operation_id: { type: 'string' } } } }] } });
+        if (message.operation === 'call') {
+          const args = message.input.arguments;
+          const receipt = { operation_id: args.operation_id, ...(args.reply === 'node'
+            ? { state: args.fail ? 'failed' : 'settled', outcome: { status: args.fail ? 'FAILED' : 'SUCCEEDED' } }
+            : { status: args.fail ? 'FAILED' : 'SUCCEEDED' }) };
+          process.send({ id: message.id, result: { recoveryPending: false, result: args.reply
+            ? { content: [{ type: 'text', text: JSON.stringify(receipt) }], ...(args.reply === 'node' ? { structuredContent: receipt } : {}) }
+            : { isError: args.fail === true, content: [{ type: 'text', text: args.fail ? 'private host probe failed' : 'private host probe completed' }] } } });
+        }
         if (message.operation === 'admit') process.send({ id: message.id, result: { files: [] } });
         if (message.operation === 'close') process.send({ id: message.id, result: { closed: true } }, () => process.disconnect());
       });
@@ -269,7 +277,7 @@ test("management commands share durable setup and recovery semantics through the
         join(profile, "config/loginom-ai-agent.json"),
         JSON.stringify({ ...testProviderConfig(llm.url), permission: { "loginom_*": "ask" } }),
       )
-      const invoke = (auto: boolean, file?: string) =>
+      const invoke = (auto: boolean, file?: string, extra: string[] = []) =>
         Bun.spawn(
           [
             process.execPath,
@@ -285,6 +293,7 @@ test("management commands share durable setup and recovery semantics through the
             "test/test-model",
             ...(auto ? ["--dangerously-skip-permissions"] : []),
             ...(file ? ["--file", file] : []),
+            ...extra,
             "--",
             "say hello",
           ],
@@ -408,6 +417,36 @@ test("management commands share durable setup and recovery semantics through the
       ).toEqual(["error", "completed"])
       expect(await correctedErrors).not.toContain("private-setup-key")
       expect(await readdir(profile)).not.toContain(".writer")
+      for (const reply of ["action", "node"]) {
+        for (const repair of [false, true]) {
+          await provider.runPromise(llm.reset)
+          await provider.runPromise(llm.tool("loginom_probe", { operation_id: "business", reply, fail: true }))
+          if (repair)
+            await provider.runPromise(llm.tool("loginom_probe", { operation_id: "business", reply, fail: false }))
+          await provider.runPromise(llm.text("business outcome inspected"))
+          const child = invoke(true)
+          const output = new Response(child.stdout).text()
+          const errors = new Response(child.stderr).text()
+          expect(await child.exited).toBe(repair ? 0 : 1)
+          const events = (await output)
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line))
+          expect(events.filter((event) => event.type === "tool_use").map((event) => event.part.state.status)).toEqual(
+            repair ? ["error", "completed"] : ["error"],
+          )
+          expect(events.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(!repair)
+          expect(await errors).not.toContain("private-setup-key")
+          expect(await readdir(profile)).not.toContain(".writer")
+        }
+      }
+      const invalid = invoke(true, undefined, ["--fork"])
+      const invalidOutput = new Response(invalid.stdout).text()
+      const invalidErrors = new Response(invalid.stderr).text()
+      expect(await invalid.exited).toBe(2)
+      expect(await invalidOutput).toContain("CLI_ARGUMENT_INVALID")
+      expect(await invalidErrors).toContain("CLI_ARGUMENT_INVALID")
+      expect(await readdir(profile)).not.toContain(".writer")
       for (const unavailable of [false, true]) {
         await provider.runPromise(llm.reset)
         if (unavailable) {
@@ -460,4 +499,4 @@ test("management commands share durable setup and recovery semantics through the
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
-}, 60_000)
+}, 90_000)

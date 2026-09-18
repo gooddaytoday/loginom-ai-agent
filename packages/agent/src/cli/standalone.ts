@@ -26,7 +26,11 @@ export async function standalone(
     process.stdout.write(`${InstallationVersion}\n`)
     return
   }
-  if (options.filter((value) => !["--headless", "--no-headless"].includes(value))[0] === "run")
+  if (
+    ["run", "providers", "auth", "models"].includes(
+      options.filter((value) => !["--headless", "--no-headless"].includes(value))[0],
+    )
+  )
     return withStandaloneCancellation(() => executeProfile(args, execute))
   return executeProfile(args, execute)
 }

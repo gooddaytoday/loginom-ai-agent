@@ -44,6 +44,8 @@ interface EffectCmdOpts<Args, A> {
    * `serve`, `web`, `account`, `db`, `upgrade`).
    */
   instance?: boolean | ((args: Args) => boolean)
+  /** Cooperative cancellation; cleanup always runs without the aborted signal. */
+  cancellation?: () => AbortSignal | undefined
   /** Defaults to process.cwd(). Override for commands that take a directory positional. */
   directory?: (args: Args) => string
   handler: (args: WithDoubleDash<Args>) => Effect.Effect<A, CliError, AppServices | InstanceStore.Service>
@@ -76,9 +78,10 @@ export const effectCmd = <Args, A>(opts: EffectCmdOpts<Args, A>) =>
       const { AppRuntime } = await import("@/effect/app-runtime")
       // yargs typing wraps Args in ArgumentsCamelCase<WithDoubleDash<...>>; cast at the boundary.
       const args = rawArgs as unknown as WithDoubleDash<Args>
+      const options = { signal: opts.cancellation?.() }
       const useInstance = typeof opts.instance === "function" ? opts.instance(args) : opts.instance !== false
       if (!useInstance) {
-        await AppRuntime.runPromise(opts.handler(args))
+        await AppRuntime.runPromise(opts.handler(args), options)
         return
       }
       const { InstanceStore } = await import("@/project/instance-store")
@@ -86,9 +89,10 @@ export const effectCmd = <Args, A>(opts: EffectCmdOpts<Args, A>) =>
       const directory = opts.directory?.(args) ?? process.cwd()
       const { store, ctx } = await AppRuntime.runPromise(
         InstanceStore.Service.use((store) => store.load({ directory }).pipe(Effect.map((ctx) => ({ store, ctx })))),
+        options,
       )
       try {
-        await AppRuntime.runPromise(opts.handler(args).pipe(Effect.provideService(InstanceRef, ctx)))
+        await AppRuntime.runPromise(opts.handler(args).pipe(Effect.provideService(InstanceRef, ctx)), options)
       } finally {
         await AppRuntime.runPromise(store.dispose(ctx))
       }
