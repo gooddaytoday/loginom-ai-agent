@@ -33,13 +33,15 @@ try {
     $security = Get-Acl -LiteralPath $entry.FullName
     if ($security.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) { exit 1 }
     $rules = $security.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])
-    $full = $false
+    $userFull = $false
     foreach ($access in $rules) {
       if ($access.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) { exit 1 }
-      if ($access.IdentityReference.Value -ne $sid.Value) { exit 1 }
-      if (($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -eq [Security.AccessControl.FileSystemRights]::FullControl) { $full = $true }
+      # Loginom runtime directories deliberately retain LocalSystem so that
+      # Windows can service Chromium files. No other principal is accepted.
+      if ($access.IdentityReference.Value -ne $sid.Value -and $access.IdentityReference.Value -ne 'S-1-5-18') { exit 1 }
+      if ($access.IdentityReference.Value -eq $sid.Value -and ($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -eq [Security.AccessControl.FileSystemRights]::FullControl) { $userFull = $true }
     }
-    if (!$full) { exit 1 }
+    if (!$userFull) { exit 1 }
     if ($entry.PSIsContainer) {
       foreach ($child in @(Get-ChildItem -LiteralPath $entry.FullName -Force)) { $items.Enqueue($child) }
     }

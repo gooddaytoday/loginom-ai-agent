@@ -21,6 +21,12 @@ test.skipIf(process.platform !== "win32")(
       await protectWindowsProfile(root)
       const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
       if (!systemRoot) throw Error("SystemRoot required")
+      const system = Bun.spawn([join(systemRoot, "System32/icacls.exe"), root, "/grant", "*S-1-5-18:(OI)(CI)F"], {
+        stdout: "ignore",
+        stderr: "ignore",
+      })
+      expect(await system.exited).toBe(0)
+      await protectWindowsProfile(root)
       const child = Bun.spawn([join(systemRoot, "System32/icacls.exe"), root, "/grant", "*S-1-1-0:(OI)(CI)R"], {
         stdout: "ignore",
         stderr: "ignore",
