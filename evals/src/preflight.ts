@@ -76,7 +76,12 @@ export async function dockSkillRevision(dock: { apiKey: string; baseUrl: string 
   const health = await fetch(`${dock.baseUrl}/health`, { signal: AbortSignal.timeout(5_000) }).catch(() => undefined)
   if (health?.status !== 200)
     throw new EvalFailure(`Dock недоступен: ${dock.baseUrl}/health → ${health?.status ?? "нет ответа"}`, 2)
-  const manifest = await fetch(`${dock.baseUrl}/api/v1/skills/loginom-automation`, {
+  // Без include_integrity Dock не возвращает result.revision; параметры совпадают с runtime skill.mjs.
+  const url = new URL(`${dock.baseUrl}/api/v1/skills/loginom-automation`)
+  url.searchParams.set("target_uri", "viking://agent/skills/loginom-automation")
+  url.searchParams.set("include_files", "true")
+  url.searchParams.set("include_integrity", "true")
+  const manifest = await fetch(url, {
     headers: { Authorization: `Bearer ${dock.apiKey}` },
     signal: AbortSignal.timeout(10_000),
   }).catch(() => undefined)
