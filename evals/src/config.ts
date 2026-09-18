@@ -75,13 +75,13 @@ export function loadConfig(argv: string[], env: Env = process.env) {
     resultsDir: path.join(evalsRoot, "results"),
     loginom: {
       url: env.LOGINOM_URL ?? "http://localhost/app/",
-      username: env.LOGINOM_USERNAME ?? "user",
+      username: dryRun ? "user" : env.LOGINOM_USERNAME ?? "user",
       password: env.LOGINOM_PASSWORD ?? "",
       container: env.LOGINOM_CONTAINER ?? "loginom-server-master",
       storageDir: env.LOGINOM_STORAGE_DIR ?? "/workdir/UserStorage/user",
     },
     dock: {
-      apiKey: required("LOGINOM_DOCK_API_KEY", !agentless),
+      apiKey: agentless ? "" : required("LOGINOM_DOCK_API_KEY", true),
       baseUrl: env.LOGINOM_DOCK_BASE_URL ?? "https://loginom.duckdns.org",
     },
     agent: {

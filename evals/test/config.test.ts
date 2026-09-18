@@ -29,6 +29,13 @@ test("loadConfig: --dry-run включает fake CLI, dir-хранилище и
   expect(config.artifactSource.endsWith("fixtures/storage")).toBe(true)
 })
 
+test("loadConfig: --dry-run не читает LOGINOM_USERNAME и LOGINOM_DOCK_API_KEY", () => {
+  const config = loadConfig(["--dry-run"], { LOGINOM_USERNAME: "other", LOGINOM_DOCK_API_KEY: "k", EVAL_REPEAT: "3" })
+  expect(config.loginom.username).toBe("user")
+  expect(config.dock.apiKey).toBe("")
+  expect(config.repeat).toBe(3)
+})
+
 test("loadConfig: без LOGINOM_DOCK_API_KEY — EvalFailure с кодом 2 и именем переменной", () => {
   expect(() => loadConfig([], { ...full, LOGINOM_DOCK_API_KEY: undefined })).toThrow(EvalFailure)
   expect(() => loadConfig([], { ...full, LOGINOM_DOCK_API_KEY: undefined })).toThrow("LOGINOM_DOCK_API_KEY")
