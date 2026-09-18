@@ -53,6 +53,7 @@ async function launch(chat: string, csv: string): Promise<Child> {
       executable: process.env.LOGINOM_AI_AGENT_TEST_CLI_EXECUTABLE,
       mode: process.env.LOGINOM_AI_AGENT_TEST_CLI_INTERFACE === "tui" ? "tui" : "run",
       headed: process.env.LOGINOM_AI_AGENT_TEST_CLI_HEADED === "1",
+      profile: process.env.LOGINOM_AI_AGENT_TEST_CLI_PROFILE,
       directory: join(directory, "cli", chat),
       csv,
       connection: {

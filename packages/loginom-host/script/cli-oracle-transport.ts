@@ -10,19 +10,20 @@ export async function cliOracleTransport(options: {
   mode?: "run" | "tui"
   headed?: boolean
   directory: string
+  profile?: string
   csv?: string
   resume?: { profile: string; workspace: string; session: string; latest?: boolean; prompt: string }
   connection: { apiKey: string; password: string; username: string; url: string }
 }) {
   await mkdir(options.directory, { recursive: true, mode: 0o700 })
   if (!options.resume && typeof options.csv !== "string") throw Error("CLI_ORACLE_INPUT_REQUIRED")
-  const profile = options.resume?.profile ?? join(options.directory, "profile")
+  const profile = options.resume?.profile ?? options.profile ?? join(options.directory, "profile")
   const env = {
     ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("LOGINOM_AI_AGENT_CLI_"))),
     LOGINOM_AI_AGENT_CLI_PROFILE: profile,
     LOGINOM_AI_AGENT_PURE: "1",
   }
-  if (!options.resume) {
+  if (!options.resume && !options.profile) {
     const setup = Bun.spawn([options.executable, "loginom", "setup", "--stdin-json", "--format", "json"], {
       env,
       stdin: new Blob([JSON.stringify(options.connection)]),

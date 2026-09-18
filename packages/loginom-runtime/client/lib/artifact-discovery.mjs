@@ -26,10 +26,23 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal) 
    const matches=roots.output.ui.elements.filter(e=>e.tid===tid);
    if(matches.length>1)return result('DISCOVERY_FILE_AMBIGUOUS');
    if(matches.length===1) {
-    const ref=matches[0].ref,observed=await ui(page,{...base,mode:'observe',root_ref:ref});
+    const ref=matches[0].ref;let observed=await ui(page,{...base,mode:'observe',root_ref:ref});
     if(observed.status!=='SUCCEEDED'||!context(observed.output))return result('DISCOVERY_FILE_CONTEXT_CHANGED');
-    const files=observed.output.ui.elements.filter(e=>e.ref===ref&&e.tid===tid&&e.label===task.artifact.name);
+    let files=observed.output.ui.elements.filter(e=>e.ref===ref&&e.tid===tid&&e.label===task.artifact.name);
     if(files.length!==1)return result('DISCOVERY_FILE_IDENTITY_CHANGED');
+    // Loginom can publish a file row before its asynchronous server upload has
+    // committed the bytes. In particular this is observable on Windows. Do
+    // not download the transient zero-byte row and mistake it for final data.
+    for(let sample=0;files[0].storage_entry?.bytes!==task.artifact.bytes&&sample<80&&Date.now()<deadline;sample++) {
+     await page.waitForTimeout(100);
+     const ready=await ui(page,{...base,mode:'observe',root_ref:ref});
+     if(ready.status!=='SUCCEEDED'||!context(ready.output))return result('DISCOVERY_FILE_CONTEXT_CHANGED');
+     observed=ready;
+     files=ready.output.ui.elements.filter(e=>e.ref===ref&&e.tid===tid&&e.label===task.artifact.name);
+     if(files.length!==1)return result('DISCOVERY_FILE_IDENTITY_CHANGED');
+    }
+    if(files[0].storage_entry?.bytes!==task.artifact.bytes)return result('DISCOVERY_FILE_SIZE_CHANGED');
+    trace.push({event:'artifact_file_size_verified',bytes:task.artifact.bytes});
     trace.push({event:'artifact_file_discovered',file_ref:ref,file_tid:tid,directory:task.artifact.upload.directory,scrolls:trace.length,document:observed.output.dom_epoch.document,workflow_ref:observed.output.workflow_ref,active_tab_ref:observed.output.active_tab_ref});
     const read=p=>ui(p,{...base,mode:'observe',root_ref:ref});
     const act=(p,snapshot)=>ui(p,{...base,mode:'act',snapshot,action:{verb:'double_click',ref}});
