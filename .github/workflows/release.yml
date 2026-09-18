@@ -180,26 +180,9 @@ jobs:
       contents: read
 
   build:
-    name: build (${{ matrix.name }})
+    name: build (linux)
     needs: verify
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: linux
-            runner: ubuntu-24.04
-            target: linux-x64
-            experimental: false
-          - name: windows
-            runner: windows-2025
-            target: win32-x64
-            experimental: true
-          - name: macos
-            runner: macos-15
-            target: darwin-arm64
-            experimental: true
-    runs-on: ${{ matrix.runner }}
-    continue-on-error: ${{ matrix.experimental }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     defaults:
       run:
@@ -213,7 +196,6 @@ jobs:
 
       # Electron runs as Node for write-manifest.ts; dpkg-deb and unsquashfs extract the installers.
       - name: Install Linux packaging dependencies
-        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libgtk-3-0t64 libnss3 libgbm1 libasound2t64 squashfs-tools
@@ -229,8 +211,7 @@ jobs:
       - name: Build desktop
         working-directory: packages/desktop
         env:
-          # electron-vite bundles the whole backend into the main process; the default
-          # V8 heap (about 2 GB on the arm64 macOS runner) is not enough for that bundle.
+          # electron-vite bundles the whole backend into the main process; give V8 room for that bundle.
           NODE_OPTIONS: --max-old-space-size=6144
         run: |
           bun run build
@@ -238,31 +219,21 @@ jobs:
 
       - name: Package desktop
         working-directory: packages/desktop
-        env:
-          # No Apple identity in CI: electron-builder skips signing and notarization instead of failing.
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: |
-          case "$RUNNER_OS" in
-            Linux) bun run package:linux --x64 --publish never ;;
-            Windows) bun run package:win --x64 --publish never ;;
-            macOS) bun run package:mac --arm64 --publish never ;;
-          esac
+        run: bun run package:linux --x64 --publish never
 
       - name: Build CLI
         run: |
           mkdir -p "$RUNNER_TEMP/cli"
-          bun packages/loginom-host/script/build-cli.ts "$RUNNER_TEMP/cli/loginom-ai-agent-cli-${{ matrix.target }}"
+          bun packages/loginom-host/script/build-cli.ts "$RUNNER_TEMP/cli/loginom-ai-agent-cli-linux-x64"
 
       # write-manifest.ts runs node_modules/electron/dist/electron as Node to record the bundled
       # Electron versions; bun install does not leave that binary behind, and electron-builder
       # keeps its own copy, so fetch it explicitly (reuses the electron download cache).
       - name: Install Electron binary for the release manifest
-        if: runner.os == 'Linux'
         working-directory: packages/desktop
         run: node node_modules/electron/install.js
 
       - name: Write release manifest and verify Linux installers
-        if: runner.os == 'Linux'
         run: |
           set -euo pipefail
           if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
@@ -277,6 +248,86 @@ jobs:
           bun scripts/release/verify-artifact.ts --manifest dist/release-manifest.json --artifact dist/loginom-ai-agent-linux-x86_64.AppImage --report dist/static-appimage.json
 
       # Flatten installers, reports and CLI archives so downloads have predictable top-level names.
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/upload"
+          find packages/desktop/dist "$RUNNER_TEMP/cli" -maxdepth 1 -type f ! -name 'builder-*' -exec cp {} "$RUNNER_TEMP/upload/" \;
+          ls -la "$RUNNER_TEMP/upload"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-linux
+          path: ${{ runner.temp }}/upload
+          if-no-files-found: error
+          retention-days: 14
+
+  # Unsigned Windows/macOS candidates: never gate the Linux release. A separate job keeps a failed,
+  # hung or cancelled leg from changing needs.build.result; step timeouts turn hangs into failures.
+  candidates:
+    name: build (${{ matrix.name }})
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            runner: windows-2025
+            target: win32-x64
+          - name: macos
+            runner: macos-15
+            target: darwin-arm64
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: true
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    env:
+      LOGINOM_AI_AGENT_VERSION: ${{ needs.verify.outputs.version }}
+      LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      - name: Setup pinned Node and Chromium
+        uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Build desktop
+        timeout-minutes: 30
+        working-directory: packages/desktop
+        env:
+          # electron-vite bundles the whole backend into the main process; the default
+          # V8 heap (about 2 GB on the arm64 macOS runner) is not enough for that bundle.
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          bun run build
+          bun typecheck
+
+      - name: Package desktop
+        timeout-minutes: 30
+        working-directory: packages/desktop
+        env:
+          # No Apple identity in CI: electron-builder skips signing and notarization instead of failing.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          case "$RUNNER_OS" in
+            Windows) bun run package:win --x64 --publish never ;;
+            macOS) bun run package:mac --arm64 --publish never ;;
+          esac
+
+      - name: Build CLI
+        timeout-minutes: 20
+        run: |
+          mkdir -p "$RUNNER_TEMP/cli"
+          bun packages/loginom-host/script/build-cli.ts "$RUNNER_TEMP/cli/loginom-ai-agent-cli-${{ matrix.target }}"
+
       - name: Collect artifacts
         run: |
           set -euo pipefail
@@ -332,7 +383,8 @@ jobs:
 
   release:
     name: release
-    needs: [verify, tests, build, linux-matrix]
+    # candidates only feeds artifacts; its result (including a timeout) never gates the release.
+    needs: [verify, tests, build, linux-matrix, candidates]
     if: always() && github.event_name == 'push' && github.ref_type == 'tag' && needs.verify.result == 'success' && needs.tests.result == 'success' && needs.build.result == 'success' && needs.linux-matrix.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 30

@@ -32,24 +32,26 @@ flowchart LR
   cut["cut: set-version, commit, tag, push (mode=cut, dev)"] -->|"push tags v*"| verify["verify: тег = package.json, канал"]
   candidate["workflow_dispatch mode=candidate"] --> verify
   verify --> tests["tests: test.yml (workflow_call)"]
-  verify --> build["build: linux / windows (exp) / macos (exp)"]
+  verify --> build["build (linux): DEB, AppImage, CLI, manifest, static verify"]
+  verify --> candidates["candidates: windows / macos (unsigned, continue-on-error)"]
   build --> matrix["linux-matrix: Docker Ubuntu 22/24/26, Debian 12/13"]
   tests --> release["release: SHA256SUMS, notes, gh release create --draft"]
   build --> release
   matrix --> release
+  candidates -.->|"только артефакты"| release
 ```
 
-`release` выполняется только для push тега и только при `success` у `verify`, `tests`, `build` и `linux-matrix`. Падение Windows/macOS не меняет результат `build` (`continue-on-error`), а отсутствующие ассеты помечаются в notes как `BLOCKED`.
+`release` выполняется только для push тега и только при `success` у `verify`, `tests`, `build` и `linux-matrix`. Windows/macOS собираются отдельным job `candidates` с `continue-on-error` и пошаговыми таймаутами: его падение, зависание или отмена по таймауту не влияет на `build`, `linux-matrix` и `release` (в первом dry run зависший на 2 часа macOS-leg в общей матрице отменялся по таймауту и блокировал `linux-matrix`); отсутствующие ассеты помечаются в notes как `BLOCKED`.
 
 ## Что делает каждый job
 
 - `cut` (`ubuntu-24.04`, `contents: write`): checkout с полной историей → [setup-bun](../../../.github/actions/setup-bun/action.yml) с `--frozen-lockfile` → [setup-git-committer](../../../.github/actions/setup-git-committer/action.yml) (токен GitHub App) → `bun script/set-version.ts --version|--bump` → `bun install --frozen-lockfile` → `git add package.json packages/desktop/package.json bun.lock` → commit, annotated tag, `git push --atomic --no-verify origin HEAD:dev refs/tags/vX.Y.Z`. Существующий локальный или удалённый тег останавливает job.
 - `verify` (`ubuntu-24.04`): читает `.version` из `package.json` и `packages/desktop/package.json`. Для тега версия обязана совпасть с обоими файлами, иначе ошибка «commit script/set-version.ts output before tagging». Для candidate используется desktop-версия; расхождение с корнем даёт warning. Outputs `version`, `channel`, `prerelease` идут в остальные jobs как `LOGINOM_AI_AGENT_VERSION` и `LOGINOM_AI_AGENT_CHANNEL`.
 - `tests`: `uses: ./.github/workflows/test.yml` с `secrets: inherit`; состав ниже.
-- `build (linux|windows|macos)` (`timeout-minutes: 120`, `shell: bash`):
-  1. Linux: `apt-get install libgtk-3-0t64 libnss3 libgbm1 libasound2t64 squashfs-tools` — Electron выполняется как Node внутри `write-manifest.ts`, `dpkg-deb`/`unsquashfs` нужны verifier'у.
+- `build (linux)` (`ubuntu-24.04`, `timeout-minutes: 120`) и `candidates` (`build (windows)` на `windows-2025`, `build (macos)` на `macos-15`; `continue-on-error`, job 90 минут, шаги сборки 20–30 минут):
+  1. Только Linux: `apt-get install libgtk-3-0t64 libnss3 libgbm1 libasound2t64 squashfs-tools` — Electron выполняется как Node внутри `write-manifest.ts`, `dpkg-deb`/`unsquashfs` нужны verifier'у.
   2. `setup-bun` (`--frozen-lockfile`) и [setup-loginom-inputs](../../../.github/actions/setup-loginom-inputs/action.yml). Composite читает `nodeVersion`, `chromiumRevision`, `playwright` из [loginom-release.json](../../../packages/product/loginom-release.json), скачивает официальную дистрибуцию Node с проверкой по `SHASUMS256.txt`, ставит Playwright Chromium через `npm ci` в `packages/loginom-runtime/client` и `playwright install chromium`, кэширует оба каталога в `$RUNNER_TEMP` и экспортирует `LOGINOM_AI_AGENT_NODE_SOURCE`, `LOGINOM_AI_AGENT_TEST_NODE`, `LOGINOM_AI_AGENT_BROWSER_SOURCE`, `PLAYWRIGHT_BROWSERS_PATH`. Единственная запись в дереве — gitignored `node_modules`.
-  3. В `packages/desktop`: `bun run build` (с `NODE_OPTIONS=--max-old-space-size=6144`: electron-vite собирает весь backend в main-бандл, и стандартного heap V8 на macOS runner не хватает), `bun typecheck`, затем `bun run package:linux --x64 --publish never` | `package:win --x64 --publish never` | `package:mac --arm64 --publish never` с `CSC_IDENTITY_AUTO_DISCOVERY=false`.
+  3. В `packages/desktop`: `bun run build` (с `NODE_OPTIONS=--max-old-space-size=6144`: electron-vite собирает весь backend в main-бандл, и стандартного heap V8 на macOS runner не хватает), `bun typecheck`, затем `bun run package:linux --x64 --publish never` в `build` либо `package:win --x64 --publish never` / `package:mac --arm64 --publish never` с `CSC_IDENTITY_AUTO_DISCOVERY=false` в `candidates`.
   4. `bun packages/loginom-host/script/build-cli.ts "$RUNNER_TEMP/cli/loginom-ai-agent-cli-<target>"` ([build-cli.ts](../../../packages/loginom-host/script/build-cli.ts)): рядом с payload появляются `loginom-ai-agent-cli-<version>-<platform>-<arch>.tar.gz` (Windows — `.zip`) и `.sha256`. Скрипт требует Bun ровно той версии и revision, что записаны в `packages/loginom-host/licenses/bun/source.json`.
   5. Только Linux: `node node_modules/electron/install.js` в `packages/desktop` (write-manifest.ts запускает `node_modules/electron/dist/electron` как Node, а `bun install` этот бинарник не оставляет), проверка `git status --porcelain` (дерево должно остаться чистым), `git archive` → `loginom-ai-agent-<version>-source.tar.gz`, [write-manifest.ts](../../../packages/desktop/scripts/release/write-manifest.ts) → `release-manifest.json` + `.sha256`, [verify-artifact.ts](../../../packages/desktop/scripts/release/verify-artifact.ts) для DEB (`static-deb.json`) и AppImage (`static-appimage.json`). Команды те же, что в [Linux-инструкции](linux.md).
   6. Файлы `packages/desktop/dist` (кроме `builder-*`) и CLI-архивы копируются плоско и выгружаются как artifact `loginom-<name>`, 14 дней.
@@ -76,7 +78,7 @@ Release manifest генерируется только для `linux-x64`: сх�
 - Только `cut`: `vars.LOGINOM_AI_AGENT_APP_ID` и `secrets.LOGINOM_AI_AGENT_APP_SECRET` — GitHub App с правом push в `dev` и создания тегов (тот же App, что в `generate.yml`). Все остальные jobs работают с `github.token`; базовые `permissions: contents: read`, `contents: write` только у `cut` и `release`.
 - Подпись не настроена ни на одной платформе; артефакты помечены `unsigned`. Точки подключения:
   - Windows: [electron-builder.config.ts](../../../packages/desktop/electron-builder.config.ts) вызывает [script/sign-windows.ps1](../../../script/sign-windows.ps1) через `win.signtoolOptions.sign`. Скрипт подписывает только при `GITHUB_ACTIONS=true` и заданных `AZURE_TRUSTED_SIGNING_ENDPOINT`, `AZURE_TRUSTED_SIGNING_ACCOUNT_NAME`, `AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE`; иначе печатает «Skipping Windows signing» и выходит с 0. Модуль `TrustedSigning 0.5.8` использует учётные данные Azure CLI, поэтому перед `package:win` нужен шаг `azure/login` (OIDC) и эти три значения в `env` шага. `verifyUpdateCodeSignature: true` уже включён.
-  - macOS: шаг `Package desktop` задаёт `CSC_IDENTITY_AUTO_DISCOVERY=false`, electron-builder пропускает подпись и, как следствие, нотаризацию (`notarize: true`, hardened runtime и entitlements уже в конфигурации). Для включения убрать эту переменную и передать `CSC_LINK`/`CSC_KEY_PASSWORD` (Developer ID Application), а для нотаризации — `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` либо `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`.
+  - macOS: шаг `Package desktop` job `candidates` задаёт `CSC_IDENTITY_AUTO_DISCOVERY=false`, electron-builder пропускает подпись и, как следствие, нотаризацию (`notarize: true`, hardened runtime и entitlements уже в конфигурации). Для включения убрать эту переменную и передать `CSC_LINK`/`CSC_KEY_PASSWORD` (Developer ID Application), а для нотаризации — `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` либо `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`.
   - Подписанные Windows/macOS сборки всё равно требуют нативной приёмки по своим runbook; подпись не переводит candidate в `PASS`.
 
 ## Публикация draft
