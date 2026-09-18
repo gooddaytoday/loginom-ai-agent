@@ -490,3 +490,26 @@ This closes in-tree Bun source/notice collection; external dependency material,
 WebKit and actual relinking verification remain separate. A new complete binary
 archive has not yet been built with this addition. The previous installed source
 candidate remains unchanged.
+
+## ICU 75.1 and runtime-reported native revisions
+
+The pinned Linux Bun reports ICU 75.1, matching the pinned WebKit Dockerfile's
+ICU source release. Downloaded the official icu4c-75_1-src.tgz, SHA256
+`cb968df3e4d2e87e8b11c49a5d01c787bd13b9545280fc6642f826527618caef`.
+Its version header is 75.1. Both named license files (LICENSE and license.html)
+are copied unchanged. The full LICENSE matches the ICU release tag's root file;
+icu4c/LICENSE in Git is a link to that root. The tag resolves to commit
+`7750081bda4b3bc1768ae03849ec70f67ea10625`.
+
+Recorded actual process.versions from pinned Bun. Twelve reported native component
+commits match the existing source records, with no mismatch: BoringSSL, libarchive,
+mimalloc, picohttpparser, WebKit, zlib, tinycc, lolhtml, c-ares, libdeflate, lshpack,
+zstd. Compatibility values such as openssl/v8/uv are preserved as reported values,
+not interpreted as independent linked-library identities. Host typecheck PASS.
+This adds ICU material and strengthens provenance; it is not a complete linker map.
+
+The full pinned WebKit Git checkout is now available separately in /tmp. GitHub's
+codeload endpoint refused archive generation (422); Git fetch/checkout succeeded
+without changing the requested commit. Local commit tree equals GitHub API tree
+`a7212e5d3aeb41afb46db3f955fb77b60900cfd6`. Its separate source archive is still
+being generated; no archive hash or complete distribution PASS is claimed yet.

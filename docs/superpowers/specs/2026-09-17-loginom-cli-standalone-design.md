@@ -3026,3 +3026,14 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
 - [x] README описывает полное покрытие src этими тремя архивами.
 - [ ] External dependency sources, WebKit и relinking остаются открыты;
   archive rebuild с этим дополнением ещё не выполнялся.
+
+### ICU и фактические runtime revisions
+
+- [x] Добавлены неизменённые LICENSE/license.html ICU 75.1 из официального
+  source release; версия совпала с Bun, LICENSE — с закреплённым release tag.
+- [x] Двенадцать native commit IDs из process.versions совпали с source records;
+  host typecheck PASS. Compatibility versions не объявляются linker map.
+- [x] Полный WebKit checkout получен через Git; commit/tree совпали с API.
+  Отказ codeload не изменил выбранную версию.
+- [ ] Отдельный полный WebKit source archive генерируется; его целостность,
+  source-distribution integration и relinking ещё не заявляются проверенными.
