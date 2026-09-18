@@ -32,7 +32,7 @@ export async function preflight(config: EvalConfig, source: ArtifactSource): Pro
   await checkStorage(source)
   environment.dock = { skillRevision: await dockSkillRevision(config.dock) }
   if (config.agent.cliMode === "source") {
-    for (const file of ["bin/node", "host/node-host.mjs"]) {
+    for (const file of ["bin/node", "host/node-host.mjs", "resource-manifest.json"]) {
       if (!(await Bun.file(path.join(config.agent.bundle, file)).exists()))
         throw new EvalFailure(
           `Dev-bundle неполный: нет ${file} в ${config.agent.bundle}. Выполните: bun run prepare-bundle`,

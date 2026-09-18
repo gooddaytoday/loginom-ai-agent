@@ -7,7 +7,8 @@ const repoRoot = path.resolve(evalsRoot, "..")
 const bundle = path.join(evalsRoot, ".bundle")
 const resources = path.join(repoRoot, "packages", "desktop", "resources", "loginom")
 
-const names = ["bin", "browsers", "runtime"]
+// Host читает resource-manifest.json из корня bundle (packages/loginom-host/src/host.ts); без него setup падает LOGINOM_CONNECTION_CHECK_FAILED.
+const names = ["bin", "browsers", "runtime", "resource-manifest.json"]
 for (const name of names) {
   const source = path.join(resources, name)
   if (!(await stat(source).catch(() => undefined))) {
@@ -20,7 +21,8 @@ for (const name of names) {
   const source = path.join(resources, name)
   const target = path.join(bundle, name)
   await rm(target, { recursive: true, force: true })
-  await (copy ? cp(source, target, { recursive: true }) : symlink(source, target))
+  // Манифест копируется всегда: host сравнивает его с реальными файлами, симлинк на файл тут не нужен.
+  await (copy || name.endsWith(".json") ? cp(source, target, { recursive: true }) : symlink(source, target))
 }
 await rm(path.join(bundle, "host"), { recursive: true, force: true })
 const build = Bun.spawn(["bun", "script/build-node-host.ts", path.join(bundle, "host")], {
