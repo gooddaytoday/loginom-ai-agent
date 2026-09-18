@@ -66,10 +66,11 @@ jobs:
       # Runs the `test` script of every workspace package; packages/desktop has none
       # and is covered by the `desktop` job below. `--continue` reports every failing
       # package instead of stopping at the first one; without it turbo 2.10 segfaults
-      # while terminating the remaining tasks on GitHub-hosted runners.
+      # while terminating the remaining tasks on GitHub-hosted runners. Streamed log
+      # order shows which package is still running when a task hangs.
       - name: Run unit tests
         timeout-minutes: 30
-        run: GITHUB_ACTIONS=false bun turbo test --continue
+        run: GITHUB_ACTIONS=false bun turbo test --continue --log-order=stream
 
       - name: Check generated client
         working-directory: packages/client
