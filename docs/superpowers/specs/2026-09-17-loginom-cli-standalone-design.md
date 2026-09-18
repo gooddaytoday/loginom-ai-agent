@@ -2907,3 +2907,15 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   лог `/tmp/loginom-final-tui-oracle-retry.log`. Итог ожидается.
 
 [Диагностика и границы исправления](../../testing/loginom-ai-agent/reports/2026-09-18-cli-final-linux/tui-driver-diagnosis.md).
+
+### Final installed headed TUI oracle — PASS
+
+- [x] Новый прогон `/tmp/loginom-linux-oracle-uwsU99`: A=55/B=101,
+  save/close и независимый cold readback, settingsReapplied=false; driver exit 0.
+- [x] Оба CLI процесса: exit 0, guard=false, PTY forced=false; по одному видимому
+  окну Chromium, remaining=[] после закрытия. Прежний failed run сохранён.
+- [x] Итог записан в final Linux report и `tui-oracle-summary.json`.
+- [ ] Отдельный Desktop dev-кандидат с теми же исходниками продукта собран:
+  `/tmp/loginom-final-desktop-3795eeb48/linux-unpacked`; проверены 4365 ресурсов,
+  runtime/pins равны CLI, отличается только flavor-specific THIRD_PARTY_NOTICES.md.
+  CSV oracle выполняется, Desktop пользователя не изменялся.

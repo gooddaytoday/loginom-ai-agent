@@ -87,3 +87,15 @@ cleaned summary run-oracle-summary.json. This run used the packaged executable
 path, not the installed launcher; installed real-provider smoke is separate.
 The source archive was also checked against git ls-tree at the binary commit:
 11903 entries, zero missing/extra files.
+
+## Final installed headed TUI oracle
+
+The fresh run `/tmp/loginom-linux-oracle-uwsU99` passed both datasets: A=55,
+B=101, save/close and independent cold readback with settingsReapplied=false.
+The same-named CSV inputs retain distinct source/package paths and original
+hashes. Both CLI children exited 0, guard=false; PTY exit was not forced. Each
+profile had one visible Chromium window; both window observers reported remaining=[].
+Driver exit 0. Summary: [tui-oracle-summary.json](tui-oracle-summary.json).
+The earlier failed B close is retained in [diagnosis](tui-driver-diagnosis.md).
+This is scripted-provider acceptance of the installed final Linux CLI, separate
+from the user-accepted real Xiaomi smoke.
