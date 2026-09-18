@@ -94,18 +94,28 @@ export async function readNodeTable(page,binding,table,request,readOutputs=readO
       return visible(cell)&&c.x>=Math.max(0,g.x)-1&&c.y>=Math.max(0,g.y)-1
         &&c.x+c.width<=Math.min(globalThis.innerWidth,g.x+g.width)+1&&c.y+c.height<=Math.min(globalThis.innerHeight,g.y+g.height)+1;
     };
+    const verticalWindow=()=>{
+      const grid=grids[1][0],g=grid.getBoundingClientRect(),top=Math.max(0,g.y),bottom=Math.min(globalThis.innerHeight,g.y+g.height);
+      const painted=rows[1].map(r=>({r,b:r.getBoundingClientRect(),index:Number(r.getAttribute('data-recordindex'))}))
+        .filter(({r,b})=>visible(r)&&b.y>=top-1&&b.y+b.height<=bottom+1);
+      if(!painted.length||painted.some(({r,b,index})=>!Number.isSafeInteger(index)||index<0||index>=cachedTotal||b.height<=0
+        ||r.getAttribute('data-boundview')!==grid.id)||new Set(painted.map(x=>x.index)).size!==painted.length)return null;
+      return {table:{...table},tid:grid.getAttribute('data-tid'),top:grid.scrollTop,max_top:grid.scrollHeight-grid.clientHeight,
+        first_visible:rowStart+Math.min(...painted.map(x=>x.index)),last_visible:rowStart+Math.max(...painted.map(x=>x.index)),
+        row_height:Math.min(...painted.map(x=>x.b.height))};
+    };
     const cache=own(store,'data'),pageSize=own(cache,'_pageSize'),map=own(cache,'map');
     if(!Number.isSafeInteger(pageSize)||pageSize<1||pageSize>1000||!map)return fail('table_cache');
     const count=Math.min(request.row_limit,total-request.row_offset,rowStart+cachedTotal-request.row_offset),values=[];
     for(let offset=0;offset<count;offset++) {
       const index=request.row_offset-rowStart+offset,pageNumber=Math.floor(index/pageSize)+1;
       const entries=own(own(map,String(pageNumber)),'value');
-      if(!Array.isArray(entries)||entries.length>pageSize)return fail('row_page_not_cached');
+      if(!Array.isArray(entries)||entries.length>pageSize)return fail('row_page_not_cached',{schema_id:schemaId,row_index:request.row_offset+offset,vertical_window:verticalWindow()});
       const record=entries[index%pageSize],data=own(record,'data'),recordId=String(own(record,'internalId')??'');
       if(record?.isModel!==true||!recordId||own(data,'$RowIndex')!==index)return fail('cached_row_identity');
       const pair=rows.map(xs=>xs.filter(r=>r.getAttribute('data-recordid')===recordId));
       if(pair.some((xs,i)=>xs.length!==1||xs[0].getAttribute('data-recordindex')!==String(index)
-        ||xs[0].getAttribute('data-boundview')!==grids[i][0].id))return fail('row_not_rendered');
+        ||xs[0].getAttribute('data-boundview')!==grids[i][0].id))return fail('row_not_rendered',{schema_id:schemaId,row_index:request.row_offset+offset,vertical_window:verticalWindow()});
       const cells=[];
       for(const field of fields) {
         // Ext recycles rendered rows: the test-id suffix can retain a render
@@ -123,7 +133,7 @@ export async function readNodeTable(page,binding,table,request,readOutputs=readO
         if(els.length!==1)return fail('cell_not_visible',{schema_id:schemaId,column_index:field.index,row_index:request.row_offset+offset});
         if(!inside(els[0],grids[1][0])) {
           const c=els[0].getBoundingClientRect(),g=grids[1][0].getBoundingClientRect(),grid=grids[1][0];
-          return fail('cell_not_visible',{schema_id:schemaId,column_index:field.index,row_index:request.row_offset+offset,
+          return fail('cell_not_visible',{schema_id:schemaId,column_index:field.index,row_index:request.row_offset+offset,vertical_window:verticalWindow(),
             horizontal_window:{table:{...table},tid:grid.getAttribute('data-tid'),left:grid.scrollLeft,max_left:grid.scrollWidth-grid.clientWidth,
               viewport_left:Math.max(0,g.x),viewport_right:Math.min(globalThis.innerWidth,g.x+g.width),cell_left:c.x,cell_right:c.x+c.width,
               row_visible:c.y>=Math.max(0,g.y)-1&&c.y+c.height<=Math.min(globalThis.innerHeight,g.y+g.height)+1}});

@@ -5,6 +5,14 @@ const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof v
 const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 const digest = value => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 const domainNode=({dom_epoch,...value})=>value;
+const sameDomainGraph=(a,b)=>same({...a,nodes:a.nodes.map(domainNode)},{...b,nodes:b.nodes.map(domainNode)});
+export function normalizeGraphRefusal(effect,receipt){
+ if(effect.kind==='connect'&&receipt?.status==='FAILED'&&receipt.action_key==='link.create'
+   &&receipt.operation_id===effect.id&&receipt.phase==='preconditions'&&receipt.effect_possible===false
+   &&receipt.cleanup_complete===true&&receipt.error?.code==='CAPABILITY_ERROR')
+   return {...receipt,status:'NOT_APPLIED',native_status:'FAILED'};
+ return receipt;
+}
 const edgeKey = e => [e.source, e.output, e.target, e.input].join('|');
 const node = (graph, id) => {
   const matches = graph.nodes.filter(n => n.ref.node_id === id);
@@ -65,7 +73,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
   };
   const commit = async () => save('node_target_checkpoint', { target_state: state });
   const change = async (kind, parameters, verify) => {
-    const original = await observe();
+    let original = await observe();
     for(let refresh=0;refresh<3;refresh++){
       budget();
       const before=refresh===0?original:await observe();
@@ -77,20 +85,20 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       const priorEffect=state.effect_possible;
       state.effect_possible = true;
       let receipt;
-      try { receipt = await adapter.mutate(effect, operation.deadline, signal); }
+      try { receipt = normalizeGraphRefusal(effect,await adapter.mutate(effect, operation.deadline, signal)); }
       catch (error) { await commit(); throw error; }
       if (receipt?.status === 'NOT_APPLIED' && receipt.effect_possible === false && receipt.cleanup_complete === true) {
         // Confirm the same live graph before accepting a pre-dispatch refusal.
         // An unrelated change or lost observation keeps this effect pending.
         const after=await observe();
-        if(!same(before,after))throw new Error('Graph changed after refused gesture');
+        if(!sameDomainGraph(before,after))throw new Error('Graph changed after refused gesture');
         await save('node_target_refusal_observed',{refusal:{effect,receipt:structuredClone(receipt),after_graph:after}});
         (state.refusals??=[]).push({id:effect.id,kind,receipt:structuredClone(receipt)});
-        state.pending = null; state.effect_possible=priorEffect;
+        state.pending = null; state.last_graph=structuredClone(after);state.effect_possible=priorEffect;
         await commit();
         // New receipt ID, same graph identity and original deadline. No retry
         // is allowed unless this exact gesture was proved not dispatched.
-        if(refresh<2)continue;
+        if(refresh<2){original=after;continue;}
         throw new Error('Graph gesture refused before effect: '+(receipt.error??'unknown precondition'));
       }
       state.pending.receipt = structuredClone(receipt);
@@ -112,11 +120,20 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
     if (state.pending) {
       // Adapter reads the receipt; it is never allowed to reissue the gesture.
       const recovery = await adapter.reconcile(state.pending, graph, operation.deadline, signal);
+      const refused=normalizeGraphRefusal(state.pending,recovery?.receipt);
+      if(recovery?.completed===true&&refused?.status==='NOT_APPLIED'&&refused.native_status==='FAILED'
+        &&recovery.cleanup_complete===true&&sameDomainGraph(state.pending.before,graph)){
+        await save('node_target_refusal_observed',{refusal:{effect:state.pending,receipt:structuredClone(refused),after_graph:graph}});
+        (state.refusals??=[]).push({id:state.pending.id,kind:state.pending.kind,receipt:structuredClone(refused)});
+        state.pending=null;state.last_graph=structuredClone(graph);state.effect_possible=state.receipts.length>0;
+        await commit();graph=await observe();
+      }else{
       const proof=verifyNodeTargetEffect(state.pending,graph,adapter.positionMatches);
       if (!recovery?.verified || recovery.cleanup_complete !== true || !proof) throw new Error('Pending graph effect is unresolved');
       state.receipts.push({ id: state.pending.id, kind: state.pending.kind, parameters: state.pending.parameters, verified: true, receipt: recovery });
       if (state.pending.kind === 'create') {state.targetId = proof.node_id;state.auto_created_links=proof.auto_created_links;}
       state.pending = null;state.last_graph=structuredClone(graph); await commit(); graph = await observe();
+      }
     }
     if (state.completed) {
       if (!same(state.final_graph, graph)) throw new Error('Completed node target has changed');
@@ -145,10 +162,16 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
         if(!NODE_TYPES[request.target.type].additional_tabular_inputs||input!==capacity)throw new Error('Additional tabular inputs must be contiguous');
         capacity++;
       }
+      if(request.target.kind==='new' && !request.target.position){
+        if(typeof adapter.choosePosition!=='function')throw Error('target.position: automatic placement is unavailable in this driver');
+        state.newPosition=await adapter.choosePosition(request,graph,operation.deadline,signal);
+        validateNodeTargetRequest({...request,target:{...request.target,position:state.newPosition}});
+        if(!state.newPosition)throw Error('target.position: no verified free position available');
+      }
       state.baseline = structuredClone(graph); await commit();
     }
     if (!state.targetId) {
-      const after = await change('create', request.target, (before, after) => {
+      const after = await change('create', {...request.target,position:request.target.position??state.newPosition}, (before, after) => {
         const added = after.nodes.filter(n => !before.nodes.some(b => b.ref.node_id === n.ref.node_id));
         if (added.length !== 1 || added[0].type !== request.target.type) return false;
         const id = added[0].ref.node_id;
@@ -222,11 +245,18 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
   if(state.pending){
     const effect=state.pending;
     const recovery=await adapter.reconcile(effect,graph,deadline);
+    const refused=normalizeGraphRefusal(effect,recovery.receipt);
+    if(recovery.completed===true&&refused?.native_status==='FAILED'&&refused.status==='NOT_APPLIED'
+      &&recovery.cleanup_complete===true&&sameDomainGraph(effect.before,graph)){
+      (state.refusals??=[]).push({id:effect.id,kind:effect.kind,receipt:structuredClone(refused)});
+      state.pending=null;state.last_graph=structuredClone(graph);state.effect_possible=state.receipts.length>0;
+    }else{
     const proof=verifyNodeTargetEffect(effect,graph,adapter.positionMatches);
     if(!recovery.verified || recovery.cleanup_complete!==true || !proof)return {status:'AMBIGUOUS',phase:'target_incomplete',cleanup_complete:recovery.cleanup_complete===true,pending:effect.id};
     if(effect.kind==='create'){state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;}
     state.receipts.push({id:effect.id,kind:effect.kind,parameters:effect.parameters,verified:true,receipt:recovery});
     state.pending=null;state.last_graph=structuredClone(graph);
+    }
   }else if(!same(state.completed?state.final_graph:(state.last_graph??state.baseline),graph))throw new Error('Partial node target graph changed');
   if(state.completed && !same(state.final_graph,graph))throw new Error('Completed node target changed');
   const event={operation_id:operation.id,phase:'node_target_checkpoint',internal_provenance:'node_target_v1',target_state:structuredClone(state)};

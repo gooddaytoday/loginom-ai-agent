@@ -413,12 +413,20 @@ function deepFreeze(value, seen = new Set()) {
 
 export function validateActionParameters(schema, value, where = 'parameters') {
   const error = message => { throw new Error(`Invalid ${where}: ${message}`); };
-  if (schema.enum && !schema.enum.some(item => Object.is(item, value))) error('value is not in the allowed enum');
+  if (schema.enum && !schema.enum.some(item => Object.is(item, value))) {
+    const allowed=JSON.stringify(schema.enum);
+    error('value is not in the allowed enum'+(schema.enum.length<=20&&allowed.length<=1000?'; allowed: '+allowed:''));
+  }
   if (schema.type === 'object') {
     if (!isObject(value)) error('expected object');
     for (const key of schema.required ?? []) if (!Object.hasOwn(value, key)) error(`missing ${key}`);
     for (const key of Object.keys(value)) {
-      if (!Object.hasOwn(schema.properties, key)) error(`unknown field ${key}`);
+      if (!Object.hasOwn(schema.properties ?? {}, key)) {
+        // Only explicitly open envelopes defer validation to the selected node
+        // contract. Catalog schemas remain closed by default.
+        if (schema.additionalProperties === true) continue;
+        error(`unknown field ${key}`);
+      }
       validateActionParameters(schema.properties[key], value[key], `${where}.${key}`);
     }
   } else if (schema.type === 'array') {

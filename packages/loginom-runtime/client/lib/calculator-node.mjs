@@ -1,10 +1,13 @@
+import {outputMappingOrigin,outputMappingState,outputRecoveryCalculatorState,verifyOutputMappingFinish,outputRecoveryBoundary,sameOutputRecovery} from './node-output-mapping-recovery.mjs';
 import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {inputMappingOrigin,inputMappingState,inputMappingGraph,verifyInputMappingFinish,inputRecoveryBoundary,sameInputRecovery} from './node-input-mapping-recovery.mjs';
 import {verifyCalculatorInlineSync} from './calculator-inline-mapping.mjs';
 import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {validateCalculatorParameters} from './calculator-parameters.mjs';
+import {preflightCalculatorSource} from './calculator-preflight.mjs';
 import {configureCalculator} from './calculator-procedure.mjs';
+import {rejectUnchangedCalculatorDraft,verifiedCalculatorSyntaxFailure} from './calculator-request-refusal.mjs';
 import {calculatorConfigurationReadback} from './calculator-readback.mjs';
 import {calculatorParametersSchema} from './node-api.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
@@ -36,7 +39,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
  const nodeApplyHandlers=new Map([['transform.calculator',{revision:'calculator-v3-internal-2',modes:['expression'],output_wizard:'separate',
   configurationReadback:calculatorConfigurationReadback,parameter_schema:calculatorParametersSchema,
   validate:(p,m,r)=>{validateCalculatorParameters(p,m,r);
-   requireValue(r.mappings.every(x=>(x.fields??[]).every(f=>f.source?.kind==='configured_field'&&(x.direction==='output'||f.excluded!==true))),
+   requireValue(r.mappings.every(x=>(x.fields??x.changes??[]).every(f=>f.source?.kind==='configured_field'&&(x.direction==='output'||f.excluded!==true))),
     'Calculator mappings require configured field names; input exclusions are unsupported');},
   configure:(ctx,p,drivers)=>drivers.configureCalculator(ctx,p)}]]);
  if(implementation){nodeApplyHandlers.clear();nodeApplyHandlers.set(implementation.type,{
@@ -45,7 +48,12 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
   validate:implementation.validate,configure:(ctx,p,drivers)=>drivers.configureCalculator(ctx,p)});}
  const nodeApplyDriverFactory=options=>{
   const {operation,execute,onRecord,now,receiptOptions}=options;
-  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint;
+  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph;
+  const graphForRejection=async()=>{
+   const g=await operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},operation.deadline);
+   requireValue(g.complete===true&&g.document_id===operation.nodeApply.node.document_id&&g.workflow_ref.workflow_id===operation.nodeApply.node.workflow_id,'Complete calculator rollback graph required');
+   return {document_id:g.document_id,workflow_id:g.workflow_ref.workflow_id,nodes:g.nodes.map(({ref,type,label,position,inputs,outputs})=>({ref,type,label,position,inputs,outputs})),links:g.links,foreign_links:g.foreign_links};
+  };
   const configureProgress={};
   const graphForInput=async()=>inputMappingGraph(await operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,
    workflow_ref:operation.nodeApply.request.workflow_ref},operation.deadline),operation.nodeApply.node);
@@ -63,12 +71,14 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
    const offset=definition?Math.floor((definition.total_columns-1)/8)*8:0;
    const s=await channel.observe({condition:'calculator '+mode+' available',...(port?{outputColumnPage:{offset,limit:8}}:{}),ready:s=>s.wizard?.status==='observed'&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+key&&e.allowed_actions.includes(verb))});
    if(recovery){
-    requireValue(s.wizard.stage==='input_mapping'&&sameInputRecovery(s.prepared_node_context,recovery.value.native_mapping.node_context),'Input mapping owner changed before Done');
-    recovery.wizard_root_ref=s.wizard.root_ref;await recordInput('node_input_mapping_commit_prepared',{checkpoint:recovery});
+    const direction=recovery===outputCheckpoint?'output':'input';
+    requireValue(s.wizard.stage===direction+'_mapping'&&sameInputRecovery(s.prepared_node_context,recovery.value.native_mapping.node_context),'Mapping owner changed before Done');
+    recovery.wizard_root_ref=s.wizard.root_ref;await recordInput('node_'+direction+'_mapping_commit_prepared',{checkpoint:recovery});
    }
    try{await channel.perform({condition:'calculator '+mode,initialObservation:s,ready:s=>s.wizard?.status==='observed',identity:s=>s.prepared_node_context,
     resolve:s=>({verb,ref:control(s,key,verb).ref})});}
-   catch(error){if(recovery){recovery.finish_reference=structuredClone(operation.lastReceipt);await recordInput('node_input_mapping_finish_unresolved',{reference:recovery.finish_reference});}throw error;}
+   catch(error){if(recovery){recovery.finish_reference=structuredClone(operation.lastReceipt);await recordInput('node_'+(recovery===outputCheckpoint?'output':'input')+'_mapping_finish_unresolved',{reference:recovery.finish_reference});}throw error;}
+   if(recovery)recovery.finish_reference=structuredClone(operation.lastReceipt);
    const graph=await channel.observe({condition:'calculator returned to graph',ready:s=>s.wizard?.status==='absent'&&s.prepared_node_context?.surface==='graph'});
    return verified({effect_possible:true,mode,settings_applied:true,execution_started:false,node_context:graph.prepared_node_context});
   };
@@ -88,10 +98,11 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
      return true;
     },
    }:{}),
-   ...(implementation?.preflight?{beforeTarget:ctx=>implementation.preflight(options,ctx,{targetOrigin,targetBuild})}:{}),
+   ...(!implementation||implementation.preflight?{beforeTarget:ctx=>(implementation?.preflight??preflightCalculatorSource)(options,ctx,{targetOrigin,targetBuild})}:{}),
    verifySource:async()=>verified({not_applicable:true,source_kind:'upstream_table'}),
    async openWizard(ctx) {
     enter(ctx);executionDriver=createNodeExecutionProcedure(channel,ctx.node);await executionDriver.prepare();
+    if(!implementation)configurationGraph=await graphForRejection();
     if(implementation?.beforeOpen)preconfiguration=await implementation.beforeOpen(channel,operation.nodeApply.request);
     const s=await channel.observe({condition:'calculator graph before opening',ready:s=>s.prepared_node_context?.surface==='graph'});
     await selectPreparedGraphNode(channel,s,'select calculator graph node');
@@ -113,13 +124,22 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
       throw error;
      }
     }
-    const changed=await configureCalculator(channel,p,{newNode:operation.nodeApply.request.target.kind==='new'});configured=changed.configuration;
+    const request=operation.nodeApply.request;
+    let baseline;
+    const changed=await configureCalculator(channel,p,{newNode:request.target.kind==='new',
+     captureBaseline:s=>{baseline=s;},
+     recoverRejectedRequest:request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0});configured=changed.configuration;
     // Close discards this editor draft directly. Next can validate a formula or
     // synchronize a derived port, neither of which is needed for cancellation.
     if(operation.nodeApply.request.finish==='close')return verified({...changed});
     const s=await channel.observe({condition:'calculator syntax validation available',readCalculator:true,ready:s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true});
-    await channel.perform({condition:'validate calculator expressions and advance',initialObservation:s,ready:s=>s.wizard?.stage==='calculator',identity:()=>ctx.node,
-     resolve:s=>({verb:'wizard_step',ref:control(s,'btnNext','wizard_step').ref,expected_stage:['output_mapping','done']})});
+    try{await channel.perform({condition:'validate calculator expressions and advance',initialObservation:s,ready:s=>s.wizard?.stage==='calculator',identity:()=>ctx.node,
+     resolve:s=>({verb:'wizard_step',ref:control(s,'btnNext','wizard_step').ref,expected_stage:['output_mapping','done']})});}
+    catch(error){
+     if(!operation.transportUncertain&&operation.cleanupConfirmed===true&&verifiedCalculatorSyntaxFailure(error,baseline))
+      await rejectUnchangedCalculatorDraft(channel,baseline,error,{syntax:true,graphBefore:configurationGraph,readGraph:graphForRejection});
+     throw error;
+    }
     let inlineMapping;
     const destination=await channel.observe({condition:'calculator validated destination',ready:s=>['output_mapping','done'].includes(s.wizard?.stage)});
     if(destination.wizard.stage==='output_mapping'){
@@ -157,7 +177,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
      enter(ctx);
      if(implementation?.beforeInput)await implementation.beforeInput(options,ctx,{targetOrigin,targetBuild});
      if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard);
-     const recoveryGraph=implementation?.inputMappingRecovery?await graphForInput():null;
+     const recoveryGraph=(!implementation||implementation.inputMappingRecovery)?await graphForInput():null;
      await channel.openInputPort(0);
      const ready=s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true;
      let s=await channel.observe({condition:'calculator incoming port schema',readMappings:true,ready});
@@ -165,7 +185,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
      const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping),changes=[];
      await implementation?.validateInput?.(operation.nodeApply.request.parameters,resolved,s.node_mapping,
        {channel,record:onRecord,operationId:operation.id});
-     if(requested.fields)changes.push(await configureOutputFields(channel,requested,sources));
+     if(requested.fields||requested.changes)changes.push(await configureOutputFields(channel,requested,sources));
      if(resolved.fields)changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
      if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
      s=await channel.observe({condition:'configured incoming port readback',readMappings:true,ready});
@@ -178,6 +198,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     }
     enter(ctx);requireValue(configured,'Configured calculator missing');
     if(implementation?.configureAllOutputs){multipleOutputs=await implementation.configureAllOutputs(channel,configured,operation.nodeApply.request.parameters,mappings,finishWizard);return multipleOutputs;}
+    const outputRecoveryGraph=!implementation?await graphForInput():null;
     await channel.openOutputPort(0);
     const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
     if(implementation){
@@ -193,7 +214,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     const changes=[];
     if(mappings.length) {
      const requested=mappings[0],resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
-     if(requested.fields)changes.push(await configureOutputFields(channel,requested,sources));
+     if(requested.fields||requested.changes)changes.push(await configureOutputFields(channel,requested,sources));
      if(resolved.fields){
       const current=await channel.observe({condition:'output identities after field edits',readMappings:true,ready});
       const updated=resolveConfiguredOutputMapping(requested,sources,current.node_mapping);
@@ -205,7 +226,10 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     const active=mapping.target_fields.filter(f=>!f.excluded),definition=await readOutputDefinitionPages(channel,{expectedCount:mapping.target_fields.length});
     requireValue(definition.fields.length===mapping.target_fields.length&&definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===mapping.target_fields[i][k])),
      'Rendered calculator output mapping differs from native fields');columns=active;
-    const finish=await finishWizard('done',true,definition);
+    outputCheckpoint={node:structuredClone(ctx.node),origin:outputMappingOrigin(targetOrigin),build:targetBuild,graph:outputRecoveryGraph,
+     mapping:outputMappingState(mapping,ctx.node),calculator:outputRecoveryCalculatorState(configured,ctx.node),
+     value:structuredClone({native_mapping:mapping,definition,changes,source_identity_verified:true}),attempts:0};
+    const finish=await finishWizard('done',true,definition,outputCheckpoint);
     return verified({effect_possible:true,native_mapping:mapping,definition,changes,finish,source_identity_verified:true});
    },
    async finish(mode,ctx){enter(ctx);if(mode==='close')return closePreparedWizard(channel);requireValue(mode==='done','Separate calculator port requires intermediate Done');return finishWizard(mode);},
@@ -254,7 +278,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,
      ports:[{port:0,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data}],table_creation:table,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:returned});
    },
-   ...(implementation?.inputMappingRecovery?{
+   ...((!implementation||implementation.inputMappingRecovery)?{
     async inspectInputMapping({readReceipt,signal}){
      const state=inputRecoveryBoundary(operation,now);requireValue(inputCheckpoint?.finish_reference?.action_key==='ui.act','Original input Done reference unavailable');
      activeSignal=signal;signal?.throwIfAborted();operation.deadline=Math.min(state.deadline,state.configure_deadline,state.pending.deadline,now()+45000);
@@ -285,7 +309,49 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
       recovery:{verified:true,finish_receipt_id:inputCheckpoint.finish_reference.id,observed_mapping:observed,probe_cancel:cancelled}});
     },
    }:{}),
+   ...(!implementation?{
+    async inspectOutputMapping({readReceipt,signal}){
+     const state=outputRecoveryBoundary(operation,now);requireValue(outputCheckpoint?.finish_reference?.action_key==='ui.act','Original output Done reference unavailable');
+     activeSignal=signal;signal?.throwIfAborted();operation.deadline=Math.min(state.deadline,state.configure_deadline,state.pending.deadline,now()+45000);
+     requireValue(!outputCheckpoint.probe_pending,'Output inspection gesture remains unresolved');
+     verifyOutputMappingFinish(outputCheckpoint,await readReceipt(outputCheckpoint.finish_reference));
+     requireValue(sameOutputRecovery(await graphForInput(),outputCheckpoint.graph),'Output source or target changed after Done');
+     return {available:true,phase:'output_mapping',receipt_id:outputCheckpoint.finish_reference.id,
+      verification:'completed_output_done_requires_configuration_and_mapping_probe',execution_started:false};
+    },
+    async recoverOutputMapping({readReceipt,signal}){
+     await this.inspectOutputMapping({readReceipt,signal});
+     requireValue(outputCheckpoint.attempts<2,'Output mapping probe budget exhausted');
+     outputCheckpoint.attempts++;outputCheckpoint.probe_pending=true;
+     let opened=false,observed,cancelled,calculator;
+     try{
+      const graph=await channel.observe({condition:'recovery calculator before read-only inspection',ready:s=>s.prepared_node_context?.surface==='graph'});
+      await selectPreparedGraphNode(channel,graph,'inspect committed calculator configuration');
+      await openPreparedWizard(channel);opened=true;
+      const s=await channel.observe({condition:'recovery checks committed formulas',readCalculator:true,ready:s=>s.node_calculator?.verified===true});
+      calculator=outputRecoveryCalculatorState(s.node_calculator,outputCheckpoint.node);
+     }finally{if(opened){await closePreparedWizard(channel);opened=false;}}
+     requireValue(sameOutputRecovery(calculator,outputCheckpoint.calculator),'Committed calculator configuration differs');
+     try{
+      await channel.openOutputPort(0);opened=true;
+      const s=await channel.observe({condition:'recovery reads committed output mapping without edits',readMappings:true,
+       ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true});observed=s.node_mapping;
+     }finally{if(opened){cancelled=await closePreparedWizard(channel);outputCheckpoint.probe_pending=false;}}
+     await recordInput('node_output_mapping_recovery_checked',{observed,cancelled,calculator,expected:outputCheckpoint.mapping});
+     requireValue(sameOutputRecovery(outputMappingState(observed,outputCheckpoint.node),outputCheckpoint.mapping),'Committed output mapping differs');
+     requireValue(sameOutputRecovery(await graphForInput(),outputCheckpoint.graph),'Output graph changed during verification');
+     outputCheckpoint.probe_verified=true;
+     return verified({...structuredClone(outputCheckpoint.value),effect_possible:true,
+      finish:verified({effect_possible:true,mode:'done',settings_applied:true,execution_started:false,node_context:cancelled.node_context}),
+      recovery:{verified:true,finish_receipt_id:outputCheckpoint.finish_reference.id,observed_mapping:observed,calculator,probe_cancel:cancelled}});
+    },
+   }:{}),
    async verifyContinuation(state,{signal}={}){
+    if(state.output_mapping_recovered&&state.phases.at(-1)?.phase==='output_mapping'){
+     if(!channel||state.pending||state.cleanup_complete!==true||!outputCheckpoint?.probe_verified||now()>=Math.min(state.deadline,state.configure_deadline))return false;
+     activeSignal=signal;signal?.throwIfAborted();operation.deadline=Math.min(state.deadline,state.configure_deadline,now()+15000);
+     return sameOutputRecovery(await graphForInput(),outputCheckpoint.graph);
+    }
     if(state.input_mapping_recovered&&state.phases.at(-1)?.phase==='input_mapping'){
      if(!channel||state.pending||state.cleanup_complete!==true||!inputCheckpoint?.probe_verified||now()>=Math.min(state.deadline,state.configure_deadline))return false;
      activeSignal=signal;signal?.throwIfAborted();operation.deadline=Math.min(state.deadline,state.configure_deadline,now()+15000);

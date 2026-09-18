@@ -13,13 +13,13 @@ export function validateFilterParameters(p,mode,r){
  need(r.target.kind==='existing'||r.inputs.length===1,'New filter requires one explicit input');
  need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0),'Filter has one table input');
  need(r.read.ports.every(p=>p===0||p===1),'Filter has two table outputs');
- need(r.finish!=='execute'||r.read.ports.length===2,'Execute must read both filter outputs');
+ need(r.finish!=='execute'||r.read.ports.length>0,'Execute must read at least one selected filter output');
  need(r.mappings.every(m=>(m.direction==='input'?m.port===0:m.port===0||m.port===1)
   &&(m.fields??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'Invalid filter port mapping');
  need(r.finish!=='close'||r.mappings.every(m=>m.direction!=='input'),'Close cannot commit input mappings');
 }
 export function createFilterNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.filter_data',mode:'conditions',revision:'filter-v3-internal-1',parameterSchema:filterParametersSchema,readback:filterConfigurationReadback,
+ type:'transform.filter_data',mode:'conditions',revision:'filter-v3-internal-1',inputMappingRecovery:true,parameterSchema:filterParametersSchema,readback:filterConfigurationReadback,
  validate:validateFilterParameters,
  validateInput:(p,resolved,native)=>p.groups===undefined?undefined:resolveFilterConditions(p,resolved.fields??native.target_fields),
  preflight:(options,ctx,config)=>preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.groups!==undefined,resolve:resolveFilterConditions,label:'filter'}),

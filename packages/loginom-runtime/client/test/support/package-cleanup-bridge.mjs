@@ -25,6 +25,12 @@ class ExternalClient {
     if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
       target,document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
+    else if(code.includes('function readSavedPackageState')){
+      this.f.events.push('saved-state');
+      if(this.f.scenario==='state-unavailable')throw Error('Read response lost');
+      value={version:1,session_id:'own-session',document_id:'own-doc',account:'test-2',package_path:path,
+        modified:this.f.scenario==='dirty-after-save'&&this.f.saves===1,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false};
+    }
     else if(code.includes('async function closeOwnedPackage')){
       this.f.events.push('package-cleanup');
       value={version:1,session_id:'own-session',document_id:'own-doc',status:this.f.scenario==='native-blocked'?'BLOCKED':'SUCCEEDED',package_closed:this.f.scenario!=='native-blocked',
@@ -43,14 +49,14 @@ mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExport
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>{
   const f=current;return {tools:[],describe:()=>({}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},
-    run:async(key,parameters,{operationId})=>({status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}}),
+    run:async(key,parameters,{operationId})=>{f.saves++;return {status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};},
   };
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
 
-for(const scenario of ['success','unprepared','no-save','native-blocked','busy'])test('isolated shutdown lifecycle: '+scenario,async()=>{
+for(const scenario of ['success','unprepared','no-save','native-blocked','busy','dirty-after-save','state-unavailable'])test('isolated shutdown lifecycle: '+scenario,async()=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-bridge-'));
-  const f=current={scenario,events:[],busy:false};
+  const f=current={scenario,events:[],busy:false,saves:0};
   const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
     metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
     artifactStore:{list:()=>[],async releaseUploads(){f.events.push('release-uploads');}}};
@@ -61,15 +67,27 @@ for(const scenario of ['success','unprepared','no-save','native-blocked','busy']
     client=new AgentClient({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
     if(scenario!=='unprepared'){
       const prep=await client.callTool({name:'dock_prepare',arguments:{}});assert.notEqual(prep.isError,true,JSON.stringify(prep));
-      if(scenario!=='no-save')await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'own-save'}});
+      if(scenario!=='no-save'){
+        const saved=await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'own-save'}});
+        const values=saved.content.filter(c=>c.type==='text').map(c=>{try{return JSON.parse(c.text);}catch{return {};}});
+        assert.equal(values[0].status,'SUCCEEDED');assert.deepEqual(values[0].output,{package_ref:{path}});
+        const advice=values.find(v=>v.kind==='dock_saved_package_state');assert.ok(advice);
+        assert.equal(advice.modified,scenario==='state-unavailable'?null:scenario==='dirty-after-save');
+        if(scenario==='dirty-after-save'){
+          assert.equal(advice.next_step.arguments.action_key,'package.save_checkpoint');assert.equal(advice.next_step.arguments.parameters.path,path);
+          const second=await client.callTool({name:advice.next_step.tool,arguments:{...advice.next_step.arguments,operation_id:'own-save-2'}});
+          const clean=second.content.map(c=>{try{return JSON.parse(c.text);}catch{return {};}}).find(v=>v.kind==='dock_saved_package_state');
+          assert.equal(clean.modified,false);assert.equal(clean.next_step,undefined);assert.equal(f.saves,2);
+        }
+      }
     }
     f.busy=scenario==='busy';
     const first=bridge.close();assert.equal(bridge.close(),first);const result=await first;
     const receipt=JSON.parse(await readFile(join(directory,'package-cleanup.json'),'utf8'));
-    if(['success','unprepared'].includes(scenario)){
+    if(['success','unprepared','dirty-after-save','state-unavailable'].includes(scenario)){
       assert.equal(result.browser_transport_closed,true);assert.equal(result.clipboard_leases_retained,0);
-      assert.equal(receipt.status,scenario==='success'?'SUCCEEDED':'SKIPPED_UNPREPARED');
-      if(scenario==='success')assert.ok(f.events.indexOf('package-cleanup')<f.events.indexOf('browser-close'));
+      assert.equal(receipt.status,scenario!=='unprepared'?'SUCCEEDED':'SKIPPED_UNPREPARED');
+      if(scenario!=='unprepared')assert.ok(f.events.indexOf('package-cleanup')<f.events.indexOf('browser-close'));
       else assert.equal(f.events.includes('package-cleanup'),false);
       assert.ok(f.events.indexOf('browser-close')<f.events.indexOf('release-uploads'));
     }else{
@@ -77,6 +95,6 @@ for(const scenario of ['success','unprepared','no-save','native-blocked','busy']
       assert.equal(f.events.includes('browser-close'),false);assert.equal(f.events.includes('release-uploads'),false);
       assert.equal(f.events.includes('package-cleanup'),scenario==='native-blocked');
     }
-    assert.equal(f.events.filter(e=>e==='package-cleanup').length,scenario==='success'||scenario==='native-blocked'?1:0);
+    assert.equal(f.events.filter(e=>e==='package-cleanup').length,['success','native-blocked','dirty-after-save','state-unavailable'].includes(scenario)?1:0);
   }finally{await client?.close();await bridge?.close();await rm(directory,{recursive:true,force:true});}
 });

@@ -2,7 +2,7 @@
 // Private native adapter endpoint; never exposed in the model's tool catalog.
 import { parseArgs } from 'node:util';
 import { loadConfig } from '../lib/config.mjs';
-import { produceHostInputTicket } from '../lib/host-inputs.mjs';
+import { produceHostInputTicket,nativeInputFailure } from '../lib/host-inputs.mjs';
 process.umask(0o077);
 try {
   const { values } = parseArgs({ options: { config:{type:'string'}, 'state-dir':{type:'string'}, agent:{type:'string'}, 'adapter-revision':{type:'string'} } });
@@ -12,4 +12,4 @@ try {
   const request = JSON.parse(text);
   const result = await produceHostInputTicket(config, request);
   process.stdout.write(JSON.stringify(result) + '\n');
-} catch { process.stderr.write('Loginom Dock: вложение не подготовлено.\n'); process.exitCode = 1; }
+} catch(error) { process.stdout.write(JSON.stringify(nativeInputFailure(error))+'\n'); process.exitCode = 1; }

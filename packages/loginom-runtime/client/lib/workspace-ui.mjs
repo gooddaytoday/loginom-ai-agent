@@ -6,7 +6,7 @@ import {captureProcessNodeFocus,restoreProcessNodeFocus} from './process-node-fo
 export const uiActionSchema = {
   type: 'object', additionalProperties: false, required: ['verb'],
   properties: {
-    verb: { type: 'string', enum: ['click', 'double_click', 'right_click', 'fill', 'press', 'drag', 'scroll', 'scroll_horizontal', 'set_checked', 'replace_expression', 'set_wizard_field', 'wizard_step', 'select_wizard_option', 'apply_expression_parameters', 'cancel_expression_parameters', 'open_wizard', 'begin_wizard', 'confirm_wizard_deactivation', 'finish_wizard', 'execute_wizard', 'execute_graph_node', 'confirm_wizard_close', 'show_process_node', 'cancel_process', 'open_node_views', 'enter_table', 'apply_output_column', 'cancel_output_column', 'apply_reform_column', 'cancel_reform_column'] },
+    verb: { type: 'string', enum: ['click', 'double_click', 'right_click', 'fill', 'press', 'drag', 'scroll', 'scroll_horizontal', 'set_checked', 'replace_expression', 'set_wizard_field', 'wizard_step', 'select_wizard_option', 'apply_expression_parameters', 'cancel_expression_parameters', 'open_wizard', 'begin_wizard', 'confirm_wizard_deactivation', 'finish_wizard', 'execute_wizard', 'execute_graph_node', 'deactivate_graph_node', 'confirm_wizard_close', 'show_process_node', 'cancel_process', 'open_node_views', 'enter_table', 'apply_output_column', 'cancel_output_column', 'apply_reform_column', 'cancel_reform_column'] },
     expected_stage: { oneOf:[{type:'string',enum:['text_import_file','text_import_format','text_export_params','text_export_format','input_mapping','output_mapping','calculator','grouping','sorting','replacement','collapse','missing_values','date_time','field_parameters','row_filter','join','union','done']},{const:['output_mapping','done']}],
       description: 'Required only for wizard_step: destination after the observed next/previous control, not the current stage. For delimited Text Import, next follows text_import_file → text_import_format → output_mapping → done; previous reverses this order. input_mapping means a separate INPUT PORT mapping wizard, never Text Import output columns. Calculator, Grouping and Sorting validation may use [output_mapping, done] for its conditional output page. Other wizard families may have different paths; inspect their current UI and sources instead of guessing. Do not pass this field to open_wizard or finish_wizard.' },
     checked: { type: 'boolean' },
@@ -50,7 +50,7 @@ export function validateUiAction(action, snapshot) {
 }
 
 export function workspaceUiCapability(page, task, readNodeContext, captureProcessFocus, restoreProcessFocus) {
-  const started = Date.now(), deadline = started + 15000;
+  const started = Date.now(), deadline = started + (task.opening_timeout_ms??15000);
   const trace = [], handles = [];
   let postActionRoot;
   let cancellationSurfaceReads=0;
@@ -74,7 +74,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // or GUID failures do not enter this wait.
     for(let sample=0;binding?.surface_pending===true && effectPossible
       && (['open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','enter_table'].includes(task.action?.verb)
-        ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true) && sample<200;sample++) {
+        ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true) && sample<(task.opening_timeout_ms?900:200);sample++) {
       record('node_surface_wait',{condition:'prepared_node_surface_ready',sample});
       await page.waitForTimeout(Math.min(50,timeout()));
       binding=await readNodeContext(page,task.prepared_node_context);
@@ -94,7 +94,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   // The state is document-bound; navigation invalidates every previous reference.
   const readUi = async (rediscover = false) => {
     const nodeContext=await boundNode();
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedOutputPort,preparedInputPort}) => {
+    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -586,7 +586,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const graphPrefix=workflow.prefix+';Graph;';
           const nativeKey=preparedNodeId&&preparedGraphTid?.startsWith(graphPrefix)?preparedGraphTid.slice(graphPrefix.length):null;
           const exact=items[0].tid===prefix+'Сервер'&&items[1].label==='Пакеты'&&items.slice(2).every(i=>i.label)
-            &&node.tid===items[4].tid+'>'+(nativeKey??format(node.label));
+            &&(node.tid===items[4].tid+'>'+(nativeKey??format(node.label))
+              ||preparedNodeId&&preparedNavigationNode?.tid===node.tid&&preparedNavigationNode.label===node.label);
           const icon=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1&&inside(found[0],e);};
           const icons=icon(crumbs[4],'.maptree-icon-workflow')&&icon(crumbs[5],'[class*="bg-vendor-icon-"]');
           if(!bounded)nodeContext.status='bounded';
@@ -2564,12 +2565,17 @@ function readRenderedInputMapping(observation) {
       const matches=nodes.filter(n=>n.FGuid===preparedNodeId),selection=d.FmxGraph?.getSelectionCells?.();
       const native=globalThis.Ext?.getCmp?.(element.id);
       if(matches.length!==1||matches[0].FLocked===true||!Array.isArray(selection)||selection.length!==1||selection[0]!==matches[0].FCell
-        ||native?.el?.dom!==element||native.disabled===true||native.tooltip!=='Выполнить узел'
-        ||!['Выполнить узел','Выполнить узел (F9)'].includes(element.getAttribute('data-qtip'))
-        ||element.querySelectorAll('.bg-icon-run_current').length!==1)return null;
+        ||native?.el?.dom!==element||native.disabled===true)return null;
+      const execute=native.tooltip==='Выполнить узел'&&['Выполнить узел','Выполнить узел (F9)'].includes(element.getAttribute('data-qtip'))
+        &&element.querySelectorAll('.bg-icon-run_current').length===1;
+      // Loginom keeps the component's original tooltip after activation; the
+      // rendered tooltip and icon carry the current toggle mode.
+      const deactivate=native.tooltip==='Выполнить узел'&&element.getAttribute('data-qtip')==='Деактивировать узел'
+        &&element.querySelectorAll('.bg-icon-stop').length===1;
+      if(!execute&&!deactivate)return null;
       const dom=d.FmxGraph.view?.getState?.(matches[0].FCell)?.shape?.node;
       if(!dom||!d.FmxGraph.container.contains(dom)||getTid(dom)!==workflow.prefix+';Graph;'+getTid(dom)?.split(';Graph;')[1])return null;
-      return {node_id:preparedNodeId,node_ref:refOf(dom),mode:'execute',source:'native_selected_graph_node'};
+      return {node_id:preparedNodeId,node_ref:refOf(dom),mode:execute?'execute':'deactivate',source:'native_selected_graph_node'};
     };
     const elements = controls.slice(0, 240).map(element => {
       const identity = identityOf(element), tag = element.tagName.toLowerCase(), tid = getTid(element);
@@ -2705,7 +2711,7 @@ function readRenderedInputMapping(observation) {
         enabled: isEnabled, visible: true, interaction, bounding_box: boxOf(element),
         // A bounded prefix is not a sufficient value precondition. A dedicated
         // large-field driver must establish its own complete read/write contract.
-        allowed_actions: collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?['execute_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && horizontalScroll?.ref===refOf(element) && interaction.state==='point_observed'?['scroll_horizontal']:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?['execute_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
+        allowed_actions: collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
     });
     scanStage='data_views';
     const nodes = labels.slice(0, 200).map(label => {
@@ -3139,6 +3145,7 @@ function readRenderedInputMapping(observation) {
     preparedWorkflowPath:task.prepared_node_context?.workflow_ref.navigation_path??null,
     preparedNodeId:task.prepared_node_context?.node.node_id??null,
     preparedGraphTid:nodeContext?.surface==='graph'?nodeContext.tid:null,
+    preparedNavigationNode:nodeContext?.surface==='graph'?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
     if (observed?.ui_read_failure) {
@@ -3199,11 +3206,12 @@ function readRenderedInputMapping(observation) {
     return observed;
   };
 
-  const locatorFor = identity => {
+  const locatorFor = (identity, graph) => {
     if (!identity || !Array.isArray(identity.path) || identity.path.some(index => !Number.isInteger(index) || index < 0) || identity.path.length > 64) fail('UI_REFERENCE_INVALID', 'Observed control identity is invalid');
     const escaped = JSON.stringify(identity.anchor_tid).replaceAll('\u2028', '\\2028 ').replaceAll('\u2029', '\\2029 ');
     const anchor = identity.anchor_tid === null ? 'html' : `[data-tid=${escaped}]`;
-    return page.locator(anchor + identity.path.map(index => ` > :nth-child(${index + 1})`).join(''));
+    const selector=anchor + identity.path.map(index => ` > :nth-child(${index + 1})`).join('');
+    return graph?page.locator('[data-tid='+JSON.stringify(graph.container_tid)+']').locator(selector):page.locator(selector);
   };
   const checkedHandle = async (before, current) => {
     if (!current || !same(before.identity, current.identity) || !same(before.signature, current.signature)
@@ -3213,14 +3221,18 @@ function readRenderedInputMapping(observation) {
       || task.action.verb==='cancel_expression_parameters' && !same(before.expression_cancel,current.expression_cancel)
       || task.action.verb==='apply_expression_parameters' && !same(before.expression_apply,current.expression_apply)
       || ['apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb) && !same(before.column_close,current.column_close)
-      || task.action.verb==='execute_graph_node' && !same(before.graph_execution,current.graph_execution)
+      || ['execute_graph_node','deactivate_graph_node'].includes(task.action.verb) && !same(before.graph_execution,current.graph_execution)
       || ['finish_wizard','execute_wizard'].includes(task.action.verb) && !same(before.wizard_finish,current.wizard_finish)
       || task.action.verb==='confirm_wizard_close' && !same(before.wizard_close_confirmation,current.wizard_close_confirmation)
       || ['open_wizard','begin_wizard'].includes(task.action.verb) && !same(before.wizard_open,current.wizard_open)
       || task.action.verb==='confirm_wizard_deactivation' && !same(before.wizard_deactivation_confirmation,current.wizard_deactivation_confirmation)
       || task.action.verb==='wizard_step' && !same(before.wizard_step,current.wizard_step)
       || task.action.verb==='select_wizard_option' && !same(before.wizard_combo,current.wizard_combo)) fail('UI_REFERENCE_STALE', 'The observed control changed; observe the workspace again');
-    const locator = locatorFor(current.identity);
+    const observedGraph=task.snapshot.graph_identity;
+    const scopedGraph=current.scope==='graph'&&observedGraph?.status==='observed'
+      &&typeof observedGraph.native_prefix==='string'&&current.tid?.startsWith(observedGraph.native_prefix)
+      &&current.identity.anchor_tid?.startsWith(observedGraph.native_prefix)?observedGraph:null;
+    const locator = locatorFor(current.identity,scopedGraph);
     if (await locator.count() !== 1) fail('UI_REFERENCE_STALE', 'Observed control is no longer unique');
     const handle = await locator.elementHandle({ timeout: timeout() });
     if (!handle) fail('UI_REFERENCE_STALE', 'Observed control is detached');
@@ -3228,7 +3240,12 @@ function readRenderedInputMapping(observation) {
     const graphPrefix = task.snapshot.graph_identity?.status==='observed'?task.snapshot.graph_identity.native_prefix:null;
     const graphBody = graphPrefix && current.scope==='graph' && current.tid?.startsWith(graphPrefix) ? current.tid.slice(graphPrefix.length) : null;
     const isGraphLink = graphBody !== null && /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(graphBody);
-    const valid = await handle.evaluate((element, ref) => element.isConnected && globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')]?.ids.get(element) === ref, current.ref);
+    const valid = await handle.evaluate((element, expected) => {
+      const ids=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')]?.ids;
+      if(!element.isConnected||ids?.get(element)!==expected.ref)return false;
+      if(expected.container_ref){let parent=element.parentElement;while(parent&&ids.get(parent)!==expected.container_ref)parent=parent.parentElement;if(!parent)return false;}
+      return true;
+    }, {ref:current.ref,container_ref:scopedGraph?.container_ref});
     // Playwright treats zero-height/width SVG geometry as invisible even when
     // the stroke is painted. Links use the same style check as observation and
     // must still prove ownership of a painted hit point below.
@@ -3310,7 +3327,9 @@ function readRenderedInputMapping(observation) {
           if(binding?.kind!=='deactivation'||n?.verified!==true||n.surface!=='graph'||n.tid!==binding.graph_tid
             ||!['document_id','workflow_id','node_id'].every(k=>n[k]===binding.node?.[k])
             ||current.wizard_pending_owner?.status!=='observed'
-            ||current.wizard_pending_owner.node?.tid!==binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
+            ||!(current.wizard_pending_owner.node?.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
+              ||typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.tid===current.wizard_pending_owner.node?.tid
+                &&n.pending_wizard_node.label===current.wizard_pending_owner.node?.label)
             ||!same(current.wizard_pending_owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path)
             ||current.ui.dialogs.length!==1||!Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).every(([name,label])=>
               current.ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name&&e.label===label
@@ -3347,9 +3366,9 @@ function readRenderedInputMapping(observation) {
         const nodeBeforeGesture=await boundNode();
         if(nodeBeforeGesture && !same(current.prepared_node_context,nodeBeforeGesture))
           fail('PREPARED_NODE_CONTEXT_CHANGED','The node surface changed before the gesture');
-        if(task.action.verb==='execute_graph_node') {
+        if(['execute_graph_node','deactivate_graph_node'].includes(task.action.verb)) {
           const launch=await readUi(),before=current.ui.elements.find(e=>e.ref===task.action.ref),after=launch.ui.elements.find(e=>e.ref===task.action.ref);
-          if(!before?.graph_execution||!after?.allowed_actions.includes('execute_graph_node')||!same(before.graph_execution,after.graph_execution))
+          if(!before?.graph_execution||!after?.allowed_actions.includes(task.action.verb)||!same(before.graph_execution,after.graph_execution))
             fail('GRAPH_EXECUTION_CONTEXT_CHANGED','The selected node or launch button changed before execution');
         }
         if(task.action.verb==='show_process_node'&&task.prepared_node_context&&captureProcessFocus){
@@ -3372,7 +3391,7 @@ function readRenderedInputMapping(observation) {
           mouseHeld = false;
           if(task.action.verb==='show_process_node')processShowCompleted=true;
         };
-        if (task.action.verb === 'click' || ['execute_graph_node','wizard_step','select_wizard_option','apply_expression_parameters','cancel_expression_parameters','open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb)) await clickTarget(1);
+        if (task.action.verb === 'click' || ['execute_graph_node', 'deactivate_graph_node','wizard_step','select_wizard_option','apply_expression_parameters','cancel_expression_parameters','open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(task.action.verb)) await clickTarget(1);
         else if (task.action.verb === 'double_click' || task.action.verb === 'enter_table') await clickTarget(2);
         else if (task.action.verb === 'right_click') await clickTarget(1, 'right');
         else if (task.action.verb === 'press') await first.press(task.action.key, { timeout: timeout() });
@@ -3549,9 +3568,18 @@ function readRenderedInputMapping(observation) {
           const confirmation=current.ui.elements.find(e=>e.ref===task.action.ref).wizard_close_confirmation;
           const path=(confirmation.input_port?confirmation.owner.node_path.slice(0,-1):confirmation.output_port?confirmation.owner.path.slice(0,-4):confirmation.owner.path.slice(0,-2)).map(({tid,label})=>({tid,label}));
           const key=confirmation.owner.node.label.replace(/\s/g,'_').replace(/,/g,'');
+          const returnedNode=s=>{
+            const before=current.prepared_node_context,after=s.prepared_node_context;
+            if(task.prepared_node_context)return before?.verified===true&&after?.verified===true
+              &&before.surface==='wizard'&&after.surface==='graph'
+              &&after.node_id===task.prepared_node_context.node.node_id
+              &&['document_id','workflow_id','node_id'].every(k=>typeof before[k]==='string'&&before[k]===after[k])
+              &&s.ui.elements.filter(e=>e.graph_node?.part==='body'&&e.tid===after.tid).length===1;
+            return s.ui.elements.filter(e=>e.graph_node?.part==='body'&&e.graph_node.node_label===key).length===1;
+          };
           const ready=s=>lifecycleContextMatches(s)&&s.wizard.status==='absent'&&!s.ui.dialogs.length&&!s.ui.masks.length
             &&s.navigation_context?.status==='observed'&&same(s.navigation_context.path,path)
-            &&s.ui.elements.filter(e=>e.graph_node?.part==='body'&&e.graph_node.node_label===key).length===1;
+            &&returnedNode(s);
           for(let attempt=0;attempt<24&&!ready(observed)&&lifecycleContextMatches(observed);attempt++) {
             await page.waitForTimeout(Math.min(100,timeout()));observed=await readOpeningUi();
           }
@@ -3575,11 +3603,12 @@ function readRenderedInputMapping(observation) {
             // deriving it from display text loses multiline automatic labels.
             const nodePrefix=workflowPath.at(-1)?.tid+'>';
             const bound=fresh.prepared_node_context,graphPrefix=fresh.workflow_ref?.prefix+';Graph;';
+            if(task.prepared_node_context&&(!bound?.verified||bound.node_id!==task.prepared_node_context.node.node_id||bound.surface!=='graph'))return null;
             // Automatic labels can contain newlines stripped by the Done
             // input. The prepared GUID reader binds the exact current graph
             // body, including its newly generated key; rendered text must
             // still match the completion label below.
-            const boundKey=!port&&bound?.verified===true&&bound.surface==='graph'
+            const boundKey=bound?.verified===true&&bound.surface==='graph'
               &&bound.node_id===task.prepared_node_context?.node.node_id&&bound.tid?.startsWith(graphPrefix)
               ?bound.tid.slice(graphPrefix.length):null;
             const key=boundKey??(port&&finishOwner.node.tid?.startsWith(nodePrefix)
@@ -3639,10 +3668,24 @@ function readRenderedInputMapping(observation) {
           const deactivationPending=task.action.verb==='begin_wizard'&&exactDeactivation(observed);
           if(deactivationPending)record('wizard_deactivation_question_observed',{node:opening.node,workflow_path:opening.workflow_path});
           const owner=observed.wizard?.owner_context;
-          // Graph and breadcrumb tids share the native formatted key; display
-          // labels retain commas/spaces and may wrap differently on the canvas.
+          // Duplicate labels use different native keys in graph (@1) and
+          // breadcrumb (-3). Accept that difference only with the original GUID
+          // independently bound to both surfaces and unchanged displayed label.
+          const beforeNode=current.prepared_node_context,afterNode=observed.prepared_node_context;
+          const labels=current.ui.elements.filter(e=>e.graph_node?.part==='label'&&e.graph_node.node_label===opening.node.node_label);
+          const normalizeLabel=value=>typeof value==='string'?value.replace(/\s/g,''):'';
+          const guidOwnerMatches=task.prepared_node_context&&beforeNode?.verified===true&&afterNode?.verified===true
+            &&beforeNode.surface==='graph'&&afterNode.surface==='wizard'
+            &&beforeNode.node_id===task.prepared_node_context.node.node_id
+            &&['document_id','workflow_id','node_id'].every(k=>typeof beforeNode[k]==='string'&&beforeNode[k]===afterNode[k])
+            &&beforeNode.tid===current.workflow_ref.prefix+';Graph;'+opening.node.node_label
+            &&(task.action.verb==='confirm_wizard_deactivation'
+              ?typeof beforeNode.pending_wizard_node?.tid==='string'&&beforeNode.pending_wizard_node.tid===owner?.node?.tid
+                &&beforeNode.pending_wizard_node.label===owner?.node?.label
+              :labels.length===1&&normalizeLabel(labels[0].label)!==''
+                &&normalizeLabel(labels[0].label)===normalizeLabel(owner?.node?.label));
           if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || observed.wizard?.status!=='observed'
-            || owner?.status!=='observed' || owner.node.tid!==opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label
+            || owner?.status!=='observed' || !guidOwnerMatches&&owner.node.tid!==opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label
             || !same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path)))
             fail('WIZARD_OPEN_NOT_CONFIRMED','The intended node wizard was not confirmed after one click; inspect the current view before retry');
           if(!deactivationPending)record('wizard_open_verified',{node:opening.node,workflow_path:opening.workflow_path,wizard_root_ref:observed.wizard.root_ref,
@@ -3724,10 +3767,17 @@ function readRenderedInputMapping(observation) {
           const parameterKey=choice.field.scope==='expression_parameter'?'expression_parameters':choice.field.scope==='output_column'?'column_parameters':choice.field.scope==='reform_column'?'reform_parameters':null;
           const expressionParameter=parameterKey!==null;
           const sourceOption=choice.field.scope==='import_source';
-          if(sourceOption)for(let attempt=0;attempt<24;attempt++) {
-            const f=observed.wizard.import_source?.fields?.[choice.field.name];
+          const exportOption=!expressionParameter&&['text_export_params','text_export_format'].includes(current.wizard.stage);
+          if(sourceOption||exportOption)for(let attempt=0;attempt<24;attempt++) {
+            const f=observed.wizard[sourceOption?'import_source':'settings']?.fields?.[choice.field.name];
             if(f?.value===choice.label&&!observed.ui.masks.length)break;
-            if(observed.wizard.root_ref!==current.wizard.root_ref||observed.wizard.stage!==current.wizard.stage||!same(observed.ui.dialogs,current.ui.dialogs))break;
+            // Export preview refreshes its caption after the picker closes.
+            // Read the original field until it settles; never select again.
+            if(!observed.authenticated||observed.origin!==current.origin||observed.loginom_build!==current.loginom_build
+              ||observed.dom_epoch.document!==current.dom_epoch.document||!same(observed.workflow_ref,current.workflow_ref)
+              ||!same(observed.package_identity,current.package_identity)||!same(observed.active_identity,current.active_identity)
+              ||observed.wizard.root_ref!==current.wizard.root_ref||observed.wizard.stage!==current.wizard.stage
+              ||!same(observed.ui.dialogs,current.ui.dialogs)||f?.input_ref!==choice.field.input_ref||f?.owner_ref!==choice.field.owner_ref)break;
             timeout();await page.waitForTimeout(Math.min(100,timeout()));observed=await readUi();
           }
           const field=observed.wizard[sourceOption?'import_source':parameterKey??'settings']?.fields?.[choice.field.name];
@@ -3763,7 +3813,7 @@ function readRenderedInputMapping(observation) {
             && fresh.wizard.root_ref===current.wizard.root_ref && same(fresh.ui.dialogs,current.ui.dialogs);
           // Wait only for this one click. No timeout or intermediate mask can
           // issue a second click or turn a closed wizard into an applied claim.
-          for(let attempt=0;attempt<24 && unchangedContext(observed)
+          for(let attempt=0;attempt<(task.opening_timeout_ms?225:24) && unchangedContext(observed)
             && (!destination(observed.wizard.stage) || observed.ui.masks.length);attempt++) {
             const calculatorValidation=current.wizard.stage==='calculator';
             const validation=calculatorValidation?observed.wizard.calculator_validation:observed.wizard.source_validation;
@@ -3891,6 +3941,10 @@ function readRenderedInputMapping(observation) {
 
 export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
+  if(options.opening_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
+    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)
+    ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>45000))
+    throw Error('Extended opening wait requires a bound node wizard and at most 45000 ms');
   if(options.mode==='act'&&['begin_wizard','confirm_wizard_deactivation','cancel_process'].includes(options.action?.verb)
     &&!options.prepared_node_context)throw Error('Node wizard deactivation requires a prepared native node binding');
   if(options.prepared_node_context!==undefined)validatePreparedNodeContext(options.prepared_node_context);

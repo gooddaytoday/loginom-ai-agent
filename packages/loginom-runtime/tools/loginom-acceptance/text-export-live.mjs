@@ -10,25 +10,59 @@ import {createActionRuntime} from '../../client/lib/executor.mjs';
 import {createCandidateNodeSupport} from '../../client/lib/node-support.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {createPublicNodeWire} from './public-node-wire.mjs';
+import {createNetworkFaultProxy} from './network-fault-proxy.mjs';
+import {createStorageBinding,withStorageIdentity} from '../../client/lib/storage-policy.mjs';
 process.umask(0o077);
+// This interactive harness must not open a package and immediately hit EOF.
+// Automated callers that provide a complete operator stream opt in explicitly.
+if(!process.stdin.isTTY&&!process.argv.includes('--allow-piped-operators'))throw Error('Interactive diagnostic harness requires a TTY (or explicit --allow-piped-operators)');
 const option=k=>{const i=process.argv.indexOf(k);if(i<0||!process.argv[i+1])throw Error('Required '+k);return process.argv[i+1];};
 const loginomUrl=option('--loginom-url'),user=option('--loginom-user'),storage=option('--storage'),packagePath=option('--package');
 const url=new URL(loginomUrl);
 if(url.username||url.password||!/^\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/.test(storage)||!packagePath.startsWith(storage+'/'))throw Error('Explicit safe URL and storage required');
 const dir=process.cwd()+'/.dock/text-export/live-'+Date.now();await fs.mkdir(dir+'/runtime',{recursive:true});
 await fs.symlink(process.env.HOME+'/.loginom-dock/runtime/browsers',dir+'/runtime/browsers');
-const session=await createSession({stateDir:dir,agent:'codex',adapterRevision:'text-export-diagnostic',mode:'executor-replay'});
+const session=await createSession({stateDir:dir,agent:'codex',adapterRevision:'text-export-diagnostic',mode:'executor-replay',storageDirectories:{packages:storage,inputs:storage,exports:storage}});
 session.metadata.targetIdentity={origin:url.origin,loginom_build:'7.4.2'};
 await fs.writeFile(dir+'/session.json',JSON.stringify(session.metadata,null,2));
+const networkFault=process.argv.includes('--network-fault-proxy')?await createNetworkFaultProxy(url.origin):null;
+if(networkFault){const config=JSON.parse(await fs.readFile(session.browserConfig,'utf8'));config.browser.launchOptions.proxy={server:networkFault.server};await fs.writeFile(session.browserConfig,JSON.stringify(config));}
 const client=new Client({name:'text-export-live',version:'1'}),transport=new StdioClientTransport({command:process.execPath,
  args:[session.browserCli,'--config',session.browserConfig],env:{...getDefaultEnvironment(),PLAYWRIGHT_BROWSERS_PATH:session.browserRoot},stderr:'pipe'});
-transport.stderr?.on('data',()=>{});let sequence=0,wire;
+transport.stderr?.on('data',()=>{});let sequence=0,wire,outputDoneReplyDropped=false,inputDoneConnectionDropped=false;
+const diagnosticFault={hideOutputReceipt:process.argv.includes('--unknown-output-done-once'),operationId:null};
 const record=createExecutionJournal({directory:dir,metadata:session.metadata});
 const execute=async code=>{
  const r=await client.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:60000});
  await fs.writeFile(dir+'/browser-'+(++sequence)+'.json',JSON.stringify(r));
  const text=r.content.filter(c=>c.type==='text').map(c=>c.text).join('\n'),raw=text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/)?.[1];
- if(!raw)throw Error(text.slice(0,1000));return JSON.parse(raw);
+ if(!raw)throw Error(text.slice(0,1000));
+ const value=JSON.parse(raw);
+ if(diagnosticFault.hideOutputReceipt&&diagnosticFault.operationId
+   &&value.output?.state==='completed'&&value.output.receipt?.operation_id===diagnosticFault.operationId){
+  await fs.appendFile(dir+'/hidden-output-receipt.jsonl',JSON.stringify({browser_sequence:sequence,operation_id:diagnosticFault.operationId,operator_injected:true})+'\n');
+  return {...value,output:{state:'missing'}};
+ }
+ const effect=value.action_key==='node.apply.transport'?value.output?.value:value;
+ // Explicit operator-only loss AFTER Loginom completed the original gesture.
+ // The browser receipt remains available for normal recovery; never suppress
+ // a second response or inject this fault into a Hermes corpus run.
+ if((process.argv.includes('--drop-output-done-once')||diagnosticFault.hideOutputReceipt)&&!outputDoneReplyDropped
+   &&effect?.action_key==='ui.act'&&effect.status==='SUCCEEDED'&&effect.trace?.some(e=>e.event==='output_port_finish_verified')){
+  outputDoneReplyDropped=true;
+  diagnosticFault.operationId=effect.operation_id;
+  await fs.writeFile(dir+'/injected-output-response-loss.json',JSON.stringify({browser_sequence:sequence,operation_id:effect.operation_id,status:effect.status,after_confirmed_gesture:true}));
+  throw Error('Operator injected loss of confirmed output Done response');
+ }
+ if(process.argv.includes('--drop-input-done-connection-once')&&!inputDoneConnectionDropped
+   &&effect?.action_key==='ui.act'&&effect.status==='SUCCEEDED'&&effect.trace?.some(e=>e.event==='input_port_finish_verified')){
+  if(!networkFault)throw Error('Input Done fault requires the diagnostic network proxy');
+  inputDoneConnectionDropped=true;
+  const transportFault=networkFault.disconnect();
+  await fs.writeFile(dir+'/injected-input-connection-loss.json',JSON.stringify({browser_sequence:sequence,operation_id:effect.operation_id,status:effect.status,after_confirmed_gesture:true,...transportFault}));
+  throw Error('Operator injected transport loss after confirmed input Done');
+ }
+ return value;
 };
 try {
  await client.connect(transport);await client.callTool({name:'browser_navigate',arguments:{url:loginomUrl}});
@@ -59,11 +93,13 @@ try {
  }
  const actions=JSON.parse(await fs.readFile('executor/catalog/actions.json')).actions,selectors=JSON.parse(await fs.readFile('executor/catalog/selectors.json')).selectors;
  for(const a of actions)if(['package.save_as','package.save_checkpoint'].includes(a.action_key))a.effect.allowed_roots=[storage];
- const config={targetOrigin:url.origin,targetBuild:'7.4.2'},support=createCandidateNodeSupport(config);
+ const config={targetOrigin:url.origin,targetBuild:'7.4.2',storageDirectories:{packages:storage,inputs:storage,exports:storage}},support=createCandidateNodeSupport(config);
+ const binding=createStorageBinding({sessionId:session.metadata.sessionId,origin:url.origin,build:'7.4.2',documentId:prep.document_id,account:user,directories:config.storageDirectories});
+ const guardedExecute=code=>execute(withStorageIdentity(code,binding));
  const rawRuntime=createActionRuntime({pinned:{actions:new Map(actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.map(s=>[s.symbol,s])),pins:{}},
-  execute,onRecord:record,...config,allowCandidate:true,artifactStore:session.artifactStore,...support});
+  execute:guardedExecute,onRecord:record,...config,allowCandidate:true,artifactStore:session.artifactStore,...support});
  wire=await createPublicNodeWire(rawRuntime,{directory:dir,browserSequence:()=>sequence});
- const ctx={execute,session,dir,fs,record,prep,runtime:wire.runtime,rawRuntime};
+ const ctx={execute,guardedExecute,session,dir,fs,record,prep,runtime:wire.runtime,rawRuntime,networkFault,diagnosticFault};
  console.log(JSON.stringify({dir,status:'READY',runtime:session.metadata.clientRevision}));
  for await(const line of readline.createInterface({input:process.stdin})) {
   if(!line.trim())continue;const command=JSON.parse(line);if(command.operator==='close')break;
@@ -71,4 +107,4 @@ try {
    await fs.writeFile(dir+'/'+command.id+'.json',JSON.stringify(result,null,2));console.log(JSON.stringify({id:command.id,result}));
   }catch(e){console.log(JSON.stringify({id:command.id,error:e.message}));}
  }
-}finally{await wire?.close();await client.callTool({name:'browser_close',arguments:{}}).catch(()=>{});await client.close();process.stdin.pause();process.stdin.unref?.();}
+}finally{await wire?.close();await client.callTool({name:'browser_close',arguments:{}}).catch(()=>{});await client.close();await networkFault?.close();process.stdin.pause();process.stdin.unref?.();}

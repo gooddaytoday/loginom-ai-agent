@@ -6,7 +6,7 @@ export async function configureSortingOutput(channel,configuration,parameters,ma
  let s=await channel.observe({condition:'sorting output inventory',readMappings:true,ready});
  s=await ensureDerivedOutputSources(channel,s);
  resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
- if(requested.fields){changes.push(await configureOutputFields(channel,requested,sources));
+ if(requested.fields||requested.changes){changes.push(await configureOutputFields(channel,requested,sources));
   s=await channel.observe({condition:'sorting output after edits',readMappings:true,ready});
   const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
   changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));

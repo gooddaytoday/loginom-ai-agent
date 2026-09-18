@@ -461,6 +461,26 @@ for(const mode of ['ready_after_load','still_loading','foreign_dialog','wrong_op
   assert.ok(!f.events.includes('mutated'));
  });
 
+for(const mode of ['ready','loading','foreign_dialog','foreign_mask'])test('preview loading permits only a bounded owned wait: '+mode,async()=>{
+ const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+ const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'source'}};
+ const root=workflow_ref.prefix+';ModelForm;PreviewWindow',node={...binding.node,verified:true,surface:'graph'};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'doc',revision:1},prepared_node_context:node,scan:{complete:true},wizard:{status:'absent'},
+  ui:{elements:[],masks:[{kind:'busy',dialog_ref:'preview',target_tid:mode==='foreign_mask'?'foreign':root+';PreviewForm'}],
+   dialogs:[{ref:'preview',identity:{anchor_tid:mode==='foreign_dialog'?'foreign':root}}],truncated:{dialogs:false,masks:false}}};
+ let clock=0,reads=0;const records=[];
+ const channel=createNodeProcedure({operation:{id:'preview',deadline:10000,action:{action_key:'node.apply',revision:'1'}},preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
+  now:()=>++clock,wait:async()=>{},record:async e=>{records.push(e);return structuredClone(e);},execute:async code=>{
+   if(code.includes('function workspaceUiCapability'))return {status:'SUCCEEDED',output:structuredClone(state)};
+   reads++;if(mode==='ready'&&reads>1){state.ui.masks=[];return {verified:true,node_id:'source',root_tid:root};}
+   return {verified:false,reason:'preview_visible_form'};
+  }});
+ const read=channel.observe({condition:'preview ready',readPreview:true,timeoutMs:60,ready:s=>s.node_preview_schema?.verified===true});
+ if(mode==='ready'){await read;assert.equal(records.find(r=>r.phase==='node_observation_sample').readiness.satisfied,false);}
+ else await assert.rejects(read,mode==='loading'?/readiness timeout/:/blocked/);
+ assert.equal(records.some(r=>r.phase==='node_step_prepared'),false);
+});
+
 test('Join link menu uses a unique bounded portal only during Join observation',async()=>{
  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
  const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'join'}};

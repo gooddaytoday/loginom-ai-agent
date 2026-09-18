@@ -52,7 +52,7 @@ test('native union rejects fabricated subtype, unknown/reserved fields and false
 test('default read remains compatible and full does not admit provenance assertions',()=>{
  const check=provider.getValidator(nodeApplyInputSchema.properties.read),old={ports:[0],sample_rows:10,require_exact_numbers:false};
  assert.equal(check(old).valid,true);assert.equal(check({...old,coverage:'full'}).valid,true);
- for(const extra of [{coverage:'all'},{owned_static:true},{expected:{verified:true}},{sample_rows:11}])assert.equal(check({...old,...extra}).valid,false);
+ for(const extra of [{coverage:'all'},{owned_static:true},{expected:{verified:true}},{sample_rows:101}])assert.equal(check({...old,...extra}).valid,false);
 });
 test('1 MiB is checked on the actual escaped MCP envelope and never truncates or alters the checkpoint',()=>{
  const r=result();r.outcome.output.output.ports[0].exact_table.rows[0][0].value='"'.repeat(180000);

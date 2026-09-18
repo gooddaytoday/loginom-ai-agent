@@ -59,7 +59,10 @@ export async function openNewOutputTable(channel,port) {
   const output=one(s.node_outputs.ports.filter(p=>p.index===port),'Requested output port missing');
   requireValue(output.active,'Requested output is not active');
   const nodeTid=s.prepared_node_context.tid;
-  await perform(s,'select prepared graph node',e=>e.graph_node?.part==='body'&&e.tid===nodeTid);
+  // Selected nodes can have their body covered by their own hover controls.
+  // The verified prepared-node observation already attests this selection.
+  if(s.node_outputs.node_selected!==true||!s.ui.elements.some(e=>e.allowed_actions.includes('open_node_views')))
+    await perform(s,'select prepared graph node',e=>e.graph_node?.part==='body'&&e.tid===nodeTid);
   s=await observe('prepared node visualizers',s=>s.ui.elements.some(e=>e.allowed_actions.includes('open_node_views')));
   await perform(s,'open prepared node visualizers',e=>e.allowed_actions.includes('open_node_views'),'open_node_views');
   s=await observe('prepared port visualizer cards',s=>s.node_outputs?.verified&&s.node_outputs.surface==='views'&&s.ui.elements.some(e=>e.viewer_vendor?.kind==='table'));
@@ -167,7 +170,10 @@ export async function configureTablePrecision(channel,table,{alreadyOpen=false,r
   // Selecting another field and returning verifies the stored dialog model;
   // merely reading an input immediately after typing is insufficient in Ext.
   for(const target of targets) {
-    const alternate=fields.find(f=>f.index!==target.index);
+    // Selecting the next target already leaves the previous field. Revisit an
+    // alternate only when this target is still selected (e.g. one numeric field).
+    // This preserves stored-model readback without a trip to column zero per field.
+    const alternate=field(s)?.source_index===target.index?fields.find(f=>f.index!==target.index):null;
     if(alternate)await select(alternate);
     await select(target);
     if(restore) {
@@ -175,7 +181,7 @@ export async function configureTablePrecision(channel,table,{alreadyOpen=false,r
       requireValue(Object.entries(original.settings).every(([name,value])=>field(s)?.[name]?.status==='observed'&&field(s)[name].value===value),
         'Restored Table format differs from original');
     } else target.verified_format=(target.type==='datetime'?verifyTableDateTimeFormat:verifyTableNumericFormat)(field(s),target);
-    if(alternate)requireValue(s.table_settings.format.metadata_fields.find(f=>f.source_index===target.index&&f.name_key===target.key)?.format_string===target.mask,
+    if(fields.length>1)requireValue(s.table_settings.format.metadata_fields.find(f=>f.source_index===target.index&&f.name_key===target.key)?.format_string===target.mask,
       'Stored Table field mask differs from the selected format');
   }
   if(!s)s=await read('Table format ready to apply');

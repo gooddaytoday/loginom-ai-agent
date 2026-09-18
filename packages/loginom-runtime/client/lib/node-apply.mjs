@@ -1,5 +1,7 @@
 import {createHash} from 'node:crypto';
+import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
 import {NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
+import {NODE_READ_MODE,nodeReadHandler} from './node-read-contract.mjs';
 
 const stable = v => Array.isArray(v) ? v.map(stable) : v && typeof v === 'object'
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, stable(v[k])])) : v;
@@ -19,7 +21,8 @@ export function validateNodeApplyRequest(request, handlers) {
     'Unsupported node.apply operation ID or contract revision');
   const graph = Object.fromEntries(['document_id','workflow_ref','target','inputs'].map(k=>[k,request[k]]));
   validateNodeTargetRequest(graph);
-  const handler = handlers.get(request.target.type);
+  const installed = handlers.get(request.target.type);
+  const handler = installed && request.mode===NODE_READ_MODE ? nodeReadHandler(installed) : installed;
   requireValue(handler && typeof handler.validate === 'function' && typeof handler.configure === 'function'
     && typeof handler.revision === 'string' && handler.revision.length > 0, 'No local configuration handler for this node type');
   requireValue(handler.output_wizard===undefined||['embedded','separate'].includes(handler.output_wizard),'Unsupported handler output wizard placement');
@@ -29,15 +32,18 @@ export function validateNodeApplyRequest(request, handlers) {
   const mapped = new Set();
   for (const mapping of request.mappings) {
     requireValue(mapping && typeof mapping === 'object' && !Array.isArray(mapping)
-      && Object.keys(mapping).every(k=>['direction','port','autosync','fields'].includes(k))
+      && Object.keys(mapping).every(k=>['direction','port','autosync','fields','changes'].includes(k))
       && ['input','output'].includes(mapping.direction) && Number.isInteger(mapping.port) && mapping.port >= 0 && mapping.port < 100,
     'Invalid port mapping');
     const key = mapping.direction + ':' + mapping.port;
     requireValue(!mapped.has(key), 'Duplicate port mapping'); mapped.add(key);
     requireValue(mapping.autosync === undefined || typeof mapping.autosync === 'boolean', 'Invalid mapping autosync');
-    if (mapping.fields !== undefined) {
-      requireValue(Array.isArray(mapping.fields) && mapping.fields.length <= 1000, 'Bounded mapping fields required');
-      for (const field of mapping.fields) {
+    requireValue(mapping.changes===undefined||mapping.direction==='output'&&mapping.fields===undefined,'Output changes and full fields are mutually exclusive');
+    const entries=mapping.fields??mapping.changes;
+    if (entries !== undefined) {
+      requireValue(Array.isArray(entries) && entries.length <= 1000, 'Bounded mapping fields required');
+      const changed=new Set();
+      for (const field of entries) {
         requireValue(field && typeof field === 'object' && !Array.isArray(field)
           && Object.keys(field).every(k=>['source','name','label','excluded'].includes(k)), 'Invalid mapping field');
         if(field.source?.kind==='configured_field') {
@@ -51,19 +57,23 @@ export function validateNodeApplyRequest(request, handlers) {
         for(const key of ['name','label'])requireValue(field[key]===undefined || typeof field[key]==='string'
           && field[key].length>0 && field[key].length<=200 && !/[\x00-\x1f]/.test(field[key]), 'Invalid mapping '+key);
         requireValue(field.excluded===undefined || typeof field.excluded==='boolean', 'Invalid exclusion flag');
+        if(mapping.changes!==undefined){
+          requireValue(field.source?.kind==='configured_field'&&!changed.has(field.source.name),'Unique configured output changes required');changed.add(field.source.name);
+          requireValue(['name','label','excluded'].some(k=>Object.hasOwn(field,k)),'Output change must rename or exclude a field');
+        }
       }
     }
   }
   object(request.read, ['ports','sample_rows','require_exact_numbers',...(Object.hasOwn(request.read??{},'coverage')?['coverage']:[])]);
   requireValue(request.read.coverage===undefined||['full','sample'].includes(request.read.coverage),'Invalid output coverage');
   if(request.read.coverage==='full')requireValue(request.target.type==='transform.collapse_columns'&&request.finish==='execute'
-    &&JSON.stringify(request.read.ports)==='[0]','Full native output requires executed Collapse output 0');
+    &&JSON.stringify(request.read.ports)==='[0]','Invalid parameters.read.coverage: full requires executed Collapse output 0; other handlers support sample');
   requireValue(Array.isArray(request.read.ports) && request.read.ports.length <= 16
     && new Set(request.read.ports).size === request.read.ports.length
     && request.read.ports.every(p=>Number.isInteger(p) && p>=0 && p<100)
-    && Number.isInteger(request.read.sample_rows) && request.read.sample_rows>=0 && request.read.sample_rows<=10
+    && Number.isInteger(request.read.sample_rows) && request.read.sample_rows>=0 && request.read.sample_rows<=100
     && typeof request.read.require_exact_numbers==='boolean', 'Invalid output read request');
-  requireValue(request.finish==='execute' || request.read.ports.length===0, 'Done or Close cannot request a fresh output');
+  requireValue(request.finish==='execute' || request.read.ports.length===0, 'Invalid parameters.read.ports: Done and Close require an empty list; choose finish=execute to read fresh output');
   object(request.budgets, ['configure_ms','execute_ms','total_ms']);
   requireValue(Object.values(request.budgets).every(v=>Number.isInteger(v) && v>=1 && v<=1800000)
     && request.budgets.total_ms>=Math.max(request.budgets.configure_ms,request.budgets.execute_ms), 'Invalid node budgets');
@@ -172,6 +182,17 @@ export async function applyNode({request, operation, handlers, drivers, record,
       // Explicit trusted-driver proof is required: a transport exception alone
       // never clears uncertainty, even in a nominally non-mutating phase.
       const refusal=error.nodePhaseRefusal;
+      if(name==='configure'&&request.target.type==='transform.calculator'
+        &&(request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0
+          ||refusal?.verification==='calculator_syntax_rejected_draft_restored')&&refusal?.phase===name&&refusal.status==='FAILED'
+        &&refusal.effect_possible===true&&refusal.cleanup_complete===true&&refusal.settings_unchanged===true
+        &&verifiedCalculatorRequestRefusal(refusal,state.node)){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+        state.correctable_calculator_request=true;
+        state.calculator_default_expression=refusal.proof.before.expressions?.length===1
+         &&refusal.proof.before.expressions[0].name==='Expr1'&&refusal.proof.before.expressions[0].formula==='';
+      }
       if(name==='configure'&&request.target.type==='exports.text'&&refusal?.phase===name&&refusal.status==='FAILED'
         &&refusal.effect_possible===true&&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&['text_export_conflict_rejected','text_export_unsupported_retained'].includes(refusal.verification)){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
@@ -241,6 +262,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
     const target=await phase('target',ctx=>drivers.prepareTarget(graph,ctx),{verify:value=>requireValue(
       value.node?.document_id===request.document_id && value.node.workflow_id===request.workflow_ref.workflow_id
       && id(value.node.node_id), 'Target phase returned a foreign node')});state.node=target.node;
+    const readingOnly=request.mode===NODE_READ_MODE;
+    if(!readingOnly){
     await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));
     await phase('open',ctx=>drivers.openWizard(ctx));
     await phase('configure',ctx=>handler.configure(ctx,request.parameters,drivers));
@@ -251,9 +274,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
         'Intermediate node Done must save settings without execution');
     }});
     if(!separateOutput||request.finish!=='close')await phase('output_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='output'),ctx));
-    const finish=await phase('finish',ctx=>separateOutput&&request.finish!=='close'
+    }
+    const finish=await phase('finish',ctx=>(readingOnly||separateOutput&&request.finish!=='close')
       ?drivers.finishGraph(request.finish,ctx):drivers.finish(request.finish,ctx),{verify:value=>{
       requireValue(value.mode===request.finish, 'Wrong wizard finish mode');
+      if(readingOnly)requireValue(value.settings_applied===false,'Output read must not apply node settings');
       if(request.finish==='execute')requireValue(id(value.execution_id), 'A fresh execution identity is required');
       else requireValue(value.execution_id==null && value.execution_started===false, 'Done must not execute');
       if(request.finish==='close')requireValue(value.draft_discarded===true && value.settings_applied===false,'Close must discard draft settings');
@@ -272,7 +297,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
           root_id:execution.root_id,group_id:execution.group_id,group_record_id:execution.group_record_id};
         const result={operation_id:operation.id,status:'FAILED',effect_possible:state.effect_possible,
           phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
-          package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:'applied'},
+          package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:readingOnly?'not_requested':'applied'},
           checkpoint_kind:'local_node_failed',persisted_package_verified:false,error:execution.error};
         await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
         return result;
@@ -281,14 +306,16 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.execution={status:'cancelled',execution_id:execution.execution_id,stop_verified:true};
         const result={operation_id:operation.id,status:'FAILED',effect_possible:state.effect_possible,
           phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
-          package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:'applied'},
+          package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:readingOnly?'not_requested':'applied'},
           checkpoint_kind:'local_node_stopped',persisted_package_verified:false,
           error:{code:'NODE_EXECUTION_CANCELLED',message:'The identified server execution was cancelled; configured node retained'}};
         await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
         return result;
       }
       state.execution={status:'completed',execution_id:execution.execution_id};
-      const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{mutation:request.read.ports.length>0||handler.fileOutput===true,verify:value=>requireValue(
+      // Output reading has its own work (formats, paging, restoration). The
+      // configuration limit does not cap it; the total operation deadline still does.
+      const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{budget:request.budgets.total_ms,mutation:request.read.ports.length>0||handler.fileOutput===true,verify:value=>requireValue(
         value.execution_id===state.execution.execution_id && ['partial','complete'].includes(value.status)
         && typeof value.evidence_ref==='string' && value.evidence_ref.length>0 && Array.isArray(value.ports)
         && value.ports.length===request.read.ports.length
@@ -298,8 +325,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
     check();
     const result={operation_id:operation.id,status:'SUCCEEDED',effect_possible:state.effect_possible,phases:state.phases.map(({value,...p})=>p),node:state.node,
       execution:state.execution,output:state.output,package_saved:false,cleanup_complete:true,warnings:[],
-      configuration:{status:request.finish==='close'?'discarded':'applied',
-        ...(request.finish!=='close'&&handler.configurationReadback?{readback:handler.configurationReadback({
+      configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied',
+        ...(!readingOnly&&request.finish!=='close'&&handler.configurationReadback?{readback:handler.configurationReadback({
           node:state.node,phases:state.phases,operation_id:operation.id})}:{})},
       checkpoint_kind:request.finish==='close'?'local_node_cancellation':'local_node_checkpoint',persisted_package_verified:false};
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
@@ -310,6 +337,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
     return {operation_id:operation.id,status:state.verified_refusal?'FAILED':state.effect_possible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:state.effect_possible,
       phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
       package_saved:false,cleanup_complete:state.cleanup_complete,warnings:[],
+      ...(state.correctable_calculator_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
+        instruction:'Retained calculator settings were independently rechecked unchanged. Correct expressions and submit a NEW operation_id with the SAME existing target '+JSON.stringify(state.node)+'. '+(state.calculator_default_expression?'The restored node has the blank default Expr1. Correct the formula by updating target:{kind:"existing",name:"Expr1"} inside the first expression with replace:false (name/label/type may be changed). replace:true replaces an INPUT field, not the saved expression. Do not leave this blank default behind. ':'To execute/read without changing formulas use parameters:{expressions:[]}; to edit a retained expression use target:{kind:"existing",name:"existing_name"} inside that expression. ')+'Keep existing connections: inputs:[] and mappings:[]. Do not create another node.'}}:{}),
       pending_phase:state.pending?.phase??null,error:{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
         ...(['WIZARD_SOURCE_VALIDATION_FAILED','WIZARD_CALCULATOR_VALIDATION_FAILED'].includes(error.receipt?.error?.code)?{cause:{code:error.receipt.error.code,
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};

@@ -21,15 +21,23 @@ import { createExecutionJournal } from './execution-journal.mjs';
 import { createRecoveryContext } from './recovery-context.mjs';
 import { outcomeVerification } from './outcome-verification.mjs';
 import { createHostArtifactAdmission, codexInputIdentity } from './host-artifacts.mjs';
-import { compactActionResult, userResultSchema, compactKnowledgeBundle, userWorkflowInstructions } from './user-results.mjs';
+import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle, userWorkflowInstructions } from './user-results.mjs';
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
-import { createUserWorkflowBindings, userNodeTool } from './user-workflow.mjs';
+import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory } from './user-workflow.mjs';
 import { makePackageCleanupCode, parsePackageCleanupResult } from './package-cleanup.mjs';
+import {makeSavedPackageStateCode,parseSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity } from './storage-policy.mjs';
 
 // Keep the runtime receipt byte-for-byte meaningful to reconciliation/journal
 // consumers; recovery advice is a separate MCP content block, never an effect.
 export function actionReply(outcome, { observe = false, userProfile = false } = {}) {
+  // A rejected observation/action did not start a browser effect. The known
+  // worker remains in control; do not turn ordinary waiting into recovery.
+  if(userProfile&&outcome.request_rejected===true&&outcome.output?.active_node_job?.state==='running'
+    &&typeof outcome.output.active_node_job.operation_id==='string'&&outcome.output.active_node_job.operation_id){
+    const result=compactNodeRequestFailure(outcome);
+    return {content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result};
+  }
   const content = [{ type: 'text', text: JSON.stringify(outcome) }];
   const output = outcome.output;
   if (observe && outcome.status === 'SUCCEEDED' && typeof output?.observation_id === 'string'
@@ -157,19 +165,24 @@ export async function createBridge(config, session, { browserTransport: managedB
       commonLocalTools: [diagnosticTool, clipboardTool, prepareTool],
       executorLocalTools: [diagnosticTool, prepareTool, workspaceObserveTool, ...(actionRuntime?.tools ?? [])],
     });
-    if (userProfile) groups.local = groups.local.map(tool => isNodeApiTool(tool.name) ? { ...userNodeTool(tool), outputSchema: userResultSchema } : tool);
+    if (userProfile) {
+      groups.remote=groups.remote.filter(tool=>['find','search','read','grep','glob','list','tree'].includes(tool.name));
+      groups.local=groups.local.filter(tool=>!['dock_ui_action','dock_artifact_upload','dock_artifact_verify'].includes(tool.name))
+        .map(tool=>isNodeApiTool(tool.name)?{...userNodeTool(tool),outputSchema:userResultSchema}:userActionTool(tool));
+    }
     const catalog = combineCatalogs(groups);
     if (actionRuntime) {
       catalog.routes.set('dock_action_describe', 'action');
       catalog.routes.set('dock_action_run', 'action');
       catalog.routes.set('dock_workspace_observe', 'action');
-      for (const name of ['dock_operation_inspect', 'dock_operation_recover', 'dock_ui_action', 'dock_artifact_upload', 'dock_artifact_verify']) catalog.routes.set(name, 'action');
+      for (const name of ['dock_operation_inspect', 'dock_operation_recover', 'dock_ui_action', 'dock_artifact_upload', 'dock_artifact_verify'])
+        if(catalog.tools.some(t=>t.name===name))catalog.routes.set(name,'action');
       for(const tool of actionRuntime.tools.filter(tool=>isNodeApiTool(tool.name)))catalog.routes.set(tool.name,'action');
     }
     await session.save(catalog);
     const server = new Server({ name: 'loginom-dock', version: session.metadata.client }, {
       capabilities: { tools: {} },
-      instructions: ['executor-preview', 'executor-replay'].includes(config.mode)
+      instructions: userProfile ? 'Call dock_prepare, then get the selected node parameter schema with dock_action_describe. Use dock_artifact_deliver for attachments and dock_node_apply for each complete node lifecycle. Keep issued identities and wait on the original operation_id. Follow next_step on failure; inspect uncertain effects before continuing. Save the package at the end. Low-level UI actions are unavailable in this profile.' : ['executor-preview', 'executor-replay'].includes(config.mode)
         ? `This process is pinned to ${config.mode}. Call dock_prepare. Plan and complete the user's goal using verified actions plus dock_workspace_observe and bounded dock_ui_action gestures. An action failure is feedback: inspect, diagnose, repair in this same session, verify and continue. For AMBIGUOUS call dock_operation_inspect; bind UI repairs to the pending operation or use dock_operation_recover. Never bypass uncertain in-flight work with a new ID. Raw JavaScript/browser tools are unavailable; the mode cannot change during this session.`
         : 'Call dock_prepare before Loginom work to load the verified full skill into the current context. Dock provides shared knowledge and a local browser. Source files and live DOM take precedence over recalled context. All clipboard copy/paste must use dock_clipboard_transfer so other Dock sessions cannot overwrite it during the operation. The installed native adapter activates shared session archiving after successful preparation. Check dock_diagnostics for actual archive activation and delivery state.',
     });
@@ -257,7 +270,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             const first = !userBundleDelivered;
             const ready = session.metadata.workspaceReady === true;
             const bundle = first ? compactKnowledgeBundle(actionRuntime.describe({
-              action_keys: ['package.save_checkpoint', 'package.save_as'],
+              action_keys: ['package.save_checkpoint'],
               node_types: actionRuntime.describe().available_node_types,
             })) : null;
             const result = { prepared: ready, sessionId: session.metadata.sessionId, skillRevision: prepared.detail.revision,
@@ -286,9 +299,10 @@ export async function createBridge(config, session, { browserTransport: managedB
               let args=request.params.arguments??{};
               if(userProfile && ['dock_node_apply','dock_node_resume'].includes(request.params.name)) {
                 validateActionParameters(userNodeTool(actionRuntime.tools.find(tool=>tool.name===request.params.name)).inputSchema,args);
-                args=userWorkflows.expandNode(args);
+                if(request.params.name==='dock_node_apply')args=userWorkflows.expandNode(args);
               }
               const result=await dispatchNodeApi(actionRuntime,request.params.name,args,{signal:extra.signal});
+              if(userProfile)userWorkflows.rememberDelivery(result,args);
               await logResult(request.params.name,result);
               return nodeResultReply(result,{userProfile});
             };
@@ -298,11 +312,18 @@ export async function createBridge(config, session, { browserTransport: managedB
             return await (local?invoke():browserGate(invoke));
           }
           if (request.params.name === 'dock_action_describe') {
-            return { content: [{ type: 'text', text: JSON.stringify(actionRuntime.describe(request.params.arguments ?? {})) }] };
+            if(userProfile){
+              const args=request.params.arguments??{},keys=args.action_keys??(args.action_key?[args.action_key]:[]);
+              if(keys.some(key=>!['package.save_as','package.save_checkpoint'].includes(key)))throw Error('Use dock_node_apply for supported nodes; request node_types for the selected parameter schema. Low-level actions require the diagnostic profile.');
+            }
+            const description=actionRuntime.describe(request.params.arguments ?? {});
+            return { content: [{ type: 'text', text: JSON.stringify(userProfile?userActionInventory(description):description) }] };
           }
           return await browserGate(async () => {
             extra.signal.throwIfAborted();
             const args = request.params.arguments ?? {};
+            if(userProfile&&request.params.name==='dock_action_run'&&!['package.save_as','package.save_checkpoint'].includes(args.action_key))
+              throw Error('Use dock_node_apply for supported nodes. Low-level actions require the diagnostic profile.');
             if(['dock_artifact_upload','dock_artifact_verify'].includes(request.params.name)) {
               const definition=actionRuntime.tools.find(tool=>tool.name===request.params.name);
               if(!definition)throw new Error('Artifact upload is unavailable in this session');
@@ -326,6 +347,27 @@ export async function createBridge(config, session, { browserTransport: managedB
             if (userProfile && outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key))
               for (const continuation of outcome.output?.workflow_continuations ?? []) userWorkflows.remember(continuation);
             const reply = actionReply(userProfile?compactActionResult(outcome):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });
+            if(outcome.status==='SUCCEEDED'&&['package.save_as','package.save_checkpoint'].includes(outcome.action_key)&&outcome.output?.package_ref?.path){
+              // Save As can reopen a package that Loginom immediately marks
+              // modified. Report this while the model can still checkpoint it,
+              // rather than discovering it only during isolated shutdown.
+              try{
+                const prepared=session.metadata.workspacePreparation?.state;
+                const options={sessionId:session.metadata.sessionId,documentId:prepared?.document_id,
+                  account:prepared?.loginom_account??config.replayLoginUser,packagePath:outcome.output.package_ref.path,
+                  loginomUrl:config.loginomUrl,loginomBuild:session.metadata.targetIdentity.loginom_build};
+                const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:makeSavedPackageStateCode(options)}},undefined,{timeout:15000});
+                const state=parseSavedPackageState(response,options),advice=savedPackageStateAdvice(state,outcome);
+                await recordExecution({phase:'saved_package_state_observed',operation_id:outcome.operation_id,state,advice});
+                reply.content.push({type:'text',text:JSON.stringify(advice)});
+              }catch{
+                // A read failure must not erase the completed save or invite
+                // a retry of an uncertain save gesture.
+                reply.content.push({type:'text',text:JSON.stringify({kind:'dock_saved_package_state',save_operation_id:outcome.operation_id,
+                  package_path:outcome.output.package_ref.path,modified:null,state:'unavailable',
+                  instruction:'The save receipt remains valid, but the current open package dirty state could not be verified. Do not claim that session cleanup is confirmed.'})});
+              }
+            }
             try {
               const verification = outcomeVerification(outcome, pinnedActions.actions.get(outcome.action_key));
               await recordExecution({ phase: 'verification_delivered', operation_id: outcome.operation_id, verification });
@@ -369,7 +411,14 @@ export async function createBridge(config, session, { browserTransport: managedB
       } catch (error) {
         const message = String(error.message).replaceAll(config.apiKey, '[redacted]');
         if (owner === 'action') {
-          const reply=actionReply(actionRuntime.requestFailure(new Error(message)),{userProfile});
+          const failure=actionRuntime.requestFailure(new Error(message));
+          if(userProfile)failure.output=userActionInventory(failure.output);
+          if(userProfile&&isNodeApiTool(request.params.name)){
+            const result=compactNodeRequestFailure(failure,request.params.arguments);
+            if(!result.effect_possible&&result.next_step.tool==='dock_node_apply')result.next_step.tool=request.params.name==='dock_node_resume'?'dock_node_apply':request.params.name;
+            return {content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result};
+          }
+          const reply=actionReply(failure,{userProfile});
           // A rejected request is not a job snapshot. Preserve its recovery data
           // as an MCP error; outputSchema applies to successful tool responses.
           if(isNodeApiTool(request.params.name))reply.isError=true;

@@ -4,6 +4,38 @@ import { compactNodeResult, compactActionResult, compactKnowledgeBundle, userRes
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 const validate = new AjvJsonSchemaValidator().getValidator(userResultSchema);
 
+test('zero interpretation warning counts only explicit numeric zeros in returned cells',()=>{
+ const sample=[[{type:'integer',value:'0',is_null:false},{type:'real',value:0,is_null:false},
+  {type:'string',value:'0',is_null:false},{type:'real',value:0,is_null:true},
+  {type:'real',value:0},{type:'real',value:1,is_null:false},
+  {type:'real',decimal:'-0.00E+02',is_null:false},
+  {type:'real',decimal:'1e-400',is_null:false},
+  {type:'real',value:1,decimal:'0',is_null:false}]];
+ const raw={operation_id:'read',outcome:{status:'SUCCEEDED',output:{output:{ports:[{
+  port:0,row_count:100,schema:[],sample,sample_complete:false,
+ }]}}}};
+ const r=compactNodeResult(raw);
+ assert.ok(r.limitations.some(s=>s.includes('3 returned numeric cells')&&s.includes('separate source metadata')));
+ assert.deepEqual(r.output.ports[0].sample,sample);
+ raw.outcome.output.output.ports[0].sample=[sample[0].filter((_,i)=>![0,1,6].includes(i))];
+ assert.ok(!compactNodeResult(raw).limitations.some(s=>s.includes('explicit zero')));
+});
+
+test('partial previews explicitly limit report claims without changing analytical data',()=>{
+ const raw={operation_id:'group',outcome:{status:'SUCCEEDED',output:{warnings:['existing warning'],output:{ports:[{
+  port:0,row_count:23,schema:[],sample:Array.from({length:10},()=>[]),sample_complete:false,
+ }]}}}};
+ const result=compactNodeResult(raw);
+ assert.equal(validate(result).valid,true);
+ assert.ok(result.limitations.some(x=>x.includes('10 of 23')&&x.includes('unseen')));
+ assert.ok(result.limitations.includes('existing warning'));
+ assert.deepEqual(raw.outcome.output.warnings,['existing warning']);
+ assert.deepEqual(result.output.ports[0].sample,raw.outcome.output.output.ports[0].sample);
+ raw.outcome.output.output.ports[0].row_count=10;
+ raw.outcome.output.output.ports[0].sample_complete=true;
+ assert.deepEqual(compactNodeResult(raw).limitations,['existing warning']);
+});
+
 test('compact node result keeps references, precision and errors without configuration traces', () => {
   const raw = { operation_id: 'job', attempt: 1, state: 'settled', progress: null, error: null,
     outcome: { status: 'SUCCEEDED', cleanup_complete: true, effect_possible: true, trace: [{ large: 'trace' }],
@@ -29,17 +61,26 @@ test('compact node result keeps references, precision and errors without configu
   raw.outcome.status = 'AMBIGUOUS';raw.outcome.error = { code: 'UNCERTAIN', message: 'inspect same ID' };
   assert.equal(compactNodeResult(raw).error.code, 'UNCERTAIN');
 });
+test('all-null sample warning is bounded and never treats missing values or unseen rows as NULL',()=>{
+ const port={port:0,row_count:72,schema:[{name:'converted',type:'integer'},{name:'present',type:'integer'},{name:'unknown',type:'integer'}],
+  sample:[[{is_null:true},{is_null:false,value:'1'},{}],[{is_null:true},{is_null:true},{}]],sample_complete:false};
+ const raw={operation_id:'calc',outcome:{status:'SUCCEEDED',output:{output:{ports:[port]}}}};
+ let r=compactNodeResult(raw);assert.equal(validate(r).valid,true);const warning=r.limitations.find(s=>s.includes('every returned cell'));
+ assert.match(warning,/converted/);assert.match(warning,/only the 2 returned rows/);assert.ok(!warning.includes('present')&&!warning.includes('unknown'));
+ assert.deepEqual(r.output.ports[0].sample,port.sample);
+ port.sample=[];r=compactNodeResult(raw);assert.ok(!r.limitations.some(s=>s.includes('every returned cell')));
+});
 test('compact actions retain navigation and issued UI controls needed for recovery', () => {
   const raw = { operation_id: 'save', status: 'SUCCEEDED', output: { workflow_ref: { workflow_id: 'new' },
     observation_id: 'obs', ui: { elements: [{ ref: 'visible', allowed_actions: ['click'] }] } }, trace: ['internal'] };
   const result = compactActionResult(raw);
   assert.deepEqual(result.output, raw.output);assert.equal(result.trace, undefined);assert.equal(raw.trace.length, 1);
 });
-test('knowledge bundle retains parameter schemas and revision pins', () => {
+test('initial knowledge bundle omits per-type schemas while retaining revision pins', () => {
   const schema = { type: 'object', required: ['keys'] };
   const result = compactKnowledgeBundle({ session_manifest: { digest: 'pin' }, actions: [{ action_key: 'save', input_schema: schema, revision: '2' }],
     node_types: [{ type: 'transform.sorting', modes: ['keys'], parameter_schema: schema, cache_key: 'cache', source: 'internal references' }] });
-  assert.equal(result.session_manifest.digest, 'pin');assert.deepEqual(result.node_types[0].parameter_schema, schema);
+  assert.equal(result.session_manifest.digest, 'pin');assert.equal(result.node_types[0].parameter_schema, undefined);
   assert.equal(result.node_types[0].cache_key, 'cache');assert.equal(result.node_types[0].source, undefined);
 });
 
@@ -74,4 +115,11 @@ test('installed import discovery supplies its complete parameter vocabulary in c
   const fresh = describeNodeTypes(['imports.text'], {}, new Map(), support.nodeApplyHandlers)[0];
   assert.equal(fresh.parameter_schema.properties.settings.properties.columns.maxItems, 1000);
   assert.equal(nodeApplyInputSchema.properties.parameters.properties.settings.properties.columns.maxItems, 1000);
+});
+
+test('verified calculator rejection exposes its concrete corrected-request continuation',()=>{
+ const next={tool:'dock_node_apply',original_operation_id:'bad',instruction:'Retain the existing node; correct the request with a new ID.'};
+ const r=compactNodeResult({operation_id:'bad',state:'settled',outcome:{status:'FAILED',effect_possible:true,cleanup_complete:true,
+  output:{node:{document_id:'d',workflow_id:'w',node_id:'n'},next_step:next,output:{status:'not_refreshed',ports:[]}}}});
+ assert.deepEqual(r.next_step,next);assert.equal(validate(r).valid,true);
 });

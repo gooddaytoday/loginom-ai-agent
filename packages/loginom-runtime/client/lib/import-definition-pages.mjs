@@ -1,5 +1,21 @@
 // Local assembly of addressed native definition pages. UI gestures and source
 // bytes stay outside this helper; output paging uses guarded native scrolling.
+import {ensureMappingTableView,mappingLinksView} from './mapping-table-view.mjs';
+
+// Some native source loads complete after their initial response and restore
+// Links view. Admit that state only to restore the owned, unchanged mapping;
+// it is never a substitute for a complete definition page.
+async function observeDefinition(channel,options){
+ const accepts=options.ready;
+ let state=await channel.observe({...options,ready:s=>accepts(s)||mappingLinksView(s)});
+ if(!mappingLinksView(state))return state;
+ const root=state.wizard.root_ref,tid=state.wizard.root_tid;
+ const native=await channel.observe({condition:'owned native mapping before table read',readMappings:true,
+  ready:s=>s.wizard?.root_ref===root&&s.wizard.root_tid===tid&&s.node_mapping?.verified===true
+   &&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true});
+ await ensureMappingTableView(channel,native);
+ return channel.observe(options);
+}
 export async function readImportDefinitionPages(channel,{expectedCount,ready=()=>true}={}) {
   return readDefinitionPages(channel,{expectedCount,ready,output:false});
 }
@@ -14,7 +30,7 @@ async function readDefinitionPages(channel,{expectedCount,ready,output}) {
   const fields=[];let schemaId=null,total=null,offset=0;
   for(let pageNumber=0;pageNumber<125;pageNumber++) {
     const columnKey=output?'output_columns':'import_columns';
-    let state=await channel.observe({condition:'complete '+(output?'output':'import')+' definition page at '+offset,
+    let state=await (output?observeDefinition:((channel,options)=>channel.observe(options)))(channel,{condition:'complete '+(output?'output':'import')+' definition page at '+offset,
       [output?'outputColumnPage':'importColumnPage']:{offset,limit:8},ready:state=>(output?['output_mapping','input_mapping'].includes(state.wizard?.stage):state.wizard?.stage==='text_import_format')
         && (state.wizard[columnKey]?.page?.status==='complete_definition_page'
           || output && state.wizard[columnKey]?.page?.status==='rendered_definition_window')&&ready(state)});
@@ -68,7 +84,7 @@ export async function observeOutputDefinitionPage(channel,{offset,ready=()=>true
   if(!Number.isInteger(offset)||offset<0||offset>=1000)throw new Error('Bounded output definition offset required');
   const accepts=s=>['output_mapping','input_mapping'].includes(s.wizard?.stage)
     &&['complete_definition_page','rendered_definition_window'].includes(s.wizard.output_columns?.page?.status)&&ready(s);
-  let state=await channel.observe({condition:'addressed output definition page at '+offset,outputColumnPage:{offset,limit:8},ready:accepts});
+  let state=await observeDefinition(channel,{condition:'addressed output definition page at '+offset,outputColumnPage:{offset,limit:8},ready:accepts});
   state=await revealOutputPage(channel,state,{offset,schemaId,total,ready});
   const p=state.wizard.output_columns.page;
   if(p.status!=='complete_definition_page'||p.offset!==offset||schemaId!==undefined&&p.schema_id!==schemaId

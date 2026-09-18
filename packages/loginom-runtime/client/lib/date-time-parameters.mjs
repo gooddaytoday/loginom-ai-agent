@@ -14,8 +14,8 @@ export function validateDateTimeParameters(p,mode,request){
  need(mode==='calendar','unsupported mode');
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>k==='fields'),'unknown parameters');
  need(request.target.kind!=='new'||Array.isArray(p.fields)&&p.fields.length>0,'new node requires fields');
- need(request.mappings.every(m=>(m.fields??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'configured-field mappings required');
- need(request.mappings.every(m=>m.direction!=='output'||m.fields===undefined||m.autosync!==true),'explicit output layout requires autosync disabled');
+ need(request.mappings.every(m=>(m.fields??m.changes??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'configured-field mappings required');
+ need(request.mappings.every(m=>m.direction!=='output'||m.fields===undefined&&m.changes===undefined||m.autosync!==true),'explicit output layout requires autosync disabled');
  if(p.fields===undefined)return;
  need(Array.isArray(p.fields)&&p.fields.length<=128,'invalid fields');
  need(request.target.kind!=='new'||p.fields.some(f=>Array.isArray(f?.transformations)&&f.transformations.length>0),'new node requires a transformation');

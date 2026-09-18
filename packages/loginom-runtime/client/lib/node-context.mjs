@@ -43,17 +43,32 @@ export async function readPreparedNodeContext(page, binding) {
     }
     if(b.workflow_ref.navigation_path.some((c,i)=>c.tid!==crumbs[i].tid || c.label!==crumbs[i].label))return reject('navigation');
     const model=card?.Controller?.FController;
-    let surface, tid, locked, outputPort;
+    let surface, tid, locked, outputPort, graphRoot, pendingWizardNode;
     if(app.ModelForm && model instanceof app.ModelForm) {
       const d=model.FDiagram, nodes=d?.FNodes?.FCollection, roots=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
       if(roots.length===0)return pending();
       if(!Array.isArray(nodes) || nodes.length>200 || roots.length!==1 || d.FmxGraph?.container!==roots[0])return reject('graph_binding');
+      graphRoot=roots[0];
       const matches=nodes.filter(n=>n.FGuid===b.node.node_id);
       if(matches.length!==1)return reject('graph_node');
       const dom=d.FmxGraph.view.getState(matches[0].FCell)?.shape?.node;
       if(!dom || !roots[0].contains(dom))return pending();
       tid=dom.getAttribute('data-tid'); surface='graph';
       locked=matches[0].FLocked===true;
+      // Before deactivation is confirmed the active controller still owns the
+      // workflow. The two rendered breadcrumb components already own the exact
+      // pending node and wizard tree objects, including duplicate-name keys.
+      if(crumbs.length===b.workflow_ref.navigation_path.length+2&&crumbs.at(-1).label==='Настройка') {
+        const nodeElements=exact(crumbs.at(-2).tid),wizardElements=exact(crumbs.at(-1).tid);
+        const nc=nodeElements.length===1&&globalThis.Ext?.getCmp(nodeElements[0].id);
+        const wc=wizardElements.length===1&&globalThis.Ext?.getCmp(wizardElements[0].id);
+        const nt=nc?._node?.data?.node,wt=wc?._node?.data?.node;
+        if(nc?.el?.dom===nodeElements[0]&&wc?.el?.dom===wizardElements[0]
+          &&app.ModelNodeTreeNode&&nt instanceof app.ModelNodeTreeNode
+          &&app.WizardTreeNode&&wt instanceof app.WizardTreeNode&&wt.ParentNode===nt
+          &&nt.ParentNode===workflowNode&&nt.FGuid===b.node.node_id&&nt.FModelNode===matches[0].data)
+          pendingWizardNode=crumbs.at(-2);
+      }
     } else if(model?.constructor?.name==='WizardModelComponentForm') {
       if(!nodeTree)return pending();
       if(!nodeTree.FModelNode || model.FModelNode!==nodeTree.FModelNode) {
@@ -80,13 +95,14 @@ export async function readPreparedNodeContext(page, binding) {
       const roots=exact(tid);
       if(roots.length && (roots.length!==1 || model.FView?.el?.dom!==roots[0]))return reject('views_binding');
     } else return pending();
-    const elements=exact(tid);
+    const elements=graphRoot?[...exact(tid)].filter(e=>graphRoot.contains(e)):exact(tid);
     if(elements.length===0)return pending();
     if(elements.length!==1)return reject('surface_ambiguous');
     if(elements[0].getBoundingClientRect().width<=0 || elements[0].getBoundingClientRect().height<=0
       || getComputedStyle(elements[0]).visibility==='hidden')return pending();
     return {verified:true,document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,surface,tid,
       ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),
-      ...(surface==='graph'?{locked}:{})};
+      ...(surface==='graph'?{locked,...(nodeTree&&crumbs.length===b.workflow_ref.navigation_path.length+1?{navigation_node:crumbs.at(-1)}:{}),
+        ...(pendingWizardNode?{pending_wizard_node:pendingWizardNode}:{})}:{} )};
   },binding);
 }

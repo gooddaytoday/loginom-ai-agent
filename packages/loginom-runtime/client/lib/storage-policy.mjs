@@ -1,5 +1,6 @@
 // Host-selected Loginom directories. These are server paths, never OS homes
 // or paths inferred from the authenticated account's name.
+import {guardLoginomConnection} from './connection-recovery.mjs';
 const purposes = ['packages', 'inputs', 'exports'];
 
 export function storagePath(value) {
@@ -50,13 +51,7 @@ export function withStorageIdentity(code, binding) {
   if (!binding) throw Error('Prepare Loginom before using the selected directories');
   return `async page=>{
     const expected=${JSON.stringify(binding)};
-    const same=await page.evaluate(b=>{
-      const connection=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection;
-      return location.origin===b.origin && globalThis.bg?.app?.Version===b.loginom_build
-        && globalThis.__loginomDockPreparationV1?.id===b.document_id
-        && connection?.Connected===true && connection.UserName===b.loginom_account;
-    },expected);
-    if(!same)throw Error('Loginom account or document changed; prepare the workspace again');
+    await (${guardLoginomConnection.toString()})(page,expected);
     return (${code})(page);
   }`;
 }

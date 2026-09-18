@@ -1,10 +1,41 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateCalculatorParameters,resolveCalculatorPatch} from '../lib/calculator-parameters.mjs';
+import {calculatorParametersSchema} from '../lib/node-api.mjs';
+import {compactNodeRequestFailure} from '../lib/user-results.mjs';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 const expression=(name,index=0)=>({name,index,record_id:'r'+index,expression_id:String(index),label:'Same',type:'real',formula:'Amount * 2',replace:false,intermediate:false,cached:true,description:'Keep me'});
 const observed=()=>({verified:true,inventory_complete:true,mode:'expression',expressions:[expression('A'),expression('B',1)]});
 const inputs=[{name:'Amount',type:'real'}];
 const request=()=>({target:{kind:'existing'},inputs:[],read:{ports:[0]},mappings:[]});
+test('published calculator schema and handler agree on new expressions and saved patches',()=>{
+ const check=new AjvJsonSchemaValidator().getValidator(calculatorParametersSchema);
+ const added={target:{kind:'new'},name:'Ratio',label:'Ratio',type:'real',formula:'Amount / 3',replace:false};
+ const incomplete={...added};delete incomplete.replace;
+ for(const [item,valid,path] of [
+  [added,true], [{target:{kind:'existing',name:'A'},formula:'Amount / 2'},true],
+  [incomplete,false,'parameters.expressions[0].replace'],
+  [{...added,target:{kind:'new',name:'Ratio'}},false,'parameters.expressions[0].target.name'],
+  [{target:{kind:'existing'},formula:'Amount'},false,'parameters.expressions[0].target.name']]){
+  const parameters={expressions:[item]};assert.equal(check(parameters).valid,valid);
+  if(valid)assert.doesNotThrow(()=>validateCalculatorParameters(parameters,'expression',request()));
+  else {
+   let error;try{validateCalculatorParameters(parameters,'expression',request());}catch(e){error=e;}
+   assert.ok(error);const reply=compactNodeRequestFailure({effect_possible:false,error:{message:error.message}},{operation_id:'bad-calc',target:{type:'transform.calculator'}});
+   assert.equal(reply.error.parameter_path,path);assert.equal(reply.effect_possible,false);assert.equal(reply.cleanup_complete,true);
+   assert.equal(reply.next_step.tool,'dock_action_describe');
+  }
+ }
+});
+
+test('new calculator refuses missing input and inherited names in expression order before any driver runs',()=>{
+ const p={expressions:[{target:{kind:'new'},name:'Ratio',label:'Ratio',type:'real',formula:'a/b',replace:false}]};
+ const r={...request(),target:{kind:'new'}};
+ assert.throws(()=>validateCalculatorParameters(p,'expression',r),/Invalid parameters.inputs:/);
+ r.inputs=[{input:0}];
+ assert.throws(()=>validateCalculatorParameters({...p,order:['a','b','Ratio']},'expression',r),/Invalid parameters.parameters.order:/);
+ assert.doesNotThrow(()=>validateCalculatorParameters({...p,order:['Ratio']},'expression',r));
+});
 test('partial expression patch retains unrequested formulas, options, description and order',()=>{
  const before=observed(),p={expressions:[{target:{kind:'existing',name:'A'},formula:'Amount * 3'}]};
  validateCalculatorParameters(p,'expression',request());const r=resolveCalculatorPatch(p,before,inputs);

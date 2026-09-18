@@ -11,8 +11,11 @@ async function fixture(mode){
  const graph={complete:true,dom_epoch:1,nodes:[{ref:{node_id:'source'},dom_epoch:2},{ref:{node_id:'target'},dom_epoch:3}],links:[]};
  const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',pinned,execute:async code=>{
   if(code.startsWith('async page=>{(page[Symbol')||code.startsWith('async page=>{page[Symbol'))return true;
+  if(code.includes('function browserCapability')){links++;return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};}
+  if(code.includes('async function prepareLinkHover'))return structuredClone(graph);
   if(code.includes('page.waitForFunction')){waits++;if(mode==='cancel')controller.abort();if(mode==='deadline')await new Promise(r=>setTimeout(r,30));return true;}
   if(code.includes('async function readGraph')){
+   if(code.includes('\"read_bindings\":true')){if(mode==='cancel_rebind')controller.abort();return {...structuredClone(graph),native_bindings:[{node_id:'source',label:'Source',outputs:[0]},{node_id:'target',label:'Export',inputs:[1]}]};}
    if(phase==='setup')return structuredClone(graph);reads++;
    if(mode==='foreign')throw Error('Prepared workflow changed');
    if(mode==='mask_forever'||reads===1)throw Error('Graph is blocked');

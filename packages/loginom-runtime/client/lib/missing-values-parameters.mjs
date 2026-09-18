@@ -25,8 +25,8 @@ export function validateMissingValuesParameters(p,mode,r){
  need(r.target.kind==='existing'||r.inputs.length===1,'New missing values requires explicit input');
  need(r.read.ports.every(i=>i===0),'Missing values has one output');
  need(r.mappings.length<=2&&r.mappings.every(m=>m.port===0),'Missing values has one input/output mapping');
- for(const m of r.mappings)if(m.fields){
-  const seen=new Set();for(const f of m.fields){
+ for(const m of r.mappings)if(m.fields||m.changes){
+  const seen=new Set();for(const f of m.fields??m.changes){
    need(f.source?.kind==='configured_field'&&name(f.source.name)&&!seen.has(f.source.name.toLowerCase()),'Unique configured mapping fields required');seen.add(f.source.name.toLowerCase());
    need(m.direction==='output'||f.excluded!==true,'Input exclusions are unsupported');
   }

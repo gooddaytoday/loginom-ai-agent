@@ -26,7 +26,7 @@ export async function readOutputContext(page,binding,readNode=readPreparedNodeCo
           const el=d.FmxGraph.view.getState(p.FCell)?.shape?.node,tid=el?.getAttribute('data-tid');
           if(!tid?.startsWith(context.tid+';Output_Data-'))continue;
           const index=tid.slice((context.tid+';Output_Data-').length);
-          if(!/^[0-9]{1,2}$/.test(index) || !guid(p.FGuid) || exact(tid).length!==1 || !d.FmxGraph.container.contains(el))return fail('port_identity');
+          if(!/^[0-9]{1,2}$/.test(index) || !guid(p.FGuid) || [...exact(tid)].filter(candidate=>d.FmxGraph.container.contains(candidate)).length!==1 || !d.FmxGraph.container.contains(el))return fail('port_identity');
           const images=[...el.querySelectorAll('image')];
           if(images.length!==1)return fail('port_icon');
           const href=images[0].getAttribute('href')??images[0].getAttribute('xlink:href');

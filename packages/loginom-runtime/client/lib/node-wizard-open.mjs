@@ -8,7 +8,8 @@ export function wizardOpenBinding(state) {
   'A prepared graph node is required to open settings');
  const controls=state.ui.elements.filter(e=>e.tid===n.tid+';Setting'&&e.wizard_open&&e.allowed_actions?.includes('begin_wizard'));
  requireValue(controls.length===1,'One prepared settings control is required');
- return {kind:'deactivation',node:{document_id:n.document_id,workflow_id:n.workflow_id,node_id:n.node_id},
+ const labels=state.ui.elements.filter(e=>e.graph_node?.part==='label'&&e.tid===n.tid+';Label;Label');
+ return {...(labels.length===1&&typeof labels[0].label==='string'?{graph_label:labels[0].label}:{}),kind:'deactivation',node:{document_id:n.document_id,workflow_id:n.workflow_id,node_id:n.node_id},
   graph_tid:n.tid,opening:structuredClone(controls[0].wizard_open)};
 }
 
@@ -17,7 +18,9 @@ export function wizardDeactivationDialogOwner(state,binding) {
  return binding?.kind==='deactivation'&&n?.verified===true&&n.surface==='graph'
   &&n.tid===binding.graph_tid&&['document_id','workflow_id','node_id'].every(k=>n[k]===binding.node?.[k])
   &&state.wizard?.status==='absent'&&state.wizard_pending_owner?.status==='observed'
-  &&state.wizard_pending_owner.node?.tid===binding.opening?.workflow_path?.at(-1)?.tid+'>'+binding.opening?.node?.node_label
+  &&(state.wizard_pending_owner.node?.tid===binding.opening?.workflow_path?.at(-1)?.tid+'>'+binding.opening?.node?.node_label
+    ||n.pending_wizard_node?.tid===state.wizard_pending_owner.node?.tid
+      &&typeof n.pending_wizard_node?.tid==='string'&&n.pending_wizard_node.label===state.wizard_pending_owner.node?.label)
   &&same(state.wizard_pending_owner.path?.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening?.workflow_path)
   &&Array.isArray(ui?.dialogs)&&ui.dialogs.length===1&&Array.isArray(ui.masks)
   &&ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===binding.graph_tid.split(';Graph;')[0]&&m.dialog_ref===null);
@@ -49,7 +52,11 @@ export async function openPreparedWizard(channel) {
  const after=await channel.observe({condition:'prepared node wizard opened',ready:s=>s.wizard?.status==='observed'
   &&s.wizard.owner_context?.status==='observed'&&s.prepared_node_context?.surface==='wizard'});
  const owner=after.wizard.owner_context;
- requireValue(owner.node.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
+ const n=after.prepared_node_context,normalize=v=>typeof v==='string'?v.replace(/\s/g,''):'';
+ const bound=n?.verified===true&&n.surface==='wizard'&&['document_id','workflow_id','node_id'].every(k=>typeof n[k]==='string'&&n[k]===binding.node[k]);
+ const ownerMatches=owner.node.tid===binding.opening.workflow_path.at(-1)?.tid+'>'+binding.opening.node.node_label
+  ||normalize(binding.graph_label)!==''&&normalize(binding.graph_label)===normalize(owner.node.label);
+ requireValue(bound&&ownerMatches
   &&same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),binding.opening.workflow_path),
   'Opened wizard owner differs from the prepared node');
  return {verified:true,deactivation_required:deactivationRequired,node_context:after.prepared_node_context,

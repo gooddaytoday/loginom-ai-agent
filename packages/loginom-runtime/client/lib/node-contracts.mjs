@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 
 export const NODE_CONTRACT_REVISION = '1.0.0';
+// Native node labels and ports extend above/left of the model-space origin.
+// Zoom cannot reveal that footprint at the canvas's zero-scroll boundary.
+export const NODE_POSITION_MIN = 64;
 const definitions = [
   ['research.duplicates', 'Дубликаты и противоречия', 'duplicates', 1, 1, false, ['mark'], 'processors/scrutiny/duplicates.md'],
   ['preprocessing.data_recovery', 'Заполнение пропусков', 'datarecovery', 1, 1, false, ['impute'], 'processors/preprocessing/imputation.md'],
@@ -49,7 +52,7 @@ export function validateNodeTargetRequest(request) {
     || request.workflow_ref.navigation_path.some(c=>!c || typeof c.tid!=='string' || !c.tid || typeof c.label!=='string' || Object.keys(c).some(k=>!['tid','label'].includes(k)))) throw new Error('Full prepared workflow reference required');
   const target = request.target;
   if (target?.kind === 'new') {
-    object(target, ['kind', 'type', 'label', 'position'], ['kind', 'type', 'position']);
+    object(target, ['kind', 'type', 'label', 'position'], ['kind', 'type']);
     if (!Object.hasOwn(NODE_TYPES, target.type)) throw new Error('Node type has no local graph handler');
   } else if (target?.kind === 'existing') {
     object(target, ['kind', 'ref', 'type', 'label', 'position'], ['kind', 'ref', 'type']);
@@ -61,7 +64,8 @@ export function validateNodeTargetRequest(request) {
     || /[;|<>"'\\\x00-\x1f]/.test(target.label))) throw new Error('Unsupported node label');
   if (target.position !== undefined) {
     object(target.position, ['x', 'y']);
-    if (Object.values(target.position).some(v => !Number.isFinite(v) || v < 8 || v > 10000)) throw new Error('Invalid node position');
+    for(const axis of ['x','y'])if(!Number.isFinite(target.position[axis]) || target.position[axis]<NODE_POSITION_MIN || target.position[axis]>10000)
+      throw new Error('Invalid parameters.target.position.'+axis+': expected '+NODE_POSITION_MIN+'..10000 to keep the node label and ports inside the canvas; omit target.position for automatic placement');
   }
   if (!Array.isArray(request.inputs) || request.inputs.length > 100) throw new Error('Bounded input list required');
   const targets = new Set();

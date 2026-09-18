@@ -1,4 +1,5 @@
 import {DATE_TIME_OPERATIONS} from './date-time-parameters.mjs';
+import {expandOutputChanges} from './output-mapping-changes.mjs';
 import {ensureGroupingOutputSources} from './grouping-output-sources.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields} from './port-mapping-procedure.mjs';
 import {ensureDateTimeRequestedOutputs} from './date-time-output-additions.mjs';
@@ -24,6 +25,7 @@ export function resolveDateTimeOutput(c,p,native,mapping={}){
   assigned.add(matches[0].source.record_id);Object.assign(matches[0],{name:t.name,label:t.label});
  }
  let ordered=pairs;
+ mapping=expandOutputChanges(mapping,pairs.map(p=>({source:{kind:'configured_field',name:p.name},name:p.name,label:p.label,excluded:p.excluded})));
  if(mapping.fields){need(mapping.fields.length===pairs.length,'explicit output mapping must account for all fields');const seen=new Set();ordered=mapping.fields.map(f=>{
   const candidates=pairs.filter(p=>p.name===f.source?.name);need(f.source?.kind==='configured_field'&&candidates.length===1&&!seen.has(candidates[0]),'unique configured output reference required');const p=candidates[0];seen.add(p);
   const excluded=f.excluded??p.excluded;need(!excluded||!p.source.required,'generated date fields cannot be excluded');
@@ -39,7 +41,7 @@ export async function configureDateTimeOutput(channel,c,p,mapping={},options={})
  const removal=await removeDateTimeOrphans(channel,initial,options.removed??[]);initial=removal.state;
  const addition=await ensureDateTimeRequestedOutputs(channel,initial,c,p,resolveDateTimeGeneratedSource);initial=addition.state;
  const planned=resolveDateTimeOutput(c,p,initial.node_mapping,mapping),changes=[];
- if(p.fields!==undefined||mapping.fields){
+ if(p.fields!==undefined||mapping.fields||mapping.changes){
   changes.push(await configureOutputFields(channel,{direction:'output',port:0,fields:planned.map(f=>({source:{kind:'configured_field',name:f.source.name},name:f.name,label:f.excluded?f.source.label:f.label,excluded:f.excluded}))},initial.node_mapping.source_fields.map(f=>({...f,used:true}))));
   const edited=(await channel.observe({condition:'date/time mapped source identities',readMappings:true,ready})).node_mapping;
   const ids=planned.map(f=>{const matches=edited.target_fields.filter(t=>(t.source??t.exclusion_source)?.record_id===f.source.record_id);need(matches.length===1,'mapped source changed');return matches[0].record_id;});
@@ -47,7 +49,7 @@ export async function configureDateTimeOutput(channel,c,p,mapping={},options={})
  }
  // Native autosync appends passthrough fields after generated fields on the
  // next node validation. An explicit layout must therefore disable it.
- if(mapping.fields||mapping.autosync!==undefined)changes.push(await configureOutputAutosync(channel,mapping.autosync??false));
+ if(mapping.fields||mapping.changes||mapping.autosync!==undefined)changes.push(await configureOutputAutosync(channel,mapping.autosync??false));
  else if(removal.receipts.length)changes.push(await configureOutputAutosync(channel,originalAutosync));
  const final=(await channel.observe({condition:'date/time final output mapping',readMappings:true,ready})).node_mapping;
  // Excluded records are service records, not output columns. Loginom gives

@@ -16,7 +16,7 @@ function fixture(overrides = {}) {
     Package:{}, HasRunningNodes:() => state.running};
   const m = {PackageNodes:{get Count(){return state.count;}, Items:() => node}, HasRunningNodes:() => state.running,
     FServerConnection:{get UserName(){return state.account;}, Connected:true, Session:{IsPackageModified:async () => {
-      events.push('modified-read'); if (state.racePath) state.path = state.racePath; return state.modified;
+      events.push('modified-read'); if (state.racePath) state.path = state.racePath; if(state.raceReadOnly!==undefined)state.readonly=state.raceReadOnly; return state.modified;
     }}}, async ClosePackage(target, suppressEvents, processAfterCall) {
       events.push('close'); assert.equal(target,node); assert.equal(suppressEvents,false); assert.equal(processAfterCall,true);
       if (state.closePrompt || state.modified) { state.dialog=true; return new Promise(resolve => {
@@ -108,4 +108,24 @@ test('QA discard does not answer a running-node or foreign-package prompt',async
     const f=fixture({modified:true,prompt}),r=await f.run({diagnosticDiscard:true});
     assert.equal(r.status,'BLOCKED');assert.equal(f.events.includes('discard'),false);assert.equal(f.state.tab,true);
   }
+});
+
+
+test('explicit read-only diagnostic cleanup closes only the owned unmodified copy',async()=>{
+ const f=fixture({readonly:true});const r=await f.run({diagnosticReadOnly:true});
+ assert.equal(r.status,'SUCCEEDED');assert.equal(r.unsaved_changes_discarded,false);
+ assert.deepEqual(f.events,['modified-read','close','tab-detached','avatar','logout','login-visible']);
+ for(const change of [{readonly:false},{readonly:true,path:'/foreign/result.lgp'},{readonly:true,account:'other'}]){
+  const bad=fixture(change);assert.equal((await bad.run({diagnosticReadOnly:true})).status,'BLOCKED');
+  assert.equal(bad.events.includes('close'),false);
+ }
+ const dirty=fixture({readonly:true,modified:true});assert.equal((await dirty.run({diagnosticReadOnly:true})).reason,'UNSAVED_CHANGES');
+ assert.throws(()=>makePackageCleanupCode({...options,diagnosticReadOnly:'true'}));
+});
+
+test('read-only mode cannot change during the server dirty-state check',async()=>{
+ for(const [readonly,raceReadOnly] of [[true,false],[false,true]]){
+  const f=fixture({readonly,raceReadOnly});const r=await f.run({diagnosticReadOnly:readonly});
+  assert.equal(r.reason,'PACKAGE_CHANGED_DURING_CHECK');assert.equal(f.events.includes('close'),false);
+ }
 });

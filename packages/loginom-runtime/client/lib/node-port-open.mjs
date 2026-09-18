@@ -88,10 +88,13 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    for(const list of node.FPorts){if(!Array.isArray(list.FCollection)||list.FCollection.length>100)fail('Port inventory bound');candidates.push(...list.FCollection);}
    const ports=[],graphBox=roots[0].getBoundingClientRect();
    for(const dom of document.querySelectorAll('[data-tid^='+JSON.stringify(tid+';'+(input?'Input':'Output')+'_Data-')+']')) {
+    // The outline keeps a cloned SVG with identical tids after closing. Only
+    // the prepared graph's own port can participate in native hit binding.
+    if(!roots[0].contains(dom))continue;
     const ptid=dom.getAttribute('data-tid'),suffix=ptid.slice((tid+';'+(input?'Input':'Output')+'_Data-').length);
     if(!/^[0-9]{1,2}$/.test(suffix))fail('Unknown output port identifier');
     const index=Number(suffix),box=dom.getBoundingClientRect();
-    if(!roots[0].contains(dom)||box.width<=0||box.height<=0||exact(ptid).length!==1)fail('Port DOM unavailable');
+    if(box.width<=0||box.height<=0||exact(ptid).filter(e=>roots[0].contains(e)).length!==1)fail('Port DOM unavailable');
     const cell=d.FmxGraph.getCellAt(box.x-graphBox.x+roots[0].scrollLeft+box.width/2,box.y-graphBox.y+roots[0].scrollTop+box.height/2);
     const matches=candidates.filter(port=>port.FCell===cell&&port.parent===node&&port.data);
     if(matches.length!==1)fail('Port native hit identity unavailable');
@@ -119,9 +122,10 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   if(r.node.FGuid!==r.node_id||r.node.data!==r.nodeData||r.port.FGuid!==r.portGuid||r.port.data!==r.portData
     ||r.port.parent!==r.node||r.port.FPortIndex!==undefined&&r.port.FPortIndex!==r.nativeIndex)fail('Retained port identity changed');
   if(mode==='menu_issued') {
+   const graph=r.graph.FDiagram.FmxGraph,drawings=exact(r.portTid).filter(e=>graph.container.contains(e));
    if(r.phase!=='reserved'||model!==r.graph||r.node.FLocked===true
-    ||exact(r.portTid).length!==1)fail('Port changed before menu gesture');
-   const graph=r.graph.FDiagram.FmxGraph,dom=exact(r.portTid)[0],box=dom.getBoundingClientRect(),gb=graph.container.getBoundingClientRect();
+    ||drawings.length!==1)fail('Port changed before menu gesture');
+   const dom=drawings[0],box=dom.getBoundingClientRect(),gb=graph.container.getBoundingClientRect();
    if(!graph.container.contains(dom)||box.width<=0||box.height<=0)fail('Port drawing unavailable');
    if(graph.getCellAt(box.x-gb.x+graph.container.scrollLeft+box.width/2,box.y-gb.y+graph.container.scrollTop+box.height/2)!==r.port.FCell)fail('Port native hit changed');
    // Hover may draw a transient SVG copy over a port. Use an observed point

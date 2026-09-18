@@ -78,3 +78,17 @@ test('a new process below the viewport is revealed directly without resetting bu
  await revealExecutionControl(channel,node,state(),target,s=>s.node_processes.processes[1].process_tid);
  assert.deepEqual(actions,[{verb:'scroll',ref:'scroll',delta_y:48}]);
 });
+
+
+test('execution return accepts a distinct breadcrumb key only with an exact cached navigation binding',async()=>{
+ for(const fault of [null,'missing','label','key']){
+  const f=fixture();f.state.prepared_node_context.tid='MF;TF-1;Graph;Import@1';
+  f.state.node_context.node.tid='workflow>Import-3';
+  f.state.prepared_node_context.navigation_node={tid:'workflow>Import-3',label:'Import'};
+  if(fault==='missing')delete f.state.prepared_node_context.navigation_node;
+  if(fault==='label')f.state.prepared_node_context.navigation_node.label='Foreign';
+  if(fault==='key')f.state.prepared_node_context.navigation_node.tid='workflow>Foreign';
+  if(fault){await assert.rejects(returnToExecutedWorkflow(f.channel,node),/does not belong/);assert.equal(f.actions.length,0);}
+  else{await returnToExecutedWorkflow(f.channel,node);assert.equal(f.actions.length,1);}
+ }
+});

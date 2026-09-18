@@ -1,4 +1,6 @@
+import {browserFailureCategory} from './browser-failure.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix} from './storage-policy.mjs';
+import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference} from './artifact-discovery.mjs';
 import {createArtifactDelivery} from './artifact-delivery.mjs';
@@ -14,6 +16,7 @@ import { createObservationPages } from './observation-pages.mjs';
 import { makeWorkspaceBootstrapCode } from './workspace.mjs';
 import { createNodeProcedure } from './node-procedure.mjs';
 import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow } from './node-apply.mjs';
+import {reconcileOutputMappingPhase} from './node-output-mapping-recovery.mjs';
 import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
 import { createNodeOperationRunner } from './node-operation-runner.mjs';
 import {nodeApiTools,deliveryApiTools} from './node-api.mjs';
@@ -340,7 +343,18 @@ export function makeArtifactDownloadCode(options) {
   return `async (page) => (${browserArtifactDownload.toString()})(page,${JSON.stringify(options)},${observe},${act},${browserArtifactReveal.toString()})`;
 }
 
-function browserCapability(page, task) {
+export function rebindNodeTargetLinkEpochs(context,observed) {
+  const shape=g=>({...g,nodes:g.nodes.map(({dom_epoch,...node})=>node)});
+  if(!context.graph_baseline||observed?.complete!==true||JSON.stringify(shape(context.graph_baseline))!==JSON.stringify(shape(observed)))
+    throw Error('Node target link graph changed before gesture');
+  return context.nodes.map(expected=>{
+    const matches=observed.nodes.filter(n=>n.ref.node_id===expected.id);
+    if(matches.length!==1||!Number.isSafeInteger(matches[0].dom_epoch))throw Error('Node target link identity changed');
+    return {...expected,dom_epoch:matches[0].dom_epoch};
+  });
+}
+
+function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs) {
   const started = Date.now();
   const deadline = task.deadline_at ?? started + task.action.timeout_ms;
   const trace = [];
@@ -362,6 +376,15 @@ function browserCapability(page, task) {
   const ensureDeadline = () => { if(task.node_target_cancellation_id && page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.node_target_cancellation_id))throw new Error('Node target cancelled');if (Date.now() >= deadline) throw new Error('Action deadline exceeded'); };
   const interact = async (operation, effect = false) => {
     ensureDeadline();
+    if(task.node_target_context&&!effectPossible&&readNodeTargetGraph){
+      // Hover controls may repaint after a delay, including between the move
+      // and mouse.down. Rebind only after a complete unchanged graph proof;
+      // the immediate DOM guard below still rejects a race after this read.
+      const context=task.node_target_context;
+      const rebound=rebindTargetEpochs(context,await readNodeTargetGraph(page,context.graph_probe));
+      if(JSON.stringify(rebound)!==JSON.stringify(context.nodes))record('node_target_link_dom_rebound',{before:context.nodes,after:rebound,full_graph_unchanged:true});
+      context.nodes=rebound;
+    }
     if(task.node_target_context)await page.evaluate(({context,beforeEffect})=>{
       const p=globalThis.__loginomDockPreparationV1,r=context.request;
       const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
@@ -1188,10 +1211,12 @@ export function makeCapabilityCode(action, selectors, parameters, options = {}) 
     if(!binding || !binding.document_id || !binding.loginom_account)throw Error('Session storage is not prepared');
     options={...options,storage_destination:requireStorageDestination(parameters.path,binding.directories,'packages')};
   }
+  const {node_target_graph_reader:readNodeTargetGraph,...serializableOptions}=options;
+  if(readNodeTargetGraph!==undefined&&(typeof readNodeTargetGraph!=='function'||!options.node_target_context))throw Error('Internal node graph reader requires a bound context');
   const handler = requireCapability(action).handler;
   const allowedSelectors = Object.fromEntries(action.selector_symbols.map(symbol => [symbol, selectors.get(symbol)]));
-  const task = { action: structuredClone(action), selectors: structuredClone(allowedSelectors), parameters: structuredClone(parameters), ...structuredClone(options), handler };
-  const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)})`;
+  const task = { action: structuredClone(action), selectors: structuredClone(allowedSelectors), parameters: structuredClone(parameters), ...structuredClone(serializableOptions), handler };
+  const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()})`;
   return ['apply', 'recover_link'].includes(task.mode) && task.receipt_namespace
     ? withBrowserReceipt(body, task) : `async (page) => ${body}`;
 }
@@ -1233,7 +1258,7 @@ export function withBrowserReceipt(body, options) {
 }
 
 export function parseCapabilityResult(response) {
-  if (response?.isError) throw new Error('Pinned browser capability call failed');
+  if (response?.isError) throw new Error('Pinned browser capability call failed ['+browserFailureCategory(response)+']');
   for (const block of response?.content ?? []) {
     if (block.type !== 'text') continue;
     const match = block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/);
@@ -1453,7 +1478,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // An inspection never calls configuration, execution or generic action
     // reconciliation. Unknown phases keep the gate until a phase-specific
     // verifier is available. A durable node checkpoint is safe to redeliver.
-    if(running)return failed(operation,'OPERATION_STILL_PENDING','The local node operation is still running');
+    if(running)return failed(operation,'OPERATION_STILL_PENDING','The original node operation is not yet confirmed. Inspect its operation_id after the active Dock call completes; do not repeat effects.');
     if(operation.nodeApply?.pending?.phase==='configure'&&operation.nodeApply.request.target.type==='transform.date_time'
       &&typeof operation.nodeApplyDrivers?.inspectConfigure==='function'){
       running=true;
@@ -1466,6 +1491,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       running=true;
       try{operation.inputMappingRecovery=await operation.nodeApplyDrivers.inspectInputMapping({readReceipt:ref=>readReceipt(operation,ref)});}
       catch(error){operation.inputMappingRecovery={available:false,phase:'input_mapping',reason:String(error.message).slice(0,1000)};}
+      finally{running=false;}
+    }
+    if(operation.nodeApply?.pending?.phase==='output_mapping'&&operation.nodeApplyDrivers?.inspectOutputMapping){
+      running=true;
+      try{operation.outputMappingRecovery=await operation.nodeApplyDrivers.inspectOutputMapping({readReceipt:ref=>readReceipt(operation,ref)});}
+      catch(error){operation.outputMappingRecovery={available:false,phase:'output_mapping',reason:String(error.message).slice(0,1000)};}
       finally{running=false;}
     }
     if(operation.nodeApply?.pending?.phase==='workflow'){
@@ -1586,9 +1617,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       required_fields: [], requires: [], provides: ['completion_receipt', 'cleanup_state'] });
     if(operation.action.capability==='node.apply'&&operation.nodeApply?.pending?.phase==='input_mapping'&&operation.inputMappingRecovery){
       const recovery=operation.inputMappingRecovery;
-      if(recovery.available)base.push({tool:'dock_node_resume',arguments:structuredClone(operation.parameters),required_fields:[],
+      if(recovery.available)base.push({tool:'dock_node_resume',arguments:{operation_id:operation.id},required_fields:[],
         requires:['original_completed_input_done','same_prepared_graph','live_mapping_probe'],provides:['verified_input_mapping','continuation_of_original_operation']});
       return {recovery_options:[],next_steps:base,input_mapping_recovery:structuredClone(recovery),internal_resume_available:false};
+    }
+    if(operation.action.capability==='node.apply'&&operation.nodeApply?.pending?.phase==='output_mapping'&&operation.outputMappingRecovery){
+      const recovery=operation.outputMappingRecovery;
+      if(recovery.available)base.push({tool:'dock_node_resume',arguments:{operation_id:operation.id},required_fields:[],
+        requires:['original_completed_output_done','same_prepared_graph','live_mapping_probe'],provides:['verified_output_mapping','continuation_of_original_operation']});
+      return {recovery_options:[],next_steps:recovery.available?[base.at(-1)]:[base[0]],output_mapping_recovery:structuredClone(recovery),internal_resume_available:false};
     }
     if (operation.transportUncertain) return { recovery_options: [], next_steps: base };
     if(operation.action.capability==='node.apply')return {recovery_options:[],next_steps:base,
@@ -1655,6 +1692,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }});
   const runtime=Object.freeze({
     startNodeApply:(request,options)=>nodeJobs.start(request,options),
+    startNodeRead:args=>nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id))),
     nodeApplyStatus:id=>nodeJobs.status(id),
     waitNodeApply:(id,options)=>nodeJobs.wait(id,options),
     cancelNodeApply:id=>nodeJobs.cancel(id),
@@ -1691,6 +1729,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         action_revision: pending?.action.revision ?? '1', operation_id: pending?.id ?? null,
         phase: 'request_rejected', effect_possible: !!pending, request_rejected: true,
         output: { available_actions: [...pinned.actions.keys()], ui_action_tool: 'dock_ui_action', operation: view(pending).output,
+          ...(nodeJobs.active?{active_node_job:nodeJobs.active}:{}),
           ...(error?.code==='ARTIFACT_GRANT_NOT_FOUND' && allowCandidate && artifactStore ? {input_artifacts:artifactStore.list()} : {}) },
         error: { code: 'REQUEST_REJECTED', message: String(error?.message ?? error).slice(0, 1000) }, trace: [] };
     },
@@ -2084,6 +2123,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           await remember(operation,'recovery_unverified',operation.outcome);return structuredClone(operation.outcome);
         }finally{running=false;}
       }
+      if(resume&&operation?.nodeApply?.pending?.phase==='output_mapping'&&operation.nodeApplyDrivers?.recoverOutputMapping){
+        running=true;
+        try{
+          await reconcileOutputMappingPhase({operation,readReceipt:ref=>readReceipt(operation,ref),record:onRecord,now,signal});
+          operation.outputMappingRecovery=null;
+        }catch(error){
+          operation.outputMappingRecovery={available:false,phase:'output_mapping',reason:String(error.message).slice(0,1000)};
+          operation.outcome=nodeApplyOutcome(operation,{...operation.outcome.output,status:'AMBIGUOUS',
+            cleanup_complete:operation.nodeApply.cleanup_complete,pending_phase:operation.nodeApply.pending?.phase??null,
+            error:{code:'OUTPUT_MAPPING_RECOVERY_UNVERIFIED',message:operation.outputMappingRecovery.reason}});
+          await remember(operation,'recovery_unverified',operation.outcome);return structuredClone(operation.outcome);
+        }finally{running=false;}
+      }
       if(resume&&['workflow','target'].includes(operation?.nodeApply?.pending?.phase))await inspectApply(operation);
       const configureContinuation=resume&&operation?.nodeApply?.pending?.phase==='configure'
         &&request.target.type==='transform.date_time'&&typeof operation.nodeApplyDrivers?.verifyPendingConfigure==='function';
@@ -2285,17 +2337,20 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(operations.has(id)||auxiliary.has(id)||operations.has(id+':upload')||auxiliary.has(id+':verify'))
         throw Error('Artifact delivery ID conflicts with an existing operation');
       auxiliary.set(id,{signature:'delivery:'+signature});
-    },admitResume:(uploadId,resumeId,signature)=>{
+    },admitResume:(uploadId,resumeId,signature,checkpoint)=>{
       if(!allowCandidate||!artifactStore)throw Error('Delivery resume requires an authorized candidate session');
       if(nodeJobs.busy||running||pending&&pending.id!==uploadId)throw Error('Another Dock operation prevents delivery resume');
-      if(operations.get(uploadId)?.action.capability!=='artifact.upload')throw Error('Original upload is absent from this session');
+      if(checkpoint?.preUpload){
+        if(pending||operations.has(uploadId)||!auxiliary.get(checkpoint.deliveryId)?.signature?.startsWith('delivery:'))
+          throw Error('Pre-upload continuation lacks a settled original delivery');
+      }else if(operations.get(uploadId)?.action.capability!=='artifact.upload')throw Error('Original upload is absent from this session');
       if(operations.has(resumeId)||auxiliary.has(resumeId))throw Error('Resume ID conflicts with an existing operation');
       auxiliary.set(resumeId,{signature:'delivery-resume:'+signature});
     }});
   // Internal delivery calls retain the original runtime methods. The returned
   // facade prevents a second caller from changing UI between transfer stages.
   const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','waitNodeApply']);
-  const nodeControls=new Set([...readOnly,'startNodeApply','cancelNodeApply','stopNodeApply']);
+  const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{
       if(delivery.busy){const error=Error('Artifact delivery is in progress');

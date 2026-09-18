@@ -25,10 +25,12 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   await acknowledge(job,'artifact_delivery_completed',{result});job.outcome=result;job.phase='completed';job.error=null;
  };
  async function run(job,artifact,signal,resumeId=null) {
-  let step=0,submitted=job.uploadStarted===true,effectPossible=submitted;
+  let submitted=job.uploadStarted===true,effectPossible=submitted;
+  const preUploadResume=!!resumeId&&job.preUploadResume===true;
   const check=()=>{signal?.throwIfAborted();requireValue(now()<job.deadline,'Artifact delivery deadline elapsed');};
   const readPages=async options=>{
-   check();const r=await runtime.observe(options);requireValue(r.status==='SUCCEEDED','Delivery observation failed');
+   check();const r=await runtime.observe(options);
+   if(r.status!=='SUCCEEDED')throw Object.assign(Error('Delivery observation failed: '+(r.error?.code??r.status)),{code:r.error?.code});
    const output=structuredClone(r.output);let cursor=output.page?.next_cursor,pages=0;
    while(cursor) {
     check();requireValue(++pages<=32,'Delivery observation page limit exceeded');
@@ -51,16 +53,34 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   };
   const roots=()=>observe({scope:'roots'});
   const click=async(s,element,verb='click',extra={},allowStaleFolder=false)=>{
-   check();const id=job.id+':nav'+(++step);
+   check();const id=job.id+':nav'+(job.navigationStep=(job.navigationStep??0)+1);
+   job.navigationUncertain=true;
    effectPossible=true;const r=await runtime.uiAct({verb,ref:element.ref,...extra},{operationId:id,observationId:s.observation_id,signal});
    // Only a matched, cleaned-up precondition refusal permits a fresh folder lookup.
    // Never reuse its ref/observation or repeat an uncertain child operation.
+   // The proven no-effect gesture leaves navigation certain, so the pre-upload
+   // checkpoint remains available if the bounded retry stops.
    if(allowStaleFolder&&r.operation_id===id&&r.status==='NOT_APPLIED'&&r.phase==='preconditions'
-     &&r.effect_possible===false&&r.cleanup_complete===true&&r.error?.code==='UI_EPOCH_CHANGED')return false;
+     &&r.effect_possible===false&&r.cleanup_complete===true&&r.error?.code==='UI_EPOCH_CHANGED'){job.navigationUncertain=false;return false;}
    requireValue(r.status==='SUCCEEDED'&&r.cleanup_complete===true,'Delivery navigation requires inspection: '+id);
+   job.navigationUncertain=false;
    return true;
   };
-  const detail=async(r,element)=>observe({rootRef:element.ref,observationId:r.observation_id});
+  const detail=async(r,element)=>{
+   const original=r,tid=element.tid;
+   for(let attempt=0;attempt<3;attempt++){
+    try{return await observe({rootRef:element.ref,observationId:r.observation_id});}
+    catch(error){
+     if(error.code!=='UI_ROOT_STALE'||attempt===2)throw error;
+     // A detached read target is not a failed gesture. Rebind the exact region
+     // in the same document/workspace; never repeat its preceding click.
+     r=await roots();
+     requireValue(r.dom_epoch?.document===original.dom_epoch?.document
+       &&JSON.stringify(r.workflow_ref)===JSON.stringify(original.workflow_ref),'Delivery detail owner changed');
+     element=one(r.ui.elements.filter(e=>e.tid===tid),'Delivery detail region unavailable');
+    }
+   }
+  };
   const ready=async(condition,read,predicate)=>{
    const deadline=Math.min(job.deadline,now()+15000);
    for(let sample=0;sample<80&&now()<deadline;sample++) {
@@ -93,7 +113,7 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   };
   try {
    let upload,inspected;
-   if(resumeId) {
+   if(resumeId&&!preUploadResume) {
     await acknowledge(job,'artifact_delivery_resume_started',{resume_id:resumeId,upload_operation_id:job.uploadId,
       verification_started:job.verificationStarted===true,deadline_at:job.deadline});
     check();inspected=await runtime.inspect({operationId:job.uploadId});
@@ -110,6 +130,10 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     bytes:artifact.bytes,sha256:artifact.sha256,overwrite:artifact.upload.overwrite,deadline_at:job.deadline});
    job.phase='destination';
    let r=await roots();
+   requireValue(typeof r.dom_epoch?.document==='string','Delivery document identity is unavailable');
+   if(preUploadResume)requireValue(r.dom_epoch.document===job.navigationDocument,'Delivery document changed before upload resume');
+   job.navigationDocument??=r.dom_epoch.document;
+   job.preUploadResume=false;
    if(!r.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;'))) {
     // Global all-scope scans can fall back to roots on a populated graph.
     // Read the already observed toolbar directly to retain complete controls.
@@ -188,12 +212,23 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    if(lostVerification)await acknowledge(job,'artifact_delivery_verification_reconciled',{inspection:final});
    await finish(job,artifact,final);
   } catch(error) {
+   // A completed navigation followed by a failed read has no unknown gesture
+   // and no upload to repeat. Retain the attachment and continue the same job
+   // from fresh UI in the same document; navigation receipt IDs stay monotonic.
+   const navigationResumable=job.uploadStarted===undefined&&job.navigationUncertain!==true
+     &&typeof job.navigationDocument==='string';
+   if(navigationResumable){
+    await acknowledge(job,'artifact_delivery_preupload_checkpoint',{document:job.navigationDocument,navigation_step:job.navigationStep??0,upload_started:false});
+    job.preUploadResume=true;
+   }
    job.error=error.code==='STORAGE_ENTRY_UNAVAILABLE'&&!submitted
     ? {code:'ARTIFACT_DESTINATION_UNAVAILABLE',message:String(error.message).slice(0,1000),
       artifact_id:artifact.artifact_id,input_artifact_admitted:true,directory:artifact.upload.directory,
       storage_entry:error.storage_entry,recovery:'Check the selected input directory and the signed-in Loginom account. The attachment was received; do not ask to attach it again.'}
     : {code:'ARTIFACT_DELIVERY_INCOMPLETE',message:String(error.message).slice(0,1000)};
-   job.outcome={status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,upload_submitted_or_unknown:submitted,upload_operation_id:job.uploadId,inspection_required:true};
+   job.outcome={status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,upload_submitted_or_unknown:submitted,upload_operation_id:job.uploadId,inspection_required:!navigationResumable,
+    ...(navigationResumable?{cleanup_complete:true,next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
+     instruction:'Continue this delivery with its original operation_id, a new resume_id and budget_ms. The admitted attachment is retained; no upload has started.'}}:{})};
   } finally {job.state='settled';active=null;}
   return snapshot(job);
  }
@@ -223,10 +258,10 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    if(prior){requireValue(prior.signature===signature,'Resume ID has different parameters');return prior.promise;}
    requireValue(!active,'Another delivery or resume is in progress');signal?.throwIfAborted();
    if(['completed','rejected'].includes(job.phase))return Promise.resolve(snapshot(job));
-   requireValue(job.uploadStarted===true,'Delivery stopped before upload; inspect navigation before a new request');
+   requireValue(job.uploadStarted===true||job.preUploadResume===true,'Delivery stopped before upload; inspect navigation before a new request');
    const artifact=artifactStore.getUploadGrant(job.artifact.artifact_id,job.artifact.upload.grant_id);
    requireValue(JSON.stringify(artifact)===JSON.stringify(job.artifact),'Admitted artifact changed');
-   admitResume(job.uploadId,request.resume_id,signature);
+   admitResume(job.uploadId,request.resume_id,signature,{preUpload:job.preUploadResume===true,deliveryId:job.id});
    job.deadline=now()+request.budget_ms;job.state='running';job.error=null;active=job;
    const promise=run(job,artifact,signal,request.resume_id);
    job.resumeRequests.set(request.resume_id,{signature,promise});return promise;

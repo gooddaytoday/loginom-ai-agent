@@ -3,14 +3,14 @@
 // Loginom's own close guard remains
 // enabled: CloseAllPackages(true, false) from E2E would bypass that guard.
 export function makePackageCleanupCode(options) {
-  const {sessionId, documentId, account, packagePath, loginomUrl, loginomBuild, tabTid, timeoutMs = 8000, diagnosticDiscard = false} = options;
+  const {sessionId, documentId, account, packagePath, loginomUrl, loginomBuild, tabTid, timeoutMs = 8000, diagnosticDiscard = false, diagnosticReadOnly = false} = options;
   if (![sessionId, documentId, account, tabTid].every(v => typeof v === 'string' && v.length > 0 && v.length <= 200)
       || typeof packagePath !== 'string' || !/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/.test(packagePath)
       || packagePath.split('/').some(p => p === '.' || p === '..') || loginomBuild !== '7.4.2'
-      || typeof diagnosticDiscard !== 'boolean' || !Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 15000) throw Error('Exact isolated cleanup identity required');
+      || typeof diagnosticReadOnly !== 'boolean' || typeof diagnosticDiscard !== 'boolean' || !Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 15000) throw Error('Exact isolated cleanup identity required');
   const url = new URL(loginomUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw Error('Invalid cleanup origin');
-  return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard})})`;
+  return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard, diagnosticReadOnly})})`;
 }
 
 export function parsePackageCleanupResult(response, expected) {
@@ -49,12 +49,13 @@ async function closeOwnedPackage(page, options) {
       });
       if (location.origin !== o.origin || app?.Version !== o.loginomBuild || prep?.document !== document
           || prep.id !== o.documentId || !ownReceipt) return {reason:'DOCUMENT_IDENTITY_CHANGED'};
-      if (m?.FServerConnection?.UserName !== o.account || !m.FServerConnection.Connected) return {reason:'ACCOUNT_CHANGED'};
+      if (m?.FServerConnection?.UserName !== o.account) return {reason:'ACCOUNT_CHANGED'};
+      if (!m.FServerConnection.Connected) return {reason:'CONNECTION_DISCONNECTED'};
       const visible = e => !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden';
       if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)) return {reason:'DIALOG_OR_OPERATION_OPEN'};
       if (m.PackageNodes?.Count !== 1) return {reason:'PACKAGE_INVENTORY_CHANGED'};
       const node = m.PackageNodes.Items(0), normalized = value => typeof value === 'string' && value ? '/'+value.replaceAll('\\','/').replace(/^\/+/, '') : null;
-      if (normalized(node.PackageFileName) !== o.packagePath || node.ReadOnly !== false) return {reason:'PACKAGE_IDENTITY_CHANGED'};
+      if (normalized(node.PackageFileName) !== o.packagePath || node.ReadOnly !== o.diagnosticReadOnly) return {reason:'PACKAGE_IDENTITY_CHANGED'};
       if (node.HasRunningNodes() !== false || m.HasRunningNodes() !== false) return {reason:'RUNNING_NODES'};
       const modified = await m.FServerConnection.Session.IsPackageModified(node.Package);
       if (modified !== false && !(modified === true && o.diagnosticDiscard === true)) return {reason:'UNSAVED_CHANGES'};
@@ -62,7 +63,7 @@ async function closeOwnedPackage(page, options) {
       // repeats lock/dirty checks and may show a prompt. Normal shutdown never
       // answers it; independent QA can explicitly discard its temporary views.
       if (m.PackageNodes.Count !== 1 || m.PackageNodes.Items(0) !== node || normalized(node.PackageFileName) !== o.packagePath
-          || m.FServerConnection.UserName !== o.account || node.HasRunningNodes() !== false) return {reason:'PACKAGE_CHANGED_DURING_CHECK'};
+          || node.ReadOnly !== o.diagnosticReadOnly || m.FServerConnection.UserName !== o.account || node.HasRunningNodes() !== false) return {reason:'PACKAGE_CHANGED_DURING_CHECK'};
       const state = globalThis.__loginomDockCleanupV1 = {identity, document, done:false, closed:false};
       Promise.resolve().then(() => m.ClosePackage(node, false, true)).then(value => {
         state.closed = value === true && m.PackageNodes.Count === 0;

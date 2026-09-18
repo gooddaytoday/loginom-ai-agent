@@ -41,7 +41,9 @@ test('two GUI conversations retain separate sessions and artifacts across turns'
  assert.equal(ra.sessionId,'dock-A');assert.equal(rb.sessionId,'dock-B');
  assert.notEqual(ra.input_artifacts[0].artifact_id,rb.input_artifacts[0].artifact_id);
  const again=await f.call(await f.ticket('A','after-login'),{},'dock_diagnostics');
- assert.deepEqual(again,ra);assert.deepEqual(f.created,['discovery','A','B']);assert.deepEqual(f.closed,['discovery']);
+ assert.deepEqual(again,ra);assert.equal(f.created[0],'discovery');
+ // Independent parallel sessions may finish admission in either order.
+ assert.deepEqual(f.created.slice(1).sort(),['A','B']);assert.deepEqual(f.closed,['discovery']);
  assert.ok((await f.client.listTools()).tools.every(x=>x.inputSchema.properties[nativeSessionKey]));
 });
 test('missing, forged and expired routing never selects the last task',async t=>{

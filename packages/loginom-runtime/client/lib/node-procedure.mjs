@@ -87,6 +87,12 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const allowedPreview=(dialog,state)=>state.node_preview_schema?.verified===true
     &&dialog.identity?.anchor_tid===state.node_preview_schema.root_tid
     &&state.node_preview_schema.node_id===preparedNodeContext?.node.node_id;
+  const pendingPreviewDialog=(dialog,state)=>{
+    const root=preparedNodeContext?.workflow_ref.prefix+';ModelForm;PreviewWindow';
+    return !!preparedNodeContext&&state.prepared_node_context?.surface==='graph'
+      &&state.node_preview_schema?.verified===false&&dialog.identity?.anchor_tid===root
+      &&state.ui.masks?.some(m=>m.kind==='busy'&&m.dialog_ref===dialog.ref&&m.target_tid===root+';PreviewForm');
+  };
   const allowedReformEditor=(dialog,state)=>state.wizard?.stage==='field_parameters'
     &&state.wizard.reform_parameters?.status==='observed'&&state.wizard.reform_parameters.portal_bound===true
     &&state.wizard.reform_parameters.selected_column?.status==='observed'
@@ -131,7 +137,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     const expressionMask=m=>expressionModal&&m.kind==='modal_background'&&m.target_tid===state.wizard.root_tid&&m.ref===state.wizard.root_ref;
     if (!Array.isArray(state.ui?.masks) || !Array.isArray(state.ui?.dialogs)
       || (!allowTransient && !closing && state.ui.masks.some(m=>!expressionMask(m)))
-      || !closing && state.ui.dialogs.some(d => !allowedDialog(d,tableDialog) && !allowedOutputEditor(d,state) && !allowedNodeEditor(d,state) && (!allowTransient || d.identity?.anchor_tid !== 'toast' && !pendingFilterDialog(d,state)))
+      || !closing && state.ui.dialogs.some(d => !allowedDialog(d,tableDialog) && !allowedOutputEditor(d,state) && !allowedNodeEditor(d,state) && (!allowTransient || d.identity?.anchor_tid !== 'toast' && !pendingFilterDialog(d,state) && !pendingPreviewDialog(d,state)))
       || ['dialogs','masks'].some(key => state.ui.truncated?.[key] !== false)
       || state.scan?.complete !== true) {
       throw new Error('Node procedure is blocked by a mask or dialog');
@@ -384,12 +390,15 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       lastPreparedStep = structuredClone(persisted);
       signal?.throwIfAborted();
       if (now() >= operation.deadline) throw new Error('Node procedure deadline elapsed before mutation');
+      const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(action.verb)
+        ?Math.min(45000,Math.max(1,Math.floor(operation.deadline-now()))):null;
       const code = makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
+        ...(openingWait?{opening_timeout_ms:openingWait}:{}),
         ...boundOptions,
         snapshot: before, expected_origin: targetOrigin, expected_build: targetBuild });
       const wrapped = wrapMutation(code, { id, signature, action_key: 'ui.act' });
       let result;
-      try { result = await execute(wrapped, { timeout: 35000 }); }
+      try { result = await execute(wrapped, { timeout: openingWait?openingWait+5000:35000 }); }
       catch (error) {
         operation.transportUncertain = true;
         operation.cleanupConfirmed = false;

@@ -21,6 +21,7 @@ function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,c
       throw Error('Unexpected evaluate: '+fn);
     },
     locator:selector=>({
+      locator:child=>page.locator(child),
       count:async()=>selector.includes('TargetBend')&&duplicate?2:1,
       isVisible:async()=>selector.includes('TargetBend')?bend:true,
       isEnabled:async()=>true,

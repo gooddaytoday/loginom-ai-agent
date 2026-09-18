@@ -35,7 +35,7 @@ export async function configureReformOutput(channel,configuration,parameters,map
  s=await ensureDerivedOutputSources(channel,s);
  const sources=reformOutputSources(configuration,s.node_mapping),requested={direction:'output',port:0,...mapping},changes=[];
  resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
- if(requested.fields){
+ if(requested.fields||requested.changes){
   changes.push(await configureOutputFields(channel,requested,sources));
   s=await channel.observe({condition:'reform output fields configured',readMappings:true,ready});
   const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);

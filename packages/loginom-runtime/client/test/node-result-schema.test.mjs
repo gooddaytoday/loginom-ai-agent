@@ -22,7 +22,8 @@ test('table output requires typed values, precision and bounded samples',()=>{
   sample_rows:1,sample_complete:true,precision:{numbers_verified:true,limitations:[],strings:'UI text'}}]};
  assert.equal(validate(r).valid,true);
  const bad=structuredClone(r);delete bad.output.ports[0].sample[0][0].precision;assert.equal(validate(bad).valid,false);
- const long=structuredClone(r);long.output.ports[0].sample=Array(11).fill(r.output.ports[0].sample[0]);assert.equal(validate(long).valid,false);
+ const hundred=structuredClone(r);hundred.output.ports[0].sample=Array(100).fill(r.output.ports[0].sample[0]);hundred.output.ports[0].sample_rows=100;hundred.output.ports[0].row_count=100;assert.equal(validate(hundred).valid,true);
+ const long=structuredClone(r);long.output.ports[0].sample=Array(101).fill(r.output.ports[0].sample[0]);assert.equal(validate(long).valid,false);
 });
 test('delivery result distinguishes unresolved transfer from a worker or successful node',()=>{
  const check=provider.getValidator(deliveryJobResultSchema),r={operation_id:'delivery',state:'settled',phase:'verify',upload_operation_id:'delivery:upload',

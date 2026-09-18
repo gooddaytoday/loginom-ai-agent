@@ -1,4 +1,5 @@
 import {resolveCalculatorPatch,planCalculatorEdits} from './calculator-parameters.mjs';
+import {rejectUnchangedCalculatorDraft} from './calculator-request-refusal.mjs';
 
 const requireValue=(ok,message)=>{if(!ok)throw Error(message);};
 const types={integer:'Целый',real:'Вещественный',string:'Строковый',boolean:'Логический',datetime:'Дата/Время'};
@@ -9,11 +10,17 @@ const control=(s,suffix,verb)=>{
  requireValue(matches.length===1,'Unique calculator control unavailable: '+suffix);return matches[0];
 };
 
-export async function configureCalculator(channel,parameters,{newNode=false}={}) {
+export async function configureCalculator(channel,parameters,{newNode=false,recoverRejectedRequest=false,captureBaseline}={}) {
  const ready=s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true;
  const observe=condition=>channel.observe({condition,readCalculator:true,ready});
  const baseline=await observe('complete calculator configuration before patch');
- const plan=resolveCalculatorPatch(parameters,baseline.node_calculator,baseline.node_calculator.input_fields,{newNode});
+ captureBaseline?.(structuredClone(baseline));
+ let plan;
+ try {plan=resolveCalculatorPatch(parameters,baseline.node_calculator,baseline.node_calculator.input_fields,{newNode});}
+ catch(error){
+  if(recoverRejectedRequest&&!newNode)await rejectUnchangedCalculatorDraft(channel,baseline,error);
+  throw error;
+ }
  const identities=new Map(baseline.node_calculator.expressions.map(e=>[e.name,e.record_id]));
  const row=(s,id)=>s.node_calculator?.expressions.find(e=>e.record_id===id);
  const select=async id=>{

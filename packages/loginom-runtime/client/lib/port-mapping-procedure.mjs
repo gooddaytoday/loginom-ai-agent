@@ -1,4 +1,5 @@
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
+import {expandOutputChanges} from './output-mapping-changes.mjs';
 
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const mappingControl=(s,suffix)=>{
@@ -53,6 +54,15 @@ export function resolveConfiguredOutputMapping(mapping,configured,native) {
     &&new Set(sources.map(s=>s.name)).size===used.length
     &&sources.every(s=>{const c=used.find(c=>c.name===s.name);return c&&c.label===s.label&&c.type===s.type;}),
   'Configured source differs from the native mapping schema');
+  if(mapping.changes!==undefined){
+    const baseline=targets.map(current=>{
+      const identity=current.source??current.exclusion_source;
+      const source=sources.find(s=>s.record_id===identity?.record_id&&s.field_id===identity?.field_id);
+      requireValue(source,'Native output change source is missing');
+      return {source:{kind:'configured_field',name:source.name},name:current.name,label:current.label,excluded:current.excluded===true};
+    });
+    mapping=expandOutputChanges(mapping,baseline);
+  }
   const fields=mapping.fields;
   if(fields===undefined)return {autosync:mapping.autosync??native.autosync,fields:null};
   requireValue(Array.isArray(fields)&&fields.length===used.length,'Mapping must account for every configured source field');

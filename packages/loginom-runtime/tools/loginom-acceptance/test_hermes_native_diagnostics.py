@@ -29,6 +29,23 @@ class Context:
 
 
 class NativeDiagnosticsTest(unittest.TestCase):
+    def test_attachment_failure_is_reported_and_does_not_leak_into_next_turn(self):
+        ctx = Context()
+        def run(argv, **kwargs):
+            if argv[1] == 'input':
+                return types.SimpleNamespace(returncode=1, stdout=json.dumps({'kind':'dock_input_error', 'code':'INPUT_FORMAT_UNSUPPORTED', 'message':'/private/secret'}))
+            return types.SimpleNamespace(returncode=0, stdout=json.dumps({'token':'a'*64}))
+        with patch.object(native,'install_usage_presence'), patch.object(native,'input_host_environment',return_value=(None,None,True)), patch.object(native.subprocess,'run',side_effect=run):
+            native.register(ctx)
+            capture=ctx.hooks['pre_llm_call'][0]; hook=ctx.hooks['pre_tool_call'][0]
+            capture(session_id='one',turn_id='first',user_message='Read /explicit/data.csv')
+            refused=hook(session_id='one',turn_id='first',tool_name='loginom_dock_prepare',args={})
+            self.assertEqual(refused['action'],'block')
+            self.assertIn('ZIP',refused['message'])
+            self.assertNotIn('/private/secret',refused['message'])
+            capture(session_id='one',turn_id='next',user_message='Continue without attachments')
+            self.assertEqual(hook(session_id='one',turn_id='next',tool_name='loginom_dock_prepare',args={})['action'],'modify')
+
     def test_current_text_prefix_excludes_attached_content_and_resolves_only_whole_files(self):
         text = '@file:"data 1.csv"'
         ref = types.SimpleNamespace(kind='file', target='data 1.csv', start=0, end=len(text), line_start=None, line_end=None)

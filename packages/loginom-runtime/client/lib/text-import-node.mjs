@@ -23,6 +23,8 @@ const verified=(details={})=>({verified:true,cleanup_complete:true,effect_possib
 export function validateTextImportNodeParameters(p,mode,request) {
   requireValue(p && Object.keys(p).sort().join(',')==='settings,source','Exact import source and settings required');
   const existing=request.target?.kind==='existing';
+  if(!existing)requireValue(Array.isArray(p.settings?.columns)&&p.settings.columns.length>0,
+    'Invalid parameters.parameters.settings.columns: new imports require a nonempty list of source columns with their selected names and types');
   (existing?validateTextImportPatch:validateTextImportFieldsRequest)(p.settings);
   if(!existing)resolveTextImportEncoding(p.settings.source.encoding);
   const s=p.source;
@@ -34,7 +36,7 @@ export function validateTextImportNodeParameters(p,mode,request) {
   // readers require complete native schemas, including every offscreen field.
   requireValue(mode==='delimited' && ['done','execute','close'].includes(request.finish) && (request.read.ports.length===0||request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0)
     && request.mappings.length<=1 && request.mappings.every(m=>m.direction==='output'&&m.port===0
-      &&(m.fields===undefined||m.fields.length>0&&m.fields.every(f=>f.source?.kind==='configured_field'&&f.excluded!==true))) && request.inputs.length===0
+      &&((m.fields??m.changes)===undefined||m.fields===undefined&&m.changes?.length===0||(m.fields??m.changes).length>0&&(m.fields??m.changes).every(f=>f.source?.kind==='configured_field'&&f.excluded!==true))) && request.inputs.length===0
     && (existing||p.settings.columns.some(c=>c.used===true)),
   'Private import node currently supports Done/Execute/Close with optional executed output 0 and configured output fields with at least one used field; input mappings and output exclusion are not installed');
 }

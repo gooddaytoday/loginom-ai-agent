@@ -19,8 +19,9 @@ export async function returnToExecutedWorkflow(channel,node) {
     &&(s.navigation_context?.status==='observed'||s.node_context?.status==='observed')});
   if(s.navigation_context?.status==='observed')return;
   const context=s.node_context,path=context.path?.slice(0,-1);
-  requireValue(context.kind==='node'&&path?.length&&context.node?.tid===path.at(-1).tid+'>'
-    +s.prepared_node_context.tid.split(';Graph;')[1],'Execution navigation does not belong to the prepared node');
+  const boundNavigation=s.prepared_node_context.navigation_node;
+  requireValue(context.kind==='node'&&path?.length&&(context.node?.tid===path.at(-1).tid+'>'
+    +s.prepared_node_context.tid.split(';Graph;')[1]||boundNavigation?.tid===context.node?.tid&&boundNavigation?.label===context.node?.label),'Execution navigation does not belong to the prepared node');
   const workflow=path.at(-1),identity=()=>({node,path});
   await channel.perform({condition:'return from executed node to its scenario',initialObservation:s,
     ready:s=>sameNode(s)&&JSON.stringify(s.node_context?.path)===JSON.stringify(context.path)
@@ -74,8 +75,8 @@ export async function revealExecutionControl(channel,node,initial,process,tid,ve
   throw new Error('Process reveal exceeded bounded scroll steps');
 }
 
-export function createNodeExecutionProcedure(channel,node) {
-  let baseline,execution,stopPromise,launchAttempted=false;
+export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false}={}) {
+  let baseline,execution,stopPromise,launchAttempted=false,deactivationAttempted=false;
   const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,...extra});
   const control=(s,tid,verb='click')=>{const current=typeof tid==='function'?tid(s):tid;
     return typeof current==='string'&&current.length?s.ui.elements.filter(e=>e.tid===current&&e.allowed_actions.includes(verb)):[];};
@@ -154,7 +155,7 @@ export function createNodeExecutionProcedure(channel,node) {
       return structuredClone(baseline);
     },
     async launchGraph() {
-      requireValue(baseline&&!execution&&!launchAttempted,'A prepared, not-yet-launched graph execution is required');
+      requireValue(baseline&&!execution&&!launchAttempted&&!deactivationAttempted,'A prepared, not-yet-launched graph execution is required');
       const same=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
         &&s.prepared_node_context.locked===false&&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k])
         &&s.wizard?.status==='absent'&&s.node_outputs?.verified===true;
@@ -166,6 +167,18 @@ export function createNodeExecutionProcedure(channel,node) {
           resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===tid&&e.graph_node?.part==='body'),'Exact graph body required').ref}),identity:()=>({node})});
       }
       const launch=s=>s.ui.elements.filter(e=>e.graph_execution?.node_id===node.node_id&&e.allowed_actions.includes('execute_graph_node'));
+      if(allowDeactivate){
+        const deactivate=s=>s.ui.elements.filter(e=>e.graph_execution?.node_id===node.node_id&&e.graph_execution.mode==='deactivate'&&e.allowed_actions.includes('deactivate_graph_node'));
+        s=await channel.observe({condition:'selected node execution state',readOutputs:true,
+          ready:s=>same(s)&&s.node_outputs.node_selected&&(launch(s).length===1||deactivate(s).length===1)});
+        if(deactivate(s).length===1){
+          deactivationAttempted=true;
+          await channel.perform({condition:'deactivate the owned completed node before fresh execution',initialObservation:s,
+            ready:s=>same(s)&&s.node_outputs.node_selected&&deactivate(s).length===1,
+            resolve:s=>({verb:'deactivate_graph_node',ref:one(deactivate(s),'Unique native deactivation control required').ref}),
+            identity:s=>({node,deactivation:one(deactivate(s),'Unique native deactivation control required').graph_execution})});
+        }
+      }
       s=await channel.observe({condition:'native execution control for selected node',readOutputs:true,
         ready:s=>same(s)&&s.node_outputs.node_selected&&launch(s).length===1});
       // Never repeat an issued or uncertain launch in this driver instance.

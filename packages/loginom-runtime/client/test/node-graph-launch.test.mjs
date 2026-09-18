@@ -2,21 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from '../lib/node-execution-procedure.mjs';
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
-function fixture({selected=false,fail=false}={}){
+function fixture({selected=false,fail=false,active=false,allowDeactivate=false,loseDeactivation=false}={}){
  const actions=[];let consoleOpen=false;
  const element=(tid,actions,extra={})=>({tid,ref:tid,allowed_actions:actions,...extra});
  const state=()=>({prepared_node_context:{verified:true,...node,surface:'graph',locked:false,tid:'graph-node'},wizard:{status:'absent'},
  node_outputs:{verified:true,node_selected:selected},node_processes:{verified:true,show_completed:true,inventory_complete:true,root_id:'root',node_context:{verified:true,...node},processes:[]},
  ui:{elements:[element('MF;cntMain;tlbMainToolbar;btnProgress',['click']),element('mnContextMenu;mniShowCompletedProcesses',['click','press']),element('ConsoleForm;btnClose',['click']),
  ...(consoleOpen?[element('ConsoleForm;ProgressForm;trpProgress;grd;tbl',['right_click'])]:[]),element('graph-node',['click'],{graph_node:{part:'body'}}),
- ...(selected?[element('launch',['execute_graph_node'],{graph_execution:{node_id:'node',source:'native_selected_graph_node'}})]:[])]}});
+ ...(selected?[element('launch',[active?'deactivate_graph_node':'execute_graph_node'],{graph_execution:{node_id:'node',mode:active?'deactivate':'execute',source:'native_selected_graph_node'}})]:[])]}});
  const channel={observe:async({ready})=>{const s=state();assert.equal(ready(s),true);return s;},perform:async p=>{const s=state();assert.equal(p.ready(s),true);const a=p.resolve(s);actions.push(a);
  if(a.ref==='MF;cntMain;tlbMainToolbar;btnProgress')consoleOpen=true;
  if(a.ref==='ConsoleForm;btnClose')consoleOpen=false;
  if(a.ref==='graph-node')selected=true;
+ if(a.verb==='deactivate_graph_node'){active=false;if(loseDeactivation)throw Error('lost deactivation reply');}
  if(a.verb==='execute_graph_node'&&fail)throw Error('lost launch reply');
  return {status:'SUCCEEDED'};}};
- return {driver:createNodeExecutionProcedure(channel,node),actions};
+ return {driver:createNodeExecutionProcedure(channel,node,{allowDeactivate}),actions};
 }
 for(const selected of [false,true])test('graph launch selects only when needed and issues one typed launch: '+selected,async()=>{
  const f=fixture({selected});await f.driver.prepare();const r=await f.driver.launchGraph();
@@ -55,4 +56,15 @@ test('graph finish receipt survives the real durable journal without embedding U
  const saved=await record({phase:'node_phase_completed',receipt:{phase:'finish',value:result}});
  assert.deepEqual(JSON.parse(JSON.stringify(saved.receipt.value)),result);
  }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('opt-in reread deactivates a completed node exactly once before executing',async()=>{
+ const f=fixture({active:true,allowDeactivate:true});await f.driver.prepare();await f.driver.launchGraph();
+ assert.deepEqual(f.actions.filter(a=>a.verb.endsWith('_graph_node')).map(a=>a.verb),['deactivate_graph_node','execute_graph_node']);
+ await assert.rejects(f.driver.launchGraph());
+});
+test('lost deactivation response blocks retries and does not execute',async()=>{
+ const f=fixture({active:true,allowDeactivate:true,loseDeactivation:true});await f.driver.prepare();await assert.rejects(f.driver.launchGraph(),/lost deactivation/);
+ await assert.rejects(f.driver.launchGraph());assert.equal(f.actions.filter(a=>a.verb==='deactivate_graph_node').length,1);
+ assert.equal(f.actions.filter(a=>a.verb==='execute_graph_node').length,0);
 });

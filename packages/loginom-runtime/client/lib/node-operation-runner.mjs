@@ -14,7 +14,7 @@ export function createNodeOperationRunner({run,validate,progress}) {
   cancel_requested:job.controller.signal.aborted,server_stop_requested:job.stopController.signal.aborted,
   progress:progress(job.id),outcome:job.outcome??null,error:job.error??null});
  const launch=(request,signature,attempt,resume)=>{
-  const job={id:request.operation_id,signature,attempt,state:'running',controller:new AbortController(),stopController:new AbortController()};
+  const job={id:request.operation_id,request:structuredClone(request),signature,attempt,state:'running',controller:new AbortController(),stopController:new AbortController()};
   jobs.set(job.id,job);
   // Claim the local ID before calling run, including its synchronous validation.
   // Both rejection and success settle this promise; no unhandled background error.
@@ -27,8 +27,10 @@ export function createNodeOperationRunner({run,validate,progress}) {
  };
  return Object.freeze({
   get busy(){return [...jobs.values()].some(job=>job.state==='running');},
+  get active(){const job=[...jobs.values()].find(job=>job.state==='running');return job?snapshot(job):null;},
   start(request,{resume=false}={}) {
    request=structuredClone(request);checkId(request.operation_id);
+   if(resume&&Object.keys(request).length===1)request=structuredClone(find(request.operation_id).request);
    const signature=digest({request,handler_revision:validate(request)}),old=jobs.get(request.operation_id);
    if(old) {
     if(old.signature!==signature)throw Error('Node operation ID was used with different parameters');

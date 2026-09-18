@@ -7,7 +7,7 @@ export async function configureCollapseOutput(channel,configuration,parameters,m
  let s=await channel.observe({condition:'collapse output inventory',readMappings:true,ready});
  s=await reconcileCollapseOutput(channel,s,sources);
  resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
- if(requested.fields){changes.push(await configureOutputFields(channel,requested,sources));
+ if(requested.fields||requested.changes){changes.push(await configureOutputFields(channel,requested,sources));
   s=await channel.observe({condition:'collapse output after edits',readMappings:true,ready});
   const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
   changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));

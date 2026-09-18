@@ -18,7 +18,7 @@ test('existing sorting replaces keys without repeating its current connection',(
 test('sorting cancellation cannot commit input mapping',()=>assert.throws(()=>validateSortingParameters(valid(),'keys',{...req,finish:'close',mappings:[{direction:'input',port:0}]}),/Close/));
 test('variant keys require an explicit case flag just like string keys',()=>{
  const p={keys:[{field:field('Mixed'),direction:'ASC'}]},fields=[{name:'Mixed',label:'Смешанный',type:'variant'}];
- assert.throws(()=>resolveSortingParameters(p,fields),/Explicit case_sensitive/);
+ assert.throws(()=>resolveSortingParameters(p,fields),/parameters.keys\[0\].case_sensitive/);
  p.keys[0].case_sensitive=false;assert.equal(resolveSortingParameters(p,fields)[0].type,'variant');
 });
 

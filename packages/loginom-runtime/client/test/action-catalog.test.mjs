@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { ACTION_CATALOG_ROOT, pinActionCatalog as pinRemoteActionCatalog, ACCEPTANCE_CHECKS, EXECUTOR_REVISION,
-  validateReplayAcceptance, assertCatalogTarget } from '../lib/action-catalog.mjs';
+  validateReplayAcceptance, assertCatalogTarget, validateActionParameters } from '../lib/action-catalog.mjs';
 import { updateForE2E } from '../../../../services/loginom-ai/deploy/loginom-dock/build-action-catalog.mjs';
 import { createActionRuntime, parseCapabilityResult } from '../lib/executor.mjs';
 
@@ -15,6 +15,12 @@ const exec = promisify(execFile);
 const root = new URL('../../executor/catalog/', import.meta.url);
 const canonical = value => JSON.stringify(value, null, 2) + '\n';
 const sha256 = value => createHash('sha256').update(value).digest('hex');
+test('enum refusal supplies bounded allowed values and parameter path without echoing input',()=>{
+ assert.throws(()=>validateActionParameters({enum:['<','<=','=','<>']},'private-input','parameters.operator'),e=>e.message==='Invalid parameters.operator: value is not in the allowed enum; allowed: ["<","<=","=","<>"]');
+ for(const values of [Array.from({length:21},(_,i)=>String(i)),['x'.repeat(1100)]]){
+  assert.throws(()=>validateActionParameters({enum:values},'private-input'),e=>e.message==='Invalid parameters: value is not in the allowed enum');
+ }
+});
 const testRuntime = { clientRevision: 'd'.repeat(64), playwright: 'test-playwright', chromiumRevision: 'test-chromium' };
 const pinActionCatalog = (remote, options = {}) => pinRemoteActionCatalog(remote, { runtimeIdentity: testRuntime, ...options });
 

@@ -58,6 +58,49 @@ test('delivery navigates exact authorized folders and reuses upload and byte ver
  result.outcome.sha256='forged';assert.equal(f.service.status('delivery').outcome.sha256,'a'.repeat(64));
  assert.throws(()=>f.service.deliver({...request,budget_ms:1000}),/different parameters/);
 });
+test('pre-upload read failure resumes the same attachment with fresh navigation IDs',async()=>{
+ const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let clicks=0,failed=false;const ids=[];
+ f.runtime.uiAct=async(a,options)=>{ids.push(options.operationId);clicks++;return act(a,options);};
+ f.runtime.observe=async options=>{
+  if(clicks===1&&!failed){failed=true;throw Error('Transient read transport failed');}
+  return observe(options);
+ };
+ const first=await f.service.deliver(request);
+ assert.equal(first.outcome.upload_submitted_or_unknown,false);assert.equal(first.outcome.next_step.tool,'dock_artifact_delivery_resume');
+ assert.equal(f.calls.includes('upload'),false);
+ const retry={operation_id:'delivery',resume_id:'resume-navigation',budget_ms:120000};
+ const promise=f.service.resume(retry),result=await promise;
+ assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(f.service.resume(retry),promise);
+ assert.deepEqual(ids,['delivery:nav1','delivery:nav2']);assert.equal(f.calls.filter(c=>c==='upload').length,1);
+});
+test('pre-upload continuation refuses changed document and unknown navigation effects',async()=>{
+ for(const uncertain of [false,true]){
+  const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let started=false;
+  f.runtime.uiAct=async(a,options)=>{started=true;if(uncertain)throw Error('Reply lost');return act(a,options);};
+  f.runtime.observe=async options=>{if(started)throw Error('Read failed');return observe(options);};
+  await f.service.deliver(request);
+  const retry={operation_id:'delivery',resume_id:'resume-check',budget_ms:120000};
+  if(uncertain)assert.throws(()=>f.service.resume(retry),/inspect navigation/);
+  else{
+   f.runtime.observe=async options=>{const r=await observe(options);r.output.dom_epoch.document='foreign';return r;};
+   const result=await f.service.resume(retry);assert.match(result.error.message,/document changed/);
+  }
+  assert.equal(f.calls.includes('upload'),false);
+ }
+});
+for(const changed of [false,true])test('stale navigation detail is rebound only in its original workspace: '+changed,async()=>{
+ const f=fixture(),observe=f.runtime.observe;let stale=false;
+ f.runtime.observe=async options=>{
+  if(options.rootRef?.endsWith(';NavigationBar;NavigationPanel')&&!stale){stale=true;return {status:'NOT_APPLIED',error:{code:'UI_ROOT_STALE'}};}
+  const result=await observe(options);
+  if(stale&&changed)result.output.dom_epoch.document='foreign';
+  return result;
+ };
+ const result=await f.service.deliver(request);assert.equal(stale,true);
+ assert.equal(result.outcome.status,changed?'NOT_APPLIED':'SUCCEEDED');
+ assert.equal(f.calls.filter(c=>c==='upload').length,changed?0:1);
+ assert.equal(f.calls.filter(c=>c==='double_click').length,changed?0:2);
+});
 for(const change of [null,'document','tab','directory'])test('delivery scrolls a virtual folder and refuses changed '+(change??'nothing'),async()=>{
  const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let scrolled=false;
  f.runtime.observe=async options=>{

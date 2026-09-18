@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {mutateGraph} from '../lib/node-target-browser.mjs';
 import {exportPaletteScroll} from '../lib/text-export-palette.mjs';
+import {nodePlacementPoint,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
 function fixture(mode={}){
  const prefix='MF;TF-1',ownerTid=prefix+';ModelForm;pnlVendors;tree',palette=prefix+';ModelForm;colVendors_Компоненты>Экспорт>Текстовый_файл;TreeText',rootTid=prefix+';ModelForm;cmpDiagram',tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
  let top=0,scrolls=0,drags=0,held=false,created=false;
@@ -25,8 +26,9 @@ function fixture(mode={}){
   mouse:{move:async()=>{},down:async()=>{held=true;drags++;},up:async()=>{if(held)created=true;held=false;}},keyboard:{press:async()=>{}}};
  const task={deadline:Date.now()+10000,request:{document_id:'doc',workflow_ref:{workflow_id:'wf',prefix,tab_tid:tabTid}},types:NODE_TYPES,effect:{id:'effect',kind:'create',before,parameters:{type:'exports.text',position:{x:mode.drop?5000:600,y:380}}}};
  if(mode.cancel)page[Symbol.for('loginom-dock.node-target-cancel')]=new Set(['effect']);
- const read=async()=>created||scrolls&&mode.graphChange?{...before,nodes:[{id:'changed'}]}:structuredClone(before);
- return {run:()=>mutateGraph(page,task,read,exportPaletteScroll),counts:()=>({scrolls,drags})};
+ const read=async()=>created||scrolls&&mode.graphChange?{...before,nodes:[{ref:{node_id:'changed'},position:{x:600,y:380}}]}:structuredClone(before);
+ const viewport=()=>({x:300,y:100,width:1100,height:720,viewportWidth:1508,viewportHeight:862,scale:1,translate:{x:0,y:0},scroll:{x:0,y:0},node_bounds:{x:900,y:480,width:80,height:100}});
+ return {run:()=>mutateGraph(page,task,read,exportPaletteScroll,viewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph),counts:()=>({scrolls,drags})};
 }
 test('new export performs one owner scroll and one drag, or no scroll for visible item',async()=>{
  for(const visible of [false,true]){const f=fixture({visible}),r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.deepEqual(f.counts(),{scrolls:visible?0:1,drags:1});assert.equal(r.cleanup_complete,true);}

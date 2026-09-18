@@ -22,11 +22,20 @@ export function validateExportDestination(value,directories=null){
  return requireExportDestination(value,directories);
 }
 export function validateTextExportParameters(p,mode,r,directories=null){
- need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>k==='overwrite'||k in EXPORT_FIELDS),'Unknown text export parameter');
- need(mode==='delimited'&&r.read.ports.length===0&&r.mappings.length===0&&r.inputs.length<=1,'Text export supports one table and file output, without requested port mappings');
- need((r.read.sample_rows??0)===0&&(r.read.require_exact_numbers??false)===false,'Text export returns verified file bytes, not tabular samples');
- need(r.target.kind==='existing'||r.inputs.length===1,'A new export requires its input table');
- if(r.target.kind==='new')need(['destination','encoding','delimiter','header','bom','line_ending','decimal_separator','null_marker','text_qualifier'].every(k=>k in p),'New export requires explicit format and destination');
+ need(p&&typeof p==='object'&&!Array.isArray(p),'Invalid parameters.parameters: expected export settings object');
+ const unknown=Object.keys(p).find(k=>k!=='overwrite'&&!Object.hasOwn(EXPORT_FIELDS,k));
+ need(unknown===undefined,'Invalid parameters.parameters.'+unknown+': unknown text export parameter; use the exports.text parameter_schema');
+ need(mode==='delimited','Invalid parameters.mode: text export supports delimited mode');
+ need(r.read.ports.length===0,'Invalid parameters.read.ports: use an empty list; text export returns output.file_artifacts');
+ need(r.mappings.length===0,'Invalid parameters.mappings: use an empty list; text export does not support requested port mappings');
+ need(r.inputs.length<=1,'Invalid parameters.inputs: text export accepts at most one table');
+ need((r.read.sample_rows??0)===0,'Invalid parameters.read.sample_rows: use 0; text export returns verified file bytes');
+ need((r.read.require_exact_numbers??false)===false,'Invalid parameters.read.require_exact_numbers: use false; text export has no tabular preview');
+ need(r.target.kind==='existing'||r.inputs.length===1,'Invalid parameters.inputs: a new export requires exactly one input table');
+ if(r.target.kind==='new'){
+  const missing=['destination','encoding','delimiter','header','bom','line_ending','decimal_separator','null_marker','text_qualifier'].filter(k=>!(k in p));
+  need(!missing.length,'Invalid parameters.'+missing[0]+': required for a new export; missing fields: '+missing.join(', '));
+ }
  if('destination'in p)validateExportDestination(p.destination,directories);
  for(const [k,values]of Object.entries({encoding:['UTF-8'],delimiter:[';',',','\t'],header:['none','names','labels'],line_ending:['LF','CRLF'],
   decimal_separator:['.',','],text_qualifier:['"'],null_marker:['','?','null','NULL'],date_separator:['.','/','\\','-'],time_separator:[':', '.'],

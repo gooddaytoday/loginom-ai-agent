@@ -5,12 +5,32 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createArtifactStore} from '../lib/artifacts.mjs';
 import {validateTextExportParameters,validateExportDestination,validateNativeExportFormat} from '../lib/text-export-parameters.mjs';
+import {compactNodeRequestFailure} from '../lib/user-results.mjs';
 const binding={session_id:'session',document_id:'document',workflow_id:'workflow',node_id:'node',execution_id:'execution',destination:'/test-2/test.csv'};
 const parameters={destination:'/test-2/test.csv',encoding:'UTF-8',delimiter:';',header:'names',bom:false,line_ending:'LF',decimal_separator:'.',null_marker:'?',text_qualifier:'"'};
+test('export request refusals identify each invalid contract path and permit correction without effects',()=>{
+ const base={operation_id:'export-invalid',target:{kind:'new',type:'exports.text'},read:{ports:[]},inputs:[{}],mappings:[]};
+ for(const [path,change,mode] of [
+  ['mode',{},'fixed'],['read.ports',{read:{ports:[0]}},'delimited'],
+  ['mappings',{mappings:[{direction:'output',port:0}]},'delimited'],
+  ['inputs',{inputs:[]},'delimited'],['inputs',{inputs:[{},{}]},'delimited'],
+  ['read.sample_rows',{read:{ports:[],sample_rows:1}},'delimited'],
+  ['read.require_exact_numbers',{read:{ports:[],require_exact_numbers:true}},'delimited']]){
+  const request={...base,...change};let failure;
+  try{validateTextExportParameters(parameters,mode,request);}catch(error){failure=compactNodeRequestFailure({error:{message:error.message},effect_possible:false},request);}
+  assert.ok(failure);assert.equal(failure.error.parameter_path,path);
+  assert.equal(failure.effect_possible,false);assert.equal(failure.cleanup_complete,true);
+  assert.equal(failure.status,'NOT_APPLIED');assert.ok(failure.next_step);
+  assert.doesNotThrow(()=>validateTextExportParameters(parameters,'delimited',{...base,operation_id:'export-corrected'}));
+ }
+});
 test('export validation refuses unsafe destinations and unsupported formats before effect',()=>{
  for(const destination of ['/test-1/test.csv','/test-2/../x.csv','/test-2/a/../../x.csv','/test-2/a%2fb.csv','https://host/x.csv','/test-2/.hidden.csv','/test-2/file.xlsx'])assert.throws(()=>validateExportDestination(destination));
  const r={target:{kind:'new'},read:{ports:[]},inputs:[{}],mappings:[]};
  assert.doesNotThrow(()=>validateTextExportParameters(parameters,'delimited',r));
+ for(const unknown of ['settings','format','columns','toString'])assert.throws(
+  ()=>validateTextExportParameters({...parameters,[unknown]:{}},'delimited',r),
+  error=>error.message.includes('parameters.parameters.'+unknown+': unknown text export parameter'));
  for(const p of [{...parameters,encoding:'ANSI'},{...parameters,delimiter:'.'},{...parameters,bom:'false'},{...parameters,overwrite:'yes'},{...parameters,extra:true}])assert.throws(()=>validateTextExportParameters(p,'delimited',r));
  assert.throws(()=>validateTextExportParameters(parameters,'delimited',{...r,read:{ports:[0]}}));
  for(const read of [{ports:[],sample_rows:1},{ports:[],require_exact_numbers:true}])assert.throws(()=>validateTextExportParameters(parameters,'delimited',{...r,read}));

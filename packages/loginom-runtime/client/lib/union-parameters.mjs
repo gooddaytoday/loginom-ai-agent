@@ -20,10 +20,10 @@ export function validateUnionParameters(p,mode,r){
  need(r.target.kind==='existing'||r.inputs.length===count&&Array.from({length:count},(_,i)=>i).every(i=>r.inputs.some(p=>p.input===i)),'New union requires every input source');
  need(r.read.ports.every(p=>p===0)&& (r.finish!=='execute'||r.read.ports.length===1),'Union execution requires output0');
  need(r.mappings.every(m=>(m.direction==='input'?m.port<count:m.port===0)
-  &&(m.fields??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'Invalid union port mapping');
+  &&(m.fields??m.changes??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'Invalid union port mapping');
  need(r.finish!=='close'||r.mappings.every(m=>m.direction!=='input'),'Close cannot commit input mappings');
- for(const m of r.mappings){if(!m.fields)continue;const sources=new Set(),targets=new Set();
-  for(const f of m.fields){const source=f.source.name.toLowerCase(),target=(f.name??f.source.name).toLowerCase();
+ for(const m of r.mappings){if(!m.fields&&!m.changes)continue;const sources=new Set(),targets=new Set();
+  for(const f of m.fields??m.changes){const source=f.source.name.toLowerCase(),target=(f.name??f.source.name).toLowerCase();
    need(!sources.has(source)&&!targets.has(target),'Union mapping name conflict');sources.add(source);targets.add(target);
   }
  }

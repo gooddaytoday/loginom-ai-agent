@@ -143,11 +143,12 @@ class Page {
   }
   async evaluate(fn, arg) { return fn(arg); }
   viewportSize() { return { width: 1000, height: 800 }; }
-  locator(selector) {
+  locator(selector, root = this.document) {
     let [anchor, ...steps] = selector.split(' > ');
-    let elements = this.document.querySelectorAll(anchor);
+    let elements = root.querySelectorAll(anchor);
     for (const step of steps) { const index = Number(step.match(/nth-child\((\d+)\)/)[1]) - 1; elements = elements.map(element => element.children[index]).filter(Boolean); }
-    return { count: async () => elements.length, elementHandle: async () => new Handle(this, elements[0]) };
+    return { count: async () => elements.length, elementHandle: async () => new Handle(this, elements[0]),
+      locator: child=>this.locator(child,{querySelectorAll:query=>elements.flatMap(e=>e.querySelectorAll(query))}) };
   }
   async execute(options) { return clone(await vm.runInContext(`(${makeWorkspaceUiCode({ expected_build: build, expected_origin: origin, ...options })})`, this.context)(this)); }
   async observe() { const outcome = await this.execute({ mode: 'observe' }); assertActionOutcome(outcome); assert.equal(outcome.status, 'SUCCEEDED'); return outcome.output; }
@@ -1581,6 +1582,32 @@ test('wizard combo option is bound to its field and confirms the displayed selec
   assert.deepEqual(page.events,['click']);
 });
 
+test('export header waits for delayed readback after one click and refuses a replacement field',async()=>{
+ for(const fault of ['none','wrong_value','replaced_input']){
+  const page=new Page(),wizard=page.add('div','MF;TF-1;WizrdMCF'),base='MF;TF-1;WizrdMCF;ExportTextFilePreviewWizard;';
+  const switches=new Map(),inputs={};let headerOwner;
+  for(const [key,value] of [['edtDelimiterChar','Запятая'],['edtCodePage','UTF-8 (65001)'],['edtLineEnding','Unix (LF)'],['edtCaptionType','Метки полей']]){
+   const wrapper=page.add('div',base+key,'',undefined,wizard);
+   const owner=page.add('div',base+key+';ValueControl','',undefined,wrapper),input=page.add('input',null,'',undefined,owner);input.value=value;inputs[key]=input;
+   const sw=page.add('div',base+key+';SwitchButton','',undefined,wizard);sw.id='switch-'+key;switches.set(sw.id,{pressed:false});
+   if(key==='edtCaptionType')headerOwner=owner;
+  }
+  page.context.Ext={getCmp:id=>switches.get(id)};
+  const ownerTid=headerOwner.getAttribute('data-tid'),list=page.add('div',ownerTid+';boundlist','',{x:200,y:200,width:180,height:60});
+  page.add('div',ownerTid+';boundlist;Имена_полей','Имена полей',{x:205,y:205,width:170,height:20},list);
+  const snapshot=await page.observe(),option=snapshot.ui.elements.find(e=>e.wizard_combo?.kind==='option');
+  assert.equal(snapshot.wizard.stage,'text_export_format');assert.equal(option.wizard_combo.field.name,'header');
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);list.remove();};
+  let waits=0;page.waitForTimeout=async()=>{if(++waits===1){
+   if(fault==='replaced_input'){inputs.edtCaptionType.remove();page.add('input',null,'',undefined,headerOwner).value='Имена полей';}
+   else if(fault==='none')inputs.edtCaptionType.value='Имена полей';
+  }};
+  const result=await page.act({verb:'select_wizard_option',ref:option.ref},snapshot);
+  assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1);assert.ok(waits>0);
+ }
+});
+
 test('wizard combo binding survives a narrow floating list read without scanning background',async()=>{
   const page=new Page(),c=importCombo(page),snapshot=await page.observe();
   const listRef=snapshot.ui.elements.find(e=>e.wizard_combo?.kind==='option').wizard_combo.list_ref;
@@ -1927,7 +1954,7 @@ test('wizard owner context uses bounded active-tab breadcrumbs and survives narr
 });
 
 test('typed wizard opening verifies node and workflow path after one settings click',async()=>{
-  for(const mode of ['bound_begin_pending','bound_begin_lock','bound_begin_foreign','bound_begin_churn','success','clipped_settings','clipped_settings_covered','formatted_name','same_label_wrong_key','renamed_tab','replaced_tab','wrong_node','wrong_workflow','dialog','lost_reply',
+  for(const mode of ['bound_begin_suffix','bound_begin_pending','bound_begin_lock','bound_begin_foreign','bound_begin_churn','success','clipped_settings','clipped_settings_covered','formatted_name','same_label_wrong_key','renamed_tab','replaced_tab','wrong_node','wrong_workflow','dialog','lost_reply',
     'stale_region','stale_origin','stale_document','stale_tab','stale_wrong_owner','stale_exhausted']) {
     const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
     let path='';
@@ -1936,7 +1963,7 @@ test('typed wizard opening verifies node and workflow path after one settings cl
       const crumb=page.add('a',base+'cnrNaviMode;b.s_'+path,label,undefined,panel);
       if(label==='Сценарий')page.add('span',null,'',undefined,crumb).attrs.class='maptree-icon-workflow';
     }
-    const nodeKey=mode==='formatted_name'?'Quantity_Сумма_по_Region':'Сумма';
+    const nodeKey=mode==='bound_begin_suffix'?'Сумма@1':mode==='formatted_name'?'Quantity_Сумма_по_Region':'Сумма';
     const nodeLabel=mode==='formatted_name'?'Quantity, Сумма по Region':'Сумма';
     const graph=page.add('div',base+'ModelForm;cmpDiagram');
     const body=page.add('g',base+'Graph;'+nodeKey,'',undefined,graph);
@@ -1963,7 +1990,7 @@ test('typed wizard opening verifies node and workflow path after one settings cl
       const wizard=page.add('div',base+'WizrdMCF');
       page.add('button',base+'WizrdMCF;CalcDataWizard;btnAddExpr','',undefined,wizard);
       if(mode==='wrong_workflow')path=path.replace('Модуль1','Модуль2');
-      const name=['wrong_node','same_label_wrong_key','stale_wrong_owner'].includes(mode)?'Другой':nodeKey;
+      const name=mode==='bound_begin_suffix'?'Сумма-3':['wrong_node','same_label_wrong_key','stale_wrong_owner'].includes(mode)?'Другой':nodeKey;
       const node=page.add('a',base+'cnrNaviMode;b.s_'+path+'>'+name,mode==='wrong_node'?'Другой':nodeLabel,undefined,panel);
       page.add('span',null,'',undefined,node).attrs.class='bg-vendor-icon-calcdata';
       const last=page.add('a',base+'cnrNaviMode;b.s_'+path+'>'+name+'>Настройка','Настройка',undefined,panel);
@@ -1997,7 +2024,7 @@ test('typed wizard opening verifies node and workflow path after one settings cl
     };
     if(mode==='clipped_settings_covered')page.document.querySelectorAll('[data-tid="GraphTopToolbar"]')[0].box.height=115;
     const result=await page.act({verb:mode.startsWith('bound_begin_')?'begin_wizard':'open_wizard',ref:button.ref},snapshot);
-    const success=['bound_begin_pending','bound_begin_lock','success','clipped_settings','formatted_name','renamed_tab','stale_region'].includes(mode);
+    const success=['bound_begin_suffix','bound_begin_pending','bound_begin_lock','success','clipped_settings','formatted_name','renamed_tab','stale_region'].includes(mode);
     assert.equal(result.status,success?'SUCCEEDED':mode==='clipped_settings_covered'?'NOT_APPLIED':'AMBIGUOUS',mode+JSON.stringify(result.error));
     assert.equal(page.events.filter(e=>e==='click').length,mode==='clipped_settings_covered'?0:1);
     assert.equal(result.trace.some(e=>e.event==='wizard_open_verified'),success);
@@ -3072,6 +3099,21 @@ test('relocated native graph namespace belongs to the active diagram instead of 
 });
 
 
+test('graph clicks bind the issued canvas even when a hidden outline keeps duplicate SVG tids',async()=>{
+ const page=new Page(),tid='MF;TF-1;Graph;Owned';
+ const body=page.add('g',tid,'',{x:200,y:200,width:60,height:60});
+ const initial=await page.observe();
+ const clone=page.add('g',tid,'',{x:0,y:0,width:0,height:0},page.document.body);clone.style.display='none';
+ const snapshot=(await page.execute({mode:'observe',root_ref:initial.graph_identity.container_ref})).output;
+ const control=snapshot.ui.elements.find(e=>e.tid===tid);
+ assert.ok(control?.allowed_actions.includes('click'));assert.equal(control.identity.anchor_tid,tid);
+ const result=await page.act({verb:'click',ref:control.ref},snapshot);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ const duplicate=page.add('g',tid,'',{x:300,y:200,width:60,height:60},body.parentElement);
+ const refused=await page.execute({mode:'act',operation_id:'negative-outline',action:{verb:'click',ref:control.ref},snapshot});
+ assert.notEqual(refused.status,'SUCCEEDED');duplicate.remove();
+});
+
 test('grouping small used-field coverage requires explicit complete geometry and closed sections',async()=>{
   for(const mode of ['complete','missing_bounds','overflow','translated','hidden_payload','extra','filter','clipped','bad_section']) {
     const {page,grid,container,records}=groupingFixture();
@@ -3594,8 +3636,9 @@ async function inputPortFinishFixture(mode='valid') {
     owner.remove();for(const c of crumbs.slice(5))c.remove();
     if(mode==='wrong_workflow')crumbs[4].ownText='Другой сценарий';
     graph=page.add('div','MF;TF-5;ModelForm;cmpDiagram','',{x:48,y:71,width:1392,height:929});
-    const key=mode==='wrong_node'?'Other':mode==='multiline'?'Duplicates:__in:_Key_Sub':'Revenue';node=page.add('g','MF;TF-5;Graph;'+key,'',{x:100,y:200,width:150,height:80},graph);
+    const key=mode==='wrong_node'?'Other':mode==='multiline'?'Duplicates:__in:_Key_Sub':mode.startsWith('suffix')?'Revenue@1':'Revenue';node=page.add('g','MF;TF-5;Graph;'+key,'',{x:100,y:200,width:150,height:80},graph);
     label=page.add('span','MF;TF-5;Graph;'+key+';Label;Label',mode==='multiline'?'Duplicates:in: Key, Sub':key,{x:110,y:220,width:120,height:30},node);
+    if(mode.startsWith('suffix')){label.ownText='Revenue';const other=page.add('g','MF;TF-5;Graph;Revenue','',{x:300,y:200,width:150,height:80},graph);page.add('span','MF;TF-5;Graph;Revenue;Label;Label','Revenue',{x:310,y:220,width:120,height:30},other);}
     if(mode.startsWith('ellipsis'))label.ownText=mode==='ellipsis_wrong_text'?'Other…':'Reve…';
     if(mode==='duplicate_node')page.add('g','MF;TF-5;Graph;'+key,'',node.box,graph);
     if(['toast','foreign_toast','permanent_toast'].includes(mode)){toast=page.add('div',mode==='foreign_toast'?'foreign':'toast','Сохранено',{x:1000,y:800,width:300,height:75});toast.attrs.role='dialog';}
@@ -3606,9 +3649,9 @@ async function inputPortFinishFixture(mode='valid') {
     if(mode==='churn')page.mutationObserver.pending.push({type:'attributes',target:node,attributeName:'style'});
     if(mode==='late_tab'&&waits===2)page.tab.attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';
   };
-  if(mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  if((mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')||mode.startsWith('suffix'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
-    async()=>({verified:true,node_id:'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
+    async()=>({verified:true,node_id:mode==='suffix_wrong_id'?'other':'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
   return {...f,done,waits:()=>waits};
 }
 
@@ -3625,10 +3668,10 @@ test('typed input-port finish is offered only with full mapping and exact owner 
 });
 
 test('typed input-port finish uses one gesture and quiet exact graph return without applied claims',async()=>{
-  for(const mode of ['valid','multiline','late_body','wrong_node','wrong_workflow','still_open','mask','duplicate_node','churn','late_tab','ellipsis_bound','ellipsis_unbound','ellipsis_wrong_body','ellipsis_wrong_text']){
+  for(const mode of ['valid','multiline','late_body','wrong_node','wrong_workflow','still_open','mask','duplicate_node','churn','late_tab','ellipsis_bound','ellipsis_unbound','ellipsis_wrong_body','ellipsis_wrong_text','suffix_bound','suffix_wrong_id']){
     const {page,waits}=await inputPortFinishFixture(mode),snapshot=await page.observe();
     const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');assert.ok(done,mode);
-    const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot),success=['valid','multiline','late_body','ellipsis_bound'].includes(mode);
+    const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot),success=['valid','multiline','late_body','ellipsis_bound','suffix_bound'].includes(mode);
     assert.equal(result.status,success?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
     assert.equal(page.events.filter(e=>e==='click').length,1,mode);
     const event=result.trace.find(e=>e.event==='input_port_finish_verified');assert.equal(!!event,success,mode);
@@ -4791,7 +4834,7 @@ test('graph observation retains automatic-label links and excludes their child d
  const s=await page.observe();assert.deepEqual(s.links.map(e=>e.tid??e),[link]);
 });
 test('output-port Close returns through the port breadcrumb path after exactly one confirmation',async()=>{
- for(const mode of ['valid','wrong_workflow','wrong_node','still_open','missing_context']) {
+ for(const mode of ['valid','duplicate','foreign_guid','foreign_document','foreign_workflow','wrong_workflow','wrong_node','still_open','missing_context']) {
   const {page}=outputPortFinishFixture(mode);
   const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
   page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
@@ -4800,14 +4843,18 @@ test('output-port Close returns through the port breadcrumb path after exactly o
   page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
   const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
   const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
-   {expected_build:build,expected_origin:origin,prepared_node_context:binding,...options},async()=>({verified:true,surface:'wizard',output_port:{direction:'output',port:0,native_index:0,port_guid:'out',opening_operation_id:'open'}}));
+   {expected_build:build,expected_origin:origin,prepared_node_context:binding,...options},async()=>{const graph=page.document.all().some(e=>e.attrs['data-tid']==='MF;TF-1;ModelForm;cmpDiagram');return {verified:true,
+     document_id:graph&&mode==='foreign_document'?'foreign':'doc',workflow_id:graph&&mode==='foreign_workflow'?'foreign':'flow',
+     node_id:graph&&['foreign_guid','wrong_node'].includes(mode)?'foreign':'node',surface:graph?'graph':'wizard',tid:graph?'MF;TF-1;Graph;'+(mode==='duplicate'?'Calc@1':'Calc'):'MF;TF-1;WizrdMCF',
+     output_port:{direction:'output',port:0,native_index:0,port_guid:'out',opening_operation_id:'open'}};});
   const snapshot=(await execute({mode:'observe'})).output;
   const button=snapshot.ui.elements.find(e=>e.allowed_actions.includes('confirm_wizard_close'));
   if(mode==='missing_context'){assert.equal(button,undefined);continue;}
   assert.ok(button,mode);
-  const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);dialog.remove();};
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);dialog.remove();if(mode==='duplicate')for(const e of page.document.all()){
+   if(e.attrs['data-tid']?.startsWith('MF;TF-1;Graph;Calc'))e.attrs['data-tid']=e.attrs['data-tid'].replace('Graph;Calc','Graph;Calc@1');}};
   const result=await execute({mode:'act',operation_id:'output-close',action:{verb:'confirm_wizard_close',ref:button.ref},snapshot});
-  assert.equal(result.status,mode==='valid'?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+  assert.equal(result.status,['valid','duplicate'].includes(mode)?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
  }
 });
@@ -4866,4 +4913,29 @@ test('bound preview schema controls do not enumerate data rows but retain blocke
  assert.ok(result.output.ui.elements.some(e=>e.tid===base+';p.h;close'));
  assert.ok(result.output.ui.masks.length>0,'omitting rows must not omit loading guards');
  assert.equal(result.output.ui.table_cells.filter(c=>c.data_cell).length,0);
+});
+
+
+test('duplicate overview keys require a matching prepared native navigation identity',async()=>{
+ for(const mode of ['bound','unbound','foreign']){
+  const {page,panel}=await nodeOverviewContextFixture(),crumb=panel.children.at(-1);
+  crumb.attrs['data-tid']+='-3';
+  const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}};
+  const reader=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'graph',tid:'MF;TF-5;Graph;Изменение@1',
+    ...(mode!=='unbound'?{navigation_node:{tid:crumb.attrs['data-tid'],label:mode==='foreign'?'Foreign':'Изменение'}}:{})});
+  const result=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:binding},reader);
+  assert.equal(result.output.node_context.status==='observed',mode==='bound',mode);
+ }
+});
+
+test('completed graph node exposes only deactivation from rendered native mode and rejects mode drift',async()=>{
+ for(const drift of [false,true]){
+ const f=graphLaunchFixture();f.button.attrs['data-qtip']='Деактивировать узел';f.button.children[0].attrs.class='bg-icon-stop';
+ const r=await f.execute({mode:'observe'}),e=r.output.ui.elements.find(e=>e.tid===f.button.attrs['data-tid']);
+ assert.deepEqual(clone(e.allowed_actions),['deactivate_graph_node']);assert.equal(e.graph_execution.mode,'deactivate');
+ assert.throws(()=>validateUiAction({verb:'execute_graph_node',ref:e.ref},r.output));
+ if(drift){f.button.attrs['data-qtip']='Выполнить узел (F9)';f.button.children[0].attrs.class='bg-icon-run_current';}
+ const result=await f.execute({mode:'act',action:{verb:'deactivate_graph_node',ref:e.ref},snapshot:r.output});
+ assert.equal(result.status==='SUCCEEDED',!drift);assert.equal(f.page.events.filter(e=>e==='click').length,drift?0:1);
+ }
 });

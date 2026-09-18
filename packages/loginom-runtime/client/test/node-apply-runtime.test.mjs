@@ -18,10 +18,11 @@ function fixture({execute=async()=>{throw Error('Unexpected public transport')},
  const drivers={verifySource:ok('source'),mapPorts:ok('mapping'),openWizard:ok('open'),finish:ok('finish',{mode:'done',execution_started:false,execution_id:null}),
   waitExecution:ok('execute'),readOutput:ok('read'),verifyContinuation:async()=>true};
  let failRecord;
+ const handlers=new Map([['imports.text',handler]]);
  const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},execute,now,
-  nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:new Map([['imports.text',handler]]),nodeApplyDriverFactory:context=>wrapDrivers?wrapDrivers(context,drivers):drivers,
+  nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:handlers,nodeApplyDriverFactory:context=>wrapDrivers?wrapDrivers(context,drivers):drivers,
   onRecord:async e=>{events.push(e);if(e.phase===failRecord)throw Error('disk unavailable');return e;}});
- return {runtime,adapter,calls,events,graph,drivers,handler,failRecord:p=>{failRecord=p}};
+ return {runtime,adapter,calls,events,graph,drivers,handler,handlers,failRecord:p=>{failRecord=p}};
 }
 test('node drivers carry plain observations and typed outcomes through the real bridge parser',async()=>{
  let observed;
@@ -188,7 +189,10 @@ test('background node status and timed waits retain one worker and expose only a
  // Public reads must not replace the observation context used by the worker.
  await assert.rejects(f.runtime.observe(),/background node operation is running/);
  await assert.rejects(f.runtime.inspect({operationId:'apply'}),/background node operation is running/);
- assert.equal(f.runtime.requestFailure(Error('competing request')).request_rejected,true);
+ const rejected=f.runtime.requestFailure(Error('competing request'));
+ assert.equal(rejected.request_rejected,true);
+ assert.equal(rejected.output.active_node_job.operation_id,'apply');
+ assert.equal(rejected.output.active_node_job.state,'running');
  assert.throws(()=>f.runtime.startNodeApply({...request(),operation_id:'competing'}),/Another node operation is running/);
  assert.throws(()=>f.runtime.nodeApplyStatus('competing'),/Unknown/);
  assert.equal(f.calls.length,count);assert.equal(f.events.length,events);
@@ -197,6 +201,7 @@ test('background node status and timed waits retain one worker and expose only a
  await assert.rejects(wait);assert.equal(f.runtime.nodeApplyStatus('apply').cancel_requested,false);
  await assert.rejects(f.runtime.runNodeApply({...request(),operation_id:'other'}),/running/);
  release();const done=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});assert.equal(done.state,'settled');assert.equal(done.outcome.status,'SUCCEEDED');
+ assert.equal(f.runtime.requestFailure(Error('later request')).output.active_node_job,undefined);
  assertJob(done);
  assert.equal(f.calls.filter(x=>x==='configure').length,1);assert.equal(f.calls.filter(x=>x==='finish').length,1);
  assert.deepEqual(f.runtime.startNodeApply(request()),done);
@@ -215,7 +220,7 @@ test('background cancellation holds the browser gate until cleanup and explicit 
  assert.equal(stopped.state,'settled');assert.equal(stopped.outcome.status,'AMBIGUOUS');assert.equal(stopped.outcome.cleanup_complete,true);
  assert.equal(stopped.progress.pending_phase,null);assert.ok(!f.calls.includes('finish'));
  const count=f.calls.length;await f.runtime.inspect({operationId:'apply'});assert.equal(f.calls.length,count);
- assert.equal(f.runtime.startNodeApply(request(),{resume:true}).attempt,2);
+ assert.equal(f.runtime.startNodeApply({operation_id:'apply'},{resume:true}).attempt,2);
  const done=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});assert.equal(done.outcome.status,'SUCCEEDED');
  assert.equal(f.calls.filter(x=>x==='create').length,1);assert.equal(f.calls.filter(x=>x==='configure').length,1);assert.equal(f.calls.filter(x=>x==='finish').length,1);
 });
@@ -532,4 +537,36 @@ test('refusal journal failure keeps the operation pending',async()=>{
  const f=refusedAfterSource();f.failRecord('node_phase_refused');
  const r=await f.runtime.runNodeApply(request());assert.equal(r.status,'AMBIGUOUS');assert.equal(r.cleanup_complete,false);
  assert.throws(()=>f.runtime.assertPreparationAllowed(),/pending|uncertain/);
+});
+
+test('clipped explicit coordinates refuse before any source, browser or journal effect; corrected omission is accepted',async()=>{
+ const f=fixture();const bad=request();bad.target.position={x:8,y:8};
+ await assert.rejects(f.runtime.runNodeApply(bad),/target\.position\.x.*64/);
+ assert.deepEqual(f.calls,[]);assert.deepEqual(f.events,[]);assert.equal(f.graph.nodes.length,0);
+ const corrected=request();corrected.operation_id='corrected-edge';delete corrected.target.position;
+ f.adapter.choosePosition=async()=>({x:104,y:200});
+ const result=await f.runtime.runNodeApply(corrected);assert.equal(result.status,'SUCCEEDED');assert.equal(f.graph.nodes.length,1);
+ assert.deepEqual(f.graph.nodes[0].position,{x:104,y:200});
+});
+
+test('public node inspect/resume recovers a lost precondition refusal without repeating the created node',async()=>{
+ const f=fixture(),r=request(),mutate=f.adapter.mutate;let refused;
+ f.handlers.set('transform.sorting',{...f.handler,modes:['keys']});r.target.type='transform.sorting';r.mode='keys';
+ const source={document_id:'doc',workflow_id:'wf',node_id:'source'};
+ f.graph.nodes.push({ref:source,type:'imports.text',label:'Original',position:{x:80,y:80},inputs:[],outputs:[0]});
+ r.inputs=[{source,output:0,input:0}];
+ f.adapter.mutate=async e=>{
+  if(e.kind==='connect'){
+   if(!refused){refused={status:'FAILED',action_key:'link.create',operation_id:e.id,phase:'preconditions',effect_possible:false,cleanup_complete:true,error:{code:'CAPABILITY_ERROR'}};throw Error('lost refusal reply');}
+   f.calls.push('connect');f.graph.links.push(e.parameters.edge);return {status:'SUCCEEDED',cleanup_complete:true};
+  }
+  const result=await mutate(e);if(e.kind==='create')f.graph.nodes.find(n=>n.ref.node_id==='new').inputs=[0];return result;
+ };
+ f.adapter.reconcile=async()=>({completed:true,verified:false,cleanup_complete:true,receipt:refused});
+ const initial=await f.runtime.runNodeApply(r);assert.equal(initial.output.pending_phase,'target');
+ const count=f.calls.length;await f.runtime.inspect({operationId:r.operation_id});
+ assert.equal(f.calls.length,count);assert.equal(f.calls.includes('open'),false);
+ const result=await f.runtime.runNodeApply(r,{resume:true});assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.equal(f.calls.filter(c=>c==='create').length,1);assert.equal(f.calls.filter(c=>c==='connect').length,1);
+ assert.equal(f.graph.nodes.length,2);assert.equal(f.graph.links.length,1);
 });

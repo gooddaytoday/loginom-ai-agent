@@ -1,4 +1,5 @@
 import {ensureGroupingOutputSources} from './grouping-output-sources.mjs';
+import {expandOutputChanges} from './output-mapping-changes.mjs';
 import {GROUPING_FUNCTIONS} from './grouping-parameters.mjs';
 import {configureOutputFields,reorderOutputFields,configureOutputAutosync} from './port-mapping-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
@@ -41,9 +42,10 @@ export function resolveGroupingOutput(configuration,parameters,native,mapping={}
   return {current,source,name:preserved?current.name:desired?.name??e.name,label:preserved?current.label:desired?.label??e.label,
    field:e.field,function:e.function,excluded:current.excluded};
  });
- if(preserved&&mapping.fields===undefined)return {fields:null};
+ if(preserved&&mapping.fields===undefined&&mapping.changes===undefined)return {fields:null};
  let ordered=preserved?actual.map(f=>resolved.find(r=>r.current.record_id===f.record_id)):
   [...configuration.keys.map(f=>resolved.find(r=>r.field===f.name&&!r.function)),...parameters.measures.map(m=>resolved.find(r=>r.field===m.field.name&&r.function===m.function))];
+ mapping=expandOutputChanges(mapping,ordered.map(r=>({source:{kind:'configured_field',name:r.name},name:r.name,label:r.label,excluded:r.excluded})));
  if(mapping.fields){
   need(mapping.fields.length===ordered.length,'Grouping output mapping must account for every configured field');
   const names=new Set();ordered=mapping.fields.map(f=>{

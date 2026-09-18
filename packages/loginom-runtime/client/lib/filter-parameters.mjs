@@ -30,9 +30,12 @@ export function validateFilterValue(value,type){
 export function validateFilterConditions(p){
  need(object(p,['groups'])&&Array.isArray(p.groups)&&p.groups.length>0&&p.groups.length<=64,'Nonempty OR groups required; empty filters are not an implicit pass-through');
  let count=p.groups.length-1;
- for(const group of p.groups){
+ for(const [groupIndex,group] of p.groups.entries()){
   need(Array.isArray(group)&&group.length>0,'Each OR group must contain at least one AND condition');count+=group.length;
-  for(const c of group){
+  for(const [conditionIndex,c] of group.entries()){
+   const validateValue=(value,key)=>{
+    try{validateFilterValue(value,c.type);}catch(error){throw Error(`Invalid parameters.groups[${groupIndex}][${conditionIndex}].${key}: ${error.message}`);}
+   };
    need(object(c,['field','operator','type','value','lower','upper','values','case_sensitive']),'Unknown filter condition property');
    need(object(c.field,['kind','name'])&&((c.field.kind==='input_field'&&name(c.field.name))||(c.field.kind==='row_number'&&c.field.name===undefined)),'Exact input field or row_number required');
    const op=FILTER_OPERATORS[c.operator];need(op,'Unsupported filter operator');
@@ -46,9 +49,9 @@ export function validateFilterConditions(p){
    need(['value','lower','upper','values'].every(k=>keys.includes(k)?Object.hasOwn(c,k):!Object.hasOwn(c,k)),'Filter operator operands differ');
    if(arity==='list'){
     need(Array.isArray(c.values)&&c.values.length>0&&c.values.length<=128,'A bounded nonempty filter list is required');
-    c.values.forEach(v=>validateFilterValue(v,c.type));
+    c.values.forEach((v,i)=>validateValue(v,`values[${i}]`));
     need(new Set(c.values.map(v=>JSON.stringify(comparable(v,c.type)))).size===c.values.length,'Duplicate filter list values');
-   }else for(const k of keys)validateFilterValue(c[k],c.type);
+   }else for(const k of keys)validateValue(c[k],k);
    if(arity===2&&c.type!=='string')need(comparable(c.lower,c.type)<=comparable(c.upper,c.type),'Filter interval lower bound exceeds upper bound');
   }
  }

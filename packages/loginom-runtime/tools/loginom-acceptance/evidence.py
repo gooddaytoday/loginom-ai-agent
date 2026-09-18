@@ -8,7 +8,7 @@ LOCAL_TOOLS = {PREFIX + name for name in ("dock_prepare", "dock_action_describe"
     "dock_workspace_observe", "dock_ui_action", "dock_operation_inspect", "dock_operation_recover", "dock_diagnostics", "dock_artifact_upload", "dock_artifact_verify")}
 KNOWLEDGE_TOOLS = {PREFIX + name for name in ("find", "search", "read", "grep", "glob", "list", "tree")}
 # Export full-node receipts without silently expanding legacy audit allowlists.
-NODE_TOOLS = {PREFIX + name for name in ("dock_node_apply", "dock_node_resume", "dock_node_status",
+NODE_TOOLS = {PREFIX + name for name in ("dock_node_apply", "dock_node_read", "dock_node_resume", "dock_node_status",
     "dock_node_wait", "dock_node_cancel", "dock_node_stop", "dock_artifact_deliver",
     "dock_artifact_delivery_status", "dock_artifact_delivery_resume")}
 
@@ -24,6 +24,11 @@ def clean(value, secrets, _path=()):
     if not isinstance(value, str): return value
     for secret in sorted((s for s in secrets if isinstance(s,str) and len(s)>3),key=len,reverse=True):
         value=value.replace(secret,'[redacted]')
+    # Hermes repeat-result notes embed an args JSON fragment inside prose,
+    # sometimes truncated before it becomes parseable JSON. Key redaction on
+    # dictionaries alone cannot protect session capabilities in these notes.
+    value=re.sub(r'''(?i)(["'][^"'\r\n]*(?:token|secret|password|api_?key|authorization|cookie)[^"'\r\n]*["']\s*:\s*["'])[^"'\r\n]*''',
+                 r'\1[redacted]',value)
     value=re.sub(r'\b(?:Bearer|Basic)\s+\S+', '[redacted]', value, flags=re.I)
     value=re.sub(r'(?i)([?&](?:token|key|api_key|access_token|password)=)[^&#\s]+', r'\1[redacted]', value)
     value=re.sub(r'(https?://)[^/@\s]+:[^/@\s]+@', r'\1[redacted]@', value)

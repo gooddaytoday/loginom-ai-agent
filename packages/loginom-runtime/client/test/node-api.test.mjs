@@ -76,7 +76,7 @@ test('Field Parameters dispatch uses the catalog scalar mode and rejects malform
  assert.deepEqual(handler.modes,['scalar']);
 });
 
-test('Filter dispatch accepts ordered conditions and two explicit outputs, refusing unsupported requests',async()=>{
+test('Filter dispatch accepts ordered conditions and selected outputs, refusing unsupported requests',async()=>{
  const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
  const {runtime,calls}=fixture(),handler=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'}).nodeApplyHandlers.get('transform.filter_data');
  const request={operation_id:'filter',contract_revision:'1.0.0',document_id:'doc',
@@ -87,7 +87,22 @@ test('Filter dispatch accepts ordered conditions and two explicit outputs, refus
   read:{ports:[0,1],sample_rows:10,require_exact_numbers:true},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
  runtime.startNodeApply=args=>{handler.validate(args.parameters,args.mode,args);calls.push(args);return {state:'running'};};
  await dispatchNodeApi(runtime,'dock_node_apply',request);assert.equal(calls.length,1);assert.deepEqual(handler.modes,['conditions']);
- for(const patch of [{parameters:{groups:[]}},{read:{...request.read,ports:[0]}},{mode:'scalar'},{mappings:[{direction:'input',port:1}]}])
+ for(const ports of [[0],[1]])await dispatchNodeApi(runtime,'dock_node_apply',{...request,read:{...request.read,ports}});
+ for(const patch of [{parameters:{groups:[]}},{read:{...request.read,ports:[]}},{read:{...request.read,ports:[2]}},{mode:'scalar'},{mappings:[{direction:'input',port:1}]}])
   await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,...patch}));
- assert.equal(calls.length,1);
+ assert.equal(calls.length,3);
+});
+
+test('published placement bounds and internal validation agree before mutations',async()=>{
+ const {nodeApplyInputSchema}=await import('../lib/node-api.mjs');
+ const {validateActionParameters}=await import('../lib/action-catalog.mjs');
+ const {validateNodeTargetRequest}=await import('../lib/node-contracts.mjs');
+ const schema=nodeApplyInputSchema.properties.target.properties.position;
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},target:{kind:'new',type:'imports.text'},inputs:[]};
+ for(const axis of ['x','y'])for(const number of [8,63.9,64,128,10000,10001]){
+  const position={x:128,y:128,[axis]:number};const valid=number>=64&&number<=10000;
+  const published=()=>validateActionParameters(schema,position),internal=()=>validateNodeTargetRequest({...request,target:{...request.target,position}});
+  if(valid){assert.doesNotThrow(published);assert.doesNotThrow(internal);}else{assert.throws(published);assert.throws(internal,new RegExp('target\\.position\\.'+axis));}
+ }
+ assert.doesNotThrow(()=>validateNodeTargetRequest(request));
 });

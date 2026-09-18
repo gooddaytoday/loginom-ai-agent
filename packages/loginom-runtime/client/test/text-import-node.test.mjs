@@ -4,6 +4,13 @@ import {createTextImportNodeSupport,validateTextImportNodeParameters,verifyTextI
 const params=()=>({settings:{source:{source_path:'/test/data.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},format:{delimiter:';',decimal_separator:'.',null_marker:'NULL',text_qualifier:'"'},columns:[{name:'A',label:'A',type:'integer',data_kind:'Дискретный',used:true}]},source:{artifact_id:'artifact',upload_operation_id:'upload',bytes:15,sha256:'a'.repeat(64)}});
 const request=()=>({finish:'done',read:{ports:[]},mappings:[],inputs:[]});
 const uploaded=()=>({operation_id:'upload',artifact:{artifact_id:'artifact',bytes:15,sha256:'a'.repeat(64)},outcome:{operation_id:'upload',action_key:'artifact.upload',status:'SUCCEEDED',cleanup_complete:true,output:{artifact_id:'artifact',destination:'/test/data.csv',bytes:15,sha256:'a'.repeat(64),server_copy_verification:{verification_id:'verification',status:'SUCCEEDED',bytes_verified:true,upload_completion_verified:true,destination:'/test/data.csv',bytes:15,sha256:'a'.repeat(64)}}}});
+test('new import missing columns identifies the corrective parameter; existing patches remain allowed',()=>{
+ const p=params();delete p.settings.columns;
+ assert.throws(()=>validateTextImportNodeParameters(p,'delimited',request()),/Invalid parameters.parameters.settings.columns:/);
+ validateTextImportNodeParameters(p,'delimited',{...request(),target:{kind:'existing'}});
+ p.settings.columns=params().settings.columns;
+ validateTextImportNodeParameters(p,'delimited',request());
+});
 test('Done candidate validates complete request before opening the node',()=>{
  validateTextImportNodeParameters(params(),'delimited',request());
  for(const mutate of [r=>r.finish='unknown',r=>r.read.ports=[0],r=>r.mappings=[{direction:'output'}],r=>r.inputs=[{}]]){const r=request();mutate(r);assert.throws(()=>validateTextImportNodeParameters(params(),'delimited',r));}

@@ -12,7 +12,10 @@ export async function preflightTabularSource(options,ctx,config,{required,resolv
  // Validate their effective schema in the normal input wizard, before editing
  // or committing it. New nodes still reject bad keys before graph creation.
  if(request.target.kind==='existing'&&!existingSource)return {verified:true,not_applicable:true,validation_deferred:'input_mapping'};
- need(inputPort===undefined?request.inputs.length===1:request.inputs.filter(i=>i.input===inputPort).length===1,label+' preflight requires an explicit input');
+ if(!(inputPort===undefined?request.inputs.length===1:request.inputs.filter(i=>i.input===inputPort).length===1)){
+  const error=Error('Invalid parameters.inputs: '+label+' preflight requires an explicit input');
+  error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
+ }
  const input=inputPort===undefined?request.inputs[0]:request.inputs.find(i=>i.input===inputPort),binding={document_id:request.document_id,workflow_ref:request.workflow_ref,node:input.source};
  const channel=createNodeProcedure({operation,execute,record:onRecord,now,maxSteps:256,...config,signal:ctx.signal,preparedNodeContext:binding,
   wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});

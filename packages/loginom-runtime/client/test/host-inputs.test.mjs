@@ -4,7 +4,7 @@ import { mkdtemp, readFile, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { codexAttachedPaths, codexDatasetContext, produceHostInputTicket } from '../lib/host-inputs.mjs';
+import { codexAttachedPaths, codexDatasetContext, produceHostInputTicket,nativeInputFailure } from '../lib/host-inputs.mjs';
 import { createHostArtifactAdmission, codexInputIdentity } from '../lib/host-artifacts.mjs';
 import { createArtifactStore } from '../lib/artifacts.mjs';
 
@@ -22,6 +22,14 @@ test('Codex attachments use the current composer section, not request text or hi
   assert.deepEqual(codexAttachedPaths({...input('/tmp/x.csv'),hook_event_name:'PostToolUse'}), []);
   assert.deepEqual(codexAttachedPaths({...input('/tmp/x.csv'),prompt:'Read /tmp/x.csv',transcript_path:'/tmp/history'}), []);
   assert.deepEqual(codexAttachedPaths({...input('/tmp/x.csv'),prompt:'## My request:\n'+prompt('/tmp/x.csv')}), []);
+});
+test('attachment limits have safe distinct errors without leaking paths',async t=>{
+ const f=await fixture(t),request={session_id:'native',turn_id:'turn',paths:Array(9).fill(f.path)};
+ for(const [paths,code] of [[request.paths,'INPUT_COUNT_LIMIT'],[[join(f.root,'secret.zip')],'INPUT_FORMAT_UNSUPPORTED']]){
+  try{await produceHostInputTicket(f.config,{...request,paths});assert.fail('Expected input refusal');}
+  catch(error){const result=nativeInputFailure(error);assert.equal(result.code,code);assert.ok(!JSON.stringify(result).includes(f.root));}
+ }
+ assert.equal(nativeInputFailure(Error('/private/secret')).code,'INPUT_PREPARATION_FAILED');
 });
 test('native attachment snapshot retains exact bytes and only one owning Dock session', async t => {
   const f = await fixture(t), context = await codexDatasetContext(f.config,input(f.path));
@@ -59,6 +67,6 @@ test('dataset admission rejects symlinks, oversized files and missing host ident
   await writeFile(f.path,Buffer.alloc(16*1024*1024+1));
   await assert.rejects(produceHostInputTicket(f.config,{...request,paths:[f.path]}),/Invalid dataset/);
   const context=await codexDatasetContext(f.config,input(f.path));
-  assert.match(context.hookSpecificOutput.additionalContext,/не удалось/);
+  assert.match(context.hookSpecificOutput.additionalContext,/INPUT_FILE_TOO_LARGE/);
   assert.doesNotMatch(context.hookSpecificOutput.additionalContext,/host_context_token/);
 });

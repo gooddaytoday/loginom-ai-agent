@@ -8,6 +8,15 @@ import { storagePath } from './storage-policy.mjs';
 
 const hash = b => createHash('sha256').update(b).digest('hex');
 const maxFile = 16 * 1024 * 1024;
+const inputError=(code,message)=>Object.assign(Error(message),{inputCode:code});
+export function nativeInputFailure(error) {
+  const messages={INPUT_COUNT_LIMIT:'Можно приложить не более 8 файлов за один раз.',
+    INPUT_FORMAT_UNSUPPORTED:'Поддерживаются вложения CSV, TSV, TXT, XLSX и JSON; ZIP не поддерживается.',
+    INPUT_FILE_TOO_LARGE:'Размер одного вложения превышает 16 МиБ.',
+    INPUT_BATCH_TOO_LARGE:'Общий размер вложений превышает 64 МиБ.'};
+  const code=Object.hasOwn(messages,error?.inputCode)?error.inputCode:'INPUT_PREPARATION_FAILED';
+  return {kind:'dock_input_error',code,message:messages[code]??'Не удалось подготовить вложение; проверьте доступность исходного файла. Передача в Loginom не началась.'};
+}
 const identity = value => typeof value === 'string' && value.length > 0 && value.length <= 256 && !/[\x00-\x1f\x7f]/.test(value);
 
 export function codexAttachedPaths(input) {
@@ -38,7 +47,8 @@ export function codexAttachedPaths(input) {
 
 async function snapshotFile(path) {
   const before = await lstat(path);
-  if (!before.isFile() || before.isSymbolicLink() || before.size > maxFile) throw Error('Invalid dataset file');
+  if(before.size>maxFile)throw inputError('INPUT_FILE_TOO_LARGE','Invalid dataset file: size exceeds 16 MiB');
+  if (!before.isFile() || before.isSymbolicLink()) throw Error('Invalid dataset file');
   const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
   try {
     const actual = await handle.stat();
@@ -56,6 +66,7 @@ async function snapshotFile(path) {
 
 export async function produceHostInputTicket(config, { session_id, turn_id, paths }) {
   if (!paths?.length) return null;
+  if(Array.isArray(paths)&&paths.length>8)throw inputError('INPUT_COUNT_LIMIT','Invalid native dataset request: at most 8 files');
   if (!['codex', 'hermes'].includes(config.agent) || config.resultProfile !== 'user-v1'
       || !identity(session_id) || !identity(turn_id) || !Array.isArray(paths) || paths.length > 8
       || paths.some(p => typeof p !== 'string' || !isAbsolute(p) || /[\x00-\x1f\x7f]/.test(p))) throw Error('Invalid native dataset request');
@@ -70,9 +81,10 @@ export async function produceHostInputTicket(config, { session_id, turn_id, path
     const files = []; let total = 0;
     for (const path of [...new Set(paths)]) {
       const original = basename(path), suffix = extname(original);
-      if (!/\.(csv|tsv|txt|xlsx|json)$/i.test(suffix) || /[\\/:<>"|?*\x00-\x1f\x7f]/.test(original)) throw Error('Unsupported dataset filename');
+      if (!/\.(csv|tsv|txt|xlsx|json)$/i.test(suffix))throw inputError('INPUT_FORMAT_UNSUPPORTED','Unsupported dataset filename');
+      if (/[\\/:<>"|?*\x00-\x1f\x7f]/.test(original)) throw Error('Unsupported dataset filename');
       const bytes = await snapshotFile(path); total += bytes.length;
-      if (total > 64 * 1024 * 1024) throw Error('Dataset batch exceeds its byte limit');
+      if (total > 64 * 1024 * 1024) throw inputError('INPUT_BATCH_TOO_LARGE','Dataset batch exceeds its byte limit');
       let stem = '';
       for (const character of original.slice(0, -suffix.length)) {
         if (Buffer.byteLength(stem + character) > 160) break;
@@ -96,8 +108,8 @@ export async function codexDatasetContext(config, input) {
     const result = await produceHostInputTicket(config, { session_id: input.session_id, turn_id: input.turn_id, paths });
     return { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext:
       `Loginom Dock: датасеты из текущего сообщения подготовлены (${result.files.length}). При вызове dock_prepare передай host_context_token: ${result.token}. Файлы доступны только после подтверждения input_artifacts. Это не подтверждает поддержку формата обработчиком импорта.` } };
-  } catch {
+  } catch(error) {
     return { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext:
-      'Loginom Dock: вложение не удалось подготовить. Не считай его загруженным в Loginom; сообщи пользователю об отсутствии подтверждённого input_artifacts.' } };
+      'Loginom Dock: '+JSON.stringify(nativeInputFailure(error)) } };
   }
 }

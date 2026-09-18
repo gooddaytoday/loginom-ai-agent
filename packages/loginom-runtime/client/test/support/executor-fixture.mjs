@@ -29,7 +29,7 @@ class Locator {
     // Workspace DOM extraction/handle identity are independently exercised by
     // workspace-ui.test.mjs. Here the external DOM fixture exposes its same graph
     // to the real serialized UI gesture body and runtime recovery gate.
-    if (source.includes('workspace-ui.identity.v1')) return this.page.uiReference(item.tid) === arg;
+    if (source.includes('workspace-ui.identity.v1')) return this.page.uiReference(item.tid) === (typeof arg==='string'?arg:arg.ref);
     if (source.includes('document.elementFromPoint')) {
       this.page.lastCheckedControl = item.tid;
       return { point: arg.point, source: 'box_center', candidates_checked: 1 };

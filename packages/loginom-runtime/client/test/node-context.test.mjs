@@ -13,7 +13,8 @@ function fixture() {
   const graph=new ModelForm();graph.FDiagram={FNodes:{FCollection:[{FGuid:'node',FCell:{}}]},FmxGraph:{container:root,view:{getState:()=>({shape:{node:dom}})}}};
   const controller={Node:{data:{node:workflowNode}},FController:graph};
   let activeElements=[tab,root,dom],crumbs=binding.workflow_ref.navigation_path.map(c=>({...element(c.tid),textContent:c.label}));
-  const document={querySelectorAll:selector=>selector.startsWith('[data-tid^=')?crumbs:activeElements.filter(e=>selector==='[data-tid='+JSON.stringify(e.getAttribute())+']')};
+  const nodeList=values=>Object.assign(Object.fromEntries(values.map((v,i)=>[i,v])),{length:values.length,[Symbol.iterator]:function*(){yield* values;}});
+  const document={querySelectorAll:selector=>nodeList(selector.startsWith('[data-tid^=')?crumbs:activeElements.filter(e=>selector==='[data-tid='+JSON.stringify(e.getAttribute())+']'))};
   const record={phase:'verified',workflowId:'flow',tab,packageNode,nodeTargetWorkflowNode:workflowNode};
   const preparation={id:'doc',document,receipts:new Map([['prepare',record]])};
   const app={PackageTreeNode,WorkFlowTreeNode,ModelNodeTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}};
@@ -34,9 +35,19 @@ function fixture() {
       nativeIndex:0,portIndex:0,enginePort:model.FModelEnginePort,operation_id:'open-port'};
     preparation.outputPortOpenReceipts=new Map([['open-port',opening]]);return {opening,model,portTree,group};
   };
-  return{binding,page,controller,enterViews,record,preparation,workflowNode,nodeTree,enterWizard,enterPortWizard,tab,graph,
-    changeCrumb:()=>crumbs[0].textContent='Other',duplicateTab:()=>activeElements.push(tab)};
+  return{binding,page,controller,enterPendingWizard:()=>{class WizardTreeNode{};app.WizardTreeNode=WizardTreeNode;
+      const nt=nodeTree,wt=Object.assign(new WizardTreeNode(),{ParentNode:nt});graph.FDiagram.FNodes.FCollection[0].data=nt.FModelNode;
+      const ne={...element(binding.workflow_ref.navigation_path[0].tid+'>Import-3'),id:'pending-node',textContent:'Import'};
+      const we={...element(binding.workflow_ref.navigation_path[0].tid+'>Import-3>Настройка'),id:'pending-wizard',textContent:'Настройка'};
+      crumbs.push(ne,we);activeElements.push(ne,we);
+      const nc={el:{dom:ne},_node:{data:{node:nt}}},wc={el:{dom:we},_node:{data:{node:wt}}};
+      context.Ext={getCmp:id=>id===ne.id?nc:id===we.id?wc:null};return {nt,wt,nc,wc};},enterOverview:()=>{controller.Node.data.node=nodeTree;crumbs.push({...element(binding.workflow_ref.navigation_path[0].tid+'>Import-3'),textContent:'Import'});},enterViews,record,preparation,workflowNode,nodeTree,enterWizard,enterPortWizard,tab,graph,
+    cloneNode:inside=>{const clone=element(dom.getAttribute());activeElements.push(clone);if(inside)root.contains=e=>e===dom||e===clone;},changeCrumb:()=>crumbs[0].textContent='Other',duplicateTab:()=>activeElements.push(tab)};
 }
+test('graph context ignores outline copies outside the native canvas but rejects duplicate nodes inside it',async()=>{
+ const f=fixture();f.cloneNode(false);assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,true);
+ const bad=fixture();bad.cloneNode(true);assert.equal((await readPreparedNodeContext(bad.page,bad.binding)).reason,'surface_ambiguous');
+});
 test('prepared context validates exact node ownership before serialization',()=>{
  const f=fixture();validatePreparedNodeContext(f.binding);
  for(const b of [{...f.binding,extra:true},{...f.binding,node:{...f.binding.node,workflow_id:'other'}},{...f.binding,node:{...f.binding.node,document_id:'other'}}])assert.throws(()=>validatePreparedNodeContext(b));
@@ -78,4 +89,26 @@ test('separate output wizard requires its verified opening receipt and exact nat
   (f,p)=>{f.preparation.outputPortOpenReceipts.set('duplicate',{...p.opening});},
  ];
  for(const [i,change] of changes.entries()){const f=fixture(),p=f.enterPortWizard();change(f,p);assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false,String(i));}
+});
+
+
+test('overview breadcrumb identity comes from the same cached node tree GUID',async()=>{
+ const f=fixture();assert.equal((await readPreparedNodeContext(f.page,f.binding)).navigation_node,undefined);
+ f.enterOverview();const result=await readPreparedNodeContext(f.page,f.binding);
+ assert.equal(result.verified,true);assert.equal(result.navigation_node.tid,'MF;TF-1;cnrNaviMode;b.s_Scenario>Import-3');
+ f.nodeTree.FGuid='foreign';assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
+});
+
+test('pending wizard breadcrumb requires the exact native node GUID',async()=>{
+ const f=fixture();assert.equal((await readPreparedNodeContext(f.page,f.binding)).pending_wizard_node,undefined);
+ f.enterPendingWizard();assert.equal((await readPreparedNodeContext(f.page,f.binding)).pending_wizard_node.tid,'MF;TF-1;cnrNaviMode;b.s_Scenario>Import-3');
+ f.nodeTree.FGuid='other';assert.equal((await readPreparedNodeContext(f.page,f.binding)).pending_wizard_node,undefined);
+});
+
+test('pending deactivation rejects mismatched breadcrumb native objects',async()=>{
+ for(const change of [p=>p.nt.FGuid='foreign',p=>p.nt.ParentNode={},p=>p.nt.FModelNode={},
+  p=>p.wt.ParentNode={},p=>p.nc.el.dom={},p=>p.wc.el.dom={},p=>p.nc._node.data.node={},p=>p.wc._node.data.node={}]){
+  const f=fixture(),p=f.enterPendingWizard();change(p);
+  assert.equal((await readPreparedNodeContext(f.page,f.binding)).pending_wizard_node,undefined);
+ }
 });

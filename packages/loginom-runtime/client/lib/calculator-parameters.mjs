@@ -9,16 +9,26 @@ export function validateCalculatorParameters(parameters,mode,request) {
     &&Object.keys(parameters).every(k=>['expressions','order'].includes(k))&&Array.isArray(parameters.expressions)
     &&parameters.expressions.length<=128,'Bounded calculator expressions required');
   requireValue(request.target.kind==='existing'||parameters.expressions.length>0,'A new calculator requires expressions');
+  requireValue(request.target.kind==='existing'||request.inputs.length===1&&request.inputs[0].input===0,
+    'Invalid parameters.inputs: a new calculator requires exactly one explicit table connection to input 0');
   const targets=new Set(),names=new Set();
-  for(const e of parameters.expressions) {
+  for(const [index,e] of parameters.expressions.entries()) {
+    const path='parameters.parameters.expressions['+index+']';
     requireValue(e&&typeof e==='object'&&!Array.isArray(e)&&Object.keys(e).every(k=>['target',...properties].includes(k)),'Invalid expression parameters');
     const t=e.target;
-    requireValue(t&&((t.kind==='new'&&Object.keys(t).join(',')==='kind')
-      ||t.kind==='existing'&&Object.keys(t).length===2&&name(t.name)),'Choose a new expression or an exact existing name');
+    requireValue(t&&typeof t==='object'&&!Array.isArray(t)&&['new','existing'].includes(t.kind),
+      'Invalid '+path+'.target: choose {kind:new} or {kind:existing,name:saved_name}');
+    if(t.kind==='new')requireValue(Object.keys(t).length===1,
+      'Invalid '+path+'.target'+(Object.hasOwn(t,'name')?'.name':'')+': a new expression target contains only kind; put its name beside target');
+    else requireValue(Object.keys(t).length===2&&name(t.name),
+      'Invalid '+path+'.target.name: supply the exact saved expression name');
     if(t.kind==='existing') {
       requireValue(request.target.kind==='existing','A new node cannot address an existing expression');
       requireValue(!targets.has(t.name.toLowerCase()),'Expression targeted more than once');targets.add(t.name.toLowerCase());
-    } else requireValue(properties.every(k=>Object.hasOwn(e,k)),'New expression requires name, label, type, formula and replace');
+    } else {
+      const missing=properties.find(k=>!Object.hasOwn(e,k));
+      requireValue(missing===undefined,'Invalid '+path+'.'+missing+': required for a new expression; provide name, label, type, formula and replace (false adds a field, true explicitly replaces an input)');
+    }
     if(e.name!==undefined){requireValue(name(e.name)&&!names.has(e.name.toLowerCase()),'Invalid or duplicate expression name');names.add(e.name.toLowerCase());}
     if(e.label!==undefined)requireValue(typeof e.label==='string'&&e.label.length>0&&e.label.length<=200&&!/[\x00-\x1f]/.test(e.label),'Invalid expression label');
     if(e.type!==undefined)requireValue(types.includes(e.type),'Unsupported expression type');
@@ -28,6 +38,9 @@ export function validateCalculatorParameters(parameters,mode,request) {
   }
   if(parameters.order!==undefined)requireValue(Array.isArray(parameters.order)&&parameters.order.length>0&&parameters.order.length<=128
     &&parameters.order.every(name)&&new Set(parameters.order.map(n=>n.toLowerCase())).size===parameters.order.length,'Explicit unique expression order required');
+  if(request.target.kind==='new'&&parameters.order!==undefined)requireValue(parameters.order.length===parameters.expressions.length
+    &&parameters.order.every(n=>parameters.expressions.some(e=>e.name===n)),
+    'Invalid parameters.parameters.order: list every calculated expression name exactly once; inherited input fields do not belong in expression order');
   requireValue(request.inputs.length<=1&&request.inputs.every(i=>i.input===0),'Calculator accepts one table input');
   requireValue(request.read.ports.every(p=>p===0),'Calculator has one table output');
   requireValue(request.mappings.length<=2&&request.mappings.every(m=>m.port===0),'Calculator has one input and output mapping');
@@ -61,7 +74,7 @@ export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=
   }
   requireValue(resolved.length>0&&resolved.length<=128,'Calculator expression count outside supported bounds');
   const finalNames=resolved.map(e=>e.name.toLowerCase());
-  requireValue(new Set(finalNames).size===finalNames.length,'Expression name collides with an unrequested expression');
+  requireValue(new Set(finalNames).size===finalNames.length,'Invalid parameters.parameters.expressions: Expression name collides with an unrequested expression; new adds, existing targets a retained name');
   for(const e of resolved) {
     const input=inputFields.find(f=>f.name.toLowerCase()===e.name.toLowerCase());
     if(e.replace)requireValue(input,'Replacement input field is missing');

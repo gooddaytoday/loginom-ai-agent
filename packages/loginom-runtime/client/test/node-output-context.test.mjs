@@ -16,10 +16,11 @@ function fixture(surface='graph') {
  const model={FDiagram:d,FPortList:{[portGuid]:{Type:0,Panel:panel}},FViewDescList:{[viewGuid]:desc},FActiveViewGuid:viewGuid};
  const Workspace={getActiveTab:()=>({Controller:{FController:model}})};
  const app={Application:{FInstance:{FMainForm:{Items:{Workspace}}}}};
- const document={querySelectorAll:q=>{const e=elements.get(JSON.parse(q.slice(10,-1)));return e?[e]:[];}};
+ const copies=[];
+ const document={querySelectorAll:q=>{const tid=JSON.parse(q.slice(10,-1)),e=elements.get(tid),matches=[...(e?[e]:[]),...copies.filter(c=>c.getAttribute('data-tid')===tid)];return {length:matches.length,...matches,[Symbol.iterator]:function*(){yield*matches;}};}};
  const context=vm.createContext({document,bg:{app}});
  const page={evaluate:(fn,arg)=>structuredClone(vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context))};
- return {binding,base,node,d,model,desc,panelEl,table,port,page,readNode:async()=>({...base})};
+ return {binding,base,node,d,model,desc,panelEl,table,port,copies,page,readNode:async()=>({...base})};
 }
 test('native output IDs retain public order and distinguish selection from activation',async()=>{
  const f=fixture(),r=await readOutputContext(f.page,f.binding,f.readNode);assert.equal(r.verified,true);
@@ -57,4 +58,11 @@ for(const suffix of ['', '_no_automapping'])for(const state of ['active','inacti
 test('output activity with icon '+state+suffix,async()=>{
  const f=fixture();f.port.querySelectorAll=()=>[{getAttribute:k=>k==='href'?'/output_table_'+state+suffix+'.svg':null}];
  const r=await readOutputContext(f.page,f.binding,f.readNode);assert.equal(r.verified,true);assert.equal(r.ports[0].active,state==='active');
+});
+
+for(const inside of [false,true])test('graph output inventory '+(inside?'rejects a duplicate inside the native canvas':'ignores an outline copy outside the native canvas'),async()=>{
+ const f=fixture(),copy={getAttribute:k=>f.port.getAttribute(k)};f.copies.push(copy);
+ f.d.FmxGraph.container.contains=e=>e===f.port||(inside&&e===copy);
+ const r=await readOutputContext(f.page,f.binding,f.readNode);
+ assert.equal(r.verified,!inside);if(inside)assert.equal(r.reason,'port_identity');else assert.equal(r.ports.length,1);
 });

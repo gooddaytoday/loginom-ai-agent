@@ -15,7 +15,7 @@ export function validateCollapseParameters(p,mode,r){
  need(r.target.kind==='existing'||r.inputs.length===1,'New collapse requires explicit input');
  need(r.read.ports.every(i=>i===0),'Collapse has one output');
  need(r.mappings.length<=2&&r.mappings.every(m=>m.port===0),'Collapse accepts input/output mapping 0');
- for(const m of r.mappings)if(m.fields){const src=new Set(),out=new Set();for(const f of m.fields){
+ for(const m of r.mappings)if(m.fields||m.changes){const src=new Set(),out=new Set();for(const f of m.fields??m.changes){
   need(f.source?.kind==='configured_field'&&name(f.source.name)&&!src.has(f.source.name.toLowerCase()),'Unique configured mapping sources required');src.add(f.source.name.toLowerCase());
   const n=f.name??f.source.name;need(name(n)&&!out.has(n.toLowerCase()),'Unique output names required');out.add(n.toLowerCase());need(m.direction==='output'||f.excluded!==true,'Input exclusions unsupported');
  }}

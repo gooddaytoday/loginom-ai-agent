@@ -77,7 +77,7 @@ class ProvenanceTest(unittest.TestCase):
                                    loginom_user=None,
                                    hermes_home=root, dock_config=config, node=root / "node", browsers=root / "browsers",
                                    hermes=root / "hermes", hermes_python=root / 'python', hermes_source=root / 'source',
-                                   output=root / "preflight.json")
+                                   output=root / "preflight.json", loginom_user='mimo')
             prior_umask = os.umask(0o077)
             try:
                 with patch.object(run.sys, "platform", "darwin"), patch.object(run, "connection", return_value={"providers":{"openai-codex":{"tokens":{"access_token":"synthetic"}}}}), \

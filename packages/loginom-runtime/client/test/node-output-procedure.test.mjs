@@ -59,8 +59,8 @@ test('empty default datetime masks are applied without selecting away and verifi
 
 test('new output tables reveal offscreen cards within their exact port before adding and entering',async()=>{
  const {openNewOutputTable}=await import('../lib/node-output-procedure.mjs');
- for(const fault of ['none','foreign_port','stalled']){
-  let views=false,selected=false,added=false,active=false,top=0;const actions=[];
+ for(const fault of ['none','already_selected','selected_without_controls','foreign_port','stalled']){
+  let views=false,selected=false,added=false,active=false,top=0,nodeClicked=false;const actions=[];
   const control=(ref,extra={})=>({ref,tid:ref,allowed_actions:['click'],interaction:{state:'point_observed'},bounding_box:{y:100},...extra});
   const card=(ref,kind,guid,outside)=>control(ref,{viewer_card:{kind,port_guid:'port',port_panel_ref:'panel',...(guid?{view_guid:guid}:{})},
    scroll:{ref:'scroll',top,max_top:800},bounding_box:{y:outside?1000:100},interaction:{state:outside?'outside_viewport':'point_observed'},
@@ -69,17 +69,54 @@ test('new output tables reveal offscreen cards within their exact port before ad
    ui:{elements:views?[control('vendor',{viewer_vendor:{kind:'table',selected}}),
     {...card('anchor','enter','old',false),...(fault==='foreign_port'?{viewer_card:{kind:'enter',port_guid:'other',port_panel_ref:'foreign',view_guid:'old'}}:{})},
     card('add','add',null,top<400),...(added?[card('new','enter','new',top<800)]:[])]:[
-     control('node',{graph_node:{part:'body'}}),control('views',{allowed_actions:['open_node_views']})]},
-   node_outputs:{verified:true,surface:views?'views':'graph',ports:[{index:0,port_guid:'port',active:true}],
+     control('node',{graph_node:{part:'body'},...(fault==='already_selected'?{allowed_actions:[],interaction:{state:'obscured'}}:{})}),...(fault!=='selected_without_controls'||nodeClicked?[control('views',{allowed_actions:['open_node_views']})]:[])]},
+   node_outputs:{verified:true,node_selected:['already_selected','selected_without_controls'].includes(fault),surface:views?'views':'graph',ports:[{index:0,port_guid:'port',active:true}],
     tables:[{view_guid:'old',port_guid:'port',active:false},...(added?[{view_guid:'new',port_guid:'port',active,table_tid:active?'table':null}]:[])]}});
   const channel={observe:async o=>{const s=snapshot();assert.equal(o.ready(s),true,o.condition);return s;},perform:async o=>{
    const s=snapshot();assert.equal(o.ready(s),true,o.condition);const a=o.resolve(s);actions.push(a);
-   if(a.ref==='views')views=true;if(a.ref==='vendor')selected=true;
+   if(a.ref==='node')nodeClicked=true;if(a.ref==='views')views=true;if(a.ref==='vendor')selected=true;
    if(a.verb==='scroll'){assert.ok(['anchor','add'].includes(a.ref));if(fault!=='stalled')top+=400;}
    if(a.ref==='add'&&a.verb==='click'){assert.equal(top>=400,true);added=true;}
    if(a.ref==='new'){assert.equal(top>=800,true);active=true;}
   }};
-  if(fault==='none'){const r=await openNewOutputTable(channel,0);assert.equal(r.table.view_guid,'new');assert.equal(actions.filter(a=>a.verb==='scroll').length,2);}
+  if(['none','already_selected','selected_without_controls'].includes(fault)){const r=await openNewOutputTable(channel,0);assert.equal(r.table.view_guid,'new');assert.equal(actions.filter(a=>a.verb==='scroll').length,2);assert.equal(actions.filter(a=>a.ref==='node').length,fault==='already_selected'?0:1);}
   else {await assert.rejects(openNewOutputTable(channel,0),/scroll/);assert.equal(added,false);assert.equal(active,false);}
+ }
+});
+
+test('wide precision readback visits stored fields once without returning to column zero',async()=>{
+ const {configureTablePrecision}=await import('../lib/node-output-procedure.mjs');
+ for(const corrupt of [false,true]) {
+  const table={table_tid:'table',view_guid:'view',port_guid:'port'},count=27;
+  const stored=Array.from({length:count},()=>({formatting:true,custom:true,format_string:'0.00',thousands:false,scientific:false,decimal_digits:'0',currency:''}));
+  let selected=null,draft,offset=0,open=true;const selections=[];
+  const fields=()=>stored.map((v,index)=>({index,source_index:index,name_key:'F'+index,type:'real',record_id:'r'+index,status:'observed',selected:selected===index,format_string:v.format_string}));
+  const control=(ref,extra={})=>({ref,tid:ref,allowed_actions:['click','fill','press','set_checked'],interaction:{state:'point_observed'},...extra});
+  const state=()=>({table_settings:{status:'observed',kind:'format',format:{
+   page:{status:'complete_definition_page',schema_id:'schema',offset,limit:8,total_columns:count,next_offset:offset+8<count?offset+8:null},
+   metadata_fields:fields().slice(offset,offset+8),fields:fields(),
+   selected_numeric:selected===null?null:{source_index:selected,name_key:'F'+selected,...Object.fromEntries(Object.entries(draft).map(([k,value])=>[k,{status:'observed',value,input_ref:k}]))}}},
+   ui:{dialogs:open?['format']:[],elements:[...fields().map(f=>control('f'+f.index,{table_field:f})),control('format_string'),control('table;ModalWindow_BrowseFormat;btnApply')]},
+   node_outputs:{tables:[{active:true,view_guid:'view'}]}});
+  const channel={observe:async o=>{offset=o.tableFormatPage?.offset??offset;const s=state();assert.equal(o.ready(s),true,o.condition);return s;},perform:async o=>{
+   const s=state();assert.equal(o.ready(s),true,o.condition);const a=o.resolve(s);
+   if(/^f\d+$/.test(a.ref)){
+    if(selected!==null)stored[selected]={...draft, ...(corrupt&&selected===12?{format_string:'0.00'}:{})};
+    selected=Number(a.ref.slice(1));draft={...stored[selected]};selections.push(selected);
+   }else if(a.verb==='fill')draft.format_string=a.text;
+   else if(a.ref.endsWith('btnApply')){stored[selected]={...draft};open=false;}
+  }};
+  if(corrupt)await assert.rejects(configureTablePrecision(channel,table,{alreadyOpen:true}),/format differs|mask differs/);
+  else {
+   const proof=await configureTablePrecision(channel,table,{alreadyOpen:true});
+   assert.equal(proof.numeric_formats.length,count);assert.equal(proof.dialog_readback_verified,true);
+   assert.deepEqual(selections,[...Array(count).keys(),...Array(count).keys()]);
+   assert.equal(stored.every(s=>s.format_string==='0.################E+00'),true);
+   open=true;selections.length=0;
+   const restored=await configureTablePrecision(channel,table,{alreadyOpen:true,restore:proof.original_formats});
+   assert.equal(restored.restored,true);
+   assert.deepEqual(selections,[...Array(count).keys(),...Array(count).keys()]);
+   assert.equal(stored.every(s=>s.format_string==='0.00'),true);
+  }
  }
 });

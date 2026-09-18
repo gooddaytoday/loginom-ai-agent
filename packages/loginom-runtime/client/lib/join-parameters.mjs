@@ -22,11 +22,11 @@ export function validateJoinParameters(p,mode,r){
  need(r.read.ports.every(p=>p===0),'Join has one output');
  need(r.finish!=='execute'||r.read.ports.length===1,'Join execution must read its output');
  need(r.mappings.every(m=>(m.direction==='input'?[0,1].includes(m.port):m.port===0)
-  &&(m.fields??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'Invalid join mapping');
+  &&(m.fields??m.changes??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'Invalid join mapping');
  need(r.finish!=='close'||r.mappings.every(m=>m.direction!=='input'),'Close cannot commit join input mappings');
- for(const m of r.mappings){if(!m.fields)continue;
+ for(const m of r.mappings){if(!m.fields&&!m.changes)continue;
   const sources=new Set(),outputs=new Set();
-  for(const f of m.fields){const source=f.source.name.toLowerCase(),target=(f.name??f.source.name).toLowerCase();
+  for(const f of m.fields??m.changes){const source=f.source.name.toLowerCase(),target=(f.name??f.source.name).toLowerCase();
    need(!sources.has(source)&&!outputs.has(target),'Join mapping name conflict');sources.add(source);outputs.add(target);
   }
  }

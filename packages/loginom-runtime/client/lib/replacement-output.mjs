@@ -58,7 +58,7 @@ export async function configureReplacementOutput(channel,configuration,parameter
  validateReplacementSources(configuration,s.node_mapping);
  const mode=s.node_mapping.produce_mode==='supplement'?'add':'replace',sources=replacementSources(configuration,mode).map(f=>({...f,used:true})),requested={direction:'output',port:0,...mapping},changes=[];
  resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
- if(requested.fields){changes.push(await configureOutputFields(channel,requested,sources));s=await channel.observe({condition:'replacement edited output',readMappings:true,ready});const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));}
+ if(requested.fields||requested.changes){changes.push(await configureOutputFields(channel,requested,sources));s=await channel.observe({condition:'replacement edited output',readMappings:true,ready});const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));}
  if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));
  s=await channel.observe({condition:'replacement output readback',readMappings:true,ready});validateReplacementSources(configuration,s.node_mapping);
  return {verified:true,cleanup_complete:true,effect_possible:changes.length>0,source_identity_verified:true,native_mapping:s.node_mapping,changes};

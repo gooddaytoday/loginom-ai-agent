@@ -21,6 +21,7 @@ export function textExportReadback({node,phases}){
   input_mapping:{port:0,autosync:input.value.native_mapping.autosync,fields:input.value.native_mapping.target_fields.map(f=>({index:f.index,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind,source_name:f.source.name}))},package_persistence_verified:false};
 }
 export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDirectories=null}){
+ let storageContinuation=null;
  const nodeApplyHandlers=new Map([['exports.text',{revision:'text-export-v1-candidate',fileOutput:true,modes:['delimited'],parameter_schema:textExportParametersSchema,
   validate:(p,m,r)=>validateTextExportParameters(p,m,r,storageDirectories),configurationReadback:textExportReadback,configure:(ctx,p,drivers)=>drivers.configureExport(ctx,p)}]]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
@@ -76,7 +77,8 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
     return execution;
    },
    async readOutput(read,ctx){enter(ctx);need(!read.ports.length&&execution?.verified&&execution.owner_verified&&execution.execution_id===ctx.execution.execution_id,'Export execution ownership missing');
-    const output=await readNativeExportFile({...options,artifactStore,targetOrigin,targetBuild,storageDirectories},ctx,configuration,execution);
+    const output=await readNativeExportFile({...options,artifactStore,targetOrigin,targetBuild,storageDirectories,storageContinuation,
+     rememberStorageContinuation:value=>{storageContinuation=structuredClone(value);}},ctx,configuration,execution);
     return verified({effect_possible:true,status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,file_artifacts:[output]});},
    async verifyContinuation(state,{signal:resumeSignal}={}){
     if(!channel||!configuration||state.pending||state.cleanup_complete!==true||state.phases.at(-1)?.phase!=='finish'||now()>=Math.min(state.deadline,state.execution_wait?.deadline??Infinity))return false;

@@ -60,5 +60,5 @@ export function decodeTableOutput(output,{formatProof,readSettings,expectedColum
   });
   return {table,schema,row_count:output.row_total,sample:values,sample_rows:values.length,sample_complete:output.sample_complete,
     precision:{numbers_verified:!limits.has('numeric_display_precision')&&!limits.has('variant_display_precision'),limitations:[...limits],strings:'cached UI text; source completeness requires independent audit'},
-    table_schema_id:output.schema_id,filter_enabled:false};
+    table_schema_id:output.schema_id,filter_enabled:false,...(output.read_limit?{limitations:[output.read_limit]}:{})};
 }

@@ -18,7 +18,7 @@ const cell={anyOf:[legacyCell,nativeCellSchema]};
 const column=object({index:integer,name:str,label:str,type:str,header_tid:str,data_kind:str},['index','name','label','type'],true);
 const port=object({...nativePortProperties,port:integer,port_guid:str,fresh:bool,freshness_basis:str,execution_id:str,
  table:object({view_guid:str,port_guid:str,table_tid:str}),schema:array(column),row_count:integer,
- sample:{type:'array',items:array(cell),maxItems:10},sample_rows:{type:'integer',minimum:0,maximum:10},sample_complete:bool,
+ sample:{type:'array',items:array(cell),maxItems:100},sample_rows:{type:'integer',minimum:0,maximum:100},sample_complete:bool,
  precision:object({numbers_verified:bool,limitations:array(str),strings:str}),table_schema_id:str,filter_enabled:bool},
  ['port','port_guid','fresh','execution_id','schema','row_count','sample','sample_rows','sample_complete','precision'],true);
 export const nodeOutputPortSchema=port;
@@ -137,9 +137,10 @@ const configurationReadback={anyOf:[exportConfigurationReadback,collapseConfigur
 export const nodeApplyResultSchema=object({operation_id:str,status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),
  effect_possible:bool,phases:array(receipt),node:nullable(ref),execution,output,
  package_saved:{type:'boolean',const:false},cleanup_complete:bool,warnings:array(str),
- configuration:object({status:values('applied','discarded'),readback:configurationReadback},['status']),
+ configuration:object({status:values('applied','discarded','not_requested'),readback:configurationReadback},['status']),
  checkpoint_kind:values('local_node_checkpoint','local_node_cancellation','local_node_stopped','local_node_failed'),
- persisted_package_verified:{type:'boolean',const:false},pending_phase:nullable(phase),error},
+ persisted_package_verified:{type:'boolean',const:false},pending_phase:nullable(phase),error,
+ next_step:object({tool:{const:'dock_node_apply'},original_operation_id:str,instruction:str})},
  ['operation_id','status','effect_possible','phases','node','execution','output','package_saved','cleanup_complete','warnings']);
 const outcome=object({status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),action_key:{type:'string',const:'node.apply'},
  action_revision:str,operation_id:str,phase:str,effect_possible:bool,cleanup_complete:bool,

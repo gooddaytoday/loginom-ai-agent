@@ -68,7 +68,7 @@ export function adaptRead(raw,{expected,lifecycle,dateProfile,consistency}={}) {
 
 // Bounded port projection; the bridge applies its separate final envelope limit.
 export function nativeUserPort(table,{sampleRows=10}={}) {
- need(Number.isInteger(sampleRows)&&sampleRows>=0&&sampleRows<=10,'public sample bound');
+ need(Number.isInteger(sampleRows)&&sampleRows>=0&&sampleRows<=100,'public sample bound');
  const sample=[];
  for(let row=0;row<Math.min(sampleRows,table.row_count);row++){
   const cells=table.cells.filter(c=>c.row===row);

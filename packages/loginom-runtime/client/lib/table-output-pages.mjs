@@ -4,13 +4,30 @@ const same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
 
 // Assemble bounded native Table pages. No freshness/precision claim is added:
 // the enclosing node operation must bind execution, settings and source audit.
-export async function readTableOutputPages(channel,table,{sampleRows=10}={}) {
+async function readTableRowPages(channel,table,{sampleRows=10,rowOffset=0}={}) {
   requireValue(Number.isInteger(sampleRows)&&sampleRows>=0&&sampleRows<=10,'Table sample must be within 0–10');
-  const columns=[],rows=[];let offset=0,limit=8,total=null,rowTotal=null,segment=null,scrolls=0,previousScroll=null,schemaId=null;
+  const columns=[],rows=[];let offset=0,limit=8,total=null,rowTotal=null,segment=null,scrolls=0,previousScroll=null,schemaId=null,previousVertical=null,verticalScrolls=0;
   for(let reads=0;reads<2300;reads++) {
-    const s=await channel.observe({condition:'Table output columns at '+offset,tablePage:{table,page:{row_offset:0,row_limit:sampleRows,column_offset:offset,column_limit:limit}},
-      ready:s=>s.node_table?.verified===true||s.node_table?.reason==='cell_not_visible'});
+    const s=await channel.observe({condition:'Table output columns at '+offset,tablePage:{table,page:{row_offset:rowOffset,row_limit:sampleRows,column_offset:offset,column_limit:limit}},
+      ready:s=>s.node_table?.verified===true||['cell_not_visible','row_not_rendered','row_page_not_cached'].includes(s.node_table?.reason)});
     const t=s.node_table;
+    if(t.verified!==true && t.vertical_window && (t.reason!=='cell_not_visible'||t.horizontal_window?.row_visible===false)) {
+      const w=t.vertical_window;
+      requireValue(same(w.table,table)&&Number.isSafeInteger(t.row_index)&&t.row_index>=rowOffset&&t.row_index<rowOffset+sampleRows
+        &&['top','max_top','first_visible','last_visible','row_height'].every(k=>Number.isFinite(w[k]))
+        &&w.top>=0&&w.max_top>=w.top&&w.row_height>0&&w.first_visible<=w.last_visible,'Invalid bound Table vertical window');
+      const controls=s.ui.elements.filter(e=>same(e.table_scroller,table)&&e.tid===w.tid&&e.scroll?.ref===e.ref
+        &&e.scroll.top===w.top&&e.scroll.max_top===w.max_top&&e.allowed_actions.includes('scroll'));
+      requireValue(controls.length===1,'Bound Table vertical control unavailable');
+      const distance=t.row_index<w.first_visible?t.row_index-w.first_visible:t.row_index>w.last_visible?t.row_index-w.last_visible:0;
+      const delta=Math.max(-1000,Math.min(1000,Math.round(distance*w.row_height)));
+      requireValue(delta!==0&&previousVertical!==w.top&&++verticalScrolls<=100,'Table vertical scroll made no progress');
+      previousVertical=w.top;
+      await channel.perform({condition:'reveal Table output row '+t.row_index,initialObservation:s,
+        ready:s=>s.node_table?.vertical_window?.top===w.top,
+        resolve:()=>({verb:'scroll',ref:controls[0].ref,delta_y:delta}),identity:()=>({table,row:t.row_index})});
+      continue;
+    }
     requireValue(typeof t.schema_id==='string'&&t.schema_id.length>0&&(!schemaId||schemaId===t.schema_id),'Table schema changed between pages');
     schemaId=t.schema_id;
     if(!t.verified) {
@@ -36,16 +53,16 @@ export async function readTableOutputPages(channel,table,{sampleRows=10}={}) {
     }
     requireValue(same(t.table,table)&&Number.isSafeInteger(t.row_total)&&t.row_total>=0
       &&Number.isInteger(t.column_total)&&t.column_total>=0&&t.column_total<=1000
-      &&t.page.column_offset===offset&&t.page.column_limit===limit&&t.page.row_offset===0&&t.page.row_limit===sampleRows
-      &&t.columns.length===Math.min(limit,t.column_total-offset)&&t.rows.length===Math.min(sampleRows,t.row_total)
+      &&t.page.column_offset===offset&&t.page.column_limit===limit&&t.page.row_offset===rowOffset&&t.page.row_limit===sampleRows
+      &&t.columns.length===Math.min(limit,t.column_total-offset)&&t.rows.length===Math.min(sampleRows,t.row_total-rowOffset)
       &&t.page.column_returned===t.columns.length&&t.page.row_returned===t.rows.length,'Invalid Table output page');
     if(total===null){total=t.column_total;rowTotal=t.row_total;segment=t.segment;}
     requireValue(total===t.column_total&&rowTotal===t.row_total&&same(segment,t.segment),'Table output changed between pages');
     requireValue(t.columns.every((c,i)=>c.index===offset+i),'Table output column order changed');
     for(const [i,row] of t.rows.entries()) {
-      requireValue(row.index===i&&typeof row.record_id==='string'&&row.cells.length===t.columns.length
+      requireValue(row.index===rowOffset+i&&typeof row.record_id==='string'&&row.cells.length===t.columns.length
         &&row.cells.every((c,j)=>c.column===offset+j),'Table output row identity changed');
-      if(offset===0)rows.push({index:i,record_id:row.record_id,cells:[]});
+      if(offset===0)rows.push({index:rowOffset+i,record_id:row.record_id,cells:[]});
       requireValue(rows[i]?.record_id===row.record_id,'Table records changed between pages');
       rows[i].cells.push(...structuredClone(row.cells));
     }
@@ -53,10 +70,32 @@ export async function readTableOutputPages(channel,table,{sampleRows=10}={}) {
     requireValue(t.page.next_column_offset===(offset===total?null:offset),'Table output cursor differs');
     if(offset===total) {
       requireValue(new Set(columns.map(c=>c.name)).size===columns.length,'Duplicate Table output column names');
-      return {table,schema_id:schemaId,columns,rows,row_total:rowTotal,column_total:total,sample_complete:rows.length===rowTotal,
+      return {table,schema_id:schemaId,columns,rows,segment,row_total:rowTotal,column_total:total,sample_complete:rowOffset===0&&rows.length===rowTotal,
         ...(total===1&&t.applied_format?{applied_format:structuredClone(t.applied_format)}:{}),value_source:t.value_source,unfiltered_verified:false,execution_freshness_verified:false,numeric_precision_verified:false};
     }
     requireValue(t.columns.length>0,'Table output page did not advance');limit=8;previousScroll=null;
   }
   throw Error('Table output page budget exceeded');
+}
+
+// Read larger previews locally in bounded native UI blocks. The existing
+// exact-number/format restoration and execution binding remain owned by callers.
+export async function readTableOutputPages(channel,table,{sampleRows=10}={}) {
+  requireValue(Number.isInteger(sampleRows)&&sampleRows>=0&&sampleRows<=100,'Table sample must be within 0–100');
+  const rows=[],seen=new Set();let first,limited=false;
+  for(let start=0;start<Math.max(1,sampleRows);start+=10){
+    const block=await readTableRowPages(channel,table,{rowOffset:start,sampleRows:Math.min(10,sampleRows-start)});
+    if(!first)first=block;
+    requireValue(first.schema_id===block.schema_id&&same(first.table,block.table)&&same(first.columns,block.columns)
+      &&first.row_total===block.row_total&&first.column_total===block.column_total&&same(first.segment,block.segment)
+      &&same(first.applied_format,block.applied_format),'Table output changed between row blocks');
+    for(const row of block.rows){
+      requireValue(!seen.has(row.record_id)&&row.index===rows.length,'Table records changed between row blocks');
+      if((rows.length+1)*block.column_total>10000||new TextEncoder().encode(JSON.stringify([...rows,row])).length>524288){limited=true;break;}
+      seen.add(row.record_id);rows.push(row);
+    }
+    if(limited||rows.length===first.row_total||sampleRows===0)break;
+  }
+  return {...first,rows,sample_complete:rows.length===first.row_total,
+    ...(limited?{read_limit:'preview_cell_or_byte_budget'}:{})};
 }

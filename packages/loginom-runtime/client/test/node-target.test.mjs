@@ -34,6 +34,23 @@ test('lost response after drop retains pending and never creates a duplicate',as
  const f=fixture(),mutate=f.adapter.mutate;f.adapter.mutate=async e=>{await mutate(e);throw new Error('lost response');};
  assert.equal((await f.run()).status,'AMBIGUOUS');assert.equal((await f.run()).status,'AMBIGUOUS');assert.deepEqual(f.calls,['create']);assert.equal(f.graph.nodes.length,2);
 });
+test('automatic placement is retained across a lost creation reply without selecting or creating twice',async()=>{
+ const f=fixture(),r=request();delete r.target.position;let choices=0;
+ f.adapter.choosePosition=async()=>{choices++;return {x:320,y:256};};
+ const mutate=f.adapter.mutate;let lost=true;
+ f.adapter.mutate=async effect=>{const receipt=await mutate(effect);if(effect.kind==='create'&&lost){lost=false;throw Error('lost');}return receipt;};
+ assert.equal((await f.run(r)).status,'AMBIGUOUS');
+ assert.deepEqual(f.operation.targetPhase.newPosition,{x:320,y:256});
+ f.adapter.reconcile=async()=>({verified:true,cleanup_complete:true});
+ assert.equal((await f.run(r)).status,'SUCCEEDED');
+ assert.equal(choices,1);assert.equal(f.calls.filter(k=>k==='create').length,1);
+ assert.equal(r.target.position,undefined);
+});
+test('no free visible position refuses before creating a node',async()=>{
+ const f=fixture(),r=request();delete r.target.position;
+ f.adapter.choosePosition=async()=>{throw Error('no free visible position');};
+ assert.equal((await f.run(r)).status,'NOT_APPLIED');assert.deepEqual(f.calls,[]);
+});
 test('unrelated graph mutation cannot be accepted as successful creation',async()=>{
  const f=fixture(),mutate=f.adapter.mutate;f.adapter.mutate=async e=>{const r=await mutate(e);f.graph.nodes[0].label='unexpected';return r;};
  assert.equal((await f.run()).status,'AMBIGUOUS');assert.equal(f.calls.length,1);
@@ -109,6 +126,20 @@ test('native adapter never retries a foreign-workflow read error',async()=>{
  const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:async()=>{calls++;throw new Error('Prepared workflow changed');}});
  await assert.rejects(adapter.observe(request(),Date.now()+1000),/workflow changed/);assert.equal(calls,1);
 });
+test('native adapter rechecks full graph after pending port paint and bounds persistent failures',async()=>{
+ const {createNodeTargetBrowserAdapter}=await import('../lib/node-target-browser.mjs');
+ for(const persistent of [false,true]){
+  let reads=0,paints=0;
+  const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:async code=>{
+   assert.ok(!code.includes('async function mutateGraph'));
+   if(code.includes('requestAnimationFrame')){paints++;return true;}
+   reads++;if(persistent||reads===1)throw Error('Visible port identity is not rendered');
+   return {complete:true,nodes:['unchanged'],links:['unchanged']};
+  }});
+  if(persistent){await assert.rejects(adapter.observe(request(),Date.now()+1000),/Visible port/);assert.equal(reads,3);assert.equal(paints,2);}
+  else{assert.deepEqual(await adapter.observe(request(),Date.now()+1000),{complete:true,nodes:['unchanged'],links:['unchanged']});assert.equal(reads,2);assert.equal(paints,1);}
+ }
+});
 test('Union lost Input_Add or connection reply cannot create a duplicate on retry',async()=>{
  for(const kind of ['add_input','connect']){
   const f=fixture(),mutate=f.adapter.mutate;let lost=false;
@@ -145,4 +176,57 @@ test('selection timeout after create and rename retains partial remove pending e
  const resumed=await f.run();assert.equal(resumed.status,'AMBIGUOUS');assert.equal(resumed.partial_effect,true);
  assert.equal(f.operation.targetPhase.pending.kind,'remove_link');assert.deepEqual(f.calls,['create','rename','remove_link']);
  assert.equal(f.graph.links.length,1);assert.equal(f.graph.nodes[1].label,'Target');
+});
+
+
+test('all node connections wait through a transient graph mask and still reject graph drift before linking',async()=>{
+ const {createNodeTargetBrowserAdapter}=await import('../lib/node-target-browser.mjs');let reads=0,waits=0;
+ const before={complete:true,marker:'before'},after={complete:true,marker:'changed'};
+ const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',pinned:{},execute:async code=>{
+  if(code.includes('waitForFunction')){waits++;return true;}
+  assert.ok(code.includes('async function readGraph'));reads++;if(reads===2)throw Error('Graph is blocked');return reads===1?before:after;
+ }});
+ const r={target:{type:'transform.group_data'}};await adapter.observe(r,Date.now()+1000);
+ const result=await adapter.mutate({id:'link',kind:'connect',before,parameters:{edge:{}}},Date.now()+1000);
+ assert.equal(result.status,'NOT_APPLIED');assert.equal(result.effect_possible,false);assert.equal(reads,3);assert.equal(waits,1);
+});
+
+for(const fault of ['none','late_dom','changed_graph','possible_effect','cleanup_missing'])test('confirmed native connect refusal: '+fault,async()=>{
+ const f=fixture(),mutate=f.adapter.mutate;let refused=false;
+ f.adapter.mutate=async effect=>{
+  if(effect.kind==='connect'&&!refused){refused=true;
+   if(fault==='late_dom')f.graph.nodes[0].dom_epoch++;
+   if(fault==='changed_graph')f.graph.nodes[0].label='changed';
+   return {action_key:'link.create',operation_id:effect.id,status:'FAILED',phase:'preconditions',effect_possible:fault==='possible_effect',cleanup_complete:fault!=='cleanup_missing',error:{code:'CAPABILITY_ERROR',message:'not dispatched'}};
+  }
+  return mutate(effect);
+ };
+ const result=await f.run();
+ if(['none','late_dom'].includes(fault)){assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(f.graph.links.length,3);assert.equal(f.calls.filter(k=>k==='create').length,1);assert.equal(f.operation.targetPhase.refusals.length,1);assert.equal(f.operation.targetPhase.refusals[0].receipt.native_status,'FAILED');}
+ else{assert.equal(result.status,'AMBIGUOUS');assert.ok(f.operation.targetPhase.pending);assert.equal(f.graph.links.length,0);}
+});
+
+for(const fault of ['none','incomplete_receipt','changed_graph','wrong_id'])test('lost refused connect response recovery: '+fault,async()=>{
+ const f=fixture(),mutate=f.adapter.mutate;let lost=false,receipt;
+ f.adapter.mutate=async effect=>{
+  if(effect.kind==='connect'&&!lost){lost=true;receipt={action_key:'link.create',operation_id:effect.id,status:'FAILED',phase:'preconditions',effect_possible:false,cleanup_complete:true,error:{code:'CAPABILITY_ERROR',message:'not dispatched'}};throw Error('lost response');}
+  return mutate(effect);
+ };
+ assert.equal((await f.run()).status,'AMBIGUOUS');
+ f.adapter.reconcile=async()=>({completed:fault!=='incomplete_receipt',verified:false,cleanup_complete:true,receipt:{...receipt,...(fault==='wrong_id'?{operation_id:'foreign'}:{})}});
+ if(fault==='changed_graph')f.graph.nodes[0].label='changed';
+ const result=await f.run();
+ if(fault==='none'){assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(f.calls.filter(k=>k==='create').length,1);assert.equal(f.graph.links.length,3);assert.equal(f.operation.targetPhase.refusals.length,1);}
+ else{assert.equal(result.status,'AMBIGUOUS');assert.ok(f.operation.targetPhase.pending);assert.equal(f.graph.links.length,0);}
+});
+
+for(const complete of [true,false])test('read-only inspection resolves only confirmed precondition refusal '+complete,async()=>{
+ const {inspectNodeTarget}=await import('../lib/node-target.mjs');
+ const f=fixture(),mutate=f.adapter.mutate;let receipt;
+ f.adapter.mutate=async effect=>{if(effect.kind==='connect'&&!receipt){receipt={action_key:'link.create',operation_id:effect.id,status:'FAILED',phase:'preconditions',effect_possible:false,cleanup_complete:true,error:{code:'CAPABILITY_ERROR'}};throw Error('lost reply');}return mutate(effect);};
+ await f.run();f.adapter.reconcile=async()=>({completed:complete,verified:false,cleanup_complete:true,receipt});
+ const count=f.calls.length;const result=await inspectNodeTarget({request:f.request,operation:f.operation,adapter:f.adapter,record:async e=>e,deadline:Date.now()+1000});
+ assert.equal(f.calls.length,count);assert.equal(result.resume_available===true,complete);
+ assert.equal(!!f.operation.targetPhase.pending,!complete);
+ if(complete){assert.equal((await f.run()).status,'SUCCEEDED');assert.equal(f.calls.filter(x=>x==='create').length,1);}
 });

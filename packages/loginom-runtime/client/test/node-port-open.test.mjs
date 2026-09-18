@@ -59,6 +59,16 @@ test('port opening binds menu and wizard native identities and replays without a
  assert.equal(f.gestures.length,2);assert.equal(r.trace.at(-1).event,'output_port_wizard_verified');
  const again=await f.run();assert.equal(again.status,'SUCCEEDED',again.error);assert.equal(again.replayed,true);assert.equal(f.gestures.length,2);
 });
+test('outline SVG clones cannot replace or duplicate a port inside the prepared graph',async()=>{
+ for(const direction of ['input','output']){
+  const f=fixture(direction);const clone=f.el(f.portDom.tid);clone.getBoundingClientRect=()=>({x:0,y:0,width:0,height:0});
+  assert.equal((await f.run()).status,'SUCCEEDED');assert.equal(f.gestures.length,2);
+  const duplicate=fixture(direction);duplicate.el(duplicate.portDom.tid).parent=duplicate.portDom.parent;
+  assert.equal((await duplicate.run()).status,'NOT_APPLIED');assert.equal(duplicate.gestures.length,0);
+  const missing=fixture(direction);missing.portDom.parent=null;
+  assert.equal((await missing.run()).status,'NOT_APPLIED');assert.equal(missing.gestures.length,0);
+ }
+});
 test('foreign menu stops before Configure and unresolved opening never repeats right click',async()=>{
  const f=fixture();f.flags.foreignMenu=true;const r=await f.run();assert.equal(r.status,'AMBIGUOUS');assert.equal(f.gestures.length,1);
  f.flags.foreignMenu=false;await f.run();assert.equal(f.gestures.length,1);

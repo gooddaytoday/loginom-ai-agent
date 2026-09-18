@@ -62,7 +62,7 @@ test('unsupported parameters reject before journal or graph',async()=>{
  const f=fixture(),p=request();p.parameters.unsupported=true;await assert.rejects(f.run(p),/unsupported/);assert.equal(f.calls.length,0);assert.equal(f.records.length,0);
 });
 test('an unimplemented handler cannot create a partial node',()=>{assert.throws(()=>validateNodeApplyRequest(request(),new Map()),/No local configuration handler/)});
-for(const [name,alter] of Object.entries({doneRead:p=>{p.finish='done'},budget:p=>{p.budgets.configure_ms=Infinity},sample:p=>{p.read.sample_rows=11},mode:p=>{p.mode='fixed_width'},revision:p=>{p.contract_revision='2'},duplicatePorts:p=>{p.read.ports=[0,0]},recipe:p=>{p.steps=[]}})){
+for(const [name,alter] of Object.entries({doneRead:p=>{p.finish='done'},budget:p=>{p.budgets.configure_ms=Infinity},sample:p=>{p.read.sample_rows=101},mode:p=>{p.mode='fixed_width'},revision:p=>{p.contract_revision='2'},duplicatePorts:p=>{p.read.ports=[0,0]},recipe:p=>{p.steps=[]}})){
  test('reject invalid contract '+name,()=>{const f=fixture(),p=request();alter(p);assert.throws(()=>validateNodeApplyRequest(p,f.handlers))});
 }
 for(const [phase,value,error] of [
@@ -203,6 +203,25 @@ test('replacement collision is a clean refusal only after an owned verified canc
  }
 });
 
+test('calculator request refusal requires unchanged readback, both owned closes and durable acknowledgement',async()=>{
+ for(const failure of [null,'journal','owner','changed','close','inputs','mappings']){
+  const f=fixture({failJournal:failure==='journal'?'node_phase_refused':undefined}),p=request();
+  p.target={kind:'existing',type:'transform.calculator',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node1'}};p.mode='expression';
+  if(failure==='inputs')p.inputs=[{source:{document_id:'doc',workflow_id:'workflow',node_id:'upstream'},output:0,input:0}];
+  if(failure==='mappings')p.mappings=[{direction:'output',port:0,autosync:true}];
+  f.handlers.set(p.target.type,{revision:'1',modes:['expression'],validate:()=>{},configure:async()=>{
+   const e=Error('collision'),closed={verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,node_context:{verified:true,...p.target.ref}};
+   e.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'calculator_request_rejected_before_edit',proof:{node:p.target.ref,before:{formula:'1'},after:{formula:'1'},first_close:structuredClone(closed),closed,settings_readback_verified:true}};
+   if(failure==='owner')closed.node_context.node_id='foreign';
+   if(failure==='changed')e.nodePhaseRefusal.proof.after.formula='2';
+   if(failure==='close')closed.settings_applied=true;
+   throw e;
+  }});
+  const r=await f.run(p);assert.equal(r.status,failure?'AMBIGUOUS':'FAILED');assert.equal(r.cleanup_complete,!failure);
+  assert.equal(r.next_step?.tool,failure?undefined:'dock_node_apply');assert.ok(!f.calls.includes('execute'));
+ }
+});
+
 test('invalid Duplicates input ends conclusively only with durable unchanged-draft cleanup proof',async()=>{
  for(const failure of ['none','cleanup_complete','settings_unchanged','verification','phase','journal','foreign_type']){
   const f=fixture({failJournal:failure==='journal'?'node_phase_refused':undefined}),p=request();
@@ -212,6 +231,32 @@ test('invalid Duplicates input ends conclusively only with durable unchanged-dra
   const r=await f.run(p);assert.equal(r.status,failure==='none'?'FAILED':'AMBIGUOUS',failure);
   assert.equal(r.cleanup_complete,failure==='none',failure);assert.equal(r.pending_phase,failure==='none'?null:'input_mapping',failure);
   assert.ok(!f.calls.includes('configure')&&!f.calls.includes('execute'));
+ }
+});
+
+test('calculator syntax refusal retains the node and names its restored default expression for new and existing targets',async()=>{
+ for(const kind of ['new','existing'])for(const failure of [null,'journal','graph','receipt','identity']){
+  const f=fixture({failJournal:failure==='journal'?'node_phase_refused':undefined}),p=request();p.target.type='transform.calculator';p.mode='expression';
+  if(kind==='existing')p.target={kind,type:'transform.calculator',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node1'}};
+  p.inputs=[{source:{document_id:'doc',workflow_id:'workflow',node_id:'source'},output:0,input:0}];
+  f.handlers.set(p.target.type,{revision:'1',modes:['expression'],validate:()=>{},configure:async()=>{
+   const node={document_id:'doc',workflow_id:'workflow',node_id:'node1'},context={verified:true,...node};
+   const closed={verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,node_context:context};
+   const validation={status:'observed',root_ref:'wizard',source:'loginom_wizard_error_tooltip',message:'Unknown MID'};
+   const receipt={action_key:'ui.act',operation_id:'apply1:n10',status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true,
+    error:{code:'WIZARD_CALCULATOR_VALIDATION_FAILED',message:validation.message},output:{prepared_node_context:context,wizard:{stage:'calculator',root_ref:'wizard',calculator_validation:validation}},
+    trace:[{event:'wizard_calculator_validation_failed',root_ref:'wizard',message:validation.message}]};
+   const before={expressions:[{name:'Expr1',formula:''}]},graph={nodes:['source','node1'],links:['source:node1']};
+   const proof={node,before,after:structuredClone(before),first_close:closed,closed,settings_readback_verified:true,
+    syntax_failure_verified:true,graph_before:graph,graph_after:structuredClone(graph),validation_receipt:receipt,validation_baseline:{prepared_node_context:context,wizard:{root_ref:'wizard'}}};
+   if(failure==='graph')proof.graph_after.links=[];
+   if(failure==='receipt')receipt.cleanup_complete=false;
+   if(failure==='identity')proof.validation_baseline.prepared_node_context={verified:true,...node,node_id:'foreign'};
+   const e=Error('syntax refused');e.receipt=receipt;e.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'calculator_syntax_rejected_draft_restored',proof};throw e;
+  }});
+  const r=await f.run(p);assert.equal(r.status,failure?'AMBIGUOUS':'FAILED');assert.equal(r.cleanup_complete,!failure);
+  assert.equal(r.node.node_id,'node1');assert.ok(!f.calls.includes('execute'));
+  if(!failure){assert.match(r.next_step.instruction,/Expr1/);assert.match(r.next_step.instruction,/SAME existing target/);assert.equal(r.pending_phase,null);}
  }
 });
 
@@ -257,4 +302,27 @@ test('unsupported retained export settings require acknowledged cleanup proof be
   f.handlers.set('exports.text',{...f.handlers.get('imports.text'),configure:async()=>{const e=Error('Unsupported retained export decimal_separator');e.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'text_export_unsupported_retained'};if(fail&&fail!=='journal')delete e.nodePhaseRefusal[fail];throw e;}});
   const r=await f.run(p);assert.equal(r.status,fail?'AMBIGUOUS':'FAILED');assert.equal(r.cleanup_complete,!fail);assert.equal(r.pending_phase,fail?'configure':null);assert.ok(!f.calls.includes('finish')&&!f.calls.includes('execute')&&!f.calls.includes('read'));
  }
+});
+
+for(const finish of ['done','close'])test('incompatible '+finish+' read identifies the rejected field before effects',()=>{
+ const p=request();p.finish=finish;
+ assert.throws(()=>validateNodeApplyRequest(p,fixture().handlers),/Invalid parameters\.read\.ports:.*finish=execute/);
+ p.read.ports=[];assert.doesNotThrow(()=>validateNodeApplyRequest(p,fixture().handlers));
+});
+test('unsupported full coverage identifies its field before graph changes',()=>{
+ const p=request();p.read.coverage='full';
+ assert.throws(()=>validateNodeApplyRequest(p,fixture().handlers),/Invalid parameters\.read\.coverage:.*other handlers support sample/);
+ p.read.coverage='sample';assert.doesNotThrow(()=>validateNodeApplyRequest(p,fixture().handlers));
+});
+
+test('output sample accepts the expanded 100-row boundary',()=>{const f=fixture(),p=request();p.read.sample_rows=100;assert.doesNotThrow(()=>validateNodeApplyRequest(p,f.handlers));});
+
+for(const exceedsTotal of [false,true])test('read uses remaining total budget, preserving its hard bound '+exceedsTotal,async()=>{
+ const f=fixture(),p=request();p.budgets={configure_ms:1000,execute_ms:1000,total_ms:10000};
+ const original=f.drivers.readOutput;
+ f.drivers.readOutput=async(read,ctx)=>{assert.equal(ctx.deadline,10001);f.setTime(exceedsTotal?10002:2500);return original(read,ctx);};
+ const result=await f.run(p);
+ assert.equal(result.status,exceedsTotal?'AMBIGUOUS':'SUCCEEDED');
+ assert.equal(f.calls.filter(c=>c==='execute').length,1);
+ if(exceedsTotal)assert.match(result.error.message,/deadline elapsed/);
 });

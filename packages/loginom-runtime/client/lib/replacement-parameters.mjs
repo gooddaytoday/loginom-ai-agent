@@ -45,7 +45,7 @@ export function validateReplacementParameters(p,mode,r){
  need(r.read.ports.every(i=>i===0),'Replacement has one table output');
  need(r.mappings.length<=2&&r.mappings.every(m=>m.port===0),'Replacement has one input/output mapping');
  need(r.finish!=='close'||r.mappings.every(m=>m.direction!=='input'),'Close cannot commit separate input mapping');
- for(const m of r.mappings)if(m.fields){const src=new Set(),out=new Set();for(const f of m.fields){need(f.source?.kind==='configured_field'&&name(f.source.name)&&!src.has(f.source.name),'Unique configured mapping sources required');src.add(f.source.name);const n=f.name??f.source.name;need(name(n)&&!out.has(n.toLowerCase()),'Unique replacement output names required');out.add(n.toLowerCase());need(m.direction==='output'||!f.excluded,'Replacement input exclusions unsupported');}}
+ for(const m of r.mappings)if(m.fields||m.changes){const src=new Set(),out=new Set();for(const f of m.fields??m.changes){need(f.source?.kind==='configured_field'&&name(f.source.name)&&!src.has(f.source.name),'Unique configured mapping sources required');src.add(f.source.name);const n=f.name??f.source.name;need(name(n)&&!out.has(n.toLowerCase()),'Unique replacement output names required');out.add(n.toLowerCase());need(m.direction==='output'||!f.excluded,'Replacement input exclusions unsupported');}}
  return p;
 }
 export function resolveReplacementParameters(p,fields){

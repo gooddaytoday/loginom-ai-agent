@@ -25,14 +25,14 @@ export function validateGroupingParameters(p,mode,r) {
  requireValue(r.read.ports.every(i=>i===0),'Grouping has one output');
  requireValue(r.mappings.length<=2&&r.mappings.every(m=>m.port===0),'Grouping has one input/output mapping');
  for(const mapping of r.mappings){
-  if(mapping.fields){
+  if(mapping.fields||mapping.changes){
    const sourceNames=new Set(),outputNames=new Set();
-   for(const item of mapping.fields){
+   for(const item of mapping.fields??mapping.changes){
     requireValue(item.source?.kind==='configured_field'&&name(item.source.name)&&!sourceNames.has(item.source.name.toLowerCase()),'Unique configured mapping fields required');sourceNames.add(item.source.name.toLowerCase());
     const output=item.name??item.source.name;requireValue(name(output)&&!outputNames.has(output.toLowerCase()),'Duplicate mapping output name');outputNames.add(output.toLowerCase());
     requireValue(item.excluded!==true||mapping.direction==='output'&&(preserved||p.group_by.some(f=>f.name===item.source.name)),'Only grouping output keys can be excluded');
    }
-   if(mapping.direction==='output'&&!preserved){
+   if(mapping.direction==='output'&&!preserved&&mapping.fields){
     const outputs=[...p.group_by.map(f=>f.name),...p.measures.map(m=>m.name)];
     requireValue(mapping.fields.length===outputs.length&&mapping.fields.every(f=>outputs.includes(f.source.name)),'Grouping output mapping must cover the exact requested fields');
    }

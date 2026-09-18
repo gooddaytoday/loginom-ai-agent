@@ -64,6 +64,25 @@ for (const [name, environment] of [
   });
 }
 
+test('user action rejected during a known node job waits instead of suggesting inspection',()=>{
+ const receipt={status:'AMBIGUOUS',request_rejected:true,operation_id:'active',effect_possible:true,
+  error:{code:'REQUEST_REJECTED',message:'A background node operation is running'},
+  output:{active_node_job:{operation_id:'active',state:'running'},operation:{private_details:'retained locally'}}};
+ const original=structuredClone(receipt),reply=actionReply(receipt,{userProfile:true,observe:true});
+ assert.equal(reply.content.length,1);assert.equal(reply.structuredContent.state,'running');
+ assert.equal(reply.structuredContent.status,undefined);
+ assert.equal(reply.structuredContent.next_step.tool,'dock_node_wait');
+ assert.deepEqual(reply.structuredContent.next_step.arguments,{operation_id:'active',timeout_ms:10000});
+ assert.equal(reply.structuredContent.effect_possible,true);
+ assert.ok(!reply.content[0].text.includes('private_details'));assert.deepEqual(receipt,original);
+ assert.deepEqual(JSON.parse(actionReply(receipt).content[0].text),receipt);
+ for(const mutate of [r=>delete r.request_rejected,r=>delete r.output.active_node_job,
+  r=>{r.output.active_node_job.state='settled'},r=>{r.output.active_node_job.operation_id=''}]){
+  const unknown=structuredClone(receipt);mutate(unknown);
+  assert.deepEqual(JSON.parse(actionReply(unknown,{userProfile:true}).content[0].text),unknown);
+ }
+});
+
 test('observation usage is a separate bounded hint and never changes the authoritative receipt', () => {
   const receipt = { status: 'SUCCEEDED', action_key: 'workspace.observe', operation_id: 'receipt-only',
     output: { observation_id: 'issued-observation', observation_kind: 'roots',

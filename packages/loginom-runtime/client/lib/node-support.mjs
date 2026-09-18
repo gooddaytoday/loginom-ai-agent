@@ -12,6 +12,8 @@ import {createSortingNodeSupport} from './sorting-node.mjs';
 import {createGroupingNodeSupport} from './grouping-node.mjs';
 import {createReformNodeSupport} from './reform-node.mjs';
 import {createCalculatorNodeSupport} from './calculator-node.mjs';
+import {NODE_READ_MODE} from './node-read-contract.mjs';
+import {createNodeReadDrivers} from './node-read-driver.mjs';
 
 // Candidate implementations share one lifecycle, gate and browser. Dispatch by
 // the already validated request; never infer a handler from the current UI.
@@ -20,6 +22,7 @@ export function createCandidateNodeSupport(config) {
  const nodeApplyHandlers=new Map([...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
+  if(options.operation.parameters?.mode===NODE_READ_MODE)return createNodeReadDrivers(options,config);
   if(type==='preprocessing.data_recovery')return missingValues.nodeApplyDriverFactory(options);
   if(type==='exports.text')return exports.nodeApplyDriverFactory(options);
   if(type==='transform.collapse_columns')return collapse.nodeApplyDriverFactory(options);

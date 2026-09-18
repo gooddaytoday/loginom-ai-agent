@@ -21,6 +21,8 @@ test('native account/document changes stop browser work before its effect', asyn
   const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')(input)',{...globals,input:arg}),effect:()=>++effects};
   const run=vm.runInNewContext('('+withStorageIdentity('async page=>page.effect()',binding)+')');
   assert.equal(await run(page),1);
+  connection.Connected=false;await assert.rejects(run(page),/connection is disconnected/);
+  connection.Connected=true;
   connection.UserName='someone-else';await assert.rejects(run(page),/account or document changed/);
   connection.UserName='operator';globals.__loginomDockPreparationV1.id='new-doc';await assert.rejects(run(page),/account or document changed/);
   assert.equal(effects,1);
