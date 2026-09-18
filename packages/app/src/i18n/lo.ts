@@ -1,4 +1,7 @@
+import { LOGINOM_ENGLISH } from "./en"
+
 export const dict = {
+  ...LOGINOM_ENGLISH,
   "desktop.menu.app": "Loginom AI Agent",
   "desktop.menu.file": "ໄຟລ໌",
   "desktop.menu.edit": "ແກ້ໄຂ",
