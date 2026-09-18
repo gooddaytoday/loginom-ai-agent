@@ -11,7 +11,10 @@ Xiaomi MiMo успешно вызвал Dock, доставил CSV и настр
 
 В исходниках добавлены последние три declared-license supplements: actual graph
 inventory больше не имеет missing-text entries, но status остаётся incomplete
-для attribution/nested/native/source/relinking audit. Новый архив ещё требуется.
+для attribution/nested/native/source/relinking audit. Полный clean archive
+`0.1.4-cli.20260918linux` собран, installed inventory проверен, штатное удаление
+сохранило 8093 файла профилей. Offline Ubuntu 22.04/Debian 12 startup/library
+checks PASS. [Финальный Linux artifact](reports/2026-09-18-cli-final-linux/report.md).
 
 ## Исправления ревью a7d812e4a — source-only, 2026-09-18
 

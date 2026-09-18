@@ -1,0 +1,20 @@
+{
+  "version": "0.1.4-cli.20260918linux",
+  "installedNoticeHashesVerified": 932,
+  "missingTexts": [],
+  "licenseAuditStatus": "incomplete",
+  "helpVersionNoProfile": true,
+  "statusHostLaunch": {
+    "revision": 0,
+    "generation": 0,
+    "url": "http://logi-test-plan.bg.local/app/",
+    "username": "user",
+    "folder": "/user",
+    "hasApiKey": false,
+    "hasPassword": false,
+    "state": "unconfigured"
+  },
+  "profilesFilesPreserved": 8093,
+  "desktopCredentialFilesUnchanged": true,
+  "launcherAndPayloadRemoved": true
+}

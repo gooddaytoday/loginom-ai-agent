@@ -2848,3 +2848,20 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
 - [ ] Новый полный архив с этими supplements и установленная сверка inventory.
   Юридическая полнота attribution/nested/native/source/relinking всё ещё не доказана;
   пустой missing-text list не означает release compliance PASS.
+
+### Финальный Linux archive и установленный lifecycle — 2026-09-18
+
+- [x] Полный clean archive `0.1.4-cli.20260918linux` из `edc68138d` включает
+  исправления ревью и notices supplements. Build/version/source stability/full
+  manifest/extracted archive PASS; SHA256 записан в отчёте.
+- [x] Штатная установка; help/version без создания profile; status через
+  bundled Node host; guard освобождён. Все 932 installed npm notice/README hashes PASS.
+- [x] Штатное удаление сохранило побайтово 8093 файла трёх тестовых профилей и
+  проверенные Desktop credential files; launcher/payload удалены.
+- [x] Offline non-root Ubuntu 22.04 и Debian 12 containers: CLI help/version,
+  комплектный Node/SQLite, Chromium version/ldd PASS. Это проверка библиотек и
+  startup, не GUI/sandbox-browser acceptance внутри контейнера.
+- [ ] Итоговая сверка требований Linux с точным разделением текущих и исторических
+  доказательств; неподписанный dev archive не объявляется production release.
+
+[Итог артефакта и install evidence](../../testing/loginom-ai-agent/reports/2026-09-18-cli-final-linux/report.md).
