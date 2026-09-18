@@ -297,7 +297,10 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         // Reuse the admitted link primitive. It owns observed port rebinding,
         // graph-diff reconciliation, mouse cleanup and bounded validation.
         const exportTarget=request.target.type==='exports.text';
-        const graph=exportTarget?await observeGraph(request,deadline):await call(readCode(task()),deadline);
+        // A loading mask can arrive after any freshly created/renamed node,
+        // not only Text Export. Re-observe read-only until that transient mask
+        // clears before dispatching the single admitted link gesture.
+        const graph=await observeGraph(request,deadline);
         if(exportTarget){signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Export connect deadline elapsed');}
         if(JSON.stringify(graph)!==JSON.stringify(effect.before))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
         const bound=await call(`async page => page.evaluate(edge=>{
