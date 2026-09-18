@@ -7,7 +7,6 @@ import { spawnSync } from 'node:child_process';
 export const isWindows = (platform = process.platform) => platform === 'win32';
 export const runtimeNodePath = (root, platform = process.platform) => join(root, 'runtime', isWindows(platform) ? 'node.exe' : 'node');
 export const launcherPath = (root, platform = process.platform) => join(root, 'bin', isWindows(platform) ? 'loginom-dock.cmd' : 'loginom-dock');
-export const chromiumAppContainerSid = 'S-1-15-3-1024-1528657515-1944437972-2795272136-1227674495-293963776-353393192-4060142787-1908764039';
 
 export function privatePath(info, platform = process.platform) {
   return isWindows(platform) || !(info.mode & 0o077);
@@ -32,26 +31,6 @@ export function protectWindowsDirectory(path, platform = process.platform) {
     encoding: 'utf8', windowsHide: true,
   });
   if (result.error || result.status !== 0) throw new Error('Cannot protect the Windows Dock directory');
-}
-
-// Chromium's Windows sandbox reads selected upload files from its restricted
-// AppContainer. Grant only read/execute on the one-use transfer directory;
-// the lease removes this directory after verification or browser shutdown.
-export function grantWindowsChromiumUploadRead(path, platform = process.platform) {
-  if (!isWindows(platform) || process.platform !== 'win32') return;
-  const root = process.env.SystemRoot ?? process.env.SYSTEMROOT;
-  if (!root || !win32.isAbsolute(root) || !win32.isAbsolute(path)) throw new Error('Cannot authorize the Windows upload staging directory');
-  const icacls = win32.join(root, 'System32', 'icacls.exe');
-  // The store root contains opaque admitted files. Chromium receives traverse
-  // only there; readable inheritance begins at the random transfer directory.
-  const parent = win32.dirname(path);
-  const traverse = spawnSync(icacls, [parent, '/grant:r', `*${chromiumAppContainerSid}:(X)`], {
-    encoding: 'utf8', windowsHide: true,
-  });
-  const result = traverse.error || traverse.status !== 0 ? traverse : spawnSync(icacls, [path, '/grant:r', `*${chromiumAppContainerSid}:(OI)(CI)RX`], {
-    encoding: 'utf8', windowsHide: true,
-  });
-  if (result.error || result.status !== 0) throw new Error('Cannot authorize the Windows upload staging directory');
 }
 
 export async function privateDirectory(path, platform = process.platform) {

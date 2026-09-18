@@ -1,10 +1,11 @@
 // Host-only admission. Never expose sourcePath or this API as a model tool.
-import {mkdir, open, lstat, realpath, unlink, chmod, rmdir} from 'node:fs/promises';
+import {mkdir, mkdtemp, open, lstat, realpath, unlink, chmod, rmdir} from 'node:fs/promises';
 import {constants} from 'node:fs';
+import {tmpdir} from 'node:os';
 import {join, resolve, isAbsolute} from 'node:path';
 import {createHash, randomUUID} from 'node:crypto';
 import {requireExportDestination,requireStorageDestination} from './storage-policy.mjs';
-import {grantWindowsChromiumUploadRead} from './platform.mjs';
+import {protectWindowsDirectory} from './platform.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const validName = name => typeof name==='string' && name.length>0 && name.length<=200
@@ -82,13 +83,21 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
   const info=await lstat(directory);
   if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Artifact directory must be a real directory');
   const root=await realpath(resolve(directory)),entries=new Map(),transfers=new Set(),outputs=new Map();
+  const browserDirectory=async fallback=>{
+    if(process.platform!=='win32'){await mkdir(fallback,{mode:0o700});return fallback;}
+    // Chromium's Windows file plumbing still encounters MAX_PATH in native
+    // upload/download handlers. Keep the user-visible basename but move only
+    // the disposable browser-facing copy to a short, private temp directory.
+    const path=await mkdtemp(join(tmpdir(),'la'));
+    protectWindowsDirectory(path);
+    return path;
+  };
   const pendingStages=new Set();let closing=false;
   const stageTransfer=async (artifactId,download=false) => {
       const descriptor=entries.get(artifactId);
       if (!descriptor) throw new Error('Artifact was not admitted in this session');
       const buffer=download ? null : await readVerified(join(root,artifactId),descriptor,maxBytes);
-      const directory=join(root,(download?'download-':'transfer-')+randomUUID()),path=join(directory,descriptor.name);
-      await mkdir(directory,{mode:0o700});
+      const directory=await browserDirectory(join(root,(download?'download-':'transfer-')+randomUUID())),path=join(directory,descriptor.name);
       const owner=await lstat(directory);
       let file;
       try {
@@ -96,7 +105,6 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
         file=await open(path,'wx',0o600);
         await file.writeFile(buffer);await file.sync();await file.close();file=null;
         await chmod(path,0o400);await chmod(directory,0o500);
-        grantWindowsChromiumUploadRead(directory);
         }
       } catch(error) {
         await file?.close();await chmod(directory,0o700);
@@ -151,8 +159,8 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
         )throw Error('Invalid native output binding');
       requireExportDestination(binding.destination,storageDirectories);
       binding=structuredClone(binding);
-      const artifactId=randomUUID(),name=binding.destination.split('/').at(-1),dir=join(root,'output-'+artifactId),path=join(dir,name);
-      await mkdir(dir,{mode:0o700});const owner=await lstat(dir);let released=false,retained=false,descriptor=null;
+      const artifactId=randomUUID(),name=binding.destination.split('/').at(-1),dir=await browserDirectory(join(root,'output-'+artifactId)),path=join(dir,name);
+      const owner=await lstat(dir);let released=false,retained=false,descriptor=null;
       const check=async()=>{const current=await lstat(dir);if(released||!current.isDirectory()||current.isSymbolicLink()||current.ino!==owner.ino||current.dev!==owner.dev)throw Error('Output lease owner changed');};
       const lease={path,artifact_id:artifactId,name,binding:Object.freeze(binding),
         async verify(suggestedName,expectedBytes){

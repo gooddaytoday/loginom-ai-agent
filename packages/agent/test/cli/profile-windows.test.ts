@@ -17,35 +17,10 @@ test.skipIf(process.platform !== "win32")(
     try {
       await mkdir(root)
       await protectWindowsProfile(root)
-      const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
-      if (!systemRoot) throw Error("SystemRoot required")
-      const inputRoot = join(root, "loginom", "sessions", "one", "artifacts", "input")
-      const transfer = join(inputRoot, "transfer-12345678-1234-1234-1234-123456789abc")
-      await mkdir(transfer, { recursive: true })
-      const uploadTraverse = Bun.spawn(
-        [
-          join(systemRoot, "System32/icacls.exe"),
-          inputRoot,
-          "/grant:r",
-          "*S-1-15-3-1024-1528657515-1944437972-2795272136-1227674495-293963776-353393192-4060142787-1908764039:(X)",
-        ],
-        { stdout: "ignore", stderr: "ignore" },
-      )
-      expect(await uploadTraverse.exited).toBe(0)
-      const uploadRead = Bun.spawn(
-        [
-          join(systemRoot, "System32/icacls.exe"),
-          transfer,
-          "/grant:r",
-          "*S-1-15-3-1024-1528657515-1944437972-2795272136-1227674495-293963776-353393192-4060142787-1908764039:(OI)(CI)RX",
-        ],
-        { stdout: "ignore", stderr: "ignore" },
-      )
-      expect(await uploadRead.exited).toBe(0)
-      await writeFile(join(transfer, "input.csv"), "test")
-      await protectWindowsProfile(root)
       await writeFile(join(root, "synthetic.txt"), "test")
       await protectWindowsProfile(root)
+      const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
+      if (!systemRoot) throw Error("SystemRoot required")
       const cache = join(root, "browser-profile", "Default", "Cache")
       await mkdir(cache, { recursive: true })
       const capability = Bun.spawn(
