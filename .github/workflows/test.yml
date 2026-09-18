@@ -79,10 +79,12 @@ jobs:
       # and is covered by the `desktop` job below. `--continue` reports every failing
       # package instead of stopping at the first one; without it turbo 2.10 segfaults
       # while terminating the remaining tasks on GitHub-hosted runners. Streamed log
-      # order shows which package is still running when a task hangs.
+      # order shows which package is still running when a task hangs. Two parallel
+      # tasks keep the agent CLI subprocess tests (15-30 s budgets) from starving on
+      # the 4-vCPU runner; the agent suite is the long pole either way.
       - name: Run unit tests
         timeout-minutes: 30
-        run: GITHUB_ACTIONS=false bun turbo test --continue --log-order=stream
+        run: GITHUB_ACTIONS=false bun turbo test --continue --log-order=stream --concurrency=2
 
       - name: Check generated client
         working-directory: packages/client
