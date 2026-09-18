@@ -8,6 +8,10 @@ export function browserEnvironment(profile, environment = process.env) {
   return { ...environment, CHROME_LOG_FILE: join(profile, "chrome-debug.log") }
 }
 
+export function browserLoggingArguments(profile) {
+  return ["--disable-logging", `--log-file=${join(profile, "chrome-debug.log")}`]
+}
+
 export function loginomAddress(value) {
   const url = new URL(value)
   if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw Error("LOGINOM_URL_INVALID")
@@ -74,18 +78,19 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       // Windows, mutating the signed/manifested application payload. Keep all
       // browser state and diagnostics inside the disposable session profile.
       env: browserEnvironment(profile),
-      ...(!headless
-        ? {
-            args: [
+      args: [
+        ...browserLoggingArguments(profile),
+        ...(!headless
+          ? [
               "--start-maximized",
               ...(process.platform === "linux" &&
               process.env.WAYLAND_DISPLAY &&
               (process.env.XDG_SESSION_TYPE === "wayland" || !process.env.DISPLAY)
                 ? ["--ozone-platform=wayland"]
                 : []),
-            ],
-          }
-        : {}),
+            ]
+          : []),
+      ],
       viewport: headless ? { width: 1280, height: 800 } : null,
     })
     .catch(() => {
