@@ -1,0 +1,45 @@
+{
+  "status": "PASS",
+  "cases": [
+    {
+      "status": "PASS",
+      "closed": "cli",
+      "survivor": "desktop"
+    },
+    {
+      "status": "PASS",
+      "closed": "desktop",
+      "survivor": "cli"
+    }
+  ],
+  "exits": [
+    {
+      "path": "close-cli/cli/exit.json",
+      "code": 0,
+      "guarded": false
+    },
+    {
+      "path": "close-cli/desktop/exit.json",
+      "code": 0
+    },
+    {
+      "path": "close-desktop/cli/exit.json",
+      "code": 0,
+      "guarded": false
+    },
+    {
+      "path": "close-desktop/desktop/exit.json",
+      "code": 0
+    }
+  ],
+  "fileAudit": {
+    "traceFiles": 1389,
+    "syscallLines": 959201,
+    "desktopReferences": {
+      "/home/kiselev/.config/com.loginom.aiagent": 0,
+      "/home/kiselev/.config/loginom-ai-agent": 0,
+      "/home/kiselev/.local/share/loginom-ai-agent": 0,
+      "/home/kiselev/.local/state/loginom-ai-agent": 0
+    }
+  }
+}

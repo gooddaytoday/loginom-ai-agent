@@ -99,3 +99,44 @@ Driver exit 0. Summary: [tui-oracle-summary.json](tui-oracle-summary.json).
 The earlier failed B close is retained in [diagnosis](tui-driver-diagnosis.md).
 This is scripted-provider acceptance of the installed final Linux CLI, separate
 from the user-accepted real Xiaomi smoke.
+
+## Current Desktop and process independence
+
+Desktop dev `0.1.4-cli.20260918linux` was built at 3795eeb48 into
+`/tmp/loginom-final-desktop-3795eeb48/linux-unpacked`. Product inputs are identical
+to CLI edc68138d: the intervening tracked changes only concern docs/test drivers.
+The Git commits and full source snapshots differ; no claim of identical full-tree
+hashes is made. Build/package logs: `/tmp/loginom-final-desktop-build.log` and
+`/tmp/loginom-final-desktop-package.log`. This unpacked candidate was not installed
+as DEB and did not replace the user's Desktop.
+
+ASAR SHA256: `98db012b65d2fd08b6a0d7a75ef3c21a9ac2cf28d2edbd47234eaf34ab0b92d1`.
+Resource manifest SHA256: `62eb0dc0aefb6770a09be029991f6c5a0b8ffa1b68f4f42ab2966c141e31fcf3`.
+All 4365 resource files/ELF checks PASS. CLI/Desktop manifests have identical pins;
+the only differing file is flavor-specific THIRD_PARTY_NOTICES.md.
+
+Desktop oracle `/tmp/loginom-linux-oracle-ZPgMbB` passed A=55/B=101, save/close
+and independent cold readback without reapplying settings, driver exit 0.
+[Summary](desktop-oracle-summary.json). Six actual Desktop/TUI/run model captures
+agree on all 34 tools and bootstrap instructions; six prepare replies also agree
+on full instructions and knowledge. [Contract hashes](contracts-summary.json).
+
+`script/desktop-cli-independence.ts` exercised both close orders with separate
+private profiles and live Loginom workspaces: closing Desktop left CLI able to
+observe an authenticated workspace; closing CLI left Desktop able to do so.
+All four children exited 0, CLI guards released. Host package typecheck PASS.
+This checks process independence, not a fault during an uncertain mutation.
+Private evidence: `/tmp/loginom-desktop-cli-independence-gPsrOu`.
+[Results](independence-summary.json).
+
+CLI setup/run/prepare/observe/close were traced with strace file syscalls only:
+1389 trace files, 959201 syscall lines, zero references to the four checked
+Desktop global config/auth/history roots. This extends the earlier providers-list
+audit but does not claim exhaustive coverage of every TUI or provider command.
+Raw traces and private profiles are outside git.
+
+After all runs no process executable remained under either candidate payload.
+The CLI test installation was removed with its own uninstall script; 35205
+files in the three evidence/profile roots were preserved byte-for-byte.
+[Cleanup](post-oracle-cleanup.json). Archives and unpacked test artifacts remain
+in /tmp; the user's Desktop installation was not modified.

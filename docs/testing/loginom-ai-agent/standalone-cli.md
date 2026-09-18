@@ -16,7 +16,12 @@ inventory больше не имеет missing-text entries, но status ост�
 сохранило 8093 файла профилей. Offline Ubuntu 22.04/Debian 12 startup/library
 checks PASS. [Финальный Linux artifact](reports/2026-09-18-cli-final-linux/report.md).
 
-## Исправления ревью a7d812e4a — source-only, 2026-09-18
+Final native headless run и installed headed TUI прошли CSV 55/101, save/close
+и независимое cold readback без перенастройки узлов. TUI: exit 0, guard=false,
+forced=false, по одному видимому окну Chromium и remaining=[] после закрытия.
+[Безопасное обновление observation в тестовом драйвере](reports/2026-09-18-cli-final-linux/tui-driver-diagnosis.md).
+
+## Исправления ревью a7d812e4a — исходная проверка 2026-09-18
 
 - Dock business failures без MCP `isError` дают ошибку tool/код 1; успешное
   исправление той же операции возвращает 0, running не снимает прежнюю ошибку.
@@ -34,7 +39,7 @@ checks PASS. [Финальный Linux artifact](reports/2026-09-18-cli-final-li
 - Установленные артефакты не пересобирались. Live provider/OAuth и native
   Windows/macOS не проверялись; историческая приёмка ниже остаётся отдельной.
 
-## Текущий checkpoint — 2026-09-18
+## Исторический checkpoint перед Linux-only продолжением — 2026-09-18
 
 Полная цель **не завершена**. Ниже идут исторические checkpoint-записи: их PASS
 относятся к указанным там artifacts, а не автоматически к последней сборке.
@@ -71,7 +76,7 @@ checks PASS. [Финальный Linux artifact](reports/2026-09-18-cli-final-li
   реализованы в source; native выполнение/приёмка отсутствуют. Candidate hashes
   получены из реальных файлов, Product release pins не переведены в native PASS.
 
-Обязательные следующие работы по исходному контракту:
+Историческая очередь по исходному контракту (актуальный scope — в начале документа):
 
 1. Live oracle с настоящим model provider на отдельном CLI-профиле (Desktop auth
    не копировать). Пользователю задан вопрос о готовом разрешённом профиле.

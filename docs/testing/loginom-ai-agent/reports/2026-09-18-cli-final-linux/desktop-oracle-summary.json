@@ -1,0 +1,25 @@
+{
+  "status": "PASS",
+  "first": {
+    "label": "A",
+    "path": "/user/loginom-ai-agent-acceptance-7c177b95-7ad8-432a-8fa0-8165a96b1cab-A.lgp",
+    "node": "cbcb0102-85d7-4049-9a84-f0d81f4c9b16",
+    "expected": {
+      "Alpha": 35,
+      "Beta": 20
+    },
+    "source": "/user/bd34e99bd59089de8764992fdd704caf47c9747b4a3f9c8ec191431f09f095af-0-sales.csv",
+    "inputSha256": "98aa522befcb544089edf626c2713e1cf69aaf54f93a0a92a0df7e3e4a10fcd5"
+  },
+  "second": {
+    "label": "B",
+    "path": "/user/loginom-ai-agent-acceptance-7c177b95-7ad8-432a-8fa0-8165a96b1cab-B.lgp",
+    "node": "bced1bfa-2de6-487a-823e-f09e2a8899e2",
+    "expected": {
+      "Alpha": 100,
+      "Beta": 1
+    },
+    "source": "/user/add550e84b383365f182ae24956c54fd70f528a3e81a8f3ef3b941782b7e97dc-0-sales.csv",
+    "inputSha256": "71566126acfc907717a41ba31ef83d8867ca6080979f62948bd906a811492f4c"
+  }
+}

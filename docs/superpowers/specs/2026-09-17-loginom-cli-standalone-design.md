@@ -526,30 +526,34 @@ SDK/Client; если HTTP contract не меняется, новый control API
 
 ### Текущая сводка — 2026-09-18
 
-Полная цель не завершена. Ниже сохранены исторические checkpoint-записи;
-незакрытый пункт в ранней записи не отменяет последующую проверку, а старый PASS
-не переносится автоматически на новые artifacts или другую ОС.
+Текущая цель ограничена Linux; Windows/macOS пользователь вынес в отдельную
+работу. Незакрытый пункт раннего checkpoint не отменяет последующую проверку;
+старые evidence сохраняют собственную версию и границы.
 
-- Этапы 1–2: CLI bootstrap/profile/guard и shared private Node host реализованы;
-  Linux source/process/installed проверки и Desktop regression выполнены.
-  Platform-specific credential/proxy acceptance остаётся частью этапа 6.
-- Этапы 3–4: CSV save/cold-reopen, TUI/run, resume, permissions и crash/network
-  recovery имеют Linux evidence ниже. Model provider в oracle scripted;
-  требуемый настоящий provider ещё не проверен.
-- Этап 5: несколько Linux development archives прошли install/uninstall и runtime
-  acceptance; installed Desktop 02:25 прошёл CSV 55/101 и cold reopen, затем
-  восстановлена стабильная 0.1.4. Notices candidate 04:30 прошёл build/manifest/archive и штатную установку,
-  help/version, installed notices и удаление; затем browser/runtime crash после
-  active import с настоящим Loginom и scripted provider.
-- Этап 6: Windows/macOS source и cross-build подготовлены; реальных native
-  install/credential/browser/GUI прогонов нет. Это не native acceptance PASS.
-- Release gates остаются открыты: настоящий model provider, native OS,
-  clean release/signing/notarization и полный license/source-distribution audit.
-  Архив 05:00: 465 npm notices, 464 README, 32 native + 3 JS source files,
-  Linux Chromium credits (757 секций); 3 npm entries и другие audit gaps остаются.
+- Этапы 1–4: standalone bootstrap/profile/guard, private Node host, команды,
+  TUI/run, вложения, permissions и recovery реализованы. Регрессии ревью
+  исправлены в `1657a6c07`; source/process/typecheck проверки PASS.
+- Настоящий Xiaomi выполнил Dock operations и импорт CSV. По явно уточнённому
+  критерию пользователя real-provider smoke **PASS**; полный сценарий модель
+  не завершила, и такой результат ей не приписывается.
+- Final Linux CLI `0.1.4-cli.20260918linux`: чистая сборка из edc68138d,
+  archive/manifest, install/uninstall и offline Ubuntu22/Debian12 startup PASS.
+  Headless run и installed headed TUI: CSV 55/101, save/close/cold readback PASS.
+- Отдельный Desktop-кандидат с идентичными исходниками продукта прошёл тот же
+  oracle. Шесть model captures и prepare instructions/knowledge совпали;
+  runtime/pins равны. Full git snapshots различаются docs/test changes.
+  Оба порядка закрытия Desktop/CLI подтвердили независимость. Пользовательская
+  установка Desktop не изменялась; тестовая установка CLI удалена.
+- Npm graph inventory: 467 packages, 468 notices + 464 README, missing texts=0.
+  Attribution/nested/native/corresponding-source/relinking audit остаётся
+  incomplete. Это неподписанный dev artifact, не production release.
+- Остаток Linux приёмки и точные границы текущих/исторических доказательств
+  фиксируются в audit ниже. Native Windows/macOS, signing/notarization и
+  публикация не объявляются выполненными.
 
 Актуальные ссылки: [CLI runbook](../../testing/loginom-ai-agent/standalone-cli.md),
-[licenses report](../../testing/loginom-ai-agent/reports/2026-09-18-cli-license-inputs/report.md).
+[final Linux report](../../testing/loginom-ai-agent/reports/2026-09-18-cli-final-linux/report.md),
+[acceptance audit](../../testing/loginom-ai-agent/reports/2026-09-18-cli-final-linux/acceptance-audit.md).
 
 ### История реализации с 2026-09-17
 
@@ -2919,3 +2923,20 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   `/tmp/loginom-final-desktop-3795eeb48/linux-unpacked`; проверены 4365 ресурсов,
   runtime/pins равны CLI, отличается только flavor-specific THIRD_PARTY_NOTICES.md.
   CSV oracle выполняется, Desktop пользователя не изменялся.
+
+### Desktop regression и независимость интерфейсов — PASS
+
+- [x] Отдельный Desktop dev-кандидат: A=55/B=101, save/close, независимый cold
+  readback без перенастройки, exit 0. Пользовательский Desktop не устанавливался
+  и не заменялся; runtime product inputs совпадают с final CLI.
+- [x] Шесть Desktop/TUI/run captures: 34 tool schemas/descriptions и bootstrap
+  совпали; шесть prepare replies содержат одинаковые full instructions/knowledge.
+- [x] Новый повторяемый `desktop-cli-independence.ts`: оба порядка закрытия,
+  оставшийся интерфейс успешно наблюдает Loginom; четыре exit 0, CLI guard=false.
+  Host typecheck PASS. Это штатное закрытие, не crash during mutation.
+- [x] CLI setup/run/prepare/observe/close file trace: 959201 syscall lines,
+  0 references к четырём Desktop global roots. Полный TUI trace не заявляется.
+- [x] Тестовые процессы завершены; штатный uninstall удалил CLI launcher/payload,
+  сохранив 35205 файлов профилей/evidence. Архивы сохранены в /tmp.
+
+[Артефакты, результаты и границы проверки](../../testing/loginom-ai-agent/reports/2026-09-18-cli-final-linux/report.md).
