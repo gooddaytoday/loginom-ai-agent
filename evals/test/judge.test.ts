@@ -1,9 +1,10 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdtemp } from "node:fs/promises"
+import { cp, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import { fetchArtifact, parseArtifactSource } from "../src/artifact"
 import { evalsRoot, loadConfig } from "../src/config"
+import { EvalFailure } from "../src/fail"
 import { judgeCommand, judgeInfo, judgeTask, prepareJudgeDir, scoreVerdict, type JudgeSettings, type Verdict } from "../src/judge"
 import { loadTasks } from "../src/task"
 
@@ -30,6 +31,10 @@ test("scoreVerdict: пропуск, лишний или дублирующийс
   const duplicated = verdict({ a: true, b: true, c: true })
   duplicated.checklist.push({ id: "a", passed: false, evidence: "dup" })
   expect(scoreVerdict(checklist, duplicated, 70)).toMatchObject({ ok: false })
+})
+
+test("scoreVerdict: пустой чеклист — ошибка", () => {
+  expect(scoreVerdict([], { checklist: [], summary: "s", confidence: "high" }, 70)).toMatchObject({ ok: false })
 })
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
@@ -90,9 +95,35 @@ const settings = (env: Record<string, string> = {}): JudgeSettings => ({
 const judgeFixture = async (env: Record<string, string> = {}) => {
   const [task] = await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"])
   const artifact = await fixtureArtifact()
-  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-judge-"))
+  const outDir = path.join(await mkdtemp(path.join(os.tmpdir(), "evals-judge-")), "judge")
   return judgeTask({ task: task!, artifactDir: path.dirname(artifact.unpackedDir), prompt: "p", outDir, judge: settings(env) })
 }
+
+test("judgeTask: эталон без Unit.xml — EvalFailure с id задачи", async () => {
+  const tmpDir = await mkdtemp(path.join(os.tmpdir(), "evals-bad-ref-"))
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-judge-"))
+  try {
+    await cp(path.join(evalsRoot, "tasks", "group-sum-qty"), path.join(tmpDir, "group-sum-qty"), { recursive: true })
+    await cp(path.join(evalsRoot, "fixtures", "storage", "not-a-package.lgp"), path.join(tmpDir, "group-sum-qty", "reference.lgp"))
+    const [task] = await loadTasks(tmpDir)
+    const artifact = await fixtureArtifact()
+    const rejected = await judgeTask({
+      task: task!,
+      artifactDir: path.dirname(artifact.unpackedDir),
+      prompt: "p",
+      outDir,
+      judge: settings(),
+    }).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    expect(rejected).toBeInstanceOf(EvalFailure)
+    expect((rejected as EvalFailure).message).toContain(task!.id)
+  } finally {
+    await rm(tmpDir, { recursive: true, force: true })
+    await rm(outDir, { recursive: true, force: true })
+  }
+})
 
 test("judgeTask: pass → score 100, одна попытка, verdict.json на диске", async () => {
   const judged = await judgeFixture()
@@ -110,6 +141,24 @@ test("judgeTask: постоянный отказ → error после двух �
 })
 
 test("judgeTask: первый отказ, второй успех → ok, attempts 2", async () => {
-  const marker = path.join(await mkdtemp(path.join(os.tmpdir(), "evals-flaky-")), "marker")
-  expect(await judgeFixture({ FAKE_CODEX_FLAKY_MARKER: marker })).toMatchObject({ ok: true, score: 100, attempts: 2 })
+  const parent = await mkdtemp(path.join(os.tmpdir(), "evals-flaky-"))
+  const marker = path.join(parent, "marker")
+  const outDir = path.join(parent, "judge")
+  try {
+    const [task] = await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"])
+    const artifact = await fixtureArtifact()
+    expect(
+      await judgeTask({
+        task: task!,
+        artifactDir: path.dirname(artifact.unpackedDir),
+        prompt: "p",
+        outDir,
+        judge: settings({ FAKE_CODEX_FLAKY_MARKER: marker }),
+      }),
+    ).toMatchObject({ ok: true, score: 100, attempts: 2 })
+    expect(await Bun.file(path.join(parent, "judge-events-1.jsonl")).exists()).toBe(true)
+    expect(await Bun.file(path.join(parent, "judge-events-2.jsonl")).exists()).toBe(true)
+  } finally {
+    await rm(parent, { recursive: true, force: true })
+  }
 })
