@@ -21,6 +21,8 @@ bun run prepare-bundle
 
 Если симлинки отклоняются, запасной путь: `bun run prepare-bundle --copy`.
 
+`--reset-profile` удаляет весь каталог eval-профиля, включая скопированный `auth.json`. После сброса скопируйте запись провайдера снова.
+
 Текущий стенд использует `EVAL_AGENT_MODEL=xiaomi-token-plan-sgp/mimo-v2.5-pro`. Это провайдер из каталога моделей агента, поэтому `EVAL_AGENT_PROVIDER_*` не нужен. `assertAuth` закрывается копированием **только** записи `"xiaomi-token-plan-sgp"` из `~/.local/share/loginom-ai-agent/auth.json` в `evals/.profile/agent/data/auth.json` (создать `data/`, если нет; режим `0600`; никогда не коммитить). Профиль eval появляется после первого запуска: прогон один раз, получить ошибку `assertAuth`, затем скопировать из корня репозитория:
 
 ```bash
@@ -48,6 +50,10 @@ bun run src/compare.ts <run-a> <run-b>       # сравнить два прог�
 ```
 
 Флаги: `--only`, `--tasks`, `--label`, `--repeat`, `--timeout-ms`, `--skip-judge`, `--keep-storage`, `--judge-only <run-id>`, `--calibrate`, `--reset-profile`, `--dry-run`.
+
+Несовместимы (отклоняются с кодом 2): `--judge-only` с `--skip-judge`, `--dry-run` или `--calibrate`; `--calibrate` с `--skip-judge` или `--dry-run`.
+
+Пункт чеклиста с `"requires_run": true` (как `honest-report`) не проверяется на калибровке: без прогона агента его нельзя оценить. То же для `"requires_result_file": true`.
 
 ## Что означают статусы
 
