@@ -1,0 +1,5 @@
+.env
+.profile/
+.bundle/
+results/
+node_modules/

@@ -1,0 +1,16 @@
+{
+  "name": "@loginom-ai-agent/evals",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "bun run src/run.ts",
+    "compare": "bun run src/compare.ts",
+    "prepare-bundle": "bun run script/prepare-bundle.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.13",
+    "typescript": "5.8.2"
+  }
+}
