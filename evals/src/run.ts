@@ -7,6 +7,7 @@ import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { cleanupArtifact, fetchArtifact, listStorage, parseArtifactSource, type ArtifactSource } from "./artifact"
 import { preflight } from "./preflight"
 import { assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
+import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
 export async function main(argv: string[]) {
@@ -23,6 +24,16 @@ export async function main(argv: string[]) {
   const runDir = path.join(config.resultsDir, runId)
   await mkdir(runDir, { recursive: true })
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
+  const judge = config.skipJudge ? null : await judgeInfo(config)
+  const settings: JudgeSettings | undefined = judge
+    ? {
+        command: config.judge.command,
+        model: config.judge.model,
+        reasoning: config.judge.reasoning,
+        timeoutMs: config.judgeTimeoutMs,
+        passThreshold: config.passThreshold,
+      }
+    : undefined
   const attempts: AttemptResult[] = []
   const state: { stopped: string | null; recovered: boolean; interruptedCleanup: { recovered: boolean } | null } = {
     stopped: null,
@@ -43,6 +54,7 @@ export async function main(argv: string[]) {
         runDir,
         signal: controller.signal,
         profileRecovered: state.recovered,
+        judge: settings,
       })
       attempts.push(result)
       console.error(`[${task.id}#${attempt}] ${result.status} score=${result.score ?? "—"} ${Math.round(result.duration_ms / 1000)}s`)
@@ -76,7 +88,7 @@ export async function main(argv: string[]) {
       dirty: environment.git?.dirty ?? null,
       model: config.agent.model,
     },
-    judge: null,
+    judge,
     dock: {
       skill_revision: environment.dock?.skillRevision ?? null,
       action_manifest_sha256: [...new Set(attempts.flatMap((item) => (item.action_manifest_sha256 ? [item.action_manifest_sha256] : [])))],
@@ -119,6 +131,7 @@ export async function runAttempt(input: {
   runDir: string
   signal: AbortSignal
   profileRecovered: boolean
+  judge?: JudgeSettings
 }): Promise<{ result: AttemptResult; stop: boolean }> {
   const base = emptyResult(input.task.id, input.attempt, input.profileRecovered)
   return attemptBody(input, base).catch((error: unknown) => ({
@@ -188,16 +201,37 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         )
       : null
   const noJudge = status === "harness_error" || status === "interrupted"
+  const judged =
+    artifact && !noJudge && !input.signal.aborted && input.judge
+      ? await judgeTask({
+          task,
+          run,
+          artifactDir: path.dirname(artifact.unpackedDir),
+          prompt,
+          outDir: path.join(outDir, "judge"),
+          judge: input.judge,
+          signal: input.signal,
+        })
+      : undefined
+  const judgeFields = judged
+    ? judgedFields(judged)
+    : {
+        score: artifact || noJudge ? null : 0,
+        pass: artifact || noJudge ? null : false,
+        judge_status: (artifact || noJudge ? "skipped" : "no_artifact") as AttemptResult["judge_status"],
+        judge_attempts: 0,
+        judge_confidence: null,
+        judge_summary: null,
+        checklist: null,
+      }
   const result: AttemptResult = {
     ...base,
+    ...judgeFields,
     status,
     exit_code: run.exitCode,
     timed_out: run.timedOut,
     interrupted: run.interrupted,
     failure_kind: status === "failed" ? run.failureKind : null,
-    score: artifact || noJudge ? null : 0,
-    pass: artifact || noJudge ? null : false,
-    judge_status: artifact || noJudge ? "skipped" : "no_artifact",
     duration_ms: run.durationMs,
     cost: run.cost,
     tokens: run.tokens,
