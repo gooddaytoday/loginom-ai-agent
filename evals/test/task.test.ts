@@ -15,6 +15,8 @@ test("loadTasks: читает три core-задачи в порядке id", as
   expect(group.inputs).toEqual(["data/sales.csv"])
   expect(group.checklist.map((item) => item.id)).toContain("result-rows")
   expect(group.checklist.find((item) => item.id === "result-rows")?.requiresResultFile).toBe(true)
+  expect(group.checklist.find((item) => item.id === "honest-report")?.requiresRun).toBe(true)
+  expect(group.checklist.find((item) => item.id === "import-csv")?.requiresRun).toBe(false)
   expect(group.checklist.find((item) => item.id === "import-csv")?.weight).toBe(1)
   expect(group.timeoutMs).toBeUndefined()
 })
@@ -44,6 +46,17 @@ test("loadTasks: битый или не-объектный task.json откло�
     await expect(loadTasks(dir)).rejects.toThrow(EvalFailure)
     await expect(loadTasks(dir)).rejects.toThrow("group-sum-qty: task.json")
   }
+})
+
+test("loadTasks: requires_run не-boolean отклоняется с именем задачи", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-tasks-"))
+  await cp(path.join(tasksDir, "group-sum-qty"), path.join(dir, "group-sum-qty"), { recursive: true })
+  const file = path.join(dir, "group-sum-qty", "task.json")
+  const raw = await Bun.file(file).json()
+  raw.checklist[0].requires_run = "true"
+  await writeFile(file, JSON.stringify(raw))
+  await expect(loadTasks(dir)).rejects.toThrow(EvalFailure)
+  await expect(loadTasks(dir)).rejects.toThrow("group-sum-qty: checklist[0].requires_run должен быть boolean")
 })
 
 test("loadTasks: requires_result_file не-boolean отклоняется с именем задачи", async () => {

@@ -1,8 +1,8 @@
-# filter_active_rows.lgp
+# Фильтр Active = true
 
 Минимальный пакет Loginom: импорт CSV → фильтр `Active=true` → экспорт результата.
 
-Файл пакета: `filter_active_rows.lgp`.
+Имена файла пакета и файла результата задаёт harness (см. TASK.md); при оценке имена файлов не учитываются.
 
 ## Назначение
 
@@ -13,18 +13,16 @@
 
 | Узел   | Компонент        | Настройка |
 |:-------|:-----------------|:----------|
-| Import | Текстовый файл   | `data/orders.csv`, первая строка — заголовок, suggest format |
+| Import | Текстовый файл   | `orders.csv`, первая строка — заголовок, suggest format |
 | Filter | Фильтр строк     | поле `Active`, условие «истина» (`frtIsTrue`) |
-| Export | Текстовый файл   | `filter_active_rows.result.csv` |
+| Export | Текстовый файл   | текстовый файл результата (имя задаёт harness) |
 
 Связи: Import `Output_Data-0` → Filter `Input_Data-0` → Export `Input_Data-1`.
 
 ## Входные данные
 
-`data/orders.csv` — 4 строки (A/B/C/D), из них `Active=true` у A и C.
+`orders.csv` — 4 строки (A/B/C/D), из них `Active=true` у A и C.
 
 ## Ожидаемый результат
 
 Экспорт содержит **2 строки** с `Active=true` (Item: A, C).
-
-Пересборка эталона — через browser automation (skill `loginom-automation`).

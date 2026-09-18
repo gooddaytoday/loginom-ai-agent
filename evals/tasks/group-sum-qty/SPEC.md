@@ -1,8 +1,8 @@
-# group_sum_qty.lgp
+# Сумма Qty по Item
 
 Минимальный пакет Loginom: импорт CSV → группировка по `Item` с суммой `Qty` → экспорт результата.
 
-Файл пакета: `group_sum_qty.lgp`.
+Имена файла пакета и файла результата задаёт harness (см. TASK.md); при оценке имена файлов не учитываются.
 
 ## Назначение
 
@@ -13,18 +13,16 @@
 
 | Узел   | Компонент        | Настройка |
 |:-------|:-----------------|:----------|
-| Import | Текстовый файл   | `data/sales.csv`, первая строка — заголовок, suggest format |
+| Import | Текстовый файл   | `sales.csv`, первая строка — заголовок, suggest format |
 | Group  | Группировка      | ключ группировки `Item`, показатель `Qty` — сумма |
-| Export | Текстовый файл   | `group_sum_qty.result.csv` |
+| Export | Текстовый файл   | текстовый файл результата (имя задаёт harness) |
 
 Связи: Import `Output_Data-0` → Group `Input_Data-0` → Export `Input_Data-1`.
 
 ## Входные данные
 
-`data/sales.csv` — Item/Qty: A×5, A×10, B×25.
+`sales.csv` — Item/Qty: A×5, A×10, B×25.
 
 ## Ожидаемый результат
 
 Экспорт содержит **2 строки**: Item A с Qty=15, Item B с Qty=25.
-
-Пересборка эталона — через browser automation (skill `loginom-automation`).

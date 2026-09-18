@@ -1,8 +1,8 @@
-# calc_data_double.lgp
+# Колонка Double = Amount * 2
 
 Минимальный пакет Loginom: импорт CSV → калькулятор (данные) → экспорт результата.
 
-Файл пакета: `calc_data_double.lgp`.
+Имена файла пакета и файла результата задаёт harness (см. TASK.md); при оценке имена файлов не учитываются.
 
 ## Назначение
 
@@ -13,18 +13,16 @@
 
 | Узел   | Компонент              | Настройка |
 |:-------|:-----------------------|:----------|
-| Import | Текстовый файл         | `data/amounts.csv`, первая строка — заголовок, suggest format |
+| Import | Текстовый файл         | `amounts.csv`, первая строка — заголовок, suggest format |
 | Calc   | Калькулятор (данные)   | выражение `Double = Amount * 2` |
-| Export | Текстовый файл         | `calc_data_double.result.csv` |
+| Export | Текстовый файл         | текстовый файл результата (имя задаёт harness) |
 
 Связи: Import `Output_Data-0` → Calc `Input_Data-0` → Export `Input_Data-1`.
 
 ## Входные данные
 
-`data/amounts.csv` — поле `Amount` со значениями 10 и 20.
+`amounts.csv` — поле `Amount` со значениями 10 и 20.
 
 ## Ожидаемый результат
 
 Экспорт содержит колонку `Double` со значениями **20** и **40**.
-
-Пересборка эталона — через browser automation (skill `loginom-automation`).

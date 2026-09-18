@@ -93,7 +93,10 @@ function checklist(raw: Raw, id: string) {
     const requiresResultFile = entry.requires_result_file === undefined ? false : entry.requires_result_file
     if (typeof requiresResultFile !== "boolean")
       throw new EvalFailure(`${id}: checklist[${index}].requires_result_file должен быть boolean`, 2)
-    return { id: itemId, text: itemText, weight, requiresResultFile }
+    const requiresRun = entry.requires_run === undefined ? false : entry.requires_run
+    if (typeof requiresRun !== "boolean")
+      throw new EvalFailure(`${id}: checklist[${index}].requires_run должен быть boolean`, 2)
+    return { id: itemId, text: itemText, weight, requiresResultFile, requiresRun }
   })
   const duplicates = items.map((item) => item.id).filter((itemId, index, all) => all.indexOf(itemId) !== index)
   if (duplicates.length) throw new EvalFailure(`${id}: повторяющиеся id в checklist: ${duplicates.join(", ")}`, 2)
@@ -103,8 +106,9 @@ function checklist(raw: Raw, id: string) {
 export async function agentInputsHash(tasks: Task[]) {
   const hasher = new Bun.CryptoHasher("sha256")
   for (const task of tasks) {
-    hasher.update(`${task.id}\n${task.prompt}\n${task.inputs.join(",")}\n`)
-    for (const input of [...task.inputs].sort()) hasher.update(await Bun.file(path.join(task.dir, input)).bytes())
+    hasher.update(`${task.id}\n`)
+    hashPart(hasher, "prompt", task.prompt)
+    for (const rel of [...task.inputs].sort()) hashPart(hasher, `input:${rel}`, await Bun.file(path.join(task.dir, rel)).bytes())
   }
   return hasher.digest("hex")
 }
@@ -112,9 +116,17 @@ export async function agentInputsHash(tasks: Task[]) {
 export async function rubricHash(tasks: Task[]) {
   const hasher = new Bun.CryptoHasher("sha256")
   for (const task of tasks) {
-    hasher.update(`${task.id}\n${JSON.stringify(task.checklist)}\n${task.expectedOutput}\n`)
-    hasher.update(await Bun.file(path.join(task.dir, task.spec)).bytes())
-    hasher.update(await Bun.file(path.join(task.dir, task.reference)).bytes())
+    hasher.update(`${task.id}\n`)
+    hashPart(hasher, "checklist", JSON.stringify(task.checklist))
+    hashPart(hasher, "expected_output", task.expectedOutput)
+    hashPart(hasher, "spec", await Bun.file(path.join(task.dir, task.spec)).bytes())
+    hashPart(hasher, "reference", await Bun.file(path.join(task.dir, task.reference)).bytes())
   }
   return hasher.digest("hex")
+}
+
+function hashPart(hasher: Bun.CryptoHasher, label: string, data: string | Uint8Array) {
+  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data
+  hasher.update(`${label}:${bytes.byteLength}\n`)
+  hasher.update(bytes)
 }
