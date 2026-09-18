@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import os from "node:os"
 import path from "node:path"
-import { cp, mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdtemp, readdir, rm } from "node:fs/promises"
 import { parseArtifactSource } from "../src/artifact"
 import { agentCommand } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
@@ -168,6 +168,41 @@ test("runAttempt: сбой подготовки судьи сохраняет т
   } finally {
     await rm(runDir, { recursive: true, force: true })
     await rm(tasksDir, { recursive: true, force: true })
+  }
+}, 60_000)
+
+test("runAttempt: no_artifact при включённом судье даёт score 0 и judge_status=no_artifact", async () => {
+  const config = loadConfig(["--dry-run"], {})
+  const [task] = await loadTasks(config.tasksDir, ["calc-data-double"])
+  const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-no-artifact-"))
+  try {
+    const { result } = await runAttempt({
+      config,
+      command: agentCommand(config),
+      source: parseArtifactSource(config.artifactSource, config.loginom),
+      task: task!,
+      attempt: 1,
+      runId: "no-artifact",
+      runDir,
+      signal: new AbortController().signal,
+      profileRecovered: false,
+      skipJudge: false,
+      judge: {
+        command: ["bun", path.join(evalsRoot, "fixtures", "fake-codex.ts")],
+        model: "fake",
+        reasoning: "high",
+        timeoutMs: 30_000,
+        passThreshold: 70,
+      },
+    })
+    expect(result.status).toBe("no_artifact")
+    expect(result.score).toBe(0)
+    expect(result.pass).toBe(false)
+    expect(result.judge_status).toBe("no_artifact")
+    expect(result.judge_attempts).toBe(0)
+    expect((await readdir(path.join(runDir, "calc-data-double", "1"))).includes("judge")).toBe(false)
+  } finally {
+    await rm(runDir, { recursive: true, force: true })
   }
 }, 60_000)
 

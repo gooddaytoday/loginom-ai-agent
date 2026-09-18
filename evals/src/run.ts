@@ -213,9 +213,9 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
           outDir: path.join(outDir, "judge"),
           judge: input.judge,
           signal: input.signal,
-        }).catch((error) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
+        }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
       : undefined
-  const skippedJudge = input.skipJudge || artifact || noJudge
+  const skippedJudge = input.skipJudge || artifact !== undefined || noJudge
   const judgeFields = judged
     ? judgedFields(judged)
     : {
