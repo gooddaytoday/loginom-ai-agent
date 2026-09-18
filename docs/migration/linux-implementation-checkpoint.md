@@ -1,5 +1,21 @@
 # Linux: завершение реализации — 2026-09-16
 
+Актуальное Linux-only продолжение CLI — 2026-09-18: пользователь принял реальный
+Xiaomi smoke (успешные Dock operations и CSV import) как достаточный. Повторный
+полный сценарий этой моделью не требуется. Final CLI `0.1.4-cli.20260918linux`
+из edc68138d прошёл archive/install/uninstall, offline Ubuntu22/Debian12 startup,
+headless run и installed headed TUI CSV 55/101/cold readback. Отдельный Desktop
+с идентичными исходниками продукта прошёл тот же oracle; шесть captures/pins
+совпали, оба порядка закрытия Desktop/CLI подтвердили независимость. Исправлен
+только acceptance driver для доказанного pre-dispatch UI_EPOCH_CHANGED.
+Тестовая установка CLI удалена, пользовательский Desktop не заменялся.
+[Текущий отчёт и ограничения](../testing/loginom-ai-agent/reports/2026-09-18-cli-final-linux/report.md),
+[остаток проверок](../testing/loginom-ai-agent/reports/2026-09-18-cli-final-linux/acceptance-audit.md).
+Windows/macOS исключены из текущей цели; неподписанные development artifacts
+не означают прохождение полного attribution/source/relinking release audit.
+
+Ниже сохранены исторические checkpoint-записи с прежним scope и версиями.
+
 Текущий standalone checkpoint 2026-09-18: source поддерживает native Windows/macOS
 build branches, но они не исполнены; Linux candidate 02:10 прошёл полный build,
 archive verification и installed network-loss acceptance после running import
