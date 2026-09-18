@@ -25,8 +25,6 @@ jobs:
     timeout-minutes: 120
     env:
       LOGINOM_AI_AGENT_CHANNEL: dev
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/loginom-browsers
-      LOGINOM_AI_AGENT_BROWSER_SOURCE: ${{ runner.temp }}/loginom-browsers
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -42,6 +40,9 @@ jobs:
         run: |
           test "$(uname -m)" = arm64
           test "$(sw_vers -productVersion | cut -d. -f1)" = 14
+          export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/loginom-browsers"
+          echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
+          echo "LOGINOM_AI_AGENT_BROWSER_SOURCE=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
           bun install --frozen-lockfile --filter '@loginom-ai-agent/desktop' --filter '@loginom-ai-agent/agent' --filter '@loginom-ai-agent/loginom-host' --filter '@loginom-ai-agent/product'
           node packages/desktop/node_modules/electron/install.js
           echo "LOGINOM_AI_AGENT_NODE_SOURCE=$(command -v node)" >> "$GITHUB_ENV"
