@@ -7,17 +7,20 @@ const repoRoot = path.resolve(evalsRoot, "..")
 const bundle = path.join(evalsRoot, ".bundle")
 const resources = path.join(repoRoot, "packages", "desktop", "resources", "loginom")
 
-await mkdir(bundle, { recursive: true })
-for (const name of ["bin", "browsers", "runtime"]) {
+const names = ["bin", "browsers", "runtime"]
+for (const name of names) {
   const source = path.join(resources, name)
   if (!(await stat(source).catch(() => undefined))) {
     console.error(`Нет ${source}: ресурсы Desktop не подготовлены (см. packages/desktop/AGENTS.md)`)
     process.exit(2)
   }
+}
+await mkdir(bundle, { recursive: true })
+for (const name of names) {
+  const source = path.join(resources, name)
   const target = path.join(bundle, name)
   await rm(target, { recursive: true, force: true })
-  if (copy) await cp(source, target, { recursive: true })
-  else await symlink(source, target)
+  await (copy ? cp(source, target, { recursive: true }) : symlink(source, target))
 }
 await rm(path.join(bundle, "host"), { recursive: true, force: true })
 const build = Bun.spawn(["bun", "script/build-node-host.ts", path.join(bundle, "host")], {
