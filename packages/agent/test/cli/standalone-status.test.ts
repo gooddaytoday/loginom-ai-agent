@@ -2,7 +2,6 @@ import { expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
-import { buildNodeHost } from "../../../loginom-host/script/build-node-host"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
 
 // CI provisions the pinned Node through LOGINOM_AI_AGENT_TEST_NODE; locally the Desktop build stages it under resources.
@@ -504,3 +503,12 @@ test("management commands share durable setup and recovery semantics through the
     await rm(directory, { recursive: true, force: true })
   }
 }, 90_000)
+
+// Bun.build inside the test runner intermittently fails with EISDIR on bundled dependencies
+// (seen with fast-check under effect), so the host is built by the script in its own process.
+async function buildNodeHost(output: string) {
+  const script = resolve(import.meta.dir, "../../../loginom-host/script/build-node-host.ts")
+  const child = Bun.spawn([process.execPath, "run", script, output], { stdout: "inherit", stderr: "pipe" })
+  const stderr = await new Response(child.stderr).text()
+  if ((await child.exited) !== 0) throw new Error(`LOGINOM_HOST_BUILD_FAILED\n${stderr}`)
+}
