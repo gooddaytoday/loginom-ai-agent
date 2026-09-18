@@ -5,13 +5,17 @@ import { tmpdir } from "node:os"
 import { buildNodeHost } from "../../../loginom-host/script/build-node-host"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
 
+// CI provisions the pinned Node through LOGINOM_AI_AGENT_TEST_NODE; locally the Desktop build stages it under resources.
+const bundledNode =
+  process.env.LOGINOM_AI_AGENT_TEST_NODE ?? resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node")
+
 test("standalone exits after failed host cleanup despite retained process handles", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-cli-failed-exit-"))
   try {
     const bundle = join(directory, "bundle")
     await mkdir(join(bundle, "bin"), { recursive: true })
     await mkdir(join(bundle, "host"))
-    await symlink(resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node"), join(bundle, "bin/node"))
+    await symlink(bundledNode, join(bundle, "bin/node"))
     await writeFile(
       join(bundle, "host/node-host.mjs"),
       `process.on("message", m => {
@@ -67,7 +71,7 @@ test("actual standalone status launches bundled Node and releases the isolated p
   try {
     const bundle = join(directory, "bundle")
     await mkdir(join(bundle, "bin"), { recursive: true })
-    await symlink(resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node"), join(bundle, "bin/node"))
+    await symlink(bundledNode, join(bundle, "bin/node"))
     await buildNodeHost(join(bundle, "host"))
     const child = Bun.spawn([process.execPath, "run", "./src/standalone.ts", "loginom", "status", "--format", "json"], {
       cwd: resolve(import.meta.dir, "../.."),
@@ -135,7 +139,7 @@ test("management commands share durable setup and recovery semantics through the
     const profile = join(directory, "profile")
     await mkdir(join(bundle, "bin"), { recursive: true })
     await mkdir(join(bundle, "runtime/src"), { recursive: true })
-    await symlink(resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node"), join(bundle, "bin/node"))
+    await symlink(bundledNode, join(bundle, "bin/node"))
     await buildNodeHost(join(bundle, "host"))
     await writeFile(join(bundle, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test" }))
     // Fixture only: handshake/validation succeeds without Chromium, Loginom or a provider.
