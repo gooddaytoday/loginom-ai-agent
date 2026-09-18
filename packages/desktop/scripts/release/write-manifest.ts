@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { readdir, writeFile } from "node:fs/promises"
+import { fileURLToPath } from "node:url"
 import { $ } from "bun"
 import { Product, productName, productSlug } from "@loginom-ai-agent/product"
 import { decodeManifest, fileHash, hash } from "./manifest"
@@ -35,8 +36,8 @@ const resourceManifest = await Bun.file(join(resources, "resource-manifest.json"
 if (resourceManifest.target !== target) throw Error("RELEASE_RESOURCES_TARGET_MISMATCH")
 const catalog = await Bun.file(join(resources, "runtime/client/node_modules/playwright-core/browsers.json")).json()
 const electron = resolve(
-  import.meta.dir,
-  `../../node_modules/electron/dist/electron${process.platform === "win32" ? ".exe" : ""}`,
+  dirname(fileURLToPath(import.meta.resolve("electron"))),
+  `dist/electron${process.platform === "win32" ? ".exe" : ""}`,
 )
 const electronVersions = JSON.parse(
   await $`${electron} -p ${"JSON.stringify(process.versions)"}`
