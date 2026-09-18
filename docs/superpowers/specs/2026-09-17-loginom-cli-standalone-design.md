@@ -3037,3 +3037,15 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   Отказ codeload не изменил выбранную версию.
 - [ ] Отдельный полный WebKit source archive генерируется; его целостность,
   source-distribution integration и relinking ещё не заявляются проверенными.
+
+### TinyCC source и полный WebKit archive
+
+- [x] Добавлен полный неизменённый TinyCC source для фактического Bun revision;
+  проверены 523 файла, все 47 native/source input hashes и host typecheck.
+- [x] Полный WebKit archive проверен против 464897 Git blob entries, включая
+  40 symlinks и executable modes. Преобразование CRLF первого экспорта устранено
+  при создании канонического архива; проверка осталась побайтовой.
+- [ ] WebKit archive пока хранится отдельно в /tmp: включение в source distribution,
+  прочие external sources, relinking и новый binary archive остаются открыты.
+
+[Результаты проверки](../../testing/loginom-ai-agent/reports/2026-09-18-cli-license-inputs/report.md).

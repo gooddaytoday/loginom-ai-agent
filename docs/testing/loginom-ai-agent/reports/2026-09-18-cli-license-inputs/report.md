@@ -513,3 +513,26 @@ codeload endpoint refused archive generation (422); Git fetch/checkout succeeded
 without changing the requested commit. Local commit tree equals GitHub API tree
 `a7212e5d3aeb41afb46db3f955fb77b60900cfd6`. Its separate source archive is still
 being generated; no archive hash or complete distribution PASS is claimed yet.
+
+## Complete TinyCC source and verified WebKit archive
+
+Added the unmodified TinyCC source archive for the revision reported by pinned
+Bun, `12882eee073cfe5c7621bcfadf679e1372d4537b`, and its per-file inventory.
+All 523 source files match the inventory. Archive SHA256:
+`6b50485fcbbfa90a99c56e8e2b6a92014dcd34377d5edb23e1938dc9ec96f0aa`.
+All 47 native/source input hashes and host typecheck PASS. The build's existing
+source-copy mechanism includes these inputs; a fresh binary build is pending.
+
+The complete WebKit archive passed strict verification against all 464897 Git
+blob entries, including 40 symlinks and executable modes. Commit/tree match the
+pinned revision and upstream API. See webkit-source-verification.json for hashes.
+The first export failed exact comparison because upstream attributes converted
+LF to CRLF in a .bat file. A canonical archive was regenerated using temporary
+.git/info/attributes disabling export/content transformations, without changing
+tracked source or weakening verification. The original export is retained in
+/tmp separately. No downloaded source was executed.
+
+The canonical archive remains outside Git at the recorded /tmp path; it is not
+published or integrated into the distributable yet. Complete source availability
+does not establish successful relinking. Distribution integration, remaining
+external source coverage, and actual relinking remain open.

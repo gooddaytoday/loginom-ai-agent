@@ -295,6 +295,16 @@
           "url": "https://raw.githubusercontent.com/oven-sh/tinycc/12882eee073cfe5c7621bcfadf679e1372d4537b/COPYING",
           "sha256": "512d2d21b6b3384ba64781abb0208a1b87740bc31e2df48e2b206ddb7e4d5779",
           "file": "512d2d21b6b3384ba64781abb0208a1b87740bc31e2df48e2b206ddb7e4d5779.txt"
+        },
+        {
+          "path": "source.tar.gz",
+          "file": "6b50485fcbbfa90a99c56e8e2b6a92014dcd34377d5edb23e1938dc9ec96f0aa.tar.gz",
+          "sha256": "6b50485fcbbfa90a99c56e8e2b6a92014dcd34377d5edb23e1938dc9ec96f0aa"
+        },
+        {
+          "path": "source-inventory.json",
+          "file": "e037b82a3d4f0bc7c741979a82e290dab6cb59ed407d1efd2b145cec441a72cd.json",
+          "sha256": "e037b82a3d4f0bc7c741979a82e290dab6cb59ed407d1efd2b145cec441a72cd"
         }
       ]
     },
