@@ -60,3 +60,39 @@ ad-hoc identity; эта граница проверяется отдельно �
 Loginom/model/CSV 55/101, совместный lifecycle, CI macOS14 и скачанные CI artifacts.
 Gatekeeper trust, Developer ID, notarization, public release и auto-update
 исключены согласованным планом. Полная GUI-приёмка на чистой macOS14 не входит в этап.
+
+## Кандидат 01: промежуточная проверка
+
+`0.1.4-macos.20260919.1`, чистый commit `dcf1b0410192dc7fcfec71b89e0240c709a19c51`.
+Desktop DMG/ZIP и CLI TAR.GZ собраны. Статические verifier после исправления
+проверки Chromium: PASS; автономный smoke после исправления loopback/timeout
+cleanup: PASS. Эти scripts новее исходников кандидата, поэтому итоговый
+кандидат будет пересобран из единого commit.
+
+Исходный Playwright Chromium имеет linker-signed ad-hoc подпись без resource seal.
+Это подтверждено на исходном и упакованном browser. Проверяется подпись кода,
+полный SHA256 inventory и строгая deep-подпись внешнего Desktop .app; Node/Chromium
+не переподписываются. Ограничение отражено в static reports.
+
+Установленный CLI01 прошёл автономные install/uninstall/reinstall, busy-payload
+refusal, сохранение профилей и Keychain read-back. GUI01 прошёл onboarding,
+реальное подключение, encrypted storage и восстановление после restart.
+Xiaomi Token Plan Singapore, `mimo-v2.5`, вернул `OK` через backend кандидата;
+никакие provider secrets не включены в доказательства.
+
+CSV01 остановился до UI-изменений: resource manifest унаследовал Linux-каталог.
+Найден существующий immutable macOS catalog `2026.09.14-rc6-macos-candidate`,
+SHA256 `d26ce18ab9ef3285d5bac7aff1d17d4968defb1d41ebd7cbbda8d9cbede07255`.
+Нативный `pinActionCatalog` проверил manifest и все связанные files; compatibility
+`loginom-7.4.2-macos-chromium-ru`, platform `macos`, browser `chromium`.
+Выбор платформенного каталога добавляется в shared staging; gate не обходится.
+
+CI01 не создал jobs из-за недопустимого runner context в job.env; исправлено.
+CI02 подтвердил arm64/macOS14 и provisioning, но Agent typecheck выявил пропуск
+root workspace SDK/@types при filtered install. Добавление `--filter loginom-ai-agent`
+подтверждено на чистом локальном архиве: frozen install и четыре typecheck PASS,
+lock unchanged, неиспользуемый Solid Start не установлен.
+
+Локальный pre-push hook запускал общий typecheck всех upstream workspaces и
+остановился на отсутствующем Solid Start в console-support. После успешных
+package-local проверок push выполнен без этого hook; сам hook не изменялся.

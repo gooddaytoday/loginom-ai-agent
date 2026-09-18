@@ -31,6 +31,8 @@ const dirty = !!(await $`git status --porcelain --untracked-files=all`.cwd(root)
 // A published candidate must be reproducible, including every previously untracked build input.
 if (dirty) throw Error("Commit the complete build inputs before writing the release manifest")
 const resources = resolve(args.resources)
+const staged = await Bun.file(join(resources, "resource-manifest.json")).json()
+if (staged.target !== args.target) throw Error("Staged resource target does not match release target")
 const catalog = await Bun.file(join(resources, "runtime/client/node_modules/playwright-core/browsers.json")).json()
 const electron = resolve(
   import.meta.dir,
@@ -78,7 +80,13 @@ const manifest = decodeManifest({
     commit: (await $`git rev-parse HEAD`.cwd(root).text()).trim(),
     dirty: false,
     patchSha256: null,
-    inputsManifestSha256: hash(JSON.stringify(pins)),
+    inputsManifestSha256: hash(
+      JSON.stringify({
+        runtime: pins,
+        actionManifestUri: staged.actionManifestUri,
+        actionManifestSha256: staged.actionManifestSha256,
+      }),
+    ),
     importSha256: source,
   },
   target: {
@@ -101,7 +109,7 @@ const manifest = decodeManifest({
     playwrightMcp: pins.playwrightMcp,
     chromiumVersion: catalog.browsers.find((item: { name: string }) => item.name === "chromium").browserVersion,
     chromiumRevision: pins.chromiumRevision,
-    catalogSha256: pins.actionManifestSha256,
+    catalogSha256: staged.actionManifestSha256,
     resourcesSha256: await fileHash(join(resources, "resource-manifest.json")),
   },
   product: {

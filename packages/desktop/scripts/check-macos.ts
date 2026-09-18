@@ -19,6 +19,7 @@ const checks = [
       "src/main/shutdown.test.ts",
       "electron-builder.config.test.ts",
       "scripts/release/artifact.test.ts",
+      "scripts/macos-smoke-probe.test.ts",
     ],
   },
   { package: "agent", args: ["typecheck"] },

@@ -5,6 +5,7 @@ import { $ } from "bun"
 import { nativeResourceCandidates } from "./native-resource-candidates"
 import { buildKeychain } from "./build-keychain"
 import release from "../../product/loginom-release.json"
+import catalogs from "../../product/loginom-catalogs.json"
 
 // Shared build-time staging; never imported by runtime entrypoints.
 export async function stageResources(input: {
@@ -184,6 +185,7 @@ export async function stageResources(input: {
     JSON.stringify(
       {
         ...release,
+        ...catalogForTarget(target),
         target,
         nodeSha256: pins.nodeSha256,
         browserSha256: pins.browserSha256,
@@ -199,6 +201,17 @@ export async function stageResources(input: {
   await rm(destination, { recursive: true, force: true })
   await rename(staging, destination)
   return { files: files.length, destination }
+}
+
+// Catalog compatibility is pinned independently of runtime binaries. Selecting
+// the native target never changes the runtime's observed OS or bypasses its gate.
+export function catalogForTarget(target: string) {
+  if (target === "linux-x64" || target === "darwin-arm64") return catalogs[target]
+  // Windows remains the historical, unaccepted candidate; this change does not
+  // introduce a Windows catalog or claim native Windows workflow acceptance.
+  if (target === "win32-x64")
+    return { actionManifestUri: release.actionManifestUri, actionManifestSha256: release.actionManifestSha256 }
+  throw Error("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
 }
 
 // Output directories may not exist yet. Resolve their existing ancestor so an

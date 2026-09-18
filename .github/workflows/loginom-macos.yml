@@ -43,7 +43,7 @@ jobs:
           export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/loginom-browsers"
           echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
           echo "LOGINOM_AI_AGENT_BROWSER_SOURCE=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
-          bun install --frozen-lockfile --filter '@loginom-ai-agent/desktop' --filter '@loginom-ai-agent/agent' --filter '@loginom-ai-agent/loginom-host' --filter '@loginom-ai-agent/product'
+          bun install --frozen-lockfile --filter loginom-ai-agent --filter '@loginom-ai-agent/desktop' --filter '@loginom-ai-agent/agent' --filter '@loginom-ai-agent/loginom-host' --filter '@loginom-ai-agent/product'
           node packages/desktop/node_modules/electron/install.js
           echo "LOGINOM_AI_AGENT_NODE_SOURCE=$(command -v node)" >> "$GITHUB_ENV"
           echo "LOGINOM_AI_AGENT_TEST_NODE=$(command -v node)" >> "$GITHUB_ENV"

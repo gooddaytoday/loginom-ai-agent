@@ -14,7 +14,7 @@ notarization, Gatekeeper trust и auto-update не входят в этот эт
 Из корня чистого зафиксированного checkout:
 
 ```sh
-bun install --frozen-lockfile --filter '@loginom-ai-agent/desktop' --filter '@loginom-ai-agent/agent' --filter '@loginom-ai-agent/loginom-host' --filter '@loginom-ai-agent/product'
+bun install --frozen-lockfile --filter loginom-ai-agent --filter '@loginom-ai-agent/desktop' --filter '@loginom-ai-agent/agent' --filter '@loginom-ai-agent/loginom-host' --filter '@loginom-ai-agent/product'
 node packages/desktop/node_modules/electron/install.js
 export LOGINOM_AI_AGENT_NODE_SOURCE="$(command -v node)"
 export LOGINOM_AI_AGENT_TEST_NODE="$LOGINOM_AI_AGENT_NODE_SOURCE"

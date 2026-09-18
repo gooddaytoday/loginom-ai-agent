@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { $ } from "bun"
+import { verifyMacBrowserSignature } from "./verify-macos"
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { decodeManifest, hash, relativePath, verifyResourceTree } from "./manifest"
@@ -119,3 +121,32 @@ test("schema version 1 reads the released Linux manifest and accepts the macOS e
   expect(() => decodeManifest({ ...mac, signing: linux.signing })).toThrow("RELEASE_MAC_POLICY_INVALID")
   expect(() => decodeManifest({ ...mac, target: { ...mac.target, arch: "x64" } })).toThrow("RELEASE_TARGET_INVALID")
 })
+
+test.skipIf(process.platform !== "darwin")(
+  "upstream linker-signed browser code is checked without a nonexistent resource seal",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "loginom-linker-signature-"))
+    const bundle = join(directory, "Browser.app")
+    const executable = join(bundle, "Contents/MacOS/Browser")
+    try {
+      await mkdir(join(bundle, "Contents/MacOS"), { recursive: true })
+      await writeFile(join(directory, "main.c"), "int main(void) { return 0; }\n")
+      await writeFile(
+        join(bundle, "Contents/Info.plist"),
+        `<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Browser</string><key>CFBundleIdentifier</key><string>com.loginom.signature-fixture</string></dict></plist>`,
+      )
+      await $`clang -arch arm64 -mmacosx-version-min=14.0 ${join(directory, "main.c")} -o ${executable}`.quiet()
+      expect(await verifyMacBrowserSignature(executable)).toBe("linker-signed-code-only; resource seal absent upstream")
+      const original = await readFile(executable)
+      const modified = Buffer.from(original)
+      modified[1024] ^= 1
+      await writeFile(executable, modified)
+      await expect(verifyMacBrowserSignature(executable)).rejects.toThrow()
+      await writeFile(executable, original)
+      await $`codesign --force --sign - ${bundle}`.quiet()
+      expect(await verifyMacBrowserSignature(executable)).toBe("bundle-and-code")
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+)

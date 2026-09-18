@@ -1,0 +1,54 @@
+{
+  "format": "loginom-macos-offline-smoke-v1",
+  "status": "PASS",
+  "timestamp": "2026-09-18T22:57:25.383Z",
+  "platform": "darwin",
+  "arch": "arm64",
+  "desktop": "/Users/kartamyshev/.cache/loginom-macos-build/candidate-01/mac-arm64/Loginom AI Agent Dev.app",
+  "cli": "/Users/kartamyshev/.cache/loginom-macos-build/candidate-01/cli",
+  "path": "/usr/bin:/bin:/usr/sbin:/sbin",
+  "checks": [
+    {
+      "check": "desktop-node",
+      "status": "PASS",
+      "detail": "24.19.0 darwin-arm64"
+    },
+    {
+      "check": "desktop-chromium",
+      "status": "PASS",
+      "detail": "153.0.8010.12"
+    },
+    {
+      "check": "cli-node",
+      "status": "PASS",
+      "detail": "24.19.0 darwin-arm64"
+    },
+    {
+      "check": "cli-chromium",
+      "status": "PASS",
+      "detail": "153.0.8010.12"
+    },
+    {
+      "check": "cli-help",
+      "status": "PASS",
+      "detail": "Help available with system-only PATH"
+    },
+    {
+      "check": "cli-version",
+      "status": "PASS",
+      "detail": "0.1.4-macos.20260919.1"
+    },
+    {
+      "check": "desktop-onboarding-and-exit",
+      "status": "PASS",
+      "detail": "Isolated first-launch form, matching version, normal process exit"
+    }
+  ],
+  "limitations": [
+    "No Loginom or model connection; no credentials supplied",
+    "Not a network sandbox",
+    "Does not validate Gatekeeper, Keychain persistence, or installed GUI acceptance"
+  ],
+  "classification": "exploratory",
+  "sourceLimitation": "Smoke source contains fixes newer than the candidate-01 source manifest; this report does not update artifact provenance."
+}

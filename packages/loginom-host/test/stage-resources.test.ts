@@ -2,7 +2,21 @@ import { expect, test } from "bun:test"
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { stageResources } from "../script/stage-resources"
+import { catalogForTarget, stageResources } from "../script/stage-resources"
+import release from "../../product/loginom-release.json"
+
+test("native catalog selection retains Linux pins and admits only the reviewed macOS catalog", () => {
+  expect(catalogForTarget("linux-x64")).toEqual({
+    actionManifestUri: release.actionManifestUri,
+    actionManifestSha256: release.actionManifestSha256,
+  })
+  expect(catalogForTarget("darwin-arm64")).toEqual({
+    actionManifestUri: "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-macos-candidate/manifest.json",
+    actionManifestSha256: "d26ce18ab9ef3285d5bac7aff1d17d4968defb1d41ebd7cbbda8d9cbede07255",
+  })
+  expect(catalogForTarget("win32-x64")).toEqual(catalogForTarget("linux-x64"))
+  expect(() => catalogForTarget("darwin-x64")).toThrow("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
+})
 
 // These fixtures exercise POSIX paths and symlink semantics before input execution.
 const posixTest = test.skipIf(process.platform !== "linux" && process.platform !== "darwin")

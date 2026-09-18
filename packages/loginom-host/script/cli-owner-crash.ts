@@ -3,9 +3,9 @@ import { join } from "node:path"
 import { networkFault } from "./network-fault"
 import { oracleProvider } from "./oracle-provider"
 
-// Manual Linux native acceptance. Default: inspect an existing package.
+// Manual Linux/macOS native acceptance. Default: inspect an existing package.
 // active-import: create a disposable unsaved draft using the attached fixture.
-if (process.platform !== "linux") throw Error("LINUX_ONLY_TEST")
+if (process.platform !== "linux" && process.platform !== "darwin") throw Error("NATIVE_PLATFORM_UNSUPPORTED")
 const executable = process.env.LOGINOM_AI_AGENT_TEST_CLI_EXECUTABLE
 const configPath = process.env.LOGINOM_AI_AGENT_TEST_CONFIG
 const savedPath = process.argv[2]
@@ -150,18 +150,24 @@ try {
   const ids = new Set([child.pid])
   for (let depth = 0; depth < 20; depth++) rows.filter((row) => ids.has(row.parent)).forEach((row) => ids.add(row.pid))
   if (ids.size < 5) throw Error("CRASH_BROWSER_TREE_MISSING")
+  const identities = new Map(rows.filter((row) => ids.has(row.pid)).map((row) => [row.pid, row.started]))
+  async function killTracked(pid: number) {
+    const current = (await processes()).find((row) => row.pid === pid)
+    if (!current || current.started !== identities.get(pid)) throw Error("CRASH_PROCESS_IDENTITY_CHANGED")
+    process.kill(pid, "SIGKILL")
+  }
   if (killHost) {
     const hosts = await Promise.all(
       rows
         .filter((row) => row.parent === child.pid)
         .map(async (row) => ({
           pid: row.pid,
-          command: await readFile(`/proc/${row.pid}/cmdline`, "utf8").catch(() => ""),
+          command: await processCommand(row.pid),
         })),
     )
-    const host = hosts.filter((row) => row.command.split("\0").some((arg) => arg.endsWith("/host/node-host.mjs")))
+    const host = hosts.filter((row) => hasArgument(row.command, "/host/node-host.mjs"))
     if (host.length !== 1) throw Error("CRASH_HOST_IDENTITY_INVALID")
-    process.kill(host[0].pid, "SIGKILL")
+    await killTracked(host[0].pid)
     // End the scripted model response so CLI reaches its final host/cleanup check.
     // This does not send another Loginom operation or authorize replay.
     provider.finish()
@@ -172,13 +178,13 @@ try {
         .filter((row) => ids.has(row.pid))
         .map(async (row) => ({
           pid: row.pid,
-          executable: await readlink(`/proc/${row.pid}/exe`).catch(() => ""),
-          command: await readFile(`/proc/${row.pid}/cmdline`, "utf8").catch(() => ""),
+          executable: await processExecutable(row.pid),
+          command: await processCommand(row.pid),
         })),
     )
     const browsers = commands.filter(
       (row) =>
-        row.executable.endsWith("/chrome") &&
+        (row.executable.endsWith("/chrome") || row.executable.endsWith("/Google Chrome for Testing")) &&
         !/(?:\s|\0)--type=/.test(row.command) &&
         !row.command.includes("/chats/readiness/") &&
         row.command.includes(join(profile, "loginom/runtime/")),
@@ -196,12 +202,12 @@ try {
     if (browsers.length !== 1) throw Error("CRASH_BROWSER_IDENTITY_INVALID")
     const runtime = rows.find((row) => row.pid === browsers[0].pid)?.parent
     if (killRuntime) {
-      const command = await readFile(`/proc/${runtime}/cmdline`, "utf8")
-      if (!runtime || !ids.has(runtime) || !command.split("\0").some((arg) => arg.endsWith("/src/managed-entry.mjs")))
+      const command = runtime ? await processCommand(runtime) : ""
+      if (!runtime || !ids.has(runtime) || !hasArgument(command, "/src/managed-entry.mjs"))
         throw Error("CRASH_RUNTIME_IDENTITY_INVALID")
-      process.kill(runtime, "SIGKILL")
+      await killTracked(runtime)
     }
-    if (killBrowser) process.kill(browsers[0].pid, "SIGKILL")
+    if (killBrowser) await killTracked(browsers[0].pid)
     provider.finish()
   }
   if (!killHost && !killBrowser && !killRuntime && !disconnectNetwork)
@@ -213,9 +219,16 @@ try {
   }
   const code = await child.exited
   const deadline = Date.now() + 30000
-  while (Date.now() < deadline && (await processes()).some((row) => ids.has(row.pid) && row.state !== "Z"))
+  while (
+    Date.now() < deadline &&
+    (await processes()).some(
+      (row) => ids.has(row.pid) && identities.get(row.pid) === row.started && !row.state.startsWith("Z"),
+    )
+  )
     await Bun.sleep(250)
-  const alive = (await processes()).filter((row) => ids.has(row.pid) && row.state !== "Z")
+  const alive = (await processes()).filter(
+    (row) => ids.has(row.pid) && identities.get(row.pid) === row.started && !row.state.startsWith("Z"),
+  )
   const output = await stdout
   const errors = await stderr
   if (output.includes(config.api_key) || errors.includes(config.api_key)) throw Error("SECRET_IN_CRASH_OUTPUT")
@@ -238,6 +251,9 @@ try {
     : []
   const retryState = retryCode === 0 ? JSON.parse(await retryOutput).state : undefined
   const result = {
+    platform: process.platform,
+    arch: process.arch,
+    executable,
     recoveryEntries,
     retryState,
     target: killHost
@@ -283,14 +299,45 @@ try {
 }
 
 async function processes() {
+  if (process.platform === "darwin") {
+    const child = Bun.spawn(["/bin/ps", "-axo", "pid=,ppid=,stat=,lstart="], { stdout: "pipe", stderr: "pipe" })
+    const output = await new Response(child.stdout).text()
+    if ((await child.exited) !== 0) throw Error("CRASH_PROCESS_SNAPSHOT_FAILED")
+    return output.split("\n").flatMap((line) => {
+      const row = line.match(/^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.+?)\s*$/)
+      return row ? [{ pid: Number(row[1]), parent: Number(row[2]), state: row[3], started: row[4] }] : []
+    })
+  }
   return Promise.all(
     (await readdir("/proc"))
       .filter((pid) => /^\d+$/.test(pid))
       .map(async (pid) => {
         const stat = await readFile(`/proc/${pid}/stat`, "utf8").catch(() => "")
         const rest = stat.slice(stat.lastIndexOf(")") + 2).split(" ")
-        return { pid: Number(pid), parent: Number(rest[1]), state: rest[0] }
+        return { pid: Number(pid), parent: Number(rest[1]), state: rest[0], started: rest[19] }
       }),
+  )
+}
+
+async function processCommand(pid: number) {
+  if (process.platform === "linux") return readFile(`/proc/${pid}/cmdline`, "utf8").catch(() => "")
+  const child = Bun.spawn(["/bin/ps", "-ww", "-p", String(pid), "-o", "command="], { stdout: "pipe", stderr: "ignore" })
+  const output = await new Response(child.stdout).text()
+  return (await child.exited) === 0 ? output.trim() : ""
+}
+
+async function processExecutable(pid: number) {
+  if (process.platform === "linux") return readlink(`/proc/${pid}/exe`).catch(() => "")
+  const child = Bun.spawn(["/bin/ps", "-ww", "-p", String(pid), "-o", "comm="], { stdout: "pipe", stderr: "ignore" })
+  const output = await new Response(child.stdout).text()
+  return (await child.exited) === 0 ? output.trim() : ""
+}
+
+function hasArgument(command: string, suffix: string) {
+  if (process.platform === "linux") return command.split("\0").some((arg) => arg.endsWith(suffix))
+  const position = command.indexOf(suffix)
+  return (
+    position !== -1 && (position + suffix.length === command.length || /\s/.test(command[position + suffix.length]))
   )
 }
 

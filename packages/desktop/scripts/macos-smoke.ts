@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { parseArgs } from "node:util"
+import { runProbe } from "./macos-smoke-probe.mjs"
 import release from "../../product/loginom-release.json"
 
 // Run against unpacked artifacts, using their own Node and Playwright runtime.
@@ -52,11 +53,9 @@ try {
     if (info.version !== release.nodeVersion || info.arch !== "arm64" || info.platform !== "darwin")
       throw new Error(`${label}: BUNDLED_NODE_INVALID`)
     results.push({ check: `${label}-node`, status: "PASS", detail: `${info.version} ${info.platform}-${info.arch}` })
-    const output = run(node, [
-      "--input-type=module",
-      "--eval",
+    const output = runProbe(
+      node,
       `
-      import { createRequire } from "node:module";
       const require = createRequire(${JSON.stringify(join(resources, "runtime/client/package.json"))});
       const { chromium } = require("playwright-core");
       const browser = await chromium.launch({
@@ -65,6 +64,7 @@ try {
         args: ["--disable-background-networking", "--disable-component-update", "--no-first-run"],
         timeout: 60000,
       });
+      ownClose(() => browser.close());
       try {
         const context = await browser.newContext({ offline: true });
         await context.route("**/*", route => route.abort());
@@ -75,7 +75,8 @@ try {
       } finally { await browser.close(); }
       if (browser.isConnected()) throw Error("BROWSER_CLOSE_FAILED");
     `,
-    ])
+      { env, cwd: root, timeout: 120_000 },
+    )
     results.push({ check: `${label}-chromium`, status: "PASS", detail: output })
   }
   const executable = join(cli, "bin/loginom-ai-agent-cli")
@@ -86,13 +87,9 @@ try {
   results.push({ check: "cli-version", status: "PASS", detail: version })
   const name = run("/usr/libexec/PlistBuddy", ["-c", "Print :CFBundleExecutable", join(desktop, "Contents/Info.plist")])
   const resources = join(desktop, "Contents/Resources/loginom")
-  run(
+  runProbe(
     join(resources, "bin/node"),
-    [
-      "--input-type=module",
-      "--eval",
-      `
-    import { createRequire } from "node:module";
+    `
     const require = createRequire(${JSON.stringify(join(resources, "runtime/client/package.json"))});
     const { _electron } = require("playwright-core");
     const application = await _electron.launch({
@@ -100,9 +97,13 @@ try {
       env: process.env,
       timeout: 120000,
     });
+    ownClose(() => application.close());
     const child = application.process();
     try {
-      await application.context().route(/^https?:\\/\\//, route => route.abort());
+      await application.context().route(/^https?:\\/\\//, route => {
+        const host = new URL(route.request().url()).hostname;
+        return ["localhost", "127.0.0.1", "[::1]"].includes(host) ? route.continue() : route.abort();
+      });
       const page = await application.firstWindow({ timeout: 120000 });
       const form = page.locator('[data-component="settings-loginom"]');
       await form.waitFor({ timeout: 120000 });
@@ -114,8 +115,7 @@ try {
     } finally { await application.close(); }
     if (child.exitCode !== 0 || child.signalCode) throw Error("DESKTOP_UNCLEAN_EXIT");
   `,
-    ],
-    300_000,
+    { env, cwd: root, timeout: 290_000 },
   )
   results.push({
     check: "desktop-onboarding-and-exit",
@@ -125,7 +125,7 @@ try {
 } catch (error) {
   failure = error instanceof Error ? error.message : String(error)
 } finally {
-  await rm(root, { recursive: true, force: true })
+  if (failure !== "SMOKE_PROBE_CLEANUP_FAILED") await rm(root, { recursive: true, force: true })
   await mkdir(dirname(report), { recursive: true })
   await Bun.write(
     report,
@@ -141,6 +141,7 @@ try {
         path: env.PATH,
         checks: results,
         ...(failure ? { failure } : {}),
+        ...(failure === "SMOKE_PROBE_CLEANUP_FAILED" ? { retainedProfile: root } : {}),
         limitations: [
           "No Loginom or model connection; no credentials supplied",
           "Not a network sandbox",
