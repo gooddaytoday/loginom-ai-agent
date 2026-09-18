@@ -6,9 +6,6 @@ on:
   push:
     tags:
       - "v*"
-    # TEMPORARY candidate dry run without API access; revert before merging.
-    branches:
-      - ci-release-candidate
   workflow_dispatch:
     inputs:
       mode:
