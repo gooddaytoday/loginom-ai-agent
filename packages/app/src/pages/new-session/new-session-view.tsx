@@ -2,7 +2,7 @@ import { useDialog } from "@loginom-ai-agent/ui/context/dialog"
 import { Tooltip } from "@loginom-ai-agent/ui/tooltip"
 import { Icon as IconV2 } from "@loginom-ai-agent/ui/v2/icon"
 import { TooltipV2 } from "@loginom-ai-agent/ui/v2/tooltip-v2"
-import { WordmarkV2 } from "@loginom-ai-agent/ui/v2/wordmark-v2"
+import { WordmarkFlowV2 } from "@loginom-ai-agent/ui/v2/wordmark-flow-v2"
 import { Show, createMemo, createSignal, type Accessor } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"
@@ -39,7 +39,7 @@ export function NewSessionView(props: {
       >
         <div class="absolute inset-x-0 top-[25.375%] flex justify-center px-6">
           <div class={NEW_SESSION_CONTENT_WIDTH}>
-            <WordmarkV2 class="h-auto w-full text-v2-background-bg-inverse" />
+            <WordmarkFlowV2 class="h-auto w-full text-v2-background-bg-inverse" />
             <div class="mt-8 flex flex-col gap-8">
               <PromptInputV2Composer controller={props.input} />
               <Show when={props.project.empty()}>

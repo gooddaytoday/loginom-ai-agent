@@ -1,0 +1,16 @@
+/* The resting accent keeps the brand fill-opacity 0.32 from the attribute; only hover lifts it. */
+[data-component="wordmark-v2"] [data-slot="wordmark-v2-accent"][data-interactive] {
+  cursor: pointer;
+  user-select: none;
+  transition: fill-opacity 220ms ease;
+}
+
+[data-component="wordmark-v2"] [data-slot="wordmark-v2-accent"][data-interactive]:hover {
+  fill-opacity: 0.42;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-component="wordmark-v2"] [data-slot="wordmark-v2-accent"][data-interactive] {
+    transition: none;
+  }
+}

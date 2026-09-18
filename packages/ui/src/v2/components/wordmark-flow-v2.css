@@ -1,0 +1,13 @@
+[data-component="wordmark-flow-v2"] {
+  position: relative;
+}
+
+[data-component="wordmark-flow-v2"] [data-slot="wordmark-flow-v2-canvas"] {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+}
+
+[data-component="wordmark-flow-v2"][data-active] [data-slot="wordmark-flow-v2-canvas"] {
+  display: block;
+}
