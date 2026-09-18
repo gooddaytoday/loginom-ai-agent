@@ -15,7 +15,10 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal) 
  const readDirectory=()=>ui(page,{...base,mode:'observe',root_ref:task.snapshot.observation_root.ref});
  const suffix=task.artifact.name.replace(/\s/g,'_').replace(/,/g,''),prefix=task.snapshot.workflow_ref.prefix;
  const tid=prefix+';FileStorageForm;colName_'+suffix,gridTid=prefix+';FileStorageForm;pnlFileStorage;tbl';
- const deadline=Date.now()+18000;
+ // Artifact verification already owns a 60-second browser budget. Leave a
+ // small transport margin, but allow slow Windows/Loginom uploads to publish
+ // their final size instead of imposing a separate short discovery timeout.
+ const deadline=Date.now()+55000;
  try {
   let reset=false;
   for(let step=0;step<16&&Date.now()<deadline;step++) {
@@ -33,7 +36,7 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal) 
     // Loginom can publish a file row before its asynchronous server upload has
     // committed the bytes. In particular this is observable on Windows. Do
     // not download the transient zero-byte row and mistake it for final data.
-    for(let sample=0;files[0].storage_entry?.bytes!==task.artifact.bytes&&sample<80&&Date.now()<deadline;sample++) {
+    for(let sample=0;files[0].storage_entry?.bytes!==task.artifact.bytes&&Date.now()<deadline;sample++) {
      await page.waitForTimeout(100);
      const ready=await ui(page,{...base,mode:'observe',root_ref:ref});
      if(ready.status!=='SUCCEEDED'||!context(ready.output))return result('DISCOVERY_FILE_CONTEXT_CHANGED');

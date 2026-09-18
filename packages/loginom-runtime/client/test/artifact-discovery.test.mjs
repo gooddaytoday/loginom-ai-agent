@@ -21,7 +21,7 @@ function fixture(fault) {
   const s=structuredClone(snapshot);
   if(fault==='directory'&&moves.length)s.file_storage.directory='/foreign';
   if(options.discover_roots&&top>=1400&&fault!=='absent')s.ui.elements=[{tid:fileTid,ref:'file'}];
-  if(options.root_ref==='file')s.ui.elements=[{tid:fileTid,ref:'file',label:name,storage_entry:{bytes:fault==='pending_size'&&fileReads++===0?0:42}}];
+  if(options.root_ref==='file')s.ui.elements=[{tid:fileTid,ref:'file',label:name,storage_entry:{bytes:fault==='pending_size'&&fileReads++<100?0:42}}];
   return {status:'SUCCEEDED',output:s};
  };
  const download=async(p,t)=>{downloads++;assert.equal(t.file_ref,'file');assert.equal(t.snapshot.ui.elements[0].label,name);
@@ -33,8 +33,9 @@ test('private discovery reveals a buffered authorized row and delegates exactly 
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.deepEqual(f.moves,[700,1400]);assert.equal(f.downloads,1);
  assert.equal(r.trace.filter(e=>e.event==='artifact_discovery_scroll').length,2);assert.equal(r.trace.at(-1).event,'download_saved');
 });
-test('private discovery waits for the exact server-side byte count before downloading',async()=>{
+test('private discovery waits beyond the old eight-second sample cap for the exact server-side byte count before downloading',async()=>{
  const f=fixture('pending_size'),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.equal(f.downloads,1);assert.ok(f.waits>=1);
+ assert.ok(f.waits>80);
  assert.ok(r.trace.some(e=>e.event==='artifact_file_size_verified'&&e.bytes===42));
 });
 for(const fault of ['owner','blocked','directory','absent','lost_scroll','lost_download'])test('discovery preserves '+fault+' without another download',async()=>{
