@@ -12,6 +12,14 @@ import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type A
 
 export async function main(argv: string[]) {
   const config = loadConfig(argv)
+  if (config.judgeOnly !== undefined) {
+    const { rejudge } = await import("./rejudge")
+    return rejudge(config, config.judgeOnly)
+  }
+  if (config.calibrate) {
+    const { calibrate } = await import("./calibrate")
+    return calibrate(config)
+  }
   const tasks = await loadTasks(config.tasksDir, config.only)
   const source = parseArtifactSource(config.artifactSource, config.loginom)
   const environment = await preflight(config, source)
