@@ -1,3 +1,4 @@
+import { Product } from "@loginom-ai-agent/product"
 import { ConfigProvider, Effect, Layer } from "effect"
 import { HttpRouter } from "effect/unstable/http"
 import { parse } from "./assertions"
@@ -22,7 +23,7 @@ export function callAuthProbe(scenario: ActiveScenario, credentials: "missing" |
     const controller = new AbortController()
     return Promise.race([
       Promise.resolve(
-        app(await runtime(), { auth: { password: "secret" } }).request(
+        app(await runtime(), { auth: { password: "secret", username: Product.slug } }).request(
           toAuthProbeRequest(scenario, credentials, controller.signal),
         ),
       ).then((response) => capture(response, scenario.capture)),
@@ -94,7 +95,7 @@ function toAuthProbeRequest(scenario: ActiveScenario, credentials: "missing" | "
   const headers = {
     ...(spec.body === undefined ? {} : { "content-type": "application/json" }),
     ...spec.headers,
-    ...(credentials === "valid" ? { authorization: basic("opencode", "secret") } : {}),
+    ...(credentials === "valid" ? { authorization: basic(Product.slug, "secret") } : {}),
   }
   return new Request(new URL(spec.path, "http://localhost"), {
     method: scenario.method,
