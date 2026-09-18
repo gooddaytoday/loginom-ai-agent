@@ -92,11 +92,13 @@ try {
     `
     const require = createRequire(${JSON.stringify(join(resources, "runtime/client/package.json"))});
     const { _electron } = require("playwright-core");
+    console.error("SMOKE_DESKTOP_LAUNCH");
     const application = await _electron.launch({
       executablePath: ${JSON.stringify(join(desktop, "Contents/MacOS", name))},
       env: process.env,
       timeout: 120000,
     });
+    console.error("SMOKE_DESKTOP_LAUNCHED");
     ownClose(() => application.close());
     const child = application.process();
     try {
@@ -105,14 +107,23 @@ try {
         return ["localhost", "127.0.0.1", "[::1]"].includes(host) ? route.continue() : route.abort();
       });
       const page = await application.firstWindow({ timeout: 120000 });
+      console.error("SMOKE_DESKTOP_WINDOW");
       const form = page.locator('[data-component="settings-loginom"]');
       await form.waitFor({ timeout: 120000 });
+      console.error("SMOKE_DESKTOP_ONBOARDING");
       if (!await form.locator('button[type="submit"]').isVisible()) throw Error("ONBOARDING_ACTION_MISSING");
       if (!await form.locator('input[type="password"]').evaluateAll(inputs => inputs.length > 0 && inputs.every(input => input.value === "")))
         throw Error("ONBOARDING_SECRETS_NOT_EMPTY");
       if (await application.evaluate(({ app }) => app.getVersion()) !== ${JSON.stringify(metadata.metadata.version)})
         throw Error("DESKTOP_VERSION_MISMATCH");
-    } finally { await application.close(); }
+    } catch (error) {
+      console.error("SMOKE_DESKTOP_CHECK_FAILED", error instanceof Error ? error.message : String(error));
+      throw error;
+    } finally {
+      console.error("SMOKE_DESKTOP_CLOSE");
+      await application.close();
+      console.error("SMOKE_DESKTOP_CLOSED");
+    }
     if (child.exitCode !== 0 || child.signalCode) throw Error("DESKTOP_UNCLEAN_EXIT");
   `,
     { env, cwd: root, timeout: 290_000 },

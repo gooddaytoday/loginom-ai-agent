@@ -92,8 +92,12 @@ export function runProbe(executable, code, options) {
   while (remaining().length && Date.now() < killed) childProcess.spawnSync("/bin/sleep", ["0.05"])
   if (remaining().length) throw Error("SMOKE_PROBE_CLEANUP_FAILED")
   rmSync(registry, { force: true })
-  if (result.error || result.status !== 0)
+  if (result.error || result.status !== 0) {
+    // This harness supplies no credentials. Keep bounded subprocess diagnostics
+    // in the invoking terminal/CI log, never in the durable smoke report.
+    if (result.stderr) process.stderr.write(result.stderr.slice(-16_384))
     throw Error(`SMOKE_PROBE_FAILED: ${result.error?.code ?? result.signal ?? result.status}`)
+  }
   if (leaked) throw Error("SMOKE_PROBE_LEFT_RUNNING_CHILDREN")
   return result.stdout.trim()
 }
