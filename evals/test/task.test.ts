@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdtemp, mkdir, writeFile, cp } from "node:fs/promises"
+import { mkdtemp, writeFile, cp } from "node:fs/promises"
 import os from "node:os"
 import { loadTasks, agentInputsHash, rubricHash } from "../src/task"
 import { evalsRoot } from "../src/config"
@@ -33,6 +33,28 @@ test("loadTasks: дубликат id в checklist отклоняется с им
   raw.checklist.push({ ...raw.checklist[0] })
   await writeFile(file, JSON.stringify(raw))
   await expect(loadTasks(dir)).rejects.toThrow("group-sum-qty: повторяющиеся id")
+})
+
+test("loadTasks: битый или не-объектный task.json отклоняется с именем задачи", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-tasks-"))
+  await cp(path.join(tasksDir, "group-sum-qty"), path.join(dir, "group-sum-qty"), { recursive: true })
+  const file = path.join(dir, "group-sum-qty", "task.json")
+  for (const broken of ["{ битый json", "null", "[]"]) {
+    await writeFile(file, broken)
+    await expect(loadTasks(dir)).rejects.toThrow(EvalFailure)
+    await expect(loadTasks(dir)).rejects.toThrow("group-sum-qty: task.json")
+  }
+})
+
+test("loadTasks: requires_result_file не-boolean отклоняется с именем задачи", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-tasks-"))
+  await cp(path.join(tasksDir, "group-sum-qty"), path.join(dir, "group-sum-qty"), { recursive: true })
+  const file = path.join(dir, "group-sum-qty", "task.json")
+  const raw = await Bun.file(file).json()
+  raw.checklist[0].requires_result_file = "true"
+  await writeFile(file, JSON.stringify(raw))
+  await expect(loadTasks(dir)).rejects.toThrow(EvalFailure)
+  await expect(loadTasks(dir)).rejects.toThrow("group-sum-qty: checklist[0].requires_result_file должен быть boolean")
 })
 
 test("hashes: смена prompt меняет agent_inputs_hash и не меняет rubric_hash", async () => {

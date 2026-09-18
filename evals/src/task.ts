@@ -25,7 +25,10 @@ async function loadTask(dir: string) {
   const id = path.basename(dir)
   const file = Bun.file(path.join(dir, "task.json"))
   if (!(await file.exists())) throw new EvalFailure(`${id}: нет task.json`, 2)
-  const raw = (await file.json()) as Raw
+  const parsed = parseJson(await file.text())
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+    throw new EvalFailure(`${id}: task.json не является корректным JSON-объектом`, 2)
+  const raw = parsed as Raw
   if (raw.id !== id) throw new EvalFailure(`${id}: поле id ("${String(raw.id)}") должно совпадать с именем каталога`, 2)
   const task = {
     id,
@@ -43,6 +46,15 @@ async function loadTask(dir: string) {
     if (!(await Bun.file(path.join(dir, rel)).exists())) throw new EvalFailure(`${id}: файл "${rel}" не найден`, 2)
   }
   return task
+}
+
+// Битый файл отличим от валидного только через исключение JSON.parse — единственный try/catch в модуле.
+function parseJson(source: string) {
+  try {
+    return JSON.parse(source) as unknown
+  } catch {
+    return undefined
+  }
 }
 
 function text(raw: Raw, key: string, id: string) {
@@ -78,7 +90,10 @@ function checklist(raw: Raw, id: string) {
     const weight = entry.weight === undefined ? 1 : entry.weight
     if (typeof weight !== "number" || weight <= 0)
       throw new EvalFailure(`${id}: checklist[${index}].weight должен быть положительным числом`, 2)
-    return { id: itemId, text: itemText, weight, requiresResultFile: entry.requires_result_file === true }
+    const requiresResultFile = entry.requires_result_file === undefined ? false : entry.requires_result_file
+    if (typeof requiresResultFile !== "boolean")
+      throw new EvalFailure(`${id}: checklist[${index}].requires_result_file должен быть boolean`, 2)
+    return { id: itemId, text: itemText, weight, requiresResultFile }
   })
   const duplicates = items.map((item) => item.id).filter((itemId, index, all) => all.indexOf(itemId) !== index)
   if (duplicates.length) throw new EvalFailure(`${id}: повторяющиеся id в checklist: ${duplicates.join(", ")}`, 2)
