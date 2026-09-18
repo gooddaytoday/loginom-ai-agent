@@ -8,7 +8,7 @@
 - Локальный стенд Loginom в docker (`loginom-server-master`, `http://localhost/app/`, пользователь `user`).
 - Отдельный API-ключ Dock для eval (не ключ Desktop): память OpenViking привязана к ключу. Dock должен отвечать этим ключом; preflight забирает манифест skill с `include_integrity=true`.
 - Codex CLI с входом по подписке (`codex login`); судья — `gpt-6-astra`/`high`.
-- Dev-bundle: `bun run prepare-bundle` (симлинки ресурсов Desktop + сборка host). Повторять после изменений в `packages/loginom-host`.
+- Dev-bundle: `bun run prepare-bundle` (полная копия ресурсов Desktop `packages/desktop/resources/loginom`, ~570 МБ, + сборка host). Симлинки не подходят: runtime проверяет, что realpath каждого файла манифеста лежит внутри bundle. Повторять после изменений в `packages/loginom-host` или ресурсах.
 
 ## Настройка
 
@@ -19,7 +19,6 @@ cp .env.example .env   # заполнить LOGINOM_DOCK_API_KEY
 bun run prepare-bundle
 ```
 
-Если симлинки отклоняются, запасной путь: `bun run prepare-bundle --copy`.
 
 `--reset-profile` удаляет весь каталог eval-профиля, включая скопированный `auth.json`. После сброса скопируйте запись провайдера снова.
 

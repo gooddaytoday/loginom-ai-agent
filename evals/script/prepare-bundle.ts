@@ -1,28 +1,24 @@
 import path from "node:path"
-import { cp, mkdir, rm, stat, symlink } from "node:fs/promises"
+import { cp, mkdir, readdir, rm, stat } from "node:fs/promises"
 
-const copy = Bun.argv.includes("--copy")
 const evalsRoot = path.resolve(import.meta.dir, "..")
 const repoRoot = path.resolve(evalsRoot, "..")
 const bundle = path.join(evalsRoot, ".bundle")
 const resources = path.join(repoRoot, "packages", "desktop", "resources", "loginom")
 
-// Host читает resource-manifest.json из корня bundle (packages/loginom-host/src/host.ts); без него setup падает LOGINOM_CONNECTION_CHECK_FAILED.
-const names = ["bin", "browsers", "runtime", "resource-manifest.json"]
-for (const name of names) {
-  const source = path.join(resources, name)
-  if (!(await stat(source).catch(() => undefined))) {
-    console.error(`Нет ${source}: ресурсы Desktop не подготовлены (см. packages/desktop/AGENTS.md)`)
+// Runtime verifyResources() требует, чтобы realpath каждого файла из resource-manifest.json
+// лежал внутри bundle, поэтому симлинки на ресурсы Desktop не подходят: копируем всё (~570 МБ).
+for (const name of ["resource-manifest.json", "bin", "browsers", "runtime"]) {
+  if (!(await stat(path.join(resources, name)).catch(() => undefined))) {
+    console.error(`Нет ${path.join(resources, name)}: ресурсы Desktop не подготовлены (см. packages/desktop/AGENTS.md)`)
     process.exit(2)
   }
 }
 await mkdir(bundle, { recursive: true })
-for (const name of names) {
-  const source = path.join(resources, name)
+for (const name of await readdir(resources)) {
   const target = path.join(bundle, name)
   await rm(target, { recursive: true, force: true })
-  // Манифест копируется всегда: host сравнивает его с реальными файлами, симлинк на файл тут не нужен.
-  await (copy || name.endsWith(".json") ? cp(source, target, { recursive: true }) : symlink(source, target))
+  await cp(path.join(resources, name), target, { recursive: true, verbatimSymlinks: true })
 }
 await rm(path.join(bundle, "host"), { recursive: true, force: true })
 const build = Bun.spawn(["bun", "script/build-node-host.ts", path.join(bundle, "host")], {
@@ -35,4 +31,4 @@ if ((await build.exited) !== 0) {
   process.exit(1)
 }
 console.log(`Dev-bundle готов: ${bundle}`)
-console.log("После изменений в packages/loginom-host выполните снова: bun run prepare-bundle")
+console.log("После изменений в packages/loginom-host или ресурсах Desktop выполните снова: bun run prepare-bundle")
