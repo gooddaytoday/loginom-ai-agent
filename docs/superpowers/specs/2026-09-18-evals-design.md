@@ -147,7 +147,10 @@ evals/
     events/*.jsonl           события CLI для тестов parseEvents (синтетические до первого живого прогона)
     fake/<task-id>.jsonl     сценарии fake CLI (+ <task-id>.exit с кодом выхода), default.jsonl
     storage/*.lgp            «хранилище» для EVAL_ARTIFACT_SOURCE=dir
-    fake-cli.ts              fake CLI
+    fake-cli.ts              fake CLI (run + management-команды loginom по файлу состояния)
+    fake-codex.ts            fake codex exec для тестов judgeTask
+    fake-codex.ts            fake judge: пишет вердикт из FAKE_CODEX_VERDICT в файл -o, код из FAKE_CODEX_EXIT
+    verdicts/*.json          готовые вердикты для тестов judgeTask
   test/                      bun test
   results/<run-id>/          gitignored
 ```
@@ -160,7 +163,7 @@ Runtime-зависимостей нет: Bun built-ins и внешние ком�
 - Dock: `LOGINOM_DOCK_API_KEY` (обязателен; **отдельный ключ для eval**, не ключ Desktop), `LOGINOM_DOCK_BASE_URL` (`https://loginom.duckdns.org`).
 - Агент: `EVAL_AGENT_MODEL` (`openai/gpt-5.6-sol`, обязателен), `EVAL_CLI_MODE` (`source` | `binary` | `fake`, по умолчанию `source`), `EVAL_CLI_BIN` (для `binary`), `EVAL_CLI_BUNDLE` (по умолчанию `evals/.bundle`), `EVAL_WORKSPACE_ROOT` (`/tmp/loginom-evals`), необязательный OpenAI-compatible провайдер для запасного пути: `EVAL_AGENT_PROVIDER_ID`, `EVAL_AGENT_PROVIDER_BASE_URL`, `EVAL_AGENT_PROVIDER_API_KEY`, `EVAL_AGENT_PROVIDER_MODEL_ID`.
 - Артефакт: `EVAL_ARTIFACT_SOURCE` (`docker` | `dir:<path>`, по умолчанию `docker`).
-- Судья: `JUDGE_MODEL` (`gpt-6-astra`, обязателен, без дефолта в коде), `JUDGE_REASONING` (`high`).
+- Судья: `JUDGE_MODEL` (`gpt-6-astra`, обязателен, без дефолта в коде), `JUDGE_REASONING` (`high`), `EVAL_JUDGE_COMMAND` (`codex`; в тестах — `bun fixtures/fake-codex.ts`; строка разбивается по пробелам, дальше добавляются аргументы `exec …`).
 - Лимиты: `EVAL_REPEAT` (1), `EVAL_TASK_TIMEOUT_MS` (900000), `EVAL_JUDGE_TIMEOUT_MS` (300000, на каждый вызов судьи), `EVAL_PASS_THRESHOLD` (70), `EVAL_CALIBRATION_POSITIVE_MIN` (90), `EVAL_CALIBRATION_NEGATIVE_MAX` (40).
 
 Значения в скобках у обязательных `LOGINOM_DOCK_API_KEY`, `EVAL_AGENT_MODEL`, `JUDGE_MODEL` — содержимое `.env.example`, а не дефолт в коде: без них `loadConfig` завершается с выходом 2 (кроме режимов, где они не нужны — ниже).
@@ -279,7 +282,7 @@ Ctrl+C в `--judge-only`: текущий вызов судьи убиваетс�
 - Вертикальные срезы: одно поведение → один падающий тест → минимальная реализация → зелёный → следующее поведение. Писать все тесты модуля заранее, а затем всю реализацию (горизонтальный срез) запрещено.
 - Первый тест каждого модуля — tracer bullet: сквозной happy path через публичный интерфейс. Далее поведения берутся по приоритету из раздела «Тестирование harness»; он же — согласованный список того, что тестируем.
 - Тесты проверяют поведение через публичные интерфейсы из раздела «Интерфейсы модулей», не внутренние функции; тест должен пережить рефакторинг внутренностей.
-- Никаких моков внутренних коллабораторов и `globalThis.*`. Внешние процессы подменяются только средствами, предусмотренными дизайном: `EVAL_CLI_MODE=fake` с `fixtures/fake-cli.ts`, `EVAL_ARTIFACT_SOURCE=dir:`. `codex exec` в тестах не вызывается: проверяются содержимое папки судьи, аргументы команды и `scoreVerdict`; живой судья — приёмка.
+- Никаких моков внутренних коллабораторов и `globalThis.*`. Внешние процессы подменяются только средствами, предусмотренными дизайном: `EVAL_CLI_MODE=fake` с `fixtures/fake-cli.ts`, `EVAL_ARTIFACT_SOURCE=dir:`, `EVAL_JUDGE_BIN=fixtures/fake-codex.ts`. Живой `codex exec` в тестах не вызывается: проверяются содержимое папки судьи, аргументы команды, `scoreVerdict` и логика повтора через fake-codex; живой судья — приёмка.
 - Рефакторинг только на зелёном; после каждого шага рефакторинга — `bun test`.
 - Если реализация требует иного интерфейса или поведения, чем записано здесь, сначала правится спека, затем тест; молчаливые отклонения недопустимы.
 - Коммит на каждом зелёном цикле или группе связанных циклов: `test(evals): …`, `feat(evals): …`.
