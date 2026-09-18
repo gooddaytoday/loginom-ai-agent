@@ -2,7 +2,8 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import { evalsRoot, loadConfig } from "../src/config"
 import { parseArtifactSource } from "../src/artifact"
-import { preflight } from "../src/preflight"
+import { EvalFailure } from "../src/fail"
+import { dockSkillRevision, preflight } from "../src/preflight"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
 
@@ -25,4 +26,30 @@ test("preflight: --judge-only проверяет только судью и не
 test("preflight: недоступный судья — EvalFailure", async () => {
   const config = loadConfig(["--judge-only", "run-1"], { JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: "/nonexistent/codex" })
   await expect(preflight(config, parseArtifactSource("docker", config.loginom))).rejects.toThrow("Судья недоступен")
+})
+
+test("dockSkillRevision: читает result.revision и падает без revision", async () => {
+  const apiKey = "eval-dock-test-key-not-for-leak"
+  let payload: object = { status: "ok", result: { revision: "r1" } }
+  const server = Bun.serve({
+    port: 0,
+    fetch(req) {
+      const url = new URL(req.url)
+      if (url.pathname === "/health") return new Response("ok", { status: 200 })
+      if (url.pathname === "/api/v1/skills/loginom-automation") return Response.json(payload)
+      return new Response("not found", { status: 404 })
+    },
+  })
+  const dock = { apiKey, baseUrl: `http://127.0.0.1:${server.port}` }
+  try {
+    expect(await dockSkillRevision(dock)).toBe("r1")
+    payload = { status: "ok", result: {} }
+    const rejected = await dockSkillRevision(dock).catch((error: unknown) => error)
+    expect(rejected).toBeInstanceOf(EvalFailure)
+    expect((rejected as EvalFailure).exitCode).toBe(2)
+    expect((rejected as EvalFailure).message).toContain("Манифест skill без revision")
+    expect((rejected as EvalFailure).message).not.toContain(apiKey)
+  } finally {
+    server.stop()
+  }
 })

@@ -29,6 +29,14 @@ test("releaseStaleWriter: снимает .writer без процессов, бе
   expect(await stat(path.join(profile, ".writer")).catch(() => undefined)).toBeUndefined()
 })
 
+test("releaseStaleWriter: путь с regex-метасимволами снимает .writer", async () => {
+  const profile = await mkdtemp(path.join(os.tmpdir(), "evals-profile-a+b(c)-"))
+  await mkdir(path.join(profile, ".writer"))
+  await writeFile(path.join(profile, ".writer", "nonce"), "x")
+  expect(await releaseStaleWriter(profile)).toBe(true)
+  expect(await stat(path.join(profile, ".writer")).catch(() => undefined)).toBeUndefined()
+})
+
 test("agentConfigJson: разрешает loginom_* и описывает OpenAI-compatible провайдер", () => {
   const base = loadConfig(["--dry-run"], {})
   expect(agentConfigJson(base)).toEqual({ permission: { "loginom_*": "allow" } })
