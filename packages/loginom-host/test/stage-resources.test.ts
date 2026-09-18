@@ -2,7 +2,21 @@ import { expect, test } from "bun:test"
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { stageResources } from "../script/stage-resources"
+import { actionCatalogForPlatform, stageResources } from "../script/stage-resources"
+
+test("resource staging selects the signed action catalog for the target platform", () => {
+  expect(actionCatalogForPlatform("linux")).toEqual({
+    actionManifestUri:
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-linux-candidate/manifest.json",
+    actionManifestSha256: "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  })
+  expect(actionCatalogForPlatform("win32")).toEqual({
+    actionManifestUri:
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-windows-candidate/manifest.json",
+    actionManifestSha256: "174258527893d1d8d5491407630b33ffdeef677aa83ad686945cc000f819beb8",
+  })
+  expect(() => actionCatalogForPlatform("freebsd")).toThrow("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
+})
 
 // These fixtures use Linux absolute paths and symlink semantics.
 const linuxTest = test.skipIf(process.platform !== "linux")

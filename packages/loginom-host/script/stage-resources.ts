@@ -5,6 +5,16 @@ import { $ } from "bun"
 import { nativeResourceCandidates } from "./native-resource-candidates"
 import { buildKeychain } from "./build-keychain"
 import release from "../../product/loginom-release.json"
+import releaseWorkflow from "../../loginom-runtime/client/lib/release-workflow.json"
+
+export function actionCatalogForPlatform(platform: string) {
+  const selected = releaseWorkflow.platforms[platform as keyof typeof releaseWorkflow.platforms]
+  if (!selected) throw new Error("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
+  return {
+    actionManifestUri: selected.manifest_uri,
+    actionManifestSha256: selected.manifest_sha256,
+  }
+}
 
 // Shared build-time staging; never imported by runtime entrypoints.
 export async function stageResources(input: {
@@ -32,6 +42,7 @@ export async function stageResources(input: {
           ? nativeResourceCandidates["darwin-arm64"]
           : undefined
   if (!pins) throw new Error("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
+  const actionCatalog = actionCatalogForPlatform(input.target.platform)
   if (pins.chromiumRevision !== release.chromiumRevision) throw Error("LOGINOM_BROWSER_REVISION_MISMATCH")
   if (![input.destination, input.node, input.browsers].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
@@ -189,6 +200,7 @@ export async function stageResources(input: {
     JSON.stringify(
       {
         ...release,
+        ...actionCatalog,
         target,
         nodeSha256: pins.nodeSha256,
         browserSha256: pins.browserSha256,
