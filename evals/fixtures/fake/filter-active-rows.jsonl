@@ -1,0 +1,3 @@
+{"type":"step_start","timestamp":1758190100000,"sessionID":"ses_fixture02","part":{"id":"prt_1","sessionID":"ses_fixture02","messageID":"msg_1","type":"step-start"}}
+{"type":"tool_use","timestamp":1758190101000,"sessionID":"ses_fixture02","part":{"id":"prt_2","sessionID":"ses_fixture02","messageID":"msg_1","type":"tool","callID":"call_1","tool":"loginom_dock_prepare","state":{"status":"error","input":{"intent":"new_draft"},"error":"LOGINOM_CONNECTION_NOT_READY","time":{"start":1758190100500,"end":1758190101000}}}}
+{"type":"error","timestamp":1758190101100,"sessionID":"ses_fixture02","error":{"name":"CLI_TOOL_FAILED","data":{"message":"CLI_TOOL_FAILED"}}}
