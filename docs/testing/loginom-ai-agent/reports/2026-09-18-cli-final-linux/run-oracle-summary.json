@@ -1,0 +1,31 @@
+{
+  "status": "PASS",
+  "evidenceRoot": "/tmp/loginom-linux-oracle-pBMt7x",
+  "provider": "scripted",
+  "interface": "native headless run",
+  "executable": "/tmp/loginom-linux-edc68138d/bin/loginom-ai-agent-cli",
+  "cases": [
+    {
+      "dataset": "A",
+      "package": "/user/loginom-ai-agent-acceptance-f5cf26ef-8d54-4c6d-939e-0cb5ca9a2fdc-A.lgp",
+      "inputSha256": "98aa522befcb544089edf626c2713e1cf69aaf54f93a0a92a0df7e3e4a10fcd5",
+      "groups": {
+        "Alpha": 35,
+        "Beta": 20
+      },
+      "coldTotal": 55,
+      "settingsReapplied": false
+    },
+    {
+      "dataset": "B",
+      "package": "/user/loginom-ai-agent-acceptance-f5cf26ef-8d54-4c6d-939e-0cb5ca9a2fdc-B.lgp",
+      "inputSha256": "71566126acfc907717a41ba31ef83d8867ca6080979f62948bd906a811492f4c",
+      "groups": {
+        "Alpha": 100,
+        "Beta": 1
+      },
+      "coldTotal": 101,
+      "settingsReapplied": false
+    }
+  ]
+}

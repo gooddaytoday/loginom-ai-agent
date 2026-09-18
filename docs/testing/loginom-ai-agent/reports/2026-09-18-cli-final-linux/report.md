@@ -72,3 +72,18 @@ Created with git archive from the binary's exact clean source commit, not HEAD:
 SHA256 `db998aeadf374476ae582df6b8129ba1f3be4d6fc7c51d913cabef9ce4331b59`.
 This supplies the tracked project sources and build/lock files. It is not a claim
 that all third-party corresponding-source/relinking obligations are satisfied.
+
+## Final native headless run oracle: PASS
+
+The packaged final CLI completed both canonical datasets with the scripted
+provider and actual Loginom/browser runtime. A: Alpha=35, Beta=20, total=55;
+B: Alpha=100, Beta=1, total=101. Each package was saved, closed and independently
+cold-opened by the bundled Node/browser readback driver. Both readbacks matched,
+settingsReapplied=false. Same-name sales.csv inputs had different hashes, remote
+source paths and saved package paths. Driver exit 0.
+
+Evidence `/tmp/loginom-linux-oracle-pBMt7x`; log `/tmp/loginom-final-csv-oracle.log`;
+cleaned summary run-oracle-summary.json. This run used the packaged executable
+path, not the installed launcher; installed real-provider smoke is separate.
+The source archive was also checked against git ls-tree at the binary commit:
+11903 entries, zero missing/extra files.

@@ -2882,3 +2882,14 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   в /tmp/loginom-linux-oracle-pBMt7x, лог /tmp/loginom-final-csv-oracle.log.
   Это packaged CLI regression без дальнейшего использования Xiaomi. До завершения
   процесса новый oracle PASS не заявляется.
+
+### Final native run oracle — PASS
+
+- [x] `0.1.4-cli.20260918linux` headless run: A=55 и B=101, реальные import/group/save,
+  отдельный cold reopen/readback совпал, settingsReapplied=false; driver exit 0.
+  Same-name CSV имеют разные bytes/hash/source/package paths. Provider scripted;
+  это final packaged CLI regression, не повторная проверка качества Xiaomi.
+- [x] Source archive: 11903 entries совпали с git tree точного binary commit,
+  missing/extra=0.
+- [ ] Установленный TUI final artifact с видимым Chromium проверяется тем же
+  oracle. Активный лог /tmp/loginom-final-tui-oracle.log; итог PASS ещё не заявлен.
