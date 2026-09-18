@@ -44,19 +44,22 @@ test("failureKind: приоритет permission → recovery → cancelled → 
   expect(failureKind({ ...base, exitCode: 130 })).toBe("cancelled")
   expect(failureKind({ ...base, errorTexts: ["APIError status 429 rate limit"] })).toBe("provider")
   expect(failureKind({ ...base, stderr: "ProviderAuthError: token expired" })).toBe("provider")
+  expect(failureKind({ ...base, stderr: "connect ECONNRESET to dock" })).toBe("other")
+  expect(failureKind({ ...base, errorTexts: ["tool status 4000ms"] })).toBe("other")
   expect(failureKind({ ...base, errors: ["CLI_TOOL_FAILED"] })).toBe("tool")
   expect(failureKind(base)).toBe("other")
 })
 
 test("agentCommand: fake-режим указывает на fixtures/fake-cli.ts и изолирует окружение", () => {
   const config = loadConfig(["--dry-run"], {})
-  const command = agentCommand(config)
+  const command = agentCommand(config, { ...process.env, LOGINOM_AI_AGENT_LEAK: "x", PATH: process.env.PATH ?? "" })
   expect(command.cmd[0]).toBe("bun")
   expect(command.cmd[1]?.endsWith("fixtures/fake-cli.ts")).toBe(true)
   expect(command.env.LOGINOM_AI_AGENT_CLI_PROFILE).toBe(config.profileDir)
   expect(command.env.LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG).toBe("1")
   expect(command.env.LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_PROMPT).toBe("1")
   expect(command.env.LOGINOM_AI_AGENT_PURE).toBe("1")
+  expect(command.env.LOGINOM_AI_AGENT_LEAK).toBeUndefined()
   expect(Object.keys(command.env).filter((key) => key.startsWith("LOGINOM_AI_AGENT_")).sort()).toEqual([
     "LOGINOM_AI_AGENT_CLI_PROFILE",
     "LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_PROMPT",
@@ -123,6 +126,26 @@ test("runAgent: таймаут останавливает процесс и по
   })
   expect(run.timedOut).toBe(true)
   expect(run.durationMs).toBeLessThan(5_000)
+}, 15_000)
+
+test("runAgent: уже отменённый AbortSignal не спавнит агента", async () => {
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-run-"))
+  const command = fakeCommand()
+  const controller = new AbortController()
+  controller.abort()
+  const run = await runAgent({
+    command: { ...command, env: { ...command.env, EVAL_FAKE_SLEEP_MS: "10000" } },
+    taskId: "group-sum-qty",
+    model: "fake/fake-model",
+    prompt: "test",
+    files: [],
+    workdir: outDir,
+    timeoutMs: 30_000,
+    outDir,
+    signal: controller.signal,
+  })
+  expect(run.interrupted).toBe(true)
+  expect(run.durationMs).toBeLessThan(2_000)
 }, 15_000)
 
 test("runAgent: abort через AbortSignal помечает interrupted", async () => {

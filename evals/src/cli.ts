@@ -5,8 +5,8 @@ import { evalsRoot, repoRoot } from "./config"
 const saveActions = new Set(["package.save_as", "package.save_checkpoint"])
 const nodeTools = new Set(["loginom_dock_node_apply", "loginom_dock_node_resume", "loginom_dock_node_wait"])
 const memoryTools = new Set(["loginom_remember", "loginom_forget", "loginom_write", "loginom_edit", "loginom_add_resource"])
-const providerErrorPattern =
-  /APIError|ProviderAuthError|ProviderModelNotFoundError|rate limit|status (4\d\d|5\d\d)|ECONNRESET|ETIMEDOUT/i
+const providerNamePattern = /\b(APIError|ProviderAuthError|ProviderModelNotFoundError|ProviderInitError)\b/
+const providerTextPattern = /\brate limit\b|\bstatus (4\d\d|5\d\d)\b|\bECONNRESET\b|\bETIMEDOUT\b/i
 const receiptLimit = 8 * 1024
 const receiptsLimit = 64 * 1024
 
@@ -84,17 +84,19 @@ export function failureKind(input: { exitCode: number; errors: string[]; errorTe
   if (input.exitCode === 4 || input.errors.some((name) => name === "LOGINOM_RECOVERY_REQUIRED" || name === "LOGINOM_CALL_UNCERTAIN"))
     return "recovery" as const
   if (input.exitCode === 130 || input.errors.includes("CLI_CANCELLED")) return "cancelled" as const
-  if ([...input.errorTexts, input.stderr].some((text) => providerErrorPattern.test(text))) return "provider" as const
+  if ([...input.errors, ...input.errorTexts, input.stderr].some((text) => providerNamePattern.test(text)))
+    return "provider" as const
+  if (input.errorTexts.some((text) => providerTextPattern.test(text))) return "provider" as const
   if (input.errors.includes("CLI_TOOL_FAILED")) return "tool" as const
   return "other" as const
 }
 export type FailureKind = ReturnType<typeof failureKind>
 
-export function agentCommand(config: EvalConfig) {
-  const inherited = Object.entries(process.env).flatMap(([key, value]) =>
+export function agentCommand(config: EvalConfig, env: Record<string, string | undefined> = process.env) {
+  const inherited = Object.entries(env).flatMap(([key, value]) =>
     value === undefined || key.startsWith("LOGINOM_AI_AGENT_") ? [] : [[key, value] as const],
   )
-  const env: Record<string, string> = {
+  const isolated: Record<string, string> = {
     ...Object.fromEntries(inherited),
     LOGINOM_AI_AGENT_CLI_PROFILE: config.profileDir,
     LOGINOM_AI_AGENT_PURE: "1",
@@ -105,10 +107,10 @@ export function agentCommand(config: EvalConfig) {
     return {
       cmd: ["bun", "run", "src/standalone.ts"],
       cwd: path.join(repoRoot, "packages", "agent"),
-      env: { ...env, LOGINOM_AI_AGENT_CLI_BUNDLE: config.agent.bundle },
+      env: { ...isolated, LOGINOM_AI_AGENT_CLI_BUNDLE: config.agent.bundle },
     }
-  if (config.agent.cliMode === "binary") return { cmd: [config.agent.cliBin ?? "loginom-ai-agent-cli"], cwd: evalsRoot, env }
-  return { cmd: ["bun", path.join(evalsRoot, "fixtures", "fake-cli.ts")], cwd: evalsRoot, env }
+  if (config.agent.cliMode === "binary") return { cmd: [config.agent.cliBin ?? "loginom-ai-agent-cli"], cwd: evalsRoot, env: isolated }
+  return { cmd: ["bun", path.join(evalsRoot, "fixtures", "fake-cli.ts")], cwd: evalsRoot, env: isolated }
 }
 export type AgentCommand = ReturnType<typeof agentCommand>
 
@@ -137,6 +139,21 @@ export async function runAgent(input: {
     input.prompt,
   ]
   const started = Date.now()
+  if (input.signal?.aborted) {
+    const parsed = parseEvents("")
+    const run = {
+      exitCode: -1,
+      timedOut: false,
+      interrupted: true,
+      startedAt: started,
+      durationMs: Date.now() - started,
+      ...parsed,
+      failureKind: "cancelled" as const,
+      stderrHead: "",
+    }
+    await Bun.write(path.join(input.outDir, "run.json"), JSON.stringify(run, null, 2))
+    return run
+  }
   const proc = Bun.spawn([...input.command.cmd, ...args], {
     cwd: input.command.cwd,
     env: { ...input.command.env, EVAL_TASK_ID: input.taskId },
@@ -144,9 +161,11 @@ export async function runAgent(input: {
     stdout: "pipe",
     stderr: "pipe",
   })
-  const stop = { timedOut: false, interrupted: false }
+  const stop = { timedOut: false, interrupted: false, terminating: false }
   // SIGINT даёт CLI шанс на штатный cleanup (host, Chromium, .writer); SIGKILL — страховка.
   const terminate = () => {
+    if (stop.terminating) return
+    stop.terminating = true
     proc.kill("SIGINT")
     const hard = setTimeout(() => proc.kill("SIGKILL"), 30_000)
     void proc.exited.then(() => clearTimeout(hard))
@@ -192,7 +211,14 @@ async function capture(stream: ReadableStream<Uint8Array>, file: string) {
   for await (const chunk of stream) {
     const text = decoder.decode(chunk, { stream: true })
     writer.write(text)
+    await writer.flush()
     chunks.push(text)
+  }
+  const rest = decoder.decode()
+  if (rest) {
+    writer.write(rest)
+    await writer.flush()
+    chunks.push(rest)
   }
   await writer.end()
   return chunks.join("")
