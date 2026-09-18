@@ -3016,3 +3016,13 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   corresponding-source/relinking. Marker scan не считается полным attribution audit.
 
 [Архив, установка и остаток аудита](../../testing/loginom-ai-agent/reports/2026-09-18-cli-bun-sources/report.md).
+
+### Полный Bun src, включая native notices
+
+- [x] Добавлены все 2899 оставшихся src entries вне JS/SQLite, без отбора только
+  по copyright markers. Содержимое и внутренняя ссылка сохранены без изменений.
+- [x] Объединение трёх архивов точно совпало со всеми 3094 src entries исходного
+  Bun commit: missing/extra/duplicates=0. Проверены 43 input hashes и typecheck.
+- [x] README описывает полное покрытие src этими тремя архивами.
+- [ ] External dependency sources, WebKit и relinking остаются открыты;
+  archive rebuild с этим дополнением ещё не выполнялся.

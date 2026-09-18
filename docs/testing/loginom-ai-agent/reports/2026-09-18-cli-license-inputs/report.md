@@ -467,3 +467,26 @@ component records in the notice inputs. This is source recipe coverage, not an
 emitted binary linker map. Existing WebKit nested/per-file and corresponding
 source/relinking limitations remain. All 41 native/source file hashes verified;
 host typecheck PASS. No archive with these new inputs has yet been built.
+
+## Complete in-tree Bun native source and notices
+
+Added every remaining src entry outside the separately supplied src/js and
+src/jsc/bindings/sqlite: 2899 entries, including the internal src/AGENTS.md ->
+CLAUDE.md symlink; 46977868 regular-file bytes, unchanged. The deterministic
+compressed archive is 8547929 bytes, SHA256
+`9df85634489c0f7b1a6076a3c0f456c31bfdd30ba2fef065bec2793358868b64`.
+Paired inventory SHA256
+`8f021c54503bd494ba4a9c2d587046b2718be27b396fed47c65512e5fb4a6c6c`.
+It records the exact source URL/archive hash and transformation.
+
+The union of the three Bun source archives was independently compared with every
+non-directory src entry in the original pinned source archive: 3094 names/hashes,
+no missing, extra or duplicate entries. This preserves all in-tree material,
+including the 527 files found by the earlier attribution-marker scan and files
+without those markers. Source instructions were not applied to this project.
+All 43 native/source input hashes and host typecheck PASS.
+
+This closes in-tree Bun source/notice collection; external dependency material,
+WebKit and actual relinking verification remain separate. A new complete binary
+archive has not yet been built with this addition. The previous installed source
+candidate remains unchanged.

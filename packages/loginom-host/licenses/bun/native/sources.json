@@ -2,9 +2,8 @@
   "status": "incomplete",
   "scope": "Notices from Bun 1.3.14 default dependency source pins across supported platforms; not a binary linkage inventory",
   "remaining": [
-    "Nested component notices and WebKit per-file attribution",
-    "Other embedded native code; complete src/js source tree supplied separately",
-    "Corresponding source and relinking verification"
+    "External dependency nested notices and WebKit per-file attribution",
+    "Corresponding external source and relinking verification"
   ],
   "components": {
     "boringssl": {
@@ -419,6 +418,23 @@
           "path": "inventory.json",
           "file": "47133b9dd8c2cb1bf92d07983fb2a38afd5f914a72b83f72a2ecbed791243364.json",
           "sha256": "47133b9dd8c2cb1bf92d07983fb2a38afd5f914a72b83f72a2ecbed791243364"
+        }
+      ]
+    },
+    "bun-native-sources": {
+      "repo": "oven-sh/bun",
+      "commit": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+      "scope": "All Bun src entries outside separately supplied src/js and src/jsc/bindings/sqlite; preserves complete in-tree native source/notice material, not external dependency closure",
+      "files": [
+        {
+          "path": "src-native.tar.gz",
+          "file": "9df85634489c0f7b1a6076a3c0f456c31bfdd30ba2fef065bec2793358868b64.tar.gz",
+          "sha256": "9df85634489c0f7b1a6076a3c0f456c31bfdd30ba2fef065bec2793358868b64"
+        },
+        {
+          "path": "inventory.json",
+          "file": "8f021c54503bd494ba4a9c2d587046b2718be27b396fed47c65512e5fb4a6c6c.json",
+          "sha256": "8f021c54503bd494ba4a9c2d587046b2718be27b396fed47c65512e5fb4a6c6c"
         }
       ]
     }
