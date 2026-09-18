@@ -33,3 +33,18 @@ and its pinned Zig fork. An isolated toolchain must be prepared for the next sta
 No downloaded sources were executed during this collection. No publication or
 release-compliance approval is claimed. Existing binary candidate hashes remain
 unchanged; the companion is supplied alongside them.
+
+## Locked lol-html crate sources
+
+The c-api Cargo.lock has 45 packages: 43 crates.io archives plus two local packages.
+All 43 original .crate archives were downloaded from static.crates.io and checked
+against the lock's SHA256 values. The separate deterministic bundle includes all
+43 unchanged archives, the exact upstream Cargo.lock and a URL/hash inventory.
+Its SHA256 is `28c4061c74cfeaf5f1871e73621b535c13d3cf8863119d79ca09a6cd6c9e2e6e`.
+
+The expanded companion `/tmp/loginom-cli-bun-source-companion-crates` contains 25
+archives. The builder verified every input and delivered copy; independent nested
+verification matched all 43 delivered crate hashes and the original lock file.
+Host typecheck PASS. The earlier 24-archive companion remains a historical artifact.
+Rust standard-library build dependencies for -Zbuild-std, toolchain prerequisites
+and actual offline compile/relink validation remain open.

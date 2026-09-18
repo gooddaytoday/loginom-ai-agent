@@ -3087,3 +3087,14 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   пересборка/перелинковка ещё не проверены; complete offline closure не заявляется.
 
 [Состав и ограничения](../../testing/loginom-ai-agent/reports/2026-09-18-cli-bun-source-companion/report.md).
+
+### Закреплённые Rust crate sources
+
+- [x] Получены все 43 внешних crate archives из lol-html c-api/Cargo.lock;
+  SHA256 совпали с lock. Два других пакета уже входят в lol-html source.
+- [x] Добавлен детерминированный crate bundle и URL/hash inventory;
+  новый companion из 25 архивов собран, входные/доставленные hashes проверены.
+- [x] Независимая проверка вложенных 43 crate hashes и оригинального lock PASS;
+  host typecheck PASS.
+- [ ] Rust std build dependencies, toolchain и actual rebuild/relink остаются
+  открыты. Подготовка отдельного Docker toolchain начата, успех пока не заявляется.

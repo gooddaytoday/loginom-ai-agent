@@ -3,7 +3,7 @@
   "status": "incomplete",
   "scope": "Complete upstream archives for direct native dependencies and full Bun build recipes; not an offline rebuild closure or relinking proof",
   "remaining": [
-    "Rust transitive crates and toolchain/build prerequisites",
+    "Rust standard-library build dependencies and toolchain prerequisites",
     "Verification of actual rebuild/relinking; upstream test submodules are not included"
   ],
   "archives": [
@@ -157,6 +157,15 @@
       "sha256": "2c53161edf633fa99acfc4eafddbafd5d9b8199f0918a1cc9152cb6c2c9bf379",
       "entries": 3238,
       "verifiedNoticeFiles": 1
+    },
+    {
+      "component": "lolhtml-crates",
+      "commit": "77127cd2b8545998756e8d64e36ee2313c4bb312",
+      "file": "lolhtml-77127cd2b8545998756e8d64e36ee2313c4bb312-crates.tar.gz",
+      "bytes": 3862751,
+      "sha256": "28c4061c74cfeaf5f1871e73621b535c13d3cf8863119d79ca09a6cd6c9e2e6e",
+      "entries": 45,
+      "scope": "43 unmodified crates verified against upstream c-api/Cargo.lock, plus Cargo.lock and URL/hash inventory"
     },
     {
       "component": "lshpack",

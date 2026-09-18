@@ -50,7 +50,9 @@ bun script/build-bun-source-companion.ts /absolute/source-inputs /absolute/new-b
 
 Проверен `/tmp/loginom-cli-bun-source-companion`: 24 архива, включая полный Bun
 с актуальными build scripts/patches, WebKit, ICU, Node headers и 20 native dependencies.
-Все 24 SHA256 прошли независимую проверку. Этот комплект включает WebKit companion,
+Все 24 SHA256 прошли независимую проверку. Расширенный комплект
+`/tmp/loginom-cli-bun-source-companion-crates` содержит 25 архивов: добавлены
+43 неизменённых Rust crates с проверкой по upstream Cargo.lock. Этот комплект включает WebKit companion,
 поэтому отдельно дублировать его архив при поставке не требуется.
 [Покрытие и оставшиеся входные данные сборки](reports/2026-09-18-cli-bun-source-companion/report.md).
 
