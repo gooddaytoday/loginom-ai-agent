@@ -155,6 +155,10 @@ export async function stageResources(input: {
   The active Dock JavaScript sources are included in runtime/.
   `,
   )
+  // Windows package isolation can expose a path through a virtualized alias.
+  // Compare canonical paths on both sides so a legitimate staged file does
+  // not look like an escape while real symlinks/junctions still fail closed.
+  const canonicalStaging = await realpath(staging)
   const files: Array<{ path: string; sha256: string; link?: string; directory?: boolean }> = []
   async function collect(directory: string): Promise<void> {
     const entries = await readdir(directory, { withFileTypes: true })
@@ -165,7 +169,7 @@ export async function stageResources(input: {
         continue
       }
       const link = entry.isSymbolicLink() ? await readlink(path) : undefined
-      const targetPath = relative(staging, await realpath(path))
+      const targetPath = relative(canonicalStaging, await realpath(path))
       if (targetPath === ".." || targetPath.startsWith(".." + sep) || isAbsolute(targetPath))
         throw Error("LOGINOM_BUILD_RESOURCE_ESCAPE")
       const directoryLink = link !== undefined && (await stat(path)).isDirectory()
