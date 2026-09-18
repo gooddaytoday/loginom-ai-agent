@@ -315,6 +315,12 @@ jobs:
           name: loginom-linux
           path: ${{ runner.temp }}/linux
 
+      # Ubuntu 24.04 hosts deny user namespaces to unconfined processes, and run-matrix.ts starts the
+      # containers with apparmor=unconfined, so the sandboxed Chromium zygote inside them could not
+      # clone(CLONE_NEWUSER). This host sysctl lifts that restriction; the browser sandbox stays on.
+      - name: Allow unprivileged user namespaces for the Chromium sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       - name: Run offline non-root OS matrix
         run: bun packages/desktop/test/loginom/docker/run-matrix.ts --artifact "$RUNNER_TEMP/linux/loginom-ai-agent-linux-amd64.deb" --output "$RUNNER_TEMP/linux-matrix"
 
