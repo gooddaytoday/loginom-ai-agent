@@ -2865,3 +2865,20 @@ Xiaomi token из Desktop для отдельного CLI test profile; нали
   доказательств; неподписанный dev archive не объявляется production release.
 
 [Итог артефакта и install evidence](../../testing/loginom-ai-agent/reports/2026-09-18-cli-final-linux/report.md).
+
+### Linux audit: permissions, filesystem access, proxy/CA и source archive
+
+- [x] Native providers list: strace file-only, 412 syscall lines, 0 обращений к
+  проверяемым Desktop roots; exit 0/guard=false. Scope — именно эта команда.
+- [x] Общий permission service, guards/aliases и standalone proxy policy:
+  86 passed/157 assertions. Подтверждён существующий workspace/process scope
+  Always, одинаковый для Desktop/CLI; новая сессия в том же instance может
+  использовать такое разрешение, но чужие pending requests не разрешаются автоматически.
+- [x] Node из final archive: HTTP proxy, HTTPS CONNECT + extra CA, node:http,
+  loopback bypass/no-direct-fallback PASS на реальных локальных сокетах.
+- [x] Точный project source archive из binary commit edc68138d создан, SHA256
+  записан в final report; это не утверждение о полном third-party relinking audit.
+- [ ] Final archive CSV 55/101/cold readback запущен штатным deterministic harness
+  в /tmp/loginom-linux-oracle-pBMt7x, лог /tmp/loginom-final-csv-oracle.log.
+  Это packaged CLI regression без дальнейшего использования Xiaomi. До завершения
+  процесса новый oracle PASS не заявляется.

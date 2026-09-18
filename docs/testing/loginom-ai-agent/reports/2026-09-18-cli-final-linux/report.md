@@ -46,3 +46,29 @@ No downloads were possible. These checks cover startup and Linux library
 compatibility, not actual Chromium launch, GPU, user namespaces, portals, GUI,
 or real model/Loginom access inside containers. Host runtime/model evidence is
 recorded separately in ../2026-09-18-cli-real-provider/report.md.
+
+## Additional Linux audit
+
+- Native providers list under strace -f -e trace=%file: 412 file-system trace
+  lines, no references beneath Desktop's config/auth/history roots; exit 0,
+  selected CLI writer released. Trace contains paths only, not read/write buffers;
+  private evidence `/tmp/loginom-cli-access-audit`. This proves this command's
+  access behavior, not a complete TUI/run filesystem audit.
+- Common permission service, profile guard/alias and standalone proxy suites:
+  86 passed, 157 assertions. Always is explicitly workspace/process-scoped:
+  the existing test verifies a subsequent session can use a matching approval;
+  unrelated pending sessions are not automatically resolved. This is shared with
+  Desktop, not a CLI-only hidden auto-approval.
+- Actual bundled Node passed local HTTP proxy, HTTPS CONNECT with explicit extra
+  CA, node:http proxy routing, loopback bypass, and no-direct-fallback checks.
+  The driver was bundled before Node execution because direct stripped-TypeScript
+  execution could not resolve extensionless imports. A first Bun CLI build syntax
+  failed; Bun.build API produced the driver and the real-network assertions passed.
+
+## Exact project source archive
+
+Created with git archive from the binary's exact clean source commit, not HEAD:
+`/tmp/loginom-ai-agent-cli-0.1.4-cli.20260918linux-source.tar.gz` (152 MiB).
+SHA256 `db998aeadf374476ae582df6b8129ba1f3be4d6fc7c51d913cabef9ce4331b59`.
+This supplies the tracked project sources and build/lock files. It is not a claim
+that all third-party corresponding-source/relinking obligations are satisfied.
