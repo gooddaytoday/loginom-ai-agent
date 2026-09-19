@@ -4,25 +4,8 @@ import { win32 } from "node:path"
 if (process.platform !== "win32") throw Error("Windows is required")
 const root = process.env.SystemRoot ?? process.env.SYSTEMROOT
 const system = { SystemRoot: root }
-const profile = Object.fromEntries(
-  Object.entries(process.env).filter(([key]) =>
-    [
-      "SYSTEMROOT",
-      "WINDIR",
-      "TEMP",
-      "TMP",
-      "USERPROFILE",
-      "LOCALAPPDATA",
-      "APPDATA",
-      "PROGRAMDATA",
-      "PROGRAMFILES",
-      "PROGRAMFILES(X86)",
-      "PROGRAMW6432",
-      "COMSPEC",
-    ].includes(key.toUpperCase()),
-  ),
-)
-for (const [name, env] of Object.entries({ system, profile })) {
+const systemModules = { ...system, PSModulePath: win32.join(root, "System32/WindowsPowerShell/v1.0/Modules") }
+for (const [name, env] of Object.entries({ system, systemModules })) {
   for (const [operation, source] of Object.entries({
     startup: "[Console]::Out.Write('OK')",
     native:
