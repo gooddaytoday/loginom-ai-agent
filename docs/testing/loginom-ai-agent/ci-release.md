@@ -34,6 +34,10 @@ gh run list --workflow release.yml --branch main
 
 Windows использует filtered hoisted install без сторонних install scripts, затем явно устанавливает Electron и настраивает node-pty. macOS использует проверенный native build entry с ограничением времени сборки CLI и очисткой дочерних процессов. Linux Docker runner снимает host AppArmor restriction для unprivileged user namespaces; sandbox Chromium внутри контейнера остаётся включённым.
 
+Windows gate также запускает нативные DPAPI, proxy, installer/launcher, manifest и process tests. PowerShell изолирует поиск модулей внутри дочернего скрипта: задание одного `PSModulePath` в окружении не предотвращает его реконструкцию Windows PowerShell при старте. Ошибки чтения/шифрования не маскируются увеличением runtime timeout.
+
+Проверки ACL/независимых профилей выполняются через `script/test-windows-profile.ps1` под одноразовым стандартным пользователем. GitHub Windows runners работают elevated и по умолчанию создают каталоги владельца Administrators, которые per-user профиль обязан отклонять. Скрипт разрешён только на GitHub-hosted runner, не наследует пользовательское окружение и удаляет созданную учётную запись после проверки. Рабочий CLI следует запускать от обычного пользователя; чужие или групповые владельцы существующего профиля не исправляются автоматически. Отдельный `windows-native-check.yml` повторяет нативные проверки на Windows 2022 и 2025.
+
 ## Артефакты
 
 Каждый набор `loginom-linux`, `loginom-windows`, `loginom-macos` плоский. Имена платформенных manifests/source archives различаются и не перезаписывают друг друга при сборе релиза.
