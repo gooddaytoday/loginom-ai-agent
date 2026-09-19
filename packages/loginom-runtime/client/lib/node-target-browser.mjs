@@ -236,10 +236,20 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
   const call = (code,deadline) => execute(code,{timeout:Math.max(1,deadline-Date.now())});
   const observeGraph=async(value,deadline)=>{
       request=value;
-      for(let refresh=0;refresh<3;refresh++){
+      const renderDeadline=Math.min(deadline,Date.now()+15000);
+      let maskRefresh=0;
+      for(;;){
         try{return await call(readCode(task()),deadline);}
         catch(error){
-          if(refresh===2 || !String(error.message).includes('Graph is blocked') || Date.now()>=deadline)throw error;
+          const message=String(error.message);
+          if(message.includes('Visible port identity is not rendered')&&Date.now()<renderDeadline){
+            // Headed Chromium can expose the cached port's visible flag one
+            // animation frame before mxGraph attaches its SVG element. This is
+            // a read-only observation retry; no gesture is repeated.
+            await new Promise(resolve=>setTimeout(resolve,80));
+            continue;
+          }
+          if(maskRefresh++>=2 || !message.includes('Graph is blocked') || Date.now()>=deadline)throw error;
           // Observe only: a transient loading mask may arrive after the prior
           // graph receipt. Wait for its disappearance, then recheck the complete
           // original preparation identity; never retry a possible gesture.
