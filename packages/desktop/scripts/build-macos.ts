@@ -3,6 +3,7 @@ import { mkdir, readdir } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { parseArgs } from "node:util"
 import { fileHash } from "./release/manifest"
+import { buildCommand } from "./build-command"
 import { productName } from "@loginom-ai-agent/product"
 import pins from "../../product/loginom-release.json"
 
@@ -40,9 +41,13 @@ await $`${process.execPath} run build`.cwd(desktop).env(env)
 await $`${process.execPath} run package:mac --arm64 --publish never --config.directories.output=${output}`
   .cwd(desktop)
   .env(env)
-await $`${process.execPath} script/build-cli.ts ${join(output, "cli")}`
-  .cwd(join(root, "packages/loginom-host"))
-  .env(env)
+await buildCommand({
+  executable: process.execPath,
+  args: ["script/build-cli.ts", join(output, "cli")],
+  cwd: join(root, "packages/loginom-host"),
+  env,
+  timeout: 10 * 60_000,
+})
 await $`git archive --format=tar.gz --output=${join(output, `loginom-ai-agent-${args.version}-source.tar.gz`)} ${commit}`.cwd(
   root,
 )

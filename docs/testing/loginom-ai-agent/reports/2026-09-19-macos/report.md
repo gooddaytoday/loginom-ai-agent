@@ -1,7 +1,22 @@
 # macOS candidate — 2026-09-19
 
-Статус: **IN PROGRESS**. Этот документ не означает принятия установленных продуктов.
+Статус: **LOCAL ACCEPTANCE PASS; CI IN PROGRESS**. Локальные установленные
+продукты приняты в описанном ниже объёме; общий план остаётся открыт до успешного
+macOS14 CI и проверки его скачанных артефактов.
 Канонический список обязательных проверок: [план](../../../../../plan.md).
+
+| Область | Кандидат / исходники | Результат |
+| --- | --- | --- |
+| macOS27 arm64, source checks | `6650b6d01` | PASS, восемь package-local групп |
+| macOS27 arm64, DMG/ZIP/CLI archives | `0.1.4-macos.20260919.2`, `6650b6d01` | Build/static/offline PASS |
+| macOS27, установленные Desktop/CLI | тот же candidate02 | Onboarding/model, CSV/cold readback, Unicode/chats, lifecycle, upgrade PASS |
+| macOS14 arm64, CI | run `35406024508` отменён; готовится диагностический повтор | Общий PASS ещё не получен |
+
+Локальные артефакты: `~/.cache/loginom-macos-build/candidate-02`.
+[Манифест](candidate-02-manifest.json), [контрольные суммы](candidate-02-SHA256SUMS).
+Ad-hoc подпись не подтверждает Gatekeeper trust; Developer ID, notarization,
+публичный релиз и auto-update исключены планом. Полная GUI-приёмка macOS14
+не выполнялась. Детальные ограничения методов указаны в JSON и разделах ниже.
 
 ## Исходная точка и окружение
 
@@ -50,7 +65,8 @@ Helper собран clang с minimum macOS 14.0 и подписан ad-hoc.
 
 Настройки пользовательского Keychain не изменялись. Созданы две отдельные
 тестовые записи. Проверка идентичной копии не доказывает доступ после изменения
-ad-hoc identity; эта граница проверяется отдельно на конечном кандидате.
+ad-hoc identity; смена helper identity не проверялась и остаётся ограничением.
+Helper01/02 имеет одинаковый SHA256 `8e26e17ed159272dee6e715c068f9e0ed646f99167373698859c96177572ee4f`.
 Локальное доказательство: `/tmp/loginom-keychain-acceptance-AIXteb/summary.json`.
 
 ## Граница приёмки
@@ -67,7 +83,7 @@ Gatekeeper trust, Developer ID, notarization, public release и auto-update
 Desktop DMG/ZIP и CLI TAR.GZ собраны. Статические verifier после исправления
 проверки Chromium: PASS; автономный smoke после исправления loopback/timeout
 cleanup: PASS. Эти scripts новее исходников кандидата, поэтому итоговый
-кандидат будет пересобран из единого commit.
+после этого кандидат02 пересобран из единого commit.
 
 Исходный Playwright Chromium имеет linker-signed ad-hoc подпись без resource seal.
 Это подтверждено на исходном и упакованном browser. Проверяется подпись кода,
@@ -85,7 +101,7 @@ CSV01 остановился до UI-изменений: resource manifest ун�
 SHA256 `d26ce18ab9ef3285d5bac7aff1d17d4968defb1d41ebd7cbbda8d9cbede07255`.
 Нативный `pinActionCatalog` проверил manifest и все связанные files; compatibility
 `loginom-7.4.2-macos-chromium-ru`, platform `macos`, browser `chromium`.
-Выбор платформенного каталога добавляется в shared staging; gate не обходится.
+Выбор платформенного каталога добавлен в shared staging; gate не обходился.
 
 CI01 не создал jobs из-за недопустимого runner context в job.env; исправлено.
 CI02 подтвердил arm64/macOS14 и provisioning, но Agent typecheck выявил пропуск
@@ -110,11 +126,11 @@ package-local проверок push выполнен без этого hook; с�
 
 Desktop02 скопирован целым bundle из readonly DMG в изолированный
 `~/.cache/loginom-macos-build/installed-02/Applications`. Runtime не скачивается
-при установке. Полная установленная приёмка продолжается.
+при установке. Полная локальная установленная приёмка завершена; результаты ниже.
 
 CI03 (`35404061216`) прошёл provisioning и source checks, но electron-vite
 исчерпал стандартный Node heap около 2 GiB. В CI build step установлен лимит
-4096 MiB; повторный run `35404497837` выполняется. Это ещё не CI PASS.
+4096 MiB; повторный run `35404497837` собрал артефакты, но не прошёл Desktop smoke (подробности ниже).
 
 Установленный Desktop02: onboarding, реальное подключение Loginom, safe IPC,
 safeStorage и повторный запуск без мастера — PASS. Реальный Xiaomi Token Plan
@@ -191,7 +207,7 @@ CI04 (`35404497837`, source `870356d33`) после увеличения heap п
 source checks, сборку обоих продуктов и static DMG/ZIP verification. Offline
 smoke подтвердил встроенные Node/Chromium обоих продуктов и CLI help/version,
 но Desktop probe завершился ошибкой. Старый probe скрывал stderr; добавлены
-ограниченные diagnostics (`949c30414`) и выполняется CI05 `35405764130`.
+ограниченные diagnostics (`949c30414`); CI05 `35405764130` впоследствии отменён до сборки.
 Полный CI PASS пока не заявляется. Downloaded CI04 artifacts отделены от
 локального candidate02: исходники отличаются CI memory setting; побайтовое
 равенство независимых сборок не предполагается.
@@ -203,6 +219,26 @@ CI05 отменён до сборки после обнаружения разл
 upgrade harness). Точная причина предыдущего CI timeout без stderr не установлена.
 Только no-credentials offline Desktop probe теперь явно получает mock-keychain;
 это не production-настройка. Настоящие safeStorage/Keychain проверки выше
-выполнялись без этого флага. Следующий CI должен подтвердить исправление.
+выполнялись без этого флага. Локальный повтор исправленного smoke прошёл. CI06 `35406024508` из `670ee6c57` остановлен диагностически до достижения smoke; причина ниже.
 [Downloaded CI04 hashes](ci-35404497837-download.json) совпали; это PASS_HASHES_ONLY,
 не замена успешному CI smoke.
+
+Нативное чтение системных CA на macOS27 — PASS
+([CA evidence](candidate-02-native-system-ca.json)): bundled Node24.19.0 прочитал
+2 системных CA, их X509 SHA256 identities присутствуют в объединённом default
+наборе из122 сертификатов; прежние120 roots сохранены. Штатный `--use-system-ca`
+также включает обе системные identities. HTTPS с объединённым trust store
+прошёл hostname/chain validation и вернул200. Системные trust settings не менялись.
+Это проверка чтения/объединения macOS trust store; private-CA-only endpoint,
+корпоративная TLS interception и установка новых CA не тестировались.
+Node объединяет system CA с bundled roots: [официальная документация](https://nodejs.org/api/cli.html#--use-system-ca).
+
+CI06 остановлен обычной отменой после25мин общего build step
+(предыдущий занимал10мин23с). Журнал после отмены показал: Desktop DMG/ZIP
+созданы, CLI native version `0.1.4-macos.6` подтверждена, последний вывод
+23:39:38 UTC — codesign Keychain helper. Далее до отмены вывода не было.
+Без отметок между операциями это не доказывает зависание именно codesign:
+впереди также resource inventory, Bun node-host/installer build, notices,
+manifest и archive roundtrip. CLI archive/static/offline этапы не достигнуты.
+В build-time scripts добавляются phase diagnostics и ограниченный watchdog
+для собственных процессов; production runtime не меняется.

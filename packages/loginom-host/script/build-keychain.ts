@@ -1,4 +1,5 @@
 import { $ } from "bun"
+import { buildPhase } from "./build-phase"
 import { mkdtemp, mkdir, link, rm } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 
@@ -11,12 +12,16 @@ export async function buildKeychain(output: string) {
   const work = await mkdtemp(join(output, ".keychain-build-"))
   try {
     await $`/usr/bin/clang -fobjc-arc -arch arm64 -mmacosx-version-min=14.0 -framework Foundation -framework Security ${join(import.meta.dir, "../native/keychain.m")} -o ${join(work, "loginom-keychain")}`
-    await $`/usr/bin/codesign --force --sign - --timestamp=none --identifier com.loginom.aiagent.cli.keychain ${join(work, "loginom-keychain")}`
-    await $`/usr/bin/codesign --verify --strict ${join(work, "loginom-keychain")}`
-    await link(join(work, "loginom-keychain"), join(output, "loginom-keychain"))
+    await buildPhase(
+      "keychain-sign",
+      () =>
+        $`/usr/bin/codesign --force --sign - --timestamp=none --identifier com.loginom.aiagent.cli.keychain ${join(work, "loginom-keychain")}`,
+    )
+    await buildPhase("keychain-verify", () => $`/usr/bin/codesign --verify --strict ${join(work, "loginom-keychain")}`)
+    await buildPhase("keychain-link", () => link(join(work, "loginom-keychain"), join(output, "loginom-keychain")))
     return join(output, "loginom-keychain")
   } finally {
-    await rm(work, { recursive: true, force: true })
+    await buildPhase("keychain-cleanup", () => rm(work, { recursive: true, force: true }))
   }
 }
 if (import.meta.main) {

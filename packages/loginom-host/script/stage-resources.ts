@@ -3,6 +3,7 @@ import { chmod, cp, mkdir, readdir, readFile, readlink, realpath, rename, rm, st
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { $ } from "bun"
 import { nativeResourceCandidates } from "./native-resource-candidates"
+import { buildPhase } from "./build-phase"
 import { buildKeychain } from "./build-keychain"
 import release from "../../product/loginom-release.json"
 import catalogs from "../../product/loginom-catalogs.json"
@@ -179,7 +180,7 @@ export async function stageResources(input: {
       })
     }
   }
-  await collect(staging)
+  await buildPhase(`${input.flavor}-resource-inventory`, () => collect(staging))
   await Bun.write(
     join(staging, "resource-manifest.json"),
     JSON.stringify(
@@ -199,7 +200,7 @@ export async function stageResources(input: {
     ) + "\n",
   )
   await rm(destination, { recursive: true, force: true })
-  await rename(staging, destination)
+  await buildPhase(`${input.flavor}-resource-publish`, () => rename(staging, destination))
   return { files: files.length, destination }
 }
 
