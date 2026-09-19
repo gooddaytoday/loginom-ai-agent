@@ -38,7 +38,13 @@ const hashes = new Map(
 await Bun.write(path.join(dir, "SHA256SUMS.txt"), files.map((file) => `${hashes.get(file)}  ${file}\n`).join(""))
 
 const matrix = await report("linux-matrix.json")
-if (matrix?.reports?.length !== 5 || !matrix.reports.every((entry: { status: string }) => entry.status === "PASS"))
+if (
+  matrix?.artifactHash !== hashes.get("loginom-ai-agent-linux-amd64.deb") ||
+  matrix?.reports?.length !== 5 ||
+  !["ubuntu22", "ubuntu24", "ubuntu26", "debian12", "debian13"].every((name) =>
+    matrix.reports.some((entry: { name: string; status: string }) => entry.name === name && entry.status === "PASS"),
+  )
+)
   throw new Error("A complete passing Linux matrix is required")
 const matrixStatus = `Docker matrix PASS (${matrix.reports.map((entry: { name: string }) => entry.name).join(", ")})`
 for (const name of ["release-manifest.json", "windows-release-manifest.json", "macos-release-manifest.json"]) {

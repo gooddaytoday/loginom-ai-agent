@@ -179,6 +179,12 @@ jobs:
     permissions:
       contents: read
 
+  typecheck:
+    needs: verify
+    uses: ./.github/workflows/typecheck.yml
+    permissions:
+      contents: read
+
   build:
     name: build (linux)
     needs: verify
@@ -304,6 +310,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "App typecheck failed" }
           bun test --conditions=browser --preload ./happydom.ts ./test-browser/settings-loginom.test.ts ./test-browser/settings-keybinds.test.ts ./test-browser/toast-owner.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Settings tests failed" }
+      - name: Verify native Windows host and CLI
+        run: |
+          Push-Location packages/loginom-host
+          bun typecheck
+          if ($LASTEXITCODE -ne 0) { throw "Host typecheck failed" }
+          bun test test/native-proxy.test.ts test/cli-credentials.test.ts test/cli-install-windows.test.ts test/cli-manifest.test.ts test/process.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Native host tests failed" }
+          Pop-Location
+          Push-Location packages/agent
+          bun typecheck
+          if ($LASTEXITCODE -ne 0) { throw "Agent typecheck failed" }
+          bun test test/cli/profile-windows.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Windows profile tests failed" }
+          Pop-Location
       - name: Write Windows manifest and verify installer
         run: |
           $dist = "$env:RUNNER_TEMP/windows/desktop"
@@ -418,8 +438,8 @@ jobs:
   release:
     name: release
     # Every platform must pass before a complete draft release can be created.
-    needs: [verify, tests, build, linux-matrix, windows, macos]
-    if: always() && github.event_name == 'push' && github.ref_type == 'tag' && needs.verify.result == 'success' && needs.tests.result == 'success' && needs.build.result == 'success' && needs.linux-matrix.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success'
+    needs: [verify, tests, typecheck, build, linux-matrix, windows, macos]
+    if: always() && github.event_name == 'push' && github.ref_type == 'tag' && needs.verify.result == 'success' && needs.tests.result == 'success' && needs.typecheck.result == 'success' && needs.build.result == 'success' && needs.linux-matrix.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:

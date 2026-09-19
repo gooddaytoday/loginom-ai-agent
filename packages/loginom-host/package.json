@@ -3,8 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { "./*": "./src/*.ts" },
-  "scripts": { "test": "bun test", "typecheck": "tsgo --noEmit" },
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsgo --noEmit"
+  },
   "dependencies": {
     "@loginom-ai-agent/product": "workspace:*",
     "@loginom-ai-agent/schema": "workspace:*",
@@ -12,6 +17,7 @@
   },
   "devDependencies": {
     "@lydell/node-pty": "catalog:",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@tsconfig/node22": "catalog:",
     "@types/bun": "catalog:",
     "@types/node": "catalog:",

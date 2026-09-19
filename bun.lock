@@ -711,6 +711,7 @@
       },
       "devDependencies": {
         "@lydell/node-pty": "catalog:",
+        "@modelcontextprotocol/sdk": "1.29.0",
         "@tsconfig/node22": "catalog:",
         "@types/bun": "catalog:",
         "@types/node": "catalog:",
