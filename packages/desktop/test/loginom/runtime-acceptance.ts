@@ -20,7 +20,12 @@ if (credentialProfile) {
   config.api_key = secrets.apiKey
 }
 const mcpConfig = process.env.LOGINOM_AI_AGENT_TEST_MCP_CONFIG
-if (mcpConfig) config.api_key = (await Bun.file(mcpConfig).json()).api_key
+if (mcpConfig) {
+  const active = await Bun.file(mcpConfig).json()
+  config.api_key = active.api_key
+  config.loginom_url = active.loginom_url
+  config.workflow_profile = { passwordless_login: true, loginom_user: active.user }
+}
 if (process.env.LOGINOM_AI_AGENT_TEST_API_KEY) config.api_key = process.env.LOGINOM_AI_AGENT_TEST_API_KEY
 if (config.workflow_profile?.passwordless_login !== true) throw Error("TEST_PASSWORD_UNAVAILABLE")
 const resources = resolve(
