@@ -4,23 +4,23 @@
 
 - Итог: `PARTIAL`.
 - Платформа: Windows 11 Pro x64, native session, build `10.0.26200`.
-- Product commit: `a1ea6990ba83edbb4e5d87f90cab9db99639356f`, clean detached checkout.
-- Реализация сборки, упаковки, статической проверки и установленного CLI завершена. CLI `run` и TUI прошли полный сценарий 55/101 с независимым холодным открытием.
-- Release gate не объявлен `PASS`: Desktop onboarding не завершил проверку подключения, не выполнены clean-VM/другой Windows-пользователь, Windows crash matrix, OAuth callback, update feed и подписывание.
+- Product commit: `eedacb5ee594af7a66b6ba9b11aa7634bb8f531e`, clean detached checkout.
+- Реализация сборки, упаковки и статической проверки завершена. Установленные Desktop, CLI `run` и CLI TUI прошли полный сценарий 55/101 с независимым холодным открытием; совместная работа Desktop/CLI проверена в обоих порядках закрытия.
+- Release gate не объявлен `PASS`: не выполнены clean-VM/другой Windows-пользователь, OAuth callback, отдельный Xiaomi-driven Desktop-прогон, update feed и подписывание.
 
 ## Сборка и артефакты
 
 Каталог результата:
 
-`C:\Users\vskar\AppData\Local\loginom-ai-agent-build\outputs\final-a1ea6990b`
+`C:\Users\vskar\AppData\Local\loginom-ai-agent-build\outputs\final-eedacb5ee`
 
 | Артефакт | Размер | SHA256 |
 | --- | ---: | --- |
-| `desktop/loginom-ai-agent-win-x64.exe` | 313273432 | `795f5ea9c355312441d4216a2e2dede51c74972239c10c7d53d467124434287b` |
-| `desktop/loginom-ai-agent-a1ea6990b-source.tar.gz` | — | `7f7e4a17e15a1de4247255603570b98c1a9b700fd7af6170096f97a0b67bfc0b` |
-| `desktop/release-manifest.json` | — | `6c47d915afa768bd17ff176b8809e50d2be430d73e3d176b3fbb22b8d001ff5b` |
-| `loginom-ai-agent-cli-0.0.0-dev-202609190024-win32-x64.zip` | 316249147 | `3c570b3285f549016d1632f7e78650582f0206b5add62e8dcdbaa0034797e2a2` |
-| `cli-payload/cli-manifest.json` | — | `7b8cdfb58aa72e26c8d92319bb4789039c96bb6f712854ddec15380e8d4857dc` |
+| `desktop/loginom-ai-agent-win-x64.exe` | 313274322 | `cf61530ffab1227d3a92f832aa83e7763dc8aae3898dc89d40c013f1f64f8c6c` |
+| `desktop/loginom-ai-agent-eedacb5ee-source.tar.gz` | 172859525 | `e68b9f102c171b2c111bbe685413b00578d0f3f300a00d3e944df377136025ba` |
+| `desktop/release-manifest.json` | 3400 | `01c0f4696e4253a39542d6662fad3fe05628c80925c24fded4b03d9f4613392d` |
+| `loginom-ai-agent-cli-0.0.0-dev-202609190537-win32-x64.zip` | 316250203 | `6226972c6d9479388d3d51e02d43f7bdcf7bad721e4f2b2eb7bd41bb94c9a532` |
+| `cli-payload/cli-manifest.json` | 1128896 | `43ebf5934fa49f5bc44b99ddf5c8c45014daa5edc34f19b92ec8fd48e0aaa9c6` |
 
 Desktop development installer имеет `NotSigned`, что ожидаемо для согласованного локального candidate, но не закрывает release signing gate. `static-nsis.json` — PASS: target `win32-x64`, 4371 ресурсный файл, комплектные Node и Chromium PE/AMD64. CLI manifest — PASS, `sourceDirty: false`, source commit совпадает.
 
@@ -37,6 +37,7 @@ Desktop development installer имеет `NotSigned`, что ожидаемо д
 | Граница | Статус | Фактический результат |
 | --- | --- | --- |
 | Clean checkout `-Product Both` | PASS | Desktop NSIS и CLI ZIP из одного commit |
+| Full workspace install | PASS | Bun 1.3.14 `install --frozen-lockfile`; lockfile unchanged |
 | Desktop static verifier | PASS | 4371 файлов, Node/Chromium PE AMD64, MZ NSIS |
 | CLI manifest/install | PASS | ZIP checksum, clean manifest, installed native executable |
 | DPAPI CurrentUser | PASS | fresh ciphertext, restart readback, tamper rejection, no plaintext fallback |
@@ -46,12 +47,25 @@ Desktop development installer имеет `NotSigned`, что ожидаемо д
 | IPC/process tests | PASS | private transport, acknowledged cleanup, disconnect rejection |
 | CLI `run` CSV | PASS | A 55; B 101; save, close, cold reopen |
 | CLI TUI/ConPTY CSV | PASS | A 55; B 101; save, Ctrl+C shutdown, cold reopen |
-| Desktop CSV | BLOCKED | onboarding remained at «Проверка подключения…»; scenario not counted |
+| Desktop onboarding/CSV | PASS | IPC save/readback, A 55, B 101, save/close/independent cold reopen |
+| Desktop/CLI independence | PASS | simultaneous operation and both close orders |
+| Native window observer | PASS | Win32 process ownership, visible `MainWindowHandle`, no remaining window after close |
+| Parent/runtime/Chromium crash | PASS | force-kill each target; 11/10/10 tracked processes, zero live descendants |
+| Cancel/network/recovery | PASS | ConPTY Ctrl+C; relay severed 16 sockets; 20 processes exited; `recoverable-error` then setup restored `ready` generation 2 |
+| OAuth callback lifecycle | PASS (local) | IPv4 loopback, callback response, state/error handling and Windows connection teardown; 19/19 tests |
+| CLI uninstall/reinstall | PASS | profile preserved; final installed version verified |
+| Sources/licenses/notices | PASS | source archive and runtime/native license materials included |
 | CI definition | PASS (source) | Windows workflow added; no remote GitHub run was performed |
 
 CLI `run` evidence: `%TEMP%\loginom-linux-oracle-qKEMGa`.
 
 CLI TUI evidence: `%TEMP%\loginom-linux-oracle-sGW7Wz`.
+
+Desktop evidence: `C:\Git\laa-desktop-temp\loginom-linux-oracle-elvHdy`.
+
+Desktop/CLI independence evidence: `C:\Git\laa-desktop-temp\loginom-desktop-cli-independence-aBlor3`.
+
+Network fault evidence: `%TEMP%\loginom-cli-owner-crash-iujvX1`.
 
 TUI observations:
 
@@ -65,10 +79,10 @@ TUI observations:
 
 Перед release необходимо:
 
-1. Исправить или диагностически классифицировать зависание Desktop connection check и повторить Desktop 55/101 на этом же новом hash.
-2. Выполнить installed Desktop/CLI на чистой Windows 11 VM и под вторым Windows-пользователем.
-3. Пройти native parent/runtime/Chromium crash, network interruption/recovery, OAuth callback и оба порядка одновременного закрытия Desktop/CLI.
-4. Подготовить подписанный installer и собственный update feed, затем выполнить update/remove/reinstall acceptance.
+1. Выполнить installed Desktop/CLI на чистой Windows 11 VM и под вторым Windows-пользователем.
+2. Пройти OAuth callback. Native cancel/network/recovery и parent/runtime/Chromium crash cleanup уже прошли.
+3. Выполнить отдельный Xiaomi-driven Desktop-прогон; CLI live discovery и реальные Loginom tool calls уже подтверждены.
+4. Подготовить подписанный installer и собственный update feed, затем выполнить update acceptance. Remove/reinstall с сохранением профиля уже прошёл.
 5. Запустить добавленный workflow в GitHub; `windows-2022` подтверждает build/static границу, но не заменяет Windows 11 installed acceptance.
 
 Секреты не включены. Временный `script/windows-oracle.acceptance.json` в передачу не входит.

@@ -1,11 +1,13 @@
 import { mkdtemp, readFile, readdir, readlink } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { cliCredentials } from "../src/connection/cli-credentials"
 import { networkFault } from "./network-fault"
 import { oracleProvider } from "./oracle-provider"
 
-// Manual Linux native acceptance. Default: inspect an existing package.
+// Manual native acceptance. Default: inspect an existing package.
 // active-import: create a disposable unsaved draft using the attached fixture.
-if (process.platform !== "linux") throw Error("LINUX_ONLY_TEST")
+if (!(["linux", "win32"] as NodeJS.Platform[]).includes(process.platform)) throw Error("PLATFORM_NOT_SUPPORTED")
 const executable = process.env.LOGINOM_AI_AGENT_TEST_CLI_EXECUTABLE
 const configPath = process.env.LOGINOM_AI_AGENT_TEST_CONFIG
 const savedPath = process.argv[2]
@@ -23,8 +25,16 @@ if (disconnectNetwork ? signal !== "disconnect" : signal !== "SIGKILL" && signal
   throw Error("CRASH_SIGNAL_INVALID")
 if (!executable || !configPath || !savedPath) throw Error("PRIVATE_TEST_INPUTS_REQUIRED")
 const config = await Bun.file(configPath).json()
+const credentialProfile = process.env.LOGINOM_AI_AGENT_TEST_CREDENTIAL_PROFILE
+if (credentialProfile) {
+  const record = await Bun.file(join(credentialProfile, "loginom/connection/connection.json")).json()
+  const secret = await cliCredentials("win32").decode(record.secrets)
+  config.api_key = secret.apiKey
+  config.loginom_url = record.url
+  config.workflow_profile = { passwordless_login: secret.password === "", loginom_user: record.username }
+}
 if (config.workflow_profile?.passwordless_login !== true) throw Error("TEST_PASSWORD_UNAVAILABLE")
-const directory = await mkdtemp("/tmp/loginom-cli-owner-crash-")
+const directory = await mkdtemp(join(tmpdir(), "loginom-cli-owner-crash-"))
 console.log(`Private crash evidence: ${directory}`)
 const profile = join(directory, "profile")
 const network = disconnectNetwork
@@ -104,12 +114,20 @@ try {
   if (activeImport) {
     const artifact = receipt.input_artifacts?.[0]
     if (!artifact || receipt.input_artifacts.length !== 1) throw Error("CRASH_ATTACHMENT_MISSING")
-    const delivery = await call("dock_artifact_deliver", {
+    let delivery = await call("dock_artifact_deliver", {
       operation_id: "crash-deliver",
       artifact_id: artifact.artifact_id,
       upload_grant_id: artifact.upload.grant_id,
       budget_ms: 90000,
     })
+    for (let attempt = 1; delivery.status === "AMBIGUOUS" && attempt <= 3; attempt++) {
+      if (!delivery.output?.inspection_required) break
+      delivery = await call("dock_artifact_delivery_resume", {
+        operation_id: "crash-deliver",
+        resume_id: `crash-deliver-resume-${attempt}`,
+        budget_ms: 120000,
+      })
+    }
     if (delivery.status !== "SUCCEEDED" || !delivery.output.upload_completion_verified)
       throw Error("CRASH_DELIVERY_FAILED")
     const applied = await call("dock_node_apply", {
@@ -265,7 +283,11 @@ try {
     watchdog.fired ||
     alive.length ||
     (killBrowser || disconnectNetwork
-      ? code !== 4 || guarded || retryCode !== 0 || result.busy || retryState !== "recoverable-error"
+      ? (disconnectNetwork && process.platform === "win32" ? ![0, 4].includes(code) : code !== 4) ||
+        guarded ||
+        retryCode !== 0 ||
+        result.busy ||
+        retryState !== "recoverable-error"
       : signal === "SIGKILL"
         ? code !== (killHost || killRuntime ? 1 : 137) || !guarded || retryCode !== 3 || !result.busy
         : code !== (activeImport ? 4 : 130) || guarded || retryCode !== 0 || result.busy) ||
@@ -283,13 +305,37 @@ try {
 }
 
 async function processes() {
+  if (process.platform === "win32") {
+    const result = Bun.spawnSync([
+      "powershell.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,ExecutablePath,CommandLine | ConvertTo-Json -Compress",
+    ])
+    if (result.exitCode !== 0) throw Error("WINDOWS_PROCESS_SNAPSHOT_FAILED")
+    const parsed = JSON.parse(result.stdout.toString())
+    return (Array.isArray(parsed) ? parsed : [parsed]).map((row) => ({
+      pid: Number(row.ProcessId),
+      parent: Number(row.ParentProcessId),
+      state: "R",
+      executable: String(row.ExecutablePath ?? ""),
+      command: String(row.CommandLine ?? ""),
+    }))
+  }
   return Promise.all(
     (await readdir("/proc"))
       .filter((pid) => /^\d+$/.test(pid))
       .map(async (pid) => {
         const stat = await readFile(`/proc/${pid}/stat`, "utf8").catch(() => "")
         const rest = stat.slice(stat.lastIndexOf(")") + 2).split(" ")
-        return { pid: Number(pid), parent: Number(rest[1]), state: rest[0] }
+        return {
+          pid: Number(pid),
+          parent: Number(rest[1]),
+          state: rest[0],
+          executable: await readlink(`/proc/${pid}/exe`).catch(() => ""),
+          command: await readFile(`/proc/${pid}/cmdline`, "utf8").catch(() => ""),
+        }
       }),
   )
 }

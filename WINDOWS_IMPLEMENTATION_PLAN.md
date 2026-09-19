@@ -33,12 +33,12 @@
 - [x] Создать ветку `windows-native` от изученного commit.
 - [x] Подготовить Node 24.19.0 и Bun 1.3.14 отдельно от существующих установок.
 - [x] Настроить окружение сборки без постоянного изменения пользовательского PATH.
-- [ ] Установить workspace-зависимости по закреплённому lockfile.
+- [x] Установить workspace-зависимости по закреплённому lockfile.
 - [x] Подготовить Windows Chromium и проверить закреплённые контрольные суммы.
 - [x] Создать отдельные каталоги сборок, тестовых профилей и диагностических материалов.
 - [x] Подтвердить действительность существующих доступов Dock без вывода секретов.
 
-Промежуточный результат 2026-09-18, commit `697cc2e5addff232f2faeb9be8c4790100995f18`: портативные Node/Bun и Chromium проверены по SHA256, relevant workspace-фильтр установлен без изменения lockfile. Полная установка всех workspace-пакетов пока блокируется изменившимся tarball `@solidjs/start` относительно integrity в lockfile; сборочные зависимости Desktop/CLI установлены и прошли typecheck.
+Промежуточный результат 2026-09-18, commit `697cc2e5addff232f2faeb9be8c4790100995f18`: портативные Node/Bun и Chromium проверены по SHA256, relevant workspace-фильтр установлен без изменения lockfile. Первоначальный полный install останавливался на временном integrity mismatch удалённого `@solidjs/start`; повторный `bun 1.3.14 install --frozen-lockfile` 2026-09-19 завершился успешно без изменения lockfile.
 
 **Готовность:** инструменты запускаются, зависимости установлены, исходные ресурсы проверены.
 
@@ -81,7 +81,7 @@
 
 - [x] Проверить штатное закрытие через IPC и подтверждение очистки.
 - [x] Проверить Ctrl+C и повторное прерывание CLI.
-- [ ] Проверить потерю родительского процесса и аварии runtime/Chromium.
+- [x] Проверить потерю родительского процесса и аварии runtime/Chromium: три Windows taskkill-сценария завершились без живых потомков.
 - [x] Ограничить принудительную очистку процессами конкретного запуска.
 - [x] Сохранять блокировку и состояние восстановления при неподтверждённой очистке.
 
@@ -98,7 +98,7 @@
 - [x] Сохранить явное добавление CLI в PATH пользователем.
 - [x] Проверить отказ удаления занятого CLI и сохранение профилей при удалении.
 - [x] Зафиксировать исходный commit, версии зависимостей и SHA256 артефактов.
-- [ ] Приложить соответствующие исходники, лицензии и уведомления.
+- [x] Приложить соответствующие исходники, лицензии и уведомления.
 
 **Готовность:** установленные файлы соответствуют манифестам; удаление не затрагивает пользовательские данные.
 
@@ -106,20 +106,20 @@
 
 - [x] Запустить относящиеся к изменениям тесты и `bun typecheck` из каталогов пакетов.
 - [x] Добавить проверки Windows-путей, прокси, манифестов и завершения процессов.
-- [ ] Перенести наблюдение за процессами и окнами на Windows API.
+- [x] Перенести наблюдение за процессами и окнами на Windows API: `Win32_Process` + `MainWindowHandle`, headed Chromium smoke — PASS.
 - [x] Проверить интерактивный CLI через ConPTY.
 - [x] Проверить пути с пробелами и кириллицей.
 - [x] Проверить запуск установленных продуктов без Node/Bun/Python в PATH.
 - [x] Проверить автономное открытие мастера настройки.
-- [ ] Пройти настройку Loginom и повторный запуск Desktop/CLI: CLI — PASS, Desktop — check остаётся в состоянии «Проверка подключения…».
+- [x] Пройти настройку Loginom и повторный запуск Desktop/CLI: оба установленных продукта прошли настройку, перезапуск и повторное чтение профиля.
 - [x] Проверить Xiaomi Token Plan без сохранения токена: обнаружение `mimo-v2.5` и реальные вызовы Loginom-инструментов подтверждены в CLI.
-- [ ] Выполнить CSV-сценарий через Desktop: результаты 55 и 101, сохранение и независимое повторное открытие.
+- [x] Выполнить CSV-сценарий через Desktop: результаты 55 и 101, сохранение и независимое повторное открытие.
 - [x] Повторить CSV-сценарий через CLI `run`.
 - [x] Повторить CSV-сценарий через TUI.
-- [ ] Подтвердить реальные вызовы Loginom-инструментов через Xiaomi Token Plan в Desktop и CLI: CLI подтверждён, Desktop заблокирован проверкой подключения.
-- [ ] Проверить одновременную работу продуктов и оба порядка их закрытия.
-- [ ] Проверить отмену, обрыв сети, аварийное завершение и последующее восстановление.
-- [ ] Проверить удаление и переустановку с сохранением профилей.
+- [ ] Подтвердить реальные вызовы Loginom-инструментов через Xiaomi Token Plan в Desktop и CLI: CLI подтверждён; Desktop CSV и Loginom tools подтверждены с scripted provider, отдельный Xiaomi-driven Desktop-прогон ещё не выполнен.
+- [x] Проверить одновременную работу продуктов и оба порядка их закрытия.
+- [x] Проверить отмену, обрыв сети, аварийное завершение и последующее восстановление: Ctrl+C через ConPTY, network relay fault, `recoverable-error` и повторная настройка до `ready`, а также parent/runtime/Chromium crash cleanup — PASS.
+- [x] Проверить удаление и переустановку с сохранением профилей.
 
 **Готовность:** все обязательные сценарии пройдены на установленных артефактах с зафиксированными хешами.
 
@@ -172,10 +172,16 @@
 
 ### 2026-09-19 — итоговый Windows candidate
 
-- Product commit: `a1ea6990ba83edbb4e5d87f90cab9db99639356f`; чистый detached checkout; portable Node `24.19.0`, Bun `1.3.14`, Chromium revision `1243`.
-- `script/build-windows.ps1 -Product Both -SkipInstall` — PASS. Desktop NSIS и CLI ZIP собраны из одного snapshot; CLI manifest сообщает `sourceDirty: false`.
-- Desktop: статическая проверка `win32-x64`, PE/AMD64 Node и Chromium, 4371 файлов — PASS. Development installer ожидаемо не подписан. Полная Desktop CSV-приёмка не засчитана: onboarding остаётся в состоянии «Проверка подключения…»; это ограничение отражено в отчёте, а не скрыто зелёными package-тестами.
-- Installed CLI `run`: A = Alpha 35, Beta 20, total 55; B = Alpha 100, Beta 1, total 101; оба пакета сохранены, закрыты и независимо открыты новым процессом — PASS.
-- Installed CLI TUI через Windows ConPTY: те же 55/101, сохранение, штатное завершение и независимое холодное чтение — PASS. Evidence root: `%TEMP%\loginom-linux-oracle-sGW7Wz`.
-- Xiaomi Token Plan: endpoint `https://token-plan-sgp.xiaomimimo.com/v1`, модель `mimo-v2.5`; live discovery и реальные Loginom tool calls в CLI подтверждены. Токен использовался только транзитно и нигде не записан.
-- Итог: реализация Windows build/package/CLI acceptance завершена; общий release gate остаётся `PARTIAL` до успешного Desktop onboarding + CSV, Windows parent/runtime crash matrix, OAuth callback, update feed и прогона на чистой Windows 11 VM/другом пользователе.
+- Product commit: `eedacb5ee594af7a66b6ba9b11aa7634bb8f531e`; чистый detached checkout; portable Node `24.19.0`, Bun `1.3.14`, Electron `42.3.3`, Chromium revision `1243`.
+- `script/build-windows.ps1 -Product Both -SkipInstall` — PASS. Desktop NSIS и CLI ZIP собраны из одного snapshot; CLI manifest сообщает `sourceDirty: false`; статическая Desktop-проверка подтвердила `win32-x64`, PE/AMD64 Node и Chromium и 4371 ресурсный файл.
+- Installed Desktop: onboarding, DPAPI/safeStorage, sidecar и полный CSV-сценарий — PASS. A = Alpha 35, Beta 20, total 55; B = Alpha 100, Beta 1, total 101; оба пакета сохранены, закрыты и независимо открыты новым процессом без повторного применения настроек. Evidence root: `C:\Git\laa-desktop-temp\loginom-linux-oracle-elvHdy`. Headless Loginom runtime разрешён только двумя тестовыми флагами; обычный Desktop остаётся headed.
+- Installed CLI `run` и TUI через Windows ConPTY: те же 55/101, сохранение, завершение и независимое холодное чтение — PASS. Evidence roots: `%TEMP%\loginom-linux-oracle-qKEMGa` и `%TEMP%\loginom-linux-oracle-sGW7Wz`.
+- Одновременная работа установленных Desktop/CLI и оба порядка закрытия — PASS. Evidence root: `C:\Git\laa-desktop-temp\loginom-desktop-cli-independence-aBlor3`.
+- Windows process/window observer: headed Chromium smoke увидел 1 видимое окно и 10 процессов, после закрытия оставшихся окон нет — PASS. Принудительное завершение parent, managed runtime и корневого Chromium отследило соответственно 11/10/10 процессов; живых потомков после cleanup нет — PASS.
+- Installed CLI network fault: локальный relay оборвал 16 активных сокетов; 20 отслеживаемых процессов завершились, writer-lock снят, новый процесс увидел `recoverable-error`. Повторная настройка из DPAPI-профиля восстановила исходный endpoint и состояние `ready`, generation 2 — PASS. Отмена CLI через реальный Ctrl+C/ConPTY и последующий холодный запуск ранее прошли.
+- OAuth callback lifecycle на Windows: исправлено зависание teardown на keep-alive/probe connection через закрытие активных соединений; callback/provider tests 19/19 и `packages/agent` typecheck — PASS. Live installed OAuth с внешним authorization server остаётся отдельным незакрытым gate.
+- Удаление старого CLI и установка final candidate сохранили DPAPI-профиль; versioned executable и launcher возвращают `0.0.0-dev-202609190537` — PASS.
+- Xiaomi Token Plan: endpoint `https://token-plan-sgp.xiaomimimo.com/v1`, модель `mimo-v2.5`; live discovery и реальные Loginom tool calls в CLI подтверждены. Полная Desktop-семантика проверена scripted provider через реальный Loginom runtime; отдельный Xiaomi-driven Desktop-прогон остаётся незакрытым. Токены использовались только транзитно и нигде не записаны.
+- Исходный архив, release manifest, CLI manifest, Electron/Chromium notices, Bun licenses/source metadata и native third-party licenses включены и проверены.
+- Полный workspace install: `bun 1.3.14 install --frozen-lockfile` — PASS, lockfile не изменён; прежний внешний integrity mismatch `@solidjs/start` больше не воспроизводится.
+- Итог: нативные Windows build/package и установленные Desktop/CLI acceptance-сценарии завершены. Общий release gate остаётся `PARTIAL` до OAuth callback, отдельного Xiaomi-driven Desktop-прогона, update feed/signing и прогона на чистой Windows 11 VM/другом пользователе.
