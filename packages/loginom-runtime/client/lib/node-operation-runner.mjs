@@ -27,6 +27,8 @@ export function createNodeOperationRunner({run,validate,progress}) {
  };
  return Object.freeze({
   get busy(){return [...jobs.values()].some(job=>job.state==='running');},
+  get unsettled(){return [...jobs.values()].some(job=>job.state==='running'||job.outcome?.status==='AMBIGUOUS'
+    ||job.outcome?.effect_possible===true&&job.outcome?.cleanup_complete!==true);},
   start(request,{resume=false}={}) {
    request=structuredClone(request);checkId(request.operation_id);
    const signature=digest({request,handler_revision:validate(request)}),old=jobs.get(request.operation_id);

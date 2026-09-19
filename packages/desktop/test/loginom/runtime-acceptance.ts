@@ -119,10 +119,22 @@ async function waitNode(child: Child, operation: string) {
   while (Date.now() < deadline) {
     const body = await call(child, "dock_node_wait", { operation_id: operation, timeout_ms: 60_000 })
     if (body.state !== "settled") continue
-    if (body.status !== "SUCCEEDED" || body.cleanup_complete !== true) throw Error(`NODE_FAILED_${operation}`)
     return body
   }
   throw Error("NODE_DEADLINE_EXCEEDED")
+}
+async function applyNode(child: Child, request: Record<string, unknown> & { operation_id: string }) {
+  let body = await call(child, "dock_node_apply", request)
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    if (body.state !== "settled") body = await waitNode(child, request.operation_id)
+    if (body.status === "SUCCEEDED" && body.cleanup_complete === true) return body
+    if (body.status !== "AMBIGUOUS") break
+    // The settled dock_node_wait result is already the required inspection.
+    // During an unresolved mutation the dynamic tool gate advertises resume,
+    // while an additional status call is intentionally unavailable.
+    body = await call(child, "dock_node_resume", request)
+  }
+  throw Error(`NODE_FAILED_${request.operation_id}`)
 }
 
 function verify(
@@ -172,12 +184,25 @@ async function dataset(label: "A" | "B") {
     const artifact = prepared.input_artifacts[0]
     if (artifact.sha256 !== createHash("sha256").update(bytes).digest("hex"))
       throw Error("ATTACHMENT_IDENTITY_MISMATCH")
-    const delivery = await call(child, "dock_artifact_deliver", {
-      operation_id: `deliver-${label}`,
+    const deliveryOperation = `deliver-${label}`
+    let delivery = await call(child, "dock_artifact_deliver", {
+      operation_id: deliveryOperation,
       artifact_id: artifact.artifact_id,
       upload_grant_id: artifact.upload.grant_id,
       budget_ms: 90000,
     })
+    // A visible Windows browser can lose the immediate upload response after
+    // Loginom has accepted it. Inspect and resume the same retained operation;
+    // never authorize a replacement upload with a new operation ID.
+    for (let attempt = 1; delivery.status === "AMBIGUOUS" && attempt <= 3; attempt++) {
+      // The settled delivery result itself is the retained status inspection.
+      if (!delivery.output?.inspection_required) break
+      delivery = await call(child, "dock_artifact_delivery_resume", {
+        operation_id: deliveryOperation,
+        resume_id: `${deliveryOperation}-resume-${attempt}`,
+        budget_ms: 120000,
+      })
+    }
     if (
       delivery.status !== "SUCCEEDED" ||
       !delivery.output.upload_completion_verified ||
@@ -189,7 +214,7 @@ async function dataset(label: "A" | "B") {
       document_id: prepared.workspace.document_id,
       workflow_ref: { workflow_id: prepared.workspace.workflow_ref.workflow_id },
     }
-    await call(child, "dock_node_apply", {
+    const importRequest = {
       ...identity,
       ...policy,
       operation_id: `import-${label}`,
@@ -212,9 +237,9 @@ async function dataset(label: "A" | "B") {
           ],
         },
       },
-    })
-    const imported = await waitNode(child, `import-${label}`)
-    await call(child, "dock_node_apply", {
+    }
+    const imported = await applyNode(child, importRequest)
+    const groupRequest = {
       ...identity,
       ...policy,
       operation_id: `group-${label}`,
@@ -227,8 +252,8 @@ async function dataset(label: "A" | "B") {
           { field: { kind: "input_field", name: valueField }, function: "sum", name: "Total", label: "Total" },
         ],
       },
-    })
-    const grouped = await waitNode(child, `group-${label}`)
+    }
+    const grouped = await applyNode(child, groupRequest)
     const values = verify(grouped, expected)
     const path = `/${config.workflow_profile.loginom_user}/loginom-ai-agent-acceptance-${chat}.lgp`
     const saved = await call(child, "dock_action_run", {

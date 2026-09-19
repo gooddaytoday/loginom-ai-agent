@@ -2305,8 +2305,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return value(...args);
     }]));
   return Object.freeze({...exposed,
-    hasActiveWork:()=>!!(running||nodeJobs.busy||delivery.busy),
-    hasUnsettledWork:()=>!!(running||pending||nodeJobs.busy||delivery.unsettled),
+    // Retained ambiguous jobs are active recovery work even while no worker is
+    // running. Keep the same host lease so the next model turn can use the
+    // explicitly bounded status/resume tools instead of dead-ending in global
+    // recovery mode.
+    hasActiveWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
+    hasUnsettledWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
     resumeArtifactDelivery:(request,options)=>delivery.resume(request,options),
     artifactDeliveryStatus:id=>delivery.status(id)});

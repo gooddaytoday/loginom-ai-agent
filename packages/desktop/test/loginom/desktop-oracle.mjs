@@ -51,9 +51,19 @@ try {
     })
     await window.api.loginom.save({ revision: current.revision, validationId: validation.validationId })
   }, input.connection)
-  // Saving starts the sidecar after the validation worker finishes. Leave
-  // enough headroom for both cold-start layers on an installed build.
-  await form.waitFor({ state: "hidden", timeout: 360000 })
+  // Direct IPC saving intentionally leaves the form's local `editing` signal
+  // untouched, so form visibility is not an authoritative readiness signal.
+  // Wait on the packaged backend state that gates actual Loginom work.
+  await page.evaluate(async () => {
+    const deadline = Date.now() + 360000
+    while (Date.now() < deadline) {
+      const current = await window.api.loginom.status()
+      if (current.state === "ready" && !current.failure) return
+      if (current.failure) throw Error(current.failure)
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+    throw Error("LOGINOM_READY_TIMEOUT")
+  })
   const server = await page.evaluate(() => window.api.awaitInitialization())
   const call = async (path, body) => {
     const response = await fetch(`${server.url}${path}?directory=${encodeURIComponent(workspace)}`, {

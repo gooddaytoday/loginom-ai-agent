@@ -45,6 +45,10 @@ export function oracleProvider(options: { directory: string; apiKey: string; onF
       const action = title ? ({ finish: true } as const) : await state.next.promise
       if (!title) state.next = Promise.withResolvers<Action>()
       if (!("finish" in action) && !body.tools?.some((tool) => tool.function?.name === action.name)) {
+        await Bun.write(
+          join(options.directory, "missing-tool.json"),
+          JSON.stringify({ requested: action.name, advertised: body.tools?.map((tool) => tool.function?.name).sort() }),
+        )
         state.pending?.reject(Error("CLI_ORACLE_TOOL_NOT_ADVERTISED"))
         return new Response("missing tool", { status: 500 })
       }
