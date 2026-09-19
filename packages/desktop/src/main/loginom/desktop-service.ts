@@ -11,5 +11,7 @@ export function desktopLoginom() {
       : resolve(import.meta.dirname, "../../resources/loginom"),
     codec: credentials(process.platform, safeStorage),
     environment: process.env,
+    headless:
+      process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING === "1" && process.env.LOGINOM_AI_AGENT_TEST_HEADLESS === "1",
   })
 }

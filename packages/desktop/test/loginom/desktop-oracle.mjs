@@ -19,6 +19,7 @@ const application = await _electron.launch({
   env: {
     ...process.env,
     LOGINOM_AI_AGENT_TEST_ONBOARDING: "1",
+    LOGINOM_AI_AGENT_TEST_HEADLESS: "1",
     LOGINOM_AI_AGENT_TEST_ROOT: profile,
     LOGINOM_AI_AGENT_PURE: "1",
     LOGINOM_AI_AGENT_CONFIG_CONTENT: JSON.stringify(input.config),
