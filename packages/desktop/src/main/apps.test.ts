@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
 
@@ -21,7 +21,7 @@ test.skipIf(process.platform !== "win32")("resolves a Windows executable directl
   process.env.PATH = `${directory}${delimiter}${originalPath ?? ""}`
 
   expect(await checkAppExists("sample-editor")).toBe(true)
-  expect(await resolveAppPath("sample-editor")).toBe(executable)
+  expect(await resolveAppPath("sample-editor")).toBe(await realpath(executable))
 })
 
 test.skipIf(process.platform !== "win32")("does not return an unresolved command wrapper", async () => {
@@ -44,5 +44,5 @@ test.skipIf(process.platform !== "win32")("resolves an executable behind a comma
   process.env.PATH = `${directory}${delimiter}${originalPath ?? ""}`
 
   expect(await checkAppExists("sample-wrapper")).toBe(true)
-  expect(await resolveAppPath("sample-wrapper")).toBe(executable)
+  expect(await resolveAppPath("sample-wrapper")).toBe(await realpath(executable))
 })
