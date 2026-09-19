@@ -35,6 +35,8 @@ try {
   await form.locator('input[autocomplete="username"]').fill(input.connection.username)
   await form.locator('input[type="password"]').nth(1).fill(input.connection.password)
   await form.locator('button[type="submit"]').click()
+  await page.waitForTimeout(3000)
+  if (await form.isVisible()) console.error(`LOGINOM_SETUP_REJECTED: ${await form.innerText()}`)
   await form.waitFor({ state: "hidden", timeout: 120000 })
   const server = await page.evaluate(() => window.api.awaitInitialization())
   const call = async (path, body) => {

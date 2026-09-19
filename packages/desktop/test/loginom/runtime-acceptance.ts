@@ -1,6 +1,7 @@
 import { clickObserved } from "./observed-click"
 import { supervise } from "@loginom-ai-agent/loginom-host/supervisor"
 import { inputStore } from "@loginom-ai-agent/loginom-host/inputs"
+import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { createHash, randomUUID } from "node:crypto"
 import { createRequire } from "node:module"
 import { mkdtemp } from "node:fs/promises"
@@ -12,6 +13,15 @@ type Child = Pick<Awaited<ReturnType<typeof supervise>>, "request" | "close">
 const configPath = process.env.LOGINOM_AI_AGENT_TEST_CONFIG
 if (!configPath) throw Error("LOGINOM_AI_AGENT_TEST_CONFIG is required")
 const config = await Bun.file(configPath).json()
+const credentialProfile = process.env.LOGINOM_AI_AGENT_TEST_CREDENTIAL_PROFILE
+if (credentialProfile) {
+  const connection = await Bun.file(join(credentialProfile, "loginom/connection/connection.json")).json()
+  const secrets = await cliCredentials("win32").decode(connection.secrets)
+  config.api_key = secrets.apiKey
+}
+const mcpConfig = process.env.LOGINOM_AI_AGENT_TEST_MCP_CONFIG
+if (mcpConfig) config.api_key = (await Bun.file(mcpConfig).json()).api_key
+if (process.env.LOGINOM_AI_AGENT_TEST_API_KEY) config.api_key = process.env.LOGINOM_AI_AGENT_TEST_API_KEY
 if (config.workflow_profile?.passwordless_login !== true) throw Error("TEST_PASSWORD_UNAVAILABLE")
 const resources = resolve(
   process.env.LOGINOM_AI_AGENT_TEST_RESOURCES ?? join(import.meta.dir, "../../resources/loginom"),
