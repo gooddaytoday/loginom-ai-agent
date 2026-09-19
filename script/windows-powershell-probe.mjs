@@ -11,11 +11,11 @@ const entries = Object.entries(process.env).filter(
 
 // Delta-debug only the synthetic probe's environment. Never print values or
 // subprocess diagnostics, and never put credentials in the child environment.
-function probe(selected, timeout = 3000) {
+function probe(selected, timeout = 3000, command = source) {
   const started = Date.now()
   const result = spawnSync(
     win32.join(root, "System32/WindowsPowerShell/v1.0/powershell.exe"),
-    ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(source, "utf16le").toString("base64")],
+    ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(command, "utf16le").toString("base64")],
     {
       env: { SystemRoot: root, ...Object.fromEntries(selected) },
       windowsHide: true,
@@ -30,21 +30,16 @@ function probe(selected, timeout = 3000) {
 }
 
 if (!probe(entries, 15000)) throw Error("Inherited non-secret environment failed")
-let selected = entries
-let chunks = 2
-while (selected.length) {
-  const size = Math.ceil(selected.length / chunks)
-  let reduced = false
-  for (let start = 0; start < selected.length; start += size) {
-    const candidate = selected.filter((_, index) => index < start || index >= start + size)
-    if (!probe(candidate)) continue
-    selected = candidate
-    chunks = Math.max(2, chunks - 1)
-    reduced = true
-    break
-  }
-  if (reduced) continue
-  if (chunks >= selected.length) break
-  chunks = Math.min(selected.length, chunks * 2)
+console.log(JSON.stringify({ moduleSearchDirectories: process.env.PSModulePath?.split(";") }))
+for (const [name, prefix] of Object.entries({
+  runtimePath: "$env:PSModulePath = [IO.Path]::Combine($PSHOME, 'Modules'); ",
+  explicitModules:
+    "$PSModuleAutoLoadingPreference = 'None'; Import-Module ([IO.Path]::Combine($PSHOME, 'Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1')); Import-Module ([IO.Path]::Combine($PSHOME, 'Modules/Microsoft.PowerShell.Management/Microsoft.PowerShell.Management.psd1')); ",
+})) {
+  console.log(name)
+  probe([], 3000, prefix + source)
 }
-console.log(JSON.stringify({ minimalKeys: selected.map(([key]) => key) }))
+for (const path of process.env.PSModulePath?.split(";") ?? []) {
+  console.log(JSON.stringify({ moduleDirectory: path }))
+  probe([["PSModulePath", path]])
+}
