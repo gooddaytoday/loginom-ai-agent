@@ -6,7 +6,7 @@
 - Платформа: Windows 11 Pro x64, native session, build `10.0.26200`.
 - Product commit: `17dc05a49ea3f1318c65f4e712116bd1a437b47f`, clean checkout (`sourceDirty: false`).
 - Реализация сборки, упаковки и статической проверки завершена. Установленные Desktop, CLI `run` и CLI TUI прошли полный сценарий 55/101 с независимым холодным открытием; совместная работа Desktop/CLI проверена в обоих порядках закрытия.
-- Release gate не объявлен `PASS`: не выполнены clean-VM/другой Windows-пользователь, OAuth callback, отдельный Xiaomi-driven Desktop-прогон, update feed и подписывание.
+- Release gate не объявлен `PASS`: не выполнены clean-VM/другой Windows-пользователь и отдельный Xiaomi-driven Desktop-прогон. Update feed и подписывание исключены из согласованного локального candidate.
 
 ## Сборка и артефакты
 
@@ -57,6 +57,7 @@ Desktop development installer имеет `NotSigned`, что ожидаемо д
 | Parent/runtime/Chromium crash | PASS | force-kill each target; 11/10/10 tracked processes, zero live descendants |
 | Cancel/network/recovery | PASS | ConPTY Ctrl+C; relay severed 16 sockets; 20 processes exited; `recoverable-error` then setup restored `ready` generation 2 |
 | OAuth callback lifecycle | PASS (local) | IPv4 loopback, callback response, state/error handling and Windows connection teardown; 19/19 tests |
+| Installed Desktop OAuth | PASS | protected-resource discovery, dynamic registration, system authorize → loopback callback, token exchange, authorized MCP connect |
 | CLI uninstall/reinstall | PASS | profile preserved; final installed version verified |
 | Sources/licenses/notices | PASS | source archive and runtime/native license materials included |
 | CI definition | PASS (source) | Windows workflow added; no remote GitHub run was performed |
@@ -71,6 +72,8 @@ Desktop/CLI independence evidence: `C:\Git\laa-desktop-temp\loginom-desktop-cli-
 
 Network fault evidence: `%TEMP%\loginom-cli-owner-crash-iujvX1`.
 
+Installed Desktop OAuth evidence: `%TEMP%\loginom-installed-oauth-kWxeK8`.
+
 TUI observations:
 
 - dataset A: Alpha `35`, Beta `20`, total `55`;
@@ -84,9 +87,8 @@ TUI observations:
 Перед release необходимо:
 
 1. Выполнить installed Desktop/CLI на чистой Windows 11 VM и под вторым Windows-пользователем.
-2. Пройти OAuth callback. Native cancel/network/recovery и parent/runtime/Chromium crash cleanup уже прошли.
-3. Выполнить отдельный Xiaomi-driven Desktop-прогон; CLI live discovery и реальные Loginom tool calls уже подтверждены.
-4. Подготовить подписанный installer и собственный update feed, затем выполнить update acceptance. Remove/reinstall с сохранением профиля уже прошёл.
-5. Запустить добавленный workflow в GitHub; `windows-2022` подтверждает build/static границу, но не заменяет Windows 11 installed acceptance.
+2. Выполнить отдельный Xiaomi-driven Desktop-прогон; CLI live discovery и реальные Loginom tool calls уже подтверждены. Installed Desktop OAuth callback уже прошёл.
+3. Для будущего публичного release, вне согласованного локального candidate, подготовить подписанный installer и собственный update feed. Remove/reinstall с сохранением профиля уже прошёл.
+4. Запустить добавленный workflow в GitHub; `windows-2022` подтверждает build/static границу, но не заменяет Windows 11 installed acceptance.
 
 Секреты не включены. Временный `script/windows-oracle.acceptance.json` в передачу не входит.
