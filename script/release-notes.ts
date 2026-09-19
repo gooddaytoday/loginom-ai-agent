@@ -100,6 +100,7 @@ const notes = [
   "- CI is credential-free and does not replace installed GUI, Keychain/DPAPI or live Loginom/provider acceptance for this exact build.",
   "- Settings: saved-key indicator, Save closes after success, Check tests the current draft, Close/Escape confirm unsaved changes.",
   "- Public automatic update feed remains disabled; install updates manually.",
+  "- Native proxy support is limited to manual HTTP/HTTPS policies; automatic PAC/WPAD policies fail explicitly.",
   "",
   "## Assets",
   "",

@@ -105,9 +105,19 @@ test("automatic, scoped, authenticated and unrepresentable policies fail without
 })
 
 test.skipIf(process.platform !== "win32")(
-  "native Windows current-user proxy policy is representable",
+  "native Windows proxy collection preserves manual routes or explicitly rejects automatic policy",
   () => {
-    const value = loadNativeProxy(process.env, "win32")
+    let value: ReturnType<typeof loadNativeProxy>
+    try {
+      value = loadNativeProxy(process.env, "win32")
+    } catch (error) {
+      // Clean Windows runners enable auto-detection. Successful native reading
+      // must reject that unsupported policy, not silently choose a direct route.
+      expect(error).toEqual(new Error("SYSTEM_PROXY_AUTOMATIC_UNSUPPORTED"))
+      expect(() => loadSystemProxyEnvironment(process.env)).toThrow("SYSTEM_PROXY_AUTOMATIC_UNSUPPORTED")
+      expect(() => loadCliProxyEnvironment(process.env)).toThrow("SYSTEM_PROXY_AUTOMATIC_UNSUPPORTED")
+      return
+    }
     expect(value === undefined || value.NODE_USE_ENV_PROXY === "1").toBe(true)
     const desktop = loadSystemProxyEnvironment(process.env)
     const cli = loadCliProxyEnvironment(process.env)
