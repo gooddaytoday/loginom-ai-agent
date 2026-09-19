@@ -1,5 +1,11 @@
 # Linux: завершение реализации — 2026-09-16
 
+Отдельное Windows-only обновление 2026-09-19: установлен Desktop 0.1.5 с
+понятной маской сохранённого ключа, check без сохранения, save/close и защитой
+несохранённых изменений. Packaged GUI и реальный installed Dock/Loginom smoke
+прошли. [Отчёт](../testing/loginom-ai-agent/reports/2026-09-19-settings-ux/report.md).
+Это не повтор Linux-проверок и не изменение установленного Linux Desktop/CLI.
+
 **Закрытие технической standalone Linux-цели — 2026-09-18.**
 Этапы 1–5 выполнены и проверены в рамках Linux-only scope. Пользователь отложил
 полный юридический third-party/source/relinking audit как отдельную работу

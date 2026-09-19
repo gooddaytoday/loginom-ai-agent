@@ -133,7 +133,9 @@ try {
   await form.getByRole("button", { name: saveName }).click()
   await expect(form).toHaveCount(0)
 
-  await page.keyboard.press("Control+,")
+  await page.getByRole("button", { name: /Loginom AI Agent/ }).click()
+  await page.getByRole("menuitem", { name: /^(File|Файл)$/ }).hover()
+  await page.getByRole("menuitem", { name: /^(Settings|Настройки)/ }).click()
   await page.getByRole("tab", { name: "Loginom", exact: true }).click()
   await expect(form.getByRole("button", { name: checkName })).toBeEnabled()
   await username().fill("from-general-settings")
@@ -172,6 +174,11 @@ try {
   }
   await writeFile(join(evidence, "summary.json"), JSON.stringify(summary, null, 2))
   console.log(JSON.stringify({ ...summary, evidence }))
+} catch (error) {
+  const page = await application.firstWindow()
+  await page.screenshot({ path: join(evidence, "failure.png") }).catch(() => {})
+  console.error(`Settings UX evidence: ${evidence}`)
+  throw error
 } finally {
   await application.close()
 }
