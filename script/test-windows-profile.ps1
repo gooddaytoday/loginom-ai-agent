@@ -38,19 +38,19 @@ try {
   $stderr = Join-Path $stage.FullName 'stderr.log'
   # CreateProcessWithLogonW limits argv to 1024 characters. Use a short file
   # invocation instead of expanding this test wrapper into an encoded command.
-  $child = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') `
+  $profileProcess = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') `
     -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', "`"$PSCommandPath`"", '-Child', '-BunPath', "`"$bun`"") `
     -Credential $credential -LoadUserProfile -UseNewEnvironment -WindowStyle Hidden `
     -WorkingDirectory (Join-Path $repo 'packages/loginom-host') `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
-  if (-not $child.WaitForExit(120000)) {
-    $child.Kill()
-    $child.WaitForExit()
+  if (-not $profileProcess.WaitForExit(120000)) {
+    $profileProcess.Kill()
+    $profileProcess.WaitForExit()
     throw 'Native profile test exceeded its process deadline'
   }
   Get-Content -LiteralPath $stdout
   Get-Content -LiteralPath $stderr
-  if ($child.ExitCode -ne 0) { throw "Native profile test failed with exit code $($child.ExitCode)" }
+  if ($profileProcess.ExitCode -ne 0) { throw "Native profile test failed with exit code $($profileProcess.ExitCode)" }
 } finally {
   # Only remove the uniquely named account this script just created. Its files
   # remain on the disposable runner for job diagnostics, never on a user PC.
