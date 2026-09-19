@@ -1,6 +1,8 @@
 import { DESKTOP_NATIVE_ENGLISH } from "./desktop-native"
 
-export const dict = {
+// English is the designer-written source. Missing locales reuse these strings
+// byte-for-byte as the established fallback; do not invent translations.
+export const LOGINOM_ENGLISH = {
   "loginom.saveClose": "Save and close",
   "loginom.saving": "Saving settings…",
   "loginom.applying": "Applying settings…",
@@ -53,6 +55,10 @@ export const dict = {
   "loginom.checking": "Checking connection…",
   "loginom.cancel": "Cancel pending changes",
   "loginom.reload": "Reload current settings",
+} as const
+
+export const dict = {
+  ...LOGINOM_ENGLISH,
 
   ...DESKTOP_NATIVE_ENGLISH,
   "command.category.suggested": "Suggested",

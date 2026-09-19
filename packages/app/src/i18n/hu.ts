@@ -1,4 +1,5 @@
 import { DESKTOP_NATIVE_KEYS } from "./desktop-native"
+import { LOGINOM_ENGLISH } from "./en"
 
 const desktop = [
   "Loginom AI Agent",
@@ -94,6 +95,7 @@ const desktop = [
 ]
 
 export const dict = {
+  ...LOGINOM_ENGLISH,
   ...Object.fromEntries(DESKTOP_NATIVE_KEYS.map((key, index) => [key, desktop[index]])),
   "command.category.suggested": "Javasolt",
   "command.category.view": "Nézet",

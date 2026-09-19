@@ -1,4 +1,5 @@
 import { Flag } from "@loginom-ai-agent/core/flag/flag"
+import { productChannel, productSlug } from "@loginom-ai-agent/product"
 import { Effect } from "effect"
 import path from "path"
 
@@ -11,8 +12,9 @@ process.env.XDG_CONFIG_HOME = path.join(exerciseGlobalRoot, "config")
 process.env.XDG_STATE_HOME = path.join(exerciseGlobalRoot, "state")
 process.env.XDG_CACHE_HOME = path.join(exerciseGlobalRoot, "cache")
 process.env.LOGINOM_AI_AGENT_DISABLE_SHARE = "true"
-export const exerciseConfigDirectory = path.join(exerciseGlobalRoot, "config", "opencode")
-export const exerciseDataDirectory = path.join(exerciseGlobalRoot, "data", "opencode")
+const app = productSlug(productChannel(process.env.LOGINOM_AI_AGENT_CHANNEL ?? "prod"))
+export const exerciseConfigDirectory = path.join(exerciseGlobalRoot, "config", app)
+export const exerciseDataDirectory = path.join(exerciseGlobalRoot, "data", app)
 
 const preserveExerciseDatabase = !!process.env.LOGINOM_AI_AGENT_HTTPAPI_EXERCISE_DB
 export const exerciseDatabasePath =

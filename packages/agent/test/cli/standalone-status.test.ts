@@ -5,16 +5,18 @@ import { tmpdir } from "node:os"
 import { createHash } from "node:crypto"
 import { buildKeychain } from "../../../loginom-host/script/build-keychain"
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
-import { buildNodeHost } from "../../../loginom-host/script/build-node-host"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
 
 const host = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-test-host-")))
 beforeAll(async () => {
   await buildNodeHost(host)
-})
+}, 60_000)
 afterAll(async () => {
   await rm(host, { recursive: true, force: true })
 })
+// CI provisions the pinned Node through LOGINOM_AI_AGENT_TEST_NODE; locally the Desktop build stages it under resources.
+const bundledNode =
+  process.env.LOGINOM_AI_AGENT_TEST_NODE ?? resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node")
 
 test("standalone exits after failed host cleanup despite retained process handles", async () => {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-failed-exit-")))
@@ -22,10 +24,7 @@ test("standalone exits after failed host cleanup despite retained process handle
     const bundle = join(directory, "bundle")
     await mkdir(join(bundle, "bin"), { recursive: true })
     await mkdir(join(bundle, "host"))
-    await symlink(
-      process.env.LOGINOM_AI_AGENT_TEST_NODE ?? resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node"),
-      join(bundle, "bin/node"),
-    )
+    await symlink(bundledNode, join(bundle, "bin/node"))
     if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
     await writeFile(
       join(bundle, "host/node-host.mjs"),
@@ -82,10 +81,7 @@ test("actual standalone status launches bundled Node and releases the isolated p
   try {
     const bundle = join(directory, "bundle")
     await mkdir(join(bundle, "bin"), { recursive: true })
-    await symlink(
-      process.env.LOGINOM_AI_AGENT_TEST_NODE ?? resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node"),
-      join(bundle, "bin/node"),
-    )
+    await symlink(bundledNode, join(bundle, "bin/node"))
     if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
     await cp(host, join(bundle, "host"), { recursive: true })
     const child = Bun.spawn([process.execPath, "run", "./src/standalone.ts", "loginom", "status", "--format", "json"], {
@@ -108,7 +104,7 @@ test("actual standalone status launches bundled Node and releases the isolated p
     expect(await child.exited).toBe(0)
     expect(await errors).toBe("")
     expect(JSON.parse(await out)).toMatchObject({ state: "unconfigured", hasApiKey: false, generation: 0 })
-    expect(await readdir(directory)).toEqual(["bundle", "profile"])
+    expect((await readdir(directory)).sort()).toEqual(["bundle", "profile"])
     expect(await readdir(join(directory, "profile"))).not.toContain(".writer")
     expect(await readdir(join(directory, "profile", "loginom"))).not.toContain("runtime")
     const run = Bun.spawn(
@@ -154,10 +150,7 @@ test("management commands share durable setup and recovery semantics through the
     const profile = join(directory, "profile")
     await mkdir(join(bundle, "bin"), { recursive: true })
     await mkdir(join(bundle, "runtime/src"), { recursive: true })
-    await symlink(
-      process.env.LOGINOM_AI_AGENT_TEST_NODE ?? resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node"),
-      join(bundle, "bin/node"),
-    )
+    await symlink(bundledNode, join(bundle, "bin/node"))
     if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
     await cp(host, join(bundle, "host"), { recursive: true })
     await writeFile(join(bundle, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test" }))
@@ -549,3 +542,12 @@ test("management commands share durable setup and recovery semantics through the
     await rm(directory, { recursive: true, force: true })
   }
 }, 90_000)
+
+// Bun.build inside the test runner intermittently fails with EISDIR on bundled dependencies
+// (seen with fast-check under effect), so the host is built by the script in its own process.
+async function buildNodeHost(output: string) {
+  const script = resolve(import.meta.dir, "../../../loginom-host/script/build-node-host.ts")
+  const child = Bun.spawn([process.execPath, "run", script, output], { stdout: "inherit", stderr: "pipe" })
+  const stderr = await new Response(child.stderr).text()
+  if ((await child.exited) !== 0) throw new Error(`LOGINOM_HOST_BUILD_FAILED\n${stderr}`)
+}

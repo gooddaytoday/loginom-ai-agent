@@ -6,15 +6,20 @@ import { nativeResourceCandidates } from "./native-resource-candidates"
 import { buildPhase } from "./build-phase"
 import { buildKeychain } from "./build-keychain"
 import release from "../../product/loginom-release.json"
-import releaseWorkflow from "../../loginom-runtime/client/lib/release-workflow.json"
+import catalogs from "../../product/loginom-catalogs.json"
 
 export function actionCatalogForPlatform(platform: string) {
-  const selected = releaseWorkflow.platforms[platform as keyof typeof releaseWorkflow.platforms]
+  const target =
+    platform === "darwin"
+      ? "darwin-arm64"
+      : platform === "win32"
+        ? "win32-x64"
+        : platform === "linux"
+          ? "linux-x64"
+          : undefined
+  const selected = target ? catalogs[target] : undefined
   if (!selected) throw new Error("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
-  return {
-    actionManifestUri: selected.manifest_uri,
-    actionManifestSha256: selected.manifest_sha256,
-  }
+  return selected
 }
 
 // Shared build-time staging; never imported by runtime entrypoints.

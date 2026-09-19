@@ -48,7 +48,7 @@ await buildCommand({
   env,
   timeout: 10 * 60_000,
 })
-await $`git archive --format=tar.gz --output=${join(output, `loginom-ai-agent-${args.version}-source.tar.gz`)} ${commit}`.cwd(
+await $`git archive --format=tar.gz --output=${join(output, `loginom-ai-agent-${args.version}-macos-source.tar.gz`)} ${commit}`.cwd(
   root,
 )
 await $`${process.execPath} scripts/release/write-manifest.ts --target darwin-arm64 --version ${args.version} --channel ${channel} --dist ${output} --resources ${join(desktop, "resources/loginom")} --output ${join(output, "release-manifest.json")}`

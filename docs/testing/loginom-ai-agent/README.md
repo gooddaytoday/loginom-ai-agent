@@ -5,12 +5,13 @@
 [standalone CLI](../../superpowers/specs/2026-09-17-loginom-cli-standalone-design.md);
 проверки установленного Desktop ниже остаются историческими доказательствами своих сборок.
 
-Статус на 2026-09-18: для Windows есть локальный неподписанный build candidate и
-отдельный CI сборки/статических package-проверок; установленная Windows 11
-приёмка и release signing ещё не пройдены. macOS остаётся планом нативных
-проверок; выполненные Linux-проверки описаны в
-[отдельном отчёте](reports/2026-09-16-linux/report.md). Нативную отладку Windows
-и macOS выполняют отдельные агенты на соответствующих машинах. Здесь определены
+Статус на 2026-09-19: нативные реализации Windows и macOS объединены с Linux в
+`main`. Установленная Windows-проверка обновлённой формы настроек описана в
+[отчёте settings UX](reports/2026-09-19-settings-ux/report.md), macOS — в
+[нативном отчёте](reports/2026-09-19-macos/report.md), Linux — в
+[отдельном отчёте](reports/2026-09-16-linux/report.md). Эти результаты относятся
+к указанным в отчётах версиям и хешам. Общий [релизный CI](ci-release.md)
+требует успеха всех трёх платформ; доверенные подписи ещё не настроены. Здесь определены
 входные материалы, порядок проверки и формат доказательств. Эти документы не
 разрешают публикацию релиза или изменение рабочего сервера Loginom.
 
@@ -152,6 +153,7 @@ REC-01/CON-07 выполняются на одноразовом тестово�
 - [Linux candidate CI](../../../.github/workflows/loginom-desktop.yml) и
   [setup-bun](../../../.github/actions/setup-bun/action.yml) остаются отдельными
   путями сборки; успешная проверка одной платформы не подтверждает другую.
+- Общий [release.yml](../../../.github/workflows/release.yml) собирает Desktop/CLI всех трёх платформ; [test.yml](../../../.github/workflows/test.yml) проверяет исходники. См. [CI runbook](ci-release.md).
 - [Desktop entry](../../../packages/desktop/src/main/index.ts), [sidecar](../../../packages/desktop/src/main/sidecar.ts), [logging](../../../packages/desktop/src/main/logging.ts): точки выбора backend, пути профиля и экспорт логов.
 
 Все эти ссылки — отправные точки для адаптации. Наличие существующего build script не означает готовность Loginom дистрибутива или правильное включение перенесённого Dock. В Linux-реализации backend уже перемещён из `packages/opencode` в `packages/agent`, namespace пакетов — `@loginom-ai-agent/*`, переменные — `LOGINOM_AI_AGENT_*`. Целевые app ID: `com.loginom.aiagent`, `com.loginom.aiagent.beta`, `com.loginom.aiagent.dev`. Manifest должен отражать итоговые пути и имена проверяемой сборки.

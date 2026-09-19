@@ -30,7 +30,7 @@ test("matches the rounded panel corners to the dark new-session background", asy
     ({ directory, draftID, server }) => {
       localStorage.setItem("settings.v3", JSON.stringify({ general: { newLayoutDesigns: true } }))
       localStorage.setItem("loginom-ai-agent-theme-id", "oc-2")
-      localStorage.setItem("opencode-color-scheme", "dark")
+      localStorage.setItem("loginom-ai-agent-color-scheme", "dark")
       localStorage.setItem(
         "loginom-ai-agent.global.dat:server",
         JSON.stringify({

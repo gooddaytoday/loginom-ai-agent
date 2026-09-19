@@ -173,5 +173,6 @@ const table = sqliteTable("session", {
 - [Application settings and onboarding](packages/app/AGENTS.md)
 - [Shared UI and new-chat branding](packages/ui/AGENTS.md)
 - [Model/backend integration](packages/agent/AGENTS.md)
+- [CI: release builds and test workflows](docs/testing/loginom-ai-agent/ci-release.md)
 
 Before resuming release work, read the [canonical Linux checkpoint](docs/migration/linux-implementation-checkpoint.md) and [platform runbooks](docs/testing/loginom-ai-agent/README.md). Reports distinguish tested installed artifacts from source-only checks. Keep durable decisions here or in the owning module; keep secrets and raw diagnostic logs out of git. Historical release reports retain the paths/version that were actually tested.

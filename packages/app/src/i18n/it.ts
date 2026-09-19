@@ -1,4 +1,7 @@
+import { LOGINOM_ENGLISH } from "./en"
+
 export const dict = {
+  ...LOGINOM_ENGLISH,
   "command.category.suggested": "Suggeriti",
   "command.category.view": "Visualizzazione",
   "command.category.project": "Progetto",

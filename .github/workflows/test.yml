@@ -4,50 +4,49 @@ on:
   push:
     branches:
       - dev
+      - main
   pull_request:
   workflow_dispatch:
+  # release.yml runs this workflow as a release gate.
+  workflow_call:
 
 concurrency:
   # Keep every run on dev so cancelled checks do not pollute the default branch
   # commit history. PRs and other branches still share a group and cancel stale runs.
-  group: ${{ case(github.ref == 'refs/heads/dev', format('{0}-{1}', github.workflow, github.run_id), format('{0}-{1}', github.workflow, github.event.pull_request.number || github.ref)) }}
+  # The `tests-` prefix keeps the group apart from callers such as release.yml
+  # (group `release-<ref>`); sharing a group with the caller would cancel it.
+  group: tests-${{ case(github.ref == 'refs/heads/dev', format('{0}-{1}', github.workflow, github.run_id), format('{0}-{1}', github.workflow, github.event.pull_request.number || github.ref)) }}
   cancel-in-progress: true
 
+# Callers may pass no more than `contents: read`; nothing here needs more.
 permissions:
   contents: read
-  checks: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   unit:
-    name: unit (${{ matrix.settings.name }})
-    strategy:
-      fail-fast: false
-      matrix:
-        settings:
-          - name: linux
-            host: blacksmith-4vcpu-ubuntu-2404
-          - name: windows
-            host: blacksmith-4vcpu-windows-2025
-    runs-on: ${{ matrix.settings.host }}
-    defaults:
-      run:
-        shell: bash
+    name: unit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: "24"
 
       - name: Setup Bun
         uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      # Exports LOGINOM_AI_AGENT_TEST_NODE (pinned Node) for the loginom-host process
+      # tests; turbo.json passes it through to `@loginom-ai-agent/loginom-host#test`.
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
 
       - name: Configure git identity
         run: |
@@ -63,52 +62,70 @@ jobs:
             turbo-${{ runner.os }}-${{ hashFiles('turbo.json', '**/package.json') }}-
             turbo-${{ runner.os }}-
 
+      # Runs the `test` script of every workspace package; packages/desktop has none
+      # and is covered by the `desktop` job below. `--continue` reports every failing
+      # package instead of stopping at the first one; without it turbo 2.10 segfaults
+      # while terminating the remaining tasks on GitHub-hosted runners. Streamed log
+      # order shows which package is still running when a task hangs. Two parallel
+      # tasks keep the agent CLI subprocess tests (15-30 s budgets) from starving on
+      # the 4-vCPU runner; the agent suite is the long pole either way.
       - name: Run unit tests
-        timeout-minutes: 20
-        run: GITHUB_ACTIONS=false bun turbo test
-        env:
-          LOGINOM_AI_AGENT_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
+        timeout-minutes: 30
+        run: GITHUB_ACTIONS=false bun turbo test --continue --log-order=stream --concurrency=2
 
       - name: Check generated client
-        if: runner.os == 'Linux'
         working-directory: packages/client
         run: bun run check:generated
 
       - name: Run HttpApi exerciser gates
-        if: runner.os == 'Linux'
         working-directory: packages/agent
         run: bun run test:httpapi
 
-  e2e:
-    name: e2e (${{ matrix.settings.name }})
-    strategy:
-      fail-fast: false
-      matrix:
-        settings:
-          - name: linux
-            host: blacksmith-4vcpu-ubuntu-2404
-          - name: windows
-            host: blacksmith-4vcpu-windows-2025
-    runs-on: ${{ matrix.settings.host }}
-    env:
-      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
-    defaults:
-      run:
-        shell: bash
+  desktop:
+    name: desktop
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      # Runs every desktop test file except src/main/draft-store.test.ts: draft-store.ts
+      # imports `node:sqlite`, which Electron's Node provides but Bun 1.3.14 does not
+      # ("No such built-in module: node:sqlite"), so `bun test` cannot load that module.
+      - name: Run desktop tests
+        working-directory: packages/desktop
+        run: bun test --path-ignore-patterns=src/main/draft-store.test.ts
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      # The app e2e suite uses @playwright/test from the root catalog. Keep its browsers
+      # apart from the pinned Loginom runtime browser (setup-loginom-inputs), which is a
+      # different Playwright version.
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      # Runs after setup-bun, which installs the latest Node 24, so 24.15 is first on PATH
+      # for `bunx playwright` and `playwright test`.
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           # Playwright 1.59 hangs while extracting Chromium with Node 24.16.
           node-version: "24.15"
-
-      - name: Setup Bun
-        uses: ./.github/actions/setup-bun
 
       - name: Read Playwright version
         id: playwright-version
@@ -124,7 +141,6 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}-chromium
 
       - name: Install Playwright system dependencies
-        if: runner.os == 'Linux'
         working-directory: packages/app
         run: bunx playwright install-deps chromium
 
@@ -143,7 +159,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: playwright-${{ matrix.settings.name }}-${{ github.run_attempt }}
+          name: playwright-linux-${{ github.run_attempt }}
           if-no-files-found: ignore
           retention-days: 7
           path: |

@@ -1,4 +1,7 @@
+import { LOGINOM_ENGLISH } from "./en"
+
 export const dict: Record<string, string> = {
+  ...LOGINOM_ENGLISH,
   "desktop.menu.app": "Loginom AI Agent",
   "desktop.menu.file": "ཡིག༌སྣོད",
   "desktop.menu.edit": "ཞུན༌དག",
