@@ -256,12 +256,24 @@ async function dataset(label: "A" | "B") {
 async function reopen(saved: Awaited<ReturnType<typeof dataset>>) {
   const path = join(directory, `saved-${saved.label}.json`)
   await Bun.write(path, JSON.stringify(saved))
+  // The independent reader only needs the Loginom endpoint and passwordless test
+  // identity.  Give it an explicit secret-free config instead of persisting the
+  // transient API key recovered from DPAPI for the parent acceptance process.
+  const coldConfigPath = join(directory, "cold-readback-config.json")
+  await Bun.write(
+    coldConfigPath,
+    JSON.stringify({
+      api_key: "acceptance-secret-not-required",
+      loginom_url: config.loginom_url,
+      workflow_profile: config.workflow_profile,
+    }),
+  )
   const child = Bun.spawn(
     [
       join(resources, "bin/node"),
       join(import.meta.dir, "cold-readback.mjs"),
       "--config",
-      configPath!,
+      coldConfigPath,
       "--resources",
       resources,
       "--saved",

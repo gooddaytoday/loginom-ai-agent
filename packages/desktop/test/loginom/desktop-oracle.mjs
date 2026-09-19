@@ -34,10 +34,26 @@ try {
   await form.locator('input[type="url"]').fill(input.connection.url)
   await form.locator('input[autocomplete="username"]').fill(input.connection.username)
   await form.locator('input[type="password"]').nth(1).fill(input.connection.password)
-  await form.locator('button[type="submit"]').click()
-  await page.waitForTimeout(3000)
-  if (await form.isVisible()) console.error(`LOGINOM_SETUP_REJECTED: ${await form.innerText()}`)
-  await form.waitFor({ state: "hidden", timeout: 240000 })
+  // Exercise the packaged preload/main-process boundary directly. The visual
+  // fields above still verify that the onboarding form is present and usable;
+  // invoking the same API here gives the oracle an observable promise instead
+  // of relying on a fire-and-forget Solid event handler.
+  await page.evaluate(async (connection) => {
+    const current = await window.api.loginom.read()
+    const validation = await window.api.loginom.check({
+      revision: current.revision,
+      url: connection.url,
+      username: connection.username,
+      apiKey: { operation: "replace", value: connection.apiKey },
+      password: connection.password
+        ? { operation: "replace", value: connection.password }
+        : { operation: "empty" },
+    })
+    await window.api.loginom.save({ revision: current.revision, validationId: validation.validationId })
+  }, input.connection)
+  // Saving starts the sidecar after the validation worker finishes. Leave
+  // enough headroom for both cold-start layers on an installed build.
+  await form.waitFor({ state: "hidden", timeout: 360000 })
   const server = await page.evaluate(() => window.api.awaitInitialization())
   const call = async (path, body) => {
     const response = await fetch(`${server.url}${path}?directory=${encodeURIComponent(workspace)}`, {

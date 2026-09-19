@@ -1,7 +1,8 @@
 import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { isAbsolute, join } from "node:path"
-import { mkdir, readFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
 import { loginBrowser, checkConnection } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
@@ -18,6 +19,7 @@ const state = {
   controller: undefined,
   session: undefined,
   browser: undefined,
+  browserProfile: undefined,
   browserServer: undefined,
   inputs: new Map(),
 }
@@ -37,6 +39,8 @@ function close() {
     for (const handle of [state.client, state.bridge, state.browserServer, state.browser]) {
       results.push(...(await Promise.allSettled([Promise.resolve().then(() => handle?.close())])))
     }
+    if (state.browserProfile)
+      results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
     if (results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
   })()
   return state.closing
@@ -87,9 +91,15 @@ async function handle(message) {
         randomUUID(),
       )
       await mkdir(directory, { recursive: true, mode: 0o700 })
+      // Chromium creates nested files below user-data-dir. The normal Desktop
+      // state path is already close to MAX_PATH on Windows, so a valid profile
+      // can otherwise fail before Loginom authentication even starts.
+      const browserProfile =
+        process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
+      state.browserProfile = process.platform === "win32" ? browserProfile : undefined
       const login = {
         browserPath: resources.browserPath,
-        profile: join(directory, "browser-profile"),
+        profile: browserProfile,
         candidate: input.connection,
         headless: input.headless === true,
       }
