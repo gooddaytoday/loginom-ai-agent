@@ -1,6 +1,23 @@
 import { DESKTOP_NATIVE_ENGLISH } from "./desktop-native"
 
 export const dict = {
+  "loginom.saveClose": "Save and close",
+  "loginom.saving": "Saving settings…",
+  "loginom.applying": "Applying settings…",
+  "loginom.saved": "Loginom settings saved",
+  "loginom.ready": "The connection is ready to use.",
+  "loginom.savedPending": "Changes are saved and will apply after active Loginom tasks and operation recovery finish.",
+  "loginom.applyFailed": "Saved Loginom settings could not be applied. Open Loginom settings to review the connection.",
+  "loginom.statusUnavailable":
+    "Could not confirm whether the saved settings were applied. Open Loginom settings to check the status.",
+  "loginom.keyUnsaved": "The new key has not been saved yet.",
+  "loginom.keyStored": "A key is saved. Enter a new key to replace it.",
+  "loginom.checkedSaved": "Connection verified: the AI server is accessible and Loginom sign-in succeeded.",
+  "loginom.refresh": "Refresh settings",
+  "loginom.discardTitle": "Close without saving?",
+  "loginom.discardDescription": "Your changes will be discarded. Previously saved settings will remain unchanged.",
+  "loginom.keepEditing": "Continue editing",
+  "loginom.discardClose": "Close without saving",
   "loginom.recoveryRequired":
     "The previous run ended before Loginom operations were confirmed. Check their results in the Loginom web application before continuing. Operations will not be replayed automatically; their journals are preserved.",
   "loginom.acknowledgeRecovery": "Results checked — finish recovery",
