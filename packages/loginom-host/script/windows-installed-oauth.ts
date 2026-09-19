@@ -27,6 +27,7 @@ await protocol.connect(transport)
 const http = Bun.serve({
   hostname: "127.0.0.1",
   port: 0,
+  idleTimeout: 255,
   async fetch(request) {
     const url = new URL(request.url)
     requests.push({ pathname: url.pathname, authorized: request.headers.get("authorization") === "Bearer acceptance-access" })

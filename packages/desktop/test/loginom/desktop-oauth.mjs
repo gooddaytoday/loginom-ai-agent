@@ -81,19 +81,30 @@ try {
       permission: [{ permission: "*", pattern: "*", action: "allow" }],
     })
     const answer = await request(`/session/${session.id}/message`, "POST", {
-      model: { providerID: "xiaomi-token-plan-sgp", modelID: "mimo-v2.5" },
+      model: { providerID: "xiaomi-token-plan-sgp", modelID: "mimo-v2.5-pro" },
       parts: [
         {
           type: "text",
-          text: "Use the Loginom tools now. Call loginom_dock_prepare exactly once with intent new_draft and a unique operation_id, then briefly report whether the returned workspace is authenticated. Do not call non-Loginom tools.",
+          text: "This is an installed Desktop tool-call acceptance test. Your first action must be calling loginom_dock_prepare exactly once with intent new_draft and a unique operation_id. Do not answer with text before that call and do not call non-Loginom tools. After the completed tool result, briefly report whether the returned workspace is authenticated.",
         },
       ],
     })
     if (answer.info?.error) throw Error(`DESKTOP_XIAOMI_MODEL_${answer.info.error.name}`)
-    xiaomiTool = answer.parts?.some(
-      (part) => part.type === "tool" && part.tool === "loginom_dock_prepare" && part.state?.status === "completed",
+    const messages = await request(`/session/${session.id}/message`, "GET")
+    xiaomiTool = messages.some((message) =>
+      message.parts?.some(
+        (part) => part.type === "tool" && part.tool === "loginom_dock_prepare" && part.state?.status === "completed",
+      ),
     )
-    if (!xiaomiTool) throw Error("DESKTOP_XIAOMI_TOOL_MISSING")
+    if (!xiaomiTool) {
+      const partSummary = messages.flatMap((message) =>
+        message.parts?.map((part) => ({
+          type: part.type,
+          ...(part.type === "tool" ? { tool: part.tool, status: part.state?.status } : {}),
+        })) ?? [],
+      )
+      throw Error(`DESKTOP_XIAOMI_TOOL_MISSING_${JSON.stringify(partSummary)}`)
+    }
   }
   console.log(
     JSON.stringify({ status: "PASS", version: await application.evaluate(({ app }) => app.getVersion()), xiaomiTool }),

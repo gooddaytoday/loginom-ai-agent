@@ -9,7 +9,7 @@
 Принятые решения:
 
 - Desktop и CLI используют независимые backend v1, процессы и профили.
-- Сквозные проверки используют существующее подключение Dock и стенд `logi-test-plan.bg.local`. Проверка модели под Windows выполняется через **Xiaomi Token Plan**, endpoint `https://token-plan-sgp.xiaomimimo.com/v1`, модель `mimo-v2.5`; токен передаётся только через временную переменную окружения и не сохраняется в репозитории, плане или отчётах.
+- Сквозные проверки используют существующее подключение Dock и стенд `logi-test-plan.bg.local`. Проверка модели под Windows выполняется через **Xiaomi Token Plan**, endpoint `https://token-plan-sgp.xiaomimimo.com/v1`: discovery проверен для `mimo-v2.5`, реальные Loginom tool calls — для `mimo-v2.5-pro`. Токен передаётся только через временную переменную окружения и не сохраняется в репозитории, плане или отчётах.
 - Для тестирования создаются отдельные профили и тестовые пакеты.
 - Результат этапа — локальные неподписанные сборки.
 - Публикация, цифровая подпись, автообновление, перенос сервера, Windows ARM64 и WSL исключены.
@@ -74,7 +74,7 @@
 - [x] Реализовать общий выбор прямого соединения или прокси для URL.
 - [x] Поддержать отдельные HTTP/HTTPS-прокси, доменные и IP-шаблоны, `<local>` и loopback.
 - [x] Подключить маршрутизацию к используемым HTTP, fetch и WebSocket-вызовам Node/Bun.
-- [ ] Проверить внутренний Loginom, внешний Dock, Xiaomi Token Plan и OAuth callback одним installed-прогоном: installed Desktop уже прошёл Loginom/Dock и OAuth; подготовленный драйвер добавляет Xiaomi tool-call в ту же сессию при наличии временного `XIAOMI_API_KEY`.
+- [x] Проверить внутренний Loginom, внешний Dock, Xiaomi Token Plan и OAuth callback одним installed-прогоном: installed Desktop выполнил OAuth flow и реальный `loginom_dock_prepare` через `mimo-v2.5-pro`, tool state `completed`.
 - [x] Для неподдерживаемых режимов выдавать явную ошибку; системные настройки компьютера не изменять.
 
 ### Жизненный цикл
@@ -112,11 +112,11 @@
 - [x] Проверить запуск установленных продуктов без Node/Bun/Python в PATH.
 - [x] Проверить автономное открытие мастера настройки.
 - [x] Пройти настройку Loginom и повторный запуск Desktop/CLI: оба установленных продукта прошли настройку, перезапуск и повторное чтение профиля.
-- [x] Проверить Xiaomi Token Plan без сохранения токена: обнаружение `mimo-v2.5` и реальные вызовы Loginom-инструментов подтверждены в CLI.
+- [x] Проверить Xiaomi Token Plan без сохранения токена: обнаружение `mimo-v2.5` подтверждено; реальные вызовы Loginom-инструментов в CLI выполнены через `mimo-v2.5-pro`.
 - [x] Выполнить CSV-сценарий через Desktop: результаты 55 и 101, сохранение и независимое повторное открытие.
 - [x] Повторить CSV-сценарий через CLI `run`.
 - [x] Повторить CSV-сценарий через TUI.
-- [ ] Подтвердить реальные вызовы Loginom-инструментов через Xiaomi Token Plan в Desktop и CLI: CLI подтверждён; Desktop CSV и Loginom tools подтверждены с scripted provider, отдельный Xiaomi-driven Desktop-прогон ещё не выполнен.
+- [x] Подтвердить реальные вызовы Loginom-инструментов через Xiaomi Token Plan в Desktop и CLI: `mimo-v2.5-pro` выполнила реальные Loginom tool calls в обоих установленных продуктах; Desktop `loginom_dock_prepare` завершён со статусом `completed`.
 - [x] Проверить одновременную работу продуктов и оба порядка их закрытия.
 - [x] Проверить отмену, обрыв сети, аварийное завершение и последующее восстановление: Ctrl+C через ConPTY, network relay fault, `recoverable-error` и повторная настройка до `ready`, а также parent/runtime/Chromium crash cleanup — PASS.
 - [x] Проверить удаление и переустановку с сохранением профилей.
@@ -180,10 +180,10 @@
 - Windows process/window observer: headed Chromium smoke увидел 1 видимое окно и 10 процессов, после закрытия оставшихся окон нет — PASS. Принудительное завершение parent, managed runtime и корневого Chromium отследило соответственно 11/10/10 процессов; живых потомков после cleanup нет — PASS.
 - Installed CLI network fault: локальный relay оборвал 16 активных сокетов; 20 отслеживаемых процессов завершились, writer-lock снят, новый процесс увидел `recoverable-error`. Повторная настройка из DPAPI-профиля восстановила исходный endpoint и состояние `ready`, generation 2 — PASS. Отмена CLI через реальный Ctrl+C/ConPTY и последующий холодный запуск ранее прошли.
 - OAuth callback lifecycle на Windows: исправлено зависание teardown на keep-alive/probe connection через закрытие активных соединений; callback/provider tests 19/19 и `packages/agent` typecheck — PASS. Live installed OAuth с локальным standards-compliant authorization server также прошёл полностью.
-- Installed Desktop OAuth: реальный sidecar выполнил protected-resource discovery, dynamic client registration, системный authorize → loopback callback, token exchange и авторизованный MCP connect — PASS. Evidence root: `%TEMP%\loginom-installed-oauth-kWxeK8`. Драйвер готов продолжить в той же Desktop-сессии вызовом Loginom tool через Xiaomi, не сохраняя ключ.
+- Installed Desktop OAuth + Xiaomi: реальный sidecar выполнил protected-resource discovery, dynamic client registration, системный authorize → loopback callback, token exchange, авторизованный MCP connect и `loginom_dock_prepare` через `xiaomi-token-plan-sgp/mimo-v2.5-pro` со статусом `completed` — PASS. Evidence root: `%TEMP%\loginom-installed-oauth-PsWsKS`.
 - Удаление старого CLI и установка проверенного candidate сохранили DPAPI-профиль. Финальные Desktop `0.1.4.0` и CLI `0.0.0-dev-202609190631` установлены; повторное CLI uninstall/install вернуло `profilesPreserved: true`, launcher version smoke — PASS. Production delta финального rebuild — только Windows-safe OAuth callback teardown, Loginom runtime не менялся.
-- Xiaomi Token Plan: endpoint `https://token-plan-sgp.xiaomimimo.com/v1`, модель `mimo-v2.5`; live discovery и реальные Loginom tool calls в CLI подтверждены. Полная Desktop-семантика проверена scripted provider через реальный Loginom runtime; отдельный Xiaomi-driven Desktop-прогон остаётся незакрытым. Токены использовались только транзитно и нигде не записаны.
+- Xiaomi Token Plan: endpoint `https://token-plan-sgp.xiaomimimo.com/v1`; discovery `mimo-v2.5` и реальные Loginom tool calls через `mimo-v2.5-pro` подтверждены. Installed Desktop и CLI оба выполнили реальные Loginom-вызовы; полная детерминированная Desktop-семантика отдельно проверена scripted provider через тот же runtime. Токены использовались только транзитно и нигде не записаны.
 - Исходный архив, release manifest, CLI manifest, Electron/Chromium notices, Bun licenses/source metadata и native third-party licenses включены и проверены.
 - Финальные артефакты commit `17dc05a49`: Desktop EXE `5617c7794d5dbabfb0822aaebaecd1c25405d24cf497bf61247a1999467e7f99`; CLI ZIP `9e0da471d69c9c085fd743eac50905bcf82f746a3d90252b625609cf3834f6f9`; source archive `8ec49329af29103c0b06c9f05ec0fea7bfdb5543813538d9c7634acee662857e`; Desktop static verifier — PASS, 4371 ресурсов.
 - Полный workspace install: `bun 1.3.14 install --frozen-lockfile` — PASS, lockfile не изменён; прежний внешний integrity mismatch `@solidjs/start` больше не воспроизводится.
-- Итог: нативные Windows build/package и установленные Desktop/CLI acceptance-сценарии завершены. Общий release gate остаётся `PARTIAL` только до отдельного Xiaomi-driven Desktop-прогона; clean Windows 11 VM/другой пользователь зафиксированы как непроверенное окружение. Update feed и signing исключены из согласованного локального unsigned candidate.
+- Итог: `PASS` в согласованном объёме локального unsigned Windows candidate. Нативные build/package и обязательные installed Desktop/CLI acceptance-сценарии, включая OAuth и Xiaomi-driven Loginom tool calls, завершены. Clean Windows 11 VM/другой пользователь зафиксированы как непроверенное окружение; update feed и signing исключены из объёма.
