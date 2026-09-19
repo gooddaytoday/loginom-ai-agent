@@ -50,14 +50,19 @@ test("shows a comment button when a line number is hovered", async ({ page }) =>
   await expectAppVisible(lineNumber)
 
   const comment = review.getByRole("button", { name: "Comment", exact: true })
-  await expect(async () => {
-    await lineNumber.hover()
-    await expect(lineNumber).toHaveAttribute("data-hovered", "")
-    await expect(comment).toHaveCount(1)
-    await expect(comment).toHaveCSS("pointer-events", "auto")
-    await comment.focus()
-    await expect(comment).toBeFocused()
-  }).toPass({ timeout: 10_000 })
+  // Highlighting can replace the gutter slot after the first pointer event.
+  // Poll the idempotent hover readiness; a nested 10s assertion exhausted the
+  // entire retry budget before hover could run again against the new slot.
+  await expect
+    .poll(async () => {
+      await lineNumber.hover()
+      return comment.count()
+    })
+    .toBe(1)
+  await expect(lineNumber).toHaveAttribute("data-hovered", "")
+  await expect(comment).toHaveCSS("pointer-events", "auto")
+  await comment.focus()
+  await expect(comment).toBeFocused()
   await comment.press("Enter")
   await expect(review.getByRole("textbox")).toBeVisible()
   await expect(review.locator('[data-slot="line-comment-editor-label"]')).toHaveText("Commenting on line 1")
