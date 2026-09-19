@@ -1,8 +1,8 @@
 # macOS candidate — 2026-09-19
 
-Статус: **LOCAL ACCEPTANCE PASS; CI IN PROGRESS**. Локальные установленные
-продукты приняты в описанном ниже объёме; общий план остаётся открыт до успешного
-macOS14 CI и проверки его скачанных артефактов.
+Статус: **PASS — все семь этапов плана выполнены**. Локальные установленные
+продукты приняты в описанном ниже объёме; macOS14 CI и проверка скачанных
+артефактов завершились успешно.
 Канонический список обязательных проверок: [план](../../../../../plan.md).
 
 | Область | Кандидат / исходники | Результат |
@@ -10,7 +10,7 @@ macOS14 CI и проверки его скачанных артефактов.
 | macOS27 arm64, source checks | `6650b6d01` | PASS, восемь package-local групп |
 | macOS27 arm64, DMG/ZIP/CLI archives | `0.1.4-macos.20260919.2`, `6650b6d01` | Build/static/offline PASS |
 | macOS27, установленные Desktop/CLI | тот же candidate02 | Onboarding/model, CSV/cold readback, Unicode/chats, lifecycle, upgrade PASS |
-| macOS14 arm64, CI | run `35406024508` отменён; готовится диагностический повтор | Общий PASS ещё не получен |
+| macOS14 arm64, CI | run `35408357070` из `e1b2b57d9` | Source/build/static/offline и downloaded verification PASS |
 
 Локальные артефакты: `~/.cache/loginom-macos-build/candidate-02`.
 [Манифест](candidate-02-manifest.json), [контрольные суммы](candidate-02-SHA256SUMS).
@@ -72,8 +72,8 @@ Helper01/02 имеет одинаковый SHA256 `8e26e17ed159272dee6e715c068f
 ## Граница приёмки
 
 Приведённые ниже source, artifact и installed проверки учитываются отдельно.
-Полная приёмка CSV, совместного lifecycle и CI остаётся незавершённой до появления
-явных результатов в соответствующих разделах.
+CSV и совместный lifecycle подтверждены установленными кандидатами ниже.
+CI и скачанные артефакты также проверены; результаты приведены в заключительном разделе.
 Gatekeeper trust, Developer ID, notarization, public release и auto-update
 исключены согласованным планом. Полная GUI-приёмка на чистой macOS14 не входит в этап.
 
@@ -208,7 +208,7 @@ source checks, сборку обоих продуктов и static DMG/ZIP veri
 smoke подтвердил встроенные Node/Chromium обоих продуктов и CLI help/version,
 но Desktop probe завершился ошибкой. Старый probe скрывал stderr; добавлены
 ограниченные diagnostics (`949c30414`); CI05 `35405764130` впоследствии отменён до сборки.
-Полный CI PASS пока не заявляется. Downloaded CI04 artifacts отделены от
+На момент CI04 полный PASS не был получен. Downloaded CI04 artifacts отделены от
 локального candidate02: исходники отличаются CI memory setting; побайтовое
 равенство независимых сборок не предполагается.
 
@@ -240,5 +240,56 @@ CI06 остановлен обычной отменой после25мин об�
 Без отметок между операциями это не доказывает зависание именно codesign:
 впереди также resource inventory, Bun node-host/installer build, notices,
 manifest и archive roundtrip. CLI archive/static/offline этапы не достигнуты.
-В build-time scripts добавляются phase diagnostics и ограниченный watchdog
+В build-time scripts добавлены phase diagnostics и ограниченный watchdog
 для собственных процессов; production runtime не меняется.
+
+CI07 [`35408357070`](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35408357070)
+запущен из `e1b2b57d9469957f04433d9a7b8eccf92d96ac21`.
+Watchdog ограничивает CLI build десятью минутами плюс до30сек диагностики/cleanup.
+Два теста подтвердили штатные exit codes, завершение собственных потомков
+и сохранение постороннего процесса; Host focused12+installer1 и
+Desktop/Host typechecks прошли.
+
+CI07: source checks и общий build/static/offline шаг прошли. Задержка CLI
+из CI06 не повторилась; её первопричина остаётся неустановленной.
+Успешный offline smoke подтверждает запуск Desktop с изолированным
+тестовым Keychain; он не заменяет нативную приёмку safeStorage выше.
+
+## Итоговая проверка macOS14 CI и скачанных артефактов
+
+[CI07](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35408357070)
+завершился SUCCESS за 7 минут 57 секунд на macOS14.8.9 arm64.
+Кандидат `0.1.4-macos.7` собран из чистого
+`e1b2b57d9469957f04433d9a7b8eccf92d96ac21` с Bun1.3.14 и Node24.19.0.
+Все восемь групп source checks, сборка Desktop/CLI, статические проверки
+и семь автономных проверок прошли.
+
+После скачивания отдельно подтверждены SHA256 девяти файлов и commit
+архива исходников. На macOS27 повторно проверены DMG и ZIP (по4432ресурса),
+CLI распакован при `umask 077`: манифест5425файлов и подписи CLI/helper — PASS.
+GUI из CI-артефактов дополнительно не запускался. Полная installed-приёмка
+относится к локальному candidate02; после его commit изменялись проверки,
+диагностика сборки и CI, а не production runtime.
+
+Доказательства:
+
+- [Проверка скачанного комплекта](ci-35408357070-download-verification.json).
+- [Проверки исходников](ci-35408357070-source-checks.json),
+  [сборка](ci-35408357070-build-report.json),
+  [автономный запуск](ci-35408357070-offline-smoke.json).
+- [Повторная проверка DMG](ci-35408357070-download-static-dmg.json)
+  и [ZIP](ci-35408357070-download-static-zip.json).
+- [Манифест](ci-35408357070-release-manifest.json)
+  и [SHA256](ci-35408357070-SHA256SUMS).
+
+Скачанный комплект сохранён в
+`~/.cache/loginom-macos-build/ci-35408357070/loginom-macos14-arm64-7/candidate`.
+Actions artifact хранится14дней; локальные копии сохранены отдельно.
+Секреты провайдера и Loginom в CI и Git не передавались.
+
+Все обязательные пункты плана закрыты. Ограничения остаются прежними:
+ad-hoc подпись без Developer ID/notarization, отсутствие полной installed-GUI
+приёмки на чистой macOS14, native picker и изменённая ad-hoc identity helper
+не проверены. CI offline использует mock Keychain; нативный safeStorage/Keychain
+проверен отдельно на macOS27. Первопричина единичного CI06 stall не установлена;
+watchdog сохраняет диагностику и возвращает ошибку при повторении.

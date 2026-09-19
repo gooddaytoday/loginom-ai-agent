@@ -2,7 +2,9 @@
 
 **Отдельное macOS-продолжение — 2026-09-19.** Ветка `macos-build` реализует
 тестовый dev pipeline macOS14+ arm64: Desktop DMG/ZIP, самостоятельный CLI
-TAR.GZ, ad-hoc подписи и общий CI. Ход работы и точные границы проверок:
+TAR.GZ, ad-hoc подписи и общий CI. Все семь этапов завершены: installed-приёмка
+на macOS27 и build/static/offline CI на macOS14.8.9 плюс проверка скачанных
+артефактов — PASS. Точные версии и границы проверок:
 [macOS report](../testing/loginom-ai-agent/reports/2026-09-19-macos/report.md),
 [план](../../plan.md). Это не изменяет исторические Linux-результаты ниже.
 

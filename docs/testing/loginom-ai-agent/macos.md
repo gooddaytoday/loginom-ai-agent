@@ -4,7 +4,9 @@
 
 Текущая реализация и проверки: [отчёт](reports/2026-09-19-macos/report.md),
 [план выполнения](../../../plan.md). Результаты macOS27 и macOS14 учитываются
-раздельно. Ниже приведена процедура для ad-hoc кандидата: Developer ID,
+раздельно. Локальная installed-приёмка macOS27 и полный CI macOS14.8.9
+([run35408357070](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35408357070)),
+включая проверку скачанных артефактов, завершились PASS. Ниже приведена процедура для ad-hoc кандидата: Developer ID,
 notarization, Gatekeeper trust и auto-update не входят в этот этап.
 
 Требуются arm64, macOS14+, Command Line Tools, Bun1.3.14, полный Node24.19.0
@@ -42,6 +44,10 @@ bun packages/desktop/scripts/build-macos.ts --output "$PWD/.codex/candidate-01" 
 Node/Chromium сохраняют upstream подписи; собственные бинарники подписываются
 ad-hoc до манифестов. CLI payload находится в `cli/`, TAR.GZ — рядом с DMG/ZIP.
 Не запускайте `scripts/prepare.ts`: legacy script изменяет package.json.
+CLI-этап ограничен десятью минутами плюс до 30 секунд на диагностику и завершение.
+При таймауте журнал содержит последнюю отметку `BEGIN`/`END`, список собственных
+процессов и ограниченные native samples. Watchdog завершает только группу
+процессов этой сборки и возвращает ошибку; такой кандидат не считается принятым.
 
 Статические проверки: DMG подключается readonly, ZIP распаковывается,
 проверяются хеши, framework symlinks, arm64, подписи и минимальная ОС.

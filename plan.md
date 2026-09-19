@@ -95,11 +95,11 @@
 - [x] Добавить macOS workflow с ручным запуском и запуском при релевантных изменениях в push/PR.
 - [x] Использовать фиксированный `macos-14` arm64 и закреплённые инструменты.
 - [x] Вызывать общий сценарий сборки с теми же параметрами, что локально.
-- [ ] Выполнять проверки исходников, сборку, проверку архивов и автономные smoke-тесты.
-- [ ] Проверять запуск встроенных Node/Chromium, CLI `--help`/`--version` и Desktop без обращения к Loginom.
+- [x] Выполнять проверки исходников, сборку, проверку архивов и автономные smoke-тесты.
+- [x] Проверять запуск встроенных Node/Chromium, CLI `--help`/`--version` и Desktop без обращения к Loginom.
 - [x] Загружать архивы, SHA256, манифесты и отчёты как Actions artifacts.
 - [x] Использовать `--publish never`; не передавать в CI секреты Loginom и модельного провайдера.
-- [ ] Получить успешный CI-прогон и проверить скачанные артефакты.
+- [x] Получить успешный CI-прогон и проверить скачанные артефакты.
 
 **Результат этапа:** подтверждённая сборка и автономный запуск на macOS 14.
 
@@ -116,8 +116,8 @@
 - [x] Проверить отмену, потерю процесса, сохранение восстановления и отсутствие оставшегося Chromium.
 - [x] Проверить install/uninstall CLI и сохранение настроек/истории при замене продуктов.
 - [x] Обновить macOS runbook, standalone CLI runbook и checkpoint.
-- [ ] Сохранить отчёт с точными версиями, commit, хешами и отдельными результатами macOS 14/27.
-- [ ] Зафиксировать оставшиеся ограничения и проверить выполнение всех обязательных пунктов плана.
+- [x] Сохранить отчёт с точными версиями, commit, хешами и отдельными результатами macOS 14/27.
+- [x] Зафиксировать оставшиеся ограничения и проверить выполнение всех обязательных пунктов плана.
 
 **Результат этапа:** принятые тестовые сборки и документация для повторения работы.
 
@@ -129,10 +129,11 @@ Ad-hoc сборка не подтверждает доверие Gatekeeper и �
 
 ## Точка продолжения
 
-- **Текущий этап:** 6 — завершение macOS14 CI; итоговый отчёт этапа7.
-- **Выполнено:** этапы1–5 и локальная installed-приёмка этапа7. Кандидат02 `0.1.4-macos.20260919.2` из чистого `6650b6d017ce805eb4e6b2e250e612ac55856f16`; DMG/ZIP/CLI/source archive/manifest/SHA256 выпущены.
-- **Проверки:** source checks, local build/static/offline, installed GUI/CLI, настоящий Finder/window/activate/CmdQ, Xiaomi reply, Unicode two-chat isolation, CSV55/101+cold readback обоих продуктов, оба close orders, crash/recovery/no orphan, upgrade settings/history — PASS. Ограничения методов отражены в отдельных JSON.
-- **CI:** macOS14 source/build/static PASS; оба Node/Chromium и CLI help/version PASS. Desktop offline probe упал без достаточной диагностики. Диагностика добавлена `949c30414`; run `35405764130` отменён до сборки. В offline-only Desktop probe добавлен `--use-mock-keychain`; локальный smoke PASS. CI06 `35406024508` source/desktop build PASS, но отменён после25мин: последний вывод в CLI staging после helper codesign, smoke не достигнут. Добавляются phase diagnostics/watchdog; следующий полный CI ещё требуется. Предыдущие CI artifacts скачаны отдельно в `~/.cache/loginom-macos-build/ci-35404497837`.
-- **Доказательства:** [отчёт](docs/testing/loginom-ai-agent/reports/2026-09-19-macos/report.md); локальные артефакты `~/.cache/loginom-macos-build/candidate-02`.
-- **Следующее действие:** определить и устранить причину CI Desktop probe, получить успешный полный CI, проверить скачанные финальные artifacts, завершить отчёт и checklist.
-- **Ограничения:** Developer ID/notarization/public release/auto-update исключены планом. Полная GUI приёмка macOS14 не заявляется. Native picker не тестировался; Unicode admission подтверждён через API.
+- **Статус:** все семь этапов завершены; обязательные проверки — PASS.
+- **Локальный кандидат:** `0.1.4-macos.20260919.2`, чистый commit `6650b6d017ce805eb4e6b2e250e612ac55856f16`; DMG/ZIP/CLI/source archive/manifest/SHA256 выпущены.
+- **macOS27:** source/build/static/offline, installed GUI/CLI, Finder/window/activate/CmdQ, Xiaomi reply, Unicode two-chat isolation, CSV55/101+cold readback обоих продуктов, оба порядка закрытия, crash/recovery/no orphan, upgrade settings/history — PASS.
+- **macOS14.8.9 arm64:** [CI07 `35408357070`](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35408357070), кандидат `0.1.4-macos.7` из `e1b2b57d9469957f04433d9a7b8eccf92d96ac21`: source/build/static/offline PASS. Скачанные SHA256/source commit, повторные DMG/ZIP проверки и CLI manifest/signatures — PASS.
+- **Доказательства:** [итоговый отчёт](docs/testing/loginom-ai-agent/reports/2026-09-19-macos/report.md). Локальный candidate02 находится в `~/.cache/loginom-macos-build/candidate-02`, CI07 — в `~/.cache/loginom-macos-build/ci-35408357070/loginom-macos14-arm64-7/candidate`.
+- **Изменения:** зафиксированы и отправлены в ветку `macos-build`; исходники проверенных кандидатов сохранены в архивах.
+- **Следующее действие:** обязательной работы по этому плану не осталось. Публичный релиз требует отдельного решения и проверки Developer ID/notarization.
+- **Ограничения:** полная GUI-приёмка macOS14 не заявляется; native picker и изменённая ad-hoc identity helper не тестировались. CI offline использует mock Keychain, реальное защищённое хранилище проверено на macOS27. Единичное зависание CLI в CI06 не повторилось; причина не установлена, диагностика и watchdog сохранены.

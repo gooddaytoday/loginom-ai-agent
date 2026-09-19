@@ -1,0 +1,91 @@
+{
+  "status": "PASS",
+  "runId": 35408357070,
+  "runUrl": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35408357070",
+  "sourceCommit": "e1b2b57d9469957f04433d9a7b8eccf92d96ac21",
+  "version": "0.1.4-macos.7",
+  "channel": "dev",
+  "ci": {
+    "os": "14.8.9",
+    "platform": "darwin",
+    "arch": "arm64",
+    "bun": "1.3.14",
+    "node": "24.19.0",
+    "sourceChecks": "PASS",
+    "build": "PASS",
+    "staticDmg": "PASS",
+    "staticZip": "PASS",
+    "offlineSmoke": "PASS",
+    "offlineChecks": [
+      "desktop-node",
+      "desktop-chromium",
+      "cli-node",
+      "cli-chromium",
+      "cli-help",
+      "cli-version",
+      "desktop-onboarding-and-exit"
+    ],
+    "installedAcceptance": "NOT_RUN"
+  },
+  "download": {
+    "sha256Sums": "PASS",
+    "sourceArchiveCommit": "PASS",
+    "checksums": [
+      {
+        "file": "build-report.json",
+        "sha256": "fdd0a0be9d491544aa0e161e672812a7e3772b9f0380ee67836652f8e29287e2"
+      },
+      {
+        "file": "loginom-ai-agent-0.1.4-macos.7-source.tar.gz",
+        "sha256": "fa1d7759ef8b762f7442062a932281e0e27ee3cd3f957c6d76bc54001b20e187"
+      },
+      {
+        "file": "loginom-ai-agent-cli-0.1.4-macos.7-darwin-arm64.tar.gz",
+        "sha256": "ba09f4988b4615b80e04a849c070d607e72e35cbc76381d545427303bf7ab6bf"
+      },
+      {
+        "file": "loginom-ai-agent-mac-arm64.dmg",
+        "sha256": "58d8d1d63d91494d7ad2c861b5349e9823bcfb56143390ae086c5057fe00e23f"
+      },
+      {
+        "file": "loginom-ai-agent-mac-arm64.zip",
+        "sha256": "0a20a2c3de5eb6f76f386564faa3a15c7f4eb3c103dc49150525f7420bd7a80b"
+      },
+      {
+        "file": "offline-smoke.json",
+        "sha256": "87aabcd8d362ae2354e7b9c618b299c82be07530cc34f41712b7423e5234eea8"
+      },
+      {
+        "file": "release-manifest.json",
+        "sha256": "8d7fc849caaaf2a23e1bcd55afcfa4569293bc19f7cf5db1edf109815bd42071"
+      },
+      {
+        "file": "static-dmg.json",
+        "sha256": "6bfa83905d04fe77d7dec16a7941b02869206e1b0994b4178f03ffa666324c89"
+      },
+      {
+        "file": "static-zip.json",
+        "sha256": "12e6bd66f1cfdfd81f044310e568e0050b3ff25491a4e611f876f86313452f93"
+      }
+    ]
+  },
+  "localVerification": {
+    "os": "27.0",
+    "arch": "arm64",
+    "staticDmg": "PASS",
+    "staticZip": "PASS",
+    "resourceFilesPerDesktopArtifact": 4432,
+    "cliExtractionUmask": "077",
+    "cliManifest": "PASS",
+    "cliFileCount": 5425,
+    "cliSignature": "PASS",
+    "keychainHelperSignature": "PASS",
+    "guiStarted": false
+  },
+  "limitations": [
+    "CI Desktop offline probe uses mock Keychain and no service credentials",
+    "CI is build/static/offline acceptance on macOS14, not full installed GUI acceptance",
+    "Downloaded artifacts were verified statically on macOS27; no additional live Loginom scenario was run",
+    "Earlier CI CLI staging stall did not recur; its exact cause remains unconfirmed"
+  ]
+}
