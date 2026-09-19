@@ -4,7 +4,7 @@
 
 - Итог: `PARTIAL`.
 - Платформа: Windows 11 Pro x64, native session, build `10.0.26200`.
-- Product commit: `eedacb5ee594af7a66b6ba9b11aa7634bb8f531e`, clean detached checkout.
+- Product commit: `17dc05a49ea3f1318c65f4e712116bd1a437b47f`, clean checkout (`sourceDirty: false`).
 - Реализация сборки, упаковки и статической проверки завершена. Установленные Desktop, CLI `run` и CLI TUI прошли полный сценарий 55/101 с независимым холодным открытием; совместная работа Desktop/CLI проверена в обоих порядках закрытия.
 - Release gate не объявлен `PASS`: не выполнены clean-VM/другой Windows-пользователь, OAuth callback, отдельный Xiaomi-driven Desktop-прогон, update feed и подписывание.
 
@@ -12,17 +12,19 @@
 
 Каталог результата:
 
-`C:\Users\vskar\AppData\Local\loginom-ai-agent-build\outputs\final-eedacb5ee`
+`C:\Users\vskar\AppData\Local\loginom-ai-agent-build\outputs\final-17dc05a49`
 
 | Артефакт | Размер | SHA256 |
 | --- | ---: | --- |
-| `desktop/loginom-ai-agent-win-x64.exe` | 313274322 | `cf61530ffab1227d3a92f832aa83e7763dc8aae3898dc89d40c013f1f64f8c6c` |
-| `desktop/loginom-ai-agent-eedacb5ee-source.tar.gz` | 172859525 | `e68b9f102c171b2c111bbe685413b00578d0f3f300a00d3e944df377136025ba` |
-| `desktop/release-manifest.json` | 3400 | `01c0f4696e4253a39542d6662fad3fe05628c80925c24fded4b03d9f4613392d` |
-| `loginom-ai-agent-cli-0.0.0-dev-202609190537-win32-x64.zip` | 316250203 | `6226972c6d9479388d3d51e02d43f7bdcf7bad721e4f2b2eb7bd41bb94c9a532` |
-| `cli-payload/cli-manifest.json` | 1128896 | `43ebf5934fa49f5bc44b99ddf5c8c45014daa5edc34f19b92ec8fd48e0aaa9c6` |
+| `desktop/loginom-ai-agent-win-x64.exe` | 313163606 | `5617c7794d5dbabfb0822aaebaecd1c25405d24cf497bf61247a1999467e7f99` |
+| `desktop/loginom-ai-agent-17dc05a49-source.tar.gz` | 11486308 | `8ec49329af29103c0b06c9f05ec0fea7bfdb5543813538d9c7634acee662857e` |
+| `desktop/release-manifest.json` | 3401 | `1a7962423723da35989f26083c700c334c29530e838485dd613121badcaab53b` |
+| `loginom-ai-agent-cli-0.0.0-dev-202609190631-win32-x64.zip` | 315876127 | `9e0da471d69c9c085fd743eac50905bcf82f746a3d90252b625609cf3834f6f9` |
+| `cli-payload/cli-manifest.json` | 1111897 | `3d1a0dc053361b9eff35dd7e0fc840e3453016a042dcf9ff8aeeb201f0528030` |
 
 Desktop development installer имеет `NotSigned`, что ожидаемо для согласованного локального candidate, но не закрывает release signing gate. `static-nsis.json` — PASS: target `win32-x64`, 4371 ресурсный файл, комплектные Node и Chromium PE/AMD64. CLI manifest — PASS, `sourceDirty: false`, source commit совпадает.
+
+Полные installed 55/101 и independence acceptance были выполнены на непосредственном предшественнике `eedacb5ee`. Между ним и финальным product commit изменены Windows acceptance-драйверы и OAuth callback teardown; Loginom runtime, Desktop onboarding и CLI execution path не менялись. Финальный hash повторно прошёл build, native CLI version smoke и статическую проверку всего Desktop resource tree.
 
 ## Окружение и провайдер
 
