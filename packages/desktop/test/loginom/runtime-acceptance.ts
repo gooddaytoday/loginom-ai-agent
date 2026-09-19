@@ -18,6 +18,8 @@ if (credentialProfile) {
   const connection = await Bun.file(join(credentialProfile, "loginom/connection/connection.json")).json()
   const secrets = await cliCredentials("win32").decode(connection.secrets)
   config.api_key = secrets.apiKey
+  config.loginom_url = connection.url
+  config.workflow_profile = { passwordless_login: secrets.password === "", loginom_user: connection.username }
 }
 const mcpConfig = process.env.LOGINOM_AI_AGENT_TEST_MCP_CONFIG
 if (mcpConfig) {

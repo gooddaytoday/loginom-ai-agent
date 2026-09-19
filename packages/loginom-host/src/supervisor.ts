@@ -163,7 +163,14 @@ export async function supervise(input: Launch) {
     })()
     return closing.promise
   }
-  const ready = await request("start", { ...input, environment: undefined, protocol: 1 }).catch(
+  // Connection validation can spend 30 seconds on MCP initialization and up
+  // to 150 seconds navigating/authenticating Loginom. Do not race that
+  // documented budget with the ordinary 120-second runtime handshake.
+  const ready = await request(
+    "start",
+    { ...input, environment: undefined, protocol: 1 },
+    input.validation ? 210_000 : 120_000,
+  ).catch(
     async (error: Error) => {
       await close()
       throw error

@@ -37,7 +37,7 @@ try {
   await form.locator('button[type="submit"]').click()
   await page.waitForTimeout(3000)
   if (await form.isVisible()) console.error(`LOGINOM_SETUP_REJECTED: ${await form.innerText()}`)
-  await form.waitFor({ state: "hidden", timeout: 120000 })
+  await form.waitFor({ state: "hidden", timeout: 240000 })
   const server = await page.evaluate(() => window.api.awaitInitialization())
   const call = async (path, body) => {
     const response = await fetch(`${server.url}${path}?directory=${encodeURIComponent(workspace)}`, {
