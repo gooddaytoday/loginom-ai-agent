@@ -317,14 +317,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Host typecheck failed" }
           bun test test/windows-powershell.test.ts test/native-proxy.test.ts test/cli-credentials.test.ts test/cli-install-windows.test.ts test/cli-manifest.test.ts test/process.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Native host tests failed" }
-          # Pure OS helpers do not need the agent's full server test preload.
-          bun test ../agent/test/cli/profile-windows.test.ts
-          if ($LASTEXITCODE -ne 0) { throw "Windows profile tests failed" }
           Pop-Location
           Push-Location packages/agent
           bun typecheck
           if ($LASTEXITCODE -ne 0) { throw "Agent typecheck failed" }
           Pop-Location
+          & ./script/test-windows-profile.ps1
       - name: Write Windows manifest and verify installer
         run: |
           $dist = "$env:RUNNER_TEMP/windows/desktop"
