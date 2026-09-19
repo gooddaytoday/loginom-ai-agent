@@ -15,7 +15,7 @@ if ($Child) {
   $env:TEMP = [IO.Path]::Combine([Environment]::GetFolderPath('UserProfile'), 'AppData', 'Local', 'Temp')
   $env:TMP = $env:TEMP
   [void][IO.Directory]::CreateDirectory($env:TEMP)
-  & $BunPath test (Join-Path $repo 'packages/agent/test/cli/profile-windows.test.ts')
+  & $BunPath test (Join-Path $PSScriptRoot 'profile-windows.test.js')
   exit $LASTEXITCODE
 }
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
@@ -29,6 +29,12 @@ $name = 'loginom-' + [Guid]::NewGuid().ToString('N').Substring(0, 10)
 $stage = New-Item -ItemType Directory -Path (Join-Path $env:PUBLIC $name)
 $bun = Join-Path $stage.FullName 'bun.exe'
 Copy-Item -LiteralPath (Get-Command bun -CommandType Application).Source -Destination $bun
+# Bundle the actual test and its product sources into the public staging folder.
+# The standard user must not gain access to the runner's private checkout/token.
+& $bun build (Join-Path $repo 'packages/agent/test/cli/profile-windows.test.ts') --target bun --outfile (Join-Path $stage.FullName 'profile-windows.test.js')
+if ($LASTEXITCODE -ne 0) { throw 'Native profile test bundle failed' }
+$launcher = Join-Path $stage.FullName 'test-windows-profile.ps1'
+Copy-Item -LiteralPath $PSCommandPath -Destination $launcher
 $password = ConvertTo-SecureString ([Guid]::NewGuid().ToString('N') + 'aA1!') -AsPlainText -Force
 $account = New-LocalUser -Name $name -Password $password -AccountNeverExpires
 try {
@@ -39,9 +45,9 @@ try {
   # CreateProcessWithLogonW limits argv to 1024 characters. Use a short file
   # invocation instead of expanding this test wrapper into an encoded command.
   $profileProcess = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') `
-    -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', "`"$PSCommandPath`"", '-Child', '-BunPath', "`"$bun`"") `
+    -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', "`"$launcher`"", '-Child', '-BunPath', "`"$bun`"") `
     -Credential $credential -LoadUserProfile -UseNewEnvironment -WindowStyle Hidden `
-    -WorkingDirectory (Join-Path $repo 'packages/loginom-host') `
+    -WorkingDirectory $stage.FullName `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
   if (-not $profileProcess.WaitForExit(120000)) {
     $profileProcess.Kill()
