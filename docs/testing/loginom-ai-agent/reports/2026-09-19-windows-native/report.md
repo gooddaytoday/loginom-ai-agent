@@ -26,6 +26,8 @@ Desktop development installer имеет `NotSigned`, что ожидаемо д
 
 Полные installed 55/101 и independence acceptance были выполнены на непосредственном предшественнике `eedacb5ee`. Между ним и финальным product commit изменены Windows acceptance-драйверы и OAuth callback teardown; Loginom runtime, Desktop onboarding и CLI execution path не менялись. Финальный hash повторно прошёл build, native CLI version smoke и статическую проверку всего Desktop resource tree.
 
+Финальный NSIS установлен поверх локального Desktop: installed product version `0.1.4.0`. CLI обновлён через штатные `uninstall.cmd`/`install.cmd`: `profilesPreserved: true`, установленная версия и launcher возвращают `0.0.0-dev-202609190631`.
+
 ## Окружение и провайдер
 
 - Portable Node `24.19.0`; Bun `1.3.14`; Electron `42.3.3`; Chromium revision `1243`.
