@@ -710,6 +710,7 @@
         "effect": "catalog:",
       },
       "devDependencies": {
+        "@lydell/node-pty": "catalog:",
         "@tsconfig/node22": "catalog:",
         "@types/bun": "catalog:",
         "@types/node": "catalog:",

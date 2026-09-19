@@ -10,5 +10,11 @@
     "@loginom-ai-agent/schema": "workspace:*",
     "effect": "catalog:"
   },
-  "devDependencies": { "@tsconfig/node22": "catalog:", "@types/bun": "catalog:", "@types/node": "catalog:", "@typescript/native-preview": "catalog:" }
+  "devDependencies": {
+    "@lydell/node-pty": "catalog:",
+    "@tsconfig/node22": "catalog:",
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:"
+  }
 }

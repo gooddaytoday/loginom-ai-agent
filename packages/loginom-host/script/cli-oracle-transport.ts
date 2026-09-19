@@ -1,5 +1,5 @@
 import { mkdir, readdir } from "node:fs/promises"
-import { join } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { observeBrowserWindows } from "./window-observer"
 import { oracleProvider, oraclePrompt } from "./oracle-provider"
 
@@ -59,8 +59,13 @@ export async function cliOracleTransport(options: {
   const child = Bun.spawn(
     options.mode === "tui"
       ? [
-          "python3",
-          join(import.meta.dir, "tui-oracle.py"),
+          ...(process.platform === "win32"
+            ? [
+                process.env.LOGINOM_AI_AGENT_TEST_NODE ??
+                  resolve(dirname(options.executable), "../resources/loginom/bin/node.exe"),
+                join(import.meta.dir, "tui-oracle-windows.ts"),
+              ]
+            : ["python3", join(import.meta.dir, "tui-oracle.py")]),
           options.executable,
           workspace,
           options.directory,
@@ -111,7 +116,8 @@ export async function cliOracleTransport(options: {
         const code = await child.exited
         const output = await stdout
         const errors = await stderr
-        if (output.includes(options.connection.apiKey) || errors.includes(options.connection.apiKey))
+        const secrets = [options.connection.apiKey, options.connection.password].filter(Boolean)
+        if (secrets.some((secret) => output.includes(secret) || errors.includes(secret)))
           throw Error("SECRET_IN_CLI_RESULT")
         await Bun.write(join(options.directory, options.mode === "tui" ? "terminal.txt" : "events.jsonl"), output)
         await Bun.write(join(options.directory, "stderr.txt"), errors)
