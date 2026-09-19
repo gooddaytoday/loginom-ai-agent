@@ -40,5 +40,9 @@ jobs:
         # This pure OS helper needs no agent server bootstrap/teardown preload.
         working-directory: packages/loginom-host
         run: |
+          $probe = New-Item -ItemType Directory -Path (Join-Path $env:RUNNER_TEMP ('loginom-acl-probe-' + [Guid]::NewGuid()))
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          $owner = (Get-Acl -LiteralPath $probe.FullName).GetOwner([Security.Principal.SecurityIdentifier]).Value
+          @{ ownerIsCurrentUser = ($owner -eq $identity.User.Value); ownerIsAdministrators = ($owner -eq 'S-1-5-32-544'); elevated = ([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) } | ConvertTo-Json -Compress
           bun test ../agent/test/cli/profile-windows.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Windows profile tests failed" }
