@@ -55,22 +55,26 @@ test("Windows codec rejects plaintext and malformed ciphertext without a native 
     await expect(cliCredentials("win32").decode(value)).rejects.toThrow("LOGINOM_CREDENTIAL_FORMAT_INVALID")
 })
 
-test.skipIf(process.platform !== "win32")("native DPAPI roundtrip, fresh ciphertext and tamper rejection", async () => {
-  const codec = cliCredentials("win32")
-  const secrets = { apiKey: "native-test-key-ключ", password: "пароль\nwith spaces" }
-  const first = await codec.encode(secrets)
-  const second = await codec.encode(secrets)
-  expect(first).toMatchObject({ format: "loginom-cli-secrets-v1", protection: "dpapi" })
-  expect(first).not.toEqual(second)
-  expect(JSON.stringify(first)).not.toContain(secrets.apiKey)
-  expect(await codec.decode(first)).toEqual(secrets)
-  if (!("payload" in first)) throw Error("Expected CLI envelope")
-  const damaged = Buffer.from(first.payload, "base64")
-  damaged[damaged.length - 1] ^= 1
-  await expect(codec.decode({ ...first, payload: damaged.toString("base64") })).rejects.toThrow(
-    "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE",
-  )
-})
+test.skipIf(process.platform !== "win32")(
+  "native DPAPI roundtrip, fresh ciphertext and tamper rejection",
+  async () => {
+    const codec = cliCredentials("win32")
+    const secrets = { apiKey: "native-test-key-ключ", password: "пароль\nwith spaces" }
+    const first = await codec.encode(secrets)
+    const second = await codec.encode(secrets)
+    expect(first).toMatchObject({ format: "loginom-cli-secrets-v1", protection: "dpapi" })
+    expect(first).not.toEqual(second)
+    expect(JSON.stringify(first)).not.toContain(secrets.apiKey)
+    expect(await codec.decode(first)).toEqual(secrets)
+    if (!("payload" in first)) throw Error("Expected CLI envelope")
+    const damaged = Buffer.from(first.payload, "base64")
+    damaged[damaged.length - 1] ^= 1
+    await expect(codec.decode({ ...first, payload: damaged.toString("base64") })).rejects.toThrow(
+      "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE",
+    )
+  },
+  30000,
+)
 
 test("native codecs reject oversized envelopes before requesting OS protection", async () => {
   const payload = "A".repeat(2 * 1024 * 1024 + 4)

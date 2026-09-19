@@ -32,6 +32,8 @@
 
 - Windows runtime environment matching is case-insensitive even for ordinary objects from IPC. Emit one uppercase name per allowed key with sorted-key precedence; retain case-sensitive Linux behavior and never inherit provider secrets or user PATH.
 
+- Native Windows PowerShell callers use `windowsPowerShellArguments`: reset module discovery to `$PSHOME/Modules` inside the child script, not just its environment (Windows PowerShell reconstructs the search path at startup). Keep OS-only executable resolution, private stdin and redacted failures. CI on Windows 2022/2025 reproduces long command discovery stalls without this isolation.
+
 - Resource staging must reject lexical and canonical overlap in either direction between every input and both destination and its staging directory before executing input Node or changing files. Resolve the existing ancestor of missing output paths without creating directories. This preflight handles existing symlink aliases but does not establish protection against concurrent path replacement.
 
 - Supervisor must reject pending requests on IPC `disconnect`, even if the child process remains alive. Transport loss is separate from confirmed process cleanup; a forced exit cannot satisfy the close acknowledgement contract.

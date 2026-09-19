@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process"
 import { win32 } from "node:path"
+import { windowsPowerShellArguments } from "../windows-powershell"
 
 // Windows PowerShell is an OS component. Never resolve it through user PATH or
 // place credentials in argv, environment variables, scripts or temporary files.
@@ -22,13 +23,7 @@ try {
   return new Promise((resolve, reject) => {
     const child = execFile(
       win32.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
-      [
-        "-NoLogo",
-        "-NoProfile",
-        "-NonInteractive",
-        "-EncodedCommand",
-        Buffer.from(script, "utf16le").toString("base64"),
-      ],
+      windowsPowerShellArguments(script),
       { env: { SystemRoot: root }, windowsHide: true, timeout: 15000, maxBuffer: 2 * 1024 * 1024, encoding: "utf8" },
       (error, stdout) => {
         // Discard child errors/stderr: platform diagnostics may contain input.

@@ -104,18 +104,22 @@ test("automatic, scoped, authenticated and unrepresentable policies fail without
   ).toThrow("SYSTEM_PROXY_AUTHENTICATION_UNSUPPORTED")
 })
 
-test.skipIf(process.platform !== "win32")("native Windows current-user proxy policy is representable", () => {
-  const value = loadNativeProxy(process.env, "win32")
-  expect(value === undefined || value.NODE_USE_ENV_PROXY === "1").toBe(true)
-  const desktop = loadSystemProxyEnvironment(process.env)
-  const cli = loadCliProxyEnvironment(process.env)
-  expect(desktop?.HTTP_PROXY).toBe(value?.HTTP_PROXY)
-  expect(desktop?.HTTPS_PROXY).toBe(value?.HTTPS_PROXY)
-  expect(desktop?.NO_PROXY).toBe(value?.NO_PROXY)
-  expect(cli?.HTTP_PROXY).toBe(desktop?.HTTP_PROXY)
-  expect(cli?.HTTPS_PROXY).toBe(desktop?.HTTPS_PROXY)
-  expect(cli?.NO_PROXY).toBe(desktop?.NO_PROXY)
-})
+test.skipIf(process.platform !== "win32")(
+  "native Windows current-user proxy policy is representable",
+  () => {
+    const value = loadNativeProxy(process.env, "win32")
+    expect(value === undefined || value.NODE_USE_ENV_PROXY === "1").toBe(true)
+    const desktop = loadSystemProxyEnvironment(process.env)
+    const cli = loadCliProxyEnvironment(process.env)
+    expect(desktop?.HTTP_PROXY).toBe(value?.HTTP_PROXY)
+    expect(desktop?.HTTPS_PROXY).toBe(value?.HTTPS_PROXY)
+    expect(desktop?.NO_PROXY).toBe(value?.NO_PROXY)
+    expect(cli?.HTTP_PROXY).toBe(desktop?.HTTP_PROXY)
+    expect(cli?.HTTPS_PROXY).toBe(desktop?.HTTPS_PROXY)
+    expect(cli?.NO_PROXY).toBe(desktop?.NO_PROXY)
+  },
+  60000,
+)
 
 test("malformed native settings and foreign-platform collection cannot silently bypass policy", () => {
   expect(() => windowsProxyEnvironment({ proxy: "proxy.test:80" }, {})).toThrow("SYSTEM_PROXY_SETTINGS_INVALID")

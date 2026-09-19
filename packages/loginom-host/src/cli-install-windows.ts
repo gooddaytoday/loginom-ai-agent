@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { windowsPowerShellArguments } from "./windows-powershell"
 import { cp, lstat, mkdir, mkdtemp, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { verifyCliManifest } from "./cli-manifest"
@@ -62,8 +63,7 @@ export async function uninstallWindowsCli(localAppData: string) {
       throw Error("CLI_INSTALL_RECEIPT_INVALID")
     const destination = join(paths.base, receipt.name)
     const destinationInfo = await lstat(destination)
-    if (!destinationInfo.isDirectory() || destinationInfo.isSymbolicLink())
-      throw Error("CLI_INSTALL_PATH_INVALID")
+    if (!destinationInfo.isDirectory() || destinationInfo.isSymbolicLink()) throw Error("CLI_INSTALL_PATH_INVALID")
     const launcherInfo = await lstat(paths.launcher)
     if (
       !launcherInfo.isFile() ||
@@ -142,13 +142,7 @@ try {
   await new Promise<void>((resolve, reject) => {
     const child = execFile(
       join(root, "System32/WindowsPowerShell/v1.0/powershell.exe"),
-      [
-        "-NoLogo",
-        "-NoProfile",
-        "-NonInteractive",
-        "-EncodedCommand",
-        Buffer.from(script, "utf16le").toString("base64"),
-      ],
+      windowsPowerShellArguments(script),
       { env: { SystemRoot: root }, windowsHide: true, timeout: 15000, maxBuffer: 1024 },
       (error, stdout) => {
         if (error || stdout !== "OK")

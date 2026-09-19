@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process"
 import { win32 } from "node:path"
 import { Option, Schema } from "effect"
+import { windowsPowerShellArguments } from "./windows-powershell"
 
 const windowsSettings = Schema.Struct({
   autoDetect: Schema.Boolean,
@@ -136,9 +137,7 @@ function bypassRules(value: string, environment: NodeJS.ProcessEnv, windows: boo
   if (prefix) {
     const fixed = prefix[1].split(".").map(Number)
     if (fixed.length > 3 || fixed.some((part) => part > 255)) throw Error("SYSTEM_PROXY_BYPASS_UNSUPPORTED")
-    const values = Array.from({ length: 256 }, (_, index) => index).filter((part) =>
-      String(part).startsWith(prefix[2]),
-    )
+    const values = Array.from({ length: 256 }, (_, index) => index).filter((part) => String(part).startsWith(prefix[2]))
     if (!values.length) throw Error("SYSTEM_PROXY_BYPASS_UNSUPPORTED")
     const ranges = values.reduce<Array<[number, number]>>((result, part) => {
       const last = result.at(-1)
@@ -169,10 +168,7 @@ function bypassRules(value: string, environment: NodeJS.ProcessEnv, windows: boo
     ]
   }
   const domain = value.startsWith("*.") ? value.slice(2) : value.startsWith(".") ? value.slice(1) : value
-  if (
-    !domain ||
-    !domain.split(".").every((part) => /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(part))
-  ) {
+  if (!domain || !domain.split(".").every((part) => /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(part))) {
     if (!/^\[?[a-fA-F0-9:]+\]?$/.test(value)) throw Error("SYSTEM_PROXY_BYPASS_UNSUPPORTED")
   }
   return [value.startsWith("*.") ? `.${domain}` : value]
@@ -229,7 +225,7 @@ public static class LoginomProxy {
 `
   const result = spawnSync(
     win32.join(root, "System32/WindowsPowerShell/v1.0/powershell.exe"),
-    ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")],
+    windowsPowerShellArguments(script),
     {
       env: { SystemRoot: root, TEMP: environment.TEMP, TMP: environment.TMP, USERPROFILE: environment.USERPROFILE },
       windowsHide: true,

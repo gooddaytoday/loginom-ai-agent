@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process"
 import { win32 } from "node:path"
+import { windowsPowerShellArguments } from "@loginom-ai-agent/loginom-host/windows-powershell"
 
 // Called before creating the writer guard or writing profile data. Existing
 // profiles are inspected, never recursively rewritten to hide unsafe ACLs.
@@ -64,13 +65,7 @@ try {
   await new Promise<void>((resolve, reject) => {
     const child = execFile(
       win32.join(systemRoot, "System32/WindowsPowerShell/v1.0/powershell.exe"),
-      [
-        "-NoLogo",
-        "-NoProfile",
-        "-NonInteractive",
-        "-EncodedCommand",
-        Buffer.from(script, "utf16le").toString("base64"),
-      ],
+      windowsPowerShellArguments(script),
       { env: { SystemRoot: systemRoot }, windowsHide: true, timeout: 30000, maxBuffer: 1024 },
       (error, stdout) => {
         if (error || stdout !== "OK") return reject(Error("PROFILE_PERMISSIONS_INVALID"))
