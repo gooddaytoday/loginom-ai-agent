@@ -3,6 +3,7 @@ import { chmod, cp, mkdir, readdir, readFile, readlink, realpath, rename, rm, st
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { $ } from "bun"
 import { nativeResourceCandidates } from "./native-resource-candidates"
+import { buildPhase } from "./build-phase"
 import { buildKeychain } from "./build-keychain"
 import release from "../../product/loginom-release.json"
 import releaseWorkflow from "../../loginom-runtime/client/lib/release-workflow.json"
@@ -194,7 +195,7 @@ export async function stageResources(input: {
       })
     }
   }
-  await collect(staging)
+  await buildPhase(`${input.flavor}-resource-inventory`, () => collect(staging))
   await Bun.write(
     join(staging, "resource-manifest.json"),
     JSON.stringify(
@@ -214,8 +215,17 @@ export async function stageResources(input: {
     ) + "\n",
   )
   await rm(destination, { recursive: true, force: true })
-  await rename(staging, destination)
+  await buildPhase(`${input.flavor}-resource-publish`, () => rename(staging, destination))
   return { files: files.length, destination }
+}
+
+// Catalog compatibility is pinned independently of runtime binaries. Selecting
+// the native target never changes the runtime's observed OS or bypasses its gate.
+export function catalogForTarget(target: string) {
+  if (target === "linux-x64") return actionCatalogForPlatform("linux")
+  if (target === "darwin-arm64") return actionCatalogForPlatform("darwin")
+  if (target === "win32-x64") return actionCatalogForPlatform("win32")
+  throw Error("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
 }
 
 // Output directories may not exist yet. Resolve their existing ancestor so an

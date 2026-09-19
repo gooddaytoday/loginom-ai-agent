@@ -1,0 +1,44 @@
+{
+  "status": "PASS",
+  "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+  "version": "0.1.4-macos.20260919.1",
+  "sourceCommit": "dcf1b0410192dc7fcfec71b89e0240c709a19c51",
+  "sourceDirty": false,
+  "archiveSha256": "8bee53e15f31ba902d34ce7d318687bf0e753926534a5d925888e98331093e3a",
+  "artifact": "/Users/kartamyshev/.cache/loginom-macos-build/candidate-01/loginom-ai-agent-cli-0.1.4-macos.20260919.1-darwin-arm64.tar.gz",
+  "home": "/tmp/loginom-cli-installed.ZOXDbm/home",
+  "profile": "/tmp/loginom-cli-installed.ZOXDbm/home/test-profile",
+  "installed": {
+    "destination": "/tmp/loginom-cli-installed.ZOXDbm/home/.local/share/loginom-ai-agent-cli/0.1.4-macos.20260919.1-dev",
+    "launcher": "/tmp/loginom-cli-installed.ZOXDbm/home/.local/bin/loginom-ai-agent-cli"
+  },
+  "keychainEvidence": {
+    "status": "PASS",
+    "evidence": "/tmp/loginom-keychain-acceptance-ClsYjZ",
+    "retainedTestKeychainEntries": 2
+  },
+  "checks": [
+    "archive-sha256",
+    "umask077-extraction-mode-preservation",
+    "bundled-node-installer-minimal-path",
+    "complete-manifest-verification-on-install",
+    "installed-help",
+    "installed-version",
+    "installed-status-unconfigured",
+    "installed-cli-and-helper-signatures",
+    "installed-helper-keychain-11-checks",
+    "lsof-busy-payload-uninstall-refusal",
+    "uninstall-removes-owned-payload-launcher",
+    "uninstall-retains-profile",
+    "same-candidate-reinstall",
+    "encrypted-envelope-no-plaintext",
+    "keychain-read-after-reinstall",
+    "installed-payload-no-open-processes"
+  ],
+  "limitations": [
+    "same-candidate replacement only; changed ad-hoc helper identity not tested",
+    "user Keychain never locked or reconfigured; unavailable storage represented by unsuccessful helper",
+    "Loginom connection/model scenarios not part of this offline acceptance"
+  ],
+  "retained": true
+}

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { loadNativeProxy } from "./native-proxy"
+import { loadNativeProxy } from "@loginom-ai-agent/loginom-host/native-proxy"
 
 // Node does not read GNOME's proxy settings, unlike Electron's Chromium network stack.
 // Apply the system route after loading the shell so stale shell variables cannot override it.

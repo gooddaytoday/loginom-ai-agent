@@ -5,7 +5,7 @@ import path from "node:path"
 
 const roots: string[] = []
 async function temporary() {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "cli-entry-test-"))
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "cli-entry-test-")))
   roots.push(root)
   return root
 }

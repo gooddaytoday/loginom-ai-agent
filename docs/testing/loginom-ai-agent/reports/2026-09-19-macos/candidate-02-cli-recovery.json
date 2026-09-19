@@ -1,0 +1,113 @@
+{
+  "status": "PASS",
+  "testedAt": "2026-09-18T23:12:44.658443+00:00",
+  "os": "27.0",
+  "installedFromArchive": true,
+  "isolatedInstall": "/tmp/loginom-cli-crash-installed.hFEEMZ",
+  "artifact": {
+    "version": "0.1.4-macos.20260919.2",
+    "channel": "dev",
+    "platform": "darwin",
+    "arch": "arm64",
+    "sourceCommit": "6650b6d017ce805eb4e6b2e250e612ac55856f16",
+    "sourceTreeSha256": "12a11079bf2c49e452087cbbc6bd96a3beeaf995fa6c877674200c789266a713",
+    "sourceDirty": false,
+    "dependencies": {
+      "bun": "1.3.14",
+      "node": "24.19.0",
+      "playwright": "1.63.0-alpha-2026-08-31",
+      "playwrightMcp": "0.0.80",
+      "chromium": "1243"
+    }
+  },
+  "cases": [
+    {
+      "scenario": "cancel",
+      "status": "PASS",
+      "evidenceDirectory": "/tmp/loginom-cli-owner-crash-b0zVs2",
+      "summary": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "executable": "/tmp/loginom-cli-crash-installed.hFEEMZ/home/.local/bin/loginom-ai-agent-cli",
+        "recoveryEntries": [
+          "068e9c42-fc7f-42f1-be4b-478c15053d4a.json"
+        ],
+        "retryState": "recoverable-error",
+        "target": "cli",
+        "deadlineExceeded": false,
+        "signal": "SIGINT",
+        "activeImport": true,
+        "code": 4,
+        "trackedProcesses": 18,
+        "alive": [],
+        "guarded": false,
+        "retryCode": 0,
+        "busy": false
+      },
+      "independentInstalledProcessScan": {
+        "remaining": 0,
+        "includesReparentedCrashpad": true
+      }
+    },
+    {
+      "scenario": "owner-kill",
+      "status": "PASS",
+      "evidenceDirectory": "/tmp/loginom-cli-owner-crash-qDCLgh",
+      "summary": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "executable": "/tmp/loginom-cli-crash-installed.hFEEMZ/home/.local/bin/loginom-ai-agent-cli",
+        "recoveryEntries": [
+          "aeeb73cf-2d11-4bf9-a61c-fd0040947894.json"
+        ],
+        "target": "cli",
+        "deadlineExceeded": false,
+        "signal": "SIGKILL",
+        "activeImport": true,
+        "code": 137,
+        "trackedProcesses": 18,
+        "alive": [],
+        "guarded": true,
+        "retryCode": 3,
+        "busy": true
+      },
+      "independentInstalledProcessScan": {
+        "remaining": 0,
+        "includesReparentedCrashpad": true
+      }
+    },
+    {
+      "scenario": "browser-kill",
+      "status": "PASS",
+      "evidenceDirectory": "/tmp/loginom-cli-owner-crash-d63IZ9",
+      "summary": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "executable": "/tmp/loginom-cli-crash-installed.hFEEMZ/home/.local/bin/loginom-ai-agent-cli",
+        "recoveryEntries": [
+          "6f0ba9a6-b043-4a5b-a000-a96443ab736e.json"
+        ],
+        "retryState": "recoverable-error",
+        "target": "browser",
+        "deadlineExceeded": false,
+        "signal": "SIGKILL",
+        "activeImport": true,
+        "code": 4,
+        "trackedProcesses": 18,
+        "alive": [],
+        "guarded": false,
+        "retryCode": 0,
+        "busy": false
+      },
+      "independentInstalledProcessScan": {
+        "remaining": 0,
+        "includesReparentedCrashpad": true
+      }
+    }
+  ],
+  "limitations": [
+    "Scripted model oracle; no model-quality claim",
+    "macOS27 local only; macOS14 CI remains separate",
+    "No new live sessions remain; profiles and durable recovery retained as evidence"
+  ]
+}

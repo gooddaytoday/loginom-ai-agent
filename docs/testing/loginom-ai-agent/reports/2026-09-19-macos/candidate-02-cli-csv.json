@@ -1,0 +1,243 @@
+{
+  "status": "PASS",
+  "version": "0.1.4-macos.20260919.2",
+  "installed": "/tmp/loginom-cli-installed.ZOXDbm/home/.local/share/loginom-ai-agent-cli/0.1.4-macos.20260919.2-dev",
+  "first": {
+    "label": "A",
+    "path": "/user/loginom-ai-agent-acceptance-b51088c9-f083-4686-9177-690e2a88d291-A.lgp",
+    "node": "3f74d3ec-b127-4de3-83ca-422700f8e5b2",
+    "expected": {
+      "Alpha": 35,
+      "Beta": 20
+    },
+    "source": "/user/5a45f8c4d14ab9523c3d23af3fe48cdb2ff242c6872595d3b2f58063e54f7295-0-sales.csv",
+    "inputSha256": "98aa522befcb544089edf626c2713e1cf69aaf54f93a0a92a0df7e3e4a10fcd5"
+  },
+  "second": {
+    "label": "B",
+    "path": "/user/loginom-ai-agent-acceptance-89c30b92-0a06-4bfe-8e1b-08a1a56d2653-B.lgp",
+    "node": "fd6a9c29-69fc-4f8c-a457-06f9b77364de",
+    "expected": {
+      "Alpha": 100,
+      "Beta": 1
+    },
+    "source": "/user/5f2a35c5fae84cfbad1cf02c694070b21ce9310ed6aaaf52b2ecc0eabdd22f07-0-sales.csv",
+    "inputSha256": "71566126acfc907717a41ba31ef83d8867ca6080979f62948bd906a811492f4c"
+  },
+  "coldA": {
+    "status": "PASS",
+    "phase": "independent_cold_reopen_readback",
+    "dataset": "A",
+    "path": "/user/loginom-ai-agent-acceptance-b51088c9-f083-4686-9177-690e2a88d291-A.lgp",
+    "node": {
+      "document_id": "1789773153766-ds6u3tml5el",
+      "workflow_id": "1789773153766-ds6u3tml5el-1",
+      "node_id": "3f74d3ec-b127-4de3-83ca-422700f8e5b2"
+    },
+    "execution": {
+      "verified": true,
+      "cleanup_complete": true,
+      "effect_possible": false,
+      "status": "completed",
+      "execution_id": "1789773153766-ds6u3tml5el:296:1",
+      "process_id": "1.2",
+      "process_record_id": "299",
+      "group_id": "1",
+      "owner_verified": true
+    },
+    "output": {
+      "ports": [
+        {
+          "table": {
+            "view_guid": "125a40dd-6a94-44ec-9bb7-c98124377b47",
+            "port_guid": "4ba0e2c2-69ad-3a32-bbdc-75714efe7a51",
+            "table_tid": "MF;TF-1;ViewsForm;BrowseView-1"
+          },
+          "schema": [
+            {
+              "index": 0,
+              "name": "Total",
+              "label": "Total",
+              "type": "real",
+              "header_tid": "MF;TF-1;ViewsForm;BrowseView-1;normalHeaderCt;Total"
+            },
+            {
+              "index": 1,
+              "name": "Category",
+              "label": "Category",
+              "type": "string",
+              "header_tid": "MF;TF-1;ViewsForm;BrowseView-1;normalHeaderCt;Category"
+            }
+          ],
+          "row_count": 2,
+          "sample": [
+            [
+              {
+                "type": "real",
+                "is_null": false,
+                "value": 35,
+                "decimal": "3.5E+01",
+                "representation": "binary64",
+                "precision": "17_significant_digits",
+                "display_text": "3,5E+01"
+              },
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "Alpha",
+                "representation": "cached_display_text",
+                "precision": "display_text"
+              }
+            ],
+            [
+              {
+                "type": "real",
+                "is_null": false,
+                "value": 20,
+                "decimal": "2E+01",
+                "representation": "binary64",
+                "precision": "17_significant_digits",
+                "display_text": "2E+01"
+              },
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "Beta",
+                "representation": "cached_display_text",
+                "precision": "display_text"
+              }
+            ]
+          ],
+          "sample_rows": 2,
+          "sample_complete": true,
+          "precision": {
+            "numbers_verified": true,
+            "limitations": [],
+            "strings": "cached UI text; source completeness requires independent audit"
+          },
+          "table_schema_id": "table-schema-1",
+          "filter_enabled": false
+        }
+      ]
+    },
+    "settingsReapplied": false,
+    "groups": {
+      "Alpha": 35,
+      "Beta": 20
+    },
+    "total": 55
+  },
+  "coldB": {
+    "status": "PASS",
+    "phase": "independent_cold_reopen_readback",
+    "dataset": "B",
+    "path": "/user/loginom-ai-agent-acceptance-89c30b92-0a06-4bfe-8e1b-08a1a56d2653-B.lgp",
+    "node": {
+      "document_id": "1789773311476-rdjv5slrhi",
+      "workflow_id": "1789773311476-rdjv5slrhi-1",
+      "node_id": "fd6a9c29-69fc-4f8c-a457-06f9b77364de"
+    },
+    "execution": {
+      "verified": true,
+      "cleanup_complete": true,
+      "effect_possible": false,
+      "status": "completed",
+      "execution_id": "1789773311476-rdjv5slrhi:297:1",
+      "process_id": "1.2",
+      "process_record_id": "300",
+      "group_id": "1",
+      "owner_verified": true
+    },
+    "output": {
+      "ports": [
+        {
+          "table": {
+            "view_guid": "80e6dd68-9c7f-4c97-b733-9901646f3fe1",
+            "port_guid": "4ba0e2c2-69ad-3a32-bbdc-75714efe7a51",
+            "table_tid": "MF;TF-1;ViewsForm;BrowseView-1"
+          },
+          "schema": [
+            {
+              "index": 0,
+              "name": "Total",
+              "label": "Total",
+              "type": "real",
+              "header_tid": "MF;TF-1;ViewsForm;BrowseView-1;normalHeaderCt;Total"
+            },
+            {
+              "index": 1,
+              "name": "Category",
+              "label": "Category",
+              "type": "string",
+              "header_tid": "MF;TF-1;ViewsForm;BrowseView-1;normalHeaderCt;Category"
+            }
+          ],
+          "row_count": 2,
+          "sample": [
+            [
+              {
+                "type": "real",
+                "is_null": false,
+                "value": 100,
+                "decimal": "1E+02",
+                "representation": "binary64",
+                "precision": "17_significant_digits",
+                "display_text": "1E+02"
+              },
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "Alpha",
+                "representation": "cached_display_text",
+                "precision": "display_text"
+              }
+            ],
+            [
+              {
+                "type": "real",
+                "is_null": false,
+                "value": 1,
+                "decimal": "1E+00",
+                "representation": "binary64",
+                "precision": "17_significant_digits",
+                "display_text": "1E+00"
+              },
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "Beta",
+                "representation": "cached_display_text",
+                "precision": "display_text"
+              }
+            ]
+          ],
+          "sample_rows": 2,
+          "sample_complete": true,
+          "precision": {
+            "numbers_verified": true,
+            "limitations": [],
+            "strings": "cached UI text; source completeness requires independent audit"
+          },
+          "table_schema_id": "table-schema-1",
+          "filter_enabled": false
+        }
+      ]
+    },
+    "settingsReapplied": false,
+    "groups": {
+      "Alpha": 100,
+      "Beta": 1
+    },
+    "total": 101
+  },
+  "sameNameInputsHaveDistinctDestinations": true,
+  "processCleanup": {
+    "lsofExit": 1,
+    "installedPayloadOpenProcesses": false
+  },
+  "notes": [
+    "A initial run stopped after save because cold-readback harness hardcoded Linux; corrected harness then cold A rerun passed",
+    "B-only continuation uses same driver operations from private copy; no repeated A workflow",
+    "Scripted oracle proves installed CLI tool transport and workflow execution, not production model quality"
+  ]
+}

@@ -1,0 +1,246 @@
+{
+  "status": "PASS",
+  "version": "0.1.4-macos.20260919.2",
+  "sourceCommit": "6650b6d017ce805eb4e6b2e250e612ac55856f16",
+  "installedFromReadonlyDMG": true,
+  "executable": "/Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/MacOS/Loginom AI Agent Dev",
+  "evidenceDirectory": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-linux-oracle-oU4Fau",
+  "datasets": [
+    {
+      "saved": {
+        "label": "A",
+        "path": "/user/loginom-ai-agent-acceptance-70ac37ea-51f0-4d90-9cc8-1d5e352f90a5-A.lgp",
+        "node": "72be06e1-454c-4b00-856b-08630c8fee57",
+        "expected": {
+          "Alpha": 35,
+          "Beta": 20
+        },
+        "source": "/user/7f59225b39e72755e3a1439bcf97bbf8ce9921035dbc34f9d24b3eb78abca9e1-0-sales.csv",
+        "inputSha256": "98aa522befcb544089edf626c2713e1cf69aaf54f93a0a92a0df7e3e4a10fcd5"
+      },
+      "coldReadback": {
+        "status": "PASS",
+        "phase": "independent_cold_reopen_readback",
+        "dataset": "A",
+        "path": "/user/loginom-ai-agent-acceptance-70ac37ea-51f0-4d90-9cc8-1d5e352f90a5-A.lgp",
+        "node": {
+          "document_id": "1789773478518-29uiz9ylmib",
+          "workflow_id": "1789773478518-29uiz9ylmib-1",
+          "node_id": "72be06e1-454c-4b00-856b-08630c8fee57"
+        },
+        "execution": {
+          "verified": true,
+          "cleanup_complete": true,
+          "effect_possible": false,
+          "status": "completed",
+          "execution_id": "1789773478518-29uiz9ylmib:298:1",
+          "process_id": "1.2",
+          "process_record_id": "301",
+          "group_id": "1",
+          "owner_verified": true
+        },
+        "output": {
+          "ports": [
+            {
+              "table": {
+                "view_guid": "cc086224-e631-4fa6-b078-021075d7f184",
+                "port_guid": "4ba0e2c2-69ad-3a32-bbdc-75714efe7a51",
+                "table_tid": "MF;TF-1;ViewsForm;BrowseView-1"
+              },
+              "schema": [
+                {
+                  "index": 0,
+                  "name": "Total",
+                  "label": "Total",
+                  "type": "real",
+                  "header_tid": "MF;TF-1;ViewsForm;BrowseView-1;normalHeaderCt;Total"
+                },
+                {
+                  "index": 1,
+                  "name": "Category",
+                  "label": "Category",
+                  "type": "string",
+                  "header_tid": "MF;TF-1;ViewsForm;BrowseView-1;normalHeaderCt;Category"
+                }
+              ],
+              "row_count": 2,
+              "sample": [
+                [
+                  {
+                    "type": "real",
+                    "is_null": false,
+                    "value": 35,
+                    "decimal": "3.5E+01",
+                    "representation": "binary64",
+                    "precision": "17_significant_digits",
+                    "display_text": "3,5E+01"
+                  },
+                  {
+                    "type": "string",
+                    "is_null": false,
+                    "value": "Alpha",
+                    "representation": "cached_display_text",
+                    "precision": "display_text"
+                  }
+                ],
+                [
+                  {
+                    "type": "real",
+                    "is_null": false,
+                    "value": 20,
+                    "decimal": "2E+01",
+                    "representation": "binary64",
+                    "precision": "17_significant_digits",
+                    "display_text": "2E+01"
+                  },
+                  {
+                    "type": "string",
+                    "is_null": false,
+                    "value": "Beta",
+                    "representation": "cached_display_text",
+                    "precision": "display_text"
+                  }
+                ]
+              ],
+              "sample_rows": 2,
+              "sample_complete": true,
+              "precision": {
+                "numbers_verified": true,
+                "limitations": [],
+                "strings": "cached UI text; source completeness requires independent audit"
+              },
+              "table_schema_id": "table-schema-1",
+              "filter_enabled": false
+            }
+          ]
+        },
+        "settingsReapplied": false,
+        "groups": {
+          "Alpha": 35,
+          "Beta": 20
+        },
+        "total": 55
+      }
+    },
+    {
+      "saved": {
+        "label": "B",
+        "path": "/user/loginom-ai-agent-acceptance-70ac37ea-51f0-4d90-9cc8-1d5e352f90a5-B.lgp",
+        "node": "749199d6-b9da-4d68-bda4-390ce7a6f4e7",
+        "expected": {
+          "Alpha": 100,
+          "Beta": 1
+        },
+        "source": "/user/181bf31ee75e27e4ed058c77888b9c7b2e491c2506ae6d686afa74c9fbfcf751-0-sales.csv",
+        "inputSha256": "71566126acfc907717a41ba31ef83d8867ca6080979f62948bd906a811492f4c"
+      },
+      "coldReadback": {
+        "status": "PASS",
+        "phase": "independent_cold_reopen_readback",
+        "dataset": "B",
+        "path": "/user/loginom-ai-agent-acceptance-70ac37ea-51f0-4d90-9cc8-1d5e352f90a5-B.lgp",
+        "node": {
+          "document_id": "1789773618666-3ed9pdj6dbd",
+          "workflow_id": "1789773618666-3ed9pdj6dbd-1",
+          "node_id": "749199d6-b9da-4d68-bda4-390ce7a6f4e7"
+        },
+        "execution": {
+          "verified": true,
+          "cleanup_complete": true,
+          "effect_possible": false,
+          "status": "completed",
+          "execution_id": "1789773618666-3ed9pdj6dbd:299:1",
+          "process_id": "1.2",
+          "process_record_id": "302",
+          "group_id": "1",
+          "owner_verified": true
+        },
+        "output": {
+          "ports": [
+            {
+              "table": {
+                "view_guid": "6a48adb4-ac3a-4bd8-aa33-6a1faf7e5257",
+                "port_guid": "4ba0e2c2-69ad-3a32-bbdc-75714efe7a51",
+                "table_tid": "MF;TF-1;ViewsForm;BrowseView-1"
+              },
+              "schema": [
+                {
+                  "index": 0,
+                  "name": "Total",
+                  "label": "Total",
+                  "type": "real",
+                  "header_tid": "MF;TF-1;ViewsForm;BrowseView-1;normalHeaderCt;Total"
+                },
+                {
+                  "index": 1,
+                  "name": "Category",
+                  "label": "Category",
+                  "type": "string",
+                  "header_tid": "MF;TF-1;ViewsForm;BrowseView-1;normalHeaderCt;Category"
+                }
+              ],
+              "row_count": 2,
+              "sample": [
+                [
+                  {
+                    "type": "real",
+                    "is_null": false,
+                    "value": 100,
+                    "decimal": "1E+02",
+                    "representation": "binary64",
+                    "precision": "17_significant_digits",
+                    "display_text": "1E+02"
+                  },
+                  {
+                    "type": "string",
+                    "is_null": false,
+                    "value": "Alpha",
+                    "representation": "cached_display_text",
+                    "precision": "display_text"
+                  }
+                ],
+                [
+                  {
+                    "type": "real",
+                    "is_null": false,
+                    "value": 1,
+                    "decimal": "1E+00",
+                    "representation": "binary64",
+                    "precision": "17_significant_digits",
+                    "display_text": "1E+00"
+                  },
+                  {
+                    "type": "string",
+                    "is_null": false,
+                    "value": "Beta",
+                    "representation": "cached_display_text",
+                    "precision": "display_text"
+                  }
+                ]
+              ],
+              "sample_rows": 2,
+              "sample_complete": true,
+              "precision": {
+                "numbers_verified": true,
+                "limitations": [],
+                "strings": "cached UI text; source completeness requires independent audit"
+              },
+              "table_schema_id": "table-schema-1",
+              "filter_enabled": false
+            }
+          ]
+        },
+        "settingsReapplied": false,
+        "groups": {
+          "Alpha": 100,
+          "Beta": 1
+        },
+        "total": 101
+      }
+    }
+  ],
+  "limitations": [
+    "Scripted provider selects tools; real installed Desktop/backend/Host/Loginom execute them",
+    "Each dataset uses its own isolated Desktop profile; same-process two-chat isolation has separate evidence"
+  ]
+}

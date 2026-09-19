@@ -1,0 +1,38 @@
+{
+  "status": "PASS",
+  "os": "27.0",
+  "evidence": [
+    {
+      "phase": "before",
+      "version": "0.1.4-macos.20260919.1",
+      "userData": "/Users/kartamyshev/.cache/loginom-macos-build/desktop-upgrade-01-02e/app-data/com.loginom.aiagent.dev",
+      "diskDatabase": true,
+      "safeStorageAvailable": true,
+      "sessionID": "ses_f492b95a0ffejp49pqAuJQHcqC",
+      "messageID": "msg_0b6d46a8d001r6KK68t2KlqoZa",
+      "sourceCommit": "dcf1b0410192dc7fcfec71b89e0240c709a19c51",
+      "appAsarSha256": "c8acb30eeecd42dded7257ccf31cf788406c5301651a3bf496d50ae19d2a82a3"
+    },
+    {
+      "phase": "after",
+      "version": "0.1.4-macos.20260919.2",
+      "userData": "/Users/kartamyshev/.cache/loginom-macos-build/desktop-upgrade-01-02e/app-data/com.loginom.aiagent.dev",
+      "diskDatabase": true,
+      "safeStorageAvailable": true,
+      "sessionID": "ses_f492b95a0ffejp49pqAuJQHcqC",
+      "messageID": "msg_0b6d46a8d001r6KK68t2KlqoZa",
+      "sourceCommit": "6650b6d017ce805eb4e6b2e250e612ac55856f16",
+      "appAsarSha256": "87761291e93ecc76aec7fa8ea577a19fdca62d29dcba41b626fb75dc2b9019a9"
+    }
+  ],
+  "settingsPreserved": true,
+  "sessionAndUserMessagePreserved": true,
+  "safeStorageCiphertextPreserved": true,
+  "limitations": [
+    "Synthetic no-reply history; no Loginom/model network activity",
+    "Isolated appData set through pre-start inspector; production runtime unchanged",
+    "Ad-hoc local macOS27 acceptance, not Gatekeeper or macOS14 acceptance",
+    "safeStorage uses synthetic ciphertext retained by the harness, not a real Loginom credential migration"
+  ],
+  "allOwnAppCopiesExited": true
+}

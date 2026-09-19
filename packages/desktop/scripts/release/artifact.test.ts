@@ -1,8 +1,17 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, rm, symlink, unlink, writeFile } from "node:fs/promises"
+import { $ } from "bun"
+import { verifyMacBrowserSignature } from "./verify-macos"
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { decodeManifest, hash, relativePath, verifyResourceTree, verifyWindowsApplication } from "./manifest"
+import {
+  decodeManifest,
+  hash,
+  relativePath,
+  verifyExecutable,
+  verifyResourceTree,
+  verifyWindowsApplication,
+} from "./manifest"
 
 test("static extraction validation detects missing, altered, escaped and foreign architecture resources", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-static-test-"))
@@ -95,6 +104,55 @@ test("validates win32-x64 PE resources and unpacked application payload", async 
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test.skipIf(process.platform === "win32")(
+  "macOS resources preserve framework links and reject foreign architecture and lost executable bits",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "loginom-mac-static-test-"))
+    const executable = Buffer.alloc(64)
+    executable.writeUInt32LE(0xfeedfacf)
+    executable.writeUInt32LE(0x0100000c, 4)
+    try {
+      await mkdir(join(directory, "Framework/Versions/A"), { recursive: true })
+      await writeFile(join(directory, "Framework/Versions/A/chrome"), executable, { mode: 0o755 })
+      await writeFile(join(directory, "node"), executable, { mode: 0o755 })
+      await symlink("A", join(directory, "Framework/Versions/Current"))
+      const resource = {
+        protocol: 1,
+        target: "darwin-arm64",
+        node: "node",
+        browser: "Framework/Versions/A/chrome",
+        files: [
+          { path: "node", sha256: hash(executable) },
+          { path: "Framework/Versions/A/chrome", sha256: hash(executable) },
+          { path: "Framework/Versions/Current", link: "A", directory: true, sha256: hash("A") },
+        ],
+      }
+      const manifest = JSON.stringify(resource)
+      await writeFile(join(directory, "resource-manifest.json"), manifest)
+      expect((await verifyResourceTree(directory, hash(manifest), "darwin-arm64")).files).toBe(3)
+      await chmod(join(directory, "node"), 0o644)
+      await expect(verifyResourceTree(directory, hash(manifest), "darwin-arm64")).rejects.toThrow(
+        "RELEASE_EXECUTABLE_INVALID",
+      )
+      await chmod(join(directory, "node"), 0o755)
+      executable.writeUInt32LE(0x01000007, 4)
+      await writeFile(join(directory, "node"), executable)
+      resource.files[0].sha256 = hash(executable)
+      const foreign = JSON.stringify(resource)
+      await writeFile(join(directory, "resource-manifest.json"), foreign)
+      await expect(verifyResourceTree(directory, hash(foreign), "darwin-arm64")).rejects.toThrow(
+        "RELEASE_EXECUTABLE_INVALID",
+      )
+      await symlink("/tmp", join(directory, "escape"))
+      await expect(verifyResourceTree(directory, hash(foreign), "darwin-arm64")).rejects.toThrow(
+        "RELEASE_RESOURCE_ESCAPE",
+      )
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+)
 
 test("decodes Linux and Windows manifests without mixing installation or artifact contracts", () => {
   expect(decodeManifest(releaseManifest("linux")).installation.scope).toBe("machine")
@@ -189,3 +247,70 @@ function releaseManifest(platform: "linux" | "win32") {
     ],
   }
 }
+
+test("schema version 1 reads the released Linux manifest and accepts the macOS extension", async () => {
+  const linux = await Bun.file(
+    new URL(
+      "../../../../docs/testing/loginom-ai-agent/reports/2026-09-17-proxy/release-manifest.json",
+      import.meta.url,
+    ),
+  ).json()
+  expect(decodeManifest(linux).target).toMatchObject({ platform: "linux", arch: "x64" })
+  const mac = {
+    ...linux,
+    target: { platform: "darwin", arch: "arm64", minimumOS: "14.0", backend: "v1" },
+    installation: { ...linux.installation, scope: "user" },
+    signing: { status: "ad-hoc", identity: "-", notarized: false },
+    artifacts: linux.artifacts.map((file: { kind: string; file: string }) => ({
+      ...file,
+      kind: file.kind === "deb" ? "dmg" : file.kind === "appimage" ? "zip" : file.kind,
+      file: file.file.replace(/\.deb$/, ".dmg").replace(/\.AppImage$/, ".zip"),
+    })),
+  }
+  expect(decodeManifest(mac).target.platform).toBe("darwin")
+  expect(() => decodeManifest({ ...mac, signing: linux.signing })).toThrow("RELEASE_MAC_POLICY_INVALID")
+  expect(() => decodeManifest({ ...mac, target: { ...mac.target, arch: "x64" } })).toThrow("RELEASE_TARGET_INVALID")
+  expect(() => decodeManifest({ ...mac, artifacts: linux.artifacts })).toThrow("RELEASE_MANIFEST_INVALID")
+  expect(() => decodeManifest({ ...releaseManifest("win32"), artifacts: mac.artifacts })).toThrow(
+    "RELEASE_MANIFEST_INVALID",
+  )
+})
+
+test("native executable validation rejects another platform's binary", () => {
+  const mac = Buffer.alloc(64)
+  mac.writeUInt32LE(0xfeedfacf)
+  mac.writeUInt32LE(0x0100000c, 4)
+  expect(() => verifyExecutable(mac, "darwin-arm64")).not.toThrow()
+  expect(() => verifyExecutable(mac, "win32-x64")).toThrow("RELEASE_EXECUTABLE_INVALID")
+  expect(() => verifyExecutable(pe(), "darwin-arm64")).toThrow("RELEASE_EXECUTABLE_INVALID")
+  expect(() => verifyExecutable(mac, "linux-x64")).toThrow("RELEASE_EXECUTABLE_INVALID")
+})
+
+test.skipIf(process.platform !== "darwin")(
+  "upstream linker-signed browser code is checked without a nonexistent resource seal",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "loginom-linker-signature-"))
+    const bundle = join(directory, "Browser.app")
+    const executable = join(bundle, "Contents/MacOS/Browser")
+    try {
+      await mkdir(join(bundle, "Contents/MacOS"), { recursive: true })
+      await writeFile(join(directory, "main.c"), "int main(void) { return 0; }\n")
+      await writeFile(
+        join(bundle, "Contents/Info.plist"),
+        `<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Browser</string><key>CFBundleIdentifier</key><string>com.loginom.signature-fixture</string></dict></plist>`,
+      )
+      await $`clang -arch arm64 -mmacosx-version-min=14.0 ${join(directory, "main.c")} -o ${executable}`.quiet()
+      expect(await verifyMacBrowserSignature(executable)).toBe("linker-signed-code-only; resource seal absent upstream")
+      const original = await readFile(executable)
+      const modified = Buffer.from(original)
+      modified[1024] ^= 1
+      await writeFile(executable, modified)
+      await expect(verifyMacBrowserSignature(executable)).rejects.toThrow()
+      await writeFile(executable, original)
+      await $`codesign --force --sign - ${bundle}`.quiet()
+      expect(await verifyMacBrowserSignature(executable)).toBe("bundle-and-code")
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+)

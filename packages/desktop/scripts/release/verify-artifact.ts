@@ -1,3 +1,4 @@
+import { verifyMacArtifact } from "./verify-macos"
 import { verifyLinuxPermissions } from "../linux-permissions"
 import { parseArgs } from "node:util"
 import { basename, join, resolve } from "node:path"
@@ -18,7 +19,9 @@ const args = parseArgs({
   strict: true,
 }).values
 if (!args.manifest || !args.artifact || !args.report)
-  throw Error("Required: --manifest <json> --artifact <deb|AppImage|exe> [--unpacked <directory>] --report <json>")
+  throw Error(
+    "Required: --manifest <json> --artifact <deb|AppImage|exe|dmg|zip> [--unpacked <directory>] --report <json>",
+  )
 const manifest = decodeManifest(await Bun.file(args.manifest).json())
 if (
   manifest.product.name !== productName(manifest.channel) ||
@@ -54,72 +57,87 @@ if (manifest.target.platform === "win32") {
 
 const directory = await mkdtemp(join(tmpdir(), "loginom-static-"))
 try {
-  const root = join(directory, "extracted")
-  if (artifact.kind === "deb") {
-    const metadata = (
-      await $`dpkg-deb --field ${resolve(args.artifact)} Package Version Architecture Depends`.text()
-    ).trim()
-    if (
-      !metadata.includes(`Package: ${manifest.product.executable}\n`) ||
-      !metadata.includes(`Version: ${manifest.version}\n`) ||
-      !metadata.includes("Architecture: amd64\n") ||
-      !metadata.includes("libasound2") ||
-      !metadata.includes("libgbm1")
+  if (artifact.kind === "dmg" || artifact.kind === "zip") {
+    if (manifest.target.platform !== "darwin") throw Error("RELEASE_TARGET_INVALID")
+    const result = await verifyMacArtifact({ manifest, artifact: args.artifact, kind: artifact.kind, directory })
+    await Bun.write(
+      args.report,
+      JSON.stringify(
+        { status: "PASS", artifact: artifact.file, sha256: artifact.sha256, ...result, executableNotRun: true },
+        null,
+        2,
+      ) + "\n",
     )
-      throw Error("RELEASE_DEB_METADATA_INVALID")
-    await $`dpkg-deb --extract ${resolve(args.artifact)} ${root}`.quiet()
-  } else if (artifact.kind === "appimage") {
-    const bytes = await readFile(args.artifact)
-    const offsets = []
-    for (let position = bytes.indexOf("hsqs"); position !== -1; position = bytes.indexOf("hsqs", position + 4)) {
+    console.log(`PASS static ${artifact.file}: ${result.files} resources`)
+  } else {
+    if (manifest.target.platform !== "linux") throw Error("RELEASE_TARGET_INVALID")
+    const root = join(directory, "extracted")
+    if (artifact.kind === "deb") {
+      const metadata = (
+        await $`dpkg-deb --field ${resolve(args.artifact)} Package Version Architecture Depends`.text()
+      ).trim()
       if (
-        position + 96 <= bytes.length &&
-        bytes.readUInt16LE(position + 28) === 4 &&
-        bytes.readUInt16LE(position + 30) === 0 &&
-        Number(bytes.readBigUInt64LE(position + 40)) <= bytes.length - position
+        !metadata.includes(`Package: ${manifest.product.executable}\n`) ||
+        !metadata.includes(`Version: ${manifest.version}\n`) ||
+        !metadata.includes("Architecture: amd64\n") ||
+        !metadata.includes("libasound2") ||
+        !metadata.includes("libgbm1")
       )
-        offsets.push(position)
-    }
-    if (offsets.length !== 1) throw Error("RELEASE_SQUASHFS_INVALID")
-    await $`unsquashfs -no-progress -d ${root} -offset ${offsets[0]} ${resolve(args.artifact)}`.quiet()
-  } else throw Error("Only Linux installer artifacts can be statically extracted")
-  const application = artifact.kind === "deb" ? join(root, "opt", manifest.product.executable) : root
-  await verifyLinuxPermissions(application)
-  await verifyLinuxPermissions(
-    artifact.kind === "deb"
-      ? join(root, "usr/share/applications", `${manifest.product.appId}.desktop`)
-      : join(root, `${manifest.product.appId}.desktop`),
-  )
-  const result = await verifyResourceTree(
-    join(application, "resources/loginom"),
-    manifest.runtime.resourcesSha256,
-    "linux-x64",
-  )
-  const desktop = await readFile(
-    artifact.kind === "deb"
-      ? join(root, "usr/share/applications", `${manifest.product.appId}.desktop`)
-      : join(root, `${manifest.product.appId}.desktop`),
-    "utf8",
-  )
-  if (
-    !desktop.includes(`Name=${manifest.product.name}`) ||
-    !desktop.includes(`StartupWMClass=${manifest.product.appId}`)
-  )
-    throw Error("RELEASE_DESKTOP_IDENTITY_INVALID")
-  if (
-    artifact.kind === "deb" &&
-    !desktop.includes(`Exec=/opt/${manifest.product.executable}/${manifest.product.executable} %U`)
-  )
-    throw Error("RELEASE_DESKTOP_EXEC_INVALID")
-  await Bun.write(
-    args.report,
-    JSON.stringify(
-      { status: "PASS", artifact: artifact.file, sha256: artifact.sha256, ...result, executableNotRun: true },
-      null,
-      2,
-    ) + "\n",
-  )
-  console.log(`PASS static ${artifact.file}: ${result.files} resources`)
+        throw Error("RELEASE_DEB_METADATA_INVALID")
+      await $`dpkg-deb --extract ${resolve(args.artifact)} ${root}`.quiet()
+    } else if (artifact.kind === "appimage") {
+      const bytes = await readFile(args.artifact)
+      const offsets = []
+      for (let position = bytes.indexOf("hsqs"); position !== -1; position = bytes.indexOf("hsqs", position + 4)) {
+        if (
+          position + 96 <= bytes.length &&
+          bytes.readUInt16LE(position + 28) === 4 &&
+          bytes.readUInt16LE(position + 30) === 0 &&
+          Number(bytes.readBigUInt64LE(position + 40)) <= bytes.length - position
+        )
+          offsets.push(position)
+      }
+      if (offsets.length !== 1) throw Error("RELEASE_SQUASHFS_INVALID")
+      await $`unsquashfs -no-progress -d ${root} -offset ${offsets[0]} ${resolve(args.artifact)}`.quiet()
+    } else throw Error("Only Linux installer artifacts can be statically extracted")
+    const application = artifact.kind === "deb" ? join(root, "opt", manifest.product.executable) : root
+    await verifyLinuxPermissions(application)
+    await verifyLinuxPermissions(
+      artifact.kind === "deb"
+        ? join(root, "usr/share/applications", `${manifest.product.appId}.desktop`)
+        : join(root, `${manifest.product.appId}.desktop`),
+    )
+    const result = await verifyResourceTree(
+      join(application, "resources/loginom"),
+      manifest.runtime.resourcesSha256,
+      "linux-x64",
+    )
+    const desktop = await readFile(
+      artifact.kind === "deb"
+        ? join(root, "usr/share/applications", `${manifest.product.appId}.desktop`)
+        : join(root, `${manifest.product.appId}.desktop`),
+      "utf8",
+    )
+    if (
+      !desktop.includes(`Name=${manifest.product.name}`) ||
+      !desktop.includes(`StartupWMClass=${manifest.product.appId}`)
+    )
+      throw Error("RELEASE_DESKTOP_IDENTITY_INVALID")
+    if (
+      artifact.kind === "deb" &&
+      !desktop.includes(`Exec=/opt/${manifest.product.executable}/${manifest.product.executable} %U`)
+    )
+      throw Error("RELEASE_DESKTOP_EXEC_INVALID")
+    await Bun.write(
+      args.report,
+      JSON.stringify(
+        { status: "PASS", artifact: artifact.file, sha256: artifact.sha256, ...result, executableNotRun: true },
+        null,
+        2,
+      ) + "\n",
+    )
+    console.log(`PASS static ${artifact.file}: ${result.files} resources`)
+  }
 } finally {
   await rm(directory, { recursive: true, force: true })
 }

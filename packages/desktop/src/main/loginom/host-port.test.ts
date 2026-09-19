@@ -7,6 +7,7 @@ import { join } from "node:path"
 import { loginomHostPort } from "./host-port"
 import { connectionService } from "./connection-service"
 import { connectionStore } from "./connection-store"
+import { credentials } from "./credentials"
 import type { desktopLoginom } from "./desktop-service"
 import { transport } from "@loginom-ai-agent/loginom-host/transport"
 import { recoveryStore } from "./recovery-store"
@@ -16,7 +17,7 @@ test.each(["call", "tools", "admit", "interrupt"])(
   "release during %s retains the generation until the actual request finishes",
   async (method) => {
     const directory = await mkdtemp(join(tmpdir(), "loginom-port-"))
-    const service = await connectionService(connectionStore(directory), {
+    const service = await connectionService(connectionStore(directory, credentials("linux")), {
       async check() {},
       async prepare() {
         return { async close() {} }

@@ -1,0 +1,13 @@
+{
+  "status": "PASS",
+  "artifact": "loginom-ai-agent-mac-arm64.zip",
+  "sha256": "0a20a2c3de5eb6f76f386564faa3a15c7f4eb3c103dc49150525f7420bd7a80b",
+  "files": 4432,
+  "node": "bin/node",
+  "browser": "browsers/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+  "minimumOS": "14.0",
+  "signing": "ad-hoc",
+  "vendorCodeSignaturesVerified": true,
+  "chromiumSignature": "linker-signed-code-only; resource seal absent upstream",
+  "executableNotRun": true
+}

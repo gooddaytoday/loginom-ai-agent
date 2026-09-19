@@ -1,0 +1,77 @@
+{
+  "status": "PASS",
+  "commit": "e1b2b57d9469957f04433d9a7b8eccf92d96ac21",
+  "platform": "darwin",
+  "arch": "arm64",
+  "bun": "1.3.14",
+  "results": [
+    {
+      "package": "product",
+      "args": [
+        "typecheck"
+      ],
+      "exitCode": 0
+    },
+    {
+      "package": "product",
+      "args": [
+        "test"
+      ],
+      "exitCode": 0
+    },
+    {
+      "package": "loginom-host",
+      "args": [
+        "typecheck"
+      ],
+      "exitCode": 0
+    },
+    {
+      "package": "loginom-host",
+      "args": [
+        "test"
+      ],
+      "exitCode": 0
+    },
+    {
+      "package": "desktop",
+      "args": [
+        "typecheck"
+      ],
+      "exitCode": 0
+    },
+    {
+      "package": "desktop",
+      "args": [
+        "test",
+        "src/main/loginom",
+        "src/main/system-proxy.test.ts",
+        "src/main/shutdown.test.ts",
+        "electron-builder.config.test.ts",
+        "scripts/release/artifact.test.ts",
+        "scripts/macos-smoke-probe.test.ts",
+        "scripts/build-command.test.ts"
+      ],
+      "exitCode": 0
+    },
+    {
+      "package": "agent",
+      "args": [
+        "typecheck"
+      ],
+      "exitCode": 0
+    },
+    {
+      "package": "agent",
+      "args": [
+        "test",
+        "test/cli/standalone.test.ts",
+        "test/cli/standalone-status.test.ts",
+        "test/cli/standalone-proxy.test.ts",
+        "test/cli/loginom-management.test.ts",
+        "test/session/loginom-result.test.ts"
+      ],
+      "exitCode": 0
+    }
+  ]
+}

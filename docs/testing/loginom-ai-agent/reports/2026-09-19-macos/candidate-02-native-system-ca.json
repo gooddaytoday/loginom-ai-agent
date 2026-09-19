@@ -1,0 +1,26 @@
+{
+  "status": "PASS",
+  "platform": "darwin",
+  "arch": "arm64",
+  "node": "24.19.0",
+  "bundledNode": true,
+  "originalCertificateCount": 120,
+  "systemCertificateCount": 2,
+  "mergedDefaultCertificateCount": 122,
+  "systemCertificatesParsed": true,
+  "allSystemCertificatesMerged": true,
+  "originalTrustPreserved": true,
+  "comparison": "X509 SHA256 identity, independent of PEM normalization",
+  "endpoint": "https://github.com/",
+  "tls": {
+    "authorized": true,
+    "statusCode": 200
+  },
+  "limitations": [
+    "Read-only macOS27 system trust-store test; trust settings unchanged",
+    "HTTPS verifies merged trust, not an endpoint relying exclusively on a private system CA",
+    "A system-only trust set rejected the public GitHub chain; production correctly merges system certificates with default roots",
+    "No enterprise interception or custom CA installation performed"
+  ],
+  "useSystemCaFlagVerified": true
+}

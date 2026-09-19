@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { recoveryStore } from "./recovery-store"
 import { connectionService } from "./connection-service"
 import { connectionStore } from "./connection-store"
+import { credentials } from "./credentials"
 
 const active = {
   generation: 1,
@@ -49,7 +50,7 @@ test("an unconfirmed dispatch survives process recreation; concurrent calls are 
 
 test("crash recovery gates a durable pending generation until explicit acknowledgement", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-crash-"))
-  const store = connectionStore(join(directory, "connection"))
+  const store = connectionStore(join(directory, "connection"), credentials("linux"))
   const location = join(directory, "recovery")
   try {
     await store.stage(active)
@@ -88,7 +89,7 @@ test("crash recovery gates a durable pending generation until explicit acknowled
 test("a pending first connection is restored without an existing active pointer", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-pending-"))
   try {
-    const store = connectionStore(directory)
+    const store = connectionStore(directory, credentials("linux"))
     await store.savePending(active)
     const service = await connectionService(store, runtime)
     try {

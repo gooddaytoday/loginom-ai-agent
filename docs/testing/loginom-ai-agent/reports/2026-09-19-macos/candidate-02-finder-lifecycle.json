@@ -1,0 +1,34 @@
+{
+  "status": "PASS",
+  "version": "0.1.4-macos.20260919.2",
+  "sourceCommit": "6650b6d017ce805eb4e6b2e250e612ac55856f16",
+  "launchedBy": "Finder double click of installed app",
+  "mainPid": 87915,
+  "isolatedProfile": "finder-profile-02",
+  "launchEnvironmentRestored": true,
+  "path": "/usr/bin:/bin:/usr/sbin:/sbin",
+  "beforeClose": [
+    "87915     1 /Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/MacOS/Loginom AI Agent Dev",
+    "87917     1 /Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler",
+    "87935 87915 /Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/Frameworks/Loginom AI Agent Dev Helper.app/Contents/MacOS/Loginom AI Agent Dev Helper",
+    "87937 87915 /Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/Frameworks/Loginom AI Agent Dev Helper.app/Contents/MacOS/Loginom AI Agent Dev Helper",
+    "87944 87915 /Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/Frameworks/Loginom AI Agent Dev Helper.app/Contents/MacOS/Loginom AI Agent Dev Helper",
+    "87945 87915 /Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/Frameworks/Loginom AI Agent Dev Helper (Renderer).app/Contents/MacOS/Loginom AI Agent Dev Helper (Renderer)"
+  ],
+  "afterLastWindowClose": [
+    "87915     1 /Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/MacOS/Loginom AI Agent Dev",
+    "87917     1 /Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler",
+    "87935 87915 /Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/Frameworks/Loginom AI Agent Dev Helper.app/Contents/MacOS/Loginom AI Agent Dev Helper",
+    "87937 87915 /Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/Frameworks/Loginom AI Agent Dev Helper.app/Contents/MacOS/Loginom AI Agent Dev Helper",
+    "87944 87915 /Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app/Contents/Frameworks/Loginom AI Agent Dev Helper.app/Contents/MacOS/Loginom AI Agent Dev Helper"
+  ],
+  "mainAliveAfterWindowClose": true,
+  "rendererAliveAfterWindowClose": false,
+  "sameMainAfterActivation": true,
+  "rendererRestoredAfterActivation": true,
+  "nativeCmdQ": true,
+  "remainingAfterCmdQ": [],
+  "limitations": [
+    "Native Finder/window/CmdQ test used onboarding without Loginom browser; active Host/browser shutdown verified separately by Desktop/CLI independence"
+  ]
+}
