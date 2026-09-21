@@ -218,5 +218,10 @@
     "baseHash": "eafc24af1321c26f8091c740be61ed55afc1f34de61477c3a96a45cea8e4459f",
     "hash": "66f6cf9d03db9b550bc37efccd68a2aa67c154dc3ad05c44b3409d32fad40cb9",
     "reason": "Regress full verified-source initialization of an existing import after its initial wizard draft was discarded; reject partial or foreign-source settings before mutation."
+  },
+  "packages/loginom-runtime/client/test/text-import-wide.test.mjs": {
+    "baseHash": "c4ea4fb47539acbd8e9edb0ac48c6893f2131546875fb963383266cc194d7f3d",
+    "hash": "1620093696f53f5afb397f3fba4114fa36ff8415642a32e169a34f1cd1d4f17c",
+    "reason": "Exercise bound metadata commit using refreshed references and reject changed owner, column, draft, original value, type or stage."
   }
 }
