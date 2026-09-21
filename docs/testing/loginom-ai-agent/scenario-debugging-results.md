@@ -8,15 +8,17 @@
 | --- | --- | --- |
 | Исходный ABC | CREATED_EXECUTED | `.3` / `ses_f3c001c10ffevlxP0Ek4C4Beav` |
 | B65 | CREATED_EXECUTED | `.5` / `ses_f3bf4fceeffeFbJCn0QjA07n9W` |
-| B02 | RUNNING | `.6` / `ses_f3beabb1affeTJydQ4bzcVwxc3` |
-| B47 | RUNNING | `.5` / `ses_f3be80188ffeWXck3xXTGcEQ0i` |
-| B37, B27, B18 | NOT_STARTED | — |
+| B02 | CREATED_EXECUTED | `.6` / `ses_f3beabb1affeTJydQ4bzcVwxc3` |
+| B47 | CREATED_EXECUTED | `.5` / `ses_f3be80188ffeWXck3xXTGcEQ0i` |
+| B37 | RUNNING | `.6` / `ses_f3bddb28dffe9rnhncERKN0Fam` |
+| B27 | RUNNING | `.5` / `ses_f3bddb28effeOkWDWMW4svtpFn` |
+| B18 | NOT_STARTED | — |
 | V65, V02, V27, V37 | NOT_STARTED | Входы и задания готовы |
 
 RUNNING и NOT_STARTED — промежуточные состояния реестра, не зачётные исходы.
 Для выполненных случаев `analytical_correctness: not_checked`.
 Фактически выполнены imports.text, transform.calculator, transform.sorting,
-transform.group_data, transform.join_data. Остальные 9 типов ещё не зачтены.
+transform.group_data, transform.join_data, transform.date_time. Остальные 8 типов ещё не зачтены.
 
 ## Исходный ABC — 2026-09-21
 
@@ -69,8 +71,8 @@ Loginom: `7.4.2` по manifest фактического prepare.
 ## Точка продолжения
 
 Исходный ABC на `.3` и B65 на `.5` завершились CREATED_EXECUTED.
-B47 выполняется на `.5`, B02 на `.6`. Профили и REPL
-сессии принадлежат только этому прогону. Последний source commit `65b0ebf4f`.
+B02 и B47 завершились; B37 выполняется на `.6`, B27 на `.5`. Профили и REPL
+сессии принадлежат только этому прогону. Последний source commit `99f65a0e4`; кандидат `.7` установлен для следующих случаев.
 Диагностическое восстановление импорта `.5` и ранний отказ Unicode-name `.6`
 подтверждены. Остальные случаи матрицы не запущены; полный аудит не завершён.
 
@@ -279,3 +281,39 @@ B02 на `.6`, чат `ses_f3beabb1affeTJydQ4bzcVwxc3`. Отдельные пр�
 Повтор macOS source pipeline после F10: 8/8 команд PASS
 (`source-checks-3.json`, `source-checks-3.log`). Эти проверки не являются
 заявлением об установленной приёмке новой ветки truncation.
+
+## B02 и B47: CREATED_EXECUTED
+
+B02 (`.6`) создал и выполнил 8 узлов, включая transform.date_time.
+Наблюдались выходы: импорт/даты 500 строк, категории 5, регионы 4,
+категория×регион 20, месячная группировка 17. Пакет
+`/user/scenario-debug-B02-candidate6-20260921.lgp` сохранён с подтверждённым
+save_completed и cleanup. B47 (`.5`) создал и выполнил 6 узлов;
+`/user/scenario-debug-B47-candidate5-20260921.lgp` сохранён аналогично.
+
+Оба прошли без ручных изменений; единственные отклонённые запросы —
+timeout_ms сверх 60000, затем модель использовала допустимое ожидание.
+Provider/model/variant неизменны; analytical_correctness: not_checked.
+Проверяемые receipts, запросы, граф и выходы сохранены в
+`B02-candidate6-metadata.json` и `B47-candidate5-metadata.json`, рядом
+полные чаты, стартовые задания и финальные снимки клиента.
+Неиспользованные filter_data и другие типы этим не засчитываются.
+
+## Кандидат `.7`
+
+Commit `99f65a0e4`, версия `0.1.7-local.20260921.7` включает backend summary F10.
+Первая сборка остановилась на cli-source-snapshot без прогресса несколько
+минут (журнал `build-5.log`); отдельное чтение 12182 исходных файлов прошло
+за 1.13 секунды. Завершены только собственные два build-процесса, результаты
+этой попытки не использовались для приёмки. Причина зависания не установлена.
+
+Повтор в `/Users/kartamyshev/.cache/loginom-macos-build/scenario-20260921-5-retry`
+прошёл: полный build, static DMG/ZIP 4446 ресурсов и offline smoke PASS.
+Установлен из readonly DMG в
+`/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260921.7/Loginom AI Agent.app`.
+При запуске следующих случаев не переносить на `.7` непроверенные ветки:
+ранее зачтённые короткие результаты не входили в изменённую ветку truncation;
+новая ветка подтверждена source tests, живая проверка oversized exact-table pending.
+
+Для установленного `.7` codesign PASS; SHA256 app.asar
+`dfd2fc7a336b69e13bc7c1b661aed0c0056aa8d477080b5079cd626ab862b2da`.
