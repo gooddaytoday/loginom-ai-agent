@@ -1,7 +1,14 @@
 import { expect, test } from "bun:test"
-import { loginomResultState } from "../../src/session/loginom-result"
+import { loginomResultState, loginomResultSummary } from "../../src/session/loginom-result"
 
 const reply = (value: unknown) => ({ content: [{ type: "text", text: JSON.stringify(value) }] })
+
+test("control summaries use only top-level receipts and preserve text-only delivery", () => {
+  const value = { operation_id: "op", status: "FAILED", error: { code: "FAILED", message: "Причина" } }
+  expect(JSON.parse(loginomResultSummary(reply(value))!)).toMatchObject(value)
+  expect(loginomResultSummary(reply({ rows: [value] }))).toBeUndefined()
+  expect(loginomResultSummary({ content: [{ type: "text", text: "not JSON" }] })).toBeUndefined()
+})
 
 test("Dock action and node failures do not require the MCP error flag", () => {
   for (const status of ["FAILED", "AMBIGUOUS", "NOT_APPLIED"]) {

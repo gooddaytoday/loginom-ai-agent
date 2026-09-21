@@ -2,6 +2,22 @@
 
 План: [2026-09-21-loginom-scenario-debugging](../../superpowers/plans/2026-09-21-loginom-scenario-debugging.md).
 
+## Текущее состояние матрицы
+
+| Случай | Статус | Клиент / чат |
+| --- | --- | --- |
+| Исходный ABC | CREATED_EXECUTED | `.3` / `ses_f3c001c10ffevlxP0Ek4C4Beav` |
+| B65 | CREATED_EXECUTED | `.5` / `ses_f3bf4fceeffeFbJCn0QjA07n9W` |
+| B02 | RUNNING | `.6` / `ses_f3beabb1affeTJydQ4bzcVwxc3` |
+| B47 | RUNNING | `.5` / `ses_f3be80188ffeWXck3xXTGcEQ0i` |
+| B37, B27, B18 | NOT_STARTED | — |
+| V65, V02, V27, V37 | NOT_STARTED | Входы и задания готовы |
+
+RUNNING и NOT_STARTED — промежуточные состояния реестра, не зачётные исходы.
+Для выполненных случаев `analytical_correctness: not_checked`.
+Фактически выполнены imports.text, transform.calculator, transform.sorting,
+transform.group_data, transform.join_data. Остальные 9 типов ещё не зачтены.
+
 ## Исходный ABC — 2026-09-21
 
 Прогон начат через интерфейс установленного Desktop
@@ -52,8 +68,8 @@ Loginom: `7.4.2` по manifest фактического prepare.
 
 ## Точка продолжения
 
-Исходный ABC на `.3` завершился CREATED_EXECUTED. B65 выполняется на `.5`,
-кандидат `.6` установлен и проходит GUI-подготовку для B02. Профили и REPL
+Исходный ABC на `.3` и B65 на `.5` завершились CREATED_EXECUTED.
+B47 выполняется на `.5`, B02 на `.6`. Профили и REPL
 сессии принадлежат только этому прогону. Последний source commit `65b0ebf4f`.
 Диагностическое восстановление импорта `.5` и ранний отказ Unicode-name `.6`
 подтверждены. Остальные случаи матрицы не запущены; полный аудит не завершён.
@@ -226,3 +242,40 @@ labels не менялись. Копия receipts/summary: `unicode-rejection-su
 успешные импорты использовали ASCII technical names, новый отказ не меняет
 их путь. Остальные изменения `.4/.5` касаются диагностики и ошибочных веток;
 они дополнительно проверяются последующими автономными случаями.
+
+## B65: CREATED_EXECUTED
+
+Кандидат `.5`, GPT-5.6 Sol / low, Loginom 7.4.2, чат
+`ses_f3bf4fceeffeFbJCn0QjA07n9W`. Входной task.md и исходный CSV с 13 полями
+переданы через GUI. Все 5 узлов выполнились: импорт, сортировка, калькулятор,
+группировка, итоговый калькулятор KPI. Подробный выход 200 строк, сводка 3 строки.
+Сохранён `/user/scenario-debug-B65-candidate5-20260921.lgp`; save_completed и
+cleanup подтверждены. Никаких ручных исправлений; неверное timeout_ms модель
+исправила сама. `analytical_correctness: not_checked`.
+Доказательства `B65-candidate5-{chat,metadata,prompt,final}` в локальном каталоге
+(расширения .json/.txt/.png). В metadata сохранены все запросы/узлы/связи и выходы.
+
+B47 запущен на `.5`, чат `ses_f3be80188ffeWXck3xXTGcEQ0i`;
+B02 на `.6`, чат `ses_f3beabb1affeTJydQ4bzcVwxc3`. Отдельные профили,
+одинаковые provider/model/variant, неизменённые исходные задания.
+
+## F10: сохранение управляющей части при backend truncation
+
+Реальный Truncate service воспроизводит потерю всей длинной JSON-строки
+с Unicode-таблицей, включая execution ID. Backend теперь при превышении
+лимита оставляет отдельный control summary: status/error/node/execution/next_step
+и явный признак data_delivery=omitted_by_backend_size_limit. Полный JSON
+записан прежним truncation service без изменений; exact_table не обрезается
+и не представляется полным в сокращённом ответе модели. Ошибка остаётся ошибкой.
+
+Регрессии с AMBIGUOUS и SUCCEEDED: проверены сохранение control fields,
+отсутствие ложного табличного результата и побайтовое сохранение исходного
+ответа. 9 session tests PASS; Agent typecheck PASS. Установленный автономный
+случай с превышением лимита ещё не выполнен; это source-level проверка.
+Автоматический доступ модели ко всему локальному файлу этим изменением
+не добавляется. Compaction и необычно большие control fields остаются
+границами отдельного аудита, а не заявляются полностью проверенными.
+
+Повтор macOS source pipeline после F10: 8/8 команд PASS
+(`source-checks-3.json`, `source-checks-3.log`). Эти проверки не являются
+заявлением об установленной приёмке новой ветки truncation.

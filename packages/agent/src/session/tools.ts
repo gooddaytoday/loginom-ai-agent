@@ -1,4 +1,4 @@
-import { loginomResultState } from "./loginom-result"
+import { loginomResultState, loginomResultSummary } from "./loginom-result"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js"
@@ -585,16 +585,21 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 const text = result.content.flatMap((block) => (block.type === "text" ? [block.text] : []))
                 const truncated = yield* truncate.output(text.join("\n\n"), {}, input.agent)
                 const state = loginomResultState(result)
+                const summary = truncated.truncated ? loginomResultSummary(result) : undefined
+                const content =
+                  truncated.truncated && summary
+                    ? `${summary}\n\nTable data and verbose details were omitted by the backend response limit. The complete original result is retained at ${truncated.outputPath}. Do not infer unread data or repeat mutations solely to retrieve omitted text.`
+                    : truncated.content
                 if (state === "failed") {
                   yield* ctx.metadata({
                     title: definition.name,
                     metadata: { generation: loginom.generation, isError: true },
                   })
-                  throw new Error(truncated.content || "LOGINOM_TOOL_FAILED")
+                  throw new Error(content || "LOGINOM_TOOL_FAILED")
                 }
                 const output = {
                   title: definition.name,
-                  output: truncated.content,
+                  output: content,
                   metadata: {
                     generation: loginom.generation,
                     truncated: truncated.truncated,

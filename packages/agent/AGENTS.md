@@ -152,6 +152,7 @@ Plain async code should pass explicit context or stay inside an Effect fiber; do
 - Preserve typed permission rejection as tool-state `metadata.permissionDenied` before provider serialization. Standalone noninteractive run must return 1 for this marker even without `permission.asked`; explicit auto-approval never overrides a policy deny.
 
 - Loginom MCP `isError` must become a tool error, matching ordinary MCP catalog behavior. Preserve the bounded error text and generation/isError metadata; do not record it as a successful completed tool part.
+- When backend truncation omits an oversized Loginom receipt, preserve its control summary (status, error, node, execution and next_step) and explicitly mark table data omitted. Keep the complete original in local tool-output storage; do not present a cropped exact table as complete or suggest repeating mutations merely to recover omitted text.
 
 - Loginom acquire/catalog/attachment-admission failures must reach the model with the preparation stage and an allowlisted Host error code. Do not advertise availability after a failed preparation or claim that a chat attachment was admitted/uploaded. Retry preparation at the ordinary subsequent turn boundary; never synthesize attachment authorization or expose raw credential-bearing errors.
 
