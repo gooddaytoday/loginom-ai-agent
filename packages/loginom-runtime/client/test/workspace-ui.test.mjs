@@ -2400,8 +2400,8 @@ test('output column typed editing preserves the selected row and all other param
 });
 
 test('input and output editors apply and cancel verify all row properties after one click',async()=>{
-  for(const direction of ['input','output'])for(const mode of ['apply','cancel','wrong_type','wrong_kind','cancel_replaced','lost_reply']) {
-    const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1));
+  for(const direction of ['input','output'])for(const mode of ['apply','cancel','wrong_type','wrong_kind','cancel_replaced','lost_reply','busy_delayed','busy_long','busy_permanent','busy_foreign_tab','busy_foreign_dialog']) {
+    const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1));
     const editor=direction==='input'?'EditTuneColumnDefForm':'EditColumnDefForm',usageColumn=direction==='input'?'colUsageType_':'colDefaultUsageType_';
     const stem=base+(direction==='input'?'TuneDataSourceMappingWizard;':'DerivedDataSourceOutputSocketWizard;');page.add('button',stem+'btnAddMappingColumn','',undefined,form);
     let table;
@@ -2417,14 +2417,23 @@ test('input and output editors apply and cancel verify all row properties after 
     }
     const cancel=mode.startsWith('cancel'),verb=cancel?'cancel_output_column':'apply_output_column';
     page.add('button',base+editor+';'+(cancel?'btnCancel':'btnApply'),'Close',{x:600,y:400,width:80,height:25},dialog);
+    if(mode==='busy_long')page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+      {expected_build:build,expected_origin:origin,settlement_timeout_ms:120000,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},
+      async()=>({verified:true,node_id:'node',surface:'wizard',tid:'MF;TF-1;WizrdMCF'})));
     const full=await page.observe(),read=await page.execute({mode:'observe',root_ref:full.wizard.column_parameters.root_ref});
     const target=read.output.ui.elements.find(e=>e.column_close);assert.ok(target);
+    let waits=0,mask;
+    page.waitForTimeout=async ms=>{clock.advance(ms+(mode==='busy_long'?5000:0));waits++;if(['busy_delayed','busy_long'].includes(mode)&&waits===20)mask.remove();if(mode==='busy_foreign_tab'&&waits===2)page.tab.attrs['data-tid']='foreign-tab';if(mode==='busy_foreign_dialog'&&waits===2)page.add('div','foreign-dialog','Other').attrs.class='x-window';};
     const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);dialog.remove();
       if(mode!=='cancel'){table.remove();createRow(cancel?'Quantity':'QuantitySum',mode==='wrong_type'?'Float':'Integer',mode==='wrong_kind'?'Дискретный':'Непрерывный');}
+      if(mode.startsWith('busy_')){mask=page.add('div','column-loading','Загрузка');mask.attrs.class='x-mask-msg';}
       if(mode==='lost_reply')throw new Error('Lost reply');
     };
     const result=await page.act({verb,ref:target.ref},read.output);
-    assert.equal(result.status,['apply','cancel'].includes(mode)?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+    assert.equal(result.status,['apply','cancel','busy_delayed','busy_long'].includes(mode)?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+    if(mode==='busy_permanent')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+    if(['busy_foreign_tab','busy_foreign_dialog'].includes(mode))assert.equal(waits,2);
+    if(mode==='busy_long')assert.ok(result.trace.find(e=>e.event==='ui_mask_wait_finished').elapsed_ms>60000);
     assert.equal(page.events.filter(e=>e==='click').length,1);
   }
 });
@@ -3430,9 +3439,9 @@ test('Table parent formatting uses exact painted Ext InputEl for zero-size inlin
 
 
 // Private candidate fixture reconstructed from the root-owned live DOM probe.
-async function inputMappingLiveFixture(duplicateLabels=false) {
+async function inputMappingLiveFixture(duplicateLabels=false,clock=Date) {
   const {mappingLiveLayout}=await import('./mapping-layout.fixture.mjs');
-  const live=structuredClone(mappingLiveLayout),page=new Page();
+  const live=structuredClone(mappingLiveLayout),page=new Page({clock});
   if(duplicateLabels){const {duplicateTypeIcons}=await import('./mapping-duplicate-icons.fixture.mjs');
     for(const side of ['source','target'])for(const grid of live[side])for(const container of grid.children)for(const table of container.children)for(const row of table.rows)for(const cell of row.cells){
       const observed=duplicateTypeIcons.find(x=>x.tid===cell.tid);if(observed){cell.text=observed.label;cell.observedIcon=observed.icons[0];}
@@ -3580,7 +3589,7 @@ test('input port overflow caption requires native binding and the exact hidden c
   if(mode==='wrong_caption')crumbs[8].ownText='Other';
   if(mode==='missing_icon')crumbs[8].children[0].remove();
   if(!mode.endsWith('unbound'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
-   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
+   {expected_build:build,expected_origin:origin,...(mode==='late_loading_long'?{settlement_timeout_ms:120000}:{}),prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
    async()=>({verified:true,surface:'wizard',node_id:'node',input_port:{direction:'input',port:0}})));
   const full=await page.observe(),narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
   assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
@@ -3640,7 +3649,7 @@ test('native process console joins bounded grids and keeps ownership and executi
 });
 
 async function inputPortFinishFixture(mode='valid') {
-  const f=await inputMappingLiveFixture(),{page,owner,base,nodes}=f;
+  const clock=fixtureClock(),f=await inputMappingLiveFixture(false,clock.Date),{page,owner,base,nodes}=f;
   const {inputPortBreadcrumbs}=await import('./input-port-breadcrumbs.fixture.mjs');
   const panel=page.add('div','MF;TF-5;NavigationBar;NavigationPanel','',{x:48,y:35,width:1392,height:36});
   const crumbs=inputPortBreadcrumbs.map((n,i)=>{
@@ -3651,7 +3660,7 @@ async function inputPortFinishFixture(mode='valid') {
   if(mode==='missing_context')crumbs[7].remove();
   if(mode==='missing_mapping')nodes.get(base+'colSourceName_Region').remove();
   if(mode==='duplicate_done')page.add('button',done.attrs['data-tid'],'Готово',done.box,owner);
-  let graph,node,label,toast,waits=0;
+  let graph,node,label,toast,loading,waits=0;
   const click=page.mouse.click;page.mouse.click=async(...args)=>{
     await click(...args);if(mode==='still_open')return;
     owner.remove();for(const c of crumbs.slice(5))c.remove();
@@ -3665,14 +3674,17 @@ async function inputPortFinishFixture(mode='valid') {
     if(['toast','foreign_toast','permanent_toast'].includes(mode)){toast=page.add('div',mode==='foreign_toast'?'foreign':'toast','Сохранено',{x:1000,y:800,width:300,height:75});toast.attrs.role='dialog';}
     if(mode==='mask')page.add('div','mask','Загрузка').attrs.class='x-mask-msg';
   };
-  page.waitForTimeout=async()=>{waits++;if(mode==='toast'&&waits===3)toast.remove();
+  page.waitForTimeout=async ms=>{clock.advance(ms+(mode==='late_loading_long'?5000:0));waits++;if(mode==='toast'&&waits===3)toast.remove();
+    if(mode.startsWith('late_loading')&&waits===2){loading=page.add('div','late-loading','Загрузка');loading.attrs.class='x-mask-msg';}
+    if(mode.startsWith('late_loading')&&mode!=='late_loading_permanent'&&waits===(mode==='late_loading_long'?10:4))loading.remove();
+    if(mode==='late_loading_foreign_workflow'&&waits===3)crumbs[4].ownText='Другой сценарий';
     if(mode==='late_body'&&waits===2){node.remove();node=page.add('g','MF;TF-5;Graph;Revenue','',{x:100,y:200,width:150,height:80},graph);label=page.add('span','MF;TF-5;Graph;Revenue;Label;Label','Revenue',{x:110,y:220,width:120,height:30},node);}
     if(mode==='churn')page.mutationObserver.pending.push({type:'attributes',target:node,attributeName:'style'});
     if(mode==='late_tab'&&waits===2)page.tab.attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';
   };
-  if((mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')||mode.startsWith('suffix'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
-    {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
-    async()=>({verified:true,node_id:mode==='suffix_wrong_id'?'other':'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
+  if((mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')||mode.startsWith('suffix')||mode.startsWith('late_loading'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,...(mode==='late_loading_long'?{settlement_timeout_ms:120000}:{}),prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
+    async()=>({verified:true,node_id:mode==='suffix_wrong_id'||mode==='late_loading_foreign_node'&&waits>=3?'other':'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
   return {...f,done,waits:()=>waits};
 }
 
@@ -3703,6 +3715,19 @@ test('typed input-port finish uses one gesture and quiet exact graph return with
       assert.equal(result.trace.find(e=>e.event==='input_port_finish_settled').quiet_samples,3);
     }
     if(mode==='late_body')assert.equal(waits(),5);if(mode==='churn')assert.equal(waits(),12);
+  }
+});
+
+test('input-port completion waits through late loading without repeating Done or accepting a changed owner',async()=>{
+  for(const mode of ['late_loading','late_loading_long','late_loading_permanent','late_loading_foreign_node','late_loading_foreign_workflow']){
+    const {page,waits}=await inputPortFinishFixture(mode),snapshot=await page.observe();
+    const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');
+    const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+    assert.equal(result.status,['late_loading','late_loading_long'].includes(mode)?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+    assert.equal(page.events.filter(e=>e==='click').length,1);
+    if(mode==='late_loading')assert.equal(result.trace.find(e=>e.event==='input_port_finish_settled').quiet_samples,3);
+    if(mode==='late_loading_permanent')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+    if(mode==='late_loading_long')assert.ok(result.trace.at(-1).at_ms>45000);
   }
 });
 
@@ -4071,6 +4096,16 @@ test('scan time budget accepts 500 ms but rejects 501 ms before issuing referenc
     }
     assert.deepEqual(page.events, []);
   }
+});
+
+test('mask settlement cannot extend unbound or unrelated actions',()=>{
+  for(const options of [
+    {mode:'observe'},
+    {mode:'act',action:{verb:'finish_wizard',ref:'ui-done'}},
+    {mode:'act',prepared_node_context:{},action:{verb:'click',ref:'ui-done'}},
+    ...[0,-1,1.5,1800001].map(settlement_timeout_ms=>({mode:'act',prepared_node_context:{},action:{verb:'finish_wizard',ref:'ui-done'},settlement_timeout_ms})),
+    {mode:'act',prepared_node_context:{},action:{verb:'finish_wizard',ref:'ui-done'},opening_timeout_ms:1000},
+  ])assert.throws(()=>makeWorkspaceUiCode({settlement_timeout_ms:60000,...options}),/Mask settlement requires/);
 });
 
 test('action deadline expires before the gesture with a controlled clock', async () => {

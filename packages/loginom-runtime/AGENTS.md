@@ -38,3 +38,7 @@
 - The compact `user-v1` node API owns technical time budgets: do not expose `budgets` to the model. `expandNode` supplies bounded setup/execution/total defaults with read and cleanup allowance. The full diagnostic node contract still accepts explicit immutable deadlines; never extend a pending operation or retry an unknown effect to recover from expiry.
 
 - A new tabular port can expose an alternate SVG without `data-tid` before its first graph observation. Bind it only through a unique rendered port in the prepared graph whose live hit-test resolves to the exact native cell, with GUID/data/parent ownership verified. If a prior binding exists, its graph, node, cell, GUID, data, type and subtype must still match. Never infer a port index, rewrite the DOM, or retry a pending graph mutation to repair this observation.
+
+
+
+- After node/port Done or column Apply/Cancel, loading masks can persist for minutes. The host supplies only the remaining original node deadline through private `settlement_timeout_ms`; the browser waits read-only while package/workflow/node and editor ownership remain unchanged. Do not replace this with a fixed number of short sleeps, repeat the gesture, reset deadlines, or accept a foreign dialog. After the mask disappears, retain exact row/graph and quiet-state verification; expiry remains ambiguous when an effect was possible.

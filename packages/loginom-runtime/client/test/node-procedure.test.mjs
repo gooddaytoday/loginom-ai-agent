@@ -568,3 +568,26 @@ test('an incomplete observation preserves the original refusal in the journal',a
  assert.equal(refused.length,1);assert.equal(refused[0].outcome.error.code,'UI_ROOT_STALE');
  assert.ok(!f.events.includes('mutated'));
 });
+
+test('bound completion gives mask settlement only the remaining parent deadline',async()=>{
+  for(const verb of ['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column','click']) {
+    const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+    const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+    const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},
+      prepared_node_context:{...binding.node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Import'},scan:{complete:true},wizard:{status:'absent'},
+      ui:{elements:[{ref:'ui-button',allowed_actions:[verb]}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+    const operation={id:'parent',deadline:65000,action:{action_key:'node.apply',revision:'1'}};
+    const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
+      now:()=>1000,wait:async()=>{},record:async e=>structuredClone(e),wrapMutation:(code,receipt)=>({code,receipt}),
+      execute:async(code,options)=>{
+        if(typeof code==='string')return {status:'SUCCEEDED',output:structuredClone(state)};
+        assert.equal(options.timeout,verb==='click'?35000:69000);
+        if(verb==='click')assert.doesNotMatch(code.code,/"settlement_timeout_ms":/);
+        else assert.match(code.code,/"settlement_timeout_ms":64000/);
+        return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state};
+      }});
+    await channel.observe({condition:'bound completion',ready:()=>true});
+    await channel.act({verb,ref:'ui-button'});
+    assert.equal(operation.deadline,65000);
+  }
+});

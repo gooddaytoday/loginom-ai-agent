@@ -50,7 +50,7 @@ export function validateUiAction(action, snapshot) {
 }
 
 export function workspaceUiCapability(page, task, readNodeContext, captureProcessFocus, restoreProcessFocus) {
-  const started = Date.now(), deadline = started + (task.opening_timeout_ms??15000);
+  const started = Date.now(), deadline = started + (task.settlement_timeout_ms??task.opening_timeout_ms??15000);
   const trace = [], handles = [];
   let postActionRoot;
   let cancellationSurfaceReads=0;
@@ -66,6 +66,17 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   const fail = (code, message) => { const error = new Error(message); error.code = code; throw error; };
   const timeout = () => { const left = deadline - Date.now(); if (left <= 0) fail('UI_DEADLINE_EXCEEDED', 'Observed UI action deadline exceeded'); return left; };
   const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+  const waitForMasks = async (observed, read, unchanged) => {
+    if(!observed.ui.masks.length || !unchanged(observed))return observed;
+    const maskStarted=Date.now();
+    record('ui_mask_wait_started',{remaining_ms:timeout()});
+    while (observed.ui.masks.length && unchanged(observed)) {
+      await page.waitForTimeout(Math.min(250,timeout()));
+      timeout();observed=await read();
+    }
+    record('ui_mask_wait_finished',{elapsed_ms:Date.now()-maskStarted,mask_present:observed.ui.masks.length>0});
+    return observed;
+  };
   const boundNode = async () => {
     if (!task.prepared_node_context) return null;
     let binding=await readNodeContext(page,task.prepared_node_context);
@@ -3627,11 +3638,12 @@ function readRenderedInputMapping(observation) {
             return bodies.length===1?bodies[0]:null;
           };
           for(let attempt=0;attempt<24 && contextMatches(observed) && (observed.wizard.status!=='absent' || observed.ui.masks.length || !targetNode(observed));attempt++) {
-            timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readOpeningUi();
+            timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await waitForMasks(await readOpeningUi(),readOpeningUi,contextMatches);
           }
-          const ready=fresh=>contextMatches(fresh) && !fresh.ui.masks.length && fresh.wizard.status==='absent' && !!targetNode(fresh)
+          const sameDestination=fresh=>contextMatches(fresh) && fresh.wizard.status==='absent' && !!targetNode(fresh)
             && fresh.navigation_context?.status==='observed'
             && same(fresh.navigation_context.path,workflowPath);
+          const ready=fresh=>sameDestination(fresh) && !fresh.ui.masks.length;
           if(!ready(observed))
             fail('WIZARD_FINISH_NOT_CONFIRMED','The expected node and workflow were not confirmed after one wizard completion click; inspect before retry');
           // Live finish can replace the newly painted graph body after the
@@ -3643,9 +3655,14 @@ function readRenderedInputMapping(observation) {
           let quietSamples=0;
           for(let attempt=0;attempt<12 && quietSamples<3;attempt++) {
             timeout();await page.waitForTimeout(Math.min(200,timeout()));
-            const fresh=await readOpeningUi();
-            if(!ready(fresh))fail('WIZARD_FINISH_NOT_CONFIRMED','The destination changed while settling after one wizard completion click; inspect before retry');
-            quietSamples=same(stamp(fresh),stamp(observed))?quietSamples+1:0;
+            const settling=await readOpeningUi();
+            const fresh=await waitForMasks(settling,readOpeningUi,sameDestination);
+            if(settling.ui.masks.length){quietSamples=0;attempt=-1;}
+            if(!sameDestination(fresh))fail('WIZARD_FINISH_NOT_CONFIRMED','The destination changed while settling after one wizard completion click; inspect before retry');
+            // A loading mask may arrive after the first graph snapshot. Keep
+            // observing this same bound destination within the operation deadline;
+            // it is not a reason to repeat Done or accept a different owner.
+            quietSamples=!settling.ui.masks.length&&!fresh.ui.masks.length&&same(stamp(fresh),stamp(observed))?quietSamples+1:0;
             observed=fresh;
           }
           if(quietSamples<3)fail('WIZARD_FINISH_NOT_SETTLED','The graph kept changing after one wizard completion click; observe before continuing');
@@ -3702,14 +3719,18 @@ function readRenderedInputMapping(observation) {
             && fresh.active_tab_ref===current.active_tab_ref && fresh.wizard.root_ref===current.wizard.root_ref && fresh.wizard.stage===(reform?'field_parameters':current.wizard.stage)
             && same(fresh.wizard.owner_context,current.wizard.owner_context)
             && same(fresh.wizard.port_context,current.wizard.port_context)
-            && same(fresh.wizard.input_port_context,current.wizard.input_port_context);
+            && same(fresh.wizard.input_port_context,current.wizard.input_port_context)
+            && fresh.ui.dialogs.every(dialog=>dialog.ref===params.root_ref);
           const matches=fresh=>(fresh.wizard[rowsKey]?.fields??[]).filter(row=>row.status==='observed' && row.selected
             && ['name','label','type','data_kind','usage'].every(k=>wanted[k] && row[k]===wanted[k])
             && (!reform || row.caching===wanted.caching && row.excluded===wanted.excluded)
             && (!cancel || row.row_ref===wanted.row_ref));
           const closed=fresh=>!fresh.wizard[paramsKey] && !fresh.ui.dialogs.some(d=>d.ref===params.root_ref);
+          // A busy owner may take much longer than the row repaint itself.
+          // Wait without another gesture, bounded by the parent operation.
+          observed=await waitForMasks(observed,readUi,sameContext);
           for(let attempt=0;attempt<12 && sameContext(observed) && (!closed(observed) || observed.ui.masks.length || matches(observed).length!==1);attempt++) {
-            timeout();await page.waitForTimeout(Math.min(100,timeout()));observed=await readUi();
+            timeout();await page.waitForTimeout(Math.min(100,timeout()));observed=await waitForMasks(await readUi(),readUi,sameContext);
           }
           if(!sameContext(observed) || !closed(observed) || observed.ui.masks.length || observed.ui.dialogs.length || matches(observed).length!==1)
             fail('OUTPUT_COLUMN_NOT_CONFIRMED','The selected output row was not confirmed after closing its editor; inspect before retry');
@@ -3941,6 +3962,11 @@ function readRenderedInputMapping(observation) {
 
 export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
+  if(options.settlement_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
+    ||!['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
+    ||options.opening_timeout_ms!==undefined||!Number.isInteger(options.settlement_timeout_ms)
+    ||options.settlement_timeout_ms<1||options.settlement_timeout_ms>1800000))
+    throw Error('Mask settlement requires a bound completion action and the remaining node deadline');
   if(options.opening_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
     ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)
     ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>45000))

@@ -393,13 +393,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (now() >= operation.deadline) throw new Error('Node procedure deadline elapsed before mutation');
       const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(action.verb)
         ?Math.min(45000,Math.max(1,Math.floor(operation.deadline-now()))):null;
+      const settlementWait=preparedNodeContext&&['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb)
+        ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const code = makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
+        ...(settlementWait?{settlement_timeout_ms:settlementWait}:{}),
         ...(openingWait?{opening_timeout_ms:openingWait}:{}),
         ...boundOptions,
         snapshot: before, expected_origin: targetOrigin, expected_build: targetBuild });
       const wrapped = wrapMutation(code, { id, signature, action_key: 'ui.act' });
       let result;
-      try { result = await execute(wrapped, { timeout: openingWait?openingWait+5000:35000 }); }
+      try { result = await execute(wrapped, { timeout: settlementWait?settlementWait+5000:openingWait?openingWait+5000:35000 }); }
       catch (error) {
         operation.transportUncertain = true;
         operation.cleanupConfirmed = false;

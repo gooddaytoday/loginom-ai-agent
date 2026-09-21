@@ -1,26 +1,61 @@
-# Точка продолжения description/dataset
+# Description + dataset: checkpoint
 
-2026-09-21. Цель активна, план ещё не выполнен полностью.
+Обновлено 2026-09-22 (времена ниже UTC). План выполняется; цель не завершена.
 
-- Baseline .10 завершён: 7 PASS, 3 BLOCKED (D45,D48,D65), 10/10 попыток, assistance=none. Все baseline Desktop закрыты.
-- Исправлена потеря видимой точки частично обрезанной кнопки Visualizers; повторный hit-test и отказ при перекрытии сохранены.
-- .11 целевой D45 BLOCKED: модель переопределила configure_ms=120000; Stop и закрытие подтверждены. .11 исторический, final на нём не запускался.
-- .12: компактный user-v1 API не принимает budgets; приложением заданы ограниченные defaults 300000/120000/600000 ms. Полный диагностический контракт и явные deadlines сохранены. Resume неизвестных эффектов не добавлялся и сроки старых операций не продлевались.
-- Проверки: полный runtime 2283 PASS, 2 Windows-only SKIP, 0 FAIL; transforms 5045 PASS. Общий macOS source-check Product/Host/Desktop/Agent ранее PASS на .11. .12 изменил только компактную JS-схему/инструкции и тесты.
+## Канонические условия
 
-## Установленный кандидат .12
+10 задач в порядке старта D02,D47,D23,D45,D19,D36,D24,D48,D27,D65. Исходные description.md + dataset.csv неизменны, начальный prompt фиксирован, технические подсказки запрещены. GPT-5.6 Sol low, Loginom 7.4.2, Desktop macOS backend v1. На попытку 30 минут, отдельные профиль/чат/пакет. Аналитическая правильность not_checked; помощь человеку пока не потребовалась. Последнее поручение пользователя: пять независимых клиентов для выявления нюансов под нагрузкой (после краткого снижения до трёх). Тяжёлые source checks не совмещать с полной нагрузкой пяти клиентов.
 
-Source `c643db47657f6644b167d27dbaa0dec269e769c4`; build `/Users/kartamyshev/.cache/loginom-macos-build/description-20260921-12`. DMG/ZIP/offline smoke/installed signature/ASAR equality PASS.
-Установка: `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260921.12/Loginom AI Agent.app`.
-ASAR `66ee2a56ad65c8af034f5737313f8dd90ddbbee346549ea8c39365bd8e800696`.
+## Установленный кандидат и история
 
-## Активная попытка
+- Baseline `.20260921.10`: 7 PASS / 3 BLOCKED (D45,D48,D65).
+- `.11`: целевой D45 BLOCKED, модель задавала короткие технические budgets.
+- `.12`: целевые D45/D48/D65 PASS; final12 9 PASS / 1 BLOCKED (D27, первое наблюдение нового native port).
+- HEAD `8ab08274c75dc3658d3fc72954cc6ab04dd937be`: безопасная привязка нового порта; предыдущие исправления visible hit point и host-owned budgets сохранены.
+- Кандидат 13: `0.1.7-local.20260922.1`, ASAR `12e483b9df3d67010cc34e440e9ff356ddc356f2be790b98a3994db6dc58f480`.
+- Установка `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260922.1/Loginom AI Agent.app`; пользовательская установка не менялась.
+- D27-target13 PASS (9 узлов), закрыт.
 
-D45-target12-a01 завершена CREATED_EXECUTED_SAVED: 4 узла, save/modified=false/cleanup подтверждены, Desktop закрыт. D48-target12-a01 завершён CREATED_EXECUTED_SAVED: 6 узлов, save/modified=false/cleanup, Desktop закрыт. D65-target12-a01 завершён CREATED_EXECUTED_SAVED: 7 узлов, save/modified=false/cleanup, Desktop закрыт. Итоговая серия final12 выполняется; свежий момент отправки и предел см. private controller-checkpoint.json. Модель GPT-5.6 Sol low, подключение ready, тот же сервер Loginom7.4.2. Исходные файлы неизменны, технические подсказки не отправлялись.
+## Final13
 
-Приватные доказательства: `/Users/kartamyshev/Library/Logs/loginom-description-debugging/20260921-163359`. Самый свежий active state в `controller-checkpoint.json`; baseline manifest в `manifest.json`; каждая попытка имеет свой `metadata.json`.
-Node REPL: `app12/page12/backend12/headers12/run12/candidate12/ctl/pw`. Не печатать backend/headers. `ctl.collectAttempt(backend12,headers12,run12)` сохраняет chat/receipts и проверяет доставленные bytes/hash и модель. Успех требует отдельно проверить конечные исполненные выходы и save+modified=false+cleanup. `ctl.finishAttempt(app12,page12,run12,summary)` сохраняет результат и закрывает Desktop. Модуль контроллера `attempt-controller-v6.mjs` сохранён вне Git; все изменяемые параметры передавать явно.
+Все 10 уже отправлены; повторно не запускать их в этой серии.
 
-Далее: пройти final10 на одном кандидате в порядке D02,D47,D23,D45,D19,D36,D24,D48,D27,D65. Final12: D02 PASS (10 узлов), D47 PASS (6 узлов), D23 PASS (7 узлов), D45 PASS (4 узла), их Desktop закрыты. D19 PASS (7 узлов), Desktop закрыт. D36 PASS (4 узла), Desktop закрыт. D24 PASS (7 узлов), Desktop закрыт. D48 PASS (8 узлов), Desktop закрыт. D27 BLOCKED (6 узлов, pending node-weekday-analysis-a02, Visible port identity is not rendered в target, resume тайм-ауты), модель завершилась сама, Desktop закрыт. D65 PASS (6 узлов), Desktop закрыт. Final12 завершена: 9 PASS / 1 BLOCKED. DEBUG_ONLY D27 завершён: 7 SUCCEEDED и save, cleanup/close подтверждены; точное состояние F12 не повторилось. Evidence /var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-U7J0yn. В исходниках подготовлена строго проверяемая первая привязка alternate SVG нового табличного порта. RED/GREEN регрессия, полный runtime 2284 PASS / 2 SKIP, transforms 5045 PASS. Общий macOS source-check PASS: 8 групп Product/Host/Desktop/Agent. Затем зафиксировать исходники, собрать новый кандидат, целевой D27 и новая полная final-серия. Точная первопричина F12/recovery ещё не доказана. Точный текущий статус — в metadata активной попытки и final12-manifest.json. При новом необходимом исправлении сохранить историю и повторить final целиком на новом кандидате.
+| Задача | Состояние |
+| --- | --- |
+| D02 | BLOCKED, 4 узла, поздняя маска после Done; D-F05; закрыт |
+| D47 | PASS, 6 узлов, закрыт |
+| D23 | PASS, 5 узлов, закрыт |
+| D45 | PASS, 5 узлов, закрыт |
+| D19 | PASS, 7 узлов, закрыт |
+| D36 | BLOCKED, 1 узел, маска после Apply выходного поля; D-F06; закрыт |
+| D24 | BLOCKED, 0 узлов; модель во всех 8 запросах неверно копировала artifact_id (8f56 вместо 8d56), корректный отказ до мутации; закрыт |
+| D48 | PASS, 6 узлов, закрыт |
+| D27 | PASS, 9 узлов, закрыт |
+| D65 | Активен, отправлен 23:19:12.439 UTC, предел 23:49:12 UTC; исправляет собственную ошибку формулы на том же сохранённом узле по подтверждённой процедуре |
 
-Предел каждой попытки 30 минут от отправки, один активный сценарий; не повторять pending-мутации. Пользовательскую установку и профиль не трогать. F03/F07 recovery не подтверждены; аналитическая правильность not_checked.
+D02/D36 завершились сами, pending сохранён, cleanup=false; Stop не нажимался. D24 завершился сам, все отказы импорта до мутации, cleanup=true. Final13 уже не прошла и не может быть объявлена успешной после исправления исходников.
+
+## Текущая доработка
+
+Незакоммиченные D-F05/D-F06: `workspace-ui.mjs`, `node-procedure.mjs` и тесты. Маска ждётся до исходного deadline узла через private host-only `settlement_timeout_ms`. Повторных жестов нет; чужой владелец/диалог отвергаются, после маски заново проверяется граф/строка и quiet samples. Добавлены trace начала/конца ожидания. Публичный Protocol/HttpApi не менялся. Тесты покрывают маску более минуты и неизменность deadline. Финальный полный runtime прогон с `--test-concurrency=1` идёт в `runtime-tests-14-final.log` (session 96534). Предыдущие промежуточные зелёные прогоны не заменяют проверку текущих байтов.
+
+Первый параллельный full runtime: 1 FAIL наблюдения консоли; отдельный повтор PASS. Первый general source check: 7/8 групп PASS, CLI management превысил 90 секунд. Полный повтор general source checks после финальных runtime tests ещё обязателен. Source attribution проверяет 5045 файлов; обновлять hashes после любых правок, baseHash сохранять.
+
+Два DEBUG_ONLY повтора оригинальных запросов на изолированной копии ресурсов `.22.1` с исправленным ожиданием (до последней доработки quiet reset/trace):
+- D02: shell 60869, `replay-mask-d02.log`, каталог `/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-0AXFCN`.
+- D36: shell 67979, `replay-mask-d36.log`, каталог `/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-5QkKFI`.
+Оба ещё работают; закрытие host/child должно быть awaited. Это не installed acceptance и не доказательство live-воспроизведения маски.
+
+## Приватный контроллер
+
+Корень `/Users/kartamyshev/Library/Logs/loginom-description-debugging/20260921-163359` (evidence). Там manifest, все чаты/receipts/profiles; не переносить в Git. `final13-manifest.json`, `controller-checkpoint.json`, `candidate13-install.json`. Не печатать credentials, backend headers, env.
+
+Persistent Node REPL: `ctl` = attempt-controller-v6.mjs, `parallel13`, `slots13` (5 объектов, закрытые остаются), `final13Manifest`, `nextIndex13=10`, `candidate13`, `installed13`, `pw`, `env`, `fs`. Активен только `slots13[2]` = D65. Остальные закрыты. Poll только `slots13.filter(s=>s.backend&&!s.run.desktop_closed)`, `ctl.collectAttempt`; успешное завершение через `ctl.finishAttempt` проверяет source bytes/SHA, execution/fresh outputs, save после графа, modified=false, cleanup и awaited app.close. После изменений сохранять `parallel13.checkpoint(evidence,candidate13,final13Manifest,slots13)`.
+
+Следующие действия: завершить final13 и debug, проверить новый код/attribution/diff, обновить отчёт, закоммитить чистые входы; собрать отдельный кандидат `.20260922.2` (внутренний 14), проверить DMG/ZIP/offline/подпись/ASAR, установить в отдельную папку; выполнить целевые D02/D36 и затем НОВУЮ полную final14 в пять клиентов. Не готовить повторно существующие профили. При новом необходимом исправлении снова сохранить непрошедшую серию и повторить final на следующем кандидате.
+
+Pinned Bun `/Users/kartamyshev/.cache/loginom-macos-build/tools/bun-darwin-aarch64/bun`, Node `/Users/kartamyshev/.cache/loginom-macos-build/tools/node-v24.19.0-darwin-arm64/bin/node`, browsers `/Users/kartamyshev/.cache/loginom-macos-build/browsers`. Build NODE_SOURCE — полный путь к бинарнику, не каталогу. Проверки package-local. Final audit `python3 <evidence>/audit-final.py final13` (исторический максимум 5), затем аналогично новой серии. В финале обновить results/план/бизнес-реестр/canonical Linux checkpoint, закрыть свои приложения, зафиксировать документацию. F03/F07 recovery, точная причина F12, compaction не заявлять без доказательств.
+
+Обновление 23:31 UTC: оба DEBUG_ONLY завершены (exit 0), включая save и awaited host/child close. Полный runtime текущих байтов: 2287 PASS / 2 SKIP / 0 FAIL; source attribution 5045 PASS. Идёт повтор общих macOS source checks: shell 14757, source-checks-14-recheck.{log,json}. D65 всё ещё активен, 4 выполненных узла. До commit/build проверить результат общих проверок и завершить final13.
+
+Обновление 23:34 UTC: final13 завершена 7 PASS / 3 BLOCKED. D65 PASS (5 узлов), все Desktop и DEBUG_ONLY процессы закрыты. Общие source checks повторены успешно: 8/8 групп, включая CLI management. Текущие исходники прошли 2287 runtime tests, 2 SKIP, attribution 5045. Далее commit, build/install `.20260922.2`, целевые D02/D36, новая final14 в пять клиентов. Активных клиентов нет; старые slots13 не использовать для новых задач.

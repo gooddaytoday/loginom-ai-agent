@@ -21,8 +21,8 @@
   },
   "packages/loginom-runtime/client/lib/workspace-ui.mjs": {
     "baseHash": "cd5898556ca838c2a00e9b5a5a717c614de72f7962c034d95fcdc26b832a7624",
-    "hash": "d6aa1729c5d1d7597875b54a7235fb1e3708de90492fc4e5fb18ad5fae08b9fd",
-    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance. Use the observed and re-hit-tested point of a partly clipped graph visualizer, preserving no-effect refusal for a covered target."
+    "hash": "63ed423cf6ff1550b9b0ce984435463fbe72ca31051c8e3023f53a1d24c9d509",
+    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance. Use the observed and re-hit-tested point of a partly clipped graph visualizer, preserving no-effect refusal for a covered target. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership."
   },
   "packages/loginom-runtime/client/test/action-catalog-lifecycle.test.mjs": {
     "baseHash": "6004e3b91aa6afd3eff0a3f36d3d054ae840e6c432d57853320033b3fc59389a",
@@ -91,8 +91,8 @@
   },
   "packages/loginom-runtime/client/test/workspace-ui.test.mjs": {
     "baseHash": "2c3fa72c098e439a19b4a309e4acb244d34816aa6891926f3e9ae897cfad5a49",
-    "hash": "cdd517e7c2f64d95c53e8ddcbf1b4f7d129798f14698b2eb3234a520b7091e05",
-    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance. Regress clipped visualizer geometry and newly covered targets against the real workspace UI executor."
+    "hash": "4ac7b1ab1768fcc8d9dd4503cda16a0871faaae6dc59bfda2c8dfb265fb91c12",
+    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance. Regress clipped visualizer geometry and newly covered targets against the real workspace UI executor. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership."
   },
   "packages/loginom-runtime/tools/loginom-acceptance/date-time-public-fixture-schema.mjs": {
     "baseHash": "27c57585cd3f391ebc2ae30115f2f4bb3f8414c614f07204460bb5f1a77ba461",
@@ -196,8 +196,8 @@
   },
   "packages/loginom-runtime/client/lib/node-procedure.mjs": {
     "baseHash": "eb08dda1ea023c1df95bac5efd4c6bccf314bea277f2d4bafd9396bec4ee94ff",
-    "hash": "b978e35731847eb8cbe0ae974224e5d073df8491c0ce5155b3a92178da10a4e5",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
+    "hash": "9249b317be7bdda20262cb1a134e018a4d64108a54099e4dbe81697173b92407",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership."
   },
   "packages/loginom-runtime/client/lib/user-preview-budget.mjs": {
     "baseHash": "b0f8bf12969340df0456c27bffdac2e5e102a2e1520ba75176a4851f8162799f",
@@ -238,5 +238,10 @@
     "baseHash": "61ab452f9c710aef8bb7afa11996f55974d22f5cb216ba1644f4725751a37a47",
     "hash": "50781db223be36f0ca84120381e6665b99bb2fd6d7a52f3d972f31ad2cf17c5d",
     "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines."
+  },
+  "packages/loginom-runtime/client/test/node-procedure.test.mjs": {
+    "baseHash": "91f5b67c0bd4c21a12d143eb78c6a5700812d40b3d5d5403cd0164731e9b514f",
+    "reason": " Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership.",
+    "hash": "109b91d836da0b11a7408165af56d6558c5d6c131bcf89f0ec00cbbaa36789f5"
   }
 }
