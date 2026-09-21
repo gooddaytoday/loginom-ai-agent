@@ -19,4 +19,5 @@ test("identity cannot be changed after startup and has no update fallback", () =
   ).toBe(true)
   expect(() => Object.assign(Product.channels, { prod: "upstream" })).toThrow()
   expect(Product.updateFeed).toBeNull()
+  expect(Product.wordmark).toBe("Loginom AI")
 })

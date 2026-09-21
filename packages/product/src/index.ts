@@ -6,6 +6,7 @@ export const Product = Object.freeze({
   scheme: "loginom-ai-agent",
   executable: "loginom-ai-agent",
   cliExecutable: "loginom-ai-agent-cli",
+  wordmark: "Loginom AI",
   database: "loginom-ai-agent.db",
   updateFeed: null as string | null,
   changelogFeed: null as string | null,

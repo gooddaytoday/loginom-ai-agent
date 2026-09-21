@@ -984,6 +984,7 @@
       "dependencies": {
         "@loginom-ai-agent/core": "workspace:*",
         "@loginom-ai-agent/plugin": "workspace:*",
+        "@loginom-ai-agent/product": "workspace:*",
         "@loginom-ai-agent/sdk": "workspace:*",
         "@loginom-ai-agent/ui": "workspace:*",
         "@opentui/core": "catalog:",
