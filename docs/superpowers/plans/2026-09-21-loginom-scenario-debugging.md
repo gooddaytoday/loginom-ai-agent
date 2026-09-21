@@ -1,9 +1,9 @@
 # План отладки создания сценариев через Loginom AI Agent
 
-Дата: 2026-09-21. Статус: приостановлен по просьбе пользователя после
-завершения активных сценариев. Исходный ABC и 10/10 случаев матрицы выполнены;
-покрыты 13/14 типов, остаётся transform.reform_columns.
-Точка продолжения: [checkpoint](../../testing/loginom-ai-agent/scenario-debugging-checkpoint.md).
+Дата: 2026-09-21. Статус: завершён. Исходный ABC и 10/10 случаев матрицы
+выполнены и сохранены; дополнительный REFORM довёл покрытие до 14/14 типов.
+Финальный установленный кандидат: `0.1.7-local.20260921.10`.
+Итог и ограничения: [checkpoint](../../testing/loginom-ai-agent/scenario-debugging-checkpoint.md).
 Ход работы: [реестр результатов](../../testing/loginom-ai-agent/scenario-debugging-results.md).
 Репозиторий: `/Users/kartamyshev/Git/loginom-ai-agent`.
 Набор заданий: `/Users/kartamyshev/Git/analitic-tasks`.

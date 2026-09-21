@@ -2,6 +2,9 @@
 
 План: [2026-09-21-loginom-scenario-debugging](../../superpowers/plans/2026-09-21-loginom-scenario-debugging.md).
 
+Этап завершён 2026-09-21: матрица 10/10, исходный ABC и дополнительный
+REFORM выполнены; покрыты 14/14 типов. Финальный установленный кандидат — `.10`.
+
 ## Текущее состояние матрицы
 
 | Случай | Статус | Клиент / чат |
@@ -17,6 +20,7 @@
 | V02 | CREATED_EXECUTED | `.6` / `ses_f3bc657c4ffeTvC1P6XK305UqQ` |
 | V37 | CREATED_EXECUTED | `.6` / `ses_f3bbe10a3ffepT603sr9zvYis2` |
 | V65 | CREATED_EXECUTED | `.10` / `ses_f3ba9dc34ffee19lAQH7mtf0Y4` |
+| REFORM (дополнительный) | CREATED_EXECUTED | `.10` / `ses_f3b613f71ffeAiZZxNADtWDouc` |
 
 RUNNING и NOT_STARTED — промежуточные состояния реестра, не зачётные исходы.
 Для выполненных случаев `analytical_correctness: not_checked`.
@@ -24,7 +28,8 @@ RUNNING и NOT_STARTED — промежуточные состояния рее�
 transform.group_data, transform.join_data, transform.date_time, transform.union_data,
 research.duplicates, preprocessing.data_recovery, transform.collapse_columns,
 transform.filter_data, transform.replace_columns, exports.text.
-Зачтены 10/10 случаев и 13/14 типов. Не покрыт transform.reform_columns.
+Зачтены 10/10 случаев матрицы и 14/14 типов, включая transform.reform_columns
+в дополнительном REFORM. Числа выше описывают фактическое покрытие, а не все режимы узлов.
 
 ## Исходный ABC — 2026-09-21
 
@@ -76,11 +81,10 @@ Loginom: `7.4.2` по manifest фактического prepare.
 
 ## Точка продолжения
 
-Работа приостановлена по просьбе пользователя после завершения активного V65.
-Зачтены исходный ABC и все десять случаев матрицы, покрыты 13/14 типов.
-Следующий шаг — отдельная автономная проверка transform.reform_columns.
-[Канонический checkpoint](scenario-debugging-checkpoint.md) содержит состояние
-процессов, установленный кандидат, доказательства и порядок продолжения.
+Этап завершён после возобновления пользователем и успешного REFORM на `.10`.
+Незавершённых сценариев текущего этапа нет.
+[Итоговый checkpoint](scenario-debugging-checkpoint.md) содержит ограничения
+и возможный следующий этап, который требует отдельного решения пользователя.
 
 
 ## Первый кандидат
@@ -507,3 +511,51 @@ wait timeout. Доказательства: `V65-candidate10-{metadata,chat}.jso
 F13 больше не остановил импорт в установленном повторе. transform.reform_columns
 модель не использовала: он не засчитывается и остаётся для продолжения.
 После запроса пользователя новые сценарии не запускались.
+
+## REFORM — окончательное покрытие `.10`
+
+Чат `ses_f3b613f71ffeAiZZxNADtWDouc`, профиль `candidate-10-reform-profile`.
+Тот же provider/model/variant: openai/gpt-5.6-sol/low, Loginom 7.4.2.
+Вход — V65/dataset.csv (16929 байт, SHA-256
+`1f799017759d3ce1e1aadf4d19c8d05622a68be6c9d0935590ff9a325deab522`).
+Модель получила [бизнес-задание](scenario-cases/REFORM/task.md) и CSV через GUI.
+Создала импорт и transform.reform_columns без вмешательства в Loginom.
+
+Импорт: execution completed, 200 строк / 13 полей. Reform: execution completed,
+200 строк / 4 поля — article/Артикул/string, product_name/Наименование/string,
+product_group/Товарная группа/string, annual_revenue/Годовая выручка/real.
+Настройка назначения «Элемент», «Группа», «Показатель» подтверждена readback.
+Девять полей исключены из отдельной ветви. Пакет
+`/user/scenario-debug-reform-candidate10-20260921.lgp` сохранён,
+save_completed/cleanup_complete подтверждены. Единственная ошибка —
+превышение максимального wait timeout; модель исправила запрос самостоятельно.
+`analytical_correctness: not_checked`.
+
+Доказательства: `REFORM-candidate10-{metadata,chat}.json`, `*-prompt.txt`,
+`*-final.png`; сводное покрытие вычислено из успешных квитанций всех случаев
+в `final-coverage.json` приватного каталога. Рабочая установка пользователя
+не заменялась; SHA-256 установленного `.10` повторно совпал с реестром.
+
+## Итоговое покрытие
+
+| Тип | Зачтённые случаи |
+| --- | --- |
+| `exports.text` | V65 |
+| `imports.text` | B02, B18, B27, B37, B47, B65, REFORM, V02, V27, V37, V65 |
+| `preprocessing.data_recovery` | V02 |
+| `research.duplicates` | V02 |
+| `transform.calculator` | B18, B27, B47, B65, V65 |
+| `transform.collapse_columns` | V37 |
+| `transform.date_time` | B02, V27 |
+| `transform.filter_data` | B27, V37 |
+| `transform.group_data` | B02, B18, B27, B37, B47, B65, V02, V27, V65 |
+| `transform.join_data` | V02, V65 |
+| `transform.reform_columns` | REFORM |
+| `transform.replace_columns` | V37 |
+| `transform.sorting` | B02, B27, B37, B47, B65, V27, V65 |
+| `transform.union_data` | V27 |
+
+Оставшиеся ограничения F03/F07, compaction и первопричина F12 перечислены
+в [аудите](scenario-debugging-audit.md); они не объявлены устранёнными.
+Приёмка подтверждает создание/выполнение/сохранение, не аналитические числа,
+все режимы узлов, cold reopen или работу на новых данных.
