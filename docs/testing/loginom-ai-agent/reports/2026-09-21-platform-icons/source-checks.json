@@ -1,0 +1,27 @@
+{
+  "sourceCommit": "645da9ebf",
+  "sourceImageSha256": "79def81eab472169fd3278d6638e98a33f85fe8f176a4900a12567f11567d1fc",
+  "unitTests": {
+    "pass": 17,
+    "skip": 1,
+    "assertions": 440
+  },
+  "typecheck": [
+    "ui",
+    "app",
+    "desktop"
+  ],
+  "cleanSnapshotTypecheck": "PASS",
+  "webBuilds": [
+    "app",
+    "loginom-site"
+  ],
+  "httpIconUrls": {
+    "app": 9,
+    "loginom-site": 9
+  },
+  "icoDecoder": "Pillow PASS, all 7 sizes",
+  "icnsDecoder": "Pillow PASS, all classic/Retina representations",
+  "generatedAssetsCheck": 135,
+  "preview": "light/dark/colored; actual sizes 16/24/32/48/64/128"
+}

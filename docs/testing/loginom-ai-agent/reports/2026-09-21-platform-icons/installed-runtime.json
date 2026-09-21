@@ -1,0 +1,6 @@
+{
+  "target": "linux-x64",
+  "files": 4379,
+  "node": "bin/node",
+  "browser": "browsers/chromium-1243/chrome-linux64/chrome"
+}
