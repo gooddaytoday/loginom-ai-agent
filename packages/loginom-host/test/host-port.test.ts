@@ -74,7 +74,9 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       expect(await call("start")).toEqual({ action: "start" })
       expect(host.journal.pending()).toEqual([])
       expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toHaveLength(1)
-      expect(await client.request("acquire", { run: "duplicate", session: "chat" })).toBeNull()
+      await expect(client.request("acquire", { run: "duplicate", session: "chat" })).rejects.toThrow(
+        "LOGINOM_CALL_BUSY",
+      )
       expect(await call("wait")).toEqual({ action: "wait" })
       expect(host.journal.pending()).toEqual([])
       expect((await recoveryStore(join(root, "recovery"))).pending()).toHaveLength(2)
@@ -96,7 +98,10 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
         await expect(call(ending)).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
       expect(host.journal.pending().length).toBeGreaterThanOrEqual(2)
       expect((await recoveryStore(join(root, "recovery"))).pending().sort()).toEqual(host.journal.pending().sort())
-      if (ending !== "close") expect(await client.request("acquire", { run: "next", session: "chat" })).toBeNull()
+      if (ending !== "close")
+        await expect(client.request("acquire", { run: "next", session: "chat" })).rejects.toThrow(
+          "LOGINOM_RECOVERY_REQUIRED",
+        )
     } finally {
       client.close()
       await port.close()

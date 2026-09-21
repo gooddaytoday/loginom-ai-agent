@@ -136,8 +136,8 @@
   },
   "packages/loginom-runtime/client/lib/node-operation-runner.mjs": {
     "baseHash": "04b740ef6b0cd2bb6a9da1a88f75e80d27c1f0f0dca73acfcd03f83d9d741e8d",
-    "hash": "079319f3b61f4b1620c7142271596cbe03e20aa9c5cea02c940395b00495d615",
-    "reason": "Merge main unsettled job state with RC9 active job snapshots and immutable ID-only resume."
+    "hash": "46973c6fbf07be858fcad3f9f578052c32940636a0d21cfbf2ce272b851205a0",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
   },
   "packages/loginom-runtime/client/lib/platform.mjs": {
     "baseHash": "5bd3c93fd075b22a376fc14e8bd465ed348ad79797a4d570a021bf7e6dd37999",
@@ -171,8 +171,8 @@
   },
   "packages/loginom-runtime/client/lib/node-apply.mjs": {
     "baseHash": "d9f4f12730a3195e893cd04244fa7d53cf7c16604e49cae3334a013903c1dcb3",
-    "hash": "de82e9acb1f67780887ecd77b319665cf957c38960481c97f08657e4c1e0625c",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path."
+    "hash": "9b1a8f6fab94eabe7118b5b8acdd1cc1448978245daad8587ff5063fe6f7b170",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
   },
   "packages/loginom-runtime/client/lib/text-import-node.mjs": {
     "baseHash": "c8df9578829bbde45d6f8513f5cfcc721019c701fbdf94f80de59479ef63c7ef",
@@ -186,12 +186,32 @@
   },
   "packages/loginom-runtime/client/test/node-apply.test.mjs": {
     "baseHash": "09e457cc476dc16b0790fad7d1742737cdbc59563a27594624b25056781bd00c",
-    "hash": "e64551ea3805ad79604459d40c180a6819677cb5f1075855258d0c2af8339a94",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path."
+    "hash": "4f0b5c279ed7aa375dc9690cba9e24c799fd9538b72986a64dbf216ac3b031f5",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
   },
   "packages/loginom-runtime/client/test/text-import-patch.test.mjs": {
     "baseHash": "8742700e801f3157a7f596e5c2d64468440de27223df210e551d0f9bd23251aa",
     "hash": "753ddd3a6c5b89fcdb918fd59e5b920a1a1319b910ac648be14717f668ba77e7",
     "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path."
+  },
+  "packages/loginom-runtime/client/lib/node-procedure.mjs": {
+    "baseHash": "eb08dda1ea023c1df95bac5efd4c6bccf314bea277f2d4bafd9396bec4ee94ff",
+    "hash": "b978e35731847eb8cbe0ae974224e5d073df8491c0ce5155b3a92178da10a4e5",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
+  },
+  "packages/loginom-runtime/client/lib/user-preview-budget.mjs": {
+    "baseHash": "b0f8bf12969340df0456c27bffdac2e5e102a2e1520ba75176a4851f8162799f",
+    "hash": "c08d10a697035a18b1f214c0f906708b6ca83508979f0d376d3ce0805abd01a0",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
+  },
+  "packages/loginom-runtime/client/test/node-operation-runner.test.mjs": {
+    "baseHash": "e3fe166737560bc7b507cc08a3a615b1b4ccf96b9f16d6817043670e8aefad3c",
+    "hash": "8ef6b0c8609488a9ddc9d31f4ec550f77cca54d7f25b37a9a7f4917d818b4c20",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
+  },
+  "packages/loginom-runtime/client/test/user-preview-budget.test.mjs": {
+    "baseHash": "a603727daf3ea0ed415b4d8147e68bd7dc5c94963250aff26a0aa9d7b97f72c6",
+    "hash": "c838ed1a68ad364398583e271f3ff3a618f7dc96e580e3b0511eeaea55c22fbe",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
   }
 }

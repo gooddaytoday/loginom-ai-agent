@@ -1,6 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createNodeOperationRunner} from '../lib/node-operation-runner.mjs';
+import {compactNodeResult} from '../lib/user-results.mjs';
+
+test('rejected resume preserves the original unresolved outcome and recovery route',async()=>{
+ const outcome={status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,
+  error:{code:'NODE_APPLY_STOPPED',message:'source field missing'},
+  output:{node:{document_id:'d',workflow_id:'w',node_id:'n'},execution:{status:'not_requested'}}};
+ const runner=createNodeOperationRunner({validate:()=>1,progress:()=>({pending_phase:'configure'}),
+  run:async(request,{resume})=>{if(resume)throw Error('Inspect unresolved phase');return outcome;}});
+ runner.start({operation_id:'one'});await runner.wait('one');
+ runner.start({operation_id:'one'},{resume:true});const result=await runner.wait('one');
+ assert.equal(runner.unsettled,true);assert.deepEqual(result.outcome,outcome);
+ const compact=compactNodeResult(result);
+ assert.equal(compact.status,'AMBIGUOUS');assert.deepEqual(compact.node,outcome.output.node);
+ assert.equal(compact.error.code,'NODE_WORKER_REJECTED');
+ assert.equal(compact.error.original_error.code,'NODE_APPLY_STOPPED');
+ assert.equal(compact.next_step.tool,'dock_operation_inspect');
+ runner.start({operation_id:'one'},{resume:true});
+ assert.deepEqual((await runner.wait('one')).outcome,outcome);
+});
 
 test('ID-only resume retains the immutable original request and validates the current handler',async()=>{
  const calls=[];let revision='v1';

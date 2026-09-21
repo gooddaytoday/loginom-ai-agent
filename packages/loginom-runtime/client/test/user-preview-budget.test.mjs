@@ -23,6 +23,18 @@ test('large strings trim whole rows explicitly without truncating cell contents 
  assert.equal(port.sample[0][0].value,source.outcome.output.output.ports[0].sample[0][0].value);assert.equal(JSON.stringify(source),before);
  assert.ok(reply.limitations.some(s=>s.includes('only '+port.sample_rows+' of 100')));assert.ok(reply.limitations.some(s=>s.includes('response budget omitted')));
 });
+test('Cyrillic preview fits the backend UTF-8 budget and retains continuation diagnostics',()=>{
+ const source=raw(Array.from({length:100},(_,i)=>[string(String(i)+':'+ 'Выручка'.repeat(60))]));
+ source.outcome.error={code:'READ_PARTIAL',message:'Получена только часть результата'};
+ source.outcome.next_step={tool:'dock_operation_inspect',arguments:{operation_id:'preview'}};
+ const reply=compactNodeResult(source);
+ assert.ok(Buffer.byteLength(JSON.stringify(reply),'utf8')<50*1024);
+ assert.deepEqual(reply.error,source.outcome.error);
+ assert.deepEqual(reply.next_step,source.outcome.next_step);
+ assert.equal(reply.operation_id,'preview');
+ assert.ok(reply.output.ports[0].sample_rows>0);
+ assert.equal(reply.output.ports[0].sample[0][0].value,source.outcome.output.output.ports[0].sample[0][0].value);
+});
 test('six-column retention keeps all rows with shorter round-trip decimals',()=>{
  const sample=Array.from({length:72},(_,i)=>[real((i+1)/101*100),real((i+1)/101),real(i+1),integer(101),string('Cohort_'+(i%6+1)),integer(i%12+1)]);
  const source=raw(sample),before=JSON.stringify(source),reply=compactNodeResult(source),port=reply.output.ports[0];

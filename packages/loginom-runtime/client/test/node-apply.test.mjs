@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
+import {NodeProcedureStepError} from '../lib/node-procedure.mjs';
 const request=()=>({operation_id:'apply1',contract_revision:'1.0.0',document_id:'doc',
   workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]},
   target:{kind:'new',type:'imports.text',label:'Import',position:{x:96,y:80}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'execute',
@@ -126,6 +127,15 @@ test('source validation preserves a bounded cause and partial effects without fi
  assert.equal(result.error.cause.code,'WIZARD_SOURCE_VALIDATION_FAILED');assert.equal(result.error.cause.message.length,240);
  assert.ok(!JSON.stringify(result).includes('must not escape'));assert.ok(!f.calls.includes('finish'));
  const count=f.calls.length;await assert.rejects(f.run(request(),{resume:true}),/unresolved/);assert.equal(f.calls.length,count);
+});
+test('native step diagnostics survive a previously unlisted Loginom failure code',async()=>{
+ const f=fixture();
+ f.handlers.get('imports.text').configure=async()=>{throw new NodeProcedureStepError({error:{
+  code:'WIZARD_COLUMN_VALIDATION_FAILED',message:'Недопустимый тип поля'}});};
+ const result=await f.run();
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.match(result.error.message,/Недопустимый тип поля/);
+ assert.deepEqual(result.error.cause,{code:'WIZARD_COLUMN_VALIDATION_FAILED',message:'Недопустимый тип поля'});
 });
 
 test('import source binding refusal releases only a verified discarded draft of the same node',async()=>{
@@ -315,6 +325,8 @@ test('verified failed execution settles once without output and refuses unproven
   f.drivers.waitExecution=async()=>p;
   const result=await f.run();assert.equal(result.status,mutate?'AMBIGUOUS':'FAILED');assert.ok(!f.calls.includes('read'));
   if(!mutate){assert.equal(result.execution.status,'failed');assert.equal(result.cleanup_complete,true);assert.equal(result.error.message,proof.error.message);
+   assert.equal(result.next_step.tool,'dock_node_apply');assert.match(result.next_step.instruction,/NEW operation_id/);
+   assert.ok(result.next_step.instruction.includes(JSON.stringify({kind:'existing',type:'imports.text',ref:result.node})));
    const calls=f.calls.length;assert.deepEqual(await f.run(),result);assert.equal(f.calls.length,calls);}
  }
  for(const failure of ['phase','checkpoint']) {

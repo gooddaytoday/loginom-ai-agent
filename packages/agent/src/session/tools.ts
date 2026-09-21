@@ -1,5 +1,6 @@
 import { loginomResultState } from "./loginom-result"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
+import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Agent } from "@/agent/agent"
 import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
@@ -44,6 +45,7 @@ const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
 
 export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   loginom?: Awaited<ReturnType<typeof LoginomHost.acquire>>
+  loginomStatus?: { failure?: string }
   agent: Agent.Info
   model: Provider.Model
   session: Session.Info
@@ -510,12 +512,20 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
 
   const loginom = input.loginom
   if (loginom) {
+    if (input.loginomStatus) delete input.loginomStatus.failure
+    const failed = (phase: string, error: unknown) => {
+      if (input.loginomStatus) input.loginomStatus.failure = phase + ": " + hostError(error)
+    }
     const catalog = yield* Effect.promise(() =>
       loginom
         .tools()
         .then((value) => ListToolsResultSchema.parse(value))
-        .catch(() => undefined),
+        .catch((error) => {
+          failed("catalog", error)
+          return undefined
+        }),
     )
+    if (!catalog) return tools
     const user = input.messages.findLast((message) => message.info.role === "user")
     if (user) {
       const files = user.parts.flatMap((part) => {
@@ -527,7 +537,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         const admitted = yield* Effect.promise(() =>
           loginom.admit(user.info.id, files).then(
             () => true,
-            () => false,
+            (error) => {
+              failed("admission", error)
+              return false
+            },
           ),
         )
         if (!admitted) return tools

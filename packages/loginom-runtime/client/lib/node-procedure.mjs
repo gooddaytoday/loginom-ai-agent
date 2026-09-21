@@ -33,7 +33,8 @@ export class NodeReadinessTimeout extends Error {
 
 export class NodeProcedureStepError extends Error {
   constructor(receipt) {
-    super('Node procedure step did not confirm completion; inspect before retry');
+    super('Node procedure step did not confirm completion; inspect before retry'
+      +(typeof receipt?.error?.message==='string'?': '+receipt.error.message.slice(0,500):''));
     this.name = 'NodeProcedureStepError';
     this.receipt = structuredClone(receipt);
   }

@@ -311,7 +311,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
         const result={operation_id:operation.id,status:'FAILED',effect_possible:state.effect_possible,
           phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
           package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:readingOnly?'not_requested':'applied'},
-          checkpoint_kind:'local_node_failed',persisted_package_verified:false,error:execution.error};
+          checkpoint_kind:'local_node_failed',persisted_package_verified:false,error:execution.error,
+          next_step:correctNodeRequest(request,state.node)};
         await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
         return result;
       }
@@ -350,12 +351,21 @@ export async function applyNode({request, operation, handlers, drivers, record,
     return {operation_id:operation.id,status:state.verified_refusal?'FAILED':state.effect_possible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:state.effect_possible,
       phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
       package_saved:false,cleanup_complete:state.cleanup_complete,warnings:[],
+      ...(state.verified_refusal&&state.cleanup_complete&&!state.pending&&state.node
+        ?{next_step:correctNodeRequest(request,state.node)}:{}),
       ...(state.correctable_import_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'The import wizard draft was discarded and the SAME node is back in the graph. Correct settings using the observed source names/labels and submit a NEW operation_id with target:'+JSON.stringify({kind:'existing',type:'imports.text',ref:state.node})+'. Keep the verified upload source, inputs:[] and mappings:[]. Supply source, format and columns again because the rejected draft was not saved. Do not recreate the node or reupload the file.'}}:{}),
       ...(state.correctable_calculator_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'Retained calculator settings were independently rechecked unchanged. Correct expressions and submit a NEW operation_id with the SAME existing target '+JSON.stringify(state.node)+'. '+(state.calculator_default_expression?'The restored node has the blank default Expr1. Correct the formula by updating target:{kind:"existing",name:"Expr1"} inside the first expression with replace:false (name/label/type may be changed). replace:true replaces an INPUT field, not the saved expression. Do not leave this blank default behind. ':'To execute/read without changing formulas use parameters:{expressions:[]}; to edit a retained expression use target:{kind:"existing",name:"existing_name"} inside that expression. ')+'Keep existing connections: inputs:[] and mappings:[]. Do not create another node.'}}:{}),
       pending_phase:state.pending?.phase??null,error:{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
-        ...(['WIZARD_SOURCE_VALIDATION_FAILED','WIZARD_CALCULATOR_VALIDATION_FAILED'].includes(error.receipt?.error?.code)?{cause:{code:error.receipt.error.code,
+        ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }
+}
+
+function correctNodeRequest(request,node) {
+  return {tool:'dock_node_apply',original_operation_id:request.operation_id,
+    instruction:'The failure is known and cleanup is verified. Correct the indicated settings or inputs and submit a NEW operation_id with target:'
+      +JSON.stringify({kind:'existing',type:request.target.type,ref:node})
+      +'. Preserve the existing graph and source receipts. Do not recreate the node or inspect an unknown effect: no effect is unresolved.'};
 }

@@ -1,8 +1,8 @@
-// Hermes JSON-wraps MCP text before its 50,000-character spillover check.
-// Leave room for the caller's row/NULL limitations. Native full-table evidence
+// Count UTF-8 bytes for the backend's 50 KiB limit as well as the legacy
+// JSON-wrapped envelope. Leave room for the caller's row/NULL limitations. Native full-table evidence
 // has a separate strict contract and is never reduced here.
 export const USER_PREVIEW_WIRE_BUDGET=46000;
-export const previewWireSize=value=>JSON.stringify({result:JSON.stringify(value)}).length;
+export const previewWireSize=value=>Buffer.byteLength(JSON.stringify({result:JSON.stringify(value)}),'utf8');
 const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>value?.[k]!==undefined).map(k=>[k,value[k]]));
 
 export function budgetUserPreview(reply) {

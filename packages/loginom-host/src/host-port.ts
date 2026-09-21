@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import type { createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
+import { hostError } from "./errors"
 export type HostPort = {
   postMessage(value: unknown): void
   on(event: "message", listener: (event: { data: unknown }) => void): void
@@ -61,8 +62,9 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         if (!("session" in input) || typeof input.session !== "string" || !input.session || runs.has(input.run))
           throw new Error("LOGINOM_RUN_INVALID")
         const chat = createHash("sha256").update(input.session).digest("hex")
-        const recovery = service.recoveries.get(chat) || [...runs.values()].some((run) => run.chat === chat)
-        const lease = recovery ? undefined : service.acquire(`${owner}:${input.run}`)
+        if (service.recoveries.has(chat)) throw new Error("LOGINOM_RECOVERY_REQUIRED")
+        if ([...runs.values()].some((run) => run.chat === chat)) throw new Error("LOGINOM_CALL_BUSY")
+        const lease = service.acquire(`${owner}:${input.run}`)
         if (!lease) {
           reply({ id: data.id, result: null })
           return
@@ -175,12 +177,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         }
       }
     } catch (error) {
-      const code =
-        error instanceof Error &&
-        ["LOGINOM_RECOVERY_REQUIRED", "LOGINOM_CALL_UNCERTAIN", "LOGINOM_CALL_BUSY"].includes(error.message)
-          ? error.message
-          : "LOGINOM_HOST_REQUEST_FAILED"
-      reply({ id: data.id, error: code })
+      reply({ id: data.id, error: hostError(error) })
     }
   }
   port.on("message", ({ data }) => {

@@ -1,0 +1,35 @@
+{
+  "V65": [
+    {
+      "file": "dataset.csv",
+      "rows": 200,
+      "sha256": "1f799017759d3ce1e1aadf4d19c8d05622a68be6c9d0935590ff9a325deab522"
+    }
+  ],
+  "V02": [
+    {
+      "file": "dataset.csv",
+      "rows": 510,
+      "sha256": "d367525d3b39bd8c991992906daeca89172b39d789744221b5a2bd8763968904"
+    }
+  ],
+  "V27": [
+    {
+      "file": "before-july.csv",
+      "rows": 181,
+      "sha256": "b32ec3e6359ded557e202bbb4f924de665b2540dff5392fe888b6d00a5c4f1be"
+    },
+    {
+      "file": "from-july.csv",
+      "rows": 184,
+      "sha256": "ac4ed840ab066a2d0d72f2b8db1e039f91c7e506d851bc2857509e253631365b"
+    }
+  ],
+  "V37": [
+    {
+      "file": "dataset.csv",
+      "rows": 500,
+      "sha256": "cd3badf4de09ee5639bee5c4da1f0c93762835ff8f4e930d36c9f764a5d24b74"
+    }
+  ]
+}

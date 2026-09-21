@@ -153,6 +153,8 @@ Plain async code should pass explicit context or stay inside an Effect fiber; do
 
 - Loginom MCP `isError` must become a tool error, matching ordinary MCP catalog behavior. Preserve the bounded error text and generation/isError metadata; do not record it as a successful completed tool part.
 
+- Loginom acquire/catalog/attachment-admission failures must reach the model with the preparation stage and an allowlisted Host error code. Do not advertise availability after a failed preparation or claim that a chat attachment was admitted/uploaded. Retry preparation at the ordinary subsequent turn boundary; never synthesize attachment authorization or expose raw credential-bearing errors.
+
 - Loginom preflight is mandatory for standalone run, while TUI without setup offers the shared interactive wizard and can continue an ordinary chat. Resume stdin after Clack/readline prompts before starting the TUI. Do not advertise Loginom tools without an active connection.
 
 - Standalone run must evaluate terminal tool outcomes before idle success. Correlate Loginom repairs by tool + operation_id, otherwise by tool + exact canonical arguments. Unrelated success must not clear failures; invalid remains unresolved without an explicit repair relationship. Keep permission/session errors independent and legacy exit behavior unchanged.

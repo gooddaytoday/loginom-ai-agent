@@ -13,7 +13,7 @@ export function createNodeOperationRunner({run,validate,progress}) {
  const snapshot=job=>structuredClone({operation_id:job.id,attempt:job.attempt,state:job.state,
   cancel_requested:job.controller.signal.aborted,server_stop_requested:job.stopController.signal.aborted,
   progress:progress(job.id),outcome:job.outcome??null,error:job.error??null});
- const launch=(request,signature,attempt,resume)=>{
+ const launch=(request,signature,attempt,resume,previous)=>{
   const job={id:request.operation_id,request:structuredClone(request),signature,attempt,state:'running',controller:new AbortController(),stopController:new AbortController()};
   jobs.set(job.id,job);
   // Claim the local ID before calling run, including its synchronous validation.
@@ -22,7 +22,14 @@ export function createNodeOperationRunner({run,validate,progress}) {
   try{execution=run(request,{signal:job.controller.signal,stopSignal:job.stopController.signal,resume});}catch(error){execution=Promise.reject(error);}
   job.completion=Promise.resolve(execution).then(
    outcome=>{job.outcome=structuredClone(outcome);job.state='settled';},
-   error=>{job.error={code:'NODE_WORKER_REJECTED',message:String(error.message).slice(0,1000)};job.state='settled';});
+   error=>{
+    // A refused continuation is not a new browser outcome. Keep the original
+    // checkpoint and uncertainty so status/wait still expose a recovery route.
+    job.outcome=previous?.outcome?structuredClone(previous.outcome):null;
+    job.error={code:'NODE_WORKER_REJECTED',message:String(error.message).slice(0,1000),
+     ...(job.outcome?.error?{original_error:structuredClone(job.outcome.error)}:{})};
+    job.state='settled';
+   });
   return snapshot(job);
  };
  return Object.freeze({
@@ -40,7 +47,7 @@ export function createNodeOperationRunner({run,validate,progress}) {
       ||old.outcome?.status==='FAILED'&&old.outcome.cleanup_complete===true&&old.outcome.output?.execution?.status==='failed'
         &&old.outcome.output.execution.failure_verified===true)return snapshot(old);
     if([...jobs.values()].some(job=>job.state==='running'))throw Error('Another node operation is running');
-    return launch(request,signature,old.attempt+1,true);
+    return launch(request,signature,old.attempt+1,true,old);
    }
    if(resume)throw Error('Cannot resume an unknown node operation');
    if([...jobs.values()].some(job=>job.state==='running'))throw Error('Another node operation is running');

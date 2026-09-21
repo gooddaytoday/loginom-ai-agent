@@ -30,3 +30,6 @@
 - After a successful `package.save_checkpoint`/`package.save_as`, the bridge reads the saved package dirty state and appends `dock_saved_package_state` advice. A failed read keeps the save receipt valid but must not be reported as confirmed cleanup.
 
 - Resource manifests may describe internal directory symlinks with link text and directory:true, hashing the link text. Verify the actual symlink, canonical containment and directory type; target files remain individually hashed. Legacy files-only manifests remain supported.
+
+- Text import source references may resolve an unambiguous observed technical name or CSV label; retain the observed technical name for editor identity checks. Never infer transliteration or match by ordinal position. A known binding refusal may discard only the operation's owned wizard draft and return a corrected existing-node request after verified same-node graph cleanup; transport uncertainty must remain unresolved.
+- A rejected node resume retains the previous outcome and unsettled state. Known verified failures should offer a corrected request on the retained node; past successful mutations alone do not make the failed request ambiguous. Ordinary preview budgets count UTF-8 bytes, while native exact-table evidence remains intact.

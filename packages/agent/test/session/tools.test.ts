@@ -166,11 +166,12 @@ it.effect("preserves running tool start time across metadata updates", () =>
   }),
 )
 
-for (const rejectAdmission of [false, true]) {
-  it.effect(`Loginom binds original user bytes and isolates admission failure (${rejectAdmission})`, () =>
+for (const failure of [undefined, "catalog", "admission"]) {
+  it.effect(`Loginom binds original user bytes and reports preparation failure (${failure})`, () =>
     Effect.gen(function* () {
       const original = MessageID.ascending()
       const admitted: { message: string; files: { name: string; data: string }[] }[] = []
+      const loginomStatus: { failure?: string } = { failure: "previous temporary failure" }
       const called: string[] = []
       const assistant: SessionV1.Assistant = {
         id: messageID,
@@ -196,6 +197,7 @@ for (const rejectAdmission of [false, true]) {
         url,
       })
       const tools = yield* SessionTools.resolve({
+        loginomStatus,
         agent,
         model,
         session: { id: sessionID, permission: [] } as unknown as Session.Info,
@@ -226,11 +228,12 @@ for (const rejectAdmission of [false, true]) {
         loginom: {
           generation: 7,
           async tools() {
+            if (failure === "catalog") throw Error("LOGINOM_KNOWLEDGE_UNAVAILABLE")
             return { tools: [{ name: "dock_prepare", inputSchema: { type: "object", properties: {} } }] }
           },
           async admit(message, files) {
             admitted.push({ message, files })
-            if (rejectAdmission) throw Error("Input storage unavailable")
+            if (failure === "admission") throw Error("Input storage unavailable: private-details-must-not-leak")
           },
           async call(_name, _args, message) {
             called.push(message)
@@ -239,13 +242,19 @@ for (const rejectAdmission of [false, true]) {
           async release() {},
         },
       })
-      expect(admitted).toEqual([{ message: original, files: [{ name: "sales.csv", data: "QTsxCg==" }] }])
+      expect(admitted).toEqual(
+        failure === "catalog" ? [] : [{ message: original, files: [{ name: "sales.csv", data: "QTsxCg==" }] }],
+      )
       expect(tools.timing).toBeDefined()
-      if (rejectAdmission) {
+      if (failure) {
+        expect(loginomStatus.failure).toBe(
+          failure === "catalog" ? "catalog: LOGINOM_KNOWLEDGE_UNAVAILABLE" : "admission: LOGINOM_HOST_REQUEST_FAILED",
+        )
         expect(tools.loginom_dock_prepare).toBeUndefined()
         expect(called).toEqual([])
         return
       }
+      expect(loginomStatus.failure).toBeUndefined()
       const execute = tools.loginom_dock_prepare.execute
       if (!execute) throw Error("Loginom tool unavailable")
       yield* Effect.promise(() =>

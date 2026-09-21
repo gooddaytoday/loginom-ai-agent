@@ -18,7 +18,9 @@ export async function acquire(session: string) {
   if (!connection) return
   const run = randomUUID()
   const value = await connection.request("acquire", { session, run })
-  if (!value || typeof value !== "object" || !("generation" in value) || typeof value.generation !== "number") return
+  if (!value) throw new Error("LOGINOM_HOST_NOT_READY")
+  if (typeof value !== "object" || !("generation" in value) || typeof value.generation !== "number")
+    throw new Error("LOGINOM_HANDSHAKE_INVALID")
   const queue = { tail: Promise.resolve(), released: false }
   return {
     generation: value.generation,
