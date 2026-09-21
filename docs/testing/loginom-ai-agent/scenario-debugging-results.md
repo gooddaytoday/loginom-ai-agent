@@ -11,19 +11,19 @@
 | B02 | CREATED_EXECUTED | `.6` / `ses_f3beabb1affeTJydQ4bzcVwxc3` |
 | B47 | CREATED_EXECUTED | `.5` / `ses_f3be80188ffeWXck3xXTGcEQ0i` |
 | B37 | CREATED_EXECUTED | `.6` / `ses_f3bddb28dffe9rnhncERKN0Fam` |
-| B27 | RUNNING | Повтор `.8` / `ses_f3bc01b39ffe0alPLlG1bQEjI4`; прежний `.5` BLOCKED |
-| B18 | RUNNING | Повтор `.8` / `ses_f3bc05856ffewJMeictcAe0Tu3`; прежний `.7` BLOCKED |
+| B27 | CREATED_EXECUTED | `.8` / `ses_f3bc01b39ffe0alPLlG1bQEjI4` |
+| B18 | CREATED_EXECUTED | `.8` / `ses_f3bc05856ffewJMeictcAe0Tu3` |
 | V27 | CREATED_EXECUTED | `.6` / `ses_f3bd0e6a1ffeUBtNOzCMf4U9QT` |
 | V02 | CREATED_EXECUTED | `.6` / `ses_f3bc657c4ffeTvC1P6XK305UqQ` |
 | V37 | CREATED_EXECUTED | `.6` / `ses_f3bbe10a3ffepT603sr9zvYis2` |
-| V65 | RUNNING | `.9` / `ses_f3bb674dbffeD525jNVz7P63Y3` |
+| V65 | BLOCKED | `.9` / `ses_f3bb674dbffeD525jNVz7P63Y3` |
 
 RUNNING и NOT_STARTED — промежуточные состояния реестра, не зачётные исходы.
 Для выполненных случаев `analytical_correctness: not_checked`.
 Фактически выполнены imports.text, transform.calculator, transform.sorting,
 transform.group_data, transform.join_data, transform.date_time, transform.union_data,
 research.duplicates, preprocessing.data_recovery, transform.collapse_columns,
-transform.filter_data, transform.replace_columns. Зачтены 7/10 случаев и 12/14 типов.
+transform.filter_data, transform.replace_columns. Зачтены 9/10 случаев и 12/14 типов.
 Узлы текущих незавершённых прогонов пока не включены в этот итог.
 
 ## Исходный ABC — 2026-09-21
@@ -76,12 +76,11 @@ Loginom: `7.4.2` по manifest фактического prepare.
 
 ## Точка продолжения
 
-Зачтены исходный ABC и семь случаев матрицы. B18/B27 повторяются на `.8`,
-V65 выполняется на `.9`; V37 завершён на `.6`. Последний source commit
-`00c32b112022d1b7bd68652f278f1495b3d97d79`, сборка `.9` завершилась успешно.
-Приватные профили, полные чаты и актуальные REPL ID записаны в
-`/Users/kartamyshev/Library/Logs/loginom-scenario-debugging/20260921/live-checkpoint.json`.
-Полный аудит и установленная проверка оставшихся препятствий продолжаются.
+Зачтены исходный ABC и девять случаев матрицы. Последний V65 остановился
+на F13; исправление проходит проверки перед сборкой следующего кандидата.
+B18/B27 завершены на `.8`, V37 на `.6`. Приватные профили и полные чаты
+сохранены в `/Users/kartamyshev/Library/Logs/loginom-scenario-debugging/20260921/`.
+Актуальные сессии и кандидаты записаны в `live-checkpoint.json` там же.
 
 
 ## Первый кандидат
@@ -433,3 +432,37 @@ collapse_columns, filter_data, replace_columns. Выход 1350 строк до�
 `.9` установлен из readonly DMG; codesign PASS. ASAR SHA-256:
 `b5bf951b1342380ce6152395bc799755768dca17bdf8002672cf91499016e4c7`.
 Подключение свежего профиля V65 готово, задание и CSV отправлены через GUI.
+
+## B18 завершён; V65 — F13
+
+B18 `.8`: 5 узлов imports.text/calculator/group_data, наблюдаемые выходы
+и сохранение `/user/scenario-debug-B18-candidate8-20260921.lgp` подтверждены.
+Модель сама исправила недопустимый wait timeout. Доказательства:
+`B18-candidate8-{metadata,chat}.json`, prompt и final.png.
+`analytical_correctness: not_checked`.
+
+V65 `.9` заблокирован при выборе data_kind колонки 10 (`Маржинальность`).
+Шаг 247 double_click получил no-effect UI_EPOCH_CHANGED и успешно обновил
+ссылку; шаг 253 select_wizard_option получил такой же строгий отказ, но вызывал
+channel.act напрямую. Pending configure затем не позволил resume/close/save.
+Модель честно сообщила об отсутствии пакета и CSV. Это F13, смежный с F11,
+но другая точка действия. Сохранены `V65-candidate9-chat.json`, prompt и blocked.png.
+
+Исправление выбора опции использует channel.perform, привязывает поле,
+редактор и значение к прежнему владельцу и проверяет принадлежность меню.
+Неизвестный эффект, смена редактора и незавершённый cleanup не повторяются.
+Узкие проверки: 33 PASS. Установленный повтор требует нового кандидата.
+
+[Аудит границ и оставшихся гипотез](scenario-debugging-audit.md).
+
+## B27 — автономный повтор `.8`
+
+Созданы и выполнены 12 узлов imports.text/calculator/group_data/sorting/filter_data.
+Пакет `/user/scenario-debug-B27-candidate8-20260921.lgp` сохранён с cleanup.
+Две ошибки запроса исправлены моделью. Прежний отказ графа в этом прогоне
+не повторился; это не доказательство его первопричины. Доказательства:
+`B27-candidate8-{metadata,chat}.json`, prompt и final.png.
+`analytical_correctness: not_checked`.
+
+Проверки F13: полный runtime 2281 PASS / 2 SKIP (`runtime-tests-7.log`),
+source transforms 5045 PASS, git diff --check PASS.

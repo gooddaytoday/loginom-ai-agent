@@ -181,8 +181,8 @@
   },
   "packages/loginom-runtime/client/lib/text-import-procedure.mjs": {
     "baseHash": "5a72ca1d8972a313737cf73713e2a3e2c219acb99d44cef550fa495826eecc00",
-    "hash": "873b42467e4a6d8b5536c5a884deb887ea88c22b3f67cdb8a95927209cdd12d7",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Require full verified source settings for an existing unconfigured import before attempting schema preservation. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label. Bind import metadata commit to the observed owner, column and draft, permitting strict no-effect epoch refresh."
+    "hash": "8850462b572a9ed40c72d54e35d630081e808a688ab5ab06ba520d1c8ef86ea1",
+    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Require full verified source settings for an existing unconfigured import before attempting schema preservation. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label. Bind import metadata commit to the observed owner, column and draft, permitting strict no-effect epoch refresh. Bind import type/data-kind option selection to its current editor and allow only a proven pre-gesture epoch refresh."
   },
   "packages/loginom-runtime/client/test/node-apply.test.mjs": {
     "baseHash": "09e457cc476dc16b0790fad7d1742737cdbc59563a27594624b25056781bd00c",

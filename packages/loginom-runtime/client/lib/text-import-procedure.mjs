@@ -184,6 +184,32 @@ export async function openImportColumnEditor(channel,initial,index,property) {
     resolve:state=>({verb:'double_click',ref:state.wizard.import_columns.fields.find(f=>f.index===index).cell_refs[property]})});
 }
 
+// A menu choice is bound to the same live editor, not merely its option label.
+export async function selectImportColumnOption(channel,initial,index,property,label) {
+  requireValue(['type','data_kind'].includes(property),'Unsupported import option property');
+  const option=state=>{
+    const w=state.wizard,e=w?.import_column_editor;
+    requireValue(w?.stage==='text_import_format'&&w.owner_context?.status==='observed'
+      &&w.owner_context.node?.tid&&w.owner_context.path?.length&&e?.status==='observed'
+      &&e.index===index&&e.property===property&&e.owner_ref&&e.input_ref&&w.root_ref,'Import option editor changed');
+    return one(state.ui.elements.filter(item=>item.allowed_actions?.includes('select_wizard_option')
+      &&item.wizard_combo?.kind==='option'&&item.wizard_combo.label===label
+      &&item.wizard_combo.field?.scope==='import_column'&&item.wizard_combo.field.name===property
+      &&item.wizard_combo.field.owner_ref===e.owner_ref&&item.wizard_combo.field.input_ref===e.input_ref
+      &&item.wizard_combo.field.root_ref===w.root_ref),'Bound import option is absent or ambiguous');
+  };
+  const describe=state=>{
+    const w=state.wizard,e=w.import_column_editor;
+    return {root:w.root_tid,owner:{node:w.owner_context.node.tid,path:w.owner_context.path.map(({tid,label})=>({tid,label}))},
+      editor:Object.fromEntries(['index','name','label','property','canonical_value','used','other_property','other_value'].map(k=>[k,e[k]])),
+      option:option(state).tid,label};
+  };
+  option(initial);const expected=describe(initial);
+  return channel.perform({condition:'select bound import option '+index+'/'+property,initialObservation:initial,
+    ready:state=>{option(state);return same(describe(state),expected);},identity:describe,
+    resolve:state=>({verb:'select_wizard_option',ref:option(state).ref})});
+}
+
 async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   (patch?validateTextImportPatch:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(parameters);
   parameters=structuredClone(parameters);
@@ -440,11 +466,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
           && e.wizard_combo?.kind === 'option' && e.wizard_combo.label === label
           && e.wizard_combo.field?.owner_ref === editor.owner_ref
           && e.wizard_combo.field?.name === property).length === 1);
-      const option = one(choosing.ui.elements.filter(e => e.allowed_actions?.includes('select_wizard_option')
-        && e.wizard_combo?.kind === 'option' && e.wizard_combo.label === label
-        && e.wizard_combo.field?.owner_ref === editor.owner_ref
-        && e.wizard_combo.field?.name === property), 'Column option is absent or ambiguous');
-      await act(choosing, { verb: 'select_wizard_option', ref: option.ref });
+      await selectImportColumnOption(channel,choosing,i,property,label);
       requireValue(columns(await read('text_import_format', 'column value applied: ' + i + '/' + property, state =>
         state.wizard.import_columns?.fields?.find(f=>f.index===i)?.[property] === wanted[property])).find(f=>f.index===i)[property] === wanted[property], 'Column readback differs');
     }
