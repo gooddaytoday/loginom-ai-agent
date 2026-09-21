@@ -80,4 +80,10 @@ docker exec loginom-server-master sh -c 'rm -f /workdir/UserStorage/user/eval-<r
 
 ## Ориентир шума
 
-Заполняется после первого живого `--repeat 3` (пункт 5 приёмки в спеке): по задачам `min–max score` и `completed/attempts`.
+Заполняется после первого живого `--repeat 3` (пункт 5 приёмки в спеке): по задачам `min–max score` и `completed/attempts`. Пока не измерен — живой прогон отложен (см. ниже).
+
+## Состояние приёмки (2026-09-18)
+
+- `--dry-run --repeat 2` и `bun test` (95 тестов) — PASS.
+- `--calibrate` живым судьёй `gpt-6-astra`/high — PASS: positive 100/100/100, negative 0/0/0 при порогах 90/40, ~40 с на вызов. Рубрика (`rubric_hash`) заморожена как baseline; менять `SPEC.md`/`checklist` после этого — значит терять сравнимость с будущими прогонами.
+- Живой прогон агентом — **отложен**: профиль совместимости Dock-исполнителя `loginom-7.4.2-linux-chromium-ru` требует `bg.app.Version` ровно `7.4.2`, а локальный docker-стенд отдаёт `7.5.0-alpha+build.41839`, поэтому `dock_prepare` возвращает `INCOMPATIBLE / UI_BUILD_MISMATCH` и агент не может построить сценарий. Нужен стенд 7.4.2. Корпоративный `http://logi-test-plan.bg.local/app/` подходит по версии, но его хранилище недоступно через `docker cp` — для него потребуется источник артефакта через Web Client (Файловое хранилище → «Скачать») или смонтированное хранилище.
