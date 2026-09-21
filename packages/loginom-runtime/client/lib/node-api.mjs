@@ -15,7 +15,7 @@ const ref=object({document_id:id,workflow_id:id,node_id:id});
 const sourceSettings=object({source_path:text(2048),encoding:text(80),rows_to_skip:integer(0,1000000),first_line_as_title:boolean},[]);
 const format=object({delimiter:{type:'string',minLength:1,maxLength:1},decimal_separator:choice('.',','),
  null_marker:{type:'string',maxLength:256},text_qualifier:{type:'string',maxLength:1}},[]);
-const column=object({source_name:{...text(120),description:'Original observed technical name or an unambiguous original CSV header/label. Do not guess transliteration. name selects the resulting technical name; label selects its display title.'},name:text(120),label:text(120),
+const column=object({source_name:{...text(120),description:'Original observed technical name or an unambiguous original CSV header/label. Do not guess transliteration. name selects the resulting technical name; label selects its display title.'},name:{...fieldName,maxLength:120},label:text(120),
  type:choice('integer','real','string','boolean','datetime'),data_kind:choice('Неопределенное','Непрерывный','Дискретный'),used:boolean},[]);
 export const duplicatesParametersSchema=object({input_fields:array(text(128),1000,1),output_fields:array(text(128),1000)});
 export const calculatorExpressionSchema={...object({target:{...object({kind:choice('new','existing'),name:fieldName},['kind']),

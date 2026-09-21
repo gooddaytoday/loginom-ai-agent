@@ -156,3 +156,52 @@ Node `ad8f7792-da20-4a7c-9fdf-8ee86acb9ec3`, document
 `1789994885116-a5hfud4m3jv`. Приватные доказательства:
 `/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-import-recovery-live-JcBvNB/summary.json`.
 Это прямой runtime-проверочный запрос; автономный сценарий им не заменяется.
+
+## Исходный ABC: CREATED_EXECUTED
+
+Кандидат `.3`, commit `6dc261bd2f30e9626ba478705b5ea65e780b4c37`,
+app.asar SHA256 `daa5c917be44c10af3f70957a2a09e450d1192953a78bed3fecf92fc9bfa9e02`.
+Настройки прежние: OpenAI / GPT-5.6 Sol / low; Loginom 7.4.2.
+Чат `ses_f3c001c10ffevlxP0Ek4C4Beav`, исходный русский CSV доставлен и сверён.
+Задание и файл отправлены через GUI. Ручных изменений Loginom не было.
+
+Созданы и выполнены 8 связанных узлов: импорт, три калькулятора, сортировка,
+две группировки и слияние. Дополнительно существующий калькулятор успешно
+исправлен новым запросом: модель увидела NULL, прочла справку и исправила
+аргумент CumulativeSum самостоятельно. Превью финальной сводки содержит
+3 строки; подробный выход — 200 строк. Ошибочные timeout_ms=120000 и
+конкурирующий apply были отвергнуты; модель сама продолжила корректно.
+
+Сохранение `/user/scenario-debug-abc-candidate1-20260921.lgp` подтверждено
+SUCCEEDED, cleanup=true, save_completed=true, modified=false.
+`analytical_correctness: not_checked`; cold reopen не выполнялся и не требуется.
+Доказательства: `candidate-1-chat.json`, `candidate-1-metadata.json`,
+`candidate-1-prompt.txt`, `candidate-1-final.png` в локальном каталоге журналов.
+Это исходный случай, не замена B65 с 13 полями.
+
+B65 запущен через GUI кандидата `.5`, GPT-5.6 Sol / low, чат
+`ses_f3bf4fceeffeFbJCn0QjA07n9W`. Профиль `candidate-3-fresh-profile`:
+проверка и сохранение подключения через штатную форму успешны. Копия
+шифрованного record в прежнем тестовом `candidate-3-profile` не читалась;
+этот незапущенный профиль сохранён для диагностики, рабочий профиль не менялся.
+
+## F06: нативная нормализация имён воспроизведена
+
+DEBUG_ONLY `.5`: заданы technical names `Товар` и `Выручка`. Редактор
+принял их, но при переходе к output_mapping Loginom 7.4.2 выдал native source
+names `Tovar` и `Vyruchka` с прежними русскими labels. Runtime остановился
+на `Configured source differs from the native mapping schema` до исполнения.
+То есть расширять ASCII-ограничения следующих обработчиков наугад нельзя:
+запрошенная техническая идентичность уже не сохраняется самим Loginom.
+Журнал: `unicode-live.log`, private evidence `loginom-unicode-import-live-kMFoML`.
+
+Контракт импорта согласован с остальными обработчиками: name — ASCII technical
+identifier, source_name — исходная Unicode-метка или наблюдаемое техническое
+имя, label — свободная русская подпись. Ошибка возникает до создания/открытия
+узла и объясняет исправление; автоматическая транслитерация не добавлялась.
+Регрессионный тест сначала упал, затем прошёл после правки; 94 теста импорта
+и node API PASS (`unicode-source-tests.log`). Установленная проверка этой
+валидации пока pending; исправление не входит в `.5`.
+
+Полный runtime suite после F06: exit 0 (`runtime-tests-4.log`); source
+transforms: 5045 PASS; `git diff --check`: PASS.

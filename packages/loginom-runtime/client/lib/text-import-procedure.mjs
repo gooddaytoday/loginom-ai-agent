@@ -57,8 +57,12 @@ function validateSettings(p,maxColumns) {
   for (const c of p.columns) {
     requireValue(c && ['data_kind,label,name,type,used',...(maxColumns!==8?['data_kind,label,name,source_name,type,used']:[])].includes(Object.keys(c).sort().join(',')), 'Column parameters are incomplete');
     for (const key of ['name', 'label']) requireValue(typeof c[key] === 'string' && c[key].length > 0 && c[key].length <= 120 && !/[\x00-\x1f]/.test(c[key]), 'Invalid column ' + key);
+    // Loginom normalizes non-ASCII names on the next wizard page, after the
+    // editor readback. Reject before graph mutation; source labels stay Unicode.
+    requireValue(/^[A-Za-z_][A-Za-z0-9_]*$/.test(c.name),
+      'Invalid parameters.parameters.settings.columns.name: technical name must use ASCII letters, digits and underscore; keep the original CSV header in source_name and the Russian display title in label');
     if(c.source_name!==undefined)requireValue(typeof c.source_name==='string' && c.source_name.length>0 && c.source_name.length<=120
-      && !/[\x00-\x1f]/.test(c.source_name) && /^[\p{L}_][\p{L}\p{N}_]*$/u.test(c.name),'Invalid explicit source or renamed field');
+      && !/[\x00-\x1f]/.test(c.source_name),'Invalid explicit source or renamed field');
     requireValue(Object.hasOwn(types, c.type) && kinds.includes(c.data_kind) && typeof c.used === 'boolean', 'Invalid column semantics');
   }
   if(maxColumns!==8)requireValue(new Set(p.columns.map(c=>c.source_name??c.name)).size===p.columns.length,'Duplicate source column names');

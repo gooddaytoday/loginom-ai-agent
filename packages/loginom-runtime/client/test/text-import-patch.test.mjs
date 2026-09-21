@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateTextImportPatch,mergeImportColumnPatch,reconcileImportColumnPatch,bindImportSourceColumns} from '../lib/text-import-procedure.mjs';
+import {validateTextImportFieldsRequest,validateTextImportPatch,mergeImportColumnPatch,reconcileImportColumnPatch,bindImportSourceColumns} from '../lib/text-import-procedure.mjs';
 import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
 const fields=[{name:'Id',label:'Identifier',type:'integer',data_kind:'Дискретный',used:true},
  {name:'Title',label:'Title',type:'string',data_kind:'Дискретный',used:true},
@@ -73,4 +73,14 @@ test('new parsed fields require complete explicit semantics; removed fields cann
   assert.throws(()=>reconcileImportColumnPatch(fields,parsed,changes,{schemaChangeRequested:true}));
  const extra={name:'Extra',label:'Count',type:'integer',data_kind:'Дискретный',used:true};
  assert.deepEqual(reconcileImportColumnPatch(fields,parsed,[extra],{schemaChangeRequested:true}),[fields[1],extra]);
+});
+
+test('native-normalized Unicode technical names are rejected before opening an import wizard',()=>{
+ const settings={source:{source_path:'/user/input.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},format:{delimiter:',',decimal_separator:'.',null_marker:'',text_qualifier:'"'},columns:[{source_name:'Выручка',name:'Revenue',label:'Выручка',type:'real',data_kind:'Непрерывный',used:true}]};
+ assert.doesNotThrow(()=>validateTextImportFieldsRequest(settings));
+ for(const name of ['Выручка','Revenue total','Revenue-total']){
+  assert.throws(()=>validateTextImportFieldsRequest({...settings,columns:[{...settings.columns[0],name}]}),/technical name.*ASCII/);
+  assert.throws(()=>validateTextImportPatch({columns:[{source_name:'Выручка',name}]}),/technical name.*ASCII/);
+ }
+ assert.doesNotThrow(()=>validateTextImportPatch({columns:[{source_name:'Выручка',label:'Общая выручка'}]}));
 });

@@ -166,8 +166,8 @@
   },
   "packages/loginom-runtime/client/lib/node-api.mjs": {
     "baseHash": "e7b2e721bc5a1c9d2a3c575e05b7776558e6b18970f769b688a3d34a82a29fc4",
-    "hash": "44a8aacbafb78c16b14d2bda9c94f6dca4d0358fc2fba960b097c9f154542146",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path."
+    "hash": "2f8cd4b9ad1f6134d1a7eff8bb119ffb897d45a58960148fea44bd3c0f4a80a2",
+    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label."
   },
   "packages/loginom-runtime/client/lib/node-apply.mjs": {
     "baseHash": "d9f4f12730a3195e893cd04244fa7d53cf7c16604e49cae3334a013903c1dcb3",
@@ -181,8 +181,8 @@
   },
   "packages/loginom-runtime/client/lib/text-import-procedure.mjs": {
     "baseHash": "5a72ca1d8972a313737cf73713e2a3e2c219acb99d44cef550fa495826eecc00",
-    "hash": "e4b1931d5fdd5cc9c8a413f0d1068cd20172349982db3b87c094d30fbe2aa7fe",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Require full verified source settings for an existing unconfigured import before attempting schema preservation."
+    "hash": "0e9768e162c6a098d77b58c2e4ee204839ff573b2186bd588b658e261c8622fb",
+    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Require full verified source settings for an existing unconfigured import before attempting schema preservation. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label."
   },
   "packages/loginom-runtime/client/test/node-apply.test.mjs": {
     "baseHash": "09e457cc476dc16b0790fad7d1742737cdbc59563a27594624b25056781bd00c",
@@ -191,8 +191,8 @@
   },
   "packages/loginom-runtime/client/test/text-import-patch.test.mjs": {
     "baseHash": "8742700e801f3157a7f596e5c2d64468440de27223df210e551d0f9bd23251aa",
-    "hash": "753ddd3a6c5b89fcdb918fd59e5b920a1a1319b910ac648be14717f668ba77e7",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path."
+    "hash": "217e7de634264591f310786f129dd9d9d438611d1602627094d3b917f962ef46",
+    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label."
   },
   "packages/loginom-runtime/client/lib/node-procedure.mjs": {
     "baseHash": "eb08dda1ea023c1df95bac5efd4c6bccf314bea277f2d4bafd9396bec4ee94ff",
