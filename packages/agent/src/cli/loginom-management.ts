@@ -39,6 +39,7 @@ export async function loginomManagement(
   options: {
     stdinJSON: boolean
     acknowledge: boolean
+    ids?: string[]
   },
 ) {
   const decoded = view(await host.request("connection.status", {}))
@@ -58,7 +59,10 @@ export async function loginomManagement(
       })
       if (isCancel(answer) || !answer) throw new Error("CLI_CANCELLED")
     }
-    return host.request("connection.recover", { revision: current.revision, ids: current.recoveries })
+    return host.request("connection.recover", {
+      revision: current.revision,
+      ids: options.ids?.length ? options.ids : current.recoveries,
+    })
   }
   if (command === "check") {
     if (!current.hasApiKey) throw new Error("LOGINOM_CONFIG_REQUIRED")

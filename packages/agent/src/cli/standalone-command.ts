@@ -6,17 +6,13 @@ import { loginomManagement } from "./loginom-management"
 import { standaloneBundle } from "./standalone-bundle"
 
 export async function standaloneCommand(args: string[], paths: ReturnType<typeof cliProfile>) {
-  const parsed = parseArgs({
-    args,
-    allowPositionals: true,
-    options: {
-      format: { type: "string", default: "default" },
-      headless: { type: "boolean", default: false },
-      "no-headless": { type: "boolean", default: false },
-      "stdin-json": { type: "boolean", default: false },
-      acknowledge: { type: "boolean", default: false },
-    },
-  })
+  const parsed = parseManagementArgs(args)
+  if (!parsed) {
+    process.exitCode = 2
+    process.stderr.write("CLI_ARGUMENT_INVALID\n")
+    return
+  }
+  const format = parsed.values.format
   function failure(value: unknown) {
     const message = value instanceof Error ? value.message : value
     const local = [
@@ -60,14 +56,14 @@ export async function standaloneCommand(args: string[], paths: ReturnType<typeof
                 ].includes(code)
               ? 2
               : 1
-    if (parsed.values.format === "json") process.stdout.write(JSON.stringify({ ok: false, code }) + "\n")
+    if (format === "json") process.stdout.write(JSON.stringify({ ok: false, code }) + "\n")
     process.stderr.write(code + "\n")
   }
   if (
     !["default", "json"].includes(parsed.values.format) ||
-    parsed.positionals.length !== 2 ||
     parsed.positionals[0] !== "loginom" ||
-    !["status", "setup", "check", "cancel-pending", "recover"].includes(parsed.positionals[1]) ||
+    !["status", "setup", "check", "cancel-pending", "recover"].includes(parsed.positionals[1] ?? "") ||
+    (parsed.positionals.length > 2 && (parsed.positionals[1] !== "recover" || !parsed.values.acknowledge)) ||
     (parsed.values["stdin-json"] && parsed.positionals[1] !== "setup") ||
     (parsed.values.acknowledge && parsed.positionals[1] !== "recover") ||
     (parsed.values.headless && parsed.values["no-headless"])
@@ -89,11 +85,30 @@ export async function standaloneCommand(args: string[], paths: ReturnType<typeof
     const result = await loginomManagement(host, parsed.positionals[1], {
       stdinJSON: parsed.values["stdin-json"],
       acknowledge: parsed.values.acknowledge,
+      ids: parsed.positionals.slice(2),
     })
     process.stdout.write(JSON.stringify(result, null, parsed.values.format === "json" ? undefined : 2) + "\n")
   } catch (error) {
     failure(error)
   } finally {
     await host.close()
+  }
+}
+
+function parseManagementArgs(args: string[]) {
+  try {
+    return parseArgs({
+      args,
+      allowPositionals: true,
+      options: {
+        format: { type: "string", default: "default" },
+        headless: { type: "boolean", default: false },
+        "no-headless": { type: "boolean", default: false },
+        "stdin-json": { type: "boolean", default: false },
+        acknowledge: { type: "boolean", default: false },
+      },
+    })
+  } catch {
+    return undefined
   }
 }

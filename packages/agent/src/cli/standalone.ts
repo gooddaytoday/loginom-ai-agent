@@ -17,7 +17,7 @@ export async function standalone(
         "Commands: run, providers (auth), models, loginom setup/check/status/cancel-pending/recover\n" +
         "Without a command: interactive TUI\n\n" +
         "Options: --headless, --no-headless, --help, --version\n" +
-        "Management: --format json; setup --stdin-json; recover --acknowledge\n" +
+        "Management: --format json; setup --stdin-json; recover --acknowledge [id...]\n" +
         "Profile: LOGINOM_AI_AGENT_CLI_PROFILE (absolute path)\n",
     )
     return

@@ -239,6 +239,14 @@ test("management commands share durable setup and recovery semantics through the
       code: 4,
       result: { code: "LOGINOM_RECOVERY_CONFIRMATION_REQUIRED" },
     })
+    expect(await command(["recover", "--acknowledge", "00000000-0000-0000-0000-000000000000"])).toMatchObject({
+      code: 3,
+      result: { code: "LOGINOM_RECOVERY_CONFLICT" },
+    })
+    expect(await command(["recover", "--acknowledge", id])).toMatchObject({ code: 0, result: { state: "ready" } })
+    expect((await recoveryStore(join(profile, "loginom/recovery"))).pending()).toEqual([])
+    const next = await journal.begin("b".repeat(64), 2)
+    await journal.settle(next, false)
     expect(await command(["recover", "--acknowledge"])).toMatchObject({ code: 0, result: { state: "ready" } })
     expect((await recoveryStore(join(profile, "loginom/recovery"))).pending()).toEqual([])
     const run = Bun.spawn(
