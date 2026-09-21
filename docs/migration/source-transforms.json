@@ -116,8 +116,8 @@
   },
   "packages/loginom-runtime/client/lib/node-target-browser.mjs": {
     "baseHash": "aebab1ef9bc8b6df4c13b5d06b8d28980b7affe07d7badf5a39b070503ded39a",
-    "hash": "f1f85940feab6756c84957364ccc2c56fba90be2d679e41e317c476ef3f160f8",
-    "reason": "Merge main bounded headed-browser port rendering waits and ordinary-node mask handling with RC9 complete native bindings, hover/rebind and bounded placement."
+    "hash": "d5c31189c1c0836b84bb52f2ce9e75cdc47168fda31961213a2bc966e288e561",
+    "reason": "Merge main bounded headed-browser port rendering waits and ordinary-node mask handling with RC9 complete native bindings, hover/rebind and bounded placement. Include observed node and port identities in rendering refusal diagnostics without weakening ownership checks."
   },
   "packages/loginom-runtime/client/test/node-placement.test.mjs": {
     "baseHash": "4ce1a2ec34ce3c5b68dcacc15d05cc438e70ec7cddcc7ff3b76f7edc1038b278",
@@ -181,8 +181,8 @@
   },
   "packages/loginom-runtime/client/lib/text-import-procedure.mjs": {
     "baseHash": "5a72ca1d8972a313737cf73713e2a3e2c219acb99d44cef550fa495826eecc00",
-    "hash": "0e9768e162c6a098d77b58c2e4ee204839ff573b2186bd588b658e261c8622fb",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Require full verified source settings for an existing unconfigured import before attempting schema preservation. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label."
+    "hash": "873b42467e4a6d8b5536c5a884deb887ea88c22b3f67cdb8a95927209cdd12d7",
+    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Require full verified source settings for an existing unconfigured import before attempting schema preservation. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label. Bind import metadata commit to the observed owner, column and draft, permitting strict no-effect epoch refresh."
   },
   "packages/loginom-runtime/client/test/node-apply.test.mjs": {
     "baseHash": "09e457cc476dc16b0790fad7d1742737cdbc59563a27594624b25056781bd00c",

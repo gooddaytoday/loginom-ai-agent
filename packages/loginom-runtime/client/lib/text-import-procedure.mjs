@@ -477,7 +477,17 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
         await act(s,{verb:'fill',ref:s.wizard.import_column_editor.input_ref,text:wanted[property]});
         s=await read('text_import_format','metadata draft text entered',state=>editorReady(state)
           && state.wizard.import_column_editor.value===wanted[property]);
-        await act(s,{verb:'press',ref:s.wizard.import_column_editor.input_ref,key:'Enter'});
+        // A native editor may update DOM attributes after typing. Refresh only
+        // a proved pre-gesture refusal, keeping the same owner and draft value.
+        await channel.perform({condition:'commit bound import metadata: '+i+'/'+property,initialObservation:s,
+          ready:state=>state.wizard?.stage==='text_import_format'&&editorReady(state)
+            &&state.wizard.import_column_editor.value===wanted[property],
+          identity:state=>{
+            const e=state.wizard.import_column_editor;
+            return {owner:identity(state.wizard.owner_context),index:e.index,name:e.name,label:e.label,
+              property:e.property,value:e.value,original_value:e.original_value,type:e.type,data_kind:e.data_kind,used:e.used};
+          },
+          resolve:state=>({verb:'press',ref:state.wizard.import_column_editor.input_ref,key:'Enter'})});
       }
       s=await read('text_import_format','metadata cell committed',state=>ready(state)
         && state.wizard.import_columns.fields.find(f=>f.index===i)?.[property]===wanted[property]);

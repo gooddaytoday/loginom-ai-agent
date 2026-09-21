@@ -10,10 +10,11 @@
 | B65 | CREATED_EXECUTED | `.5` / `ses_f3bf4fceeffeFbJCn0QjA07n9W` |
 | B02 | CREATED_EXECUTED | `.6` / `ses_f3beabb1affeTJydQ4bzcVwxc3` |
 | B47 | CREATED_EXECUTED | `.5` / `ses_f3be80188ffeWXck3xXTGcEQ0i` |
-| B37 | RUNNING | `.6` / `ses_f3bddb28dffe9rnhncERKN0Fam` |
-| B27 | RUNNING | `.5` / `ses_f3bddb28effeOkWDWMW4svtpFn` |
-| B18 | NOT_STARTED | — |
-| V65, V02, V27, V37 | NOT_STARTED | Входы и задания готовы |
+| B37 | CREATED_EXECUTED | `.6` / `ses_f3bddb28dffe9rnhncERKN0Fam` |
+| B27 | BLOCKED | `.5` / `ses_f3bddb28effeOkWDWMW4svtpFn` |
+| B18 | BLOCKED | `.7` / `ses_f3bd81345ffea4N7Co16zrp2B5` |
+| V27 | RUNNING | `.6` / `ses_f3bd0e6a1ffeUBtNOzCMf4U9QT` |
+| V65, V02, V37 | NOT_STARTED | Входы и задания готовы |
 
 RUNNING и NOT_STARTED — промежуточные состояния реестра, не зачётные исходы.
 Для выполненных случаев `analytical_correctness: not_checked`.
@@ -317,3 +318,32 @@ Commit `99f65a0e4`, версия `0.1.7-local.20260921.7` включает backe
 
 Для установленного `.7` codesign PASS; SHA256 app.asar
 `dfd2fc7a336b69e13bc7c1b661aed0c0056aa8d477080b5079cd626ab862b2da`.
+
+## B37 завершён; B18 и B27 — новые препятствия
+
+B37: 7 узлов (imports.text, transform.group_data, transform.sorting),
+пакет `/user/scenario-debug-B37-candidate6-20260921.lgp` сохранён с
+подтверждённым завершением. Модель сама исправила отклонённые конкурентные
+запросы, продолжив их последовательно. Доказательства: `B37-candidate6-*`
+в приватном каталоге серии; числовая правильность не проверялась.
+
+B18 (`.7`) остановился на импорте: F11 — Enter для подтверждения метки
+`category` получил строгое `NOT_APPLIED / preconditions / UI_EPOCH_CHANGED`,
+`effect_possible:false`, `cleanup_complete:true`. Исходный редактор и введённое
+значение остались наблюдаемыми. Прямой `channel.act` не использовал существующее
+ограниченное обновление ссылок через `channel.perform`; configure стал pending,
+resume не смог продолжить. Исправление связывает подтверждение с владельцем,
+колонкой, типом, исходным и введённым значением; после доказанного отказа до
+жеста допустимо новое наблюдение с новой ссылкой. Не разрешает повтор неизвестного
+жеста или изменение другого редактора. Узкие проверки: 104 PASS. Установленный
+повтор ещё не выполнен.
+
+B27 (`.5`) выполнил несколько ветвей, но следующий узел группировки остановился
+на target: `Visible port identity is not rendered`. Последующие inspect/resume
+получили timeout, сохранение заблокировано незавершённой операцией. Причина
+исследуется; результаты не засчитаны. Чаты: `B18-candidate7-chat.json`,
+`B27-candidate5-chat.json`.
+
+Проверки F11: runtime 2275 PASS / 2 SKIP; узкие graph regressions 47 PASS;
+macOS source checks 8/8 PASS (`source-checks-4.json`). Диагностика F12 дополнена
+наблюдаемыми node/port ID и признаками наличия элемента; проверка графа не ослаблена.

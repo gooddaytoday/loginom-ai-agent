@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {configureTextImportFields,importFieldRevealDelta} from '../lib/text-import-procedure.mjs';
 import {textImportStepBudget} from '../lib/text-import-limits.mjs';
 
-function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null}={}) {
+function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,editorChange=null}={}) {
  const columns=Array.from({length:count},(_,index)=>({index,status:'observed',name:'F'+index,label:'F'+index,type:'string',data_kind:'Дискретный',used:true,
   cell_refs:Object.fromEntries(['name','label','type','data_kind','used'].map(p=>[p,p+':'+index]))}));
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'path',label:'Scenario'}]};
@@ -40,8 +40,18 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
    editor={...c,property,original_value:c.label,input_ref:'editor',value:c.label};return;
   }
   if(action.verb==='fill'){assert.equal(action.ref,'editor');editor.value=action.text;return;}
-  if(action.verb==='press'){assert.equal(action.key,'Enter');columns[editor.index].label=editor.value;editor=null;return;}
+  if(action.verb==='press'){assert.equal(action.key,'Enter');assert.equal(action.ref,editor.input_ref);columns[editor.index].label=editor.value;editor=null;return;}
   assert.fail('Unexpected gesture: '+action.verb);
+ },perform:async options=>{
+  const before=options.initialObservation;
+  assert.equal(options.ready(before),true);
+  const refreshed=structuredClone(before);
+  refreshed.wizard.import_column_editor.input_ref='fresh-editor';
+  if(editorChange)editorChange(refreshed);
+  assert.equal(options.ready(refreshed),true,'changed editor is not ready');
+  assert.deepEqual(options.identity(refreshed),options.identity(before),'editor identity changed');
+  editor.input_ref='fresh-editor';
+  return channel.act(options.resolve(refreshed));
  }};
  return {parameters,channel,owner,budget,reads,get steps(){return steps;},get gestures(){return gestures;}};
 }
@@ -52,6 +62,23 @@ for(const count of [400,1000])for(const editLabels of [false,true])test(`${count
  assert.equal(f.reads.filter(r=>r.condition.startsWith('complete import definition page')).length,2*Math.ceil(count/8));
  if(editLabels){assert.ok(f.steps>2048,'regression must exercise the former limit');assert.equal(f.gestures,count*3+1);}
  else {assert.equal(f.gestures,1);assert.ok(f.steps<400,'unchanged fields use complete sweeps, not per-property reads');}
+});
+test('metadata commit resolves a fresh editor reference with the same draft',async()=>{
+ const f=fixture(1,{editLabels:true});
+ const result=await configureTextImportFields(f.channel,f.parameters,f.owner);
+ assert.equal(result.columns[0].label,'Label0');
+});
+for(const [name,editorChange] of Object.entries({
+ owner:s=>s.wizard.owner_context.node.tid='foreign',
+ column:s=>s.wizard.import_column_editor.index++,
+ draft:s=>s.wizard.import_column_editor.value='foreign',
+ original:s=>s.wizard.import_column_editor.original_value='foreign',
+ type:s=>s.wizard.import_column_editor.type='integer',
+ stage:s=>s.wizard.stage='done',
+}))test('metadata commit cannot refresh changed '+name,async()=>{
+ const f=fixture(1,{editLabels:true,editorChange});
+ await assert.rejects(configureTextImportFields(f.channel,f.parameters,f.owner));
+ assert.equal(f.gestures,3,'only Next, editor open and draft fill were applied');
 });
 test('the final full sweep rejects a change to a skipped offscreen field',async()=>{
  const f=fixture(400,{drift:true});await assert.rejects(configureTextImportFields(f.channel,f.parameters,f.owner),/definitions differ/);

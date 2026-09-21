@@ -82,7 +82,10 @@ export async function readGraph(page, task) {
             if(hit===p.FCell)ptid=previous.tid;
           }
         }
-        if (p.FCell?.visible===true && (!ptid || !containers[0].contains(element))) fail('Visible port identity is not rendered');
+        if (p.FCell?.visible===true && (!ptid || !containers[0].contains(element))) fail('Visible port identity is not rendered: '+JSON.stringify({
+          node_id:n.FGuid,port_id:p.FGuid??null,node_tid:tid,port_tid:ptid??null,
+          element_present:!!element,element_in_graph:!!element&&containers[0].contains(element),
+          previous_tid:previous?.tid??null,type:p.FType,subtype:p.FSubType}));
         if (!ptid || !containers[0].contains(element)) continue; // Hidden service ports are outside tabular phase.
         if(!ptid.startsWith(tid+';'))fail('Port identity belongs to another node');
         if(element.getAttribute('data-tid')===ptid && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
