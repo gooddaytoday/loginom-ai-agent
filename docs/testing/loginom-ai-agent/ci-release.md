@@ -2,20 +2,24 @@
 
 [release.yml](../../../.github/workflows/release.yml) собирает Desktop и самостоятельный CLI из одного commit для Linux x64, Windows x64 и macOS arm64. Все три платформы, общие тесты и Linux Docker-матрица обязательны. Неполный релиз не создаётся.
 
-Текущая интеграция: ветка `main`, версия 0.1.5. Default branch репозитория остаётся `dev`; её настройка не меняется. До завершения конкретного run этот документ описывает контракт CI, а не результат проверки.
+Текущая интеграция: ветка `loginom`, версия 0.1.6. Default branch репозитория остаётся `dev`; её настройка не меняется. До завершения конкретного run этот документ описывает контракт CI, а не результат проверки.
+
+`test.yml` и `typecheck.yml` запускаются на push любой ветки (включая имена со слешами) и на PR в любую ветку. Отдельные Windows native checks запускаются на push любой ветки при изменении указанных в workflow путей. Push тега обслуживает `release.yml`, который включает общие тесты и typecheck как reusable gates; отдельные push-запуски тестов на тег не дублируются.
+
+После merge `a6048e756` на GitHub был только успешный macOS candidate; полный набор не падал, а не запускался из-за прежних branch filters. Следующая полная сборка запускается новым annotated-тегом `v0.1.6`; существующий `v0.1.5` остаётся на прежнем commit.
 
 ## Запуск и публикация
 
 - Push тега `vX.Y.Z`: версия должна совпадать с корневым и Desktop `package.json`; после успешных проверок создаётся **draft pre-release**.
-- `workflow_dispatch`, `mode=candidate`: сборка выбранного ref без создания релиза. Артефакты хранятся 14 дней. Для 0.1.5 используется канал `prod`.
+- `workflow_dispatch`, `mode=candidate`: сборка выбранного ref без создания релиза. Артефакты хранятся 14 дней. Для 0.1.6 используется канал `prod`.
 - `mode=cut`: только `main` или `dev`; `script/set-version.ts` синхронизирует manifests/lock, job коммитит версию и атомарно пушит ветку с annotated-тегом. Требуются GitHub App ID/secret. Альтернатива — вручную закоммитить версию, создать новый тег и отправить его; существующие теги не перемещать.
 - Публикация draft — отдельное действие после проверки отчётов и явного разрешения пользователя. CI автоматически не публикует. Feed автообновления отключён.
 
 Для workflow, уже выполнявшегося в репозитории, запуск выбранной ветки доступен через API/CLI:
 
 ```sh
-gh workflow run release.yml --ref main -f mode=candidate -f channel=prod
-gh run list --workflow release.yml --branch main
+gh workflow run release.yml --ref loginom -f mode=candidate -f channel=prod
+gh run list --workflow release.yml --branch loginom
 ```
 
 ## Обязательные проверки

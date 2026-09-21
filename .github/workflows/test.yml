@@ -2,9 +2,7 @@ name: test
 
 on:
   push:
-    branches:
-      - dev
-      - main
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
   # release.yml runs this workflow as a release gate.
