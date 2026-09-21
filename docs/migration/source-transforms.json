@@ -231,12 +231,12 @@
   },
   "packages/loginom-runtime/client/lib/user-workflow.mjs": {
     "baseHash": "cc84d83a95211bdcceadeeed7e57599ed90e9431fdae2dfc7f1913148877f1c2",
-    "hash": "f94e4377638c209b1421f794642aa9aefad8f324a55870499af19f61461deece",
-    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints."
+    "hash": "d139e2516d995d1b04ccf0062268ab8c9e71e7678162122439c9efbb9e9d46a0",
+    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines."
   },
   "packages/loginom-runtime/client/test/user-workflow.test.mjs": {
     "baseHash": "61ab452f9c710aef8bb7afa11996f55974d22f5cb216ba1644f4725751a37a47",
-    "hash": "50ed95b88cfbb81fdd9eb06c0230ddefc4d84049f25c934e4a399df0f8742193",
-    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints."
+    "hash": "50781db223be36f0ca84120381e6665b99bb2fd6d7a52f3d972f31ad2cf17c5d",
+    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines."
   }
 }

@@ -68,3 +68,11 @@ D65: 8 узлов с прочитанными выходами; 9-й abc-key-ite
 Проверки: 374 UI/procedure/output + 86 API/workflow/node.apply тестов PASS на bundled Node24.19.0. Source transforms: 5045 файлов PASS. F03 recovery и F07 resume не объявляются исправленными: новые безопасные маршруты возобновления не добавлялись.
 
 Общий macOS source-check: PASS (8 групп, typecheck Product/Host/Desktop/Agent и соответствующие тесты). DEBUG_ONLY D48 на неизменённом .10: семь исходных операций повторены, выполнены, сохранены; исходная геометрия перекрытия не повторилась. Это наблюдение реального UI, но не положительная приёмка исправления. Изолированный runtime завершён с awaited cleanup.
+
+## Целевой D45 на .11
+
+Кандидат .11 source `658b8ab95` прошёл DMG/ZIP/offline smoke, installed signature и ASAR equality. D45-target11-a01 отправлен 19:08:16 UTC, завершён BLOCKED после штатной Stop; Desktop закрыт. Модель явно передала configure_ms=120000, execute_ms=120000, total_ms=300000. Настройка широкого импорта снова исчерпала configure deadline; recover/resume отказали pending. Пояснения и новые defaults .11 недостаточны, так как модель переопределила технический срок.
+
+Следующее изменение: компактный user-v1 каталог больше не принимает поле budgets; длительности принадлежат приложению. Полный диагностический контракт сохранён с явными неизменяемыми сроками. Это не продление старого pending и не исправление F07 recovery. Новый кандидат .12 потребуется до любых зачётных final. 87 API/workflow/apply проверок PASS, включая отказ model budgets до мутации и сохранение полного контракта.
+
+Перед .12 полный runtime suite: 2283 PASS, 2 SKIP, 0 FAIL на pinned Node24.19.0; source transforms 5045 PASS.

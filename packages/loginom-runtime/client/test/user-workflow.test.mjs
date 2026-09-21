@@ -12,7 +12,7 @@ import {validateTextExportParameters} from '../lib/text-export-parameters.mjs';
 const workspace=()=>({document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'tab',prefix:'prefix',navigation_path:[{tid:'module',label:'Module'},{tid:'scenario',label:'Scenario'}]}});
 const request=()=>({operation_id:'op',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf'},
   target:{kind:'existing',type:'transform.sorting',ref:{document_id:'doc',workflow_id:'wf',node_id:'sort'}},inputs:[],mappings:[],mode:'keys',parameters:{},finish:'execute',
-  read:{ports:[0],sample_rows:3,require_exact_numbers:false},budgets:{configure_ms:1000,execute_ms:1000,total_ms:3000}});
+  read:{ports:[0],sample_rows:3,require_exact_numbers:false}});
 
 test('new export technical defaults preserve explicit format and never authorize overwrite or patch existing nodes',()=>{
  const b=createUserWorkflowBindings();b.remember(workspace());
@@ -80,6 +80,18 @@ test('technical defaults expand deterministically and preserve explicit choices'
   const explicit={configure_ms:1000,execute_ms:1000,total_ms:2000};
   assert.deepEqual(bindings.expandNode({...args,budgets:explicit}).budgets,explicit,'caller deadlines must not be silently extended');
  }
+});
+
+test('compact model calls cannot override host budgets while the diagnostic contract retains them',async()=>{
+ const bindings=createUserWorkflowBindings();bindings.remember(workspace());
+ const original=nodeApiTools.find(t=>t.name==='dock_node_apply'),compact=userNodeTool(original);
+ const args={...request(),budgets:{configure_ms:120000,execute_ms:120000,total_ms:120000}};
+ assert.throws(()=>validateActionParameters(compact.inputSchema,args),/unknown field.*budgets/);
+ assert.equal(new AjvJsonSchemaValidator().getValidator(compact.inputSchema)(args).valid,false);
+ assert.ok(original.inputSchema.properties.budgets);
+ const full=bindings.expandNode(args);let received;
+ await dispatchNodeApi({tools:nodeApiTools,startNodeApply:async r=>{received=r;}},'dock_node_apply',full);
+ assert.deepEqual(received.budgets,args.budgets);
 });
 test('new import defaults use only a locally confirmed upload and preserve explicit settings',()=>{
  const binding=createUserWorkflowBindings();binding.remember(workspace());
