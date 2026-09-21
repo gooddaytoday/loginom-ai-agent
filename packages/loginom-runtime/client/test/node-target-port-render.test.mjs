@@ -7,8 +7,8 @@ function fixture(){
  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'tab',navigation_path:[{tid:'crumb',label:'Scenario'}]}};
  const element=tid=>({getAttribute:()=>tid,textContent:'Scenario',getBoundingClientRect:()=>({width:10,height:10}),classList:{contains:()=>true}});
  const tab=element('tab'),root=element('MF;TF-1;ModelForm;cmpDiagram'),body=element('MF;TF-1;Graph;Calc'),portDom=element('MF;TF-1;Graph;Calc;Output_Data-0'),crumb=element('crumb'),labelDom=element('MF;TF-1;Graph;Calc;Label;Label');
- const alternatePortDom=element(null);let duplicateShape=false,wrongHit=false;
- root.contains=e=>e===body||e===portDom||e===alternatePortDom||e===labelDom;root.querySelectorAll=()=>[];
+ const alternatePortDom=element(null),inside=[];let duplicateShape=false,wrongHit=false;
+ root.contains=e=>e===body||e===portDom||e===alternatePortDom||e===labelDom||inside.includes(e);root.querySelectorAll=()=>[body,portDom,labelDom,...inside].filter(e=>e.getAttribute('data-tid'));
  const port={FCell:{visible:true}},node={FGuid:'n',FIconCls:'bg-vendor-icon-calcdata',FCell:{geometry:{x:10,y:10}},FPorts:[{FCollection:[port]}]};
  Object.assign(port,{FGuid:'port-guid',data:{},parent:node,FType:1,FSubType:1});port.FCell.parent=node.FCell;
  let portTid='MF;TF-1;Graph;Calc;Output_Data-0';portDom.getAttribute=()=>portTid;
@@ -20,12 +20,12 @@ function fixture(){
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:workflowNode}},FController:model}})}}}}}};
  const outside=[];
  const nodeList=values=>Object.assign(Object.fromEntries(values.map((v,i)=>[i,v])),{length:values.length,[Symbol.iterator]:function*(){yield* values;}});
- const document={querySelectorAll:selector=>nodeList(selector.startsWith('[data-tid^=')?[crumb]:[tab,root,body,portDom,...outside,...(labelRendered?[labelDom]:[])].filter(e=>selector==='[data-tid='+JSON.stringify(e.getAttribute())+']'))};
+ const document={querySelectorAll:selector=>nodeList(selector.startsWith('[data-tid^=')?[crumb]:[tab,root,body,portDom,...inside,...outside,...(labelRendered?[labelDom]:[])].filter(e=>selector==='[data-tid='+JSON.stringify(e.getAttribute())+']'))};
  const preparation={id:'doc',document,receipts:new Map([['p',{phase:'verified',workflowId:'wf',packageNode,tab}]])};
  const context=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app},__loginomDockPreparationV1:preparation,getComputedStyle:()=>({visibility:'visible'}),setTimeout,clearTimeout,requestAnimationFrame:callback=>{if(pausedPaint)return;onPaint();callback(0);}});
  const page={evaluate:(fn,arg)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context)};
  const adapter=createNodeTargetBrowserAdapter({origin:'http://loginom.test',build:'7.4.2',pinned:{},execute:code=>vm.runInNewContext('('+code+')',{...context})(page)});
- return {binding:()=>readGraph(page,{request,types:{},origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},read:()=>adapter.observe(request,Date.now()+1000),alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ return {binding:()=>readGraph(page,{request,types:{},origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
 test('outline copies outside the prepared canvas do not replace its port or label bindings',async()=>{
  const f=fixture();f.outline();await f.read();f.alternateShape();assert.deepEqual(Array.from((await f.read()).nodes[0].outputs),[0]);
@@ -34,6 +34,15 @@ test('outline copies outside the prepared canvas do not replace its port or labe
 test('rerendered port without data-tid retains only its previously bound native identity',async()=>{
  const f=fixture();await f.read();f.alternateShape();
  assert.deepEqual(Array.from((await f.read()).nodes[0].outputs),[0]);
+});
+test('first observation binds an alternate port shape only through its rendered native cell',async()=>{
+ const f=fixture();f.alternateShape();
+ assert.deepEqual(Array.from((await f.read()).nodes[0].outputs),[0]);
+ assert.deepEqual(Array.from((await f.binding()).native_bindings[0].outputs),[0]);
+ for(const change of [f=>f.wrongHit(),f=>f.duplicatePort(),f=>f.losePortTid(),f=>{f.port.FGuid=null;},f=>{f.port.data=null;},f=>{f.port.parent={};},f=>{f.port.FCell.parent={};}]){
+  const invalid=fixture();invalid.alternateShape();change(invalid);
+  await assert.rejects(invalid.read(),/Visible port identity/);
+ }
 });
 test('missing port attribute cannot borrow an unobserved or changed native identity',async()=>{
  const fresh=fixture();fresh.losePortTid();await assert.rejects(fresh.read(),/Visible port identity/);

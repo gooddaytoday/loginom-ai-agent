@@ -1,21 +1,26 @@
 # Точка продолжения description/dataset
 
-2026-09-21. Этап B завершён: 10/10 попыток на установленной 0.1.7-local.20260921.10, 7 PASS, 3 BLOCKED (D45,D48,D65). Все assistance=none. Все тестовые Desktop закрыты. Источник baseline 4270f2c93551562c5f46e1b6c27812317e81f5ff; ASAR и 20/20 исходных файлов проверены.
+2026-09-21. Цель активна, план ещё не выполнен полностью.
 
-Этап C: исправлена точка клика частично обрезанных Visualizers; уточнены описание бюджетов/wait и managed defaults по измеренным UI-затратам. Явные deadlines, неизвестные эффекты и resume не ослаблены. 460 узких тестов и source transforms PASS. Общий macOS source-check PASS (8 групп). Кандидат .11 собран и установлен отдельно; DMG/ZIP/offline smoke/installed signature/ASAR PASS. Final ещё NOT_STARTED.
+- Baseline .10 завершён: 7 PASS, 3 BLOCKED (D45,D48,D65), 10/10 попыток, assistance=none. Все baseline Desktop закрыты.
+- Исправлена потеря видимой точки частично обрезанной кнопки Visualizers; повторный hit-test и отказ при перекрытии сохранены.
+- .11 целевой D45 BLOCKED: модель переопределила configure_ms=120000; Stop и закрытие подтверждены. .11 исторический, final на нём не запускался.
+- .12: компактный user-v1 API не принимает budgets; приложением заданы ограниченные defaults 300000/120000/600000 ms. Полный диагностический контракт и явные deadlines сохранены. Resume неизвестных эффектов не добавлялся и сроки старых операций не продлевались.
+- Проверки: полный runtime 2283 PASS, 2 Windows-only SKIP, 0 FAIL; transforms 5045 PASS. Общий macOS source-check Product/Host/Desktop/Agent ранее PASS на .11. .12 изменил только компактную JS-схему/инструкции и тесты.
 
-Приватные доказательства/manifest/controller: `/Users/kartamyshev/Library/Logs/loginom-description-debugging/20260921-163359`. Изолированный DEBUG_ONLY replay D48 на .10 завершён успешно (7 узлов и save), исходное перекрытие не повторилось; runtime закрыт. Запуск выполнен через replay-live.ts; evidence `/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-8pzpCO`. Он не засчитывается как приёмка.
+## Установленный кандидат .12
 
-Далее: завершить DEBUG_ONLY, проверки и исходный commit; собрать .11 из чистого checkout по macOS runbook, проверить DMG/ZIP/offline smoke/подпись/hash, установить отдельно. Затронутые D45/D48/D65 повторить через Desktop с исходными файлами и без подсказок, затем все 10 final на одной сборке в порядке D02,D47,D23,D45,D19,D36,D24,D48,D27,D65. Если финальная серия выявит новый необходимый фикс — сохранить её исторически и повторить целиком после нового кандидата.
+Source `c643db47657f6644b167d27dbaa0dec269e769c4`; build `/Users/kartamyshev/.cache/loginom-macos-build/description-20260921-12`. DMG/ZIP/offline smoke/installed signature/ASAR equality PASS.
+Установка: `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260921.12/Loginom AI Agent.app`.
+ASAR `66ee2a56ad65c8af034f5737313f8dd90ddbbee346549ea8c39365bd8e800696`.
 
-Модель openai/gpt-5.6-sol low; Loginom7.4.2; предел попытки 30 минут от отправки. Не повторять мутации pending. F03/F07 recovery не подтверждены. Аналитическая правильность not_checked. Не заменять пользовательскую /Applications/Loginom AI Agent.app и её профиль.
+## Активная попытка
 
-## Кандидат .11 и целевые прогоны
+D45-target12-a01 завершена CREATED_EXECUTED_SAVED: 4 узла, save/modified=false/cleanup подтверждены, Desktop закрыт. D48-target12-a01 завершён CREATED_EXECUTED_SAVED: 6 узлов, save/modified=false/cleanup, Desktop закрыт. D65-target12-a01 завершён CREATED_EXECUTED_SAVED: 7 узлов, save/modified=false/cleanup, Desktop закрыт. Итоговая серия final12 выполняется; свежий момент отправки и предел см. private controller-checkpoint.json. Модель GPT-5.6 Sol low, подключение ready, тот же сервер Loginom7.4.2. Исходные файлы неизменны, технические подсказки не отправлялись.
 
-Source: `658b8ab953232164c9f28534e39b2990c0c85547`. Build: `/Users/kartamyshev/.cache/loginom-macos-build/description-20260921-11`. Установка: `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260921.11/Loginom AI Agent.app`. ASAR: `c535dd986706564d3487249f0ab46642b47b35597ba1e6366261b9b04702a24a`.
+Приватные доказательства: `/Users/kartamyshev/Library/Logs/loginom-description-debugging/20260921-163359`. Самый свежий active state в `controller-checkpoint.json`; baseline manifest в `manifest.json`; каждая попытка имеет свой `metadata.json`.
+Node REPL: `app12/page12/backend12/headers12/run12/candidate12/ctl/pw`. Не печатать backend/headers. `ctl.collectAttempt(backend12,headers12,run12)` сохраняет chat/receipts и проверяет доставленные bytes/hash и модель. Успех требует отдельно проверить конечные исполненные выходы и save+modified=false+cleanup. `ctl.finishAttempt(app12,page12,run12,summary)` сохраняет результат и закрывает Desktop. Модуль контроллера `attempt-controller-v6.mjs` сохранён вне Git; все изменяемые параметры передавать явно.
 
-Активен D45-target11-a01: отправлен 19:08:16 UTC, предел 19:38:16 UTC, PID39981. node_repl: app11/page11/backend11/headers11/run11; ctl.collectAttempt(backend11,headers11,run11) сохраняет chat/receipts/metadata; секреты headers/backend не печатать. Контроллер и свежий active checkpoint находятся в приватном evidence, модуль attempt-controller.mjs. Все changed vars передавать в функции явно.
+Далее: пройти final10 на одном кандидате в порядке D02,D47,D23,D45,D19,D36,D24,D48,D27,D65. Final12: D02 PASS (10 узлов), D47 PASS (6 узлов), D23 PASS (7 узлов), D45 PASS (4 узла), их Desktop закрыты. D19 PASS (7 узлов), Desktop закрыт. D36 PASS (4 узла), Desktop закрыт. D24 PASS (7 узлов), Desktop закрыт. D48 PASS (8 узлов), Desktop закрыт. D27 BLOCKED (6 узлов, pending node-weekday-analysis-a02, Visible port identity is not rendered в target, resume тайм-ауты), модель завершилась сама, Desktop закрыт. D65 PASS (6 узлов), Desktop закрыт. Final12 завершена: 9 PASS / 1 BLOCKED. DEBUG_ONLY D27 завершён: 7 SUCCEEDED и save, cleanup/close подтверждены; точное состояние F12 не повторилось. Evidence /var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-U7J0yn. В исходниках подготовлена строго проверяемая первая привязка alternate SVG нового табличного порта. RED/GREEN регрессия, полный runtime 2284 PASS / 2 SKIP, transforms 5045 PASS. Общий macOS source-check PASS: 8 групп Product/Host/Desktop/Agent. Затем зафиксировать исходники, собрать новый кандидат, целевой D27 и новая полная final-серия. Точная первопричина F12/recovery ещё не доказана. Точный текущий статус — в metadata активной попытки и final12-manifest.json. При новом необходимом исправлении сохранить историю и повторить final целиком на новом кандидате.
 
-## Актуальное состояние после целевого .11
-
-D45-target11-a01 BLOCKED: модель переопределила configure budget на 120000; Stop подтверждена, Desktop закрыт, активных UI/сценариев нет. .11 оставлен историческим, final не начинался. В исходниках user-v1 budgets скрыты и отвергаются валидатором; сроки задаёт приложение. Диагностический полный контракт сохранён. 87 узких проверок PASS; полный runtime suite 2283 PASS, 2 SKIP, 0 FAIL; source transforms 5045 PASS. Далее commit/build/install .12 и целевые D45/D48/D65, потом final10.
+Предел каждой попытки 30 минут от отправки, один активный сценарий; не повторять pending-мутации. Пользовательскую установку и профиль не трогать. F03/F07 recovery не подтверждены; аналитическая правильность not_checked.

@@ -5,16 +5,16 @@
 
 | Задача | Baseline | Final |
 | --- | --- | --- |
-| D02 | CREATED_EXECUTED_SAVED, none | NOT_STARTED |
-| D47 | CREATED_EXECUTED_SAVED, none | NOT_STARTED |
-| D23 | CREATED_EXECUTED_SAVED, none | NOT_STARTED |
-| D45 | BLOCKED, none | NOT_STARTED |
-| D19 | CREATED_EXECUTED_SAVED, none | NOT_STARTED |
-| D36 | CREATED_EXECUTED_SAVED, none | NOT_STARTED |
-| D24 | CREATED_EXECUTED_SAVED, none | NOT_STARTED |
-| D48 | BLOCKED, none | NOT_STARTED |
-| D27 | CREATED_EXECUTED_SAVED, none | NOT_STARTED |
-| D65 | BLOCKED, none | NOT_STARTED |
+| D02 | CREATED_EXECUTED_SAVED, none | CREATED_EXECUTED_SAVED, none |
+| D47 | CREATED_EXECUTED_SAVED, none | CREATED_EXECUTED_SAVED, none |
+| D23 | CREATED_EXECUTED_SAVED, none | CREATED_EXECUTED_SAVED, none |
+| D45 | BLOCKED, none | CREATED_EXECUTED_SAVED, none |
+| D19 | CREATED_EXECUTED_SAVED, none | CREATED_EXECUTED_SAVED, none |
+| D36 | CREATED_EXECUTED_SAVED, none | CREATED_EXECUTED_SAVED, none |
+| D24 | CREATED_EXECUTED_SAVED, none | CREATED_EXECUTED_SAVED, none |
+| D48 | BLOCKED, none | CREATED_EXECUTED_SAVED, none |
+| D27 | CREATED_EXECUTED_SAVED, none | BLOCKED, none |
+| D65 | BLOCKED, none | CREATED_EXECUTED_SAVED, none |
 
 Доказательства: `/Users/kartamyshev/Library/Logs/loginom-description-debugging/20260921-163359`.
 Подготовка: 20/20 файлов и установленный ASAR проверены. D02: 10 узлов, 5 типов; подтверждены исполнение итоговых ветвей, сохранение, modified=false и cleanup. Desktop штатно закрыт.
@@ -76,3 +76,51 @@ D65: 8 узлов с прочитанными выходами; 9-й abc-key-ite
 Следующее изменение: компактный user-v1 каталог больше не принимает поле budgets; длительности принадлежат приложению. Полный диагностический контракт сохранён с явными неизменяемыми сроками. Это не продление старого pending и не исправление F07 recovery. Новый кандидат .12 потребуется до любых зачётных final. 87 API/workflow/apply проверок PASS, включая отказ model budgets до мутации и сохранение полного контракта.
 
 Перед .12 полный runtime suite: 2283 PASS, 2 SKIP, 0 FAIL на pinned Node24.19.0; source transforms 5045 PASS.
+
+## Целевой D45 на .12
+
+CREATED_EXECUTED_SAVED, assistance=none: 19:20:26–19:28 UTC, 4 узла (импорт, группировка, сортировка, фильтр), все execution=completed, свежие выходы и cleanup=true. Save и modified=false подтверждены. Исходный CSV 200×16 импортирован; настройка использовала host budgets 300000/120000/600000. Конкурирующий запрос и неподдерживаемую метку модель исправила сама, мутации отказанных запросов не выполнялись. Desktop закрыт штатно. Аналитическая правильность not_checked.
+
+## Целевой D48 на .12
+
+CREATED_EXECUTED_SAVED, assistance=none: 6 узлов (импорт, калькулятор и 4 группировки), свежие исполненные выходы, save, modified=false и cleanup подтверждены. Desktop закрыт. Три параллельных запроса были отклонены до мутации; модель дождалась исходной операции. Точное исходное перекрытие Visualizers не повторилось (off-center observations=0), поэтому прохождение не доказывает live-hit проблемной геометрии и не засчитывается как recovery F03. Защита точки клика покрыта воспроизводимой red/green регрессией; исходная причина установлена по журналу baseline.
+
+## Целевой D65 на .12
+
+CREATED_EXECUTED_SAVED, assistance=none: 7 узлов, исполнение и свежие выходы подтверждены, save/modified=false/cleanup=true. Ошибок инструментов не было; выполнена и прочитана ветвь фильтрации группы A. Desktop закрыт. Это новая успешная попытка, а не восстановление исходного pending/read из baseline. Три затронутые задачи D45/D48/D65 прошли на .12.
+
+Итоговый кандидат зафиксирован: .12 (`c643db47657f6644b167d27dbaa0dec269e769c4`, ASAR `66ee2a56ad65c8af034f5737313f8dd90ddbbee346549ea8c39365bd8e800696`). Начинается новая полная серия final12 в исходном порядке; целевые успехи в неё не переносятся.
+
+Final12 D02: 10 выполненных узлов, исходный CSV подтверждён lineage по bytes/SHA, свежие выходы/save/modified=false/cleanup, Desktop закрыт.
+
+Final12 D47: 6 выполненных узлов, bytes/SHA исходного CSV, свежие выходы/save/modified=false/cleanup подтверждены; корректный отказ пустого group_by модель обошла сама. Desktop закрыт.
+
+Final12 D23: 7 выполненных узлов; исходный CSV, свежие выходы и сохранение после графа, modified=false/cleanup подтверждены. Модель исправила отказы coverage=full и пустого group_by самостоятельно. Desktop закрыт.
+
+Final12 D45: 4 выполненных узла; исходный CSV 200×16, свежие выходы, сохранение после графа, modified=false/cleanup подтверждены. Широкий импорт прошёл прежний deadline без продления старой операции; это новая попытка. Desktop закрыт.
+
+Final12 D19: 7 выполненных узлов; исходный CSV, свежие выходы, сохранение после графа, modified=false/cleanup подтверждены. Два конкурирующих запроса отклонены до мутации, модель дождалась исходной операции. Desktop закрыт.
+
+Final12 D36: 4 выполненных узла; исходный CSV, свежие выходы, сохранение после графа, modified=false/cleanup подтверждены. Ошибок инструментов нет, Desktop закрыт.
+
+Final12 D24: 7 выполненных узлов; исходный CSV, свежие выходы, сохранение после графа, modified=false/cleanup подтверждены. Четыре конкурирующих запроса корректно отклонены, модель продолжила самостоятельно. Desktop закрыт.
+
+Final12 D48: 8 выполненных узлов; исходный CSV, свежие выходы, сохранение после графа, modified=false/cleanup подтверждены. Ошибок инструментов нет, Desktop закрыт. Это новый успешный сценарий, а не восстановление старого pending.
+
+Final12 D27: BLOCKED после 6 выполненных узлов. При target операции node-weekday-analysis-a02 возник Visible port identity is not rendered (node bd9a24f1-a18f-448a-ae5d-15a8daf8e27a, port 4ba0e2c2-69ad-3a32-bbdc-75714efe7a51, node_tid MF;TF-1;Graph;Группировка, port_tid null, element_present/in_graph true). Это естественная ветка F12 до исполнения нового узла. Resume исходной операции принимался, но возвращал MCP timeout; recovery внутренних фаз отказал с Use the enclosing node procedure. Модель сама завершила работу, save отсутствует, pending AMBIGUOUS сохранён. Desktop штатно закрыт; повтор в том же профиле запрещён без reconciliation. Исходная фраза наблюдателя о чтении была уточнена: отказ возник в target. Final12 остаётся исторической непрошедшей серией; после D65 требуется разбор дефекта и новая полная final-серия после исправления.
+
+Final12 D65: 6 выполненных узлов; исходный CSV, свежие выходы, сохранение после графа, modified=false/cleanup подтверждены. Один конкурирующий запрос отклонён, модель продолжила самостоятельно. Desktop закрыт.
+
+Итог final12: 9 CREATED_EXECUTED_SAVED, 1 BLOCKED (D27), assistance=none для всех 10. Все тестовые Desktop закрыты. Цель 10/10 ещё не достигнута. Начат отдельный DEBUG_ONLY D27 с исходными запросами, изолированной копией ресурсов .12 и только дополнительным read-only сбором геометрии/нативной привязки проблемного порта.
+
+## D-F04 / D27 final12: первое наблюдение порта
+
+На .12 (`c643db476`) новый узел `Группировка` создан жестом, но target read-back отказал: нативный видимый output-port имел SVG без `data-tid`, previous_tid=null. После отказа обычный workspace.observe видел `Группировка;Output_Data-0` с box=(1021,726,15,24). До отказа завершены source/workflow, новый узел ещё не настраивался и не исполнялся; возможный эффект создания сохранён в pending. Исходный total deadline 21:59:33.076 UTC, ошибка 21:50:04.579 UTC: это не исчерпание общего бюджета. Inspect/resume возвращали MCP timeout, internal recovery направлял к enclosing node procedure; рабочего завершения не получилось.
+
+Изолированный DEBUG_ONLY повтор исходных семи операций на копии ресурсов .12 с read-only диагностикой: все SUCCEEDED, save SUCCEEDED, awaited shutdown завершён. Доказательства `/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-U7J0yn`. Проблемная SVG-геометрия не повторилась; точное совпадение нативной ячейки и видимого порта в исходном сбое не было сохранено, поэтому первопричина F12 целиком не объявляется установленной.
+
+Подготовлено узкое исправление подтверждённого ограничения наблюдателя: раньше fallback требовал уже известную привязку порта, которой нет при первом наблюдении. Теперь допускается только единственный видимый табличный порт с уникальным data-tid внутри исходного графа, hit-test которого указывает на ту же нативную ячейку с проверенными GUID/data/parent. Прежняя привязка, если она есть, должна полностью совпадать. Не используются индексы коллекции, изменение DOM или повтор неизвестного жеста. Класс first-observation alternate SVG воспроизведён RED на прежнем исполнителе; GREEN после правки, включая отказы неоднозначной/чужой/изменённой привязки.
+
+Проверки нового исходного кандидата: 49 узких PASS, полный runtime 2284 PASS / 2 Windows-only SKIP / 0 FAIL; source transforms 5045 PASS. Установленная приёмка ещё впереди; final12 остаётся исторической серией 9/10.
+
+Общий macOS source-check нового исправления: PASS, 8 групп Product/Host/Desktop/Agent (typecheck и профильные тесты). Проверялось рабочее дерево перед commit, поэтому report содержит прежний HEAD c643db476.

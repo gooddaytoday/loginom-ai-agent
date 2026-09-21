@@ -64,22 +64,29 @@ export async function readGraph(page, task) {
       for (const ports of n.FPorts ?? []) for (const p of ports.FCollection ?? []) {
         const element = graph.view.getState(p.FCell)?.shape?.node;
         let ptid = element?.getAttribute('data-tid');
-        // Loginom 7.4.2 can expose a second port SVG after cancelling its wizard
-        // with data-tid retained on the first element. Accept only a previously observed identity
-        // of this exact native port/cell in this graph. Never invent an index
-        // from collection order or repair the application's DOM.
+        let renderedPort=element;
+        // Loginom 7.4.2 can expose a second SVG even on a newly created port,
+        // retaining data-tid on the first element. Bind only a unique rendered
+        // port whose live hit-test resolves to this exact native cell. Preserve
+        // prior identity checks; never infer an index or repair the DOM.
         const previous=portIdentities.get(p);
         if(!ptid && element && containers[0].contains(element) && visible(element)
-          && previous && previous.graph===graph && previous.node===n && previous.cell===p.FCell
-          && previous.guid===p.FGuid && previous.data===p.data && p.parent===n
-          && p.FCell.parent===n.FCell && previous.nodeTid===tid
-          && previous.type===p.FType && previous.subtype===p.FSubType){
-          const rendered=[...exact(previous.tid)].filter(e=>containers[0].contains(e)),box=containers[0].getBoundingClientRect();
-          if(rendered.length===1 && containers[0].contains(rendered[0]) && visible(rendered[0])){
-            const portBox=rendered[0].getBoundingClientRect();
-            const hit=graph.getCellAt(portBox.x-box.x+containers[0].scrollLeft+portBox.width/2,
-              portBox.y-box.y+containers[0].scrollTop+portBox.height/2);
-            if(hit===p.FCell)ptid=previous.tid;
+          && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
+          && (!previous || (previous.graph===graph && previous.node===n && previous.cell===p.FCell
+            && previous.guid===p.FGuid && previous.data===p.data && previous.nodeTid===tid
+            && previous.type===p.FType && previous.subtype===p.FSubType))){
+          const box=containers[0].getBoundingClientRect();
+          const rendered=(previous?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
+            const candidate=e.getAttribute('data-tid');
+            if(!containers[0].contains(e) || !visible(e) || !candidate?.startsWith(tid+';')
+              || (!previous && !/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1))))return false;
+            if([...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1)return false;
+            const portBox=e.getBoundingClientRect();
+            return graph.getCellAt(portBox.x-box.x+containers[0].scrollLeft+portBox.width/2,
+              portBox.y-box.y+containers[0].scrollTop+portBox.height/2)===p.FCell;
+          });
+          if(rendered.length===1){
+            renderedPort=rendered[0];ptid=renderedPort.getAttribute('data-tid');
           }
         }
         if (p.FCell?.visible===true && (!ptid || !containers[0].contains(element))) fail('Visible port identity is not rendered: '+JSON.stringify({
@@ -88,7 +95,7 @@ export async function readGraph(page, task) {
           previous_tid:previous?.tid??null,type:p.FType,subtype:p.FSubType}));
         if (!ptid || !containers[0].contains(element)) continue; // Hidden service ports are outside tabular phase.
         if(!ptid.startsWith(tid+';'))fail('Port identity belongs to another node');
-        if(element.getAttribute('data-tid')===ptid && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
+        if(renderedPort.getAttribute('data-tid')===ptid && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && [...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)portIdentities.set(p,{graph,node:n,cell:p.FCell,guid:p.FGuid,data:p.data,nodeTid:tid,type:p.FType,subtype:p.FSubType,tid:ptid});
         const suffix = ptid.slice(tid.length + 1), m = /^(Input|Output)_Data-(\d+)$/.exec(suffix);
         allPorts.push(suffix);
