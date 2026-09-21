@@ -67,11 +67,26 @@ test('pre-upload read failure resumes the same attachment with fresh navigation 
  };
  const first=await f.service.deliver(request);
  assert.equal(first.outcome.upload_submitted_or_unknown,false);assert.equal(first.outcome.next_step.tool,'dock_artifact_delivery_resume');
+ assert.equal(first.outcome.effect_possible,true);assert.equal(first.outcome.cleanup_complete,true);
+ assert.equal(f.service.busy,false);assert.equal(f.service.unsettled,false);
  assert.equal(f.calls.includes('upload'),false);
  const retry={operation_id:'delivery',resume_id:'resume-navigation',budget_ms:120000};
  const promise=f.service.resume(retry),result=await promise;
  assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(f.service.resume(retry),promise);
  assert.deepEqual(ids,['delivery:nav1','delivery:nav2']);assert.equal(f.calls.filter(c=>c==='upload').length,1);
+ assert.equal(f.service.unsettled,false);
+});
+test('a safe pre-upload pause cannot hide uncertainty from a later navigation reply',async()=>{
+ const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let clicks=0,failed=false;
+ f.runtime.uiAct=async(...args)=>{clicks++;return act(...args);};
+ f.runtime.observe=async options=>{if(clicks===1&&!failed){failed=true;throw Error('Transient read failed');}return observe(options);};
+ await f.service.deliver(request);assert.equal(f.service.unsettled,false);
+ f.runtime.uiAct=async()=>{throw Error('Navigation reply lost');};
+ const resumed=f.service.resume({operation_id:'delivery',resume_id:'lost-navigation',budget_ms:120000});
+ assert.equal(f.service.busy,true);assert.equal(f.service.unsettled,true);
+ const result=await resumed;
+ assert.equal(result.outcome.inspection_required,true);assert.equal(f.service.busy,false);assert.equal(f.service.unsettled,true);
+ assert.ok(!f.calls.includes('upload'));
 });
 test('pre-upload continuation refuses changed document and unknown navigation effects',async()=>{
  for(const uncertain of [false,true]){
@@ -239,6 +254,7 @@ function resumeFixture(stage) {
 }
 for(const stage of ['upload','verify'])test('explicit resume after '+stage+' keeps original transfer IDs and skips completed effects',async()=>{
  const f=resumeFixture(stage),initial=await f.service.deliver(request);assert.equal(initial.outcome.status,'AMBIGUOUS');
+ assert.equal(f.service.busy,false);assert.equal(f.service.unsettled,true);
  const resume={operation_id:'delivery',resume_id:'resume-1',budget_ms:120000};
  const p=f.service.resume(resume);assert.equal(f.service.resume(resume),p);
  const r=await p;assert.equal(r.state,'settled');assert.equal(r.outcome.status,'SUCCEEDED');

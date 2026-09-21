@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { withBrowserReceipt, makeCapabilityCode } from './executor.mjs';
-import { NODE_TYPES } from './node-contracts.mjs';
+import { NODE_TYPES, NODE_POSITION_MIN } from './node-contracts.mjs';
 import {activatePreparedWorkflow} from './node-workflow-activation.mjs';
 import {exportPaletteScroll} from './text-export-palette.mjs';
 import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
@@ -364,7 +364,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const occupied=[...e.querySelectorAll('[data-tid*=";Graph;"]')].map(n=>n.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
         for(let y=80;y<height-80;y+=128)for(let x=80;x<width-96;x+=160){
           const position=(${nodePlacementPosition.toString()})(view,{x:b.x+x,y:b.y+y});
-          if(position.x<0||position.y<0)continue;
+          if(position.x<${NODE_POSITION_MIN}||position.y<${NODE_POSITION_MIN}||position.x>10000||position.y>10000)continue;
           const screen=(${nodePlacementPoint.toString()})(view,position),px=screen.x,py=screen.y,hit=document.elementFromPoint(px,py);
           if(px<0||py<0||!hit||!(hit===e||e.contains(hit)))continue;
           if(occupied.some(r=>px>r.left-72&&px<r.right+96&&py>r.top-56&&py<r.bottom+72))continue;

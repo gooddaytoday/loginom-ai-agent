@@ -234,7 +234,10 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
  }
  return Object.freeze({
   get busy(){return active!==null;},
-  get unsettled(){return active!==null || [...jobs.values()].some(job=>job.phase!=='completed' && job.outcome?.effect_possible===true);},
+  // Confirmed navigation remains an effect, but its acknowledged pre-upload
+  // checkpoint can resume without putting the managed host into recovery.
+  get unsettled(){return active!==null || [...jobs.values()].some(job=>job.phase!=='completed' && job.outcome?.effect_possible===true
+    && !(job.preUploadResume===true && job.outcome.inspection_required===false && job.outcome.cleanup_complete===true));},
   deliver(request,{signal}={}) {
    requireValue(request&&Object.keys(request).sort().join(',')==='artifact_id,budget_ms,operation_id,upload_grant_id','Exact delivery request required');
    requireValue(typeof request.operation_id==='string'&&/^[A-Za-z0-9_.:-]{1,80}$/.test(request.operation_id),'Bounded delivery ID required');

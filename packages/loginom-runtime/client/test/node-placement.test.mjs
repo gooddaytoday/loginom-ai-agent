@@ -1,6 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {runInNewContext} from 'node:vm';
+import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
+import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 import {nodePlacementPoint,nodePlacementPosition,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
+
+for(const {scale,translate,expected} of [
+ {scale:1.5,translate:{x:0,y:0},expected:{x:160,y:136}},
+ {scale:2,translate:{x:0,y:0},expected:{x:120,y:104}},
+ {scale:1,translate:{x:32,y:32},expected:{x:208,y:176}},
+ {scale:1,translate:{x:16,y:16},expected:{x:64,y:64}},
+ {scale:1,translate:{x:-9920,y:-9920},expected:{x:10000,y:10000}},
+ {scale:1,translate:{x:-10000,y:0},expected:null},
+ {scale:1,translate:{x:0,y:-10000},expected:null},
+])test('automatic placement respects model bounds: '+JSON.stringify({scale,translate}),async()=>{
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},target:{kind:'new',type:'imports.text'},inputs:[]};
+ const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+ const canvas={getBoundingClientRect:()=>({x:0,y:0,width:800,height:600,right:800,bottom:600}),querySelectorAll:()=>[],scrollLeft:0,scrollTop:0};
+ const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale,translate}}}}};
+ const context={innerWidth:800,innerHeight:600,document:{elementFromPoint:()=>canvas},
+  bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
+ let calls=0;
+ const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>{
+  if(++calls===1)return graph;
+  return runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})});
+ }});
+ const result=adapter.choosePosition(request,graph,Date.now()+10000);
+ if(!expected){await assert.rejects(result,/no free visible canvas position/);return;}
+ const position=structuredClone(await result);
+ assert.deepEqual(position,expected);
+ assert.doesNotThrow(()=>validateNodeTargetRequest({...request,target:{...request.target,position}}));
+});
 test('viewport rebinding ignores only node DOM epochs and preserves graph root and domain identities',()=>{
  const before={dom_epoch:1,document_id:'d',nodes:[{dom_epoch:2,ref:{node_id:'n'},position:{x:1,y:2},outputs:[0]}],links:[]};
  const after=structuredClone(before);after.nodes[0].dom_epoch=3;assert.equal(samePlacementGraph(before,after),true);

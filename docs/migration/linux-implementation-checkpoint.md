@@ -1,5 +1,18 @@
 # Linux: завершение реализации — 2026-09-16
 
+Исправления review RC9 — 2026-09-21 (исходники, без сборки/установки):
+подтверждённый pre-upload checkpoint больше не удерживает managed host в
+recovery из-за уже завершённой навигации; неизвестный результат последующего
+перехода или upload по-прежнему требует recovery. Автоматическое размещение
+узлов пропускает координаты вне 64..10000 после пересчёта масштаба и смещения.
+Регрессии воспроизведены до правки. После правки pinned Node 24.19.0:
+146 PASS (`artifact-delivery`, `node-placement`, `node-target`, `executor`,
+`--test --test-isolation=none`, запуск из `packages/loginom-runtime/client`).
+Migration tests: 6 PASS; `verify_sources.py --transforms`: 5045 PASS.
+Обновлены локальные source-transforms; upstream source-map сохранён.
+[План и границы проверки](../superpowers/plans/2026-09-21-rc9-review-fixes.md).
+Полный client suite и живая Loginom/installed acceptance в этой правке не выполнялись.
+
 Очистка 2026-09-18: удалены три дублирующих каталога последней сборки;
 установки, архивы и материалы аудита сохранены.
 [Журнал очистки](../testing/loginom-ai-agent/reports/2026-09-18-installed-desktop-cli/cleanup.md).

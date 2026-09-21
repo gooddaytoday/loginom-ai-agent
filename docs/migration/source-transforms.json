@@ -1,8 +1,8 @@
 {
   "packages/loginom-runtime/client/lib/artifact-delivery.mjs": {
     "baseHash": "ba2efc6163025322f0d10e699648767b8980abcbba10c274578d2570fb6b0ba6",
-    "hash": "3df600f0d5ff302d8440746a2a827526fe863f8872a67a2cf3cbf472bf323351",
-    "reason": "Expose unsettled execution and ambiguous artifact delivery state to the managed desktop recovery lease; preserve runtime execution semantics."
+    "hash": "05cc65cfe7892582088d0e5e2199ea1ae7170574dd36b6c5d054310dd775d3db",
+    "reason": "Expose unsettled execution and ambiguous artifact delivery state to the managed desktop recovery lease; preserve runtime execution semantics. Keep acknowledged safe pre-upload checkpoints settled for managed resume while retaining confirmed navigation effect evidence and recovery for subsequent uncertainty."
   },
   "packages/loginom-runtime/client/lib/bridge.mjs": {
     "baseHash": "c56450b8f4db74c4ccfbf3162d1a7d6dc7422bab3ac35704f7d45923282630c3",
@@ -36,8 +36,8 @@
   },
   "packages/loginom-runtime/client/test/artifact-delivery.test.mjs": {
     "baseHash": "85fedc595920ebeb86878d38d7180e7eb626565b2abe944710bac8942fed28a0",
-    "hash": "26a4157fad9f9b8ed5d6065d95b11216d2eff385b57e4451cbde93d1a6cb413f",
-    "reason": "Cover the local host lifecycle: retry the artifact folder search after UI_EPOCH_CHANGED (allowStaleFolder) and expose unsettled delivery state; upstream assertions retained."
+    "hash": "345a3b8ec4b4e7b3745a4c6ceb165cb986c316cf4d1388e5e58cb9e5851178a1",
+    "reason": "Cover the local host lifecycle: retry the artifact folder search after UI_EPOCH_CHANGED (allowStaleFolder) and expose unsettled delivery state; upstream assertions retained. Regress safe pre-upload lifecycle and renewed uncertainty after navigation loss; retain upload and verification recovery coverage."
   },
   "packages/loginom-runtime/client/test/executor.test.mjs": {
     "baseHash": "45efb45e922f9a347a6ce56763280d5edf8dde4d3a9840816bb8f4df44b7d519",
@@ -113,5 +113,15 @@
     "baseHash": "98b9dc45b781a9e50c73c60f2b6d52e63def4fdcee6e3a03e566e47e134655c0",
     "hash": "e162f6f66c2ff594a1797fee8fb93d6e852df0314bbdbf9eeb70650ed596ea5d",
     "reason": "Adapt imported paths to the monorepo; archive obsolete Codex manifest tests while retaining runtime behavior assertions."
+  },
+  "packages/loginom-runtime/client/lib/node-target-browser.mjs": {
+    "baseHash": "aebab1ef9bc8b6df4c13b5d06b8d28980b7affe07d7badf5a39b070503ded39a",
+    "reason": "Constrain automatic placement to validated model-coordinate bounds after zoom/translation/scroll instead of returning a point rejected by the target contract.",
+    "hash": "36f218139ed67c0489eed679167303840aa0825d64f6529da74234050ce301a1"
+  },
+  "packages/loginom-runtime/client/test/node-placement.test.mjs": {
+    "baseHash": "4ce1a2ec34ce3c5b68dcacc15d05cc438e70ec7cddcc7ff3b76f7edc1038b278",
+    "reason": "Exercise the real browser-adapter chooser at 150/200 percent zoom, translated viewports, and both model-coordinate bounds.",
+    "hash": "2a04117979f38a7165f9e9d1a0b862c7c64982f64d0f7ba357ed895a4452f42d"
   }
 }
