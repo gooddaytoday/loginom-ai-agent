@@ -227,6 +227,13 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   // Source and format are caller decisions. No automatic type detection result
   // is treated as confirmation of the requested schema.
   const sourceBaseline=patch?(await read('text_import_file','existing source initialized',isTextImportSourceReady)).wizard.import_source:null;
+  // A discarded first configuration leaves a graph node with no source. There
+  // is no retained schema to inspect until complete source settings are applied.
+  if(patch&&sourceBaseline.fields.source_path.value==='') {
+    validateTextImportFieldsRequest(parameters);
+    requireValue(parameters.source.source_path===patch.verifiedSourcePath,'Existing source does not match the verified upload');
+    return configureImport(channel,parameters,owner,true);
+  }
   if(patch && parameters.source.source_path===undefined)requireValue(sourceBaseline.fields.source_path.value===patch.verifiedSourcePath,'Existing source does not match the verified upload');
   let formatBaseline,columnBaseline;
   const capturePatchSchema=async()=>{

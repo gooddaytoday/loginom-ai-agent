@@ -181,8 +181,8 @@
   },
   "packages/loginom-runtime/client/lib/text-import-procedure.mjs": {
     "baseHash": "5a72ca1d8972a313737cf73713e2a3e2c219acb99d44cef550fa495826eecc00",
-    "hash": "05fea83b56e26f9f9658aece720457c2a56fc37388e09c4163d6ce3aeb0ab8db",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path."
+    "hash": "e4b1931d5fdd5cc9c8a413f0d1068cd20172349982db3b87c094d30fbe2aa7fe",
+    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Require full verified source settings for an existing unconfigured import before attempting schema preservation."
   },
   "packages/loginom-runtime/client/test/node-apply.test.mjs": {
     "baseHash": "09e457cc476dc16b0790fad7d1742737cdbc59563a27594624b25056781bd00c",
@@ -213,5 +213,10 @@
     "baseHash": "a603727daf3ea0ed415b4d8147e68bd7dc5c94963250aff26a0aa9d7b97f72c6",
     "hash": "c838ed1a68ad364398583e271f3ff3a618f7dc96e580e3b0511eeaea55c22fbe",
     "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
+  },
+  "packages/loginom-runtime/client/test/text-import-source-replacement.test.mjs": {
+    "baseHash": "eafc24af1321c26f8091c740be61ed55afc1f34de61477c3a96a45cea8e4459f",
+    "hash": "66f6cf9d03db9b550bc37efccd68a2aa67c154dc3ad05c44b3409d32fad40cb9",
+    "reason": "Regress full verified-source initialization of an existing import after its initial wizard draft was discarded; reject partial or foreign-source settings before mutation."
   }
 }
