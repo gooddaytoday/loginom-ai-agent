@@ -16,15 +16,15 @@
 | V27 | CREATED_EXECUTED | `.6` / `ses_f3bd0e6a1ffeUBtNOzCMf4U9QT` |
 | V02 | CREATED_EXECUTED | `.6` / `ses_f3bc657c4ffeTvC1P6XK305UqQ` |
 | V37 | CREATED_EXECUTED | `.6` / `ses_f3bbe10a3ffepT603sr9zvYis2` |
-| V65 | RUNNING | `.10` / `ses_f3ba9dc34ffee19lAQH7mtf0Y4`; прежний `.9` BLOCKED |
+| V65 | CREATED_EXECUTED | `.10` / `ses_f3ba9dc34ffee19lAQH7mtf0Y4` |
 
 RUNNING и NOT_STARTED — промежуточные состояния реестра, не зачётные исходы.
 Для выполненных случаев `analytical_correctness: not_checked`.
 Фактически выполнены imports.text, transform.calculator, transform.sorting,
 transform.group_data, transform.join_data, transform.date_time, transform.union_data,
 research.duplicates, preprocessing.data_recovery, transform.collapse_columns,
-transform.filter_data, transform.replace_columns. Зачтены 9/10 случаев и 12/14 типов.
-Узлы текущих незавершённых прогонов пока не включены в этот итог.
+transform.filter_data, transform.replace_columns, exports.text.
+Зачтены 10/10 случаев и 13/14 типов. Не покрыт transform.reform_columns.
 
 ## Исходный ABC — 2026-09-21
 
@@ -76,11 +76,11 @@ Loginom: `7.4.2` по manifest фактического prepare.
 
 ## Точка продолжения
 
-Зачтены исходный ABC и девять случаев матрицы. V65 повторяется на `.10`
-после исправления F13 и успешных проверок исходников/установки.
-B18/B27 завершены на `.8`, V37 на `.6`. Приватные профили и полные чаты
-сохранены в `/Users/kartamyshev/Library/Logs/loginom-scenario-debugging/20260921/`.
-Актуальные сессии и кандидаты записаны в `live-checkpoint.json` там же.
+Работа приостановлена по просьбе пользователя после завершения активного V65.
+Зачтены исходный ABC и все десять случаев матрицы, покрыты 13/14 типов.
+Следующий шаг — отдельная автономная проверка transform.reform_columns.
+[Канонический checkpoint](scenario-debugging-checkpoint.md) содержит состояние
+процессов, установленный кандидат, доказательства и порядок продолжения.
 
 
 ## Первый кандидат
@@ -480,3 +480,30 @@ V65 повторён с теми же заданием, вложением и м
 узлов на `.9`, включая проблемное размещение `(672,576)`. Он не заменяет
 автономную приёмку. Журнал `port-replay-live.log`, приватные квитанции в
 `/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-HFMIgd`.
+
+Диагностический повтор B27 `.9` завершён с exit 0: восемь операций
+(включая изменение существующего узла) выполнены, семь узлов имеют
+наблюдаемый выход, пакет сохранён. Прежнее размещение `(672,576)` прошло.
+Копии квитанций: `port-replay-receipts/` в приватном каталоге серии.
+F12 не повторился ни в автономном `.8`, ни в этом повторе; первопричина
+исчезновения порта остаётся неподтверждённой, общий guard не ослаблялся.
+
+Пользователь попросил завершить только активный V65, затем остановить
+работу и сохранить точку продолжения. Дополнительные сценарии не запускаются.
+
+## V65 — автономный повтор `.10` завершён
+
+Чат `ses_f3ba9dc34ffee19lAQH7mtf0Y4`: 8 узлов — импорт, сортировка,
+калькуляторы, группировка, соединение и exports.text. Наблюдаемые выходы:
+200 товаров и 3 группы. Пакет `/user/scenario-debug-V65-candidate10-20260921.lgp`
+сохранён с подтверждённым cleanup. CSV:
+`/user/scenario-debug-V65-candidate10-20260921.csv`, 25890 байт, SHA-256
+`0f85375a28666e80f0cf267977d7b8e1cd4a3a8a7e081689a43463bb8233e995`.
+Экспорт подтверждён собственным execution и полученным файлом; это не
+сравнение аналитических чисел с эталоном. Модель сама исправила неверный
+wait timeout. Доказательства: `V65-candidate10-{metadata,chat}.json`, prompt
+и final.png в приватном каталоге серии. `analytical_correctness: not_checked`.
+
+F13 больше не остановил импорт в установленном повторе. transform.reform_columns
+модель не использовала: он не засчитывается и остаётся для продолжения.
+После запроса пользователя новые сценарии не запускались.
