@@ -169,6 +169,9 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       if (disposed) return
       setState("view", reconcile({ ...current }))
       setState("baseline", { ...state.baseline!, revision: current.revision })
+      // The settings are durable but activation awaits explicit recovery. The
+      // form already shows that notice; this is not a failed connection check.
+      if (current.recoveries?.length && !current.failure) return
       if (current.failure || !["ready", "pending"].includes(current.state))
         throw Error(current.failure ?? "LOGINOM_RUNTIME_START_FAILED")
       apply(current)
@@ -184,7 +187,11 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
     if (!api || busy() || !state.view) return
     setState("phase", "applying")
     try {
-      const current = await api.acknowledgeRecovery({ revision: state.view.revision, ids: state.view.recoveries ?? [] })
+      // Solid store arrays are proxies; Electron cannot clone them across IPC.
+      const current = await api.acknowledgeRecovery({
+        revision: state.view.revision,
+        ids: [...(state.view.recoveries ?? [])],
+      })
       if (!disposed) apply(current)
     } catch (value) {
       error(value)

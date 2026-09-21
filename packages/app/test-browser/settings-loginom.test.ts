@@ -54,6 +54,44 @@ function setup(initial: Partial<Loginom.View> = {}) {
 }
 
 describe("Loginom settings", () => {
+  test("recovery sends cloneable IDs across the Desktop bridge", async () => {
+    const ids = ["11111111-1111-4111-8111-111111111111"]
+    const f = setup({ state: "recoverable-error", recoveries: [...ids] })
+    const acknowledged: Array<{ revision: number; ids: readonly string[] }> = []
+    f.api.acknowledgeRecovery = async (input) => {
+      acknowledged.push(structuredClone(input))
+      f.update({ state: "ready", recoveries: [] })
+      return f.api.read()
+    }
+    try {
+      await f.form.load()
+      await f.form.recover()
+      expect(acknowledged).toEqual([{ revision: 1, ids }])
+      expect(f.form.state.failed).toBe(false)
+      expect(f.form.state.view?.state).toBe("ready")
+      expect(f.form.state.view?.recoveries).toEqual([])
+    } finally {
+      f.dispose()
+    }
+  })
+  test("saved settings awaiting recovery keep the recovery notice without a server failure", async () => {
+    const ids = ["11111111-1111-4111-8111-111111111111"]
+    const f = setup({ state: "recoverable-error", recoveries: ids })
+    try {
+      await f.form.load()
+      f.form.edit({ apiKey: "replacement" })
+      await f.form.submit(true)
+      expect(f.saves).toHaveLength(1)
+      expect(f.closed).toHaveLength(0)
+      expect(f.form.state.failed).toBe(false)
+      expect(f.form.state.message).toBeUndefined()
+      expect(f.form.state.view?.recoveries).toEqual(ids)
+      expect(f.form.state.baseline?.revision).toBe(2)
+      expect(f.form.state.apiKey).toBe("replacement")
+    } finally {
+      f.dispose()
+    }
+  })
   test("opening and reverting edits can close without confirmation or writes", async () => {
     const f = setup()
     try {
