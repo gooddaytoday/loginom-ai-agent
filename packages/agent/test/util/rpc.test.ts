@@ -9,11 +9,13 @@ test("worker RPC reports bounded failures and explicit disconnect rejects pendin
   const client = Rpc.client<typeof rpc>(worker)
   try {
     expect(await client.call("echo", "hello")).toBe("hello")
-    await expect(client.call("fail", undefined)).rejects.toThrow("RPC_REQUEST_FAILED")
+    // Bun 1.3 `expect(...).rejects` never settles for a promise rejected by a worker message
+    // that is posted right after an awaited worker reply, so the rejections are captured directly.
+    expect(await failure(client.call("fail", undefined))).toBe("RPC_REQUEST_FAILED")
     const pending = client.call("wait", undefined)
     client.close()
-    await expect(pending).rejects.toThrow("RPC_CLOSED")
-    await expect(client.call("echo", "late")).rejects.toThrow("RPC_CLOSED")
+    expect(await failure(pending)).toBe("RPC_CLOSED")
+    expect(await failure(client.call("echo", "late"))).toBe("RPC_CLOSED")
   } finally {
     client.close()
     await worker.terminate()
@@ -57,3 +59,12 @@ test("Loginom worker bridge round-trips requests and propagates host disconnect 
     await worker.terminate()
   }
 })
+
+async function failure(promise: Promise<unknown>) {
+  const error = await promise.then(
+    () => undefined,
+    (error: unknown) => error,
+  )
+  expect(error).toBeInstanceOf(Error)
+  return (error as Error).message
+}

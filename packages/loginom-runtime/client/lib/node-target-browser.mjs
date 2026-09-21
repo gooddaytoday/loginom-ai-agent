@@ -312,18 +312,21 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
   const call = (code,deadline) => execute(code,{timeout:Math.max(1,deadline-Date.now())});
   const observeGraph=async(value,deadline,{readBindings=false}={})=>{
       request=value;
-      for(let refresh=0;refresh<3;refresh++){
+      const renderDeadline=Math.min(deadline,Date.now()+15000);
+      let maskRefresh=0;
+      for(;;){
         try{return await call(readCode(task({read_bindings:readBindings})),deadline);}
         catch(error){
-          const message=String(error.message),pendingPort=message.includes('Visible port identity is not rendered');
-          if(refresh===2 || !pendingPort&&!message.includes('Graph is blocked') || Date.now()>=deadline)throw error;
-          if(pendingPort){
-            // After leaving a port wizard its native visibility may precede
-            // the SVG paint. Re-read the entire prepared identity; never omit
-            // the missing port or repeat the preceding wizard gesture.
+          const message=String(error.message);
+          if(message.includes('Visible port identity is not rendered')&&Date.now()<renderDeadline){
+            // Headed Chromium can expose the cached port's visible flag one
+            // animation frame before mxGraph attaches its SVG element. This is
+            // a read-only observation retry; no gesture is repeated.
             await call('async page => {await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));return true;}',deadline);
+            await new Promise(resolve=>setTimeout(resolve,80));
             continue;
           }
+          if(maskRefresh++>=2 || !message.includes('Graph is blocked') || Date.now()>=deadline)throw error;
           // Observe only: a transient loading mask may arrive after the prior
           // graph receipt. Wait for its disappearance, then recheck the complete
           // original preparation identity; never retry a possible gesture.
@@ -399,6 +402,9 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
       if(effect.kind==='connect' && pinned){
         // Reuse the admitted link primitive. It owns observed port rebinding,
         // graph-diff reconciliation, mouse cleanup and bounded validation.
+        // A loading mask can arrive after any freshly created/renamed node,
+        // not only Text Export. Re-observe read-only until that transient mask
+        // clears before dispatching the single admitted link gesture.
         let graph=await observeGraph(request,deadline);
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
         if(JSON.stringify(graph)!==JSON.stringify(effect.before))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};

@@ -2,7 +2,7 @@
 
 import { $ } from "bun"
 import path from "path"
-import { mkdir } from "node:fs/promises"
+import { mkdir, rm } from "node:fs/promises"
 import { Product } from "@loginom-ai-agent/product"
 import { fileURLToPath } from "url"
 import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
@@ -244,7 +244,7 @@ for (const item of targets) {
     }
   }
 
-  await $`rm -rf ./${output}/${name}/bin/tui`
+  await rm(path.join(output, name, "bin/tui"), { recursive: true, force: true })
   await Bun.file(`${output}/${name}/package.json`).write(
     JSON.stringify(
       {

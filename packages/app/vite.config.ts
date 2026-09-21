@@ -20,6 +20,9 @@ const sentry =
     : false
 
 export default defineConfig({
+  // Git for Windows checks out repository symlinks as link-text files when
+  // Developer Mode is unavailable. Keep the renderer's public assets regular.
+  publicDir: "public-static",
   plugins: [desktopPlugin, sentry] as any,
   server: {
     host: "0.0.0.0",

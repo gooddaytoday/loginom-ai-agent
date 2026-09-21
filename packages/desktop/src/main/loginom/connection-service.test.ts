@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { connectionStore } from "./connection-store"
+import { credentials } from "./credentials"
 import { connectionService, type ConnectionRuntime } from "./connection-service"
 import type { Loginom } from "@loginom-ai-agent/schema/loginom"
 
@@ -16,7 +17,7 @@ const candidate: Loginom.Candidate = {
 async function fixture(runtime?: ConnectionRuntime) {
   const directory = await mkdtemp(join(tmpdir(), "loginom-service-"))
   const closed: number[] = []
-  const store = connectionStore(directory)
+  const store = connectionStore(directory, credentials("linux"))
   const service = await connectionService(
     store,
     runtime ?? {
@@ -249,7 +250,7 @@ test("released recovery leases cannot resume ordinary execution", async () => {
 
 test("post-rename durability failure keeps runtime and active file on the same generation", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-commit-"))
-  const store = connectionStore(directory)
+  const store = connectionStore(directory, credentials("linux"))
   const closed: number[] = []
   const service = await connectionService(
     {

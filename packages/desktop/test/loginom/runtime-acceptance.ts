@@ -1,5 +1,6 @@
 import { supervise } from "@loginom-ai-agent/loginom-host/supervisor"
 import { inputStore } from "@loginom-ai-agent/loginom-host/inputs"
+import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { createHash, randomUUID } from "node:crypto"
 import { createRequire } from "node:module"
 import { mkdtemp, readdir } from "node:fs/promises"
@@ -11,6 +12,22 @@ type Child = Pick<Awaited<ReturnType<typeof supervise>>, "request" | "close">
 const configPath = process.env.LOGINOM_AI_AGENT_TEST_CONFIG
 if (!configPath) throw Error("LOGINOM_AI_AGENT_TEST_CONFIG is required")
 const config = await Bun.file(configPath).json()
+const credentialProfile = process.env.LOGINOM_AI_AGENT_TEST_CREDENTIAL_PROFILE
+if (credentialProfile) {
+  const connection = await Bun.file(join(credentialProfile, "loginom/connection/connection.json")).json()
+  const secrets = await cliCredentials("win32").decode(connection.secrets)
+  config.api_key = secrets.apiKey
+  config.loginom_url = connection.url
+  config.workflow_profile = { passwordless_login: secrets.password === "", loginom_user: connection.username }
+}
+const mcpConfig = process.env.LOGINOM_AI_AGENT_TEST_MCP_CONFIG
+if (mcpConfig) {
+  const active = await Bun.file(mcpConfig).json()
+  config.api_key = active.api_key
+  config.loginom_url = active.loginom_url
+  config.workflow_profile = { passwordless_login: true, loginom_user: active.user }
+}
+if (process.env.LOGINOM_AI_AGENT_TEST_API_KEY) config.api_key = process.env.LOGINOM_AI_AGENT_TEST_API_KEY
 if (config.workflow_profile?.passwordless_login !== true) throw Error("TEST_PASSWORD_UNAVAILABLE")
 const resources = resolve(
   process.env.LOGINOM_AI_AGENT_TEST_RESOURCES ?? join(import.meta.dir, "../../resources/loginom"),
@@ -59,6 +76,7 @@ async function launch(chat: string, csv: string, cleanupPackage: string): Promis
       executable: process.env.LOGINOM_AI_AGENT_TEST_CLI_EXECUTABLE,
       mode: process.env.LOGINOM_AI_AGENT_TEST_CLI_INTERFACE === "tui" ? "tui" : "run",
       headed: process.env.LOGINOM_AI_AGENT_TEST_CLI_HEADED === "1",
+      profile: process.env.LOGINOM_AI_AGENT_TEST_CLI_PROFILE,
       directory: join(directory, "cli", chat),
       csv,
       connection: {
@@ -166,10 +184,22 @@ async function waitNode(child: Child, operation: string) {
   while (Date.now() < deadline) {
     const body = await call(child, "dock_node_wait", { operation_id: operation, timeout_ms: 60_000 })
     if (body.state !== "settled") continue
-    if (body.status !== "SUCCEEDED" || body.cleanup_complete !== true) throw Error(`NODE_FAILED_${operation}`)
     return body
   }
   throw Error("NODE_DEADLINE_EXCEEDED")
+}
+async function applyNode(child: Child, request: Record<string, unknown> & { operation_id: string }) {
+  let body = await call(child, "dock_node_apply", request)
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    if (body.state !== "settled") body = await waitNode(child, request.operation_id)
+    if (body.status === "SUCCEEDED" && body.cleanup_complete === true) return body
+    if (body.status !== "AMBIGUOUS") break
+    // The settled dock_node_wait result is already the required inspection.
+    // During an unresolved mutation the dynamic tool gate advertises resume,
+    // while an additional status call is intentionally unavailable.
+    body = await call(child, "dock_node_resume", request)
+  }
+  throw Error(`NODE_FAILED_${request.operation_id}`)
 }
 
 function verify(
@@ -220,12 +250,25 @@ async function dataset(label: "A" | "B") {
     const artifact = prepared.input_artifacts[0]
     if (artifact.sha256 !== createHash("sha256").update(bytes).digest("hex"))
       throw Error("ATTACHMENT_IDENTITY_MISMATCH")
-    const delivery = await call(child, "dock_artifact_deliver", {
-      operation_id: `deliver-${label}`,
+    const deliveryOperation = `deliver-${label}`
+    let delivery = await call(child, "dock_artifact_deliver", {
+      operation_id: deliveryOperation,
       artifact_id: artifact.artifact_id,
       upload_grant_id: artifact.upload.grant_id,
       budget_ms: 90000,
     })
+    // A visible Windows browser can lose the immediate upload response after
+    // Loginom has accepted it. Inspect and resume the same retained operation;
+    // never authorize a replacement upload with a new operation ID.
+    for (let attempt = 1; delivery.status === "AMBIGUOUS" && attempt <= 3; attempt++) {
+      // The settled delivery result itself is the retained status inspection.
+      if (!delivery.output?.inspection_required) break
+      delivery = await call(child, "dock_artifact_delivery_resume", {
+        operation_id: deliveryOperation,
+        resume_id: `${deliveryOperation}-resume-${attempt}`,
+        budget_ms: 120000,
+      })
+    }
     if (
       delivery.status !== "SUCCEEDED" ||
       !delivery.output.upload_completion_verified ||
@@ -237,7 +280,7 @@ async function dataset(label: "A" | "B") {
       document_id: prepared.workspace.document_id,
       workflow_ref: { workflow_id: prepared.workspace.workflow_ref.workflow_id },
     }
-    await call(child, "dock_node_apply", {
+    const importRequest = {
       ...identity,
       ...policy,
       operation_id: `import-${label}`,
@@ -260,9 +303,9 @@ async function dataset(label: "A" | "B") {
           ],
         },
       },
-    })
-    const imported = await waitNode(child, `import-${label}`)
-    await call(child, "dock_node_apply", {
+    }
+    const imported = await applyNode(child, importRequest)
+    const groupRequest = {
       ...identity,
       ...policy,
       operation_id: `group-${label}`,
@@ -275,8 +318,8 @@ async function dataset(label: "A" | "B") {
           { field: { kind: "input_field", name: valueField }, function: "sum", name: "Total", label: "Total" },
         ],
       },
-    })
-    const grouped = await waitNode(child, `group-${label}`)
+    }
+    const grouped = await applyNode(child, groupRequest)
     const values = verify(grouped, expected)
     const saveOperation = await save(child, label, path)
     return { values, saveOperation, node: grouped.node.node_id, source: artifact.upload.destination }
@@ -296,12 +339,24 @@ async function dataset(label: "A" | "B") {
 async function reopen(saved: Awaited<ReturnType<typeof dataset>>) {
   const path = join(directory, `saved-${saved.label}.json`)
   await Bun.write(path, JSON.stringify(saved))
+  // The independent reader only needs the Loginom endpoint and passwordless test
+  // identity.  Give it an explicit secret-free config instead of persisting the
+  // transient API key recovered from DPAPI for the parent acceptance process.
+  const coldConfigPath = join(directory, "cold-readback-config.json")
+  await Bun.write(
+    coldConfigPath,
+    JSON.stringify({
+      api_key: "acceptance-secret-not-required",
+      loginom_url: config.loginom_url,
+      workflow_profile: config.workflow_profile,
+    }),
+  )
   const child = Bun.spawn(
     [
       join(resources, "bin/node"),
       join(import.meta.dir, "cold-readback.mjs"),
       "--config",
-      configPath!,
+      coldConfigPath,
       "--resources",
       resources,
       "--saved",

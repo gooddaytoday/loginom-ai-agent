@@ -35,8 +35,13 @@ function cleanupStateIndex(oauthState: string) {
 function stopIfIdle() {
   if (pendingAuths.size > 0 || !server) return
 
-  server.close()
+  const active = server
   server = undefined
+  active.close()
+  // Windows can retain an accepted keep-alive or probe connection long after
+  // the callback response. Do not leave the loopback listener lifecycle owned
+  // by that socket once the OAuth flow has settled.
+  active.closeAllConnections?.()
 }
 
 function handleRequest(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
@@ -175,8 +180,12 @@ export async function isPortInUse(port: number = OAUTH_CALLBACK_PORT): Promise<b
 
 export async function stop(): Promise<void> {
   if (server) {
-    await new Promise<void>((resolve) => server!.close(() => resolve()))
+    const active = server
     server = undefined
+    await new Promise<void>((resolve) => {
+      active.close(() => resolve())
+      active.closeAllConnections?.()
+    })
   }
 
   for (const [_name, pending] of pendingAuths) {

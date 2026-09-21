@@ -1,5 +1,25 @@
 # Linux: завершение реализации — 2026-09-16
 
+Слияние `main` → `loginom` — 2026-09-21 (только исходники): `main`
+`c8a8ac0bd` объединена с `loginom` `6bffc8e3b`. Разрешены шесть текстовых
+конфликтов; сохранены RC9 recovery checkpoints, ID-only resume и native bindings,
+платформенные изменения Windows/macOS и Debian prerelease-проверка.
+Контракт retained ambiguous work сохраняет lease текущего владельца для
+ограниченных status/resume; безопасный pre-upload checkpoint остаётся settled.
+Устаревший тест трёх попыток воспроизведён 3/3 и заменён детерминированными
+проверками transient paint, caller deadline и render deadline 15s: временной
+контракт намеренно изменён в `main` коммитом `b336e78af`.
+
+Проверки объединённого дерева, Bun 1.3.14 / Node 24.19.0:
+client suite (`--test --test-isolation=none` из `packages/loginom-runtime/client`)
+— 2258 PASS / 2 SKIP; runtime tests — 28 PASS; host — 56 PASS / 7 SKIP;
+Desktop unit/packaging — 72 PASS / 5 SKIP; migration unit — 6 PASS.
+Typecheck `agent`, `app`, `desktop`, `loginom-host` — PASS после
+`bun install --frozen-lockfile`. `verify_sources.py --transforms` — 5045 PASS;
+локальные transformation hashes обновлены, upstream source-map сохранён.
+`git diff --check` — PASS. Новые дистрибутивы не собирались и не устанавливались;
+live Loginom и native Windows/macOS acceptance для этого merge не выполнялись.
+
 Исправления review RC9 — 2026-09-21 (исходники, без сборки/установки):
 подтверждённый pre-upload checkpoint больше не удерживает managed host в
 recovery из-за уже завершённой навигации; неизвестный результат последующего
@@ -13,6 +33,20 @@ Migration tests: 6 PASS; `verify_sources.py --transforms`: 5045 PASS.
 [План и границы проверки](../superpowers/plans/2026-09-21-rc9-review-fixes.md).
 Полный client suite и живая Loginom/installed acceptance в этой правке не выполнялись.
 
+Отдельное Windows-only обновление 2026-09-19: установлен Desktop 0.1.5 с
+понятной маской сохранённого ключа, check без сохранения, save/close и защитой
+несохранённых изменений. Packaged GUI и реальный installed Dock/Loginom smoke
+прошли. [Отчёт](../testing/loginom-ai-agent/reports/2026-09-19-settings-ux/report.md).
+Это не повтор Linux-проверок и не изменение установленного Linux Desktop/CLI.
+
+**Отдельное macOS-продолжение — 2026-09-19.** Ветка `macos-build` реализует
+тестовый dev pipeline macOS14+ arm64: Desktop DMG/ZIP, самостоятельный CLI
+TAR.GZ, ad-hoc подписи и общий CI. Все семь этапов завершены: installed-приёмка
+на macOS27 и build/static/offline CI на macOS14.8.9 плюс проверка скачанных
+артефактов — PASS. Точные версии и границы проверок:
+[macOS report](../testing/loginom-ai-agent/reports/2026-09-19-macos/report.md),
+[план](../../plan.md). Это не изменяет исторические Linux-результаты ниже.
+
 Очистка 2026-09-18: удалены три дублирующих каталога последней сборки;
 установки, архивы и материалы аудита сохранены.
 [Журнал очистки](../testing/loginom-ai-agent/reports/2026-09-18-installed-desktop-cli/cleanup.md).
@@ -22,7 +56,7 @@ Migration tests: 6 PASS; `verify_sources.py --transforms`: 5045 PASS.
 архив `20260916-source-01` этот commit не содержит). Живая Loginom-приёмка
 нового runtime и снимок нового архива ещё pending.
 
-**Актуальная пользовательская установка — 2026-09-18:** Desktop и CLI
+**Актуальная пользовательская установка Linux — 2026-09-18:** Desktop и CLI
 `0.1.4-local.20260918.697cc2e5a` собраны из чистого snapshot и установлены.
 Desktop GUI/ASAR/4365 runtime hashes и CLI help/version/status PASS.
 Профили сохранены; CLI оставлен установленным.

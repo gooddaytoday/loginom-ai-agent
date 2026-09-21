@@ -36,7 +36,11 @@ test("Windows environment keeps mixed-case OS/proxy keys with one canonical spel
   const env = runtimeEnvironment(
     {
       SystemRoot: "C:\\Windows",
+      SystemDrive: "C:",
       UserProfile: "C:\\Users\\fixture",
+      ProgramData: "C:\\ProgramData",
+      AppData: "C:\\Users\\fixture\\AppData\\Roaming",
+      LocalAppData: "C:\\Users\\fixture\\AppData\\Local",
       Temp: "C:\\Temp",
       https_proxy: "http://proxy.test:8080",
       HTTPS_PROXY: "http://preferred.test:8080",
@@ -49,7 +53,11 @@ test("Windows environment keeps mixed-case OS/proxy keys with one canonical spel
   )
   expect(env).toEqual({
     SYSTEMROOT: "C:\\Windows",
+    SYSTEMDRIVE: "C:",
     USERPROFILE: "C:\\Users\\fixture",
+    PROGRAMDATA: "C:\\ProgramData",
+    APPDATA: "C:\\Users\\fixture\\AppData\\Roaming",
+    LOCALAPPDATA: "C:\\Users\\fixture\\AppData\\Local",
     TEMP: "C:\\Temp",
     HTTPS_PROXY: "http://preferred.test:8080",
     NODE_EXTRA_CA_CERTS: "C:\\certs\\test.pem",

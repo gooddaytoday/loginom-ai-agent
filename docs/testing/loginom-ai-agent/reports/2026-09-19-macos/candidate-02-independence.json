@@ -1,0 +1,1350 @@
+{
+  "status": "PASS",
+  "exitCode": 0,
+  "evidence": "/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-desktop-cli-independence-Vp245M",
+  "scopes": {
+    "desktop": "/Users/kartamyshev/.cache/loginom-macos-build/installed-02/Applications/Loginom AI Agent Dev.app",
+    "cli": "/private/tmp/loginom-cli-installed.ZOXDbm/home/.local/share/loginom-ai-agent-cli/0.1.4-macos.20260919.2-dev"
+  },
+  "observedProcesses": [
+    {
+      "pid": 83538,
+      "parent": 83536,
+      "started": "Sat Sep 19 02:23:01 2026",
+      "owner": "cli",
+      "role": "cli-backend"
+    },
+    {
+      "pid": 83549,
+      "parent": 83538,
+      "started": "Sat Sep 19 02:23:03 2026",
+      "owner": "cli",
+      "role": "node-host"
+    },
+    {
+      "pid": 83555,
+      "parent": 83549,
+      "started": "Sat Sep 19 02:23:03 2026",
+      "owner": "cli",
+      "role": "runtime"
+    },
+    {
+      "pid": 83576,
+      "parent": 83555,
+      "started": "Sat Sep 19 02:23:05 2026",
+      "owner": "cli",
+      "role": "browser"
+    },
+    {
+      "pid": 83578,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:05 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 83580,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:05 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 83582,
+      "parent": 83576,
+      "started": "Sat Sep 19 02:23:05 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83583,
+      "parent": 83576,
+      "started": "Sat Sep 19 02:23:05 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83584,
+      "parent": 83576,
+      "started": "Sat Sep 19 02:23:05 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83585,
+      "parent": 83576,
+      "started": "Sat Sep 19 02:23:05 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83587,
+      "parent": 83576,
+      "started": "Sat Sep 19 02:23:05 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83589,
+      "parent": 83576,
+      "started": "Sat Sep 19 02:23:05 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83590,
+      "parent": 83576,
+      "started": "Sat Sep 19 02:23:05 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83705,
+      "parent": 83549,
+      "started": "Sat Sep 19 02:23:10 2026",
+      "owner": "cli",
+      "role": "runtime"
+    },
+    {
+      "pid": 83721,
+      "parent": 83705,
+      "started": "Sat Sep 19 02:23:11 2026",
+      "owner": "cli",
+      "role": "browser"
+    },
+    {
+      "pid": 83725,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:11 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 83727,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:11 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 83732,
+      "parent": 83721,
+      "started": "Sat Sep 19 02:23:11 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83733,
+      "parent": 83721,
+      "started": "Sat Sep 19 02:23:11 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83734,
+      "parent": 83721,
+      "started": "Sat Sep 19 02:23:11 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83736,
+      "parent": 83721,
+      "started": "Sat Sep 19 02:23:11 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83738,
+      "parent": 83721,
+      "started": "Sat Sep 19 02:23:11 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83739,
+      "parent": 83721,
+      "started": "Sat Sep 19 02:23:11 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83844,
+      "parent": 83536,
+      "started": "Sat Sep 19 02:23:15 2026",
+      "owner": "cli",
+      "role": "cli-backend"
+    },
+    {
+      "pid": 83845,
+      "parent": 83536,
+      "started": "Sat Sep 19 02:23:15 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83853,
+      "parent": 83845,
+      "started": "Sat Sep 19 02:23:16 2026",
+      "owner": "desktop",
+      "role": "desktop-main"
+    },
+    {
+      "pid": 83863,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:16 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 83881,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:16 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 83882,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:16 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83883,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:17 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83884,
+      "parent": 83844,
+      "started": "Sat Sep 19 02:23:17 2026",
+      "owner": "cli",
+      "role": "node-host"
+    },
+    {
+      "pid": 83887,
+      "parent": 83884,
+      "started": "Sat Sep 19 02:23:17 2026",
+      "owner": "cli",
+      "role": "runtime"
+    },
+    {
+      "pid": 83898,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:17 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 83919,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:18 2026",
+      "owner": "desktop",
+      "role": "runtime"
+    },
+    {
+      "pid": 83923,
+      "parent": 83887,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "browser"
+    },
+    {
+      "pid": 83928,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 83933,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 83940,
+      "parent": 83923,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83941,
+      "parent": 83923,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83942,
+      "parent": 83923,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83944,
+      "parent": 83923,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83947,
+      "parent": 83923,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83948,
+      "parent": 83923,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 84038,
+      "parent": 83919,
+      "started": "Sat Sep 19 02:23:22 2026",
+      "owner": "desktop",
+      "role": "browser"
+    },
+    {
+      "pid": 84055,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:22 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 84059,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:22 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 84065,
+      "parent": 84038,
+      "started": "Sat Sep 19 02:23:22 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84066,
+      "parent": 84038,
+      "started": "Sat Sep 19 02:23:22 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84067,
+      "parent": 84038,
+      "started": "Sat Sep 19 02:23:22 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84069,
+      "parent": 84038,
+      "started": "Sat Sep 19 02:23:23 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84071,
+      "parent": 84038,
+      "started": "Sat Sep 19 02:23:23 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84072,
+      "parent": 84038,
+      "started": "Sat Sep 19 02:23:23 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84163,
+      "parent": 83884,
+      "started": "Sat Sep 19 02:23:25 2026",
+      "owner": "cli",
+      "role": "runtime"
+    },
+    {
+      "pid": 84255,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:26 2026",
+      "owner": "desktop",
+      "role": "runtime"
+    },
+    {
+      "pid": 84256,
+      "parent": 84163,
+      "started": "Sat Sep 19 02:23:26 2026",
+      "owner": "cli",
+      "role": "browser"
+    },
+    {
+      "pid": 84258,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:26 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 84260,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:26 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 84262,
+      "parent": 84256,
+      "started": "Sat Sep 19 02:23:26 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 84263,
+      "parent": 84256,
+      "started": "Sat Sep 19 02:23:26 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 84264,
+      "parent": 84256,
+      "started": "Sat Sep 19 02:23:27 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 84266,
+      "parent": 84256,
+      "started": "Sat Sep 19 02:23:27 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 84268,
+      "parent": 84256,
+      "started": "Sat Sep 19 02:23:27 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 84269,
+      "parent": 84256,
+      "started": "Sat Sep 19 02:23:27 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 84369,
+      "parent": 84255,
+      "started": "Sat Sep 19 02:23:28 2026",
+      "owner": "desktop",
+      "role": "browser"
+    },
+    {
+      "pid": 84381,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:28 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 84383,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:28 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 84386,
+      "parent": 84369,
+      "started": "Sat Sep 19 02:23:28 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84387,
+      "parent": 84369,
+      "started": "Sat Sep 19 02:23:28 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 84388,
+      "parent": 84369,
+      "started": "Sat Sep 19 02:23:28 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 84390,
+      "parent": 84369,
+      "started": "Sat Sep 19 02:23:29 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84392,
+      "parent": 84369,
+      "started": "Sat Sep 19 02:23:29 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84393,
+      "parent": 84369,
+      "started": "Sat Sep 19 02:23:29 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84713,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:33 2026",
+      "owner": "desktop",
+      "role": "runtime"
+    },
+    {
+      "pid": 84797,
+      "parent": 84713,
+      "started": "Sat Sep 19 02:23:35 2026",
+      "owner": "desktop",
+      "role": "browser"
+    },
+    {
+      "pid": 84803,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:35 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 84807,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:35 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 84837,
+      "parent": 84797,
+      "started": "Sat Sep 19 02:23:35 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84838,
+      "parent": 84797,
+      "started": "Sat Sep 19 02:23:35 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84843,
+      "parent": 84797,
+      "started": "Sat Sep 19 02:23:35 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84847,
+      "parent": 84797,
+      "started": "Sat Sep 19 02:23:35 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84849,
+      "parent": 84797,
+      "started": "Sat Sep 19 02:23:35 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 84850,
+      "parent": 84797,
+      "started": "Sat Sep 19 02:23:35 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 85504,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:44 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 85657,
+      "parent": 83536,
+      "started": "Sat Sep 19 02:23:46 2026",
+      "owner": "cli",
+      "role": "cli-backend"
+    },
+    {
+      "pid": 85665,
+      "parent": 85657,
+      "started": "Sat Sep 19 02:23:48 2026",
+      "owner": "cli",
+      "role": "node-host"
+    },
+    {
+      "pid": 85666,
+      "parent": 85665,
+      "started": "Sat Sep 19 02:23:48 2026",
+      "owner": "cli",
+      "role": "runtime"
+    },
+    {
+      "pid": 85675,
+      "parent": 85666,
+      "started": "Sat Sep 19 02:23:49 2026",
+      "owner": "cli",
+      "role": "browser"
+    },
+    {
+      "pid": 85677,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:49 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 85679,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:49 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 85681,
+      "parent": 85675,
+      "started": "Sat Sep 19 02:23:49 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 85682,
+      "parent": 85675,
+      "started": "Sat Sep 19 02:23:49 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 85683,
+      "parent": 85675,
+      "started": "Sat Sep 19 02:23:49 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 85684,
+      "parent": 85675,
+      "started": "Sat Sep 19 02:23:49 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 85691,
+      "parent": 85675,
+      "started": "Sat Sep 19 02:23:50 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 85698,
+      "parent": 85675,
+      "started": "Sat Sep 19 02:23:50 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 85699,
+      "parent": 85675,
+      "started": "Sat Sep 19 02:23:50 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 85786,
+      "parent": 85665,
+      "started": "Sat Sep 19 02:23:53 2026",
+      "owner": "cli",
+      "role": "runtime"
+    },
+    {
+      "pid": 85795,
+      "parent": 85786,
+      "started": "Sat Sep 19 02:23:54 2026",
+      "owner": "cli",
+      "role": "browser"
+    },
+    {
+      "pid": 85797,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:54 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 85799,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:54 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 85801,
+      "parent": 85795,
+      "started": "Sat Sep 19 02:23:54 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 85802,
+      "parent": 85795,
+      "started": "Sat Sep 19 02:23:54 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 85803,
+      "parent": 85795,
+      "started": "Sat Sep 19 02:23:54 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 85805,
+      "parent": 85795,
+      "started": "Sat Sep 19 02:23:54 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 85807,
+      "parent": 85795,
+      "started": "Sat Sep 19 02:23:55 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 85808,
+      "parent": 85795,
+      "started": "Sat Sep 19 02:23:55 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 85898,
+      "parent": 83536,
+      "started": "Sat Sep 19 02:23:58 2026",
+      "owner": "cli",
+      "role": "cli-backend"
+    },
+    {
+      "pid": 85899,
+      "parent": 83536,
+      "started": "Sat Sep 19 02:23:58 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 85913,
+      "parent": 85899,
+      "started": "Sat Sep 19 02:23:59 2026",
+      "owner": "desktop",
+      "role": "desktop-main"
+    },
+    {
+      "pid": 85919,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:59 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 85937,
+      "parent": 85913,
+      "started": "Sat Sep 19 02:23:59 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 85938,
+      "parent": 85913,
+      "started": "Sat Sep 19 02:23:59 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 85939,
+      "parent": 85913,
+      "started": "Sat Sep 19 02:23:59 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 85969,
+      "parent": 85898,
+      "started": "Sat Sep 19 02:24:00 2026",
+      "owner": "cli",
+      "role": "node-host"
+    },
+    {
+      "pid": 85973,
+      "parent": 85969,
+      "started": "Sat Sep 19 02:24:00 2026",
+      "owner": "cli",
+      "role": "runtime"
+    },
+    {
+      "pid": 85989,
+      "parent": 85913,
+      "started": "Sat Sep 19 02:24:00 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86001,
+      "parent": 85913,
+      "started": "Sat Sep 19 02:24:01 2026",
+      "owner": "desktop",
+      "role": "runtime"
+    },
+    {
+      "pid": 86038,
+      "parent": 85973,
+      "started": "Sat Sep 19 02:24:02 2026",
+      "owner": "cli",
+      "role": "browser"
+    },
+    {
+      "pid": 86041,
+      "parent": 1,
+      "started": "Sat Sep 19 02:24:02 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 86043,
+      "parent": 1,
+      "started": "Sat Sep 19 02:24:02 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 86045,
+      "parent": 86038,
+      "started": "Sat Sep 19 02:24:02 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 86046,
+      "parent": 86038,
+      "started": "Sat Sep 19 02:24:02 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 86048,
+      "parent": 86038,
+      "started": "Sat Sep 19 02:24:02 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 86066,
+      "parent": 86038,
+      "started": "Sat Sep 19 02:24:03 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 86068,
+      "parent": 86038,
+      "started": "Sat Sep 19 02:24:03 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 86069,
+      "parent": 86038,
+      "started": "Sat Sep 19 02:24:03 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 86141,
+      "parent": 86001,
+      "started": "Sat Sep 19 02:24:05 2026",
+      "owner": "desktop",
+      "role": "browser"
+    },
+    {
+      "pid": 86143,
+      "parent": 1,
+      "started": "Sat Sep 19 02:24:05 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 86145,
+      "parent": 1,
+      "started": "Sat Sep 19 02:24:05 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 86147,
+      "parent": 86141,
+      "started": "Sat Sep 19 02:24:05 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86148,
+      "parent": 86141,
+      "started": "Sat Sep 19 02:24:05 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86149,
+      "parent": 86141,
+      "started": "Sat Sep 19 02:24:05 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86150,
+      "parent": 86141,
+      "started": "Sat Sep 19 02:24:05 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86151,
+      "parent": 86141,
+      "started": "Sat Sep 19 02:24:05 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86154,
+      "parent": 86141,
+      "started": "Sat Sep 19 02:24:05 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86155,
+      "parent": 86141,
+      "started": "Sat Sep 19 02:24:05 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86327,
+      "parent": 85969,
+      "started": "Sat Sep 19 02:24:08 2026",
+      "owner": "cli",
+      "role": "runtime"
+    },
+    {
+      "pid": 86356,
+      "parent": 85913,
+      "started": "Sat Sep 19 02:24:09 2026",
+      "owner": "desktop",
+      "role": "runtime"
+    },
+    {
+      "pid": 86407,
+      "parent": 86327,
+      "started": "Sat Sep 19 02:24:10 2026",
+      "owner": "cli",
+      "role": "browser"
+    },
+    {
+      "pid": 86409,
+      "parent": 86356,
+      "started": "Sat Sep 19 02:24:10 2026",
+      "owner": "desktop",
+      "role": "browser"
+    },
+    {
+      "pid": 86434,
+      "parent": 1,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 86435,
+      "parent": 1,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 86438,
+      "parent": 1,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 86439,
+      "parent": 1,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 86442,
+      "parent": 86407,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 86443,
+      "parent": 86409,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86444,
+      "parent": 86409,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 86445,
+      "parent": 86407,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 86446,
+      "parent": 86407,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 86447,
+      "parent": 86407,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 86448,
+      "parent": 86409,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 86449,
+      "parent": 86409,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 86467,
+      "parent": 86407,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 86468,
+      "parent": 86409,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86482,
+      "parent": 86407,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 86483,
+      "parent": 86407,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 86484,
+      "parent": 86409,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86485,
+      "parent": 86409,
+      "started": "Sat Sep 19 02:24:11 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86788,
+      "parent": 85913,
+      "started": "Sat Sep 19 02:24:16 2026",
+      "owner": "desktop",
+      "role": "runtime"
+    },
+    {
+      "pid": 86878,
+      "parent": 86788,
+      "started": "Sat Sep 19 02:24:18 2026",
+      "owner": "desktop",
+      "role": "browser"
+    },
+    {
+      "pid": 86880,
+      "parent": 1,
+      "started": "Sat Sep 19 02:24:18 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 86882,
+      "parent": 1,
+      "started": "Sat Sep 19 02:24:18 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 86888,
+      "parent": 86878,
+      "started": "Sat Sep 19 02:24:18 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86890,
+      "parent": 86878,
+      "started": "Sat Sep 19 02:24:18 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 86896,
+      "parent": 86878,
+      "started": "Sat Sep 19 02:24:18 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 86908,
+      "parent": 86878,
+      "started": "Sat Sep 19 02:24:18 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86919,
+      "parent": 86878,
+      "started": "Sat Sep 19 02:24:18 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 86920,
+      "parent": 86878,
+      "started": "Sat Sep 19 02:24:18 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 87628,
+      "parent": 85913,
+      "started": "Sat Sep 19 02:24:27 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    }
+  ],
+  "simultaneousIndependentRuntimeAndBrowserSnapshot": [
+    {
+      "pid": 83844,
+      "parent": 83536,
+      "started": "Sat Sep 19 02:23:15 2026",
+      "owner": "cli",
+      "role": "cli-backend"
+    },
+    {
+      "pid": 83845,
+      "parent": 83536,
+      "started": "Sat Sep 19 02:23:15 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83853,
+      "parent": 83845,
+      "started": "Sat Sep 19 02:23:16 2026",
+      "owner": "desktop",
+      "role": "desktop-main"
+    },
+    {
+      "pid": 83863,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:16 2026",
+      "owner": "desktop",
+      "role": "crashpad"
+    },
+    {
+      "pid": 83881,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:16 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 83882,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:16 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83883,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:17 2026",
+      "owner": "desktop",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83884,
+      "parent": 83844,
+      "started": "Sat Sep 19 02:23:17 2026",
+      "owner": "cli",
+      "role": "node-host"
+    },
+    {
+      "pid": 83887,
+      "parent": 83884,
+      "started": "Sat Sep 19 02:23:17 2026",
+      "owner": "cli",
+      "role": "runtime"
+    },
+    {
+      "pid": 83898,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:17 2026",
+      "owner": "desktop",
+      "role": "other"
+    },
+    {
+      "pid": 83919,
+      "parent": 83853,
+      "started": "Sat Sep 19 02:23:18 2026",
+      "owner": "desktop",
+      "role": "runtime"
+    },
+    {
+      "pid": 83923,
+      "parent": 83887,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "browser"
+    },
+    {
+      "pid": 83928,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 83933,
+      "parent": 1,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "crashpad"
+    },
+    {
+      "pid": 83940,
+      "parent": 83923,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83941,
+      "parent": 83923,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83942,
+      "parent": 83923,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "utility-process"
+    },
+    {
+      "pid": 83944,
+      "parent": 83923,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83947,
+      "parent": 83923,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 83948,
+      "parent": 83923,
+      "started": "Sat Sep 19 02:23:19 2026",
+      "owner": "cli",
+      "role": "other"
+    },
+    {
+      "pid": 84038,
+      "parent": 83919,
+      "started": "Sat Sep 19 02:23:22 2026",
+      "owner": "desktop",
+      "role": "browser"
+    }
+  ],
+  "remainingProcesses": [],
+  "commandsOrSecretsPersisted": false,
+  "limitations": [
+    "Role detection comes from process executable/arguments; raw command lines are never persisted",
+    "Scenario verifies both close orders using fresh observations; no production model quality claim",
+    "Utility process subtype was not retained; separate backend ownership is supported by main CLI/desktop identities and separate Host/runtime/browser trees, not a recorded utility subtype"
+  ]
+}

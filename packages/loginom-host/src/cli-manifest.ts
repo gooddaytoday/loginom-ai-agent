@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 import { createReadStream } from "node:fs"
-import { lstat, readFile, readdir, readlink, realpath, stat, writeFile } from "node:fs/promises"
+import { lstat, open, readFile, readdir, readlink, realpath, stat, writeFile } from "node:fs/promises"
 import { isAbsolute, join, relative, sep } from "node:path"
 import { Option, Schema } from "effect"
 
@@ -50,8 +50,9 @@ export async function verifyCliManifest(root: string, expected: { platform: stri
   if (!/^[a-f0-9]{40}$/.test(info.sourceCommit) || !/^[a-f0-9]{64}$/.test(info.sourceTreeSha256))
     throw new Error("LOGINOM_MANIFEST_INVALID")
   const files = value.value.files
+  const paths = files.map((item) => (info.platform === "win32" ? item.path.toLowerCase() : item.path))
   if (
-    new Set(files.map((item) => item.path)).size !== files.length ||
+    new Set(paths).size !== files.length ||
     files.some((item) => !safePath(item.path) || !/^[a-f0-9]{64}$/.test(item.sha256))
   )
     throw new Error("LOGINOM_MANIFEST_INVALID")
@@ -75,7 +76,78 @@ export async function verifyCliManifest(root: string, expected: { platform: stri
   ]) {
     if (!entries.has(required)) throw new Error("LOGINOM_MANIFEST_INCOMPLETE")
   }
+  if (info.platform === "win32" && info.arch === "x64") await verifyWindowsPayload(root, entries)
   return info
+}
+
+async function verifyWindowsPayload(root: string, entries: Map<string, typeof file.Type>) {
+  const decoded = Schema.decodeUnknownOption(Schema.UnknownFromJsonString)(
+    await readFile(join(root, "resources/loginom/resource-manifest.json"), "utf8"),
+  )
+  if (Option.isNone(decoded) || !decoded.value || typeof decoded.value !== "object")
+    throw new Error("LOGINOM_MANIFEST_RESOURCE_INVALID")
+  const resource = decoded.value as Record<string, unknown>
+  if (
+    resource.target !== "win32-x64" ||
+    resource.node !== "bin/node.exe" ||
+    typeof resource.browser !== "string" ||
+    !safePath(resource.browser) ||
+    !resource.browser.toLowerCase().endsWith(".exe") ||
+    !Array.isArray(resource.files)
+  )
+    throw new Error("LOGINOM_MANIFEST_RESOURCE_INVALID")
+  const resources = new Set<string>()
+  for (const item of resource.files) {
+    if (!item || typeof item !== "object") throw new Error("LOGINOM_MANIFEST_RESOURCE_INVALID")
+    const entry = item as Record<string, unknown>
+    if (
+      typeof entry.path !== "string" ||
+      !safePath(entry.path) ||
+      typeof entry.sha256 !== "string" ||
+      !/^[a-f0-9]{64}$/.test(entry.sha256) ||
+      resources.has(entry.path.toLowerCase()) ||
+      (entry.link !== undefined && typeof entry.link !== "string")
+    )
+      throw new Error("LOGINOM_MANIFEST_RESOURCE_INVALID")
+    resources.add(entry.path.toLowerCase())
+    const outer = entries.get(`resources/loginom/${entry.path}`)
+    if (!outer || outer.sha256 !== entry.sha256 || outer.link !== entry.link)
+      throw new Error("LOGINOM_MANIFEST_RESOURCE_MISMATCH")
+  }
+  if (!resources.has(resource.node.toLowerCase()) || !resources.has(resource.browser.toLowerCase()))
+    throw new Error("LOGINOM_MANIFEST_RESOURCE_INVALID")
+  const node = entries.get(`resources/loginom/${resource.node}`)
+  const browser = entries.get(`resources/loginom/${resource.browser}`)
+  if (resource.nodeSha256 !== node?.sha256 || resource.browserSha256 !== browser?.sha256)
+    throw new Error("LOGINOM_MANIFEST_RESOURCE_MISMATCH")
+  await Promise.all(
+    ["bin/loginom-ai-agent-cli.exe", `resources/loginom/${resource.node}`, `resources/loginom/${resource.browser}`].map(
+      (path) => requirePeAmd64(join(root, path)),
+    ),
+  )
+}
+
+async function requirePeAmd64(path: string) {
+  const handle = await open(path, "r")
+  try {
+    const dos = Buffer.alloc(64)
+    if ((await handle.read(dos, 0, dos.length, 0)).bytesRead !== dos.length || dos.readUInt16LE(0) !== 0x5a4d)
+      throw new Error("LOGINOM_MANIFEST_EXECUTABLE_INVALID")
+    const offset = dos.readUInt32LE(0x3c)
+    if (offset < 64 || offset > 16 * 1024 * 1024) throw new Error("LOGINOM_MANIFEST_EXECUTABLE_INVALID")
+    const header = Buffer.alloc(26)
+    if (
+      (await handle.read(header, 0, header.length, offset)).bytesRead !== header.length ||
+      header.readUInt32LE(0) !== 0x00004550 ||
+      header.readUInt16LE(4) !== 0x8664 ||
+      header.readUInt16LE(20) < 2 ||
+      (header.readUInt16LE(22) & 0x0002) === 0 ||
+      header.readUInt16LE(24) !== 0x020b
+    )
+      throw new Error("LOGINOM_MANIFEST_EXECUTABLE_INVALID")
+  } finally {
+    await handle.close()
+  }
 }
 
 function safePath(path: string) {

@@ -29,7 +29,7 @@ describe("terminalWebSocketURL", () => {
       directory: "/tmp/project",
       cursor: 0,
       sameOrigin: false,
-      username: "opencode",
+      username: "loginom-ai-agent",
       password: "secret",
     })
 
@@ -49,7 +49,7 @@ describe("terminalWebSocketURL", () => {
       directory: "/tmp/project",
       cursor: 10,
       sameOrigin: true,
-      username: "opencode",
+      username: "loginom-ai-agent",
       password: "secret",
     })
 
@@ -67,7 +67,7 @@ describe("terminalWebSocketURL", () => {
       directory: "/tmp/project",
       cursor: 10,
       sameOrigin: true,
-      username: "opencode",
+      username: "loginom-ai-agent",
       password: "secret",
       authToken: true,
     })

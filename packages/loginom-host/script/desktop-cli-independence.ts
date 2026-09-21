@@ -3,6 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { cliOracleTransport } from "./cli-oracle-transport"
 import { desktopOracleTransport } from "./desktop-oracle-transport"
+import { cliCredentials } from "../src/connection/cli-credentials"
 
 // Native acceptance: close each independent application while the other has a
 // live Loginom workspace, then require a fresh successful observation there.
@@ -12,6 +13,14 @@ const desktop = process.env.LOGINOM_AI_AGENT_TEST_DESKTOP_EXECUTABLE
 const resources = process.env.LOGINOM_AI_AGENT_TEST_RESOURCES
 if (!configPath || !cli || !desktop || !resources) throw Error("INDEPENDENCE_INPUTS_REQUIRED")
 const config = await Bun.file(configPath).json()
+const credentialProfile = process.env.LOGINOM_AI_AGENT_TEST_CREDENTIAL_PROFILE
+if (credentialProfile) {
+  const record = await Bun.file(join(credentialProfile, "loginom/connection/connection.json")).json()
+  const secret = await cliCredentials("win32").decode(record.secrets)
+  config.api_key = secret.apiKey
+  config.loginom_url = record.url
+  config.workflow_profile = { passwordless_login: secret.password === "", loginom_user: record.username }
+}
 if (config.workflow_profile?.passwordless_login !== true) throw Error("TEST_PASSWORD_UNAVAILABLE")
 const directory = await mkdtemp(join(tmpdir(), "loginom-desktop-cli-independence-"))
 console.log(`Private acceptance evidence: ${directory}`)

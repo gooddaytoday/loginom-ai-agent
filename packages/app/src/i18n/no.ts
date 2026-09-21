@@ -1,7 +1,8 @@
-import { dict as en } from "./en"
+import { dict as en, LOGINOM_ENGLISH } from "./en"
 type Keys = keyof typeof en
 
 export const dict = {
+  ...LOGINOM_ENGLISH,
   "desktop.menu.app": "Loginom AI Agent",
   "desktop.menu.file": "Arkiv",
   "desktop.menu.edit": "Rediger",

@@ -1,5 +1,5 @@
 import { mkdir, readdir } from "node:fs/promises"
-import { join } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { observeBrowserWindows } from "./window-observer"
 import { oracleProvider, oraclePrompt } from "./oracle-provider"
 
@@ -10,19 +10,20 @@ export async function cliOracleTransport(options: {
   mode?: "run" | "tui"
   headed?: boolean
   directory: string
+  profile?: string
   csv?: string
   resume?: { profile: string; workspace: string; session: string; latest?: boolean; prompt: string }
   connection: { apiKey: string; password: string; username: string; url: string }
 }) {
   await mkdir(options.directory, { recursive: true, mode: 0o700 })
   if (!options.resume && typeof options.csv !== "string") throw Error("CLI_ORACLE_INPUT_REQUIRED")
-  const profile = options.resume?.profile ?? join(options.directory, "profile")
+  const profile = options.resume?.profile ?? options.profile ?? join(options.directory, "profile")
   const env = {
     ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("LOGINOM_AI_AGENT_CLI_"))),
     LOGINOM_AI_AGENT_CLI_PROFILE: profile,
     LOGINOM_AI_AGENT_PURE: "1",
   }
-  if (!options.resume) {
+  if (!options.resume && !options.profile) {
     const setup = Bun.spawn([options.executable, "loginom", "setup", "--stdin-json", "--format", "json"], {
       env,
       stdin: new Blob([JSON.stringify(options.connection)]),
@@ -58,8 +59,13 @@ export async function cliOracleTransport(options: {
   const child = Bun.spawn(
     options.mode === "tui"
       ? [
-          "python3",
-          join(import.meta.dir, "tui-oracle.py"),
+          ...(process.platform === "win32"
+            ? [
+                process.env.LOGINOM_AI_AGENT_TEST_NODE ??
+                  resolve(dirname(options.executable), "../resources/loginom/bin/node.exe"),
+                join(import.meta.dir, "tui-oracle-windows.ts"),
+              ]
+            : ["python3", join(import.meta.dir, "tui-oracle.py")]),
           options.executable,
           workspace,
           options.directory,
@@ -110,7 +116,8 @@ export async function cliOracleTransport(options: {
         const code = await child.exited
         const output = await stdout
         const errors = await stderr
-        if (output.includes(options.connection.apiKey) || errors.includes(options.connection.apiKey))
+        const secrets = [options.connection.apiKey, options.connection.password].filter(Boolean)
+        if (secrets.some((secret) => output.includes(secret) || errors.includes(secret)))
           throw Error("SECRET_IN_CLI_RESULT")
         await Bun.write(join(options.directory, options.mode === "tui" ? "terminal.txt" : "events.jsonl"), output)
         await Bun.write(join(options.directory, "stderr.txt"), errors)

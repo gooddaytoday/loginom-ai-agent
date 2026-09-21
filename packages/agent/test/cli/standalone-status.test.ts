@@ -1,17 +1,31 @@
-import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises"
+import { afterAll, beforeAll, expect, test } from "bun:test"
+import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
-import { buildNodeHost } from "../../../loginom-host/script/build-node-host"
+import { createHash } from "node:crypto"
+import { buildKeychain } from "../../../loginom-host/script/build-keychain"
+import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
 
+const host = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-test-host-")))
+beforeAll(async () => {
+  await buildNodeHost(host)
+}, 60_000)
+afterAll(async () => {
+  await rm(host, { recursive: true, force: true })
+})
+// CI provisions the pinned Node through LOGINOM_AI_AGENT_TEST_NODE; locally the Desktop build stages it under resources.
+const bundledNode =
+  process.env.LOGINOM_AI_AGENT_TEST_NODE ?? resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node")
+
 test("standalone exits after failed host cleanup despite retained process handles", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-cli-failed-exit-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-failed-exit-")))
   try {
     const bundle = join(directory, "bundle")
     await mkdir(join(bundle, "bin"), { recursive: true })
     await mkdir(join(bundle, "host"))
-    await symlink(resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node"), join(bundle, "bin/node"))
+    await symlink(bundledNode, join(bundle, "bin/node"))
+    if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
     await writeFile(
       join(bundle, "host/node-host.mjs"),
       `process.on("message", m => {
@@ -63,12 +77,13 @@ test("standalone exits after failed host cleanup despite retained process handle
 }, 12_000)
 
 test("actual standalone status launches bundled Node and releases the isolated profile", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-cli-status-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-status-")))
   try {
     const bundle = join(directory, "bundle")
     await mkdir(join(bundle, "bin"), { recursive: true })
-    await symlink(resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node"), join(bundle, "bin/node"))
-    await buildNodeHost(join(bundle, "host"))
+    await symlink(bundledNode, join(bundle, "bin/node"))
+    if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
+    await cp(host, join(bundle, "host"), { recursive: true })
     const child = Bun.spawn([process.execPath, "run", "./src/standalone.ts", "loginom", "status", "--format", "json"], {
       cwd: resolve(import.meta.dir, "../.."),
       env: {
@@ -89,7 +104,7 @@ test("actual standalone status launches bundled Node and releases the isolated p
     expect(await child.exited).toBe(0)
     expect(await errors).toBe("")
     expect(JSON.parse(await out)).toMatchObject({ state: "unconfigured", hasApiKey: false, generation: 0 })
-    expect(await readdir(directory)).toEqual(["bundle", "profile"])
+    expect((await readdir(directory)).sort()).toEqual(["bundle", "profile"])
     expect(await readdir(join(directory, "profile"))).not.toContain(".writer")
     expect(await readdir(join(directory, "profile", "loginom"))).not.toContain("runtime")
     const run = Bun.spawn(
@@ -129,14 +144,15 @@ test("actual standalone status launches bundled Node and releases the isolated p
 }, 15_000)
 
 test("management commands share durable setup and recovery semantics through the real Node host", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "loginom-cli-management-"))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-management-")))
   try {
     const bundle = join(directory, "bundle")
     const profile = join(directory, "profile")
     await mkdir(join(bundle, "bin"), { recursive: true })
     await mkdir(join(bundle, "runtime/src"), { recursive: true })
-    await symlink(resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node"), join(bundle, "bin/node"))
-    await buildNodeHost(join(bundle, "host"))
+    await symlink(bundledNode, join(bundle, "bin/node"))
+    if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
+    await cp(host, join(bundle, "host"), { recursive: true })
     await writeFile(join(bundle, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test" }))
     // Fixture only: handshake/validation succeeds without Chromium, Loginom or a provider.
     await writeFile(
@@ -205,7 +221,15 @@ test("management commands share durable setup and recovery semantics through the
       result: { state: "ready", generation: 2, hasApiKey: true, hasPassword: false },
     })
     const persisted = JSON.parse(await readFile(join(profile, "loginom/connection/connection.json"), "utf8"))
-    expect(JSON.parse(persisted.secrets.payload)).toEqual({ apiKey: "private-setup-key", password: "" })
+    expect(
+      await cliCredentials(process.platform, { root: join(profile, "loginom"), resources: bundle }).decode(
+        persisted.secrets,
+      ),
+    ).toEqual({ apiKey: "private-setup-key", password: "" })
+    expect(persisted.secrets.protection).toBe(
+      process.platform === "darwin" ? "keychain" : process.platform === "win32" ? "dpapi" : "plaintext",
+    )
+    if (process.platform !== "linux") expect(JSON.stringify(persisted)).not.toContain("private-setup-key")
     expect(await command(["check"])).toMatchObject({ code: 0, result: { code: "LOGINOM_CONNECTION_VALID" } })
     expect(await command(["cancel-pending"])).toMatchObject({ code: 0, result: { state: "ready" } })
     const journal = await recoveryStore(join(profile, "loginom/recovery"))
@@ -497,6 +521,33 @@ test("management commands share durable setup and recovery semantics through the
       await provider.dispose()
     }
   } finally {
+    if (process.platform === "darwin") {
+      const root = await realpath(join(directory, "profile/loginom")).catch(() => undefined)
+      if (root) {
+        // Delete only this test's profile key, without changing Keychain settings.
+        const cleanup = Bun.spawn(
+          [
+            "/usr/bin/security",
+            "delete-generic-password",
+            "-s",
+            "com.loginom.aiagent.cli.profile-key.v1",
+            "-a",
+            createHash("sha256").update(root).digest("hex"),
+          ],
+          { stdout: "ignore", stderr: "ignore" },
+        )
+        expect([0, 44]).toContain(await cleanup.exited)
+      }
+    }
     await rm(directory, { recursive: true, force: true })
   }
 }, 90_000)
+
+// Bun.build inside the test runner intermittently fails with EISDIR on bundled dependencies
+// (seen with fast-check under effect), so the host is built by the script in its own process.
+async function buildNodeHost(output: string) {
+  const script = resolve(import.meta.dir, "../../../loginom-host/script/build-node-host.ts")
+  const child = Bun.spawn([process.execPath, "run", script, output], { stdout: "inherit", stderr: "pipe" })
+  const stderr = await new Response(child.stderr).text()
+  if ((await child.exited) !== 0) throw new Error(`LOGINOM_HOST_BUILD_FAILED\n${stderr}`)
+}

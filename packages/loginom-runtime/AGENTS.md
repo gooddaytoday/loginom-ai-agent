@@ -13,7 +13,7 @@
 
 - On startup error, clean up resources but keep the private IPC channel open until the owner receives an acknowledged close. Exiting earlier masks the original error as unconfirmed cleanup. Owner disconnect still closes and exits.
 
-- Private call replies distinguish `activeWork` (a live executor, node job or delivery) from the broader `recoveryPending`/unsettled indicator. The host must retain durable admission records during active work without blocking the owner's wait calls. Once work stops, retained uncertainty still requires recovery; active work is not proof of successful completion.
+- Private call replies expose `activeWork` and `recoveryPending`/unsettled state. Retained ambiguous operations keep the current owner's host lease active so its bounded status/resume tools remain available even without a running worker. Durable admission records remain until uncertainty is reconciled; owner loss or release still requires recovery. Safe pre-upload checkpoints with confirmed cleanup and no required inspection are settled and do not retain an active lease. Active work is not proof of successful completion.
 
 - Artifact delivery may refresh a destination-folder lookup after a matched UI_EPOCH_CHANGED receipt only when status is NOT_APPLIED, phase is preconditions, effect_possible is false and cleanup_complete is true. Use a new observation/ref/action ID, revalidate the same document/workflow/tab/parent directory and verified folder, and stop after three attempts or cancellation. This does not authorize retrying upload, verification, uncertain navigation, or a prior settled delivery/recovery record.
 

@@ -11,8 +11,8 @@
   },
   "packages/loginom-runtime/client/lib/executor.mjs": {
     "baseHash": "df21720858bb89bb40d6c4fe46620728b1d6e86b0d9d7aafa4992c8f2cf93a6e",
-    "hash": "cf44c98e294acf0069d7f8079da5fe49e390723e68438968daafdc777c888441",
-    "reason": "Expose unsettled execution and ambiguous artifact delivery state to the managed desktop recovery lease; preserve runtime execution semantics."
+    "hash": "e28ad0cfcf9ca4e509522dd61c893756af3c6603931872f92f5a732a2bb78c8e",
+    "reason": "Merge main retained-uncertainty host leases for bounded status/resume with RC9 settled pre-upload checkpoint semantics."
   },
   "packages/loginom-runtime/client/lib/session.mjs": {
     "baseHash": "db89431390466874ef7ea709f5e8c866d1558dd54fc776c9ea1befd3bf286ef3",
@@ -41,8 +41,8 @@
   },
   "packages/loginom-runtime/client/test/executor.test.mjs": {
     "baseHash": "45efb45e922f9a347a6ce56763280d5edf8dde4d3a9840816bb8f4df44b7d519",
-    "hash": "bb4bddfae59b9a6979c889e5943872f0d62f211b2b77f3d98540805de20ac633",
-    "reason": "Cover the local host lifecycle: hasActiveWork/hasUnsettledWork on the runtime facade and unsettled artifact delivery exposure; upstream assertions retained."
+    "hash": "28c0bf7c16f276bae47caa268109a0d2c4c77327a75a276c261285d1d85d1372",
+    "reason": "Verify main retained ambiguous execution remains active for the owning host lease."
   },
   "packages/loginom-runtime/client/test/hooks.test.mjs": {
     "baseHash": "5eec1e38bd6b401eaf5c3b3a36fb06ab723ca1330013ba246621e60a6de6b290",
@@ -116,12 +116,52 @@
   },
   "packages/loginom-runtime/client/lib/node-target-browser.mjs": {
     "baseHash": "aebab1ef9bc8b6df4c13b5d06b8d28980b7affe07d7badf5a39b070503ded39a",
-    "reason": "Constrain automatic placement to validated model-coordinate bounds after zoom/translation/scroll instead of returning a point rejected by the target contract.",
-    "hash": "36f218139ed67c0489eed679167303840aa0825d64f6529da74234050ce301a1"
+    "hash": "f1f85940feab6756c84957364ccc2c56fba90be2d679e41e317c476ef3f160f8",
+    "reason": "Merge main bounded headed-browser port rendering waits and ordinary-node mask handling with RC9 complete native bindings, hover/rebind and bounded placement."
   },
   "packages/loginom-runtime/client/test/node-placement.test.mjs": {
     "baseHash": "4ce1a2ec34ce3c5b68dcacc15d05cc438e70ec7cddcc7ff3b76f7edc1038b278",
     "reason": "Exercise the real browser-adapter chooser at 150/200 percent zoom, translated viewports, and both model-coordinate bounds.",
     "hash": "2a04117979f38a7165f9e9d1a0b862c7c64982f64d0f7ba357ed895a4452f42d"
+  },
+  "packages/loginom-runtime/client/lib/artifact-discovery.mjs": {
+    "baseHash": "54b42a453c083e73e96b812a82d080d4b36645caaef65b4de41113702ba816ab",
+    "hash": "8b0763b6be72704b4f7e0adfe9ea1f3ed3a5f653d45523dfc0005c27b6028a93",
+    "reason": "Merge main Windows upload verification: wait for the final server-side size, refresh only the verified directory and retain bounded discovery."
+  },
+  "packages/loginom-runtime/client/lib/artifacts.mjs": {
+    "baseHash": "cf15b29e251069957916d4c1db31172fbeb34d42fc973e0cca82da8fe744dcef",
+    "hash": "8199c0cd5bc209aadc77571933391a01b9b3af72ff63e8af35565dc6b5b06ea5",
+    "reason": "Merge main Windows short private browser-facing transfer/output paths while retaining host-only artifact admission and verification."
+  },
+  "packages/loginom-runtime/client/lib/node-operation-runner.mjs": {
+    "baseHash": "04b740ef6b0cd2bb6a9da1a88f75e80d27c1f0f0dca73acfcd03f83d9d741e8d",
+    "hash": "079319f3b61f4b1620c7142271596cbe03e20aa9c5cea02c940395b00495d615",
+    "reason": "Merge main unsettled job state with RC9 active job snapshots and immutable ID-only resume."
+  },
+  "packages/loginom-runtime/client/lib/platform.mjs": {
+    "baseHash": "5bd3c93fd075b22a376fc14e8bd465ed348ad79797a4d570a021bf7e6dd37999",
+    "hash": "c3921b0bdfccae5bcf1e1d354f72e3cd27c246834283fce76fea5a827a61e108",
+    "reason": "Merge main Windows directory protection using absolute OS-owned whoami and icacls paths."
+  },
+  "packages/loginom-runtime/client/test/artifact-discovery.test.mjs": {
+    "baseHash": "808decca4fd2ccc1fa7db20a1c9cc52d2c07bbaa386b226475eafba8e30bfd3c",
+    "hash": "8e9fbe8e9edd149368fb978439340642c1ae648a3a10fff3432a308da79a2207",
+    "reason": "Cover main Windows delayed upload size publication and verified-directory refresh."
+  },
+  "packages/loginom-runtime/client/test/artifacts.test.mjs": {
+    "baseHash": "c1d81f52b4d7098f840098bf1b391ba421b3db758d091879a4c6dad4dd98085d",
+    "hash": "ed34ccd4042cee1893d37721e0ac549b0ad0aaf2dfe56e69894162710033a1b2",
+    "reason": "Cover main Windows short private browser-facing transfer paths."
+  },
+  "packages/loginom-runtime/client/test/text-export-connect.test.mjs": {
+    "baseHash": "115c7fb88c1c3a128bd4b4b5da4edff2287d31d32fa9356418d215fb1bdcb4c8",
+    "hash": "6ada240b4a961f03f41e4065cdd757f40b727e5f1b93567cb3eae2755ed336ab",
+    "reason": "Merge main ordinary-node transient mask regression with RC9 export-link identity checks."
+  },
+  "packages/loginom-runtime/client/test/node-target.test.mjs": {
+    "baseHash": "040ed302e9817e19f8beb5f825747be5cc683ee596ed172f70eaedd620596dcb",
+    "hash": "a810dfb7fd46b26e86b4fba346cf1d7d2d42940b455b5d92af084579f98fbf34",
+    "reason": "Verify merged read-only port observation with deterministic transient, caller-deadline and 15-second render-deadline coverage instead of the superseded three-attempt limit."
   }
 }

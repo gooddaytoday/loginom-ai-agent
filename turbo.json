@@ -8,10 +8,18 @@
       "dependsOn": [],
       "outputs": ["dist/**"]
     },
-    "opencode#test": {
+    "@loginom-ai-agent/plugin#build": {
+      "dependsOn": ["@loginom-ai-agent/sdk#build"],
+      "outputs": ["dist/**"]
+    },
+    "@loginom-ai-agent/agent#test": {
       "dependsOn": ["^build"],
       "outputs": [],
       "passThroughEnv": ["*"]
+    },
+    "@loginom-ai-agent/loginom-host#test": {
+      "outputs": [],
+      "passThroughEnv": ["LOGINOM_AI_AGENT_TEST_NODE"]
     },
     "@loginom-ai-agent/core#test": {
       "dependsOn": ["^build"],

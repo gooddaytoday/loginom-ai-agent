@@ -15,10 +15,30 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal) 
  const readDirectory=()=>ui(page,{...base,mode:'observe',root_ref:task.snapshot.observation_root.ref});
  const suffix=task.artifact.name.replace(/\s/g,'_').replace(/,/g,''),prefix=task.snapshot.workflow_ref.prefix;
  const tid=prefix+';FileStorageForm;colName_'+suffix,gridTid=prefix+';FileStorageForm;pnlFileStorage;tbl';
- const deadline=Date.now()+18000;
+ // Artifact verification already owns a 60-second browser budget. Leave a
+ // small transport margin, but allow slow Windows/Loginom uploads to publish
+ // their final size instead of imposing a separate short discovery timeout.
+ const deadline=Date.now()+55000;
+ let refreshes=0;
+ const refreshDirectory=async()=>{
+  const before=await readDirectory();
+  if(before.status!=='SUCCEEDED'||!context(before.output))return false;
+  const tid=before.output.workflow_ref.prefix+';FileStorageForm;btnRefresh';
+  const control=page.locator('[data-tid='+JSON.stringify(tid)+']');
+  if(await control.count()!==1||!await control.isVisible()||!await control.isEnabled())return false;
+  uncertain=true;
+  await control.click({timeout:10000});
+  await page.waitForTimeout(250);
+  const after=await readDirectory();
+  uncertain=false;
+  if(after.status!=='SUCCEEDED'||!context(after.output))return false;
+  moved=true;refreshes++;
+  trace.push({event:'artifact_directory_refreshed',attempt:refreshes});
+  return true;
+ };
  try {
   let reset=false;
-  for(let step=0;step<16&&Date.now()<deadline;step++) {
+  for(let step=0;step<96&&Date.now()<deadline;step++) {
    const directory=await readDirectory();
    if(directory.status!=='SUCCEEDED'||!context(directory.output))return result('DISCOVERY_DIRECTORY_CHANGED');
    const roots=await ui(page,{...base,mode:'observe',discover_roots:true,storage_name:task.artifact.name});
@@ -26,10 +46,20 @@ export async function discoverArtifactAndDownload(page,task,ui,download,reveal) 
    const matches=roots.output.ui.elements.filter(e=>e.tid===tid);
    if(matches.length>1)return result('DISCOVERY_FILE_AMBIGUOUS');
    if(matches.length===1) {
-    const ref=matches[0].ref,observed=await ui(page,{...base,mode:'observe',root_ref:ref});
+    const ref=matches[0].ref;let observed=await ui(page,{...base,mode:'observe',root_ref:ref});
     if(observed.status!=='SUCCEEDED'||!context(observed.output))return result('DISCOVERY_FILE_CONTEXT_CHANGED');
-    const files=observed.output.ui.elements.filter(e=>e.ref===ref&&e.tid===tid&&e.label===task.artifact.name);
+    let files=observed.output.ui.elements.filter(e=>e.ref===ref&&e.tid===tid&&e.label===task.artifact.name);
     if(files.length!==1)return result('DISCOVERY_FILE_IDENTITY_CHANGED');
+    // Loginom can publish a file row before its asynchronous server upload has
+    // committed the bytes. The rendered row is cached, so passive observation
+    // never updates it on Windows. Refresh the already verified directory and
+    // rediscover the row; never download or resubmit while its size differs.
+    if(files[0].storage_entry?.bytes!==task.artifact.bytes) {
+     trace.push({event:'artifact_file_size_pending',observed_bytes:files[0].storage_entry?.bytes??null,expected_bytes:task.artifact.bytes});
+     if(refreshes>=20||!await refreshDirectory())return result('DISCOVERY_FILE_SIZE_CHANGED');
+     continue;
+    }
+    trace.push({event:'artifact_file_size_verified',bytes:task.artifact.bytes});
     trace.push({event:'artifact_file_discovered',file_ref:ref,file_tid:tid,directory:task.artifact.upload.directory,scrolls:trace.length,document:observed.output.dom_epoch.document,workflow_ref:observed.output.workflow_ref,active_tab_ref:observed.output.active_tab_ref});
     const read=p=>ui(p,{...base,mode:'observe',root_ref:ref});
     const act=(p,snapshot)=>ui(p,{...base,mode:'act',snapshot,action:{verb:'double_click',ref}});

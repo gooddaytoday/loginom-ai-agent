@@ -28,6 +28,8 @@ export function createNodeOperationRunner({run,validate,progress}) {
  return Object.freeze({
   get busy(){return [...jobs.values()].some(job=>job.state==='running');},
   get active(){const job=[...jobs.values()].find(job=>job.state==='running');return job?snapshot(job):null;},
+  get unsettled(){return [...jobs.values()].some(job=>job.state==='running'||job.outcome?.status==='AMBIGUOUS'
+    ||job.outcome?.effect_possible===true&&job.outcome?.cleanup_complete!==true);},
   start(request,{resume=false}={}) {
    request=structuredClone(request);checkId(request.operation_id);
    if(resume&&Object.keys(request).length===1)request=structuredClone(find(request.operation_id).request);

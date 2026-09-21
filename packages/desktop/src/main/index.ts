@@ -52,7 +52,8 @@ import { migrate } from "./migrate"
 import { cleanupStoreFiles } from "./store-cleanup"
 import { startBackgroundCli } from "./background-cli"
 import { setNativeTranslations } from "./native-translations"
-import { loadSystemProxyEnvironment } from "./system-proxy"
+import { loadDesktopProxyEnvironment } from "./system-proxy"
+import { createQuitHandler } from "./shutdown"
 
 const TEST_ONBOARDING = process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING === "1"
 const SIDECAR_VERSION = process.env.LOGINOM_AI_AGENT_SIDECAR_V2 === "1" ? "v2" : "v1"
@@ -82,8 +83,8 @@ function emitDeepLinks(urls: string[]) {
 async function killSidecar() {
   if (!server) return
   const current = server
-  server = null
   await current.stop()
+  if (server === current) server = null
 }
 
 function ensureLoopbackNoProxy() {
@@ -159,9 +160,21 @@ const main = Effect.gen(function* () {
       },
     },
   )
-  const stopSidecars = async () => {
-    await killSidecar()
-    wslServers.stopAll()
+  let loginomStarting: ReturnType<typeof desktopLoginom> | undefined
+  let serverStarting: ReturnType<typeof spawnLocalServer> | undefined
+  let stopping: Promise<void> | undefined
+  const stopSidecars = () => {
+    stopping ??= (async () => {
+      try {
+        // Startup can still be admitting the backend when Cmd+Q arrives.
+        await serverStarting?.then((started) => started.listener.stop(), () => undefined)
+        await killSidecar()
+      } finally {
+        wslServers.stopAll()
+        await (await loginomStarting)?.close()
+      }
+    })()
+    return stopping
   }
   const relaunch = () => {
     setAppQuitting()
@@ -196,7 +209,7 @@ const main = Effect.gen(function* () {
   }
 
   const shellEnv = preferAppEnv(app.getPath("userData"))
-  const systemProxy = loadSystemProxyEnvironment(process.env)
+  const systemProxy = loadDesktopProxyEnvironment(process.env)
   if (systemProxy) {
     Object.assign(process.env, systemProxy)
     logger.log("system HTTP/HTTPS proxy settings applied", {
@@ -226,15 +239,15 @@ const main = Effect.gen(function* () {
     emitDeepLinks([url])
   })
 
-  app.on("before-quit", () => {
-    setAppQuitting()
-    void stopSidecars()
-  })
-
-  app.on("will-quit", () => {
-    setAppQuitting()
-    void stopSidecars()
-  })
+  app.on(
+    "before-quit",
+    createQuitHandler({
+      markQuitting: setAppQuitting,
+      stop: stopSidecars,
+      quit: () => app.quit(),
+      onError: (error) => logger.error("application shutdown failed", error),
+    }),
+  )
 
   app.on("child-process-gone", (_event, details) => {
     writeLog("utility", "child process gone", { details }, "error")
@@ -285,11 +298,11 @@ const main = Effect.gen(function* () {
     checkForUpdates: () => void showUpdaterDialog(updater, true),
     relaunch,
   }
-  const loginom = yield* Effect.promise(() => desktopLoginom())
+  if (stopping) return
+  loginomStarting = desktopLoginom()
+  const loginom = yield* Effect.promise(() => loginomStarting!)
+  if (stopping) return
   registerLoginomIpc(loginom.api)
-  app.on("before-quit", () => {
-    void loginom.close()
-  })
   registerIpcHandlers({
     killSidecar: () => killSidecar(),
     relaunch,
@@ -384,17 +397,22 @@ const main = Effect.gen(function* () {
     const url = `http://${hostname}:${port}`
     const password = randomUUID()
 
+    if (stopping) return
     logger.log("spawning sidecar", { url })
-    const { listener, health } = yield* Effect.promise(() =>
-      spawnLocalServer(hostname, port, password, {
-        userDataPath: app.getPath("userData"),
-        loginom,
-        onStdout: (message) => writeLog("server", "stdout", { message }),
-        onStderr: (message) => writeLog("server", "stderr", { message }, "warn"),
-        onExit: (code) => writeLog("utility", "sidecar exited", { code }, "warn"),
-      }),
-    )
+    serverStarting = spawnLocalServer(hostname, port, password, {
+      userDataPath: app.getPath("userData"),
+      loginom,
+      onStdout: (message) => writeLog("server", "stdout", { message }),
+      onStderr: (message) => writeLog("server", "stderr", { message }, "warn"),
+      onExit: (code) => writeLog("utility", "sidecar exited", { code }, "warn"),
+    })
+    const { listener, health } = yield* Effect.promise(() => serverStarting!)
     server = listener
+    if (stopping) {
+      void health.wait.catch(() => undefined)
+      yield* Effect.promise(() => killSidecar())
+      return
+    }
     yield* Deferred.succeed(serverReady, {
       url,
       username: "loginom-ai-agent",
@@ -418,6 +436,7 @@ const main = Effect.gen(function* () {
   }).pipe(forwardInitializationFailure(serverReady), Effect.forkChild)
 
   yield* Fiber.await(loadingTask)
+  if (stopping) return
 
   app.on("window-all-closed", () => {
     if (process.platform === "darwin") return

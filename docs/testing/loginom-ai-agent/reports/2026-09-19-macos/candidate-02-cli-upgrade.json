@@ -1,0 +1,30 @@
+{
+  "status": "PASS",
+  "archiveSha256": "5703670700781e5a97b0335db71fd3ac8a909724754bf5b492a6f04d79c02018",
+  "profileFilesPreserved": 2,
+  "encryptedEnvelopeRetained": true,
+  "installed": {
+    "destination": "/tmp/loginom-cli-installed.ZOXDbm/home/.local/share/loginom-ai-agent-cli/0.1.4-macos.20260919.2-dev",
+    "launcher": "/tmp/loginom-cli-installed.ZOXDbm/home/.local/bin/loginom-ai-agent-cli"
+  },
+  "version": "0.1.4-macos.20260919.2",
+  "oldEncryptedProfileStatus": {
+    "revision": 1,
+    "generation": 1,
+    "url": "http://logi-test-plan.bg.local/app/?testable=true",
+    "username": "user",
+    "folder": "/user",
+    "hasApiKey": true,
+    "hasPassword": false,
+    "state": "ready"
+  },
+  "oldHistoryRetained": {
+    "sessions": 1,
+    "messages": 3,
+    "parts": 10
+  },
+  "oldKeychainEnvelope": {
+    "status": "PASS",
+    "oldCiphertextReadableWithNewInstalledHelper": true
+  }
+}

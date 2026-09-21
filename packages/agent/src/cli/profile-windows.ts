@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process"
 import { win32 } from "node:path"
+import { windowsPowerShellArguments } from "@loginom-ai-agent/loginom-host/windows-powershell"
 
 // Called before creating the writer guard or writing profile data. Existing
 // profiles are inspected, never recursively rewritten to hide unsafe ACLs.
@@ -10,7 +11,7 @@ export async function protectWindowsProfile(root: string) {
   const script = `
 $ErrorActionPreference = 'Stop'
 try {
-  $path = [Console]::In.ReadToEnd()
+  $path = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String([Console]::In.ReadToEnd()))
   $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
   $item = Get-Item -LiteralPath $path -Force
   if (!$item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { exit 1 }
@@ -33,13 +34,27 @@ try {
     $security = Get-Acl -LiteralPath $entry.FullName
     if ($security.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) { exit 1 }
     $rules = $security.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])
-    $full = $false
+    $userFull = $false
     foreach ($access in $rules) {
+      # Deny entries only reduce access. Chromium adds an Everyone/Traverse
+      # deny to some LevelDB files, so rejecting denials makes a valid profile
+      # impossible to reopen without weakening its confidentiality.
+      if ($access.AccessControlType -eq [Security.AccessControl.AccessControlType]::Deny) { continue }
       if ($access.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) { exit 1 }
-      if ($access.IdentityReference.Value -ne $sid.Value) { exit 1 }
-      if (($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -eq [Security.AccessControl.FileSystemRights]::FullControl) { $full = $true }
+      # Loginom runtime directories deliberately retain LocalSystem so that
+      # Windows can service Chromium files. Other allows are handled narrowly.
+      if ($access.IdentityReference.Value -ne $sid.Value -and $access.IdentityReference.Value -ne 'S-1-5-18') {
+        # Chromium grants its restricted AppContainer capability modify access
+        # to cache/network directories. Accept that narrow SID class only
+        # inside browser-profile and never with FullControl.
+        $browserCapability = @($entry.FullName.Split([IO.Path]::DirectorySeparatorChar)) -contains 'browser-profile' -and
+          $access.IdentityReference.Value -match '^S-1-15-3-1024-(?:[0-9]+-){7}[0-9]+$' -and
+          ($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne [Security.AccessControl.FileSystemRights]::FullControl
+        if (!$browserCapability) { exit 1 }
+      }
+      if ($access.IdentityReference.Value -eq $sid.Value -and ($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -eq [Security.AccessControl.FileSystemRights]::FullControl) { $userFull = $true }
     }
-    if (!$full) { exit 1 }
+    if (!$userFull) { exit 1 }
     if ($entry.PSIsContainer) {
       foreach ($child in @(Get-ChildItem -LiteralPath $entry.FullName -Force)) { $items.Enqueue($child) }
     }
@@ -50,13 +65,7 @@ try {
   await new Promise<void>((resolve, reject) => {
     const child = execFile(
       win32.join(systemRoot, "System32/WindowsPowerShell/v1.0/powershell.exe"),
-      [
-        "-NoLogo",
-        "-NoProfile",
-        "-NonInteractive",
-        "-EncodedCommand",
-        Buffer.from(script, "utf16le").toString("base64"),
-      ],
+      windowsPowerShellArguments(script),
       { env: { SystemRoot: systemRoot }, windowsHide: true, timeout: 30000, maxBuffer: 1024 },
       (error, stdout) => {
         if (error || stdout !== "OK") return reject(Error("PROFILE_PERMISSIONS_INVALID"))
@@ -64,6 +73,6 @@ try {
       },
     )
     child.stdin?.on("error", () => reject(Error("PROFILE_PERMISSIONS_INVALID")))
-    child.stdin?.end(root)
+    child.stdin?.end(Buffer.from(root, "utf16le").toString("base64"))
   })
 }

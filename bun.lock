@@ -522,7 +522,7 @@
     },
     "packages/desktop": {
       "name": "@loginom-ai-agent/desktop",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "dependencies": {
         "@zip.js/zip.js": "2.7.62",
         "drizzle-orm": "catalog:",
@@ -710,6 +710,8 @@
         "effect": "catalog:",
       },
       "devDependencies": {
+        "@lydell/node-pty": "catalog:",
+        "@modelcontextprotocol/sdk": "1.29.0",
         "@tsconfig/node22": "catalog:",
         "@types/bun": "catalog:",
         "@types/node": "catalog:",

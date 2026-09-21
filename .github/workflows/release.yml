@@ -1,0 +1,489 @@
+name: release
+
+run-name: ${{ github.ref_type == 'tag' && format('release {0}', github.ref_name) || format('release {0} from {1}', inputs.mode || 'candidate', github.ref_name) }}
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "candidate builds and tests this ref without publishing; cut bumps the version, commits and pushes a tag from main or dev"
+        type: choice
+        options:
+          - candidate
+          - cut
+        default: candidate
+      bump:
+        description: "cut: semver part to bump relative to the root package.json version (ignored when version is set)"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        required: false
+      version:
+        description: "cut: explicit version X.Y.Z[-pre.N]; overrides bump"
+        type: string
+        required: false
+        default: ""
+      channel:
+        description: "candidate: release channel of the build"
+        type: choice
+        options:
+          - prod
+          - beta
+        default: prod
+
+# Distinct from the tests- group of the reusable test workflow so a called run can never cancel this one.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  cut:
+    name: cut
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'cut'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Require main or dev
+        if: github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Release cuts must be dispatched from main or dev, not $GITHUB_REF"
+          exit 1
+
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      # The App token makes the tag push emit a push event; GITHUB_TOKEN pushes would not start the release run.
+      - name: Setup git committer
+        uses: ./.github/actions/setup-git-committer
+        with:
+          opencode-app-id: ${{ vars.LOGINOM_AI_AGENT_APP_ID }}
+          opencode-app-secret: ${{ secrets.LOGINOM_AI_AGENT_APP_SECRET }}
+
+      - name: Set version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "$VERSION" ]; then
+            bun script/set-version.ts --version "$VERSION"
+          elif [ -n "$BUMP" ]; then
+            bun script/set-version.ts --bump "$BUMP"
+          else
+            echo "::error::Provide bump or version for a release cut"
+            exit 1
+          fi
+
+      - name: Commit, tag and push
+        env:
+          TAG: v${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag $TAG already exists"
+            exit 1
+          fi
+          # The bumped manifests and lockfile must still install frozen, exactly as the release build will.
+          bun install --frozen-lockfile
+          git add package.json packages/desktop/package.json bun.lock
+          if git diff --cached --quiet; then
+            echo "Version ${TAG#v} is already committed"
+          else
+            git commit -m "chore(release): $TAG"
+          fi
+          git tag -a "$TAG" -m "$TAG"
+          git push --atomic --no-verify origin "HEAD:$GITHUB_REF_NAME" "refs/tags/$TAG"
+          echo "Pushed \`$TAG\` to $GITHUB_REF_NAME; the tag push starts the release build." >> "$GITHUB_STEP_SUMMARY"
+
+  verify:
+    name: verify
+    # Any push (a tag, or a branch if a push trigger is ever added) and candidate dispatches build; only tags release.
+    if: github.event_name == 'push' || inputs.mode == 'candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      channel: ${{ steps.release.outputs.channel }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Resolve version and channel
+        id: release
+        env:
+          CHANNEL_INPUT: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          root=$(jq -er .version package.json)
+          desktop=$(jq -er .version packages/desktop/package.json)
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+            if [ "$version" != "$root" ] || [ "$version" != "$desktop" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match package.json ($root) and packages/desktop/package.json ($desktop); commit script/set-version.ts output before tagging"
+              exit 1
+            fi
+            case "$version" in
+              *-*) channel=beta; prerelease=true ;;
+              *) channel=prod; prerelease=false ;;
+            esac
+          else
+            # electron-builder versions the Desktop from packages/desktop/package.json; candidates follow it.
+            version="$desktop"
+            channel="${CHANNEL_INPUT:-prod}"
+            prerelease=false
+            if [ "$root" != "$desktop" ]; then
+              echo "::warning::package.json ($root) and packages/desktop/package.json ($desktop) differ; the candidate uses $desktop"
+            fi
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Version '$version' is not X.Y.Z[-pre.N]"
+            exit 1
+          fi
+          if [ "$channel" != "prod" ]; then
+            echo "::warning::The Docker matrix installs /opt/loginom-ai-agent (prod slug); the $channel channel fails linux-matrix until run-matrix.ts is channel-aware"
+          fi
+          {
+            echo "version=$version"
+            echo "channel=$channel"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+          echo "Building version \`$version\` on channel \`$channel\` (prerelease: $prerelease)" >> "$GITHUB_STEP_SUMMARY"
+
+  tests:
+    name: tests
+    needs: verify
+    uses: ./.github/workflows/test.yml
+    secrets: inherit
+    permissions:
+      contents: read
+
+  typecheck:
+    needs: verify
+    uses: ./.github/workflows/typecheck.yml
+    permissions:
+      contents: read
+
+  build:
+    name: build (linux)
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    env:
+      LOGINOM_AI_AGENT_VERSION: ${{ needs.verify.outputs.version }}
+      LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # Electron runs as Node for write-manifest.ts; dpkg-deb and unsquashfs extract the installers.
+      - name: Install Linux packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-3-0t64 libnss3 libgbm1 libasound2t64 squashfs-tools
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      - name: Setup pinned Node and Chromium
+        uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Build desktop
+        working-directory: packages/desktop
+        env:
+          # electron-vite bundles the whole backend into the main process; give V8 room for that bundle.
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          bun run build
+          bun typecheck
+
+      - name: Package desktop
+        working-directory: packages/desktop
+        run: bun run package:linux --x64 --publish never
+
+      - name: Build CLI
+        run: |
+          mkdir -p "$RUNNER_TEMP/cli"
+          bun packages/loginom-host/script/build-cli.ts "$RUNNER_TEMP/cli/loginom-ai-agent-cli-linux-x64"
+
+      # write-manifest.ts runs node_modules/electron/dist/electron as Node to record the bundled
+      # Electron versions; bun install does not leave that binary behind, and electron-builder
+      # keeps its own copy, so fetch it explicitly (reuses the electron download cache).
+      - name: Install Electron binary for the release manifest
+        working-directory: packages/desktop
+        run: node node_modules/electron/install.js
+
+      - name: Write release manifest and verify Linux installers
+        run: |
+          set -euo pipefail
+          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+            echo "::error::The build left the tree dirty; write-manifest.ts requires committed inputs"
+            git status --porcelain --untracked-files=all
+            exit 1
+          fi
+          git archive --format=tar.gz --output="packages/desktop/dist/loginom-ai-agent-${LOGINOM_AI_AGENT_VERSION}-source.tar.gz" HEAD
+          cd packages/desktop
+          bun scripts/release/write-manifest.ts --target linux-x64 --version "$LOGINOM_AI_AGENT_VERSION" --channel "$LOGINOM_AI_AGENT_CHANNEL" --dist dist --resources resources/loginom --output dist/release-manifest.json
+          bun scripts/release/verify-artifact.ts --manifest dist/release-manifest.json --artifact dist/loginom-ai-agent-linux-amd64.deb --report dist/static-deb.json
+          bun scripts/release/verify-artifact.ts --manifest dist/release-manifest.json --artifact dist/loginom-ai-agent-linux-x86_64.AppImage --report dist/static-appimage.json
+
+      # Flatten installers, reports and CLI archives so downloads have predictable top-level names.
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/upload"
+          find packages/desktop/dist "$RUNNER_TEMP/cli" -maxdepth 1 -type f ! -name 'builder-*' -exec cp {} "$RUNNER_TEMP/upload/" \;
+          ls -la "$RUNNER_TEMP/upload"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-linux
+          path: ${{ runner.temp }}/upload
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    name: build (windows)
+    needs: verify
+    runs-on: windows-2025
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      LOGINOM_AI_AGENT_VERSION: ${{ needs.verify.outputs.version }}
+      LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.19.0"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: "1.3.14"
+      - name: Setup pinned Node and Chromium
+        uses: ./.github/actions/setup-loginom-inputs
+      - name: Build both Windows products
+        timeout-minutes: 60
+        run: |
+          & ./script/build-windows.ps1 -Product Both -OutputDirectory "$env:RUNNER_TEMP/windows" -NodeSource $env:LOGINOM_AI_AGENT_NODE_SOURCE -BrowserSource $env:LOGINOM_AI_AGENT_BROWSER_SOURCE -BunPath (Get-Command bun).Source -Channel $env:LOGINOM_AI_AGENT_CHANNEL
+      - name: Verify Windows source and packaging
+        working-directory: packages/desktop
+        run: |
+          bun typecheck
+          if ($LASTEXITCODE -ne 0) { throw "Desktop typecheck failed" }
+          bun test electron-builder.config.test.ts scripts/copy-icons.test.ts scripts/release/artifact.test.ts src/main/apps.test.ts src/main/system-proxy.test.ts src/main/shutdown.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Desktop tests failed" }
+      - name: Verify settings regression
+        working-directory: packages/app
+        run: |
+          bun typecheck
+          if ($LASTEXITCODE -ne 0) { throw "App typecheck failed" }
+          bun test --conditions=browser --preload ./happydom.ts ./test-browser/settings-loginom.test.ts ./test-browser/settings-keybinds.test.ts ./test-browser/toast-owner.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Settings tests failed" }
+      - name: Verify native Windows host and CLI
+        run: |
+          Push-Location packages/loginom-host
+          bun typecheck
+          if ($LASTEXITCODE -ne 0) { throw "Host typecheck failed" }
+          bun test test/windows-powershell.test.ts test/native-proxy.test.ts test/cli-credentials.test.ts test/cli-install-windows.test.ts test/cli-manifest.test.ts test/process.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Native host tests failed" }
+          Pop-Location
+          Push-Location packages/agent
+          bun typecheck
+          if ($LASTEXITCODE -ne 0) { throw "Agent typecheck failed" }
+          Pop-Location
+          & ./script/test-windows-profile.ps1
+      - name: Write Windows manifest and verify installer
+        run: |
+          $dist = "$env:RUNNER_TEMP/windows/desktop"
+          git archive --format=tar.gz "--output=$dist/loginom-ai-agent-$env:LOGINOM_AI_AGENT_VERSION-windows-source.tar.gz" HEAD
+          if ($LASTEXITCODE -ne 0) { throw "Source archive failed" }
+          bun packages/desktop/scripts/release/write-manifest.ts --target win32-x64 --version $env:LOGINOM_AI_AGENT_VERSION --channel $env:LOGINOM_AI_AGENT_CHANNEL --dist $dist --resources "$dist/win-unpacked/resources/loginom" --output "$dist/windows-release-manifest.json"
+          if ($LASTEXITCODE -ne 0) { throw "Manifest failed" }
+          bun packages/desktop/scripts/release/verify-artifact.ts --manifest "$dist/windows-release-manifest.json" --artifact "$dist/loginom-ai-agent-win-x64.exe" --unpacked "$dist/win-unpacked" --report "$dist/static-nsis.json"
+          if ($LASTEXITCODE -ne 0) { throw "Installer verification failed" }
+          if ((Get-AuthenticodeSignature -LiteralPath "$dist/loginom-ai-agent-win-x64.exe").Status -ne "NotSigned") { throw "Expected unsigned Windows candidate" }
+      - name: Collect Windows artifacts
+        run: |
+          $upload = New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/windows-upload"
+          Copy-Item -Path "$env:RUNNER_TEMP/windows/desktop/*-win-x64.exe", "$env:RUNNER_TEMP/windows/desktop/*-source.tar.gz", "$env:RUNNER_TEMP/windows/desktop/windows-release-manifest.json*", "$env:RUNNER_TEMP/windows/desktop/static-nsis.json", "$env:RUNNER_TEMP/windows/loginom-ai-agent-cli-*.zip*" -Destination $upload.FullName
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: loginom-windows
+          path: ${{ runner.temp }}/windows-upload
+          if-no-files-found: error
+          retention-days: 14
+
+  macos:
+    name: build (macos)
+    needs: verify
+    runs-on: macos-14
+    timeout-minutes: 120
+    env:
+      LOGINOM_AI_AGENT_VERSION: ${{ needs.verify.outputs.version }}
+      LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.19.0"
+          architecture: arm64
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: "1.3.14"
+      - name: Setup pinned Node and Chromium
+        uses: ./.github/actions/setup-loginom-inputs
+      - name: Install locked macOS dependencies
+        run: |
+          test "$(uname -m)" = arm64
+          bun install --frozen-lockfile --filter loginom-ai-agent --filter '@loginom-ai-agent/desktop' --filter '@loginom-ai-agent/agent' --filter '@loginom-ai-agent/loginom-host' --filter '@loginom-ai-agent/product'
+          node packages/desktop/node_modules/electron/install.js
+      - name: Verify macOS source
+        run: bun packages/desktop/scripts/check-macos.ts "$RUNNER_TEMP/macos-source-checks.json"
+      - name: Build, verify and offline-smoke both macOS products
+        timeout-minutes: 75
+        run: bun packages/desktop/scripts/build-macos.ts --output "$RUNNER_TEMP/macos" --version "$LOGINOM_AI_AGENT_VERSION"
+      - name: Collect platform-specific metadata
+        run: |
+          mv "$RUNNER_TEMP/macos/release-manifest.json" "$RUNNER_TEMP/macos/macos-release-manifest.json"
+          mv "$RUNNER_TEMP/macos/release-manifest.json.sha256" "$RUNNER_TEMP/macos/macos-release-manifest.json.sha256"
+          mv "$RUNNER_TEMP/macos/build-report.json" "$RUNNER_TEMP/macos/macos-build-report.json"
+          mv "$RUNNER_TEMP/macos/offline-smoke.json" "$RUNNER_TEMP/macos/macos-offline-smoke.json"
+          cp "$RUNNER_TEMP/macos-source-checks.json" "$RUNNER_TEMP/macos/"
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: loginom-macos
+          path: |
+            ${{ runner.temp }}/macos/*.dmg
+            ${{ runner.temp }}/macos/*.zip
+            ${{ runner.temp }}/macos/*.tar.gz
+            ${{ runner.temp }}/macos/*.sha256
+            ${{ runner.temp }}/macos/*.json
+          if-no-files-found: error
+          retention-days: 14
+
+  linux-matrix:
+    name: linux-matrix
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: loginom-linux
+          path: ${{ runner.temp }}/linux
+
+      # Ubuntu 24.04 hosts deny user namespaces to unconfined processes, and run-matrix.ts starts the
+      # containers with apparmor=unconfined, so the sandboxed Chromium zygote inside them could not
+      # clone(CLONE_NEWUSER). This host sysctl lifts that restriction; the browser sandbox stays on.
+      - name: Allow unprivileged user namespaces for the Chromium sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Run offline non-root OS matrix
+        run: bun packages/desktop/test/loginom/docker/run-matrix.ts --artifact "$RUNNER_TEMP/linux/loginom-ai-agent-linux-amd64.deb" --output "$RUNNER_TEMP/linux-matrix"
+
+      - name: Upload matrix report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-linux-matrix
+          path: ${{ runner.temp }}/linux-matrix
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: release
+    # Every platform must pass before a complete draft release can be created.
+    needs: [verify, tests, typecheck, build, linux-matrix, windows, macos]
+    if: always() && github.event_name == 'push' && github.ref_type == 'tag' && needs.verify.result == 'success' && needs.tests.result == 'success' && needs.typecheck.result == 'success' && needs.build.result == 'success' && needs.linux-matrix.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      CHANNEL: ${{ needs.verify.outputs.channel }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Download artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: loginom-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/assets
+
+      - name: Write SHA256SUMS and release notes
+        run: |
+          set -euo pipefail
+          # Only linux-matrix.json from the matrix artifact is published; its logs stay in the workflow artifact.
+          find "$RUNNER_TEMP/assets" -name '*.log' -delete
+          bun script/release-notes.ts --tag "$TAG" --channel "$CHANNEL" --assets "$RUNNER_TEMP/assets" --output "$RUNNER_TEMP/notes.md"
+
+      - name: Create draft release
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --json isDraft >/dev/null 2>&1; then
+            echo "::error::A release for $TAG already exists; delete the stale draft before re-running"
+            exit 1
+          fi
+          args=(--draft --prerelease --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md")
+          url=$(gh release create "$TAG" "${args[@]}" "$RUNNER_TEMP"/assets/*)
+          {
+            echo "Draft release: $url"
+            echo
+            cat "$RUNNER_TEMP/notes.md"
+          } >> "$GITHUB_STEP_SUMMARY"

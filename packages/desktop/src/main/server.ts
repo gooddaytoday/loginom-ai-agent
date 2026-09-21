@@ -181,12 +181,10 @@ export async function spawnLocalServer(
         if (stopping) return stopping
         if (exited) return Promise.resolve()
         child.postMessage({ type: "stop" })
-        stopping = Promise.race([
-          exit.promise.then(() => undefined),
-          delay(SIDECAR_STOP_TIMEOUT).then(() => {
-            if (!exited) child.kill()
-          }),
-        ])
+        const timeout = setTimeout(() => {
+          if (!exited) child.kill()
+        }, SIDECAR_STOP_TIMEOUT)
+        stopping = exit.promise.then(() => undefined).finally(() => clearTimeout(timeout))
         return stopping
       },
     },
@@ -228,10 +226,6 @@ function createSidecarEnv(): Record<string, string> {
   delete env.DEBUG
   if (process.platform === "linux") delete env.LD_PRELOAD
   return env
-}
-
-function delay(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms))
 }
 
 function serializeError(error: unknown) {

@@ -1,7 +1,7 @@
 import { constants } from 'node:fs';
 import { access, lstat, mkdir, readFile, readlink, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { join } from 'node:path';
+import { join, win32 } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 export const isWindows = (platform = process.platform) => platform === 'win32';
@@ -13,7 +13,9 @@ export function privatePath(info, platform = process.platform) {
 }
 
 function windowsSid() {
-  const result = spawnSync('whoami.exe', ['/user', '/fo', 'csv', '/nh'], { encoding: 'utf8', windowsHide: true });
+  const root = process.env.SystemRoot ?? process.env.SYSTEMROOT;
+  if (!root || !win32.isAbsolute(root)) throw new Error('Cannot identify the Windows user for Dock permissions');
+  const result = spawnSync(win32.join(root, 'System32', 'whoami.exe'), ['/user', '/fo', 'csv', '/nh'], { encoding: 'utf8', windowsHide: true });
   if (result.error || result.status !== 0) throw new Error('Cannot identify the Windows user for Dock permissions');
   const match = result.stdout.match(/"(S-1-[0-9-]+)"/i);
   if (!match) throw new Error('Cannot identify the Windows user for Dock permissions');
@@ -22,8 +24,10 @@ function windowsSid() {
 
 export function protectWindowsDirectory(path, platform = process.platform) {
   if (!isWindows(platform) || process.platform !== 'win32') return;
+  const root = process.env.SystemRoot ?? process.env.SYSTEMROOT;
+  if (!root || !win32.isAbsolute(root)) throw new Error('Cannot protect the Windows Dock directory');
   const sid = windowsSid();
-  const result = spawnSync('icacls.exe', [path, '/inheritance:r', '/grant:r', `*${sid}:(OI)(CI)F`, '*S-1-5-18:(OI)(CI)F'], {
+  const result = spawnSync(win32.join(root, 'System32', 'icacls.exe'), [path, '/inheritance:r', '/grant:r', `*${sid}:(OI)(CI)F`, '*S-1-5-18:(OI)(CI)F'], {
     encoding: 'utf8', windowsHide: true,
   });
   if (result.error || result.status !== 0) throw new Error('Cannot protect the Windows Dock directory');

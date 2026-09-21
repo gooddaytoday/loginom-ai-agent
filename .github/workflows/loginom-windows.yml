@@ -1,0 +1,145 @@
+name: Loginom Windows candidate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/loginom-windows.yml"
+      - "bun.lock"
+      - "package.json"
+      - "script/build-windows.ps1"
+      - "packages/agent/**"
+      - "packages/app/**"
+      - "packages/desktop/**"
+      - "packages/loginom-host/**"
+      - "packages/loginom-runtime/**"
+      - "packages/product/**"
+      - "packages/schema/**"
+      - "packages/ui/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: loginom-windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-package-test:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      LOGINOM_AI_AGENT_CHANNEL: dev
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.19.0"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: "1.3.14"
+
+      - name: Resolve pinned portable inputs
+        shell: pwsh
+        run: |
+          $node = (Get-Command node.exe -CommandType Application -ErrorAction Stop).Source
+          $bun = (Get-Command bun.exe -CommandType Application -ErrorAction Stop).Source
+          if ((& $node --version) -ne "v24.19.0") { throw "Unexpected Node version" }
+          if ((& $bun --version) -ne "1.3.14") { throw "Unexpected Bun version" }
+          $browsers = Join-Path $env:RUNNER_TEMP "loginom-browsers"
+          New-Item -ItemType Directory -Force -Path $browsers | Out-Null
+          "PLAYWRIGHT_BROWSERS_PATH=$browsers" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "LOGINOM_AI_AGENT_BROWSER_SOURCE=$browsers" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "LOGINOM_WINDOWS_OUTPUT=$(Join-Path $env:RUNNER_TEMP 'loginom-windows')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "LOGINOM_CI_NODE_SOURCE=$node" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "LOGINOM_CI_BUN_PATH=$bun" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Provision pinned Chromium input
+        working-directory: packages/loginom-runtime/client
+        shell: pwsh
+        run: |
+          npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
+          & $env:LOGINOM_CI_NODE_SOURCE node_modules/playwright/cli.js install chromium
+          $browser = Join-Path $env:PLAYWRIGHT_BROWSERS_PATH "chromium-1243\chrome-win64\chrome.exe"
+          if (-not (Test-Path -LiteralPath $browser -PathType Leaf)) { throw "Pinned Chromium executable is missing: $browser" }
+
+      - name: Build Desktop and CLI from a clean checkout
+        shell: pwsh
+        run: |
+          & .\script\build-windows.ps1 `
+            -Product Both `
+            -OutputDirectory (Join-Path $env:RUNNER_TEMP "loginom-windows") `
+            -NodeSource $env:LOGINOM_CI_NODE_SOURCE `
+            -BrowserSource $env:LOGINOM_AI_AGENT_BROWSER_SOURCE `
+            -BunPath $env:LOGINOM_CI_BUN_PATH `
+            -Channel dev
+
+      - name: Run package-local checks
+        shell: pwsh
+        run: |
+          Push-Location packages/desktop
+          try {
+            & $env:LOGINOM_CI_BUN_PATH typecheck
+            if ($LASTEXITCODE -ne 0) { throw "Desktop typecheck failed" }
+            & $env:LOGINOM_CI_BUN_PATH test electron-builder.config.test.ts scripts/copy-icons.test.ts scripts/release/artifact.test.ts src/main/apps.test.ts src/main/system-proxy.test.ts
+            if ($LASTEXITCODE -ne 0) { throw "Desktop Windows package tests failed" }
+          } finally { Pop-Location }
+          Push-Location packages/loginom-host
+          try {
+            $env:LOGINOM_AI_AGENT_TEST_NODE = $env:LOGINOM_CI_NODE_SOURCE
+            & $env:LOGINOM_CI_BUN_PATH typecheck
+            if ($LASTEXITCODE -ne 0) { throw "Host typecheck failed" }
+            & $env:LOGINOM_CI_BUN_PATH test test/native-proxy.test.ts test/cli-credentials.test.ts test/cli-install-windows.test.ts test/cli-manifest.test.ts test/process.test.ts
+            if ($LASTEXITCODE -ne 0) { throw "CLI Windows package tests failed" }
+          } finally { Pop-Location }
+          Push-Location packages/agent
+          try {
+            & $env:LOGINOM_CI_BUN_PATH typecheck
+            if ($LASTEXITCODE -ne 0) { throw "Agent typecheck failed" }
+            & $env:LOGINOM_CI_BUN_PATH test test/cli/profile-windows.test.ts
+            if ($LASTEXITCODE -ne 0) { throw "Windows profile tests failed" }
+          } finally { Pop-Location }
+
+      - name: Verify unsigned candidate outputs
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP "loginom-windows"
+          $installer = @(Get-ChildItem -LiteralPath (Join-Path $output "desktop") -Filter "*-win-x64.exe" -File)
+          $archive = @(Get-ChildItem -LiteralPath $output -Filter "loginom-ai-agent-cli-*-win32-x64.zip" -File)
+          if ($installer.Count -ne 1) { throw "Expected exactly one Desktop installer, found $($installer.Count)" }
+          if ($archive.Count -ne 1) { throw "Expected exactly one CLI archive, found $($archive.Count)" }
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer[0].FullName
+          if ($signature.Status -ne "NotSigned") { throw "Expected an unsigned development installer, got $($signature.Status)" }
+          $checksumPath = $archive[0].FullName + ".sha256"
+          if (-not (Test-Path -LiteralPath $checksumPath -PathType Leaf)) { throw "CLI checksum is missing" }
+          $expected = ((Get-Content -LiteralPath $checksumPath -Raw).Trim() -split "\s+")[0]
+          $actual = (Get-FileHash -LiteralPath $archive[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($expected -ne $actual) { throw "CLI archive checksum mismatch" }
+          $summary = [ordered]@{
+            commit = $env:GITHUB_SHA
+            runner = "windows-2022"
+            channel = "dev"
+            signed = $false
+            node = (& $env:LOGINOM_CI_NODE_SOURCE --version)
+            bun = (& $env:LOGINOM_CI_BUN_PATH --version)
+            chromium_revision = "1243"
+            desktop = [ordered]@{ name = $installer[0].Name; bytes = $installer[0].Length; sha256 = (Get-FileHash -LiteralPath $installer[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+            cli = [ordered]@{ name = $archive[0].Name; bytes = $archive[0].Length; sha256 = $actual }
+          }
+          $summary | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $output "ci-summary.json") -Encoding utf8
+
+      - name: Upload short-lived unsigned candidates
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: loginom-windows-unsigned-${{ github.run_id }}
+          path: |
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/desktop/*-win-x64.exe
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/loginom-ai-agent-cli-*-win32-x64.zip
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/loginom-ai-agent-cli-*-win32-x64.zip.sha256
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/ci-summary.json
+          if-no-files-found: error
+          retention-days: 7

@@ -126,19 +126,39 @@ test('native adapter never retries a foreign-workflow read error',async()=>{
  const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:async()=>{calls++;throw new Error('Prepared workflow changed');}});
  await assert.rejects(adapter.observe(request(),Date.now()+1000),/workflow changed/);assert.equal(calls,1);
 });
-test('native adapter rechecks full graph after pending port paint and bounds persistent failures',async()=>{
+for(const [label,persistent,budget] of [
+ ['transient paint',false,1000],
+ ['caller deadline',true,800],
+ ['render deadline',true,20000],
+])test('native adapter rechecks full graph and bounds pending port observation: '+label,async t=>{
  const {createNodeTargetBrowserAdapter}=await import('../lib/node-target-browser.mjs');
- for(const persistent of [false,true]){
-  let reads=0,paints=0;
-  const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:async code=>{
-   assert.ok(!code.includes('async function mutateGraph'));
-   if(code.includes('requestAnimationFrame')){paints++;return true;}
-   reads++;if(persistent||reads===1)throw Error('Visible port identity is not rendered');
-   return {complete:true,nodes:['unchanged'],links:['unchanged']};
-  }});
-  if(persistent){await assert.rejects(adapter.observe(request(),Date.now()+1000),/Visible port/);assert.equal(reads,3);assert.equal(paints,2);}
-  else{assert.deepEqual(await adapter.observe(request(),Date.now()+1000),{complete:true,nodes:['unchanged'],links:['unchanged']});assert.equal(reads,2);assert.equal(paints,1);}
+ t.mock.timers.enable({apis:['Date','setTimeout'],now:10000});
+ const started=Date.now(),limit=Math.min(budget,15000),reads=[],outcome={};let paints=0;
+ const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:async code=>{
+  assert.ok(!code.includes('async function mutateGraph'));
+  if(code.includes('requestAnimationFrame')){paints++;return true;}
+  assert.ok(code.includes('async function readGraph'));
+  reads.push(Date.now()-started);
+  if(persistent||reads.length===1)throw Error('Visible port identity is not rendered');
+  return {complete:true,nodes:['unchanged'],links:['unchanged']};
+ }});
+ void adapter.observe(request(),started+budget).then(result=>{outcome.result=result;},error=>{outcome.error=error;});
+ // Flush browser-read microtasks between fake-clock ticks; no real retry delay
+ // or mutation is needed to exercise the caller and 15-second render bounds.
+ for(let elapsed=0;elapsed<=limit+80;elapsed+=20){
+  await new Promise(setImmediate);
+  if(outcome.result||outcome.error)break;
+  t.mock.timers.tick(20);
  }
+ if(persistent){
+  assert.match(outcome.error?.message??'observation did not settle',/Visible port identity is not rendered/);
+  assert.equal(reads[0],0);assert.ok(reads.length>2);
+  assert.ok(reads.at(-1)>=limit);assert.ok(reads.at(-1)<limit+80);
+  assert.ok(reads.slice(0,-1).every(elapsed=>elapsed<limit));
+  assert.equal(paints,reads.length-1);return;
+ }
+ assert.deepEqual(outcome.result,{complete:true,nodes:['unchanged'],links:['unchanged']});
+ assert.deepEqual(reads,[0,80]);assert.equal(paints,1);
 });
 test('Union lost Input_Add or connection reply cannot create a duplicate on retry',async()=>{
  for(const kind of ['add_input','connect']){

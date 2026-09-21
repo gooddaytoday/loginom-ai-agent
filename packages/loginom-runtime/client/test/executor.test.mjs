@@ -524,7 +524,7 @@ test('host lifecycle distinguishes an active operation from retained uncertainty
     assert.equal(engine.hasUnsettledWork(), true);
     resume.resolve();
     assert.equal((await work).status, ambiguous ? 'AMBIGUOUS' : 'SUCCEEDED');
-    assert.equal(engine.hasActiveWork(), false);
+    assert.equal(engine.hasActiveWork(), ambiguous);
     assert.equal(engine.hasUnsettledWork(), ambiguous);
   }
 });

@@ -26,6 +26,9 @@ async function signWindows(configuration: { path: string }) {
 // FPM also creates desktop entries outside appOutDir; their modes must not inherit a private shell umask.
 if (process.platform === "linux") process.umask(0o022)
 
+// Ad-hoc test artifacts must never select a certificate from the local keychain.
+if (process.platform === "darwin") process.env.CSC_IDENTITY_AUTO_DISCOVERY = "false"
+
 const channel = productChannel(process.env.LOGINOM_AI_AGENT_CHANNEL)
 const appId = Product.channels[channel]
 const config: Configuration = {
@@ -34,6 +37,9 @@ const config: Configuration = {
   productName: process.platform === "linux" ? productSlug(channel) : productName(channel),
   artifactName: Product.artifactName,
   publish: Product.updateFeed ? { provider: "generic", url: Product.updateFeed } : null,
+  // Native backend dependencies run in the bundled Node sidecar. Renderer/main
+  // dependencies use N-API or platform packages already selected by the lockfile.
+  npmRebuild: false,
   async afterPack(context) {
     if (context.electronPlatformName !== "linux") return
     await linuxPermissions(context.appOutDir)
@@ -44,20 +50,15 @@ const config: Configuration = {
     )
   },
   directories: { output: "dist", buildResources: "resources" },
-  extraMetadata: { productName: productName(channel), desktopName: `${appId}.desktop` },
+  extraMetadata: {
+    productName: productName(channel),
+    desktopName: `${appId}.desktop`,
+    ...(process.env.LOGINOM_AI_AGENT_VERSION ? { version: process.env.LOGINOM_AI_AGENT_VERSION } : {}),
+  },
   files: ["out/**/*", "resources/icons/**/*"],
   extraResources: [
     { from: "resources/loginom", to: "loginom" },
     { from: "resources/icons", to: "icons" },
-    ...(process.platform === "darwin"
-      ? [
-          {
-            from: "native/",
-            to: "native/",
-            filter: ["index.js", "index.d.ts", "build/Release/mac_window.node", "swift-build/**"],
-          },
-        ]
-      : []),
   ],
   protocols: { name: Product.name, schemes: [Product.scheme] },
   mac: {
@@ -67,21 +68,32 @@ const config: Configuration = {
     gatekeeperAssess: false,
     entitlements: "resources/entitlements.plist",
     entitlementsInherit: "resources/entitlements.plist",
-    notarize: true,
-    target: ["dmg", "zip"],
+    minimumSystemVersion: "14.0",
+    identity: "-",
+    // Preserve upstream signatures and the staged resource-manifest hashes.
+    signIgnore: ["/Contents/Resources/loginom/bin/", "/Contents/Resources/loginom/browsers/"],
+    notarize: false,
+    target: [
+      { target: "dmg", arch: ["arm64"] },
+      { target: "zip", arch: ["arm64"] },
+    ],
   },
-  dmg: { sign: true },
+  dmg: { sign: false },
   win: {
     icon: "resources/icons/icon.ico",
+    executableName: productSlug(channel),
+    requestedExecutionLevel: "asInvoker",
     signtoolOptions: { sign: signWindows },
-    target: ["nsis"],
+    target: [{ target: "nsis", arch: ["x64"] }],
     verifyUpdateCodeSignature: true,
   },
   nsis: {
     oneClick: true,
     perMachine: false,
+    deleteAppDataOnUninstall: false,
     installerIcon: "resources/icons/icon.ico",
     installerHeaderIcon: "resources/icons/icon.ico",
+    shortcutName: productName(channel),
   },
   linux: {
     syncDesktopName: true,

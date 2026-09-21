@@ -48,7 +48,7 @@ describe("parseReadableConfigInvalidError", () => {
     const result = parseReadableConfigInvalidError(error, language.t)
 
     expect(result).toBe(
-      ["Arquivo de config em opencode.config.ts invalido: settings.host: Required", "mode: Invalid"].join("\n"),
+      ["Arquivo de config em loginom-ai-agent.config.ts invalido: settings.host: Required", "mode: Invalid"].join("\n"),
     )
   })
 

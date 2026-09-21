@@ -3,8 +3,24 @@ import { chmod, cp, mkdir, readdir, readFile, readlink, realpath, rename, rm, st
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { $ } from "bun"
 import { nativeResourceCandidates } from "./native-resource-candidates"
+import { buildPhase } from "./build-phase"
 import { buildKeychain } from "./build-keychain"
 import release from "../../product/loginom-release.json"
+import catalogs from "../../product/loginom-catalogs.json"
+
+export function actionCatalogForPlatform(platform: string) {
+  const target =
+    platform === "darwin"
+      ? "darwin-arm64"
+      : platform === "win32"
+        ? "win32-x64"
+        : platform === "linux"
+          ? "linux-x64"
+          : undefined
+  const selected = target ? catalogs[target] : undefined
+  if (!selected) throw new Error("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
+  return selected
+}
 
 // Shared build-time staging; never imported by runtime entrypoints.
 export async function stageResources(input: {
@@ -32,6 +48,7 @@ export async function stageResources(input: {
           ? nativeResourceCandidates["darwin-arm64"]
           : undefined
   if (!pins) throw new Error("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
+  const actionCatalog = actionCatalogForPlatform(input.target.platform)
   if (pins.chromiumRevision !== release.chromiumRevision) throw Error("LOGINOM_BROWSER_REVISION_MISMATCH")
   if (![input.destination, input.node, input.browsers].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
@@ -61,16 +78,17 @@ export async function stageResources(input: {
   }
   const version = (await $`${node} --version`.text()).trim()
   if (version !== `v${release.nodeVersion}`) throw new Error("LOGINOM_NODE_VERSION_MISMATCH")
-  for (const [path, expected] of [
-    [node, pins.nodeSha256],
-    [join(browsers, pins.browser), pins.browserSha256],
-    [join(source, "client/package-lock.json"), release.runtimeLockSha256],
-    [resolve(source, "../product/models.json"), release.modelsSha256],
+  for (const input of [
+    { path: node, expected: pins.nodeSha256, text: false },
+    { path: join(browsers, pins.browser), expected: pins.browserSha256, text: false },
+    { path: join(source, "client/package-lock.json"), expected: release.runtimeLockSha256, text: true },
+    { path: resolve(source, "../product/models.json"), expected: release.modelsSha256, text: true },
   ]) {
+    const contents = await readFile(input.path)
     if (
       createHash("sha256")
-        .update(await readFile(path))
-        .digest("hex") !== expected
+        .update(input.text ? normalizeText(contents) : contents)
+        .digest("hex") !== input.expected
     )
       throw new Error("LOGINOM_BUILD_INPUT_HASH_MISMATCH")
   }
@@ -154,6 +172,10 @@ export async function stageResources(input: {
   The active Dock JavaScript sources are included in runtime/.
   `,
   )
+  // Windows package isolation can expose a path through a virtualized alias.
+  // Compare canonical paths on both sides so a legitimate staged file does
+  // not look like an escape while real symlinks/junctions still fail closed.
+  const canonicalStaging = await realpath(staging)
   const files: Array<{ path: string; sha256: string; link?: string; directory?: boolean }> = []
   async function collect(directory: string): Promise<void> {
     const entries = await readdir(directory, { withFileTypes: true })
@@ -164,7 +186,7 @@ export async function stageResources(input: {
         continue
       }
       const link = entry.isSymbolicLink() ? await readlink(path) : undefined
-      const targetPath = relative(staging, await realpath(path))
+      const targetPath = relative(canonicalStaging, await realpath(path))
       if (targetPath === ".." || targetPath.startsWith(".." + sep) || isAbsolute(targetPath))
         throw Error("LOGINOM_BUILD_RESOURCE_ESCAPE")
       const directoryLink = link !== undefined && (await stat(path)).isDirectory()
@@ -178,12 +200,13 @@ export async function stageResources(input: {
       })
     }
   }
-  await collect(staging)
+  await buildPhase(`${input.flavor}-resource-inventory`, () => collect(staging))
   await Bun.write(
     join(staging, "resource-manifest.json"),
     JSON.stringify(
       {
         ...release,
+        ...actionCatalog,
         target,
         nodeSha256: pins.nodeSha256,
         browserSha256: pins.browserSha256,
@@ -197,8 +220,17 @@ export async function stageResources(input: {
     ) + "\n",
   )
   await rm(destination, { recursive: true, force: true })
-  await rename(staging, destination)
+  await buildPhase(`${input.flavor}-resource-publish`, () => rename(staging, destination))
   return { files: files.length, destination }
+}
+
+// Catalog compatibility is pinned independently of runtime binaries. Selecting
+// the native target never changes the runtime's observed OS or bypasses its gate.
+export function catalogForTarget(target: string) {
+  if (target === "linux-x64") return actionCatalogForPlatform("linux")
+  if (target === "darwin-arm64") return actionCatalogForPlatform("darwin")
+  if (target === "win32-x64") return actionCatalogForPlatform("win32")
+  throw Error("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
 }
 
 // Output directories may not exist yet. Resolve their existing ancestor so an
@@ -208,4 +240,8 @@ async function canonicalBuildPath(path: string): Promise<string> {
     if (error.code !== "ENOENT" || dirname(path) === path) throw error
     return join(await canonicalBuildPath(dirname(path)), basename(path))
   })
+}
+
+function normalizeText(contents: Buffer) {
+  return Buffer.from(contents.toString("utf8").replaceAll("\r\n", "\n"))
 }

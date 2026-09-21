@@ -117,6 +117,7 @@ test('browser upload staging preserves basename and verified bytes until explici
     assert.throws(()=>{lease.path=sourcePath;},TypeError);
     assert.throws(()=>{lease.descriptor.name='other.csv';},TypeError);
     assert.equal(basename(lease.path),'Продажи.csv');assert.deepEqual(await lease.verify(),descriptor);
+    if(process.platform==='win32')assert.ok(lease.path.length<260,'Windows browser-facing upload path must stay below MAX_PATH');
     await writeFile(sourcePath,'new input');assert.equal((await readFile(lease.path)).toString(),'abc');
     if(process.platform!=='win32')assert.equal((await stat(lease.path)).mode&0o777,0o400);
     assert.equal(JSON.stringify(store.list()).includes(lease.path),false);

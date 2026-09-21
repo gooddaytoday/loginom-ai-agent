@@ -129,7 +129,7 @@ bun scripts/release/docker-linux-smoke.ts --manifest ../../artifacts/loginom-ai-
 
 ## Задача R5. Перевести CI, подпись и обновления на свой продукт
 
-**Файлы:** создать `.github/workflows/loginom-desktop.yml`; изменить `packages/desktop/electron-builder.config.ts`, `src/main/updater.ts`, `scripts/finalize-latest-yml.ts`, `scripts/finalize-latest-json.ts`, соответствующие tests; согласовать с foundations изменения upstream workflow и `Product`.
+**Файлы:** создать `.github/workflows/release.yml` (режим `candidate`); изменить `packages/desktop/electron-builder.config.ts`, `src/main/updater.ts`, `scripts/finalize-latest-yml.ts`, `scripts/finalize-latest-json.ts`, соответствующие tests; согласовать с foundations изменения upstream workflow и `Product`.
 
 - [ ] Собственные repository guard/runner labels: узнать origin и доступные runners, не копировать `anomalyco` conditions или signer IDs. Targets только linux-x64, win32-x64, darwin-arm64. Linux build baseline совместим с Ubuntu22/Debian12; более новый CI image сам по себе не доказывает эту совместимость.
 - [ ] Workflow вызывает R1/R2/R3, Linux R4; Windows/mac jobs нативные. Node24 для build и Bun из packageManager — build prerequisites, не пользовательские зависимости. Точный набор signing secrets документируется по собственному signer; их отсутствие блокирует signed job, не выдаёт unsigned за release.

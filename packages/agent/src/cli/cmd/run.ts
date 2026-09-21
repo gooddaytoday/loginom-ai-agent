@@ -20,7 +20,9 @@ import type { Argv } from "yargs"
 import path from "path"
 import { pathToFileURL } from "url"
 import { fileSnapshot } from "@/util/file-snapshot"
-import { Effect } from "effect"
+import { Cause, Effect, Exit } from "effect"
+import { ProviderV2 } from "@loginom-ai-agent/core/provider"
+import { ModelV2 } from "@loginom-ai-agent/core/model"
 import { UI } from "../ui"
 import { effectCmd } from "../effect-cmd"
 import { EOL } from "os"
@@ -266,9 +268,40 @@ export const RunCommand = effectCmd({
     const { RuntimeFlags } = yield* Effect.promise(() => import("@/effect/runtime-flags"))
     const { InstanceRef } = yield* Effect.promise(() => import("@/effect/instance-ref"))
     const { ServerAuth } = yield* Effect.promise(() => import("@/server/auth"))
+    const { Provider } = yield* Effect.promise(() => import("@/provider/provider"))
     const agentSvc = yield* Agent.Service
     const flags = yield* RuntimeFlags.Service
     const localInstance = yield* InstanceRef
+    const provider = yield* Provider.Service
+    const requested = pick(args.model)
+    if (requested && !args.attach && !args.mini) {
+      const resolved = yield* provider
+        .getModel(ProviderV2.ID.make(requested.providerID), ModelV2.ID.make(requested.modelID))
+        .pipe(Effect.exit)
+      if (Exit.isFailure(resolved)) {
+        const err = Cause.squash(resolved.cause)
+        const message = formatRunError(err) ?? (err instanceof Error ? err.message : String(err))
+        if (args.format === "json") {
+          process.stdout.write(
+            JSON.stringify({
+              type: "error",
+              timestamp: Date.now(),
+              sessionID: "",
+              error: {
+                name: Provider.ModelNotFoundError.isInstance(err) ? "ProviderModelNotFoundError" : "Unknown",
+                data: { message: Provider.ModelNotFoundError.isInstance(err) ? err.message : message },
+              },
+            }) + EOL,
+          )
+        } else {
+          UI.error(message)
+        }
+        process.exitCode = 1
+        // Standalone must return so host cleanup can run; do not throw into CLI_RUN_FAILED.
+        if (!process.env.LOGINOM_AI_AGENT_CLI_ROOT) exitCli(1)
+        return
+      }
+    }
     yield* Effect.promise(async () => {
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
       const interactive = args.mini
@@ -794,8 +827,12 @@ export const RunCommand = effectCmd({
                 err = String(props.error.data.message)
               }
               error = error ? error + EOL + err : err
-              if (emit("error", { error: props.error })) continue
-              UI.error(err)
+              // Stop on the error event. Waiting for idle is the #27371 hang:
+              // getModel dies, the SDK call may still be pending, and idle
+              // never arrives. JSON errors come from the prompt result so this
+              // path does not emit a second record.
+              if (args.format !== "json") UI.error(err)
+              break
             }
 
             if (
@@ -869,6 +906,7 @@ export const RunCommand = effectCmd({
             const error = await completed
             if (error) process.exitCode = 1
           }
+          let rejected = false
 
           try {
             if (standaloneCancellation()?.aborted) {
@@ -887,6 +925,7 @@ export const RunCommand = effectCmd({
               if (result.error) {
                 if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
                 process.exitCode = 1
+                rejected = true
                 return
               }
               await finish()
@@ -904,6 +943,7 @@ export const RunCommand = effectCmd({
             if (result.error) {
               if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
               process.exitCode = 1
+              rejected = true
               return
             }
             await finish()
@@ -911,7 +951,9 @@ export const RunCommand = effectCmd({
           } finally {
             try {
               subscription.abort()
-              await completed
+              // A rejected prompt already has a nonzero exit. Do not wait for
+              // idle or SSE close — that wait is how #27371 hung in CI.
+              if (!rejected) await completed
               if (cancellation.pending) {
                 await cancellation.pending
                 process.exitCode = 130
@@ -921,6 +963,12 @@ export const RunCommand = effectCmd({
               process.off("SIGINT", interrupt)
             }
           }
+          // Legacy CLI owns the process. Leave after a rejected prompt so
+          // instance dispose / worker teardown cannot outlive the error.
+          if (rejected && !process.env.LOGINOM_AI_AGENT_CLI_ROOT) {
+            exitCli(1)
+          }
+          return
         }
 
         const model = pick(args.model)

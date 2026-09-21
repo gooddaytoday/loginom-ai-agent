@@ -1,12 +1,17 @@
-import { $ } from "bun"
+import { cp, rm } from "node:fs/promises"
+import { resolve } from "node:path"
 import { resolveChannel } from "./utils"
 
-const arg = process.argv[2]
-const channel = arg === "dev" || arg === "beta" || arg === "prod" ? arg : resolveChannel()
+export async function copyIcons(channel = resolveChannel(), packageDirectory = resolve(import.meta.dir, "..")) {
+  const source = resolve(packageDirectory, "icons", channel)
+  const destination = resolve(packageDirectory, "resources/icons")
 
-const src = `./icons/${channel}`
-const dest = "resources/icons"
+  await rm(destination, { recursive: true, force: true })
+  await cp(source, destination, { recursive: true })
+  console.log(`Copied ${channel} icons from ${source} to ${destination}`)
+}
 
-await $`rm -rf ${dest}`
-await $`cp -R ${src} ${dest}`
-console.log(`Copied ${channel} icons from ${src} to ${dest}`)
+if (import.meta.main) {
+  const value = process.argv[2]
+  await copyIcons(value === "dev" || value === "beta" || value === "prod" ? value : resolveChannel())
+}

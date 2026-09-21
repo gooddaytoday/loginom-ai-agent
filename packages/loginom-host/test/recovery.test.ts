@@ -5,12 +5,15 @@ import { tmpdir } from "node:os"
 import { connectionStore } from "../src/connection/connection-store"
 import { connectionService } from "../src/connection/connection-service"
 import { recoveryStore } from "../src/connection/recovery-store"
+import { credentials } from "../src/connection/credentials"
 
 test.each([false, true])("recovery resets only idle runtimes; shutdown race = %s", async (shutdown) => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-recovery-idle-"))
   const reset = Promise.withResolvers<void>()
   const entered = Promise.withResolvers<void>()
-  const store = connectionStore(join(directory, "connection"))
+  // Recovery exercises generation ownership; use the explicit plaintext test
+  // codec rather than requesting the host OS's unavailable desktop safeStorage.
+  const store = connectionStore(join(directory, "connection"), credentials("linux"))
   const journal = await recoveryStore(join(directory, "recovery"))
   await store.stage({
     generation: 1,

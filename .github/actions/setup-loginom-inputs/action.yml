@@ -1,0 +1,145 @@
+name: "Setup Loginom inputs"
+description: >-
+  Provision the pinned official Node distribution and the pinned Playwright Chromium from
+  packages/product/loginom-release.json, cache both, and export LOGINOM_AI_AGENT_NODE_SOURCE,
+  LOGINOM_AI_AGENT_TEST_NODE, LOGINOM_AI_AGENT_BROWSER_SOURCE and PLAYWRIGHT_BROWSERS_PATH as absolute paths.
+outputs:
+  node:
+    description: "Absolute path of the pinned Node executable inside the full distribution"
+    value: ${{ steps.pins.outputs.node }}
+  browsers:
+    description: "Absolute Playwright browsers directory containing chromium-<revision>"
+    value: ${{ steps.pins.outputs.browsers }}
+  node-version:
+    description: "Pinned Node version"
+    value: ${{ steps.pins.outputs.node-version }}
+  chromium-revision:
+    description: "Pinned Playwright Chromium revision"
+    value: ${{ steps.pins.outputs.chromium-revision }}
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve pinned inputs
+      id: pins
+      shell: bash
+      run: |
+        set -euo pipefail
+        node_version=$(jq -er .nodeVersion packages/product/loginom-release.json)
+        chromium=$(jq -er .chromiumRevision packages/product/loginom-release.json)
+        playwright=$(jq -er .playwright packages/product/loginom-release.json)
+        # stage-resources.ts resolves npm relative to the Node executable, so the layout must be
+        # the official distribution: bin/node + lib/node_modules/npm on POSIX, node.exe + node_modules/npm on Windows.
+        case "$RUNNER_OS" in
+          Linux) os=linux; extension=tar.xz; executable=bin/node; npm=lib/node_modules/npm/bin/npm-cli.js ;;
+          macOS) os=darwin; extension=tar.gz; executable=bin/node; npm=lib/node_modules/npm/bin/npm-cli.js ;;
+          Windows) os=win; extension=zip; executable=node.exe; npm=node_modules/npm/bin/npm-cli.js ;;
+          *) echo "::error::Unsupported runner OS: $RUNNER_OS"; exit 1 ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64) arch=x64 ;;
+          ARM64) arch=arm64 ;;
+          *) echo "::error::Unsupported runner architecture: $RUNNER_ARCH"; exit 1 ;;
+        esac
+        # Git Bash keeps RUNNER_TEMP in Windows form; a drive-letter path with forward slashes
+        # is absolute for bash, Node and Bun alike, so every exported path uses that form.
+        root="$RUNNER_TEMP"
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          root=$(cygpath -m "$RUNNER_TEMP")
+        fi
+        distribution="node-v${node_version}-${os}-${arch}"
+        {
+          echo "node-version=$node_version"
+          echo "chromium-revision=$chromium"
+          echo "playwright=$playwright"
+          echo "archive=${distribution}.${extension}"
+          echo "node-root=$root/loginom-node"
+          echo "node=$root/loginom-node/$distribution/$executable"
+          echo "npm=$root/loginom-node/$distribution/$npm"
+          echo "browsers=$root/loginom-browsers"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Restore pinned Node and Chromium
+      id: cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: |
+          ${{ steps.pins.outputs.node-root }}
+          ${{ steps.pins.outputs.browsers }}
+        # Playwright decides which companion builds (headless shell, ffmpeg) accompany the Chromium revision.
+        key: ${{ runner.os }}-${{ runner.arch }}-node-${{ steps.pins.outputs.node-version }}-chromium-${{ steps.pins.outputs.chromium-revision }}-playwright-${{ steps.pins.outputs.playwright }}
+
+    - name: Download pinned Node
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        NODE_ROOT: ${{ steps.pins.outputs.node-root }}
+        NODE_VERSION: ${{ steps.pins.outputs.node-version }}
+        ARCHIVE: ${{ steps.pins.outputs.archive }}
+      run: |
+        set -euo pipefail
+        rm -rf "$NODE_ROOT"
+        mkdir -p "$NODE_ROOT"
+        base="https://nodejs.org/dist/v${NODE_VERSION}"
+        curl -fsSL --retry 3 --retry-delay 5 -o "$NODE_ROOT/$ARCHIVE" "$base/$ARCHIVE"
+        curl -fsSL --retry 3 --retry-delay 5 -o "$NODE_ROOT/SHASUMS256.txt" "$base/SHASUMS256.txt"
+        expected=$(awk -v file="$ARCHIVE" '$2 == file { print $1 }' "$NODE_ROOT/SHASUMS256.txt")
+        if command -v sha256sum >/dev/null 2>&1; then
+          actual=$(sha256sum "$NODE_ROOT/$ARCHIVE" | cut -d' ' -f1)
+        else
+          actual=$(shasum -a 256 "$NODE_ROOT/$ARCHIVE" | cut -d' ' -f1)
+        fi
+        if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+          echo "::error::SHA256 mismatch for $ARCHIVE: expected '${expected:-missing from SHASUMS256.txt}', got '$actual'"
+          exit 1
+        fi
+        case "$ARCHIVE" in
+          *.tar.xz) tar -xJf "$NODE_ROOT/$ARCHIVE" -C "$NODE_ROOT" ;;
+          *.tar.gz) tar -xzf "$NODE_ROOT/$ARCHIVE" -C "$NODE_ROOT" ;;
+          *.zip) 7z x -y -bso0 -bsp0 -o"$NODE_ROOT" "$NODE_ROOT/$ARCHIVE" ;;
+        esac
+        rm -f "$NODE_ROOT/$ARCHIVE" "$NODE_ROOT/SHASUMS256.txt"
+
+    - name: Install pinned Chromium
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      # The only in-repo write is the gitignored node_modules; release scripts require a clean tree.
+      working-directory: packages/loginom-runtime/client
+      env:
+        NODE: ${{ steps.pins.outputs.node }}
+        NPM: ${{ steps.pins.outputs.npm }}
+        PLAYWRIGHT_BROWSERS_PATH: ${{ steps.pins.outputs.browsers }}
+      run: |
+        set -euo pipefail
+        rm -rf "$PLAYWRIGHT_BROWSERS_PATH"
+        "$NODE" "$NPM" ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
+        "$NODE" node_modules/playwright/cli.js install chromium
+
+    - name: Export pinned inputs
+      shell: bash
+      env:
+        NODE: ${{ steps.pins.outputs.node }}
+        NODE_VERSION: ${{ steps.pins.outputs.node-version }}
+        BROWSERS: ${{ steps.pins.outputs.browsers }}
+        CHROMIUM: ${{ steps.pins.outputs.chromium-revision }}
+      run: |
+        set -euo pipefail
+        if [ ! -f "$NODE" ]; then
+          echo "::error::Pinned Node executable is missing: $NODE"
+          exit 1
+        fi
+        actual=$("$NODE" --version | tr -d '\r')
+        if [ "$actual" != "v$NODE_VERSION" ]; then
+          echo "::error::Pinned Node at $NODE reports $actual, expected v$NODE_VERSION"
+          exit 1
+        fi
+        if [ ! -d "$BROWSERS/chromium-$CHROMIUM" ]; then
+          echo "::error::Playwright Chromium revision $CHROMIUM is missing under $BROWSERS"
+          exit 1
+        fi
+        {
+          echo "LOGINOM_AI_AGENT_NODE_SOURCE=$NODE"
+          echo "LOGINOM_AI_AGENT_TEST_NODE=$NODE"
+          echo "LOGINOM_AI_AGENT_BROWSER_SOURCE=$BROWSERS"
+          echo "PLAYWRIGHT_BROWSERS_PATH=$BROWSERS"
+        } >> "$GITHUB_ENV"
+        echo "Pinned Node $actual at $NODE; Chromium $CHROMIUM under $BROWSERS"

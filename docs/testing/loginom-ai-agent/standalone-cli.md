@@ -1,6 +1,23 @@
 # Самостоятельный CLI: checkpoint и приёмка
 
-**Актуальная пользовательская установка — 2026-09-18:** Desktop и CLI
+## macOS candidate, 2026-09-19
+
+Общий Desktop/CLI pipeline и установка описаны в [macOS runbook](macos.md).
+Текущие доказательства: [отчёт](reports/2026-09-19-macos/report.md).
+macOS использует отдельный CLI profile, встроенные Node/Chromium и Keychain
+helper. Собственные бинарники подписываются ad-hoc до манифестов; upstream
+runtime не переподписывается. TAR.GZ проверяется после распаковки при umask077.
+Установленный кандидат `0.1.4-macos.20260919.2` (source `6650b6d01`) на macOS27
+прошёл install/uninstall, busy-payload refusal, Keychain read-back после upgrade,
+сохранение истории, CSV55/101 с независимым холодным открытием, отмену и потерю
+процесса с durable recovery и без оставшегося Chromium. Модель в CSV-приёмке
+scripted; реальный Xiaomi smoke Desktop проверен отдельно. CI macOS14 и
+совместный lifecycle отражаются в текущем отчёте; эти результаты не расширяют
+историческую Linux-приёмку ниже.
+
+## Linux: текущая установка и исторические проверки
+
+**Актуальная пользовательская установка Linux — 2026-09-18:** Desktop и CLI
 `0.1.4-local.20260918.697cc2e5a` собраны из чистого snapshot и установлены.
 Desktop GUI/ASAR/4365 runtime hashes и CLI help/version/status PASS.
 Профили сохранены; CLI оставлен установленным.

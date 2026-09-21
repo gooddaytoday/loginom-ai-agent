@@ -11,4 +11,4 @@ const result = await stageResources({
   target: { platform: process.platform, arch: process.arch },
   flavor: "desktop",
 })
-console.log(`Bundled Loginom Linux runtime: ${result.files} verified resource files`)
+console.log(`Bundled Loginom ${process.platform}-${process.arch} runtime: ${result.files} verified resource files`)
