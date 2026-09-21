@@ -11,15 +11,20 @@
 | B02 | CREATED_EXECUTED | `.6` / `ses_f3beabb1affeTJydQ4bzcVwxc3` |
 | B47 | CREATED_EXECUTED | `.5` / `ses_f3be80188ffeWXck3xXTGcEQ0i` |
 | B37 | CREATED_EXECUTED | `.6` / `ses_f3bddb28dffe9rnhncERKN0Fam` |
-| B27 | BLOCKED | `.5` / `ses_f3bddb28effeOkWDWMW4svtpFn` |
-| B18 | BLOCKED | `.7` / `ses_f3bd81345ffea4N7Co16zrp2B5` |
+| B27 | RUNNING | Повтор `.8` / `ses_f3bc01b39ffe0alPLlG1bQEjI4`; прежний `.5` BLOCKED |
+| B18 | RUNNING | Повтор `.8` / `ses_f3bc05856ffewJMeictcAe0Tu3`; прежний `.7` BLOCKED |
 | V27 | CREATED_EXECUTED | `.6` / `ses_f3bd0e6a1ffeUBtNOzCMf4U9QT` |
-| V65, V02, V37 | NOT_STARTED | Входы и задания готовы |
+| V02 | CREATED_EXECUTED | `.6` / `ses_f3bc657c4ffeTvC1P6XK305UqQ` |
+| V37 | CREATED_EXECUTED | `.6` / `ses_f3bbe10a3ffepT603sr9zvYis2` |
+| V65 | RUNNING | `.9` / `ses_f3bb674dbffeD525jNVz7P63Y3` |
 
 RUNNING и NOT_STARTED — промежуточные состояния реестра, не зачётные исходы.
 Для выполненных случаев `analytical_correctness: not_checked`.
 Фактически выполнены imports.text, transform.calculator, transform.sorting,
-transform.group_data, transform.join_data, transform.date_time, transform.union_data. Остальные 7 типов ещё не зачтены.
+transform.group_data, transform.join_data, transform.date_time, transform.union_data,
+research.duplicates, preprocessing.data_recovery, transform.collapse_columns,
+transform.filter_data, transform.replace_columns. Зачтены 7/10 случаев и 12/14 типов.
+Узлы текущих незавершённых прогонов пока не включены в этот итог.
 
 ## Исходный ABC — 2026-09-21
 
@@ -71,11 +76,12 @@ Loginom: `7.4.2` по manifest фактического prepare.
 
 ## Точка продолжения
 
-Исходный ABC на `.3` и B65 на `.5` завершились CREATED_EXECUTED.
-B02 и B47 завершились; B37 выполняется на `.6`, B27 на `.5`. Профили и REPL
-сессии принадлежат только этому прогону. Последний source commit `99f65a0e4`; кандидат `.7` установлен для следующих случаев.
-Диагностическое восстановление импорта `.5` и ранний отказ Unicode-name `.6`
-подтверждены. Остальные случаи матрицы не запущены; полный аудит не завершён.
+Зачтены исходный ABC и семь случаев матрицы. B18/B27 повторяются на `.8`,
+V65 выполняется на `.9`; V37 завершён на `.6`. Последний source commit
+`00c32b112022d1b7bd68652f278f1495b3d97d79`, сборка `.9` завершилась успешно.
+Приватные профили, полные чаты и актуальные REPL ID записаны в
+`/Users/kartamyshev/Library/Logs/loginom-scenario-debugging/20260921/live-checkpoint.json`.
+Полный аудит и установленная проверка оставшихся препятствий продолжаются.
 
 
 ## Первый кандидат
@@ -394,3 +400,36 @@ ASAR SHA-256: `05bcfec3ccc6fe6a044b7de1ceff2c70068f41478cf9b5b166a8f0879fb140f2`
 
 Пользователь разрешил доступ `.8` к Keychain; оба свежих подключения ready,
 GPT-5.6 Sol / low выбран через GUI, начаты повторы B18 и B27.
+
+## V02 — автономная приёмка `.6`
+
+Чат `ses_f3bc657c4ffeTvC1P6XK305UqQ`: шесть выполненных узлов — импорт,
+маркировка дублей, группировка, заполнение пропусков, итоги категорий и соединение.
+Из 510 исходных строк получен доступный выход из 500 строк. Пакет
+`/user/scenario-debug-V02-candidate6-20260921.lgp` сохранён с подтверждённым cleanup.
+Модель сама исправила превышение wait timeout и недопустимое совмещение поля
+группировки с агрегатом. Доказательства: `V02-candidate6-{metadata,chat}.json`,
+`V02-candidate6-prompt.txt`, `V02-candidate6-final.png` в приватном каталоге.
+`analytical_correctness: not_checked`.
+
+## Кандидат `.9`
+
+Собран из `00c32b112022d1b7bd68652f278f1495b3d97d79`. DMG/ZIP проверены:
+4446 ресурсов, offline smoke PASS; журнал `build-7.log`. Добавлено только
+ограниченное ожидание кадров при повторном чтении графа. Оно не меняет
+успешные преобразования предыдущих зачтённых случаев и не разрешает повтор
+неизвестного эффекта. Живая проверка этой ветки ещё не завершена.
+
+## V37 — автономная приёмка `.6`
+
+Чат `ses_f3bbe10a3ffepT603sr9zvYis2`: четыре созданных узла — импорт,
+collapse_columns, filter_data, replace_columns. Выход 1350 строк доступен;
+пакет `/user/scenario-debug-V37-candidate6-20260921.lgp` сохранён.
+Модель сама исправила обязательный параметр сравнения строк и повторно
+настроила собственный узел замены. Журнал и квитанции: `V37-candidate6-*`.
+`analytical_correctness: not_checked`. reform_columns здесь не использован
+и не засчитывается; вместе с exports.text он остаётся для V65.
+
+`.9` установлен из readonly DMG; codesign PASS. ASAR SHA-256:
+`b5bf951b1342380ce6152395bc799755768dca17bdf8002672cf91499016e4c7`.
+Подключение свежего профиля V65 готово, задание и CSV отправлены через GUI.
