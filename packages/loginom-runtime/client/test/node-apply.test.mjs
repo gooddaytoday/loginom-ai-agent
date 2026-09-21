@@ -128,6 +128,34 @@ test('source validation preserves a bounded cause and partial effects without fi
  const count=f.calls.length;await assert.rejects(f.run(request(),{resume:true}),/unresolved/);assert.equal(f.calls.length,count);
 });
 
+test('import source binding refusal releases only a verified discarded draft of the same node',async()=>{
+ for(const invalid of [null,'owner','applied','execution','cleanup','journal']) {
+  const f=fixture(invalid==='journal'?{failJournal:'node_phase_refused'}:{});
+  f.handlers.get('imports.text').configure=async()=>{
+   const error=new Error('Requested source field is missing or ambiguous: Missing');
+   const closed={verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,
+    execution_started:false,node_context:{verified:true,surface:'graph',document_id:'doc',workflow_id:'workflow',node_id:'node1'}};
+   if(invalid==='owner')closed.node_context.node_id='foreign';
+   if(invalid==='applied')closed.settings_applied=true;
+   if(invalid==='execution')closed.execution_started=true;
+   if(invalid==='cleanup')closed.cleanup_complete=false;
+   error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,
+    settings_unchanged:true,verification:'text_import_binding_draft_discarded',proof:{closed}};
+   throw error;
+  };
+  const result=await f.run();
+  assert.equal(result.status,invalid?'AMBIGUOUS':'FAILED');
+  assert.equal(result.cleanup_complete,!invalid);
+  assert.equal(result.pending_phase,invalid?'configure':null);
+  assert.ok(!f.calls.includes('finish')&&!f.calls.includes('execute'));
+  if(!invalid) {
+   assert.equal(result.next_step.tool,'dock_node_apply');
+   assert.match(result.next_step.instruction,/NEW operation_id/);
+   assert.ok(result.next_step.instruction.includes(JSON.stringify({kind:'existing',type:'imports.text',ref:result.node})));
+  }
+ }
+});
+
 test('self source references name the current port source and cannot mix opaque IDs',()=>{
  const f=fixture(),p=request();p.mappings=[{direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'Сумма'}}]}];
  assert.doesNotThrow(()=>validateNodeApplyRequest(p,f.handlers));

@@ -14,11 +14,35 @@ test('new import settings bind by source identity and retain native file order',
   assert.throws(()=>bindImportSourceColumns(invalid,observed));
  assert.throws(()=>bindImportSourceColumns(requested,observed.map(c=>({...c,status:'unknown'}))));
 });
+test('Russian source labels bind to observed technical names before editing fields',()=>{
+ const observed=[{...fields[0],name:'Kod_tovara',label:'Код товара',index:0,status:'observed'},
+  {...fields[2],name:'Vyruchka_za_god_rub',label:'Выручка за год руб',index:1,status:'observed'}];
+ const requested=[{...fields[2],source_name:'Выручка за год руб',name:'Revenue'},
+  {...fields[0],source_name:'Код товара',name:'ProductId'}];
+ assert.deepEqual(bindImportSourceColumns(requested,observed),[
+  {...requested[1],source_name:'Kod_tovara'},{...requested[0],source_name:'Vyruchka_za_god_rub'}]);
+ assert.equal(requested[0].source_name,'Выручка за год руб');
+});
+test('source labels never guess between duplicates or consume one field twice',()=>{
+ const observed=fields.slice(0,2).map((c,index)=>({...c,label:'Повтор',index,status:'observed'}));
+ assert.throws(()=>bindImportSourceColumns([{...fields[0],source_name:'Повтор'},fields[1]],observed));
+ assert.throws(()=>bindImportSourceColumns([{...fields[0],source_name:'Identifier'},fields[0]],
+  fields.slice(0,2).map((c,index)=>({...c,index,status:'observed'}))));
+ assert.throws(()=>bindImportSourceColumns([{...fields[0],source_name:'Id'},fields[1]],
+  [{...observed[0],label:'Other'},{...observed[1],label:'Id'}]));
+});
 test('partial column updates preserve order, other fields and unspecified properties',()=>{
  const baseline=structuredClone(fields),patch=[{source_name:'Id',name:'RecordId'},{name:'Amount',label:'Сумма'}];
  const result=mergeImportColumnPatch(baseline,patch);
  assert.deepEqual(result,[{...fields[0],name:'RecordId',source_name:'Id'},fields[1],{...fields[2],label:'Сумма'}]);
  assert.deepEqual(baseline,fields);assert.equal(patch[0].label,undefined);
+});
+test('existing import patches accept unique Russian labels without requiring a rename',()=>{
+ const source=fields.map(c=>({...c,label:c.name==='Id'?'Код товара':c.label}));
+ assert.deepEqual(mergeImportColumnPatch(source,[{source_name:'Код товара',used:false}]),
+  [{...source[0],used:false},...source.slice(1)]);
+ assert.deepEqual(reconcileImportColumnPatch(source,source,[{source_name:'Код товара',name:'ProductId'}]),
+  [{...source[0],name:'ProductId',source_name:'Id'},...source.slice(1)]);
 });
 test('unknown fields, duplicate identities and name collisions cannot silently rewrite a schema',()=>{
  for(const patch of [[{name:'Missing',used:false}],[{name:'Id',used:false},{name:'Id',label:'Other'}],[{source_name:'Id',name:'Title'}]])

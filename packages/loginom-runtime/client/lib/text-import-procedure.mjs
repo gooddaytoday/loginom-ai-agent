@@ -82,7 +82,7 @@ export function validateTextImportPatch(p) {
     requireValue(object(c) && Object.keys(c).every(k=>['source_name','name','label','type','data_kind','used'].includes(k)), 'Invalid column patch');
     const key=c.source_name??c.name;
     requireValue(typeof key==='string' && key.length>0 && !keys.has(key),'Missing or duplicate patch column identity');keys.add(key);
-    validateTextImportFieldsRequest({source,format,columns:[{name:key,label:key,type:'string',data_kind:'Дискретный',used:true,...c}]});
+    validateTextImportFieldsRequest({source,format,columns:[{name:c.source_name===undefined?key:'Validation',label:key,type:'string',data_kind:'Дискретный',used:true,...c}]});
   }
   validateTextImportFieldsRequest({source,format,columns:[{name:'Validation',label:'Validation',type:'string',data_kind:'Дискретный',used:true}]});
 }
@@ -92,7 +92,7 @@ export function mergeImportColumnPatch(fields,changes=[]) {
   requireValue(Array.isArray(fields)&&fields.length>0&&fields.length<=1000
     &&new Set(fields.map(c=>c.name)).size===fields.length,'A complete unique source schema is required');
   const result=fields.map(c=>Object.fromEntries(['name','label','type','data_kind','used'].map(k=>[k,c[k]])));
-  for(const change of changes) {
+  for(const change of resolveImportSourceColumns(changes,fields)) {
     const key=change.source_name??change.name,index=fields.findIndex(c=>c.name===key);
     requireValue(index>=0,'Patch column is absent from the observed schema: '+key);
     result[index]={...result[index],...Object.fromEntries(Object.entries(change).filter(([k])=>k!=='source_name')),
@@ -109,8 +109,7 @@ export function reconcileImportColumnPatch(before,parsed,changes=[],{schemaChang
   mergeImportColumnPatch(before);mergeImportColumnPatch(parsed);
   const oldNames=before.map(c=>c.name),newNames=parsed.map(c=>c.name);
   requireValue(schemaChangeRequested||same(oldNames,newNames),'Source schema changed without requested parsing changes');
-  for(const change of changes)requireValue(newNames.includes(change.source_name??change.name),
-    'Patch column is absent from the parsed source: '+(change.source_name??change.name));
+  changes=resolveImportSourceColumns(changes,parsed);
   const base=parsed.map(field=>{
     const previous=before.find(c=>c.name===field.name);
     if(previous)return previous;
@@ -132,11 +131,33 @@ export function bindImportSourceColumns(requested,observed) {
   requireValue(requested.length===observed.length&&new Set(observed.map(c=>c.name)).size===observed.length
     &&new Set(requested.map(c=>c.source_name??c.name)).size===requested.length,
     'Every parsed source field requires one unique settings reference');
-  return observed.map((column,index)=>{
-    requireValue(column.status==='observed'&&column.index===index,'Parsed source field identity is incomplete');
-    const wanted=one(requested.filter(c=>(c.source_name??c.name)===column.name),'Requested source field is missing or ambiguous');
-    return structuredClone(wanted);
+  requireValue(observed.every((column,index)=>column.status==='observed'&&column.index===index),
+    'Parsed source field identity is incomplete');
+  const bound=resolveImportSourceColumns(requested,observed);
+  return observed.map(column=>one(bound.filter(c=>(c.source_name??c.name)===column.name),
+    'Requested source field is missing or ambiguous'));
+}
+
+export class ImportColumnBindingError extends Error {
+  constructor(key,candidates,observed) {
+    super('Requested source field is missing or ambiguous: '+JSON.stringify(key)
+      +'; observed name/label: '+JSON.stringify((candidates.length?candidates:observed).slice(0,8).map(({name,label})=>({name,label}))));
+    this.name='ImportColumnBindingError';
+  }
+}
+
+function resolveImportSourceColumns(requested,observed) {
+  const bound=requested.map(column=>{
+    const key=column.source_name??column.name;
+    const candidates=observed.filter(field=>field.name===key||field.label===key);
+    if(candidates.length!==1)throw new ImportColumnBindingError(key,candidates,observed);
+    // Later editor checks need the observed technical identity, not a guessed
+    // transliteration or the original human-readable CSV heading.
+    return {...structuredClone(column),...(key!==candidates[0].name?{source_name:candidates[0].name}:{})};
   });
+  requireValue(new Set(bound.map(c=>c.source_name??c.name)).size===bound.length,
+    'Multiple settings references resolve to the same parsed source field');
+  return bound;
 }
 
 // Reuse the shared pre-gesture recovery: only an unchanged, fully bound cell

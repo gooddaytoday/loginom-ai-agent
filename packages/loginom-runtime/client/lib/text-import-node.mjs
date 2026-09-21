@@ -2,7 +2,7 @@ import {verifyUploadLineage} from './upload-lineage.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
 import {createNodeProcedure} from './node-procedure.mjs';
-import {configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady} from './text-import-procedure.mjs';
+import {configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError} from './text-import-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {readOutputDefinitionPages,readImportDefinitionPages} from './import-definition-pages.mjs';
 import {makeRetainedImportSourceCode,makeRetainedImportFormatCode,verifyConfiguredImportContinuation,verifyMappedImportContinuation,finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
@@ -155,11 +155,21 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
       },
       async configureTextImport(ctx,p) {
         enter(ctx);requireValue(owner,'Import was not opened by this operation');
-        configured=operation.nodeApply.request.target.kind==='existing'
-          ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination)
-          :await configureTextImportFields(channel,p.settings,owner);
-        requireValue(configured.columns.some(c=>c.used),'Import output requires at least one used field');
-        return configured;
+        try {
+          configured=operation.nodeApply.request.target.kind==='existing'
+            ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination)
+            :await configureTextImportFields(channel,p.settings,owner);
+          requireValue(configured.columns.some(c=>c.used),'Import output requires at least one used field');
+          return configured;
+        } catch(error) {
+          // Binding rejects after completed observations, before editing any
+          // column. Close only this operation's draft; never hide transport loss.
+          if(!(error instanceof ImportColumnBindingError)||operation.transportUncertain)throw error;
+          const closed=await closePreparedWizard(channel);
+          error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,
+            cleanup_complete:true,settings_unchanged:true,verification:'text_import_binding_draft_discarded',proof:{closed}};
+          throw error;
+        }
       },
       async mapPorts(mappings,ctx) {
         if(ctx.receipt_id===operation.id+':input_mapping'){requireValue(mappings.length===0,'Import input mappings are not installed');return verified({mappings:[],not_applicable:true});}
