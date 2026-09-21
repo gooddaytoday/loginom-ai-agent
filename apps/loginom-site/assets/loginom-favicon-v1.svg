@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <g id="tile">
+    <rect x="64" y="70" width="896" height="890" rx="124" fill="#000" opacity=".12"/>
+    <rect x="64" y="64" width="896" height="890" rx="124" fill="#FCFBFA"/>
+    <rect x="65" y="65" width="894" height="888" rx="123" fill="none" stroke="#D9D6D3" stroke-width="2"/>
+  </g>
+<g>
+  <!-- The small mark keeps the folded L silhouette, without subpixel AI details. -->
+  <g id="mark" transform="translate(62 21) scale(.8)">
+    <path fill="#E6403D" d="M450 347C450 301 424 268 379 268C316 268 262 331 262 399V751C262 869 332 947 450 947H786C827 947 859 914 859 873C859 835 826 805 784 805H511C468 805 450 783 450 738Z"/>
+    <path fill="#BD2D32" d="M262 641V751C262 869 332 947 450 947H786C827 947 859 914 859 873C859 835 826 805 784 805H511C374 805 282 753 262 641Z"/>
+  </g>
+</g></svg>

@@ -28,6 +28,7 @@
     "src/components/file-icons/sprite.svg",
     "src/components/provider-icons/sprite.svg",
     "src/assets/icons/app/*",
+    "src/assets/loginom/*",
     "src/assets/fonts/*",
     "src/assets/audio/*",
     "LICENSE"

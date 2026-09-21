@@ -97,7 +97,7 @@ const config: Configuration = {
   },
   linux: {
     syncDesktopName: true,
-    icon: "resources/icons",
+    icon: "resources/icons/linux",
     category: "Office",
     executableName: productSlug(channel),
     desktop: { entry: { Name: productName(channel), StartupWMClass: appId } },

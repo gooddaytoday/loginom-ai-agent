@@ -7,7 +7,12 @@ export async function copyIcons(channel = resolveChannel(), packageDirectory = r
   const destination = resolve(packageDirectory, "resources/icons")
 
   await rm(destination, { recursive: true, force: true })
-  await cp(source, destination, { recursive: true })
+  // Do not stage historical Android/iOS/Store images or mixed-platform PNGs.
+  await Promise.all(
+    ["linux", "icon.png", "icon.ico", "icon.icns", "dock.png"].map((name) =>
+      cp(resolve(source, name), resolve(destination, name), { recursive: true }),
+    ),
+  )
   console.log(`Copied ${channel} icons from ${source} to ${destination}`)
 }
 
