@@ -325,7 +325,9 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
             // Headed Chromium can expose the cached port's visible flag one
             // animation frame before mxGraph attaches its SVG element. This is
             // a read-only observation retry; no gesture is repeated.
-            await call('async page => {await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));return true;}',deadline);
+            // A background document may suspend frames entirely; it must not
+            // keep this read pending beyond the enclosing observation budget.
+            await call('async page => {await page.evaluate(()=>new Promise(resolve=>{const timer=setTimeout(resolve,100);requestAnimationFrame(()=>requestAnimationFrame(()=>{clearTimeout(timer);resolve();}));}));return true;}',deadline);
             await new Promise(resolve=>setTimeout(resolve,80));
             continue;
           }

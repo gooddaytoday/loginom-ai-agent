@@ -116,8 +116,8 @@
   },
   "packages/loginom-runtime/client/lib/node-target-browser.mjs": {
     "baseHash": "aebab1ef9bc8b6df4c13b5d06b8d28980b7affe07d7badf5a39b070503ded39a",
-    "hash": "d5c31189c1c0836b84bb52f2ce9e75cdc47168fda31961213a2bc966e288e561",
-    "reason": "Merge main bounded headed-browser port rendering waits and ordinary-node mask handling with RC9 complete native bindings, hover/rebind and bounded placement. Include observed node and port identities in rendering refusal diagnostics without weakening ownership checks."
+    "hash": "734edf3e071ac5eba57798f854b4db3101ba46028d1a7be7c1bc3ddd34590916",
+    "reason": "Merge main bounded headed-browser port rendering waits and ordinary-node mask handling with RC9 complete native bindings, hover/rebind and bounded placement. Include observed node and port identities in rendering refusal diagnostics without weakening ownership checks. Bound frame wait during read-only retries when background animation is suspended."
   },
   "packages/loginom-runtime/client/test/node-placement.test.mjs": {
     "baseHash": "4ce1a2ec34ce3c5b68dcacc15d05cc438e70ec7cddcc7ff3b76f7edc1038b278",
@@ -223,5 +223,10 @@
     "baseHash": "c4ea4fb47539acbd8e9edb0ac48c6893f2131546875fb963383266cc194d7f3d",
     "hash": "1620093696f53f5afb397f3fba4114fa36ff8415642a32e169a34f1cd1d4f17c",
     "reason": "Exercise bound metadata commit using refreshed references and reject changed owner, column, draft, original value, type or stage."
+  },
+  "packages/loginom-runtime/client/test/node-target-port-render.test.mjs": {
+    "baseHash": "ae1ca9bd5ecc473a9a73dc49aed8146b335aab063a868c72b1052687dffd91f3",
+    "reason": "Bound read-only port paint waits when browser animation frames are suspended.",
+    "hash": "d0f22332325e7f98cca4b62c22552e2fbefd400a0b07513c2e98e6f864406924"
   }
 }

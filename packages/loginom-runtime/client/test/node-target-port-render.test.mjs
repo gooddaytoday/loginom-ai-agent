@@ -13,7 +13,7 @@ function fixture(){
  Object.assign(port,{FGuid:'port-guid',data:{},parent:node,FType:1,FSubType:1});port.FCell.parent=node.FCell;
  let portTid='MF;TF-1;Graph;Calc;Output_Data-0';portDom.getAttribute=()=>portTid;
  node.FLabel={parent:node,FCell:{parent:node.FCell,visible:true},FRawValue:'Calc'};
- let rendered=true,labelRendered=true,onPaint=()=>{};
+ let rendered=true,labelRendered=true,onPaint=()=>{},pausedPaint=false;
  const graph={container:root,getCellAt:()=>wrongHit?{}:port.FCell,view:{getState:cell=>cell===node.FCell?{shape:{node:body}}:cell===node.FLabel.FCell?(labelRendered?{text:{node:labelDom}}:null):rendered?{shape:{node:duplicateShape?alternatePortDom:portDom}}:null}};
  const model=Object.assign(new ModelForm(),{FCreateDraggedNodeStarted:false,FDraggingOverGraph:false,FDiagram:{FmxGraph:graph,FNodes:{FCollection:[node]}}});
  const packageNode=new PackageTreeNode(),workflowNode=Object.assign(new WorkFlowTreeNode(),{ParentNode:packageNode});
@@ -22,10 +22,10 @@ function fixture(){
  const nodeList=values=>Object.assign(Object.fromEntries(values.map((v,i)=>[i,v])),{length:values.length,[Symbol.iterator]:function*(){yield* values;}});
  const document={querySelectorAll:selector=>nodeList(selector.startsWith('[data-tid^=')?[crumb]:[tab,root,body,portDom,...outside,...(labelRendered?[labelDom]:[])].filter(e=>selector==='[data-tid='+JSON.stringify(e.getAttribute())+']'))};
  const preparation={id:'doc',document,receipts:new Map([['p',{phase:'verified',workflowId:'wf',packageNode,tab}]])};
- const context=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app},__loginomDockPreparationV1:preparation,getComputedStyle:()=>({visibility:'visible'}),requestAnimationFrame:callback=>{onPaint();callback(0);}});
+ const context=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app},__loginomDockPreparationV1:preparation,getComputedStyle:()=>({visibility:'visible'}),setTimeout,clearTimeout,requestAnimationFrame:callback=>{if(pausedPaint)return;onPaint();callback(0);}});
  const page={evaluate:(fn,arg)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context)};
  const adapter=createNodeTargetBrowserAdapter({origin:'http://loginom.test',build:'7.4.2',pinned:{},execute:code=>vm.runInNewContext('('+code+')',{...context})(page)});
- return {binding:()=>readGraph(page,{request,types:{},origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},read:()=>adapter.observe(request,Date.now()+1000),alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ return {binding:()=>readGraph(page,{request,types:{},origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},read:()=>adapter.observe(request,Date.now()+1000),alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
 test('outline copies outside the prepared canvas do not replace its port or label bindings',async()=>{
  const f=fixture();f.outline();await f.read();f.alternateShape();assert.deepEqual(Array.from((await f.read()).nodes[0].outputs),[0]);
@@ -44,6 +44,10 @@ test('missing port attribute cannot borrow an unobserved or changed native ident
 test('port rendered on the next paint is fully rebound before graph acceptance',async()=>{
  const f=fixture();f.hide();f.paintWith(()=>f.show());
  const result=await f.read();assert.equal(result.complete,true);assert.deepEqual(Array.from(result.nodes[0].outputs),[0]);
+});
+test('suspended animation frames cannot hang a read-only port observation', {timeout:3000},async()=>{
+ const f=fixture();f.hide();f.pausePaint();
+ await assert.rejects(f.read(),/Visible port identity is not rendered/);
 });
 test('visible native port without a rendered identity cannot enter a complete graph checkpoint',async()=>{
  const f=fixture();assert.deepEqual(Array.from((await f.read()).nodes[0].outputs),[0]);
