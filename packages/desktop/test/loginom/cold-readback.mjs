@@ -51,7 +51,7 @@ const { context } = await loginBrowser({
   browserPath: resources.browserPath,
   profile: join(args.output, "browser"),
   candidate: { url: config.loginom_url, username: config.workflow_profile.loginom_user, password: "" },
-  headless: true,
+  headless: process.env.LOGINOM_AI_AGENT_TEST_HEADLESS !== "0",
   keepOpen: true,
 })
 const page = context.pages()[0]

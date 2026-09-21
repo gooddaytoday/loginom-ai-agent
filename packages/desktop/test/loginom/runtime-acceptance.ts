@@ -76,7 +76,7 @@ async function launch(chat: string, csv: string, cleanupPackage: string): Promis
     stateDir: directory,
     generation: 1,
     chat,
-    headless: true,
+    headless: process.env.LOGINOM_AI_AGENT_TEST_HEADLESS !== "0",
     connection: {
       generation: 1,
       revision: 1,
