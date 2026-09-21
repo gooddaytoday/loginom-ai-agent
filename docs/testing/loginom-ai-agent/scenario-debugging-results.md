@@ -52,9 +52,11 @@ Loginom: `7.4.2` по manifest фактического prepare.
 
 ## Точка продолжения
 
-Разрешить системный запрос Keychain для установленного тестового кандидата,
-затем повторить исходный ABC через его GUI. Отдельно воспроизвести ошибочную
-ссылку на колонку и проверить исправление того же узла после закрытия черновика.
+Keychain разблокирован: кандидат `.3` выполняет самостоятельный ABC
+в чате `ses_f3c001c10ffevlxP0Ek4C4Beav` (тот же GPT-5.6 Sol, low).
+Исходный импорт и первый калькулятор SUCCEEDED. Дождаться результата,
+сохранить доказательства и продолжить матрицу на кандидате `.5`.
+Диагностическое восстановление того же узла в `.5` подтверждено ниже.
 Матрица B65/B02/B47/B37/B27/B18/V65/V02/V27/V37 ещё не запускалась.
 
 ## Первый кандидат
@@ -136,3 +138,21 @@ codesign PASS. Артефакты: `scenario-20260921-2` рядом с перв�
 
 Повтор полного runtime suite после этой правки: exit 0 (`runtime-tests-3.log`);
 source transforms: 5045 PASS; `git diff --check`: PASS.
+
+## Третий кандидат и подтверждение восстановления
+
+`d8a537ac3d7b64afa0b9bec6d6cc575a08d13f03`, `0.1.7-local.20260921.5`:
+штатная сборка DMG/ZIP, статическая проверка 4446 ресурсов, offline smoke PASS.
+Установлен из readonly DMG, codesign PASS. Каталог артефактов:
+`/Users/kartamyshev/.cache/loginom-macos-build/scenario-20260921-3`.
+Установка: `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260921.5/Loginom AI Agent.app`.
+SHA256 app.asar: `4a83e641fd82fd373ccdc2c040d452aa946ce469ee3bb16482e861f94b9cb4f2`.
+
+DEBUG_ONLY live regression: PASS (`import-recovery-live-3.log`).
+Неверная колонка → FAILED с подтверждённым закрытием собственного мастера →
+новый operation ID и тот же node → SUCCEEDED, execution completed,
+наблюдаемый выход из двух строк → package.save_checkpoint SUCCEEDED.
+Node `ad8f7792-da20-4a7c-9fdf-8ee86acb9ec3`, document
+`1789994885116-a5hfud4m3jv`. Приватные доказательства:
+`/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-import-recovery-live-JcBvNB/summary.json`.
+Это прямой runtime-проверочный запрос; автономный сценарий им не заменяется.
