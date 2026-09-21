@@ -1,5 +1,15 @@
 # Linux: завершение реализации — 2026-09-16
 
+CI release v0.1.6 — 2026-09-21: все обязательные jobs
+[run 35584356107](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35584356107)
+прошли на исходном commit `ec399bdf7283f0c7e03aabf295a4db44346f4310`.
+Desktop и standalone CLI собраны под Linux x64, Windows x64 и macOS arm64;
+unit/e2e/typecheck, native checks, static/offline и Linux Docker matrix — PASS.
+Создан draft pre-release с 30 assets; public publication не выполнялась.
+[Отчёт и hashes](../testing/loginom-ai-agent/reports/2026-09-21-ci-release/report.md).
+Пользовательские установки не менялись; это CI artifact acceptance, не новая
+installed live Loginom/provider acceptance.
+
 Слияние `main` → `loginom` — 2026-09-21 (только исходники): `main`
 `c8a8ac0bd` объединена с `loginom` `6bffc8e3b`. Разрешены шесть текстовых
 конфликтов; сохранены RC9 recovery checkpoints, ID-only resume и native bindings,

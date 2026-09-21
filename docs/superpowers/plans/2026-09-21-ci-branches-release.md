@@ -19,12 +19,15 @@ Root/Desktop manifests и bun.lock обновляются через `script/set
 - [x] Обновить три workflow и CI runbook.
 - [x] Выполнить `bun script/set-version.ts --version 0.1.6` на Bun 1.3.14.
 - [x] Проверить YAML, branch/tag filters, неизменность release gates и frozen install.
-- [ ] Создать коммит с Conventional Commit message; сохранить пользовательский cleanup.md.
-- [ ] Создать annotated v0.1.6 и атомарно отправить loginom с тегом; pre-push не отключать.
-- [ ] Проверить удалённые refs и запуск test/typecheck/release в GitHub Actions.
+- [x] Создать коммит с Conventional Commit message; сохранить пользовательский cleanup.md.
+- [x] Создать annotated v0.1.6 и атомарно отправить loginom с тегом; pre-push не отключать.
+- [x] Проверить удалённые refs и запуск test/typecheck/release в GitHub Actions.
 
-- [ ] Довести полный release workflow до success под Linux x64, Windows x64 и macOS arm64, исправляя подтверждённые ошибки.
-- [ ] Сверить артефакты Desktop/CLI, обязательные gates и draft-only статус; сохранить итоговый отчёт.
+- [x] Довести полный release workflow до success под Linux x64, Windows x64 и macOS arm64, исправляя подтверждённые ошибки.
+- [x] Сверить артефакты Desktop/CLI, обязательные gates и draft-only статус; сохранить итоговый отчёт.
 
 Пользователь отдельно подтвердил сопровождение до успешной сборки всех платформ.
 Локальные проверки конфигурации не объявляются успешной релизной сборкой.
+
+Итог: [release run 35584356107](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35584356107) — success.
+[Отчёт и проверенные артефакты](../../testing/loginom-ai-agent/reports/2026-09-21-ci-release/report.md).

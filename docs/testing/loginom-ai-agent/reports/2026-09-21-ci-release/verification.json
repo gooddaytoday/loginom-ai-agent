@@ -1,0 +1,327 @@
+{
+  "version": "0.1.6",
+  "sourceCommit": "ec399bdf7283f0c7e03aabf295a4db44346f4310",
+  "run": {
+    "id": 35584356107,
+    "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35584356107",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "release": {
+    "id": 392846183,
+    "url": "https://github.com/gooddaytoday/loginom-ai-agent/releases/tag/untagged-b6a4114f81f3e106ee1f",
+    "tag": "v0.1.6",
+    "draft": true,
+    "prerelease": true
+  },
+  "jobs": [
+    {
+      "id": 106284126625,
+      "name": "verify",
+      "conclusion": "success"
+    },
+    {
+      "id": 106284128008,
+      "name": "cut",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 106284186283,
+      "name": "build (macos)",
+      "conclusion": "success"
+    },
+    {
+      "id": 106284186331,
+      "name": "build (windows)",
+      "conclusion": "success"
+    },
+    {
+      "id": 106284186345,
+      "name": "build (linux)",
+      "conclusion": "success"
+    },
+    {
+      "id": 106284186503,
+      "name": "typecheck / typecheck",
+      "conclusion": "success"
+    },
+    {
+      "id": 106284186738,
+      "name": "tests / unit",
+      "conclusion": "success"
+    },
+    {
+      "id": 106284186740,
+      "name": "tests / desktop",
+      "conclusion": "success"
+    },
+    {
+      "id": 106284186751,
+      "name": "tests / e2e",
+      "conclusion": "success"
+    },
+    {
+      "id": 106286611441,
+      "name": "linux-matrix",
+      "conclusion": "success"
+    },
+    {
+      "id": 106288241119,
+      "name": "release",
+      "conclusion": "success"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 10632960022,
+      "name": "loginom-linux-matrix",
+      "size": 72743,
+      "digest": "sha256:3394b46b7789ac9c96c51dddf0f17c68318222ba5ca4a7580c95658f3333a415"
+    },
+    {
+      "id": 10632205509,
+      "name": "loginom-windows",
+      "size": 1004944266,
+      "digest": "sha256:968a53c6deafcd5362e3b40bb550bb8f2e803ba7c572a7803c4f9784679c20ab"
+    },
+    {
+      "id": 10631719885,
+      "name": "loginom-macos",
+      "size": 1506223828,
+      "digest": "sha256:c997476ffab068009d7cc86434cd7db7fe0eee91823c1e1a09dff51070692564"
+    },
+    {
+      "id": 10631684588,
+      "name": "loginom-linux",
+      "size": 1483945697,
+      "digest": "sha256:adb2605c8695c6be10c35acc98703e251c2111ae94b47c0569602028c86e255c"
+    }
+  ],
+  "assets": [
+    {
+      "id": 578747210,
+      "name": "linux-matrix.json",
+      "size": 892,
+      "digest": "sha256:c134c38c7164cb2eb0b4faa25f64e585fc407d75b7068d7afc24ea1e22ce1984",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747211,
+      "name": "loginom-ai-agent-0.1.6-macos-source.tar.gz",
+      "size": 173164204,
+      "digest": "sha256:cff6a93f89cee4d66301f49e5c18cbb2a5582f371361ab301a3a9163eaa0b667",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747204,
+      "name": "loginom-ai-agent-0.1.6-source.tar.gz",
+      "size": 173164204,
+      "digest": "sha256:cff6a93f89cee4d66301f49e5c18cbb2a5582f371361ab301a3a9163eaa0b667",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747206,
+      "name": "loginom-ai-agent-0.1.6-windows-source.tar.gz",
+      "size": 173305114,
+      "digest": "sha256:1a2c64a33c5814d06db4be55c599a884b4982086ccd7dd09ab7a6a0093343ca3",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747222,
+      "name": "loginom-ai-agent-cli-0.1.6-darwin-arm64.tar.gz",
+      "size": 368713485,
+      "digest": "sha256:a4bf895ffbf8e599a598f3a27b1ef7085abf7eff34c280040c78d68f55eb0776",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747224,
+      "name": "loginom-ai-agent-cli-0.1.6-darwin-arm64.tar.gz.sha256",
+      "size": 113,
+      "digest": "sha256:9896fdb41d5fa6abb96adc3039dd17b807fcfbbd66851713f4d09085f9a9eb3a",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747237,
+      "name": "loginom-ai-agent-cli-0.1.6-linux-x64.tar.gz",
+      "size": 409285307,
+      "digest": "sha256:ded552a637ab85b45d195705e62297d0e92dcae74067a180d17bfca204acf814",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747390,
+      "name": "loginom-ai-agent-cli-0.1.6-linux-x64.tar.gz.sha256",
+      "size": 110,
+      "digest": "sha256:5cb1b8e88c8c65d394f90b8a84c5b987d1d6c3fb802645fa84c9ce5e1d6fd7ed",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747404,
+      "name": "loginom-ai-agent-cli-0.1.6-win32-x64.zip",
+      "size": 438039740,
+      "digest": "sha256:29743e17b921c08d04cd161657a7ab55be39bf914c0f68cae291b3094def901f",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747414,
+      "name": "loginom-ai-agent-cli-0.1.6-win32-x64.zip.sha256",
+      "size": 107,
+      "digest": "sha256:656c5af7a9d4f7b6e4bfd002641e0f14147c40e10412064aa3cc691edce7dfab",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747430,
+      "name": "loginom-ai-agent-linux-amd64.deb",
+      "size": 405824984,
+      "digest": "sha256:d79d9fc29414c93fbb50af9da14e615d8307adeb5470b2c87fcf649e7b02f6c2",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747446,
+      "name": "loginom-ai-agent-linux-x86_64.AppImage",
+      "size": 499094550,
+      "digest": "sha256:e475c03a9258cc2c6d54de715c922d39613ce4db9342cc31af09f93e74bbd8c7",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747460,
+      "name": "loginom-ai-agent-mac-arm64.dmg",
+      "size": 483934228,
+      "digest": "sha256:342c4fee4d323a5dca836bbc359a9d8613fcfbde145bf2e0da227752044ae68f",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747511,
+      "name": "loginom-ai-agent-mac-arm64.zip",
+      "size": 485336357,
+      "digest": "sha256:1774a6f2c93022499a2790b295c13048078e3be64dbad92881a5abeb075241e5",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747651,
+      "name": "loginom-ai-agent-win-x64.exe",
+      "size": 396674698,
+      "digest": "sha256:c334f4d954e69c33e086fc85a5ef7cbe4bfaae71a8c140663df53f7eb8a520d2",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747821,
+      "name": "macos-build-report.json",
+      "size": 559,
+      "digest": "sha256:ee8f69f4cd70a29dd43879678b3be37f7ee1856e1da3fc088a5db11212486297",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747817,
+      "name": "macos-offline-smoke.json",
+      "size": 1418,
+      "digest": "sha256:e8fbab52354124ac1fb6c34b7dd70922e0cb1f5f103dce60ec44002f3b88d4a0",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747829,
+      "name": "macos-release-manifest.json",
+      "size": 3749,
+      "digest": "sha256:6dc9280fd0cfcde300e6bc14a0e79f6088ac5e383086b3a36735243b66137d55",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747830,
+      "name": "macos-release-manifest.json.sha256",
+      "size": 65,
+      "digest": "sha256:619486f60f11090d032fda8f5840b8ec0bb34f448c67602d216114d747b1f30e",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747840,
+      "name": "macos-source-checks.json",
+      "size": 1497,
+      "digest": "sha256:250430b343c094e96c223d54cc88f9a77c6ef8591db02511fef4b1df36f02457",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747841,
+      "name": "release-manifest.json",
+      "size": 3740,
+      "digest": "sha256:e85f09e7e3a62f0db5a01e14acc5ed986ed94b7495cb0f9e51d404861eaceefe",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747844,
+      "name": "release-manifest.json.sha256",
+      "size": 65,
+      "digest": "sha256:a3b7665552741f851b2a3e2d0642bc239d6aff7cfb4d38be108a285df29cf2ad",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747207,
+      "name": "SHA256SUMS.txt",
+      "size": 2846,
+      "digest": "sha256:7dba5a433ee6216ac9058bb2fd9f2cc44c52f1bd2493a7ff9bab2f916b3563ca",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747854,
+      "name": "static-appimage.json",
+      "size": 312,
+      "digest": "sha256:922d42a929fd49c2f14048c6ee7609d0813ccd33e57e86cdd1ef215d9bc21a15",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747855,
+      "name": "static-deb.json",
+      "size": 306,
+      "digest": "sha256:d1c364230f7a9bcb2e6879b125de35e71c69f34cd4f95c1c3092d96734051938",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747856,
+      "name": "static-dmg.json",
+      "size": 540,
+      "digest": "sha256:ded69f3534ecfb3c6af59da14c313f8ae09cc0cf57fb550fd5df97e19023fa28",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747860,
+      "name": "static-nsis.json",
+      "size": 308,
+      "digest": "sha256:dfb3062f38d01001eaf9c4668bdca6a1cfede866549a7608985e30d0ad4ec89a",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747861,
+      "name": "static-zip.json",
+      "size": 540,
+      "digest": "sha256:f3644994a1d34f19a355dcae66072c0d92168410abd828a9d945b9ff4d454b46",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747864,
+      "name": "windows-release-manifest.json",
+      "size": 3372,
+      "digest": "sha256:46d97367ae9fa735668d864177515524568fc78a7dc30c5f4a4baac64adfdcca",
+      "state": "uploaded"
+    },
+    {
+      "id": 578747866,
+      "name": "windows-release-manifest.json.sha256",
+      "size": 65,
+      "digest": "sha256:aed0ce8cecae240d86a15399e077111a043e75edd1d9eb1e9c3882774ad0b0b5",
+      "state": "uploaded"
+    }
+  ],
+  "verification": {
+    "assetCount": 30,
+    "releaseNoteDigestsMatched": 29,
+    "cliManifestSourceCommitMatched": true,
+    "cliManifestSourceDirty": false,
+    "linuxMatrix": [
+      "ubuntu22",
+      "ubuntu24",
+      "ubuntu26",
+      "debian12",
+      "debian13"
+    ],
+    "downloadedInstallersLocally": false,
+    "installedLiveAcceptance": false
+  }
+}
