@@ -16,7 +16,7 @@
 | V27 | CREATED_EXECUTED | `.6` / `ses_f3bd0e6a1ffeUBtNOzCMf4U9QT` |
 | V02 | CREATED_EXECUTED | `.6` / `ses_f3bc657c4ffeTvC1P6XK305UqQ` |
 | V37 | CREATED_EXECUTED | `.6` / `ses_f3bbe10a3ffepT603sr9zvYis2` |
-| V65 | BLOCKED | `.9` / `ses_f3bb674dbffeD525jNVz7P63Y3` |
+| V65 | RUNNING | `.10` / `ses_f3ba9dc34ffee19lAQH7mtf0Y4`; прежний `.9` BLOCKED |
 
 RUNNING и NOT_STARTED — промежуточные состояния реестра, не зачётные исходы.
 Для выполненных случаев `analytical_correctness: not_checked`.
@@ -76,8 +76,8 @@ Loginom: `7.4.2` по manifest фактического prepare.
 
 ## Точка продолжения
 
-Зачтены исходный ABC и девять случаев матрицы. Последний V65 остановился
-на F13; исправление проходит проверки перед сборкой следующего кандидата.
+Зачтены исходный ABC и девять случаев матрицы. V65 повторяется на `.10`
+после исправления F13 и успешных проверок исходников/установки.
 B18/B27 завершены на `.8`, V37 на `.6`. Приватные профили и полные чаты
 сохранены в `/Users/kartamyshev/Library/Logs/loginom-scenario-debugging/20260921/`.
 Актуальные сессии и кандидаты записаны в `live-checkpoint.json` там же.
@@ -466,3 +466,17 @@ channel.act напрямую. Pending configure затем не позволил
 
 Проверки F13: полный runtime 2281 PASS / 2 SKIP (`runtime-tests-7.log`),
 source transforms 5045 PASS, git diff --check PASS.
+
+## Кандидат `.10`
+
+Из `4270f2c93551562c5f46e1b6c27812317e81f5ff` собран и установлен
+`0.1.7-local.20260921.10`. DMG/ZIP 4446 ресурсов, offline smoke и codesign PASS.
+ASAR SHA-256: `ea84ccd576ba9be459348e565082f0de73220804eb0ab9749f5d1a70c399e4b1`.
+V65 повторён с теми же заданием, вложением и моделью через GUI; меняются
+только уникальные пути вывода. Профиль `candidate-8-V65-profile`, чат
+`ses_f3ba9dc34ffee19lAQH7mtf0Y4`.
+
+Отдельный DEBUG_ONLY-повтор B27 воспроизводит прежние запросы и координаты
+узлов на `.9`, включая проблемное размещение `(672,576)`. Он не заменяет
+автономную приёмку. Журнал `port-replay-live.log`, приватные квитанции в
+`/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-HFMIgd`.
