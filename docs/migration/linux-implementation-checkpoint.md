@@ -1,5 +1,14 @@
 # Linux: завершение реализации — 2026-09-16
 
+Локальное macOS-обновление — 2026-09-21: `0.1.7-local.20260921.1` из
+`603259682` собрана и установлена в `/Applications/Loginom AI Agent.app`.
+Исправлена ложная recovery-блокировка при параллельных tool calls.
+Source/build/static/offline и установленный GUI connection/save/restart — PASS;
+macOS Keychain доступ подтверждён пользователем после смены ad-hoc сборки.
+Обычный профиль запущен, настройки/auth/история и старые recovery-записи сохранены.
+Публикации и push не было; CLI собран, но не устанавливался. Это не новая
+Linux-приёмка. [Отчёт установки](../testing/loginom-ai-agent/reports/2026-09-21-local-macos/report.md).
+
 CI release v0.1.6 — 2026-09-21: все обязательные jobs
 [run 35584356107](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35584356107)
 прошли на исходном commit `ec399bdf7283f0c7e03aabf295a4db44346f4310`.
