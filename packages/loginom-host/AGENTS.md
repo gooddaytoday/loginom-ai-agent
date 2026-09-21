@@ -28,6 +28,8 @@
 
 - A successful runtime reply can retain active asynchronous work. Keep its journal records durable but permit the same run to poll while `activeWork` is true. Clear that run's records only when its runtime reports no unsettled work. Losing/releasing the owner or receiving inactive uncertainty moves all retained records to recovery. Never acquire a second run for the same chat while the first owns it; unrelated runs cannot reconcile its records.
 
+- Serialize model tool calls per acquired run in `adapter.ts`, before transport timeout and durable admission. Queued cancellation must not interrupt a different active call; released runs must never dispatch queued work. HostPort separately rejects a concurrent call with `LOGINOM_CALL_BUSY` before journal creation, without abandoning the active call. Interrupt bypasses serialization. See [parallel-call regression acceptance](../../docs/testing/loginom-ai-agent/parallel-calls.md).
+
 - Manual CSV acceptance shares `script/oracle-provider.ts` across Desktop and CLI transports. It queues scripted model tool calls, captures the actually advertised Loginom contract and never supplies synthetic attachment admission. Each interface must send its own original-user attachment. `compare-oracle-contracts.ts` compares captured schemas and the bootstrap Loginom instruction; it does not prove all dynamic instructions or same-build provenance. Desktop acceptance uses a private GUI profile and its real backend API, not direct Host dispatch.
 
 - Windows runtime environment matching is case-insensitive even for ordinary objects from IPC. Emit one uppercase name per allowed key with sorted-key precedence; retain case-sensitive Linux behavior and never inherit provider secrets or user PATH.

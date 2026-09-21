@@ -16,6 +16,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       chat: string
       lease: NonNullable<ReturnType<typeof service.acquire>>
       calls: number
+      dispatching: boolean
       released: boolean
       active: Set<string>
     }
@@ -66,7 +67,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           reply({ id: data.id, result: null })
           return
         }
-        runs.set(input.run, { chat, lease, calls: 0, released: false, active: new Set() })
+        runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set() })
         reply({ id: data.id, result: { generation: lease.generation } })
         return
       }
@@ -81,6 +82,10 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         return
       }
       if (data.method !== "interrupt" && service.journal.pending().length) throw new Error("LOGINOM_RECOVERY_REQUIRED")
+      // Refuse competing calls before durable admission. The active call keeps its
+      // own journal and lease; a known no-dispatch refusal is not uncertainty.
+      if (data.method === "call" && run.dispatching) throw new Error("LOGINOM_CALL_BUSY")
+      if (data.method === "call") run.dispatching = true
       run.calls++
       try {
         if (data.method === "tools") {
@@ -163,6 +168,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           throw new Error("LOGINOM_CALL_UNCERTAIN")
         }
       } finally {
+        if (data.method === "call") run.dispatching = false
         run.calls--
         if (run.released && !run.calls) {
           await release(input.run, run)
@@ -170,7 +176,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       }
     } catch (error) {
       const code =
-        error instanceof Error && ["LOGINOM_RECOVERY_REQUIRED", "LOGINOM_CALL_UNCERTAIN"].includes(error.message)
+        error instanceof Error &&
+        ["LOGINOM_RECOVERY_REQUIRED", "LOGINOM_CALL_UNCERTAIN", "LOGINOM_CALL_BUSY"].includes(error.message)
           ? error.message
           : "LOGINOM_HOST_REQUEST_FAILED"
       reply({ id: data.id, error: code })
