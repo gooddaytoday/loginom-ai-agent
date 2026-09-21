@@ -83,7 +83,9 @@ export function createUserWorkflowBindings() {
       }
       return { ...request,parameters, workflow_ref: structuredClone(ref),mappings:request.mappings??[],
         read:{ports,sample_rows:ports.length?5:0,require_exact_numbers:false,...request.read},
-        budgets:{configure_ms:120000,execute_ms:120000,total_ms:Math.max(300000,request.budgets?.configure_ms??0,request.budgets?.execute_ms??0),...request.budgets} };
+        // Native wide-column setup and exact-format readback are sequential UI
+        // work. Reserve time for both; explicit caller deadlines remain binding.
+        budgets:{configure_ms:300000,execute_ms:120000,total_ms:Math.max(600000,request.budgets?.configure_ms??0,request.budgets?.execute_ms??0),...request.budgets} };
     },
     normalizePreparation(args) {
       if (args.intent !== 'existing_workflow') return args;

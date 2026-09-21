@@ -21,8 +21,8 @@
   },
   "packages/loginom-runtime/client/lib/workspace-ui.mjs": {
     "baseHash": "cd5898556ca838c2a00e9b5a5a717c614de72f7962c034d95fcdc26b832a7624",
-    "hash": "7348572b2822fa122a51c3bc888751d9230ed9201db40c0765cfd77e7e27511f",
-    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance."
+    "hash": "d6aa1729c5d1d7597875b54a7235fb1e3708de90492fc4e5fb18ad5fae08b9fd",
+    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance. Use the observed and re-hit-tested point of a partly clipped graph visualizer, preserving no-effect refusal for a covered target."
   },
   "packages/loginom-runtime/client/test/action-catalog-lifecycle.test.mjs": {
     "baseHash": "6004e3b91aa6afd3eff0a3f36d3d054ae840e6c432d57853320033b3fc59389a",
@@ -91,8 +91,8 @@
   },
   "packages/loginom-runtime/client/test/workspace-ui.test.mjs": {
     "baseHash": "2c3fa72c098e439a19b4a309e4acb244d34816aa6891926f3e9ae897cfad5a49",
-    "hash": "0480d8adc1affb76c89945471d183f2f3b2d907b9e2d1b56b9d3ce6e304784fd",
-    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance."
+    "hash": "cdd517e7c2f64d95c53e8ddcbf1b4f7d129798f14698b2eb3234a520b7091e05",
+    "reason": "Expose the observed Loginom package menu as a bounded UI region even when a large workflow forces roots discovery; regression coverage for close/reopen acceptance. Regress clipped visualizer geometry and newly covered targets against the real workspace UI executor."
   },
   "packages/loginom-runtime/tools/loginom-acceptance/date-time-public-fixture-schema.mjs": {
     "baseHash": "27c57585cd3f391ebc2ae30115f2f4bb3f8414c614f07204460bb5f1a77ba461",
@@ -166,8 +166,8 @@
   },
   "packages/loginom-runtime/client/lib/node-api.mjs": {
     "baseHash": "e7b2e721bc5a1c9d2a3c575e05b7776558e6b18970f769b688a3d34a82a29fc4",
-    "hash": "2f8cd4b9ad1f6134d1a7eff8bb119ffb897d45a58960148fea44bd3c0f4a80a2",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label."
+    "hash": "9f3191d49b1a1fb2b2345a25a396ac6b83d8f566b69e01ba9167d3e3192cca81",
+    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label. Describe shared phase and total deadlines, exact-read cleanup cost and the 60000 ms wait limit."
   },
   "packages/loginom-runtime/client/lib/node-apply.mjs": {
     "baseHash": "d9f4f12730a3195e893cd04244fa7d53cf7c16604e49cae3334a013903c1dcb3",
@@ -228,5 +228,15 @@
     "baseHash": "ae1ca9bd5ecc473a9a73dc49aed8146b335aab063a868c72b1052687dffd91f3",
     "reason": "Bound read-only port paint waits when browser animation frames are suspended.",
     "hash": "d0f22332325e7f98cca4b62c22552e2fbefd400a0b07513c2e98e6f864406924"
+  },
+  "packages/loginom-runtime/client/lib/user-workflow.mjs": {
+    "baseHash": "cc84d83a95211bdcceadeeed7e57599ed90e9431fdae2dfc7f1913148877f1c2",
+    "hash": "f94e4377638c209b1421f794642aa9aefad8f324a55870499af19f61461deece",
+    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints."
+  },
+  "packages/loginom-runtime/client/test/user-workflow.test.mjs": {
+    "baseHash": "61ab452f9c710aef8bb7afa11996f55974d22f5cb216ba1644f4725751a37a47",
+    "hash": "50ed95b88cfbb81fdd9eb06c0230ddefc4d84049f25c934e4a399df0f8742193",
+    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints."
   }
 }

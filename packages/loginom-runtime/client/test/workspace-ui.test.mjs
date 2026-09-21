@@ -496,6 +496,27 @@ test('stable SVG DOM geometry dispatches the checked point even when Playwright 
   }
 });
 
+test('partly clipped graph visualizers use their observed painted point and refuse a newly covered point', async () => {
+  for (const covered of [false, true]) {
+    const page = new Page();
+    page.context.innerWidth = 1000; page.context.innerHeight = 800;
+    const graph = page.add('div', 'MF;TF-1;ModelForm;cmpDiagram', '', { x: 0, y: 0, width: 1000, height: 790 });
+    Object.assign(graph, { clientWidth: 1000, clientHeight: 790, scrollHeight: 846, scrollTop: 0, style: { overflowY: 'auto' } });
+    const body = page.add('g', 'MF;TF-1;Graph;Узел', '', { x: 450, y: 700, width: 80, height: 80 }, graph);
+    page.add('span', 'MF;TF-1;Graph;Узел;Label;Label', 'Узел', undefined, body);
+    const control = page.add('g', 'MF;TF-1;Graph;Узел;Visualizers', '', { x: 500, y: 786, width: 24, height: 24 }, graph);
+    const toolbar = page.add('div', 'BottomToolbar', '', { x: 0, y: 790, width: 1000, height: 10 });
+    const snapshot = await page.observe(), element = snapshot.ui.elements.find(item => item.tid === control.getAttribute('data-tid'));
+    assert.equal(element.interaction.state, 'point_observed');
+    assert.ok(element.interaction.point.y < 790);
+    if (covered) page.beforeHandleGeometry = () => { toolbar.box.y = 780; toolbar.box.height = 20; };
+    const result = await page.act({ verb: 'click', ref: element.ref }, snapshot);
+    assert.equal(result.status, covered ? 'NOT_APPLIED' : 'SUCCEEDED', JSON.stringify(result.error));
+    if (covered) { assert.equal(result.error.code, 'UI_REFERENCE_OBSCURED'); assert.equal(result.effect_possible, false); }
+    assert.deepEqual(page.clickedPoints, covered ? [] : [{ ...element.interaction.point, clickCount: 1 }]);
+  }
+});
+
 test('a DOM geometry change during preflight is rejected before any checked-point click', async () => {
   const page = new Page(), shape = page.add('g', 'MF;TF-1;Graph;Узел');
   const snapshot = await page.observe(), element = snapshot.ui.elements.find(item => item.tid === shape.getAttribute('data-tid'));

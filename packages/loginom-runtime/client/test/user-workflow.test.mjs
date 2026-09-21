@@ -74,8 +74,11 @@ test('technical defaults expand deterministically and preserve explicit choices'
   const args=request();args.target.type=type;args.finish=finish;delete args.read;delete args.budgets;delete args.mappings;
   validateActionParameters(tool.inputSchema,args);
   const full=bindings.expandNode(args);assert.deepEqual(full.read.ports,ports);assert.deepEqual(full.mappings,[]);
+  assert.ok(full.budgets.total_ms>full.budgets.configure_ms+full.budgets.execute_ms,'default deadline reserves output read and cleanup time');
   assert.deepEqual(bindings.expandNode(args),full);
   assert.equal(bindings.expandNode({...args,read:{sample_rows:2},budgets:{total_ms:500000}}).budgets.total_ms,500000);
+  const explicit={configure_ms:1000,execute_ms:1000,total_ms:2000};
+  assert.deepEqual(bindings.expandNode({...args,budgets:explicit}).budgets,explicit,'caller deadlines must not be silently extended');
  }
 });
 test('new import defaults use only a locally confirmed upload and preserve explicit settings',()=>{

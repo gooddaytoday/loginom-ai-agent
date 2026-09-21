@@ -3265,9 +3265,9 @@ function readRenderedInputMapping(observation) {
     const validExtents = box && (isGraphLink ? box.width >= 0 && box.height >= 0 && (box.width > 0 || box.height > 0) : box.width > 0 && box.height > 0);
     if (!box?.styles_visible || !validExtents || ['x', 'y', 'width', 'height'].some(key => !Number.isFinite(box[key])
       || Math.abs(box[key] - current.bounding_box[key]) > 0.75)) fail('UI_REFERENCE_STALE', 'Observed control geometry changed');
-    // Buffered rows and node settings can be partly clipped by their scrolling view.
+    // Buffered rows, node settings and visualizers can be partly clipped by their scrolling view.
     // Use the freshly observed cell point, then hit-test that exact point again.
-    const point = (current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open) && current.interaction?.state==='point_observed'
+    const point = (current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.graph_node?.part==='visualizers') && current.interaction?.state==='point_observed'
       ? current.interaction.point : { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     if (!isGraphLink && viewport && (point.x < 0 || point.y < 0 || point.x >= viewport.width || point.y >= viewport.height)) fail('UI_REFERENCE_OFFSCREEN', 'Observed control is outside the viewport');
     const hit = await handle.evaluate((element, { point, viewport, isGraphLink }) => {

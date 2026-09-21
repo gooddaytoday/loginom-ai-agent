@@ -1,0 +1,333 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-09-21",
+  "status": "planned_not_run",
+  "source_root": "/Users/kartamyshev/Git/analitic-tasks",
+  "plan": "../../superpowers/plans/2026-09-21-loginom-description-dataset-debugging.md",
+  "notes": [
+    "Hashes identify unchanged source inputs, not expected analytical outputs.",
+    "Each attempt receives description.md and data/dataset.csv through Desktop.",
+    "No new-series execution is attested by this manifest."
+  ],
+  "cases": [
+    {
+      "order": 1,
+      "id": "D02",
+      "directory": "task02-group-analysis",
+      "files": [
+        {
+          "path": "description.md",
+          "bytes": 1212,
+          "sha256": "9e353747e9c01f64913aa0cbdd5db485c74db82504b288cf88289ffabe67fc4b"
+        },
+        {
+          "path": "data/dataset.csv",
+          "bytes": 22195,
+          "sha256": "673fc3a6482c19baf96a2221a3964c151716a9c5e66837601df3d8de6316d1a8",
+          "rows": 500,
+          "columns": 7,
+          "fields": [
+            "transaction_id",
+            "category",
+            "region",
+            "quantity",
+            "unit_price",
+            "date",
+            "total"
+          ],
+          "empty_cells": 0
+        }
+      ]
+    },
+    {
+      "order": 2,
+      "id": "D47",
+      "directory": "task47-budget-variance",
+      "files": [
+        {
+          "path": "description.md",
+          "bytes": 1070,
+          "sha256": "4eda7a44aa26dbd5d31ede66930aa55384d653de1644e64998e0d3d35d7795fa"
+        },
+        {
+          "path": "data/dataset.csv",
+          "bytes": 6651,
+          "sha256": "835c1976b749a47c21c9fedeb1e1d3469afe6978b2ddb438985981c091ea4362",
+          "rows": 120,
+          "columns": 9,
+          "fields": [
+            "budget_id",
+            "category",
+            "quarter",
+            "budgeted",
+            "actual",
+            "department",
+            "variance",
+            "variance_pct",
+            "is_over_budget"
+          ],
+          "empty_cells": 0
+        }
+      ]
+    },
+    {
+      "order": 3,
+      "id": "D23",
+      "directory": "task23-employee-performance",
+      "files": [
+        {
+          "path": "description.md",
+          "bytes": 1102,
+          "sha256": "ca6f0144f206ad72f9cb997f3a9156b5335cc2e93e57c12fe1263721746f886c"
+        },
+        {
+          "path": "data/dataset.csv",
+          "bytes": 4148,
+          "sha256": "a135e7406cd5e5ff1dfb1c2ca929281319a2ccca2b7e1856868e8015407ec975",
+          "rows": 150,
+          "columns": 7,
+          "fields": [
+            "employee_id",
+            "department",
+            "experience_years",
+            "kpi_score",
+            "projects_completed",
+            "overtime_hours",
+            "satisfaction_score"
+          ],
+          "empty_cells": 0
+        }
+      ]
+    },
+    {
+      "order": 4,
+      "id": "D45",
+      "directory": "task45-financial-statements",
+      "files": [
+        {
+          "path": "description.md",
+          "bytes": 1178,
+          "sha256": "e7470b63300d0d690ec40b2ccea5a2366a726c4184b57f1b97f940f619e72108"
+        },
+        {
+          "path": "data/dataset.csv",
+          "bytes": 29880,
+          "sha256": "3039f28dc50bd55c019f59741a822812d0e6f8e55d999b12b45f58554591c2b9",
+          "rows": 200,
+          "columns": 16,
+          "fields": [
+            "company_id",
+            "industry",
+            "revenue",
+            "net_income",
+            "total_assets",
+            "total_liabilities",
+            "current_assets",
+            "current_liabilities",
+            "operating_cash_flow",
+            "equity",
+            "debt_to_equity",
+            "current_ratio",
+            "roe",
+            "roa",
+            "profit_margin",
+            "asset_turnover"
+          ],
+          "empty_cells": 0
+        }
+      ]
+    },
+    {
+      "order": 5,
+      "id": "D19",
+      "directory": "task19-campaign-roi",
+      "files": [
+        {
+          "path": "description.md",
+          "bytes": 1359,
+          "sha256": "b08f909b383b89f049e655b7edd07ab3da701c40d13474ea8c56934ba45d9c27"
+        },
+        {
+          "path": "data/dataset.csv",
+          "bytes": 36288,
+          "sha256": "57ea09cd16bdcfac7b9e7954d243031d1c32a9bb14433de11027a7eb339d3eb5",
+          "rows": 500,
+          "columns": 12,
+          "fields": [
+            "campaign_id",
+            "channel",
+            "budget",
+            "impressions",
+            "clicks",
+            "conversions",
+            "revenue",
+            "target_audience",
+            "duration_days",
+            "ctr",
+            "conversion_rate",
+            "roi"
+          ],
+          "empty_cells": 0
+        }
+      ]
+    },
+    {
+      "order": 6,
+      "id": "D36",
+      "directory": "task36-unit-economics",
+      "files": [
+        {
+          "path": "description.md",
+          "bytes": 1193,
+          "sha256": "f45d4c1bb3302420cdf1cb2202d967f98bbb574ee0d7252b818df3b495831403"
+        },
+        {
+          "path": "data/dataset.csv",
+          "bytes": 17061,
+          "sha256": "0a79417be13f8134d1220c9312fb6dac13370371e8b2562fec3eba72bbfbe8a4",
+          "rows": 300,
+          "columns": 9,
+          "fields": [
+            "customer_id",
+            "acquisition_channel",
+            "cac",
+            "monthly_revenue",
+            "churn_rate",
+            "months_active",
+            "total_revenue",
+            "gross_margin",
+            "ltv"
+          ],
+          "empty_cells": 0
+        }
+      ]
+    },
+    {
+      "order": 7,
+      "id": "D24",
+      "directory": "task24-dynamic-pricing",
+      "files": [
+        {
+          "path": "description.md",
+          "bytes": 1140,
+          "sha256": "8118925dd3bd97c0f342901ab4017f0fc5d7c65c17ec62b0b85950d2cd83bbb7"
+        },
+        {
+          "path": "data/dataset.csv",
+          "bytes": 16901,
+          "sha256": "dbfd1c551d760325df8ac870c55a006dfa7fbb607bba430c723ab5ae6967b334",
+          "rows": 400,
+          "columns": 8,
+          "fields": [
+            "product_id",
+            "product_category",
+            "base_price",
+            "dynamic_price",
+            "units_sold",
+            "season",
+            "competitor_price",
+            "customer_rating"
+          ],
+          "empty_cells": 0
+        }
+      ]
+    },
+    {
+      "order": 8,
+      "id": "D48",
+      "directory": "task48-quality-control",
+      "files": [
+        {
+          "path": "description.md",
+          "bytes": 1051,
+          "sha256": "c3d8c8cb1edc1484a95849a834f0721114be36c7d1226d40af3f7c5faa69c32e"
+        },
+        {
+          "path": "data/dataset.csv",
+          "bytes": 28841,
+          "sha256": "d5f13a2f7c8fad4fea2301486221cfa1b6e9f7e7bb861a6a1116123efc7fd346",
+          "rows": 500,
+          "columns": 11,
+          "fields": [
+            "product_id",
+            "production_line",
+            "shift",
+            "defect_count",
+            "total_produced",
+            "defect_rate",
+            "inspection_score",
+            "temperature",
+            "humidity",
+            "operator_experience",
+            "material_batch"
+          ],
+          "empty_cells": 0
+        }
+      ]
+    },
+    {
+      "order": 9,
+      "id": "D27",
+      "directory": "task27-demand-forecasting",
+      "files": [
+        {
+          "path": "description.md",
+          "bytes": 1175,
+          "sha256": "2ac8d816119f4b15fef92079eba8efb750cfb9a4d1aa450fbd88fd7661dd5520"
+        },
+        {
+          "path": "data/dataset.csv",
+          "bytes": 10915,
+          "sha256": "3e3802f3314e24c964aee9a1ea9985d6ad3b28dea8cbbb51cd44e6fdbafd3786",
+          "rows": 365,
+          "columns": 7,
+          "fields": [
+            "date",
+            "day_of_week",
+            "is_weekend",
+            "temperature",
+            "promotion",
+            "competitor_promo",
+            "daily_demand"
+          ],
+          "empty_cells": 0
+        }
+      ]
+    },
+    {
+      "order": 10,
+      "id": "D65",
+      "directory": "task65-abc-analysis",
+      "files": [
+        {
+          "path": "description.md",
+          "bytes": 1258,
+          "sha256": "ceb6a233d33bfc62f2e14a98bb3fbf797cf294d07a4ea6d37f512a3988addfd6"
+        },
+        {
+          "path": "data/dataset.csv",
+          "bytes": 16735,
+          "sha256": "a7992f3107ae4e187196259f559cbc8be7865b562bda15559ed0377ff6758c55",
+          "rows": 200,
+          "columns": 13,
+          "fields": [
+            "item_id",
+            "item_name",
+            "category",
+            "annual_sales_units",
+            "unit_price",
+            "annual_revenue",
+            "stock_quantity",
+            "storage_cost_per_unit",
+            "supplier",
+            "lead_time_days",
+            "profit_margin",
+            "total_storage_cost",
+            "profit"
+          ],
+          "empty_cells": 0
+        }
+      ]
+    }
+  ]
+}
