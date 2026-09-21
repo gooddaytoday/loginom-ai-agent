@@ -13,13 +13,13 @@
 | B37 | CREATED_EXECUTED | `.6` / `ses_f3bddb28dffe9rnhncERKN0Fam` |
 | B27 | BLOCKED | `.5` / `ses_f3bddb28effeOkWDWMW4svtpFn` |
 | B18 | BLOCKED | `.7` / `ses_f3bd81345ffea4N7Co16zrp2B5` |
-| V27 | RUNNING | `.6` / `ses_f3bd0e6a1ffeUBtNOzCMf4U9QT` |
+| V27 | CREATED_EXECUTED | `.6` / `ses_f3bd0e6a1ffeUBtNOzCMf4U9QT` |
 | V65, V02, V37 | NOT_STARTED | Входы и задания готовы |
 
 RUNNING и NOT_STARTED — промежуточные состояния реестра, не зачётные исходы.
 Для выполненных случаев `analytical_correctness: not_checked`.
 Фактически выполнены imports.text, transform.calculator, transform.sorting,
-transform.group_data, transform.join_data, transform.date_time. Остальные 8 типов ещё не зачтены.
+transform.group_data, transform.join_data, transform.date_time, transform.union_data. Остальные 7 типов ещё не зачтены.
 
 ## Исходный ABC — 2026-09-21
 
@@ -347,3 +347,34 @@ B27 (`.5`) выполнил несколько ветвей, но следующ
 Проверки F11: runtime 2275 PASS / 2 SKIP; узкие graph regressions 47 PASS;
 macOS source checks 8/8 PASS (`source-checks-4.json`). Диагностика F12 дополнена
 наблюдаемыми node/port ID и признаками наличия элемента; проверка графа не ослаблена.
+
+## Кандидат `.8`
+
+Из `820613e24` собран `0.1.7-local.20260921.8`: DMG/ZIP, 4446 ресурсов,
+offline smoke и установленная подпись прошли проверки. Установлен из DMG в
+`~/Applications/Loginom Scenario Tests/0.1.7-local.20260921.8/`.
+ASAR SHA-256: `05bcfec3ccc6fe6a044b7de1ceff2c70068f41478cf9b5b166a8f0879fb140f2`.
+Новые отдельные профили для повторов B18/B27; предыдущие журналы сохранены.
+
+Попытки V02 (`ses_f3bcbe4e0ffeb83HkEETl4MdmB`, `.7`) и V37
+(`ses_f3bcb6c90ffexlQq1eoatzUHhs`, `.5`) после незавершённых операций
+получили `LOGINOM_HOST_NOT_READY` до инструментов. Это подтверждает передачу
+недоступности модели, но не засчитывается как создание сценария.
+
+## V27 — автономная приёмка `.6`
+
+Чат `ses_f3bd0e6a1ffeUBtNOzCMf4U9QT`: 6 созданных и выполненных узлов —
+2 импорта, union_data, date_time, group_data, sorting. Наблюдаемый общий поток
+365 строк, календарный итог 12 строк. Пакет
+`/user/scenario-debug-V27-candidate6-20260921.lgp` сохранён, cleanup подтверждён.
+Модель исправляла неверные параметры сама; команды/ожидаемый граф не передавались.
+Доказательства: `V27-candidate6-metadata.json`, `V27-candidate6-chat.json`,
+`V27-candidate6-prompt.txt`, `V27-candidate6-final.png` в приватном каталоге серии.
+`analytical_correctness: not_checked`. Успешный путь `.6` сохраняется в `.8`: F10
+изменяет только реально усечённые ответы, F11 — подтверждённый отказ до Enter;
+диагностика портов меняет только текст отказа. Эти ветки не заменяют отдельную
+приёмку на воспроизведённых ошибках.
+
+Запуск двух свежих профилей `.8` ожидает ручного системного доступа macOS
+к связке ключей. Запрос пользователю отправлен; защита не обходилась.
+Прежний `.6` остаётся работоспособным; на нём запущен отдельный V02.
