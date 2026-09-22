@@ -2,6 +2,12 @@
 
 Обновлено 2026-09-22. План НЕ завершён. Последняя full final16: 4 PASS / 4 BLOCKED / 1 INTERRUPTED / 1 FAILED(provider). Все завершённые попытки закрыты, неизвестный read D65 сохранён. Кандидат 16: целевой D65 PASS, final16 завершена, все клиенты закрыты. На кандидате17 пользователь подтвердил Keychain, запущены четыре целевых Desktop. Цель остаётся новый полный 10/10 на одном установленном кандидате.
 
+## Кандидат18 установлен; целевой D65 отправлен
+
+D-F11 сохранён в `361b13682cf63c7280eef2027015a4d81e38029d`. Версия `0.1.7-local.20260922.6`, ASAR `628613ce1c8fc9a600dbf78105d7ed65f253162b8210e1334fff80d2317263bf`, отдельная установка `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260922.6/Loginom AI Agent.app`. На этот раз **общий build-macos PASS**, включая CLI TAR.GZ, source snapshot и общий Desktop+CLI offline smoke; прежняя задержка упаковки не повторилась. DMG/ZIP по4446 ресурсов, readonly установка, подпись deep/strict и совпадение ASAR PASS. `candidate18-install.json`, build directory `description-20260922-6`.
+
+Окно и connection ready подтверждены, D65-target18 отправлен через UI **08:31:30.226Z**, deadline30min. GPT-5.6 Sol low, два исходных файла, новый профиль; никаких подсказок. REPL install18/candidate18/installed18, target18Manifest, targets18[0] с app/page/backend/headers (секреты не печатать). Все targets17 закрыты. После целевого PASS начать новую full final18 в фиксированном порядке max5. Не переносить предыдущие PASS; final18-manifest.json и десять независимых профилей подготовлены, ещё не отправлены. REPL final18Manifest/slots18/launchNext18/pollFinal18; launchNext18 выбирает первый run без sent_at и сохраняет slot до configureUI, лимит5. Целевой D65 прошёл импорт, сценарий ещё выполняется.
+
 ## Текущий этап: исправление D-F11 перед кандидатом18
 
 Target17 закончена 3 PASS / 1 BLOCKED, все четыре Desktop закрыты: D36 3 узла, D24 5, D27 8; D65 0, UI_EPOCH_CHANGED на fill подписи столбца, enclosing configure unresolved. Strict target17-audit.json complete=false/3 of4/max4. Final17 не запускалась.

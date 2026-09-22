@@ -6,6 +6,8 @@ Desktop `.20260922.4` проверен отдельно: DMG/ZIP/static/offline/
 
 Исправления D-F09/D-F10 сохранены в `617f37364`, DEBUG_ONLY четыре сценария PASS. Desktop `.20260922.5` установлен отдельно: DMG/ZIP/static/offline/signature/ASAR PASS; CLI source-snapshot снова не завершился. После ручного Keychain целевые D36/D24/D27 прошли, D65 заблокирован UI_EPOCH_CHANGED при metadata fill. D-F11 исправлен в рабочем дереве, 132 узких и DEBUG_ONLY D65 PASS, полные проверки выполняются перед новым кандидатом. Итоговый 10/10 остаётся обязательным.
 
+Кандидат18 `.20260922.6` из `361b13682` установлен отдельно: полный build-macos/CLI/static/offline/signature/ASAR PASS, предыдущая задержка CLI не повторилась. D65-target18 отправлен после connection ready, новая полная серия10/10 ещё обязательна.
+
 Исследование description/dataset на macOS — 2026-09-22, ещё выполняется:
 отдельный тестовый кандидат `0.1.7-local.20260922.3` из `512a9b9bef88800d358b0e808d0f03fbd59b5e51`
 установлен в `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260922.3/`.
