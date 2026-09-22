@@ -2,7 +2,7 @@
 
 [release.yml](../../../.github/workflows/release.yml) собирает Desktop и самостоятельный CLI из одного commit для Linux x64, Windows x64 и macOS arm64. Все три платформы, общие тесты и Linux Docker-матрица обязательны. Неполный релиз не создаётся.
 
-Текущая интеграция: ветка `loginom`, подготовка версии 0.1.9. Default branch репозитория остаётся `dev`; её настройка не меняется. До завершения конкретного run этот документ описывает контракт CI, а не результат проверки. С 0.1.9 удалён импорт системного прокси, как описано в [решении](../../superpowers/specs/2026-09-22-proxy-policy.md); native gates проверяют сохранение явного proxy environment, а unit gate дополнительно выполняет реальный Node HTTP/fetch/HTTPS CONNECT тест.
+Текущая интеграция: ветка `loginom`, версия 0.1.9. Полный выпуск прошёл CI, создан draft с 30 assets: [отчёт](reports/2026-09-22-proxy-release.md). Default branch репозитория остаётся `dev`; её настройка не меняется. С 0.1.9 удалён импорт системного прокси, как описано в [решении](../../superpowers/specs/2026-09-22-proxy-policy.md); native gates проверяют сохранение явного proxy environment, а unit gate дополнительно выполняет реальный Node HTTP/fetch/HTTPS CONNECT тест.
 
 `test.yml` и `typecheck.yml` запускаются на push любой ветки (включая имена со слешами) и на PR в любую ветку. Отдельные Windows native checks запускаются на push любой ветки при изменении указанных в workflow путей. Push тега обслуживает `release.yml`, который включает общие тесты и typecheck как reusable gates; отдельные push-запуски тестов на тег не дублируются.
 

@@ -1,6 +1,13 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-09-22 — подготовка 0.1.9: возврат proxy environment OpenCode
+## 2026-09-22 — 0.1.9: возврат proxy environment OpenCode
+
+Полная сборка завершена: [отчёт 0.1.9](../testing/loginom-ai-agent/reports/2026-09-22-proxy-release.md).
+Source `5b77332ae`, все обязательные jobs PASS после повтора Windows DPAPI
+timeout на неизменном source. Создан draft pre-release с 30 assets;
+Desktop/CLI Linux x64, Windows x64, macOS arm64. Manifests и SHA256 проверены.
+Тег 0.1.8 не выпущен и не перемещён. Публикация и установленная live-приёмка
+нового клиента не выполнялись.
 
 По решению пользователя автоматический импорт системного прокси удалён из
 Desktop и CLI на Linux/Windows/macOS. Сохраняются explicit proxy environment,
@@ -11,9 +18,9 @@ Desktop targeted 12 PASS / 2 SKIP, Host environment 2 PASS; реальный Nod
 HTTP/fetch/HTTPS CONNECT, localhost bypass и no-direct-fallback PASS.
 Широкий CLI bootstrap suite на локальной Windows: 4 PASS / 4 FAIL; те же четыре
 теста падают на неизменённом baseline (provider management и POSIX signal paths).
-Linux-only subprocess proxy regression локально SKIP, должен пройти CI.
-Сборки и установленная приёмка 0.1.9 на этом этапе ещё не выполнены;
-release workflow должен подтвердить все три платформы до создания draft.
+Linux-only subprocess proxy regression локально SKIP, в финальном CI PASS.
+Release workflow подтвердил все три платформы; установленная live-приёмка
+новой версии остаётся отдельной проверкой.
 
 ## 2026-09-22 — опубликован CI release 0.1.7
 

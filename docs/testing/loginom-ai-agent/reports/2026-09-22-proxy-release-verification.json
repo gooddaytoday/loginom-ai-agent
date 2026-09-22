@@ -1,0 +1,1326 @@
+{
+  "version": "0.1.9",
+  "sourceCommit": "5b77332ae4e65ec99c19e1330e70d097d2528e4b",
+  "release": {
+    "url": "https://github.com/gooddaytoday/loginom-ai-agent/releases/tag/untagged-1a5784d779f0b23931b3",
+    "draft": true,
+    "prerelease": true
+  },
+  "run": {
+    "attempt": 2,
+    "conclusion": "success",
+    "headSha": "5b77332ae4e65ec99c19e1330e70d097d2528e4b",
+    "jobs": [
+      {
+        "completedAt": "2026-09-22T19:02:55Z",
+        "conclusion": "success",
+        "databaseId": 106888367570,
+        "name": "build (windows)",
+        "startedAt": "2026-09-22T18:50:08Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-22T18:50:10Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-22T18:50:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:50:23Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "number": 2,
+            "startedAt": "2026-09-22T18:50:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:50:31Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "number": 3,
+            "startedAt": "2026-09-22T18:50:23Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:50:33Z",
+            "conclusion": "success",
+            "name": "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+            "number": 4,
+            "startedAt": "2026-09-22T18:50:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:50:57Z",
+            "conclusion": "success",
+            "name": "Setup pinned Node and Chromium",
+            "number": 5,
+            "startedAt": "2026-09-22T18:50:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:00:04Z",
+            "conclusion": "success",
+            "name": "Build both Windows products",
+            "number": 6,
+            "startedAt": "2026-09-22T18:50:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:00:12Z",
+            "conclusion": "success",
+            "name": "Verify Windows source and packaging",
+            "number": 7,
+            "startedAt": "2026-09-22T19:00:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:00:14Z",
+            "conclusion": "success",
+            "name": "Verify settings regression",
+            "number": 8,
+            "startedAt": "2026-09-22T19:00:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:01:32Z",
+            "conclusion": "success",
+            "name": "Verify native Windows host and CLI",
+            "number": 9,
+            "startedAt": "2026-09-22T19:00:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:01:53Z",
+            "conclusion": "success",
+            "name": "Write Windows manifest and verify installer",
+            "number": 10,
+            "startedAt": "2026-09-22T19:01:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:01:55Z",
+            "conclusion": "success",
+            "name": "Collect Windows artifacts",
+            "number": 11,
+            "startedAt": "2026-09-22T19:01:53Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:02:29Z",
+            "conclusion": "success",
+            "name": "Upload Windows artifacts",
+            "number": 12,
+            "startedAt": "2026-09-22T19:01:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:02:45Z",
+            "conclusion": "success",
+            "name": "Post Setup pinned Node and Chromium",
+            "number": 21,
+            "startedAt": "2026-09-22T19:02:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:02:50Z",
+            "conclusion": "success",
+            "name": "Post Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+            "number": 22,
+            "startedAt": "2026-09-22T19:02:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:02:50Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "number": 23,
+            "startedAt": "2026-09-22T19:02:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:02:52Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "number": 24,
+            "startedAt": "2026-09-22T19:02:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:02:52Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 25,
+            "startedAt": "2026-09-22T19:02:52Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35767862239/job/106888367570"
+      },
+      {
+        "completedAt": "2026-09-22T18:44:17Z",
+        "conclusion": "success",
+        "databaseId": 106888368882,
+        "name": "build (macos)",
+        "startedAt": "2026-09-22T18:33:07Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-22T18:33:10Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-22T18:33:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:33:19Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "number": 2,
+            "startedAt": "2026-09-22T18:33:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:33:24Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "number": 3,
+            "startedAt": "2026-09-22T18:33:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:33:25Z",
+            "conclusion": "success",
+            "name": "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+            "number": 4,
+            "startedAt": "2026-09-22T18:33:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:33:43Z",
+            "conclusion": "success",
+            "name": "Setup pinned Node and Chromium",
+            "number": 5,
+            "startedAt": "2026-09-22T18:33:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:12Z",
+            "conclusion": "success",
+            "name": "Install locked macOS dependencies",
+            "number": 6,
+            "startedAt": "2026-09-22T18:33:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:36:53Z",
+            "conclusion": "success",
+            "name": "Verify macOS source",
+            "number": 7,
+            "startedAt": "2026-09-22T18:34:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:43:14Z",
+            "conclusion": "success",
+            "name": "Build, verify and offline-smoke both macOS products",
+            "number": 8,
+            "startedAt": "2026-09-22T18:36:53Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:43:15Z",
+            "conclusion": "success",
+            "name": "Collect platform-specific metadata",
+            "number": 9,
+            "startedAt": "2026-09-22T18:43:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:44:02Z",
+            "conclusion": "success",
+            "name": "Upload macOS artifacts",
+            "number": 10,
+            "startedAt": "2026-09-22T18:43:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:44:10Z",
+            "conclusion": "success",
+            "name": "Post Setup pinned Node and Chromium",
+            "number": 17,
+            "startedAt": "2026-09-22T18:44:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:44:11Z",
+            "conclusion": "success",
+            "name": "Post Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+            "number": 18,
+            "startedAt": "2026-09-22T18:44:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:44:11Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "number": 19,
+            "startedAt": "2026-09-22T18:44:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:44:11Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "number": 20,
+            "startedAt": "2026-09-22T18:44:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:44:14Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 21,
+            "startedAt": "2026-09-22T18:44:11Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35767862239/job/106888368882"
+      },
+      {
+        "completedAt": "2026-09-22T18:49:08Z",
+        "conclusion": "success",
+        "databaseId": 106888369562,
+        "name": "linux-matrix",
+        "startedAt": "2026-09-22T18:42:16Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-22T18:42:19Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-22T18:42:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:42:26Z",
+            "conclusion": "success",
+            "name": "Checkout repository",
+            "number": 2,
+            "startedAt": "2026-09-22T18:42:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:42:28Z",
+            "conclusion": "success",
+            "name": "Setup Bun",
+            "number": 3,
+            "startedAt": "2026-09-22T18:42:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:43:42Z",
+            "conclusion": "success",
+            "name": "Download Linux artifacts",
+            "number": 4,
+            "startedAt": "2026-09-22T18:42:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:43:42Z",
+            "conclusion": "success",
+            "name": "Allow unprivileged user namespaces for the Chromium sandbox",
+            "number": 5,
+            "startedAt": "2026-09-22T18:43:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:49:01Z",
+            "conclusion": "success",
+            "name": "Run offline non-root OS matrix",
+            "number": 6,
+            "startedAt": "2026-09-22T18:43:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:49:03Z",
+            "conclusion": "success",
+            "name": "Upload matrix report",
+            "number": 7,
+            "startedAt": "2026-09-22T18:49:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:49:05Z",
+            "conclusion": "success",
+            "name": "Post Setup Bun",
+            "number": 13,
+            "startedAt": "2026-09-22T18:49:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:49:06Z",
+            "conclusion": "success",
+            "name": "Post Checkout repository",
+            "number": 14,
+            "startedAt": "2026-09-22T18:49:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:49:06Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 15,
+            "startedAt": "2026-09-22T18:49:06Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35767862239/job/106888369562"
+      },
+      {
+        "completedAt": "2026-09-22T18:40:21Z",
+        "conclusion": "success",
+        "databaseId": 106888369650,
+        "name": "tests / e2e",
+        "startedAt": "2026-09-22T18:33:02Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-22T18:33:04Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-22T18:33:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:33:09Z",
+            "conclusion": "success",
+            "name": "Checkout repository",
+            "number": 2,
+            "startedAt": "2026-09-22T18:33:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:07Z",
+            "conclusion": "success",
+            "name": "Setup Bun",
+            "number": 3,
+            "startedAt": "2026-09-22T18:33:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:12Z",
+            "conclusion": "success",
+            "name": "Setup Node",
+            "number": 4,
+            "startedAt": "2026-09-22T18:34:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:12Z",
+            "conclusion": "success",
+            "name": "Read Playwright version",
+            "number": 5,
+            "startedAt": "2026-09-22T18:34:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:13Z",
+            "conclusion": "success",
+            "name": "Cache Playwright browsers",
+            "number": 6,
+            "startedAt": "2026-09-22T18:34:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:26Z",
+            "conclusion": "success",
+            "name": "Install Playwright system dependencies",
+            "number": 7,
+            "startedAt": "2026-09-22T18:34:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:35Z",
+            "conclusion": "success",
+            "name": "Install Playwright browsers",
+            "number": 8,
+            "startedAt": "2026-09-22T18:34:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:40:09Z",
+            "conclusion": "success",
+            "name": "Run app e2e tests",
+            "number": 9,
+            "startedAt": "2026-09-22T18:34:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:40:12Z",
+            "conclusion": "success",
+            "name": "Upload Playwright artifacts",
+            "number": 10,
+            "startedAt": "2026-09-22T18:40:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:40:17Z",
+            "conclusion": "success",
+            "name": "Post Cache Playwright browsers",
+            "number": 17,
+            "startedAt": "2026-09-22T18:40:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:40:18Z",
+            "conclusion": "success",
+            "name": "Post Setup Node",
+            "number": 18,
+            "startedAt": "2026-09-22T18:40:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:40:18Z",
+            "conclusion": "success",
+            "name": "Post Setup Bun",
+            "number": 19,
+            "startedAt": "2026-09-22T18:40:18Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:40:18Z",
+            "conclusion": "success",
+            "name": "Post Checkout repository",
+            "number": 20,
+            "startedAt": "2026-09-22T18:40:18Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:40:18Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 21,
+            "startedAt": "2026-09-22T18:40:18Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35767862239/job/106888369650"
+      },
+      {
+        "completedAt": "2026-09-22T18:49:53Z",
+        "conclusion": "success",
+        "databaseId": 106888370003,
+        "name": "tests / unit",
+        "startedAt": "2026-09-22T18:33:37Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-22T18:33:39Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-22T18:33:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:33:43Z",
+            "conclusion": "success",
+            "name": "Checkout repository",
+            "number": 2,
+            "startedAt": "2026-09-22T18:33:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:32Z",
+            "conclusion": "success",
+            "name": "Setup Bun",
+            "number": 3,
+            "startedAt": "2026-09-22T18:33:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:47Z",
+            "conclusion": "success",
+            "name": "Setup Loginom pinned inputs",
+            "number": 4,
+            "startedAt": "2026-09-22T18:34:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:47Z",
+            "conclusion": "success",
+            "name": "Verify explicit proxy environment with real Node networking",
+            "number": 5,
+            "startedAt": "2026-09-22T18:34:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:47Z",
+            "conclusion": "success",
+            "name": "Configure git identity",
+            "number": 6,
+            "startedAt": "2026-09-22T18:34:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:35:20Z",
+            "conclusion": "success",
+            "name": "Cache Turbo",
+            "number": 7,
+            "startedAt": "2026-09-22T18:34:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:46:09Z",
+            "conclusion": "success",
+            "name": "Run unit tests",
+            "number": 8,
+            "startedAt": "2026-09-22T18:35:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:46:11Z",
+            "conclusion": "success",
+            "name": "Check generated client",
+            "number": 9,
+            "startedAt": "2026-09-22T18:46:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:49:15Z",
+            "conclusion": "success",
+            "name": "Run HttpApi exerciser gates",
+            "number": 10,
+            "startedAt": "2026-09-22T18:46:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:49:47Z",
+            "conclusion": "success",
+            "name": "Post Cache Turbo",
+            "number": 17,
+            "startedAt": "2026-09-22T18:49:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:49:50Z",
+            "conclusion": "success",
+            "name": "Post Setup Loginom pinned inputs",
+            "number": 18,
+            "startedAt": "2026-09-22T18:49:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:49:50Z",
+            "conclusion": "success",
+            "name": "Post Setup Bun",
+            "number": 19,
+            "startedAt": "2026-09-22T18:49:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:49:51Z",
+            "conclusion": "success",
+            "name": "Post Checkout repository",
+            "number": 20,
+            "startedAt": "2026-09-22T18:49:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:49:51Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 21,
+            "startedAt": "2026-09-22T18:49:51Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35767862239/job/106888370003"
+      },
+      {
+        "completedAt": "2026-09-22T18:35:48Z",
+        "conclusion": "success",
+        "databaseId": 106888401929,
+        "name": "typecheck / typecheck",
+        "startedAt": "2026-09-22T18:33:02Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-22T18:33:04Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-22T18:33:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:33:14Z",
+            "conclusion": "success",
+            "name": "Checkout repository",
+            "number": 2,
+            "startedAt": "2026-09-22T18:33:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:13Z",
+            "conclusion": "success",
+            "name": "Setup Bun",
+            "number": 3,
+            "startedAt": "2026-09-22T18:33:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:35:44Z",
+            "conclusion": "success",
+            "name": "Run typecheck",
+            "number": 4,
+            "startedAt": "2026-09-22T18:34:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:35:45Z",
+            "conclusion": "success",
+            "name": "Post Setup Bun",
+            "number": 7,
+            "startedAt": "2026-09-22T18:35:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:35:45Z",
+            "conclusion": "success",
+            "name": "Post Checkout repository",
+            "number": 8,
+            "startedAt": "2026-09-22T18:35:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:35:45Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-09-22T18:35:45Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35767862239/job/106888401929"
+      },
+      {
+        "completedAt": "2026-09-22T18:42:12Z",
+        "conclusion": "success",
+        "databaseId": 106888406693,
+        "name": "build (linux)",
+        "startedAt": "2026-09-22T18:33:02Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-22T18:33:03Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-22T18:33:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:33:10Z",
+            "conclusion": "success",
+            "name": "Checkout repository",
+            "number": 2,
+            "startedAt": "2026-09-22T18:33:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:33:19Z",
+            "conclusion": "success",
+            "name": "Install Linux packaging dependencies",
+            "number": 3,
+            "startedAt": "2026-09-22T18:33:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:09Z",
+            "conclusion": "success",
+            "name": "Setup Bun",
+            "number": 4,
+            "startedAt": "2026-09-22T18:33:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:21Z",
+            "conclusion": "success",
+            "name": "Setup pinned Node and Chromium",
+            "number": 5,
+            "startedAt": "2026-09-22T18:34:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:35:20Z",
+            "conclusion": "success",
+            "name": "Build desktop",
+            "number": 6,
+            "startedAt": "2026-09-22T18:34:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:39:55Z",
+            "conclusion": "success",
+            "name": "Package desktop",
+            "number": 7,
+            "startedAt": "2026-09-22T18:35:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:40:55Z",
+            "conclusion": "success",
+            "name": "Build CLI",
+            "number": 8,
+            "startedAt": "2026-09-22T18:39:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:40:56Z",
+            "conclusion": "success",
+            "name": "Install Electron binary for the release manifest",
+            "number": 9,
+            "startedAt": "2026-09-22T18:40:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:41:27Z",
+            "conclusion": "success",
+            "name": "Write release manifest and verify Linux installers",
+            "number": 10,
+            "startedAt": "2026-09-22T18:40:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:41:27Z",
+            "conclusion": "success",
+            "name": "Collect artifacts",
+            "number": 11,
+            "startedAt": "2026-09-22T18:41:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:42:05Z",
+            "conclusion": "success",
+            "name": "Upload artifacts",
+            "number": 12,
+            "startedAt": "2026-09-22T18:41:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:42:09Z",
+            "conclusion": "success",
+            "name": "Post Setup pinned Node and Chromium",
+            "number": 22,
+            "startedAt": "2026-09-22T18:42:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:42:09Z",
+            "conclusion": "success",
+            "name": "Post Setup Bun",
+            "number": 23,
+            "startedAt": "2026-09-22T18:42:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:42:10Z",
+            "conclusion": "success",
+            "name": "Post Checkout repository",
+            "number": 24,
+            "startedAt": "2026-09-22T18:42:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:42:10Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 25,
+            "startedAt": "2026-09-22T18:42:10Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35767862239/job/106888406693"
+      },
+      {
+        "completedAt": "2026-09-22T18:34:12Z",
+        "conclusion": "success",
+        "databaseId": 106888411542,
+        "name": "tests / desktop",
+        "startedAt": "2026-09-22T18:33:02Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-22T18:33:03Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-22T18:33:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:33:08Z",
+            "conclusion": "success",
+            "name": "Checkout repository",
+            "number": 2,
+            "startedAt": "2026-09-22T18:33:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:33:55Z",
+            "conclusion": "success",
+            "name": "Setup Bun",
+            "number": 3,
+            "startedAt": "2026-09-22T18:33:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:09Z",
+            "conclusion": "success",
+            "name": "Run desktop tests",
+            "number": 4,
+            "startedAt": "2026-09-22T18:33:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:10Z",
+            "conclusion": "success",
+            "name": "Post Setup Bun",
+            "number": 7,
+            "startedAt": "2026-09-22T18:34:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:10Z",
+            "conclusion": "success",
+            "name": "Post Checkout repository",
+            "number": 8,
+            "startedAt": "2026-09-22T18:34:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:34:10Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-09-22T18:34:10Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35767862239/job/106888411542"
+      },
+      {
+        "completedAt": "2026-09-22T18:32:44Z",
+        "conclusion": "skipped",
+        "databaseId": 106888416223,
+        "name": "cut",
+        "startedAt": "2026-09-22T18:50:13Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35767862239/job/106888416223"
+      },
+      {
+        "completedAt": "2026-09-22T18:32:58Z",
+        "conclusion": "success",
+        "databaseId": 106888430234,
+        "name": "verify",
+        "startedAt": "2026-09-22T18:32:47Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-22T18:32:48Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-22T18:32:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:32:55Z",
+            "conclusion": "success",
+            "name": "Checkout repository",
+            "number": 2,
+            "startedAt": "2026-09-22T18:32:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:32:55Z",
+            "conclusion": "success",
+            "name": "Resolve version and channel",
+            "number": 3,
+            "startedAt": "2026-09-22T18:32:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:32:56Z",
+            "conclusion": "success",
+            "name": "Post Checkout repository",
+            "number": 6,
+            "startedAt": "2026-09-22T18:32:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T18:32:56Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 7,
+            "startedAt": "2026-09-22T18:32:56Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35767862239/job/106888430234"
+      },
+      {
+        "completedAt": "2026-09-22T19:04:32Z",
+        "conclusion": "success",
+        "databaseId": 106893127018,
+        "name": "release",
+        "startedAt": "2026-09-22T19:02:58Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-22T19:03:00Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-22T19:02:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:03:14Z",
+            "conclusion": "success",
+            "name": "Checkout repository",
+            "number": 2,
+            "startedAt": "2026-09-22T19:03:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:03:15Z",
+            "conclusion": "success",
+            "name": "Setup Bun",
+            "number": 3,
+            "startedAt": "2026-09-22T19:03:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:03:51Z",
+            "conclusion": "success",
+            "name": "Download artifacts",
+            "number": 4,
+            "startedAt": "2026-09-22T19:03:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:03:55Z",
+            "conclusion": "success",
+            "name": "Write SHA256SUMS and release notes",
+            "number": 5,
+            "startedAt": "2026-09-22T19:03:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:04:29Z",
+            "conclusion": "success",
+            "name": "Create draft release",
+            "number": 6,
+            "startedAt": "2026-09-22T19:03:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:04:30Z",
+            "conclusion": "success",
+            "name": "Post Setup Bun",
+            "number": 11,
+            "startedAt": "2026-09-22T19:04:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:04:30Z",
+            "conclusion": "success",
+            "name": "Post Checkout repository",
+            "number": 12,
+            "startedAt": "2026-09-22T19:04:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-22T19:04:30Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 13,
+            "startedAt": "2026-09-22T19:04:30Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35767862239/job/106893127018"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35767862239"
+  },
+  "assets": [
+    {
+      "name": "linux-matrix.json",
+      "size": 892,
+      "state": "uploaded",
+      "digest": "sha256:a473043e26f22f91b0a01d7a31dbd0d4e7048c31676c06225c3f318b6e30999c",
+      "notesHash": "a473043e26f22f91b0a01d7a31dbd0d4e7048c31676c06225c3f318b6e30999c",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-0.1.9-macos-source.tar.gz",
+      "size": 169837976,
+      "state": "uploaded",
+      "digest": "sha256:a85c0a80ef94f3b4d52080ecef7beb135390c6d9a1da9fcdb538c213687c06ba",
+      "notesHash": "a85c0a80ef94f3b4d52080ecef7beb135390c6d9a1da9fcdb538c213687c06ba",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-0.1.9-source.tar.gz",
+      "size": 169837976,
+      "state": "uploaded",
+      "digest": "sha256:a85c0a80ef94f3b4d52080ecef7beb135390c6d9a1da9fcdb538c213687c06ba",
+      "notesHash": "a85c0a80ef94f3b4d52080ecef7beb135390c6d9a1da9fcdb538c213687c06ba",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-0.1.9-windows-source.tar.gz",
+      "size": 169977432,
+      "state": "uploaded",
+      "digest": "sha256:acee1461a1f2520cc3dfb2157849d0514c42abef5da4c10e8819aacf1536769f",
+      "notesHash": "acee1461a1f2520cc3dfb2157849d0514c42abef5da4c10e8819aacf1536769f",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-cli-0.1.9-darwin-arm64.tar.gz",
+      "size": 368716905,
+      "state": "uploaded",
+      "digest": "sha256:09b74db9f0b0e27c7bade1ec1bd8ba6991270a46027ffc8771ca8a7e4ecf6285",
+      "notesHash": "09b74db9f0b0e27c7bade1ec1bd8ba6991270a46027ffc8771ca8a7e4ecf6285",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-cli-0.1.9-darwin-arm64.tar.gz.sha256",
+      "size": 113,
+      "state": "uploaded",
+      "digest": "sha256:2f136ff28b7b28ea1fca01060c9e5c6f8466ad5b84d0c8ca0fa082a588b6a663",
+      "notesHash": "2f136ff28b7b28ea1fca01060c9e5c6f8466ad5b84d0c8ca0fa082a588b6a663",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-cli-0.1.9-linux-x64.tar.gz",
+      "size": 409286485,
+      "state": "uploaded",
+      "digest": "sha256:a492ef780cc891bfde5c985a85180041ecb054e76a017bbabec0e8709f2ba951",
+      "notesHash": "a492ef780cc891bfde5c985a85180041ecb054e76a017bbabec0e8709f2ba951",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-cli-0.1.9-linux-x64.tar.gz.sha256",
+      "size": 110,
+      "state": "uploaded",
+      "digest": "sha256:9c0f695720ba609151da662b84441e3cb6b569f90bf541732a6dbbb59a3e3966",
+      "notesHash": "9c0f695720ba609151da662b84441e3cb6b569f90bf541732a6dbbb59a3e3966",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-cli-0.1.9-win32-x64.zip",
+      "size": 438042280,
+      "state": "uploaded",
+      "digest": "sha256:82fdbe387538e9bf8e0f4226872a893098c334310c02d3779ddc5a1a7e5c38c8",
+      "notesHash": "82fdbe387538e9bf8e0f4226872a893098c334310c02d3779ddc5a1a7e5c38c8",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-cli-0.1.9-win32-x64.zip.sha256",
+      "size": 107,
+      "state": "uploaded",
+      "digest": "sha256:3d7a574c73aebe3e1734d4fa0790618efdf24dcac096e3f0837c8fc2a916d9af",
+      "notesHash": "3d7a574c73aebe3e1734d4fa0790618efdf24dcac096e3f0837c8fc2a916d9af",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-linux-amd64.deb",
+      "size": 402838500,
+      "state": "uploaded",
+      "digest": "sha256:b404c8442f18c74b32ef86d89b4f46c15a18f0a4e30aff829063ac6460d3f08c",
+      "notesHash": "b404c8442f18c74b32ef86d89b4f46c15a18f0a4e30aff829063ac6460d3f08c",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-linux-x86_64.AppImage",
+      "size": 493397226,
+      "state": "uploaded",
+      "digest": "sha256:d5ce34931af7f7f168d0d6d347f7c052c95bc331afc47b0f5f5ebe596662b073",
+      "notesHash": "d5ce34931af7f7f168d0d6d347f7c052c95bc331afc47b0f5f5ebe596662b073",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-mac-arm64.dmg",
+      "size": 475810774,
+      "state": "uploaded",
+      "digest": "sha256:37c0f496b0e5ceb64beb51b12d6195cd7427d0e40eafe7113e351fb3e5bff33f",
+      "notesHash": "37c0f496b0e5ceb64beb51b12d6195cd7427d0e40eafe7113e351fb3e5bff33f",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-mac-arm64.zip",
+      "size": 478425540,
+      "state": "uploaded",
+      "digest": "sha256:e0f57343922599646fe7dafbdc0783251aaa11b14f6d0cbdcd049fa886b58b93",
+      "notesHash": "e0f57343922599646fe7dafbdc0783251aaa11b14f6d0cbdcd049fa886b58b93",
+      "matchesNotes": true
+    },
+    {
+      "name": "loginom-ai-agent-win-x64.exe",
+      "size": 390628628,
+      "state": "uploaded",
+      "digest": "sha256:9f2312866f51469f33fc9981b54eaa78666e8a6640c4abb72c715e5e9606e2d1",
+      "notesHash": "9f2312866f51469f33fc9981b54eaa78666e8a6640c4abb72c715e5e9606e2d1",
+      "matchesNotes": true
+    },
+    {
+      "name": "macos-build-report.json",
+      "size": 559,
+      "state": "uploaded",
+      "digest": "sha256:5f3d69da8361296fd58700c356cf5317bca521e9b3a1906dc8b6301a8aa91787",
+      "notesHash": "5f3d69da8361296fd58700c356cf5317bca521e9b3a1906dc8b6301a8aa91787",
+      "matchesNotes": true
+    },
+    {
+      "name": "macos-offline-smoke.json",
+      "size": 1418,
+      "state": "uploaded",
+      "digest": "sha256:fbb0e1af444162d3786e883f7fc950a994d4c8a69298fad5745df08f96bab27c",
+      "notesHash": "fbb0e1af444162d3786e883f7fc950a994d4c8a69298fad5745df08f96bab27c",
+      "matchesNotes": true
+    },
+    {
+      "name": "macos-release-manifest.json",
+      "size": 3749,
+      "state": "uploaded",
+      "digest": "sha256:625b25bc4b43707cdbc7d22cf1c4d56fae14f632ac01a6f4772ade1d4240a2a6",
+      "notesHash": "625b25bc4b43707cdbc7d22cf1c4d56fae14f632ac01a6f4772ade1d4240a2a6",
+      "matchesNotes": true
+    },
+    {
+      "name": "macos-release-manifest.json.sha256",
+      "size": 65,
+      "state": "uploaded",
+      "digest": "sha256:989d1539ae34e906b7f22549264555c5c4386b1f52b837303d8f1e10d1906733",
+      "notesHash": "989d1539ae34e906b7f22549264555c5c4386b1f52b837303d8f1e10d1906733",
+      "matchesNotes": true
+    },
+    {
+      "name": "macos-source-checks.json",
+      "size": 1456,
+      "state": "uploaded",
+      "digest": "sha256:a3c451c3a7ddf0876607d26c8d5b0a709ed02f0bb4678cab6cb7edb3be06675b",
+      "notesHash": "a3c451c3a7ddf0876607d26c8d5b0a709ed02f0bb4678cab6cb7edb3be06675b",
+      "matchesNotes": true
+    },
+    {
+      "name": "release-manifest.json",
+      "size": 3740,
+      "state": "uploaded",
+      "digest": "sha256:c75169397227e6d6e45c52a7c09ff9a50397c7a586fca3b88e64b60e8ed038d4",
+      "notesHash": "c75169397227e6d6e45c52a7c09ff9a50397c7a586fca3b88e64b60e8ed038d4",
+      "matchesNotes": true
+    },
+    {
+      "name": "release-manifest.json.sha256",
+      "size": 65,
+      "state": "uploaded",
+      "digest": "sha256:1235f5251bf308c47b96b64196c8ddf62ceb7895024adc2531821a271a5212b0",
+      "notesHash": "1235f5251bf308c47b96b64196c8ddf62ceb7895024adc2531821a271a5212b0",
+      "matchesNotes": true
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "size": 2846,
+      "state": "uploaded",
+      "digest": "sha256:8ffc2a7c107d12666d9bad0f3931772c220200b924cd5fc4a6a4494d11aea94a",
+      "matchesNotes": null
+    },
+    {
+      "name": "static-appimage.json",
+      "size": 312,
+      "state": "uploaded",
+      "digest": "sha256:dc5aeeb960153804211aa50d819bd42124c37f8833954fcb73dbf3abff1d8367",
+      "notesHash": "dc5aeeb960153804211aa50d819bd42124c37f8833954fcb73dbf3abff1d8367",
+      "matchesNotes": true
+    },
+    {
+      "name": "static-deb.json",
+      "size": 306,
+      "state": "uploaded",
+      "digest": "sha256:8d999ac644b090e2702c918c047570b5b3c2e9218339620f058b174bd73f0bb6",
+      "notesHash": "8d999ac644b090e2702c918c047570b5b3c2e9218339620f058b174bd73f0bb6",
+      "matchesNotes": true
+    },
+    {
+      "name": "static-dmg.json",
+      "size": 540,
+      "state": "uploaded",
+      "digest": "sha256:98457ebd8344a5a755285bc025b2af19fc29e9cc6f25a2c9dd0dc2c245ee74ad",
+      "notesHash": "98457ebd8344a5a755285bc025b2af19fc29e9cc6f25a2c9dd0dc2c245ee74ad",
+      "matchesNotes": true
+    },
+    {
+      "name": "static-nsis.json",
+      "size": 308,
+      "state": "uploaded",
+      "digest": "sha256:329fd7b3c65d59b69a034ff273c86bd9eab98e693394cea5bd36f05aef47e02b",
+      "notesHash": "329fd7b3c65d59b69a034ff273c86bd9eab98e693394cea5bd36f05aef47e02b",
+      "matchesNotes": true
+    },
+    {
+      "name": "static-zip.json",
+      "size": 540,
+      "state": "uploaded",
+      "digest": "sha256:a37f9a50a9ad2fb450f2139a9f4a8761e3ed5c037c04d9813364386dc1972cd3",
+      "notesHash": "a37f9a50a9ad2fb450f2139a9f4a8761e3ed5c037c04d9813364386dc1972cd3",
+      "matchesNotes": true
+    },
+    {
+      "name": "windows-release-manifest.json",
+      "size": 3372,
+      "state": "uploaded",
+      "digest": "sha256:23f3bcaa8feaca213ec15e9e5cb18b1e85b675fc682ddfd61449047294df0b52",
+      "notesHash": "23f3bcaa8feaca213ec15e9e5cb18b1e85b675fc682ddfd61449047294df0b52",
+      "matchesNotes": true
+    },
+    {
+      "name": "windows-release-manifest.json.sha256",
+      "size": 65,
+      "state": "uploaded",
+      "digest": "sha256:fa5bd1b2126f93d7fe004a6ca2a88170a525e69b94953fbf94a21e0e3cfc7763",
+      "notesHash": "fa5bd1b2126f93d7fe004a6ca2a88170a525e69b94953fbf94a21e0e3cfc7763",
+      "matchesNotes": true
+    }
+  ],
+  "reportVerification": {
+    "downloadedMetadataHashesMatch": true,
+    "checksumsMatchAllAssets": true,
+    "platformProvenanceMatch": true,
+    "statuses": {
+      "linux-matrix.json": "provenance verified",
+      "macos-build-report.json": "PASS",
+      "macos-offline-smoke.json": "PASS",
+      "macos-release-manifest.json": "provenance verified",
+      "macos-source-checks.json": "PASS",
+      "release-manifest.json": "provenance verified",
+      "static-appimage.json": "PASS",
+      "static-deb.json": "PASS",
+      "static-dmg.json": "PASS",
+      "static-nsis.json": "PASS",
+      "static-zip.json": "PASS",
+      "windows-release-manifest.json": "provenance verified"
+    }
+  }
+}
