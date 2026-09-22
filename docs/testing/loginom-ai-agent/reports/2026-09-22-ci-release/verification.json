@@ -1,0 +1,350 @@
+{
+  "status": "PASS",
+  "version": "0.1.7",
+  "commit": "34c7bc9439d9fb6c124d46cf69266c82e667932a",
+  "run": "https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35711281665",
+  "assets": [
+    {
+      "file": "linux-matrix.json",
+      "bytes": 892,
+      "sha256": "5ef3db70d17519876fe2d0740c6491df877dc67cd88ce63c627ee1eb75beb0db"
+    },
+    {
+      "file": "loginom-ai-agent-0.1.7-macos-source.tar.gz",
+      "bytes": 169824653,
+      "sha256": "ba8eaeb92ac602cc6823e830f147d937d58996e5ad642a1b68538f8c6a931120"
+    },
+    {
+      "file": "loginom-ai-agent-0.1.7-source.tar.gz",
+      "bytes": 169824653,
+      "sha256": "ba8eaeb92ac602cc6823e830f147d937d58996e5ad642a1b68538f8c6a931120"
+    },
+    {
+      "file": "loginom-ai-agent-0.1.7-windows-source.tar.gz",
+      "bytes": 169982672,
+      "sha256": "3b861bc70ebcbe44512af73aec3f4ca17ff3c265a457454bfa6a4046477db92f"
+    },
+    {
+      "file": "loginom-ai-agent-cli-0.1.7-darwin-arm64.tar.gz",
+      "bytes": 368716655,
+      "sha256": "2042d51cbee54eea3f15a3eed702ed71fa2978651b757c29e8c666e0c53880bd"
+    },
+    {
+      "file": "loginom-ai-agent-cli-0.1.7-darwin-arm64.tar.gz.sha256",
+      "bytes": 113,
+      "sha256": "1b3a48fe9d7fe7a62cb54b35fa74ac7827344ce4152dda77e95507886378ed5c"
+    },
+    {
+      "file": "loginom-ai-agent-cli-0.1.7-linux-x64.tar.gz",
+      "bytes": 409296779,
+      "sha256": "94c3b75b95080cf8da7ee1d347cb89b6f3f1a26c64eb354a8e740e80bffcaaf2"
+    },
+    {
+      "file": "loginom-ai-agent-cli-0.1.7-linux-x64.tar.gz.sha256",
+      "bytes": 110,
+      "sha256": "56e0244830dac4729d4f5e4bd7c9d8dc6035a1ca44bfcfa23922b29740afa5e5"
+    },
+    {
+      "file": "loginom-ai-agent-cli-0.1.7-win32-x64.zip",
+      "bytes": 438045493,
+      "sha256": "7ec8cda32d22273b7d0173565df45db1238da3b2977c9fa166f982fff33f09cf"
+    },
+    {
+      "file": "loginom-ai-agent-cli-0.1.7-win32-x64.zip.sha256",
+      "bytes": 107,
+      "sha256": "8e784b1d1ebdfa760c6550709c198e689de32b7f57ca03de9e1b0ca450b758f7"
+    },
+    {
+      "file": "loginom-ai-agent-linux-amd64.deb",
+      "bytes": 402841020,
+      "sha256": "ff2ed8b9b2136d8c9648f8f73cb050165757d9163e8a0963c603b31e14d57474"
+    },
+    {
+      "file": "loginom-ai-agent-linux-x86_64.AppImage",
+      "bytes": 493429588,
+      "sha256": "b7a3ec31154c05fa6166177e04754dc2d4c4e95542f0ad7be441a7cf9d67e846"
+    },
+    {
+      "file": "loginom-ai-agent-mac-arm64.dmg",
+      "bytes": 475803461,
+      "sha256": "8cbfd0a801986c9b663f42a9a33b9a0ed462fc8b98506d251e6db464e1425724"
+    },
+    {
+      "file": "loginom-ai-agent-mac-arm64.zip",
+      "bytes": 478422380,
+      "sha256": "6cdaffeb21ccaa530f600001c4179a2af32355645bdc283406668e928eb115d3"
+    },
+    {
+      "file": "loginom-ai-agent-win-x64.exe",
+      "bytes": 390625575,
+      "sha256": "c64f068f4f9e4aadd140e2c11bb6ee482146efb849e4397cb0534326fa06ce9e"
+    },
+    {
+      "file": "macos-build-report.json",
+      "bytes": 559,
+      "sha256": "ef693857c0e38e415fcd3aefc163e784a642251b487a4b2eee819807a43c373a"
+    },
+    {
+      "file": "macos-offline-smoke.json",
+      "bytes": 1418,
+      "sha256": "9a60da7c732da85ba146268181096d462e2f777304838068b7338530493691fc"
+    },
+    {
+      "file": "macos-release-manifest.json",
+      "bytes": 3749,
+      "sha256": "8ef0aab10d054bd37a9663c4c17b8c3287d3a7353e2cf1ea08ca85fd061ef701"
+    },
+    {
+      "file": "macos-release-manifest.json.sha256",
+      "bytes": 65,
+      "sha256": "9f40a513c6d5feac28861517c07ecf37fd494cda715204278243db419565b150"
+    },
+    {
+      "file": "macos-source-checks.json",
+      "bytes": 1497,
+      "sha256": "a71eafa77b44d94f156b33cc018f8eaf76afe7fcfd27bc901bc8652971c5e255"
+    },
+    {
+      "file": "release-manifest.json",
+      "bytes": 3740,
+      "sha256": "0023919f8e78e5d67d993f8211854059098101da36b0d68a3033c1537ab5f985"
+    },
+    {
+      "file": "release-manifest.json.sha256",
+      "bytes": 65,
+      "sha256": "59a0ca37b005cf7ac9c9cd277a094690b7598fcb2443d14f716f7dc84b3f1e4f"
+    },
+    {
+      "file": "static-appimage.json",
+      "bytes": 312,
+      "sha256": "e67e23aa74e345fbfd9eb33457083182139e6faace07c54e3cee29bbcf96908a"
+    },
+    {
+      "file": "static-deb.json",
+      "bytes": 306,
+      "sha256": "ce422aab44d5dbba29fcef8953e32f2d1f42bd37c8f86a8394a18c78a231c3be"
+    },
+    {
+      "file": "static-dmg.json",
+      "bytes": 540,
+      "sha256": "ac8bd356abfa15e05b005acae98f35e35ea3c927f785e4ecdb7022767deb5383"
+    },
+    {
+      "file": "static-nsis.json",
+      "bytes": 308,
+      "sha256": "5759e071763f4b0be40e43e02c7880142937816532c6952d3904ca867ea7b233"
+    },
+    {
+      "file": "static-zip.json",
+      "bytes": 540,
+      "sha256": "730d88fdee3ce56902acbd401f1f68cc10c765f171231354a4f15d7ca852b8d0"
+    },
+    {
+      "file": "windows-release-manifest.json",
+      "bytes": 3372,
+      "sha256": "3007c832491b2070aed443c501068b14039ec7b9c703bd2bc2c5a79fae6b0dff"
+    },
+    {
+      "file": "windows-release-manifest.json.sha256",
+      "bytes": 65,
+      "sha256": "416d4d16e86245c40cfa4f142e2d0e7b6d80e3c1ebed52bae27f4f7d60735e9e"
+    }
+  ],
+  "checksumsVerified": 30,
+  "cli": [
+    {
+      "file": "loginom-ai-agent-cli-0.1.7-linux-x64.tar.gz",
+      "metadata": {
+        "version": "0.1.7",
+        "channel": "prod",
+        "platform": "linux",
+        "arch": "x64",
+        "sourceCommit": "34c7bc9439d9fb6c124d46cf69266c82e667932a",
+        "sourceTreeSha256": "ed17341f818b71e8e30da6cf2b1f8b32a130fef74cb12acfb0ef50c13e54a0cc",
+        "sourceDirty": false,
+        "dependencies": {
+          "bun": "1.3.14",
+          "node": "24.19.0",
+          "playwright": "1.63.0-alpha-2026-08-31",
+          "playwrightMcp": "0.0.80",
+          "chromium": "1243"
+        }
+      },
+      "resources": 5663
+    },
+    {
+      "file": "loginom-ai-agent-cli-0.1.7-win32-x64.zip",
+      "metadata": {
+        "version": "0.1.7",
+        "channel": "prod",
+        "platform": "win32",
+        "arch": "x64",
+        "sourceCommit": "34c7bc9439d9fb6c124d46cf69266c82e667932a",
+        "sourceTreeSha256": "11f2abd5ed7f5c1b058b41cb64ff6be1e8fd3a16e48b1a6b424ee3158792fed3",
+        "sourceDirty": false,
+        "dependencies": {
+          "bun": "1.3.14",
+          "node": "24.19.0",
+          "playwright": "1.63.0-alpha-2026-08-31",
+          "playwrightMcp": "0.0.80",
+          "chromium": "1243"
+        }
+      },
+      "resources": 5791
+    },
+    {
+      "file": "loginom-ai-agent-cli-0.1.7-darwin-arm64.tar.gz",
+      "metadata": {
+        "version": "0.1.7",
+        "channel": "prod",
+        "platform": "darwin",
+        "arch": "arm64",
+        "sourceCommit": "34c7bc9439d9fb6c124d46cf69266c82e667932a",
+        "sourceTreeSha256": "f40d51b26ae04ebfdce3a43e98ba0334b3c3985f54b5bfc2fc31dd68bbcf8e35",
+        "sourceDirty": false,
+        "dependencies": {
+          "bun": "1.3.14",
+          "node": "24.19.0",
+          "playwright": "1.63.0-alpha-2026-08-31",
+          "playwrightMcp": "0.0.80",
+          "chromium": "1243"
+        }
+      },
+      "resources": 5439
+    }
+  ],
+  "linuxMatrix": {
+    "artifactHash": "ff2ed8b9b2136d8c9648f8f73cb050165757d9163e8a0963c603b31e14d57474",
+    "reports": [
+      {
+        "name": "ubuntu22",
+        "base": "ubuntu:22.04",
+        "status": "PASS",
+        "phase": "offline-nonroot-launch",
+        "exitCode": 0
+      },
+      {
+        "name": "ubuntu24",
+        "base": "ubuntu:24.04",
+        "status": "PASS",
+        "phase": "offline-nonroot-launch",
+        "exitCode": 0
+      },
+      {
+        "name": "ubuntu26",
+        "base": "ubuntu:26.04",
+        "status": "PASS",
+        "phase": "offline-nonroot-launch",
+        "exitCode": 0
+      },
+      {
+        "name": "debian12",
+        "base": "debian:bookworm-slim",
+        "status": "PASS",
+        "phase": "offline-nonroot-launch",
+        "exitCode": 0
+      },
+      {
+        "name": "debian13",
+        "base": "debian:trixie-slim",
+        "status": "PASS",
+        "phase": "offline-nonroot-launch",
+        "exitCode": 0
+      }
+    ]
+  },
+  "limitations": [
+    "CI artifact acceptance; no installed live Loginom/provider acceptance of these exact binaries",
+    "First macOS attempt failed with EPERM in build timeout process-group test and hung; cancelled, second attempt unchanged sources"
+  ],
+  "release": {
+    "url": "https://github.com/gooddaytoday/loginom-ai-agent/releases/tag/v0.1.7",
+    "id": 393623297,
+    "publishedAt": "2026-09-22T10:10:40Z",
+    "draft": false,
+    "prerelease": true
+  },
+  "jobs": [
+    {
+      "name": "build (macos)",
+      "conclusion": "success",
+      "startedAt": "2026-09-22T09:54:14Z",
+      "completedAt": "2026-09-22T10:05:54Z"
+    },
+    {
+      "name": "verify",
+      "conclusion": "success",
+      "startedAt": "2026-09-22T09:35:54Z",
+      "completedAt": "2026-09-22T09:36:05Z"
+    },
+    {
+      "name": "build (linux)",
+      "conclusion": "success",
+      "startedAt": "2026-09-22T09:36:09Z",
+      "completedAt": "2026-09-22T09:45:55Z"
+    },
+    {
+      "name": "tests / e2e",
+      "conclusion": "success",
+      "startedAt": "2026-09-22T09:36:09Z",
+      "completedAt": "2026-09-22T09:42:31Z"
+    },
+    {
+      "name": "build (windows)",
+      "conclusion": "success",
+      "startedAt": "2026-09-22T09:36:09Z",
+      "completedAt": "2026-09-22T09:48:21Z"
+    },
+    {
+      "name": "linux-matrix",
+      "conclusion": "success",
+      "startedAt": "2026-09-22T09:46:00Z",
+      "completedAt": "2026-09-22T09:51:23Z"
+    },
+    {
+      "name": "tests / unit",
+      "conclusion": "success",
+      "startedAt": "2026-09-22T09:36:08Z",
+      "completedAt": "2026-09-22T09:51:59Z"
+    },
+    {
+      "name": "typecheck / typecheck",
+      "conclusion": "success",
+      "startedAt": "2026-09-22T09:36:09Z",
+      "completedAt": "2026-09-22T09:38:30Z"
+    },
+    {
+      "name": "tests / desktop",
+      "conclusion": "success",
+      "startedAt": "2026-09-22T09:36:09Z",
+      "completedAt": "2026-09-22T09:37:32Z"
+    },
+    {
+      "name": "cut",
+      "conclusion": "skipped",
+      "startedAt": "2026-09-22T09:54:10Z",
+      "completedAt": "2026-09-22T09:35:49Z"
+    },
+    {
+      "name": "release",
+      "conclusion": "success",
+      "startedAt": "2026-09-22T10:05:57Z",
+      "completedAt": "2026-09-22T10:08:50Z"
+    }
+  ],
+  "attempt": 2,
+  "localMacosZip": {
+    "status": "PASS",
+    "artifact": "loginom-ai-agent-mac-arm64.zip",
+    "sha256": "6cdaffeb21ccaa530f600001c4179a2af32355645bdc283406668e928eb115d3",
+    "target": "darwin-arm64",
+    "files": 4446,
+    "node": "bin/node",
+    "browser": "browsers/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+    "minimumOS": "14.0",
+    "signing": "ad-hoc",
+    "vendorCodeSignaturesVerified": true,
+    "chromiumSignature": "linker-signed-code-only; resource seal absent upstream",
+    "executableNotRun": true
+  }
+}

@@ -1,13 +1,20 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-09-22 — подготовка CI release 0.1.7
+## 2026-09-22 — опубликован CI release 0.1.7
 
 Объединены локальные исправления description/dataset и пять удалённых коммитов
 `loginom`, история сохранена merge-коммитом `bacf27ebf`. Версии 0.1.7 согласованы.
 Runtime 2315 PASS / 2 Windows SKIP, Desktop 140 PASS / 3 SKIP, CLI/branding
 и typecheck шести пакетов PASS; source attribution 5045 PASS. Выпуск Desktop/CLI
 всех трёх поддерживаемых платформ и публикация разрешены пользователем.
-CI и публичный релиз пока ожидаются; пользовательские установки не менялись.
+[Pre-release v0.1.7](https://github.com/gooddaytoday/loginom-ai-agent/releases/tag/v0.1.7)
+опубликован из `34c7bc9439d9fb6c124d46cf69266c82e667932a`: Desktop/CLI
+Linux x64, Windows x64, macOS arm64; все обязательные jobs PASS, Linux matrix 5/5.
+30 assets проверены по SHA256, provenance и GitHub digest; скачанный macOS ZIP
+прошёл независимую локальную проверку 4446 ресурсов и подписей. Первая macOS
+попытка зависла на EPERM в тесте завершения группы процессов; повтор без
+изменения исходников успешен. Пользовательские установки не менялись;
+это CI artifact acceptance, не installed live acceptance точных релизных файлов.
 [Отчёт выпуска](../testing/loginom-ai-agent/reports/2026-09-22-ci-release/report.md).
 
 ## 2026-09-22 — description/dataset завершено, final18 10/10
