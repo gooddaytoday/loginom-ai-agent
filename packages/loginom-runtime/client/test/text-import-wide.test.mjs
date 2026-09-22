@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {configureTextImportFields,importFieldRevealDelta} from '../lib/text-import-procedure.mjs';
 import {textImportStepBudget} from '../lib/text-import-limits.mjs';
 
-function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,editorChange=null}={}) {
+function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=null,editorChange=null,fillChange=null}={}) {
  const columns=Array.from({length:count},(_,index)=>({index,status:'observed',name:'F'+index,label:'F'+index,type:'string',data_kind:'Дискретный',used:true,
   cell_refs:Object.fromEntries(['name','label','type','data_kind','used'].map(p=>[p,p+':'+index]))}));
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'path',label:'Scenario'}]};
@@ -14,7 +14,7 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
  if(nullMarker!==null)parameters.format.null_marker=nullMarker;
  const request={target:{kind:'new'},parameters:{settings:parameters},mappings:[]},budget=textImportStepBudget(request);
  let stage='text_import_file',steps=0,editor,initialSweep=false,gestures=0;
- const reads=[];
+ const reads=[],performed=[];
  const check=()=>{assert.ok(++steps<=budget,'fixed procedure exhausted its schema allowance');};
  const values=o=>Object.fromEntries(Object.entries(o).map(([k,value])=>[k,{status:'observed',truncated:false,value}]));
  const state=(offset=0)=>({wizard:{status:'observed',stage,root_tid:'wizard',root_ref:'wizard-ref',owner_context:owner,
@@ -39,7 +39,7 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
    const [property,index]=action.ref.split(':'),c=columns[Number(index)];assert.equal(property,'label');
    editor={...c,property,original_value:c.label,input_ref:'editor',value:c.label};return;
   }
-  if(action.verb==='fill'){assert.equal(action.ref,'editor');editor.value=action.text;return;}
+  if(action.verb==='fill'){assert.equal(action.ref,editor.input_ref);editor.value=action.text;return;}
   if(action.verb==='press'){assert.equal(action.key,'Enter');assert.equal(action.ref,editor.input_ref);columns[editor.index].label=editor.value;editor=null;return;}
   assert.fail('Unexpected gesture: '+action.verb);
  },perform:async options=>{
@@ -47,13 +47,16 @@ function fixture(count,{editLabels=false,drift=false,nullMarker=null,optionMode=
   assert.equal(options.ready(before),true);
   const refreshed=structuredClone(before);
   refreshed.wizard.import_column_editor.input_ref='fresh-editor';
-  if(editorChange)editorChange(refreshed);
+  const filling=options.resolve(before).verb==='fill';
+  performed.push(filling?'fill':'commit');
+  if(filling&&fillChange)fillChange(refreshed);
+  if(!filling&&editorChange)editorChange(refreshed);
   assert.equal(options.ready(refreshed),true,'changed editor is not ready');
   assert.deepEqual(options.identity(refreshed),options.identity(before),'editor identity changed');
   editor.input_ref='fresh-editor';
   return channel.act(options.resolve(refreshed));
  }};
- return {parameters,channel,owner,budget,reads,get steps(){return steps;},get gestures(){return gestures;}};
+ return {parameters,channel,owner,budget,reads,performed,get steps(){return steps;},get gestures(){return gestures;}};
 }
 for(const count of [400,1000])for(const editLabels of [false,true])test(`${count} fields are completely checked within a schema-sized budget (edits=${editLabels})`,async()=>{
  const f=fixture(count,{editLabels});const result=await configureTextImportFields(f.channel,f.parameters,f.owner);
@@ -128,4 +131,24 @@ test('arbitrary Null marker retains the observed input path',async()=>{
 for(const optionMode of ['duplicate','foreign_owner','foreign_root','wrong_case','bad_readback','replaced_input'])test('Null marker refuses '+optionMode+' without typing fallback',async()=>{
  const f=fixture(1,{nullMarker:'NULL',optionMode});await assert.rejects(configureTextImportFields(f.channel,f.parameters,f.owner));
  assert.ok(f.gestures<=3);
+});
+
+
+test('metadata fill uses a fresh bound editor before committing the same draft',async()=>{
+ const f=fixture(1,{editLabels:true});
+ const result=await configureTextImportFields(f.channel,f.parameters,f.owner);
+ assert.equal(result.columns[0].label,'Label0');
+ assert.deepEqual(f.performed,['fill','commit']);
+});
+for(const [name,fillChange] of Object.entries({
+ owner:s=>s.wizard.owner_context.node.tid='foreign',
+ column:s=>s.wizard.import_column_editor.index++,
+ value:s=>s.wizard.import_column_editor.value='foreign',
+ original:s=>s.wizard.import_column_editor.original_value='foreign',
+ type:s=>s.wizard.import_column_editor.type='integer',
+ stage:s=>s.wizard.stage='done',
+}))test('metadata fill cannot refresh changed '+name,async()=>{
+ const f=fixture(1,{editLabels:true,fillChange});
+ await assert.rejects(configureTextImportFields(f.channel,f.parameters,f.owner));
+ assert.equal(f.gestures,2,'only Next and editor open were applied');
 });

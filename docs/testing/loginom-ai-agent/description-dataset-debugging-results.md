@@ -160,3 +160,19 @@ Strict final16 audit: 4/10, max_observed5, все попытки закрыты,
 
 
 2026-09-22, DEBUG_ONLY 17b: исходные D36/D24 (импорт, калькулятор, grouping) и импорты D27/D65 прошли на изменённых исходниках. Всего 8 node.apply и четыре save SUCCEEDED/cleanup=true; четыре awaited shutdown проверены, `debug17b-audit.json`. Это не installed acceptance; нагрузочные задержки final16 в этой диагностике не повторились. Первая диагностика 17 прервалась (три CALL_UNCERTAIN, один WIZARD_CONTEXT_CHANGED); временные журналы после перерыва отсутствуют, первопричина не установлена. Новые попытки имели новые независимые сеансы, неизвестные старые действия не повторялись.
+
+
+## Кандидат17: целевая серия и D-F11
+
+Desktop `.20260922.5`, source `617f37364a260b013b142d7d7c47dbdd6543b219`, ASAR `a9a7da454a59f6e933559b89238db5b62194cf6c54e8acc54b127a491e015082`. DMG/ZIP/static/Desktop offline/signature/ASAR PASS; CLI source-snapshot повторно не завершён, общий build не PASS. Keychain вручную подтверждён пользователем. Целевая серия max4 завершена 3 PASS / 1 BLOCKED, strict audit3/4, все четыре клиента закрыты. Полная final17 не запускалась из-за нового исправления.
+
+- D36 CREATED_EXECUTED_SAVED (3 nodes/5.74 min)
+- D24 CREATED_EXECUTED_SAVED (5 nodes/10.47 min)
+- D27 CREATED_EXECUTED_SAVED (8 nodes/11.47 min)
+- D65 BLOCKED (0 nodes/3.43 min)
+
+D-F11: D65 остановлен в node-import-abc-001, step132 fill названия annual_revenue «Годовая выручка». Квитанция NOT_APPLIED/preconditions/UI_EPOCH_CHANGED, effect=false/cleanup=true, без жеста (trace observation_started, action_failed, 86ms). Прямой act этого шага не использовал уже существующий perform refresh; enclosing configure остался AMBIGUOUS. Последующий UI_SCAN_LIMIT/work при диагностике — вторичный отказ, а не time-scan D-F09; его лимит не ослабляется. Исходная операция не повторялась.
+
+Исправление: metadata fill, как и Enter commit, использует bounded perform с новым наблюдением и прежним owner/index/name/label/property/value/original_value/type/data_kind/used. Изменившийся редактор, неизвестный эффект и неподтверждённый cleanup по-прежнему запрещают повтор. 7 регрессий RED до исправления; 132 узких GREEN. DEBUG_ONLY исходного запроса D65 на новом независимом сеансе прошёл: импорт и save SUCCEEDED/cleanup=true, awaited shutdown; debug18-audit.json. Это не installed acceptance. Новая сборка и итоговая серия обязательны. Бизнес-помощи не было; аналитическая корректность/полнота описания not_checked.
+
+D-F11 полные исходные проверки: runtime2315 PASS/2 Windows-only SKIP/0 FAIL, macOS source checks8/8 PASS, source attribution5045 PASS.

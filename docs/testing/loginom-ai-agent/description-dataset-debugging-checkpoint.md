@@ -1,14 +1,20 @@
 # Description + dataset: checkpoint
 
-Обновлено 2026-09-22. План НЕ завершён. Последняя full final16: 4 PASS / 4 BLOCKED / 1 INTERRUPTED / 1 FAILED(provider). Все завершённые попытки закрыты, неизвестный read D65 сохранён. Кандидат 16: целевой D65 PASS, final16 завершена, все клиенты закрыты. Цель остаётся новый полный 10/10 на одном установленном кандидате.
+Обновлено 2026-09-22. План НЕ завершён. Последняя full final16: 4 PASS / 4 BLOCKED / 1 INTERRUPTED / 1 FAILED(provider). Все завершённые попытки закрыты, неизвестный read D65 сохранён. Кандидат 16: целевой D65 PASS, final16 завершена, все клиенты закрыты. На кандидате17 пользователь подтвердил Keychain, запущены четыре целевых Desktop. Цель остаётся новый полный 10/10 на одном установленном кандидате.
 
-## Кандидат 17 — подготовлен, ожидается Keychain
+## Текущий этап: исправление D-F11 перед кандидатом18
+
+Target17 закончена 3 PASS / 1 BLOCKED, все четыре Desktop закрыты: D36 3 узла, D24 5, D27 8; D65 0, UI_EPOCH_CHANGED на fill подписи столбца, enclosing configure unresolved. Strict target17-audit.json complete=false/3 of4/max4. Final17 не запускалась.
+
+В рабочем дереве D-F11: text-import-procedure.mjs использует bounded same-editor perform для fill, как для Enter; text-import-wide.test.mjs +7 регрессий (7 RED до, 132 GREEN после), AGENTS и 2 attribution hash обновлены, attribution5045 PASS. DEBUG_ONLY исходного D65-target17 импорта + save SUCCEEDED, awaited shutdown; replay18-Aplr9T, debug18-audit.json. Не засчитывать как installed. Полные runtime2315 PASS/2 Windows-only SKIP/0 FAIL, macOS source checks8/8 PASS; attribution5045 PASS. Далее сохранить код, clean candidate `.20260922.6`, targeted D65, затем новый full max5.
+
+## Кандидат 17 — целевая installed-приёмка начата
 
 Исправления D-F09/D-F10 сохранены в `617f37364a260b013b142d7d7c47dbdd6543b219`. Четыре DEBUG_ONLY 17b прошли; полные исходные проверки 2308 PASS/2 SKIP, macOS8/8, attribution5045. Desktop **0.1.7-local.20260922.5** установлен из readonly DMG в отдельный `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260922.5/Loginom AI Agent.app`, ASAR `a9a7da454a59f6e933559b89238db5b62194cf6c54e8acc54b127a491e015082`. DMG/ZIP static, все исходные Desktop-only offline checks, подпись deep/strict и равенство ASAR PASS. `candidate17-install.json`, build directory `description-20260922-5`.
 
 Общий build-macos снова остановился на CLI source-snapshot без активности; собственный CLI child завершён SIGTERM после сохранения sample. Desktop source archive/manifest/static/offline выполнены отдельно на том же чистом commit; общий build/CLI не PASS. Пользовательская установка не заменялась.
 
-`target17-manifest.json`: подготовлены D36,D24,D27,D65, ещё НЕ отправлены. Первый запуск D36 ожидает macOS Keychain (SecurityAgent). Read-only попытка открыть SecurityAgent отклонена автоматической проверкой безопасности; нужна ручная обработка системного запроса пользователем, обход запрещён. Deadline попытки не начат. REPL заново инициализирован: fs, evidence, ctl, parallel13, baselineManifest, pw через createRequire, env, install17/candidate17/installed17, target17Manifest/targets17. После допуска дождаться окна и connection ready, настроить модель/вложения, отправить целевые четыре; затем новый полный final17 max5. Не засчитывать source diagnostics как installed PASS.
+`target17-manifest.json`: пользователь вручную подтвердил Keychain. Все четыре D36,D24,D27,D65 отправлены через UI, первые D36 08:11:22.665Z; новые независимые профили, готовые подключения, исходные вложения и GPT-5.6 Sol low. До четырёх активных целевых клиентов, затем новая full final17 max5. Первый запуск D36 ранее ожидал macOS Keychain (SecurityAgent). Попытка открыть SecurityAgent для наблюдения была отклонена автоматической проверкой безопасности; пользователь затем обработал запрос вручную. Срок каждой попытки начат только при отправке; ручное ожидание Keychain до отправки не входит. REPL заново инициализирован: fs, evidence, ctl, parallel13, baselineManifest, pw через createRequire, env, install17/candidate17/installed17, target17Manifest/targets17. Все четыре окна, connection ready, модель и исходные вложения проверены при отправке. Контроллер pollTargets17 собирает квитанции и закрывает только подтверждённые успешные попытки. Затем новый полный final17 max5. Не засчитывать source diagnostics как installed PASS.
 
 ## Текущий этап: разбор final16, подготовка исправлений
 

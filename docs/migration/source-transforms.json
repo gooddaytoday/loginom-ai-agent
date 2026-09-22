@@ -181,8 +181,8 @@
   },
   "packages/loginom-runtime/client/lib/text-import-procedure.mjs": {
     "baseHash": "5a72ca1d8972a313737cf73713e2a3e2c219acb99d44cef550fa495826eecc00",
-    "hash": "8850462b572a9ed40c72d54e35d630081e808a688ab5ab06ba520d1c8ef86ea1",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Require full verified source settings for an existing unconfigured import before attempting schema preservation. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label. Bind import metadata commit to the observed owner, column and draft, permitting strict no-effect epoch refresh. Bind import type/data-kind option selection to its current editor and allow only a proven pre-gesture epoch refresh."
+    "hash": "e1c0d6399fa1f9784da057fdb805ac47801492b85ae1ebf1e26c758c60e157bd",
+    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Require full verified source settings for an existing unconfigured import before attempting schema preservation. Reject native-normalized Unicode technical names before import graph mutation while preserving original Unicode source_name and label. Bind import metadata commit to the observed owner, column and draft, permitting strict no-effect epoch refresh. Bind import type/data-kind option selection to its current editor and allow only a proven pre-gesture epoch refresh. Bind metadata text fills to the unchanged editor through bounded pre-gesture refresh, with owner, value and schema drift refusals."
   },
   "packages/loginom-runtime/client/test/node-apply.test.mjs": {
     "baseHash": "09e457cc476dc16b0790fad7d1742737cdbc59563a27594624b25056781bd00c",
@@ -221,8 +221,8 @@
   },
   "packages/loginom-runtime/client/test/text-import-wide.test.mjs": {
     "baseHash": "c4ea4fb47539acbd8e9edb0ac48c6893f2131546875fb963383266cc194d7f3d",
-    "hash": "1620093696f53f5afb397f3fba4114fa36ff8415642a32e169a34f1cd1d4f17c",
-    "reason": "Exercise bound metadata commit using refreshed references and reject changed owner, column, draft, original value, type or stage."
+    "hash": "b18f7fd698796754b076ec4919aeaa571439c8773f5f2dd01359ae138fa1a16e",
+    "reason": "Exercise bound metadata commit using refreshed references and reject changed owner, column, draft, original value, type or stage. Bind metadata text fills to the unchanged editor through bounded pre-gesture refresh, with owner, value and schema drift refusals."
   },
   "packages/loginom-runtime/client/test/node-target-port-render.test.mjs": {
     "baseHash": "ae1ca9bd5ecc473a9a73dc49aed8146b335aab063a868c72b1052687dffd91f3",

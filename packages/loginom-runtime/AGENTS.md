@@ -49,3 +49,5 @@
 
 - Under concurrent load, only a proven NOT_APPLIED/effect=false/cleanup=true UI_SCAN_LIMIT with a time-limit trace before any precondition or gesture may refresh the read. Keep the original observation/parent deadline, rediscover roots, reset consecutive confirmations and require fresh same-context observations. Work/element/traversal limits and unknown effects remain refusals. A refused pre-gesture action uses the existing bounded same-target/same-intent refresh route, never a raw replay.
 - Compact node configuration may consume the shared 600000 ms total allowance; do not impose a separate 300000 ms setup cutoff. Execution remains bounded by its cap and the remaining total deadline; output read/restoration also consume that original remainder. Do not sum phase maxima, extend pending deadlines or change full diagnostic explicit budgets.
+
+- Import metadata text fill and Enter commit both use the bounded same-editor refresh route. A proved pre-gesture refusal may reobserve only the same owner, column, property, original value, draft value and schema; changed editor state or unknown effect must stop.

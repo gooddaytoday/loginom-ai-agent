@@ -495,8 +495,18 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
           && e.property===property && e.name===before.name
           && (e.label===before.label || property==='name' && associated && e.label_associated===true && e.label===e.value)
           && e.type===before.type && e.data_kind===before.data_kind && e.used===before.used && e.original_value===before[property];};
+        const editorIdentity=state=>{
+          const e=state.wizard.import_column_editor;
+          return {owner:identity(state.wizard.owner_context),index:e.index,name:e.name,label:e.label,
+            property:e.property,value:e.value,original_value:e.original_value,type:e.type,data_kind:e.data_kind,used:e.used};
+        };
         s=await read('text_import_format','bound metadata text editor',editorReady);
-        await act(s,{verb:'fill',ref:s.wizard.import_column_editor.input_ref,text:wanted[property]});
+        // Native attribute updates can invalidate the snapshot before typing,
+        // too. Refresh only a proved no-effect refusal on this unchanged editor.
+        await channel.perform({condition:'fill bound import metadata: '+i+'/'+property,initialObservation:s,
+          ready:state=>state.wizard?.stage==='text_import_format'&&editorReady(state),
+          identity:editorIdentity,
+          resolve:state=>({verb:'fill',ref:state.wizard.import_column_editor.input_ref,text:wanted[property]})});
         s=await read('text_import_format','metadata draft text entered',state=>editorReady(state)
           && state.wizard.import_column_editor.value===wanted[property]);
         // A native editor may update DOM attributes after typing. Refresh only
@@ -504,11 +514,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
         await channel.perform({condition:'commit bound import metadata: '+i+'/'+property,initialObservation:s,
           ready:state=>state.wizard?.stage==='text_import_format'&&editorReady(state)
             &&state.wizard.import_column_editor.value===wanted[property],
-          identity:state=>{
-            const e=state.wizard.import_column_editor;
-            return {owner:identity(state.wizard.owner_context),index:e.index,name:e.name,label:e.label,
-              property:e.property,value:e.value,original_value:e.original_value,type:e.type,data_kind:e.data_kind,used:e.used};
-          },
+          identity:editorIdentity,
           resolve:state=>({verb:'press',ref:state.wizard.import_column_editor.input_ref,key:'Enter'})});
       }
       s=await read('text_import_format','metadata cell committed',state=>ready(state)
