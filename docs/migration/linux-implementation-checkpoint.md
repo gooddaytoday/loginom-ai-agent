@@ -1,12 +1,12 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-09-22 — description/dataset, D-F11 после целевой серии17
+## 2026-09-22 — description/dataset завершено, final18 10/10
 
-Desktop `.20260922.4` проверен отдельно: DMG/ZIP/static/offline/signature/ASAR PASS; CLI build не завершён на cli-source-snapshot. Целевой D65 прошёл, включая самостоятельное reread55/exact с восстановлением форматов. Full final16 max5: 4 PASS / 4 BLOCKED / 1 INTERRUPTED по30мин / 1 FAILED(provider DNS), все клиенты закрыты. Исправляются UI_SCAN_LIMIT/time и configure300s при общем600s. Узкие180 PASS, runtime2308 PASS/2 SKIP, attribution5045 PASS; новая установленная приёмка ещё обязательна. Пользовательская установка и Linux acceptance не менялись. [Текущий checkpoint](../testing/loginom-ai-agent/description-dataset-debugging-checkpoint.md).
+Полная новая серия description.md+dataset.csv на macOS завершена: **10/10 CREATED_EXECUTED_SAVED**, максимум5 независимых Desktop, все попытки без помощи, до30мин, исходные файлы/выполнение/save/cleanup/закрытие подтверждены strict audit. Кандидат `.20260922.6` из `361b13682cf63c7280eef2027015a4d81e38029d`, ASAR `628613ce1c8fc9a600dbf78105d7ed65f253162b8210e1334fff80d2317263bf`, отдельная тестовая установка. Runtime2315 PASS/2 Windows SKIP, macOS8/8, attribution5045; общий build-macos/Desktop+CLI/static/offline/signature/ASAR PASS. В сборках16/17 CLI snapshot не завершался, в18 прошёл; причина прежней задержки не доказана.
 
-Исправления D-F09/D-F10 сохранены в `617f37364`, DEBUG_ONLY четыре сценария PASS. Desktop `.20260922.5` установлен отдельно: DMG/ZIP/static/offline/signature/ASAR PASS; CLI source-snapshot снова не завершился. После ручного Keychain целевые D36/D24/D27 прошли, D65 заблокирован UI_EPOCH_CHANGED при metadata fill. D-F11 исправлен в рабочем дереве, 132 узких и DEBUG_ONLY D65 PASS, полные проверки выполняются перед новым кандидатом. Итоговый 10/10 остаётся обязательным.
+Исправления включают bounded observation refresh под нагрузкой, общий срок настройки без отдельного300s cutoff и same-editor refresh при вводе метаданных. Целевой D65-target18 PASS, затем все10 заново на том же кандидате. Рабочая установка пользователя не заменялась, push/публикации не было; это не новая Linux-приёмка. Аналитическая корректность/полнота описания не оценивались. [Отчёт](../testing/loginom-ai-agent/description-dataset-debugging-results.md), [итоговый checkpoint](../testing/loginom-ai-agent/description-dataset-debugging-checkpoint.md).
 
-Кандидат18 `.20260922.6` из `361b13682` установлен отдельно: полный build-macos/CLI/static/offline/signature/ASAR PASS, предыдущая задержка CLI не повторилась. D65-target18 отправлен после connection ready, новая полная серия10/10 ещё обязательна.
+### Исторические контрольные точки
 
 Исследование description/dataset на macOS — 2026-09-22, ещё выполняется:
 отдельный тестовый кандидат `0.1.7-local.20260922.3` из `512a9b9bef88800d358b0e808d0f03fbd59b5e51`
