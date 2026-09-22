@@ -258,5 +258,10 @@
     "baseHash": "302b52662243395d43941b5620de342324e6b1305f436c06d0a7166593c0343b",
     "hash": "213dfa3b861aacdfde1a4430ff423872aaee6b362f8a85002735efd9dd16facf",
     "reason": "Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets."
+  },
+  "apps/loginom-site/index.html": {
+    "baseHash": "47608c281b7d6cc1c8bb5684f1dcc77268eadc04c77646a51f506de42ee174b5",
+    "hash": "6b09f9d7c0843b076daf72c55670dbe45f44cef5fb592782f1ed538c77cc7367",
+    "reason": "Preserve remote commit 645da9ebf platform branding: replace the imported landing favicon with Loginom PNG/SVG/ICO, Apple touch icon and web manifest links."
   }
 }
