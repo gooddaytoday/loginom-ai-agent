@@ -297,9 +297,10 @@ export async function createBridge(config, session, { browserTransport: managedB
             const invoke=async()=>{
               requirePreparedWorkspace(session.metadata);
               let args=request.params.arguments??{};
-              if(userProfile && ['dock_node_apply','dock_node_resume'].includes(request.params.name)) {
+              if(userProfile && ['dock_node_apply','dock_node_resume','dock_node_read'].includes(request.params.name)) {
                 validateActionParameters(userNodeTool(actionRuntime.tools.find(tool=>tool.name===request.params.name)).inputSchema,args);
                 if(request.params.name==='dock_node_apply')args=userWorkflows.expandNode(args);
+                if(request.params.name==='dock_node_read')args=userWorkflows.expandNodeRead(args);
               }
               const result=await dispatchNodeApi(actionRuntime,request.params.name,args,{signal:extra.signal});
               if(userProfile)userWorkflows.rememberDelivery(result,args);

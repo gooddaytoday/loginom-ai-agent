@@ -37,6 +37,8 @@
 
 - The compact `user-v1` node API owns technical time budgets: do not expose `budgets` to the model. `expandNode` supplies bounded setup/execution/total defaults with read and cleanup allowance. The full diagnostic node contract still accepts explicit immutable deadlines; never extend a pending operation or retry an unknown effect to recover from expiry.
 
+- The same ownership applies to `dock_node_read`: compact `user-v1` omits `budget_ms` and supplies 600000 ms for fresh execution, exact-format reading and restoration. Validate compact arguments before expansion. Full diagnostic read defaults and explicit budgets remain unchanged; a 60000 ms polling wait is not an operation deadline, and an expired pending read must never be relaunched or extended automatically.
+
 - A new tabular port can expose an alternate SVG without `data-tid` before its first graph observation. Bind it only through a unique rendered port in the prepared graph whose live hit-test resolves to the exact native cell, with GUID/data/parent ownership verified. If a prior binding exists, its graph, node, cell, GUID, data, type and subtype must still match. Never infer a port index, rewrite the DOM, or retry a pending graph mutation to repair this observation.
 
 

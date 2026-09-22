@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {buildNodeReadRequest,alignReadSchema} from '../lib/node-read-contract.mjs';
 import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {dispatchNodeApi,nodeApiTools} from '../lib/node-api.mjs';
+import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
 const schema=[{index:0,name:'value',label:'Value',type:'real'}];
 const source=()=>({parameters:{contract_revision:'1.0.0',target:{type:'transform.calculator',label:'Calculation'},workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;path',label:'Scenario'}]}},outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node,cleanup_complete:true,execution:{status:'completed'},output:{ports:[{port:0,schema}]}}}});
@@ -25,6 +26,17 @@ test('unknown, failed, unsettled, file-only and absent-port sources refuse befor
  const s=source(),before=structuredClone(s),request=buildNodeReadRequest(args,s);
  validateNodeApplyRequest(request,handlers);assert.deepEqual(s,before);
  assert.deepEqual(request.inputs,[]);assert.deepEqual(request.mappings,[]);assert.equal(request.target.kind,'existing');
+});
+test('host reread allowance reaches every phase while full diagnostic defaults and explicit budgets remain unchanged',()=>{
+ const s=source(),before=structuredClone(s),expanded=createUserWorkflowBindings().expandNodeRead(args);
+ const request=buildNodeReadRequest(expanded,s);validateNodeApplyRequest(request,handlers);
+ assert.deepEqual(request.budgets,{configure_ms:600000,execute_ms:600000,total_ms:600000});
+ assert.deepEqual(request.read,{ports:[0],sample_rows:100,require_exact_numbers:true});
+ assert.deepEqual(s,before);
+ for(const budget of [undefined,60000]){
+  const explicit=buildNodeReadRequest({...args,...(budget===undefined?{}:{budget_ms:budget})},s);
+  assert.deepEqual(explicit.budgets,{configure_ms:budget??300000,execute_ms:budget??300000,total_ms:budget??300000});
+ }
 });
 test('read lifecycle skips every configuration phase and retries without another launch',async()=>{
  const request=buildNodeReadRequest(args,source()),operation={id:'read'},calls=[];

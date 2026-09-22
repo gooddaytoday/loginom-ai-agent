@@ -23,8 +23,13 @@ export function userActionInventory(value) {
   return copy;
 }
 export function userNodeTool(tool) {
-  if (!['dock_node_apply', 'dock_node_resume'].includes(tool.name)) return tool;
+  if (!['dock_node_apply', 'dock_node_resume', 'dock_node_read'].includes(tool.name)) return tool;
   const copy = structuredClone(tool);
+  if(tool.name==='dock_node_read'){
+    delete copy.inputSchema.properties.budget_ms;
+    copy.description+=' The application manages the bounded deadline for execution, exact-format reads and restoration. Do not supply budget_ms; a wait timeout does not end or restart the read.';
+    return copy;
+  }
   if(tool.name==='dock_node_resume'){
     copy.inputSchema={type:'object',properties:{operation_id:copy.inputSchema.properties.operation_id},required:['operation_id'],additionalProperties:false};
     copy.description='Continue the SAME inspected node operation using only its original operation_id. Dock retains the immutable request and accepted phases. Unresolved effects still require verified reconciliation; never recreate the node.';
@@ -65,6 +70,11 @@ export function createUserWorkflowBindings() {
     remember({ document_id, workflow_ref }) {
       if (typeof document_id !== 'string' || !workflow_ref?.workflow_id || !Array.isArray(workflow_ref.navigation_path)) return;
       references.set(key(document_id, workflow_ref.workflow_id), structuredClone(workflow_ref));
+    },
+    expandNodeRead(request) {
+      // Exact-format reads must also restore every column and return to the
+      // graph. The compact schema rejects caller budgets before this expansion.
+      return {budget_ms:600000,...request};
     },
     expandNode(request) {
       const ref = references.get(key(request.document_id, request.workflow_ref?.workflow_id));

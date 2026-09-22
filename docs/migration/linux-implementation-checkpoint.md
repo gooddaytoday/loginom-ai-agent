@@ -1,5 +1,19 @@
 # Linux: завершение реализации — 2026-09-16
 
+Исследование description/dataset на macOS — 2026-09-22, ещё выполняется:
+отдельный тестовый кандидат `0.1.7-local.20260922.3` из `512a9b9bef88800d358b0e808d0f03fbd59b5e51`
+установлен в `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260922.3/`.
+Исправлены ожидание масок до исходного срока и ложный конфликт preview
+с идентификаторами скрытой копии графа; прежние исправления портов и бюджетов сохранены.
+Runtime 2289 PASS / 2 Windows SKIP, общие macOS source checks 8/8 PASS;
+DMG/ZIP, offline smoke, подпись и установленный hash проверены.
+Целевые D02/D36 прошли; final15 в пять клиентов завершена 9 PASS / 1 BLOCKED.
+D65 выявил короткий заданный моделью срок дополнительного чтения; исправление
+compact node_read проверяется, новая итоговая серия ещё обязательна.
+Рабочая установка пользователя не менялась; это не новая Linux-приёмка.
+[Результаты и ограничения](../testing/loginom-ai-agent/description-dataset-debugging-results.md),
+[точка продолжения](../testing/loginom-ai-agent/description-dataset-debugging-checkpoint.md).
+
 Локальное macOS-обновление восстановления — 2026-09-21:
 `0.1.7-local.20260921.2` из `be0011166` установлена и проверена.
 Исправлены Proxy-массив в recovery IPC и ложная ошибка сохранения.

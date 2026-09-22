@@ -6,8 +6,8 @@
   },
   "packages/loginom-runtime/client/lib/bridge.mjs": {
     "baseHash": "c56450b8f4db74c4ccfbf3162d1a7d6dc7422bab3ac35704f7d45923282630c3",
-    "hash": "e253ada2bb5df51dacb9b6797815f861f7474c99f2b9e8295d078ca6f1c414ae",
-    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account."
+    "hash": "9fc063185cfd888c807325e4da4c1f29efdd31505d4441295b19914d8d95dfee",
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Acceptance package cleanup binds to the account observed at workspace preparation when the managed runtime has no replay login account. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets."
   },
   "packages/loginom-runtime/client/lib/executor.mjs": {
     "baseHash": "df21720858bb89bb40d6c4fe46620728b1d6e86b0d9d7aafa4992c8f2cf93a6e",
@@ -231,13 +231,13 @@
   },
   "packages/loginom-runtime/client/lib/user-workflow.mjs": {
     "baseHash": "cc84d83a95211bdcceadeeed7e57599ed90e9431fdae2dfc7f1913148877f1c2",
-    "hash": "d139e2516d995d1b04ccf0062268ab8c9e71e7678162122439c9efbb9e9d46a0",
-    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines."
+    "hash": "5a821dbdc53ab6600690d7613ac6f528ad67555bb25185c5291af45b3dcd0098",
+    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets."
   },
   "packages/loginom-runtime/client/test/user-workflow.test.mjs": {
     "baseHash": "61ab452f9c710aef8bb7afa11996f55974d22f5cb216ba1644f4725751a37a47",
-    "hash": "50781db223be36f0ca84120381e6665b99bb2fd6d7a52f3d972f31ad2cf17c5d",
-    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines."
+    "hash": "45bc4915bf460be8444baf12671b5f3555c86e2ebac0272395e6f5f5d5499673",
+    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets."
   },
   "packages/loginom-runtime/client/test/node-procedure.test.mjs": {
     "baseHash": "91f5b67c0bd4c21a12d143eb78c6a5700812d40b3d5d5403cd0164731e9b514f",
@@ -253,5 +253,10 @@
     "baseHash": "2b1fdd9c6ddb950c22d2cea6b28e31d0c19ed085dca894decd783aae24f78f20",
     "hash": "7e1a3708e0461d902ecf7ec1e3ce768f212c868486d447b208a51645eae71944",
     "reason": "Cover hidden cached graph duplicates, same-graph ambiguity and foreign native port roots."
+  },
+  "packages/loginom-runtime/client/test/node-read.test.mjs": {
+    "baseHash": "302b52662243395d43941b5620de342324e6b1305f436c06d0a7166593c0343b",
+    "hash": "213dfa3b861aacdfde1a4430ff423872aaee6b362f8a85002735efd9dd16facf",
+    "reason": "Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets."
   }
 }

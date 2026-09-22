@@ -93,6 +93,22 @@ test('compact model calls cannot override host budgets while the diagnostic cont
  await dispatchNodeApi({tools:nodeApiTools,startNodeApply:async r=>{received=r;}},'dock_node_apply',full);
  assert.deepEqual(received.budgets,args.budgets);
 });
+test('compact rereads reject model deadlines and dispatch a bounded host deadline without changing read options',async()=>{
+ const bindings=createUserWorkflowBindings(),original=nodeApiTools.find(t=>t.name==='dock_node_read'),compact=userNodeTool(original);
+ const args={operation_id:'reread',source_operation_id:'created',read:{ports:[0],sample_rows:55,require_exact_numbers:true}};
+ const short={...args,budget_ms:60000};
+ assert.throws(()=>validateActionParameters(compact.inputSchema,short),/unknown field.*budget_ms/);
+ assert.equal(new AjvJsonSchemaValidator().getValidator(compact.inputSchema)(short).valid,false);
+ assert.ok(original.inputSchema.properties.budget_ms);
+ validateActionParameters(compact.inputSchema,args);
+ const before=structuredClone(args),calls=[],runtime={tools:nodeApiTools,startNodeRead:r=>{calls.push(r);return r;}};
+ await dispatchNodeApi(runtime,'dock_node_read',bindings.expandNodeRead(args));
+ assert.equal(calls[0].budget_ms,600000);
+ assert.deepEqual(calls[0].read,args.read);assert.equal(calls[0].source_operation_id,args.source_operation_id);
+ assert.deepEqual(args,before);
+ await dispatchNodeApi(runtime,'dock_node_read',short);
+ assert.equal(calls[1].budget_ms,60000,'full diagnostic deadlines remain explicit and immutable');
+});
 test('new import defaults use only a locally confirmed upload and preserve explicit settings',()=>{
  const binding=createUserWorkflowBindings();binding.remember(workspace());
  const args={...request(),target:{kind:'new',type:'imports.text'},mode:'delimited',parameters:{source:{artifact_id:'artifact',upload_operation_id:'delivery:upload'},settings:{columns:[{name:'Amount',type:'real'}]}}};
