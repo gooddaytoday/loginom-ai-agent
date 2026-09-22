@@ -1,19 +1,16 @@
 import { type ComponentProps } from "solid-js"
+import icon from "../assets/loginom/loginom-icon.svg"
 
 export const Mark = (props: { class?: string }) => (
   <svg
     data-component="logo-mark"
     class={props.class}
-    viewBox="0 0 40 40"
+    viewBox="0 0 1024 1024"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     aria-label="Loginom AI Agent"
   >
-    <rect width="40" height="40" rx="10" fill="#A23938" />
-    <path d="M11 11h9c8 0 12 4 12 9s-4 9-12 9h-9M12 11v18m0-9h11" stroke="#fff" stroke-width="3" />
-    <circle cx="12" cy="11" r="3" fill="#E7D2D5" />
-    <circle cx="12" cy="29" r="3" fill="#E7D2D5" />
-    <circle cx="24" cy="20" r="3" fill="#E7D2D5" />
+    <image href={icon} width="1024" height="1024" />
   </svg>
 )
 
@@ -22,16 +19,12 @@ export const Splash = (props: Pick<ComponentProps<"svg">, "ref" | "class">) => (
     ref={props.ref}
     data-component="logo-splash"
     class={props.class}
-    viewBox="0 0 40 40"
+    viewBox="0 0 1024 1024"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     aria-label="Loginom AI Agent"
   >
-    <rect width="40" height="40" rx="10" fill="#A23938" />
-    <path d="M11 11h9c8 0 12 4 12 9s-4 9-12 9h-9M12 11v18m0-9h11" stroke="#fff" stroke-width="3" />
-    <circle cx="12" cy="11" r="3" fill="#E7D2D5" />
-    <circle cx="12" cy="29" r="3" fill="#E7D2D5" />
-    <circle cx="24" cy="20" r="3" fill="#E7D2D5" />
+    <image href={icon} width="1024" height="1024" />
   </svg>
 )
 

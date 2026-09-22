@@ -554,6 +554,7 @@
         "electron": "42.3.3",
         "electron-builder": "26.15.2",
         "electron-vite": "^5",
+        "sharp": "0.33.5",
         "solid-js": "catalog:",
         "sury": "11.0.0-alpha.4",
         "typescript": "~5.6.2",
@@ -984,6 +985,7 @@
       "dependencies": {
         "@loginom-ai-agent/core": "workspace:*",
         "@loginom-ai-agent/plugin": "workspace:*",
+        "@loginom-ai-agent/product": "workspace:*",
         "@loginom-ai-agent/sdk": "workspace:*",
         "@loginom-ai-agent/ui": "workspace:*",
         "@opentui/core": "catalog:",

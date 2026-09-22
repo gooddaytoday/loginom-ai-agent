@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- The small mark keeps the folded L silhouette, without subpixel AI details. -->
+  <g id="mark" transform="translate(62 21) scale(.8)">
+    <path fill="#E6403D" d="M450 347C450 301 424 268 379 268C316 268 262 331 262 399V751C262 869 332 947 450 947H786C827 947 859 914 859 873C859 835 826 805 784 805H511C468 805 450 783 450 738Z"/>
+    <path fill="#BD2D32" d="M262 641V751C262 869 332 947 450 947H786C827 947 859 914 859 873C859 835 826 805 784 805H511C374 805 282 753 262 641Z"/>
+  </g>
+</svg>

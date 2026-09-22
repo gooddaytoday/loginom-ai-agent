@@ -39,6 +39,15 @@ macOS Keychain доступ подтверждён пользователем п
 Публикации и push не было; CLI собран, но не устанавливался. Это не новая
 Linux-приёмка. [Отчёт установки](../testing/loginom-ai-agent/reports/2026-09-21-local-macos/report.md).
 
+Иконки платформ — 2026-09-21: Desktop **0.1.6** из чистого `645da9ebf`
+собран и переустановлен в Linux. Новые ICO/ICNS/PNG, Mark/Splash,
+notification icon, favicon и PWA assets обоих сайтов; исходный PNG сохранён.
+17 tests / 440 assertions, typecheck ui/app/desktop, web builds, DEB/AppImage
+static verification и installed 4379 resource hashes — PASS. GTK lookup девяти
+размеров и реальный X11 window icon проверены, GUI — в отдельном Xvfb-профиле.
+Пользовательские настройки и CLI сохранены. Native Windows/macOS appearance
+и публикация сайтов не выполнялись. [Отчёт и hashes](../testing/loginom-ai-agent/reports/2026-09-21-platform-icons/report.md).
+
 CI release v0.1.6 — 2026-09-21: все обязательные jobs
 [run 35584356107](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/35584356107)
 прошли на исходном commit `ec399bdf7283f0c7e03aabf295a4db44346f4310`.

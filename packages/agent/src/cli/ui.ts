@@ -1,13 +1,7 @@
 import { EOL } from "os"
 import { Schema } from "effect"
-import { logo as glyphs } from "./logo"
-
-const wordmark = [
-  `⠀                                ▄     `,
-  `█▀▀█ █▀▀█ █▀▀█ █▀▀▄ █▀▀▀ █▀▀█ █▀▀█ █▀▀█`,
-  `█  █ █  █ █▀▀▀ █  █ █    █  █ █  █ █▀▀▀`,
-  `▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀`,
-]
+import { Product } from "@loginom-ai-agent/product"
+import { logo as glyphs, wordmarkAccentAnsi } from "./logo"
 
 export class CancelledError extends Schema.TaggedErrorClass<CancelledError>()("UICancelledError", {}) {}
 
@@ -47,13 +41,7 @@ export function empty() {
 
 export function logo(pad?: string) {
   if (!process.stdout.isTTY && !process.stderr.isTTY) {
-    const result = []
-    for (const row of wordmark) {
-      if (pad) result.push(pad)
-      result.push(row)
-      result.push(EOL)
-    }
-    return result.join("").trimEnd()
+    return `${pad ?? ""}${Product.wordmark}`
   }
 
   const result: string[] = []
@@ -64,7 +52,7 @@ export function logo(pad?: string) {
     bg: "\x1b[48;5;235m",
   }
   const right = {
-    fg: reset,
+    fg: wordmarkAccentAnsi,
     shadow: "\x1b[38;5;238m",
     bg: "\x1b[48;5;238m",
   }

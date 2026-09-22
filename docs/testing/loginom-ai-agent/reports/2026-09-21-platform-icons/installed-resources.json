@@ -1,0 +1,46 @@
+{
+  "status": "PASS",
+  "activeIconFiles": 13,
+  "desktopEntry": "/usr/share/applications/com.loginom.aiagent.desktop",
+  "iconName": "loginom-ai-agent",
+  "gtkThemeLookup": [
+    {
+      "size": 16,
+      "path": "/usr/share/icons/hicolor/16x16/apps/loginom-ai-agent.png"
+    },
+    {
+      "size": 24,
+      "path": "/usr/share/icons/hicolor/24x24/apps/loginom-ai-agent.png"
+    },
+    {
+      "size": 32,
+      "path": "/usr/share/icons/hicolor/32x32/apps/loginom-ai-agent.png"
+    },
+    {
+      "size": 48,
+      "path": "/usr/share/icons/hicolor/48x48/apps/loginom-ai-agent.png"
+    },
+    {
+      "size": 64,
+      "path": "/usr/share/icons/hicolor/64x64/apps/loginom-ai-agent.png"
+    },
+    {
+      "size": 96,
+      "path": "/usr/share/icons/hicolor/96x96/apps/loginom-ai-agent.png"
+    },
+    {
+      "size": 128,
+      "path": "/usr/share/icons/hicolor/128x128/apps/loginom-ai-agent.png"
+    },
+    {
+      "size": 256,
+      "path": "/usr/share/icons/hicolor/256x256/apps/loginom-ai-agent.png"
+    },
+    {
+      "size": 512,
+      "path": "/usr/share/icons/hicolor/512x512/apps/loginom-ai-agent.png"
+    }
+  ],
+  "protectedConfigurationsUnchanged": 3,
+  "cliLauncherUnchanged": true
+}

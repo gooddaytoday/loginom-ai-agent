@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "version": "0.1.6",
+  "channel": "prod",
+  "builtAt": "2026-09-21T13:52:18.036Z",
+  "source": {
+    "commit": "645da9ebfd83764da01d39df1d6eb01f799e0558",
+    "dirty": false,
+    "patchSha256": null,
+    "inputsManifestSha256": "779a010bfa0eebfee1485b92413e806ef2d10b303740e58f1b39b2be2617e851",
+    "importSha256": "c3c39a1a3c54e81e042e24688e2d0215774c67b0c015e9354b53bda2fbb251f6"
+  },
+  "target": {
+    "platform": "linux",
+    "arch": "x64",
+    "minimumOS": "Ubuntu 22.04; Debian 12",
+    "backend": "v1"
+  },
+  "build": {
+    "os": "linux",
+    "arch": "x64",
+    "bun": "1.3.14",
+    "lockSha256": "911714051a004c04a8c8fdc9f1f777546c41f4ba3b73e92b236ebaae50e63225"
+  },
+  "runtime": {
+    "electron": "42.3.3",
+    "electronNode": "24.15.0",
+    "node": "24.19.0",
+    "playwright": "1.63.0-alpha-2026-08-31",
+    "playwrightMcp": "0.0.80",
+    "chromiumVersion": "153.0.8010.12",
+    "chromiumRevision": "1243",
+    "catalogSha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+    "resourcesSha256": "0d52a614fc36120dde18e4f801f011e80a4362aa518eceea8b111f060b145d35"
+  },
+  "product": {
+    "name": "Loginom AI Agent",
+    "appId": "com.loginom.aiagent",
+    "executable": "loginom-ai-agent",
+    "uriScheme": "loginom-ai-agent"
+  },
+  "paths": {
+    "executor": "resources/loginom/runtime/src/managed-entry.mjs",
+    "node": "resources/loginom/bin/node",
+    "chromium": "resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+    "config": "${XDG_CONFIG_HOME:-~/.config}/com.loginom.aiagent",
+    "data": "${XDG_DATA_HOME:-~/.local/share}/loginom-ai-agent",
+    "cache": "${XDG_CACHE_HOME:-~/.cache}/loginom-ai-agent",
+    "state": "${XDG_STATE_HOME:-${XDG_CONFIG_HOME:-~/.config}/com.loginom.aiagent}/loginom-ai-agent",
+    "logs": "${XDG_CONFIG_HOME:-~/.config}/com.loginom.aiagent/logs",
+    "profiles": "${XDG_CONFIG_HOME:-~/.config}/com.loginom.aiagent/loginom/runtime",
+    "secretStore": "plaintext-private-0600"
+  },
+  "connection": {
+    "schemaVersion": 1,
+    "generationProtocol": 1,
+    "knowledgeEndpoint": "https://loginom.duckdns.org/mcp"
+  },
+  "updater": {
+    "feed": null,
+    "channel": "prod",
+    "previousVersion": null
+  },
+  "signing": {
+    "status": "unsigned",
+    "identity": null,
+    "notarized": false
+  },
+  "installation": {
+    "scope": "machine",
+    "uninstallPolicy": "DEB removes application files and retains user data. AppImage is a portable user-owned file.",
+    "preservesUserData": true
+  },
+  "validation": {
+    "commands": [
+      {
+        "cwd": "packages/desktop",
+        "argv": [
+          "bun",
+          "test",
+          "src/main/loginom",
+          "electron-builder.config.test.ts",
+          "scripts/release/artifact.test.ts"
+        ]
+      }
+    ],
+    "reportFiles": [
+      "static-deb.json",
+      "static-appimage.json",
+      "linux-matrix/linux-matrix.json"
+    ]
+  },
+  "provenance": {
+    "licensesSha256": "668d68cc42db444e278a1fd1fee8bc6701179d9c3bd4d3e2abdb7920d7cb58a1",
+    "migrationManifestSha256": "c3c39a1a3c54e81e042e24688e2d0215774c67b0c015e9354b53bda2fbb251f6"
+  },
+  "artifacts": [
+    {
+      "file": "loginom-ai-agent-0.1.6-source.tar.gz",
+      "kind": "source",
+      "bytes": 169586812,
+      "sha256": "1a04688a8083aef7103a69e7e86ed31d0ff29df6bda514cd475323a1f6b11cd7"
+    },
+    {
+      "file": "loginom-ai-agent-linux-amd64.deb",
+      "kind": "deb",
+      "bytes": 316375000,
+      "sha256": "be22270b0f7a0984490fc971d91d8b02777585daa02c5bf2d25c22a4be769ae8"
+    },
+    {
+      "file": "loginom-ai-agent-linux-x86_64.AppImage",
+      "kind": "appimage",
+      "bytes": 404443764,
+      "sha256": "66ed159625ec81b588a090a1062aa3af58f318cb9c5e26765e6f4982928555d4"
+    }
+  ]
+}

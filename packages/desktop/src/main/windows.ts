@@ -160,7 +160,8 @@ export function restoreMainWindows() {
 }
 
 export function setDockIcon() {
-  if (process.platform !== "darwin") return
+  // Installed apps use the bundle ICNS, including its small and Retina artwork.
+  if (process.platform !== "darwin" || app.isPackaged) return
   const icon = nativeImage.createFromPath(join(iconsDir(), "dock.png"))
   if (!icon.isEmpty()) app.dock?.setIcon(icon)
 }

@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "version": "0.1.6",
+  "isolatedProfile": "/tmp/loginom-icons-profile-XfR2Xj",
+  "links": [
+    "./loginom-favicon-32-v1.png",
+    "./loginom-favicon-v1.svg"
+  ],
+  "faviconMatches": true,
+  "notificationIconMatches": true,
+  "native": {
+    "status": "PASS",
+    "frames": [
+      {
+        "width": 512,
+        "height": 512,
+        "transparentCorner": true,
+        "matchingOpaquePixels": 173368
+      }
+    ]
+  }
+}

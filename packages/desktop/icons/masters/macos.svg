@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile-mac" x1="512" y1="100" x2="512" y2="924" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#F4F1EE"/>
+    </linearGradient>
+    <filter id="tile-shadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#32241E" flood-opacity=".18"/>
+    </filter>
+  </defs>
+  <g id="tile" filter="url(#tile-shadow)">
+    <path fill="url(#tile-mac)" d="M332 100H692C852 100 924 172 924 332V692C924 852 852 924 692 924H332C172 924 100 852 100 692V332C100 172 172 100 332 100Z"/>
+  </g>
+</svg>
