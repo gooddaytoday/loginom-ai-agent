@@ -34,7 +34,7 @@ test("parseEvents: ошибочная фикстура даёт имена ош�
 test("parseEvents: preflight-ошибка без sessionID", async () => {
   const parsed = parseEvents(await fixture("events/preflight-error.jsonl"))
   expect(parsed.sessionId).toBeUndefined()
-  expect(parsed.errors).toEqual(["LOGINOM_CONFIG_REQUIRED"])
+  expect(parsed.errors).toEqual(["LOGINOM_RECOVERY_REQUIRED"])
 })
 
 test("failureKind: приоритет permission → recovery → cancelled → provider → tool → other", () => {
