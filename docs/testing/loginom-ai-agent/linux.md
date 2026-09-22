@@ -84,7 +84,7 @@ LOGINOM_AI_AGENT_TEST_CONFIG=/path/to/private/config.json bun test/loginom/paren
 В репозитории есть [воспроизводимый тест AppImage N→N+1](../../../packages/desktop/test/loginom/updater/README.md). Он создаёт только изолированные тестовые сборки с локальным feed, проверяет повреждённый SHA512 и чужие targets/channels, обновляет приложение и проверяет сохранность настройки и сообщения чата. В пользовательской сборке feed остаётся отключённым; публикация отдельно не выполнялась.
 
 
-## Прокси через окружение (с 0.1.8)
+## Прокси через окружение (с 0.1.9)
 
 Автоматический импорт системных настроек GNOME/Windows/macOS отменён. Desktop и CLI
 используют явные HTTP_PROXY, HTTPS_PROXY и NO_PROXY, как OpenCode. Chromium сохраняет

@@ -38,9 +38,9 @@ printf "%s\\n" "org.gnome.system.proxy mode 'manual'" "org.gnome.system.proxy.ht
         )
         const output = new Response(child.stdout).text()
         const errors = new Response(child.stderr).text()
-        expect(await child.exited).toBe(2)
+        expect(await child.exited).toBe(1)
         expect(await errors).toBe("LOGINOM_BUNDLE_INCOMPLETE\n")
-        expect(await output).toBe("")
+        expect(JSON.parse(await output)).toEqual({ ok: false, code: "LOGINOM_BUNDLE_INCOMPLETE" })
         expect(await readdir(profile)).not.toContain(".writer")
         expect(await readdir(directory)).not.toContain("proxy-probe")
       }
