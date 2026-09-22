@@ -6,7 +6,6 @@ import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { once } from "node:events"
-import { systemProxyEnvironment } from "../../src/main/system-proxy.ts"
 
 // Real Node HTTP, fetch and TLS CONNECT, without global fetch stubs.
 const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
@@ -70,14 +69,19 @@ for (const server of [proxy, tlsProxy])
     socket.on("close", () => upstream.destroy())
   })
 try {
-  const settings = `org.gnome.system.proxy mode 'manual'
-org.gnome.system.proxy use-same-proxy false
-org.gnome.system.proxy ignore-hosts ['localhost,127.0.0.0/8,::1']
-org.gnome.system.proxy.http host '127.0.0.1'
-org.gnome.system.proxy.http port ${port(proxy)}
-org.gnome.system.proxy.https host '127.0.0.1'
-org.gnome.system.proxy.https port ${port(tlsProxy)}`
-  const env = systemProxyEnvironment(settings, { ...process.env, NODE_EXTRA_CA_CERTS: cert })!
+  const env = {
+    ...process.env,
+    NODE_EXTRA_CA_CERTS: cert,
+    HTTP_PROXY: `http://127.0.0.1:${port(proxy)}`,
+    http_proxy: `http://127.0.0.1:${port(proxy)}`,
+    HTTPS_PROXY: `http://127.0.0.1:${port(tlsProxy)}`,
+    https_proxy: `http://127.0.0.1:${port(tlsProxy)}`,
+    ALL_PROXY: "",
+    all_proxy: "",
+    NO_PROXY: "localhost,127.0.0.1,::1",
+    no_proxy: "localhost,127.0.0.1,::1",
+    NODE_USE_ENV_PROXY: "1",
+  }
   const run = async (code: string, environment = env) => {
     const child = spawn(node, ["--input-type=module", "-e", code], {
       env: environment,

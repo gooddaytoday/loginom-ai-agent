@@ -15,7 +15,6 @@ const checks = [
     args: [
       "test",
       "src/main/loginom",
-      "src/main/system-proxy.test.ts",
       "src/main/shutdown.test.ts",
       "electron-builder.config.test.ts",
       "scripts/release/artifact.test.ts",

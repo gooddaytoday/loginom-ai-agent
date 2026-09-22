@@ -1,5 +1,9 @@
 # Самостоятельный CLI: checkpoint и приёмка
 
+> С 0.1.8 CLI больше не импортирует системные настройки прокси: используются
+> явные proxy-переменные окружения, как OpenCode. Native proxy acceptance ниже
+> относится к историческим версиям. [Решение и варианты](../../superpowers/specs/2026-09-22-proxy-policy.md).
+
 ## macOS candidate, 2026-09-19
 
 Общий Desktop/CLI pipeline и установка описаны в [macOS runbook](macos.md).

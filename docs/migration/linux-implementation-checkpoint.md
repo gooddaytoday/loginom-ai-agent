@@ -1,5 +1,20 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-09-22 — подготовка 0.1.8: возврат proxy environment OpenCode
+
+По решению пользователя автоматический импорт системного прокси удалён из
+Desktop и CLI на Linux/Windows/macOS. Сохраняются explicit proxy environment,
+loopback bypass Desktop и собственное системное обнаружение Chromium.
+[Решение, причины и отложенные варианты](../superpowers/specs/2026-09-22-proxy-policy.md).
+Версии root/Desktop/lock согласованы на 0.1.8. Typecheck Desktop/Agent/Host PASS;
+Desktop targeted 12 PASS / 2 SKIP, Host environment 2 PASS; реальный Node
+HTTP/fetch/HTTPS CONNECT, localhost bypass и no-direct-fallback PASS.
+Широкий CLI bootstrap suite на локальной Windows: 4 PASS / 4 FAIL; те же четыре
+теста падают на неизменённом baseline (provider management и POSIX signal paths).
+Linux-only subprocess proxy regression локально SKIP, должен пройти CI.
+Сборки и установленная приёмка 0.1.8 на этом этапе ещё не выполнены;
+release workflow должен подтвердить все три платформы до создания draft.
+
 ## 2026-09-22 — опубликован CI release 0.1.7
 
 Объединены локальные исправления description/dataset и пять удалённых коммитов

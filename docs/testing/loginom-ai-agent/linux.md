@@ -84,18 +84,22 @@ LOGINOM_AI_AGENT_TEST_CONFIG=/path/to/private/config.json bun test/loginom/paren
 В репозитории есть [воспроизводимый тест AppImage N→N+1](../../../packages/desktop/test/loginom/updater/README.md). Он создаёт только изолированные тестовые сборки с локальным feed, проверяет повреждённый SHA512 и чужие targets/channels, обновляет приложение и проверяет сохранность настройки и сообщения чата. В пользовательской сборке feed остаётся отключённым; публикация отдельно не выполнялась.
 
 
-## Системный HTTP/HTTPS-прокси (с 0.1.1)
+## Прокси через окружение (с 0.1.8)
 
-На Linux с GNOME приложение при запуске читает ручные HTTP/HTTPS-настройки через `gsettings`. Они применяются после загрузки окружения shell и имеют приоритет над его `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` и вариантами в нижнем регистре. Учитываются `use-same-proxy` и системные исключения, в том числе список адресов, записанный одной строкой. Localhost всегда исключён: это внутренний backend и callback OAuth.
+Автоматический импорт системных настроек GNOME/Windows/macOS отменён. Desktop и CLI
+используют явные HTTP_PROXY, HTTPS_PROXY и NO_PROXY, как OpenCode. Chromium сохраняет
+собственное системное обнаружение; его сетевое поведение не равно поведению Node.
+Для backend и OAuth настройка прокси только в интерфейсе ОС недостаточна.
+Передавайте переменные процессу приложения, сохраняя localhost/127.0.0.1/::1 в NO_PROXY.
 
-Настройки передаются Node-backend и изолированным процессам Dock. Node использует их для HTTP, fetch и HTTPS CONNECT; отказ прокси не вызывает прямого повтора. Chromium/Electron используют системный сетевой стек; Linux-runtime сохраняет сведения о desktop-сессии и D-Bus для доступа к настройкам браузера. После изменения системного прокси приложение следует полностью перезапустить.
-
-Текущая реализация импорта в Node охватывает **ручные HTTP/HTTPS-прокси GNOME без proxy-auth**. PAC/SOCKS и настройки KDE/Windows/macOS этим изменением не реализованы. При отсутствии ручных настроек GNOME сохраняется существующая обработка proxy-переменных окружения. Некорректный адрес или требующий авторизации ручной прокси вызывает явную ошибку и не подменяется прямым соединением.
+Причина возврата, ограничения и будущие варианты описаны в
+[решении по прокси](../../superpowers/specs/2026-09-22-proxy-policy.md).
+Отчёт Linux 0.1.1 ниже является исторической приёмкой прежнего поведения.
 
 Проверка транспорта с локальными HTTP/HTTPS-серверами и временным сертификатом (нужен `openssl`), из `packages/desktop`:
 
 ```sh
-LOGINOM_AI_AGENT_TEST_NODE=/absolute/path/to/pinned/node /absolute/path/to/pinned/node test/loginom/system-proxy.ts
+LOGINOM_AI_AGENT_TEST_NODE=/absolute/path/to/pinned/node /absolute/path/to/pinned/node test/loginom/environment-proxy.ts
 ```
 
 Проверка ChatGPT через настоящий backend в отдельном пустом профиле:

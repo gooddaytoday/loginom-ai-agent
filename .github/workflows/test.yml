@@ -46,6 +46,10 @@ jobs:
       - name: Setup Loginom pinned inputs
         uses: ./.github/actions/setup-loginom-inputs
 
+      - name: Verify explicit proxy environment with real Node networking
+        working-directory: packages/desktop
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" test/loginom/environment-proxy.ts'
+
       - name: Configure git identity
         run: |
           git config --global user.email "bot@opencode.ai"

@@ -85,7 +85,7 @@ jobs:
           try {
             & $env:LOGINOM_CI_BUN_PATH typecheck
             if ($LASTEXITCODE -ne 0) { throw "Desktop typecheck failed" }
-            & $env:LOGINOM_CI_BUN_PATH test electron-builder.config.test.ts scripts/copy-icons.test.ts scripts/release/artifact.test.ts src/main/apps.test.ts src/main/system-proxy.test.ts
+            & $env:LOGINOM_CI_BUN_PATH test electron-builder.config.test.ts scripts/copy-icons.test.ts scripts/release/artifact.test.ts src/main/apps.test.ts
             if ($LASTEXITCODE -ne 0) { throw "Desktop Windows package tests failed" }
           } finally { Pop-Location }
           Push-Location packages/loginom-host
@@ -93,7 +93,7 @@ jobs:
             $env:LOGINOM_AI_AGENT_TEST_NODE = $env:LOGINOM_CI_NODE_SOURCE
             & $env:LOGINOM_CI_BUN_PATH typecheck
             if ($LASTEXITCODE -ne 0) { throw "Host typecheck failed" }
-            & $env:LOGINOM_CI_BUN_PATH test test/native-proxy.test.ts test/cli-credentials.test.ts test/cli-install-windows.test.ts test/cli-manifest.test.ts test/process.test.ts
+            & $env:LOGINOM_CI_BUN_PATH test test/environment.test.ts test/cli-credentials.test.ts test/cli-install-windows.test.ts test/cli-manifest.test.ts test/process.test.ts
             if ($LASTEXITCODE -ne 0) { throw "CLI Windows package tests failed" }
           } finally { Pop-Location }
           Push-Location packages/agent

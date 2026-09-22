@@ -52,7 +52,6 @@ import { migrate } from "./migrate"
 import { cleanupStoreFiles } from "./store-cleanup"
 import { startBackgroundCli } from "./background-cli"
 import { setNativeTranslations } from "./native-translations"
-import { loadDesktopProxyEnvironment } from "./system-proxy"
 import { createQuitHandler } from "./shutdown"
 
 const TEST_ONBOARDING = process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING === "1"
@@ -209,16 +208,6 @@ const main = Effect.gen(function* () {
   }
 
   const shellEnv = preferAppEnv(app.getPath("userData"))
-  const systemProxy = loadDesktopProxyEnvironment(process.env)
-  if (systemProxy) {
-    Object.assign(process.env, systemProxy)
-    logger.log("system HTTP/HTTPS proxy settings applied", {
-      http: Boolean(systemProxy.HTTP_PROXY),
-      https: Boolean(systemProxy.HTTPS_PROXY),
-    })
-  }
-  ensureLoopbackNoProxy()
-  useEnvProxy()
 
   app.on("second-instance", (_event: Event, argv: string[]) => {
     const urls = argv.filter((arg: string) => arg.startsWith("loginom-ai-agent://"))

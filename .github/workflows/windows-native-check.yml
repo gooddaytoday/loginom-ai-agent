@@ -35,7 +35,7 @@ jobs:
           $env:LOGINOM_AI_AGENT_TEST_NODE = (Get-Command node).Source
           bun typecheck
           if ($LASTEXITCODE -ne 0) { throw "Host typecheck failed" }
-          bun test test/windows-powershell.test.ts test/native-proxy.test.ts test/cli-credentials.test.ts test/cli-install-windows.test.ts test/cli-manifest.test.ts test/process.test.ts
+          bun test test/windows-powershell.test.ts test/environment.test.ts test/cli-credentials.test.ts test/cli-install-windows.test.ts test/cli-manifest.test.ts test/process.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Native host tests failed" }
       - name: Verify native profile
         run: ./script/test-windows-profile.ps1

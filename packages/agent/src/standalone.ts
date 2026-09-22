@@ -1,17 +1,6 @@
 import { standalone } from "./cli/standalone"
 
 await standalone(process.argv.slice(2), async (args, paths) => {
-  const { loadCliProxyEnvironment } = await import("@loginom-ai-agent/loginom-host/system-proxy")
-  try {
-    const environment = loadCliProxyEnvironment(process.env)
-    if (environment) Object.assign(process.env, environment)
-  } catch (error) {
-    if (!(error instanceof Error) || !/^SYSTEM_PROXY_[A-Z_]+$/.test(error.message)) throw error
-    // No host or provider has started, so the profile guard can be released normally.
-    process.stderr.write(error.message + "\n")
-    process.exitCode = 2
-    return
-  }
   if (["providers", "auth", "models"].includes(args[0] ?? "")) {
     const { standaloneModels } = await import("./cli/standalone-models")
     await standaloneModels(args)
