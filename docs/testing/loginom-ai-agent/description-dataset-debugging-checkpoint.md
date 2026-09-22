@@ -2,6 +2,14 @@
 
 Обновлено 2026-09-22. План НЕ завершён. Последняя full final16: 4 PASS / 4 BLOCKED / 1 INTERRUPTED / 1 FAILED(provider). Все завершённые попытки закрыты, неизвестный read D65 сохранён. Кандидат 16: целевой D65 PASS, final16 завершена, все клиенты закрыты. Цель остаётся новый полный 10/10 на одном установленном кандидате.
 
+## Кандидат 17 — подготовлен, ожидается Keychain
+
+Исправления D-F09/D-F10 сохранены в `617f37364a260b013b142d7d7c47dbdd6543b219`. Четыре DEBUG_ONLY 17b прошли; полные исходные проверки 2308 PASS/2 SKIP, macOS8/8, attribution5045. Desktop **0.1.7-local.20260922.5** установлен из readonly DMG в отдельный `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260922.5/Loginom AI Agent.app`, ASAR `a9a7da454a59f6e933559b89238db5b62194cf6c54e8acc54b127a491e015082`. DMG/ZIP static, все исходные Desktop-only offline checks, подпись deep/strict и равенство ASAR PASS. `candidate17-install.json`, build directory `description-20260922-5`.
+
+Общий build-macos снова остановился на CLI source-snapshot без активности; собственный CLI child завершён SIGTERM после сохранения sample. Desktop source archive/manifest/static/offline выполнены отдельно на том же чистом commit; общий build/CLI не PASS. Пользовательская установка не заменялась.
+
+`target17-manifest.json`: подготовлены D36,D24,D27,D65, ещё НЕ отправлены. Первый запуск D36 ожидает macOS Keychain (SecurityAgent). Read-only попытка открыть SecurityAgent отклонена автоматической проверкой безопасности; нужна ручная обработка системного запроса пользователем, обход запрещён. Deadline попытки не начат. REPL заново инициализирован: fs, evidence, ctl, parallel13, baselineManifest, pw через createRequire, env, install17/candidate17/installed17, target17Manifest/targets17. После допуска дождаться окна и connection ready, настроить модель/вложения, отправить целевые четыре; затем новый полный final17 max5. Не засчитывать source diagnostics как installed PASS.
+
 ## Текущий этап: разбор final16, подготовка исправлений
 
 D-F08 исправлен и зафиксирован в `3e19818b6fd65bf867e0d382f0acdf718e8c4b07`: compact user-v1 не публикует/не принимает budget_ms в node_read. После проверки compact schema клиент назначает новой операции 600000 ms. Полный диагностический API, default 300000 и явно принятые сроки неизменны. Исходный read D65-final15 не повторялся и не продлевался.
