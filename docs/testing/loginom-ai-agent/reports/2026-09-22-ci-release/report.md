@@ -24,11 +24,12 @@ Bun 1.3.14, Node 24.19.0, macOS arm64:
   UI wordmark animation: 13 PASS.
 - Typecheck product/agent/app/desktop/ui/tui: PASS.
 - Source attribution: 5045 файлов PASS; `git diff --check`: PASS.
-- Полный runtime suite: выполняется.
-- Локальный frozen install: заблокирован неверным DNS-ответом для `pkg.pr.new`
-  и ERR_TLS_CERT_ALTNAME_INVALID. Проверка сертификата не отключалась.
-  Запрос с независимым DNS-адресом и обычной проверкой TLS дал HTTP 200.
-  До создания тега обязательна успешная frozen-установка в GitHub Actions.
+- Полный runtime suite: 2315 PASS / 2 Windows SKIP / 0 FAIL (136.8 s).
+- Frozen install: PASS после восстановления единственной зависимости
+  `@solidjs/start` с исходного HTTPS URL через независимый DNS-адрес.
+  Сертификат и SHA-512 из lockfile проверены; TLS не отключался,
+  lockfile/dependency versions не менялись. Причина первичного сбоя —
+  ошибочный локальный DNS-ответ (`ERR_TLS_CERT_ALTNAME_INVALID`).
 
 ## Границы приёмки
 

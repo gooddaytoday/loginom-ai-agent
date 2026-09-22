@@ -1,5 +1,15 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-09-22 — подготовка CI release 0.1.7
+
+Объединены локальные исправления description/dataset и пять удалённых коммитов
+`loginom`, история сохранена merge-коммитом `bacf27ebf`. Версии 0.1.7 согласованы.
+Runtime 2315 PASS / 2 Windows SKIP, Desktop 140 PASS / 3 SKIP, CLI/branding
+и typecheck шести пакетов PASS; source attribution 5045 PASS. Выпуск Desktop/CLI
+всех трёх поддерживаемых платформ и публикация разрешены пользователем.
+CI и публичный релиз пока ожидаются; пользовательские установки не менялись.
+[Отчёт выпуска](../testing/loginom-ai-agent/reports/2026-09-22-ci-release/report.md).
+
 ## 2026-09-22 — description/dataset завершено, final18 10/10
 
 Полная новая серия description.md+dataset.csv на macOS завершена: **10/10 CREATED_EXECUTED_SAVED**, максимум5 независимых Desktop, все попытки без помощи, до30мин, исходные файлы/выполнение/save/cleanup/закрытие подтверждены strict audit. Кандидат `.20260922.6` из `361b13682cf63c7280eef2027015a4d81e38029d`, ASAR `628613ce1c8fc9a600dbf78105d7ed65f253162b8210e1334fff80d2317263bf`, отдельная тестовая установка. Runtime2315 PASS/2 Windows SKIP, macOS8/8, attribution5045; общий build-macos/Desktop+CLI/static/offline/signature/ASAR PASS. В сборках16/17 CLI snapshot не завершался, в18 прошёл; причина прежней задержки не доказана.
