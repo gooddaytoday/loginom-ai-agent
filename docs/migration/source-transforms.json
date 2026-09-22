@@ -186,8 +186,8 @@
   },
   "packages/loginom-runtime/client/test/node-apply.test.mjs": {
     "baseHash": "09e457cc476dc16b0790fad7d1742737cdbc59563a27594624b25056781bd00c",
-    "hash": "4f0b5c279ed7aa375dc9690cba9e24c799fd9538b72986a64dbf216ac3b031f5",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
+    "hash": "a62915b85e2567d35e3a0c1e6498e3f47c224b2ef0222dbc650080e1f1f5b147",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines."
   },
   "packages/loginom-runtime/client/test/text-import-patch.test.mjs": {
     "baseHash": "8742700e801f3157a7f596e5c2d64468440de27223df210e551d0f9bd23251aa",
@@ -196,8 +196,8 @@
   },
   "packages/loginom-runtime/client/lib/node-procedure.mjs": {
     "baseHash": "eb08dda1ea023c1df95bac5efd4c6bccf314bea277f2d4bafd9396bec4ee94ff",
-    "hash": "cad65cd14aaf98726ddd20041c7bf4107a7539abeb40aed5e0a38db69361792f",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Preserve refused native observations without granting a usable snapshot or permitting a gesture."
+    "hash": "9e56d2eae27d3b8100c1f0d6ffde7351cae100439e5296beb53d79d9d65f72fe",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Preserve refused native observations without granting a usable snapshot or permitting a gesture. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines."
   },
   "packages/loginom-runtime/client/lib/user-preview-budget.mjs": {
     "baseHash": "b0f8bf12969340df0456c27bffdac2e5e102a2e1520ba75176a4851f8162799f",
@@ -231,18 +231,18 @@
   },
   "packages/loginom-runtime/client/lib/user-workflow.mjs": {
     "baseHash": "cc84d83a95211bdcceadeeed7e57599ed90e9431fdae2dfc7f1913148877f1c2",
-    "hash": "5a821dbdc53ab6600690d7613ac6f528ad67555bb25185c5291af45b3dcd0098",
-    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets."
+    "hash": "24cf4aaf66f9fe78bbc7221877e91c3c9d9457af3f38b6d917172c6cf73248c3",
+    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines."
   },
   "packages/loginom-runtime/client/test/user-workflow.test.mjs": {
     "baseHash": "61ab452f9c710aef8bb7afa11996f55974d22f5cb216ba1644f4725751a37a47",
-    "hash": "45bc4915bf460be8444baf12671b5f3555c86e2ebac0272395e6f5f5d5499673",
-    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets."
+    "hash": "59680264ccf9e375aa351d5e72cbe386f197d5c736e8d0ff8057560a4aff7e2a",
+    "reason": "Reserve default time for native wide setup and exact read cleanup while preserving every explicit caller deadline; regression checks cover both constraints. Compact user-v1 calls now omit model-selected budgets; the original diagnostic contract retains explicit bounded deadlines. Keep compact reread deadlines host-owned, including execution and exact-format restoration, while preserving full diagnostic budgets. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines."
   },
   "packages/loginom-runtime/client/test/node-procedure.test.mjs": {
     "baseHash": "91f5b67c0bd4c21a12d143eb78c6a5700812d40b3d5d5403cd0164731e9b514f",
-    "reason": "Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Verify refusal journaling and absence of mutation authority for unverified or foreign previews.",
-    "hash": "66dac5ba431855166b63ec76cb1a534d0165fecf62a91529b19db6e54b730eb7"
+    "reason": "Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Verify refusal journaling and absence of mutation authority for unverified or foreign previews. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines.",
+    "hash": "d6bb677c140b7f166adab227a17712b0d848aaebe6163d38d950cf8e9be732b1"
   },
   "packages/loginom-runtime/client/lib/node-preview-schema.mjs": {
     "baseHash": "36f345b3e26e04dc8d65340a8f5e54b86da128b6a5cb994f0c45da61473b2c38",

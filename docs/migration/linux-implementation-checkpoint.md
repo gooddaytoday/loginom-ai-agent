@@ -1,9 +1,8 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-09-22 — description/dataset, кандидат macOS 16
+## 2026-09-22 — description/dataset, final16 и новые ограничения под нагрузкой
 
-Исправлен host-owned срок дополнительного чтения (`3e19818b6`), runtime 2291 PASS / 2 SKIP, macOS source checks 8/8 PASS. DEBUG_ONLY D65 reread завершён за 95.313s с восстановлением форматов и save. Desktop `.20260922.4` установлен отдельно, DMG/ZIP/static/offline/signature/ASAR PASS; полный build-macos/CLI не завершён из-за повторного ожидания cli-source-snapshot. Desktop проверен отдельно, CLI не объявляется готовым. Целевой D65 ещё не отправлен: первый запуск ожидает окна и ручной проверки Keychain. Final15 остаётся 9 PASS / 1 BLOCKED, новая полная серия обязательна. Пользовательская установка и Linux acceptance не изменены. Подробности и текущий PID — [checkpoint](../testing/loginom-ai-agent/description-dataset-debugging-checkpoint.md).
-
+Desktop `.20260922.4` проверен отдельно: DMG/ZIP/static/offline/signature/ASAR PASS; CLI build не завершён на cli-source-snapshot. Целевой D65 прошёл, включая самостоятельное reread55/exact с восстановлением форматов. Full final16 max5: 4 PASS / 4 BLOCKED / 1 INTERRUPTED по30мин / 1 FAILED(provider DNS), все клиенты закрыты. Исправляются UI_SCAN_LIMIT/time и configure300s при общем600s. Узкие180 PASS, runtime2308 PASS/2 SKIP, attribution5045 PASS; новая установленная приёмка ещё обязательна. Пользовательская установка и Linux acceptance не менялись. [Текущий checkpoint](../testing/loginom-ai-agent/description-dataset-debugging-checkpoint.md).
 
 Исследование description/dataset на macOS — 2026-09-22, ещё выполняется:
 отдельный тестовый кандидат `0.1.7-local.20260922.3` из `512a9b9bef88800d358b0e808d0f03fbd59b5e51`

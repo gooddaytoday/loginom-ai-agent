@@ -214,7 +214,15 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           ...boundOptions,
           discover_roots: true, expected_origin: targetOrigin, expected_build: targetBuild }),
         { timeout: Math.min(35000, Math.max(1, deadline - observationNow())) });
-        if (roots.status !== 'SUCCEEDED') throw new Error('Node procedure roots could not be observed');
+        if (roots.status !== 'SUCCEEDED') {
+          if (timeScanRefusal(roots,'workspace.observe')) {
+            await entry('node_observation_scan_retried',{step,sample,internal_operation_id:id,
+              condition,stage:'roots',outcome:structuredClone(roots)});
+            satisfied=false;confirmations=0;previousIdentity=undefined;
+            continue;
+          }
+          throw new Error('Node procedure roots could not be observed');
+        }
         const wizard = roots.output.wizard;
         const portals = wizard?.status === 'observed' ? (roots.output.ui?.elements??[]).filter(e =>
           (e.tid?.startsWith(wizard.root_tid + ';') || wizard.stage==='field_parameters' && e.tid?.startsWith('EditReformColumnDefForm;') || wizard.stage==='input_mapping' && e.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist') && e.tid.endsWith(';boundlist')) : [];
@@ -272,6 +280,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           {timeout:Math.min(35000,Math.max(1,deadline-observationNow()))});
         }
         if (result.status !== 'SUCCEEDED') {
+          // A wall-clock scan can expire under contention without producing
+          // refs or effects. Rediscover within this same observation deadline;
+          // work/element limits and uncertain gestures are never retried here.
+          if (timeScanRefusal(result,'workspace.observe')) {
+            assertContext(roots.output,true,tableDialog,true);
+            await entry('node_observation_scan_retried',{step,sample,internal_operation_id:id,
+              condition,stage:'detail',outcome:structuredClone(result)});
+            satisfied=false;confirmations=0;previousIdentity=undefined;
+            continue;
+          }
           // A closing modal can disappear after root discovery. Only this
           // strict read-only refusal permits rediscovery, never replay a gesture.
           if (root && rootRefreshes < 2 && result.status === 'NOT_APPLIED'
@@ -433,8 +451,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     // Fixed handlers supply the readiness condition and domain identity. Caller
     // input never contains a resolver or a recipe. Only a durably recorded,
-    // strictly pre-gesture epoch refusal or explicitly proved body replacement
-    // permits a new local attempt.
+    // strictly pre-gesture epoch/scan refusal or proved body replacement
+    // permits a new local attempt with unchanged identity and intent.
     async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody }) {
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
@@ -493,12 +511,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             || !Array.isArray(r.trace)) throw error;
           const epochRefusal=r.phase==='preconditions'&&r.error?.code==='UI_EPOCH_CHANGED'
             ||r.phase==='observing'&&r.error?.code==='UI_ROOT_STALE';
+          const scanRefusal=timeScanRefusal(r,'ui.act');
           // Only an opting-in source selector can prove a replaced native body.
           // This remains a new observation and bound attempt, never a raw retry.
           const bodyRefusal=r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_STALE'
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
-          if(!epochRefusal&&!bodyRefusal)throw error;
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
@@ -506,6 +525,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             condition, binding_sha256: binding, intent_sha256: intent,
             effect_possible: false,
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
+            ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
             || event.binding_sha256 !== binding || event.intent_sha256 !== intent) {
@@ -518,4 +538,12 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     get lastPreparedStep() { return structuredClone(lastPreparedStep); },
   };
   return Object.freeze(channel);
+}
+
+function timeScanRefusal(receipt,actionKey) {
+  return receipt?.status==='NOT_APPLIED'&&receipt.action_key===actionKey&&receipt.phase==='observing'
+    &&receipt.effect_possible===false&&receipt.cleanup_complete===true&&receipt.error?.code==='UI_SCAN_LIMIT'
+    &&receipt.output?.observation_required===true&&receipt.output.scan?.complete===false&&receipt.output.scan.limit_exceeded===true
+    &&Array.isArray(receipt.trace)&&receipt.trace.some(e=>e.event==='ui_scan_limit'&&e.limit_kind==='time')
+    &&!receipt.trace.some(e=>['ui_preconditions_verified','ui_gesture_applied'].includes(e.event));
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createNodeProcedure } from '../lib/node-procedure.mjs';
 import { validateTextImportRequest } from '../lib/text-import-procedure.mjs';
 
-function fixture({ recordFailure, executeFailure, changedDocument, foreignReceipt, movingEpoch, dialogsAtRead, staleReads = 0, staleEffect = false, loadingSamples = 0, maxSteps = 8, signal, sharedOperation, now = () => 1, monotonicNow } = {}) {
+function fixture({ recordFailure, executeFailure, changedDocument, foreignReceipt, movingEpoch, dialogsAtRead, readRefusal, wait = async () => {}, staleReads = 0, staleEffect = false, loadingSamples = 0, maxSteps = 8, signal, sharedOperation, now = () => 1, monotonicNow } = {}) {
   const events = [], records = []; let reads = 0;
   const operation = sharedOperation ?? { id: 'parent', action: { action_key: 'node.import.configure', revision: '1' },
     deadline: 10000, checkpoint: { workflow_ref: { prefix: 'MF;TF-1', tab_tid: 'tab' }, document_id: 'doc' } };
@@ -11,12 +11,13 @@ function fixture({ recordFailure, executeFailure, changedDocument, foreignReceip
     dom_epoch: { document: changedDocument ? 'foreign' : 'doc', revision: 1 }, scan: { complete: true }, wizard: staleReads ? {status:'observed',root_ref:'ui-root',root_tid:'Wizard'} : { status: 'absent' },
     ui: { masks: [], dialogs: [], truncated: { elements: false, masks: false, dialogs: false },
       elements: [{ ref: 'ui-button', allowed_actions: ['click'] }] } };
-  const channel = createNodeProcedure({ operation, maxSteps, signal, now, monotonicNow, wait: async () => {},
+  const channel = createNodeProcedure({ operation, maxSteps, signal, now, monotonicNow, wait,
     targetOrigin: 'http://example.test', targetBuild: '7.4.2',
     record: async entry => { events.push(entry.phase); if (recordFailure && entry.phase === recordFailure) throw new Error('disk failure'); records.push(entry); return structuredClone(entry); },
     wrapMutation: (code, options) => { events.push('wrapped'); return { code, options }; },
     execute: async code => {
       if (typeof code === 'string') { reads++;
+        const refusal=readRefusal?.(reads);if(refusal)return refusal;
         if(reads%2===0 && reads<=staleReads*2)return {status:'NOT_APPLIED',action_key:'workspace.observe',phase:'observing',effect_possible:staleEffect,cleanup_complete:true,error:{code:'UI_ROOT_STALE'}};
         const output = structuredClone(state);
         if(staleReads && reads%2===1){output.observation_kind='roots';output.ui.truncated.dialogs=true;output.ui.truncated.masks=true;}
@@ -38,6 +39,37 @@ test('a disappearing read root permits at most two rediscoveries without gesture
     const f=fixture(config);await assert.rejects(f.channel.observe({condition:'dialog closed',ready:()=>true}));
     assert.ok(!f.events.includes('node_observation_root_refreshed'));
   }
+});
+const timedScanRefusal = (action_key='workspace.observe') => ({status:'NOT_APPLIED',action_key,phase:'observing',effect_possible:false,cleanup_complete:true,
+ error:{code:'UI_SCAN_LIMIT'},output:{observation_required:true,scan:{complete:false,limit_exceeded:true}},trace:[{event:'ui_scan_limit',limit_kind:'time',scan_stage:'controls'}]});
+for(const failedRead of [1,2])test('a transient time scan refusal rediscoveries safely at read '+failedRead,async()=>{
+ const f=fixture({readRefusal:n=>n===failedRead?timedScanRefusal():undefined});
+ await f.channel.observe({condition:'field settled',ready:()=>true});
+ assert.equal(f.records.filter(r=>r.phase==='node_observation_scan_retried').length,1);
+ assert.ok(!f.events.includes('mutated'));
+ await f.channel.act({verb:'click',ref:'ui-button'});assert.equal(f.events.filter(e=>e==='mutated').length,1);
+});
+test('a time scan refusal resets consecutive identity confirmation',async()=>{
+ const f=fixture({readRefusal:n=>n===4?timedScanRefusal():undefined});
+ await f.channel.observe({condition:'field settled',ready:()=>true,confirmIdentity:()=>({node:'same'})});
+ assert.equal(f.records.filter(r=>r.phase==='node_observation_sample').length,3);
+});
+for(const [name,alter] of Object.entries({work:r=>{r.trace[0].limit_kind='work'},elements:r=>{r.trace[0].limit_kind='elements'},traversal:r=>{r.trace[0].limit_kind='traversal'},unknown:r=>{r.trace=[]},effect:r=>{r.effect_possible=true},cleanup:r=>{r.cleanup_complete=false},gesture:r=>{r.trace.push({event:'ui_gesture_applied'})},precondition:r=>{r.trace.push({event:'ui_preconditions_verified'})}}))test('scan retry rejects '+name,async()=>{
+ const refusal=timedScanRefusal();alter(refusal);
+ const f=fixture({readRefusal:n=>n===2?refusal:undefined});await assert.rejects(f.channel.observe({condition:'field settled',ready:()=>true}));
+ assert.ok(!f.events.includes('node_observation_scan_retried'));assert.ok(!f.events.includes('mutated'));
+});
+test('persistent time scan failures consume the original observation deadline and leave no usable refs',async()=>{
+ let time=1,reads=0;const f=fixture({now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms},readRefusal:()=>{reads++;time+=600;return timedScanRefusal()}});
+ const deadline=f.operation.deadline;
+ await assert.rejects(f.channel.observe({condition:'field settled',ready:()=>true,timeoutMs:1500}),/readiness timeout/);
+ assert.equal(f.operation.deadline,deadline);assert.ok(reads<=3);
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+});
+test('a foreign document after a retried scan never authorizes a gesture',async()=>{
+ const f=fixture({changedDocument:true,readRefusal:n=>n===1?timedScanRefusal():undefined});
+ await assert.rejects(f.channel.observe({condition:'field settled',ready:()=>true}),/document or workflow changed/);
+ assert.ok(!f.events.includes('mutated'));
 });
 test('durable internal preparation precedes mutation; next action requires fresh observation', async () => {
   const f = fixture(); await f.channel.observe({ condition: 'button usable', ready: s => s.ui.elements.some(e => e.ref === 'ui-button') }); await f.channel.act({ verb: 'click', ref: 'ui-button' });
@@ -164,7 +196,7 @@ function recoveryFixture({ initialSequence = 0, refusals = 1, receipt = {}, chan
       mutations++;
       return {operation_id:code.reference.id,action_key:'ui.act',cleanup_complete:true,effect_possible:mutations>refusals,
         status:mutations>refusals?'SUCCEEDED':'NOT_APPLIED',phase:mutations>refusals?'completed':'preconditions',
-        error:{code:'UI_EPOCH_CHANGED'},trace:[],...receipt};
+        error:{code:'UI_EPOCH_CHANGED'},trace:[],...(typeof receipt==='function'?receipt(mutations):receipt)};
     }});
   const perform=()=>channel.perform({condition:'same field editor',ready:()=>true,identity:s=>s.binding,confirmIdentity,refreshReplacedBody,
     resolve:s=>({verb:'fill',ref:s.ui.elements[0].ref,text:s.desired})});
@@ -178,6 +210,15 @@ test('strict pre-gesture epoch refusal refreshes and rebinds one unchanged field
 });
 test('local epoch recovery stops after two refreshes',async()=>{
   const f=recoveryFixture({refusals:10});await assert.rejects(f.perform(),/did not confirm/);assert.equal(f.mutations,3);
+});
+test('a proven pre-gesture time scan refusal rebinds the same action with a new receipt',async()=>{
+ const f=recoveryFixture({receipt:n=>n===1?timedScanRefusal('ui.act'):{}});await f.perform();assert.equal(f.mutations,2);
+ const refresh=f.records.find(r=>r.phase==='node_step_refresh_authorized');assert.equal(refresh.reason,'read_scan_time_limit');
+ assert.equal(new Set(f.records.filter(r=>r.phase==='node_step_prepared').map(r=>r.internal_operation_id)).size,2);
+});
+test('time scan action refresh stays bounded and refuses changed intent',async()=>{
+ const f=recoveryFixture({refusals:10,receipt:timedScanRefusal('ui.act')});await assert.rejects(f.perform());assert.equal(f.mutations,3);
+ const changed=recoveryFixture({changedIntent:true,receipt:n=>n===1?timedScanRefusal('ui.act'):{}});await assert.rejects(changed.perform(),/intent changed/);assert.equal(changed.mutations,1);
 });
 for(const [name,receipt] of Object.entries({effect:{effect_possible:true},unknown:{status:'AMBIGUOUS'},cleanup:{cleanup_complete:false},phase:{phase:'applying'},trace:{trace:[{event:'ui_preconditions_verified'}]},missingTrace:{trace:undefined},foreignCode:{error:{code:'UI_CONTEXT_CHANGED'}}})){
   test('epoch recovery refuses '+name,async()=>{const f=recoveryFixture({receipt});await assert.rejects(f.perform());assert.equal(f.mutations,1)});

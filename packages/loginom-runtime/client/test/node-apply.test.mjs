@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {NodeProcedureStepError} from '../lib/node-procedure.mjs';
+import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 const request=()=>({operation_id:'apply1',contract_revision:'1.0.0',document_id:'doc',
   workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]},
   target:{kind:'new',type:'imports.text',label:'Import',position:{x:96,y:80}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'execute',
@@ -22,6 +23,17 @@ test('full shell orders configuration before execution and binds empty fresh out
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.equal(r.execution.status,'completed');assert.equal(r.output.ports[0].row_count,0);
  assert.deepEqual(f.calls,['source','target','mapping','open','configure','mapping','finish','execute','read']);
  assert.equal(r.package_saved,false);assert.equal(r.persisted_package_verified,false);assert.equal(f.records.at(-1).phase,'node_checkpoint');
+});
+for(const expired of [false,true])test('host configuration beyond five minutes retains the original shared total deadline '+expired,async()=>{
+ const f=fixture(),bindings=createUserWorkflowBindings(),p=request();
+ bindings.remember({document_id:p.document_id,workflow_ref:p.workflow_ref});delete p.budgets;
+ const expanded=bindings.expandNode(p),configure=f.handlers.get('imports.text').configure,read=f.drivers.readOutput;
+ f.handlers.get('imports.text').configure=async(...args)=>{f.setTime(350001);return configure(...args)};
+ f.drivers.readOutput=async(options,ctx)=>{assert.equal(ctx.deadline,600001);f.setTime(expired?600002:445001);return read(options,ctx)};
+ const result=await f.run(expanded);assert.equal(result.status,expired?'AMBIGUOUS':'SUCCEEDED');
+ assert.ok(f.calls.includes('read'));
+ assert.equal(f.operation.nodeApply.deadline,600001);
+ if(expired){assert.match(result.error.message,/deadline/);assert.ok(!f.records.some(r=>r.phase==='node_checkpoint'));}
 });
 test('Done never waits or reads stale output',async()=>{
  const f=fixture(),p=request();p.finish='done';p.read.ports=[];const r=await f.run(p);
