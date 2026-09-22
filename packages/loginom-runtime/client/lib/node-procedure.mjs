@@ -302,7 +302,15 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           result.output.node_missing_values=await execute(makeMissingValuesContextCode(preparedNodeContext),{timeout:Math.min(35000,Math.max(1,deadline-observationNow()))});
           if(result.output.node_missing_values.node_context&&JSON.stringify(canonical(result.output.node_missing_values.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Native missing values context changed during observation');
         }
-        assertContext(result.output, true, tableDialog, false, wizardConfirmation);
+        try {
+          assertContext(result.output, true, tableDialog, false, wizardConfirmation);
+        } catch (error) {
+          // Keep the native read that caused the refusal; it must never become
+          // a usable snapshot or authorize a gesture.
+          await entry('node_observation_context_refused', {step, sample, internal_operation_id:id,
+            condition, reason:error.message, outcome:structuredClone(result)});
+          throw error;
+        }
         if(readNavigation)result.output.node_navigation_read=true;
         if(boundWizardConfirmation(result.output,wizardConfirmation))result.output.node_wizard_confirmation=structuredClone(wizardConfirmation);
         // These are bounded reads of native UI caches and DOM, guarded by the

@@ -63,3 +63,20 @@ test('inactive cached dataset roots cannot shadow the single visible preview sch
  assert.equal(f.read().verified,true);
  hidden.checkVisibility=()=>true;assert.equal(f.read().verified,false);
 });
+
+test('multi-output preview ignores cached foreign graphs but rejects duplicates in its bound graph',()=>{
+ const f=fixture(),graphRoot=f.el('MF;TF-1;ModelForm;cmpDiagram'),nodeRoot=f.el('MF;TF-1;Graph;Filter',graphRoot);
+ f.node.FCell={};f.port.FCell={};
+ const second={FGuid:'second',FType:1,FSubType:1,FPortIndex:1,parent:f.node,FCell:{}};
+ f.node.FPorts[0].FCollection.push(second);
+ const firstRoot=f.el(nodeRoot.tid+';Output_Data-0',graphRoot),secondRoot=f.el(nodeRoot.tid+';Output_Data-1',graphRoot);
+ const roots=new Map([[f.node.FCell,nodeRoot],[f.port.FCell,firstRoot],[second.FCell,secondRoot]]);
+ f.model.FDiagram={FmxGraph:{container:graphRoot,view:{getState:cell=>({shape:{node:roots.get(cell)}})}}};
+ const cachedNode=f.el(nodeRoot.tid),cachedFirst=f.el(firstRoot.tid,cachedNode),cachedSecond=f.el(secondRoot.tid,cachedNode);
+ for(const el of [cachedNode,cachedFirst,cachedSecond])el.checkVisibility=()=>false;
+ assert.equal(f.read().verified,true);
+ cachedFirst.parent=graphRoot;assert.equal(f.read().verified,false);cachedFirst.parent=cachedNode;
+ cachedSecond.parent=graphRoot;assert.equal(f.read().verified,false);cachedSecond.parent=cachedNode;
+ cachedNode.parent=graphRoot;assert.equal(f.read().verified,false);cachedNode.parent=null;
+ roots.set(second.FCell,cachedSecond);assert.equal(f.read().verified,false);
+});

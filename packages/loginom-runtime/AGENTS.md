@@ -42,3 +42,5 @@
 
 
 - After node/port Done or column Apply/Cancel, loading masks can persist for minutes. The host supplies only the remaining original node deadline through private `settlement_timeout_ms`; the browser waits read-only while package/workflow/node and editor ownership remain unchanged. Do not replace this with a fixed number of short sleeps, repeat the gesture, reset deadlines, or accept a foreign dialog. After the mask disappears, retain exact row/graph and quiet-state verification; expiry remains ambiguous when an effect was possible.
+
+- Preview schema reads must scope graph node/port `data-tid` uniqueness to the prepared native graph. Cached inactive graphs can retain identical IDs elsewhere in the document. Native roots must still belong to the current graph; duplicate identities inside that graph remain invalid. Preserve refused native observations in the journal without making them usable action snapshots.

@@ -196,8 +196,8 @@
   },
   "packages/loginom-runtime/client/lib/node-procedure.mjs": {
     "baseHash": "eb08dda1ea023c1df95bac5efd4c6bccf314bea277f2d4bafd9396bec4ee94ff",
-    "hash": "9249b317be7bdda20262cb1a134e018a4d64108a54099e4dbe81697173b92407",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership."
+    "hash": "cad65cd14aaf98726ddd20041c7bf4107a7539abeb40aed5e0a38db69361792f",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Preserve refused native observations without granting a usable snapshot or permitting a gesture."
   },
   "packages/loginom-runtime/client/lib/user-preview-budget.mjs": {
     "baseHash": "b0f8bf12969340df0456c27bffdac2e5e102a2e1520ba75176a4851f8162799f",
@@ -241,7 +241,17 @@
   },
   "packages/loginom-runtime/client/test/node-procedure.test.mjs": {
     "baseHash": "91f5b67c0bd4c21a12d143eb78c6a5700812d40b3d5d5403cd0164731e9b514f",
-    "reason": " Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership.",
-    "hash": "109b91d836da0b11a7408165af56d6558c5d6c131bcf89f0ec00cbbaa36789f5"
+    "reason": "Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Verify refusal journaling and absence of mutation authority for unverified or foreign previews.",
+    "hash": "66dac5ba431855166b63ec76cb1a534d0165fecf62a91529b19db6e54b730eb7"
+  },
+  "packages/loginom-runtime/client/lib/node-preview-schema.mjs": {
+    "baseHash": "36f345b3e26e04dc8d65340a8f5e54b86da128b6a5cb994f0c45da61473b2c38",
+    "hash": "2c0efd0c1dca00ddd4a0551c34c88c85d9c074cb225f4c2fb9ac0f024bdd6030",
+    "reason": "Scope preview node and output identity uniqueness to the prepared native graph, excluding cached foreign graphs."
+  },
+  "packages/loginom-runtime/client/test/node-preview-schema.test.mjs": {
+    "baseHash": "2b1fdd9c6ddb950c22d2cea6b28e31d0c19ed085dca894decd783aae24f78f20",
+    "hash": "7e1a3708e0461d902ecf7ec1e3ce768f212c868486d447b208a51645eae71944",
+    "reason": "Cover hidden cached graph duplicates, same-graph ambiguity and foreign native port roots."
   }
 }

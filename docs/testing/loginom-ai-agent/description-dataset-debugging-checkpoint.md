@@ -1,75 +1,45 @@
 # Description + dataset: checkpoint
 
-> Актуальное состояние после второго goal-turn с блокировкой: PID 16791 подтверждён живым, окон 0, prompt не отправлен. Впервые подготовлены **оба target14 (D02,D36) и все 10 final14**; исходные файлы проверены по bytes/SHA. Профили уже существуют — НЕ вызывать prepareAttempt повторно. Node REPL содержит `final14Manifest`; `target14Manifest.runs` содержит D02 и D36. Из них запущен только D02, ожидающий системную связку ключей. Final14 запускать только после целевых проверок. Private manifests сохранены; секреты не выводились. Предыдущий turn дал прогресс (исправление/сборка/диагностика), текущий подтвердил живое ожидание и подготовил оставшиеся профили. Внешний блокер остаётся тем же; завершённой приёмки нет.
+Обновлено 2026-09-22. План не завершён. Связка ключей подтверждена пользователем; блокировка первого запуска снята.
 
-Обновлено 2026-09-22 (времена ниже UTC). План выполняется; цель не завершена.
+## Текущее состояние
+
+Кандидат 14: `0.1.7-local.20260922.2`, исходники `5a144cd7c1d8cea269a52be59fa5a1d340d27b3d`, ASAR `5a6b4a572eed65a15a0126c093e1854b031f372db688e997cc80f05f22ac9a71`. Установлен в `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260922.2/Loginom AI Agent.app`. Пользовательская установка не менялась. DMG/ZIP (4446 ресурсов), offline smoke, подпись и совпадение ASAR проверены.
+
+Целевые target14 завершены, оба Desktop штатно закрыты:
+- D36: CREATED_EXECUTED_SAVED, 4 узла, оригинальный CSV подтверждён, сохранение после графа, modified=false.
+- D02: BLOCKED, 5 выполненных узлов. `node-group-region-20260922-001` остановлен в target при предпросмотре upstream перед созданием группировки: `Node procedure is blocked by a mask or dialog`. F3 подтверждён, окно PreviewWindow появилось. В исходной попытке полный native schema не сохранён до assertContext; отдельное воспроизведение ниже подтвердило скрытые внешние копии графа. Повторные resume/recovery отказы; модель запросила ручное закрытие окна. Техническая помощь не оказана. Pending сохранён, cleanup=false. Кнопка Stop не нажималась: модель ждала вопрос, рабочий node worker уже не выполнялся; приложение закрыто штатно.
+
+Final14: все десять профилей подготовлены, НИ ОДИН prompt не отправлен. Не создавать профили повторно. Пока новый отказ D02 не разобран, final14 не начинать. Если нужен новый runtime fix — новая сборка, целевая проверка и новая полная серия на одном кандидате.
 
 ## Канонические условия
 
-10 задач в порядке старта D02,D47,D23,D45,D19,D36,D24,D48,D27,D65. Исходные description.md + dataset.csv неизменны, начальный prompt фиксирован, технические подсказки запрещены. GPT-5.6 Sol low, Loginom 7.4.2, Desktop macOS backend v1. На попытку 30 минут, отдельные профиль/чат/пакет. Аналитическая правильность not_checked; помощь человеку пока не потребовалась. Последнее поручение пользователя: пять независимых клиентов для выявления нюансов под нагрузкой (после краткого снижения до трёх). Тяжёлые source checks не совмещать с полной нагрузкой пяти клиентов.
+Порядок старта D02,D47,D23,D45,D19,D36,D24,D48,D27,D65. Неизменные description.md + dataset.csv, фиксированный начальный prompt. GPT-5.6 Sol low, Loginom 7.4.2, macOS Desktop backend v1. До пяти независимых клиентов по последнему поручению пользователя; разные профили, сессии и пути пакетов. Предел 30 минут от отправки, без продления pending. Технические подсказки и ручное исправление графа запрещены. Analytical correctness и description completeness — not_checked. Бизнес-ответы пока не потребовались.
 
-## Установленный кандидат и история
+## Завершённая история
 
-- Baseline `.20260921.10`: 7 PASS / 3 BLOCKED (D45,D48,D65).
-- `.11`: целевой D45 BLOCKED, модель задавала короткие технические budgets.
-- `.12`: целевые D45/D48/D65 PASS; final12 9 PASS / 1 BLOCKED (D27, первое наблюдение нового native port).
-- HEAD `8ab08274c75dc3658d3fc72954cc6ab04dd937be`: безопасная привязка нового порта; предыдущие исправления visible hit point и host-owned budgets сохранены.
-- Кандидат 13: `0.1.7-local.20260922.1`, ASAR `12e483b9df3d67010cc34e440e9ff356ddc356f2be790b98a3994db6dc58f480`.
-- Установка `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260922.1/Loginom AI Agent.app`; пользовательская установка не менялась.
-- D27-target13 PASS (9 узлов), закрыт.
+Baseline `.21.10`: 7 PASS / 3 BLOCKED. `.11` целевой D45 не прошёл. `.12` целевые D45/D48/D65 прошли; final12 9 PASS / 1 BLOCKED. `.22.1` целевой D27 прошёл; final13 7 PASS / 3 BLOCKED (D02/D36 маски, D24 ошибочный artifact_id модели). Все прежние Desktop и DEBUG_ONLY закрыты. Полный реестр причин, hashes и ограничений — в description-dataset-debugging-results.md.
 
-## Final13
+D-F05/D-F06 исправлены в 5a144cd7c: ожидание масок после Done и Apply/Cancel до исходного срока, без повторных жестов; владелец проверяется, после маски требуется проверка quiet-state. 2287 runtime PASS / 2 Windows SKIP, source attribution 5045 PASS, общие macOS source checks 8/8 PASS. Ранние проверки под нагрузкой имели два отказа; изолированные полные повторы прошли, история сохранена. DEBUG_ONLY прежних D02/D36 прошли, но исходная долгая маска не повторилась. В target14 ожидания кратких масок наблюдались, но минутная live-маска пока не воспроизведена.
 
-Все 10 уже отправлены; повторно не запускать их в этой серии.
+## Диагностика нового preview refusal
 
-| Задача | Состояние |
-| --- | --- |
-| D02 | BLOCKED, 4 узла, поздняя маска после Done; D-F05; закрыт |
-| D47 | PASS, 6 узлов, закрыт |
-| D23 | PASS, 5 узлов, закрыт |
-| D45 | PASS, 5 узлов, закрыт |
-| D19 | PASS, 7 узлов, закрыт |
-| D36 | BLOCKED, 1 узел, маска после Apply выходного поля; D-F06; закрыт |
-| D24 | BLOCKED, 0 узлов; модель во всех 8 запросах неверно копировала artifact_id (8f56 вместо 8d56), корректный отказ до мутации; закрыт |
-| D48 | PASS, 6 узлов, закрыт |
-| D27 | PASS, 9 узлов, закрыт |
-| D65 | Активен, отправлен 23:19:12.439 UTC, предел 23:49:12 UTC; исправляет собственную ошибку формулы на том же сохранённом узле по подтверждённой процедуре |
+Первый DEBUG_ONLY повтор исходных запросов D02-target14 завершён (exit 0, host/child close awaited), пять операций PASS, шестая повторила отказ: native schema `verified=false`, reason=`preview_port_graph`, masks=[], принадлежащий исходному узлу PreviewWindow. Материалы `replay-preview-d02.log`, каталог `/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-g1qnxW`.
 
-D02/D36 завершились сами, pending сохранён, cleanup=false; Stop не нажимался. D24 завершился сам, все отказы импорта до мутации, cleanup=true. Final13 уже не прошла и не может быть объявлена успешной после исправления исходников.
+Второй и третий DEBUG_ONLY завершены штатно. Третий (`replay-preview-identity-d02.log`, `/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-vMKKzD`) подтвердил причину: global exact(tid) содержит два элемента — видимый в native graph и скрытый вне его. Native shape/port identity/hit-test корректны. Это не alternate SVG; экспериментальная проверка этой гипотезы удалена, приватный RED не считать регрессией подтверждённого бага.
 
-## Текущая доработка
+Незакоммиченный runtime fix: node-preview-schema ограничивает уникальность tid подготовленным native graph; чужие native roots и дубликаты внутри graph всё ещё отвергаются. node-procedure сохраняет `node_observation_context_refused`, не разрешая жестов. Новая регрессия hidden foreign graph RED/GREEN; 89 узких PASS. Source transforms обновлены, 5045 PASS.
 
-Незакоммиченные D-F05/D-F06: `workspace-ui.mjs`, `node-procedure.mjs` и тесты. Маска ждётся до исходного deadline узла через private host-only `settlement_timeout_ms`. Повторных жестов нет; чужой владелец/диалог отвергаются, после маски заново проверяется граф/строка и quiet samples. Добавлены trace начала/конца ожидания. Публичный Protocol/HttpApi не менялся. Тесты покрывают маску более минуты и неизменность deadline. Финальный полный runtime прогон с `--test-concurrency=1` идёт в `runtime-tests-14-final.log` (session 96534). Предыдущие промежуточные зелёные прогоны не заменяют проверку текущих байтов.
+Полный runtime завершён: 2289 PASS / 2 Windows SKIP / 0 FAIL, `runtime-tests-15.log`. DEBUG_ONLY на исправленных файлах прошёл шесть исходных запросов, включая прежний отказ, и save; host/child close awaited, exit 0 (`replay-preview-fixed-d02.log`, `/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-iforC6`). Все диагностические процессы закрыты.
 
-Первый параллельный full runtime: 1 FAIL наблюдения консоли; отдельный повтор PASS. Первый general source check: 7/8 групп PASS, CLI management превысил 90 секунд. Полный повтор general source checks после финальных runtime tests ещё обязателен. Source attribution проверяет 5045 файлов; обновлять hashes после любых правок, baseHash сохранять.
+Общие macOS source checks завершены: 8/8 PASS (`source-checks-15.{log,json}`). Далее review/commit, clean build `.20260922.3` в новый output, установка, целевые D02/D36 и новая полная final15 в пять клиентов. Старый final14 остаётся NOT_STARTED.
 
-Два DEBUG_ONLY повтора оригинальных запросов на изолированной копии ресурсов `.22.1` с исправленным ожиданием (до последней доработки quiet reset/trace):
-- D02: shell 60869, `replay-mask-d02.log`, каталог `/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-0AXFCN`.
-- D36: shell 67979, `replay-mask-d36.log`, каталог `/var/folders/d0/pcsq9b9j1pvgy1vd9mp9l61w0000gn/T/loginom-port-replay-5QkKFI`.
-Оба ещё работают; закрытие host/child должно быть awaited. Это не installed acceptance и не доказательство live-воспроизведения маски.
+## Приватные материалы и продолжение
 
-## Приватный контроллер
+Корень evidence: `/Users/kartamyshev/Library/Logs/loginom-description-debugging/20260921-163359`. Чаты, receipts, profiles, metadata и execution journals не переносить в Git. Не печатать headers, env или секреты.
 
-Корень `/Users/kartamyshev/Library/Logs/loginom-description-debugging/20260921-163359` (evidence). Там manifest, все чаты/receipts/profiles; не переносить в Git. `final13-manifest.json`, `controller-checkpoint.json`, `candidate13-install.json`. Не печатать credentials, backend headers, env.
+Persistent Node REPL: `ctl` = attempt-controller-v7.mjs, `parallel13`, `targets14` (оба closed), `target14Manifest`, `final14Manifest`, `candidate14`, `installed14`, `pw`, `env`, `fs`. Старые slots13 закрыты и не используются. Полный финальный аудит: `audit-final.py <series>` проверяет последние состояния узлов, оригинальные файлы и CSV lineage, модель, порядок/изоляцию/длительность, save-after-graph, modified=false и закрытие. Исторический final13 повторно проверен, максимум одновременных клиентов 5.
 
-Persistent Node REPL: `ctl` = attempt-controller-v6.mjs, `parallel13`, `slots13` (5 объектов, закрытые остаются), `final13Manifest`, `nextIndex13=10`, `candidate13`, `installed13`, `pw`, `env`, `fs`. Активен только `slots13[2]` = D65. Остальные закрыты. Poll только `slots13.filter(s=>s.backend&&!s.run.desktop_closed)`, `ctl.collectAttempt`; успешное завершение через `ctl.finishAttempt` проверяет source bytes/SHA, execution/fresh outputs, save после графа, modified=false, cleanup и awaited app.close. После изменений сохранять `parallel13.checkpoint(evidence,candidate13,final13Manifest,slots13)`.
+Pinned Bun `/Users/kartamyshev/.cache/loginom-macos-build/tools/bun-darwin-aarch64/bun`; Node `/Users/kartamyshev/.cache/loginom-macos-build/tools/node-v24.19.0-darwin-arm64/bin/node`; browsers `/Users/kartamyshev/.cache/loginom-macos-build/browsers`. Проверки package-local. Сборка только чистого commit с новой версией/output; переменные полностью LOGINOM_AI_AGENT_CHANNEL/NODE_SOURCE/TEST_NODE/BROWSER_SOURCE, NODE_SOURCE — бинарник.
 
-Следующие действия: завершить final13 и debug, проверить новый код/attribution/diff, обновить отчёт, закоммитить чистые входы; собрать отдельный кандидат `.20260922.2` (внутренний 14), проверить DMG/ZIP/offline/подпись/ASAR, установить в отдельную папку; выполнить целевые D02/D36 и затем НОВУЮ полную final14 в пять клиентов. Не готовить повторно существующие профили. При новом необходимом исправлении снова сохранить непрошедшую серию и повторить final на следующем кандидате.
-
-Pinned Bun `/Users/kartamyshev/.cache/loginom-macos-build/tools/bun-darwin-aarch64/bun`, Node `/Users/kartamyshev/.cache/loginom-macos-build/tools/node-v24.19.0-darwin-arm64/bin/node`, browsers `/Users/kartamyshev/.cache/loginom-macos-build/browsers`. Build NODE_SOURCE — полный путь к бинарнику, не каталогу. Проверки package-local. Final audit `python3 <evidence>/audit-final.py final13` (исторический максимум 5), затем аналогично новой серии. В финале обновить results/план/бизнес-реестр/canonical Linux checkpoint, закрыть свои приложения, зафиксировать документацию. F03/F07 recovery, точная причина F12, compaction не заявлять без доказательств.
-
-Обновление 23:31 UTC: оба DEBUG_ONLY завершены (exit 0), включая save и awaited host/child close. Полный runtime текущих байтов: 2287 PASS / 2 SKIP / 0 FAIL; source attribution 5045 PASS. Идёт повтор общих macOS source checks: shell 14757, source-checks-14-recheck.{log,json}. D65 всё ещё активен, 4 выполненных узла. До commit/build проверить результат общих проверок и завершить final13.
-
-Обновление 23:34 UTC: final13 завершена 7 PASS / 3 BLOCKED. D65 PASS (5 узлов), все Desktop и DEBUG_ONLY процессы закрыты. Общие source checks повторены успешно: 8/8 групп, включая CLI management. Текущие исходники прошли 2287 runtime tests, 2 SKIP, attribution 5045. Далее commit, build/install `.20260922.2`, целевые D02/D36, новая final14 в пять клиентов. Активных клиентов нет; старые slots13 не использовать для новых задач.
-
-## Текущая остановка первого запуска кандидата 14 (23:41 UTC)
-
-Исправление закоммичено: `5a144cd7c1d8cea269a52be59fa5a1d340d27b3d`. Собран и установлен `0.1.7-local.20260922.2`, ASAR `5a6b4a572eed65a15a0126c093e1854b031f372db688e997cc80f05f22ac9a71`. Build report, DMG/ZIP static (4446 ресурсов), offline smoke, codesign и совпадение установленного ASAR PASS. Каталог сборки `/Users/kartamyshev/.cache/loginom-macos-build/description-20260922-2`; установка `/Users/kartamyshev/Applications/Loginom Scenario Tests/0.1.7-local.20260922.2/Loginom AI Agent.app`. Первый вызов сборки отказал до создания каталога из-за неверных имён переменных окружения; исправленный вызов использовал LOGINOM_AI_AGENT_CHANNEL/NODE_SOURCE/BROWSER_SOURCE (полные префиксы LOGINOM_AI_AGENT_).
-
-Целевой D02-target14-a01 подготовлен, но prompt НЕ отправлен. D36-target14 ещё не подготовлен. Первый запуск Electron истёк через 45 секунд и был закрыт самим launcher. Повторный запуск PID 16791 остаётся жив, `appTarget14.windows().length===0`; `firstWindow` истёк. SecurityAgent запущен (PID 16740), но его диалог не прочитан: CUA getApp(com.apple.SecurityAgent) отказал по safety policy. Не обходить отказ через другой UI/CLI драйвер и не писать секреты в журнал/проект. Пользователь разрешил работу без повторных согласований и предоставил секрет для системного диалога; ограничение исходит от инструмента, не от отсутствия пользовательского разрешения.
-
-Node REPL: `candidate14`, `installed14`, `target14Manifest` (один run D02), `targets14=[]`, **appTarget14** (живое ElectronApplication), `pageTarget14` не получен. При продолжении сначала проверить существующий appTarget14/windows, не запускать второй процесс с тем же профилем. Если появилось окно, получить firstWindow, настроить через ctl.configureUI, добавить в targets14, дождаться ready, отправить через ctl.submitUI. Затем создать D36-target14 и после успешных целевых — новую final14 из 10 свежих попыток в пять клиентов. Приватный controller-checkpoint указывает startup_no_window; target14-manifest сохранён. Никакая попытка на новом кандидате пока не засчитана.
-
-Это первое зафиксированное ожидание внешнего системного подтверждения. Цель не завершена. Все исходные/предыдущие/диагностические клиенты закрыты; оставлен только новый тестовый клиент на первом запуске.
-
-Уточнение диагностики: read-only sample собственного PID 16791 подтвердил ожидание SecItemCopyMatching / SecKeychainItemCopyContent / SecurityServer decrypt. Связка ключей — подтверждённая точка блокировки запуска; содержимое системного диалога по-прежнему не прочитано. Требуется ручное подтверждение системного запроса, поскольку CUA отказал в доступе к SecurityAgent. Секрет не записывался в файлы проекта/диагностики.
+Следующее: диагностировать preview отказ; исправить подтверждённую причину и проверить; затем целевые и новая полная серия десяти задач в пять клиентов. В конце обновить results/план/бизнес-реестр/canonical Linux checkpoint, закрыть свои процессы и зафиксировать документы. Не объявлять 10/10 до нового полного успеха. F03/F07 recovery, полную причину F12 и compaction не заявлять без доказательств.

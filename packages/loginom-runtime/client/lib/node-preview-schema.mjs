@@ -26,11 +26,13 @@ export function readPreviewSchemaBrowser(binding){
  if(outputs.length===1){if(port.FPortIndex!==undefined&&port.FPortIndex!==0)return fail('preview_port_inventory');}
  else{
   const graph=model.FDiagram?.FmxGraph,nodeRoot=graph?.view?.getState(node.FCell)?.shape?.node,nodeTid=nodeRoot?.getAttribute('data-tid');
-  if(!nodeTid?.startsWith(prefix+';Graph;')||exact(nodeTid).length!==1||!graph.container.contains(nodeRoot))return fail('preview_port_graph');
+  // Cached inactive graphs retain the same data-tid values. The prepared
+  // native graph owns this preview; only duplicates inside it are ambiguous.
+  if(!nodeTid?.startsWith(prefix+';Graph;')||exact(nodeTid).filter(e=>graph.container.contains(e)).length!==1||!graph.container.contains(nodeRoot))return fail('preview_port_graph');
   const indexed=[];
   for(const p of outputs){
    const root=graph.view.getState(p.FCell)?.shape?.node,tid=root?.getAttribute('data-tid'),base=nodeTid+';Output_Data-';
-   if(!tid?.startsWith(base)||!/^\d{1,2}$/.test(tid.slice(base.length))||exact(tid).length!==1||!graph.container.contains(root))return fail('preview_port_graph');
+   if(!tid?.startsWith(base)||!/^\d{1,2}$/.test(tid.slice(base.length))||exact(tid).filter(e=>graph.container.contains(e)).length!==1||!graph.container.contains(root))return fail('preview_port_graph');
    const index=Number(tid.slice(base.length));
    if(p.FPortIndex!==undefined&&p.FPortIndex!==index)return fail('preview_port_graph');
    indexed.push({port:p,index});
