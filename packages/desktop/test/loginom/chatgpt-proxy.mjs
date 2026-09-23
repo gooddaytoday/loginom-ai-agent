@@ -1,5 +1,5 @@
 import { createRequire } from "node:module"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { setTimeout } from "node:timers/promises"
@@ -50,12 +50,14 @@ try {
   assert.equal(exchange.status, 500)
   const log = await (async () => {
     for (let attempt = 0; attempt < 100; attempt++) {
-      const text = await readFile(join(profile, "data/loginom-ai-agent/log/loginom-ai-agent.log"), "utf8")
+      const text = await readServerLog(profile)
       if (text.includes("Token exchange failed:")) return text
       await setTimeout(50)
     }
-    return await readFile(join(profile, "data/loginom-ai-agent/log/loginom-ai-agent.log"), "utf8")
+    return await readServerLog(profile)
   })()
+  const legacy = await namedFiles(join(profile, "data"), "loginom-ai-agent.log")
+  assert.equal(legacy.length, 0, "backend log file was created outside the desktop log directory")
   const diagnostic = log.match(/Token exchange failed: HTTP [0-9]+(?: \([a-z_]+\))?/)?.[0]
   assert.ok(
     diagnostic === "Token exchange failed: HTTP 401 (token_expired)",
@@ -81,4 +83,27 @@ try {
 } finally {
   await application.close()
   await rm(profile, { recursive: true, force: true })
+}
+
+async function readServerLog(profile) {
+  const paths = await namedFiles(join(profile, "desktop", "logs"), "server.log")
+  const texts = await Promise.all(paths.map((path) => readFile(path, "utf8").catch(() => "")))
+  return texts.join("\n")
+}
+
+async function namedFiles(dir, name) {
+  const found = []
+  const walk = async (current) => {
+    const entries = await readdir(current, { withFileTypes: true }).catch(() => [])
+    for (const entry of entries) {
+      const path = join(current, entry.name)
+      if (entry.isDirectory()) {
+        await walk(path)
+        continue
+      }
+      if (entry.name === name) found.push(path)
+    }
+  }
+  await walk(dir)
+  return found
 }
