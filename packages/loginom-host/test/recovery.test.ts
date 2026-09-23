@@ -14,7 +14,7 @@ test.each([false, true])("recovery resets only idle runtimes; shutdown race = %s
   // Recovery exercises generation ownership; use the explicit plaintext test
   // codec rather than requesting the host OS's unavailable desktop safeStorage.
   const store = connectionStore(join(directory, "connection"), credentials("linux"))
-  const journal = await recoveryStore(join(directory, "recovery"))
+  const journal = await recoveryStore(join(directory, "recovery"), { strict: true })
   await store.stage({
     generation: 1,
     revision: 1,

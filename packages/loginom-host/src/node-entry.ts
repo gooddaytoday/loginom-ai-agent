@@ -81,13 +81,15 @@ async function dispatch(message: unknown) {
         typeof input.resources !== "string" ||
         !isAbsolute(input.resources) ||
         !("headless" in input) ||
-        typeof input.headless !== "boolean"
+        typeof input.headless !== "boolean" ||
+        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean")
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
       const options = {
         root: input.root,
         resources: input.resources,
         headless: input.headless,
+        strictRecovery: "strictRecovery" in input && input.strictRecovery === true,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
       }

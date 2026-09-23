@@ -179,7 +179,7 @@ test("management commands share durable setup and recovery semantics through the
       });
     `,
     )
-    async function command(args: string[], input = "") {
+    async function command(args: string[], input = "", extra: NodeJS.ProcessEnv = {}) {
       const child = Bun.spawn(
         [process.execPath, "run", "./src/standalone.ts", "loginom", ...args, "--format", "json"],
         {
@@ -189,6 +189,7 @@ test("management commands share durable setup and recovery semantics through the
             BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
             LOGINOM_AI_AGENT_CLI_PROFILE: profile,
             LOGINOM_AI_AGENT_CLI_BUNDLE: bundle,
+            ...extra,
           },
           stdin: new Blob([input]),
           stdout: "pipe",
@@ -232,23 +233,39 @@ test("management commands share durable setup and recovery semantics through the
     if (process.platform !== "linux") expect(JSON.stringify(persisted)).not.toContain("private-setup-key")
     expect(await command(["check"])).toMatchObject({ code: 0, result: { code: "LOGINOM_CONNECTION_VALID" } })
     expect(await command(["cancel-pending"])).toMatchObject({ code: 0, result: { state: "ready" } })
-    const journal = await recoveryStore(join(profile, "loginom/recovery"))
+    const strictRecovery = { LOGINOM_AI_AGENT_STRICT_RECOVERY: "1" }
+    const journal = await recoveryStore(join(profile, "loginom/recovery"), { strict: true })
     const id = await journal.begin("a".repeat(64), 2)
     await journal.settle(id, false)
-    expect(await command(["recover"])).toMatchObject({
+    expect(await command(["recover"], "", strictRecovery)).toMatchObject({
       code: 4,
       result: { code: "LOGINOM_RECOVERY_CONFIRMATION_REQUIRED" },
     })
-    expect(await command(["recover", "--acknowledge", "00000000-0000-0000-0000-000000000000"])).toMatchObject({
+    expect(
+      await command(["recover", "--acknowledge", "00000000-0000-0000-0000-000000000000"], "", strictRecovery),
+    ).toMatchObject({
       code: 3,
       result: { code: "LOGINOM_RECOVERY_CONFLICT" },
     })
-    expect(await command(["recover", "--acknowledge", id])).toMatchObject({ code: 0, result: { state: "ready" } })
-    expect((await recoveryStore(join(profile, "loginom/recovery"))).pending()).toEqual([])
+    expect(await command(["recover", "--acknowledge", id], "", strictRecovery)).toMatchObject({
+      code: 0,
+      result: { state: "ready" },
+    })
+    expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
     const next = await journal.begin("b".repeat(64), 2)
     await journal.settle(next, false)
-    expect(await command(["recover", "--acknowledge"])).toMatchObject({ code: 0, result: { state: "ready" } })
-    expect((await recoveryStore(join(profile, "loginom/recovery"))).pending()).toEqual([])
+    expect(await command(["recover", "--acknowledge"], "", strictRecovery)).toMatchObject({
+      code: 0,
+      result: { state: "ready" },
+    })
+    expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
+    const dropped = await journal.begin("c".repeat(64), 2)
+    await journal.settle(dropped, false)
+    const advisory = await command(["status"])
+    expect(advisory.code).toBe(0)
+    expect(advisory.result.state).toBe("ready")
+    expect(advisory.result.recoveries).toBeUndefined()
+    expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
     const run = Bun.spawn(
       [
         process.execPath,
@@ -417,7 +434,7 @@ test("management commands share durable setup and recovery semantics through the
       const toolFailure = invoke(true)
       const failureOutput = new Response(toolFailure.stdout).text()
       const failureErrors = new Response(toolFailure.stderr).text()
-      expect(await toolFailure.exited).toBe(1)
+      expect(await toolFailure.exited).toBe(0)
       const failureEvents = (await failureOutput)
         .trim()
         .split("\n")
@@ -427,8 +444,8 @@ test("management commands share durable setup and recovery semantics through the
         error: "private host probe failed",
         metadata: { isError: true },
       })
-      expect(failureEvents).toContainEqual(
-        expect.objectContaining({ type: "error", error: expect.objectContaining({ name: "CLI_TOOL_FAILED" }) }),
+      expect(failureEvents.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(
+        false,
       )
       expect(await failureErrors).not.toContain("private-setup-key")
       expect(await readdir(profile)).not.toContain(".writer")
@@ -459,7 +476,7 @@ test("management commands share durable setup and recovery semantics through the
           const child = invoke(true)
           const output = new Response(child.stdout).text()
           const errors = new Response(child.stderr).text()
-          expect(await child.exited).toBe(repair ? 0 : 1)
+          expect(await child.exited).toBe(0)
           const events = (await output)
             .trim()
             .split("\n")
@@ -467,7 +484,7 @@ test("management commands share durable setup and recovery semantics through the
           expect(events.filter((event) => event.type === "tool_use").map((event) => event.part.state.status)).toEqual(
             repair ? ["error", "completed"] : ["error"],
           )
-          expect(events.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(!repair)
+          expect(events.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(false)
           expect(await errors).not.toContain("private-setup-key")
           expect(await readdir(profile)).not.toContain(".writer")
         }
@@ -498,16 +515,13 @@ test("management commands share durable setup and recovery semantics through the
         const unresolved = invoke(true)
         const unresolvedOutput = new Response(unresolved.stdout).text()
         const unresolvedErrors = new Response(unresolved.stderr).text()
-        expect(await unresolved.exited).toBe(1)
+        expect(await unresolved.exited).toBe(unavailable ? 1 : 0)
         const unresolvedEvents = (await unresolvedOutput)
           .trim()
           .split("\n")
           .map((line) => JSON.parse(line))
-        expect(unresolvedEvents).toContainEqual(
-          expect.objectContaining({
-            type: "error",
-            error: expect.objectContaining({ name: "CLI_TOOL_FAILED" }),
-          }),
+        expect(unresolvedEvents.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(
+          unavailable,
         )
         if (unavailable) expect(unresolvedEvents.find((event) => event.type === "tool_use").part.tool).toBe("invalid")
         expect(await unresolvedErrors).not.toContain("private-setup-key")

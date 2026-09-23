@@ -152,12 +152,6 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
                 <Show when={form.state.view?.state === "recoverable-error" && !form.state.view?.recoveries?.length}>
                   <p role="alert">{language.t("loginom.runtimeFailed")}</p>
                 </Show>
-                <Show when={form.state.view?.recoveries?.length}>
-                  <p role="alert">{language.t("loginom.recoveryRequired")}</p>
-                  <Button type="button" variant="secondary" disabled={form.busy()} onClick={() => void form.recover()}>
-                    {language.t("loginom.acknowledgeRecovery")}
-                  </Button>
-                </Show>
                 <Show when={form.state.message}>
                   {(message) => (
                     <div

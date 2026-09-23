@@ -1,3 +1,5 @@
+// The settings recovery button is hidden while advisory recovery is the default.
+// This installed check does not apply until that button is shown again.
 import assert from "node:assert/strict"
 import { createRequire } from "node:module"
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"

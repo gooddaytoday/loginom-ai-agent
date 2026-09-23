@@ -64,6 +64,9 @@ test.each(["call", "tools", "admit", "interrupt"])(
         ...service,
         journal: await recoveryStore(join(directory, "recovery")),
         recoveries: new Map(),
+        resetRestarts() {},
+        markRuntimeStale() {},
+        async retireRuntime() {},
         async inputs(generation: number, chat: string, message: string, files: []) {
           return inputStore(join(directory, "inputs")).admit(`${generation}:${chat}`, message, files, "/user")
         },

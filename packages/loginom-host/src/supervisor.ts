@@ -193,5 +193,5 @@ export async function supervise(input: Launch) {
     await close()
     throw new Error("LOGINOM_HANDSHAKE_INVALID")
   }
-  return { ready, request, close }
+  return { ready, request, close, exited }
 }

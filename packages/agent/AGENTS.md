@@ -158,7 +158,7 @@ Plain async code should pass explicit context or stay inside an Effect fiber; do
 
 - Loginom preflight is mandatory for standalone run, while TUI without setup offers the shared interactive wizard and can continue an ordinary chat. Resume stdin after Clack/readline prompts before starting the TUI. Do not advertise Loginom tools without an active connection.
 
-- Standalone run must evaluate terminal tool outcomes before idle success. Correlate Loginom repairs by tool + operation_id, otherwise by tool + exact canonical arguments. Unrelated success must not clear failures; invalid remains unresolved without an explicit repair relationship. Keep permission/session errors independent and legacy exit behavior unchanged.
+- Standalone run must evaluate terminal tool outcomes before idle success. Ошибки инструментов `loginom_*` не попадают в `unresolved` и не дают `CLI_TOOL_FAILED`. Код выхода определяют провайдер, разрешения, невалидные вызовы и ошибки остальных инструментов. Для прочих инструментов успех с другими аргументами не снимает прежний отказ. Успех сценария evals считается по наличию `.lgp`: код 0 без пакета — это `no_artifact`.
 
 - Standalone full-file user references are persisted as byte snapshots before Loginom admission; references with URL query/range or fragment remain references and do not authorize whole-file transfer. `util/file-snapshot.ts` supplies bounded regular-file reads for this path and `run --file`, rejects FIFO without waiting for a writer, and detects size/mtime changes during the read. Do not snapshot paths returned by model tools as original user attachments.
 

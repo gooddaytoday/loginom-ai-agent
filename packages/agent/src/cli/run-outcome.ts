@@ -6,6 +6,9 @@ export function runToolOutcome() {
   return {
     observe(part: ToolPart) {
       if (part.state.status !== "completed" && part.state.status !== "error") return
+      // A failed Loginom scenario must not fail the whole run. Permission denials
+      // and invalid calls stay on their own tool names.
+      if (part.tool.startsWith("loginom_")) return
       const input = part.state.input
       const identity =
         part.tool.startsWith("loginom_") && typeof input.operation_id === "string" && input.operation_id
@@ -16,7 +19,6 @@ export function runToolOutcome() {
         unresolved.add(key)
         return
       }
-      if (part.tool.startsWith("loginom_") && part.state.metadata?.loginomPending === true) return
       unresolved.delete(key)
     },
     failed: () => unresolved.size > 0,

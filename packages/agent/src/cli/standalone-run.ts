@@ -49,7 +49,13 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     failure("CLI_CANCELLED", 130)
     return
   }
-  const host = await launchNodeHost({ ...bundle, root: paths.loginom, headless, environment: process.env })
+  const host = await launchNodeHost({
+    ...bundle,
+    root: paths.loginom,
+    headless,
+    environment: process.env,
+    strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
+  })
   const cleanup: { dispose?: () => Promise<void>; detach?: () => void } = {}
   try {
     if (signal?.aborted) throw Error("CLI_CANCELLED")

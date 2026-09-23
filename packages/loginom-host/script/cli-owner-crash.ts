@@ -41,7 +41,12 @@ const profile = join(directory, "profile")
 const network = disconnectNetwork
   ? await networkFault(config.loginom_url, process.env.LOGINOM_AI_AGENT_TEST_RELAY_HOST)
   : undefined
-const env = { ...process.env, LOGINOM_AI_AGENT_CLI_PROFILE: profile, LOGINOM_AI_AGENT_PURE: "1" }
+const env = {
+  ...process.env,
+  LOGINOM_AI_AGENT_CLI_PROFILE: profile,
+  LOGINOM_AI_AGENT_PURE: "1",
+  LOGINOM_AI_AGENT_STRICT_RECOVERY: "1",
+}
 const setup = Bun.spawn([executable, "loginom", "setup", "--stdin-json", "--format", "json"], {
   env,
   stdin: new Blob([

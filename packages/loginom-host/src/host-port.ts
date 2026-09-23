@@ -26,11 +26,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
   const pending = new Set<Promise<void>>()
   async function abandon(run: NonNullable<ReturnType<typeof runs.get>>) {
     for (const id of run.active) await service.journal.settle(id, false)
-    if (run.active.size) {
-      run.lease.holdRecovery()
-      service.recoveries.set(run.chat, run.lease)
-      run.active.clear()
-    }
+    const retained = [...run.active].filter((id) => service.journal.pending().includes(id))
+    run.active.clear()
+    if (!retained.length) return
+    run.lease.holdRecovery()
+    service.recoveries.set(run.chat, run.lease)
   }
   async function release(id: string, run: NonNullable<ReturnType<typeof runs.get>>) {
     await abandon(run)
@@ -69,6 +69,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           reply({ id: data.id, result: null })
           return
         }
+        await service.retireRuntime(chat)
+        service.resetRestarts(chat)
         runs.set(input.run, { chat, lease, calls: 0, dispatching: false, released: false, active: new Set() })
         reply({ id: data.id, result: { generation: lease.generation } })
         return
@@ -132,6 +134,9 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           throw new Error("LOGINOM_CALL_INVALID")
         const recovery = { id: undefined as string | undefined }
         try {
+          // A dead runtime is replaced before admission. Past the relaunch limit this
+          // is a known refusal, not an uncertain dispatch.
+          await service.runtime(run.lease.generation, run.chat)
           recovery.id = await service.journal.begin(run.chat, run.lease.generation)
           run.active.add(recovery.id)
           const runtime = await service.runtime(run.lease.generation, run.chat)
@@ -150,6 +155,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             throw new Error("LOGINOM_REPLY_INVALID")
           if (result.recoveryPending && !("activeWork" in result && result.activeWork === true)) {
             await abandon(run)
+            service.markRuntimeStale(run.chat)
           }
           if (result.recoveryPending === false) {
             // Only this owner and runtime can prove completion of its prior async work.
@@ -162,11 +168,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             }
           }
           reply({ id: data.id, result: result.result })
-        } catch {
+        } catch (error) {
+          if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
           // A journal write failure precedes runtime dispatch and cannot establish
           // an uncertain external operation without an admitted journal identity.
           if (!recovery.id) throw new Error("LOGINOM_HOST_REQUEST_FAILED")
           await abandon(run)
+          service.markRuntimeStale(run.chat)
           throw new Error("LOGINOM_CALL_UNCERTAIN")
         }
       } finally {

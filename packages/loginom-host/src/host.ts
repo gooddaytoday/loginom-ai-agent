@@ -14,17 +14,41 @@ export async function createLoginomHost(options: {
   codec: CredentialCodec
   environment?: NodeJS.ProcessEnv
   headless?: boolean
+  strictRecovery?: boolean
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
   const resources = options.resources
   const environment = { ...(options.environment ?? process.env) }
   const inputs = inputStore(join(root, "inputs"))
-  const journal = await recoveryStore(join(root, "recovery"))
+  const journal = await recoveryStore(join(root, "recovery"), { strict: options.strictRecovery === true })
   const generations = new Map<
     number,
     { connection: ActiveConnection; children: Map<string, Promise<Awaited<ReturnType<typeof supervise>>>> }
   >()
+  const restarts = new Map<string, number>()
+  const lost = new Set<string>()
+  const stale = new Set<string>()
+  type Runtime = Awaited<ReturnType<typeof supervise>>
+  function retain(
+    generation: { children: Map<string, Promise<Runtime>> },
+    chat: string,
+    child: Promise<Runtime>,
+  ) {
+    const tracked = child.then((runtime) => {
+      void runtime.exited.then(() => {
+        if (generation.children.get(chat) !== tracked) return
+        lost.add(chat)
+        generation.children.delete(chat)
+      })
+      return runtime
+    })
+    generation.children.set(chat, tracked)
+    tracked.catch(() => {
+      if (generation.children.get(chat) === tracked) generation.children.delete(chat)
+    })
+    return tracked
+  }
   async function launch(connection: ActiveConnection, chat: string, validation = false) {
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     return supervise({
@@ -60,8 +84,9 @@ export async function createLoginomHost(options: {
       },
       async prepare(connection) {
         const child = await launch(connection, "readiness")
-        const generation = { connection, children: new Map([["readiness", Promise.resolve(child)]]) }
+        const generation = { connection, children: new Map<string, Promise<Runtime>>() }
         generations.set(connection.generation, generation)
+        retain(generation, "readiness", Promise.resolve(child))
         return {
           async reset() {
             const results = await Promise.allSettled(
@@ -101,6 +126,26 @@ export async function createLoginomHost(options: {
     },
     journal,
     recoveries,
+    resetRestarts(chat: string) {
+      restarts.delete(chat)
+      lost.delete(chat)
+    },
+    markRuntimeStale(chat: string) {
+      stale.add(chat)
+    },
+    async retireRuntime(chat: string) {
+      if (!stale.delete(chat)) return
+      const closing: Promise<void>[] = []
+      for (const generation of generations.values()) {
+        const child = generation.children.get(chat)
+        if (!child) continue
+        generation.children.delete(chat)
+        closing.push(child.then((runtime) => runtime.close()).then(() => undefined, () => undefined))
+      }
+      await Promise.all(closing)
+      restarts.delete(chat)
+      lost.delete(chat)
+    },
     async interruptAll() {
       const results = await Promise.allSettled(
         [...generations.values()].flatMap((generation) =>
@@ -121,12 +166,13 @@ export async function createLoginomHost(options: {
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       const previous = current.children.get(chat)
       if (previous) return previous
-      const child = launch(current.connection, chat)
-      current.children.set(chat, child)
-      child.catch(() => {
-        if (current.children.get(chat) === child) current.children.delete(chat)
-      })
-      return child
+      if (lost.has(chat)) {
+        const count = restarts.get(chat) ?? 0
+        if (count >= 2) throw new Error("LOGINOM_RUNTIME_UNAVAILABLE")
+        restarts.set(chat, count + 1)
+        lost.delete(chat)
+      }
+      return retain(current, chat, launch(current.connection, chat))
     },
   }
 }

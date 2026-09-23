@@ -25,11 +25,11 @@ const runtime = {
 test("an unconfirmed dispatch survives process recreation; concurrent calls are not erased", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-recovery-"))
   try {
-    const journal = await recoveryStore(directory)
+    const journal = await recoveryStore(directory, { strict: true })
     const first = await journal.begin("a".repeat(64), 1)
     const second = await journal.begin("a".repeat(64), 1)
     await journal.settle(first, true)
-    expect((await recoveryStore(directory)).pending()).toEqual([second])
+    expect((await recoveryStore(directory, { strict: true })).pending()).toEqual([second])
     expect((await stat(join(directory, `${second}.json`))).mode & 0o777).toBe(0o600)
     expect(Object.keys(JSON.parse(await readFile(join(directory, `${second}.json`), "utf8"))).sort()).toEqual([
       "chat",
@@ -40,9 +40,9 @@ test("an unconfirmed dispatch survives process recreation; concurrent calls are 
     expect(journal.pending()).toEqual([second])
     const third = await journal.begin("a".repeat(64), 1)
     await journal.settle(third, true)
-    expect((await recoveryStore(directory)).pending()).toEqual([second])
+    expect((await recoveryStore(directory, { strict: true })).pending()).toEqual([second])
     await journal.acknowledge([second])
-    expect((await recoveryStore(directory)).pending()).toEqual([])
+    expect((await recoveryStore(directory, { strict: true })).pending()).toEqual([])
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
@@ -58,8 +58,8 @@ test("crash recovery gates a durable pending generation until explicit acknowled
     await store.savePending({ ...active, generation: 2, revision: 2, username: "other" })
     // Covers a crash after staging the new generation but before the active pointer.
     await store.stage({ ...active, generation: 2, revision: 2, username: "other" })
-    const marker = await (await recoveryStore(location)).begin("b".repeat(64), 1)
-    const recovered = await recoveryStore(location)
+    const marker = await (await recoveryStore(location, { strict: true })).begin("b".repeat(64), 1)
+    const recovered = await recoveryStore(location, { strict: true })
     const service = await connectionService(store, runtime, recovered)
     try {
       await service.settled()

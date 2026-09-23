@@ -18,11 +18,11 @@ function part(tool: string, input: Record<string, unknown>, failed: boolean): To
 
 test("a successful unrelated call cannot erase an unresolved failure", () => {
   const outcome = runToolOutcome()
-  outcome.observe(part("loginom_apply", { operation_id: "one", value: 1 }, true))
-  outcome.observe(part("loginom_read", { operation_id: "one", value: 1 }, false))
-  outcome.observe(part("loginom_apply", { operation_id: "two", value: 1 }, false))
+  outcome.observe(part("apply", { operation_id: "one", value: 1 }, true))
+  outcome.observe(part("read", { operation_id: "one", value: 1 }, false))
+  outcome.observe(part("apply", { operation_id: "two", value: 1 }, false))
   expect(outcome.failed()).toBe(true)
-  outcome.observe(part("loginom_apply", { operation_id: "one", value: 2 }, false))
+  outcome.observe(part("apply", { operation_id: "one", value: 1 }, false))
   expect(outcome.failed()).toBe(false)
 })
 
@@ -58,14 +58,22 @@ test("an arbitrary MCP operation_id does not imply the Loginom operation contrac
   expect(outcome.failed()).toBe(false)
 })
 
-test("a running retry is not evidence that the failed operation was repaired", () => {
+test("a Loginom tool error does not fail the run", () => {
+  const outcome = runToolOutcome()
+  outcome.observe(part("loginom_dock_artifact_deliver", { operation_id: "deliver" }, true))
+  expect(outcome.failed()).toBe(false)
+  outcome.observe(part("bash", { command: "ls" }, true))
+  expect(outcome.failed()).toBe(true)
+  outcome.observe(part("invalid", { tool: "loginom_missing", error: "not available" }, false))
+  expect(outcome.failed()).toBe(true)
+})
+
+test("a running Loginom retry does not fail the run", () => {
   const outcome = runToolOutcome()
   outcome.observe(part("loginom_apply", { operation_id: "one" }, true))
   const pending = part("loginom_apply", { operation_id: "one" }, false)
   if (pending.state.status !== "completed") throw Error("invalid fixture")
   pending.state.metadata.loginomPending = true
   outcome.observe(pending)
-  expect(outcome.failed()).toBe(true)
-  outcome.observe(part("loginom_apply", { operation_id: "one" }, false))
   expect(outcome.failed()).toBe(false)
 })

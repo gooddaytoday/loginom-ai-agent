@@ -6,7 +6,10 @@ import { join } from "node:path"
 type Entry = { id: string; chat: string; generation: number }
 
 // Written before dispatch. An absent reply never becomes permission to replay a mutation.
-export async function recoveryStore(directory: string) {
+// Strict mode keeps an uncertain dispatch until acknowledgement. Advisory mode drops it
+// so a failed scenario does not block the next call.
+export async function recoveryStore(directory: string, options?: { strict?: boolean }) {
+  const strict = options?.strict === true
   await mkdir(directory, { recursive: true, mode: 0o700 })
   const info = await lstat(directory)
   if (
@@ -59,6 +62,9 @@ export async function recoveryStore(directory: string) {
     entries.delete(entry.id)
     recovered.delete(entry.id)
   }
+  if (!strict) {
+    for (const entry of [...entries.values()]) await remove(entry)
+  }
   return {
     pending: () => [...recovered],
     async acknowledge(ids: readonly string[]) {
@@ -93,7 +99,7 @@ export async function recoveryStore(directory: string) {
       active.delete(id)
       const entry = entries.get(id)
       if (!entry) return
-      if (!certain) {
+      if (!certain && strict) {
         recovered.add(id)
         return
       }

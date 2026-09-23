@@ -11,6 +11,7 @@ export async function launchNodeHost(input: {
   resources: string
   headless: boolean
   environment?: NodeJS.ProcessEnv
+  strictRecovery?: boolean
 }) {
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
@@ -68,6 +69,7 @@ export async function launchNodeHost(input: {
         root: input.root,
         resources: input.resources,
         headless: input.headless,
+        ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
       },
       30_000,
     )

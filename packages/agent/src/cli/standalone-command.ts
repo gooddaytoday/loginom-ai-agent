@@ -80,6 +80,7 @@ export async function standaloneCommand(args: string[], paths: ReturnType<typeof
     resources: bundle.resources,
     headless: parsed.values.headless && !parsed.values["no-headless"],
     environment: process.env,
+    strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
   })
   try {
     const result = await loginomManagement(host, parsed.positionals[1], {

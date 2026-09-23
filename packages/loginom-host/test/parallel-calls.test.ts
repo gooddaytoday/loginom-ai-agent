@@ -65,7 +65,13 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
       password: "",
     })
     await store.activate(1)
-    const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
+    const host = await createLoginomHost({
+      root,
+      resources,
+      codec: credentials("linux"),
+      environment: {},
+      strictRecovery: true,
+    })
     const requests = new EventEmitter()
     const replies = new EventEmitter()
     const port = loginomHostPort(
