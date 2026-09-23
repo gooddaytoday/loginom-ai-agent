@@ -59,10 +59,23 @@ function shouldProxy(hostname: string, port: number) {
     const proxyHostname = parsed ? parsed[1] : proxy
     const proxyPort = parsed ? Number.parseInt(parsed[2]) : 0
     if (proxyPort && proxyPort !== port) return true
-
-    if (!/^[.*]/.test(proxyHostname)) return hostname !== proxyHostname
-    return !hostname.endsWith(proxyHostname.startsWith("*") ? proxyHostname.slice(1) : proxyHostname)
+    // `d` и `.d` закрывают сам домен и поддомены, как fetch в Bun 1.3 и Node 24.
+    // Голое имя не суффикс: `example.test` не исключает `notexample.test`.
+    return !ruleExcludes(hostname, proxyHostname)
   })
+}
+
+function ruleExcludes(hostname: string, rule: string) {
+  if (rule.startsWith("*.")) {
+    const suffix = rule.slice(2)
+    return hostname === suffix || hostname.endsWith(`.${suffix}`)
+  }
+  if (rule.startsWith(".")) {
+    const suffix = rule.slice(1)
+    return hostname === suffix || hostname.endsWith(rule)
+  }
+  if (rule.startsWith("*")) return hostname.endsWith(rule.slice(1))
+  return hostname === rule || hostname.endsWith(`.${rule}`)
 }
 
 function env(key: string) {

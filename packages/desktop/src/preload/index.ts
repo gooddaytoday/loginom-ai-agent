@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron"
 import type { ElectronAPI, WslServersEvent } from "./types"
+import type { SystemProxyStatus } from "@loginom-ai-agent/app/system-proxy"
 import type { UpdaterState } from "@loginom-ai-agent/app/updater"
 
 const updaterCallbacks = new Set<(state: UpdaterState) => void>()
@@ -21,6 +22,13 @@ const api: ElectronAPI = {
   },
   killSidecar: () => ipcRenderer.invoke("kill-sidecar"),
   awaitInitialization: () => ipcRenderer.invoke("await-initialization"),
+  getSystemProxyStatus: () => ipcRenderer.invoke("get-system-proxy-status"),
+  setSystemProxyEnabled: (enabled) => ipcRenderer.invoke("set-system-proxy-enabled", enabled),
+  onSystemProxyStatus: (callback) => {
+    const handler = (_event: unknown, status: SystemProxyStatus) => callback(status)
+    ipcRenderer.on("system-proxy-status", handler)
+    return () => ipcRenderer.removeListener("system-proxy-status", handler)
+  },
   wslServers: {
     getState: () => ipcRenderer.invoke("wsl-servers-get-state"),
     subscribe: (cb) => {

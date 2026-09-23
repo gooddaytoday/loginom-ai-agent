@@ -299,6 +299,9 @@ export const SettingsGeneral: Component = () => {
   const GeneralSection = () => (
     <div class="flex flex-col gap-1">
       <SettingsList>
+        <Show when={platform.getSystemProxyStatus}>
+          <SystemProxySetting />
+        </Show>
         <SettingsRow
           title={language.t("settings.general.row.language.title")}
           description={language.t("settings.general.row.language.description")}
@@ -773,6 +776,33 @@ export const SettingsGeneral: Component = () => {
         </Show>
       </div>
     </div>
+  )
+}
+
+const SystemProxySetting: Component = () => {
+  const platform = usePlatform()
+  const language = useLanguage()
+  const [status] = createResource(() => platform.getSystemProxyStatus?.())
+  return (
+    <Show when={status()}>
+      {(current) => (
+        <SettingsRow
+          title={language.t("systemProxy.settings.title")}
+          description={`${language.t("systemProxy.settings.description")} ${language.t(
+            current().state === "applied" ? "systemProxy.state.applied" : `systemProxy.state.${current().state}`,
+            { address: current().http ?? current().https ?? "" },
+          )}`}
+        >
+          <Switch
+            data-action="settings-system-proxy"
+            checked={current().enabled}
+            onChange={(checked) => {
+              void platform.setSystemProxyEnabled?.(checked).then(() => platform.restart())
+            }}
+          />
+        </SettingsRow>
+      )}
+    </Show>
   )
 }
 

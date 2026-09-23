@@ -3,6 +3,7 @@ import type { DesktopMenuAction } from "@loginom-ai-agent/app/desktop-menu"
 import type { WslServersPlatform } from "@loginom-ai-agent/app/wsl/types"
 import type { UpdaterState } from "@loginom-ai-agent/app/updater"
 import type { DesktopNativeBundle } from "@loginom-ai-agent/app/i18n/desktop-native"
+import type { SystemProxyStatus } from "@loginom-ai-agent/app/system-proxy"
 export type {
   WslDistroProbe,
   WslInstalledDistro,
@@ -47,6 +48,9 @@ export type ElectronAPI = {
   loginom: Loginom.API
   killSidecar: () => Promise<void>
   awaitInitialization: () => Promise<ServerReadyData>
+  getSystemProxyStatus: () => Promise<SystemProxyStatus>
+  setSystemProxyEnabled: (enabled: boolean) => Promise<void>
+  onSystemProxyStatus: (callback: (status: SystemProxyStatus) => void) => () => void
   wslServers: WslServersAPI
   updater: UpdaterAPI
   consumeInitialDeepLinks: () => Promise<string[]>

@@ -16,7 +16,11 @@ type Logger = {
   error(message: string, meta?: Record<string, unknown>): void
 }
 
-export async function startBackgroundCli(logger: Logger, shellStateHome?: string) {
+export async function startBackgroundCli(
+  logger: Logger,
+  shellStateHome?: string,
+  proxyEnvironment?: Record<string, string>,
+) {
   const bundled = app.isPackaged
     ? join(process.resourcesPath, executableName())
     : join(root, "../../resources", executableName())
@@ -40,7 +44,7 @@ export async function startBackgroundCli(logger: Logger, shellStateHome?: string
   })
 
   const daemonStateHome = found?.stateHome ?? stateHome
-  const url = await run(binary, ["service", "start"], logger, { stateHome: daemonStateHome })
+  const url = await run(binary, ["service", "start"], logger, { stateHome: daemonStateHome, proxyEnvironment })
   const password = await run(binary, ["service", "get", "password"], logger, {
     redact: true,
     stateHome: daemonStateHome,
@@ -81,10 +85,10 @@ async function run(
   binary: string,
   args: string[],
   logger: Logger,
-  options: { redact?: boolean; stateHome?: string } = {},
+  options: { redact?: boolean; stateHome?: string; proxyEnvironment?: Record<string, string> } = {},
 ) {
   logger.log("v2 CLI command started", { binary, args })
-  const env = { ...process.env }
+  const env = { ...process.env, ...options.proxyEnvironment }
   if (options.stateHome === undefined) delete env.XDG_STATE_HOME
   else env.XDG_STATE_HOME = options.stateHome
   return execFileAsync(binary, args, { env, windowsHide: true }).then(

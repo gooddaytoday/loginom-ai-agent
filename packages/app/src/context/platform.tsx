@@ -7,6 +7,7 @@ import { ServerConnection } from "./server"
 import type { WslServersPlatform } from "../wsl/types"
 import type { UpdaterPlatform } from "../updater"
 import type { DraftStore } from "@/utils/draft-store"
+import type { SystemProxyStatus } from "@/system-proxy"
 
 type PickerPaths = string | string[] | null
 type OpenDirectoryPickerOptions = { title?: string; multiple?: boolean }
@@ -123,6 +124,15 @@ type PlatformBase = {
 
   /** Record a fatal renderer error in platform logs (desktop only) */
   recordFatalRendererError?(error: FatalRendererErrorLog): Promise<void>
+
+  /** Current system-proxy decision (desktop only) */
+  getSystemProxyStatus?(): Promise<SystemProxyStatus>
+
+  /** Persist whether startup should read the operating-system proxy (desktop only) */
+  setSystemProxyEnabled?(enabled: boolean): Promise<void>
+
+  /** Subscribe to system-proxy status updates (desktop only) */
+  onSystemProxyStatus?(callback: (status: SystemProxyStatus) => void): () => void
 }
 
 export type Platform = PlatformBase &

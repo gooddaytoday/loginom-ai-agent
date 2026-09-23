@@ -52,6 +52,8 @@ jobs:
           node node_modules/playwright/cli.js install chromium
       - name: Source checks
         run: bun packages/desktop/scripts/check-macos.ts "$RUNNER_TEMP/source-checks.json"
+      - name: Read system proxy
+        run: bun packages/loginom-host/script/system-proxy-smoke.ts
       - name: Build and verify both products
         env:
           CANDIDATE_VERSION: ${{ inputs.version || format('0.1.4-macos.{0}', github.run_number) }}

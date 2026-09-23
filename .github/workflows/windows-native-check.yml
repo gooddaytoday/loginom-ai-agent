@@ -39,3 +39,5 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Native host tests failed" }
       - name: Verify native profile
         run: ./script/test-windows-profile.ps1
+      - name: Read system proxy
+        run: bun packages/loginom-host/script/system-proxy-smoke.ts

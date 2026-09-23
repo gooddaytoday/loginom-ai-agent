@@ -8,7 +8,7 @@ import { homedir, tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
 import type { Event } from "electron"
-import { app, BrowserWindow } from "electron"
+import { app, BrowserWindow, dialog, session } from "electron"
 import { Product, productName } from "@loginom-ai-agent/product"
 
 import { Cause, Deferred, Effect, Fiber } from "effect"
@@ -34,6 +34,18 @@ import {
   spawnLocalServer,
   type SidecarListener,
 } from "./server"
+import { probeProxyUrl } from "@loginom-ai-agent/loginom-host/system-proxy"
+import {
+  formatSystemProxyLog,
+  loopbackNoProxy,
+  publishSystemProxyStatus,
+  startSystemProxyDetection,
+  statusFromResult,
+  subscribeSystemProxyStatus,
+  type SystemProxyDetection,
+} from "./system-proxy"
+import { SYSTEM_PROXY_ENABLED_KEY } from "./store-keys"
+import { getStore } from "./store"
 import { setupAutoUpdater, showUpdaterDialog } from "./updater"
 import { safeWebContentsURL } from "./window-state"
 import {
@@ -87,23 +99,17 @@ async function killSidecar() {
 }
 
 function ensureLoopbackNoProxy() {
-  const loopback = ["127.0.0.1", "localhost", "::1"]
-  const upsert = (key: string) => {
-    const items = (process.env[key] ?? "")
-      .split(",")
-      .map((value: string) => value.trim())
-      .filter((value: string) => Boolean(value))
+  for (const key of ["NO_PROXY", "no_proxy"]) process.env[key] = loopbackNoProxy(process.env[key])
+}
 
-    for (const host of loopback) {
-      if (items.some((value: string) => value.toLowerCase() === host)) continue
-      items.push(host)
-    }
-
-    process.env[key] = items.join(",")
+function systemProxyEnabled() {
+  const flag = process.env.LOGINOM_AI_AGENT_SYSTEM_PROXY
+  if (typeof flag === "string" && ["off", "0", "false"].includes(flag.trim().toLowerCase())) return false
+  try {
+    return getStore().get(SYSTEM_PROXY_ENABLED_KEY) !== false
+  } catch {
+    return true
   }
-
-  upsert("NO_PROXY")
-  upsert("no_proxy")
 }
 
 const main = Effect.gen(function* () {
@@ -162,7 +168,9 @@ const main = Effect.gen(function* () {
   let loginomStarting: ReturnType<typeof desktopLoginom> | undefined
   let serverStarting: ReturnType<typeof spawnLocalServer> | undefined
   let stopping: Promise<void> | undefined
+  let systemProxy: SystemProxyDetection | undefined
   const stopSidecars = () => {
+    systemProxy?.stop()
     stopping ??= (async () => {
       try {
         // Startup can still be admitting the backend when Cmd+Q arrives.
@@ -206,6 +214,16 @@ const main = Effect.gen(function* () {
     app.quit()
     return
   }
+  systemProxy = startSystemProxyDetection({
+    environment: process.env,
+    enabled: systemProxyEnabled(),
+  })
+  subscribeSystemProxyStatus((status) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isDestroyed()) continue
+      win.webContents.send("system-proxy-status", status)
+    }
+  })
   startSession()
 
   const shellEnv = preferAppEnv(app.getPath("userData"))
@@ -262,6 +280,11 @@ const main = Effect.gen(function* () {
   const serverReady = Deferred.makeUnsafe<ServerReadyData, unknown>()
 
   yield* Effect.promise(() => app.whenReady())
+  try {
+    systemProxy?.useChromium((url) => session.defaultSession.resolveProxy(url))
+  } catch (error) {
+    logger.warn("system proxy browser probe unavailable", error)
+  }
 
   if (!TEST_ONBOARDING) migrate()
   yield* Effect.promise(() => cleanupStoreFiles(app.getPath("userData"))).pipe(
@@ -324,6 +347,7 @@ const main = Effect.gen(function* () {
     setNativeTranslations: (bundle) => {
       if (setNativeTranslations(bundle)) createMenu(menuDeps)
     },
+    systemProxyEnabled,
   })
   registerWslIpcHandlers(wslServers)
   void updater.start()
@@ -340,13 +364,30 @@ const main = Effect.gen(function* () {
 
   const loadingTask = yield* Effect.gen(function* () {
     logger.log("sidecar connection started", { version: SIDECAR_VERSION })
+    const proxyResult = yield* Effect.promise(() => systemProxy?.result ?? Promise.resolve(undefined))
+    if (proxyResult) {
+      logger.log(formatSystemProxyLog(proxyResult))
+      publishSystemProxyStatus(statusFromResult(proxyResult, systemProxyEnabled()))
+      const address = proxyResult.summary.http ?? proxyResult.summary.https
+      if (proxyResult.state === "applied" && address)
+        void probeProxyUrl(`http://${address}`, 1500).then((status) => {
+          if (status !== "closed" && status !== "timeout") return
+          logger.log("system proxy: unreachable", { proxy: address })
+          publishSystemProxyStatus({
+            ...statusFromResult(proxyResult, systemProxyEnabled()),
+            notices: [...proxyResult.notices, { code: "unreachable", detail: address }],
+          })
+        })
+    }
 
     ensureLoopbackNoProxy()
     useEnvProxy()
 
     if (SIDECAR_VERSION === "v2") {
       logger.log("spawning v2 sidecar")
-      const sidecar = yield* Effect.promise(() => startBackgroundCli(logger, shellEnv?.XDG_STATE_HOME))
+      const sidecar = yield* Effect.promise(() =>
+        startBackgroundCli(logger, shellEnv?.XDG_STATE_HOME, proxyResult?.environment),
+      )
       yield* Deferred.succeed(serverReady, {
         url: sidecar.url,
         username: sidecar.username,
@@ -392,6 +433,7 @@ const main = Effect.gen(function* () {
     logger.log("spawning sidecar", { url })
     serverStarting = spawnLocalServer(hostname, port, password, {
       userDataPath: app.getPath("userData"),
+      proxyEnvironment: proxyResult?.environment,
       loginom,
       onStdout: (message) => writeLog("server", message),
       onStderr: (message) => writeLog("server", message),
@@ -448,10 +490,45 @@ const main = Effect.gen(function* () {
   if (windows.length) createMenu(menuDeps)
 })
 
-Effect.runFork(
+const fiber = Effect.runFork(
   main.pipe(
     Effect.tapCause((cause) =>
       Effect.sync(() => writeLog("main", "main process failed", { cause: Cause.pretty(cause) }, "error")),
     ),
   ),
 )
+
+void Effect.runPromise(
+  Fiber.join(fiber).pipe(
+    Effect.catchCause((cause) =>
+      Effect.sync(() => {
+        exitFailedStartup(cause)
+      }),
+    ),
+  ),
+)
+
+function exitFailedStartup(cause: Cause.Cause<unknown>) {
+  const message = Cause.pretty(cause)
+  try {
+    writeLog("main", "main process failed", { cause: message }, "error")
+  } catch {
+    // Журнал мог ещё не открыться: ранний сбой всё равно должен завершить процесс.
+  }
+  process.stderr.write(`main process failed\n${message}\n`)
+  if (BrowserWindow.getAllWindows().length > 0) return
+  try {
+    if (app.isPackaged) {
+      const russian = app.getLocale().toLowerCase().startsWith("ru")
+      dialog.showErrorBox(
+        "Loginom AI Agent",
+        russian
+          ? "Приложение не смогло запуститься. Подробности записаны в журнал."
+          : "The application could not start. Details were written to the log.",
+      )
+    }
+  } catch {
+    // Диалог недоступен до готовности приложения.
+  }
+  app.exit(1)
+}

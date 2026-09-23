@@ -95,8 +95,11 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     // Configure the existing v1 backend only after the profile and Loginom preflight.
     process.env.LOGINOM_AI_AGENT_DISABLE_AUTOUPDATE = "1"
     process.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH = "1"
+    const { applyCliSystemProxy, publishCliProxyToast } = await import("./standalone-proxy")
+    await applyCliSystemProxy()
     LoginomHost.connect(host.port)
     const { AppRuntime } = await import("../effect/app-runtime")
+    if (mode === "tui") await publishCliProxyToast()
     cleanup.dispose = async () => {
       const { HttpApiApp } = await import("../server/routes/instance/httpapi/server")
       try {

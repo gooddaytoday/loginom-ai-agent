@@ -4,6 +4,7 @@ import {
   ACCEPTED_FILE_EXTENSIONS,
   AppBaseProviders,
   AppInterface,
+  SystemProxyNotice,
   loadLocaleDict,
   normalizeLocale,
   type Locale,
@@ -283,6 +284,10 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
       await window.api.setDefaultServerUrl(url)
     },
 
+    getSystemProxyStatus: () => window.api.getSystemProxyStatus(),
+    setSystemProxyEnabled: (enabled) => window.api.setSystemProxyEnabled(enabled),
+    onSystemProxyStatus: (callback) => window.api.onSystemProxyStatus(callback),
+
     wslServers: wslServersApi,
 
     getDisplayBackend: async () => {
@@ -431,6 +436,7 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
         locale={locale.latest}
         onNativeTranslations={(bundle) => void window.api.setNativeTranslations(bundle).catch(() => undefined)}
       >
+        <SystemProxyNotice />
         <Show when={true}>{(_) => <App />}</Show>
       </AppBaseProviders>
     </PlatformProvider>
