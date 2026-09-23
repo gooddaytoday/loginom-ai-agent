@@ -5,7 +5,8 @@ import WebSocket from "ws"
 import { APICallError } from "ai"
 import { ProviderError } from "@/provider/error"
 import { errorMessage } from "@/util/error"
-import { ProxyEnv } from "@/util/proxy-env"
+import { describeProxyFailure } from "@/util/proxy-error"
+import { websocketTransport } from "@/util/ws-transport"
 import { isRecord } from "@/util/record"
 
 export const PROTOCOL_HEADER = "responses_websockets=2026-02-06"
@@ -82,12 +83,8 @@ export function connectResponsesWebSocket(options: ConnectResponsesWebSocketOpti
     }
     delete headers["content-length"]
 
-    // Bun does not apply HTTP(S)_PROXY to WebSockets unless the proxy is supplied explicitly.
-    const proxy =
-      typeof Bun === "undefined"
-        ? undefined
-        : ProxyEnv.getProxyForUrl(options.url.replace(/^wss:/, "https:").replace(/^ws:/, "http:"))
-    const connect = { headers, ...(proxy ? { proxy } : {}) }
+    // Bun needs an explicit proxy. Node's ws package ignores HTTP(S)_PROXY unless an agent is set.
+    const connect = { headers, ...websocketTransport(options.url) }
     const socket = new WebSocket(options.url, connect)
     const timeout = options.timeout
       ? setTimeout(() => {
@@ -114,7 +111,9 @@ export function connectResponsesWebSocket(options: ConnectResponsesWebSocketOpti
     function onError(error: unknown) {
       socket.on("error", () => {})
       cleanup()
-      reject(error instanceof Error ? error : new Error(errorMessage(error), { cause: error }))
+      const code = describeProxyFailure(error)
+      const message = error instanceof Error ? error.message : errorMessage(error)
+      reject(new Error(code && !message.includes(code) ? `${message} (${code})` : message, { cause: error }))
     }
 
     function onClose(code: number, reason: Buffer) {

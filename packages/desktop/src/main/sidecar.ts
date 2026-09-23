@@ -1,4 +1,5 @@
 import type { HostPort } from "@loginom-ai-agent/loginom-host/host-port"
+import { assignProxyEnvironment, loopbackNoProxy } from "./proxy-env"
 import { exitOnFatalErrors } from "./fatal-exit"
 import * as http from "node:http"
 import * as tls from "node:tls"
@@ -21,7 +22,8 @@ type StartCommand = {
 }
 
 type StopCommand = { type: "stop" }
-type SidecarCommand = StartCommand | StopCommand
+type ProxyCommand = { type: "proxy"; environment: Record<string, string> }
+type SidecarCommand = StartCommand | StopCommand | ProxyCommand
 
 type SidecarMessage =
   | { type: "ready" }
@@ -47,6 +49,12 @@ parentPort.on("message", (event) => {
   if (!command) return
   if (command.type === "stop") {
     void stop()
+    return
+  }
+  if (command.type === "proxy") {
+    assignProxyEnvironment(process.env, command.environment)
+    ensureLoopbackNoProxy()
+    useEnvProxy()
     return
   }
   void start(command, event.ports?.[0])
@@ -102,23 +110,7 @@ function prepareSidecarEnv(password: string, userDataPath: string) {
 }
 
 function ensureLoopbackNoProxy() {
-  const loopback = ["127.0.0.1", "localhost", "::1"]
-  const upsert = (key: string) => {
-    const items = (process.env[key] ?? "")
-      .split(",")
-      .map((value: string) => value.trim())
-      .filter((value: string) => Boolean(value))
-
-    for (const host of loopback) {
-      if (items.some((value: string) => value.toLowerCase() === host)) continue
-      items.push(host)
-    }
-
-    process.env[key] = items.join(",")
-  }
-
-  upsert("NO_PROXY")
-  upsert("no_proxy")
+  for (const key of ["NO_PROXY", "no_proxy"]) process.env[key] = loopbackNoProxy(process.env[key])
 }
 
 function useSystemCertificates() {
@@ -142,8 +134,14 @@ function useEnvProxy() {
 
 function parseCommand(value: unknown): SidecarCommand | undefined {
   if (!value || typeof value !== "object") return
-  const command = value as Partial<StartCommand | StopCommand>
+  const command = value as { type?: string; environment?: unknown; hostname?: unknown; port?: unknown; password?: unknown; userDataPath?: unknown }
   if (command.type === "stop") return { type: "stop" }
+  if (command.type === "proxy" && command.environment && typeof command.environment === "object") {
+    const environment = Object.fromEntries(
+      Object.entries(command.environment).flatMap(([key, item]) => (typeof item === "string" ? [[key, item]] : [])),
+    )
+    return { type: "proxy", environment }
+  }
   if (command.type !== "start") return
   if (typeof command.hostname !== "string") return
   if (typeof command.port !== "number") return

@@ -11,6 +11,8 @@ import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { setForceFocus } from "./debug"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
 import { getStore, removeStoreFileIfEmpty } from "./store"
+import { SYSTEM_PROXY_ENABLED_KEY } from "./store-keys"
+import { currentSystemProxyStatus, publishSystemProxyStatus } from "./system-proxy"
 import {
   getPinchZoomEnabled,
   getWindowID,
@@ -52,6 +54,7 @@ type Deps = {
   exportDebugLogs: () => Promise<string>
   recordFatalRendererError: (error: FatalRendererError) => Promise<void> | void
   setNativeTranslations: (bundle: DesktopNativeBundle) => void
+  systemProxyEnabled: () => boolean
 }
 
 export function registerIpcHandlers(deps: Deps) {
@@ -64,6 +67,11 @@ export function registerIpcHandlers(deps: Deps) {
 
   ipcMain.handle("kill-sidecar", () => deps.killSidecar())
   ipcMain.handle("await-initialization", () => deps.awaitInitialization())
+  ipcMain.handle("get-system-proxy-status", () => ({ ...currentSystemProxyStatus(), enabled: deps.systemProxyEnabled() }))
+  ipcMain.handle("set-system-proxy-enabled", (_event: IpcMainInvokeEvent, enabled: boolean) => {
+    getStore().set(SYSTEM_PROXY_ENABLED_KEY, enabled === true)
+    publishSystemProxyStatus({ ...currentSystemProxyStatus(), enabled: enabled === true })
+  })
   ipcMain.handle("consume-initial-deep-links", () => deps.consumeInitialDeepLinks())
   ipcMain.handle("get-default-server-url", () => deps.getDefaultServerUrl())
   ipcMain.handle("set-default-server-url", (_event: IpcMainInvokeEvent, url: string | null) =>

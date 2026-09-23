@@ -1,4 +1,5 @@
 export { AppBaseProviders, AppInterface } from "./app"
+export { SystemProxyNotice } from "./components/system-proxy-notice"
 export { useLayout } from "./context/layout"
 export { useServerSDK } from "./context/server-sdk"
 export { useServerSync } from "./context/server-sync"

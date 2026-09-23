@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./system-proxy": "./src/system-proxy/index.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {

@@ -5,6 +5,8 @@ import { Product } from "@loginom-ai-agent/product"
 export async function standaloneModels(args: string[]) {
   process.env.LOGINOM_AI_AGENT_DISABLE_AUTOUPDATE = "1"
   process.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH = "1"
+  const { applyCliSystemProxy } = await import("./standalone-proxy")
+  await applyCliSystemProxy()
   const { AppRuntime } = await import("../effect/app-runtime")
   try {
     if (standaloneCancellation()?.aborted) throw new Error("CLI_CANCELLED")
