@@ -171,13 +171,13 @@
   },
   "packages/loginom-runtime/client/lib/node-apply.mjs": {
     "baseHash": "d9f4f12730a3195e893cd04244fa7d53cf7c16604e49cae3334a013903c1dcb3",
-    "hash": "9b1a8f6fab94eabe7118b5b8acdd1cc1448978245daad8587ff5063fe6f7b170",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
+    "hash": "15510617c4456311804b023265766e3845bd03fb79ad5ed60f59ddbbe942f831",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Accept a verified discarded import draft after a configure readiness timeout and ask to repeat the same settings on the same node."
   },
   "packages/loginom-runtime/client/lib/text-import-node.mjs": {
     "baseHash": "c8df9578829bbde45d6f8513f5cfcc721019c701fbdf94f80de59479ef63c7ef",
-    "hash": "42ea058ba1ed06a06bffe8525cda9f9fcbb4d1efa41f8d7640f3ec39398665e8",
-    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path."
+    "hash": "9914dd751a5690d8b159e4a227171744e86f3070bb65b07edacf61b0109ae8bc",
+    "reason": "Resolve original CSV labels using observed source identities and discard only the owned import draft after a known binding refusal, preserving uncertainty and a corrected existing-node request path. Discard only the owned import draft after a configure readiness timeout without transport uncertainty."
   },
   "packages/loginom-runtime/client/lib/text-import-procedure.mjs": {
     "baseHash": "5a72ca1d8972a313737cf73713e2a3e2c219acb99d44cef550fa495826eecc00",
@@ -186,8 +186,8 @@
   },
   "packages/loginom-runtime/client/test/node-apply.test.mjs": {
     "baseHash": "09e457cc476dc16b0790fad7d1742737cdbc59563a27594624b25056781bd00c",
-    "hash": "a62915b85e2567d35e3a0c1e6498e3f47c224b2ef0222dbc650080e1f1f5b147",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines."
+    "hash": "b4e7ed678d375ec88d952f49792565ec1a1001d7e4837fb6c1fe0e5963610dfa",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines. Cover the readiness draft-discard proof matrix."
   },
   "packages/loginom-runtime/client/test/text-import-patch.test.mjs": {
     "baseHash": "8742700e801f3157a7f596e5c2d64468440de27223df210e551d0f9bd23251aa",

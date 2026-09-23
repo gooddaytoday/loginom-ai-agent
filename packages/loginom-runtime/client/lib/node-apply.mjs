@@ -184,7 +184,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       const refusal=error.nodePhaseRefusal;
       const importClosed=refusal?.proof?.closed;
       if(name==='configure'&&request.target.type==='imports.text'
-        &&refusal?.verification==='text_import_binding_draft_discarded'&&refusal.phase===name
+        &&['text_import_binding_draft_discarded','text_import_readiness_draft_discarded'].includes(refusal?.verification)&&refusal.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
         &&refusal.settings_unchanged===true&&importClosed?.verified===true&&importClosed.cleanup_complete===true
         &&importClosed.draft_discarded===true&&importClosed.settings_applied===false
@@ -193,7 +193,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&['document_id','workflow_id','node_id'].every(k=>importClosed.node_context[k]===state.node?.[k])) {
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
-        state.correctable_import_request=true;
+        state.correctable_import_request=refusal.verification==='text_import_readiness_draft_discarded'?'readiness':'binding';
       }
       if(name==='configure'&&request.target.type==='transform.calculator'
         &&(request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0
@@ -354,7 +354,9 @@ export async function applyNode({request, operation, handlers, drivers, record,
       ...(state.verified_refusal&&state.cleanup_complete&&!state.pending&&state.node
         ?{next_step:correctNodeRequest(request,state.node)}:{}),
       ...(state.correctable_import_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
-        instruction:'The import wizard draft was discarded and the SAME node is back in the graph. Correct settings using the observed source names/labels and submit a NEW operation_id with target:'+JSON.stringify({kind:'existing',type:'imports.text',ref:state.node})+'. Keep the verified upload source, inputs:[] and mappings:[]. Supply source, format and columns again because the rejected draft was not saved. Do not recreate the node or reupload the file.'}}:{}),
+        instruction:'The import wizard draft was discarded and the SAME node is back in the graph. '+(state.correctable_import_request==='readiness'
+          ?'The wizard did not reach an expected state, so no setting was saved. Submit a NEW operation_id with the SAME settings and target:'
+          :'Correct settings using the observed source names/labels and submit a NEW operation_id with target:')+JSON.stringify({kind:'existing',type:'imports.text',ref:state.node})+'. Keep the verified upload source, inputs:[] and mappings:[]. Supply source, format and columns again because the rejected draft was not saved. Do not recreate the node or reupload the file.'}}:{}),
       ...(state.correctable_calculator_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'Retained calculator settings were independently rechecked unchanged. Correct expressions and submit a NEW operation_id with the SAME existing target '+JSON.stringify(state.node)+'. '+(state.calculator_default_expression?'The restored node has the blank default Expr1. Correct the formula by updating target:{kind:"existing",name:"Expr1"} inside the first expression with replace:false (name/label/type may be changed). replace:true replaces an INPUT field, not the saved expression. Do not leave this blank default behind. ':'To execute/read without changing formulas use parameters:{expressions:[]}; to edit a retained expression use target:{kind:"existing",name:"existing_name"} inside that expression. ')+'Keep existing connections: inputs:[] and mappings:[]. Do not create another node.'}}:{}),
       pending_phase:state.pending?.phase??null,error:{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),

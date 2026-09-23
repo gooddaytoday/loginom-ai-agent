@@ -1,7 +1,7 @@
 import {verifyUploadLineage} from './upload-lineage.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
-import {createNodeProcedure} from './node-procedure.mjs';
+import {createNodeProcedure,NodeReadinessTimeout} from './node-procedure.mjs';
 import {configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError} from './text-import-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {readOutputDefinitionPages,readImportDefinitionPages} from './import-definition-pages.mjs';
@@ -164,10 +164,13 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         } catch(error) {
           // Binding rejects after completed observations, before editing any
           // column. Close only this operation's draft; never hide transport loss.
-          if(!(error instanceof ImportColumnBindingError)||operation.transportUncertain)throw error;
+          // Таймаут готовности — чтение без мутаций после подтверждённых жестов;
+          // закрытие черновика не сохраняет его частичную настройку.
+          const readiness=error instanceof NodeReadinessTimeout;
+          if(!(error instanceof ImportColumnBindingError||readiness)||operation.transportUncertain)throw error;
           const closed=await closePreparedWizard(channel);
-          error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,
-            cleanup_complete:true,settings_unchanged:true,verification:'text_import_binding_draft_discarded',proof:{closed}};
+          error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+            verification:readiness?'text_import_readiness_draft_discarded':'text_import_binding_draft_discarded',proof:{closed}};
           throw error;
         }
       },
