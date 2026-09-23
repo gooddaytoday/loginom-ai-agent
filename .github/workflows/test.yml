@@ -54,7 +54,12 @@ jobs:
         working-directory: packages/desktop
         run: |
           bun test/loginom/no-proxy-contract.mjs
-          ELECTRON_RUN_AS_NODE=1 ./node_modules/electron/dist/electron test/loginom/no-proxy-contract.mjs
+          # bun install links Electron before its postinstall downloads the binary.
+          electron_dir="$(node -p "require('path').dirname(require.resolve('electron/package.json'))")"
+          if [ ! -x "$electron_dir/dist/electron" ]; then
+            node "$electron_dir/install.js"
+          fi
+          ELECTRON_RUN_AS_NODE=1 "$electron_dir/dist/electron" test/loginom/no-proxy-contract.mjs
 
       - name: Configure git identity
         run: |
