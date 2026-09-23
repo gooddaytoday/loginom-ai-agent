@@ -52,6 +52,7 @@
 
 - Import metadata text fill and Enter commit both use the bounded same-editor refresh route. A proved pre-gesture refusal may reobserve only the same owner, column, property, original value, draft value and schema; changed editor state or unknown effect must stop.
 
+- Loginom 7.4.2 может сам закрыть редактор типа/вида данных колонки импорта сразу после открытия. Переоткрывать его можно, только если квитанция двойного клика показала этот редактор, а два одинаковых наблюдения — его отсутствие при неизменных name/label/type/data_kind/used; не больше двух переоткрытий, затем `NodeReadinessTimeout`.
 - Таймаут одного чтения внутри наблюдения узловой процедуры не обрезается ниже 5000 мс: исчерпание бюджета наблюдения даёт `NodeReadinessTimeout`, а не `MCP error -32001`. Настоящий транспортный таймаут чтения остаётся ошибкой транспорта.
 - `dock_node_resume` отклоняется при допуске, если продолжение заведомо невозможно; прежняя попытка и исход сохраняются.
 - `dock_action_run` при висящей `node.apply` возвращает её исход, а не фантомный `OPERATION_STILL_PENDING`; `requestFailure` при висящей операции отдаёт пустой `available_actions`. Разбор: [ABC configure editor diagnosis](../../docs/testing/loginom-ai-agent/abc-configure-editor-diagnosis.md).

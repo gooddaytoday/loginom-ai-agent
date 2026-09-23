@@ -2,6 +2,7 @@
 // and the independent auditor are complete this module is not catalog-admitted.
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
 import {readImportDefinitionPages} from './import-definition-pages.mjs';
+import {NodeReadinessTimeout} from './node-procedure.mjs';
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const types = { integer: 'Целый', real: 'Вещественный', string: 'Строковый', boolean: 'Логический', datetime: 'Дата/Время' };
 const kinds = ['Неопределенное', 'Непрерывный', 'Дискретный'];
@@ -184,6 +185,31 @@ export async function openImportColumnEditor(channel,initial,index,property) {
     resolve:state=>({verb:'double_click',ref:state.wizard.import_columns.fields.find(f=>f.index===index).cell_refs[property]})});
 }
 
+// Loginom 7.4.2 может закрыть только что открытый редактор колонки отложенной
+// перерисовкой грида. Переоткрытие допустимо, лишь когда квитанция жеста
+// показала редактор этой колонки, а затем он исчез при неизменной колонке
+// в двух одинаковых наблюдениях; иначе остаётся обычный таймаут готовности.
+export async function openImportColumnEditorBound(channel,read,initial,index,property,name) {
+  const field=state=>state.wizard?.import_columns?.fields?.find(f=>f.index===index);
+  const values=state=>Object.fromEntries(['name','label','type','data_kind','used'].map(k=>[k,field(state)?.[k]]));
+  const before=values(initial);
+  const bound=e=>e?.status==='observed'&&e.index===index&&e.property===property&&e.name===name;
+  const open=state=>{
+    const e=state.wizard.import_column_editor;
+    return bound(e)&&e.picker_status==='observed'&&state.ui.elements.some(item=>item.ref===e.picker_ref&&item.allowed_actions?.includes('click'));
+  };
+  const closed=state=>state.wizard.import_column_editor==null&&field(state)?.status==='observed'&&same(values(state),before);
+  let state=initial;
+  for(let reopened=0;;reopened++) {
+    const receipt=await openImportColumnEditor(channel,state,index,property);
+    const shown=bound(receipt?.output?.wizard?.import_column_editor);
+    state=await read('text_import_format','column editor: '+index+'/'+property,s=>open(s)||shown&&closed(s));
+    if(open(state))return state;
+    if(reopened>=2)throw new NodeReadinessTimeout('import column editor keeps closing: '+index+'/'+property);
+    state=await read('text_import_format','column editor closed unchanged: '+index+'/'+property,closed,{confirmIdentity:values});
+  }
+}
+
 // A menu choice is bound to the same live editor, not merely its option label.
 export async function selectImportColumnOption(channel,initial,index,property,label) {
   requireValue(['type','data_kind'].includes(property),'Unsupported import option property');
@@ -218,8 +244,8 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   let currentOwner = owner;
   let columnOffset=0;
   const identity = c => ({ node: c?.node?.tid, path: c?.path?.map(x => ({ tid: x.tid, label: x.label })) });
-  const read = async (stage, condition = 'stage controls ready', ready = () => true) => {
-    const s = await channel.observe({ condition: stage + ': ' + condition,
+  const read = async (stage, condition = 'stage controls ready', ready = () => true, options = {}) => {
+    const s = await channel.observe({ condition: stage + ': ' + condition, ...options,
       ...(fieldsOnly&&stage==='text_import_format'?{importColumnPage:{offset:columnOffset,limit:8}}:{}),ready: state => {
       const w = state.wizard;
       if (w?.status === 'observed' && !same(identity(w.owner_context), identity(currentOwner))) {
@@ -432,13 +458,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
         }
         requireValue(s.ui.elements.find(e=>e.ref===c.cell_refs[property])?.interaction?.state==='point_observed','Import column reveal budget exceeded');
       }
-      await openImportColumnEditor(channel,s,i,property);
-      const editing = await read('text_import_format', 'column editor: ' + i + '/' + property, state => {
-        const e = state.wizard.import_column_editor;
-        return e?.status === 'observed' && e.index === i && e.property === property
-          && e.name === wanted.name && e.picker_status === 'observed'
-          && state.ui.elements.some(item=>item.ref===e.picker_ref&&item.allowed_actions?.includes('click'));
-      });
+      const editing = await openImportColumnEditorBound(channel,read,s,i,property,wanted.name);
       let editor = editing.wizard.import_column_editor;
       requireValue(editor?.status === 'observed' && editor.index === i && editor.property === property
         && editor.name === wanted.name && editor.picker_status === 'observed', 'Column editor binding is incomplete');
