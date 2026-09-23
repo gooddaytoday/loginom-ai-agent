@@ -11,7 +11,7 @@ import type { Event } from "electron"
 import { app, BrowserWindow } from "electron"
 import { Product, productName } from "@loginom-ai-agent/product"
 
-import { Deferred, Effect, Fiber } from "effect"
+import { Cause, Deferred, Effect, Fiber } from "effect"
 import contextMenu from "electron-context-menu"
 
 import type { ServerReadyData } from "../preload/types"
@@ -19,7 +19,7 @@ import { checkAppExists, resolveAppPath } from "./apps"
 import { CHANNEL } from "./constants"
 import { registerIpcHandlers, sendDeepLinks, sendMenuCommand } from "./ipc"
 import { forwardInitializationFailure } from "./initialization"
-import { exportDebugLogs, initCrashReporter, initLogging, startNetLog, write as writeLog } from "./logging"
+import { exportDebugLogs, initCrashReporter, initLogging, startNetLog, startSession, write as writeLog } from "./logging"
 import { createMenu } from "./menu"
 import {
   finishFirstLaunchOnboarding,
@@ -206,6 +206,7 @@ const main = Effect.gen(function* () {
     app.quit()
     return
   }
+  startSession()
 
   const shellEnv = preferAppEnv(app.getPath("userData"))
 
@@ -253,6 +254,7 @@ const main = Effect.gen(function* () {
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
       setAppQuitting()
+      writeLog("main", "signal received", { signal })
       void stopSidecars().finally(() => app.quit())
     })
   }
@@ -391,9 +393,9 @@ const main = Effect.gen(function* () {
     serverStarting = spawnLocalServer(hostname, port, password, {
       userDataPath: app.getPath("userData"),
       loginom,
-      onStdout: (message) => writeLog("server", "stdout", { message }),
-      onStderr: (message) => writeLog("server", "stderr", { message }, "warn"),
-      onExit: (code) => writeLog("utility", "sidecar exited", { code }, "warn"),
+      onStdout: (message) => writeLog("server", message),
+      onStderr: (message) => writeLog("server", message),
+      onExit: (code) => writeLog("server", "sidecar exited", { code }, code === 0 ? "info" : "error"),
     })
     const { listener, health } = yield* Effect.promise(() => serverStarting!)
     server = listener
@@ -422,7 +424,13 @@ const main = Effect.gen(function* () {
     )
 
     logger.log("loading task finished")
-  }).pipe(forwardInitializationFailure(serverReady), Effect.forkChild)
+  }).pipe(
+    Effect.tapCause((cause) =>
+      Effect.sync(() => writeLog("main", "initialization failed", { cause: Cause.pretty(cause) }, "error")),
+    ),
+    forwardInitializationFailure(serverReady),
+    Effect.forkChild,
+  )
 
   yield* Fiber.await(loadingTask)
   if (stopping) return
@@ -440,4 +448,10 @@ const main = Effect.gen(function* () {
   if (windows.length) createMenu(menuDeps)
 })
 
-Effect.runFork(main)
+Effect.runFork(
+  main.pipe(
+    Effect.tapCause((cause) =>
+      Effect.sync(() => writeLog("main", "main process failed", { cause: Cause.pretty(cause) }, "error")),
+    ),
+  ),
+)

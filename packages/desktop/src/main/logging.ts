@@ -1,12 +1,16 @@
+import { productSlug } from "@loginom-ai-agent/product"
 import { MainLogger } from "electron-log"
 import log from "electron-log/main.js"
 import { app, crashReporter, netLog, shell } from "electron"
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs"
 import { ZipWriter, BlobWriter, BlobReader } from "@zip.js/zip.js"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 import { homedir } from "node:os"
+import { CHANNEL } from "./constants"
+import { logRetention } from "./log-retention"
 
 const MAX_LOG_AGE_DAYS = 7
+const MAX_LOG_BYTES = 100 * 1024 * 1024
 const TAIL_LINES = 1000
 const EXPORT_WINDOW = 24 * 60 * 60 * 1000
 const MAX_EXPORT_FILE_SIZE = 50 * 1024 * 1024
@@ -15,6 +19,7 @@ const NET_LOG_SIZE = 20 * 1024 * 1024
 let root = ""
 let run = ""
 let netLogPath: string | undefined
+let retention: ReturnType<typeof logRetention> | undefined
 
 let logger: MainLogger
 export const getLogger = () => logger
@@ -28,9 +33,34 @@ export function initLogging() {
       `${safeLogName(message?.scope ?? (message?.variables?.processType === "renderer" ? "renderer" : "main"))}.log`,
     )
   log.initialize({ preload: false, spyRendererConsole: true })
+  log.errorHandler.startCatching()
   initConsoleTransport()
-  cleanup()
   return (logger = log)
+}
+
+export function startSession() {
+  retention = logRetention({
+    root,
+    run,
+    crashDumps: app.getPath("crashDumps"),
+    legacy: serverLogRoots().map((dir) => join(dir, "loginom-ai-agent.log")),
+    maxBytes: MAX_LOG_BYTES,
+    maxAge: MAX_LOG_AGE_DAYS * 24 * 60 * 60 * 1000,
+    reserve: { log: log.transports.file.maxSize, netlog: NET_LOG_SIZE },
+  })
+  const archive = log.transports.file.archiveLogFn
+  log.transports.file.archiveLogFn = (file) => {
+    archive(file)
+    retention?.prune()
+  }
+  const previous = retention.start()
+  if (previous) write("crash", "previous session ended unexpectedly", { run: previous.run, dumps: previous.dumps }, "error")
+  app.once("quit", (_event, exitCode) => endSession("app quit", { exitCode }))
+}
+
+export function endSession(reason: string, extra?: Record<string, unknown>) {
+  write("main", reason, extra)
+  retention?.end()
 }
 
 export function initCrashReporter() {
@@ -115,21 +145,6 @@ function safeLogName(name: string) {
   return name.replace(/[^a-z0-9_.-]/gi, "_") || "main"
 }
 
-function cleanup() {
-  const dir = root || dirname(log.transports.file.getFile().path)
-  const cutoff = Date.now() - MAX_LOG_AGE_DAYS * 24 * 60 * 60 * 1000
-
-  for (const entry of readdirSync(dir)) {
-    const file = join(dir, entry)
-    try {
-      const info = statSync(file)
-      if (info.mtimeMs < cutoff) rmSync(file, { recursive: true, force: true })
-    } catch {
-      continue
-    }
-  }
-}
-
 function manifest() {
   return {
     generated: new Date().toISOString(),
@@ -151,7 +166,7 @@ function manifest() {
 
 function serverLogRoots() {
   const xdgData = process.env.XDG_DATA_HOME || join(homedir(), ".local", "share")
-  return [...new Set([join(xdgData, "loginom-ai-agent", "log"), join(app.getPath("userData"), "loginom-ai-agent", "log")])]
+  return [join(xdgData, productSlug(CHANNEL), "log")]
 }
 
 type Entry = { name: string; path?: string; data?: Buffer }

@@ -1,5 +1,5 @@
 import type { HostPort } from "@loginom-ai-agent/loginom-host/host-port"
-
+import { exitOnFatalErrors } from "./fatal-exit"
 import * as http from "node:http"
 import * as tls from "node:tls"
 
@@ -36,6 +36,8 @@ type ParentPort = {
 type Listener = {
   stop(close?: boolean): void | Promise<void>
 }
+
+exitOnFatalErrors("sidecar")
 
 const parentPort = getParentPort()
 let listener: Listener | undefined
@@ -94,6 +96,8 @@ function prepareSidecarEnv(password: string, userDataPath: string) {
     LOGINOM_AI_AGENT_SERVER_USERNAME: "loginom-ai-agent",
     LOGINOM_AI_AGENT_SERVER_PASSWORD: password,
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
+    LOGINOM_AI_AGENT_PRINT_LOGS: "1",
+    LOGINOM_AI_AGENT_DISABLE_LOG_FILE: "1",
   })
 }
 

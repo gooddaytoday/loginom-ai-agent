@@ -65,7 +65,8 @@ export function minimumLogLevel() {
 }
 
 export function loggers() {
-  return process.env.LOGINOM_AI_AGENT_PRINT_LOGS === "1" ? [fileLogger(), stderrLogger] : [fileLogger()]
+  const file = process.env.LOGINOM_AI_AGENT_DISABLE_LOG_FILE === "1" ? [] : [fileLogger()]
+  return process.env.LOGINOM_AI_AGENT_PRINT_LOGS === "1" ? [...file, stderrLogger] : file
 }
 
 export * as Logging from "./logging"
