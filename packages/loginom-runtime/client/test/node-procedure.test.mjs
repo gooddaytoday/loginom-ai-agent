@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createNodeProcedure } from '../lib/node-procedure.mjs';
 import { validateTextImportRequest } from '../lib/text-import-procedure.mjs';
 
-function fixture({ recordFailure, executeFailure, changedDocument, foreignReceipt, movingEpoch, dialogsAtRead, readRefusal, wait = async () => {}, staleReads = 0, staleEffect = false, loadingSamples = 0, maxSteps = 8, signal, sharedOperation, now = () => 1, monotonicNow } = {}) {
+function fixture({ recordFailure, executeFailure, changedDocument, foreignReceipt, movingEpoch, dialogsAtRead, readRefusal, onRead, wait = async () => {}, staleReads = 0, staleEffect = false, loadingSamples = 0, maxSteps = 8, signal, sharedOperation, now = () => 1, monotonicNow } = {}) {
   const events = [], records = []; let reads = 0;
   const operation = sharedOperation ?? { id: 'parent', action: { action_key: 'node.import.configure', revision: '1' },
     deadline: 10000, checkpoint: { workflow_ref: { prefix: 'MF;TF-1', tab_tid: 'tab' }, document_id: 'doc' } };
@@ -15,8 +15,9 @@ function fixture({ recordFailure, executeFailure, changedDocument, foreignReceip
     targetOrigin: 'http://example.test', targetBuild: '7.4.2',
     record: async entry => { events.push(entry.phase); if (recordFailure && entry.phase === recordFailure) throw new Error('disk failure'); records.push(entry); return structuredClone(entry); },
     wrapMutation: (code, options) => { events.push('wrapped'); return { code, options }; },
-    execute: async code => {
+    execute: async (code, options) => {
       if (typeof code === 'string') { reads++;
+        onRead?.(options);
         const refusal=readRefusal?.(reads);if(refusal)return refusal;
         if(reads%2===0 && reads<=staleReads*2)return {status:'NOT_APPLIED',action_key:'workspace.observe',phase:'observing',effect_possible:staleEffect,cleanup_complete:true,error:{code:'UI_ROOT_STALE'}};
         const output = structuredClone(state);
@@ -156,6 +157,17 @@ test('stable DOM cannot satisfy a pending semantic condition', async () => {
 test('readiness timeout names the missing result and invalidates old refs', async () => {
   const f = fixture(); await f.channel.observe({ condition: 'button usable', ready: s => s.ui.elements.some(e => e.ref === 'ui-button') });
   await assert.rejects(f.channel.observe({ condition: 'column editor bound', ready: () => false }), /readiness timeout: column editor bound/);
+  await assert.rejects(f.channel.act({ verb: 'click', ref: 'ui-button' }), /fresh internal observation/);
+  assert.ok(!f.events.includes('mutated'));
+});
+
+test('an observation ending mid-read reports readiness timeout, not a clipped transport timeout', async () => {
+  let time = 1;
+  const f = fixture({ now: () => time, monotonicNow: () => time, wait: async ms => { time += ms; },
+    onRead: options => { if (options.timeout < 200) throw new Error('MCP error -32001: Request timed out'); time += 200; } });
+  await assert.rejects(f.channel.observe({ condition: 'column editor: 3/data_kind', ready: () => false, timeoutMs: 1500 }),
+    /readiness timeout: column editor: 3\/data_kind/);
+  assert.equal(f.records.filter(r => r.phase === 'node_observation_timeout').length, 1);
   await assert.rejects(f.channel.act({ verb: 'click', ref: 'ui-button' }), /fresh internal observation/);
   assert.ok(!f.events.includes('mutated'));
 });

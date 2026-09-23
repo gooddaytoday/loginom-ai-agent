@@ -51,3 +51,5 @@
 - Compact node configuration may consume the shared 600000 ms total allowance; do not impose a separate 300000 ms setup cutoff. Execution remains bounded by its cap and the remaining total deadline; output read/restoration also consume that original remainder. Do not sum phase maxima, extend pending deadlines or change full diagnostic explicit budgets.
 
 - Import metadata text fill and Enter commit both use the bounded same-editor refresh route. A proved pre-gesture refusal may reobserve only the same owner, column, property, original value, draft value and schema; changed editor state or unknown effect must stop.
+
+- Таймаут одного чтения внутри наблюдения узловой процедуры не обрезается ниже 5000 мс: исчерпание бюджета наблюдения даёт `NodeReadinessTimeout`, а не `MCP error -32001`. Настоящий транспортный таймаут чтения остаётся ошибкой транспорта.

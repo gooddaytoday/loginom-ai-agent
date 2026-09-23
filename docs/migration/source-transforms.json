@@ -196,8 +196,8 @@
   },
   "packages/loginom-runtime/client/lib/node-procedure.mjs": {
     "baseHash": "eb08dda1ea023c1df95bac5efd4c6bccf314bea277f2d4bafd9396bec4ee94ff",
-    "hash": "9e56d2eae27d3b8100c1f0d6ffde7351cae100439e5296beb53d79d9d65f72fe",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Preserve refused native observations without granting a usable snapshot or permitting a gesture. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines."
+    "hash": "5bb25314fcd135ac5b4f4ac26d240198d429fa04762ad78b55e7be779edf2ecf",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Preserve refused native observations without granting a usable snapshot or permitting a gesture. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines. Give each observation read at least 5000 ms instead of the remaining readiness budget, so an expiring observation reports a readiness timeout rather than an MCP transport timeout."
   },
   "packages/loginom-runtime/client/lib/user-preview-budget.mjs": {
     "baseHash": "b0f8bf12969340df0456c27bffdac2e5e102a2e1520ba75176a4851f8162799f",
@@ -241,8 +241,8 @@
   },
   "packages/loginom-runtime/client/test/node-procedure.test.mjs": {
     "baseHash": "91f5b67c0bd4c21a12d143eb78c6a5700812d40b3d5d5403cd0164731e9b514f",
-    "reason": "Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Verify refusal journaling and absence of mutation authority for unverified or foreign previews. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines.",
-    "hash": "d6bb677c140b7f166adab227a17712b0d848aaebe6163d38d950cf8e9be732b1"
+    "reason": "Bound node completion and column Apply/Cancel wait for loading masks using the remaining parent deadline, with unchanged owner verification and no repeated gesture; cover minute-long loading, deadline expiry and foreign ownership. Verify refusal journaling and absence of mutation authority for unverified or foreign previews. Keep shared node deadlines under concurrent load and permit only proven no-effect time-scan rereads with fresh binding; preserve unknown effects and total deadlines. Cover an observation that expires in the middle of a read.",
+    "hash": "469223ad8c087d5cd87861fac0e25106d8b2b31ebfdc78df610636397fc04f81"
   },
   "packages/loginom-runtime/client/lib/node-preview-schema.mjs": {
     "baseHash": "36f345b3e26e04dc8d65340a8f5e54b86da128b6a5cb994f0c45da61473b2c38",

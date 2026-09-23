@@ -40,6 +40,10 @@ export class NodeProcedureStepError extends Error {
   }
 }
 
+// Остаток бюджета наблюдения бывает короче самого чтения; обрезанный до него
+// таймаут выдаёт исчерпание ожидания за потерю транспорта.
+const MIN_OBSERVATION_READ_MS = 5000;
+
 const canonical = value => Array.isArray(value) ? value.map(canonical)
   : value && typeof value === 'object'
     ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
@@ -201,6 +205,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const started = now(), monotonicStarted = monotonicNow();
       const observationNow = () => started + monotonicNow() - monotonicStarted;
       const deadline = Math.min(operation.deadline, started + timeoutMs);
+      const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
       let result, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
       try {
       for (let sample = 0; sample < 80; sample++) {
@@ -213,7 +218,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const roots = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
           ...boundOptions,
           discover_roots: true, expected_origin: targetOrigin, expected_build: targetBuild }),
-        { timeout: Math.min(35000, Math.max(1, deadline - observationNow())) });
+        { timeout: readTimeout() });
         if (roots.status !== 'SUCCEEDED') {
           if (timeScanRefusal(roots,'workspace.observe')) {
             await entry('node_observation_scan_retried',{step,sample,internal_operation_id:id,
@@ -264,20 +269,20 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           ...(importColumnPage===undefined?{}:{import_column_page:importColumnPage}),
           ...(outputColumnPage===undefined?{}:{output_column_page:outputColumnPage}),
           ...(tableFormatPage===undefined?{}:{table_format_page:tableFormatPage}) }),
-        { timeout: Math.min(35000, Math.max(1, deadline - observationNow())) });
+        { timeout: readTimeout() });
         if(result.status==='SUCCEEDED'&&readMissingValues&&result.output.wizard?.stage==='missing_values'&&result.output.ui.dialogs.length===1){
           // Ext's message box has no root data-tid. Re-read its observed portal;
           // native field ownership and exact prompt controls are checked below.
           result=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
             root_ref:result.output.ui.dialogs[0].ref,expected_origin:targetOrigin,expected_build:targetBuild}),
-          {timeout:Math.min(35000,Math.max(1,deadline-observationNow()))});
+          {timeout:readTimeout()});
         }
         if(result.status==='SUCCEEDED' && wizardConfirmationOwner(result.output,wizardConfirmation)) {
           // The native message box is a portal outside the wizard subtree.
           const dialog=result.output.ui.dialogs[0];
           result=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
             root_ref:dialog.ref,expected_origin:targetOrigin,expected_build:targetBuild}),
-          {timeout:Math.min(35000,Math.max(1,deadline-observationNow()))});
+          {timeout:readTimeout()});
         }
         if (result.status !== 'SUCCEEDED') {
           // A wall-clock scan can expire under contention without producing
@@ -310,14 +315,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw error;
         }
         if(readPreview){
-          result.output.node_preview_schema=await execute(makeNodePreviewSchemaCode(preparedNodeContext),{timeout:Math.min(35000,Math.max(1,deadline-observationNow()))});
+          result.output.node_preview_schema=await execute(makeNodePreviewSchemaCode(preparedNodeContext),{timeout:readTimeout()});
         }
         if(readFilter){
-          result.output.node_filter=await execute(makeFilterContextCode(preparedNodeContext),{timeout:Math.min(35000,Math.max(1,deadline-observationNow()))});
+          result.output.node_filter=await execute(makeFilterContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_filter.node_context&&JSON.stringify(canonical(result.output.node_filter.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Native filter context changed during observation');
         }
         if(readMissingValues){
-          result.output.node_missing_values=await execute(makeMissingValuesContextCode(preparedNodeContext),{timeout:Math.min(35000,Math.max(1,deadline-observationNow()))});
+          result.output.node_missing_values=await execute(makeMissingValuesContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_missing_values.node_context&&JSON.stringify(canonical(result.output.node_missing_values.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Native missing values context changed during observation');
         }
         try {
@@ -339,7 +344,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           [readCollapse,'node_collapse',makeCollapseContextCode], [readDateTime,'node_date_time',makeDateTimeContextCode], [readDuplicates,'node_duplicates',makeDuplicatesContextCode], [readUnion,'node_union',makeUnionContextCode], [readJoin,'node_join',makeJoinContextCode], [readCalculator,'node_calculator',makeCalculatorContextCode], [readGrouping,'node_grouping',makeGroupingContextCode], [readReplacement,'node_replacement',makeReplacementContextCode], [readSorting,'node_sorting',makeSortingContextCode], [readReform,'node_reform',makeReformContextCode]]) {
           if (!requested) continue;
           if (observationNow() >= deadline) break;
-          const native=await execute(makeCode(preparedNodeContext),{timeout:Math.min(35000,Math.max(1,deadline-observationNow()))});
+          const native=await execute(makeCode(preparedNodeContext),{timeout:readTimeout()});
           result.output[key]=native;
           if(native.node_context && JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
             throw new Error('Native process/output context changed during observation');
@@ -348,7 +353,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           if(observationNow()>=deadline)break;
           result.output.node_table_request=structuredClone(tablePage);
           result.output.node_table=await execute(makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page),
-            {timeout:Math.min(35000,Math.max(1,deadline-observationNow()))});
+            {timeout:readTimeout()});
         }
         if(observationNow()>=deadline)break;
         if(tableDialog) {
