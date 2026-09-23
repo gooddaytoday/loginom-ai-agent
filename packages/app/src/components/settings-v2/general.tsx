@@ -69,6 +69,39 @@ const soundSettings = {
   },
 } as const
 
+const SystemProxySetting: Component = () => {
+  const platform = usePlatform()
+  const language = useLanguage()
+  const [status] = createResource(() => platform.getSystemProxyStatus?.())
+  const stateText = () => {
+    const current = status()
+    if (!current) return ""
+    const address = current.http ?? current.https ?? ""
+    if (current.state === "applied") return language.t("systemProxy.state.applied", { address })
+    if (current.state === "off") return language.t("systemProxy.state.off")
+    if (current.state === "environment") return language.t("systemProxy.state.environment")
+    if (current.state === "failed") return language.t("systemProxy.state.failed")
+    return language.t("systemProxy.state.direct")
+  }
+  return (
+    <Show when={platform.getSystemProxyStatus}>
+      <SettingsRowV2
+        title={language.t("systemProxy.settings.title")}
+        description={`${language.t("systemProxy.settings.description")} ${stateText()}`.trim()}
+      >
+        <div data-action="settings-system-proxy">
+          <Switch
+            checked={status()?.enabled !== false}
+            onChange={(checked) => {
+              void platform.setSystemProxyEnabled?.(checked).then(() => platform.restart())
+            }}
+          />
+        </div>
+      </SettingsRowV2>
+    </Show>
+  )
+}
+
 const PermissionScopeSetting: Component<{ controller: PermissionScopeController }> = (props) => {
   const language = useLanguage()
   return (
@@ -327,6 +360,8 @@ export const SettingsGeneralV2: Component<{
   const GeneralSection = () => (
     <div class="settings-v2-section">
       <SettingsListV2>
+        <SystemProxySetting />
+
         <LanguageSetting />
 
         <PermissionScopeSetting controller={permissionScope} />

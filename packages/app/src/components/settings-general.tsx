@@ -783,26 +783,31 @@ const SystemProxySetting: Component = () => {
   const platform = usePlatform()
   const language = useLanguage()
   const [status] = createResource(() => platform.getSystemProxyStatus?.())
+  const current = () => status()
+  const stateText = () => {
+    const value = current()
+    if (!value) return ""
+    const address = value.http ?? value.https ?? ""
+    if (value.state === "applied") return language.t("systemProxy.state.applied", { address })
+    if (value.state === "off") return language.t("systemProxy.state.off")
+    if (value.state === "environment") return language.t("systemProxy.state.environment")
+    if (value.state === "failed") return language.t("systemProxy.state.failed")
+    return language.t("systemProxy.state.direct")
+  }
   return (
-    <Show when={status()}>
-      {(current) => (
-        <SettingsRow
-          title={language.t("systemProxy.settings.title")}
-          description={`${language.t("systemProxy.settings.description")} ${language.t(
-            current().state === "applied" ? "systemProxy.state.applied" : `systemProxy.state.${current().state}`,
-            { address: current().http ?? current().https ?? "" },
-          )}`}
-        >
-          <Switch
-            data-action="settings-system-proxy"
-            checked={current().enabled}
-            onChange={(checked) => {
-              void platform.setSystemProxyEnabled?.(checked).then(() => platform.restart())
-            }}
-          />
-        </SettingsRow>
-      )}
-    </Show>
+    <SettingsRow
+      title={language.t("systemProxy.settings.title")}
+      description={`${language.t("systemProxy.settings.description")} ${stateText()}`.trim()}
+    >
+      <div data-action="settings-system-proxy">
+        <Switch
+          checked={current()?.enabled !== false}
+          onChange={(checked) => {
+            void platform.setSystemProxyEnabled?.(checked).then(() => platform.restart())
+          }}
+        />
+      </div>
+    </SettingsRow>
   )
 }
 
