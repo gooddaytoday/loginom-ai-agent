@@ -238,6 +238,17 @@ test('background cancellation holds the browser gate until cleanup and explicit 
  assert.equal(f.calls.filter(x=>x==='create').length,1);assert.equal(f.calls.filter(x=>x==='configure').length,1);assert.equal(f.calls.filter(x=>x==='finish').length,1);
 });
 
+test('an unresumable pending configure is refused at admission without a phantom running attempt',async()=>{
+ const f=fixture();f.handler.configure=async()=>{f.calls.push('configure');throw Error('Node procedure readiness timeout: editor; no mutation was authorized')};
+ f.runtime.startNodeApply(request());
+ const stopped=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+ assert.equal(stopped.outcome.status,'AMBIGUOUS');assert.equal(stopped.progress.pending_phase,'configure');
+ assert.throws(()=>f.runtime.startNodeApply({operation_id:'apply'},{resume:true}),/unresolved phase/);
+ const status=f.runtime.nodeApplyStatus('apply');
+ assert.equal(status.attempt,1);assert.equal(status.state,'settled');assert.equal(status.error,null);assert.deepEqual(status.outcome,stopped.outcome);
+ assert.equal(f.calls.filter(x=>x==='configure').length,1);
+});
+
 test('background failed worker is settled and cannot silently restart or accept a changed handler',async()=>{
  const f=fixture();f.failRecord('prepared');f.runtime.startNodeApply(request());
  const failed=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});assert.equal(failed.state,'settled');assert.equal(failed.error.code,'NODE_WORKER_REJECTED');

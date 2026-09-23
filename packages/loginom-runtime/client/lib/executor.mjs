@@ -1682,7 +1682,20 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (!operation || pending !== operation) return view(operation);
     return view(operation, await reconcilePending());
   };
+  const nodeResumeRefusal='Resume requires the original inspected node checkpoint without an unresolved phase';
+  const nodeResumeBlocked=operation=>{
+    const configureContinuation=operation?.nodeApply?.pending?.phase==='configure'
+      &&operation.nodeApply.request.target.type==='transform.date_time'&&typeof operation.nodeApplyDrivers?.verifyPendingConfigure==='function';
+    return !operation||pending!==operation||!configureContinuation&&(!!operation.nodeApply?.pending||!operation.cleanupConfirmed);
+  };
   const nodeJobs=createNodeOperationRunner({run:(request,options)=>runtime.runNodeApply(request,options),
+    admitResume:id=>{
+      const operation=operations.get(id),phase=operation?.nodeApply?.pending?.phase,drivers=operation?.nodeApplyDrivers;
+      // Эти фазы сначала сверяют собственные квитанции; итоговую проверку делает runNodeApply.
+      if(phase==='input_mapping'&&drivers?.recoverInputMapping||phase==='output_mapping'&&drivers?.recoverOutputMapping
+        ||['workflow','target'].includes(phase))return;
+      if(nodeResumeBlocked(operation))throw new Error(nodeResumeRefusal);
+    },
     validate:request=>{const h=validateNodeApplyRequest(request,nodeApplyHandlers).handler;return h.output_wizard==='separate'?JSON.stringify({revision:h.revision,output_wizard:'separate'}):h.revision;},
     progress:id=>{
       const state=operations.get(id)?.nodeApply;
@@ -2137,10 +2150,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         }finally{running=false;}
       }
       if(resume&&['workflow','target'].includes(operation?.nodeApply?.pending?.phase))await inspectApply(operation);
-      const configureContinuation=resume&&operation?.nodeApply?.pending?.phase==='configure'
-        &&request.target.type==='transform.date_time'&&typeof operation.nodeApplyDrivers?.verifyPendingConfigure==='function';
-      if(resume&&(!operation||pending!==operation||!configureContinuation&&(operation.nodeApply?.pending||!operation.cleanupConfirmed)))
-        throw new Error('Resume requires the original inspected node checkpoint without an unresolved phase');
+      if(resume&&nodeResumeBlocked(operation))throw new Error(nodeResumeRefusal);
       running=true;
       try {
         if(!operation){

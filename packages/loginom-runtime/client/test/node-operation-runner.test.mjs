@@ -35,6 +35,20 @@ test('ID-only resume retains the immutable original request and validates the cu
  assert.equal(calls.length,2);
 });
 
+test('resume admission refusal keeps the settled attempt and is not consulted for running or completed jobs',async()=>{
+ const admitted=[];let outcome={status:'AMBIGUOUS'},release;
+ const runner=createNodeOperationRunner({validate:()=>1,progress:()=>null,
+  admitResume:id=>{admitted.push(id);if(outcome.status==='AMBIGUOUS')throw Error('Resume requires the original inspected node checkpoint without an unresolved phase');},
+  run:async()=>{await new Promise(r=>{release=r;});return outcome;}});
+ runner.start({operation_id:'one'});
+ assert.equal(runner.start({operation_id:'one'},{resume:true}).attempt,1);assert.deepEqual(admitted,[]);
+ release();const settled=await runner.wait('one');
+ assert.throws(()=>runner.start({operation_id:'one'},{resume:true}),/unresolved phase/);
+ assert.deepEqual(runner.status('one'),settled);assert.deepEqual(admitted,['one']);
+ outcome={status:'SUCCEEDED'};runner.start({operation_id:'two'});release();const done=await runner.wait('two');
+ assert.deepEqual(runner.start({operation_id:'two'},{resume:true}),done);assert.deepEqual(admitted,['one']);
+});
+
 test('ID-only resume does not duplicate a running or completed worker',async()=>{
  let release,count=0;const runner=createNodeOperationRunner({validate:()=>1,progress:()=>null,
   run:async()=>{count++;await new Promise(r=>{release=r;});return {status:'SUCCEEDED'};}});

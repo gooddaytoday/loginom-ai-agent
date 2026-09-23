@@ -7,7 +7,7 @@ const checkId=id=>{if(typeof id!=='string'||!/^[A-Za-z0-9_.:-]{1,128}$/.test(id)
 
 // Host lifecycle only: a wait timeout never aborts the worker or starts another
 // operation. The original runtime retains the mutation gate through cleanup.
-export function createNodeOperationRunner({run,validate,progress}) {
+export function createNodeOperationRunner({run,validate,progress,admitResume}) {
  const jobs=new Map();
  const find=id=>{checkId(id);const job=jobs.get(id);if(!job)throw Error('Unknown node operation');return job;};
  const snapshot=job=>structuredClone({operation_id:job.id,attempt:job.attempt,state:job.state,
@@ -47,6 +47,9 @@ export function createNodeOperationRunner({run,validate,progress}) {
       ||old.outcome?.status==='FAILED'&&old.outcome.cleanup_complete===true&&old.outcome.output?.execution?.status==='failed'
         &&old.outcome.output.execution.failure_verified===true)return snapshot(old);
     if([...jobs.values()].some(job=>job.state==='running'))throw Error('Another node operation is running');
+    // Заведомо невозможное продолжение отклоняется до новой попытки: иначе
+    // вызывающий видит running, а воркер тут же отвечает NODE_WORKER_REJECTED.
+    admitResume?.(request.operation_id);
     return launch(request,signature,old.attempt+1,true,old);
    }
    if(resume)throw Error('Cannot resume an unknown node operation');

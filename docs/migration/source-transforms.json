@@ -11,8 +11,8 @@
   },
   "packages/loginom-runtime/client/lib/executor.mjs": {
     "baseHash": "df21720858bb89bb40d6c4fe46620728b1d6e86b0d9d7aafa4992c8f2cf93a6e",
-    "hash": "43d877ca8b688dee939ec863f3b4bf9f20b407ff6673fa03df10b3bb010ef39d",
-    "reason": "Merge main retained-uncertainty host leases for bounded status/resume with RC9 settled pre-upload checkpoint semantics. Inspect a retained node operation before claiming the action gate, so saves return its outcome instead of a phantom active call; list no available actions in refusals while an operation is pending."
+    "hash": "4b9f8749a8aa50cf2f5785f3ea26a670627c72722122b7c5b9599a4d47aaadf7",
+    "reason": "Merge main retained-uncertainty host leases for bounded status/resume with RC9 settled pre-upload checkpoint semantics. Inspect a retained node operation before claiming the action gate, so saves return its outcome instead of a phantom active call; list no available actions in refusals while an operation is pending. Refuse impossible node resumes at admission through the shared resume predicate."
   },
   "packages/loginom-runtime/client/lib/session.mjs": {
     "baseHash": "db89431390466874ef7ea709f5e8c866d1558dd54fc776c9ea1befd3bf286ef3",
@@ -136,8 +136,8 @@
   },
   "packages/loginom-runtime/client/lib/node-operation-runner.mjs": {
     "baseHash": "04b740ef6b0cd2bb6a9da1a88f75e80d27c1f0f0dca73acfcd03f83d9d741e8d",
-    "hash": "46973c6fbf07be858fcad3f9f578052c32940636a0d21cfbf2ce272b851205a0",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
+    "hash": "3743c9996b0a3a5e5791cdaa512c4eb834b805b26e18550de5fbf1bebe53560a",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Consult an optional resume admission check before launching a new attempt; running, completed and verified-final jobs keep their early snapshots."
   },
   "packages/loginom-runtime/client/lib/platform.mjs": {
     "baseHash": "5bd3c93fd075b22a376fc14e8bd465ed348ad79797a4d570a021bf7e6dd37999",
@@ -206,8 +206,8 @@
   },
   "packages/loginom-runtime/client/test/node-operation-runner.test.mjs": {
     "baseHash": "e3fe166737560bc7b507cc08a3a615b1b4ccf96b9f16d6817043670e8aefad3c",
-    "hash": "8ef6b0c8609488a9ddc9d31f4ec550f77cca54d7f25b37a9a7f4917d818b4c20",
-    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes."
+    "hash": "54270b3924191971b38540b91e50dbb8c5c25cb3149d30c00273a79e14bfe8e5",
+    "reason": "Preserve native failure details, verified repair routes and unresolved node state after refused resumes; count preview limits in UTF-8 bytes. Cover resume admission refusal without a new attempt."
   },
   "packages/loginom-runtime/client/test/user-preview-budget.test.mjs": {
     "baseHash": "a603727daf3ea0ed415b4d8147e68bd7dc5c94963250aff26a0aa9d7b97f72c6",
@@ -266,7 +266,7 @@
   },
   "packages/loginom-runtime/client/test/node-apply-runtime.test.mjs": {
     "baseHash": "1182580cc60adeb720d6fbfa002e56699254765d18ae8dbf96f34c1e7cb59fbd",
-    "hash": "61c33250cba796a86e28bfd33afeabab4f11a9f7cb1cbadcc29e669d50ab99c0",
-    "reason": "Cover saves behind a retained ambiguous configure and empty refusal action lists."
+    "hash": "4f5525f0f62923d5c8798fb9896d72a60fa4921d2426dce8e64075720447b579",
+    "reason": "Cover saves behind a retained ambiguous configure and empty refusal action lists. Cover resume admission refusal of an unresumable pending configure."
   }
 }
