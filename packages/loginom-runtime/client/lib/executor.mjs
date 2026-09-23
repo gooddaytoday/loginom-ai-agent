@@ -1728,7 +1728,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return { status: pending ? 'AMBIGUOUS' : 'FAILED', action_key: pending?.action.action_key ?? 'request.validate',
         action_revision: pending?.action.revision ?? '1', operation_id: pending?.id ?? null,
         phase: 'request_rejected', effect_possible: !!pending, request_rejected: true,
-        output: { available_actions: [...pinned.actions.keys()], ui_action_tool: 'dock_ui_action', operation: view(pending).output,
+        output: { available_actions: pending ? [] : [...pinned.actions.keys()], ui_action_tool: 'dock_ui_action', operation: view(pending).output,
           ...(nodeJobs.active?{active_node_job:nodeJobs.active}:{}),
           ...(error?.code==='ARTIFACT_GRANT_NOT_FOUND' && allowCandidate && artifactStore ? {input_artifacts:artifactStore.list()} : {}) },
         error: { code: 'REQUEST_REJECTED', message: String(error?.message ?? error).slice(0, 1000) }, trace: [] };
@@ -2280,13 +2280,20 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         throw new Error('operation_id must be a stable identifier with at most 128 characters');
       }
       if (running) throw new Error('Another Dock action is still running');
+      const signature = fingerprint(actionKey, parameters);
+      if (operationId && auxiliary.has(operationId)) throw new Error('Operation ID conflicts with a recovery or UI operation');
+      if (operationId && operations.has(operationId) && operations.get(operationId).signature !== signature) {
+        throw new Error('operation_id was already used with different parameters');
+      }
+      // inspectApply сам захватывает шлюз только на время своих фазовых чтений;
+      // под чужим захватом он принял бы этот вызов за активную операцию.
+      if (pending?.action.capability === 'node.apply') {
+        const reconciled = await inspectApply(pending);
+        if (pending || (operationId && operationId === reconciled.operation_id)) return reconciled;
+        if (running) throw new Error('Another Dock action is still running');
+      }
       running = true;
       try {
-        const signature = fingerprint(actionKey, parameters);
-        if (operationId && auxiliary.has(operationId)) throw new Error('Operation ID conflicts with a recovery or UI operation');
-        if (operationId && operations.has(operationId) && operations.get(operationId).signature !== signature) {
-          throw new Error('operation_id was already used with different parameters');
-        }
         if (pending) {
           const reconciled = await reconcilePending();
           if (pending || (operationId && operationId === reconciled.operation_id) || signature === operations.get(reconciled.operation_id)?.signature) return reconciled;

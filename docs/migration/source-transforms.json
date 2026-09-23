@@ -11,8 +11,8 @@
   },
   "packages/loginom-runtime/client/lib/executor.mjs": {
     "baseHash": "df21720858bb89bb40d6c4fe46620728b1d6e86b0d9d7aafa4992c8f2cf93a6e",
-    "hash": "e28ad0cfcf9ca4e509522dd61c893756af3c6603931872f92f5a732a2bb78c8e",
-    "reason": "Merge main retained-uncertainty host leases for bounded status/resume with RC9 settled pre-upload checkpoint semantics."
+    "hash": "43d877ca8b688dee939ec863f3b4bf9f20b407ff6673fa03df10b3bb010ef39d",
+    "reason": "Merge main retained-uncertainty host leases for bounded status/resume with RC9 settled pre-upload checkpoint semantics. Inspect a retained node operation before claiming the action gate, so saves return its outcome instead of a phantom active call; list no available actions in refusals while an operation is pending."
   },
   "packages/loginom-runtime/client/lib/session.mjs": {
     "baseHash": "db89431390466874ef7ea709f5e8c866d1558dd54fc776c9ea1befd3bf286ef3",
@@ -263,5 +263,10 @@
     "baseHash": "47608c281b7d6cc1c8bb5684f1dcc77268eadc04c77646a51f506de42ee174b5",
     "hash": "6b09f9d7c0843b076daf72c55670dbe45f44cef5fb592782f1ed538c77cc7367",
     "reason": "Preserve remote commit 645da9ebf platform branding: replace the imported landing favicon with Loginom PNG/SVG/ICO, Apple touch icon and web manifest links."
+  },
+  "packages/loginom-runtime/client/test/node-apply-runtime.test.mjs": {
+    "baseHash": "1182580cc60adeb720d6fbfa002e56699254765d18ae8dbf96f34c1e7cb59fbd",
+    "hash": "61c33250cba796a86e28bfd33afeabab4f11a9f7cb1cbadcc29e669d50ab99c0",
+    "reason": "Cover saves behind a retained ambiguous configure and empty refusal action lists."
   }
 }

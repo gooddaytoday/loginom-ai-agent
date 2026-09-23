@@ -4,13 +4,14 @@ import {createActionRuntime,parseCapabilityResult} from '../lib/executor.mjs';
 import vm from 'node:vm';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
+import {actions} from './support/executor-fixture.mjs';
 const validateJob=new AjvJsonSchemaValidator().getValidator(nodeJobResultSchema);
 const assertJob=job=>{const result=validateJob(job);assert.equal(result.valid,true,result.errorMessage);};
 const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
 const request=()=>({operation_id:'apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
  target:{kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'done',
  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
-function fixture({execute=async()=>{throw Error('Unexpected public transport')},wrapDrivers,now=Date.now}={}){
+function fixture({execute=async()=>{throw Error('Unexpected public transport')},wrapDrivers,now=Date.now,pinnedActions=new Map()}={}){
  const calls=[],events=[];const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),reconcile:async()=>({verified:true,cleanup_complete:true}),mutate:async e=>{calls.push(e.kind);if(e.kind==='create')graph.nodes.push({ref:{document_id:'doc',workflow_id:'wf',node_id:'new'},type:e.parameters.type,label:'Source',position:e.parameters.position,inputs:[],outputs:[0]});return {status:'SUCCEEDED',cleanup_complete:true};}};
  const ok=(name,extra={})=>async()=>{calls.push(name);return {verified:true,cleanup_complete:true,effect_possible:false,...extra}};
@@ -19,7 +20,7 @@ function fixture({execute=async()=>{throw Error('Unexpected public transport')},
   waitExecution:ok('execute'),readOutput:ok('read'),verifyContinuation:async()=>true};
  let failRecord;
  const handlers=new Map([['imports.text',handler]]);
- const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},execute,now,
+ const runtime=createActionRuntime({pinned:{actions:pinnedActions,selectors:new Map(),pins:{}},allowCandidate:pinnedActions.size>0,execute,now,
   nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:handlers,nodeApplyDriverFactory:context=>wrapDrivers?wrapDrivers(context,drivers):drivers,
   onRecord:async e=>{events.push(e);if(e.phase===failRecord)throw Error('disk unavailable');return e;}});
  return {runtime,adapter,calls,events,graph,drivers,handler,handlers,failRecord:p=>{failRecord=p}};
@@ -83,6 +84,18 @@ test('lost finish cannot be repeated, abandoned, or repaired through generic UI'
  await assert.rejects(f.runtime.uiAct({verb:'click',ref:'ui-1'},{operationId:'gesture',observationId:'obs',recoveryOperationId:'apply'}),/original node phase/);
  await assert.rejects(f.runtime.runNodeApply({...request(),operation_id:'other'}),/pending/);
  assert.equal(f.calls.length,count);assert.throws(()=>f.runtime.assertPreparationAllowed(),/uncertain/);
+});
+test('a save behind a retained ambiguous configure returns that node outcome, not a phantom active call',async()=>{
+ const f=fixture({pinnedActions:actions});
+ f.handler.configure=async()=>{f.calls.push('configure');throw Error('Node procedure readiness timeout: editor; no mutation was authorized')};
+ const r=await f.runtime.runNodeApply(request());assert.equal(r.status,'AMBIGUOUS');assert.equal(r.output.pending_phase,'configure');
+ const count=f.calls.length;
+ const saved=await f.runtime.run('package.save_checkpoint',{path:'/user/abc.lgp',conflict_policy:'replace'},{operationId:'save'});
+ assert.equal(saved.operation_id,'apply');assert.equal(saved.status,'AMBIGUOUS');assert.equal(saved.error.code,'NODE_APPLY_STOPPED');
+ await assert.rejects(f.runtime.run('package.save_checkpoint',{path:'/user/abc.lgp',conflict_policy:'replace'},{operationId:'apply'}),/different parameters/);
+ const refused=f.runtime.requestFailure(Error('Use the enclosing node procedure to resume this internal phase'));
+ assert.equal(refused.operation_id,'apply');assert.deepEqual(refused.output.available_actions,[]);
+ assert.equal(f.calls.length,count);
 });
 test('concurrent inspection cannot release the gate before a cancelled call completes',async()=>{
  const f=fixture(),controller=new AbortController();let release;
