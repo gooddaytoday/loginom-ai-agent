@@ -3,10 +3,11 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFile
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { validateProjectRouting, ProjectRoutingError } from './project-routing.mjs';
+import { DEPLOYMENT } from './deployment.mjs';
 
-export const ENROLLMENT_GENERATION = '20260913.5';
-export const PROJECT_ROOT = '/Users/kartamyshev/Git/loginom-dock';
-export const ENROLLMENTS_DIR = join(homedir(), '.openviking/project-memory-enrollments/loginom-dock');
+export const ENROLLMENT_GENERATION = DEPLOYMENT.generation;
+export const PROJECT_ROOT = DEPLOYMENT.projectRoot;
+export const ENROLLMENTS_DIR = DEPLOYMENT.enrollmentsDir;
 const fail = message => { throw new ProjectRoutingError(message); };
 export const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 export const enrollmentKey = cwd => hash(cwd);

@@ -6,11 +6,16 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
-SOURCE_ROOT = Path(__file__).resolve().parents[3]
-SPEC = importlib.util.spec_from_file_location('prepare_memory', SOURCE_ROOT / 'tools/project-memory/prepare_task_memory.py')
+DEFINITION = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(DEFINITION))
+from project_context import GENERATION, deployment, locations, project_root
+from prepare_project_memory import prepare as prepare_project
+SOURCE_ROOT = project_root()
+SPEC = importlib.util.spec_from_file_location('prepare_memory', DEFINITION / 'prepare_task_memory.py')
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
@@ -35,22 +40,22 @@ class PreparationTest(unittest.TestCase):
         self.sha = self.git('rev-parse', 'HEAD').strip()
         self.cwd = self.root / '.worktrees/node-21-fixture'
         self.cwd.parent.mkdir()
-        self.branch = 'codex/node-21-fixture'
+        self.branch = 'node-21-fixture'
         self.git('worktree', 'add', '-qb', self.branch, str(self.cwd), self.sha)
-        runtime = self.root / '.dock/shared-project-memory/runtime/20260913.5'
-        shutil.copytree(SOURCE_ROOT / '.dock/shared-project-memory/runtime/20260913.5', runtime)
-        old = SOURCE_ROOT / '.dock/shared-project-memory/rollout-20260913.5'
-        rollout = self.root / '.dock/shared-project-memory/rollout-20260913.5'
-        rollout.mkdir()
-        manifest = json.loads((old / 'manifest.json').read_text())
-        state = self.home / '.openviking/project-states/loginom-dock'
-        state.mkdir(parents=True, mode=0o700)
-        manifest['new_task_route'].update(projectRoot=str(self.root), stateDir=str(state))
-        (rollout / 'manifest.json').write_text(json.dumps(manifest))
-        hooks = (old / 'hooks.json.pending').read_bytes()
-        (rollout / 'hooks.json.pending').write_bytes(hooks)
-        (self.root / '.codex').mkdir()
-        (self.root / '.codex/hooks.json').write_bytes(hooks)
+        runtime, rollout = locations(self.root)
+        source_runtime = Path(os.environ.get('PROJECT_MEMORY_TEST_RUNTIME', str(locations(SOURCE_ROOT)[0])))
+        shutil.copytree(source_runtime, runtime)
+        (runtime / 'deployment.json').write_text(json.dumps(deployment(self.root)))
+        self.plugin = self.base / 'plugin'
+        for folder in ('.codex-plugin', 'hooks', 'scripts'):
+            (self.plugin / folder).mkdir(parents=True)
+        (self.plugin / '.codex-plugin/plugin.json').write_text('{"version":"0.8.1"}')
+        (self.plugin / 'hooks/hooks.json').write_text('{}')
+        for name in ('session-start-commit', 'auto-recall', 'auto-capture', 'pre-compact-capture', 'session-end', 'config'):
+            (self.plugin / 'scripts' / (name + '.mjs')).write_text('// fixture\n')
+        self.node = Path(shutil.which('node')).resolve()
+        prepare_project(self.root, self.node, self.plugin, install=True)
+        self.rollout = rollout
         (self.home / '.openviking/project-memory-routing.json').write_text('{"projects":[]}')
         (self.cwd / '.codex').mkdir()
         self.config = self.cwd / '.codex/config.toml'
@@ -89,6 +94,37 @@ class PreparationTest(unittest.TestCase):
         (self.home / '.openviking/project-memory-routing.json').write_text(json.dumps({'projects':[{'workspaces':[str(self.cwd)]}]}))
         with self.assertRaises(ValueError): MODULE.prepare(self.cwd, self.branch, self.sha, True)
         self.assertEqual(self.config.read_bytes(), self.original)
+
+    def test_main_and_external_worktrees_are_never_registered(self):
+        with self.assertRaises(ValueError): MODULE.prepare(self.root, 'master', self.sha, True)
+        outside = self.base / 'external-worktree'
+        self.git('worktree', 'add', '-qb', 'external', str(outside), self.sha)
+        with self.assertRaises(ValueError): MODULE.prepare(outside, 'external', self.sha, True)
+        self.assertFalse((outside / '.codex/config.toml').exists())
+
+    def test_preview_does_not_write_registration_and_missing_legacy_registry_is_ok(self):
+        (self.home / '.openviking/project-memory-routing.json').unlink()
+        before = sorted(self.home.rglob('*'))
+        MODULE.prepare(self.cwd, self.branch, self.sha)
+        self.assertEqual(before, sorted(self.home.rglob('*')))
+
+    def test_new_project_hooks_do_not_require_or_change_legacy_rollout(self):
+        hooks = json.loads((self.root / '.codex/hooks.json').read_text())
+        self.assertEqual(len(hooks['hooks']), 5)
+        for groups in hooks['hooks'].values():
+            self.assertEqual(len(groups), 1)
+            self.assertTrue(groups[0]['hooks'][0]['command'].endswith('--enrollments-only'))
+        self.assertFalse((self.root / '.codex/config.toml').exists())
+        legacy = self.home / '.openviking/project-memory-routing.json'
+        before = legacy.read_bytes()
+        prepare_project(self.root, self.node, self.plugin, install=True)
+        self.assertEqual(legacy.read_bytes(), before)
+
+    def test_unrelated_existing_hooks_are_not_overwritten(self):
+        path = self.root / '.codex/hooks.json'
+        path.write_text('{"other":"hooks"}')
+        with self.assertRaises(ValueError): prepare_project(self.root, self.node, self.plugin, install=True)
+        self.assertEqual(path.read_text(), '{"other":"hooks"}')
 
 
 if __name__ == '__main__': unittest.main()

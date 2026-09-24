@@ -1946,8 +1946,8 @@
   },
   "services/loginom-ai/tools/project-memory/README.md": {
     "baseHash": "a024e036bf9e963b61cb79f6291b35bb5df90e7af749f694f02df65261d462cf",
-    "hash": "7a632dbd27e3fdc7e4f62f068b674e2043cb2048245546767e9a430532186539",
-    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+    "hash": "972840296109aa791994331e63b325fbde65056a427f8e9ef0d9c5ad47102750",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed. Adapt project-scoped OpenViking enrollment for Loginom AI Agent generation 20260924.1; preserve Dock routes and upstream originals; live activation and the full capture cycle were verified on 2026-09-24; evidence and per-worktree admission requirements are documented in docs/node-development/workflow/shared-memory.md."
   },
   "services/loginom-ai/docs/loginom-dock/operations.md": {
     "baseHash": "7407f2f64cdd3af827bb696218bcd35682891d823b3a205bb0cdb1a4922a6da1",
@@ -1958,5 +1958,50 @@
     "baseHash": "3ea2f67253ef2d70a720f203b59fe024a6d7eb9535cc00b7b93a6573c5311f8b",
     "hash": "3b76063268769cd8a62d083d8252fef92537a905b1b2ecbe0af4b364cb4d62bc",
     "reason": "Label related legacy documentation and replace obsolete checkout requirement with an explicit historical reference; original version retained in recorded Git commit."
+  },
+  "services/loginom-ai/tools/project-memory/adapter.patch": {
+    "baseHash": "697293ff468a7e3594c52e5d6d9345ab79e64294b084ea28af18527472d6f872",
+    "hash": "058bed61fbeed0609ac3e77e7c97fb7ea85a06b36fd6280db87e9003b413a037",
+    "reason": "Adapt project-scoped OpenViking enrollment for Loginom AI Agent generation 20260924.1; preserve Dock routes and upstream originals; live activation and the full capture cycle were verified on 2026-09-24; evidence and per-worktree admission requirements are documented in docs/node-development/workflow/shared-memory.md."
+  },
+  "services/loginom-ai/tools/project-memory/assemble_runtime.py": {
+    "baseHash": "ad77eab2ae9841f77245e8eef287160427ddbe8f611d07f6924248e934e25a0b",
+    "hash": "63370bb372f4037802fa56c8e9d4b0abe0b565c0f430b93bbe9bbddbed6b930a",
+    "reason": "Adapt project-scoped OpenViking enrollment for Loginom AI Agent generation 20260924.1; preserve Dock routes and upstream originals; live activation and the full capture cycle were verified on 2026-09-24; evidence and per-worktree admission requirements are documented in docs/node-development/workflow/shared-memory.md."
+  },
+  "services/loginom-ai/tools/project-memory/enroll_task.mjs": {
+    "baseHash": "42d6fe2f4261ec2b74c577d354444dbe5ce642d1af41366994a871bd2f4a91d0",
+    "hash": "9bc3cee176d1a9630300f1b2e0543a1569bf77c2082410da07ce5d0fcfab258f",
+    "reason": "Adapt project-scoped OpenViking enrollment for Loginom AI Agent generation 20260924.1; preserve Dock routes and upstream originals; live activation and the full capture cycle were verified on 2026-09-24; evidence and per-worktree admission requirements are documented in docs/node-development/workflow/shared-memory.md."
+  },
+  "services/loginom-ai/tools/project-memory/overlay/enrollment-management.mjs": {
+    "baseHash": "7812cf55008b57592923c703a0433e295b4d78e61f988e578930ca9e383664d1",
+    "hash": "0ad39d9a5a64fe3d897ed0370536756ab2b3c5e952f83b35a7562767bb3afe6f",
+    "reason": "Adapt project-scoped OpenViking enrollment for Loginom AI Agent generation 20260924.1; preserve Dock routes and upstream originals; live activation and the full capture cycle were verified on 2026-09-24; evidence and per-worktree admission requirements are documented in docs/node-development/workflow/shared-memory.md."
+  },
+  "services/loginom-ai/tools/project-memory/overlay/enrollment-routing.mjs": {
+    "baseHash": "573b0ad4c3a9c8a3742070001f74e36b51def7982d768e7313aa253c622e62fc",
+    "hash": "96d20bb43aff625f729b8b5a5d871a4addf7c8316b47d4f7c87512f30b6fe129",
+    "reason": "Adapt project-scoped OpenViking enrollment for Loginom AI Agent generation 20260924.1; preserve Dock routes and upstream originals; live activation and the full capture cycle were verified on 2026-09-24; evidence and per-worktree admission requirements are documented in docs/node-development/workflow/shared-memory.md."
+  },
+  "services/loginom-ai/tools/project-memory/overlay/test/enrollment.test.mjs": {
+    "baseHash": "15eae7693af5082f24f03ab0da07a9c793191b06dd7a7636db1f69c1f46c2f9f",
+    "hash": "6202121589b74a8da2f8cb6f0de087de1c89f6e379d3dac341dd3c0391f8d110",
+    "reason": "Adapt project-scoped OpenViking enrollment for Loginom AI Agent generation 20260924.1; preserve Dock routes and upstream originals; live activation and the full capture cycle were verified on 2026-09-24; evidence and per-worktree admission requirements are documented in docs/node-development/workflow/shared-memory.md."
+  },
+  "services/loginom-ai/tools/project-memory/prepare_task_memory.py": {
+    "baseHash": "cd6980e86a4a4f15071055df929f40c7e5c4bc6946f5d940f0766a1b7706c89d",
+    "hash": "7de1c2191fa7484624a0417737bf542a774090afacad9bd96f83178433b88a83",
+    "reason": "Adapt project-scoped OpenViking enrollment for Loginom AI Agent generation 20260924.1; preserve Dock routes and upstream originals; live activation and the full capture cycle were verified on 2026-09-24; evidence and per-worktree admission requirements are documented in docs/node-development/workflow/shared-memory.md."
+  },
+  "services/loginom-ai/tools/project-memory/review_hooks.mjs": {
+    "baseHash": "a74a06075a6326430b868c7b6265456df56bdddf92617fae1414ef27fdd1eb21",
+    "hash": "2009fcb3af892b2903ce974a670440f08b382b621134d2bae2cf4dac80198a4d",
+    "reason": "Adapt project-scoped OpenViking enrollment for Loginom AI Agent generation 20260924.1; preserve Dock routes and upstream originals; live activation and the full capture cycle were verified on 2026-09-24; evidence and per-worktree admission requirements are documented in docs/node-development/workflow/shared-memory.md."
+  },
+  "services/loginom-ai/tools/project-memory/test/prepare_task_memory_test.py": {
+    "baseHash": "bd7581211301c8d8286a646cd11fce415a83bb003661e85e6accdd4012d25304",
+    "hash": "a8af8735a75a085741de54fd311dc3fada19b2c5ace7f8bacb5ec098c55fb276",
+    "reason": "Adapt project-scoped OpenViking enrollment for Loginom AI Agent generation 20260924.1; preserve Dock routes and upstream originals; live activation and the full capture cycle were verified on 2026-09-24; evidence and per-worktree admission requirements are documented in docs/node-development/workflow/shared-memory.md."
   }
 }

@@ -9,9 +9,9 @@ import tempfile
 import tomllib
 import uuid
 from pathlib import Path
+from project_context import GENERATION, project_root, read_manifest
 
-ROOT = Path(__file__).resolve().parents[2]
-GENERATION = '20260913.5'
+ROOT = project_root()
 
 
 def sha(data):
@@ -40,28 +40,27 @@ def atomic(path, data):
             os.unlink(name)
 
 
-def prepare(cwd, branch, base, install=False):
-    if cwd.is_symlink() or cwd.resolve(strict=True) != cwd or cwd.parent != ROOT / '.worktrees':
+def prepare(cwd, branch, base, install=False, root=None, generation=GENERATION):
+    root = project_root(root or ROOT)
+    if cwd.is_symlink() or cwd.resolve(strict=True) != cwd or cwd.parent != root / '.worktrees':
         raise ValueError('Use one exact permanent worktree directly below this project/.worktrees')
-    if Path(git(cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir')) != ROOT / '.git' or \
+    if Path(git(cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir')) != root / '.git' or \
             git(cwd, 'rev-parse', '--show-toplevel') != str(cwd):
         raise ValueError('The folder is not a linked worktree of this repository')
     if git(cwd, 'branch', '--show-current') != branch or git(cwd, 'rev-parse', 'HEAD') != base:
         raise ValueError('Branch or fresh accepted base differs from the recorded preparation')
-    legacy = json.loads((Path.home() / '.openviking/project-memory-routing.json').read_text())
+    legacy_file = Path.home() / '.openviking/project-memory-routing.json'
+    legacy = json.loads(legacy_file.read_text()) if legacy_file.exists() else {'projects': []}
     if any(str(cwd) in x['workspaces'] for x in legacy['projects']):
         raise ValueError('Existing legacy routes are immutable; this helper only prepares fresh workspaces')
-    directory = Path.home() / '.openviking/project-memory-enrollments/loginom-dock'
-    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    runtime, rollout, manifest = read_manifest(root, generation)
+    directory = Path(manifest['deployment']['enrollmentsDir'])
     private(directory, True)
     record_path = directory / (sha(str(cwd).encode()) + '.json')
-    runtime = ROOT / '.dock/shared-project-memory/runtime' / GENERATION
-    rollout = ROOT / '.dock/shared-project-memory' / ('rollout-' + GENERATION)
-    manifest = json.loads((rollout / 'manifest.json').read_text())
     for name, digest in manifest['runtime_files'].items():
         if (runtime / name).is_symlink() or sha((runtime / name).read_bytes()) != digest:
             raise ValueError('Prepared immutable runtime differs from its installation manifest')
-    hooks = (ROOT / '.codex/hooks.json').read_bytes()
+    hooks = (root / '.codex/hooks.json').read_bytes()
     if hooks != (rollout / 'hooks.json.pending').read_bytes():
         raise ValueError('Compatible enrollment hooks are not installed')
     config = cwd / '.codex/config.toml'
@@ -121,5 +120,7 @@ if __name__ == '__main__':
     parser.add_argument('--branch', required=True)
     parser.add_argument('--base', required=True)
     parser.add_argument('--install', action='store_true')
+    parser.add_argument('--project-root', type=Path)
+    parser.add_argument('--generation', default=GENERATION)
     args = parser.parse_args()
-    print(json.dumps(prepare(args.cwd, args.branch, args.base, args.install), ensure_ascii=False))
+    print(json.dumps(prepare(args.cwd, args.branch, args.base, args.install, args.project_root, args.generation), ensure_ascii=False))

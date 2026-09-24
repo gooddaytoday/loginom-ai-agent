@@ -7,13 +7,17 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from project_context import GENERATION, deployment, locations, project_root
 
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def assemble(source, output, definition):
+def assemble(source, output, definition, identity):
+    if output.is_symlink():
+        raise ValueError('Runtime output must not be a symlink')
+    output = output.resolve()
     manifest = json.loads((definition / 'upstream-manifest.json').read_text())
     source = source.resolve(strict=True)
     for name, expected in manifest['files'].items():
@@ -36,6 +40,8 @@ def assemble(source, output, definition):
                 target = stage / path.relative_to(definition / 'overlay')
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(path, target)
+        (stage / 'deployment.json').write_text(json.dumps(identity, indent=2) + '\n')
+        (stage / 'deployment.json').chmod(0o600)
         expected = {str(path.relative_to(stage)): digest(path) for path in stage.rglob('*') if path.is_file()}
         if output.exists():
             actual = {str(path.relative_to(output)): digest(path) for path in output.rglob('*') if path.is_file()}
@@ -51,6 +57,9 @@ if __name__ == '__main__':
     definition = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, default=Path('/Users/kartamyshev/Git/openviking/integrations/codex-mcp-adapter'))
-    parser.add_argument('--output', type=Path, default=definition.parents[1] / '.dock/shared-project-memory/runtime/20260913.5')
+    parser.add_argument('--project-root', type=Path)
+    parser.add_argument('--generation', default=GENERATION)
+    parser.add_argument('--output', type=Path)
     args = parser.parse_args()
-    assemble(args.source, args.output, definition)
+    root = project_root(args.project_root)
+    assemble(args.source, args.output or locations(root, args.generation)[0], definition, deployment(root, args.generation))

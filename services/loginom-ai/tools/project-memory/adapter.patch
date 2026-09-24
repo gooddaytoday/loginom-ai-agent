@@ -71,6 +71,6 @@
 @@ -6,4 +6,4 @@
  const auditPath = process.env.OPENVIKING_ADAPTER_AUDIT_PATH;
 -const adapter = new Adapter({ observe: event => {
-+const adapter = new Adapter({ requireEnrollment: true, observe: event => {
++const adapter = new Adapter({ requireEnrollment: true, routing: () => ({ projects: [] }), observe: event => {
    if (auditPath) appendFileSync(auditPath, `${JSON.stringify(event)}\n`, { mode: 0o600 });
  } });

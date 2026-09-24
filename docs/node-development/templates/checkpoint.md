@@ -10,6 +10,10 @@
 - Save/reopen/cleanup: <подтверждение или UNCONFIRMED>.
 - Проверки и ограничения, старые FAIL: <...>.
 - Общая память, проверенный route и устойчивые выводы: <...>.
+- Memory generation/registration ID и exact cwd/task ID: <...>.
+- Допуск actor health/find/read и bootstrap/hooks receipts: <...>.
+- Capture/extraction/read-back из основного checkout: <ожидает/проверен, evidence>;
+  cursor сохранён, повторной регистрации либо второго захвата нет: <подтверждение>.
 - Незавершённые события/неясная доставка/dispatch_id: <...>.
 - Следующий безопасный шаг, owner, next trigger: <...>.
 

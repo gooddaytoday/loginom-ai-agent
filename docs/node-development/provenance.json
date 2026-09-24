@@ -7607,8 +7607,8 @@
       "source_bytes": 31715,
       "path": "../../services/loginom-ai/tools/project-memory/README.md",
       "repo_path": "services/loginom-ai/tools/project-memory/README.md",
-      "adapted_sha256": "7a632dbd27e3fdc7e4f62f068b674e2043cb2048245546767e9a430532186539",
-      "bytes": 32555,
+      "adapted_sha256": "972840296109aa791994331e63b325fbde65056a427f8e9ef0d9c5ad47102750",
+      "bytes": 32812,
       "disposition": "reuse_identical",
       "transformations": [
         {
@@ -7622,6 +7622,11 @@
         {
           "type": "resolved_paths",
           "count": 6
+        },
+        {
+          "type": "current_enrollment_navigation",
+          "date": "2026-09-24",
+          "detail": "Add CURRENT.md pointer for Loginom AI Agent 20260924.1; preserve historical Dock instructions and acceptance."
         }
       ]
     }

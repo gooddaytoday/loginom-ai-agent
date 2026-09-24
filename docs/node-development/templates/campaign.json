@@ -29,7 +29,13 @@
   "acceptance_timeout_seconds": 1800,
   "memory": {
     "status": "not_enrolled",
-    "root": null,
+    "root": "viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-ai-agent/memories",
+    "namespace": "loginom-ai-agent",
+    "generation": "20260924.1",
+    "project_installation": "unverified",
+    "live_activation": "pending",
+    "full_capture_cycle": "pending",
+    "task_enrollments": [],
     "evidence": null
   },
   "assignments": [],

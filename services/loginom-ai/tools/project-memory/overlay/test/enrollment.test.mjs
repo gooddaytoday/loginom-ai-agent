@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {randomUUID} from 'node:crypto';
-import {loadEnrollment,enrollmentPath,observationPath,observeBootstrap,requireEnrolledTask,hash} from '../enrollment-routing.mjs';
+import {loadEnrollment,enrollmentPath,observationPath,observeBootstrap,requireEnrolledTask,hash,ENROLLMENT_GENERATION} from '../enrollment-routing.mjs';
 import {validateProjectRouting,makeRoutingReceipt,routingReceiptPath} from '../project-routing.mjs';
 import {enrollFreshTask,validateBootstrapEvidence,validateEnrollmentHooks} from '../enrollment-management.mjs';
 import {runHook} from '../hook-router.mjs';
@@ -25,7 +25,7 @@ function fixture(t) {
  function prepare(n){
   const cwd=join(projectRoot,'.worktrees','node-'+n);mkdirSync(cwd);mkdirSync(join(cwd,'.codex'));
   writeFileSync(join(cwd,'.codex/config.toml'),'# private',{mode:0o600});
-  const routeSpec={projectRoot,workspaces:[cwd],stateDir,pluginRoot,generation:'20260913.5'};
+  const routeSpec={projectRoot,workspaces:[cwd],stateDir,pluginRoot,generation:ENROLLMENT_GENERATION};
   const route=validateProjectRouting({version:1,projects:[routeSpec]}).projects[0];
   const record={version:1,cwd,registrationId:randomUUID(),routeSpec,routeHash:route.routeHash,status:'pending',threadId:null,
    prepared:{configSha256:hash('# private'),hooksSha256:hash('{}')},createdAt:new Date().toISOString()};
@@ -34,7 +34,7 @@ function fixture(t) {
  }
  const f=prepare(21),threadId='fresh-node-21';
  const evidence={threadId,cwd:f.cwd,registrationId:f.record.registrationId,turnStatus:'completed',threadStatus:'idle',developmentStarted:false,turnId:'bootstrap-turn',checkedAt:new Date().toISOString()};
- const hooksReceipt={generation:'20260913.5',hooksSha256:hash('{}'),checkedAt:new Date().toISOString(),workspaces:[{cwd:f.cwd,originalMemoryHooks:[],projectHooks:Array(2).fill(['sessionStart','userPromptSubmit','stop','preCompact','sessionEnd']).flat().map(event=>({event,trustStatus:'trusted',currentHash:'sha256:'+'a'.repeat(64)}))}]};
+ const hooksReceipt={generation:ENROLLMENT_GENERATION,hooksSha256:hash('{}'),checkedAt:new Date().toISOString(),workspaces:[{cwd:f.cwd,originalMemoryHooks:[],projectHooks:['sessionStart','userPromptSubmit','stop','preCompact','sessionEnd'].map(event=>({key:event,event,trustStatus:'trusted',currentHash:'sha256:'+'a'.repeat(64)}))}]};
  const load=cwd=>loadEnrollment(cwd,options);
  const context={cwd:f.cwd,threadId};
  const observe=()=>observeBootstrap(load(f.cwd),context,{},'SessionStart');
@@ -143,4 +143,21 @@ for(const change of [{turnStatus:'inProgress'},{threadStatus:'active'},{developm
 test('hook admission rejects stale trust, another generation and original capture',t=>{
  const f=fixture(t);
  for(const change of [{generation:'old'},{checkedAt:'2000-01-01'},{hooksSha256:'wrong'}, {workspaces:[{...f.hooksReceipt.workspaces[0],originalMemoryHooks:[{enabled:true}]}]}])assert.throws(()=>validateEnrollmentHooks({...f.hooksReceipt,...change},f.record));
+});
+
+test('five unique expected hooks are required, not legacy duplicates or invented events', t => {
+ const f=fixture(t), workspace=f.hooksReceipt.workspaces[0];
+ for(const hooks of [workspace.projectHooks.concat(workspace.projectHooks),
+   workspace.projectHooks.map(x=>({...x,key:'duplicate'})),
+   workspace.projectHooks.map((x,i)=>i===0?{...x,event:'unexpected'}:x)])
+  assert.throws(()=>validateEnrollmentHooks({...f.hooksReceipt,workspaces:[{...workspace,projectHooks:hooks}]},f.record));
+});
+
+test('main and external worktrees keep official capture and cannot receive enrollment records', t => {
+ const f=fixture(t);
+ for(const cwd of [f.projectRoot,join(f.base,'outside')]) {
+  const record={...f.record,cwd,routeSpec:{...f.record.routeSpec,workspaces:[cwd]}};
+  writeFileSync(enrollmentPath(cwd,f.directory),JSON.stringify(record),{mode:0o600});
+  assert.throws(()=>loadEnrollment(cwd,f.options),/exact project worktree/);
+ }
 });

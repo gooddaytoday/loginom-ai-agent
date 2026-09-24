@@ -3,13 +3,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const runtime = join(root, '.dock/shared-project-memory/runtime/20260913.5');
 const args = process.argv.slice(2);
 const options = Object.fromEntries(args.reduce((pairs, value, i) => {
-  if (i % 2 === 0) { if (!['--cwd','--thread','--evidence','--hooks-receipt'].includes(value) || !args[i+1]) throw Error('Expected --cwd --thread --evidence --hooks-receipt'); pairs.push([value.slice(2), args[i+1]]); } return pairs;
+  if (i % 2 === 0) { if (!['--runtime','--cwd','--thread','--evidence','--hooks-receipt'].includes(value) || !args[i+1]) throw Error('Expected --runtime --cwd --thread --evidence --hooks-receipt'); pairs.push([value.slice(2), args[i+1]]); } return pairs;
 }, []));
-if (Object.keys(options).length !== 4) throw Error('All four enrollment arguments are required');
+if (Object.keys(options).length !== 5) throw Error('All five enrollment arguments are required');
+const runtime = resolve(options.runtime);
 const { protectedPath } = await import(pathToFileURL(join(runtime, 'enrollment-routing.mjs')));
 for (const file of [options.evidence, options['hooks-receipt']]) protectedPath(resolve(file));
 const evidence = JSON.parse(readFileSync(options.evidence,'utf8'));

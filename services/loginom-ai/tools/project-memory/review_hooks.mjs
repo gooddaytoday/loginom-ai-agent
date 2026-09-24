@@ -9,12 +9,15 @@ import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const option = name => { const i=process.argv.indexOf(name); return i<0?null:process.argv[i+1]; };
-const generation = option('--generation') || '20260913.3';
-if (!['20260913.3','20260913.4','20260913.5'].includes(generation)) throw new Error('Unsupported reviewed generation');
-const rollout = join(root, '.dock/shared-project-memory', `rollout-${generation}`);
-const manifest = JSON.parse(readFileSync(join(rollout, 'manifest.json'), 'utf8'));
+if (!option('--manifest')) throw new Error('Pass the exact prepared --manifest path');
+const manifestPath = resolve(option('--manifest'));
+const rollout = resolve(manifestPath, '..');
+const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+const root = manifest.deployment.projectRoot;
+const generation = manifest.generation;
+if (manifest.deployment.generation !== generation || manifest.expected_hook_count !== 5)
+  throw new Error('Expected the prepared five-hook deployment');
 const expected = JSON.parse(readFileSync(join(rollout, 'hooks.json.pending'), 'utf8'));
 const eventNames = {SessionStart:'sessionStart', UserPromptSubmit:'userPromptSubmit', Stop:'stop',
   PreCompact:'preCompact', SessionEnd:'sessionEnd'};

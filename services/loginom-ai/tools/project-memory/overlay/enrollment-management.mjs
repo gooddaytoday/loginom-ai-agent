@@ -28,9 +28,11 @@ export function validateEnrollmentHooks(receipt, record, now = Date.now()) {
   if (!receipt || receipt.generation !== record.routeSpec.generation || receipt.hooksSha256 !== record.prepared.hooksSha256 ||
       !Number.isFinite(Date.parse(receipt.checkedAt)) || now - Date.parse(receipt.checkedAt) > 600000 ||
       Date.parse(receipt.checkedAt) > now + 30000 || !workspace || workspace.originalMemoryHooks?.length !== 0 ||
-      workspace.projectHooks?.length !== 10 || new Set(workspace.projectHooks.map(x => x.event)).size !== 5 ||
+      workspace.projectHooks?.length !== 5 ||
+      JSON.stringify(workspace.projectHooks.map(x => x.event).sort()) !== JSON.stringify(['preCompact','sessionEnd','sessionStart','stop','userPromptSubmit']) ||
+      new Set(workspace.projectHooks.map(x => x.key)).size !== 5 ||
       !workspace.projectHooks.every(x => x.trustStatus === 'trusted' && /^sha256:[a-f0-9]{64}$/.test(x.currentHash)))
-    fail('Refresh normal hooks/list: legacy and enrollment hooks must be trusted and original plugin capture absent.');
+    fail('Refresh normal hooks/list: five enrollment hooks must be trusted and original plugin capture absent.');
 }
 
 export async function enrollFreshTask({ cwd, threadId, evidence, hooksReceipt,
