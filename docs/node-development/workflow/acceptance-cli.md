@@ -6,7 +6,7 @@
 одновременно занят только **один слот модельной приёмки**, в том числе при
 [отдельной обработке узла](single-node.md).
 
-Модель — `openai/gpt-5.6-sol`, вариант `low`, существующая ChatGPT OAuth-подписка.
+Модель — `openai/gpt-6-sol`, вариант `low`, существующая ChatGPT OAuth-подписка.
 Разработчик Astra / medium и модель CLI имеют разные задачи и истории.
 Computer Use, Hermes и плагины ChatGPT/Codex в этом маршруте не используются.
 
@@ -87,7 +87,7 @@ setup не нужен. Перед запуском должны быть под�
 
 ```sh
 "$NODE_ACCEPTANCE_CLI" run --no-headless --format json \
-  --model openai/gpt-5.6-sol --variant low \
+  --model openai/gpt-6-sol --variant low \
   --dir "<чистая рабочая папка задачи>" \
   --file "<абсолютный путь task.md>" \
   --file "<абсолютный путь dataset.csv>" \
@@ -143,7 +143,7 @@ manifest попытки. Предел времени контролирует в
 
 ```sh
 "$NODE_ACCEPTANCE_CLI" run --no-headless --format json \
-  --model openai/gpt-5.6-sol --variant low \
+  --model openai/gpt-6-sol --variant low \
   --dir "<та же папка>" --session "<точный sessionID>" \
   -- "<ответ на необходимое уточнение>"
 ```

@@ -19,7 +19,7 @@
 - CLI candidate/runtime SHA: <...>; CLI session: <null до фактического запуска>.
 - Общий журнал ресурсов хоста: <точный путь к host-resources.json>; владелец: <...>.
 - Итоговый CLI slot: один на host; lease и acceptance.lock по регламенту оркестратора.
-- Модель приёмки: `openai/gpt-5.6-sol`, `low`; timeout: 30 минут либо <из подплана>.
+- Модель приёмки: `openai/gpt-6-sol`, `low`; timeout: 30 минут либо <из подплана>.
 
 Прочитай [README](../README.md), [single-node](../workflow/single-node.md) и
 [lifecycle](../workflow/lifecycle.md); реализуй только назначенный подплан.

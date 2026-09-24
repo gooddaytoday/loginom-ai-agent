@@ -35,7 +35,7 @@ Component ID: <из реестра>. Runtime type: <проверенный ил�
 
 ## Задание CLI и приёмка
 
-<Отдельные business task+input, уникальный package path, Sol low, attempt timeout,
+<Отдельные business task+input, уникальный package path, GPT-6 Sol (`openai/gpt-6-sol`) / low, attempt timeout,
 проверки параметров/связей/результатов/сохранения/повторного открытия; expected изолированы.>
 
 ## Критерии этапов

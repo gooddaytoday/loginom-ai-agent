@@ -21,7 +21,7 @@
       "effort": "medium"
     },
     "acceptance": {
-      "model": "openai/gpt-5.6-sol",
+      "model": "openai/gpt-6-sol",
       "variant": "low",
       "credential_source": "existing-chatgpt-oauth"
     }
