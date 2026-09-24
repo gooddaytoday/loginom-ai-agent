@@ -8,6 +8,17 @@
 
 После merge `a6048e756` на GitHub был только успешный macOS candidate; полный набор не падал, а не запускался из-за прежних branch filters. Полная сборка новым annotated-тегом `v0.1.6` завершилась успешно: [CI report](reports/2026-09-21-ci-release/report.md). Создан draft с 30 assets; существующий `v0.1.5` остался на прежнем commit.
 
+## Последний проверенный выпуск
+
+[v0.1.14](https://github.com/gooddaytoday/loginom-ai-agent/releases/tag/v0.1.14)
+опубликован как pre-release из `8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf`.
+Полный [release run](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/36016334443)
+завершён успешно: native builds/общие проверки прошли на попытке 1, вся Linux-матрица
+5/5 — на попытке 3 после восстановления Ubuntu mirror (libexpat HTTP 404).
+Исходники и workflow между попытками не менялись; тег не перемещён.
+Все 30 assets и SHA-256 проверены. Live-приёмка точного macOS ZIP и границы
+Windows/Linux/CLI проверок описаны в [отчёте](reports/2026-09-24-endpoints-release.md).
+
 ## Запуск и публикация
 
 - Push тега `vX.Y.Z`: версия должна совпадать с корневым и Desktop `package.json`; после успешных проверок создаётся **draft pre-release**.

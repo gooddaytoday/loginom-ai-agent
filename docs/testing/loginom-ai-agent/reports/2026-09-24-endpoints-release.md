@@ -58,9 +58,52 @@ live login attempts timed out behind a transient Loginom mask; a diagnostic
 copy exposed the intercepted click, and the complete final installed run passed.
 This does not establish that server-side mask delays have been eliminated.
 
-## Release checkpoint
+## v0.1.14 release verification
 
-CI and artifact verification are pending. This report must be completed with
-the source commit, release run, asset verification and publication status.
-Local source/live checks do not establish installed acceptance of release binaries.
-Linux/Windows remain unsigned; macOS own code is ad-hoc signed without notarization.
+Source: `8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf`, immutable tag `v0.1.14`.
+[Release run 36016334443](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/36016334443).
+All three native builds, shared unit/HTTP API tests, Desktop tests, e2e and
+typecheck passed on attempt 1. Linux matrix attempt 1 passed 4/5 systems;
+Ubuntu 26.04 failed before application launch on an Ubuntu libexpat HTTP 404.
+Attempt 2 passed Ubuntu 26.04 and Debian 12/13; Ubuntu 22.04/24.04 failed on
+the same mirror download problem. Neither incomplete matrix authorizes release.
+The failed reports and logs were preserved locally before replacing their CI
+artifact for the next attempt. No application assertions were weakened.
+
+On 2026-09-24, all three exact missing Ubuntu package URLs returned HTTP 200.
+The full five-system matrix was rerun without source, tag or workflow changes.
+Attempt 3 passed all five systems in one matrix run: Ubuntu 22.04/24.04/26.04
+and Debian 12/13, each `offline-nonroot-launch`, exit 0. The report references
+DEB SHA-256 `58271c18affd713e9056bdaadc13cabacbb5416128e00cd0b65b9c95c7de2b5f`.
+The successful native builds and other gates are retained from attempt 1;
+there is no aggregation of different matrix attempts. Mirror recovery made
+workflow modifications and a new client version unnecessary.
+The complete release run finished **SUCCESS** on attempt 3. CI created a draft
+with 30 assets. Local release validation passed; all 30 GitHub asset sizes and
+SHA-256 digests matched the locally verified files, including `SHA256SUMS.txt`.
+The user-authorized [v0.1.14 pre-release](https://github.com/gooddaytoday/loginom-ai-agent/releases/tag/v0.1.14)
+was published at **2026-09-24 15:44:46 UTC**. Read-back confirmed `isDraft=false`,
+`isPrerelease=true`, 30 assets. Release notes describe the new defaults/migration,
+actual acceptance boundaries and mirror retries; an obsolete proxy-policy line
+from the notes template was removed. No client, workflow or tag changed after
+building. Reports/checkpoint are recorded in a subsequent documentation commit.
+
+All downloaded Desktop manifests identify that same clean source and version;
+installer/source hashes and the CLI/archive and manifest checksum files passed
+local verification. macOS native source/build/static/offline reports passed.
+The exact downloaded macOS ZIP was extracted into an isolated test installation:
+new form/profile defaults, authenticated MCP/Loginom check and save passed.
+Migration to generation 2 preserved credentials and historical generation 1.
+An initial live migration preparation timed out behind the Loginom UI mask;
+restarting the same isolated profile completed its pending migration successfully.
+The mask delay itself is not claimed fixed. A second complete clean-profile
+check/save and migration run passed without a retry immediately before publication
+verification (`loginom-014-release-live-BKiKyb`, temporary local evidence).
+
+Linux installed acceptance is the DEB's offline non-root container matrix;
+AppImage static extraction is not an installed AppImage GUI test. Windows has
+native CI, installer/payload and independent-profile tests, but no local installed
+live Loginom acceptance. CLI migration has shared service tests with CLI codecs;
+no installed CLI live Loginom acceptance is claimed. No model/provider request
+was tested. Linux/Windows remain unsigned; macOS own code is ad-hoc signed without
+notarization. Signing, auto-update and public-site changes are outside this release.
