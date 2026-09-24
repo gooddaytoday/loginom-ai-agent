@@ -2003,5 +2003,10 @@
     "baseHash": "bd7581211301c8d8286a646cd11fce415a83bb003661e85e6accdd4012d25304",
     "hash": "a8af8735a75a085741de54fd311dc3fada19b2c5ace7f8bacb5ec098c55fb276",
     "reason": "Adapt project-scoped OpenViking enrollment for Loginom AI Agent generation 20260924.1; preserve Dock routes and upstream originals; live activation and the full capture cycle were verified on 2026-09-24; evidence and per-worktree admission requirements are documented in docs/node-development/workflow/shared-memory.md."
+  },
+  "packages/loginom-runtime/client/test/workspace.test.mjs": {
+    "baseHash": "1fb5d7d07fb6fa868127a15b31b6ba6e880c1d25f292518f9edcf40f42b0e29d",
+    "hash": "cf92229b08aa83d26eb3b90b0900f323302df868836db1f30ba0b3fbcee9e25c",
+    "reason": "Regress private login followed by workspace preparation using the same canonical public/custom URL; preserve strict foreign-page rejection."
   }
 }

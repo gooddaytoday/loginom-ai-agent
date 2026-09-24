@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
-import { loginBrowser, checkConnection } from "./connection-check.mjs"
+import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts } from "../client/lib/artifacts.mjs"
 import { createBridge } from "../client/lib/bridge.mjs"
@@ -106,7 +106,8 @@ async function handle(message) {
       const config = {
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
-        loginomUrl: input.connection.url,
+        // Preparation must bind to the same canonical path used by private login.
+        loginomUrl: loginomAddress(input.connection.url),
         stateDir: input.stateDir,
         agent: "loginom-ai-agent",
         adapterRevision: "1",

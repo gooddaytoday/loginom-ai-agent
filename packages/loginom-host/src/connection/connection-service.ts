@@ -100,7 +100,7 @@ export async function connectionService(
     return {
       revision: state.revision,
       generation: current?.generation ?? 0,
-      url: current?.url ?? Product.connection.url,
+      url: settingsAddress(current?.url ?? Product.connection.url),
       username: current?.username ?? Product.connection.username,
       folder: `/${current?.username ?? Product.connection.username}`,
       hasApiKey: !!current?.apiKey,
@@ -241,7 +241,7 @@ export async function connectionService(
       const record = {
         generation: state.generation + 1,
         revision: state.revision + 1,
-        url: candidate.url,
+        url: settingsAddress(candidate.url),
         username: candidate.username,
         apiKey,
         password,
@@ -368,6 +368,14 @@ export async function connectionService(
       state.phase = state.active ? "recoverable-error" : "unconfigured"
     },
   }
+}
+
+// The browser adds its automation flag privately; old saved URLs may contain it.
+function settingsAddress(value: string) {
+  const url = new URL(value)
+  if (!url.searchParams.has("testable")) return value
+  url.searchParams.delete("testable")
+  return url.href
 }
 
 function isLegacyDefaultUrl(url: string) {

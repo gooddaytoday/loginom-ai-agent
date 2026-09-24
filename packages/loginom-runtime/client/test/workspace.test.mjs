@@ -5,6 +5,7 @@ import { makeWorkspacePrepareCode, makeWorkspaceBootstrapCode, parseWorkspacePre
 import {prepareTool} from '../lib/skill.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import { createSerialGate } from '../lib/clipboard.mjs';
+import { loginomAddress, loginPage } from '../../src/connection-check.mjs';
 
 const build = '7.5.0-alpha+build.49202';
 
@@ -80,8 +81,9 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
       return exact?tabs.flatMap(t=>[t.graph,t.area,t.home]).filter(e=>e && e.tid===JSON.parse(exact[1])):[];
     }},bg:{app:{Version:actualBuild,PackageTreeNode:PackageNode,Application:{FInstance:{FMainForm:{Items:{Workspace:{
       getActiveTab:()=>({Controller:{Node:{data:{node:packages.get(active)}}}}),
-    }}}}}}}});
+    }},FMapTree:{FServerConnection:{UserName:'test-account'}}}}}}}});
   const locator = selector => ({
+    or() { return this; }, first() { return this; }, async waitFor() {}, async inputValue() { return ''; },
     async isVisible() {
       if (selector.includes('btnAvatar')) return authenticated;
       if (selector.includes('edtUsername')) return !authenticated;
@@ -102,7 +104,7 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
   });
   return { events, tabs, context, openFiles() {add(null);const tab=tabs.at(-1);tab.graph=null;tab.area=null;packages.delete(tab);}, page: {
     url: () => url,
-    async goto(value) { url = value; events.push('navigate'); },
+    async goto(value) { url = value;context.location={origin:new URL(value).origin,pathname:new URL(value).pathname};events.push('navigate'); },
     async evaluate(fn,args) {context.args=args;return runInContext(`(${fn.toString()})(args)`,context);},
     locator, async waitForTimeout() {entryDelay=Math.max(0,entryDelay-1);busyTicks=Math.max(0,busyTicks-1);},
   } };
@@ -117,6 +119,32 @@ test('normal preparation opens Loginom and asks for login without assuming test 
   const state = await execute(fixture);
   assert.equal(state.status, 'LOGIN_REQUIRED');
   assert.deepEqual(fixture.events, ['navigate']);
+});
+
+for (const address of ['https://app.loginom.ai', 'https://app.loginom.ai/app/', 'https://app.loginom.ai/?lang=ru&testable=false', 'https://private.example/custom/?lang=ru']) {
+  test('private login and preparation share the canonical address: '+address, async () => {
+    const fixture=pageFixture();
+    await loginPage(fixture.page,{url:address,username:'test-account',password:''});
+    const state=await execute(fixture,{loginomUrl:loginomAddress(address)});
+    assert.equal(state.status,'READY');
+    assert.equal(state.authenticated,true);
+    assert.equal(fixture.events.filter(event=>event==='navigate').length,1);
+    assert.equal(fixture.events.filter(event=>event==='login').length,1);
+    assert.equal(fixture.events.filter(event=>event==='create_draft').length,1);
+    assert.equal(new URL(fixture.page.url()).searchParams.get('testable'),'true');
+  });
+}
+
+test('prepared login rejects a foreign path or origin before creating a draft', async () => {
+  for (const address of ['https://app.loginom.ai/foreign/', 'https://other.example/app/']) {
+    const fixture=pageFixture();
+    await loginPage(fixture.page,{url:'https://app.loginom.ai',username:'test-account',password:''});
+    await fixture.page.goto(address);
+    const state=await execute(fixture,{loginomUrl:loginomAddress('https://app.loginom.ai')});
+    assert.equal(state.reason,'FOREIGN_PAGE');
+    assert.equal(state.effect_possible,false);
+    assert.ok(!fixture.events.includes('create_draft'));
+  }
 });
 
 test('operator test login and authenticated normal preparation reach the same workspace contract', async () => {

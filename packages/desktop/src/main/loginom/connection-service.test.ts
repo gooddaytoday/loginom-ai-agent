@@ -75,6 +75,35 @@ test("safe views expose defaults and presence flags only; a successful save surv
   }
 })
 
+test("automation query stays out of saved settings and restored public views", async () => {
+  const f = await fixture()
+  try {
+    await save(f.service, { ...candidate, url: "https://example.test/app/?testable=false&a=b" })
+    expect((await f.store.read())?.url).toBe("https://example.test/app/?a=b")
+    expect((await f.service.api.read()).url).toBe("https://example.test/app/?a=b")
+    await f.service.close()
+    const record = (await f.store.read())!
+    await f.store.stage({ ...record, generation: 2, revision: 2, url: "https://example.test/app/?a=b&testable=true" })
+    await f.store.activate(2)
+    const restored = await connectionService(f.store, {
+      async check() {},
+      async prepare() {
+        return { async close() {} }
+      },
+    })
+    try {
+      await restored.settled()
+      expect((await restored.api.read()).url).toBe("https://example.test/app/?a=b")
+      expect((await restored.api.status()).url).toBe("https://example.test/app/?a=b")
+      expect((await f.store.read())?.url).toContain("testable=true")
+    } finally {
+      await restored.close()
+    }
+  } finally {
+    await f.close()
+  }
+})
+
 test("two active drains and an ambiguous receipt hold the old generation and gate new work", async () => {
   const f = await fixture()
   try {

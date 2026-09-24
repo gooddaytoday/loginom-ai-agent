@@ -1,5 +1,7 @@
 # Loginom runtime host
 
+- Connection settings and public read/status views omit the internal `testable` query parameter, including for old saved URLs. New saves remove it while preserving other parameters. Runtime adds `testable=true` privately through `loginomAddress`; private login and managed bridge preparation must use that same canonical address. Historical generations remain immutable.
+
 - Public service defaults are `https://mcp.loginom.ai/mcp` and `https://app.loginom.ai`. At startup, `connectionService` migrates only the exact old default `http://logi-test-plan.bg.local/app` (with optional trailing slash), using a fresh durable generation. Pending settings take precedence; preserve custom URLs, credentials and historical generations. Failed preparation leaves the durable pending record for the next startup. Desktop and CLI share this migration.
 
 - This package owns runtime supervision (`src/supervisor.ts`), private transport (`transport.ts`), the backend adapter (`adapter.ts`), original-user input admission (`inputs.ts`), and extracted connection/recovery logic (`src/connection`). `createLoginomHost` in `src/host.ts` composes these with explicit paths, credential codec, environment and browser mode. Desktop supplies Electron paths and safeStorage; the model must never become their authority.
