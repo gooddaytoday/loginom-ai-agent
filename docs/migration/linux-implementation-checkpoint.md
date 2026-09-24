@@ -1,5 +1,17 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-09-24 — CI release 0.1.12
+
+Ветка `loginom` и новый annotated-тег `v0.1.12` отправлены из
+`7cf322f72696506282a823c7124b79145a98c664`. Полный release run успешен на
+попытке 3: Desktop/CLI Linux x64, Windows x64, macOS arm64, unit/e2e/Desktop,
+typecheck, native/static/offline и Linux matrix 5/5 PASS. Проверки ветки также
+успешны. Создан draft pre-release с 30 assets; SHA256SUMS сверены с GitHub
+digests, скачанные метаданные проверены локально. Исходники и тесты между
+попытками не менялись; причины части нестабильных сбоев остаются не доказаны.
+Установленная live-приёмка и публичная публикация не выполнялись.
+[Отчёт и история повторов](../testing/loginom-ai-agent/reports/2026-09-24-ci-release.md).
+
 ## 2026-09-22 — 0.1.9: возврат proxy environment OpenCode
 
 Полная сборка завершена: [отчёт 0.1.9](../testing/loginom-ai-agent/reports/2026-09-22-proxy-release.md).
