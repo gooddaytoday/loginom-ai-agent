@@ -709,6 +709,7 @@
       "dependencies": {
         "@loginom-ai-agent/product": "workspace:*",
         "@loginom-ai-agent/schema": "workspace:*",
+        "acorn": "8.15.0",
         "effect": "catalog:",
       },
       "devDependencies": {

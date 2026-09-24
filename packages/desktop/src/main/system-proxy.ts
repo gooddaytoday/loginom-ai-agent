@@ -1,6 +1,7 @@
 import type { SystemProxyStatus } from "@loginom-ai-agent/app/system-proxy"
 import {
   directResult,
+  explicitProxy,
   failedResult,
   probeProxyUrl,
   readSystemProxy,
@@ -46,7 +47,7 @@ export function startSystemProxyDetection(input: {
   const capped = new Promise<SystemProxyResult>((resolve) => {
     capTimer = setTimeout(() => resolve(failedResult("timeout")), input.timeoutMs ?? 10_000)
   })
-  const skipped = input.enabled === false || disabled(environment)
+  const skipped = input.enabled === false || disabled(environment) || Boolean(explicitProxy(environment))
   const emptySnapshot: SystemProxySnapshot = {}
   const readPromise = skipped
     ? Promise.resolve({ ok: true as const, snapshot: emptySnapshot })
@@ -70,7 +71,7 @@ export function startSystemProxyDetection(input: {
   }
 
   async function detect(): Promise<SystemProxyResult> {
-    if (input.enabled === false || disabled(environment)) return { ...directResult(), state: "off" }
+    if (skipped) return resolveSystemProxy({ platform: input.platform, environment, enabled: input.enabled })
     try {
       await Promise.race([chromiumReady, aborted(abort.signal)])
       if (abort.signal.aborted) return directResult()

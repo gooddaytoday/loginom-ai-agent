@@ -192,6 +192,33 @@ test("production paths probe SOCKS-only mixed ports and closed proxies", async (
   }
 })
 
+test("explicit proxy variables work without waiting for system readers or Chromium", async () => {
+  for (const key of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]) {
+    const environment = { [key]: "http://explicit.test:8080", NO_PROXY: "local.test" }
+    let reads = 0
+    const detection = startSystemProxyDetection({
+      environment,
+      timeoutMs: 100,
+      read: () => {
+        reads += 1
+        return new Promise(() => undefined)
+      },
+    })
+    try {
+      const result = await detection.result
+      expect(result.state).toBe("environment")
+      expect(result.summary.http).toBe("explicit.test:8080")
+      expect(result.summary.noProxy).toBe("local.test")
+      expect(result.environment).toBeUndefined()
+      expect(result.notices).toEqual([])
+      expect(sidecarEnvironment(environment, result.environment)[key]).toBe("http://explicit.test:8080")
+      expect(reads).toBe(0)
+    } finally {
+      detection.stop()
+    }
+  }
+})
+
 test("an explicit switch skips system proxy discovery", async () => {
   let reads = 0
   const detection = startSystemProxyDetection({

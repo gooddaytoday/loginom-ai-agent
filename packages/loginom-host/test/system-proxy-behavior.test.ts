@@ -129,6 +129,36 @@ test("quotes inside a PAC URL literal do not hide its DIRECT branch", async () =
   expect(result.notices).toContainEqual({ code: "automatic-unsupported" })
 })
 
+test("a regular expression does not hide a DIRECT branch in PAC", async () => {
+  const result = await resolveSystemProxy({
+    platform: "linux",
+    gnome: "org.gnome.system.proxy mode 'auto'\n",
+    pacScript: String.raw`function FindProxyForURL(url, host) {
+      if (/^https?:\/\//.test(url)) return "DIRECT";
+      return "PROXY 127.0.0.1:8080";
+    }`,
+  })
+  expect(result.state).toBe("direct")
+  expect(result.environment).toBeUndefined()
+  expect(result.notices).toContainEqual({ code: "automatic-unsupported" })
+})
+
+test("comments and regular expressions do not add PAC routes", async () => {
+  const result = await resolveSystemProxy({
+    platform: "linux",
+    gnome: "org.gnome.system.proxy mode 'auto'\n",
+    pacScript: String.raw`function FindProxyForURL(url, host) {
+      const pattern = /[\/"']*DIRECT PROXY unused.example:9090/;
+      const fraction = 4 / 2; // return "DIRECT";
+      /* return "PROXY unused.example:9091"; */
+      return "PROXY 127.0.0.1:8080";
+    }`,
+  })
+  expect(result.state).toBe("applied")
+  expect(result.environment?.HTTPS_PROXY).toBe("http://127.0.0.1:8080")
+  expect(result.notices).toEqual([])
+})
+
 test("IPv6 proxy URLs keep a single pair of brackets", () => {
   const parsed = parseProxyAddress("http://[::1]:8080")
   expect(parsed.kind).toBe("http")

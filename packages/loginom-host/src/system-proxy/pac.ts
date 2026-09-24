@@ -1,5 +1,6 @@
 import { createReadStream } from "node:fs"
 import { stat } from "node:fs/promises"
+import { tokenizer, tokTypes } from "acorn"
 
 import { parseProxyAddress } from "./address"
 
@@ -74,21 +75,12 @@ async function readPacText(chunks: AsyncIterable<Uint8Array>) {
 // CLI не исполняет PAC. Если в скрипте ровно один HTTP(S)-адрес, берём его:
 // так устроены локальные PAC многих VPN-клиентов.
 export function proxyFromPacScript(script: string): PacProxy {
-  // Маркеры комментариев внутри строк (например, https://) остаются частью строки.
-  const quoted: string[] = []
-  const source = script.replace(
-    /"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|`(?:\\[\s\S]|[^`\\])*`|\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/g,
-    (token) => {
-      if (token.startsWith("/")) return " "
-      quoted.push(token)
-      return token
-    },
-  )
-  if (hasStandaloneDirect(source, quoted)) return { http: "", socks: "", ambiguous: true }
+  const tokens = pacTokens(script)
+  if (!tokens || hasStandaloneDirect(tokens.source, tokens.quoted)) return { http: "", socks: "", ambiguous: true }
   const http = new Set<string>()
   const socks = new Set<string>()
   const pattern = /\b(DIRECT|QUIC|PROXY|HTTPS|SOCKS4|SOCKS5|SOCKS)\b(?:\s+("[^"]+"|'[^']+'|[^\s;"']+))?/gi
-  for (const match of source.matchAll(pattern)) {
+  for (const match of tokens.source.matchAll(pattern)) {
     const kind = match[1].toUpperCase()
     const token = match[2]?.replace(/^['"]|['"]$/g, "")
     if (kind === "DIRECT" || kind === "QUIC" || !token) continue
@@ -103,6 +95,23 @@ export function proxyFromPacScript(script: string): PacProxy {
     http: http.size === 1 ? [...http][0] : "",
     socks: socks.size === 1 ? [...socks][0] : "",
     ambiguous: http.size > 1 || (http.size === 0 && socks.size > 1),
+  }
+}
+
+function pacTokens(script: string) {
+  const source: string[] = []
+  const quoted: string[] = []
+  try {
+    // Токенизатор пропускает комментарии и различает regexp и деление, не исполняя PAC.
+    for (const token of tokenizer(script, { ecmaVersion: "latest" })) {
+      if (token.type === tokTypes.regexp) continue
+      const text = script.slice(token.start, token.end)
+      if (token.type === tokTypes.string || token.type === tokTypes.template) quoted.push(text)
+      source.push(text)
+    }
+    return { source: source.join(" "), quoted }
+  } catch {
+    return undefined
   }
 }
 

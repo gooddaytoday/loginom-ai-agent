@@ -214,6 +214,9 @@ const main = Effect.gen(function* () {
     app.quit()
     return
   }
+  startSession()
+  // Явный прокси из login shell должен быть известен до запуска читателей ОС.
+  const shellEnv = preferAppEnv(app.getPath("userData"))
   systemProxy = startSystemProxyDetection({
     environment: process.env,
     enabled: systemProxyEnabled(),
@@ -224,10 +227,6 @@ const main = Effect.gen(function* () {
       win.webContents.send("system-proxy-status", status)
     }
   })
-  startSession()
-
-  const shellEnv = preferAppEnv(app.getPath("userData"))
-
   app.on("second-instance", (_event: Event, argv: string[]) => {
     const urls = argv.filter((arg: string) => arg.startsWith("loginom-ai-agent://"))
     if (urls.length) {

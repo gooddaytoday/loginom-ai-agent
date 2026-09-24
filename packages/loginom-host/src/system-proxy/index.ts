@@ -1,5 +1,6 @@
 export { parseProxyAddress, proxyHostPort } from "./address"
 export { translateBypass } from "./bypass"
+export { explicitProxy } from "./environment"
 export { parseGnomeSettings } from "./gnome"
 export { parseKdeSettings } from "./kde"
 export { parseMacosSettings } from "./macos"
