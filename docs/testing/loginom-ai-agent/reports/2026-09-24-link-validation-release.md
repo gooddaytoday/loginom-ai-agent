@@ -53,7 +53,7 @@ system-proxy description; runtime proxy behavior is unchanged.
 
 ## Release verification — 2026-09-25 Europe/Moscow
 
-**READY FOR PUBLICATION; draft only. Separate user authorization is pending.**
+**PUBLISHED as pre-release after separate user authorization.**
 
 Annotated tag `v0.1.16` identifies `2bac319e8fc7b35558b8fd309126b7b32f49a7ef`
 on `loginom`, prod channel. Branch and new tag were pushed atomically. The existing
@@ -121,7 +121,15 @@ Raw journals, credentials and profiles are excluded from Git.
 Windows/Linux received full native CI and the Linux DEB matrix; no live Loginom
 scenario acceptance is claimed for those platforms. Linux/Windows remain
 unsigned; macOS own code is ad-hoc signed, without Developer ID/notarization.
-The public automatic update feed remains disabled. Publication must await the
-user's separate authorization after reviewing this report and the prepared notes.
-After publication, verify pre-release status and asset availability and append
-the final release link here.
+The public automatic update feed remains disabled.
+
+## Publication — 2026-09-25 Europe/Moscow
+
+The user separately authorized publication after reviewing the prepared draft.
+[Pre-release v0.1.16](https://github.com/gooddaytoday/loginom-ai-agent/releases/tag/v0.1.16)
+was published at 2026-09-24T21:29:27Z with `draft=false`, `prerelease=true`,
+and without marking it as the latest stable release. All 30 assets retained
+exactly their verified SHA-256 digests and sizes; every public download returned
+HTTP 200 with the expected size. One transient GitHub API connection reset was
+resolved by repeating the read; publication was not repeated. The acceptance
+lease was released after confirmed cleanup. The v0.1.15 tag/draft was preserved.
