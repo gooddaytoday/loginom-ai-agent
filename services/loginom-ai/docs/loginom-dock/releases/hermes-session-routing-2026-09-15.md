@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-cd6e8703e136` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Изоляция задач Hermes после RC6 — 15 сентября 2026
 
 **Продолжение:** исправление опубликовано и установлено в RC7 после разрешения
@@ -19,7 +21,7 @@ Hermes использовал прежний named MCP `loginom-dock`: Dock sess
 работала правильно; повторное вложение не могло исправить маршрутизацию.
 
 В Hermes 0.21.0, core `693641aa8b4359c602283bdbbc14041e03bc47bc`,
-`tools/mcp_tool.py::_servers[name]` общий для чатов одного процесса.
+`unavailable:artifact-fb6587e73771cdb2[name]` общий для чатов одного процесса.
 `mcp_tool_discovery.py` повторно использует здоровое подключение;
 `mcp_tool_handlers.py` не передаёт native session/turn в MCP metadata.
 Штатный pre-tool hook может дополнить аргументы без модификации Hermes core.
@@ -85,7 +87,7 @@ Runtime, оба общих плагина, сайт, GitHub и конфигур�
   После v6 изменено только обозначение внутреннего транспорта в origin receipt
   и добавлена его адресная проверка; повтор живого прогона для этого не заявлен.
 
-Evidence: `.dock/hermes-session-routing-20260915/`, в частности
+Evidence: `unavailable:artifact-fd3ededc3cc7b051`, в частности
 `focused-tests-release-candidate.txt`, `plugin-tests-final.txt`,
 `shutdown-outside-sandbox.txt`, `native-core-probe-v6.txt`,
 `native-core-v6/{summary.json,dock/sessions/*/package-cleanup.json}`.

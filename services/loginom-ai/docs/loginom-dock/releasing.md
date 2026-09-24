@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-d133356d69b4` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Подготовка выпуска Loginom Dock
 
 10 сентября на этот Mac по запросу пользователя установлена внутренняя версия
@@ -28,19 +30,19 @@ Windows-приёмка и повтор полного набора пропущ�
 используют `v*` для Python-пакета OpenViking и отдельные префиксы для компонентов.
 Файлы CI для выпуска клиента Dock не меняются.
 
-Текущая серверная установка и доступ — в [operations.md](operations.md).
+Текущая серверная установка и доступ — в [operations.md](../../../../docs/node-development/history/supplements/docs/loginom-dock/operations.md).
 Предварительный выпуск уже опубликован; следующие шаги относятся к **новому**
 выпуску с новой версией и тегом. Не пересоздавать существующие assets под тем же тегом.
 
 ## Состав
 
 Каждый архив содержит Node.js 24.19.0, закреплённые зависимости браузера/MCP,
-оба native-плагина, мастер `install.sh` либо `install.ps1`, `client/INSTALL.md`, лицензии и
+оба native-плагина, мастер `install.sh` либо `install.ps1`, `packages/loginom-runtime/client/INSTALL.md`, лицензии и
 `release.json`. В manifest входят версия, исходный commit, признак чистоты
 исходников, совместимость с агентами и контрольные суммы файлов.
 
 Версия клиента, двух plugin manifests и ревизии hooks должны совпадать.
-Проверять `client/package.json`, `plugins/loginom-dock/.codex-plugin/plugin.json`,
+Проверять `packages/loginom-runtime/client/package.json`, `plugins/loginom-dock/.codex-plugin/plugin.json`,
 `plugins/loginom-dock-hermes/plugin.yaml`, native hooks и полученный manifest.
 Существующая установленная среда пользователя не обновляется от изменения версии
 в checkout или от публикации файлов.
@@ -82,10 +84,10 @@ Windows-приёмка и повтор полного набора пропущ�
 
 ```sh
 python3 deploy/loginom-dock/package-client-source.py \
-  --root "$PWD" --output .dock/client-source.tar.gz --require-clean
+  --root "$PWD" --output unavailable:artifact-aa071a1e5681bf57 --require-clean
 python3 deploy/loginom-dock/client-source-inventory.py \
-  --archive .dock/client-source.tar.gz \
-  --manifest .dock/client-source.tar.gz.manifest.json
+  --archive unavailable:artifact-aa071a1e5681bf57 \
+  --manifest unavailable:artifact-00428907ec979dc9
 ```
 
 Это небольшой клиентский архив, не полный серверный снимок. На VPS после распаковки

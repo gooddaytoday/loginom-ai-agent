@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-b7a61887c9f4` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Нехватка места на Mac — 13 сентября 2026
 
 При активном Hermes узла14 и работе16/17 Data достиг100%:116MiB free,
@@ -6,7 +8,7 @@ ENOSPC при записи. Main .dock129GiB/worktrees45GiB сохранены; 
 активных npm install/ci/exec процессов не было. Координатор удалил только
 /Users/kartamyshev/.npm/_cacache; installed dependencies/runtime/evidence не менялись.
 После очистки df7.9GiB free, повторный df подтвердил. Local receipt:
-.dock/disk-cache-cleanup-20260913.json.
+unavailable:artifact-c67c1fbec9159ba4.
 
 До уведомления16 удалил126воспроизводимыхcache каталогов своих закрытых
 Chromium-профилей (272401205bytes); по отчёту активный профиль и evidence
@@ -37,7 +39,7 @@ node_16_export_investigation.md содержит export данные, но не�
 отсутствие uv/pip установок и выполнил штатный uv cache clean только
 `/Users/kartamyshev/.cache/uv`. Exit0,250013files/5.2GiB reported removed;
 фактический df после очистки3.9GiB. Не путать размер кэша с приростом free.
-Receipt `.dock/disk-uv-cleanup-20260913.json`. Evidence/DB/WAL/venv/runtime
+Receipt `unavailable:artifact-993dfe3c43d0a814`. Evidence/DB/WAL/venv/runtime
 и профили браузеров не удалялись. Другие крупные browser/runtime caches
 не затрагивались. Оба разработчика уведомлены и продолжают ограниченную
 подготовку. Предложенный node14 reserve12GiB не достигнут: Hermes остаётся

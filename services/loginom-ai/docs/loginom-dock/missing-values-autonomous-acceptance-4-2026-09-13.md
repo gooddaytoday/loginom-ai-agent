@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-9c4b3773062b` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: автономная приёмка 4 — 13 сентября 2026
 
 **FAIL. Единственный разрешённый Hermes run выполнен; полная цель не принята.**
@@ -74,7 +76,7 @@ SHA `73e93c1e573abd863b09d25e087f690bf0d6bc0e5b262663f97a34ac8353999d`.
 ## Закреплённый комплект и дальнейшая работа
 
 [Полные pins и38 квитанций](missing-values-autonomous-acceptance-4-pins-2026-09-13.json).
-Приватный корень `.dock/node14-autonomous-acceptance-4/`.
+Приватный корень `unavailable:artifact-ca377e1eedbb73b9`.
 Индекс SHA `e407c16756727df985b652dbc4a32b7d6428087e371c1bb91177e649c5604736`.
 
 - Source7bef361cf5320e553d68fc020493717c6e50683e; исходный report/headac7ce151.

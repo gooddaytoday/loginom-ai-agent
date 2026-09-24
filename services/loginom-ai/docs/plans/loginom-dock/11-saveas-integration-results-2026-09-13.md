@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-6ad5c4e51b14` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Узел11: Save As интегрирован и проверен
 
 Статус: **integration_complete_focused_pass / awaiting_coordinator**.
@@ -10,9 +12,9 @@
 
 Из `0e11a3fb24ca40a9f855008d2b0d1856d6f771ad` перенесены ровно:
 
-- Единственный hunk `client/lib/executor.mjs`: ожидание завершения native Save As,
+- Единственный hunk `packages/loginom-runtime/client/lib/executor.mjs`: ожидание завершения native Save As,
   проверка ошибки и `save_flow_completed` перенесены перед `if (keepOpen)`.
-- Один overwrite race test в `client/test/executor.test.mjs`, добавленный отдельно
+- Один overwrite race test в `packages/loginom-runtime/client/test/executor.test.mjs`, добавленный отдельно
   после проверки известного различия EOF-контекста.
 
 Исходные целевые blobs совпали с согласованным пакетом. Runtime hunk совпал с
@@ -84,7 +86,7 @@ runtime/session/catalog binding и две публичные операции с
 - Runtime: `8d6d4b3cd7f5d19a3ac1e9ac6537ff8219f97f9898326227df3f3ae55dcb1380`.
 - Goal SHA не изменён: `d283e683fe61298a9273365ca485d63e16fb582d08b45d42dfefb70c65952a9c`.
 - Harness input-map SHA: `427cf196518020fed8be9f72076e76cdca61bc498763e1e0f32a2fe9e0c98b0b`.
-- Архив `.dock/replacement/saveas-integration/client-source-b0571534.tar.gz`,
+- Архив `unavailable:artifact-6d1689c6c531187b`,
   **392 файла / 1 020 063 байта**, SHA
   `396026de516792499c9d21f00981ea0044d9d47fced7f052b65c307150ebbf50`.
   Байты и inventory проверены, исходники совпали с source commit; capability ABI

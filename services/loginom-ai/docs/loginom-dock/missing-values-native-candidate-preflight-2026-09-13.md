@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-ee264a7bc0a4` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: native-save candidate preflight, 2026-09-13
 
 Команда: `node14:native-save-candidate-preflight:1:921f5d51e78cd190f1352900ee755fee9c2b614759b46b04595e3dc34537a483`.
@@ -19,7 +21,7 @@ Compatibility: Loginom7.4.2, macOS, Chromium, ru; E2E
 `2cad5602158fd2e4836d821d644a2b8d92f571a2`, оба save-root только `/test-4`.
 Candidate staged, не activated; server/current и общий клиент не переключались.
 
-В exporter добавлен tracked `executor/capability-abi.json`, который publisher
+В exporter добавлен tracked `packages/loginom-runtime/executor/capability-abi.json`, который publisher
 импортирует при старте. Новый packet-v2 содержит11 файлов; publisher `--help`,
 publisher import и builder import прошли в изолированно извлечённом комплекте.
 Локальный build/stage не выполнялся. Старый10-file packet-v1 сохранён.
@@ -28,7 +30,7 @@ publisher import и builder import прошли в изолированно из
 
 Реальный старт полного набора из9 CSV был отклонён до prepare: production
 `admitStartupArtifacts` допускает не более8. Старый неуспешный запуск сохранён в
-`.dock/node14-native-candidate/20260913-071234-6033f986/` вместе с первоначальным
+`unavailable:artifact-c7adeaf37ccbc2d2` вместе с первоначальным
 `full-goal-mcp.json` и `full-goal-startup-blocker.json`.
 
 `reordered.csv` содержит те же3 строки, что `precision.csv`, в другом порядке
@@ -44,7 +46,7 @@ SHA источника. Сохранены9 импортов,12 финальны
 по production API schema. Новый полный model-free prepare прошёл с8 artifacts в
 user-v1: session `69006a92-7487-4a34-9607-5bc81cd6727f`, document
 `1789274297139-0bh09fsj2tl8`. Отдельная initialize/list_tools сессия осталась idle.
-Evidence: `.dock/node14-native-candidate/20260913-073658-fb37fc47/`.
+Evidence: `unavailable:artifact-8c09bfd0bd5eec85`.
 Порядок и метки нового варианта goal ещё должны пройти полный автономный сценарий;
 успешный startup не является выполнением его12 результатов.
 
@@ -52,7 +54,7 @@ Evidence: `.dock/node14-native-candidate/20260913-073658-fb37fc47/`.
 
 Component session `a9d5d907-f6bd-4443-92bf-6b9cc253c86c`, document
 `1789273118522-a05656u26wu`; evidence
-`.dock/node14-native-candidate/20260913-071823-64a944c0/`.
+`unavailable:artifact-8ea5b8912633e465`.
 Три CSV доставлены штатно с проверкой байтов. Созданы2 импорта и2 Missing Values;
 input/output autosync=false. У первого импорта заменён core.csv на changed.csv
 с тем же GUID, затем тот же Missing Values выполнен с parameters={}, inputs=[],
@@ -74,8 +76,8 @@ receipts также сопоставлены с каждым значением 
 Cancel были inactive, после выполнения зависимого узла — active; execution IDs
 новые. Source bytes после reopen повторно не скачивались: связь с ними доказана
 предыдущими upload receipts и сохранённым source path/format/schema.
-Evidence: `.dock/node14-native-candidate/reopen-1/`; итог
-`.dock/node14-native-candidate/component-audit-2.json` (`passed=true`,
+Evidence: `unavailable:artifact-cd7224ec76e98868`; итог
+`unavailable:artifact-c9ae04c5761ac2e5` (`passed=true`,
 `scope=native_component_diagnostic`, `model_started=false`, `full_goal_accepted=false`).
 
 Geometry-wrapper проверен в настоящих source MCP prepare: viewport=null,

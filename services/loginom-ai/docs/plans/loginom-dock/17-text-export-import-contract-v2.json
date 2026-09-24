@@ -3,7 +3,7 @@
   "run_id": "20260914-000803-18fad485",
   "passed": false,
   "original_revision": "908c9b7d90eefd72fea2ae9a7e62bcf90b5469cf",
-  "reevaluation_path": ".dock/node17/acceptance/runs/20260914-000803-18fad485/reevaluation-v2-model-03.json",
+  "reevaluation_path": "unavailable:artifact-3da810c7c282520f",
   "reevaluation_sha256": "7cfda95e105c4b336b61c772e8cca3d68eda2d5c0c70c1324d1c0914e987ff95",
   "original_files_sha256": {
     "request.json": "fadee131be6f33342f3887d33008de47d9d88079511dbc331946ec32645c42b7",
@@ -71,12 +71,18 @@
     }
   },
   "tests": {
-    "command": "python3 -m unittest discover -s tools/loginom-acceptance -p 'test_text_export_*.py'",
+    "command": "python3 -m unittest discover -s unavailable:artifact-abdc500409930ca3 -p 'test_text_export_*.py'",
     "passed": 30
   },
   "remaining_blockers": [
     "Unchanged frozen observed_origin rejects the two native workspace_prepared events in the model session",
     "Independent original persistence pending; coordinator owns investigation of read-only original"
   ],
-  "original_artifacts_unchanged": true
+  "original_artifacts_unchanged": true,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-cee43b9092c8",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

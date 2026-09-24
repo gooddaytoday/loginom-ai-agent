@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-577860211043` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 13 «Дата и время»: отдельное ревью 1
 
 **Результат: найдены три существенных замечания. К автономной приёмке кандидат
@@ -13,10 +15,10 @@
 
 ## N13-R1 — P1: потерянный ответ настройки блокирует исходную операцию без recovery
 
-Места: `client/lib/date-time-procedure.mjs:48–50` — новый вызов переключения;
-`client/lib/executor.mjs:1421–1473` — общий `inspectApply`;
-`client/lib/executor.mjs:2022–2024` — запрет resume при unresolved phase;
-`client/lib/calculator-node.mjs:207–213` — продолжение только от принятого finish.
+Места: `unavailable:artifact-143c0b8b150450c5` — новый вызов переключения;
+`unavailable:artifact-2ffe69e618a8dd96` — общий `inspectApply`;
+`unavailable:artifact-05814129f3707022` — запрет resume при unresolved phase;
+`unavailable:artifact-4c30c4eb5ee407fd` — продолжение только от принятого finish.
 
 **Условие:** существующий узел, фаза configure; native click DateB/quarter
 успешно выполнился, ответ потерян. Браузер и черновик ещё существуют; доступна
@@ -37,7 +39,7 @@ AMBIGUOUS/configure/cleanup_complete=false. Независимые снимки 
 подтвердила: inspect → state=pending, recovery_options=[],
 internal_resume_available=false; resume запрещён; другой operation_id запрещён
 с `Another Dock operation remains pending`. Configure вызван один раз.
-Артефакт: `.dock/node13-review/recovery-repro.json`; воспроизводящий скрипт рядом.
+Артефакт: `unavailable:artifact-9004b384ac6349da`; воспроизводящий скрипт рядом.
 Это модель общей границы runtime, не новая живая попытка.
 
 **Влияние:** одна потеря ответа после уже исполненного флага блокирует дальнейшую
@@ -56,8 +58,8 @@ configure-варианта необходимо согласовать с ним
 
 ## N13-R2 — P1: подтверждённая ошибка исполнения остаётся неопределённым pending
 
-Места: `client/lib/node-execution-procedure.mjs:247–248`,
-`client/lib/node-apply.mjs:162–188`, `client/lib/executor.mjs:1421–1473`.
+Места: `unavailable:artifact-081d3ef34e4af155`,
+`unavailable:artifact-3822427adad58028`, `unavailable:artifact-2ffe69e618a8dd96`.
 Это **существующий общий дефект**, уже обозначенный координатором как
 terminal-failure работа ветки14; отдельную реализацию здесь не начинать.
 
@@ -70,7 +72,7 @@ terminal-failure работа ветки14; отдельную реализац�
 Проверка общего runtime с воспроизведением именно этой ошибки драйвера вернула
 AMBIGUOUS, pending_phase=execute, execution.status=pending при сохранённом
 execution_id; inspect/resume не разрешили продолжение. Артефакт:
-`.dock/node13-review/terminal-failure-repro.json` и одноимённый скрипт.
+`unavailable:artifact-82221af3df15e114` и одноимённый скрипт.
 Реальную ошибку процесса Date/time в этом ревью **не вызывали**; вывод основан
 на коде реального драйвера и проверке общей границы обработки. Успешные
 0×7/4×27 эту ветку не проверяют.
@@ -86,7 +88,7 @@ execution/node/document с подтверждённым cleanup, честно з
 
 ## N13-R3 — P2: аудитор не проверяет запрошенные метки сквозных выходов
 
-Место: `tools/loginom-acceptance/date_time_configuration_evidence.py:127–139`,
+Место: `unavailable:artifact-2a3a03c6f92aff97`,
 особенно условие на `origin.get('configured_label')` в строке134.
 
 **Воспроизведение без изменения журналов:** взять оригинальный запрос
@@ -94,7 +96,7 @@ execution/node/document с подтверждённым cleanup, честно з
 Исходный audit PASS. В копии запроса задать для output mapping источника `Id`
 `label="Unfulfilled requested label"`, оставив все реальные observations,
 квитанции и результат без изменений. Audit снова PASS. То же воспроизведено
-для `Amount`. Артефакт: `.dock/node13-review/auditor-label-repro.json`.
+для `Amount`. Артефакт: `unavailable:artifact-6f9971a59a5dd76b`.
 
 У сквозного столбца нет configured_label, поэтому сравнение с запросом
 пропускается, а projection копирует фактическую метку. Последующие проверки
@@ -122,7 +124,7 @@ healthy; поиск выполнялся в actor shared-project scope. Наст
 
 - В данном этапе: **326/326** профильных клиентских тестов и **106/106** общих
   тестов Grouping output/source guards, node procedure и apply runtime;
-  **511/511** Python acceptance unit tests. Логи в `.dock/node13-review/`:
+  **511/511** Python acceptance unit tests. Логи в `unavailable:artifact-f6a38f4aafe5010b`:
   `focused-tests.log`, `shared-tests.log`, `python-tests.log`.
 - **181** сохранённый публичный ответ с state из сессий1e/f7/6e прошёл текущую
   строгую схему MCP через SDK AjvJsonSchemaValidator; schema-check.json.

@@ -31,5 +31,11 @@
     "empty": 7
   },
   "live_evidence_negative_rejections": 19,
-  "provenance_negative_rejections": 3
+  "provenance_negative_rejections": 3,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-7beb641d4c09",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

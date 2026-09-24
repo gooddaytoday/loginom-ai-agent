@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-0e8097947c64` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Node17: единственный native smoke остановлен, replace не отправлен
 
 Назначение `node17:native-observer-smoke:1:18b3ac38`.
@@ -101,14 +103,14 @@ Runtime155 inputs и source `25249210` не менялись; runtime
 Не утверждать сохранность/сохранение несохранённого draft либо server-side logout.
 
 Evidence root:
-`.dock/node17/native-observer-smoke/20260913-142510-94897ed4/`.
+`unavailable:artifact-106c7f0717f8e36d`.
 Основные файлы: request.json, preparation.json, geometry.json, smoke-source.json,
 smoke-original.json, smoke-reject.json, replace-body.json, observer/*.jsonl,
 initial-readonly-diagnosis.json, readonly-diagnosis.json, initial-diagnosis.png,
 diagnosis.png, native-audit.json, session-close.json, process-close-check.json.
 Raw execution journal находится в private/dock-state/sessions/<session ID>/.
 В соседнем JSON — точные pins и hashes ключевых evidence. Аудит воспроизводится
-локальным `.dock/node17/native-observer-smoke/audit-probe.py` без UI/model.
+локальным `unavailable:artifact-f9a10b81981dbeb1` без UI/model.
 
 Следующий owner — координатор: решить адресное исправление ожидания навигации
 и origin-binding аудитора, затем отдельно назначить новый bounded smoke.

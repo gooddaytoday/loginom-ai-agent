@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-aafb919627a9` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 13: исправлен размер входа приёмки
 
 Команда `node13:acceptance-input-limit-fix:1:881793e1f1d5b61f149112f3d6a29f72eb441b4e`.
@@ -67,15 +69,15 @@ expected, точную схему и отсутствие truncation. Добав
 
 Полный Python suite: **533 PASS** (531 прежний +2 новых теста). Сверка всех6 схем
 и исключения с881793e1 — PASS. Inputs inventory: **249 файлов**, hashes PASS.
-Артефакты проверки: `.dock/node13-input-limit-fix/python-tests.log`,
+Артефакты проверки: `unavailable:artifact-4f7b430e3c94dc9c`,
 `public-schema.json`, `schema-preservation.json`, `inputs-check.json`, `hashes.json`.
 
 Повторяемые безмодельные команды:
 
 ```sh
-python3 -m unittest discover -s tools/loginom-acceptance -p 'test_date_time_sales_preparation.py'
-python3 tools/loginom-acceptance/date_time_admission.py --inputs-only
-python3 tools/loginom-acceptance/date_time_launch.py --admission tools/loginom-acceptance/fixtures/date-time/admission.pending.json
+python3 -m unittest discover -s unavailable:artifact-abdc500409930ca3 -p 'test_date_time_sales_preparation.py'
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_admission.py --inputs-only
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_launch.py --admission packages/loginom-runtime/tools/loginom-acceptance/fixtures/date-time/admission.pending.json
 ```
 
 Последняя остаётся BLOCKED / exit1. Рабочие команды будущего запуска и direct-open
@@ -85,7 +87,7 @@ python3 tools/loginom-acceptance/date_time_launch.py --admission tools/loginom-a
 
 R1 configure continuation прежнегоID с полной29строчной матрицей и его реальные
 positive/negative проверки остаются OPEN. R2 terminal failure integration и новая
-целевая live Date/time проверка остаются OPEN. Общий executor/recovery не менялся.
+целевая live Date/time проверка остаются OPEN. Общий unavailable:artifact-b16792fc12242b66 не менялся.
 Direct-open diagnostic protocol и полный новый goal ещё не прошли end-to-end;
 это подготовка, **не live/Hermes acceptance**. Final runtime/archive/catalog,
 coordinator slot и admission не назначены. Исторические4×27 не перенесены на10×27.
@@ -94,7 +96,7 @@ Hermes, stage/build/merge/cherry-pick/push/deploy/activation/shared plugin и re
 
 ## Обновлённые SHA-256
 
-Пути относительно `tools/loginom-acceptance/`. Entry полного аудитора не менялся;
+Пути относительно `unavailable:artifact-6c9840df3f4b6129`. Entry полного аудитора не менялся;
 изменились его component, admission guard и pinned inputs. Bytes SHA `inputs.json`
 и SHA canonical sorted map — разные, обе формы приведены явно.
 

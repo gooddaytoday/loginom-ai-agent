@@ -9,5 +9,11 @@
   "fresh_sessions": 10,
   "fresh_cells": 470,
   "original_failure_preserved": true,
-  "evidence": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/docs/loginom-dock/node16-final-acceptance-2026-09-14.json"
+  "evidence": "historical-ref:ref-71eafd060ac53403",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-989e24bd2475",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

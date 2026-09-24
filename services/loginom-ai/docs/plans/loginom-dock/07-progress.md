@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-f1cbda4ccd6c` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Подплан 07: ход реализации
 
 9 сентября 2026. Итог: **implemented / live_verified**, Hermes49/49 PASS.
@@ -11,8 +13,8 @@
 Живая диагностика: Loginom 7.4.2, `logi-test-plan.bg.local`, выбранный оператором
 account `user`, отдельная копия `/user/dock-p3/packages/Dock-grouping-diagnostic-20260909.lgp`.
 Окно развёрнуто; viewport null, фактическая рабочая область 2044×1035.
-Сессия `.dock/calculator-v3/live-1788967321873`, данные диагностики и исходники
-в `.dock/grouping-v3/`. Первый запуск копирования сохранил копию, но дальнейший
+Сессия `unavailable:artifact-c1c477bee5f61289`, данные диагностики и исходники
+в `unavailable:artifact-1def480bd05b5439`. Первый запуск копирования сохранил копию, но дальнейший
 переход не был готов; повторное открытие точной копии подтвердило доступ на запись.
 
 Подтверждённые особенности UI:
@@ -55,7 +57,7 @@ goal-only Hermes-приёмка openai-codex / gpt-5.6-sol / low. Никакие
   Codex-диагностика, не независимая автономная приёмка.
 - Source pins получены из manifest: E2E `2cad5602158fd2e4836d821d644a2b8d92f571a2`,
   Help `353e506ba04b77a2926d8ddf8472b36c684b67fd`; шесть file SHA в
-  `.dock/grouping-v3/sources/pins.json`.
+  `unavailable:artifact-dd102a12b6e81065`.
 - 325 выбранных client tests и отдельно 80 lifecycle tests прошли. Добавлены
   10 grouping parameter/context проверок; они прошли.
 - Ранняя проверка нового узла использует временный Quick Preview точного source
@@ -106,7 +108,7 @@ goal-only Hermes-приёмка openai-codex / gpt-5.6-sol / low. Никакие
   У одиночной функции источник иногда имеет суффикс (`Text_Count`, `Other_Sum`,
   `Amount_Avg`), тогда как исходный target имеет простое имя. Resolver проверяет
   допустимые точные имена, тип/метку и взаимно однозначное native соответствие.
-- Fixture `tools/loginom-acceptance/fixtures/grouping/grouping.csv`: 150 bytes,
+- Fixture `packages/loginom-runtime/tools/loginom-acceptance/fixtures/grouping/grouping.csv`: 150 bytes,
   SHA-256 `579c1df3f406bc4b6839ea9d587736d120092128404ba68f2619b2e9a720e27c`.
   Восемь строк с Null, пустой строкой, отрицательными числами и дробной точностью.
 - `group-null-1788972776859`: SUCCEEDED, 3×7, execution
@@ -189,7 +191,7 @@ Run `20260909-201828-1d8068f0` завершил все пять операций
 
 Codex заново открыл отдельную копию пакета, выполнил импорт и проверил native
 Preview: восемь строк, Amount пустой→Null, Text quoted empty→пустая строка,
-Text null marker→Null. Каталог `.dock/calculator-v3/live-1788974985085`,
+Text null marker→Null. Каталог `unavailable:artifact-4139f74c5ad5bda7`,
 `audit-preview-cache4.json`. Диагностический браузер закрыт перед новым Hermes.
 Verifier принимает только полные identity mappings с точными порядком/именами/
 метками, без исключений; отрицательные тесты сохранены. Добавлен regression

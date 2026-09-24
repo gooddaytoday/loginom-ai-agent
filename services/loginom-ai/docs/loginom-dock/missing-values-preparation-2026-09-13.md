@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-17faf0b2fe6c` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: пакет подготовки автономной приёмки
 
 Подготовка завершена до внешнего server-stage gate. Hermes не запускался,
@@ -10,16 +12,16 @@ Runtime не изменился: **`a9db4113ac69d38d7227e971ece3652acf3e1bf83672
 
 ## Передача для VPS
 
-- Архив: `.dock/node14-acceptance-packet-v1/catalog-source.tar`.
+- Архив: `unavailable:artifact-a7938edcb1b999d5`.
   SHA256 `ab94339d26a497cbf467d19b9758c4937911ef40e0e40463ef0ec8b0f59a25a4`.
-- Пофайловый manifest: `.dock/node14-acceptance-packet-v1/source-manifest.json`.
+- Пофайловый manifest: `unavailable:artifact-fa93e474f763ec7a`.
   SHA256 `d3766d8cf818aa1f1ebb73939ef047f498321a746a162fdb361a0431330dc7fe`.
-- Воспроизводимый exporter: `tools/loginom-acceptance/node14/build_packet.py`.
+- Воспроизводимый exporter: `packages/loginom-runtime/tools/loginom-acceptance/node14/build_packet.py`.
   Экспортированы **10 tracked файлов точного code commit**, а не рабочий каталог.
   Все байты и полный состав повторно сверены после извлечения. Зависимости
   штатного builder импортированы без сборки. .env, профилей, секретов и
   node_modules в архиве нет.
-- [Команды build/validate/stage и readback](../../tools/loginom-acceptance/node14/VPS.md).
+- [Команды build/validate/stage и readback](../../../../packages/loginom-runtime/tools/loginom-acceptance/node14/VPS.md).
   Версия `2026.09.13-node14-test4.1-candidate`, allowed_roots обоих save actions
   строго `/test-4`; Loginom7.4.2/macOS/Chromium/ru, E2E
   `2cad5602158fd2e4836d821d644a2b8d92f571a2`, node.add DataRecovery.
@@ -31,9 +33,9 @@ Runtime не изменился: **`a9db4113ac69d38d7227e971ece3652acf3e1bf83672
 
 ## Goal, fixtures и независимая проверка
 
-[Матрица допуска, команды запуска и порядок сохранения/повторного открытия](../../tools/loginom-acceptance/node14/PREPARATION.md)
+[Матрица допуска, команды запуска и порядок сохранения/повторного открытия](../../../../packages/loginom-runtime/tools/loginom-acceptance/node14/PREPARATION.md)
 отделяют старые targeted/fault checks от обязанностей обычного Hermes.
-[Естественное задание](../../tools/loginom-acceptance/goals/missing-values-complete.txt)
+[Естественное задание](../../../../packages/loginom-runtime/tools/loginom-acceptance/goals/missing-values-complete.txt)
 охватывает все заявленные методы/границы, а не прежний финальный3×5.
 В пакете остаются **12 результатов и9 импортов**. Среднее и константа проверяются
 на14 содержательных стадиях, дополнительно Done/Close/preserve после отмены.
@@ -76,7 +78,7 @@ precheck session. Правило len(metadata_sessions)==1 не копирова
 первый существующий Node14 → полное чтение3×5 → загрузка другого CSV → изменение
 файла **того же импорта** → повтор Node14 с parameters:{} → полное чтение4×5.
 
-Evidence `.dock/node14-live-1789269790444/`, session
+Evidence `unavailable:artifact-b506391b5fcded85`, session
 `6dd781f2-25c4-4715-be64-208c932ce569`, тот же Missing GUID
 `de695a64-b435-4bbd-ad4e-7a94852498d3` и Import GUID
 `f6b59238-84e2-4e59-9a8f-c865e89d3893`.
@@ -97,13 +99,13 @@ Execution до: `1789269837824-gpzttd345a:187:1`, после:
 
 - **514/514 Python tests PASS**, включая6 новых компонентных тестов и отрицательные
   подмены session/window/raw cells/checkpoint trace. Лог
-  `.dock/node14-preparation/python-tests-final.log`.
+  `unavailable:artifact-2894ced6206eeea1`.
 - Синтаксис новых JS/Python проверен, `git diff --check` PASS.
 - Source preflight: **395 build inputs совпали с HEAD**, runtime156 совпал с c32.
-  `.dock/node14-preparation/source-preflight.json`.
+  `unavailable:artifact-32d9524fa31fec22`.
 - Реальный subscription/dependency preflight **PASS без модели/MCP/browser**:
   Hermes0.21.0, существующая openai-codex/gpt-5.6-sol/low, fallback запрещён.
-  `.dock/node14-preparation/subscription-preflight.json`.
+  `unavailable:artifact-93d42070dca00ed6`.
   Предыдущие precheck receipts не перезаписывались. Проверка без manifest URI/SHA
   подтверждает среду, не ещё отсутствующий candidate.
 - Полный клиент повторно не запускался: production inputs не менялись и совпали

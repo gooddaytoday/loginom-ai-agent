@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-8c72056c1860` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # 11. Замена значений по внутренней таблице
 
 Статус: **integration_complete_focused_pass / awaiting_coordinator**, 13 сентября 2026.
@@ -42,8 +44,8 @@ Null, пустая строка и буквальный текст `null` раз
 
 ## Что есть сейчас и источники
 
-Компонент отмечен в `executor/inventory/palette-2026-09-05.json` как «Замена».
-В `client/lib/node-contracts.mjs` зарегистрирован `transform.replace_columns` с
+Компонент отмечен в `packages/loginom-runtime/executor/inventory/palette-2026-09-05.json` как «Замена».
+В `packages/loginom-runtime/client/lib/node-contracts.mjs` зарегистрирован `transform.replace_columns` с
 иконкой `bg-vendor-icon-replacecolumns`, проверенной в живом графе.
 Кандидат использует `replacement-{parameters,context,procedure,output,readback}.mjs`
 и общий lifecycle; регистрация не означает автономную приёмку.
@@ -143,6 +145,6 @@ PASS модели, отдельного unit-теста или одного фл
   опустить их для сохранения настроек. Каждый переданный rule полностью
   заменяет exact-таблицу только своего поля. Неизвестные режимы существующего
   узла не редактируются без полного проверенного чтения.
-- Проверяющий код и fixtures находятся в `tools/loginom-acceptance/replacement_*`
+- Проверяющий код и fixtures находятся в `unavailable:artifact-7da62b01401be4b9`
   и `fixtures/replacement/`. Проверка операции не доказывает сохранение пакета,
   неизменность источника или автономное выполнение всей задачи.

@@ -8,10 +8,10 @@
   "model_source_revision": "908c9b7d90eefd72fea2ae9a7e62bcf90b5469cf",
   "runtime": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
   "original_package": "/test-2/packages/Dock-acceptance-20260914-000803-18fad485.lgp",
-  "fresh_directory": ".dock/text-export/live-1789376572763",
+  "fresh_directory": "unavailable:artifact-978c3aac8007b16f",
   "fresh_session_id": "f8cc0bda-0b80-4b29-b9c0-a1d8a0aad27c",
   "full_evaluation": {
-    "path": ".dock/node17/acceptance/runs/20260914-000803-18fad485/reevaluation-v5-full-final.json",
+    "path": "unavailable:artifact-05f08bff6a5787f9",
     "sha256": "0bd2163e07d518efa36a1f750838216bce6a35cce86d0b59188cd36b5430ecf5",
     "passed": true,
     "checks_passed": 54,
@@ -162,8 +162,8 @@
   "tests": {
     "passed": 41,
     "fresh_negative_mutations": 21,
-    "command": "python3 -m unittest discover -s tools/loginom-acceptance -p 'test_text_export_*.py'",
-    "syntax_check": "node --check tools/loginom-acceptance/text-export-fresh.mjs",
+    "command": "python3 -m unittest discover -s unavailable:artifact-abdc500409930ca3 -p 'test_text_export_*.py'",
+    "syntax_check": "node --check historical-ref:ref-e1ef1439e9c07b6b",
     "diff_check_passed": true
   },
   "new_hermes_run": false,
@@ -175,5 +175,11 @@
   "remaining_scope_limitations": [
     "Acceptance applies to candidate runtime c9972b58 on Loginom7.4.2 and the declared Node17 contract",
     "Merge/release/install remain coordinator actions requiring separate user authorization"
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-2f72e52fb535",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

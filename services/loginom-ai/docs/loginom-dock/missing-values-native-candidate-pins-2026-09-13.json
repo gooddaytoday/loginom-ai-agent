@@ -263,15 +263,15 @@
   "packet_archive_sha256": "d120d055300863f2e0594e04ccc38147c79ba55296fc24a942270e36fef6cfcd",
   "packet_manifest_sha256": "7adeb48e9295ca792d07899d0137f92f153a91eb274fcd98e1f363f2d14305d0",
   "evidence": {
-    ".dock/node14-native-candidate/final-source-preflight.json": "ce25bad130a6235d10f9946a450310f2c6f2d493d3e43f6fcb12056e7c461de5",
-    ".dock/node14-native-candidate/final-subscription-preflight.json": "2e4523a3dee0ac132af82d5fdc8466ab6a22d5cccc6b29f788435e3b143fbd48",
-    ".dock/node14-native-candidate/registered-manifest-readback.json": "02213fa735703c06c2013b2d069288891dfe3da5bc566f0281b6a9949468a905",
-    ".dock/node14-native-candidate/candidate-bytes-verified.json": "6323cd0c9bedef2721865acad4a7b13a234ec4dba9351c82f6692037412fd97a",
-    ".dock/node14-native-candidate/component-audit-2.json": "f39b580c2a67d4669c0aaf76d52f62dc7c4c2bad86bcf1542288b32a8769c675",
-    ".dock/node14-native-candidate/20260913-073658-fb37fc47/full-startup-gate.json": "8afe024e19814836b53fc32c0f2c255792b121e7c9034a0d6ff54d265f1f6253",
-    ".dock/node14-native-candidate/20260913-073658-fb37fc47/tool-precheck.json": "55c27c3876e8af15ecff0f0b10e4b7445067ac8001013d7ffd3bd96d9cded33c",
-    ".dock/node14-native-candidate/old-packet-import-failure-reproduced.json": "65da88411cae7a715168c95c77f2d23f804b18e0132ae0738608b6bac6cefff3",
-    ".dock/node14-acceptance-packet-v2/import-verification.json": "3d72097943da9343c23e39bfbad20c92381780e69b31df982490227916ca9352"
+    "unavailable:artifact-1a9df611b2127316": "ce25bad130a6235d10f9946a450310f2c6f2d493d3e43f6fcb12056e7c461de5",
+    "unavailable:artifact-925becc886a549c2": "2e4523a3dee0ac132af82d5fdc8466ab6a22d5cccc6b29f788435e3b143fbd48",
+    "unavailable:artifact-f34c9cd403ddeb08": "02213fa735703c06c2013b2d069288891dfe3da5bc566f0281b6a9949468a905",
+    "unavailable:artifact-36de02914155596c": "6323cd0c9bedef2721865acad4a7b13a234ec4dba9351c82f6692037412fd97a",
+    "unavailable:artifact-c9ae04c5761ac2e5": "f39b580c2a67d4669c0aaf76d52f62dc7c4c2bad86bcf1542288b32a8769c675",
+    "unavailable:artifact-f87111566c1ef29b": "8afe024e19814836b53fc32c0f2c255792b121e7c9034a0d6ff54d265f1f6253",
+    "unavailable:artifact-b5e68f9c2d14836a": "55c27c3876e8af15ecff0f0b10e4b7445067ac8001013d7ffd3bd96d9cded33c",
+    "unavailable:artifact-160e7768554d650b": "65da88411cae7a715168c95c77f2d23f804b18e0132ae0738608b6bac6cefff3",
+    "unavailable:artifact-9e760c304f013617": "3d72097943da9343c23e39bfbad20c92381780e69b31df982490227916ca9352"
   },
   "candidate_staged": true,
   "candidate_activated": false,
@@ -289,5 +289,11 @@
     "python": 517,
     "node_startup_api": 2
   },
-  "full_goal_declared_final_results": 12
+  "full_goal_declared_final_results": 12,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-77e452abe05d",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

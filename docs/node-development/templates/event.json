@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "event_id": "example-not-sent",
+  "campaign_id": null,
+  "node_id": null,
+  "attempt_id": null,
+  "phase": null,
+  "kind": "phase_completed",
+  "outcome": null,
+  "developer_task_id": null,
+  "developer_turn_id": null,
+  "cli_session_id": null,
+  "source_commit": null,
+  "report_refs": [],
+  "dispatch_id": null,
+  "delivery_status": "not_sent",
+  "status": "received",
+  "resolution": {
+    "owner": null,
+    "next_trigger": null,
+    "reason": null
+  },
+  "created_at": null,
+  "updated_at": null
+}

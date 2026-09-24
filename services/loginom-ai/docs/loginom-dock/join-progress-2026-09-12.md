@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-71817c9dcfd1` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Слияние — последовательная реализация 12 сентября 2026
 
 Статус: **in_progress**, не принято, не опубликовано. Пользователь запросил
@@ -46,11 +48,11 @@ LValue,RValue. Составной ключ LKey↔RKey и Part↔PartR сохр�
 ещё впереди. Фикстуры пока диагностические: правило Null-ключей и независимый
 oracle приёмки ещё не утверждены наблюдениями. Hermes не запускался.
 
-Локальные материалы: `.dock/join-20260912/commands/`, исходное исследование
-`.dock/process-node-focus-20260911/live-1789164933898/`. Последний каталог содержит
+Локальные материалы: `unavailable:artifact-06686dc9917e5145`, исходное исследование
+`unavailable:artifact-e572c08373f7e930`. Последний каталог содержит
 `imports-full.json`, `reader-stable.json`, `join-output.json`, `saved.json` и журнал.
-Новые сессии запускаются через `tools/loginom-acceptance/join-live.mjs` и сохраняют
-свои собственные source pins в `.dock/join-20260912/live-*/session.json`.
+Новые сессии запускаются через `packages/loginom-runtime/tools/loginom-acceptance/join-live.mjs` и сохраняют
+свои собственные source pins в `unavailable:artifact-482c7b574afcc91d`.
 
 ## Следующие проверки
 
@@ -96,7 +98,7 @@ sandbox-прогон имел9отказов локальных сокетов/c
   Общий UI и независимый auditor расширены для Close второго входа с его квитанцией.
 - Независимый `join_configuration_evidence.py` принял Inner и mapped-проходы;
   `join_evidence_negative.py` отверг 11/11 подмен (`join-auditor-negatives.json`).
-- Независимые fixtures/oracle созданы в `tools/loginom-acceptance/fixtures/join`.
+- Независимые fixtures/oracle созданы в `unavailable:artifact-3d3ade8c66adee74`.
   Эти CSV ещё не использовались для final acceptance; правило Null зафиксировано ранее.
 - Обнаружено: при autosync=false включение right keys сохраняло неполный выход.
   Readback отверг его после выполнения (AMBIGUOUS, не принимать как успех).
@@ -155,7 +157,7 @@ sandbox-прогон имел9отказов локальных сокетов/c
   диагностический замер: локальный цикл выполняет дополнительные guards/readback;
   ускорение wall time не заявляется. Внешние вызовы Hermes будут посчитаны отдельно.
 - Диагностический пакет закрыт с отменой собственных несохранённых изменений,
-  браузер завершён. Доказательства сохранены в `.dock/join-20260912/`.
+  браузер завершён. Доказательства сохранены в `unavailable:artifact-06bdfd035ada1154`.
 - Python suite: 485 PASS. Первый полный клиентский повтор без sandbox: 1336 PASS,
   1 SKIP, 1 сбой неизменённого workspace deadline теста (2 мс); отдельный повтор
   workspace suite прошёл. Идёт полный подтверждающий повтор. Sandbox-вариант

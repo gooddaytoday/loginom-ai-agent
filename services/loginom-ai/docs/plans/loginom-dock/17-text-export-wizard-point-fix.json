@@ -61,7 +61,7 @@
   },
   "fix": "Native wizard_open controls reuse the current observed point; geometry, identity and exact elementFromPoint hit guards remain mandatory",
   "live": {
-    "directory": ".dock/text-export/live-1789331872062",
+    "directory": "unavailable:artifact-e862819ab9a52a2a",
     "package": "/test-2/node17-wizard-clipping-run7.lgp",
     "diagnostic_copy_only": true,
     "geometry_preparation": "Moved diagnostic nodes and scrolled native diagram44px; exact failing button box and point reproduced",
@@ -96,17 +96,17 @@
   "runtime": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
   "manifest_sha256": "1b1f55b42bccba1439ae12a0c230922cb0b0f14fa958520c083abca7ba5f8cfd",
   "launch": {
-    "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export",
+    "cwd": "unavailable:artifact-d88e6354ae46b3ef",
     "argv": [
       "python3",
-      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/tools/loginom-acceptance/run.py",
+      "historical-ref:ref-0674e0822e4a813a",
       "--run",
       "--goal",
       "text-export-node-complete",
       "--model-profile",
       "chatgpt-sol",
       "--runs-root",
-      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs",
+      "unavailable:artifact-37ba8a48fd33b829",
       "--node",
       "/Users/kartamyshev/.loginom-dock/releases/0.1.0-dev.20260910.3-80ca61417ec7/runtime/node",
       "--hermes-home",
@@ -154,7 +154,7 @@
   },
   "component": {
     "run_id": "20260913-235110-fb8639df",
-    "audit_path": "docs/plans/loginom-dock/17-text-export-wizard-point-component-success.json",
+    "audit_path": "historical-ref:ref-a63df1096a39d265",
     "audit_sha256": "cd6d0788ae5e418b1b977de98df4435f9d478e34e4b356095097b972552ac4c6",
     "passed": true,
     "bytes": 124,
@@ -169,12 +169,18 @@
     "global_config_unchanged": true
   },
   "preflight": {
-    "path": ".dock/node17/wizard-point-preflight.json",
+    "path": "unavailable:artifact-a04b77360fbe0e86",
     "sha256": "42c7f8c6c9f3fc134294f8724097cef91334af8c082820550e9e1b518dda56ac",
     "passed": true,
     "model_started": false,
     "provider": "openai-codex",
     "model": "gpt-5.6-sol",
     "reasoning_effort": "low"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-872e486d0ad0",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

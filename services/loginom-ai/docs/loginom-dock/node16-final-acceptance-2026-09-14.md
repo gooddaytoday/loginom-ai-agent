@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-5a811d6bfe13` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node16: полная независимая приёмка пройдена
 
 **FULL PASS: 10 случаев / 470 ячеек, 10 независимых открытий / 470 ячеек,
@@ -21,7 +23,7 @@ Wrapper завершился exit2/FAILED_MODEL_OR_EXPORT уже после ус
 в spillover-файлы. Исходный collapse-audit.json не был создан.
 
 Request, scenario, evidence, attempt и traceback сохранены. Отдельный
-`tools/node16-model5-audit/reevaluate.py` проверяет их хеши и все272исходных файла
+`services/loginom-ai/tools/node16-model5-audit/reevaluate.py` проверяет их хеши и все272исходных файла
 harness, восстанавливает только transport и запускает прежние семантические проверки.
 Путь/идентичность call/arguments/session, длина и preview файлов проверены;
 полный результат wide дополнительно сверяется с native journal и frozen oracle.
@@ -69,10 +71,10 @@ harness, восстанавливает только transport и запуска
 
 ## Доказательства и дальнейшие границы
 
-- Исходный run: `.dock/node16/hermes-runs/20260914-004604-475bb0c8`.
+- Исходный run: `unavailable:artifact-40a59ab0e7b307ab`.
 - Полный отчёт: `versioned-full-audit-v1.json`; связка: `independent/bundle.json`.
 - Десять результатов: `independent/fresh-batch-results.json`.
-- Loss: `.dock/node16/live-1789375922149/versioned-loss-verification-v1.json`.
+- Loss: `unavailable:artifact-e62f50c6350cd7f9`.
 - [Машинный итог с хешами и точными сессиями](node16-final-acceptance-2026-09-14.json).
 
 Node16 готов к передаче координатору после единственного review и исправлений.

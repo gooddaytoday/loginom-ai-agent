@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-d9658b9d7473` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14 autonomous acceptance 2 — FAIL
 
 Команда `node14:autonomous-acceptance:2:direct-user-confirmation-20260913`.
@@ -123,7 +125,7 @@ returncode0, usage.completed=true; эти признаки не подтверж
 
 ## Evidence и checkpoint
 
-Run-root: `.dock/node14-autonomous-acceptance-2/runs/20260913-113814-1bc86af9/`.
+Run-root: `unavailable:artifact-0bedc27a83127b87`.
 Сохранены исходные request/scenario/tool-precheck/attempt/evidence/efficiency,
 geometry, pre-audit, отдельная failure-public-chain, process-check и final-summary.
 [13 receipts с SHA](missing-values-autonomous-acceptance-2-pins-2026-09-13.json).

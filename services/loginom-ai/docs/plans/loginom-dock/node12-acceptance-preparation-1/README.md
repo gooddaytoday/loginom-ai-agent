@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-44a439d8cbc4` и изменения: [происхождение](../../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../../docs/node-development/README.md).
+
 # Узел 12 — комплект подготовки автономной приёмки
 
 Команда: `node12:acceptance-preparation:1:7bf88255562c59cd32397be3f68c4ec85cb55b38`.
@@ -22,15 +24,15 @@ Source commit: `7bf88255562c59cd32397be3f68c4ec85cb55b38`, ветка
 
 Полные mappings: [pins.json](pins.json), [source-files.json](source-files.json).
 624 tracked-файла отобраны из указанного commit: клиентский inventory (386 файлов),
-весь harness с goal/fixtures, executor/catalog и сборщик/публикатор каталога.
-Приватный исходный архив `.dock/node12-acceptance-preparation-1/source-7bf88255.tar`,
+весь harness с goal/fixtures, unavailable:artifact-1556b84c1b55d60e и сборщик/публикатор каталога.
+Приватный исходный архив `unavailable:artifact-f7bfe56e01be1a64`,
 SHA-256 `b42eaa33f903b68d88e8cbe05416fd1bd430aae181cc4d3994da199bbff8be56`.
 Это исходники для VPS, не локальная production-сборка. Архив не содержит credentials,
 node_modules, личных конфигов, журналов или прежних frozen exports.
 
 ## Задача и полный результат
 
-Hermes получает существующий `tools/loginom-acceptance/goals/duplicates-node-complete.txt`
+Hermes получает существующий `packages/loginom-runtime/tools/loginom-acceptance/goals/duplicates-node-complete.txt`
 через штатный renderer и три `fixtures/duplicates/Node12-*.csv`. Имена доставки и
 путь пакета renderer формирует по новому run ID. Goal содержит пользовательские
 действия, параметры данных, ожидаемые группы и ограничения работы; не содержит
@@ -54,7 +56,7 @@ Hermes получает существующий `tools/loginom-acceptance/goals
 Финальный независимый gate:
 
 ```sh
-python3 tools/loginom-acceptance/duplicates_node_acceptance.py --run-dir "$NODE12_RUN_DIR"
+python3 packages/loginom-runtime/tools/loginom-acceptance/duplicates_node_acceptance.py --run-dir "$NODE12_RUN_DIR"
 ```
 
 Аудитор проверяет публичные вызовы, нативный журнал, исходные байты/типы,
@@ -80,7 +82,7 @@ Value отдельно от пустой строки и текста `null`. NU
 содержит другой URL; override обязателен. Общий config и установленный клиент
 не изменяются. Ключ Dock читается только из существующего собственного config.
 
-Штатный run.py создаст новый уникальный каталог `.dock/node12-autonomous/runs/<run-id>`:
+Штатный run.py создаст новый уникальный каталог `unavailable:artifact-cb8afc215e71b08f<run-id>`:
 `private/hermes-home`, `private/dock-state`, отдельный
 `private/dock-state/sessions/<session-id>/browser-profile`. Shared browser binaries
 используются только для чтения; профиль и журнал никогда не переиспользуются.
@@ -99,14 +101,14 @@ Value отдельно от пустой строки и текста `null`. NU
 действий. Команды из корня worktree:
 
 ```sh
-bash docs/plans/loginom-dock/node12-acceptance-preparation-1/launch.sh preflight
+bash services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-1/launch.sh preflight
 # Только после отдельной выдачи слота:
-bash docs/plans/loginom-dock/node12-acceptance-preparation-1/launch.sh run
+bash services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-1/launch.sh run
 ```
 
 Полный `launch.sh preflight` прошёл на настоящих candidate URI/SHA.
 [Машинная сводка](candidate-preflight-summary.json) закрепляет SHA отчёта;
-приватный отчёт — `.dock/node12-acceptance-preparation-1/candidate-preflight.json`.
+приватный отчёт — `unavailable:artifact-836c08eae7c66958`.
 Hermes --version проверен штатным preflight; сценарий/модель/браузер не запускались.
 Никаких фиктивных pin и старой автономной приёмки нет.
 
@@ -151,7 +153,7 @@ Source preflight: 386/386 inputs совпали с commit. Runtime/dependency pr
 прошёл; 14 duplicates tests и 4 preflight tests прошли. Shell syntax обоих scripts
 проверен. Дополнительно проверены отказ launch без candidate pin, отклонение
 пустых доказательств полным аудитором и hashes исходного архива. Отчёты находятся
-в `.dock/node12-acceptance-preparation-1/`. Live матрица и Hermes не повторялись.
+в `unavailable:artifact-3e546e2dce1f0e0f`. Live матрица и Hermes не повторялись.
 
 Следующее действие: отдельная выдача слота после узла 11. Stage/readback и полный
 preflight завершены. Merge/push/deploy/install в этой задаче отсутствуют.
@@ -175,7 +177,7 @@ compatibility 7.4.2 и `/test-1/packages` у обеих операций сох�
 ```sh
 NODE12_MANIFEST_URI='viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.13-node12.1-candidate/manifest.json' \
 NODE12_MANIFEST_SHA256=1a5a46312501d20ec7e23a2db12ed95bf34d784ead45628b12cdcf1492a276ce \
-bash docs/plans/loginom-dock/node12-acceptance-preparation-1/launch.sh run
+bash services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-1/launch.sh run
 ```
 
 Повторять preflight с тем же output-файлом нельзя: runner защищает доказательства

@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-2b87776eaa8a` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Параметры полей: текущая реализация и диагностика
 
 Подплан [05](../plans/loginom-dock/05-field-parameters.md) завершён в source runtime.
@@ -71,9 +73,9 @@ outer 1508×949, available 1512×949. Установленный клиент и
 
 Доказательства только для Codex development QA:
 
-- `.dock/field-parameters/` — тесты, извлечённая привязка входа,
+- `unavailable:artifact-861a1bc9d21ae51e` — тесты, извлечённая привязка входа,
   временные диагностические сценарии.
-- `.dock/calculator-v3/live-1789095757976/` — `reform-configure-editor-root.json`,
+- `unavailable:artifact-1df8beb81a42dc02` — `reform-configure-editor-root.json`,
   `identity-reorder.json`, `output-inspect.json`, `output-sources.json`,
   `save-diagnostic.json`, браузерные ответы и журнал квитанций.
 - Стартовый runtime этого запуска
@@ -111,7 +113,7 @@ outer 1508×949, available 1512×949. Установленный клиент и
 После сохранения текущий выходной wizard закрыт с подтверждением отказа от
 его черновика, пакет закрыт через меню; отдельно прочитана страница «Начало»
 без диалогов. Новый source harness открыл `0345.lgp` **без копирования и без
-read-only режима**: `.dock/calculator-v3/live-1789096668393/`, стартовый runtime
+read-only режима**: `unavailable:artifact-eb701a890fbd38f0`, стартовый runtime
 `28652b0c68339f10ee4adf554e22695a953f680a89a7f2d18b2177b32e714f20`.
 В нём проверяется процедура с `input_field` именами и полным input mapping.
 
@@ -202,7 +204,7 @@ source harness открывает этот пакет для проверки а
 
 ## Полная exploratory-матрица
 
-Новый harness `.dock/calculator-v3/live-1789098831600` открыл сохранённый пакет
+Новый harness `unavailable:artifact-6886cb6701df169a` открыл сохранённый пакет
 без read-only режима. Стартовый runtime
 `f9f8d809d758acce2eb4dd62e7213fa1982ebcb5b42f2b9f655cc81312e3344f`.
 `matrix-source-execute-read.json`: новое выполнение источника, полный вход
@@ -227,7 +229,7 @@ Upstream preview не содержит вида: эту часть провер�
 определений; использован тот же способ чтения страницы, что уже есть в общем
 `finishWizard(port=true)`. Продуктовый helper для этого менять не потребовалось.
 
-Golden-файл `tools/loginom-acceptance/fixtures/field-parameters/scalar-matrix.json`
+Golden-файл `packages/loginom-runtime/tools/loginom-acceptance/fixtures/field-parameters/scalar-matrix.json`
 и исходный CSV закреплены **после exploratory-наблюдения, до повторного QA**.
 Это ещё не результат повторной проверки и не frozen acceptance: во время
 диагностики обновлялся workspace observer. Подтверждённые примеры:
@@ -253,7 +255,7 @@ Golden-файл `tools/loginom-acceptance/fixtures/field-parameters/scalar-matri
 Настроенная матрица сохранена отдельно через UI:
 `/user/dock-p3/field-parameters-matrix-configured-20260911.lgp`.
 Имя подтверждено отдельным наблюдением, пакет закрыт; новый maximized harness
-открыл его без read-only режима: `.dock/calculator-v3/live-1789099750847`,
+открыл его без read-only режима: `unavailable:artifact-4fdd7858e277a1d5`,
 стартовый runtime `fbc0b13ea4fe89fffbe828afc2ed77a9212d1b118929e8635969ca8c75a9b6c5`.
 Запущен публичный existing `node.apply` с `changes: []`, `finish: execute`,
 чтением 10 строк: `matrix-reform-existing-public-1`. Результат ещё ожидается.

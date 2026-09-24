@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-03aee6ff1591` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Подплан 10: Объединение — приёмка 12 сентября 2026
 
 Статус: **implemented / live_verified (source runtime)**. Подплан завершён
@@ -51,7 +53,7 @@ Source pin: `c5c6a69e69d91b64231617833f7f97354fcd04a4ff0986ad8d4766766270348c`.
 Manifest: `viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.11-parallel-pilot.1-candidate/manifest.json`,
 SHA256 `4ac827fc9e0cefa609bf2cb8fd7d3d79318dd3fe92999decc7e385fae51fc6e2`.
 Локальные evidence/request/efficiency/audit:
-`.dock/union-20260912/runs/20260912-174232-0449c132/`.
+`unavailable:artifact-344a66241c15955a`.
 Машинная сводка: [union-acceptance-2026-09-12.json](../../loginom-dock/union-acceptance-2026-09-12.json).
 
 Внешние вызовы: 34, включая 12 node_apply и 12 node_wait; 32 model API calls.

@@ -100,52 +100,52 @@
   },
   "evidence": [
     {
-      "path": ".dock/node13-acceptance/runs/20260914-091807-4289644a/evidence.json",
+      "path": "unavailable:artifact-0a8e6dd60de09611",
       "sha256": "bfc391763cb74698f4ff874d850be006f3786cda2af5f647e1eacfe0bef67a7c",
       "bytes": 972895728
     },
     {
-      "path": ".dock/node13-acceptance/runs/20260914-091807-4289644a/audit-before-reopen-resolved.json",
+      "path": "unavailable:artifact-79145cdfd06be99c",
       "sha256": "2a20837d58fb461eee3903643df12f1d01ab4275acb6ea5051b1a52c20a44696",
       "bytes": 52126
     },
     {
-      "path": ".dock/node13-acceptance/runs/20260914-091807-4289644a/audit-final-resolved.json",
+      "path": "unavailable:artifact-7bd882f3393a47ad",
       "sha256": "2dbfab71d920da39026e401171fabfbeab4e21d7696767a14652cb518b501f7c",
       "bytes": 75341
     },
     {
-      "path": ".dock/node13-acceptance/runs/20260914-091807-4289644a/reopen-events-projection-receipt.json",
+      "path": "unavailable:artifact-6e408fb38a5a8fbf",
       "sha256": "da4288ff0e62ad411ce1b3a9f6375fb23e8129c9cd4d45b141aea4bf229cfaf8",
       "bytes": 653
     },
     {
-      "path": ".dock/node13-live-preflight/final-admission-3/admission.before-slot.json",
+      "path": "unavailable:artifact-b9a41f0d2dd26c07",
       "sha256": "dc4270c42b3cdd6f7a3ff0868f80f9342cc73f77739da68dc231d1e8cbc8022e",
       "bytes": 21299
     },
     {
-      "path": ".dock/node13-live-preflight/final-admission-3/admission.json",
+      "path": "unavailable:artifact-e6dda4ce13d2cd14",
       "sha256": "d74556471e4ce8d8ca6a67f1bfaa11ab507d5e6c75e803e9049105f28cd2b225",
       "bytes": 21594
     },
     {
-      "path": ".dock/node13-live-preflight/final-admission-3/check-assigned.json",
+      "path": "unavailable:artifact-3eefed8579615d71",
       "sha256": "3cfd9a2bfa63434cde72391030e54d3d4b6becdbae2a12977e7c95c9a5eb9c2d",
       "bytes": 1174
     },
     {
-      "path": ".dock/node13-live-preflight/final-admission-3/post-run-kit.json",
+      "path": "unavailable:artifact-2fdfd41c76cd7a1a",
       "sha256": "72437575c200f451b36934cbcfc272aa7684b67e5d0e9dbac39f30ea8c8d32f4",
       "bytes": 810
     },
     {
-      "path": ".dock/node13-live-preflight/final-admission-3/model-exit-cleanup.json",
+      "path": "unavailable:artifact-a462bc8d453eca22",
       "sha256": "9f3169bc121eb6d6f45e42dac9110d8179a3a11eeabffc9033055d387dc92363",
       "bytes": 286
     },
     {
-      "path": ".dock/stream-runtime/sessions/d2cc7fa6-bced-430e-bb6c-e526adfdf8e2/diagnostics.json",
+      "path": "unavailable:artifact-7d6a029afa62f2ce",
       "sha256": "3b0e2e30c62b8c30191610f21680b229a92e8a46b50244432174f59a5cb34696",
       "bytes": 725092
     }
@@ -156,5 +156,11 @@
     "historical full2 admission remains invalid; earlier failure evidence preserved",
     "old unrelated holder session server close remains unconfirmed; its local processes are absent"
   ],
-  "recorded_at": "2026-09-14T11:04:54.616795+00:00"
+  "recorded_at": "2026-09-14T11:04:54.616795+00:00",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-be63ceb4020e",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

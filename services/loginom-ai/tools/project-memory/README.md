@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-7a4f7aac11d3` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Подключение задач к общей памяти Loginom Dock
 
 ## Новый узел: регистрация поколения 20260913.5
@@ -22,8 +24,8 @@ Dock-плагина выполнить сначала preview, затем уст
 заполнители: взять настоящий путь, именованную ветку и полный принятый base SHA.
 
 ```sh
-python3 tools/project-memory/prepare_task_memory.py --cwd <worktree> --branch <branch> --base <SHA>
-python3 tools/project-memory/prepare_task_memory.py --cwd <worktree> --branch <branch> --base <SHA> --install
+python3 services/loginom-ai/tools/project-memory/prepare_task_memory.py --cwd <worktree> --branch <branch> --base <SHA>
+python3 services/loginom-ai/tools/project-memory/prepare_task_memory.py --cwd <worktree> --branch <branch> --base <SHA> --install
 ```
 
 Helper проверяет linked Git worktree именно этого репозитория, ветку/base,
@@ -61,7 +63,7 @@ cwd, registrationId, routeHash и время. Остальные события 
 
 После завершения подготовительного хода координатор получает свежий app snapshot:
 реальный task ID, turn ID, `completed` и `idle`. Сохранить только эти метаданные
-в приватный JSON0600, например `.dock/shared-project-memory/<node>-bootstrap-evidence.json`:
+в приватный JSON0600, например `unavailable:artifact-ff086937f3f40ded<node>-bootstrap-evidence.json`:
 
 ```json
 {
@@ -82,8 +84,8 @@ cwd, registrationId, routeHash и время. Остальные события 
 Если проверка устарела — перечитать состояние, а не поменять дату вслепую.
 
 ```sh
-node tools/project-memory/review_hooks.mjs --generation 20260913.5 --workspace <worktree> --trust --output <hooks-receipt.json>
-node tools/project-memory/enroll_task.mjs --cwd <worktree> --thread <actual-task-ID> --evidence <bootstrap-evidence.json> --hooks-receipt <hooks-receipt.json>
+node services/loginom-ai/tools/project-memory/review_hooks.mjs --generation 20260913.5 --workspace <worktree> --trust --output <hooks-receipt.json>
+node services/loginom-ai/tools/project-memory/enroll_task.mjs --cwd <worktree> --thread <actual-task-ID> --evidence <bootstrap-evidence.json> --hooks-receipt <hooks-receipt.json>
 ```
 
 `review_hooks` читает штатный `hooks/list`, сверяет точные команды и сохраняет
@@ -139,7 +141,7 @@ actor-поиском. Полный цикл новой регистрации п
 [регистрация](../../docs/loginom-dock/node16-start-2026-09-13.json).
 [Сводка доказательств](../../docs/loginom-dock/memory-enrollment-2026-09-13.json).
 
-Установленная сборка `.dock/shared-project-memory/runtime/20260913.5` неизменна;
+Установленная сборка `unavailable:artifact-eb64192cb02d3aa4` неизменна;
 manifest и trust/compatibility receipts — `rollout-20260913.5` рядом.
 `assemble_runtime.py` воспроизводит её и отказывает при несовпадении, а
 `prepare_enrollment_rollout.py --install` предназначен для установки поколения
@@ -175,7 +177,7 @@ MCP каждой задачи прошёл health/find/read общей памя�
 продолжили разработку в прежних задачах на Astra medium. Новый общий capture
 и extraction проверены на завершённых пробах 11/12; capture текущих этапов
 13/14 проверяется после их завершения. Подробные свидетельства:
-`docs/loginom-dock/memory-routing-activation-2026-09-13.json`.
+`services/loginom-ai/docs/loginom-dock/memory-routing-activation-2026-09-13.json`.
 
 ## Подготовленный результат
 
@@ -200,10 +202,10 @@ MCP каждой задачи прошёл health/find/read общей памя�
   Активные project state и receipts требуют 0600.
 
 Подготовленный runtime:
-`/Users/kartamyshev/Git/loginom-dock/.dock/shared-project-memory/runtime/20260913.3`.
+`unavailable:artifact-6b79bb8b8375311a`.
 
 Подготовленные конфигурации и diff:
-`/Users/kartamyshev/Git/loginom-dock/.dock/shared-project-memory/rollout-20260913.3`.
+`unavailable:artifact-f38777545b5cbfee`.
 Они имеют суффикс `.pending` и не загружаются Codex. `manifest.json` фиксирует
 исходные SHA конфигураций; перед применением их необходимо сверить заново.
 
@@ -324,7 +326,7 @@ URI/типы операций и summary, без before/after и сырых со
 
 ## Источники
 
-- Текущая политика: `docs/loginom-dock/shared-project-memory.md`.
+- Текущая политика: `services/loginom-ai/docs/loginom-dock/shared-project-memory.md`.
 - Исходный адаптер: `/Users/kartamyshev/Git/openviking/integrations/codex-mcp-adapter`.
 - Официальный плагин: `/Users/kartamyshev/.codex/plugins/cache/openviking/openviking-memory/0.8.1`.
 - [Codex: загрузка и доверие к hooks](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks).

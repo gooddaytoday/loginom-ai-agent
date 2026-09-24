@@ -3,7 +3,7 @@
   "slot": "node11-hermes-20260913-28434c4b",
   "status": "failed_acceptance_diagnosed_slot_released",
   "run_id": "20260913-054024-fef0b53e",
-  "run_directory": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e",
+  "run_directory": "unavailable:artifact-5a1ac7f98a41ccca",
   "code_commit": "91dee921e9e17343d53bf20fd7ca5f3b19f8de7a",
   "preparation_commit": "be4d31bf9e15e1ea4ab4e1868010871927c34d8b",
   "branch": "codex/node-11-replacement",
@@ -306,42 +306,42 @@
   },
   "artifacts": {
     "request.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/request.json",
+      "path": "unavailable:artifact-255082bab1bc7289",
       "sha256": "a667efea6824a6deadbdf086357bea3962a3eeaababc56b3c4d17a90dfc0fdea",
       "bytes": 126813
     },
     "scenario.txt": {
-      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/scenario.txt",
+      "path": "unavailable:artifact-be49f39947028fce",
       "sha256": "eec482c065d238456ab9525fe72f3e3b08d57e0f59b5ac984cebbfc46c848315",
       "bytes": 5339
     },
     "candidate-pin.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/candidate-pin.json",
+      "path": "unavailable:artifact-4399660522e8d65f",
       "sha256": "3f1654e0219170c540fc235171c8027107cc7fccf930643f330c2d4aa3b85994",
       "bytes": 2220
     },
     "evidence.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/evidence.json",
+      "path": "unavailable:artifact-3508202b187c5fd1",
       "sha256": "8954736ade6843a381462110536eb752e81855207ced4d9c1fa14cde5b65a0b4",
       "bytes": 316565541
     },
     "replacement-acceptance-audit.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/replacement-acceptance-audit.json",
+      "path": "unavailable:artifact-f8b89e26481fea0e",
       "sha256": "2ec24614fc37c9dd9e86866d422c950451d3b42cd16af6e9926caf7b70c66a40",
       "bytes": 14494
     },
     "postrun-diagnosis.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/postrun-diagnosis.json",
+      "path": "unavailable:artifact-d40868ae2d4308ba",
       "sha256": "3c42fb8d218468171c2e0a132e048e7e5817a499f1e073a4182ddc7de498aebf",
       "bytes": 2351
     },
     "operator-observation.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/operator-observation.json",
+      "path": "unavailable:artifact-abd6aa35a2832678",
       "sha256": "619445842e36076c7663c98b250fd7ca006e9a77ed204da0a974eb35aea478cb",
       "bytes": 672
     },
     "process-cleanup.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-054024-fef0b53e/process-cleanup.json",
+      "path": "unavailable:artifact-a09a915b1ef53311",
       "sha256": "813705b1dd80a3f68b0db24df6c80f3843fe8ca32482c3e536e206c872b37b2e",
       "bytes": 204
     }
@@ -358,5 +358,11 @@
     "revoked_by_coordinator": true,
     "next_owner": "node12",
     "new_hermes_started": false
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-457e61c2e0b3",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

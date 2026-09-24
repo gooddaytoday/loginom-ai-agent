@@ -755,59 +755,65 @@
   "manual_repair_or_second_run": false,
   "artifacts": {
     "launch-receipt.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-122247-a862a34d/launch-receipt.json",
+      "path": "unavailable:artifact-b3da4f139a7bd9bd",
       "sha256": "dd81b98241947b41aee4101edc732a2141e8dd90a0933dcaf7e93407d4662172",
       "bytes": 729
     },
     "request.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-122247-a862a34d/request.json",
+      "path": "unavailable:artifact-86b4644d604fd9ae",
       "sha256": "48cf291327a67573692068a7039dd39fda4d9fd3134f85f75edb65b49fc0db4b",
       "bytes": 127856
     },
     "scenario.txt": {
-      "path": ".dock/replacement/acceptance-runs/20260913-122247-a862a34d/scenario.txt",
+      "path": "unavailable:artifact-6133a4e7fc74d733",
       "sha256": "bf1541435655c8a1ac185ad192a64dc946644276483de9e50b5ed9faa5d701f4",
       "bytes": 5534
     },
     "candidate-pin.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-122247-a862a34d/candidate-pin.json",
+      "path": "unavailable:artifact-4136127658e45b4e",
       "sha256": "08e5857a230b09587ea0c6b1529c3884448c9381952c04e935f3695225772339",
       "bytes": 2097
     },
     "tool-precheck.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-122247-a862a34d/tool-precheck.json",
+      "path": "unavailable:artifact-90ee77583934b038",
       "sha256": "f790eb966905442feb480123a6655cf41be8cec56158c6c69e788a95cbe3c386",
       "bytes": 1408
     },
     "attempt.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-122247-a862a34d/attempt.json",
+      "path": "unavailable:artifact-1ca7b49293ca2e5c",
       "sha256": "c3a094d17207753f4ca7cde2cc643c18bdae5bab98afa930d0aad0ea587b50bb",
       "bytes": 106
     },
     "efficiency.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-122247-a862a34d/efficiency.json",
+      "path": "unavailable:artifact-a1fcb18930f8c142",
       "sha256": "8c6747e0d18bf21a8fae33eaa2f7790c610ef55879df12c06f1f2ff7420097ad",
       "bytes": 22784
     },
     "evidence.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-122247-a862a34d/evidence.json",
+      "path": "unavailable:artifact-4fa38d90ca0fc5bd",
       "sha256": "9e7954bbec597b994b843a5f88ca2043f2d1d2a18ae94dec627e7bb7c954c612",
       "bytes": 316203041
     },
     "replacement-acceptance-audit.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-122247-a862a34d/replacement-acceptance-audit.json",
+      "path": "unavailable:artifact-441d5b8a0e50959e",
       "sha256": "714dd34e3fd7f13614fb173eec91f866bee905e3a7e51e4fe7b8ccfdb717a5cf",
       "bytes": 16573
     },
     "save-failure-observation.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-122247-a862a34d/save-failure-observation.json",
+      "path": "unavailable:artifact-a2f6246ca105516f",
       "sha256": "46b98cb11375c18a8880818430488337d30f3c970cd71d7382869630b8ff5c51",
       "bytes": 3669
     },
     "process-cleanup.json": {
-      "path": ".dock/replacement/acceptance-runs/20260913-122247-a862a34d/process-cleanup.json",
+      "path": "unavailable:artifact-9a0404037b400250",
       "sha256": "99b63a9345556556b92959e60488033e9e94b9af0bd61f47c6d7ed967db3024b",
       "bytes": 158
     }
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-ef32049012cf",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

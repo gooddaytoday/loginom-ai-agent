@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-2de6715511b6` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Узел11: переоценка persistence — 13 сентября 2026
 
 **PASS59/59 при отдельной переоценке замороженного run20260913-122247-a862a34d.**
@@ -57,7 +59,7 @@ reopen, с исходными independent expected outputs. Итог59/59 PASS �
 Команда выполненной переоценки:
 
 ```sh
-python3 tools/loginom-acceptance/replacement_reassessment.py --run-dir .dock/replacement/acceptance-runs/20260913-122247-a862a34d --output .dock/replacement/autonomous-v2/persistence-reassessment-v2.json
+python3 packages/loginom-runtime/tools/loginom-acceptance/replacement_reassessment.py --run-dir unavailable:artifact-50af1f6bb7cabf26 --output unavailable:artifact-fbcdf21d60760eed
 ```
 
 Runtime/VPS/stage/current/main/push/plugin/routing не менялись. Candidate остаётся

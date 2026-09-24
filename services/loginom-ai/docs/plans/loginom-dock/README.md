@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-f02e5b60755c` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Подпланы реализации Loginom Dock
 
 Редакция: 13 сентября 2026 года. Узел 12 принят в отдельной неслитой ветке;
@@ -189,7 +191,7 @@ live_verified по мокам, исходникам, коду возврата �
 Ошибка возвращает работу к диагностике, а не к повтору неизменного прогона.
 
 Свидетельства и ограничения сохранять в
-[implementation-status](../../loginom-dock/implementation-status.md),
+[implementation-status](../../../../../docs/node-development/history/supplements/docs/loginom-dock/implementation-status.md),
 текущую точку продолжения — в
 [resume-checkpoint](../../loginom-dock/resume-checkpoint.md).
 Восемь обработчиков03–10 приняты в source runtime в ограниченных режимах.

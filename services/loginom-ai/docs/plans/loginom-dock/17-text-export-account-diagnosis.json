@@ -80,5 +80,11 @@
     "private/dock-state/sessions/4d3d1826-3d57-47c7-8fb2-ccfae855fbb8/session.json": "6a40f1fcd1d43492111fdff59aacf11c2bacee5b92d69b713b2716564c511efc",
     "private/dock-state/sessions/4d3d1826-3d57-47c7-8fb2-ccfae855fbb8/execution-events.jsonl": "caf0d35992571dd6e7be8be3945b3aa559b7d3a6be6f01ba1edf4ad87d8666b9",
     "private/dock-state/sessions/4d3d1826-3d57-47c7-8fb2-ccfae855fbb8/playwright.json": "a03d88127a588b7bec29b947561c54ca3a82331e7ccaded27ceda997d43b8387"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-207ac34da5fc",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

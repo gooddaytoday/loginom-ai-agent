@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-235e2f36bd89` и изменения: [происхождение](../../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../../docs/node-development/README.md).
+
 # N13-R2: выбранный пакет переноса, без применения
 
 Источник: `a63586fe096f4fd7f17f346c391834d3e34bdaa4`.
@@ -25,6 +27,6 @@ node14 target-placement fix. В generator проверяется побайто�
 описаны в [плане R2](../../node-13-r2-integration-plan.md).
 
 Воспроизведение из корня репозитория на указанной целевой базе:
-`python3 tools/loginom-acceptance/prepare_date_time_r2_transfer.py <output-dir>`.
+`python3 packages/loginom-runtime/tools/loginom-acceptance/prepare_date_time_r2_transfer.py <output-dir>`.
 Generator записывает только пакет и вызывает dry-check; изменения в исходники
 не вносит. SHA256 итогового patch: 47830abe656d8a5abed35e27ee4ca54fb8d46bb4e5b45ce4f47b2b6dc833a182.

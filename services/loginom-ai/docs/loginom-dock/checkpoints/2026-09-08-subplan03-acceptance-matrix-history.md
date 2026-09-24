@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-890d40f6c7b2` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 > **22:29 МСК:** полный `remote-readback-20260908-222113-70a0533e` принят всеми component audits, включая наблюдённый configuration readback до/после сохранения и все public calls. Полный pin83 `172d0c6b…11dd5`. Новый Hermes `20260908-222819-2e3cc755` запущен; итог ещё не получен. [Checkpoint](../resume-checkpoint.md).
 
 > **22:12 МСК:** четвёртый Hermes `20260908-220328-c2a6b6f2` завершён; frozen audit FAIL. После двух успешных node.apply и двух save модель дополнительно открыла wizard. Отдельная ошибка verifier optional existing label исправлена,120 import tests PASS; persistence diagnostic PASS/3 negatives не заменяет frozen FAIL. Следующий продуктовый пробел — compact observed configuration readback в node.apply result. [Checkpoint](../resume-checkpoint.md).
@@ -27,6 +29,6 @@
 | Самостоятельный Hermes Sol/low | Goal, native skill, isolated runner и independent auditor реализованы | Третий run20260908-175420-820c1351 frozen FAIL сохранён: повторные settings/mapping после reopen и последняя перезапись без проверки. Skill уточнён; нужны Codex verification и новый frozen Hermes run |
 | Карточка/контракт/поставка | VPS candidate node-apply.1 и MCP result schema существуют; source tests1015 PASS/1 SKIP, pin8d8967ca…e9d5/82files; Python import119 PASS | Сверить итоговый реестр ограничений и release gates; production не менялся |
 
-Текущие артефакты находятся в `.dock/text-import-v3/`. Сохранённые отчёты
+Текущие артефакты находятся в `unavailable:artifact-e03d84ff00f108c4`. Сохранённые отчёты
 компонентных проверок не заменяют полный аудит подплана. Не повторять законченный
 run без выявленного пробела в доказательствах или изменения соответствующего кода.

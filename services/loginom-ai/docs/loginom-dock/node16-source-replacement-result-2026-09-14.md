@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-f0241323fdf3` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node16: смена файла существующего импорта
 
 Статус: **целевое исправление проверено; Node16 не принят**.
@@ -21,7 +23,7 @@ Source `8cd5c2811a216b45ae50a16a4ed1930e4e87fa59`, runtime
 семь определений. Это подтверждено видимым UI, E2E
 `bg/sels/import/sColumnDefsTuning.ts: toolbar.RefreshAll` и
 [официальной справкой импорта](https://help.loginom.ru/userguide/integration/import/txt/index.html).
-Исходная диагностическая сессия `.dock/node16/live-1789333573886`, снимки
+Исходная диагностическая сессия `unavailable:artifact-eefe805efb170914`, снимки
 `source-change-visible.png` и `source-change-after-refresh.png` сохранены.
 
 Теперь только при фактической смене пути существующего источника обработчик
@@ -34,7 +36,7 @@ Source `8cd5c2811a216b45ae50a16a4ed1930e4e87fa59`, runtime
 
 ## Свежая проверка исправления
 
-Сессия `.dock/node16/live-1789334154742` запущена на новом runtime, с видимым
+Сессия `unavailable:artifact-9d4cd0f11b0e9c17` запущена на новом runtime, с видимым
 максимизированным окном и viewport=null. Исходные пакеты модели не изменялись.
 
 - Existing import all-null → mapped: SUCCEEDED; определения Zone,S,Id,D,B,R,I,
@@ -75,7 +77,7 @@ Source `8cd5c2811a216b45ae50a16a4ed1930e4e87fa59`, runtime
 
 ## Передача координатору
 
-Минимальный пакет `.dock/node16/candidate-8cd5c281`: 184 файла, 1 958 721 байт;
+Минимальный пакет `unavailable:artifact-0471a4bd6724427e`: 184 файла, 1 958 721 байт;
 каждая запись tar сверена с manifest. От candidate-b0709ec0 изменены один
 production-файл и ранее закоммиченный план `16-collapse-columns.md`.
 Четыре разрешённых служебных файла остались прежними; новые verifier-файлы
@@ -98,7 +100,7 @@ production-файл и ранее закоммиченный план `16-collap
 `node16-hermes-20260914-0badbd69`, candidate SHA256
 `0badbd69238af677d85da3ac9bc8a52fc889f303fcdd8c06bb75ff8773ee5514`.
 Свежий actual MCP private user-v1/executor-replay rehearsal
-`.dock/node16/candidate4-rehearsal-20260914`, session
+`unavailable:artifact-23cfadba2de61a19`, session
 `ba858355-4955-4445-b1e3-9e71ce9b9f1d`: READY7.4.2, точные runtime/manifest/
 action/selectors и разрешённый storage root подтверждены. Окно1508×862,
 outer1508×949 при available1512×949, viewport=null/start-maximized.

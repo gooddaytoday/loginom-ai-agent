@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-e4aa07baa044` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Missing Values: аудит existing import исправлен, готовность9
 
 **Готово к следующему выделенному полному Hermes-прогону.**
@@ -46,7 +48,7 @@ source/account и независимый reader/reopen не изменены. Н
 
 ## Комплект9
 
-`.dock/node14-acceptance9-preparation/kit-2026.09.14-node14-acceptance9.1/`.
+`unavailable:artifact-de0f9f1df5137376`.
 Скопированы и сверены 413 файлов: 156 runtime и 257 harness. Изменены ровно
 три verifier-файла и добавлен regression runner; остальные входы совпадают
 с kit8. Штатный preflight прошёл без модели. Перед запуском обновить его.
@@ -60,13 +62,13 @@ source/account и независимый reader/reopen не изменены. Н
 | Launch plan | `19245af1d71305d67f73d70fa17ee989be4106290d9a3b6a6de0c03b469656ae` |
 
 Команда — массив args в launch-plan.json. Новый root
-`.dock/node14-autonomous-acceptance-9/runs`, тот же candidate test4.2/cadd80df…,
+`unavailable:artifact-8a3aebd42f467313`, тот же candidate test4.2/cadd80df…,
 test-4 и /test-4, existing openai-codex/gpt-5.6-sol/low,3600s/200turns.
 До модели проверить профиль, auth, отсутствие другого model/launcher и
 получить отдельное назначение слота. Самостоятельно следующий run не запущен.
 
 При подготовке candidate для аудита включить точную копию существующего
-`/Users/kartamyshev/Git/loginom-dock/.dock/node14-candidate-v2-20260913/stage-report.json`
+`unavailable:artifact-c4b2c7b72fa45ec7`
 после сверки digest со свежим candidate readback. Он нужен аудитору наряду
 с четырьмя файлами каталога. Отсутствие этой локальной квитанции в первом
 вызове run8 было исправлено копированием оригинала, не генерацией нового proof.

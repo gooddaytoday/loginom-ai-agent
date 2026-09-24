@@ -68,5 +68,11 @@
     "Focused evidence does not replace full autonomous acceptance; original FAIL 55/59 remains unchanged.",
     "Main import required its original parameters and traversed its wizard; no wizard-bypass claim.",
     "Fresh candidate runtime preflight still required; Hermes slot remains with node14."
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-8574c24b9161",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

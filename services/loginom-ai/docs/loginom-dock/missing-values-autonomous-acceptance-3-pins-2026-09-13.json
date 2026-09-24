@@ -37,62 +37,68 @@
     "sha256": "cdba2cab732718232d3c21befd751d142b7efa64b20a9d89a83cb0ce5f9ffaf8"
   },
   "receipts": {
-    ".dock/node14-autonomous-acceptance-3/authorization.json": {
+    "unavailable:artifact-dc7e4db001c06a7b": {
       "bytes": 549,
       "sha256": "cdba2cab732718232d3c21befd751d142b7efa64b20a9d89a83cb0ce5f9ffaf8"
     },
-    ".dock/node14-autonomous-acceptance-3/goal-inventory.json": {
+    "unavailable:artifact-773338b4b03dc8cb": {
       "bytes": 2473,
       "sha256": "48778a7695d2bb789e64549f03a226743cdaf69bf782258b7d7828dbeac2a386"
     },
-    ".dock/node14-autonomous-acceptance-3/launch.log": {
+    "unavailable:artifact-cc1066f6be8ad034": {
       "bytes": 469,
       "sha256": "0efbe74acda6f76d1fd42b9aba24856009bc761c62f6a6a32906ee4315539d6f"
     },
-    ".dock/node14-autonomous-acceptance-3/launcher-exit.json": {
+    "unavailable:artifact-cf924449ac358c5d": {
       "bytes": 17,
       "sha256": "e89df0eae5ec7db81135aed16463968955c578bcc4f2ec43172eff351f080c17"
     },
-    ".dock/node14-autonomous-acceptance-3/process-check.json": {
+    "unavailable:artifact-9d41e93ff6c115ce": {
       "bytes": 101,
       "sha256": "1490b2e4c7962d563809671d070ef4893cc8fbb9718d74749856ee89bb951f21"
     },
-    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/attempt.json": {
+    "unavailable:artifact-9d0c7fe68897ae4a": {
       "bytes": 106,
       "sha256": "4a8274edc8ea02321c70accaeea787beba28ac1c82da55ef6a5b6a9cd868d877"
     },
-    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/efficiency.json": {
+    "unavailable:artifact-9e95e97ea24d2636": {
       "bytes": 10390,
       "sha256": "3bcdc38b925e6b44f86110d0ac8b3d22754b4e827084c21e8811437be3a43af9"
     },
-    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/evidence.json": {
+    "unavailable:artifact-0d9cb37c16a8802e": {
       "bytes": 221053626,
       "sha256": "5ab0cc93d3f2dbf6bcb17c64ce529fcd8f8e33755a5c4f91fb0241a1806df5da"
     },
-    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/final-audit.json": {
+    "unavailable:artifact-12dc230a9a5fd11e": {
       "bytes": 427,
       "sha256": "cd0b08214cf1e8c8a4e6a61e479cc1460a0337181f6682d0e9eeb0a5f2bedf17"
     },
-    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/geometry-7f49e39f-3752-4a75-b6ef-be8b778e4f3e.json": {
+    "unavailable:artifact-a7cabeec4e52ca45": {
       "bytes": 614,
       "sha256": "a93f9ba859e58903940fc513d334d361ad93d188ca1592e3046428cb7a8b8bd4"
     },
-    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/pre-audit.json": {
+    "unavailable:artifact-8a8ef2e1ad11ac11": {
       "bytes": 427,
       "sha256": "cd0b08214cf1e8c8a4e6a61e479cc1460a0337181f6682d0e9eeb0a5f2bedf17"
     },
-    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/request.json": {
+    "unavailable:artifact-53198f1b5f963a06": {
       "bytes": 129971,
       "sha256": "46617cc1ed3fedc703a69834c574d5f181301146c0bbc60a369ff64a69513fa6"
     },
-    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/scenario.txt": {
+    "unavailable:artifact-3800679d20b89ff9": {
       "bytes": 9657,
       "sha256": "57189307eddc1350a9db6462d826890aa8f75cf99f393a9af8b642eb7a318d78"
     },
-    ".dock/node14-autonomous-acceptance-3/runs/20260913-132939-0384fe0b/tool-precheck.json": {
+    "unavailable:artifact-d7c024ba4f121030": {
       "bytes": 1112,
       "sha256": "1deb718120d86d3cde78ffa8f091aeb1dbefc1f0d2c48416af5b924c587ed26c"
     }
   },
-  "evidence_index_sha256": "0fff6fdbacad3350588ea0d6259cea4d71452f74aa35cc7690363a0a88108a4a"
+  "evidence_index_sha256": "0fff6fdbacad3350588ea0d6259cea4d71452f74aa35cc7690363a0a88108a4a",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-07d2dd5c05e1",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

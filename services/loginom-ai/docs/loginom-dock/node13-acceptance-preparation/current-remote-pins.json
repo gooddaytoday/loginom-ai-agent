@@ -79,5 +79,11 @@
       "http://logi-test-plan.bg.local/app/bg/app/Uses.js": "2b8598cddfd5f224b9e75806c9ba475cf1ff2ed6c37b599feb5b035be9a3dfb8"
     },
     "coverage": "HTML and statically linked entry assets; dynamically loaded modules require live prepared build verification"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-d794a70fb92c",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

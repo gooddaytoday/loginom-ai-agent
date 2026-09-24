@@ -16,7 +16,7 @@
     "runtime": "db331fdcde5a6f635e49801fb59d951773bb532531253b8b053fb35e5980ddcb",
     "session": "1de08440-613a-404d-a56d-1b3243bbde2c",
     "evidence": {
-      "path": "docs/loginom-dock/node-13-configure-recovery-1.md",
+      "path": "historical-ref:ref-f9478f8383cff86d",
       "sha256": "68e7316cc2a2def6ff3c508d56da4f09904b3f529a15fcaca2f68d21c9fd498c"
     },
     "boundary": "Same-ID configure flag continuation, two 29-row matrices; live selected-field refusal; other negative mutations are local. Not rerun on 2488fdaa."
@@ -25,7 +25,7 @@
     "status": "accepted_bounded_live_and_persistence",
     "commit": "7d7f0bc2a23c8db5d57fbeb9ceb57d3a8ca29907",
     "evidence": {
-      "path": "docs/loginom-dock/node-13-manual-output-evidence.json",
+      "path": "historical-ref:ref-14ca8418eb57dd35",
       "sha256": "0f64c53625423d510b4333e7c33ecc5a97ec71bdcd6b53e93de8a913cddd7c13"
     },
     "boundary": "Requested missing outputs only with manual autosync=false; prior persisted 4x8. R2 current runtime retained configuration and restored fresh 4x8, not a new persistence run."
@@ -35,7 +35,7 @@
     "commit": "5a4c46fc3a9eb19c0fb440c19decdd1931df7b82",
     "runtime": "2488fdaa08e4d6da9b7a31fb7598f675a8ad972efd65640b34cbc851feb16e2b",
     "evidence": {
-      "path": "docs/loginom-dock/node-13-r2-integration-evidence.json",
+      "path": "historical-ref:ref-534a4da83637141b",
       "sha256": "234ff3eec89e5b8a7d59b9d5cc2294194fea636f8271295b4428237a23106167"
     },
     "boundary": "Native failed dependency, cleanup, no stale read, repeat/resume, 15 negatives, restored 4x8. Not full 10-row goal."
@@ -44,7 +44,7 @@
     "status": "closed_historical_fix",
     "commit": "ed53b0189fa92dfc879015ee08580dcadf2c3cd2",
     "evidence": {
-      "path": "docs/loginom-dock/node-13-fix-1.md",
+      "path": "historical-ref:ref-133d74687f74a26c",
       "sha256": "2a8b93e1d49082391fea155f048dde44eb964560f06226fedb8583fa71dab7f1"
     },
     "boundary": "Complete output overrides auditor and independently reopened 4x27; not fresh 10x27."
@@ -65,5 +65,11 @@
     "Direct-open adapter and full 10-row auditor live validation before Hermes",
     "Final source HEAD/admission receipts and coordinator slot/run_id/budget",
     "One autonomous Sol/low run and independent six-node reopen audit"
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-c8b4cc2a154e",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-08d0257266de` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 13: комплект кандидата полной приёмки подготовлен
 
 Назначение `node13:acceptance-candidate-preparation:1:5a4c46fc`.
@@ -24,7 +26,7 @@ Hermes, браузер и модель не запускались; слот н�
 Архив дважды сформирован одинаково и прочитан обратно без расхождений.
 Это исходники для сборки action catalog, не локальный production bundle клиента.
 
-- Архив: `.dock/node13-candidate-prep/source-packet/candidate-source.tar.gz`.
+- Архив: `unavailable:artifact-4be574362b6dc4b3`.
 - SHA256 архива: `3daf75bb171c4297b9f7b2b013b4310555640ca9810ac07413fde923a7a5903e`.
 - SHA256 source manifest: `772f5f873dbe6a95c851e258e40992540e7e3c0c9a24fc4eed11026e5b88752a`.
 - [Source manifest](node13-acceptance-preparation/source-manifest.json),
@@ -51,7 +53,7 @@ Hermes, браузер и модель не запускались; слот н�
 NULL, ручные имена/метки/порядок/исключение и обе полные ветки обязательны.
 Несовместимая fixture на 12 строк не возвращалась.
 
-[Inventory 263 файлов](../../tools/loginom-acceptance/fixtures/date-time/inputs.json)
+[Inventory 263 файлов](../../../../packages/loginom-runtime/tools/loginom-acceptance/fixtures/date-time/inputs.json)
 перезакреплён на текущие harness/auditor bytes. Независимый Gregorian oracle и основной контракт
 `date_time_sales_acceptance.py` сохранены: точные значения не выводятся из actual.
 Аудитор требует все результаты до сохранения, один финальный checkpoint и

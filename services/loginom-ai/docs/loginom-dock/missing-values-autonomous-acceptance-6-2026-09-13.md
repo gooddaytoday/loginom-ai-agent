@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-96bcb1b08762` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: шестая автономная приёмка — 13 сентября 2026
 
 **FAIL.** Run `20260913-221602-99120ff2` выполнил 24 успешные операции
@@ -76,4 +78,4 @@ Missing Values и проверка применимости уже сущест�
 выделения общего слота; модели этой фазой больше не запускались.
 
 [Pins и 50 квитанций](missing-values-autonomous-acceptance-6-pins-2026-09-13.json).
-Private root: `.dock/node14-autonomous-acceptance-6/`.
+Private root: `unavailable:artifact-1219b6ca4d4c519d`.

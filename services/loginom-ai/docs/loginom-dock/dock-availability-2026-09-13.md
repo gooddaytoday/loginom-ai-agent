@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-2b9bd2151b9b` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # OpenViking восстановлен, разработчики возобновлены — 13 сентября 2026
 
 После нового сообщения пользователя выполнены проверки установленным модулем
@@ -10,7 +12,7 @@
 | `/health` с авторизацией | HTTP200, 681 ms; правильные account/user |
 | `/api/v1/system/status` | HTTP200, 217 ms |
 | Доступ к `viking://~/memories` | HTTP200, 239 ms |
-| MCP `tools/list` | HTTP200, 230 ms, 15 инструментов |
+| MCP `unavailable:artifact-b7721731a8ca0e97` | HTTP200, 230 ms, 15 инструментов |
 | Auto-recall в текущем чате | Контекст вновь поступил |
 
 Dock `dock_diagnostics(checkConnections=true)` также снова подтвердил сервер,
@@ -42,9 +44,9 @@ remote pinning; Loginom 7.4.2/test-3, новая редактируемая ко
 ревью, Hermes, новые назначения, merge или release.
 
 Локальные свидетельства:
-`.dock/server-diagnosis-20260913/openviking-recovery-redacted.json` и
-`.dock/server-diagnosis-20260913/developers-resumed-redacted.json`.
-Реестр `.dock/node-streams-20260912/state.json` обновлён.
+`unavailable:artifact-675a124e72657cf6` и
+`unavailable:artifact-6ece88e5c298ae66`.
+Реестр `unavailable:artifact-e0a5b485a1f5c041` обновлён.
 Ниже сохранён предшествующий снимок с уже снятой TLS-ошибкой личной памяти.
 
 ---
@@ -130,10 +132,10 @@ TLS-ошибку. Конфигурация памяти не менялась; �
 не объявлена успешной. Ревью, Hermes, следующие узлы, слияние и поставка
 автоматически не запускались.
 
-Результаты без credentials сохранены в `.dock/server-diagnosis-20260913/`:
+Результаты без credentials сохранены в `unavailable:artifact-5127a41a56bb0043`:
 `probe-after-user-reboot-redacted.json`, `probe-direct-redacted.json`,
 `ssh-stage-redacted.json`, `recovery-redacted.json`.
-Реестр координатора: `.dock/node-streams-20260912/state.json`.
+Реестр координатора: `unavailable:artifact-e0a5b485a1f5c041`.
 
 Для пассивной проверки соединения используется `/health`. В текущем source
 `/ready` вызывает embedding, а `verify-server.py` вызывает `/ready`; они не

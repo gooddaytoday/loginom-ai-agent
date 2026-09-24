@@ -3,7 +3,7 @@
   "run_id": "20260914-000803-18fad485",
   "passed": false,
   "original_revision": "908c9b7d90eefd72fea2ae9a7e62bcf90b5469cf",
-  "reevaluation_path": ".dock/node17/acceptance/runs/20260914-000803-18fad485/reevaluation-v3-model-02.json",
+  "reevaluation_path": "unavailable:artifact-298bd5e1fbd89297",
   "reevaluation_sha256": "62f4f70957ae827dd273f1ccbc49f5a046d0bea242476a53a87d031a67137682",
   "original_files_sha256": {
     "request.json": "fadee131be6f33342f3887d33008de47d9d88079511dbc331946ec32645c42b7",
@@ -91,7 +91,7 @@
     "module": "text_export_origin.py",
     "condition": "ownership_verified is True and target_verified is True",
     "observed": "reopened ownership_verified=false",
-    "source_semantics": "client/lib/workspace.mjs:108 sets ownership_verified only for intent=new_draft"
+    "source_semantics": "unavailable:artifact-fe92cd685e4de2d5 sets ownership_verified only for intent=new_draft"
   },
   "tests": {
     "passed": 34,
@@ -101,5 +101,11 @@
     "Independent derivation of saved/reopened package ownership (raw ownership flag must not be rewritten)",
     "Fresh original persistence; coordinator investigates actual read-only mode"
   ],
-  "original_files_unchanged": true
+  "original_files_unchanged": true,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-8ab700feed91",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

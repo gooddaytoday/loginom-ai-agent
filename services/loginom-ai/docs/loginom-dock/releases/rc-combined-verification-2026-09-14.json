@@ -13,9 +13,9 @@
       "passed": true,
       "run_id": "20260914-164641-6f525862",
       "model_checks": 29,
-      "audit": "/Users/kartamyshev/Git/loginom-dock/.dock/rc-combined-20260914/runs/20260914-164641-6f525862/full-audit-v3-1.json",
+      "audit": "unavailable:artifact-bc7f34343cbdef1d",
       "audit_sha256": "25ffcbab27336160f38514516487c2a69a0915d407855195e2cfd6f90fbe6719",
-      "reopen": "/Users/kartamyshev/Git/loginom-dock/.dock/rc-combined-20260914/reopen-cleaning-3",
+      "reopen": "unavailable:artifact-416363725e9b9de3",
       "package_path": "/test-2/packages/Dock-acceptance-20260914-164641-6f525862.lgp",
       "reader_cleanup": {
         "version": 1,
@@ -43,9 +43,9 @@
       "passed": true,
       "run_id": "20260914-171044-adf9b38b",
       "model_checks": 25,
-      "audit": "/Users/kartamyshev/Git/loginom-dock/.dock/rc-combined-20260914/runs/20260914-171044-adf9b38b/full-audit-v3-1.json",
+      "audit": "unavailable:artifact-de6c85376820b438",
       "audit_sha256": "e92d04953de7ba06d854f258b2612cde33271814c06dba4b384888cf7e1c3014",
-      "reopen": "/Users/kartamyshev/Git/loginom-dock/.dock/rc-combined-20260914/reopen-calendar-1",
+      "reopen": "unavailable:artifact-37be5b9959278e36",
       "package_path": "/test-2/packages/Dock-acceptance-20260914-171044-adf9b38b.lgp",
       "reader_cleanup": {
         "version": 1,
@@ -73,9 +73,9 @@
       "passed": true,
       "run_id": "20260914-172241-7a748db9",
       "model_checks": 21,
-      "audit": "/Users/kartamyshev/Git/loginom-dock/.dock/rc-combined-20260914/runs/20260914-172241-7a748db9/full-audit-v3-1.json",
+      "audit": "unavailable:artifact-861645c67a419a03",
       "audit_sha256": "8ab49fd573442db1740b632de4099b83794d9044ffe29bb6007a704cae90cb2a",
-      "reopen": "/Users/kartamyshev/Git/loginom-dock/.dock/rc-combined-20260914/reopen-export-1",
+      "reopen": "unavailable:artifact-d0b36c1ff92c6aa8",
       "package_path": "/test-2/packages/Dock-acceptance-20260914-172241-7a748db9.lgp",
       "reader_cleanup": {
         "version": 1,
@@ -107,5 +107,11 @@
     "Confirmed Loginom 7.4.2 stand and tested modes only",
     "SIGKILL/network loss cannot guarantee native logout",
     "Existing historical failures preserved"
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-ccbeb30c1176",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-54334503d83c` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Обновление установленного клиента — 11 сентября 2026
 
 Установлен клиент **`0.1.0-dev.20260910.3-aff2b95bac44`** с исправлениями
@@ -17,8 +19,8 @@
 
 314 из 318 build inputs побайтно совпали с принятым main. Четыре файла
 перенесены побайтно из прежней установленной версии:
-`client/bin/diagnostic.mjs`, `client/lib/local-diagnostics.mjs`,
-`client/test/local-diagnostics.test.mjs`, `plugins/loginom-dock-hermes/__init__.py`.
+`packages/loginom-runtime/client/bin/diagnostic.mjs`, `packages/loginom-runtime/client/lib/local-diagnostics.mjs`,
+`packages/loginom-runtime/client/test/local-diagnostics.test.mjs`, `plugins/loginom-dock-hermes/__init__.py`.
 Обработчики Loginom из ревью не менялись. Это локальный установочный снимок,
 не новый опубликованный коммит main или GitHub Release.
 
@@ -71,7 +73,7 @@ CLI сохраняет прежнее предупреждение о service de
 `~/.loginom-dock/previous` указывает на
 `releases/0.1.0-dev.20260910.3-2e4fd4e5e6e3`; его целостность проверена.
 Снимки исходных настроек и native-регистраций:
-`.dock/client-update-7774320f/before-install/` (приватно, вне Git).
+`unavailable:artifact-b29de93c110eb03b` (приватно, вне Git).
 Регистрационные журналы обоих агентов содержат исходные native sources и
 предыдущий runtime; для полного отката нужны оба плагина и runtime.
 Локальное зеркало нового source сохранено в
@@ -88,7 +90,7 @@ API/MCP-сервер и его модели не обновлялись. Нов�
 проверены объединённый комплект, native-подключения и живая работа установки.
 Совместимость с Loginom 7.5 и Windows этой работой не заявляется.
 
-Приватные доказательства — `.dock/client-update-7774320f/`:
+Приватные доказательства — `unavailable:artifact-7658b0bd5c4151f6`:
 `combined-source.json`, `combined.tar.gz.manifest.json`, `bundle-verification.json`,
 `tests-summary.json`, `configuration-verification.json`, `native-after.json`,
 `installation.json`, `mcp-smoke.json`, `final-runtime-verification.json`,

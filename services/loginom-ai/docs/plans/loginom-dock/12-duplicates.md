@@ -1,12 +1,14 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-3d01eca92d43` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 > 13 сентября: отдельный пересмотр неизменного run20260913-072904-3cc4ad0e
 > verifier identity-import-v1 прошёл **122/122**. Исходный frozen **FAIL112/118** сохранён.
 > Нового Hermes run не было; production/goal не менялись. Отчёт:
-> `docs/plans/loginom-dock/node12-identity-auditor-followup-1/README.md`.
+> `services/loginom-ai/docs/plans/loginom-dock/node12-identity-auditor-followup-1/README.md`.
 
 > 13 сентября: кандидат12.2 прошёл новый автономный run, но frozen аудит **FAIL112/118**.
 > Причина: три identity import mappings вне закреплённого scope аудитора (шесть gates).
 > Save/close/open и16 node operations прошли. Полная приёмка остаётся незавершённой.
-> Отчёт: `docs/plans/loginom-dock/node12-acceptance-preparation-2/attempt-20260913-072904.md`.
+> Отчёт: `services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-2/attempt-20260913-072904.md`.
 
 # 12. Дубликаты и противоречия: разметка качества данных
 
@@ -48,7 +50,7 @@ Scope — разметка исходных строк и чтение четы�
 
 ## Что есть сейчас и источники
 
-Компонент присутствует в `executor/inventory/palette-2026-09-05.json` под ID
+Компонент присутствует в `packages/loginom-runtime/executor/inventory/palette-2026-09-05.json` под ID
 `Дубликаты_и_противоречия`. Зарегистрирован тип `research.duplicates`, режим `mark`;
 реализованы назначения входа, полный результат и независимые аудиторы.
 Полный сценарный auditor подготовлен для отдельного автономного запуска.

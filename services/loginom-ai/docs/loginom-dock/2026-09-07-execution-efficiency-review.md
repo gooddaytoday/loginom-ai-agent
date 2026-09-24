@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-9d974ddc6f24` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Ускорение создания сценариев и выхода из MVP
 
 Срез: 7 сентября 2026. Статус: **исследование и варианты для выбора**, не новая редакция согласованного плана. Исполнение P3 остаётся на паузе. Новые Hermes-прогоны, изменения runtime, моделей, конфигурации, браузера и production в рамках исследования не выполнялись.
@@ -93,9 +95,9 @@ API-вызовы модели и вызовы инструментов разл�
 ## Где проверить выводы
 
 - [Текущий checkpoint](resume-checkpoint.md) и [план §§13–19](../plans/2026-09-02-loginom-dock-implementation-plan.md).
-- [Незавершённые P3 gates](../../tools/loginom-acceptance/data_pipeline.py), [Calculator verifier](../../tools/loginom-acceptance/calculator_evidence.py).
-- [Страницы наблюдений](../../client/lib/observation-pages.mjs), [UI drivers](../../client/lib/workspace-ui.mjs), [конфигурация acceptance](../../tools/loginom-acceptance/run.py).
-- Приватная очищенная статистика: `.dock/post-mvp-p0/analysis-20260907-hermes-costs.json` и одноимённый `.md`; отдельные анализы `analysis-20260907-architecture.md` и `analysis-20260907-hermes-context.md`.
-- Исторический анализ: `.dock/recipe-system-research/research/03-session-analysis.md`; это срез 4 сентября, а не статистика текущей ревизии.
+- [Незавершённые P3 gates](../../../../packages/loginom-runtime/tools/loginom-acceptance/data_pipeline.py), [Calculator verifier](../../../../packages/loginom-runtime/tools/loginom-acceptance/calculator_evidence.py).
+- [Страницы наблюдений](../../../../packages/loginom-runtime/client/lib/observation-pages.mjs), [UI drivers](../../../../packages/loginom-runtime/client/lib/workspace-ui.mjs), [конфигурация acceptance](../../../../packages/loginom-runtime/tools/loginom-acceptance/run.py).
+- Приватная очищенная статистика: `unavailable:artifact-5cf7d7d1cf04873e` и одноимённый `.md`; отдельные анализы `analysis-20260907-architecture.md` и `analysis-20260907-hermes-context.md`.
+- Исторический анализ: `unavailable:artifact-ac6c213fb2c4ae24`; это срез 4 сентября, а не статистика текущей ревизии.
 
 Изменён только исследовательский документ и добавлены очищенные аналитические файлы. Согласованный план, точка паузы, модели и реализация не изменены. Аудиты сохранены без замены. Ограничения: нет новой сравнительной живой серии, нет измерения расхода Codex/списаний подписки, неизвестна величина будущей экономии.

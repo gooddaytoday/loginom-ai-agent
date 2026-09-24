@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-0193cd7d2b63` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: обновление ссылки источника и готовность к Hermes
 
 **Готово к полному Hermes-прогону после выделения общего слота.**
@@ -75,7 +77,7 @@ runtime ниже, test-4, отдельный документ и viewport=null. 
 
 ## Комплект следующего полного запуска
 
-Kit: `.dock/node14-acceptance6-preparation/kit-2026.09.13-node14-acceptance6.1/`.
+Kit: `unavailable:artifact-6dda7ed032482026`.
 Сверены 412 файлов снимка: 156 runtime + 256 harness. В harness поменялись
 только две привязки runtime; текст задания, fixtures, oracle и полный аудитор
 сохранены. Preflight после коммита прошёл без запуска модели.
@@ -91,7 +93,7 @@ Kit: `.dock/node14-acceptance6-preparation/kit-2026.09.13-node14-acceptance6.1/`
 
 Точная команда — массив args в `launch-plan.json` указанного kit:
 существующий run.py, goal missing-values-complete, profile chatgpt-sol,
-test-4, новый runs-root `.dock/node14-autonomous-acceptance-6/runs`,
+test-4, новый runs-root `unavailable:artifact-ec149dcb9dde698c`,
 timeout3600/max-turns200. Provider openai-codex, model gpt-5.6-sol, low.
 На 16:38 UTC подписка проверена более чем на 4200 секунд, свободно
 87 190 745 088 байт. Перед фактическим запуском обновить обычный preflight

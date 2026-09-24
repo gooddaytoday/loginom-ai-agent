@@ -320,5 +320,11 @@
     ],
     "scope": "exact_excluded_source_and_target_metadata",
     "effective_output_column": false
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-5eaa1eaebded",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

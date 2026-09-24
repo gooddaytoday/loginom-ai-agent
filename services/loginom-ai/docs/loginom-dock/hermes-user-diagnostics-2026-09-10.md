@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-07f450c379a8` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Обычная работа Hermes и локальная диагностика — 10 сентября 2026
 
 Пользовательский профиль реализован и проверен на основном установленном Hermes.
@@ -134,7 +136,7 @@ Codex отдельно проверил реальный UI, источник CS
 оговорённые provider/model/reasoning и запись MCP Dock. Исходные конфигурации и
 native source сохранены приватно; прежний runtime
 `0.1.0-dev.20260910.2-0afdd48cc0d2` оставлен для отката. Подробности —
-[operations.md](operations.md). Служба Hermes перезапущена штатно; её прежнее
+[operations.md](../../../../docs/node-development/history/supplements/docs/loginom-dock/operations.md). Служба Hermes перезапущена штатно; её прежнее
 предупреждение о stale service definition не исправлялось в этой работе.
 
 Подтверждён только закреплённый профиль четырёх обработчиков на Loginom 7.4.2.
@@ -168,7 +170,7 @@ Production API/каталог и landing не переключались.
 ускорения или экономии не заявляется; старый ноль записи кеша не был отдельно
 подтверждён исходным признаком присутствия.
 
-Приватные доказательства: `.dock/hermes-user-20260910/` — `candidate-ordinary-run/`
+Приватные доказательства: `unavailable:artifact-7c5a6e91b5c02e3e` — `candidate-ordinary-run/`
 (задание, время, статистика, итоговый ответ, журнал, сверка токенов),
 `live-1789055625609/` (отдельный аудит), `candidate-negative-checks.json`,
 `client-tests-d-vps.log`, `python-tests-ready.log`, `before-install/`,

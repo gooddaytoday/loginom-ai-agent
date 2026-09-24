@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-f7b0112b6cdf` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Живая перепроверка ревью «Параметров полей» — 11 сентября 2026
 
 Два замечания ревью подтверждены на Loginom 7.4.2 и исправлены в исходниках.
@@ -68,11 +70,11 @@ Reform сохраняет исходную конфигурацию и допу�
 
 ## Доказательства и проверки
 
-- До исправлений: `.dock/calculator-v3/live-1789112332749/`,
+- До исправлений: `unavailable:artifact-6a7575daf77ad3f9`,
   `collision-before-fix.json`, `hover-before-fix-3.json`, скриншоты и сырой журнал.
-- Промежуточная проверка: `.dock/calculator-v3/live-1789113359480/`.
+- Промежуточная проверка: `unavailable:artifact-629b332029dcbdb8`.
   Отказ расширенного смешанного запроса сохранён; последующий успех его не заменяет.
-- Окончательная Codex-диагностика: `.dock/calculator-v3/live-1789113801355/`.
+- Окончательная Codex-диагностика: `unavailable:artifact-af205e8c4cf44b26`.
   `collision-after.json`, `inherited-collision.json`, `selection-after.json`,
   `mixed-valid.json`, `review-audit.json`, `negative-review-audit.json`,
   `mixed-output-oracle.json`; все 24 значения совпали с прежним frozen CSV oracle
@@ -81,12 +83,12 @@ Reform сохраняет исходную конфигурацию и допу�
   подмен отклонены**. Отдельный аудитор проверяет отмену обоих черновиков до
   сохранения input mapping и сравнивает прогноз конфигурации с живым мастером.
 - Client: **1244 PASS, 1 SKIP**. Python: **461 PASS**.
-  Логи: `.dock/reform-review-20260911/client-tests.log` и `python-tests.log`.
+  Логи: `unavailable:artifact-ca2284a44203053e` и `python-tests.log`.
 - Runtime Codex-диагностики и запущенного Hermes:
   `ab4702e56bbe6dac75a7df75f99919e5f6152324bf3d0633eae11cdf4bf03313`.
 - Hermes run: `20260911-110726-82fa90aa`, существующая ChatGPT subscription,
   `openai-codex / gpt-5.6-sol / low`, без fallback.
-  Материалы: `.dock/reform-review-20260911/hermes-runs/20260911-110726-82fa90aa/`.
+  Материалы: `unavailable:artifact-1f77a6d3a0a84be6`.
   Статус: **49/49 frozen PASS, 9/9 отрицательных подмен отклонены**.
   Runtime и harness не менялись во время запуска; текущие исходники совпали с pin.
 - SHA-256 итогового аудита:

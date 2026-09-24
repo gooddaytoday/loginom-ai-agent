@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-8be7c9ae715c` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Узел11 «Замена»: разработка завершена — 13 сентября 2026
 
 Статус этапа: **завершён, готов к одному отдельному ревью**.
@@ -61,7 +63,7 @@ Python-аудиторы компилируются; `git diff --check` прош�
 Собственный аккаунт test-2, пакет `/test-2/Node11-Handler-90de4e18.lgp`.
 Пакет сохранён, закрытие подтверждено Home/отсутствием мастера и графа;
 source harness завершён штатно. Все browser profiles и доказательства находятся
-в `.dock/stream-runtime/sessions/` этого worktree. Не использовать старые
+в `unavailable:artifact-3d8353b5a5093cb6` этого worktree. Не использовать старые
 workflow/document refs при новом запуске.
 
 Рабочая ветка `codex/node-11-replacement`; bootstrap-правка `.gitignore`

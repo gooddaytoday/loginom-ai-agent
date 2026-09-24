@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-204de0291319` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Установка клиента с «Параметрами полей» — 11 сентября 2026
 
 На Mac установлен **`0.1.0-dev.20260910.3-7adeb19b4c91`** с подпланом05 и
@@ -15,8 +17,8 @@
 Исходная установка `0.1.0-dev.20260910.3-aff2b95bac44`, source
 `615b26ae96ba34b7146630e7b1518f7004714ff5`, содержала локальную диагностику
 ошибок API, отсутствующую в main. Она сохранена побайтно в четырёх файлах:
-`client/bin/diagnostic.mjs`, `client/lib/local-diagnostics.mjs`,
-`client/test/local-diagnostics.test.mjs`, `plugins/loginom-dock-hermes/__init__.py`.
+`packages/loginom-runtime/client/bin/diagnostic.mjs`, `packages/loginom-runtime/client/lib/local-diagnostics.mjs`,
+`packages/loginom-runtime/client/test/local-diagnostics.test.mjs`, `plugins/loginom-dock-hermes/__init__.py`.
 Эти изменения не добавлялись в main в рамках реализации параметров полей.
 
 Чистый установочный снимок
@@ -100,7 +102,7 @@ GUID двух узлов и единственной связи; подтвер�
 `~/.loginom-dock/previous` указывает на
 `releases/0.1.0-dev.20260910.3-aff2b95bac44`; его 4132 файла также проверены.
 Приватные снимки настроек и регистраций находятся в
-`.dock/client-update-field-parameters-20260911/before-install/`.
+`unavailable:artifact-aaebc83a9ca9d030`.
 Регистрационные журналы сохраняют прежние native sources и runtime;
 полный откат включает оба плагина и runtime.
 Hermes закреплён на локальное зеркало
@@ -115,7 +117,7 @@ Hermes для установки не запускалась: полная пр�
 принятым исходникам, а проверки объединённого комплекта перечислены отдельно.
 Совместимость с Loginom 7.5 и Windows не заявляется; V4/V5 целиком не закрыты.
 
-Приватные доказательства: `.dock/client-update-field-parameters-20260911/` —
+Приватные доказательства: `unavailable:artifact-7510fe8604c6efa4` —
 `combined-source.json`, `combined.tar.gz.manifest.json`, `bundle-verification.json`,
 `tests-summary.json`, `configuration-verification.json`, `native-after.json`,
 `installation.json`, `mcp-smoke.json`, `final-runtime-verification.json`.

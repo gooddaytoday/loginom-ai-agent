@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-04ca4cc61d47` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node16: проект exact variant контракта
 
 Назначение `node16:variant-contract-design:1:dc93af3f`. Основание — решение
@@ -123,7 +125,7 @@ node-api, не уже доступная опция. `require_exact_numbers` н�
 
 ## Pure prototype и граница доверия
 
-`tools/loginom-acceptance/collapse/variant-contract/adapter.mjs` не содержит RPC,
+`packages/loginom-runtime/tools/loginom-acceptance/collapse/variant-contract/adapter.mjs` не содержит RPC,
 browser calls или public imports. `adaptCell` повторно декодирует saved significant
 bytes и не доверяет ранее вычисленному decoded/display/Names/DataTypes.
 `adaptRead` сверяет expected binding, read_id/lifecycle, координаты, размеры и
@@ -148,16 +150,16 @@ releasedRequests/Responses и pending0; неопределённая сесси�
 
 | Модуль | Точный предполагаемый diff / владелец |
 | --- | --- |
-| новый client/lib/variant-native-read.mjs | Перенос только принятого fixed321 diagnostic reader; private capability, pinned frontend, read_id, завершённый lifecycle, полный guards и byte budget. Владелец node16; общий transport не менять |
-| новый client/lib/variant-native-values.mjs | Pure scalar conversion из этого прототипа, strict discriminated cell validation; node16 |
-| client/lib/calculator-node.mjs readOutput | После completed execution и schema выбрать bounded exact reader только для разрешённого Collapse variant. Связать Preview datasource с тем же port/table, вернуть graph и прежний cleanup; node16 с согласованием общего владельца |
-| client/lib/collapse-node.mjs | Явный opt-in implementation flag для exact variant; не включать RPC всем tabular handlers |
-| client/lib/table-output-values.mjs | Принимать только trusted exact supplement того же execution/schema/координат; не выводить subtype из display. Обычный scalar/UI путь сохранить; общий владелец через координатора |
-| client/lib/table-output-pages.mjs | Не расширять sample10 автоматически. Exact-full отдельный bounded read; существующее horizontal paging остаётся UI sample |
-| client/lib/node-result-schema.mjs | Strict union cell_type/native/representation, read_coverage/read_consistency/exact_table max50×8, sample по-прежнему≤10 |
-| client/lib/user-results.mjs | Allowlist новых cell/port полей; JSON roundtrip exact_table без усечения. Проверить actual compactNodeResult, не только proposedUserPort |
-| client/lib/node-api.mjs | Additive read.coverage, согласованный exact-full отказ и документация семантики native date; общий API владелец/координатор |
-| client/test и tools/loginom-acceptance/collapse | Регрессии прежних handlers + independent full result audit после fresh reopen; node16 |
+| новый packages/loginom-runtime/client/lib/variant-native-read.mjs | Перенос только принятого fixed321 diagnostic reader; private capability, pinned frontend, read_id, завершённый lifecycle, полный guards и byte budget. Владелец node16; общий transport не менять |
+| новый packages/loginom-runtime/client/lib/variant-native-values.mjs | Pure scalar conversion из этого прототипа, strict discriminated cell validation; node16 |
+| packages/loginom-runtime/client/lib/calculator-node.mjs readOutput | После completed execution и schema выбрать bounded exact reader только для разрешённого Collapse variant. Связать Preview datasource с тем же port/table, вернуть graph и прежний cleanup; node16 с согласованием общего владельца |
+| packages/loginom-runtime/client/lib/collapse-node.mjs | Явный opt-in implementation flag для exact variant; не включать RPC всем tabular handlers |
+| packages/loginom-runtime/client/lib/table-output-values.mjs | Принимать только trusted exact supplement того же execution/schema/координат; не выводить subtype из display. Обычный scalar/UI путь сохранить; общий владелец через координатора |
+| packages/loginom-runtime/client/lib/table-output-pages.mjs | Не расширять sample10 автоматически. Exact-full отдельный bounded read; существующее horizontal paging остаётся UI sample |
+| packages/loginom-runtime/client/lib/node-result-schema.mjs | Strict union cell_type/native/representation, read_coverage/read_consistency/exact_table max50×8, sample по-прежнему≤10 |
+| packages/loginom-runtime/client/lib/user-results.mjs | Allowlist новых cell/port полей; JSON roundtrip exact_table без усечения. Проверить actual compactNodeResult, не только proposedUserPort |
+| packages/loginom-runtime/client/lib/node-api.mjs | Additive read.coverage, согласованный exact-full отказ и документация семантики native date; общий API владелец/координатор |
+| unavailable:artifact-e4dc0356f15ef0c1 и unavailable:artifact-9df4270a3bfa8a62 | Регрессии прежних handlers + independent full result audit после fresh reopen; node16 |
 
 Нужна проверка полного public path strict schema→MCP result→actual user-v1:
 проектный `proposedUserPort` этого не заменяет. В runtime.pin/frontend provenance

@@ -107,17 +107,23 @@
   ],
   "own_processes_remaining": false,
   "receipts": {
-    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/request.json": "afc9fe20984a1dfb63cb288e9c9338676e9f85758ae474abbabfd40c4b47cee8",
-    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/scenario.txt": "af05fa83d742f92bcac1ff4c4f306de94abcca5b6d3d0ede588daee299cc798f",
-    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/evidence.json": "c9a358b46a8db72067b87a754efb8f8db8e7057a65e7a3f38314df14bc69ca28",
-    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/attempt.json": "838311a7f485851dac9b9e8495a6722f55c4026e41a8650979ef8c73ba359d96",
-    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/duplicates-node-audit.json": "1270695cd955d80d4e9505220a6136167cbbab150e1c236b58752af029327fc7",
-    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/efficiency.json": "c3f994812b8ac3396ac2aab67ae03ea5c4b583ef63070b8b367a43adfb16394b",
-    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/tool-precheck.json": "1deb718120d86d3cde78ffa8f091aeb1dbefc1f0d2c48416af5b924c587ed26c",
-    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/window-process-actual.json": "8cd78d98a43a19ec9c9024ebb8843491e5ec4e76ac18bd77e97919a4323f35b5",
-    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/window-geometry.json": "1e5ffcc6733d173345c42049dbfcf69482fa9395198c53d5dae3690a04e6beca",
-    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/model-identity-live.json": "f60a3ec450c120e805eb9c35df1b4892a175571ec13503ee74d0f98ef5f42e03",
-    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/import-contract-diagnosis.json": "6faff88409c137639f4393f6ed69c75090f1ac9352cbc5ae1bc9bf26f2e7da8b",
-    "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-072904-3cc4ad0e/final-process-check.json": "71047a384f251072800b05269912159671915ec3abe26ab318c6a40507a4517a"
+    "unavailable:artifact-f4ade8a4fc1fd842": "afc9fe20984a1dfb63cb288e9c9338676e9f85758ae474abbabfd40c4b47cee8",
+    "unavailable:artifact-4be19e1e66d6d4bb": "af05fa83d742f92bcac1ff4c4f306de94abcca5b6d3d0ede588daee299cc798f",
+    "unavailable:artifact-915c9c625ad1400d": "c9a358b46a8db72067b87a754efb8f8db8e7057a65e7a3f38314df14bc69ca28",
+    "unavailable:artifact-674d2c642467a330": "838311a7f485851dac9b9e8495a6722f55c4026e41a8650979ef8c73ba359d96",
+    "unavailable:artifact-67792ab036cdbc58": "1270695cd955d80d4e9505220a6136167cbbab150e1c236b58752af029327fc7",
+    "unavailable:artifact-3ed9c93530085c66": "c3f994812b8ac3396ac2aab67ae03ea5c4b583ef63070b8b367a43adfb16394b",
+    "unavailable:artifact-45b2e664519e9f3b": "1deb718120d86d3cde78ffa8f091aeb1dbefc1f0d2c48416af5b924c587ed26c",
+    "unavailable:artifact-1c44e78818efd834": "8cd78d98a43a19ec9c9024ebb8843491e5ec4e76ac18bd77e97919a4323f35b5",
+    "unavailable:artifact-79584354042ddd59": "1e5ffcc6733d173345c42049dbfcf69482fa9395198c53d5dae3690a04e6beca",
+    "unavailable:artifact-224fd5c34597c805": "f60a3ec450c120e805eb9c35df1b4892a175571ec13503ee74d0f98ef5f42e03",
+    "unavailable:artifact-ff5a380ebd19436e": "6faff88409c137639f4393f6ed69c75090f1ac9352cbc5ae1bc9bf26f2e7da8b",
+    "unavailable:artifact-a01ed0cc6e982ac0": "71047a384f251072800b05269912159671915ec3abe26ab318c6a40507a4517a"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-561dcd79a4d1",
+    "provenance": "../../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

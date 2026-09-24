@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-d008423faacd` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # 02. Добавление узлов на сценарий
 
 Статус: **implemented / live_verified (source runtime)**, не released.
@@ -19,14 +21,14 @@
 
 ## Исходная точка и источники
 
-[capability-registry.mjs](../../../client/lib/capability-registry.mjs) уже регистрирует
+[capability-registry.mjs](../../../../../packages/loginom-runtime/client/lib/capability-registry.mjs) уже регистрирует
 node.add и link.create. Использовать их код и проверки как основу; их существующие
 внешние семантики сохраняются. Это не готовая составная операция node.apply.
 
-Проверить [workspace-ui.mjs](../../../client/lib/workspace-ui.mjs),
-[executor.mjs](../../../client/lib/executor.mjs),
-[execution-journal.mjs](../../../client/lib/execution-journal.mjs) и
-[action-catalog.mjs](../../../client/lib/action-catalog.mjs).
+Проверить [workspace-ui.mjs](../../../../../packages/loginom-runtime/client/lib/workspace-ui.mjs),
+[executor.mjs](../../../../../packages/loginom-runtime/client/lib/executor.mjs),
+[execution-journal.mjs](../../../../../packages/loginom-runtime/client/lib/execution-journal.mjs) и
+[action-catalog.mjs](../../../../../packages/loginom-runtime/client/lib/action-catalog.mjs).
 E2E через Dock: bg/helpers/workflow/node.ts, ports.ts, links.ts;
 Help: data/workflow/ports/README.md, optional-ports.md,
 automapping-of-fields.md. Селекторы и жесты закреплять по источникам и живому UI.

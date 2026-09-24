@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-a9952ba079a0` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Узел 11: первый автономный прогон — FAIL, диагностика завершена
 
 Команда `node11:autonomous-acceptance:1:28434c4b61305eaa08c76db1dad470599852b48f333f734ad3e946687941ab37`.
@@ -17,7 +19,7 @@
   Точный pin координатора скопирован без изменений; staged=true, activated=false.
 - Loginom 7.4.2, account `test-2`, storage `/test-2`.
 - Run `20260913-054024-fef0b53e`, каталог
-  `.dock/replacement/acceptance-runs/20260913-054024-fef0b53e`.
+  `unavailable:artifact-5a1ac7f98a41ccca`.
 - Hermes 0.21.0, существующая подписка `openai-codex / gpt-5.6-sol / low`.
   Свежий preflight PASS; 31 API call, exit0, completed=true, timeout=false.
   Это статистика процесса, не основание для принятия.
@@ -106,7 +108,7 @@ operator-observation.json и process-cleanup.json. Исходная Hermes histo
 остаётся в защищённом `private/hermes-home/state.db`; безопасный экспорт
 содержит вызовы/ответы, без копирования скрытых рассуждений или model prose.
 Исходные browser/session журналы сохранены под `private/dock-state/sessions/`.
-Диагностические наблюдения — `.dock/stream-runtime/sessions/c8a8405c-c68e-4c1b-a795-1bbba83e7da0/`.
+Диагностические наблюдения — `unavailable:artifact-b5f03157be66260c`.
 
 [Машинный отчёт и хеши артефактов](../../loginom-dock/replacement-autonomous-2026-09-13.json).
 Повторная проверка процессов после экспорта и после диагностики не обнаружила

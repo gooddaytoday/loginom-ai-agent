@@ -55,25 +55,25 @@
   "diagnostic_setup_failure": "First standalone MCP check rejected own 0755 state directory; changed own directory to ordinary-run 0700; unchanged stock check passed. Original failure retained. No approval rejection.",
   "effective_usage_identity": "Provider/model selected explicitly and existing subscription validated locally; actual model usage identity can only be checked after authorized run.",
   "receipts": {
-    ".dock/node12-followup-1/candidate-preflight.json": {
+    "unavailable:artifact-97ae52a854a5a31f": {
       "sha256": "8a579da5c1e668177158ae545dbd3e043dbb373cfee8a14e361c7b3e036586f8"
     },
-    ".dock/node12-candidate-preflight-2/manifest-mcp-readback.json": {
+    "unavailable:artifact-58e874dce3f961fd": {
       "sha256": "d0c9a5bedc170754dd251c982508e0ad8568d300091eda0027962c496df62adf"
     },
-    ".dock/node12-candidate-preflight-2/tool-precheck.json": {
+    "unavailable:artifact-d91c0d817eeed437": {
       "sha256": "69ad3486c60157a164ec2ba9e1b979e5eb78cf0cdabe73db2a5428f4666c9d34"
     },
-    ".dock/node12-candidate-preflight-2/tool-precheck-private-mode.json": {
+    "unavailable:artifact-bd9cc7c30c760c50": {
       "sha256": "55c27c3876e8af15ecff0f0b10e4b7445067ac8001013d7ffd3bd96d9cded33c"
     },
-    ".dock/node12-candidate-preflight-2/private/config.json": {
+    "unavailable:artifact-aa1e0b5bb9f5a3a3": {
       "sha256": "d93e82a1a7eed854f23c21ebc7d95b5cff8498ef118d1d6276aeb1e3df47c0e6"
     },
-    ".dock/node12-candidate-preflight-2/private/dock-state/sessions/8bb2ccf0-03fb-4b0e-a74e-debffda7b097/session.json": {
+    "unavailable:artifact-99b50fb23f45c153": {
       "sha256": "0668c952fa15bf0240bffe26926c6ade688e39cfce5e92c593de90ff1c11728b"
     },
-    ".dock/node12-candidate-preflight-2/process-check.json": {
+    "unavailable:artifact-5cf6691fee68850c": {
       "sha256": "000638f2b3e0bb751efbccfb3817a7ed08c18b47a7a4dfea3e6e945ebff7c23e"
     }
   },
@@ -89,5 +89,11 @@
     "actionManifestDigest": "d0c9a5bedc170754dd251c982508e0ad8568d300091eda0027962c496df62adf",
     "actionCatalogVersion": "2026.09.13-node12.2-candidate"
   },
-  "own_processes_remaining": false
+  "own_processes_remaining": false,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-eabd54bf4c35",
+    "provenance": "../../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

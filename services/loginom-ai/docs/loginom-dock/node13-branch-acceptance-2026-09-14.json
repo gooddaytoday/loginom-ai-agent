@@ -19,5 +19,11 @@
   "independent_persistence_checks_passed": 30,
   "own_cleanup_verified": true,
   "merged": false,
-  "published": false
+  "published": false,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-043bf36ea308",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

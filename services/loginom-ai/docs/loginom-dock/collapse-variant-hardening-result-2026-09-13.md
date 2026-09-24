@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-fcd506a8093e` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node16: изолированная проверка variant lifecycle и datetime
 
 Разрешение: `node16:variant-hardening:1:direct-user-20260913`. Продолжение
@@ -119,14 +121,14 @@ Hermes, повторный review, mainmerge, deploy и общий plugin не �
 Public runtime pin остался
 `7ed94630353fed483f53a029a3aea7828920235879569b83d303510213b3d239`.
 Закреплённые SHA frontend повторно совпали до опытов. Manifest
-`tools/loginom-acceptance/collapse/variant-prototype/hardening-provenance.json`
+`packages/loginom-runtime/tools/loginom-acceptance/collapse/variant-prototype/hardening-provenance.json`
 содержит отдельные SHA reader/decoder/fixture/audit и сохранённых evidence.
 Исторический `provenance.json` относится к предыдущему commit и не перезаписан.
 
 Основной аудит:
-`python3 tools/loginom-acceptance/collapse/variant-prototype/hardening-audit.py
-.dock/node16/live-1789295696452 .dock/node16/live-1789296218513
-.dock/node16/live-1789294747254` (аргументы одной командой).
+`python3 packages/loginom-runtime/tools/loginom-acceptance/collapse/variant-prototype/hardening-audit.py
+unavailable:artifact-f8586dbe5e80eeae unavailable:artifact-c4efe75611600e43
+unavailable:artifact-62351175bcc34784` (аргументы одной командой).
 
 Run `live-1789295519956` сохранён как неуспешная подготовка с координатой вне
 экрана; он не входит в положительную приёмку. Raw artifacts остались только

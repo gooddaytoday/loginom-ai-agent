@@ -40,10 +40,10 @@
     "whitespace": {
       "status": "passed_except_preserved_historical_artifacts",
       "excluded": [
-        "docs/loginom-dock/transfers/node13-r2/source-selected.patch",
-        "docs/loginom-dock/transfers/node13-r2/terminal-failure.patch",
-        "tools/node16-audit-reevaluation/auditor-node-projection-candidate.py",
-        "tools/loginom-acceptance/fixtures/text-export/expected/*.bin"
+        "historical-ref:ref-aa46a07f354c5493",
+        "historical-ref:ref-17a87b081468bbf5",
+        "historical-ref:ref-61e83d4948568649",
+        "unavailable:artifact-afb22999e2db103b"
       ],
       "reason": "Preserve historical byte hashes and intentional CRLF/BOM fixture content"
     }
@@ -124,22 +124,22 @@
   },
   "original_dirty_files": {
     "AGENTS.md": "ccdf4f718d4be74e57a58d0287872021fc091726b7046a74359a8db760faefcb",
-    "docs/loginom-dock/agent-handoff.md": "586ab118b84e7b88e3abd39971e2f62e3fd9f1dec30ffde04e2e90f7be1f18da",
-    "docs/loginom-dock/coordinator-decisions-2026-09-13-afternoon.md": "6434e95bca970820411f25c0a51bca1b866678d84c294642d7a2a3549c83e1e0",
-    "docs/loginom-dock/operations.md": "fa6a43ba07997bb5f751cf11b172214e9ada3d44a485876c4a2ebbbe00251161",
-    "docs/plans/loginom-dock/automatic-node-workflow.md": "73fa150ad654d86e62ecb9aca31e50f177f61f2bac639de8a71d3317e25000cd",
-    "docs/plans/loginom-dock/node-workflow-runbook.md": "e022668199bd9fa73d0854eff00a924b9c990172a000972f6b9fe8bd27360447",
-    "docs/loginom-dock/node13-branch-acceptance-2026-09-14.json": "f8a0b76cfb1081447223435073561b4e6edd602b301bae1a06d6fbddad06391b",
-    "docs/loginom-dock/node13-read-performance-2026-09-14.md": "8636baba8e0ea19b1d76f1b84e63ee17b2cac9668f18942ad9f1611ec1eaf915",
-    "docs/loginom-dock/node14-branch-acceptance-2026-09-14.json": "ae9cd32e1f0753d92d2efc0bb79e5df4d6099bf597377aec3b926815e5f460fe",
-    "docs/loginom-dock/node16-branch-acceptance-2026-09-14.json": "8d75772b3b44b669b828aced439d3dc5443a1bbeef21ae0d0942c9654ea9dd78",
-    "docs/loginom-dock/node16-candidate-2026-09-13.json": "82e62bb559cad1c01cfe5e717ca94879acf99ccd4410b0f0eb54e45e5863b972",
-    "docs/loginom-dock/node16-candidate2-2026-09-13.json": "dc5be3e203ddc10a0fdc9a46486e5e0a9668346ff10cd71997f4a036a5d12440",
-    "docs/loginom-dock/node16-candidate3-2026-09-13.json": "356e8112e094ae707f09017d50effc9e43e301b828eb75cb874a88be75fccacd",
-    "docs/loginom-dock/node16-candidate4-2026-09-14.json": "0304af3f725c02ee1c97c3c88c9cf9ee2f845bca09552198791968db1a03a21e",
-    "docs/loginom-dock/node17-branch-acceptance-2026-09-14.json": "959637abddd0952e3a802894f60826a8d7f2626eab220be7a2c24d6fb80b75a8",
-    "docs/loginom-dock/node17-reevaluation-check-2026-09-14.json": "5d8c587402fa8ff2dae413d3266e77832d51dedccc911713ce4439b7bb2c2220",
-    "docs/loginom-dock/releases/rc-preparation-2026-09-14.md": "70fa23e35b597a9eb903d5efbc9413f84c164b7d00c9f226b932f81a3cc36761"
+    "historical-ref:ref-2c0da70e7e09de97": "586ab118b84e7b88e3abd39971e2f62e3fd9f1dec30ffde04e2e90f7be1f18da",
+    "historical-ref:ref-e71a755edee683a4": "6434e95bca970820411f25c0a51bca1b866678d84c294642d7a2a3549c83e1e0",
+    "historical-ref:ref-03f9c3616062fd81": "fa6a43ba07997bb5f751cf11b172214e9ada3d44a485876c4a2ebbbe00251161",
+    "historical-ref:ref-e459b1ed7e3b5981": "73fa150ad654d86e62ecb9aca31e50f177f61f2bac639de8a71d3317e25000cd",
+    "historical-ref:ref-6849ecf0a0affba6": "e022668199bd9fa73d0854eff00a924b9c990172a000972f6b9fe8bd27360447",
+    "historical-ref:ref-043bf36ea308cb6c": "f8a0b76cfb1081447223435073561b4e6edd602b301bae1a06d6fbddad06391b",
+    "historical-ref:ref-e3e50376d3988252": "8636baba8e0ea19b1d76f1b84e63ee17b2cac9668f18942ad9f1611ec1eaf915",
+    "historical-ref:ref-ae511ca35fdf348c": "ae9cd32e1f0753d92d2efc0bb79e5df4d6099bf597377aec3b926815e5f460fe",
+    "historical-ref:ref-989e24bd24752118": "8d75772b3b44b669b828aced439d3dc5443a1bbeef21ae0d0942c9654ea9dd78",
+    "unavailable:artifact-22a704d1006b0854": "82e62bb559cad1c01cfe5e717ca94879acf99ccd4410b0f0eb54e45e5863b972",
+    "unavailable:artifact-83991e154c3f0736": "dc5be3e203ddc10a0fdc9a46486e5e0a9668346ff10cd71997f4a036a5d12440",
+    "unavailable:artifact-b8a0029c9669a087": "356e8112e094ae707f09017d50effc9e43e301b828eb75cb874a88be75fccacd",
+    "unavailable:artifact-e043f173a13b28cb": "0304af3f725c02ee1c97c3c88c9cf9ee2f845bca09552198791968db1a03a21e",
+    "historical-ref:ref-9d25d9064b0dc361": "959637abddd0952e3a802894f60826a8d7f2626eab220be7a2c24d6fb80b75a8",
+    "unavailable:artifact-c822e472cdeb87de": "5d8c587402fa8ff2dae413d3266e77832d51dedccc911713ce4439b7bb2c2220",
+    "historical-ref:ref-225aae35f7e6b222": "70fa23e35b597a9eb903d5efbc9413f84c164b7d00c9f226b932f81a3cc36761"
   },
   "limitations": [
     "Known slow exact reading retained by user decision",
@@ -149,5 +149,11 @@
   ],
   "main_updated": false,
   "pushed": false,
-  "published": false
+  "published": false,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-57a54bb5f146",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

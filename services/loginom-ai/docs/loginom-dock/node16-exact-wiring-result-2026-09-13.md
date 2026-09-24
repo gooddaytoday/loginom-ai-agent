@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-42d7bbdd036b` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 16: ограниченное exact-full чтение подключено
 
 Дата: 13 сентября 2026. Назначение `node16:exact-wiring:1:7e1bbab9`.
@@ -61,12 +63,12 @@ production serializer и настоящий user-v1 compactor. Это не пр�
 
 ## Доказательства и воспроизведение
 
-[Манифест](../../tools/loginom-acceptance/collapse/exact-wiring/provenance.json)
+[Манифест](../../../../packages/loginom-runtime/tools/loginom-acceptance/collapse/exact-wiring/provenance.json)
 закрепляет 166 runtime source files, 65 evidence files, аудиторы, тесты и harness.
 [Машинный итог](node16-exact-wiring-2026-09-13.json).
-Проверка: `python3 tools/loginom-acceptance/collapse/exact-wiring/verify.py`.
+Проверка: `python3 packages/loginom-runtime/tools/loginom-acceptance/collapse/exact-wiring/verify.py`.
 Команда не запускает браузер или модель; локальные доказательства находятся
-в `.dock/node16` и не включены в Git. Для воспроизведения проверки нужны эти файлы.
+в `unavailable:artifact-11af8c4e4bf94a22` и не включены в Git. Для воспроизведения проверки нужны эти файлы.
 Исторические manifests сохранены; изменённые prototype sources закреплены новым
 манифестом. Исторический replay требует соответствующих исторических исходников.
 

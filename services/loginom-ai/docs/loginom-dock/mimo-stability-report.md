@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-10b53282e1c7` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 > **Пауза по просьбе пользователя, 17 сентября 2026.** [Передача MiMo в новую сессию](mimo-session-handoff-2026-09-17.md). Последний run19 остановлен; финальные38 запусков не начаты. Новая правка mapping-table-view — непроверенный черновик. Этот checkpoint заменяет прежние статусы active для MiMo.
 
 ## 2026-09-17: retry19 прошла прежний сбой; подготовлены oracle04/17
@@ -201,7 +203,7 @@ scenario-reopen передаёт read-only режим только в cleanup с
 Живой proof предшествовал параметризации и проверил тот же нативный путь;
 свежий живой запуск финального параметризованного кода ещё требуется.
 
-MCP schema investigation: Hermes tools/mcp_tool_schema.py::_convert_mcp_schema
+MCP schema investigation: Hermes unavailable:artifact-e08d3acee94e7987
 передаёт name/description/inputSchema, не outputSchema. Поэтому полные58–87k
 определения инструментов НЕ являются доказательством такого объёма на модели.
 apply/resume inputSchema21k каждый остаются направлением измерения.
@@ -262,7 +264,7 @@ Task02 run `20260917-140005-59459432`, source9283894b:505.516с,
 500исходных и366строк2024года, суммы+количества транзакций по5категориям,
 4регионам и20сочетаниям,3сортировки, настройки и7связей прошли проверку.
 Выручка365345.55; maxdelta2e-11. Аудит:
-`.dock/mimo-stability-20260916/task02-current-independent/full-audit-identity-checked.json`.
+`unavailable:artifact-71d100199f4a5474`.
 10намеренных нарушений в копиях evidence отвергнуты, оригиналы сохранены.
 
 Итоговый текст:5категорий,4региона,top10сочетаний и4минимальных сочетания
@@ -283,7 +285,7 @@ Task02 run `20260917-140005-59459432`, source9283894b:505.516с,
 Task47 запущена без изменения клиента: run `20260917-141717-072ebb4e`, terminal88722,
 source `9283894bd2f8e093c3c45954754a6ce2e0527e3aa74277fce7c36e49990407d8`. Папка /mimo/MiMo-task47-diagnostic-current-20260917
 проверена в UI (mimo,2044×1035,logout PASS). Исходные description.md+native CSV,
-Xiaomi/MiMo/medium. Проверить профиль и продолжать88722; client/plugin не менять
+Xiaomi/MiMo/medium. Проверить профиль и продолжать88722; unavailable:artifact-6d7010401760532d не менять
 до завершения модели и reader. Объём исходного задания/38серии сохраняется.
 
 ---
@@ -413,7 +415,7 @@ Run `20260917-125531-4e0733cf` завершён:712.221с,25вызовов ин�
 агента; семантика effort на стороне провайдера отдельно не доказана.
 Сохранение и штатный logout PASS. Независимый reader session30428 завершён,
 cleanup PASS, настройки4узлов,3связи и все9872ячейки четырёх таблиц проверены.
-Доказательства: `.dock/mimo-stability-20260916/task38-diagnostic13-independent/`
+Доказательства: `unavailable:artifact-59344a78e0f0c88c`
 `numerical-audit.json`, `configuration-audit.json`, `index.json`.
 Максимальное численное расхождение1.05e-14; импорт596×16 точный.
 
@@ -454,7 +456,7 @@ matrix-live-audit.json внутри run. Средняя кривая group-avg-r
 не перезапись результатов прогона. Требование записано в post-export-actions.json.
 Не печатать сырые текстовые notices или аргументы со служебными токенами.
 
-Сформирован `.dock/mimo-stability-20260916/final-acceptance-ledger.json`:
+Сформирован `unavailable:artifact-2377330c73d51a52`:
 38слотов, все PENDING, итоговая ревизия ещё не назначена;24исключённых задачи
 с причинами и хешами. Диагностические прогоны не повышают долю итогового успеха.
 
@@ -470,8 +472,8 @@ matrix-live-audit.json внутри run. Средняя кривая group-avg-r
   до продолжения. Без подтверждённой квитанции повторный Done не разрешён.
 - Живые fault-injection прогоны source
   `a61d378dda239a1b611d714b927ba01bb52ee10e588d52ad6fe7f7d5948e0c60`:
-  `.dock/text-export/live-1789637923482` (Filter) и
-  `.dock/text-export/live-1789638101972` (Calculator). Обрыв транспорта после
+  `unavailable:artifact-243e9f70df21cbc3` (Filter) и
+  `unavailable:artifact-2b7e323e79ebe392` (Calculator). Обрыв транспорта после
   успешного Input Done + потерянный ответ -> AMBIGUOUS -> inspect -> resume
   исходной операции -> SUCCEEDED. Ровно1новый узел/1связь, same-ID без новых
   browser calls. Фильтр12×6/72ячейки, калькулятор72×6/432ячейки полностью
@@ -531,13 +533,13 @@ profile-verification-start.json. Source307fa0c6 зафиксирован до з
   OnTransportErrorHandler предлагает восстановление при `WasClean=false`.
   Штатный close(1000) даёт отдельную ошибку; это не эквивалент сетевого разрыва.
   Наблюдение и read-only исходники native обработчиков:
-  `.dock/text-export/live-1789636882745`. Его браузер закрыт, но server logout
+  `unavailable:artifact-2ace57fb73da59e6`. Его браузер закрыт, но server logout
   не подтверждён; диагностическая копия после этого оказалась read-only.
 - Browser offline не разорвал установленный WebSocket за12с. Для воспроизводимой
   диагностики добавлен локальный proxy: только целевой HTTP origin/8080,
   управление одним браузером, обрыв его tunnels, без журналирования данных.
   Это operator-only инструмент; настройки стенда и Hermes не меняются.
-- `.dock/text-export/live-1789637317579`: обрыв одного tunnel вызвал штатное
+- `unavailable:artifact-5ef94cee217dedf2`: обрыв одного tunnel вызвал штатное
   восстановление. После нажатия сохранены ссылки connection/remote/session,
   document и package. Cleanup/logout PASS, discard=false.
 
@@ -558,7 +560,7 @@ Connected=true/FReconnecting=false. Подмена сессии, другой д
 - Полный client: **2059PASS /1SKIP /0FAIL**. Первый sandbox-прогон упал на
   EPERM локальных портов; повтор с разрешёнными loopback-портами прошёл.
   26 адресных storage/reconnect/browser tests PASS; proxy test PASS.
-- `.dock/text-export/live-1789637513338`, source выше: guard самостоятельно
+- `unavailable:artifact-80dc7883e53f0615`, source выше: guard самостоятельно
   восстановил связь после аварийного обрыва, сохранив исходную сессию/пакет.
 - После восстановления public node operation создала и выполнила фильтр:
  12×6, ровно1новый узел/1связь; same-ID не вызвал новых действий. Все72ячейки
@@ -619,7 +621,7 @@ main, общий плагин и сервер не обновлялись.
 
 ### Живая причина и границы вывода
 
-В `.dock/text-export/live-1789635228922` при завершении мастера входного порта
+В `unavailable:artifact-8b44ad5161b86c30` при завершении мастера входного порта
 воспроизведён `WIZARD_CONTEXT_CHANGED`; затем cleanup ошибочно дал ACCOUNT_CHANGED.
 Прямое наблюдение показало прежние document_id/account=mimo, но Connected=false.
 UI показывал «Обнаружен разрыв связи. Восстановить сессию?». Штатное восстановление
@@ -649,7 +651,7 @@ UI показывал «Обнаружен разрыв связи. Восста
   11 Python history/compaction tests PASS. В diagnostic11 read не вызывался.
 - Итоговый source `ada1c8145312d39553d5414359dd032def7121d42f7a7fbeaaa44a20486e1908`:
   полный client2046PASS/1SKIP/0FAIL. Живой public MCP в
-  `.dock/text-export/live-1789635606445`: новый фильтр с read.ports=[0],12×6,
+  `unavailable:artifact-6486694aec1f26b4`: новый фильтр с read.ports=[0],12×6,
   все72ячейки PASS (max8.47e-15), один новый узел/связь, same-ID без браузерных действий.
   Источник предварительно выполнен оператором; это адресная живая проверка,
   не автономная приёмка Hermes. Диагностический новый узел отброшен только в копии;
@@ -689,7 +691,7 @@ issues/00k/00k0/441.ts, issues/08k/08k0/8447.ts. Деактивация може
 
 ### Проверено на source 8f4113a761b796e9f6670c76ed5cb2a61b60a2d7d996d742e6d5e4d5ef5d70c2
 
-- Публичный MCP, `.dock/text-export/live-1789631647451`, Loginom7.4.2/mimo,
+- Публичный MCP, `unavailable:artifact-081169604954774f`, Loginom7.4.2/mimo,
   только `/mimo/MiMo-task38-diagnostic10-20260917/read-route-diagnostic-copy.lgp`.
 - 12×4: PASS, 20.950с. 72×5: PASS, 35.079с. Настроечные мастера не открывались;
   граф/координаты/связи не изменились; same-ID повтор и неизвестный source не вызвали
@@ -899,7 +901,7 @@ logout подтверждён без отбрасывания изменений
 это дефект аудитора. Его cleanup/logout PASS. Добавлено ограниченное раскрытие
 точного узла штатным масштабированием с проверкой неизменности полного графа;
 3адресных теста PASS. Повторный полный аудит выполняется в отдельной директории
-`task38-diagnostic7-independent2`, на прежних неизменных client/plugin исходниках.
+`task38-diagnostic7-independent2`, на прежних неизменных unavailable:artifact-6d7010401760532d исходниках.
 
 Итоговая серия38прогонов не начата. Изменения только в отдельной ветке;
 main, общий плагин и сервер не обновлялись.
@@ -1078,12 +1080,12 @@ MiMo использовала неподдержанную функцию MID. �
 ## Доказательства и продолжение
 
 - [План и подробные checkpoints](../plans/loginom-dock/mimo-scenario-stability.md).
-- `.dock/mimo-stability-20260916/client-suite-report-grounding.txt`.
-- `.dock/mimo-stability-20260916/live-export-tab-reuse1/file-audit.json`.
-- `.dock/mimo-stability-20260916/live-duplicate-label-fix5/displayed-result-audit.json`.
-- `.dock/mimo-stability-20260916/audit-task02-fix2-7/numerical-audit.json`.
-- `.dock/mimo-stability-20260916/audit-task47-fix4-2/full-audit-v2.json`.
-- `.dock/mimo-stability-20260916/audit-task47-fix5-1/full-audit.json`.
+- `unavailable:artifact-9c5ee04a4ce16744`.
+- `unavailable:artifact-0caf53ecca5159c1`.
+- `unavailable:artifact-dcae7c784d143836`.
+- `unavailable:artifact-83a19d274d11e0f6`.
+- `unavailable:artifact-350895a0ae11277c`.
+- `unavailable:artifact-3f59f10410b052bf`.
 
 Каталог `.dock` содержит локальные доказательства и не публикуется вместе с исходниками.
 
@@ -1143,14 +1145,14 @@ logout SUCCEEDED; исходные сохранённые сценарии не 
 Дополнительно исправлено чтение выходных портов после открытия мини-карты:
 скрытые SVG-копии вне native canvas не являются вторым портом. Проверки
 однозначности внутри полотна сохранены;26тестов output context PASS.
-Повторяемая операторская проверка: `tools/loginom-acceptance/placement.operator.js`.
+Повторяемая операторская проверка: `packages/loginom-runtime/tools/loginom-acceptance/placement.operator.js`.
 Полный регрессионный набор выполняется; найден и исправлен устаревший mock
 opaque UI identity в executor-fixture (20адресных тестов скачивания PASS).
 Это техническая диагностика Codex; новой успешной автономной MiMo-приёмкой
 не считается. Итоговые38прогонов ещё не начинались.
 
 
-2026-09-16, MiMo placement regression: полный client suite **1919PASS/1SKIP**,0FAIL (1920tests,52.65s). Evidence `.dock/mimo-stability-20260916/client-suite-placement-outputs.txt`. Live export + same-ID replay + automatic calculator placement PASS на runtime17b309e. Общая автономная приёмка корпуса ещё не завершена; следующий диагностический прогон — task34.
+2026-09-16, MiMo placement regression: полный client suite **1919PASS/1SKIP**,0FAIL (1920tests,52.65s). Evidence `unavailable:artifact-366c15bd461cfd31`. Live export + same-ID replay + automatic calculator placement PASS на runtime17b309e. Общая автономная приёмка корпуса ещё не завершена; следующий диагностический прогон — task34.
 
 
 ### Task34 остановлена на подтверждённом техническом сбое
@@ -1216,4 +1218,4 @@ medium; runtime `952003a177eb4485076e7e5c632ad936b6677ab502cb0294184e01338ca2f1d
 Это не заменяет финальную серию на одной неизменной версии.
 
 Машинная точка продолжения:
-`.dock/mimo-stability-20260916/resume-checkpoint-20260917-task19.json`.
+`unavailable:artifact-8d89cc7ed10f65a1`.

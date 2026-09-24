@@ -25,5 +25,11 @@
   ],
   "merged": false,
   "deployed": false,
-  "shared_plugin_updated": false
+  "shared_plugin_updated": false,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-f51296c9caa6",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

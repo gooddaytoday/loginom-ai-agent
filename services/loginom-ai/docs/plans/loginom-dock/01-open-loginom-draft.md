@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-452f007380a3` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # 01. Открытие Loginom и черновика
 
 Статус: **implemented locally**; goal-only приёмка нового черновика **17/17 PASS**. Этапы V1/V2.
@@ -22,16 +24,16 @@ Production не обновлён; это не приёмка драйвера 02
 
 ## Исходная точка до реализации 01 и источники
 
-[workspace.mjs](../../../client/lib/workspace.mjs) до реализации 01 открывал URL,
+[workspace.mjs](../../../../../packages/loginom-runtime/client/lib/workspace.mjs) до реализации 01 открывал URL,
 проверял UI build, различал READY / LOGIN_REQUIRED / INCOMPATIBLE, допускал явно
 разрешённый тестовый вход и создавал черновик при отсутствии активной вкладки.
 Обнаружение любой активной вкладки не доказывало принадлежность задаче.
 В реализации 01 добавлена точная привязка к задаче; фиксированная пауза 500 мс
 заменена именованными условиями готовности. Текущий API описан в контракте выше.
 
-Изучить [session.mjs](../../../client/lib/session.mjs),
-[executor.mjs](../../../client/lib/executor.mjs) и
-[prepare_binding.py](../../../tools/loginom-acceptance/prepare_binding.py).
+Изучить [session.mjs](../../../../../packages/loginom-runtime/client/lib/session.mjs),
+[executor.mjs](../../../../../packages/loginom-runtime/client/lib/executor.mjs) и
+[prepare_binding.py](../../../../../packages/loginom-runtime/tools/loginom-acceptance/prepare_binding.py).
 Источники через Dock: Help data/quick-start/first-workflow.md и
 E2E bg/helpers/packages.ts, bg/helpers/workflow/node.ts.
 Сверить [Help первого сценария](https://help.loginom.ru/userguide/quick-start/first-workflow.html)

@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-cef864ce2293` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Loginom Dock: MVP и план развития полного исполнителя
 
 Обновлено: 5 сентября 2026 года.
@@ -15,7 +17,7 @@
 P0 начат: source/live preflight, базовый launcher/audit и проверка источников реализованы;
 этап целиком ещё не завершён. P1–P9 — запланированная работа.
 Уже реализованное состояние системы и доказательства приёмки находятся в
-[журнале реализации](../loginom-dock/implementation-status.md), устройство
+[журнале реализации](../../../../docs/node-development/history/supplements/docs/loginom-dock/implementation-status.md), устройство
 существующих компонентов — в [архитектуре](../loginom-dock/architecture.md).
 
 Навигация по продолжению:
@@ -268,7 +270,7 @@ Live-приёмка этого кандидата доказала работу 
 по изогнутой SVG-линии, доступность кнопок подтверждения и классификацию
 фоновой маски с текстом «Загрузка». Удаление и сохранённый граф проверены
 на текущем runtime, в том числе из установленного комплекта. Доказательства — в
-[журнале реализации](../loginom-dock/implementation-status.md).
+[журнале реализации](../../../../docs/node-development/history/supplements/docs/loginom-dock/implementation-status.md).
 
 Первые три прогона расширения остановились до продуктивных действий из-за прежнего
 поведения discovery и обработки прикладных ошибок; они не считаются успешной
@@ -983,7 +985,7 @@ Hermes выбирает логику сценария, компоненты, с�
 проверки epoch и ссылок перед действием сохраняются. Время локальной операции
 в двух Hermes-прогонах: 258,439 → 82,818 секунды. Это не замер всего сценария
 и не приёмка полного P3. Ограничения и доказательства — в
-[журнале реализации](../loginom-dock/implementation-status.md).
+[журнале реализации](../../../../docs/node-development/history/supplements/docs/loginom-dock/implementation-status.md).
 
 **Завершение мастера — обязательный контракт (уточнение пользователя 7 сентября).**
 Это три разных действия; обработчик не должен заменять одно другим:
@@ -1045,7 +1047,7 @@ verifiers, выполняет профильные проверки. Повто�
 `--start-maximized` и `viewport: null`: страница использует развёрнутое окно без
 фиксированного малого viewport. После запуска проверять фактический размер;
 старое небольшое окно не считать подтверждением нового режима. В исходном
-`client/lib/session.mjs` эти параметры уже предусмотрены для headed-сессии;
+`packages/loginom-runtime/client/lib/session.mjs` эти параметры уже предусмотрены для headed-сессии;
 наличие исходной правки не доказывает обновление установленного клиента.
 Стенд: `http://logi-test-plan.bg.local/app/?testable=true`, явно выбранный
 `user` без пароля, проверенное хранилище `/user/dock-p3`.
@@ -1061,7 +1063,7 @@ verifiers, выполняет профильные проверки. Повто�
 ## 14. Проверенная исходная точка на 5 сентября
 
 Это снимок для передачи работы; перед исполнением следующего этапа сверить его
-с [журналом](../loginom-dock/implementation-status.md), рабочими файлами и живой
+с [журналом](../../../../docs/node-development/history/supplements/docs/loginom-dock/implementation-status.md), рабочими файлами и живой
 системой. Идентификаторы ниже нельзя переносить на изменённую сборку.
 
 | Составляющая | Подтверждённое состояние |
@@ -1096,7 +1098,7 @@ bundle digest — разные сущности. Dirty-архив содержи
   и не готовая attestation всех проверок одного нового выпуска.
 - Цикл rc.2 → rc.4 → rollback rc.2 → rc.4 был runtime-only. Native hooks,
   регистрация и новая полная версия skill этим циклом не приняты.
-- Приватный итог — `.dock/agent-recovery-acceptance/independent-final-acceptance-summary.json`,
+- Приватный итог — `unavailable:artifact-cbc8f6a375abebd3`,
   SHA `5e2bdc6f977234bc9425f5d0987ab89544ff5846c5dacbe2f4c94b66e83b1f17`.
   `.dock/` не входит в Git; отсутствие этого evidence у следующего агента требует
   честного указания недоступности и нового воспроизводимого прогона.
@@ -1116,24 +1118,24 @@ reasoning `medium`**. Это прямое изменение пользоват�
 
 | Область | Файлы и текущая граница |
 | --- | --- |
-| Public MCP и режимы | `client/lib/bridge.mjs`, `catalog.mjs`, `config.mjs`, `client/bin/loginom-dock.mjs`: prepare, dispatch, схемы tools, запрет raw browser/clipboard в executor; режим закрепляется при запуске |
-| Каталог и валидация | `client/lib/action-catalog.mjs`, `executor/capability-abi.json`, `executor/schemas/`, `executor/catalog/`: закрытый список из трёх actions/capabilities и строгие pins |
-| Исполнение и recovery | `client/lib/executor.mjs`: browser capability, host lifecycle, operation state, receipts, reconcile/recover, владение затронутыми объектами |
-| UI и подготовка | `client/lib/workspace-ui.mjs`, `workspace.mjs`: observation/opaque refs/gestures, геометрия, маски, готовность Loginom; доказательства read-only probes — [pinned-ui-probes.md](../loginom-dock/pinned-ui-probes.md) |
-| Журнал и session pin | `client/lib/execution-journal.mjs`, `session.mjs`: redacted append/fsync; ручной список 40 runtime inputs; reader/resume пока отсутствует |
+| Public MCP и режимы | `packages/loginom-runtime/client/lib/bridge.mjs`, `catalog.mjs`, `config.mjs`, `packages/loginom-runtime/client/bin/loginom-dock.mjs`: prepare, dispatch, схемы tools, запрет raw browser/clipboard в executor; режим закрепляется при запуске |
+| Каталог и валидация | `packages/loginom-runtime/client/lib/action-catalog.mjs`, `packages/loginom-runtime/executor/capability-abi.json`, `unavailable:artifact-af889cf39b5ba418`, `unavailable:artifact-f444950c80c5ec91`: закрытый список из трёх actions/capabilities и строгие pins |
+| Исполнение и recovery | `packages/loginom-runtime/client/lib/executor.mjs`: browser capability, host lifecycle, operation state, receipts, reconcile/recover, владение затронутыми объектами |
+| UI и подготовка | `packages/loginom-runtime/client/lib/workspace-ui.mjs`, `workspace.mjs`: observation/opaque refs/gestures, геометрия, маски, готовность Loginom; доказательства read-only probes — [pinned-ui-probes.md](../loginom-dock/pinned-ui-probes.md) |
+| Журнал и session pin | `packages/loginom-runtime/client/lib/execution-journal.mjs`, `session.mjs`: redacted append/fsync; ручной список 40 runtime inputs; reader/resume пока отсутствует |
 | Каталог: build и publication | `deploy/loginom-dock/build-action-catalog.mjs`, `publish-action-catalog.py`: candidate, selective stale, stage/activate, acceptance; это не компилятор всей E2E-базы |
-| Skill | `client/lib/skill.mjs`, `skills/loginom-automation/`, `plugins/loginom-dock/skills/loginom/`, `plugins/loginom-dock-hermes/skills/loginom/`, `deploy/loginom-dock/publish-skill.py`: полный skill отдельно от bootstrap и runtime bundle |
-| Архив и взаимодействие | `client/lib/archive.mjs`, `history.mjs`, `hooks.mjs`, `hook-runtime.mjs`, `redact.mjs`, `clipboard.mjs`: подготовка/очистка/очередь/общий clipboard lock |
-| Дистрибутив и native | `deploy/loginom-dock/package-client-source.py`, `build-client-bundle.py`, `client/lib/install.mjs`, `native.mjs`, `client/bin/setup.mjs`, оба native-плагина |
-| Проверки поведения | `client/test/executor.test.mjs`, `recovery.test.mjs`, `workspace-ui.test.mjs`, `workspace.test.mjs`, `bridge.test.mjs`, `action-catalog*.test.mjs`, `execution-journal.test.mjs`, `support/` |
-| Совместимость поставки | `client/test/install.test.mjs`, `native.test.mjs`, `skill.test.mjs`, suites архива/hooks/clipboard, `tests/unit/test_dock_client_packaging.py`, `landing/release.json` |
+| Skill | `packages/loginom-runtime/client/lib/skill.mjs`, `skills/loginom-automation/`, `plugins/loginom-dock/skills/loginom/`, `plugins/loginom-dock-hermes/skills/loginom/`, `deploy/loginom-dock/publish-skill.py`: полный skill отдельно от bootstrap и runtime bundle |
+| Архив и взаимодействие | `packages/loginom-runtime/client/lib/archive.mjs`, `history.mjs`, `hooks.mjs`, `hook-runtime.mjs`, `redact.mjs`, `clipboard.mjs`: подготовка/очистка/очередь/общий clipboard lock |
+| Дистрибутив и native | `deploy/loginom-dock/package-client-source.py`, `build-client-bundle.py`, `packages/loginom-runtime/client/lib/install.mjs`, `native.mjs`, `packages/loginom-runtime/client/bin/setup.mjs`, оба native-плагина |
+| Проверки поведения | `packages/loginom-runtime/client/test/executor.test.mjs`, `recovery.test.mjs`, `workspace-ui.test.mjs`, `workspace.test.mjs`, `bridge.test.mjs`, `action-catalog*.test.mjs`, `execution-journal.test.mjs`, `support/` |
+| Совместимость поставки | `packages/loginom-runtime/client/test/install.test.mjs`, `native.test.mjs`, `skill.test.mjs`, suites архива/hooks/clipboard, `tests/unit/test_dock_client_packaging.py`, `landing/release.json` |
 
 Полная [карта E2E-источников](../loginom-dock/e2e-source-map.md) содержит 14 областей,
 точные пути/строки helpers, selectors и примеров, связанные зависимости и
 предупреждения. На текущей машине источник — `/Users/kartamyshev/Git/e2e-tests`.
 Его HEAD `986c871…` отличается от source pin, но 46 выбранных файлов сверены
 побайтно с blobs `2cad560…`; для новой работы проверять выбранные файлы снова.
-Старые пять retrieval-копий в `.dock/executor-mvp-acceptance/e2e` неполны.
+Старые пять retrieval-копий в `unavailable:artifact-6e59fb771e276da2` неполны.
 
 Основные входы в E2E: `bg/helpers/packages.ts`, `workflow/node.ts`,
 `workflow/links.ts`, `workflow/ports.ts`, `wizard.ts`, `progressForm.ts`,
@@ -1342,7 +1344,7 @@ P6 вводится только после подтверждения повт�
   tests и документацию как самостоятельный проверяемый набор. Проверить новый
   чистый checkout: ни один необходимый import/fixture не должен зависеть от `.dock/`.
 - [x] Вынести очищенные harness, goal-only задания, fault wrappers, независимые
-  auditors и их тесты в поддерживаемый `tools/loginom-acceptance/`. Не копировать
+  auditors и их тесты в поддерживаемый `unavailable:artifact-6c9840df3f4b6129`. Не копировать
   целиком `.dock`, Hermes SQLite, системные prompts, reasoning, credentials,
   browser profiles и сырые transcripts. Fault wrappers — операторский инструмент,
   они не входят в production runtime и проверяют SHA исходного места инъекции.
@@ -1366,7 +1368,7 @@ P6 вводится только после подтверждения повт�
 с реальным входным составом. `--source-clean` подтверждён равенством build inputs
 commit, а не изменением флага. Публичный release для этого этапа не нужен.
 
-Начато 5 сентября: в `tools/loginom-acceptance/` добавлен source-only preflight
+Начато 5 сентября: в `unavailable:artifact-6c9840df3f4b6129` добавлен source-only preflight
 с пофайловым inventory, сверкой байтов/режимов/состава с commit и runtime pin.
 Временная чистая Git-копия выбранных inputs проходит изолированный client suite.
 Исходная goal-only задача перенесена в `goals/basic-graph.txt` без изменения текста.
@@ -1418,7 +1420,7 @@ run `20260905-135148-6fa2b372`; его общий 33/34 FAIL сохранён. 6
 Индекс содержит 24 попытки / 9 PASS. Следующий объём — review/фиксация исходников
 и чистая поставка на VPS; перенос инструментария/команд/индекса завершён.
 Фиксация MVP и проверка окончательной чистой поставки ещё не завершены. Подробности и команды —
-в [README инструментария](../../tools/loginom-acceptance/README.md).
+в [README инструментария](../../../../packages/loginom-runtime/tools/loginom-acceptance/README.md).
 
 P0 завершён 5 сентября: commits `cb2bc041` / `28657479`, чистый checkout
 139 client / 64 Python / 10 packaging checks; source-clean сборки на VPS
@@ -1430,11 +1432,11 @@ Hermes/ChatGPT/Luna/medium. Реальная задача запускалась
 
 ### P1. Зафиксировать объём и расширяемые контракты
 
-**Менять:** `action-catalog.mjs`, `executor/capability-abi.json`, schemas/catalog,
+**Менять:** `action-catalog.mjs`, `packages/loginom-runtime/executor/capability-abi.json`, schemas/catalog,
 tool schemas в `bridge.mjs`/`catalog.mjs`, bootstrap/full skills и publisher
 в части единого списка возможностей.
 
-- [ ] Создать **проектируемый** `executor/coverage.json` и его краткое описание:
+- [ ] Создать **проектируемый** `packages/loginom-runtime/executor/coverage.json` и его краткое описание:
   family/action, пользовательская цель, inputs/outputs/effects, source dependencies,
   поддержанные builds/platforms, status, unit/live evidence, known gaps, следующий
   шаг. Статусы различают `planned`, `implemented`, `live_verified`, `released`,
@@ -1468,13 +1470,13 @@ tool schemas в `bridge.mjs`/`catalog.mjs`, bootstrap/full skills и publisher
 
 P1 начат 5 сентября: локальный registry связывает key/capability/handler/effect;
 tool schemas, admission и dispatch согласованы, неизвестные и перепутанные
-действия отклоняются до браузера. Next steps содержат реальные tools/поля/роли
+действия отклоняются до браузера. Next steps содержат реальные unavailable:artifact-3bf75b1008da9b33
 IDs; recovery_options больше не предлагает несуществующие strategies.
 Subset схем проверяет типы/место keywords и не игнорирует неизвестные поля;
 закрыт обход через prototype properties. Outcome envelope усилен, но полный
 раздельный proof ещё предстоит. Начальный coverage: 78 E2E компонентов +
 68 общих операций; live/Help inventory остаются незавершёнными.
-См. `docs/loginom-dock/executor-contracts.md` и `coverage.md`.
+См. `services/loginom-ai/docs/loginom-dock/executor-contracts.md` и `coverage.md`.
 
 Registry/schema/recovery подтверждены реальным rename run
 `20260905-142903-f1cc2e29` — 34/34 PASS с E2E/Help и save/reopen,
@@ -1610,7 +1612,7 @@ Hermes Xiaomi MiMo 2.5: provider xiaomi, model mimo-v2.5, reasoning medium,
 Новые acceptance runs должны фиксировать выбранный destination до запуска.
 
 
-5 сентября подготовлен `tools/loginom-acceptance/fixtures/data-pipeline`:
+5 сентября подготовлен `unavailable:artifact-eca9075bb5cffc09`:
 CSV (6 строк), полный expected import/calculator/group (6/6/3 строки), task
 и ограничения приёмки. Типы, quoted delimiter, empty/null и суммы зафиксированы
 до model run. Статус fixture-only: upload, выполнение и сохранение ещё не приняты.
@@ -2030,7 +2032,7 @@ truncated evidence, текст успеха без apply, повторный app
 
 ### 19.3. Допуск конкретного выпуска
 
-Текущая `executor/schemas/replay-acceptance.schema.json` и оба валидатора требуют
+Текущая `packages/loginom-runtime/executor/schemas/replay-acceptance.schema.json` и оба валидатора требуют
 ровно 11 базовых checks:
 
 ```text
@@ -2074,7 +2076,7 @@ snapshot, Loginom profile и реально выполненные задачи.
 публиковать текущий dirty MVP. Правка этого плана сама не требует VPS build,
 переустановки, model run, переключения catalog/skill или серверного деплоя.
 Перед будущими server mutations прочитать актуальные
-[operations.md](../loginom-dock/operations.md) и
+[operations.md](../../../../docs/node-development/history/supplements/docs/loginom-dock/operations.md) и
 [releasing.md](../loginom-dock/releasing.md), сверить live inventory и полномочия
 текущей задачи. Ниже проверенные формы **существующих** команд; значения в
 угловых скобках подготовить и проверить, буквально их не выполнять.
@@ -2084,7 +2086,7 @@ snapshot, Loginom profile и реально выполненные задачи.
 Из корня репозитория, с закреплёнными зависимостями:
 
 ```sh
-"<Node 24.19.0>" --test --test-concurrency=1 client/test/*.test.mjs
+"<Node 24.19.0>" --test --test-concurrency=1 unavailable:artifact-8de5677a4a5eeb76
 "<Python с зависимостями проекта>" -m pytest tests/unit/test_dock_client_packaging.py
 
 python3 deploy/loginom-dock/package-client-source.py \
@@ -2107,7 +2109,7 @@ python3 deploy/loginom-dock/package-client-source.py \
 
 ```sh
 "<закреплённый-Node>" deploy/loginom-dock/build-action-catalog.mjs \
-  --input executor/catalog --out "<пустой-каталог>" \
+  --input unavailable:artifact-1556b84c1b55d60e --out "<пустой-каталог>" \
   --version "<версия-кандидата>" \
   --e2e-manifest "<проверенный-source-manifest.json>" \
   --compatibility "<compatibility.json>"

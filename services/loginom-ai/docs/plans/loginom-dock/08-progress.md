@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-167db9c78a90` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 > Текущее состояние: подплан08 принят, [аудит56/56](08-completion-audit.md).
 > Последующий естественный пользовательский опыт и закрытие замечаний —
 > [48/48 и локальная поставка для Mac](../../loginom-dock/sales-followups-2026-09-10.md).
@@ -21,7 +23,7 @@
 Живая диагностика: отдельная копия
 `/user/dock-p3/packages/Dock-sorting-diagnostic-20260910.lgp` на Loginom7.4.2,
 `logi-test-plan.bg.local`, выбранный ранее оператором account `user`.
-Сессия `.dock/calculator-v3/live-1789021537858`, Node24.19.0,
+Сессия `unavailable:artifact-42ef6234fe4682dd`, Node24.19.0,
 viewport null, развёрнутое окно2044×1035; исходный runtime102 закреплён как
 `5641f29244f3c3b77bbddc947b09539f7cfc2c544ca9c49b121f48dba7915c01`.
 После исходного запуска код менялся; этот pin не является pin новой приёмки.
@@ -264,7 +266,7 @@ MapAlias08: configuration и полный output audit PASS (execution32), вк�
 - Runtime `1edc7ad9defe28975de1b0795e71436f4158a71a4405226a3a2cf75e2d0eaa1c`;
   native skill `317ea2027516b73a132cdbb61ba4446b14b0bfa6ab248c79808681b765297826`;
   goal `517fca059e4f65fddae3199c9cacd9edd80fb025aaf3b23ec64d1063eb7f8d12`.
-- Run-dir `.dock/sorting-v3/runs/20260910-110705-9136285d`; итоговый путь
+- Run-dir `unavailable:artifact-3279392222324ae7`; итоговый путь
   `/user/dock-p3/packages/Dock-acceptance-20260910-110705-9136285d.lgp`.
   Это целевой путь, наличие ещё не подтверждено. Runtime/auditors не менять
   до завершения и независимого `sales_sorting_acceptance.py`.
@@ -294,7 +296,7 @@ Codex повторно открыл реальный целевой UI: `live-17
 geometry: viewport null, окно2044×1035. Пакет открылся read-only, harness
 закрылся до каких-либо настроек/копирования; для проверки target этого достаточно.
 
-Новая отдельная private конфигурация `.dock/sorting-v3/acceptance-config.json`
+Новая отдельная private конфигурация `unavailable:artifact-958082a85cecf39a`
 отличается от текущей только `loginom_url=http://logi-test-plan.bg.local/app/?testable=true`.
 Основной config и credentials не изменялись. Повторный автономный run
 `20260910-111339-6b48145f` начал Sol/low; source runtime/native skill/goal pins

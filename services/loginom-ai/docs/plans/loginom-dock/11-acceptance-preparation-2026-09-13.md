@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-f89f0c5aab1e` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Узел 11: комплект автономной приёмки подготовлен
 
 Команда: `node11:acceptance-preparation:1:91dee921e9e17343d53bf20fd7ca5f3b19f8de7a`.
@@ -12,11 +14,11 @@
 - Runtime 155 файлов:
   `b99b922033e87b7580f14c2eec8cd0744c23bab29ee45b2548212cdac8c394ca`.
 - Чистые build inputs: 389 tracked файлов коммита. Архив
-  `.dock/replacement/acceptance-preparation/client-source-91dee921.tar.gz`,
+  `unavailable:artifact-781959b570690ea6`,
   SHA `8fe1faca81c16291fff2b704b7f20388edb3432fe0513243a3cdb2bae632096c`,
   1017271 байт. Рядом `.manifest.json` с полным списком path/SHA/size/mode.
   Состав определяет `deploy/loginom-dock/package-client-source.py`; включает
-  client, оба плагина, shared adapters, builder/publisher и executor/catalog/schemas.
+  client, оба плагина, shared adapters, builder/publisher и unavailable:artifact-a9e850f2f3253f03.
   Непринятые изменения AGENTS.md и .gitignore, секреты, профили и .dock не включены.
 - Node 24.19.0, Playwright 1.63.0-alpha-2026-08-31, Playwright MCP 0.0.80,
   SDK 1.30.0, Chromium 153.0.8010.12/rev1243.
@@ -29,17 +31,17 @@
   `afa295bf48dc48da5d3c995665a06ef2190ff620bae3243d46557e0371536790`.
   Её текущий серверный readback ещё требуется; новая сессия проверит файл по хешу.
 - Используется существующий приёмочный adapter `0.1.0-rc.4-acceptance`, entry
-  `client/bin/loginom-dock.mjs`; содержимое entry/adapter связано source pin.
+  `packages/loginom-runtime/client/bin/loginom-dock.mjs`; содержимое entry/adapter связано source pin.
   Отдельный диагностический adapter `node11-full-source-harness` не выдаётся за Hermes.
 
 ## Задача, данные и независимые эталоны
 
-Goal: `tools/loginom-acceptance/goals/replacement-node-complete.txt` содержит
+Goal: `packages/loginom-runtime/tools/loginom-acceptance/goals/replacement-node-complete.txt` содержит
 только пользовательскую задачу и описание данных; нет driver-команд, manifest,
 operation IDs, внутренних квитанций или инструкций построения доказательств.
 При запуске подставляются только уникальные имена CSV и путь пакета.
 
-Данные `tools/loginom-acceptance/fixtures/replacement/input.csv` и
+Данные `packages/loginom-runtime/tools/loginom-acceptance/fixtures/replacement/input.csv` и
 `partial-input.csv` уже tracked; их размеры и SHA закреплены в
 `replacement_upload_probe.py`. Оба доставляются с проверкой исходных байтов.
 Никаких fixture/expected файлов из других веток не требуется.
@@ -65,7 +67,7 @@ N11-R1 refusal уже проверен отдельной прямой матр�
 
 ## Независимый аудит
 
-`tools/loginom-acceptance/replacement_acceptance.py` связывает:
+`packages/loginom-runtime/tools/loginom-acceptance/replacement_acceptance.py` связывает:
 
 - точный goal, данные, stage pin, модель/эффективный usage/auth guard;
 - пользовательские MCP-вызовы и ответы с исходными node/save квитанциями;
@@ -86,17 +88,17 @@ N11-R1 refusal уже проверен отдельной прямой матр�
 ## Изоляция и команды на Mac
 
 Локальный запуск выполняется из этого worktree. Его `run.py` создаёт уникальный
-`.dock/replacement/acceptance-runs/<run-id>/private/hermes-home` и `dock-state`;
+`unavailable:artifact-8e78cd45fadf6e0f<run-id>/private/hermes-home` и `dock-state`;
 браузерный профиль — `dock-state/sessions/<session-id>/browser-profile`.
 Каждый запуск имеет отдельные auth-copy/cursor/evidence. Dock читает только
-явный `.dock/stream-runtime/config.json`, Hermes — существующую `.hermes` подписку.
+явный `unavailable:artifact-f77afb35dfa1513e`, Hermes — существующую `.hermes` подписку.
 Личная OpenViking память не подставляется в Dock. Shared hooks не перенастраиваются.
 Loginom account **test-2**, storage **/test-2**, конечный путь
 `/test-2/packages/Dock-acceptance-<run-id>.lgp`; оригинальные пакеты не затрагиваются.
 
 ```sh
-python3 tools/loginom-acceptance/replacement_launch.py --preflight \
-  --output .dock/replacement/acceptance-preparation/preflight-before-slot.json
+python3 packages/loginom-runtime/tools/loginom-acceptance/replacement_launch.py --preflight \
+  --output unavailable:artifact-703a2925216030d9
 ```
 
 После stage/readback и явного слота координатор передаёт `candidate-pin.json`
@@ -106,9 +108,9 @@ python3 tools/loginom-acceptance/replacement_launch.py --preflight \
 Команды следующего этапа (обязательные аргументы без значений вызывают отказ):
 
 ```sh
-python3 tools/loginom-acceptance/replacement_launch.py --run \
+python3 packages/loginom-runtime/tools/loginom-acceptance/replacement_launch.py --run \
   --candidate-pin "$node11_candidate_pin" --slot-id "$node11_slot_id"
-python3 tools/loginom-acceptance/replacement_acceptance.py \
+python3 packages/loginom-runtime/tools/loginom-acceptance/replacement_acceptance.py \
   --run-dir "$node11_run_directory" --candidate-pin "$node11_candidate_pin"
 ```
 
@@ -127,7 +129,7 @@ Publisher создаёт только отсутствующие файлы, о�
 полностью читает их обратно; одинаковая существующая версия не перезаписывается.
 
 Передать source archive, его manifest и tracked
-`tools/loginom-acceptance/replacement-stage-vps.sh` в отдельный серверный inbox.
+`packages/loginom-runtime/tools/loginom-acceptance/replacement-stage-vps.sh` в отдельный серверный inbox.
 На VPS проверить доступный Node 24.19.0 и передать его абсолютный путь третьим
 аргументом; путь VPS Node не выдумывается. Точная команда с выбранным новым build-dir:
 
@@ -166,7 +168,7 @@ subscription и новый контракт задачи. Реальный prefl
 Аудиторы повторно проверены на сохранённых файлах: 7 групп PASS, 18/18 подмен
 отклонены (12 typed + 6 persistence). Это регрессия компонентов, не новый live-run.
 
-Локальные результаты: `.dock/replacement/acceptance-preparation/`:
+Локальные результаты: `unavailable:artifact-0dd613e0e682e8cd`:
 source-preflight.json, preflight-complete.json, auditor-components.json,
 preparation-tests-complete.log, source archive и manifest. Сводка:
 [replacement-acceptance-preparation-2026-09-13.json](../../loginom-dock/replacement-acceptance-preparation-2026-09-13.json).

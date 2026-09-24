@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-a66a45d7b4f7` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Возврат из панели выполнения к сценарию — 11 сентября 2026
 
 ## Установка12сентября
@@ -47,9 +49,9 @@ Codex/Hermes обновлены. [Отчёт установки](client-update-p
   если она скрыта, и проверяет завершение той же записи процесса. Узел повторно
   не запускается. Прежняя окончательная проверка контекста остаётся обязательной.
 
-Исходники: [process-node-focus.mjs](../../client/lib/process-node-focus.mjs),
-[workspace-ui.mjs](../../client/lib/workspace-ui.mjs),
-[node-execution-procedure.mjs](../../client/lib/node-execution-procedure.mjs).
+Исходники: [process-node-focus.mjs](../../../../packages/loginom-runtime/client/lib/process-node-focus.mjs),
+[workspace-ui.mjs](../../../../packages/loginom-runtime/client/lib/workspace-ui.mjs),
+[node-execution-procedure.mjs](../../../../packages/loginom-runtime/client/lib/node-execution-procedure.mjs).
 Наблюдения сопоставлены с E2E `bg/sels/sProgressForm.ts` и Help
 `data/interface/processes-panel.md` через Dock.
 
@@ -71,7 +73,7 @@ Codex/Hermes обновлены. [Отчёт установки](client-update-p
 
 ## Локальные доказательства
 
-Каталог `.dock/process-node-focus-20260911/` (не публикуется):
+Каталог `unavailable:artifact-cae6c6eddba7cba2` (не публикуется):
 
 - исходный сбой: `live-1789146624362/browser-186.json`, подтверждение вкладок
   `confirmed-baseline-state.json`;

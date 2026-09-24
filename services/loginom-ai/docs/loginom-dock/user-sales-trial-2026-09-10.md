@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-88cb6af81050` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Пользовательский опыт: описание + sales.csv — 10 сентября 2026
 
 Это исходный неуспешный опыт. Последующие
@@ -40,7 +42,7 @@ runtime `96f8b5db7901c29ab5c631d57ad85f6e0f8b9181ed471b311c238732733e081e`,
 
 ## Время и токены
 
-Run-dir: `.dock/user-sales-trial/runs/20260910-121607`.
+Run-dir: `unavailable:artifact-0ea42d3be6d78b6d`.
 Hermes session `20260910_121619_a073f1`.
 
 | Метрика | Значение |
@@ -110,7 +112,7 @@ AMBIGUOUS/NODE_APPLY_STOPPED, phase=target, cleanup_complete=false,
 «Graph effect needs reconciliation». Входная связь отсутствовала.
 
 Это подтверждено native graph receipts. Вероятный механизм — склеивание строк
-перенесённой подписи: `client/lib/node-target-browser.mjs:49` использует
+перенесённой подписи: `unavailable:artifact-53c818348ad1919a` использует
 `labelElements[0].textContent` с заменой NBSP, без границы между текстовыми
 фрагментами. Перенос и фактическое сохранённое native имя не проверены отдельным
 live replay; это гипотеза причины, а не установленный факт. Прямое окно завершённой

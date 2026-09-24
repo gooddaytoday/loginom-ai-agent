@@ -35,7 +35,7 @@
   "account": "test-2",
   "storage_root": "/test-2",
   "source_archive": {
-    "path": ".dock/replacement/acceptance-preparation/client-source-91dee921.tar.gz",
+    "path": "unavailable:artifact-781959b570690ea6",
     "sha256": "8fe1faca81c16291fff2b704b7f20388edb3432fe0513243a3cdb2bae632096c",
     "files": 389,
     "build_inputs_match_commit": true
@@ -49,10 +49,10 @@
     "negative_cases_passed": 18,
     "vps_script_syntax": true
   },
-  "goal": "tools/loginom-acceptance/goals/replacement-node-complete.txt",
-  "auditor": "tools/loginom-acceptance/replacement_acceptance.py",
-  "launch": "tools/loginom-acceptance/replacement_launch.py",
-  "vps_stage": "tools/loginom-acceptance/replacement-stage-vps.sh",
+  "goal": "historical-ref:ref-10c96900b6b1cbaa",
+  "auditor": "historical-ref:ref-5e1127315b20ad2f",
+  "launch": "historical-ref:ref-020401471266479c",
+  "vps_stage": "historical-ref:ref-0257e651428b732d",
   "scope": "typed replacements, partial rule preservation, add/replace transitions, final reopening and fresh output; 4 nodes, 2 links, 11 node operations",
   "pending": [
     "coordinator immutable candidate stage/readback",
@@ -61,5 +61,11 @@
     "fresh subscription preflight",
     "actual maximized viewport verification",
     "ordinary Hermes and independent full audit"
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-c0c41f342920",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

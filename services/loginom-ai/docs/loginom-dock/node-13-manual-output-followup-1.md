@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-e25999e97d28` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел13: ручная выходная схема — focused follow-up
 
 Назначение `node13:manual-output-followup:1:b01f2e83ca6253087bba71150f078b9d9083f612`,
@@ -108,16 +110,16 @@ mapping, свежие значения. **package_persistence_verified=true**. �
 Hermes acceptance=false.
 
 [Машиночитаемые результаты и хэши журналов](node-13-manual-output-evidence.json).
-Журналы находятся в собственном `.dock/stream-runtime/sessions/<session-id>/`;
+Журналы находятся в собственном `unavailable:artifact-3d8353b5a5093cb6<session-id>/`;
 сырые журналы и browser replies в Git не включены.
 
 Воспроизведение аудита из корня worktree:
 ```text
-python3 tools/loginom-acceptance/date_time_audit.py <configure-session-dir> node13-manual-add
-python3 tools/loginom-acceptance/date_time_manual_output.py <configure-session-dir>
-python3 tools/loginom-acceptance/date_time_manual_output_negatives.py <configure-session-dir>
-python3 tools/loginom-acceptance/date_time_audit.py <reopen-session-dir> node13-manual-reopen
-python3 tools/loginom-acceptance/date_time_persistence.py <configure-session-dir> node13-manual-add <reopen-session-dir> node13-manual-reopen
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_audit.py <configure-session-dir> node13-manual-add
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_manual_output.py <configure-session-dir>
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_manual_output_negatives.py <configure-session-dir>
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_audit.py <reopen-session-dir> node13-manual-reopen
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_persistence.py <configure-session-dir> node13-manual-add <reopen-session-dir> node13-manual-reopen
 ```
 
 ## Проверки и R2

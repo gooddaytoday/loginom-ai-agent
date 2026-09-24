@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-7261e75f4796` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14 autonomous acceptance 1: запуск заблокирован
 
 Команда `node14:autonomous-acceptance:1:921f5d51e78cd190f1352900ee755fee9c2b614759b46b04595e3dc34537a483`.
@@ -23,9 +25,9 @@ run ID и actual usage отсутствуют. Проверка процессо
 
 ## Receipts
 
-- `.dock/node14-autonomous-acceptance-1/preflight.json`: SHA256 `30187325f8189ba731565ad75823288207c7b4dfc420e715594af1e5465f1c23`.
-- `.dock/node14-autonomous-acceptance-1/approval-block.json`: SHA256 `717e4e0660f88f1529b6bf46a868458f612c976565434df2adc9ea53bf436e5e`.
-- `.dock/node14-autonomous-acceptance-1/process-check.json`: SHA256 `7cf53dcb90ac0cefb8a9a31b7d0702a68a4f078782c75ccae53d72bcfedbbd65`.
+- `unavailable:artifact-fde58abaf061a75c`: SHA256 `30187325f8189ba731565ad75823288207c7b4dfc420e715594af1e5465f1c23`.
+- `unavailable:artifact-316e87a8028e2ba7`: SHA256 `717e4e0660f88f1529b6bf46a868458f612c976565434df2adc9ea53bf436e5e`.
+- `unavailable:artifact-117ec4be7ea871be`: SHA256 `7cf53dcb90ac0cefb8a9a31b7d0702a68a4f078782c75ccae53d72bcfedbbd65`.
 
 | Gate | Результат |
 |---|---|

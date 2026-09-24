@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-1d4f4af194c8` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 13: checkpoint разработки
 
 ## Текущее состояние — candidate preparation завершена
@@ -129,7 +131,7 @@ PASS с input/output autosync=false. Все собственные live-сесс
   подтверждённое хранилище `/test-3`.
 - Node 24.19.0 из установленного release
   `0.1.0-dev.20260910.3-80ca61417ec7`; зависимости основной ветки только читались.
-- Собственный `.dock/stream-runtime`, visible Chromium 153.0.8010.12,
+- Собственный `unavailable:artifact-fabc7308cdee9821`, visible Chromium 153.0.8010.12,
   `--start-maximized`, viewport null, inner 1508×862, outer 1508×949.
 - Source bridge / `dock_prepare`, новая фиксация исходников на каждом запуске.
   В metadata каждой диагностической сессии `archiveActive=false`.
@@ -229,8 +231,8 @@ prepare. Workflow ID изменился с `1789246038001-dsjstdk5dc-2` на
 
 Последние harness завершены. Продолжить после восстановления HTTPS:
 запустить свежий `date-time-live.mjs` с теми же config/state/pins, дождаться
-READY, затем `.dock/start-case.mjs`, `.dock/graph.mjs`,
-`.dock/activate-source.mjs`, `.dock/apply-new.mjs`. При диалоге восстановления
+READY, затем `unavailable:artifact-9db1e9411ca877d5`, `unavailable:artifact-de2966170d8610c1`,
+`unavailable:artifact-c05922157a22fbad`, `unavailable:artifact-a79d238d169f48dc`. При диалоге восстановления
 сессии сначала штатно восстановить соединение, заново prepare и graph refs;
 не повторять запуск вслепую. Новый запрос сейчас использует Done, все 24
 преобразования, одинаковые входные метки, выходной порядок и исключение DateB.
@@ -238,7 +240,7 @@ READY, затем `.dock/start-case.mjs`, `.dock/graph.mjs`,
 аудит, затем оставшиеся случаи и persistence. Hermes по-прежнему не запускать
 без отдельной выдачи координатора.
 
-Fresh source harness: `tools/loginom-acceptance/date-time-live.mjs`.
+Fresh source harness: `packages/loginom-runtime/tools/loginom-acceptance/date-time-live.mjs`.
 Приватные команды и результаты находятся в `.dock/`; каждый запуск сохраняет
 session metadata, remote pins, browser receipts и public node API evidence.
 Фикстура `/test-3/Node13-20260912-diagnostic.lgp` с
@@ -295,7 +297,7 @@ runtime `d2fcaea53e7474b14db50e9d942a28ba3f9359ea5b6e9836c62d0b1ebfe1cef6`,
 копия `/test-3/N13-6c827c79.lgp`; source prepare/pins/build/geometry проверены.
 Полный клиентский набор после исправлений: **1401 PASS / 1 SKIP / 0 FAIL**,
 1402 теста, запуск с доступом к localhost, concurrency=1.
-Лог: `.dock/client-tests-resume.log`. Полный node13-new-24 выполняется.
+Лог: `unavailable:artifact-863a3a59d415bf53`. Полный node13-new-24 выполняется.
 
 В 6c827c79 весь node13-new-24 дошёл до SUCCEEDED checkpoint: 24 флага,
 28 записей mapping, 27 включённых выходов с заданным порядком, DateB исключён,
@@ -310,9 +312,9 @@ node-result-schema отсутствовала ветка date_time readback. П�
 `/test-3/N13-6c827c79.lgp`: SUCCEEDED, save_completed=true,
 persisted_content_verified=false. Затем пакет закрыт, диалогов нет, harness
 закрыт. Новый fresh source harness должен открыть этот сохранённый пакет,
-сделать новую собственную копию (`.dock/start-configured-case.mjs`), заново
+сделать новую собственную копию (`unavailable:artifact-9c981647ba2dd010`), заново
 прочитать граф, активировать fixture-source и выполнить
-`.dock/execute-configured.mjs` (existing Календарь, parameters={}, полный exact
+`unavailable:artifact-f8e160aea18ce371` (existing Календарь, parameters={}, полный exact
 read до 30 минут). Это проверка сохранённых настроек, ещё не доказанная
 package persistence. Исходная fixture сохранена отдельно и не изменялась.
 
@@ -322,7 +324,7 @@ package persistence. Исходная fixture сохранена отдельн�
 Узел Календарь GUID `b95ac3b5-12ea-4f63-8537-a25f0ebff7a3` обнаружен в новом
 графе с исходной связью. `node13-execute-24` (parameters={}, mappings=[])
 прошёл configure/finish/execute и читает точный выход. Результат ещё ожидается.
-Повторные API/schema tests: 13/13 PASS, `.dock/node-api-schema-resume.log`.
+Повторные API/schema tests: 13/13 PASS, `unavailable:artifact-7d6c3624c4229182`.
 После завершения read запустить independent audit и negative checks для этой
 операции; при успехе сопоставить readback с предыдущим сохранённым конфигом.
 Нельзя заявлять успешный публичный вызов до получения его финального ответа.
@@ -356,7 +358,7 @@ autosync=false. Публичный node13-layout-save SUCCEEDED для
 `/test-3/N13-fcccbde6.lgp`, пакет закрыт без диалогов.
 
 Новое независимое открытие: сессия `a52fd065-7187-41e1-abe2-aeea4ff6f74f`,
-тот же source runtime f19e8e..., `.dock/start-layout-case.mjs` открыла точный
+тот же source runtime f19e8e..., `unavailable:artifact-9efc61a876b100ca` открыла точный
 сохранённый пакет и создала копию `/test-3/N13-a52fd065.lgp`. Граф считан заново,
 GUID Календарь остался b95ac3b5-12ea-4f63-8537-a25f0ebff7a3. Выполняется
 node13-execute-24 (parameters={}, mappings=[], полный exact read).
@@ -380,7 +382,7 @@ explicitPeerConfigured=false, workspacePeer=true. Настройки не мен
 сохранение autosync=false и порядка Id, Amount, A_date, A_month_end…;
 execute прошёл, полный read продолжается. Полный клиентский набор на текущем
 коде: **1403 PASS / 1 SKIP / 0 FAIL** (1404 теста),
-`.dock/client-tests-layout.log`. Python oracle: 3/3 PASS.
+`unavailable:artifact-51d797a427d9f252`. Python oracle: 3/3 PASS.
 Для пустого входа аудитор дополнен явным fixture=empty; стандартная fixture
 boundaries остаётся неизменной. Новые приватные сценарии empty-fixture и
 empty-date-new пока только подготовлены, не запускались.
@@ -395,7 +397,7 @@ empty-date-new, small-remove, small-add-reorder, small-close, small-preserve,
 wrong-type и occupied-upstream. Скрипты подготовлены в .dock, ещё не проверены.
 
 Отрицательные проверки node13-execute-24 в a52fd065: **8/8 PASS**;
-лог .dock/layout-negative.log, базовые audit/persistence PASS сохранены в сессии.
+лог unavailable:artifact-02cbf346178615bd, базовые audit/persistence PASS сохранены в сессии.
 
 В a52fd065 публичный node13-empty-fixture SUCCEEDED (0/4 строк), затем
 публичный node13-empty-new SUCCEEDED: новый Пустой календарь, две даты с метками
@@ -439,7 +441,7 @@ small-remove → audit → small-add-reorder → audit → small-close → small
 → date_time_close.py → wrong-type (предварительно активировать fixture import)
 → occupied-upstream → loss-of-reply. Новый harness уже содержит armDateFlagReplyLoss.
 Общий клиент: **1409 PASS / 1 SKIP / 0 FAIL** (1410 тестов),
-.dock/client-tests-removal.log. Python oracle 3/3 PASS; старый полный 4×27
+unavailable:artifact-b649c46e91286282. Python oracle 3/3 PASS; старый полный 4×27
 после дополнения независимого verifier по-прежнему PASS.
 Закрытые harness оставляли Node-процессы без работы; принадлежность шести
 процессов подтверждена по cwd, они завершены TERM после закрытия пакетов.
@@ -484,7 +486,7 @@ receipt сохранён; восстановление прежнего draft н
 что существующий output-port Done. Независимый Python verifier расширен отдельно.
 Профильные JS проверки: **271/271 PASS**, Python close evidence: **3/3 PASS**.
 Полный клиент: **1413 PASS / 1 SKIP / 0 FAIL** (1414 тестов),
-`.dock/client-tests-output-close-unrestricted.log`. Первая sandbox-попытка получила
+`unavailable:artifact-86c8f2c071ddc46c`. Первая sandbox-попытка получила
 listen EPERM в тестах локальных clipboard sockets; повтор с доступом прошёл.
 
 Текущая live-сессия d2bde39d-f454-4857-ad3b-b696acfac089, runtime
@@ -494,7 +496,7 @@ listen EPERM в тестах локальных clipboard sockets; повтор 
 small-baseline выполняется. Успех live Close/output removal пока не установлен.
 
 d2bde39d small-baseline: public SUCCEEDED, independent configuration audit PASS
-(`.dock/d2-baseline-audit.log`). small-remove прошёл open, включая настоящий Close
+(`unavailable:artifact-47817b5bbb7f5572`). small-remove прошёл open, включая настоящий Close
 исходного выходного порта без применения. Configure остановился AMBIGUOUS до
 нажатия удаления: `Initial bound observation is no longer current or ready`.
 Raw observation страницы содержал exact orphan delete cell, но node_mapping
@@ -515,7 +517,7 @@ workflow -2 / MF;TF-3. Подготовка guarded activation выполняе�
 Предыдущий harness 14354 завершился exit 0 после закрытия пакета и bridge;
 новый операторский shutdown больше не оставил idle process.
 Полный клиент после paging fix: **1414 PASS / 1 SKIP / 0 FAIL** (1415 тестов),
-`.dock/client-tests-orphan-paging.log`.
+`unavailable:artifact-d18f4101f1be8d13`.
 
 91422da2 small-remove (без baseline) остановился AMBIGUOUS/open:
 `Fetching grouping sources changed the output definition`. Native Get source
@@ -531,12 +533,12 @@ small-remove; эту нормализованную копию затем исп
 
 Сессия e6677b8e-9b20-49d8-9278-d194767dba09 (PTY 80785), тот же runtime f9af0409…:
 prepare-small-fixture → small-baseline public SUCCEEDED → independent audit PASS
-`.dock/e6-baseline-audit.log` → реальный public package.save_checkpoint
+`unavailable:artifact-64db8af70560cf5a` → реальный public package.save_checkpoint
 `node13-small-fixture-save` SUCCEEDED в `/test-3/N13-e6677b8e.lgp`.
 Сохранение без reopening, persisted_content_verified=false. Это новая полная
-baseline fixture для дальнейших повторов; `.dock/start-stable-case.mjs` открывает
+baseline fixture для дальнейших повторов; `unavailable:artifact-a27c67f1bb1490d7` открывает
 её и создаёт отдельную копию. В текущей сессии small-remove запущен после save.
-Все 509 Python acceptance unit tests прошли (`.dock/python-acceptance-output-close.log`);
+Все 509 Python acceptance unit tests прошли (`unavailable:artifact-2b55774a3a731910`);
 модели/Hermes не запускались.
 
 e6677b8e small-remove дошёл до реального однократного удаления orphan SmallYear.
@@ -562,7 +564,7 @@ prepare-stable-fixture завершился READY: `/test-3/N13-32e30eb6.lgp` с
 сохранённой baseline e6677b8e, import/filter активированы, окно1508×862/viewportnull.
 Документ1789263363009-ynvk8w85wx, workflow -2 / MF;TF-3. small-remove выполняется.
 После последнего runtime fix: клиент **1414 PASS / 1 SKIP**, Python **510 PASS**,
-`.dock/client-tests-removal-autosync.log`, `.dock/python-acceptance-removal-autosync.log`.
+`unavailable:artifact-a73b007312d7e29b`, `unavailable:artifact-372d042542723916`.
 
 32e30eb6 small-remove остановился AMBIGUOUS/open на source fetch 5→6 даже после
 public save baseline. Поэтому гипотеза о достаточности сохранения/нормализации
@@ -600,8 +602,8 @@ Persistence verifier получил --fixture empty для будущего во
 восстановления и проверки fault ещё не было.
 
 1e796919 `node13-small-remove`: **public SUCCEEDED**, независимый config/removal
-аудит **PASS**, 7/7 negative mutations обнаружены (`.dock/1e-removal-audit.log`,
-`.dock/1e-removal-negative.log`). Удалён SmallYear; сохранены SmallMonthEnd ←
+аудит **PASS**, 7/7 negative mutations обнаружены (`unavailable:artifact-5d7a4a95d402fa6b`,
+`unavailable:artifact-cfccf7a074dd75f9`). Удалён SmallYear; сохранены SmallMonthEnd ←
 DateB/month_end и Id/DateA/DateB/Amount, итоговые5 полей, autosync=true.
 Проверены raw source fetch5→6 с точным append Amount, исходный OUTPUT Close без
 применения, снятие только year DateA, exact orphan deletion и восстановление
@@ -611,7 +613,7 @@ autosync. Незапрошенная матрица DateB и StringFmt сохр�
 входной порядок Id/Amount/DateB/DateA, DateB не запрошен.
 
 1e796919 `node13-small-add-reorder`: **public SUCCEEDED**, независимый аудит PASS,
-9/9 negative checks (`.dock/1e-add-reorder-audit.log`, `...-negative.log`). Добавлены
+9/9 negative checks (`unavailable:artifact-4fe21a5d1deaab75`, `...-negative.log`). Добавлены
 DateA/year SmallYear и DateA/month_start SmallMonthStart; DateB/month_end сохранён,
 выход7 полей. Входной порядок Id/Amount/DateB/DateA подтверждён raw mapping и
 запросом. В independent verifier добавлена проверка входных names/labels/order и
@@ -625,7 +627,7 @@ label mutations обнаружены. Ранее empty-new audit прошёл, �
 Затем audit → small-close → small-preserve → date_time_close.py с before_id
 node13-small-freeze-output → wrong-type → occupied-upstream → public save → fault.
 
-1e796919 freeze-output public SUCCEEDED и audit PASS (`.dock/1e-freeze-audit.log`):
+1e796919 freeze-output public SUCCEEDED и audit PASS (`unavailable:artifact-ed8b0224386bed48`):
 output autosync=false, семь полей и обе матрицы сохранены. `node13-small-close`
 public SUCCEEDED с configuration.discarded, cleanup=true, без input/output mapping
 и без выполнения. `node13-small-preserve` (parameters={}, mappings=[], Done)
@@ -637,8 +639,8 @@ public SUCCEEDED с configuration.discarded, cleanup=true, без input/output m
 
 1e796919 small-preserve public SUCCEEDED. **Close audit PASS**, до/после полностью
 совпали обе матрицы, input mapping/order и output mapping/order при autosync=false;
-6/6 отрицательных подмен обнаружены (`.dock/1e-close-audit.log`, session
-`date-time-close-negative.json`, script `.dock/check-close-negatives.py`).
+6/6 отрицательных подмен обнаружены (`unavailable:artifact-79663fc8bae7e73e`, session
+`date-time-close-negative.json`, script `unavailable:artifact-b04014c6dec0371b`).
 `node13-wrong-type`: public NOT_APPLIED, cleanup=true/effect=false, native preview
 подтвердил Id integer, новый узел не создан, граф неизменен; refusal audit PASS.
 `node13-occupied-upstream`: public NOT_APPLIED, cleanup=true/effect=false,
@@ -683,9 +685,9 @@ persistence audit **FAIL: saved_configuration_changed**: только поряд
 при input autosync=true изменился с Id/Amount/DateB/DateA на Id/DateB/DateA/Amount.
 Это не полный persistence PASS. Проверяется явно фиксированный input autosync=false
 (`node13-small-freeze-input`), затем отдельный save/reopen/execute без настройки.
-Логи `.dock/f7-reopen-audit.log`, `.dock/f7-reopen-negative.log`; строгий отказ
+Логи `unavailable:artifact-1645bf4ffd936b8f`, `unavailable:artifact-70331330552bec94`; строгий отказ
 сохранён в f7 session `date-time-persistence.json`. Финальные Python unit tests
-511 PASS (`.dock/python-acceptance-date-final.log`).
+511 PASS (`unavailable:artifact-be5dc14b06693e6a`).
 
 f7cf52c5 `node13-small-freeze-input` public SUCCEEDED/config audit PASS,
 input autosync=false; public save `node13-small-fixture-save` SUCCEEDED в

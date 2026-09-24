@@ -704,12 +704,12 @@
   },
   "artifacts": {
     "reassessment": {
-      "path": ".dock/replacement/autonomous-v2/persistence-reassessment-v2.json",
+      "path": "unavailable:artifact-fbcdf21d60760eed",
       "sha256": "8550439c1398bc60aaa6f181e3ce31fe674fa7d08127f77f5ea891cc3ac255eb",
       "bytes": 22441
     },
     "tests": {
-      "path": ".dock/replacement/autonomous-v2/reassessment-tests.log",
+      "path": "unavailable:artifact-6d0bab8b142ba75c",
       "sha256": "5e91e0bb2aa66fa24a27e9518d4abfaa34b1a4711e1507f3f490cf6dc777da11",
       "bytes": 4943
     }
@@ -729,5 +729,11 @@
     "Offline reassessment of one original execution; no new autonomous run.",
     "Original FAIL57/59 remains immutable; new verifier identity and result are separate.",
     "Candidate remains staged, not activated; coordinator acceptance/review/merge are separate."
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-4cdb50e71b27",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

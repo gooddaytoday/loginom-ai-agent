@@ -45,5 +45,11 @@
   "current_server": "/opt/loginom-dock/releases/20260904-landing-7b711846",
   "current_catalog_sha256": null,
   "existing_server_and_current_preserved": true,
-  "autonomous_acceptance_passed": false
+  "autonomous_acceptance_passed": false,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-03bf7f4b58bc",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

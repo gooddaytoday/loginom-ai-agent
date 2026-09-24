@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-974b923ad325` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: target placement и завершение проверенного отказа
 
 Узкая живая проверка прошла. Отказ создания за пределами видимого графа больше
@@ -53,13 +55,13 @@ Inspect подтверждал cleanup и снимал внутреннюю pend
 ## Живые доказательства
 
 Все пути ниже относительно корня этого worktree; индекс SHA/размеров2523 файлов:
-`.dock/node14-target-followup/evidence-files.json`.
+`unavailable:artifact-f4f053245c6c409f`.
 
 | Проверка | Доказательство | Результат |
 |---|---|---|
-| Исходная геометрия и отказ без source preflight | `.dock/node14-live-1789290924775/geometry-target.json` | NOT_APPLIED, граф неизменен |
+| Исходная геометрия и отказ без source preflight | `unavailable:artifact-ee2dfa0f9f44fd3f` | NOT_APPLIED, граф неизменен |
 | Полная исходная цепочка | тот же каталог: `check-chain.json`, `resume-before.json`, `check-after-resume.json`, `execution-events.jsonl` | AMBIGUOUS/pending, save заблокирован |
-| Исправленный отказ | `.dock/node14-live-1789291337674/check-fixed.json` | FAILED, cleanup=true, inspect=resolved, узла нет |
+| Исправленный отказ | `unavailable:artifact-a461039277418f6c` | FAILED, cleanup=true, inspect=resolved, узла нет |
 | Новый ID и доступная позиция750,260 | `correct-new-id.json`, `finish-fixed-final.json` в том же каталоге | SUCCEEDED, ровно один узел и одна связь |
 | Независимая таблица | `missing-note-only-followup-corrected-independent-full-raw.json` и `finish-fixed-final.json` | 4×5, все20 ячеек сверены |
 | Native save | `finish-fixed-final.json`, `execution-events.jsonl`, `final-ui.json`, `saved-graph.png` | SUCCEEDED, save_flow_completed, тот же workflow |
@@ -70,14 +72,14 @@ Inspect подтверждал cleanup и снимал внутреннюю pend
 пустая строка и числовые значения сохранены. Содержимое .lgp после независимого
 переоткрытия не проверялось; здесь подтверждено штатное завершённое сохранение.
 
-Промежуточная сессия `.dock/node14-live-1789291255047` открыла прежний компонентный
+Промежуточная сессия `unavailable:artifact-a5a669843e99922d` открыла прежний компонентный
 образец read-only из-за серверной блокировки и остановилась до необходимой
 проверки. Она сохранена как непрошедшая подготовка; исправление затем проверено
 в новом черновике с отдельным CSV. Первоначальная диагностическая ошибка схемы
 нового запроса и проба save без conflict_policy также сохранены; они не считались
 продуктовыми дефектами. Valid save probe отдельно подтвердил исходную блокировку.
 Собственные процессы трёх сессий остановлены; read-only process check09:29:16UTC
-сохранён в `.dock/node14-target-followup/process-check.json`.
+сохранён в `unavailable:artifact-a010446fe05ebd67`.
 
 ## Проверки и следующий кандидат
 
@@ -94,7 +96,7 @@ Goal и fixtures не менялись. В verifier/reopen обновлены т
 и версия следующего каталога; критерии принятия не ослаблены.
 
 Подготовлена версия `2026.09.13-node14-test4.2-candidate`, **не staged**.
-Архив `.dock/node14-target-followup/catalog-packet/catalog-source.tar` содержит
+Архив `unavailable:artifact-87857670299f53e0` содержит
 11 tracked build dependencies из source-коммита. SHA:
 `d120d055300863f2e0594e04ccc38147c79ba55296fc24a942270e36fef6cfcd`.
 Он совпадает с предыдущим архивом: исходники каталога не менялись.
@@ -103,13 +105,13 @@ Goal и fixtures не менялись. В verifier/reopen обновлены т
 Все файлы извлечены в отдельный каталог и сверены; builder import и publisher
 --help прошли. Сборки каталога на Mac и действий на VPS не было.
 
-Для координатора: использовать прежний [VPS workflow](../../tools/loginom-acceptance/node14/VPS.md)
+Для координатора: использовать прежний [VPS workflow](../../../../packages/loginom-runtime/tools/loginom-acceptance/node14/VPS.md)
 с новым архивом, source-коммитом и версией test4.2, обоими save roots=/test-4.
 Перед stage требуется проверить отсутствие новой версии; manifest SHA появится
 только после server build/readback. Новый экземпляр архива воспроизводится:
 
 ```sh
-python3 tools/loginom-acceptance/node14/build_packet.py --commit e433c593cbc729af29c69933a777a70d672a4e21 --version 2026.09.13-node14-test4.2-candidate --out .dock/node14-target-followup-packet-copy
+python3 packages/loginom-runtime/tools/loginom-acceptance/node14/build_packet.py --commit e433c593cbc729af29c69933a777a70d672a4e21 --version 2026.09.13-node14-test4.2-candidate --out unavailable:artifact-a3d880a91b27fdd7
 ```
 
 **Остаток полного допуска:** `missing_values_acceptance.py:22,112` по-прежнему

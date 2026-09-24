@@ -89,12 +89,18 @@
     }
   ],
   "audit": {
-    "path": ".dock/stream-runtime/sessions/e5c05a99-044d-47d1-8d69-0d9106963289/full-independent-reopen-audit.json",
+    "path": "unavailable:artifact-1c4953e0db6bbcb2",
     "sha256": "fabe693c888945990b48cda6173d56a79e5f0fe6efe5803e4d33175693f3daa1"
   },
   "diagnostics": {
-    "path": ".dock/stream-runtime/sessions/e5c05a99-044d-47d1-8d69-0d9106963289/diagnostics.json",
+    "path": "unavailable:artifact-70b527796105bbaf",
     "sha256": "964ae9a1add83d74173bedb56b23b8350e5c6c18adc4ae1837913e8a01fa7e89"
   },
-  "hermes_acceptance": false
+  "hermes_acceptance": false,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-80684c9d1620",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

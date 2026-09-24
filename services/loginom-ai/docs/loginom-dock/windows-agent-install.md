@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-13d92af71fb0` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Windows: hotfix установки npm Codex
 
 7 сентября 2026 опубликован **`0.1.0-rc.2-fix`**:
@@ -18,7 +20,7 @@
 `codex-cli 0.153.2` удовлетворяет прежнему минимуму `0.149.1`; он не изменён.
 Исходная Windows-сессия в этой задаче не воспроизводилась.
 
-`client/lib/agent-command.mjs` выбирает абсолютный путь по PATH/PATHEXT/cwd
+`packages/loginom-runtime/client/lib/agent-command.mjs` выбирает абсолютный путь по PATH/PATHEXT/cwd
 переданного окружения и сохраняет его для preflight, snapshot, регистрации,
 удаления и восстановления. EXE/COM запускаются напрямую, CMD — через
 `cross-spawn@7.0.6`; `which@2.0.2` разрешает путь. Эти версии уже присутствовали
@@ -71,4 +73,4 @@ Compose из operations.md. API, модели, credentials и TLS-тома не 
 `/opt/loginom-dock/current` остаётся на `20260904-landing-7b711846`; его исходные
 caddy-image.* описывают старое развёртывание. Актуальный образ определяется
 production deploy.env/контейнером и новым `client-build/.../landing/image.*`.
-Локальные доказательства: `.dock/releases/windows-hotfix/rc2-fix/`.
+Локальные доказательства: `unavailable:artifact-416660af583ffe19`.

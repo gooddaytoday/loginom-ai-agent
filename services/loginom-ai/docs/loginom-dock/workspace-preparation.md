@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-44d24e9e2114` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Подготовка рабочей области — контракт 01
 
 Реализация в исходниках от 7 сентября 2026 года. Production и установленный
@@ -101,7 +103,7 @@ MCP проверены создание, повтор и возврат к то�
 Fault-проверки потери ответа/документа, deadline и отмены — source tests;
 их нельзя выдавать за принудительные отказы живого сервера.
 
-Private evidence: `.dock/open-draft-v1/`. Доказательства диагностики отделены
+Private evidence: `unavailable:artifact-7d3cddcf270d9f0b`. Доказательства диагностики отделены
 от goal-only Hermes в `hermes-runs/`. Прежние неуспешные audits не перезаписываются.
 Профиль новых запусков, request/evidence, auditor и admission:
 `openai-codex / gpt-5.6-sol / low`, существующая подписка Hermes, без fallback.

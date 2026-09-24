@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-bc1a70dfd6a4` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Драйвер добавления и связывания узлов — подплан 02
 
 Статус на 7 сентября 2026: **implemented / live_verified (source runtime)**.
@@ -60,7 +62,7 @@ DOM epoch здесь — инкарнация DOM-объекта, а не счё
 Перенос выбранного узла блокировался его собственной NodesControls. Драйвер
 снимает выделение через наблюдённую пустую точку, проверяет неизменность графа
 и переносит тот же узел. Проверено (720,480) → (416,280), без новых связей:
-`.dock/add-nodes-v2/mcp-1788810831031/autolink-study.json`.
+`unavailable:artifact-b0b266cd51322c13`.
 
 При удалении автосвязи видимость кнопки ещё не означала доступность точки клика.
 Добавлены именованные ожидания панели удаления и подтверждения; перед click
@@ -76,7 +78,7 @@ DOM epoch здесь — инкарнация DOM-объекта, а не счё
 ## Приёмка и точные свидетельства
 
 Финальная самостоятельная Hermes-приёмка:
-`.dock/add-nodes-v2/hermes-20260907-231505-1d21cb34/audit.json` — **15/15 PASS**.
+`unavailable:artifact-64dbd3f6a10d8f5e` — **15/15 PASS**.
 
 - Provider/model/reasoning: существующая ChatGPT подписка,
   `openai-codex / gpt-5.6-sol / low`, без fallback; auth guard подтверждён.
@@ -95,20 +97,20 @@ DOM epoch здесь — инкарнация DOM-объекта, а не счё
   (reasoning 458 входит в отчёт usage). Полный usage сохранён в run.
 
 Текущие проверки клиента: **444 PASS, 1 SKIP, 0 FAIL**, всего 445 tests
-(`.dock/add-nodes-v2/reorder-tests.txt`). Независимый audit: 4 tests PASS.
+(`unavailable:artifact-58d50ef53e2eee10`). Независимый audit: 4 tests PASS.
 Негативный живой прогон той же ревизии:
-`.dock/add-nodes-v2/mcp-1788812039844/negative-results.json`, 4 PASS — потерянный
+`unavailable:artifact-1420ef2f34af235e`, 4 PASS — потерянный
 reply/recovery без дубля, несуществующий выход, отмена до и во время вызова.
 Unit-проверки также покрывают чужой граф/DOM epoch, повтор ID, отказ журнала,
 посторонние изменения при resume, одинаковые метки и сохранность чужих объектов.
 
-Операторская MCP-оболочка `tools/loginom-acceptance/node-target-server.mjs`
+Операторская MCP-оболочка `packages/loginom-runtime/tools/loginom-acceptance/node-target-server.mjs`
 не входит в поставку. Она предоставляет типизированный доступ к внутренней
 фазе для независимой приёмки 02; JavaScript и селекторы модель не получает.
 Команда повторной приёмки только после новых необходимых изменений:
 
 ```sh
-python3 tools/loginom-acceptance/run-node-target.py --run \
+python3 packages/loginom-runtime/tools/loginom-acceptance/run-node-target.py --run \
   --loginom-url 'http://logi-test-plan.bg.local/app/?testable=true' \
   --loginom-user user
 ```

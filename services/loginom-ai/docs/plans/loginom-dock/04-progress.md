@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-3ca4a2f6ec22` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # 04 — контрольная точка, 9 сентября 2026
 
 Статус: **implemented / live_verified (source runtime)**. Подплан завершён;
@@ -24,9 +26,9 @@ Production, серверные модели и установленный кли
 `user` и хранилище `/user/dock-p3` из принятой диагностики03. Вход аккаунта `test`
 не прошёл. Видимые source browsers: start-maximized, viewport null, геометрия
 проверена. Help/E2E получены через Dock; локальные диагностические источники —
-`.dock/calculator-v3/sources/`.
+`unavailable:artifact-ab5e9f1fb8058160`.
 
-В `.dock/text-import-v3/execute-1788942658614` вручную проверены несколько
+В `unavailable:artifact-9fc9d4e7e62d181b` вручную проверены несколько
 выражений, одинаковые метки, зависимость Adjusted от Revenue, замена Amount,
 ошибка `Amount *`, отдельный порт и выход 3×5 с дробями, отрицательным числом,
 пустой строкой и Null. Ошибочный Next остался на выражениях; кнопку
@@ -40,7 +42,7 @@ Production, серверные модели и установленный кли
 и 56 calculator/readback/node-apply тестов PASS; полная регрессия новой ревизии ещё нужна.
 Независимый новый audit ещё не выполнен.
 
-Первый публичный MCP проход `.dock/calculator-v3/live-1788943996260` остановился
+Первый публичный MCP проход `unavailable:artifact-a5ca8cb3d3ed010a` остановился
 в open до жеста: уведомление Loginom и пакет «только чтение». Inspect сохранил
 AMBIGUOUS, повторное изменение runtime отказал. Save As вручную создал собственную
 копию `/user/dock-p3/packages/Calculator04-working-1788944404327.lgp`; новая
@@ -49,9 +51,9 @@ AMBIGUOUS, повторное изменение runtime отказал. Save As
 
 ## Продолжение
 
-Текущий public source diagnostic: `.dock/calculator-v3/live-1788944448000`,
+Текущий public source diagnostic: `unavailable:artifact-a99acdfb65259f9c`,
 runtime pin `683fa1909320ce4781fad54a993f36d4300d3b65f4f8de00a75625325665c0a2`.
-`tools/loginom-acceptance/calculator-live.mjs` принимает operator scripts через
+`packages/loginom-runtime/tools/loginom-acceptance/calculator-live.mjs` принимает operator scripts через
 stdin; их вмешательство исключает классификацию запуска как Hermes acceptance.
 
 Публичный existing-node проход `calculator-existing-1788944469069` SUCCEEDED:
@@ -70,7 +72,7 @@ WizardModelComponentForm удерживает FModelSocket (proxy сравнив
 в `live-1788945172563/input-opener-new.json` и `input-read-fresh.json`.
 Механизм input mapping добавлен в кандидат, его полный node.apply ещё проверяется.
 
-Следующий source diagnostic `.dock/calculator-v3/live-1788945172563`, runtime pin
+Следующий source diagnostic `unavailable:artifact-9a876e054575bb2c`, runtime pin
 `b70f2eb2eae2f8bbdee3ae34a23248e002099d909360b9762dc4cce49714d50d`:
 создание Calculator04New от исходного Import03Done.
 `calculator-new-1788945209449` выполнил все11 фаз: node

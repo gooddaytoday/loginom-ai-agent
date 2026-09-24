@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-4ef5618f2276` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # 07. Группировка — аудит требований
 
 Статус: **implemented / live_verified**; автономный аудит **49/49 PASS**.
@@ -41,7 +43,7 @@ links, сохранённые настройки и свежие execution ident
 | B | 3 | 0.0617283945061725 | 2 |
 | C | 7 | Null | 2 |
 
-Evidence root: `.dock/grouping-v3/hermes-runs/20260909-204416-901e8de6`.
+Evidence root: `unavailable:artifact-cf19bc24f7c43076`.
 Сохранены и побайтно проверены 256 файлов:102 runtime +154 harness inputs.
 Повтор `audit_directory` из frozen-source дал тот же **49/49 PASS**.
 
@@ -59,9 +61,9 @@ oracle/ограничение identity mapping, затем некорректн�
 ## Проверки исходников
 
 Client: **1115 PASS, 1 SKIP**, Python: **409 PASS**. Полные журналы:
-`.dock/grouping-v3/final-client-tests.log`, `.dock/grouping-v3/final-python-tests.log`.
+`unavailable:artifact-8bf06cea5eaaa1e7`, `unavailable:artifact-b152f83de209a5ac`.
 Адресные live/audit доказательства находятся в двух диагностических каталогах:
-`.dock/calculator-v3/live-1788967321873` и `.dock/calculator-v3/live-1788973416670`.
+`unavailable:artifact-c1c477bee5f61289` и `unavailable:artifact-0511d9dc9a104f35`.
 Ни локальные тесты, ни Codex-диагностика не заменяют Hermes acceptance.
 
 ## Границы

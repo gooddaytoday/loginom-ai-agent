@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-9d61a7a3e14e` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Обычная установка перед RC6
 
 Пользователь14сентября выбрал: сначала довести обычную установку до работы с новыми узлами и пользовательскими каталогами, затем выпустить RC и обновить сайт. Это расширение подготовки поставки, не запуск новых узлов. Принятая реализация98fd9c5a и website014d0dac сохранены. Main/серверный runtime/общий установленный плагин пока не менялись.
@@ -35,7 +37,7 @@ Source refs для вложений: Codex26.908.40834/codex0.154.0-alpha.6.2 na
 ### Каталоги и проверка обычного профиля
 
 На VPS собраны и прочитаны обратно immutable rc6 candidate-каталоги для трёх
-платформ. Их точные URI/SHA закреплены в `client/lib/release-workflow.json`;
+платформ. Их точные URI/SHA закреплены в `packages/loginom-runtime/client/lib/release-workflow.json`;
 production current не переключён. Source4b452787 включил привязку Codex input
 ticket к переданным самим host thread_id/turn_id;11адресных проверок прошли.
 
@@ -43,7 +45,7 @@ ticket к переданным самим host thread_id/turn_id;11адресн�
 LOGIN_REQUIRED→READY, фактический orcestrator,14типов, развёрнутое окно и
 выбранный каталог. Пакет `/orcestrator/RC public 20260914/Проверка установки.lgp`
 сохранён; попытка записи вне разрешённой папки отклонена до эффекта.
-Evidence: `.dock/public-installation/ordinary-live/001`–`004` в интеграционном
+Evidence: `unavailable:artifact-dd4e92b4cee4d29a`–`004` в интеграционном
 worktree. После сохранения transport закрыт; native ClosePackage/Logout именно
 для этой пробы не подтверждены. Сквозная native-передача вложения ещё не принята.
 По последнему указанию пользователя дальнейшие проверки — только скриптами
@@ -75,7 +77,7 @@ Live-передача обнаружила виртуализацию больш
 только эти входы, чтобы пути выходного пакета/CSV не превращались в локальные
 вложения;9native-проверок прошли.
 
-`.dock/public-installation/attachment-probe-final-source`: на Loginom7.4.2
+`unavailable:artifact-1d2a5f3a99f6d9bd`: на Loginom7.4.2
 подтверждены admit→upload230байт/SHA→возврат в тот же сценарий→save_checkpoint→
 ClosePackage→Logout. Session614bdf46-4be1-4f30-b092-1eb6e2cb43ab, пакет
 `/orcestrator/RC public 20260914/Attachment-probe-1789404298678.lgp`;
@@ -110,7 +112,7 @@ Amount:integer и строки Север52, Юг10, Запад0, сохрани
 своего диагностического просмотра. Оба выполнили Logout. Временные настройки
 профиля и Hermes восстановлены побайтно; auth guard не обнаружил refresh/import.
 
-Evidence: `.dock/public-installation/native-final/{pre-audit,final-audit}.json`,
+Evidence: `unavailable:artifact-39d803a0f0913383{pre-audit,final-audit}.json`,
 `native-public-evidence.json`, `reopened/`. В local diagnostics сериализованный
 `action_key` скрывается слишком широким redactor; для аудита использованы
 оригинальные tool envelopes только этой сессии из Hermes DB, без system/reasoning.

@@ -5,5 +5,11 @@
     "expected.json": "900df299dcef95c9cdc8a511d2f732664539c71a82ac400526310470e3bd6654",
     "inputs.json": "320f7d6769388b946a75183562a3dec9c5bcea5d1e7aacc4665d96f0254d0c2f",
     "version.json": "885e6e26635d281382f1ed3d2fd8089713439db37d7b88e914c50506956467c1"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-de15a8cb3bb5",
+    "provenance": "../../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

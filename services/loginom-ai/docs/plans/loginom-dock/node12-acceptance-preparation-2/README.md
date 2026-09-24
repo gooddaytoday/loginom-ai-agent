@@ -1,7 +1,9 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-0ac8ff273e1e` и изменения: [происхождение](../../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../../docs/node-development/README.md).
+
 > 13 сентября: отдельный пересмотр неизменного run20260913-072904-3cc4ad0e
 > verifier identity-import-v1 прошёл **122/122**. Исходный frozen **FAIL112/118** сохранён.
 > Нового Hermes run не было; production/goal не менялись. Отчёт:
-> `docs/plans/loginom-dock/node12-identity-auditor-followup-1/README.md`.
+> `services/loginom-ai/docs/plans/loginom-dock/node12-identity-auditor-followup-1/README.md`.
 
 # Узел 12 — комплект кандидата после точечного follow-up
 
@@ -26,8 +28,8 @@ openai-codex/gpt-5.6-sol/low, без обновления токенов и fall
 0755 на собственной state-папке; после приведения к штатным0700 проверка прошла.
 Исходная квитанция отказа сохранена; код и ограничения защиты не изменялись.
 
-Preflight receipt: `.dock/node12-followup-1/candidate-preflight.json`.
-MCP и серверные подтверждения: `.dock/node12-candidate-preflight-2/`.
+Preflight receipt: `unavailable:artifact-97ae52a854a5a31f`.
+MCP и серверные подтверждения: `unavailable:artifact-89125475dabda27d`.
 Эти preflight receipts не перезаписывать. Source archive/source-files.json описывают
 неизменный source commit0e11a3fb; документальные pins не входят в runtime/harness
 или source build input map, пересборка исходного архива не требуется.
@@ -113,7 +115,7 @@ changed settings request, explicit truncated flag, incomplete sample, wrong coun
 short rows, changed schema/value, old execution, different source bytes.
 Все отклонены на отдельных копиях, исходные evidence не изменялись.
 
-Приватные артефакты `.dock/node12-followup-1/`:
+Приватные артефакты `unavailable:artifact-957732117fe7a993`:
 `native/native-audit.json`, `native/negative-audit.json`,
 `native/settings-diagnostic-audit.json`, `native/evidence.json`, `ui-7.json`;
 воспроизводимые diagnostic scripts — рядом. SHA перечислены в
@@ -147,7 +149,7 @@ null; boolean/real/datetime как входные поля, NULL keys, отде�
   `node12-followup-1` указан в живой сессии отдельно.
 
 628 tracked-файлов ровно из source commit собраны в исходный архив
-`.dock/node12-followup-1/source-0e11a3fb.tar`, SHA-256
+`unavailable:artifact-300dc5eec9bc3af1`, SHA-256
 `39876dd6a497762bf1ea2f8626d6d3dde2b2c279c564f964448c3adec4939192`.
 Все извлечённые members сверены с source-files.json. Client source preflight:
 386/386 inputs соответствуют commit. Это исходный архив, не локальная сборка.
@@ -176,9 +178,9 @@ build-report.json и stage-report.json. Пути выше предложены, 
 После получения проверенных новых NODE12_MANIFEST_URI/NODE12_MANIFEST_SHA256:
 
 ```sh
-bash docs/plans/loginom-dock/node12-acceptance-preparation-2/launch.sh preflight
+bash services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-2/launch.sh preflight
 # Только после отдельного нового слота:
-bash docs/plans/loginom-dock/node12-acceptance-preparation-2/launch.sh run
+bash services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-2/launch.sh run
 ```
 
 Сохраняются обычный goal duplicates-node-complete целиком (16 операций),

@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-d4fb649eb6d1` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node16 — Свёртка столбцов: разработка
 
 Статус: **независимая часть реализована; полный exact variant_io BLOCKED**.
@@ -97,7 +99,7 @@ Native-наблюдение связано с конкретным узлом, �
 
 ## Доказательства и границы
 
-Все raw-артефакты в собственной `.dock/node16/`, не публикуются как память.
+Все raw-артефакты в собственной `unavailable:artifact-1f3f00ac9e4d7670`, не публикуются как память.
 Основные run-dir:
 
 - `live-1789276952774`: первоначальный native mixed probe.
@@ -115,17 +117,17 @@ Native-наблюдение связано с конкретным узлом, �
   повторное выполнение mapped без задания параметров, входной variant refusal
   и сохранённый отказ повторного открытия empty (см. ниже).
 
-`tools/loginom-acceptance/collapse/audit_diagnostic.py` проверяет mixed
+`packages/loginom-runtime/tools/loginom-acceptance/collapse/audit_diagnostic.py` проверяет mixed
 configuration/display,13отрицательных подмен на результат. Он явно возвращает
 exact_variant_acceptance:BLOCKED. `audit_wide.py` проверяет homogeneous полный
 результат отдельно и не объявляет variant_io пройденным.
 
 Финальный полный функциональный source baseline:1405PASS/1SKIP/0FAIL
-(`.dock/node16/full-source-tests-final.log`);17направленных collapse tests.
+(`unavailable:artifact-7ff20790bf52e872`);17направленных collapse tests.
 После него уточнена только пользовательская строка описания скалярного Values
 в node-api; функциональные обработчики живого pin не менялись.
 Финальная направленная проверка collapse/API/result-schema:29PASS/0FAIL
-(`.dock/node16/final-focused-tests.log`). Первый sandbox baseline имел EPERM
+(`unavailable:artifact-6860088a27b12178`). Первый sandbox baseline имел EPERM
 локальных сокетов; повтор со штатным разрешением прошёл, отказы не скрыты.
 
 Полный exact variant_io остаётся открытым: проверенный Preview теряет

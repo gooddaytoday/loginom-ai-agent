@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-fd2b17e24f06` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел13: точный пакет R2 разрешён пользователем
 
 Manual output source7d7f0bc2/reportc4d9c935 проверен ограниченно:
@@ -10,7 +12,7 @@ Manual output source7d7f0bc2/reportc4d9c935 проверен ограничен�
 Помощник сверил hashes/blobs и равенство added/removed payload. Только terminal
 execution failure, cleanup/checkpoint и идемпотентный FAILED с контрактами/тестами.
 Missing-values schema, input-mapping recovery и новый target-placement не включены.
-Пакет находится в worktree13 docs/loginom-dock/transfers/node13-r2.
+Пакет находится в worktree13 unavailable:artifact-0b29e0ec4f1191c5.
 
 Пользователю запрошен точный перенос и R2 live gate в test-3. До ответа разрешения
 нет; разработчик уведомлён. Пакет не применён, Hermes не назначен, main/plugin

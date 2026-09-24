@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-00e12907f4d4` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел16: checkpoint подключения exact-full
 
 Назначение `node16:exact-wiring:1:7e1bbab9`. Только собственная ветка/source runtime.
@@ -6,14 +8,14 @@
 Ниже сохранена история наблюдений, включая первоначальные отказы.
 
 - Исправлен tag8: `ignoreBOM:true`; U+FEFF сохраняется при декодировании.
-- Первый полный native gate: `.dock/node16/live-1789297740900`, таблица15×4,
+- Первый полный native gate: `unavailable:artifact-3eee3a77722f20aa`, таблица15×4,
   все60ячееек при DataTypes-off. Независимый Python audit PASS. Native bytes3600.
   Reexecute отверг старый execution доRPC; смена owner отвергнута доRPC;
   deactivate во времяread отверг весьread после5запросов, все5ответов освобождены.
 - Подключены черновые private client modules: provenance из host operations,
   fixed321/interface116 и frontend pins; additive coverage full; строгие native
   cells и реальный compactNodeResult. Обычный sample10 сохранён.
-- `.dock/node16/live-1789299090417`: fresh reopen/verified import; все60клеток
+- `unavailable:artifact-ae239f2e91466583`: fresh reopen/verified import; все60клеток
   прочитаны, Preview закрыт. Public operation AMBIGUOUS из-за слишком строгого
   сравнения journal acknowledgement со служебными полями. Исправлено сравнение
   phase/operation_id/proof. Старый outcome сохранён, сессия logout/close завершена.
@@ -21,7 +23,7 @@
   Общий запуск в sandbox:1400PASS/9FAIL/1SKIP; все9FAIL требуют разрешённого
   локального listen, получен EPERM. Повтор без sandbox пока не выполнен.
 
-Текущая live диагностика empty: `.dock/node16/live-1789299390039`.
+Текущая live диагностика empty: `unavailable:artifact-e7170a2aa6144508`.
 Empty public admission пока явно выключен. Следующие gates: empty count/schema,
 полный public result, actual MCP/user-v1, save/newsession/reexecute и независимый
 аудит; затем общий regression и свежий manifest pins. Hermes/review/merge/plugin/
@@ -29,14 +31,14 @@ VPS не запускались. Чужие изменения AGENTS/.gitignore
 
 ## Дополнительные подтверждения
 
-Empty gate `.dock/node16/live-1789299390039`: header-only13bytes, две native
+Empty gate `unavailable:artifact-e7170a2aa6144508`: header-only13bytes, две native
 RowCount выборки (DataSetForm и DataSourceProxy),0/0/0/0 у controller/table/proxy/store,
 полный mapping4fields,0pending; native result0×4 с0RPC. Три loader method SHA
 закреплены. Кеш значений/подписки не создаются для0rows; специальный путь требует
 fetch-completed metadata, не только исходный0.
 
 Общий regression вне sandbox:1472PASS/1SKIP/0FAIL.
-Следующий mixed run `.dock/node16/live-1789299953847` вновь сохранил AMBIGUOUS:
+Следующий mixed run `unavailable:artifact-dc604d146121e105` вновь сохранил AMBIGUOUS:
 после60cells и закрытияPreview журнал нормализовал origin URL, добавив `/`.
 Нормализация доказательства перед записью и проверка actual redacting journal
 добавлены;5focused journal/public tests PASS. Последний полный regression
@@ -52,7 +54,7 @@ phase=destination; исходный AMBIGUOUS неизменён. Underlying upl
 resume implementation требует uploadStarted=true и здесь не применим.
 Все1371JSONL records валидны,1272rootJSON валидны; только browser-1256.json пуст
 из-за ENOSPC. Файл сохранён как evidence hole; ранее успешные артефакты целы.
-Проверка: `.dock/node16/enospc-evidence-integrity.json`.
+Проверка: `unavailable:artifact-33031cb2cd0f4522`.
 
 До ответа координатора очищены только126cache directories закрытых собственных
 Chromium profiles,272401205bytes; активный profile и evidence сохранены.

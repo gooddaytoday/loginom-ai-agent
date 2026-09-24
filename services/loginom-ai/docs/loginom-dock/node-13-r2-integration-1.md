@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-7c29ac026da3` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел13: terminal failure R2 интегрирован и проверен
 
 Назначение `node13:r2-integration:1:47830abe656d8a5abed35e27ee4ca54fb8d46bb4e5b45ce4f47b2b6dc833a182`.
@@ -80,15 +82,15 @@ Amount excluded/autosync=false. **R2_terminal_live=PASS** в этом focused sc
 принятое доказательство manual-output save/reopen.
 
 [Машиночитаемые результаты, native proof, hashes](node-13-r2-integration-evidence.json).
-Исходные browser replies/журналы находятся в собственном .dock/stream-runtime/sessions/
+Исходные browser replies/журналы находятся в собственном unavailable:artifact-3d8353b5a5093cb6
 aa03cb93-8df3-4b1c-808e-6a13e835caf4/ и в Git не включены.
 
 Воспроизведение независимых проверок из корня worktree:
 ```text
-python3 tools/loginom-acceptance/date_time_terminal_failure.py <session-dir> --missing-path /test-3/node13-r2-aa03cb93.csv
-python3 tools/loginom-acceptance/date_time_terminal_negatives.py <session-dir>
-python3 tools/loginom-acceptance/date_time_audit.py <session-dir> node13-r2-restored
-python3 tools/loginom-acceptance/date_time_r2_gate.py <session-dir>
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_terminal_failure.py <session-dir> --missing-path /test-3/node13-r2-aa03cb93.csv
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_terminal_negatives.py <session-dir>
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_audit.py <session-dir> node13-r2-restored
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_r2_gate.py <session-dir>
 ```
 
 ## Проверки и сохранность
@@ -97,7 +99,7 @@ python3 tools/loginom-acceptance/date_time_r2_gate.py <session-dir>
 - Полный клиент1477 PASS/1 SKIP; Python533 PASS.
 - Исходники client совпадают с выбранным переносом; дополнительные Python-файлы
   служат независимыми аудиторами этого теста.
-- [Снимок реально выполненного harness](../../tools/loginom-acceptance/node13-r2-snapshot/README.md)
+- [Снимок реально выполненного harness](../../../../packages/loginom-runtime/tools/loginom-acceptance/node13-r2-snapshot/README.md)
   содержит исходные шаги/CSV и их SHA256; основа — существующий date-time-live.mjs
   и public-node-wire.mjs. Селекторы Files/rename/upload сверены с E2E
   bg/selectors.ts:1492/1512/1517, bg/helpers/filestorage.ts и реальным UI.

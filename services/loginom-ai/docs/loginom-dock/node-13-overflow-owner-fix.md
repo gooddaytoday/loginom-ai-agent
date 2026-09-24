@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-b5812ace6c25` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node13: владелец выходного порта при переполнении навигации
 
 Статус: адресное исправление завершено. Live SUCCEEDED/cleanup=true,
@@ -16,7 +18,7 @@ Hermes на повторный running poll прошёл всё, кроме inde
 и Нет продаж дали PASS. На Пустом календаре `node13-reopen-5` остановился
 AMBIGUOUS/output_mapping, cleanup=false, до execution. Исходный статус сохранён.
 Мастер затем отменён оператором, пакет закрыт без save, harness exit0.
-Receipt: `.dock/node13-live-preflight/reopen-r2-overflow-failure.json`.
+Receipt: `unavailable:artifact-c9347bf25fff6493`.
 
 ## Причина и граница исправления
 
@@ -63,7 +65,7 @@ open воспроизвёл первоначальный read-only режим б
 
 Новая сессия `b357b29f-4948-4f2d-891c-8905d1418492` (PTY47664), тот же реальный
 размер окна и Loginom7.4.2, новый runtime d5fd1ba7. Скрипт
-`.dock/node13-live-preflight/focus-overflow-reopen-with-upstream.mjs` открывает
+`unavailable:artifact-642f9974fad09847` открывает
 тот же `/test-3/packages/Dock-date-time-20260913-195531-1f2bd245.lgp`, требует
 фактический read-only, выполняет сохранённый upstream filter штатным graph
 execution без настройки, затем existing/Execute Пустого календаря с parameters={},
@@ -78,7 +80,7 @@ port GUID `4ba0e2c2-69ad-3a32-bbdc-75714efe7a51`, native_index0,
 opening_operation_id `node13-overflow-empty:n52`. Узел прошёл output mapping,
 Done, execution и перешёл в полное чтение. Ни масштаб, ни режим read-only
 не менялись. После завершения закрыть новый пакет без save, затем исходную
-сессию-держатель. Проверка: `.dock/node13-live-preflight/audit-overflow-persistence.py
+сессию-держатель. Проверка: `unavailable:artifact-c73f4bc069351edc
 <новая сессия>`; результаты двух runtime остаются раздельными.
 
 ## Завершение фазы — 14 сентября 2026

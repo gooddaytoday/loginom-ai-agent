@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-62b624dcd815` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # 06. Аудит «Фильтра строк»
 
 ## Дополнение после ревью
@@ -44,7 +46,7 @@ Chromium на macOS. Установленный клиент и опублико
 
 | Требование | Свидетельства |
 |---|---|
-| Все операторы на совместимых пяти типах и номер строки | `.dock/row-filter/complete-matrix-audit.json`: 90/90, повторная независимая сверка исходного CSV, raw конфигурации и обоих полных Id-выходов |
+| Все операторы на совместимых пяти типах и номер строки | `unavailable:artifact-e6e8dabb847c2260`: 90/90, повторная независимая сверка исходного CSV, raw конфигурации и обоих полных Id-выходов |
 | Регистр, границы, список с запятой внутри значения | Строковые cases36–57 и74–85; дополнительные native `< Alpha` / `> preTail` в `live-1789126596945` |
 | Различающий приоритет И/ИЛИ | Case86: `Id=9 OR (Id>=6 AND Id<=7)` дал [6,6,7,9], ошибочная left-associative группировка теряет9 |
 | Null против пустой строки; пять полных столбцов, точные дроби, секунды, дубли | `live-1789126379733/typed-independent-audit.json`: шесть операций, 8/2 →5/5 →5/5 для двух фильтров |
@@ -56,7 +58,7 @@ Chromium на macOS. Установленный клиент и опублико
 | Stale до жеста, владельцы, deadline, загрузка редакторов | Поведенческие client tests; два bounded refresh только при доказанном отсутствии эффекта, монотонное время ожидания |
 | Полнота независимых аудиторов | 14 отрицательных подмен configuration/output; 10 подмен полного сценария на диагностической перепроверке первой Hermes-попытки |
 
-`live-*` относятся к `.dock/calculator-v3/`. Матрица содержит свидетельства
+`live-*` относятся к `unavailable:artifact-18a7dfafd3298bff`. Матрица содержит свидетельства
 нескольких source revisions, исправления повторно проверены в затронутых случаях;
 полный автономный сценарий проверяет окончательный единый runtime.
 Ожидаемые строки вычисляются отдельно от клиентского обработчика.
@@ -65,8 +67,8 @@ Chromium на macOS. Установленный клиент и опублико
 
 ## Тесты и закреплённые исходники
 
-- Client: 1280 total, 1279 PASS, 1 SKIP, 0 FAIL; `.dock/row-filter/all-client-tests-final-candidate.log`.
-- Python: 475 PASS; `.dock/row-filter/python-tests-final-source-name.log`.
+- Client: 1280 total, 1279 PASS, 1 SKIP, 0 FAIL; `unavailable:artifact-492d5b29d6f3ac37`.
+- Python: 475 PASS; `unavailable:artifact-13fda8b6a99040f1`.
 - Runtime: `5c945f3e189e6588acf036ca7139e35c62bf055b30b7ce78bd1fa7b2c548756d`.
 - Native skill SHA-256: `714104445d37265943ab5e7d55a7c505c00fe38a62bc38a0c3c8ea24f7764b39`.
 - Catalog: `viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.08-node-apply.1-candidate/manifest.json`.
@@ -99,7 +101,7 @@ Chromium на macOS. Установленный клиент и опублико
 условия, портовые настройки, сохранённый граф и новые execution IDs проверены.
 
 Все request/pins, evidence, efficiency и отрицательные проверки находятся в
-`.dock/row-filter/hermes-runs/20260911-154023-843300b0/`.
+`unavailable:artifact-d73277c673afbd7b`.
 Audit SHA-256: `8fad61fa1cd80daf4d5e923efe6ee1548f496658cb11e20cfde40a8aee07d2d8`.
 Полная матрица и пограничные проверки вместе с этим аудитом закрывают подплан06.
 

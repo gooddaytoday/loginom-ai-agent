@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-a783e57395ab` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node16: диагностика пустого результата после открытия
 
 Назначение `node16:empty-persistence-followup:1:6e36609d`, собственная test-1,
@@ -35,10 +37,10 @@ effect_possible=false, cleanup_complete=true, node:null до мастера/му
 
 ## Save → новая сессия → reexecute
 
-- `.dock/node16/live-1789291097039`: before-wizard graph, неактивный Preview,
+- `unavailable:artifact-8313d35f1dab8186`: before-wizard graph, неактивный Preview,
   F9 источника, source-active-owner (7полей/0строк), successful empty,
   chain-after-success, публичный package.save_checkpoint SUCCEEDED.
-- `.dock/node16/live-1789291348311`: новая сессия после этого save, граф до входа
+- `unavailable:artifact-4b506f0cf6e6018e`: новая сессия после этого save, граф до входа
   в мастер, inactive-source-refusal без мутации; затем F9 источника и
   empty-reopened-active SUCCEEDED с прежними ролями и полной схемой.
   verified-source-owner повторно подтверждает filter owner/port и7полей/0строк.
@@ -46,7 +48,7 @@ effect_possible=false, cleanup_complete=true, node:null до мастера/му
   ошибка следующего диагностического чтения сохранена, доказательством не служит.
 - `audit_persistence.py`: сравнивает оба графа, save receipt, независимый empty
   output, полный input mapping и12отрицательных подмен. PASS сохранён в
-  `.dock/node16/audit-empty-persistence-v3.json`.
+  `unavailable:artifact-6830b4780510035f`.
 
 ## Минимальное воспроизведение
 

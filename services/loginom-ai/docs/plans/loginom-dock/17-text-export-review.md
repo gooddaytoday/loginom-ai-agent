@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-0d51840149da` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Единственное review: узел17 Text export
 
 Назначение `node17:review:1:110da29a`, 13.09.2026. Component
@@ -13,7 +15,7 @@ merge/push/deploy и изменения памяти/хуков не запус�
 
 ## R1 — P2: специальный Next отправляет действие после отмены
 
-Место: `client/lib/text-export-procedure.mjs:86–89`, также `:19–39`.
+Место: `unavailable:artifact-59c6d3e04f260551`, также `:19–39`.
 
 `configureTextExport` напрямую вызывает `execute` после await onRecord для
 `text_export_next_prepared`, обходя `channel.perform` и его checkBudget.
@@ -21,7 +23,7 @@ merge/push/deploy и изменения памяти/хуков не запус�
 Сам `exportNext` задаёт новые 15 секунд уже после первого клика и не наблюдает
 отмену перед кликом Next или ответом Yes/No на overwrite-диалог.
 
-Воспроизведение на неизменённом финальном коде: `.dock/node17/review/probes.mjs`.
+Воспроизведение на неизменённом финальном коде: `unavailable:artifact-b76cf514a37eb426`.
 Использована настоящая `configureTextExport` и сохранённые native configuration/
 workflow refs финального сценария. Fake transport только считает отправки;
 callback записи `text_export_next_prepared` вызывает AbortController.abort().
@@ -40,15 +42,15 @@ answer и истечение общего бюджета. Не повторят�
 
 ## R2 — P2: неподдержанный сохранённый decimal default допускается до Execute
 
-Место: `client/lib/text-export-procedure.mjs:82–85`,
-`client/lib/text-export-parameters.mjs:46–48`; потребитель —
-`client/lib/node-result-schema.mjs:84` (exportConfigurationReadback).
+Место: `unavailable:artifact-ba575238cba662df`,
+`unavailable:artifact-69a02e553290a47b`; потребитель —
+`unavailable:artifact-cd14cd2129677b89` (exportConfigurationReadback).
 
 Existing patch проверяет только явно переданные параметры. Final retained guard
 проверяет encoding/delimiter/header/line_ending/bom, но не параметры первой
 страницы. Нативный локальный decimal separator имеет значение `""`: это реальное
 наблюдение `text_export_native_read` операции `export-empty-copy5`,
-`.dock/text-export/live-1789299534188/execution-events.jsonl`, runtime
+`unavailable:artifact-39e6bf57dd97dea2`, runtime
 `96f34c91eff1f908432c7ac417cc05dbfc920404ccf4825ba95fa510ab5cd78a`.
 Этот native default исправлялся явным параметром в успешном development case;
 он не доказывает корректность destination-only patch узла с сохранённым default.
@@ -60,7 +62,7 @@ Existing patch проверяет только явно переданные п�
 результат по output schema; permissive user-v1 projection сама по себе не
 устраняет выход за объявленный контракт.
 
-Воспроизведение `.dock/node17/review/probes.mjs`: на реальной final configuration
+Воспроизведение `unavailable:artifact-b76cf514a37eb426`: на реальной final configuration
 меняется только observed decimal_separator на подтверждённый native default.
 `validateNativeExportFormat` принимает конфигурацию; настоящий `textExportReadback`
 создаёт результат, а SDK Ajv validator для nodeApplyResultSchema возвращает
@@ -96,10 +98,10 @@ transport скачивания переиспользован; новый про
 
 Доказательства:
 
-- `.dock/node17/review/probes.mjs`, `probes.json` — два детерминированных дефекта;
-- `.dock/node17/review/integrity.json` — независимое чтение 11 файлов после ENOSPC;
-- `.dock/node17/review/projection.mjs`, `projection.json` — user-v1 без потери данных;
-- `.dock/node17/review/runtime-boundaries.json` — сравнение source manifests.
+- `unavailable:artifact-b76cf514a37eb426`, `probes.json` — два детерминированных дефекта;
+- `unavailable:artifact-f44066faddd52131` — независимое чтение 11 файлов после ENOSPC;
+- `unavailable:artifact-23d7d2231c3079ed`, `projection.json` — user-v1 без потери данных;
+- `unavailable:artifact-84e08724cb61aa56` — сравнение source manifests.
 
 ## Границы runtime и новые подтверждённые lessons узла17
 

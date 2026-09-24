@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-612f05c7f224` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # 13 сентября 2026 — точечный follow-up после автономного FAIL
 
 Исправление0e11a3fb проверено новым source harness: native34/34,
@@ -15,7 +17,7 @@
 Source MCP работает из собственного worktree, Node 24.19.0. Проверены все
 148 записей clientSourceManifest: несовпадений нет. Сессия
 `8d403b79-1f8b-4cdc-9e04-5da8a99aadbd`, её профиль и состояние находятся в
-`.dock/stream-runtime`. Skill закреплён на
+`unavailable:artifact-fabc7308cdee9821`. Skill закреплён на
 `afa295bf48dc48da5d3c995665a06ef2190ff620bae3243d46557e0371536790`.
 Native archiveActive=false; отсутствие всех глобальных hook-процессов не проверялось.
 OpenViking health успешен, обращения выполнялись с actor scope без override Peer.
@@ -25,7 +27,7 @@ OpenViking health успешен, обращения выполнялись с a
 1512×949, viewport=null, рабочая область 1508×862; --start-maximized подтверждён
 в конфигурации отдельного браузера. Корень `/test-1` открыт через файловый UI.
 Создан и подтверждён там `/test-1/Node12-diagnostics-20260912-8d403b79.lgp`.
-Приватный checkpoint: `.dock/stream-preflight.json`.
+Приватный checkpoint: `unavailable:artifact-22950d6e897487a2`.
 
 ## Наблюдения
 
@@ -52,7 +54,7 @@ OpenViking health успешен, обращения выполнялись с a
 10 дублей в 4 группах (1/2/3, 4/5/6, 9/10, 11/12), противоречий нет.
 Служебные имена: Duplicate, DuplicateGroup, Contradiction, ContradictionGroup;
 метки соответствуют Help. Приватные DOM evidence:
-`.dock/node12-first-output.json`, `.dock/node12-key-only-output.json`.
+`unavailable:artifact-0050731ccda3c811`, `unavailable:artifact-dec22045bcb9575f`.
 
 ## Следующее действие
 
@@ -81,13 +83,13 @@ Hermes, ревью, push, сборка и установка не запуска
 Текущие профильные duplicates suites: 11 PASS. Новые global-role и прежние
 output-column focused проверки прошли; общий финальный прогон ещё не выполнен.
 
-Source-сессии и operator/execution-events находятся только в .dock/stream-runtime.
+Source-сессии и operator/execution-events находятся только в unavailable:artifact-fabc7308cdee9821.
 Последняя завершившаяся диагностическая попытка: 3ccfe64e-242a-4894-b294-f6fe0c29cb85,
 node12-existing-roles-01: AMBIGUOUS configure, без execution; не считать успехом.
 Копии /test-1/Node12-handler-20260912-live02.lgp ... live05.lgp созданы для
 диагностики. После завершения браузерного процесса серверная блокировка пакета
 может сохраняться, поэтому копию явно закрывать через меню Loginom перед передачей.
-Приватный .dock/node12-source-harness.mjs передаёт длинные requests через args_path:
+Приватный unavailable:artifact-718e0356f04ea39d передаёт длинные requests через args_path:
 прямая строка JSON в macOS PTY упиралась в ограничение длины ввода.
 
 Остаются полная handler-матрица, независимый auditor с отрицательными подменами,
@@ -115,7 +117,7 @@ Harness закрыт, все operator-ответы и execution-events сохр�
 также получила SSL connection timeout. Пины и провайдеры не подменялись.
 
 Полный набор клиента перед последней локальной правкой: **1398 PASS / 1 SKIP**,
-без отказов (`.dock/node12-final-source-tests.log`). Readback дополнительно
+без отказов (`unavailable:artifact-ffe91c2d14bb7c26`). Readback дополнительно
 исправлен по контракту сохранения исходных полей: текущий порядок выходного
 mapping может отличаться от порядка role-grid. Проверяется точное взаимно
 однозначное соответствие имён, меток, типов и native source records, без
@@ -132,7 +134,7 @@ mapping может отличаться от порядка role-grid. Пров�
 ## Продолжение прямой QA — 13 сентября 2026
 
 Доступ восстановлен; личная OpenViking health-проверка прошла. Подтверждены
-source runtime Node 24.19.0, собственное состояние `.dock/stream-runtime`,
+source runtime Node 24.19.0, собственное состояние `unavailable:artifact-fabc7308cdee9821`,
 аккаунт `test-1` и окно 1508×862 с viewport:null. Установленные плагины и VPS
 не менялись; общая проверка маршрутизации native hooks не подменяется archive=false.
 
@@ -241,9 +243,9 @@ Loginom 7.4.2, `test-1`, видимое окно 1508×862, отдельный s
 - Полный клиентский набор: 1403 PASS, 1 SKIP, 0 FAIL. Полный Python-набор:
   516 PASS. `git diff --check` прошёл. Production build не выполнялся.
 
-Доказательства доступны в `.dock/stream-runtime/sessions/<session>/` (operator и
-execution-events.jsonl) и `.dock/node12-qa2-{complete,persistence}-audit.json`,
-`.dock/node12-qa2-{audit-negatives,input-refusal-audit}.json`.
+Доказательства доступны в `unavailable:artifact-3d8353b5a5093cb6<session>/` (operator и
+execution-events.jsonl) и `unavailable:artifact-aa0d1f5c3ced2857{complete,persistence}-audit.json`,
+`unavailable:artifact-aa0d1f5c3ced2857{audit-negatives,input-refusal-audit}.json`.
 Технические ошибки диагностического оператора (неверное имя timeout параметра,
 неполный target) сохранены в журнале и не засчитаны как успешные операции.
 
@@ -270,7 +272,7 @@ Workspace resolver сохранил Peer `-Users-kartamyshev-Git-loginom-dock--w
 NOT_APPLIED (`reserved service field name or label`), до target checkpoint и
 без выполнения. Этот дополнительный источник сохранён отдельно в
 `/test-1/Node12-negative-20260913.lgp`; основной complete-пакет остался с шестью
-узлами и тремя связями. Доказательство: `.dock/node12-qa2-collision-audit.json`.
+узлами и тремя связями. Доказательство: `unavailable:artifact-e93047bf47c57a3c`.
 
 Этап development завершён, готов к одному ревью по отдельной команде координатора.
 Готовность к автономной приёмке пока не заявляется: отдельный candidate-каталог,
@@ -291,5 +293,5 @@ N12-R1 / P2 подтверждён на копии свежих живых до�
 11/11 положительных output-аудитов, 3/3 отказа согласованным подменам схемы,
 519 Python tests прошли. Runtime pin не изменён; новый harness manifest hash
 `b73e69f020fa7a2d8b0a7c30e721d8bca940ccf6476baf1e1de1328aae94ffd0`
-и 239 file hashes записаны в `.dock/node12-r1-fix/pins.json`.
+и 239 file hashes записаны в `unavailable:artifact-8be4f805aa9c3692`.
 Это не автономная приёмка: node12 candidate URI/SHA и слот Hermes ожидаются.

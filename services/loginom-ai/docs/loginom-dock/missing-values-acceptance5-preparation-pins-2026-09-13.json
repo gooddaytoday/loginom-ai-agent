@@ -45,15 +45,15 @@
     "combined_export_complete": false,
     "model_started": false,
     "recovery": "direct verification of original per-action receipts and JSONL journal; no monolithic export rebuilt",
-    "session_metadata": ".dock/node14-acceptance5-preparation/live-context/sessions/c062a0a7-bd93-4cdf-857b-0e44a0aaf75f/session.json",
+    "session_metadata": "unavailable:artifact-6ff60b05030cdb52",
     "journal": {
-      "path": ".dock/node14-acceptance5-preparation/live-context/sessions/c062a0a7-bd93-4cdf-857b-0e44a0aaf75f/execution-events.jsonl",
+      "path": "unavailable:artifact-14cc6ed4e008c5df",
       "bytes": 345473569,
       "sha256": "08e4b2b85cc33eb6b0fc43c60363ae6d6d7bf68c5523a8d658b95c6234b4cdb7",
       "parsed_events": 10637
     },
     "original_public_evidence": {
-      "path": ".dock/node14-acceptance5-preparation/live-context/public-evidence.json",
+      "path": "unavailable:artifact-820a5a9fb7b54c71",
       "bytes": 1768407,
       "sha256": "c2d8425eb99d1ef113610bf7dd767a210a6e48a5d457c0e03d48986910a62c38"
     }
@@ -119,253 +119,259 @@
   "launch_authorized": false,
   "slot": null,
   "receipts": {
-    ".dock/node14-acceptance5-preparation/candidate/actions.json": {
+    "unavailable:artifact-7c4d5b7665ecedb0": {
       "bytes": 34340,
       "sha256": "d13b9342f913f4dbc3248b22d9d021a6ed4abdf178af3fb7d8d4f76a08f280da"
     },
-    ".dock/node14-acceptance5-preparation/candidate/manifest.json": {
+    "unavailable:artifact-5e87ddb16ac90375": {
       "bytes": 718,
       "sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad"
     },
-    ".dock/node14-acceptance5-preparation/candidate/selectors.json": {
+    "unavailable:artifact-ce735c809d55a226": {
       "bytes": 23083,
       "sha256": "03a83df5e2e5dc185ab1d6a985c3b6e23bf70ee7596786e99f5eaf32337c94a7"
     },
-    ".dock/node14-acceptance5-preparation/candidate/source-index.json": {
+    "unavailable:artifact-8e7aafe0bfd28f33": {
       "bytes": 3805,
       "sha256": "b9e92ce80ffaf6bd8e19eb2fd62b61a926b898e5fe65deb75757833296da08ed"
     },
-    ".dock/node14-acceptance5-preparation/candidate-readback.json": {
+    "unavailable:artifact-abdb9276515f39fe": {
       "bytes": 2154,
       "sha256": "a98e4da9063285a70296932caf07da744cc717c46bd572f3b6e8b6c63c34d688"
     },
-    ".dock/node14-acceptance5-preparation/context-comparison.json": {
+    "unavailable:artifact-d8aa2501e3178737": {
       "bytes": 11403,
       "sha256": "8a7291aa36ff8a21efa491242b0f545e39baabadd65e4188d142649fb00f5447"
     },
-    ".dock/node14-acceptance5-preparation/context-verification.json": {
+    "unavailable:artifact-3072800ad013bf95": {
       "bytes": 671,
       "sha256": "8d2fcfd3d7d1a5472541d66a20dba24cefb630bb25480d2e70a7974bbc05cc28"
     },
-    ".dock/node14-acceptance5-preparation/diagnostic-export-failure.json": {
+    "unavailable:artifact-90136ab099c34c93": {
       "bytes": 1004,
       "sha256": "b2ad65f991f28b38441c7a4a9bb843f08e6e05a6f34cd25559c65fdc623a295f"
     },
-    ".dock/node14-acceptance5-preparation/download.mjs": {
+    "unavailable:artifact-6dbd409475671f5a": {
       "bytes": 1689,
       "sha256": "db166195aa33296ea518d5c307269a1aa6edebfee999e5146b9cfe1c133061b5"
     },
-    ".dock/node14-acceptance5-preparation/export-write-probe-final.json": {
+    "unavailable:artifact-2f0b57e552fca3d9": {
       "bytes": 62794,
       "sha256": "f81b72cf8c3a62d695ba88cc8b19f0ab34a4d3fc6ee0f818e1c1c38389a6dfb1"
     },
-    ".dock/node14-acceptance5-preparation/export-write-probe.json": {
+    "unavailable:artifact-f8d809cb09b75fcd": {
       "bytes": 62794,
       "sha256": "f81b72cf8c3a62d695ba88cc8b19f0ab34a4d3fc6ee0f818e1c1c38389a6dfb1"
     },
-    ".dock/node14-acceptance5-preparation/frozen-contract-check.json": {
+    "unavailable:artifact-20218b7035770669": {
       "bytes": 250,
       "sha256": "09d1cc87e310f8e9f6944068767e25b049a1178f7652109e0ebe47f0112c243e"
     },
-    ".dock/node14-acceptance5-preparation/full-context.mjs": {
+    "unavailable:artifact-b5aeaae96cebe882": {
       "bytes": 9870,
       "sha256": "0da783ee62951a840e45448b38aca938fc4f014f2319ff72e4f604cd0584325c"
     },
-    ".dock/node14-acceptance5-preparation/import-refusal-tests.log": {
+    "unavailable:artifact-1f3c6928a176c09a": {
       "bytes": 106,
       "sha256": "4f846cfb5cdbb7e139f6cd6e15086281ea4a91fb5c6cc97badb87e266826aa01"
     },
-    ".dock/node14-acceptance5-preparation/kit-2026.09.13-node14-acceptance5.1/launch-plan.json": {
+    "unavailable:artifact-5be0cb144f4bb52c": {
       "bytes": 3635,
       "sha256": "33f27fa4e4d9895a69bb0a02afe1291e7bcac59baa4b774ae42993ce621a9a50"
     },
-    ".dock/node14-acceptance5-preparation/kit-2026.09.13-node14-acceptance5.1/manifest.json": {
+    "unavailable:artifact-08c43396fe5289f9": {
       "bytes": 43790,
       "sha256": "66b2e7bbb1750855c8c970870a0c07373b1407518e35040e3b2d1b51476dbeef"
     },
-    ".dock/node14-acceptance5-preparation/kit-2026.09.13-node14-acceptance5.1/snapshot-check.json": {
+    "unavailable:artifact-788128e74872e9fc": {
       "bytes": 195,
       "sha256": "64559faa877a10a35fae46977432ce344a23e736d41131c2037460b82de203c4"
     },
-    ".dock/node14-acceptance5-preparation/live-context/01-before.json": {
+    "unavailable:artifact-8e91ea758796b859": {
       "bytes": 9587,
       "sha256": "910cf5fbabfe7eeac2393d4d6c2e8f9af8bf453a5e1e354281c4db84d8f83504"
     },
-    ".dock/node14-acceptance5-preparation/live-context/02-create.json": {
+    "unavailable:artifact-c16b4f0f8799cd21": {
       "bytes": 34747,
       "sha256": "477c8a3639f9343f0027769ea7a77f7a49c6761cfdd1f9509d94349ded9b52c5"
     },
-    ".dock/node14-acceptance5-preparation/live-context/03-rename.json": {
+    "unavailable:artifact-2cc7647415944fe1": {
       "bytes": 35572,
       "sha256": "b6e882f3790e5d47f4c1e400903cecb93317fcb4fd6778fadbb2fddb08f4f2dc"
     },
-    ".dock/node14-acceptance5-preparation/live-context/04-observer.json": {
+    "unavailable:artifact-daf615086c76978a": {
       "bytes": 914,
       "sha256": "f07569381229ab67c3912961af0eef39cef1e614939f4decccc13ff0c4b747d0"
     },
-    ".dock/node14-acceptance5-preparation/live-context/05-remove.json": {
+    "unavailable:artifact-238653710e96ef97": {
       "bytes": 35159,
       "sha256": "ebd14c0861a06940d459dc87960116ecb52f20f995d42aab58b105f0dcf47c02"
     },
-    ".dock/node14-acceptance5-preparation/live-context/06-observations.json": {
+    "unavailable:artifact-023ed2b615370074": {
       "bytes": 1165,
       "sha256": "f65b40ed46d81582728990c020349ee2f7d1781568a174fa03bb6e8932519f00"
     },
-    ".dock/node14-acceptance5-preparation/live-context/after-remove.png": {
+    "unavailable:artifact-fd4136de54eef8f6": {
       "bytes": 294681,
       "sha256": "51e209ab44ff86df2bbdcfaee33c932c46e6c1fc5bbefbe6030298977149c31f"
     },
-    ".dock/node14-acceptance5-preparation/live-context/built-nodes.json": {
+    "unavailable:artifact-e54ee269e881b0be": {
       "bytes": 255065,
       "sha256": "0c2eb0ab7165d636a10b86fca90c40f8b07440ade953f0dbb8068300aed7320b"
     },
-    ".dock/node14-acceptance5-preparation/live-context/context-ready.json": {
+    "unavailable:artifact-85b721d9b1875d0f": {
       "bytes": 14335,
       "sha256": "369cdee3bd9cf8b3b5a194e67625702f555eafa5642c48009c2316533179f9c1"
     },
-    ".dock/node14-acceptance5-preparation/live-context/context-threshold41-create-before.json": {
+    "unavailable:artifact-0069b8dd1b3a0e79": {
       "bytes": 11503,
       "sha256": "6fb9a661083cf7566ed6b33d6374c6447b063d3d6dbf5d0c4ed3ac1defaf822b"
     },
-    ".dock/node14-acceptance5-preparation/live-context/context-threshold41-remove-link-before.json": {
+    "unavailable:artifact-1ca5c34b3444c276": {
       "bytes": 12325,
       "sha256": "52b01a9f0526f37e2ccd608285adb36963ac53d66abbd91b126c53b66fa47aec"
     },
-    ".dock/node14-acceptance5-preparation/live-context/context-threshold41-rename-before.json": {
+    "unavailable:artifact-d8dcf66b47ae1d9c": {
       "bytes": 12380,
       "sha256": "dd189524b368b6f6264df6db579bb26e91665302d8b6881cb726ee503a7f4f68"
     },
-    ".dock/node14-acceptance5-preparation/live-context/geometry.json": {
+    "unavailable:artifact-f3a9850d93a3962a": {
       "bytes": 631,
       "sha256": "bfd1531ebe6d6f02e172fd5a1f5189d66703ab759a8cdfa33ac980b911a2b670"
     },
-    ".dock/node14-acceptance5-preparation/live-context/prepare.json": {
+    "unavailable:artifact-61fe71010b1ddb37": {
       "bytes": 23900,
       "sha256": "2929fd442fc3bc102a27bb9ba08932e30337309a1b080edc515ff69c50e69d7c"
     },
-    ".dock/node14-acceptance5-preparation/live-context/public-evidence.json": {
+    "unavailable:artifact-820a5a9fb7b54c71": {
       "bytes": 1768407,
       "sha256": "c2d8425eb99d1ef113610bf7dd767a210a6e48a5d457c0e03d48986910a62c38"
     },
-    ".dock/node14-acceptance5-preparation/live-context/raw-1.json": {
+    "unavailable:artifact-588251dd07d947be": {
       "bytes": 38106,
       "sha256": "298ba168aca32b7606ae87064dca0e4d8ecd21d3799bff39d5715ec4b7d55917"
     },
-    ".dock/node14-acceptance5-preparation/live-context/raw-10.json": {
+    "unavailable:artifact-1e2589f3b35f76f6": {
       "bytes": 38840,
       "sha256": "bfff9781bae8a308be8a4d9cb6d24a67956468d5ab50cc593da9a57fae85c39c"
     },
-    ".dock/node14-acceptance5-preparation/live-context/raw-11.json": {
+    "unavailable:artifact-c0b80bc689b9fa1b": {
       "bytes": 81841,
       "sha256": "2583f4601e35a46799638b5b7ad8ee6b200326f41b1a1733eb5a63f694cd383b"
     },
-    ".dock/node14-acceptance5-preparation/live-context/raw-12.json": {
+    "unavailable:artifact-9a7857d444b4dad0": {
       "bytes": 38709,
       "sha256": "2aec5fcf625f60359b7550bd1cceef557824cc084349909cb221face7bcb4c24"
     },
-    ".dock/node14-acceptance5-preparation/live-context/raw-2.json": {
+    "unavailable:artifact-2973c5d90fd6b698": {
       "bytes": 38108,
       "sha256": "b3ff21528e610da9ebe918f1248ea1b64cea65d69ba9b896eb0883080a1d6700"
     },
-    ".dock/node14-acceptance5-preparation/live-context/raw-3.json": {
+    "unavailable:artifact-e98a3ae7f449cce0": {
       "bytes": 816,
       "sha256": "4524600324624b42be0b4db24ee087f238d161f87e765d42fb9901dca66bf924"
     },
-    ".dock/node14-acceptance5-preparation/live-context/raw-4.json": {
+    "unavailable:artifact-7137fe29027ecc17": {
       "bytes": 1214,
       "sha256": "a0dedc5cac01eba34893f9bff30c2f8cf3f073218eda91742e56e94e94f90f90"
     },
-    ".dock/node14-acceptance5-preparation/live-context/raw-5.json": {
+    "unavailable:artifact-4e0ee7faa48ce550": {
       "bytes": 80830,
       "sha256": "f1b1fa58d78adda5abd80231441cee3ffd0349bd1a1fbe5de1822c894d57c81e"
     },
-    ".dock/node14-acceptance5-preparation/live-context/raw-6.json": {
+    "unavailable:artifact-c9bddc2dfefee791": {
       "bytes": 38614,
       "sha256": "7acb87bd284c1499006f34469051c5c11fe4ecfa51fd76622808d71d97183b4a"
     },
-    ".dock/node14-acceptance5-preparation/live-context/raw-7.json": {
+    "unavailable:artifact-a39173963629cbb9": {
       "bytes": 38866,
       "sha256": "09fbb0cf50e4fe705494802d4266ee2e5e28a3a5c882fb2af75cbd09dfad42eb"
     },
-    ".dock/node14-acceptance5-preparation/live-context/raw-8.json": {
+    "unavailable:artifact-200eff24c21e4271": {
       "bytes": 82074,
       "sha256": "448179374e7fad2ab9aca1bcc6fcb05065d4a1322ac32b389391a155ab2133b4"
     },
-    ".dock/node14-acceptance5-preparation/live-context/raw-9.json": {
+    "unavailable:artifact-93571eb3190d1f07": {
       "bytes": 38840,
       "sha256": "bfff9781bae8a308be8a4d9cb6d24a67956468d5ab50cc593da9a57fae85c39c"
     },
-    ".dock/node14-acceptance5-preparation/live-context/sessions/c062a0a7-bd93-4cdf-857b-0e44a0aaf75f/execution-events.jsonl": {
+    "unavailable:artifact-14cc6ed4e008c5df": {
       "bytes": 345473569,
       "sha256": "08e4b2b85cc33eb6b0fc43c60363ae6d6d7bf68c5523a8d658b95c6234b4cdb7"
     },
-    ".dock/node14-acceptance5-preparation/live-context/sessions/c062a0a7-bd93-4cdf-857b-0e44a0aaf75f/session.json": {
+    "unavailable:artifact-6ff60b05030cdb52": {
       "bytes": 27611,
       "sha256": "56acfb4173899c51455670fcf4072548b1b22d1de26620fb83144da9a4db52a4"
     },
-    ".dock/node14-acceptance5-preparation/missing-values-tests.log": {
+    "unavailable:artifact-d4f2d05dac564f0a": {
       "bytes": 118,
       "sha256": "90da4b51dce5e2ec5d5ef00d30f92ca3bdfae43f89373c105b9f97bf73673ae1"
     },
-    ".dock/node14-acceptance5-preparation/old-evidence-check.json": {
+    "unavailable:artifact-3fc7ca6a03ce27da": {
       "bytes": 526,
       "sha256": "2a1d4984d0c04097958ef35b4c36b705ffa9f43a1db1e55c00f94e545fa789a5"
     },
-    ".dock/node14-acceptance5-preparation/original-node-requests.json": {
+    "unavailable:artifact-ef07b6eab56bde9b": {
       "bytes": 62794,
       "sha256": "f81b72cf8c3a62d695ba88cc8b19f0ab34a4d3fc6ee0f818e1c1c38389a6dfb1"
     },
-    ".dock/node14-acceptance5-preparation/parse-candidate.mjs": {
+    "unavailable:artifact-094f1ee8fd791b25": {
       "bytes": 1022,
       "sha256": "7c4808a600bd6bff5edd25e2e19b84f70c3a6c678d21f289e5d35ecaf0a9d0e6"
     },
-    ".dock/node14-acceptance5-preparation/parser-receipt.json": {
+    "unavailable:artifact-89ae8a3488206eb5": {
       "bytes": 856,
       "sha256": "05cf701041180b59d1a9ea96a9a25fb24efe32a3c636b7ed4237e03dc482bcf1"
     },
-    ".dock/node14-acceptance5-preparation/preflight-final-output.txt": {
+    "unavailable:artifact-9156b24c7af06dea": {
       "bytes": 242,
       "sha256": "1887500892745d7edda40f11a7e9f294048c3f5b4a652ea8cd36028e35038a8d"
     },
-    ".dock/node14-acceptance5-preparation/preflight-final.json": {
+    "unavailable:artifact-66d9be1e35aa9589": {
       "bytes": 128312,
       "sha256": "630ddd96ea2ac77116b395f9987bc3ec58e81b91239bbf1236a814fbbee40cb6"
     },
-    ".dock/node14-acceptance5-preparation/preflight-output.txt": {
+    "unavailable:artifact-343597e91a9a4122": {
       "bytes": 242,
       "sha256": "1887500892745d7edda40f11a7e9f294048c3f5b4a652ea8cd36028e35038a8d"
     },
-    ".dock/node14-acceptance5-preparation/preflight.json": {
+    "unavailable:artifact-bfa9288bfe4f0550": {
       "bytes": 128312,
       "sha256": "5ceb037721a72750db8bf92b80609bab2ab57dc7cde78ee16cfc2b54cf9dd267"
     },
-    ".dock/node14-acceptance5-preparation/process-check.json": {
+    "unavailable:artifact-8db52abd8eef1d03": {
       "bytes": 40,
       "sha256": "4fd69b8ba37cf88efd1f8020481604bbe4f828a47a591b6f94ff4f0280aa05f2"
     },
-    ".dock/node14-acceptance5-preparation/readiness-final.json": {
+    "unavailable:artifact-022b5176c7040ad7": {
       "bytes": 829,
       "sha256": "ff939b3a073a98dac03183766149b348f71586bf6ff0f22c459e8cdac30f8a29"
     },
-    ".dock/node14-acceptance5-preparation/readiness.json": {
+    "unavailable:artifact-342d93768e52a14e": {
       "bytes": 829,
       "sha256": "ffe65388d3c8c8392e9bf3a7b69ed6f3e77a953a1e60ca6d1106d3336223dd0b"
     },
-    ".dock/node14-acceptance5-preparation/readiness.py": {
+    "unavailable:artifact-0c4f935acd583b7b": {
       "bytes": 1735,
       "sha256": "1575e5fe0078a550431d9266e353fd0349da81446935e0ff10b4f6c924bf2cd0"
     },
-    ".dock/node14-acceptance5-preparation/selection-observer.code": {
+    "unavailable:artifact-e67934dedad735c7": {
       "bytes": 723,
       "sha256": "1008ca49dc40a8fdb903bff728634f57e41d48b2d23015d07f717c06be406212"
     },
-    ".dock/node14-acceptance5-preparation/target-tests.log": {
+    "unavailable:artifact-bbc1edb336fea6a0": {
       "bytes": 3969,
       "sha256": "9bd1e5cf02e9bbbd23b9ed66b8ffbc033dd658269a8645a7d4b8e11dc5c0537d"
     },
-    ".dock/node14-acceptance5-preparation/verify-context.mjs": {
+    "unavailable:artifact-5ca8cb4b38ef0649": {
       "bytes": 2704,
       "sha256": "bd80abbed8b24d398a8e66f0af1d0f77827eb7aae16690d1e34f7623776dfc30"
     }
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-cf39522c065a",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

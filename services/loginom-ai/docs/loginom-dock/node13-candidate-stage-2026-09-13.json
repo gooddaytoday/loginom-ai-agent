@@ -57,8 +57,14 @@
     "publisher_additions": {
       "source_commit": "5a4c46fc3a9eb19c0fb440c19decdd1931df7b82",
       "deploy/loginom-dock/publish-action-catalog.py": "4b5a7ce16f32a55b3c7f4f49693f89233781448c0a45a42516b67406b3b8a90b",
-      "executor/capability-abi.json": "a5c7601faba918c2e68d3ada81628a3138ca90737ad2e474e41a2900adc3ca3f"
+      "historical-ref:ref-e2b637aa045a83d9": "a5c7601faba918c2e68d3ada81628a3138ca90737ad2e474e41a2900adc3ca3f"
     },
     "first_publish_attempt": "failed before publication because publisher was outside expected directory tree; exact publisher+ABI added in original relative structure, no rebuild"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-0811b2e375e9",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

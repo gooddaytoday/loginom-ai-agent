@@ -46,7 +46,7 @@
       78
     ]
   },
-  "evidence_directory": ".dock/join-review-20260912/hermes-runs/20260912-065436-43d5fd56",
+  "evidence_directory": "unavailable:artifact-8d636d3cdf4188d3",
   "sha256": {
     "request.json": "e635fa483e46911454fa1dc045ca2caf178b8ee008c4ef930cde85a2f033edfd",
     "scenario.txt": "a7e453dc6b56a2c86b0ae08077c193b5f3ff6df8fa27737d0a67ebaf003b53b9",
@@ -60,5 +60,11 @@
   "limitations": [
     "Live Join schemas above 40 fields per input were not tested.",
     "Right/full/difference joins and restoring excluded output fields remain outside this follow-up."
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-61510d2a8409",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

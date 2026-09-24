@@ -50,7 +50,7 @@
   "runtime": "2897649a8d2120d25e4c80af8af2c6cdd834023b5bda1a1bd5baf073c6e9ba32",
   "runtime_inputs": 155,
   "runtime_changes_since_diagnostic": [
-    "client/lib/text-import-procedure.mjs"
+    "historical-ref:ref-f838cf41f14f14f5"
   ],
   "manifest_sha256": "d86f72c478cd23ad49fdc31a0a5ef2b50894f6e51bb13664851be7e07f5e7380",
   "goal_sha256": "5db16d49554a80afceedcbad2f9a836378377650bcec1d27c4768638a29b46b6",
@@ -62,7 +62,7 @@
   "node_tests_passed": 98,
   "python_tests_passed": 21,
   "live": {
-    "directory": ".dock/text-import-v3/execute-1789318005470",
+    "directory": "unavailable:artifact-20f9c11b471b1346",
     "configuration": {
       "passed": true,
       "failures": [],
@@ -118,17 +118,17 @@
   },
   "preflight_sha256": "6b954396987dffa37594d5a84cc1358bb848676525e4b2743ae3facb2a333e8f",
   "launch": {
-    "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export",
+    "cwd": "unavailable:artifact-d88e6354ae46b3ef",
     "argv": [
       "python3",
-      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/tools/loginom-acceptance/run.py",
+      "historical-ref:ref-0674e0822e4a813a",
       "--run",
       "--goal",
       "text-export-node-complete",
       "--model-profile",
       "chatgpt-sol",
       "--runs-root",
-      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs",
+      "unavailable:artifact-37ba8a48fd33b829",
       "--node",
       "/Users/kartamyshev/.loginom-dock/releases/0.1.0-dev.20260910.3-80ca61417ec7/runtime/node",
       "--hermes-home",
@@ -170,5 +170,11 @@
     "process-close-check.json": "633dd7e33c301147d586dcc4a8bb28f982676245c369994c00420d4e0bd8eeb8",
     "full-audit.json": "7ff32a2fc872d06f8b75ef2409a994c1192943ce17350b7aa079eea4211b5b55",
     "full-audit-after-pin-refresh.json": "91411fd7b9a241e8a144e5bf0296c37b9a153f3006073f57280286f0ce2556d2"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-87693ba3ec1b",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

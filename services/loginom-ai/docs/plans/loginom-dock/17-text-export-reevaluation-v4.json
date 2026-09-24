@@ -6,7 +6,7 @@
   "model_side_passed": true,
   "original_runtime_revision": "c9972b58cfcb36fdedad6fa495424259243c4e9204d4e28909d33653810c7c3d",
   "source_revision": "908c9b7d90eefd72fea2ae9a7e62bcf90b5469cf",
-  "evaluation_path": ".dock/node17/acceptance/runs/20260914-000803-18fad485/reevaluation-v4-model-02.json",
+  "evaluation_path": "unavailable:artifact-48b89f2f20bce954",
   "evaluation_sha256": "d5740bddad51dfbad7dd55697e28f0b89ad647e3192c4a742e4c61c89af317be",
   "provenance": {
     "original_files_sha256": {
@@ -92,12 +92,18 @@
   "remaining_gate": "Independent fresh-session native audit of exact original package; actual read-only investigation owned by coordinator",
   "remaining_gate_implemented_as_fail_closed": true,
   "tests": {
-    "command": "python3 -m unittest discover -s tools/loginom-acceptance -p 'test_text_export_*.py'",
+    "command": "python3 -m unittest discover -s unavailable:artifact-abdc500409930ca3 -p 'test_text_export_*.py'",
     "passed": 37,
     "origin_interval_negative_cases": 20,
     "reopened_owner_negative_cases": 21
   },
   "original_files_unchanged": true,
   "no_new_model": true,
-  "no_browser_reopen": true
+  "no_browser_reopen": true,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-c028881e6bff",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

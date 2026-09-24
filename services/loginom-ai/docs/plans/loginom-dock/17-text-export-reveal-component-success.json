@@ -179,5 +179,11 @@
     "private/dock-state/sessions/cab79d82-569a-4f4b-acfb-c1001d08b2ba/execution-events.jsonl": "1addc13ef7f4e8495f5570f996cd4afcf480a0a430e9509461baea78aca3d248",
     "private/dock-state/sessions/cab79d82-569a-4f4b-acfb-c1001d08b2ba/playwright.json": "482b1d3e23c4a69397cb87ae7767d11b7475f9ff8704475e2294d4cde8bd560a",
     "observer/reject-baseline/829b9fdd-b761-4cb3-b420-a30c87f04689/Dock-export-20260913-205523-3f16316a-csv.csv": "9f9972ed174053d02745df8df0c3c2d44697b33f7fb6da2ce8463eb58cc5d13a"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-f4218cab3022",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

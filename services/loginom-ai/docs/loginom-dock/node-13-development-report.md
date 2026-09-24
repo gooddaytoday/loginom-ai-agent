@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-8b1138b629fd` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 13 «Дата и время»: development-проверка
 
 Статус на 2026-09-13: **development и прямые проверки завершены, готов к отдельному ревью**.
@@ -51,8 +53,8 @@ viewport=null, 1508×862. Node **24.19.0** из установленного з�
 Текущий source runtime:
 `dd0979bf175bd4164ab0d0647daecd69782b1c8ab0d10b2e690d313b9704b6d0`.
 Клиент: **1415 PASS / 1 SKIP**, Python acceptance unit tests: **511 PASS**.
-Логи: `.dock/client-tests-date-source-fetch.log`,
-`.dock/python-acceptance-date-final.log`.
+Логи: `unavailable:artifact-4ed31893b79c8b68`,
+`unavailable:artifact-be5dc14b06693e6a`.
 
 | Проверка | Доказательство | Результат |
 | --- | --- | --- |
@@ -68,19 +70,19 @@ viewport=null, 1508×862. Node **24.19.0** из установленного з�
 | Сохранённое состояние после отмены fault draft, input autosync=true | 1e796919 → f7cf52c5, `node13-small-reopen-execute` | Execute/raw/values PASS, 0×7; strict persistence FAIL: вход autosync=true переставил поля |
 | Save/reopen/execute с input/output autosync=false | f7cf52c5 → 6e3aa7ff, `node13-small-reopen-execute` | public SUCCEEDED; raw/config/values и strict persistence PASS, 0×7; 9/9 negatives |
 
-Сессии находятся в `.dock/stream-runtime/sessions/<UUID>/`.
+Сессии находятся в `unavailable:artifact-3d8353b5a5093cb6<UUID>/`.
 1e796919: `1e796919-a7f3-4966-8339-b93a0f309734`;
 f7cf52c5: `f7cf52c5-9dc4-41dd-a405-f4df805b9526`;
 6e3aa7ff: `6e3aa7ff-33ff-4fd6-893e-2cffdb0ee11a`.
 Последний сохранённый проверенный baseline: `/test-3/N13-f7cf52c5.lgp`.
-Final logs: `.dock/6e-reopen-audit.log`, `.dock/6e-reopen-negative.log`,
+Final logs: `unavailable:artifact-673b67078badc88b`, `unavailable:artifact-08835a6542838509`,
 6e3aa7ff `date-time-persistence.json`. Диагностические пакеты закрыты, последний
 harness завершился с exit0; собственные browser sessions освобождены.
 Их точные pins и промежуточные отказы перечислены в checkpoint.
 Старые 4×27 и 0×6 не выдаются за новые исполнения текущего runtime: их сырые
 журналы повторно прошли обновлённый независимый аудитор.
 
-Основные независимые verifiers находятся в `tools/loginom-acceptance/`:
+Основные независимые verifiers находятся в `unavailable:artifact-6c9840df3f4b6129`:
 `date_time_audit.py`, `date_time_negative.py`, `date_time_removal_evidence.py`,
 `date_time_close.py`, `date_time_refusals.py`, `date_time_reply_loss.py`,
 `date_time_persistence.py`. Источником служат сырые observations/receipts и

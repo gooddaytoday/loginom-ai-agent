@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-a623b37cf80d` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 > Исторический contract1. Уточнение координатора и актуальная офлайн-интеграция:
 > [contract2](17-text-export-read-observer-v2.md). Applied-settings snapshot
 > больше не требуется для узкого byte-read gate; native smoke всё ещё pending.
@@ -13,7 +15,7 @@ reader и не публичная возможность Hermes. `acceptance_rea
 
 ## Реализованная часть
 
-`tools/loginom-acceptance/text-export-read-observer.mjs` принимает host-owned
+`packages/loginom-runtime/tools/loginom-acceptance/text-export-read-observer.mjs` принимает host-owned
 `dispatch`, `observe`, журнал и приватный artifact root. Callback по умолчанию
 отказывает с `NATIVE_APPLIED_SETTINGS_GRAPH_READER_UNAVAILABLE`. Нет импорта
 entry клиента, перехвата SDK или запуска браузера. Тестовые callbacks создают
@@ -44,9 +46,9 @@ observer — лишь intent. Источник actual anchor ещё не инт�
 
 ## Точная причина остановки зависимой части
 
-`client/lib/node-context.mjs:88` на закрытом графе возвращает identity, surface,
+`unavailable:artifact-82761f3be30144eb` на закрытом графе возвращает identity, surface,
 refs и locked. Он не читает применённые настройки export/source и весь граф.
-`client/lib/text-export-context.mjs:6` требует уже открытый мастер, а его browser
+`unavailable:artifact-77aa2804b7e8d895` требует уже открытый мастер, а его browser
 reader читает поля страниц мастера. После terminal reject мастер закрыт.
 Старый handler readback не доказывает текущее состояние настроек. Открытие мастера
 для чтения может менять активность узла и противоречит требованию невмешательства.

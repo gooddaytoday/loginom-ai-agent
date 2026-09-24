@@ -52,38 +52,44 @@
   "autonomous_acceptance_passed": false,
   "slot_id": null,
   "artifacts": {
-    ".dock/replacement/candidate-v2-preflight/coordinator-receipt.json": {
+    "unavailable:artifact-9a97aa5363a8cdd5": {
       "sha256": "9e5f286ca3760424ab7b63f4408bb6a1e0ac4af0012125cc71da1f3f1752a0b1",
       "bytes": 3301
     },
-    ".dock/replacement/candidate-v2-preflight/preflight.json": {
+    "unavailable:artifact-c0ec1970a05e0cac": {
       "sha256": "9dc02f3fcf71a82b3566b5a19c631db9cd66625056b9b233cac21aaf472e40fe",
       "bytes": 127159
     },
-    ".dock/stream-runtime/sessions/8d0c37ed-22e9-4469-b7eb-201252c4200a/prepare.json": {
+    "unavailable:artifact-bc9be1ee37bf3bb5": {
       "sha256": "3d2086b241280ec4ecee02f33db19d126e706e7f2ca9b54e9fb821cc837442c1",
       "bytes": 16549
     },
-    ".dock/stream-runtime/sessions/8d0c37ed-22e9-4469-b7eb-201252c4200a/remote-pins.json": {
+    "unavailable:artifact-5c3b14cd9a5c8fd0": {
       "sha256": "1571aead50bedf66155bbecc0164cc040cf602f49ab0790f763d802a06fa8216",
       "bytes": 61982
     },
-    ".dock/stream-runtime/sessions/8d0c37ed-22e9-4469-b7eb-201252c4200a/session.json": {
+    "unavailable:artifact-65b1358180e3aea7": {
       "sha256": "00e9b347af368a7c3ee5373ecb8b174c977009e3582629772d7d0fde8e0b76ad",
       "bytes": 29598
     },
-    ".dock/stream-runtime/sessions/8d0c37ed-22e9-4469-b7eb-201252c4200a/execution-events.jsonl": {
+    "unavailable:artifact-eab5f505dcf159b9": {
       "sha256": "d30ceda67edff8ef3db435ad6143884be1ca4ade243c47f4186d239bdbe0d5c1",
       "bytes": 3960689
     },
-    ".dock/stream-runtime/sessions/8d0c37ed-22e9-4469-b7eb-201252c4200a/candidate-save-describe.json": {
+    "unavailable:artifact-56fac0470d03b7a6": {
       "sha256": "c16be34c41217bbd25a43001511f5fcd1df912dd1241a1480e92afb77c07b82e",
       "bytes": 8227
     },
-    ".dock/stream-runtime/sessions/8d0c37ed-22e9-4469-b7eb-201252c4200a/candidate-final-observe.json": {
+    "unavailable:artifact-1a389e55af97d7e4": {
       "sha256": "8b2cb1c6ad359bfc8f08569697ed8a8343ea8d80fca6a17c8cb5fbdc963a5a0b",
       "bytes": 4288
     }
   },
-  "own_session_processes_remaining": 0
+  "own_session_processes_remaining": 0,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-50f72b7ae3f2",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

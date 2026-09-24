@@ -27,7 +27,7 @@
     {
       "node": 11,
       "thread_id": "01a0971e-804e-7f42-923a-4cdb1de181be",
-      "worktree": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-11-replacement",
+      "worktree": "unavailable:artifact-f4373de5e91099c0",
       "phase": "awaiting-shared-memory-transition-and-acceptance",
       "actor_access": {
         "health": "healthy",
@@ -42,7 +42,7 @@
     {
       "node": 12,
       "thread_id": "01a0971e-9324-7cd1-8610-cf343b3838b1",
-      "worktree": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates",
+      "worktree": "unavailable:artifact-86de2b2a9fd3c09e",
       "phase": "awaiting-shared-memory-transition-and-acceptance-candidate",
       "actor_access": {
         "health": "healthy",
@@ -57,7 +57,7 @@
     {
       "node": 13,
       "thread_id": "01a0971e-a2c3-7e21-898b-9b865527a484",
-      "worktree": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-13-date-time",
+      "worktree": "unavailable:artifact-6d6fd528bdbb608d",
       "phase": "development-resumed-shared-memory",
       "actor_access": {
         "health": "healthy",
@@ -78,7 +78,7 @@
     {
       "node": 14,
       "thread_id": "01a09738-2d64-7dc2-8cb3-634663d0b406",
-      "worktree": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-14-missing-values",
+      "worktree": "unavailable:artifact-a924fe5ececcf8a3",
       "phase": "development-resumed-shared-memory",
       "actor_access": {
         "health": "healthy",
@@ -240,5 +240,11 @@
     "target": "events/2026/09/13",
     "source_sha": "ce10e177647ac27eb469832c14c6ff07e3325620",
     "hermes_acceptance": false
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-07c397762d60",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

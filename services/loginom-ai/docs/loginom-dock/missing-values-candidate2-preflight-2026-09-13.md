@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-94ca97ba6c96` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 14: preflight кандидата test4.2 — 2026-09-13
 
 Назначение `node14:candidate-preflight:2:cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad`
@@ -13,7 +15,7 @@ SHA: `cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad`.
 
 Все **4/4** файла заново скачаны через штатный Dock download API и сверены по
 размеру/SHA с readback координатора; три каталожных файла также сверены с manifest.
-Локальные точные байты: `.dock/node14-candidate-preflight-2/candidate/`.
+Локальные точные байты: `unavailable:artifact-b6b9a34715c1b3fc`.
 В этот же каталог скопированы неизменённые stage-report и coordinator-readback,
 необходимые полному аудитору. Первое скачивание ограничил сетевой sandbox;
 повтор с разрешённым сетевым доступом прошёл. Серверных изменений не выполнялось.
@@ -61,10 +63,10 @@ SHA исходного goal:
 
 [Точные pins и индекс доказательств](missing-values-candidate2-preflight-pins-2026-09-13.json).
 Готовый план одного запуска:
-`.dock/node14-candidate-preflight-2/acceptance-launch-plan.json`.
+`unavailable:artifact-1238084df31ff246`.
 Он содержит точные аргументы и `launch_authorized:false`; сам план ничего не
 запускает. После выдачи слота повторно проверить pins и срок действия подписки,
-использовать новый run/session и `.dock/node14-autonomous-acceptance-3/runs`.
+использовать новый run/session и `unavailable:artifact-9fb194ecd7ffc948`.
 Не продолжать уже закрытый startup-сеанс. Для полного аудитора использовать
 скачанный каталог candidate2, затем отдельный независимый reader полного scope.
 

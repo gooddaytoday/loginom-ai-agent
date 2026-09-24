@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-61ee286836b7` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # 05. Аудит завершения «Параметры полей»
 
 После живой перепроверки ревью принят новый runtime: [исправления и повторная
@@ -42,7 +44,7 @@
 | Реальное сохранение/reopen и новое выполнение | Финальный goal-only Hermes и `reform_node_acceptance.py`; persisted settings, exact path, graph и новые execution IDs |
 | Полнота аудитора | Девять подмен полного успешного evidence отклонены, включая согласованную подмену дроби в наблюдениях и отсутствие обязательных квитанций |
 
-Имена `live-*` выше относятся к локальному `.dock/calculator-v3/`.
+Имена `live-*` выше относятся к локальному `unavailable:artifact-18a7dfafd3298bff`.
 Первый исследовательский прогон матрицы не выдаётся за проверку заранее
 зафиксированного oracle. Исходные отказы, восстановление и pins описаны в
 [журнале работы](../../loginom-dock/field-parameters-progress-2026-09-11.md).
@@ -67,7 +69,7 @@ Timestamp, Id, NetAmount, Enabled. Первичная стадия 6×5 такж
 - Catalog SHA-256: `936ef73d933e85bfd8429b8b0f2b515c543ca415a2b22ba57e108232c54ddf44`.
 - Audit SHA-256: `3d9441a6bbedf408271a20836cb4d44996dadcce612514991e9ce7766f6fd810`.
 - Полные request/pins, evidence, efficiency, первичный audit и negative-audit:
-  `.dock/field-parameters/hermes-runs/20260911-083239-ed5ccd06/`.
+  `unavailable:artifact-9598c65bbf719460`.
 - Исходный cleanup CSV SHA-256: `c1204e8bb03a0a686ec291de1fa5d532f19830589d4040e695f2f17e186f2a2e`.
 
 Журнал сессии: 05:33:12.469–05:39:06.162 UTC, **5 мин 53,693 с**.

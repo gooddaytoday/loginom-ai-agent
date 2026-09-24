@@ -36,13 +36,13 @@
   },
   "original_fresh_audit": {
     "status": "incomplete_read_only",
-    "directory": ".dock/text-export/live-1789326618235",
+    "directory": "unavailable:artifact-593a681fb148c3e3",
     "original_package": "/test-2/packages/Dock-acceptance-20260913-215018-6e242f0e.lgp",
     "administration_hidden_for_test2": true,
     "further_unlock_attempts_stopped_by_coordinator": true
   },
   "live_fix": {
-    "directory": ".dock/text-export/live-1789327048922",
+    "directory": "unavailable:artifact-e7b14b09930f5692",
     "diagnostic_copy_only": true,
     "path": "/test-2/node17-save-reopen-fixed-full6.lgp",
     "save_close_reopen": true,
@@ -74,17 +74,17 @@
   "runtime": "cd471237bdf5bc67bc668a02b3c5d1ad118b3e9fcfc74a235f10449ac5c1e01f",
   "manifest_sha256": "ac814f07b0e670c25a8afdba89aadfe1a934f2bd94cef58188a818c54eaf5728",
   "launch": {
-    "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export",
+    "cwd": "unavailable:artifact-d88e6354ae46b3ef",
     "argv": [
       "python3",
-      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/tools/loginom-acceptance/run.py",
+      "historical-ref:ref-0674e0822e4a813a",
       "--run",
       "--goal",
       "text-export-node-complete",
       "--model-profile",
       "chatgpt-sol",
       "--runs-root",
-      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs",
+      "unavailable:artifact-37ba8a48fd33b829",
       "--node",
       "/Users/kartamyshev/.loginom-dock/releases/0.1.0-dev.20260910.3-80ca61417ec7/runtime/node",
       "--hermes-home",
@@ -124,7 +124,7 @@
     "No repeat full review, merge, deploy or shared plugin update"
   ],
   "virtual_grid": {
-    "failed_run": ".dock/node17/user-v1-component/20260913-222625-513785bc",
+    "failed_run": "unavailable:artifact-0be96be03ba0db83",
     "failure": {
       "phase": "baseline_source_ready",
       "error": "Baseline export failed",
@@ -168,7 +168,7 @@
       "remaining_pids": [],
       "closed": true
     },
-    "diagnosis_directory": ".dock/text-export/live-1789327789787",
+    "diagnosis_directory": "unavailable:artifact-a021a473a12e65d5",
     "native_store_count": 138,
     "target_exists_bytes": 124,
     "initial_exact_dom_observation_elements": 0,
@@ -187,13 +187,13 @@
       ]
     },
     "proof": {
-      "path": ".dock/text-export/live-1789327789787/virtual-search-proof.json",
+      "path": "unavailable:artifact-63272b661db607fd",
       "sha256": "378af8b635d6bfa9f3f999fb8e025734b92b53e1e12b4a853319b313b7414d41"
     },
     "diagnostic_helper_initial_attempt": "Stopped at folder end because roots intentionally omit row labels; corrected to verify label only in addressed detail observation; original evidence retained",
     "native_runtime_diagnostic": "f49e81858f84820dbdb97917efc43beaa05321f154c35c0b737d67a270e9e247 plus separately imported current helper; integrated fresh runtime component is pending",
     "integrated_retry_failure": {
-      "run": ".dock/node17/user-v1-component/20260913-223512-4afee206",
+      "run": "unavailable:artifact-1be4326180a7654c",
       "failure": {
         "phase": "baseline_source_ready",
         "error": "Baseline export failed",
@@ -241,7 +241,7 @@
       "fix": "Preserve original observed table root during scroll refresh"
     },
     "observer_missing_row_failure": {
-      "run": ".dock/node17/user-v1-component/20260913-223756-bb4f0e85",
+      "run": "unavailable:artifact-ee17a4b8831e693b",
       "product_export_status": "SUCCEEDED",
       "reject_status": "FAILED",
       "failure": {
@@ -258,7 +258,7 @@
       "fix": "Acceptance observer reuses bounded native row search; JS policy and independent Python audit validate declared folder/table/name, owner, motion, count and no post-download search"
     },
     "replace_read_failure": {
-      "run": ".dock/node17/user-v1-component/20260913-224418-246a09ef",
+      "run": "unavailable:artifact-e1f64a06bc025598",
       "original": "SUCCEEDED",
       "replace_result": {
         "result_version": "user-v1",
@@ -306,8 +306,8 @@
   },
   "component": {
     "run": "20260913-224754-cbf8ef54",
-    "directory": ".dock/node17/user-v1-component/20260913-224754-cbf8ef54",
-    "audit_path": "docs/plans/loginom-dock/17-text-export-save-virtual-component-success.json",
+    "directory": "unavailable:artifact-0da9c4f2c336c720",
+    "audit_path": "historical-ref:ref-88897328429b3f58",
     "audit_sha256": "f76440c403731d24b26beb9a7e590ee91e75a936d20bb0c578bbab1ca4f55469",
     "passed": true,
     "actual_downloads": 1,
@@ -328,12 +328,18 @@
     "global_config_unchanged": true
   },
   "preflight": {
-    "path": ".dock/node17/save-virtual-preflight.json",
+    "path": "unavailable:artifact-539d5f6309e5870b",
     "sha256": "deb0a630f3c3fe72d522d2c4bd857b7042a3282d8a670c444a6896d141fee296",
     "passed": true,
     "model_started": false,
     "provider": "openai-codex",
     "model": "gpt-5.6-sol",
     "reasoning_effort": "low"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-fb8eea8aa9ce",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

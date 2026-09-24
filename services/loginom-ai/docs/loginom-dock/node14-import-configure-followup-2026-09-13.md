@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-e163e8010745` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 14: исправлен выбор NULL в импорте — 2026-09-13
 
 Выполнено назначение `node14:import-configure-followup:1:b79da602`.
@@ -87,7 +89,7 @@ Runtime финальной live-проверки и source preflight:
 Live использовал immutable test4.2/cadd80df; server catalog не менялся.
 
 [Машинные pins и receipts](node14-import-configure-followup-pins-2026-09-13.json).
-Приватные доказательства: `.dock/node14-import-followup/`.
+Приватные доказательства: `unavailable:artifact-2ad769f00465583b`.
 Старые13/13 receipts acceptance2 и14/14 acceptance3 повторно сверены по размерам/SHA.
 Goal/oracle/harness, старые frozen pins и результаты не переписаны. Перед новым
 acceptance требуется отдельный свежий pinned комплект под изменённый runtime;

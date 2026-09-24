@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-fa6b801d81b1` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Missing Values: выбор целевого узла после выходного мастера
 
 **Готово к следующему полному Hermes-прогону после выделения слота.**
@@ -50,7 +52,7 @@ operation_id сохранены, обе квитанции request_rejected со
 
 ## Комплект следующей приёмки
 
-Kit `.dock/node14-acceptance7-preparation/kit-2026.09.13-node14-acceptance7.1/`.
+Kit `unavailable:artifact-fa819b9e21b65ff1`.
 Скопированы и сверены 412 файлов: 156 runtime и 256 harness. В harness изменены
 только две runtime-привязки; goal, fixtures, oracle и весь аудитор неизменны.
 Штатный preflight завершён exit0 без модели. Перед запуском его обновить.

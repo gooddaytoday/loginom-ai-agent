@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-6c8f5c666923` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Loginom Dock: план реализации и выхода из MVP
 
 Редакция: 12 сентября 2026 года; архитектура и Hermes Sol/low согласованы 7 сентября.
@@ -219,7 +221,7 @@ MCP прошла за 24,948 с. Последний Hermes прежней сер
 
 Точные SHA, старые результаты и состояние остановки:
 [checkpoint](../loginom-dock/resume-checkpoint.md) и
-[журнал реализации](../loginom-dock/implementation-status.md).
+[журнал реализации](../../../../docs/node-development/history/supplements/docs/loginom-dock/implementation-status.md).
 Их не пересчитывать и не переименовывать под новую модель/архитектуру.
 
 **Новый обязательный профиль всех Hermes-прогонов:**
@@ -233,7 +235,7 @@ Launcher, аудит и admission переведены на Sol/low при ре�
 Стенд разработки: Loginom 7.4.2 по адресу
 http://logi-test-plan.bg.local/app/?testable=true.
 Текущий явно выбранный аккаунт user без пароля и наблюдённое хранилище /user/dock-p3
-описаны в [operations](../loginom-dock/operations.md).
+описаны в [operations](../../../../docs/node-development/history/supplements/docs/loginom-dock/operations.md).
 Это параметры данного стенда, не defaults продукта. Перед новым запуском проверить
 доступ, origin/build, назначение файлов и совместимость.
 
@@ -553,8 +555,8 @@ Runtime и harness во время приёмки не менять. Стары�
 ## 10. Совместимость, инфраструктура и поставка
 
 Повторно использовать существующие client registry/executor, UI drivers, artifact
-transport, operation journal/recovery, observation pages и tools/loginom-acceptance.
-Подробная карта файлов — в [handoff](../loginom-dock/agent-handoff.md).
+transport, operation journal/recovery, observation pages и unavailable:artifact-abdc500409930ca3.
+Подробная карта файлов — в [handoff](../../../../docs/node-development/history/supplements/docs/loginom-dock/agent-handoff.md).
 Документация контрактов должна различать реализованное и целевое поведение.
 
 Сохранить OpenViking APIs/MCP, ingestion/search/sessions/storage schema, атрибуцию,
@@ -590,7 +592,7 @@ macOS Apple Silicon, Windows 11 x64 и Linux x64, native-интеграции Co
 работает внутри executor; автоматическое переключение на raw classic после
 неуспеха запрещено. Старые сессии и явно выбранный classic сохраняют свои pins
 и границы; наличие classic не заменяет приёмку объявленного первого выпуска.
-Конкретные текущие команды и доступ — [operations](../loginom-dock/operations.md)
+Конкретные текущие команды и доступ — [operations](../../../../docs/node-development/history/supplements/docs/loginom-dock/operations.md)
 и [releasing](../loginom-dock/releasing.md); перед использованием сверять live state.
 
 <a id="post-mvp-handoff"></a>

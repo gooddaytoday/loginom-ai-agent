@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-ba968bcfcf29` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Узел 11: исправления подготовки автономной приёмки, 13 сентября 2026
 
 Статус: **followup_complete / awaiting_coordinator**. Команда
@@ -32,7 +34,7 @@ ABI/executor/target, собственные profile/artifacts, каталог to
 runtime/manifest, точным клиентом initialize и последовательностью методов.
 `check-tools.mjs` связывает новый каталог с PID своего дочернего процесса и сохраняет
 хеши origin и metadata после закрытия. Допустима лишь последовательность initialize,
-initialized, list_tools; закрытие обязательно. tools/call, неизвестный метод/клиент,
+initialized, list_tools; закрытие обязательно. unavailable:artifact-c161ac627293ff78, неизвестный метод/клиент,
 prepare/workspaceReady/skill/target/workflow или execution events исключают льготу.
 Отсутствие активности без origin не является доказательством. Аргументы, ответы,
 текст модели и credentials в origin не записываются.
@@ -46,7 +48,7 @@ prepare/workspaceReady/skill/target/workflow или execution events исклю�
 ### Историческая диагностика без пересмотра результата
 
 `N11-A2-historical-diagnostic.json` сохранён отдельно в
-`.dock/replacement/acceptance-followup/`. Полный прежний goal-аудит повторён из
+`unavailable:artifact-b8345bcd8e5569a8`. Полный прежний goal-аудит повторён из
 снимка `be4d31bf`; все его harness inputs сопоставлены с исходным request.json.
 Его 56 предметных проверок дали три прежних отказа: save_chain и обе persistence
 проверки из-за отсутствующего checkpoint. Новый session diagnostic подтвердил
@@ -106,7 +108,7 @@ runtime сессии совпал с окончательным исходным
 - Runtime: `3b21e8f0c52820b058caf9c02bb00d006d7bf9b451891ec27646f8018e46e00e`.
 - Goal SHA256: `d283e683fe61298a9273365ca485d63e16fb582d08b45d42dfefb70c65952a9c`.
 - Harness input-map SHA256: `4ec0ac41998acdffdb939c2c18d2246224b5d6a90ad7789ae248e272a52c205b`.
-- Архив `.dock/replacement/acceptance-followup/client-source-7de7f23e.tar.gz`:
+- Архив `unavailable:artifact-1868c80ed42f6610`:
   `e7a2103be3679abd0907ed6454f39adf062db0f68808f01da101308b64299ab9`, 1 019 833 байта.
 
 **Нужны новая VPS-сборка и stage/readback.** Предложена версия

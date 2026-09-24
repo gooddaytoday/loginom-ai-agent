@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-0eac77314b7d` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Node17: незакрытый reject-baseline gate
 
 Назначение `node17:acceptance-kit-fix:1:reject-baseline`.
@@ -36,7 +38,7 @@ Goal и fixtures неизменны: 22 node operations, 3 deliveries, все sa
 
 Память OpenViking здорова. Выполнены только локальные малозатратные проверки:
 2 readiness tests и 4 tests существующего Text export kit прошли. Source probe
-сохранён в `.dock/node17/kit-fix/public-reader-probe.json`. `git diff --check`
+сохранён в `unavailable:artifact-5c7120f8ede57c1a`. `git diff --check`
 прошёл. Hermes, браузер, VPS, общий клиент и каталоги не запускались/не менялись.
 
 Это проверки fail-closed поведения, **не** выполненная семантическая матрица

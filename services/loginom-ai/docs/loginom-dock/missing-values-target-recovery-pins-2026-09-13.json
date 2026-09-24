@@ -263,11 +263,11 @@
   "candidate_manifest_sha256": null,
   "candidate_staged": false,
   "candidate_activated": false,
-  "packet_archive": ".dock/node14-target-followup/catalog-packet/catalog-source.tar",
+  "packet_archive": "unavailable:artifact-87857670299f53e0",
   "packet_archive_sha256": "d120d055300863f2e0594e04ccc38147c79ba55296fc24a942270e36fef6cfcd",
   "packet_manifest_sha256": "d504ab5f0cd4e600a41c0606c5a6e5957c8be49160b144ed837a9709765a87f3",
   "packet_files": 11,
-  "evidence_index": ".dock/node14-target-followup/evidence-files.json",
+  "evidence_index": "unavailable:artifact-f4f053245c6c409f",
   "evidence_index_sha256": "33b5771d6e8e3ae0b6fad5e2ed8c3630bd92d48360823be3aaaa63d454a46923",
   "evidence_files": 2523,
   "live_summary": {
@@ -300,5 +300,11 @@
   "model_started": false,
   "full_goal_accepted": false,
   "full_auditor_refusal_support": "unchanged; unique successful node_checkpoint required for each prepared request",
-  "old_fail_receipts_unchanged": 13
+  "old_fail_receipts_unchanged": 13,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-5d953c70f568",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

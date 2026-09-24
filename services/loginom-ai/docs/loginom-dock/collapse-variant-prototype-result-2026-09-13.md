@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-3489cdfba633` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node16: результат разрешённого variant-прототипа
 
 **Фиксированный метод пригоден как источник typed bytes для проверенных случаев
@@ -7,7 +9,7 @@ Loginom7.4.2. Полный variant_io остаётся BLOCKED; reader не ин
 `node16:variant-prototype:1:direct-user-20260913`. Отдельные test-1 process/profile,
 пакет `/test-1/node16-20260913-a56c2488/Node16-variant-prototype.lgp`, скопированный
 через штатный UI из собственного диагностического пакета. Native RPC применяется
-только внутри `tools/loginom-acceptance/collapse/variant-prototype/raw-read.mjs`.
+только внутри `packages/loginom-runtime/tools/loginom-acceptance/collapse/variant-prototype/raw-read.mjs`.
 Общий plugin, hooks, память, transport configuration и публичные handlers не менялись.
 
 ## Что проверено
@@ -90,10 +92,10 @@ exception object через другую remote interface. Message ID сверя
 
 ## Provenance и возобновление
 
-Run-dir `.dock/node16/live-1789292821504`, source-runtime pin
+Run-dir `unavailable:artifact-804b907c92deb25b`, source-runtime pin
 `7ed94630353fed483f53a029a3aea7828920235879569b83d303510213b3d239`.
 Этот pin относится к public UI harness; отдельные prototype file SHA и exact
-frontend SHA находятся в `tools/loginom-acceptance/collapse/variant-prototype/provenance.json`.
+frontend SHA находятся в `packages/loginom-runtime/tools/loginom-acceptance/collapse/variant-prototype/provenance.json`.
 Три обязательных frontend SHA совпали с исходным планом; SysUtils.js и
 BitConverter.js дополнительно закреплены для проверки date/int64 semantics.
 После live были только сужены string codepages до UTF-8; final decoder replay23PASS.

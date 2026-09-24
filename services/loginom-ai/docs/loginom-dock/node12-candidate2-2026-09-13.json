@@ -38,7 +38,7 @@
   "source_archive_sha256": "39876dd6a497762bf1ea2f8626d6d3dde2b2c279c564f964448c3adec4939192",
   "source_members_verified": 628,
   "readback_verified": true,
-  "local_download": ".dock/node12-candidate2-20260913/server-candidate",
+  "local_download": "unavailable:artifact-6ec7249a58d3d241",
   "candidate_preflight_verified": true,
   "hermes_started": true,
   "preflight_receipt_sha256": "e9dd6baa90c20abd5ff6a0f35489f48bb51ba1b0d9e505b6b71d230070d6ef29",
@@ -53,6 +53,12 @@
   "acceptance_report_commit": "59062bff9520a90c1e616bd72a680ce393fd3ded",
   "followup": "Strict identity-only import verifier correction on immutable saved live evidence",
   "branch_acceptance_status": "accepted_scoped_by_separate_versioned_reassessment",
-  "branch_acceptance_evidence": "docs/loginom-dock/node12-branch-acceptance-2026-09-13.json",
-  "original_frozen_audit_preserved": true
+  "branch_acceptance_evidence": "historical-ref:ref-7beb641d4c090ca8",
+  "original_frozen_audit_preserved": true,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-b95565b64e93",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

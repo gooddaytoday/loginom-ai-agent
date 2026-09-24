@@ -16,7 +16,7 @@
       "case": "csv",
       "destination": "/test-2/node17-new-csv-20260913.csv",
       "runtime": "8311356da6215b347ea506c9bb128952c558d893dda2d59781b3c4831bad82db",
-      "evidence_directory": ".dock/text-export/live-1789297661190",
+      "evidence_directory": "unavailable:artifact-4682141b1e48d7f3",
       "receipt": "new-csv.json",
       "fixture": "escaping.json",
       "settings": {
@@ -38,7 +38,7 @@
       "case": "typed",
       "destination": "/test-2/node17-typed-export-20260913.csv",
       "runtime": "8311356da6215b347ea506c9bb128952c558d893dda2d59781b3c4831bad82db",
-      "evidence_directory": ".dock/text-export/live-1789297661190",
+      "evidence_directory": "unavailable:artifact-4682141b1e48d7f3",
       "receipt": "new-typed.json",
       "fixture": "typed.json",
       "settings": {
@@ -60,7 +60,7 @@
       "case": "tsv",
       "destination": "/test-2/node17-variant-tsv-20260913-2.tsv",
       "runtime": "01d2406804353ec9f314bcddf9544246cc60c613965f5b94393d4cccb139c4d4",
-      "evidence_directory": ".dock/text-export/live-1789297277833",
+      "evidence_directory": "unavailable:artifact-191b1ff7da676384",
       "receipt": "variant-tsv.json",
       "fixture": "escaping.json",
       "settings": {
@@ -82,7 +82,7 @@
       "case": "wide",
       "destination": "/test-2/node17-wide-export-final-20260913.tsv",
       "runtime": "dcc8df45b13bbfd6bd68b9d558553eca2cb6ab843db04184893378da8a95ba7a",
-      "evidence_directory": ".dock/text-export/live-1789298553347",
+      "evidence_directory": "unavailable:artifact-9baf64b75b0a6550",
       "receipt": "final-wide.json",
       "fixture": "wide.json",
       "settings": {
@@ -104,7 +104,7 @@
       "case": "empty",
       "destination": "/test-2/node17-empty-export-final-20260913.csv",
       "runtime": "96f34c91eff1f908432c7ac417cc05dbfc920404ccf4825ba95fa510ab5cd78a",
-      "evidence_directory": ".dock/text-export/live-1789299534188",
+      "evidence_directory": "unavailable:artifact-af4c009ed69efdbe",
       "receipt": "final-empty.json",
       "fixture": "empty.json",
       "settings": {
@@ -126,7 +126,7 @@
       "case": "zero",
       "destination": "/test-2/node17-empty-noheader-final-20260913.csv",
       "runtime": "96f34c91eff1f908432c7ac417cc05dbfc920404ccf4825ba95fa510ab5cd78a",
-      "evidence_directory": ".dock/text-export/live-1789299534188",
+      "evidence_directory": "unavailable:artifact-af4c009ed69efdbe",
       "receipt": "final-zero.json",
       "fixture": "empty.json",
       "settings": {
@@ -148,7 +148,7 @@
       "case": "replace",
       "destination": "/test-2/node17-new-csv-20260913.csv",
       "runtime": "96f34c91eff1f908432c7ac417cc05dbfc920404ccf4825ba95fa510ab5cd78a",
-      "evidence_directory": ".dock/text-export/live-1789299534188",
+      "evidence_directory": "unavailable:artifact-af4c009ed69efdbe",
       "receipt": "replace.json",
       "fixture": "escaping.json",
       "settings": {
@@ -170,7 +170,7 @@
       "case": "reopen-csv",
       "destination": "/test-2/node17-reopened-csv-20260913.csv",
       "runtime": "afc199953de8a6a7e0d1e3a04247a98e69d85d832e26d0168a06b2c0bb6b8cab",
-      "evidence_directory": ".dock/text-export/live-1789299943232",
+      "evidence_directory": "unavailable:artifact-7ff085e03c9498e4",
       "receipt": "reopen-csv.json",
       "fixture": "escaping.json",
       "settings": {
@@ -192,7 +192,7 @@
       "case": "reopen-typed",
       "destination": "/test-2/node17-reopened-typed-20260913.csv",
       "runtime": "afc199953de8a6a7e0d1e3a04247a98e69d85d832e26d0168a06b2c0bb6b8cab",
-      "evidence_directory": ".dock/text-export/live-1789299943232",
+      "evidence_directory": "unavailable:artifact-7ff085e03c9498e4",
       "receipt": "reopen-typed.json",
       "fixture": "typed.json",
       "settings": {
@@ -214,7 +214,7 @@
       "case": "reopen-done",
       "destination": "/test-2/node17-reopened-done-20260913.csv",
       "runtime": "afc199953de8a6a7e0d1e3a04247a98e69d85d832e26d0168a06b2c0bb6b8cab",
-      "evidence_directory": ".dock/text-export/live-1789299943232",
+      "evidence_directory": "unavailable:artifact-7ff085e03c9498e4",
       "receipt": "reopen-done.json",
       "fixture": "escaping.json",
       "settings": {
@@ -236,7 +236,7 @@
       "case": "new-final",
       "destination": "/test-2/node17-new-final-20260913.csv",
       "runtime": "afc199953de8a6a7e0d1e3a04247a98e69d85d832e26d0168a06b2c0bb6b8cab",
-      "evidence_directory": ".dock/text-export/live-1789299943232",
+      "evidence_directory": "unavailable:artifact-7ff085e03c9498e4",
       "receipt": "new-final.json",
       "fixture": "escaping.json",
       "settings": {
@@ -273,18 +273,24 @@
       "pass": 1398,
       "skip": 1,
       "fail": 0,
-      "evidence": ".dock/node17/source-tests-connect-final.log"
+      "evidence": "unavailable:artifact-dea690fe9590eea2"
     },
     "final_guard_focused": {
       "tests": 10,
       "pass": 10,
       "fail": 0,
-      "evidence": ".dock/node17/format-guard-tests.log"
+      "evidence": "unavailable:artifact-6ec1d3447c92d65a"
     },
     "auditor_unittest": {
       "tests": 1,
       "negative_subcases": 14,
       "pass": true
     }
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-3c8d7bd0ce1d",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

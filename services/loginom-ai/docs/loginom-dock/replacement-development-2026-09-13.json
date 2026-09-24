@@ -14,77 +14,77 @@
   "checks": {
     "public_multi": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/961f9801-0b4f-4eae-bde1-156bf3a1224e/multi-audit.json"
+      "evidence": "unavailable:artifact-5c6b37aba2ed512a"
     },
     "new_replace_aliases": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/961f9801-0b4f-4eae-bde1-156bf3a1224e/qa-new-audit.json"
+      "evidence": "unavailable:artifact-d436dc595d1c6927"
     },
     "unchanged_reopen": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/7809ab9a-c36e-44cf-b5b7-bf8f38de7347/qa-reopen-audit.json"
+      "evidence": "unavailable:artifact-c6b1063171960c47"
     },
     "partial_done": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/7809ab9a-c36e-44cf-b5b7-bf8f38de7347/qa-update-config-audit.json"
+      "evidence": "unavailable:artifact-1c3109ee3e4a4336"
     },
     "partial_output": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/7809ab9a-c36e-44cf-b5b7-bf8f38de7347/qa-updated-audit.json"
+      "evidence": "unavailable:artifact-3473f9782a293e3b"
     },
     "wide_rules": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/wide-audit.json"
+      "evidence": "unavailable:artifact-9f370c3bb279efe8"
     },
     "wide_fresh_source": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/wide-refreshed-audit.json"
+      "evidence": "unavailable:artifact-fcedc020992005cd"
     },
     "empty_import": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/empty-source-audit.json"
+      "evidence": "unavailable:artifact-20c11d4427115259"
     },
     "empty_replace": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/empty-audit.json"
+      "evidence": "unavailable:artifact-ed2bf2578e43d1cc"
     },
     "persisted_import": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/import-persistence-audit.json"
+      "evidence": "unavailable:artifact-b9541dc17a726d9a"
     },
     "save_reopen_reexecute": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/persistence-audit-v2.json"
+      "evidence": "unavailable:artifact-afccf8db5c6375bf"
     },
     "dropped_mcp_response": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/lost-response-audit.json"
+      "evidence": "unavailable:artifact-d7a3c5d4c47668fb"
     },
     "source": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/source-audit.json"
+      "evidence": "unavailable:artifact-e2527fd96e16cb68"
     },
     "close_rollback": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/7809ab9a-c36e-44cf-b5b7-bf8f38de7347/qa-close-audit.json"
+      "evidence": "unavailable:artifact-44591aed62337431"
     },
     "idempotent_replay": {
       "passed": true,
-      "evidence": ".dock/stream-runtime/sessions/961f9801-0b4f-4eae-bde1-156bf3a1224e/replay-multi.json"
+      "evidence": "unavailable:artifact-e200bbc3d0111a6e"
     },
     "pre_ui_refusals": {
       "passed": true,
       "count": 4,
-      "evidence": ".dock/stream-runtime/sessions/7809ab9a-c36e-44cf-b5b7-bf8f38de7347/refusals.json"
+      "evidence": "unavailable:artifact-d1ecb64153bf8182"
     },
     "negative_evidence": {
       "passed": true,
       "count": 26,
       "evidence": [
-        ".dock/stream-runtime/sessions/961f9801-0b4f-4eae-bde1-156bf3a1224e/multi-negative-bound.json",
-        ".dock/stream-runtime/sessions/7809ab9a-c36e-44cf-b5b7-bf8f38de7347/close-negative.json",
-        ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/persistence-negative.json",
-        ".dock/stream-runtime/sessions/e1368ffd-31b0-4766-968a-076b121d1e6c/lost-response-negative.json"
+        "unavailable:artifact-f13be9a27d55d61c",
+        "unavailable:artifact-615f6257a7c4ef22",
+        "unavailable:artifact-538479afb385ef06",
+        "unavailable:artifact-17393fabb6d61854"
       ]
     },
     "runtime_unchanged": {
@@ -98,7 +98,7 @@
       "pass": 1402,
       "skip": 1,
       "fail": 0,
-      "evidence": ".dock/replacement/client-tests-20260913.log"
+      "evidence": "unavailable:artifact-c3b47743c3db360c"
     }
   },
   "limitations": [
@@ -110,5 +110,11 @@
     "Candidate catalog is the pinned development profile, not a published accepted release.",
     "archiveActive=false does not establish global native-hook isolation."
   ],
-  "production_changed": false
+  "production_changed": false,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-d639d98ce8b2",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

@@ -278,5 +278,1685 @@
     "baseHash": "7561c163bcf926c95c821838218941596cf1e4f3bdaa453ac3b795bf684f2501",
     "hash": "f1b25423e441ee420987e916f750a196cbf298eeb636f54c74f5243048fdff36",
     "reason": "Update the default MCP endpoint to https://mcp.loginom.ai/mcp for the public Loginom AI service."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/03-text-import.md": {
+    "baseHash": "c7f01a3985638aeeec008affae08be6093698798cb2b6da477473b0cab3c31eb",
+    "hash": "06e3d2db17061d6aa7e9c49631fa3b671105f74e6da3e7ea2d65223d427f85a6",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/04-calculator.md": {
+    "baseHash": "faafe39b18f89653a98c5e461b936d87754753a65358ed82654627635e791fb4",
+    "hash": "7f8bb1ec33435dbaa7fdecd1d19d9fd4078e19719d556940f0ada43abbbbddb9",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/05-field-parameters.md": {
+    "baseHash": "5ee30d74c1d30fb8a9f41824c015cc0439ae5ed3ab7a82dce95185e18a00b1ed",
+    "hash": "0204dab184bf574e42661209f8086000b12e472b6153f166fa04a1db91917436",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/06-row-filter.md": {
+    "baseHash": "207142f6440da43f2b673c9cf26b08871f44c53d71998711be42f64b4571fcb7",
+    "hash": "0a6d09103727977c3e88b6fa3a4664d72cdf296318c3f6fa2a3a7326f65c587d",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/07-grouping.md": {
+    "baseHash": "61348c244bbf03ce4616f77633a53737edad5f12d13cc8b838d1cb945bf9749e",
+    "hash": "18646092d6293b7d93128dd663043675a66c1978621970b34847c5b198552cb4",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/08-sorting.md": {
+    "baseHash": "927d0243b420d1a59d5f744e86c17444e819d3167696aac646a59b7e9fc39b3a",
+    "hash": "151ef86702f485470cd3568f22ddb07687a9011c99839bee68c4b424c0cf64a0",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/09-join.md": {
+    "baseHash": "73a27b40e145d57fddec8a676285e1b2966abd00e408fc625ab4c874fc4a52e5",
+    "hash": "ed5cff5206e86e75738bd6bede7b6603bb4f028b914379424a3a4624e40818e3",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/10-union.md": {
+    "baseHash": "ddd97dcc2278ece49b24274e97465052a0fe4c566b67059eea8f8ab2a074abdc",
+    "hash": "1637ac9407e35a19b673711026e55b13cec0dbe7c4389444f240eb32734f4d0e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/11-replacement.md": {
+    "baseHash": "c70a4e8e7a1c724f0bdac06c1bd697ac89c40b4d2bac1b4804a53be1c60b0daa",
+    "hash": "3ca4e55a0a30103bf7afdd2f124116c18f1e433f47ec92d808c4b90f50472e6e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/12-duplicates.md": {
+    "baseHash": "7fe40ca2688eb91e18ba3b6d9bb1964d3e7ed15bd691a92d791638e3c92e1944",
+    "hash": "8f7038415dd63eac58005cce32a4d969eebfd92437156982db3ca8c3b22607a5",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/13-date-time.md": {
+    "baseHash": "2db65e93b53340b62926e3b8cdb40ba6b911e4469c21d8bb4d6146de63924fe9",
+    "hash": "7de763ede96470b9f1701811250779bee963029727840916c7717e860883e2ee",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/14-missing-values.md": {
+    "baseHash": "1d84c5d9c10ecb057c7e97b45d556cd73a4521017c45642d7441f4f81f44cfe5",
+    "hash": "2586b70cde5efd0a8f5c2b1873e22ff21d22d9db98ceb71e0ecd0a386fdd93dd",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/15-cross-table.md": {
+    "baseHash": "2e07ab69a3f0dceea427d733c2c61b82caedcd4a394bf42afe774f6b03502450",
+    "hash": "bb33f229791422b421524cde57f889a2d531b7baa5ca5b005f21ca07bcd4ebe0",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/16-collapse-columns.md": {
+    "baseHash": "3cd62218827792b3abdc8d8eefbfff1ac746eba8153d8ca507bd6175dd32a1fc",
+    "hash": "a86287777890ea381d462bb29bfe967799d423a68ad65d5fe095883787044c7d",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export.md": {
+    "baseHash": "ff239b41bf6aec19b3c7d8a158ef62252e8958b73fb20a71fb75f5d7759ba43a",
+    "hash": "265bdd6506c64ee80a6d2dcff630c2f6bef57111c2b6714da183d32a6a085a85",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/README.md": {
+    "baseHash": "27f35e7aae91dbf52e5450137ee6d4a1d81bf37aa696d52a8892b450f2e00d8a",
+    "hash": "c5ef7e3779053ac582b09fbe3db23cb42c7db2928c8ae0612595652ccae24ef5",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/automatic-node-workflow.md": {
+    "baseHash": "f867554a4ea1c8b128c9ce1d1a24c9ad490b09236ee4d21a7688efbe8f7c8322",
+    "hash": "8e7af3a419e654996791b4e1b6d8562741f43715bc371aba5da04c0246174be4",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/coordinator-inbox.md": {
+    "baseHash": "1f96748ad77e96ef0eba28bf32737d95889ca904c1d9d07e2a0669aa39ba615f",
+    "hash": "1c5cc288e98c57acfb80293bee9029b81c345fbb77d73a403bc173627e811f6c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/four-stream-node-roadmap.md": {
+    "baseHash": "ede42944befeaa9662e79a23c6b6af0fc2b78eae005f277d7e8ea97cdd3d70e4",
+    "hash": "16611194a603b19e0612dd9d6a1e681c927815bded3fc51cace7104713f72bd4",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/next-wave.md": {
+    "baseHash": "4d38569a9c67085d1d308da02bcf1924a473f3e1e4bb0116fe9e7f8dddf9b4e6",
+    "hash": "92055e48c4ef679ed2734ac3cb956b8b9f2ba01be0419c5543efd2fb631d3689",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node-workflow-runbook.md": {
+    "baseHash": "eabfc50e1b141dc2c4094133d38b874b0229489b69f3215b1d06a0604213148d",
+    "hash": "128be1116a8316bdbf35c7424cf97383284df7b2e9af54202aef347f25c9c54c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/three-stream-workflow.md": {
+    "baseHash": "dac4d8457c31bb34d9d01f8ef79749e4f29c9a543f5183433f21c0970d225084",
+    "hash": "5595e44d9a244cea9a5a780ec7c9e42e7c5ec3289c85ce187c735223d9110b61",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/2026-09-07-execution-efficiency-review.md": {
+    "baseHash": "cf0960c7457576ba2d5ff1b84fd5d2ac971ddeb00195f91617f46c8c1a6a99c4",
+    "hash": "8ed022beb4d6263ac87fe60d4feeaf0fd5af16985b74dd0abe0e34b0f73d60eb",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/accepted-node-cleanup-2026-09-13.md": {
+    "baseHash": "adb4f5dc01d275ad389a79d36a5ce4b5517a9de2e0794e2e47ce6ec05e53d131",
+    "hash": "adc0e38b413f3dec7f74c92d88258af7b2d2ac26f6d5d6dbeab7d3c65b4291d1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/architecture.md": {
+    "baseHash": "7388a00a8f0baf2aa8b895d3b3655142d35ab51c03e1662aa66fe10ff0f95868",
+    "hash": "d3ecfc508d4a32a93f87763dc086e59f0b9ead4c6dcfb711b76f0d8675155396",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/autolinks.md": {
+    "baseHash": "d2360a69a4f9a610c76dd97c933530989f69023a70b8ef6bff9f6b86b41a4909",
+    "hash": "23ee6906c2453afdf10d2ea92c7066f923259cc5c34ac76bda178929e671ce55",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/checkpoints/2026-09-06-before-run215646.md": {
+    "baseHash": "1e6cd372d8e47f1a2953be1e9fe31671db05197f30fe6c7658ef43d067994e0d",
+    "hash": "c829e0b485d920677930874d3f09dcc5908fe632ff85d61a0743bababf913100",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/checkpoints/2026-09-08-subplan03-acceptance-matrix-history.md": {
+    "baseHash": "e1c628ea7272b4cf8cf38793fcdeaa959c840476816d9ebfb1eb14950e217519",
+    "hash": "63b8a6a55887b0aa892151e07cbdb1ee9bce48d84e4e4c4a1b6ae49a42691775",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/checkpoints/2026-09-08-subplan03-before-completion.md": {
+    "baseHash": "e81b329d0bb08c7b0cba48e3a406e3072ce46f5ce4b86d23f5e421d714fff097",
+    "hash": "18e8f54de4b8885216c620a4b389b32500aa3ad1d74ac0dd42235deafe097074",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/client-update-2026-09-11.md": {
+    "baseHash": "0dd945879011651b5a2117556cb197ee28d263db723ee9168eeb04114b1d94f0",
+    "hash": "83cd75844f033726e63f3009858c6dec5a03ae13eef373827fd8dfb41ad2591f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/client-update-field-parameters-2026-09-11.md": {
+    "baseHash": "af1832f22ae9e8360f8df50fbc5cbb0ef3a546255ed783a578dd9a9b605160b7",
+    "hash": "968104f93b70ab91fcb5f3676e9971accd6a7475feaf8c79cf9f959afc263871",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/client-update-join-2026-09-12.md": {
+    "baseHash": "e5b3f6731c396c664e00967e923f07c79dcadf2bef7c3fee58890d154d9be074",
+    "hash": "0ad93b63e6c4f1e70e7a348b3d3df530e10b2c7edb82f003788a22e413483ea3",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/client-update-process-focus-2026-09-12.md": {
+    "baseHash": "a7f2f5bd5b23f5045da778ff254730dabb622215ba8e0286a00736055cca9cf1",
+    "hash": "f3309b1843f76ebed95d5285b2b09da6c7a94dbd1aeed0aeb978e5a42fd36b66",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/client-update-row-filter-2026-09-11.md": {
+    "baseHash": "e404a26050ce59cf17dc009dcbc3ae3ab5d80155659623574d9a95fa1d0c5f94",
+    "hash": "9849d93d6591f8b8916c46de946c296e626b2cc6acfc4f27e9ec8d0782fa1cd3",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/client-update-union-2026-09-12.json": {
+    "baseHash": "8a02532916ac7a7cd8d7a1854cb446adf0ba1bffb19025b2cf6f1b10dd18da61",
+    "hash": "e0ab98c9870f73805d26826674b2b35bd3a83683fcdc2edf4c9bfe5134653496",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/client-update-union-2026-09-12.md": {
+    "baseHash": "848e8374d757f898fa8df5f6a5b637fe3ba9f607f46927af774e3802dcb529df",
+    "hash": "ca6f1459054d3332c269dfd9a0287697ba5c1718fa5c12c3edaa703fbf0ac2d8",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/collapse-columns-development-2026-09-13.md": {
+    "baseHash": "41c85751a6eb90dc4f5e45b2c48b39dc6d4fddd7d2f989586e7da9ce38572a8f",
+    "hash": "235089bcd272883be0ee48534ca7601f45971b48034e745347e9d81614284a4a",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/collapse-empty-persistence-2026-09-13.md": {
+    "baseHash": "f3459be87d9b400a2da3d8a56ede955fc9e3cfa1d7fc06b351b42acb5389def6",
+    "hash": "7e6dff7237bce0542d5cb0a7da317552a71848797f5859ca4ef0da2569419c00",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/collapse-variant-blocker-2026-09-13.md": {
+    "baseHash": "6fd4e7d56af64e8c64acbea8a4a4b2f84910b36de82c7924e8f537aec8ba3c7f",
+    "hash": "f873c063aaa6ebf2c98e2266770f393097d7319f4346fd735a6895a29bda5656",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/collapse-variant-hardening-result-2026-09-13.md": {
+    "baseHash": "e66b5fc58ba555d98f11e23fe5fbf715fe85bd2701e7939310544929d30a86b2",
+    "hash": "79ce9be686b62a36d938b5b60e74700c74b261199dd908d71256a37bd9d9b1cb",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/collapse-variant-prototype-plan-2026-09-13.md": {
+    "baseHash": "41dae28b21384c17be56ecab91e82e9f5a83ec6a02acf1cc832ef1ce53d2d015",
+    "hash": "83db39d8ef89bd902c06fc44d62f2ba531adebc23f76c4d4da2b568b99319714",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/collapse-variant-prototype-result-2026-09-13.md": {
+    "baseHash": "a89da9c7491b0c8cdb8d8d7f0266981a7b8cf49afa0adcb1158d160b21a0f9b6",
+    "hash": "a0a78311c557c08d518adefb8e8374806ed962e2d1e7e1e63baaa1afaf037183",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/coverage.md": {
+    "baseHash": "e56f635420754d4553eb26afebea8794f643b330a6b6e0f39723f7c5ff6d590d",
+    "hash": "930633265340bd136bd67e39f19925c00e64047bf1609abd2f64bbaf6bc2ebd7",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/development.md": {
+    "baseHash": "4b74160eac47a69d4fad099c0697a51362c6d413f990541bd1b968c14e4fcb9e",
+    "hash": "7d9b4ee2648320902e3b434bfbd2793263aef8c6d5fbd2f312150c30fdf00501",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/disk-pressure-2026-09-13.md": {
+    "baseHash": "babaecf3c8f2d48bec7cae23e431bd357f661b5be46ae324ad577a77f6396e93",
+    "hash": "486dc00efc681bd1871325a8d73d206fcef0ee2bd936077d7367d00477797ba1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/dock-availability-2026-09-13.md": {
+    "baseHash": "35a458d2e6e29681e1d670b482b4c02af2d1eb48f2b7527b3158ef330cfd5249",
+    "hash": "bf1e2be40fd1d17599eb4eff7dba3d3229465f7dce0ae40411abcf6596c76bc0",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/duplicates-progress-2026-09-12.md": {
+    "baseHash": "ef5ad655f36cf051a2fe43c106f441ac88b9571d5b6ca547c7a17607651906ec",
+    "hash": "fdcd32d4bf6f735c0d4518ddfa780cd5c7d63b9ce574056345650ce043624c28",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/e2e-source-map.md": {
+    "baseHash": "21174a036684dff22688b813fc02856c09fff56088ee48db138fd122686ab8dd",
+    "hash": "11b313fcf1b2cdce45a6ce8a350a115ce230d01d5c6c210c15267e93ed418e7c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/field-parameters-progress-2026-09-11.md": {
+    "baseHash": "94760e47ab2fb11aa70bf9ec1a4c6cb597d22f52f70e3d24cac685d6b22a1647",
+    "hash": "c633a683ec593dab8406d0021caf388b428f2c98187961289aa6816272167469",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/field-parameters-review-2026-09-11.md": {
+    "baseHash": "268e6cfa4311eb818743630138aee3fc6bb2f418d1dadb04048f2c307a317388",
+    "hash": "c75aa3525955ccc817b0dd5099d23fdede51812c6fbdb0fccfbaa9696c53aa29",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/hermes-user-diagnostics-2026-09-10.md": {
+    "baseHash": "3b78eac706921675c236bd7ac5aeebde19379f86c0651a782de9923e4d764039",
+    "hash": "27bfff5e5ff7c5bc4eb0a470c09a5c290db788dd9e1e271fd2aec6882712f796",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/import-source-reference-2026-09-10.md": {
+    "baseHash": "1a1c80c81e2549251f925e6bdf5cb318f7e2836b00a09654af2c59e5b25060d8",
+    "hash": "7ce2f42424c502d78622cde4157617e37eeb61756b01bbd4578c5fd582343bf7",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/join-acceptance-2026-09-12.json": {
+    "baseHash": "b6204f53f6d1cbac9e8682be37d4e2f688078f6ca866abc8f1b5e04689a8cfcf",
+    "hash": "ecae5e02553dc5f759165a124b8b12ce25b21d388c0713e9f65c714f2167c0fb",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/join-progress-2026-09-12.md": {
+    "baseHash": "d4b41a65a5c3f2f20a4450414dcb8c32283e59e3b9bcae6476fdfbc634b59425",
+    "hash": "6c528201fce7da21e7d0f845b6faab917ddc4f31d7d8fb96ba4beea7d0052ed2",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/join-review-acceptance-2026-09-12.json": {
+    "baseHash": "473ed1770ad2fe9d2003fa40215509aee1082bd1c3ae8d9283e60b0c22e18a6d",
+    "hash": "29c57122f304f107d3da8616d8e4cdd9585b155b97281e86c85f92ade9d79410",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/join-review-live-2026-09-12.md": {
+    "baseHash": "a1a9ae796d68738bb12c681b516cbd5c933eaf31a1014135f7039259f2f35ce2",
+    "hash": "fdeb04e2c6573f5349ab1e8661a32f79286e3c85653b44cf91e912bd85d9e62d",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/memory-enrollment-2026-09-13.json": {
+    "baseHash": "c00824331648292cfef91d2749bb42c740fd441ed5d2f0f40d4758f0c191a094",
+    "hash": "63590c944e868a77ea23c7c6b0c7b3925319b47776b032ea6187ee5f57e0fb36",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/memory-routing-activation-2026-09-13.json": {
+    "baseHash": "acf075a8378acfd405a8a9009018ebd99c026bd15b90caae33e275a357188452",
+    "hash": "31a379169a523d8a6ea044aa0e634bd2552aaed8db778ce41f78a00677600b14",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/mimo-session-handoff-2026-09-17.md": {
+    "baseHash": "8bec1a363f46661e0c134d45aa2eab54b0f8c33e32ff75ce9e28484825491e6b",
+    "hash": "fc4a92ea9455b6e0c3c2ee83b6cb3202e9f516800ef4cfe2f42aef795eb83121",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/mimo-stability-pause-2026-09-16.md": {
+    "baseHash": "ecb824873b12d2a8696c2bedf75a8bf6cfb8b469af34f1dad1e794a6adeeac81",
+    "hash": "4f34740421a8020e8554528c17483f717ec4e579c13dc0f5c52bdc68d69d960f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/mimo-stability-report.md": {
+    "baseHash": "e712d68f4a6c8e4c3603ae1284310c90314a1c9b4e45db6e1ac52084f665b0e5",
+    "hash": "c226d8c04287039fefce24b2430c584ce7d673128e2b29717648c0d7389cab51",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-acceptance5-preparation-2026-09-13.md": {
+    "baseHash": "ba5fa08905962e1a032521ebd7a1fd99e9cb8f06f8570af53da9f55085429206",
+    "hash": "b7a495eed558c7ead7b4042f7b9f228fa4113a412a30256213aaea57640cb1e8",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-acceptance5-preparation-pins-2026-09-13.json": {
+    "baseHash": "9e22f2333ebf72d7907bef485821f399d904871fa4aa456cd5f565ff089cde8b",
+    "hash": "7fc74b67e78e55fbeb02e1ea1c6cabcd03327be6b37d6a64fca4ea508b55e229",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-1-blocked-2026-09-13.md": {
+    "baseHash": "2bac133a3ecf10178582b72d919ff9428760816264f65fb2f5bdd865af38bb9f",
+    "hash": "d22fea31906f6611dfa4aa205ac8ab602845becf25bcbacc215b33e5bc1ace65",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-2-2026-09-13.md": {
+    "baseHash": "927b7f921ab2e24e66df976facffbb813fd22d60915fc3f8aaed5d9c5107318d",
+    "hash": "78e18283ce4e5a9bd0b9d1df2400c803af4fe53f7596328123510fc88437284a",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-2-pins-2026-09-13.json": {
+    "baseHash": "fc5b6868bfe0dd9c03b6d733c0fcef2c39fe9616640132b2e92859f812c2833d",
+    "hash": "1aea8dd1260cd3b44b5a14bd28163b8f791997f4b2405bb7045fc346ed1e049e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-3-2026-09-13.md": {
+    "baseHash": "a9a8701ed8c80f609b92824d0922a9628e7b3e70c404a9f0d418da3c74db8a9b",
+    "hash": "0d848fbe3cbb77071c4a481941cc1180021656235da11497b6cd04342a921d13",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-3-pins-2026-09-13.json": {
+    "baseHash": "ed3c6b4d6cdeafdc079c13e0282b4a49b5c80db3d5eb1a6318b58a797d91b7d1",
+    "hash": "a7f7c1cc99b91eaad6a9fb31d6fd17b46f9c459f2962b87e09b4ed32bdfb0131",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-4-2026-09-13.md": {
+    "baseHash": "16b5e8f1bc7205def4096b58a6dbb4a27ba3a6baf55110db3fe1a71f260e978c",
+    "hash": "3ed0a3c49b247197e3ac2e3c5419be33b1d2de6bb6c5ce7dc588f8b4c447d7ab",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-4-pins-2026-09-13.json": {
+    "baseHash": "709100fb04c30374a37db060e984eabf807c5eef081fb0b54ea532e6b99dd063",
+    "hash": "57951db53bf1498a41712786ad32117fad2de274d714f3a735f70872349a4a1e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-5-2026-09-13.md": {
+    "baseHash": "3bf87f6768279f26b3f66211f8a41cc6aeba609fbdde4e691540a5ef50488db6",
+    "hash": "2d8dd604a2b2a6b18b054654913cb540c535fed56f2c6109a02c57833d57631c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-5-pins-2026-09-13.json": {
+    "baseHash": "a30f100aeb6984beef19230523a576d77091a2503cea442a99e3c8507939448c",
+    "hash": "dee4df3200fd87030e4c53399e4084092a8ac46a31ac4c01929f996fb180ddf1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-6-2026-09-13.md": {
+    "baseHash": "d0e63bc5b66b6f1f0302b116dc29dfd95c64f3c4a3405fde54fa1755a9d28e21",
+    "hash": "2945d1359ae5c655c3809e258ca78fef0636b15a9ac5816176444a76eb1bfc6d",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-6-pins-2026-09-13.json": {
+    "baseHash": "9dd1dedcc4c46df5326b1fd263540575f07c3c4cdfb851b5c8d537e1911a1d6d",
+    "hash": "da4f50137ba406115e089e36b764047fa54960913eda5428a4b8e09132902e18",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-7-2026-09-14.md": {
+    "baseHash": "65acaa820655a1e08a05e33f65fc6652038b2defc4d36b6587e6cf93fb628475",
+    "hash": "04ad4dd50b1729fcd86b8a6398c9eced676d67a9ebe81dbb794c3850d3336888",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-7-pins-2026-09-14.json": {
+    "baseHash": "bde1c3091c061a477ced73a055bd071de5f48a15fdf1b45cc7e33a4b04384c29",
+    "hash": "4a2894683d51be16d43875732f4c2137e22567a4ae9d4c7290411fa82238da1c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-8-2026-09-14.md": {
+    "baseHash": "0d3ed7e3abec6de1b5decf139be5e27f92de6aaf7c2a9b3e9e6ad3064b013325",
+    "hash": "7bcf657d431b02188f4848a78d76f9be0bfafe1e2bee938a97e6e0dbe13abef9",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-autonomous-acceptance-8-pins-2026-09-14.json": {
+    "baseHash": "19005c55d8db5e619ca7c6e616a8f60dca4b594c421cb737f8cc9de86a747caa",
+    "hash": "c28406540c62e2da4aad415b4f0d94af3af98387bcc4044025609f0937f5f5e1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-candidate-request-2026-09-13.md": {
+    "baseHash": "c645ce6884fc1c35388108acf3b5c54e32f8cc7ff88d4e77a9d9198665a655c0",
+    "hash": "8e76a1a4e4543913456ee28d6d9d63636f2c9fc3df08ed9554ee304ee7069e6d",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-candidate2-preflight-2026-09-13.md": {
+    "baseHash": "8fcc0601e840b08d2036f13131299904f7ea1b55b8ae5dfff916230feb6d8906",
+    "hash": "a9de1af58b33d020cf66773e459c87532c4273640fc9ccdcde53c14f02e63b7c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-candidate2-preflight-pins-2026-09-13.json": {
+    "baseHash": "c273666be288bb3e298e0d56376aa47ec6c74fcfb0daa176a1898b1fbf1e8e1b",
+    "hash": "ab9f02185a396f142836470b834c123e65982f33dae8480a0578ef89abe0a9f3",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-development-report-2026-09-13.md": {
+    "baseHash": "2cde24b2fba2108e8f015a947bfaa3d3f3e7b615b35ede60dbc42b3d57d1d781",
+    "hash": "a26dd4cc2669fd1eaac200ecaf98702de18b64fe83bdb89b5c7a6bcb73fd227c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-existing-import-audit-fix-2026-09-14.md": {
+    "baseHash": "11c6e972f819d1808f1f465e2a4f275f854e4b0fa6f2f39cb9795b0c34f0ca59",
+    "hash": "87b23f8c1e440e37430c042a9e714c01ab74e261e4b9318d995811b745ac1b78",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-existing-import-audit-fix-pins-2026-09-14.json": {
+    "baseHash": "628c473d0737377c88220cccce6f6d015e44e47deb13ae0943e4deb6bc77d188",
+    "hash": "725d4db9cec82167f2ebdc21541ebea10713f351440d3b3ff93473a79e8d9584",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-fix-r1-2026-09-13.md": {
+    "baseHash": "ca4fd683e86f3ad12a3088036ee1db111b1e891a692e008b4e3b6df893574504",
+    "hash": "aac39b79d44868733d981a3ac771aa543d2841d56ccb7ee4816f6b31da2e6f46",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-import-layout-fix-2026-09-14.md": {
+    "baseHash": "4949776d3d2b4feb04598cdab2cd85e7bd79883db89eab538bfed9d2fecbbf07",
+    "hash": "610791f90d4fa29ee6aed502ec5c1a391529049df30617b0567558be443450ce",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-import-layout-fix-pins-2026-09-14.json": {
+    "baseHash": "8cad14c74e5a26a62dfedbe067f6a81af59611b387d315f5dc1d0d0811777046",
+    "hash": "20deea534b86506ace089319c1dec3f5002b0c649171e4a33a5ec71a50eb7563",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-native-candidate-pins-2026-09-13.json": {
+    "baseHash": "370d4d4a7e7a2cec39c9a3d5dcb400ddba6dc80dc01699280a8faf7bdce6ebde",
+    "hash": "4a1e3deaddacc66671568b42c2ecd900e6ed473f12d8fa14ba22d5b0c041a8e7",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-native-candidate-preflight-2026-09-13.md": {
+    "baseHash": "345f859e2d5685e66abfd3d362c660eebd6a581d3f7297c8efefc8199b1c4940",
+    "hash": "f5f528d2ef90f0af9b0ddbe9de454302cc799d22e9ab195613f819f25acd186f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-preparation-2026-09-13.md": {
+    "baseHash": "bba11856909d38205e1ce06915665e7d916c3f304aa342df9ea38a9e367a7129",
+    "hash": "4889fb5cc69f4dfa083e5996f3ea0c913a1f9040b19975fa3de2757d25ed82c1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-preparation-pins-2026-09-13.json": {
+    "baseHash": "da06fba95ad044ccdbeb0a2c7032661ac2d76a1ede825d2fce25faaa78c3298e",
+    "hash": "fdfafb5c4c03489097cbb95a628f4becd63865463b405e406947e47f313f7341",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-progress-2026-09-12.md": {
+    "baseHash": "a8319559d072cd1a189067c6b17f0cbfd6f617aab93ce83e476d30ecfa8811ee",
+    "hash": "21acf05d72e9d39fa1fb99d95a50cbc3d180dfb808261017b0c464b3c6435d6e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-recovery-2026-09-13.md": {
+    "baseHash": "53676392890fb31de53c1f9f8fd9ca9b897e40085b4d72bf8d6036f96c634f11",
+    "hash": "93507b30ef612b80a30924d138d0e13efc554f75c89281f52321fbe776672d5f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-remove-link-diagnosis-2026-09-13.md": {
+    "baseHash": "3d54d9bf91dcefc24d189e178d3564fa9d900b41329966ea93484f15872523bc",
+    "hash": "9fc753697185597b0ab680ad351600b14949646126a89c45baafafd68277840e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-remove-link-diagnosis-pins-2026-09-13.json": {
+    "baseHash": "17d9570e47a29b4d13458b047337a55a5bfa98bfec58d30a81819340795f354e",
+    "hash": "98fce67ce58f6e1db14f00a775340a6e55527237ffec6f57e05562c6edc53d73",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-run8-reevaluation-v2-2026-09-14.md": {
+    "baseHash": "4bf5c5cce3d3dd9c261efbe7a5362f91ab9a12b9c168da59327b45405e3bb49d",
+    "hash": "445dcf21c4a3af2f2d903a6a410f03269c44b06b26a6aad87733a5ce307e8e3c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-run8-reevaluation-v2-pins-2026-09-14.json": {
+    "baseHash": "cbfda2f51cb5486d4b837ec5825cc787abffe5f90654c07a5ecb9734a33b7da8",
+    "hash": "4630c9a62054f7ff55a7e18c7418e72e98b3e5de0161b67053aa39a8ff2cbbd8",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-source-selection-fix-2026-09-13.md": {
+    "baseHash": "f8bf006f0a416ae17b6c8911af82c7bf67c1b877f9c94ae6fa0e27840553d3be",
+    "hash": "3d848232f03ee4319757b48f76d0f9bd5a028a76af7ebbdfa1e9af9a71a921fc",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-source-selection-fix-pins-2026-09-13.json": {
+    "baseHash": "f27169532fb343a353cf1f51249d97c3f0661c18a83c455475c7d32cfd3582be",
+    "hash": "f5ca0cab6f72b0d4d62fa5e14e6ac5dc671936eef526dfcd4ed290607151dbc0",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-stale-full-context-diagnosis-2026-09-13.md": {
+    "baseHash": "1b1ed00e0a13ed25903eb35c74574c086d12a11a6194f1b167a123aa4289dcfc",
+    "hash": "2280a5840bdd814e84f94344b1e3f4ce0301f346045044584722af4c361e7e9b",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-stale-full-context-diagnosis-pins-2026-09-13.json": {
+    "baseHash": "b6fa293655cbb9ee6197b0b6c89b3e3aa85cbe96a3666efdb4f3f20c34c20d7b",
+    "hash": "086f2d8635a952904ea87cc592782cd0d3d91eb968fd4eb7c0dbc61924e36f62",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-stale-target-diagnosis-2026-09-13.md": {
+    "baseHash": "f2b1d7e8821452f2790152ed26c302d0e39463fa0058f12cecd94c55b9e89bd6",
+    "hash": "27582e6a1577f9630b6bdb1f2441159170b048baa335d4db613c7e741b8afa95",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-stale-target-diagnosis-pins-2026-09-13.json": {
+    "baseHash": "f5b3b35ae35dbfd289ed630f1de59920969e4532ff39840bdb58abb9417bc0a8",
+    "hash": "2091e418fc486d05ea8f90761c25f43c7fe4ccc8cd12a97e7d46dd689f335a26",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-target-recovery-2026-09-13.md": {
+    "baseHash": "92a02019665aca38df2b107ab95664464207fefc47d4bbe8dd08f22f023b3ee0",
+    "hash": "77899e9357f53e6369abc0b97c45624254834cad3092687598b3244d854f1f50",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-target-recovery-pins-2026-09-13.json": {
+    "baseHash": "4380be2d2139f8b77fd35aa0d9939e2969a46a1f36f290270706481c6055cb6c",
+    "hash": "1699e9b71dbb09d7e6f1d1d3cbddc414d9887b1188417ad8a327b1102d293aa1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-target-selection-fix-2026-09-13.md": {
+    "baseHash": "a71793b84902a842eae2638ee68eac4af3bde155ba9626e7083f380b120d11b8",
+    "hash": "520b742caddf3616e91241d64b9a25762172a4ed2ec7e97927b64571292fa59f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-target-selection-fix-pins-2026-09-13.json": {
+    "baseHash": "90d2523ce17f91a56f13e9b80820f71d9c6db25539a586bb01f22321a930ba4f",
+    "hash": "d360752c1a89f0e26bbb10f38d10c5e8101cc4840c0b83102695d1cc22ade3d6",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-terminal-refusal-verifier-2026-09-13.md": {
+    "baseHash": "abf05e3da1acb66c7ab0df885346ca128cbb664bc5e8c09efc69ebb830ef5177",
+    "hash": "a6384d41e23a4116fab1fb1e08a711ab22440ab2e5c7cb035395600bd566ba89",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/missing-values-terminal-refusal-verifier-pins-2026-09-13.json": {
+    "baseHash": "500adc84a4685aed6e8a71c6f24c0f1977d23e5b808fb6234046a661556f9bbf",
+    "hash": "fa3088606e98094d04e91ab597a206e27af4b896aa817132f5f26f01d797d62c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-acceptance-candidate-preparation-1.md": {
+    "baseHash": "43864564432543bb2270ce821d89d2c0d43bb87cab4e2b5315873a4987c8a8f2",
+    "hash": "f7c3543b0b8497e1e994bbddb575651be35c9397346e03a37246ea8e45c6ba7b",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-acceptance-input-limit-fix-1.md": {
+    "baseHash": "d04bd2f387c2bd7b7856c3d4cc70c5f1d9b927f33a83a14fd7055cd55dd172fd",
+    "hash": "f5a4c9748cf82b7e31667eaa0762281f62a4dd48b26bc7d3a0c334cfb6c662ff",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-acceptance-input-preparation-1.md": {
+    "baseHash": "72e96687de0cbb4b6bb163f10716d7a0c4604db5dad668ce291cab47f88458f9",
+    "hash": "cfd6fd12c726e08aab2faff00370542f3de2b7dc57946796cbc327141c34ae61",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-candidate-live-preflight-1.md": {
+    "baseHash": "b52762a066c392bee9b20640127a8c5048f465a2e290059e91394f5dd70f0fd3",
+    "hash": "c3dbc08469ec93ea43089099bd5f8cc75aed6c5239acf6623def84b48a493152",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-checkpoint.md": {
+    "baseHash": "450e35ee8c99e06207ef31c88ef41f6ea8d1475126e6dfc36f851fe1ba17574f",
+    "hash": "32036363c10b7fb7df557017fe272a34645762a2a768fdea252bd5f189f4a07d",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-configure-recovery-1.md": {
+    "baseHash": "68e7316cc2a2def6ff3c508d56da4f09904b3f529a15fcaca2f68d21c9fd498c",
+    "hash": "ebe6b059077ed4568435179e0ca7104182ee0b59794faaed4d217dc8c0a8dcee",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-development-report.md": {
+    "baseHash": "d6c04bff6342806493732f768fa9282ec389713529e3b89ca3aca0ede648ba97",
+    "hash": "ede333dc41f2441ea8f98aea8d3bac91e7b266d7ab5e6ee30e370f54f0f9cbcd",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-fix-1.md": {
+    "baseHash": "2a8b93e1d49082391fea155f048dde44eb964560f06226fedb8583fa71dab7f1",
+    "hash": "bc72730dfe0553323dd21079d3708bdce5b04f2415da281da2e705a40eb4f72b",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-hermes-full-1.md": {
+    "baseHash": "5a99fe51c88f70c515de45c650123334341a22c2f6cdf2dcc8c22596dbe766e5",
+    "hash": "5867b9d3bdede9bbeefac3edb51d275f842a4213f69e0a650e6402f2b8c49ec5",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-hermes-full-3.md": {
+    "baseHash": "d66cc65c1028512c103ef904402562041e8ee3de5b914e3d15eee0af4ad54daf",
+    "hash": "2935d3e5ee09cbc6513225d72de5f7ca32e12b8d68af010b4ffe76640b2028f4",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-manual-output-evidence.json": {
+    "baseHash": "0f64c53625423d510b4333e7c33ecc5a97ec71bdcd6b53e93de8a913cddd7c13",
+    "hash": "083cf6de11044d4366d5578b2ed024e6faa7c7533088b383e83132b2e1a53a41",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-manual-output-followup-1.md": {
+    "baseHash": "8fcf3e86b41f0f18090c37ad22282c5dd66331d1db45a12fbc0089221ec5ae20",
+    "hash": "27076455b250255fa896cf4ec357752ae42275691e5600751a39b7b22b7b2afa",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-overflow-owner-fix.md": {
+    "baseHash": "f0e36d591529ed7aeccd3c0aa632390e5ffb22ef0839b894ffcd64e8a7441e13",
+    "hash": "c75e54d6d4aef4f3a00a92d4477f58466e491e67b638fb7c70c524b7b0049df2",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-r2-integration-1.md": {
+    "baseHash": "bd11f804d743701633d07ebe0acd87eadf5dd9ddae317cc371feccd82103fbfa",
+    "hash": "4931130aed19c02f5a7634423cd11d8eb93539a596c163d934ef896847e964a5",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-r2-integration-evidence.json": {
+    "baseHash": "234ff3eec89e5b8a7d59b9d5cc2294194fea636f8271295b4428237a23106167",
+    "hash": "a937824b46f301e24d9381de07cf6b15b45e9a73eea3a61534d9bb451a278f44",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-r2-integration-plan.md": {
+    "baseHash": "98bbbef927fec445dd6446b5aa15a2910c11a058c4ebdf180535b7f5b30e5203",
+    "hash": "6124b3565a79512d11ea965c4ada445cc41d2b21ede577f400b2d9a7036a48be",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-resume-frozen-v4-1.md": {
+    "baseHash": "6903c875819325fe45bf3c32213815419493311cd833f50db54704b7a71d0a13",
+    "hash": "ab26efe44254dcac7949ad1cedc44c7461073ee4902e7c0c0f6c6acb48eb7739",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-13-review-1.md": {
+    "baseHash": "a926127a3db7628484b65ab77faddaa92ea5563c62238f6160bbced33ff44a7b",
+    "hash": "b321d4689ddd65f14cea35f6c3d9a83011251d6cd251547113bacd70aa8b34f8",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node-target-driver.md": {
+    "baseHash": "d647e64ec24ad0bb17330932f9b0efea5fed09a7b6273261c7290e931d5e621a",
+    "hash": "8b1d330fbcde746f4bd3ea57b24c382a3e8a6adc583e1f78a7807e1f6d813c04",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node11-autonomous-v2-2026-09-13.json": {
+    "baseHash": "58fdd66644c67dde036f8898261f5d252beddcad0293020c6a2700608a471a7d",
+    "hash": "1786c40a453df6ca257e54e5075a41814b59f92800e3fa8f8556243b34f57edd",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node11-branch-acceptance-2026-09-13.json": {
+    "baseHash": "d3c003af6952e6a83d08a287b994f14511f41ccc3753838a0b6585edd8ce230e",
+    "hash": "4389df9c60fa94e5405f714def48bc3efda4b39e6339e54bf7ec02829971f77b",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node11-candidate-2026-09-13.json": {
+    "baseHash": "3f1654e0219170c540fc235171c8027107cc7fccf930643f330c2d4aa3b85994",
+    "hash": "ddf3294c8955f3b6a379360d7cc7af578f140b1b251b5cc77a14ed2cebe1075a",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node11-candidate-v2-2026-09-13.json": {
+    "baseHash": "9e5f286ca3760424ab7b63f4408bb6a1e0ac4af0012125cc71da1f3f1752a0b1",
+    "hash": "cf4c97a5148b45b63a7d1e2691530fb8daf8e4170335de856f4d3a92014a31f8",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node11-candidate-v2-pin-2026-09-13.json": {
+    "baseHash": "08e5857a230b09587ea0c6b1529c3884448c9381952c04e935f3695225772339",
+    "hash": "450bb892cde6f8bc934f199235e5e73e84ff54fb2d65a2e26fcc613face5065e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node11-candidate-v2-preflight-2026-09-13.json": {
+    "baseHash": "2fa06b36fabe135e59de566fe6023e3e1adeb261d225945c06cabc5bb5aec31f",
+    "hash": "698eef7eae6d335caf47bb21bdbbbab862ebf8f96c1fc97994477c446f3deaf3",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node11-persistence-reassessment-2026-09-13.json": {
+    "baseHash": "2ad79b074f735bb3e720a34983ea4aae1910801ad8957c0b4cd22cceed69508c",
+    "hash": "61a2a2437b451ed16b9dc9a8a4df9cef23d13812662fdc051bac41e47e9119ec",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node12-branch-acceptance-2026-09-13.json": {
+    "baseHash": "87b79ab29ce711b21312ea0d63bd6e401212aa6a3e5779392aac4ac4bf036f11",
+    "hash": "0c64391d6b472845d0ff09f287c8f9ebd38fa98016f54f7a1c9b90d5dcd0f28f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node12-candidate-2026-09-13.json": {
+    "baseHash": "25939542d73c1ec3746693d95fa2a1640033f5068ec5fd41a2a7f30fec229302",
+    "hash": "25424cc24b4e5d678194ee6daab0d965a07d7cb05ee7aff48eedc154977b7d05",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node12-candidate2-2026-09-13.json": {
+    "baseHash": "136284df3686dbccd472420cc584d15b47074b95cf7d997bd4c547f140db9813",
+    "hash": "2543c0775d932b4ef59dcd72c2b69ab997e732c1f6a84f85a2b3645d26700b27",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-acceptance-preparation/admission.template.json": {
+    "baseHash": "d42f54468dbbc77ef85b44be3b78a0780aaee135360541e1563d493aba106cca",
+    "hash": "ddc50bb9a29349fc8c2028a98469f5e342fe06f24b57879480859a538f7b9f99",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-acceptance-preparation/compatibility.json": {
+    "baseHash": "ef7bdb64b42808f095bf45542b233577f5fcbb7750a9c6dae846e100551ef437",
+    "hash": "327adeec008332e353ffc6018e37ea8c7154c49a3ae136e75cbf94d94b8f2eff",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-acceptance-preparation/current-remote-pins.json": {
+    "baseHash": "1540fa2e43d9c1d7f70379a3b5837e589ce59c9c1ed78241eebf9ed733cda9b7",
+    "hash": "8b0f80ba261d5b5280d3026ceb8c3f3d70eb41b296db52be329707612e015dc4",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-acceptance-preparation/environment.json": {
+    "baseHash": "a2bbb9a6222901d7ccaaf265198befc7caef5df78bee9fe62ac19a4b863ce91f",
+    "hash": "d52a5ce0dc4db0581ab5a9fad7fdc9d84e9fd1932fce980b0071ae23c6316963",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-acceptance-preparation/evidence-map.json": {
+    "baseHash": "1fbee7938a4361b364e0fc38b9e1dd3cd238be83c712253e3e7a953a4bc4e166",
+    "hash": "6e08f987bd4eac0a8aa755d1d5a81c59b46922794465594b9f58535682f6fcd4",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-acceptance-preparation/source-manifest.json": {
+    "baseHash": "772f5f873dbe6a95c851e258e40992540e7e3c0c9a24fc4eed11026e5b88752a",
+    "hash": "984bb456062b76133db4a6589a466d11a424a8ea666e742829be6f70979e29df",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-branch-acceptance-2026-09-14.json": {
+    "baseHash": "f8a0b76cfb1081447223435073561b4e6edd602b301bae1a06d6fbddad06391b",
+    "hash": "3ed61fcafd647b839b59ff57cc8ddb53a0d7958b875c29443e21d8d6ea22885c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-candidate-stage-2026-09-13.json": {
+    "baseHash": "971dd54bce65f83d2938dbae94782412fac576e5598f7d2bfb9316cbef4a4aed",
+    "hash": "2501c7b79bac5c09bc5c80aea517c5cbf4fff1ea2d216734cf6b00e9d73a27c7",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/frozen-v2-timeout.json": {
+    "baseHash": "0dcc76e610c09992cf72aac54ded47729bb898465c2eff939f49db7d8b0da1de",
+    "hash": "29be522213090e1c963c6f39cbaeacd4363cf0274b46dfc60b10b69535f4f380",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/frozen-v3-done-audit.json": {
+    "baseHash": "c777eeed7a9a67fb2e2d8087eb843904edf4122cb25a411f098873dfe6fd860c",
+    "hash": "720b8fb4e076c4763eaf401280d1e9b936b6c125a0e67a17faba05d2e9ef2014",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/frozen-v3-resource-pause.json": {
+    "baseHash": "b57d4e57efb591fac5c2cf1a2baf04fd699613f1002e0e689c42373eaa880aac",
+    "hash": "f9dc8663717201de39c58a289188800fa2971bb6dad27b9aef811df07497823e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/frozen-v3/manifest.json": {
+    "baseHash": "559878c246e360191e76c160e800359783b38cb58f12e74b9a6eb08e451fb346",
+    "hash": "d47e889c7cb27bb4b2ca2d0bbedcd0e57dbb4fe431b9c8041111831db7560c00",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/frozen-v4-evidence-packet.json": {
+    "baseHash": "583dcc5e448f0f7df5380f58b2aeb52b2f367993d08d5840029f5baf0a66e4fb",
+    "hash": "1809cb2a4535b13f7ac3485693f8bb84d087442255976dc7ee78d9608c15e48a",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/frozen-v4-public-schema.json": {
+    "baseHash": "ac910eb4f021149ba7c11204255cac0be252cb0ca017e646c39d0d9ff38c3634",
+    "hash": "aff2e22530c0b02d7075eca05421672a3dccbdf8ac9856187f25e21040e4e495",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/frozen-v4-reassessment.json": {
+    "baseHash": "caa43cd496595124b27b7656e6ed56d902b353982d9649f090da9d21835fecd0",
+    "hash": "9ae21140a5f9d3d58fd5f0f3c54e0c05a519beea10a89b420ed408c8dd5ff9ce",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/hermes-excluded-request-live-diagnosis.json": {
+    "baseHash": "4a2d7fc1269083eb1cba79aa895905e41dcca900d027ad7282d8f2c2663022f7",
+    "hash": "834a5e686d76526532299eebea22bf58b13206b4abc6f6a5f10e3f6aa87ac0ed",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/hermes-full-1-failure.json": {
+    "baseHash": "b8d17e52cec75a58912d34b97d5d6609548941808d079686a4a3c3ade63877bf",
+    "hash": "652f4af768030a3cb83dddff51c32be9dded482a7779f2fb1360e163552a1494",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/hermes-full-3-audit.json": {
+    "baseHash": "2dbfab71d920da39026e401171fabfbeab4e21d7696767a14652cb518b501f7c",
+    "hash": "1ad5e0bdfb1d09d0d6202730fb2a2a5e41b92b4bf5db961bcf3bfb80be1eb2bd",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/hermes-full-3-summary.json": {
+    "baseHash": "8c1b6fe05f5537175f83bd15cfba0eb65ff68be163e38c9daf05253ba86587a4",
+    "hash": "6edccd7b250eda11203fcafa70d167588f9aeb4a49162112a412bab3880ac5d1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/hermes-prompt-clarification.json": {
+    "baseHash": "0ca9ed437410deb38f525a7f9e21ab0069456a67b1d64e0e16895a2170d54b68",
+    "hash": "24e3ad1b47c63ee8ffc00e98f353d188f670187886a4ec064d3466f09765c88f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/overflow-persistence-audit.json": {
+    "baseHash": "62fefed98d7b63a1b6c9c59ce841b95dbd4af1c385b2ed698ac5a1408fcfe347",
+    "hash": "5293b7b0502085487c4e41d9ac98caf15deb3d253637e4869ea69d1f6e022dd7",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/overflow-verification-summary.json": {
+    "baseHash": "bf8dc3f0c6909292edf0a9b3dc2c96ee7cef24b71591c395a53ba82b02e3bdd7",
+    "hash": "a8744172ac400e5b2fcfd71904db589058b2aa2bf7eaa9deb8600e31337b5665",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/resume-v4-full-save-summary.json": {
+    "baseHash": "8aeda15e40e861400e6e8f9609b3dd38321f270f9115db101c43079392d85e1b",
+    "hash": "89e0ee89e7bfc2b87cfb89142150e28ce2ec77f6ef3a83ae3366db9d2f6fed28",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/resume-v4-reopen-summary.json": {
+    "baseHash": "9b9b0a883d186e388e2f57d38f84243e1177a6ab2697ee9c6a8bc7e119c2efaa",
+    "hash": "8e10d2ec6620d173f1bcf3db4898bf212f8ea5a8b6815de466a8128a572017f6",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-live-preflight/resumed-journal-prefix.json": {
+    "baseHash": "a80b364aa0199615e3e1dd914a7035e6a23719bfebc19b1bc0d79b5651c72f1b",
+    "hash": "fbd2cde940c608167e46833ae1150a3de41cd6e1e9b6441c6da1fea008e4a5a0",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-r2-transfer-decision-2026-09-13.md": {
+    "baseHash": "ecd8c5deb5ee43213d2d0cb6cbbc617a644c11100b3a65c15e7d47b93b7a8d1d",
+    "hash": "051eb8be6c15d76ebd96aee1fa46bcc7ca07b183b517c8c5988a189b7e13d6b5",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node13-read-performance-2026-09-14.md": {
+    "baseHash": "8636baba8e0ea19b1d76f1b84e63ee17b2cac9668f18942ad9f1611ec1eaf915",
+    "hash": "45c016c18d332c973285c62b65f07c7f3a6ec42d0983c1c635b8ed2cba2f263a",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node14-branch-acceptance-2026-09-14.json": {
+    "baseHash": "ae9cd32e1f0753d92d2efc0bb79e5df4d6099bf597377aec3b926815e5f460fe",
+    "hash": "b558ede08bfdfdcf4ce7cade19844c0b500411ecf0f1588f14be79806cfa3a4b",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node14-candidate-2026-09-13.json": {
+    "baseHash": "fcd1b1f3bb227476ea094e0616179e9943e1e2da3e15206c753ac7c1ced07f46",
+    "hash": "4c609ad06c27b5f4b0f8237c2aa957b22c2a338676cd6a09284c85222cf65f19",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node14-candidate-v2-stage-2026-09-13.json": {
+    "baseHash": "9c96f7704b2cc578e50a33a583235c060d80a597415c94e75b14e1cf6225e229",
+    "hash": "10d5b0244d89dfad868ab80f81d3e57f7771e0071b75c49d09d51401eeee1a67",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node14-import-configure-followup-2026-09-13.md": {
+    "baseHash": "0c8cfc5736bdcb8797bf7fb4340a3804e7c5ae1093c87dce61ffab465de5d2d6",
+    "hash": "4a239050aa08a91b3a216d727743ca092e759d8663086ddece2feca5b7d18524",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node14-import-configure-followup-pins-2026-09-13.json": {
+    "baseHash": "f5fcee0d0c94691396672c50e42cef7f9070e7373c0f6503ab689c4b3d26f9c8",
+    "hash": "27295e2a7530aa5eaa67ec9d7ac9940dddbbf79c38dce98462e4bf9d5ff66d4c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node14-import-placement-refusal-proposal-2026-09-13.md": {
+    "baseHash": "4ca85a73b6a140f0eb9e810ee4c94e152cdfa9067feafc1470f78d0687314898",
+    "hash": "df9375537e2d86b08e10f5e7ebf18b756aeca98d53bee86f239664fa7233fb6a",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node14-import-refusal-verifier-2026-09-13.md": {
+    "baseHash": "cee3d9e900d85a5d9ae980c74c117addbe9b798c9e26d3fe74e22f8269a8ace7",
+    "hash": "bc9abbb1be069e028f7b801a49d21d2fb61311ee9a9c1a6912adb799724d8553",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node14-import-refusal-verifier-pins-2026-09-13.json": {
+    "baseHash": "386c702e2ee6f6096ddd337c95cf1632c1be0f7b1854112e013179e9d5c3bf0f",
+    "hash": "16ed03f104348931376ab346761cbfd02f62ed184e95198300ab77db4868dca1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node14-native-preflight-2026-09-13.json": {
+    "baseHash": "2075ddbd789a915df30fb281ba226d3bbd00f9358ed501da501d1ece43081f1c",
+    "hash": "0e25c9cd7a065e0477dbb853d22625fbf4af9f6e636e1df75c1316ce9486bd89",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-branch-acceptance-2026-09-14.json": {
+    "baseHash": "8d75772b3b44b669b828aced439d3dc5443a1bbeef21ae0d0942c9654ea9dd78",
+    "hash": "6d6c1f06ccd0e66712e1baa1d0c8bb43d4f0fac5487e8c426322535059f4417b",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-exact-wiring-2026-09-13.json": {
+    "baseHash": "62bc1ccf56596dc79e879a2d051033ba957199f52311e1b3b5f02054372a7593",
+    "hash": "4f19fbd3783e7f99604e296dd509b4ea501b8813587442aae4980ebc888ecea8",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-exact-wiring-decision-2026-09-13.md": {
+    "baseHash": "2f57e1fb06869dd46bb32a6a4c49dc8d0fb69c766b35048204ff986d7c9a0cb9",
+    "hash": "4cd08c5874fe284811fd52ead8f65a28bc980cc586673edef6249e7c33abd642",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-exact-wiring-progress-2026-09-13.md": {
+    "baseHash": "6854d329c57c383033693b0e9d53d407cfd5fbb486ee12adda3b15a793211311",
+    "hash": "01c0866a6029d6caf71651f0342c787df86affcbfd3433dfd5cece17789c86a7",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-exact-wiring-result-2026-09-13.md": {
+    "baseHash": "d68591b191c4e2361173b62eb1f4c99f2f84f81944be7188f188f0293bbfb09e",
+    "hash": "416114f89c60f5260bed1a6bfcc15864b2b2566ec81f48dd9c778d0ebabf1ea9",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-final-acceptance-2026-09-14.json": {
+    "baseHash": "7b98c72bee30df70a3d105221968b92e813dfda7b20464e486e2a088a707ce17",
+    "hash": "f3d3143872bbcd795bc1b75011c0586a8b89ff0936af634232813e0c3c4207c3",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-final-acceptance-2026-09-14.md": {
+    "baseHash": "f3031dd06812743af144d2bd607e29abf7376ef61d81b757e571a1e05bec1b73",
+    "hash": "6317aea8dc96cb3e0d0da1ecd3bdc071b3f19f7172632ea670d2912339f3e3f3",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-hash-fix-result-2026-09-13.md": {
+    "baseHash": "55893a170d8639593a6ef38214527874ef8f9c6c18f90ff2a3fe3f3fd190b0f3",
+    "hash": "655d47ffe71e316a68b991765682a605d508f89a8c68260c8afd712d43490422",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-native-gates-progress-2026-09-13.md": {
+    "baseHash": "8877fa1158b858ad3bd463a9ecb6f1c67975bf9ef62369fff6969bbb24fbb7ae",
+    "hash": "86189cbca81a5cd0ae99f2596918a4551bcb00b64002bdfc9e6c8ecb0e36423f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-review-fix-result-2026-09-13.md": {
+    "baseHash": "86ac2a15cb07001a95890763c0431bb800d8ff1ad372cb24a35075421ac5e28c",
+    "hash": "35018655bfe3898085cdaced8500cb1c3ec68f0b9c1923ca51673fdfd4bfd5c6",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-shared-memory-knowledge-2026-09-13.json": {
+    "baseHash": "83c2ad47888ee7eaf0f7830071ce50063aef98ad6a79532f32235ea0e2621a54",
+    "hash": "a793dff006e4fd370eba86893830eebbe707ad333703df83f373c5e473da4197",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-source-replacement-result-2026-09-14.md": {
+    "baseHash": "2dbdbdbb257e2641276b5b676b1b2c6168a5ea68336087fb729307f07d2275d7",
+    "hash": "43a2b75b20c7cb6fba0191f1f1c93deb520963c2f1c1a400cb9cbe855845816c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-start-2026-09-13.json": {
+    "baseHash": "0439f3ac7a8528146a1a6e7ddc549e3ba7eb4000a0fcd29f092b0bdf6536ee78",
+    "hash": "fdf35f2dc734fc6d029bfdcdb19b416ff34c48c7723d1d9ed262aef1ec8980ce",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-variant-contract-design-2026-09-13.md": {
+    "baseHash": "27f2272c270404af6124755690fa9697f9dcb2bbdb57dc2254be652591291d71",
+    "hash": "ddb41f83c20c39ab5a5b6379220aee1ce8d829e86a43fd76b10b67d432143ab0",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-variant-contract-next-step-2026-09-13.md": {
+    "baseHash": "144d10bfc3bc550b768e21b1afb9e392f61dca953df186cf20f9d5ea836e774f",
+    "hash": "77a183729341d17b8772947c4789970760c7c5d66c737a071c8b51a559c883c1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-variant-prototype-decision.md": {
+    "baseHash": "fd02213f9831be8a9b7345e44cac66a6b82364b81345a69662775ef9b3b5e64f",
+    "hash": "49a1fbdcacb34dc64ba5152ccb9883633129c618b8705dd2775ce3c9aeafeffa",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node16-variant-reader-checkpoint-2026-09-13.json": {
+    "baseHash": "1ba169738e9fd8191ac1909f4ef3fb0fbb2272d97d7b11fe40eecaf3fd662bf6",
+    "hash": "777a94af615c0d4ad1d166a4c66ccef42bf8fc4082c2f254959453a6b3ca4db0",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/node17-branch-acceptance-2026-09-14.json": {
+    "baseHash": "959637abddd0952e3a802894f60826a8d7f2626eab220be7a2c24d6fb80b75a8",
+    "hash": "a8dc50b3a363126fa0cb779f9338e2722da084ec4c0e69e119fd24cfe3d3d2f6",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/p3-import-viewport-review.md": {
+    "baseHash": "4ddfc12399223add790b799d89803039188c12127ae6f02728059185e3460410",
+    "hash": "7a42b1327dcc807c0c299e835fe3814520dd1e8e0d08b4efece0a5b34c068fc9",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/p4-managed-shutdown.md": {
+    "baseHash": "fc0f9e068807c23334a2161693f9de33d564334cb947aac9f04f4b2a60821c8a",
+    "hash": "58dca9dec5009bfae00bafee30410cb4fe0af662016430ca933c53bd33a06192",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/p8-source-dependency-review.md": {
+    "baseHash": "982f405c3aa824a1495f30e251e6fb4da3d450963950cc2875971fd1f387a89c",
+    "hash": "dd15b7882599a06f2c732330fc6d96514f53fd9ae14c839224596faac357991c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/parallel-node-pilot.md": {
+    "baseHash": "2a8adc90cc54131e1fde3e1096e9f84fe94aedeee0e44a49820e6ccbd25078ae",
+    "hash": "a1ed2f2ee67ff028ef7833563a09feddb458ebc645e7e0c9899b945f0b2b3172",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/pinned-ui-probes.md": {
+    "baseHash": "bf2b7c04e1a92cc41dfdc9d3303268cf7ff6b8cb4fcfa5c722d424763527940c",
+    "hash": "4e39ecdf2fe44a5a61f128259f99d70d62b9aa8def7cab612829598a59e85268",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/process-node-focus-fix-20260911.md": {
+    "baseHash": "05adf4d253c30ebdc850e0c3f45e7a7b0dbc91c4285a3f80784bcca572c3840a",
+    "hash": "97cfead6da7d8b8d37caf525b04b2172d962f4d9b67016bed24bc9331c7f9c11",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/0.1.0-rc.5.md": {
+    "baseHash": "22c7f8aa5e060a1a39de764774286f4ae1f116e993f2acb34c82dee83357bd7c",
+    "hash": "202e672902471b96228ed05d409bfa52ec949269d610a78308fc1c718794c99f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/hermes-session-routing-2026-09-15.md": {
+    "baseHash": "34311a3a20040627099a12974971d56663b2693e3f5e311f79e82348e92879b2",
+    "hash": "6d86428f37ae31a09551762218efa9ed4fb28d1bd98b7dd50789128aad9e8d01",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/rc-combined-verification-2026-09-14.json": {
+    "baseHash": "27a13329e4a20817fab8c5891410b9bcb3d3e20cba2a697425a513d674baec60",
+    "hash": "836681494c2ca5b63a5b6b424d4b360dcb7ff0ded373e552e84be746a8226203",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/rc-combined-verification-2026-09-14.md": {
+    "baseHash": "2c4683ab36e5e4c61ff573146fb4192b6c6445117086a79f895e9a8ed0a84da5",
+    "hash": "b0e17b936ff4efddf703617324f58bd9b80d679f228228f101cb1e597ca79aea",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/rc-integration-2026-09-14.json": {
+    "baseHash": "16d7055cc7a45920ea45705e62f775863e7a8d5497ff60f2fd8b0e17cae0d594",
+    "hash": "7721bee2485209b9d4dd4ee2b8a8eca414d96effe90743ef1afda9fd3dad5ad1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/rc-integration-2026-09-14.md": {
+    "baseHash": "14d17545ba39a4cbd3ab879f99a99ce90adce322ed8e32d76c276f9f75823da0",
+    "hash": "dae47560e20927da08f64cb5378e3a582c8b12089350b59c0ed1733ecb625fcd",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/rc-package-cleanup-proposal-2026-09-14.md": {
+    "baseHash": "e4da14804d845a6acb10b489cafa60cf2dd51f938ac3ee962901d59f5ab98e50",
+    "hash": "8c46929179ad5f730a25d85aceeb10dab1209900a286457d3e1db55c92e08a05",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/rc-preparation-2026-09-14.md": {
+    "baseHash": "3412da03ad6df2c6d445ccab07bf86169faf11994cf9c032dc7a636fb8d1936d",
+    "hash": "d7cd2d72e1df59891a8e673d2be431646a185987650f122514cb7cef1e23d752",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/rc-public-installation-2026-09-14.md": {
+    "baseHash": "88d425cf0fc6115d1aec436a5d5acb5e4df7ff01fa65582dcd985015f5772c99",
+    "hash": "c6ec7bc6e8058e26894d4bcc0b00caf3224c2c1f84614e9c954e459dcbed0b85",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/rc6-release-2026-09-14.md": {
+    "baseHash": "16c57b1594d728812b1b3dab627b255a058ff64a2e83a28c60f4917f679fe063",
+    "hash": "ba598ce9dea256833c18faa764b6aa236332afd63e10465e8838ab88dc1ba2df",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/rc7-grouping-preview-2026-09-15.md": {
+    "baseHash": "3c3de28ee23205b1347d052fb67d6b842282183691cae1b793c382ac1bdd47da",
+    "hash": "47e4d0af7dbb1692a315cbac991e5efbd432e4a8486d504f9de9a3dcb5083d7a",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/rc7-release-2026-09-15.md": {
+    "baseHash": "97549aeef55079567ecda5e62072d232df8d838cc27021f6563469f6f6beb046",
+    "hash": "4ed799fa9ea6739e4b996ee318484f807b70eab193ef7d138a0a079069ed66af",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releases/rc8-release-2026-09-15.md": {
+    "baseHash": "a40eec4d804f20852c2ecc6ba3d1e66ca861885aef6f6e5a15e6a0d14ef62b7e",
+    "hash": "c16e480ace10c99d6e6d6858a7a6eabe9337cf90a385cd9baf73d85917b42c5c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/releasing.md": {
+    "baseHash": "b2ade3a92df9ef6229613b5211410b5a7c480d78924b78d0a6144e06be6e15f2",
+    "hash": "c06efdc68dfeec3365efc7daa5c5eae6edbb872ea2694f96e41c8e23aac96934",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/rename-recovery-fix-2026-09-10.md": {
+    "baseHash": "dafe84fb440a7a611d8dc74efddde4061712f08e4513ed4460faf2252221656a",
+    "hash": "ff44614ae05bcdf5c588eee4f1e1845226d4fb9f79e37e3665a639a6f6e0d7a3",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/replacement-acceptance-followup-2026-09-13.json": {
+    "baseHash": "af403d7645f7f52b7495669fee1a2228c93634971c9d4e6df6544c798bb19998",
+    "hash": "db43fe65f958bec642ad8e443a742ce8a963e32c610e8f40f34cb124852084d7",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/replacement-acceptance-preparation-2026-09-13.json": {
+    "baseHash": "8bccc8ef004f028f4abc02d516a7f5c92fa0d556d8387037ff3d70eb519bd3b2",
+    "hash": "abf1439096f67265ae7e59e9dc174f3f5fa7c1adaa8f1da2593b38b0aa9cc7a6",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/replacement-autonomous-2026-09-13.json": {
+    "baseHash": "b0fb4a934c7cfe289bd1e825760d7acb6629390ebf7cc13886d558d8bd7286b4",
+    "hash": "2c77a07fe0843d3b7ab84f28e1ebf7e8952958fc539b9541c537b5a3e63368c5",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/replacement-development-2026-09-13.json": {
+    "baseHash": "91a0b0e65d42f9c1a48ede14e820071e19c3b7fa5660a7b46342e0c1ffcb2bf6",
+    "hash": "6b237d2a96daf599933a9ad1981e32fca871c51673f543e29c609cdcc66c1cd4",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/replacement-fix-2026-09-13.json": {
+    "baseHash": "20b8e42f44ef8ee8b55ab192232e237db370597592f96d0348de501a1b4e8450",
+    "hash": "124c71ee407c0e0d1910ec9448230f19bb2cfcdb9db85e6d82991cf3bcf4f160",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/replacement-progress-2026-09-12.md": {
+    "baseHash": "c117d805d8a422c6222650c10a95bbf4c1fc1c90a252065eadadf9bb4e83489f",
+    "hash": "6681b49441b5773ae0e250a1771d125910de654cca70ce6f176f2578afb1b448",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/replacement-saveas-integration-2026-09-13.json": {
+    "baseHash": "4f65999e9fa0500b6ff31820736bf3711d3320c557828cc905c7f44ca6287b02",
+    "hash": "f391ff69a1eaf3f327d27688abd5fba9977603e5b4cbc9a7c7c5643c213dade1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/resume-checkpoint.md": {
+    "baseHash": "f1a570ba0cbe4a629bc89209a53cb63021900d0ada94d9c49fe29f7668c3fac3",
+    "hash": "4f42b44cd726307f8e4429e1ebb59707b5f828d570adb3c8314a4962532af528",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/review-0537cc2-2026-09-10.md": {
+    "baseHash": "34488711fa8cd84425a043cd90cd07136cb829aeee8092eb8d8718ffc4cd92ec",
+    "hash": "c013aa9943c049de26465faa6a59bb870ad99b6fffdc3e11983459993b8ade7d",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/row-filter-node.md": {
+    "baseHash": "ad75317701933261341ac870ba28a0e83856d053ed0b209726e908c992651a53",
+    "hash": "8a019db46d6fa96b69ab80cb3510ef2ae60b483a17621f2f11ed2a809861c7a6",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/row-filter-progress-2026-09-11.md": {
+    "baseHash": "b5a24b09cc96020b45c5dfd9c1767b0386b237431aa5055dc83654c492e69e58",
+    "hash": "3b779ae88ea67b55fff212fedbe33d947536fbbf87bef36d2ce452c235336c26",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/row-filter-review-live-2026-09-11.md": {
+    "baseHash": "6caf7124126df448c4a08612302f7824e1c649214de2e7dc9e6e2aacc88b5e96",
+    "hash": "9008f734eb9500f7ed26ebf4bfa99a2a7b05e92582c1201bcc1875d3c4101ea5",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/sales-followups-2026-09-10.md": {
+    "baseHash": "6134b8b7c5a220e6495e92e62ee1d8a3828583572e0b58fb740f2d52cc096351",
+    "hash": "7bfbea8293cafc357c1b528a8f12e0a5c07c72022c3474a5ca53ac46262a0f32",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/shared-project-memory.md": {
+    "baseHash": "6d58d465f67b753d6f6e1b969535d336a92efeca6defd59bac66b0bfdb801840",
+    "hash": "75359166d18e168b0e1bfcc0f5e9c88d40f2565efbe683abb34bc125a62161ac",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/text-import-node.md": {
+    "baseHash": "d0d1a575bafed12562da0e1c7e77930e7bbc37d5363807f1728f486205634fc9",
+    "hash": "d6b75fdc79a66054e609d52f8591ea980df10c37c67fa3deb667a09d5bd61fcc",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/transfers/node13-r2/README.md": {
+    "baseHash": "24050d44f86ab708035acd5fd370899b325b9d018b03ac436e43b936cf422c7e",
+    "hash": "f7d0aba653d228710749129f723b85ea88b8f1ad105a5d4211aab6a51d888bda",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/transfers/node13-r2/manifest.json": {
+    "baseHash": "abdaba2526eda60759d07770b86c9d8cab0cf5e3fae042a462c03d102e78f15f",
+    "hash": "a759e6ae6c9000b4ed9fff47e0938656ef5636e7f5877ff32c568f06dcaf0ed4",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/union-acceptance-2026-09-12.json": {
+    "baseHash": "a4ac6850ee196c5e5d35f2ae24695e40956b44a7c1e14e28a29a124e37212b66",
+    "hash": "b0e65e673cd46f162cd06992357ed31c0d126f1163411593e2e0acfa001e738c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/union-progress-2026-09-12.md": {
+    "baseHash": "974e104f543e683bf1dcea637ddf3ff030c0bbd4a25898d9ef4252c012dbf1bd",
+    "hash": "2bf5367cfa1d452c4396bc2bb9ce406944540e77a34814f9e416b6ab73c5c833",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/union-review-acceptance-2026-09-12.json": {
+    "baseHash": "b29e6b9ef85dfc3cced06f03cdb45b67c5bd83297e62e7a9ec0084846c2df677",
+    "hash": "78d6f0a893bf9c3f8415cd16cc453fa43e8b34d0e60cb4914a4a517adbc6356c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/union-review-progress-2026-09-12.md": {
+    "baseHash": "f6d72e88b758c9c1b68360dfad1eae2d6a283f86f6e9ffb0008d62ffaa2601d6",
+    "hash": "b4041e1bea7ac62d39b144daed0eabee1aa238a4b353d83b757b4bfbb69a6997",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/user-sales-trial-2026-09-10.md": {
+    "baseHash": "9cbcc97bec8c5c442a12aede4a1a9f972aa45a07e53f4a221de67d47280bdda6",
+    "hash": "7e7c82072a72406ccb6e4f548a09e50ef9a098af85a2cc154677d0a91dbfa16b",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/windows-agent-install.md": {
+    "baseHash": "790001d80ec40d3c540fa168cf1de9b427982b7483a73d9d1cd50d2224246ee7",
+    "hash": "f057db3877189f6e4e79c22388ae4c580ff089897862a7bbe94ff67fc72c849e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/workspace-preparation.md": {
+    "baseHash": "55cddee240a359fc9aea3d74364b39cd14464f7ec5b97dfc2c999510ed87003d",
+    "hash": "22d19e58e26a993c726c6420a06a0a6d27e790b422d12628e8977f10e6092838",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/2026-09-02-loginom-dock-implementation-plan-history-through-2026-09-07.md": {
+    "baseHash": "6a5370e3516f2045a3188671b2c3dc4ab09da7c74c25d95e6981a5393133b3dd",
+    "hash": "1ad708ec08713f05294d0314528b15b138c89f654181b914066b5423f6c5dc99",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/2026-09-02-loginom-dock-implementation-plan.md": {
+    "baseHash": "4f4c4a6e00e4c21278b778baca2ab8b2eab6dc02c6be0858aa62d37127996c79",
+    "hash": "7e9e6ad423d7e9f3f647bc565031c8bae8d80f624a21df3e7d46e89ca0863a4a",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/01-open-loginom-draft.md": {
+    "baseHash": "0a03d6f078b11afcb6b467485512abc48d68b6b8a2a450b343e37fb0df4685c1",
+    "hash": "8bd7671a446af7f4142b4a5cd7347e2d1358e012732738248ea1e5b089e35f2d",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/02-add-nodes.md": {
+    "baseHash": "deceb132a82db14311a06b4c776053a714a5f7238a68768de32b1041d82d57de",
+    "hash": "643436ac1baf30d559fb385ebef2a8ef04259e253e9f5c9e7d6b4f7fc01d1c94",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/03-acceptance-matrix.md": {
+    "baseHash": "c5b9668e94d02a7874afcc58cc74a2c47bee6f33becf14ee39cddc92e3711687",
+    "hash": "a041c92462f487e0fad6e67413e1a3cfae452bb19a2766b679e56bb7fd453075",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/03-completion-audit.md": {
+    "baseHash": "fd6c9b9880e3b35e381d2da9bc56f04ef0105c6103f7ce91deeab6778a17cb6d",
+    "hash": "a3e86233e1422934f5c041bf5246fd5a99dac262579d474c288da7040b59e26a",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/03-review-followup.md": {
+    "baseHash": "5767c92a1ab434a79df6d37559f0f213439fe6278e9936365ad0e8220a0e3f5e",
+    "hash": "29d69db6548c4d7ab006b8f3799789cf11135be423d82f69e1862ef1d3801b50",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/04-completion-audit.md": {
+    "baseHash": "ad537946b6dd0278afa73eff613f7cd7b7f2d39c458d509adc9461726a7b424d",
+    "hash": "dba08a44c8ce89550f7a8d41409d30e87efa141595a00652e7db1a05864aad4c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/04-progress.md": {
+    "baseHash": "9c5fbd38c280356b77c04bc5f8eb2156505cf8be8d57c1d60503fb9b64941149",
+    "hash": "b3c7e3e1d1840f7dea2faba363ffa4960891a55842a6708bc7ff2aff0b085aad",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/04-review-followup.md": {
+    "baseHash": "1917a90daf82066c911678e34c190004f31d843a87470ad42745ed3e5bc28a7f",
+    "hash": "234072ce8f6b84ccbf93efc23e9cbf912a3a5fc7ab73fd108759704dcf36dbed",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/05-completion-audit.md": {
+    "baseHash": "b8fc6e1d13f3b9d1793839914c9c9dc57a2108774b228b6deea44afcd88b1a40",
+    "hash": "b9606e60e4e3bdfec13e32b76464e521c02d27e0af8ad8a9c687bad6cd620af4",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/06-completion-audit.md": {
+    "baseHash": "b7df106c9119144d452311ddd152057ec6c774b9301462606c831766d1eb0049",
+    "hash": "d3393a5bcaf5d19186969b8ff0b3b05c4e08a38d11fe663f41c5d62cffea2014",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/07-completion-audit.md": {
+    "baseHash": "cee369dde4f852300c37301a1ca4951f067a0fe1a2ee27cb47c753204b974c7c",
+    "hash": "53a050da0079f96a0e15aa172c05c95cdf6be4b72c5d4a22100c534d26cd9a09",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/07-progress.md": {
+    "baseHash": "f77b873d0d3c9819b07216923aa0b16af7cdd61a4d67f2e8485c8e43fe0bc300",
+    "hash": "9fba85fd0355a10ea81989a0e2ccf9d231780b963cf79c691254d22a61570101",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/07-source-pins.md": {
+    "baseHash": "7fa08c0252ffd79fa448bb89fb4097f27d1a8da99133163863247a93ebe0d422",
+    "hash": "cd21666cbea64d517058b0702bc36c8806176da1937b38a0c5c1d1ef75ec9346",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/08-completion-audit.md": {
+    "baseHash": "e8a5df1dff94052fa5202e33dc037b0e60aed8c653d57eed7929b5d8dbc32554",
+    "hash": "78230d7b4ad62950e8242305bdcf1f913caf5c91764890bc3491d8de41a41537",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/08-progress.md": {
+    "baseHash": "2a2b28d83306e6481b64d663384e1719822353751ee1ad2cac327fd0092b10e3",
+    "hash": "927f7fff4774ece724562398a312f6dfccf478f197685561aa59fc6ed61510ba",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/08-source-pins.md": {
+    "baseHash": "1be284169d06deff3fa3392c006f989164d36297b31851d5ef7f2041a2d663e8",
+    "hash": "1931c7105ab8cba872733477535d0e6baba3e92bc03b7e6f9075a5d5c2f24f6f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/09-completion-audit.md": {
+    "baseHash": "2a5c21df3867fb938d26aa6ed3e9542535c74501214d5cca19eacd79a701f7b3",
+    "hash": "0ff0acf1db84ceffc77b6d589df1cdaf1efbab336a04639609c241966a234edc",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/09-hermes-user-diagnostics.md": {
+    "baseHash": "6caeaf189125f2f80329f4feb72054aa6c5fa25d99073e99f9a9d594bc5be95b",
+    "hash": "13280e31b516aedd23682648d4d79bc3d3dedef8bd529b4c1ba9d3916403f1d0",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/10-completion-audit.md": {
+    "baseHash": "2c34e40f4246c8d857a92e396e7e958c027f69ab1df630a7f0adb296c2cd7b12",
+    "hash": "42dcc4134e5f56fe24ca04434210a2742e26a687aff599b381d5d11ad0be6f39",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/11-acceptance-followup-2026-09-13.md": {
+    "baseHash": "1982a58aa8bf802cc62b71ac40fe9aa49164e5274a3759a8064bd88cd4437034",
+    "hash": "bb546a1ebf98e2d27a65826e9b2c5bfb4644416bfcb9bc76cf40d3af49bc71c1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/11-acceptance-preparation-2026-09-13.md": {
+    "baseHash": "19e10d19a7b2fa8b9b1682ba8ecc13bbe469ee20fc21212956bb93013e1f1760",
+    "hash": "2c942fed010740124a261c6f683c814ae9ebc28fa0abe2b359e02c2a00cebfbf",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/11-autonomous-acceptance-2026-09-13.md": {
+    "baseHash": "6422eaf3fa028feba358ad5e41d60f4765bf0ba434effd7e2da4e3105ce2f4aa",
+    "hash": "b5c458946d1c6d424892d22045d223cc2a610ad922353c0436b0dcdfa4afb462",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/11-autonomous-v2-2026-09-13.md": {
+    "baseHash": "faf8c3e9d56d500fa1c6b960d4f968837581d2e08d003183d563f330e571fe57",
+    "hash": "dfbf621191cbaabaa53a0becc10f91973a86a50fb99cfdcf7a1fe4250b71cd17",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/11-candidate-v2-preflight-2026-09-13.md": {
+    "baseHash": "38d06ae3a0c016956becd9dc24687fdb29fec35aec658396d4289eb71448d633",
+    "hash": "b681453d1d2aad3e19e060155011b443c0be11f6602dbd622d2c634e1a7fcb1d",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/11-code-review-2026-09-13.md": {
+    "baseHash": "ba97ca91a6cae439fff97318a00dfb9db91d60a91191e16fd6537650e2f42d8b",
+    "hash": "5ce79ca59d5da217b7b2ed3a20dc95a39b3ac8d5aa172f4b2a57ec1bd4ca9554",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/11-development-audit.md": {
+    "baseHash": "5bcd79049f6dfb50e0c3860b56a14650d05aecadadce462045c384dddcfd46bc",
+    "hash": "3ed36fa5cbd2cc6874f6d65ae54b527529194eb45d3cd08fcd22abbbc5a84d1e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/11-fix-results-2026-09-13.md": {
+    "baseHash": "8942715af5a148504f342d15ee65da7fe0a2ccaf724d1090a6f9c87c4a4277cb",
+    "hash": "3ae4fcffefca622e29926c2ededc87df270c778efc04ea7b42d3fd5f5fbe0d13",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/11-persistence-reassessment-2026-09-13.md": {
+    "baseHash": "d8ec741ce467d461c8f1779919fc75ab00298cbbdee23530deebb512af2ae8d5",
+    "hash": "93515c6b0fdf11953019317bf02da750aacc346010ee62c939c33f3b29daca62",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/11-saveas-integration-package-2026-09-13.md": {
+    "baseHash": "434df76dc0ce17c4320977a263840893c915af536681c4e91b9c9b6dbbe31ca3",
+    "hash": "32d237c2c5f213ea9663bf697d52a7689f2c598d415e76a60e5daab39287064d",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/11-saveas-integration-results-2026-09-13.md": {
+    "baseHash": "77937ab2bb5409fa40d04b9865901af24c277297fb9f2739f8515a505266dfc5",
+    "hash": "61540d570b7e13deebed7ae3164e45d7a1954b7fd3e972cb01de7c4cf7e3f504",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/12-code-review-2026-09-13.md": {
+    "baseHash": "e67ce65119af61c1bfc2745d202b6071b7d9c0b75a7af529cf4d838b269d6e0c",
+    "hash": "84e04d083b206fc26dc2911fa62c337776a1290aa6bca788462aa1563e6b999f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/12-review-fix-2026-09-13.md": {
+    "baseHash": "1b4a7cfb2420c604eea9b8c565ed27d62a095c0d831db83897e2063e21b31bbe",
+    "hash": "d7b051ebdb99281b9ee4d140f376aaedbedd1e6415175be5aeb34f2379ae43b0",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-acceptance-preparation.json": {
+    "baseHash": "f4fd723da84d9f89c067f714ef70c5bb7b7ce7e1d10852cb7aed388b6cccc479",
+    "hash": "6aba990fc5529f2e2ba2ef6e19a2b49457660e01462b63eba20b80ff6222c963",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-acceptance-preparation.md": {
+    "baseHash": "54958e0be3e3c450df14545919f37783e9bd734180316d429ce962f8400e05ba",
+    "hash": "e028c63da99f17344b366ae178eeb43008a0bc58a18ddd1dca66243f3b10382f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-account-diagnosis.json": {
+    "baseHash": "ff00a025f351f0a500a5c4bf7a3f6870a5d6d5abb2d02b437df9daad2d774a1c",
+    "hash": "bc67aef5074133afd5e8804b202731f5a8af6e41d191a02d71601ff541cde0a0",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-account-diagnosis.md": {
+    "baseHash": "fdf865f18523dedec141856cc3317ed7c21bcb467b0a105c51342ec11c0c1fe5",
+    "hash": "643d379c4ad8b552376f4bc67b1e9642d767eb2531fdd3cc25f312cf1e927c60",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-account-preflight.json": {
+    "baseHash": "97298141889504191178c3655f322ca8a568fe8c0b0dfb41b5e80674882019c3",
+    "hash": "f394ce5f039ae46926a245c46ecce4820cdad974a3eca9abc73aeba72df901a7",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-account-preflight.md": {
+    "baseHash": "510b318ebe8b4fa36c40bd750c719088cffd3d9406be1fba1bdd4a0a2592caa6",
+    "hash": "6a7293cb7725221a60470e7f7860d89451cf63baf5430d0681849bed89cd9efe",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-binding-component-success.json": {
+    "baseHash": "5cc446e96f1f24d7781dacb19cd7b0b2ab25cbc37abf475267415f16c2b26ff3",
+    "hash": "3880cb3a5b791416c11c35a26592378302fa31e27b7279cfdfd7258f85bd97cd",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-binding-fix.json": {
+    "baseHash": "5073d9f9809bce46a5394226fbed2bf596c2adfb42ff34163ae8f80e4d984bd1",
+    "hash": "1aac441ad1baa327d12d84c49895f7e170987fa93dcf9916d58386e9568b0ffe",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-binding-fix.md": {
+    "baseHash": "3cf42bf4fce8baff7244d9fd6a4ac8c5bc4865bc9ccff586fb84c1d28b9ad0e3",
+    "hash": "3f2e9d04f696aa34cd2330662345198c647e4de4edfcd3aeeef4b66afb68ac46",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-evidence.json": {
+    "baseHash": "c2c24e74e1aa0ebbe19f2d995587755e706ef3c2543e7eaf4ef4f6389dd5ca7e",
+    "hash": "85d67dd61497ff12ca1cff22961db7dd78f42ca21b644d47470463c25452d5b5",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-final-admission-preflight.json": {
+    "baseHash": "14ca9784b7f6ac3ebc8391d0f2f0ca00fe951ffe3c0597f44ca9a10c1058fd47",
+    "hash": "8a175de06f2f446ac54a4742495390bfe8a76a5d010b11060abbe5542e352a36",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-final-admission-preflight.md": {
+    "baseHash": "8d922235f37359d44fe5926fd76ebabc6303c7b93ae1d0c6e9dbe72c35c1b540",
+    "hash": "365c95165d730ef5372db3d959e779bf3b1cb9027f95552a030b98973012f4d2",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-final-admission.json": {
+    "baseHash": "1b1f55b42bccba1439ae12a0c230922cb0b0f14fa958520c083abca7ba5f8cfd",
+    "hash": "1a07c1afc0d9638ff47af722b79abeda19d4f6fb2afdc1b5a34ac926a3433bb8",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-fix-evidence.json": {
+    "baseHash": "fb26f4d62e81852287005de092d4932980ab2ec89016ff893694b36df6cc9674",
+    "hash": "8eff9760ad4dee21d501ee66422f017a127cafc26545a611eecdf6a2b707b61b",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-fix.md": {
+    "baseHash": "3e7dc3d8e9d31fa2f3a06d2e4935b078f98a485d56e2d8e2f5f75a9c64942483",
+    "hash": "2e49f43c4b6b5c6f6c1006320af7b45a4b12b24f60c40482b526c60b2064570b",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-full-acceptance-v5.json": {
+    "baseHash": "f0a416e76f0ea6a7e1a335837d4d553d81afcb437389358a5e38437afa0ab044",
+    "hash": "7684888e062110461fbf89cde4e27008eecc2a117bec7a2aef0df0a108457bee",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-full-acceptance-v5.md": {
+    "baseHash": "bd2883c5b3ada0cc6fa809ebcc659d84d383edc8b24f7dc9e9763362da3afd1d",
+    "hash": "7e4f116f01e1361a884edb2ea3c59995cbc4755d6f40098c4d89133ed844e8b5",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-full8-blocker.json": {
+    "baseHash": "56c4333fffaccdd204502adc0bc5b66ccdbfa3bdf9b431e2ed78e289afd46d0b",
+    "hash": "3b0fd8ba219536bffa8b4e438c33a52a56fa8a914aa5b0480d297e792b224b61",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-full8-blocker.md": {
+    "baseHash": "6d485cb9361b89fb10995cd87ec7c5e6bd8f2f8153c57b17822245fcc76cfaef",
+    "hash": "b28f238f4f6ce2e2219e229984c6659df8d8617208b4a76a0ebfc9f16381c09c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-import-contract-v2.json": {
+    "baseHash": "01c0da91aaa41d75713caa246b7e775bc37a8c071eb900f74db5918b56203997",
+    "hash": "d518c42ea5ba9f36ee953a718fb984197c91856c1c77cffd1d332ee2277f7c38",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-import-editor-fix.json": {
+    "baseHash": "827c37668cc354c1da6fade72db67f80e46daeca15e138d3da761fdbdaf14d43",
+    "hash": "c8d5a154daececf6969dff76182d2c821a2014ecd755ff7c7781eb16e15473ef",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-import-editor-fix.md": {
+    "baseHash": "61684270a9e3db7811cb15cc6188bef65f9735574ac68f8a4d2222059fc5e920",
+    "hash": "3c9b1468897965535493d86dd896fdaeecf82f6c5737ab3e25fe2c961b13c70b",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-import-origin-v3.json": {
+    "baseHash": "76dab9a0a8d8d3f4505567da141306c6933960d62d9c3dd7f216ed2a7da3ea77",
+    "hash": "ac8b5a082e21d4b3a167be327e8a9f34e82ec946adcc69d8f8178a26fadf4834",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-import-origin-v3.md": {
+    "baseHash": "aa945c4d3a2d2851df3a1f83c55020620274b1f4e1107b42dbd977a6a4d35fc2",
+    "hash": "badd82d4fc5922dc6f979989fb9692a3b021683febaef555e65cb04cfae2f2a2",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-native-observer-smoke.md": {
+    "baseHash": "06e04562d72cfa77a973cb4bfa5e7529f78b352ed06a09e7a73276d1627b10dd",
+    "hash": "10241764531ab7898e5cb951bb9b1715b0bf74410ab1bfddf05d7a05a2378403",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-navigation-origin-fix.json": {
+    "baseHash": "282939430558498b87b844b1db117e1073f67d966c9a689b27910082bef5e14a",
+    "hash": "07b4987effec4ed467e8a960f080e3220dc8164bd6311d3363dbcab127cfd4bf",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-navigation-origin-fix.md": {
+    "baseHash": "3bd2bbbdbf544be712ff5a524333973874dfeeed920f02b952be31ce09037f9e",
+    "hash": "1866d8620995011b8b75b6c5606a5ba590671f51e896fa7268b3e03487c34c71",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-read-observer-v2.md": {
+    "baseHash": "a31e4d84375fae4ea70fd0f013179a28e512983481c4f964bf7611fa84fa9c05",
+    "hash": "15a11c23f4be6f4b8569ba7ddd917ef2f0f729a619cfa0750d07019af07ccbd8",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-read-observer.md": {
+    "baseHash": "8d9a9461f2a341f72823b4522d910a983a182e14c9f89ee0e3cddf43cf52c409",
+    "hash": "e21572e5a0004336a380d14bd278d2d2c1c424066248c48386bf986227c2c42f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-reevaluation-v4.json": {
+    "baseHash": "460c71b3c6acd6baae38e97a2ca77f869fd5f095f01207398f76836e528b6ca1",
+    "hash": "c9f9aad49270238bcc69fb543cb1d6e81d15a721ed029993f864f9cf9effe7d6",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-reevaluation-v4.md": {
+    "baseHash": "debab44d8b26c8d79466affdb499197458ca6dae982e1fd9ba5e3111c3d57168",
+    "hash": "e2e4e004b7f1922657f0f68fbb733c78f891e9b1867734b9afcd8c63c38b9536",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-reject-baseline-gate.json": {
+    "baseHash": "a814e187bbb1e0664ea84ff36c98669d506d901e246f94dbe59a980a87e97d86",
+    "hash": "4c2d4252a31926d4d40b479b95b174dba3c9e55c961211db7b62c7b516019581",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-reject-baseline-gate.md": {
+    "baseHash": "03598187a1068b8bd96591dfe10c2dd48aabfae9f5ca74aeb1b555f10a28adfb",
+    "hash": "b06b55cefc7fa70ecca01e4440376886f997368038718ba9681bfb24837d93aa",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-resume-fresh-20260914.json": {
+    "baseHash": "bd1deadca55b25c15b4dc4982d21ed22703448b199591de32a462766991f5e16",
+    "hash": "0a3d54282dd5aa600ed585831aa1742161adf0965df43405cf7ab2ed38701562",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-resume-fresh-20260914.md": {
+    "baseHash": "3bef155b0c50613f1b5d944e986e441c76f927ead0b6b2c5a1a13c048f0dc57e",
+    "hash": "c5d5fad7017e28bd84b8e6cd406d08339d2759de4cc7f3e7ca4ddf56d35c6956",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-return-component-success.json": {
+    "baseHash": "aa486e409189a7d73e94dc4219d8feba04939176f98588850ded722622faa4b3",
+    "hash": "5ad1c926bd79fd778a3b30d1dab49ae805d4a185b21777cd48fc0d94b813191f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-return-fix.json": {
+    "baseHash": "e098a6fb93690b802f201c60d884c126702e1d91403a29bd0fb1bbdf3e22bed0",
+    "hash": "ca1cf70a06041c841b1ed2cf3a57558b274dfbf622e254d998fc19e2033446e3",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-return-fix.md": {
+    "baseHash": "9370cb85b3c44ed06c10fbc1a5abf2ede3f42d9be5b628ad6a5a5a70d492ad17",
+    "hash": "170c56a4d0e2850fb24e15000b4b9399673b42082de7d8cc95bd430162f2d858",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-reveal-component-success.json": {
+    "baseHash": "17efde63ab50a4fef91204c659732156adb27658258bd2703f4aacf11dcc6929",
+    "hash": "9a06181e31816196d855335786642726d4a46d1217bd4a0083cf890aeddb13a6",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-reveal-fix.json": {
+    "baseHash": "10ca8576db1332a254fd5602d2ec98d1e7727038a6541cf5c03db69479d970a8",
+    "hash": "ae07a52cb02adba8c4fadd339b6ac4cd0c14376a9e56917967ba61516139fa40",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-reveal-fix.md": {
+    "baseHash": "654994224229c656a72f842578781c544d285e7692ff57f2df5ac7ba035854f0",
+    "hash": "416cd51fc2cf35430d85f5f63814e3e0a19ee1dcd2c984eb64311c0560800d9f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-review.md": {
+    "baseHash": "3119d2304a383908112fcc1319947f3b8e67de2010d11a9155db12d8c40b0ebd",
+    "hash": "cee98906d9376243233498b232429b41ab55328cdc8289206c1200602c9dac23",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-save-reopen-fix.json": {
+    "baseHash": "feb4a112465764efb6149a7a3b246b373765e58428b719775a99b3599fff15f7",
+    "hash": "8285fb6641a68d5a12a773f8a1d054c5edc704279d3602cd3ae50f9f6aae014e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-save-reopen-fix.md": {
+    "baseHash": "7c56cb1e88b9a50e2d8c087e15f9b7d9a701f7000ec2f3dba58f07ae5d2f1a91",
+    "hash": "1446f0427db03be87ed04beb48fdf97c7dc9386bec14386ddb5c89670a914355",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-wizard-point-fix.json": {
+    "baseHash": "0996cbe0622c8133177a5d8462469941ade04ae7e90869590280a3c0127c8b34",
+    "hash": "420c3e6b5b6e884387320578f012d900459376fc0990302cc5373834e166beeb",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/17-text-export-wizard-point-fix.md": {
+    "baseHash": "de6608daa03a452d6552f31885f49544824bf0045725b27bcc47fd541153a2a0",
+    "hash": "4cefb229fc014b550febc5bf61a6f39aa4cbc1d23491a3a7d75af6260b24769a",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/four-stream-node-roadmap.json": {
+    "baseHash": "969d6b077ab881ec55e578d80f0589ca4e0d1e572c255d5b1d401e1ba19ea0c0",
+    "hash": "62ff91345201c09472b25a8d23f5a829edadccb7dbe1c027d805962f00335d87",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/mimo-scenario-stability.md": {
+    "baseHash": "369bb1a724ed035d9d0b362787fcbf55f33baa3921f126f67af3293ed91644d7",
+    "hash": "c6c2fb851556fa31476276857b2481ad7645e078dddf8151796ed89f0d220f4e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node-roadmap-live-2026-09-12.json": {
+    "baseHash": "9839828b27bf7daf0fa22f421ff577e89471c954e924a84f506c90055ca164d9",
+    "hash": "3674704b410f8717f23f94f873150008e098b2314371f053f05716a33ea8afed",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-1/README.md": {
+    "baseHash": "aef7e514e4a3aa98148bde9add9bd0bb5fea486acb64a87ef8e657121a92cecf",
+    "hash": "1ccf0793ffd2c07f70b0315a63c601e6120cfe53492c8a8482b71d81fbda91cd",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-1/attempt-20260913-060042.md": {
+    "baseHash": "02faeec4f40828bcc216a9c2d503048fc4f9b974498d5665fb5c4c0d3c821881",
+    "hash": "4f7527823f332253d0d07d95b8aa1decdddfa22f97a717a86a4ab6c1038f899c",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-1/attempt-20260913-060514.json": {
+    "baseHash": "8228e00a19162f3523c2bca3ea49a4f425519016ad7e4f1632e991e816f05581",
+    "hash": "f26c57091848ef8d4572f6a79580e7abc7e325a2f5961e657879d741442ecf32",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-1/attempt-20260913-060514.md": {
+    "baseHash": "6756bad3864873260c7fb45464b43e8d65c872bf07a2a5d82aeb86270ff52d5d",
+    "hash": "b417cea19d63bc0026b618ba6a9a92e0e2a7b0e516181aa5d75ed566aa3f6e89",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-1/candidate-preflight-summary.json": {
+    "baseHash": "b1a4237537de84e834efa62e050ab99cbd4589c145d38484f87141b50ec7b5be",
+    "hash": "7cec948b8d91df8f5471461ea790e1beea9250ffa790f1e36b5d1fc8d1af9e8e",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-1/expected.json": {
+    "baseHash": "f2a98f4eee7e38a59c0104a2c4c66aeffb167df0979c5ae04eb80de9112bcbf7",
+    "hash": "7add0854f25a93629bbbf1d1d16e2aeb184a39fb4b1dab9382d445caa5cc01ff",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-1/pins.json": {
+    "baseHash": "33a7ce8322b917e928fe8af3e037f45b7262f5e5f970d5346adca5dd403a3eea",
+    "hash": "14eef9b01486662eb7ce563761da92c3eb0fb4a5e44c51cac92d697441d830e1",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-1/source-files.json": {
+    "baseHash": "29dd508b0d1639e9df9946906c64b271c1ebca66a023c3a76fda77e785186ea8",
+    "hash": "ed63e2aaa46bcc22757b345a9cc56fdb6250e55776e797df8ec76a28a44ef18f",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-2/README.md": {
+    "baseHash": "cb686002a7ca0429ce6f6828e19c9784b9d424c422281b96147a664a22495777",
+    "hash": "7670d3131c63a9d7d3d74863210f117261d589ee747f9643f80f9c9b2ce06604",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-2/attempt-20260913-072904.json": {
+    "baseHash": "368f7690a98adae89913be2bad372559a08f8758e5855088dce8ea5f095eefe3",
+    "hash": "c4c9293e4d8efe991143b442da5cb782d8bf1ef5a9760c6fd17e3e1ff3aa2e15",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-2/attempt-20260913-072904.md": {
+    "baseHash": "b5f9da3bc2bae93a79f65bcb82778f833be952da2e7708f5d1d10900a631b897",
+    "hash": "83cb07146345c9ede807de7df131cf0b2f6f9d5cf5a55b63481ca6602c09164d",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-2/candidate-preflight-2.json": {
+    "baseHash": "e9dd6baa90c20abd5ff6a0f35489f48bb51ba1b0d9e505b6b71d230070d6ef29",
+    "hash": "69c6dd62803089159b5a1b200a611a809fb93be99df9014c9102f326e5ff9df9",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/plans/loginom-dock/node12-acceptance-preparation-2/followup-summary.json": {
+    "baseHash": "57a5083d9ab5093a736a0ff4055d5fd45ddffd8db4963fcac1aff4541cb2c3c6",
+    "hash": "b34f455c5d4061001d8c583346d3c26d81fcf2ad7716c87041b94cf7088d4e34",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/tools/project-memory/README.md": {
+    "baseHash": "a024e036bf9e963b61cb79f6291b35bb5df90e7af749f694f02df65261d462cf",
+    "hash": "7a632dbd27e3fdc7e4f62f068b674e2043cb2048245546767e9a430532186539",
+    "reason": "Adapt historical node documentation navigation to Loginom AI Agent; keep original ZIP hashes, historical outcomes and identities in node-development provenance. No runtime behavior changed."
+  },
+  "services/loginom-ai/docs/loginom-dock/operations.md": {
+    "baseHash": "7407f2f64cdd3af827bb696218bcd35682891d823b3a205bb0cdb1a4922a6da1",
+    "hash": "8ffa9017b434f5d8b8718c94a4d3edd59b9cb810fbe98e6e57a93d6161dc7a8c",
+    "reason": "Label related legacy documentation and replace obsolete checkout requirement with an explicit historical reference; original version retained in recorded Git commit."
+  },
+  "services/loginom-ai/docs/loginom-dock/agent-handoff.md": {
+    "baseHash": "3ea2f67253ef2d70a720f203b59fe024a6d7eb9535cc00b7b93a6573c5311f8b",
+    "hash": "3b76063268769cd8a62d083d8252fef92537a905b1b2ecbe0af4b364cb4d62bc",
+    "reason": "Label related legacy documentation and replace obsolete checkout requirement with an explicit historical reference; original version retained in recorded Git commit."
   }
 }

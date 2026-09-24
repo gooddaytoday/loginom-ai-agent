@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-92cfa05cb0c1` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 13: входы приёмки подготовлены, допуск остаётся закрытым
 
 Команда: `node13:acceptance-input-preparation:1:ed53b0189fa92dfc879015ee08580dcadf2c3cd2`.
@@ -6,7 +8,7 @@
 
 ## Подготовленный объём
 
-Естественное ТЗ `tools/loginom-acceptance/goals/date-time-sales.txt` требует
+Естественное ТЗ `packages/loginom-runtime/tools/loginom-acceptance/goals/date-time-sales.txt` требует
 месячные и квартальные суммы продаж, полный календарный результат по двум датам
 и пустую ветку. Оно описывает бизнес-результат и точные имена/метки/порядок,
 но не содержит API-рецепта, размера sample_rows, fault injection или дополнительного
@@ -83,10 +85,10 @@ run создаётся с exist_ok=false. Состояние только в э�
 запускают модель, MCP или браузер:
 
 ```sh
-python3 tools/loginom-acceptance/date_time_admission.py --inputs-only
-python3 tools/loginom-acceptance/date_time_admission.py --render 20260913-120000-1234abcd
-python3 tools/loginom-acceptance/date_time_goal_oracle.py
-python3 tools/loginom-acceptance/date_time_launch.py --admission tools/loginom-acceptance/fixtures/date-time/admission.pending.json
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_admission.py --inputs-only
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_admission.py --render 20260913-120000-1234abcd
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_goal_oracle.py
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_launch.py --admission packages/loginom-runtime/tools/loginom-acceptance/fixtures/date-time/admission.pending.json
 ```
 
 Последняя сейчас ожидаемо возвращает **exit 1 / passed=false / model_started=false**.
@@ -95,9 +97,9 @@ run_id в примере render — только пример рендеринг
 Только после интеграции, финальной фиксации, каталог admission и отдельного слота:
 
 ```sh
-python3 tools/loginom-acceptance/date_time_launch.py --admission .dock/node13-acceptance/admission.json
-python3 tools/loginom-acceptance/date_time_launch.py --admission .dock/node13-acceptance/admission.json --run
-python3 tools/loginom-acceptance/date_time_sales_acceptance.py .dock/node13-acceptance/runs/RUN_ID --admission .dock/node13-acceptance/admission.json --diagnostics .dock/node13-acceptance/diagnostics.json --output .dock/node13-acceptance/full-audit.json
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_launch.py --admission unavailable:artifact-1e7192209b61d4a1
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_launch.py --admission unavailable:artifact-1e7192209b61d4a1 --run
+python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_sales_acceptance.py unavailable:artifact-5e011a6187c9e077 --admission unavailable:artifact-1e7192209b61d4a1 --diagnostics unavailable:artifact-8d8d08abb8be2bf5 --output unavailable:artifact-f929f59998175206
 ```
 
 RUN_ID заменяется реальным допущенным ID. Файлы результатов создаются без
@@ -184,7 +186,7 @@ R2 остаётся source/model finding: новой живой Date/time failur
 неполные/искажённые source rows, full read на 12/0 строках без магического 10,
 отказ summary-only аудитору, недопуск пустых/фиктивных gate receipts и gate перед
 авторизацией/runtime setup. Прикладной inputs-check PASS, guarded pending-launch
-ожидаемо заблокирован. Последний smoke указан в `.dock/node13-acceptance-inputs/`.
+ожидаемо заблокирован. Последний smoke указан в `unavailable:artifact-3cf421c0f3581e29`.
 
 Новые fixture/goal/full auditor **ещё не прошли live/Hermes**. Предыдущие свежие
 4×27 и persistence на dd0979bf относятся к fix round и не переименованы в результаты
@@ -194,7 +196,7 @@ OpenViking healthy, shared actor memory прочитана; routing/hooks не �
 
 ## SHA-256 подготовленных входов
 
-Все пути ниже относительно `tools/loginom-acceptance/`. `inputs.json` фиксирует
+Все пути ниже относительно `unavailable:artifact-6c9840df3f4b6129`. `inputs.json` фиксирует
 полную зависимость аудитора: все локальные .py/.mjs, цель, CSV, expected и pending
 шаблон; это не client runtime pin и не source archive. После разрешённых изменений
 общих файлов inventory нужно осознанно перефиксировать и повторно проверить.

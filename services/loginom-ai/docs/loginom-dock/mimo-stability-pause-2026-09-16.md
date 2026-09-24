@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-d9739d333a7b` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Пауза: Hermes / Xiaomi MiMo — 16 сентября 2026
 
 **Историческая точка паузы. Пользователь дал команду продолжить 16 сентября, работа возобновлена около20:16MSK.**
@@ -5,8 +7,8 @@
 ## Среда и сохранность
 
 - Ветка `codex/mimo-scenario-stability`, база `9b46c85f68d054a27afad732d74785332098c0ba`. Изменения сохранены в рабочем дереве, коммитов этой работы нет.
-- Сторонние 38 файлов остались в stash `pre-mimo-stability-20260916 preserved unrelated work` и `.dock/mimo-stability-20260916/preexisting/`. Не смешивать и не восстанавливать поверх текущих файлов.
-- Не относятся к работе: `landing/concepts/`, `landing/sites-ai/`, `docs/loginom-dock/windows-rc8-debug-2026-09-16.md`.
+- Сторонние 38 файлов остались в stash `pre-mimo-stability-20260916 preserved unrelated work` и `unavailable:artifact-50e69f51365772be`. Не смешивать и не восстанавливать поверх текущих файлов.
+- Не относятся к работе: `landing/concepts/`, `landing/sites-ai/`, `unavailable:artifact-769272e4b4879aac`.
 - Стенд `http://10.200.11.224/app/?testable=true`, Loginom7.4.2; отдельный пользователь **mimo**, пароль пустой.
 - Только существующая подписка **xiaomi / mimo-v2.5 / medium**, native hooks и штатное CSV-вложение. Другие модели не использовать.
 - Main, сервер, общий плагин не обновлялись. Слияние и публикация требуют отдельной команды.
@@ -15,7 +17,7 @@
 ## Точное место остановки
 
 Прогон задачи21 **`20260916-183006-fc786284`**, каталог
-`.dock/mimo-stability-20260916/runs/20260916-183006-fc786284`.
+`unavailable:artifact-91c6f02b78935a1e`.
 Выделенная папка Loginom `/mimo/MiMo-task21-diagnostic1-20260916`.
 
 По просьбе пользователя отправлен SIGTERM только Hermes PID81510. Запускатель завершился и экспортировал13вызовов инструментов, результаты и этапы; returncode−15,282.740с. Отсутствие PID81502/81510/81511/81512 и процессов с приватным каталогом запуска проверено. Общий пользовательский Hermes gateway не останавливался. Hermes-слот освобождён; история сохранена со статусом paused_by_user.
@@ -50,12 +52,12 @@
 5. Остаются восстановление подтверждённой ошибки выходного мастера, gap preflight существующего калькулятора, живая fault-проверка доставки и потерянного ответа. Нельзя снимать блокировку одним Cancel без сверки.
 6. После исправлений заморозить runtime и выполнить согласованную серию38запусков:6основных×3,20прочихдопущенных×1. **Эта финальная серия ещё не начата.**
 
-Во время модели и независимого reopen не менять client/lib или plugins: они входят в runtime pin. Изменения аудиторов/tools/docs вне этого pin допустимы. Использовать pinned Node `/Users/kartamyshev/.loginom-dock/current/runtime/node`. Browser/network/localhost-тесты требуют разрешения sandbox.
+Во время модели и независимого reopen не менять unavailable:artifact-47995fe672cb178a или plugins: они входят в runtime pin. Изменения аудиторов/tools/docs вне этого pin допустимы. Использовать pinned Node `/Users/kartamyshev/.loginom-dock/current/runtime/node`. Browser/network/localhost-тесты требуют разрешения sandbox.
 
 ## Указатели
 
 - [План и подробные checkpoints](../plans/loginom-dock/mimo-scenario-stability.md).
 - [Промежуточный отчёт](mimo-stability-report.md).
-- Основные доказательства `.dock/mimo-stability-20260916/`.
-- Запускатель `tools/loginom-acceptance/analytic_corpus.py`; настройка папки `scenario-storage.mjs`; независимый reopen `scenario-reopen.mjs`.
+- Основные доказательства `unavailable:artifact-c32940cc6c91c155`.
+- Запускатель `packages/loginom-runtime/tools/loginom-acceptance/analytic_corpus.py`; настройка папки `scenario-storage.mjs`; независимый reopen `scenario-reopen.mjs`.
 - Старые неуспехи, аудиторы, результаты и stash сохранить. Никаких фоновых продолжений/автоматизаций не создано.

@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-da3812e7e193` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 16: конкретное решение по точному чтению variant
 
 13 сентября 2026. **Пользователь прямо разрешил ограниченный эксперимент.**
@@ -22,7 +24,7 @@ response IBGDataSource.AsVariant(Row,Col), method321/interface116 до ReadVaria
 в собственной test-1 сессии Loginom7.4.2, максимум50строк×8столбцов.
 Это новая внутренняя RPC capability, а не текущий cached-UI reader.
 Исходный план разработчика:
-`.worktrees/node-16-collapse-columns/docs/loginom-dock/collapse-variant-prototype-plan-2026-09-13.md`.
+`unavailable:artifact-727b98939539f8b3`.
 
 До каждого чтения доказать datasource owner, document/workflow/node/port/index,
 execution freshness, schema/row bounds и фиксированные build/source SHA; перепроверить

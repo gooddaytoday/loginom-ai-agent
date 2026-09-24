@@ -32,15 +32,15 @@
   ],
   "artifacts": {
     "request.json": {
-      "path": ".dock/union-review-20260912/runs/20260912-202024-3ae2302f/request.json",
+      "path": "unavailable:artifact-cbac91ec2c4489cd",
       "sha256": "642cf7d6e08d6b5922aa0b59ed0e1d8b02006be5a302609afa6ae490b33e0635"
     },
     "union-review-audit.json": {
-      "path": ".dock/union-review-20260912/runs/20260912-202024-3ae2302f/union-review-audit.json",
+      "path": "unavailable:artifact-4516a1c1ca9fdccd",
       "sha256": "cbd54c9a719c7088d9a700fd291a6eeef056f4cdcd5c3af17271ce40c88c2018"
     },
     "union-review-negative-audit.json": {
-      "path": ".dock/union-review-20260912/runs/20260912-202024-3ae2302f/union-review-negative-audit.json",
+      "path": "unavailable:artifact-65ab9e1c9ddf7147",
       "sha256": "82fa39a6be88c148c26f09417a2447c77c213c57c473fc00a00f4d03cb54bdbd"
     }
   },
@@ -48,5 +48,11 @@
     "Source runtime only; installed client unchanged",
     "No production build, deployment, publication, commit or push",
     "Prior two review runs retain their failed frozen audit verdicts"
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-95e63f380ce1",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

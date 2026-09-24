@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-8956d58ffd7d` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 > **8 сентября 2026, 22:29 МСК:** configuration readback реализован; полный MCP run222113 delivery/output/save/reopen/readback/public audits PASS на полном pin83. Новый Hermes222819 достиг model_started (Sol/low), итог ожидается. [Checkpoint](../resume-checkpoint.md).
 
 > **8 сентября 2026, 22:12 МСК:** четвёртый Hermes `20260908-220328-c2a6b6f2` frozen FAIL (лишний UI после успешного reexecute). Выявлена и исправлена отдельная ошибка optional target.label в verifier: import120 PASS, persistence diagnostic PASS/3 negatives. Следующий шаг — наблюдённые настройки в публичном результате обработчика, Codex verification, затем новая автономная приёмка. [Точный checkpoint](../resume-checkpoint.md).
@@ -394,20 +396,20 @@ Prepared output name/label driver прошёл independent draft audit
 
 ## Исходная точка и источники
 
-Есть ограниченный [text-import-procedure.mjs](../../../client/lib/text-import-procedure.mjs),
-[node-procedure.mjs](../../../client/lib/node-procedure.mjs), UI-примитивы и
+Есть ограниченный [text-import-procedure.mjs](../../../../../packages/loginom-runtime/client/lib/text-import-procedure.mjs),
+[node-procedure.mjs](../../../../../packages/loginom-runtime/client/lib/node-procedure.mjs), UI-примитивы и
 независимые проверки импорта. Старый пилот работает с уже открытым мастером,
 проверяет до восьми полностью видимых полей и связан с отдельным roundtrip.
 Он не доказывает новый полный node.apply или приёмку Sol/low.
 
-Переиспользовать [workspace-ui.mjs](../../../client/lib/workspace-ui.mjs),
-[outcome-verification.mjs](../../../client/lib/outcome-verification.mjs),
-[observation-pages.mjs](../../../client/lib/observation-pages.mjs),
-[execution-journal.mjs](../../../client/lib/execution-journal.mjs).
-Проверки: [node_procedure_evidence.py](../../../tools/loginom-acceptance/node_procedure_evidence.py),
-[import_settings_evidence.py](../../../tools/loginom-acceptance/import_settings_evidence.py),
-[import_roundtrip_evidence.py](../../../tools/loginom-acceptance/import_roundtrip_evidence.py),
-[upload_verify.py](../../../tools/loginom-acceptance/upload_verify.py).
+Переиспользовать [workspace-ui.mjs](../../../../../packages/loginom-runtime/client/lib/workspace-ui.mjs),
+[outcome-verification.mjs](../../../../../packages/loginom-runtime/client/lib/outcome-verification.mjs),
+[observation-pages.mjs](../../../../../packages/loginom-runtime/client/lib/observation-pages.mjs),
+[execution-journal.mjs](../../../../../packages/loginom-runtime/client/lib/execution-journal.mjs).
+Проверки: [node_procedure_evidence.py](../../../../../packages/loginom-runtime/tools/loginom-acceptance/node_procedure_evidence.py),
+[import_settings_evidence.py](../../../../../packages/loginom-runtime/tools/loginom-acceptance/import_settings_evidence.py),
+[import_roundtrip_evidence.py](../../../../../packages/loginom-runtime/tools/loginom-acceptance/import_roundtrip_evidence.py),
+[upload_verify.py](../../../../../packages/loginom-runtime/tools/loginom-acceptance/upload_verify.py).
 
 Источники через Dock: Help data/integration/import/txt/README.md,
 data/workflow/ports/mapping-master.md, data/visualization/preview/quick-view.md;

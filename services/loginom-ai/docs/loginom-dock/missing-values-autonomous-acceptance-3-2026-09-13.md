@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-3086455625f9` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 14: автономная приёмка candidate2 — FAIL, 2026-09-13
 
 Назначение `node14:autonomous-acceptance:3:cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad`
@@ -19,7 +21,7 @@ Run: `20260913-132939-0384fe0b`, рабочая MCP-сессия:
 - Сохранены все **31 вызов, 31 ответ и 3396 событий**. Export complete;
   source/runtime/harness/native skill не изменились.
 - Исторический launch plan с `launch_authorized:false` не менялся. Отдельная
-  квитанция разрешения: `.dock/node14-autonomous-acceptance-3/authorization.json`.
+  квитанция разрешения: `unavailable:artifact-dc7e4db001c06a7b`.
 
 ## Результаты и блокер
 
@@ -77,7 +79,7 @@ Candidate `2026.09.13-node14-test4.2-candidate`, manifest SHA:
 `cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad`.
 
 [Точные pins и 14 receipts](missing-values-autonomous-acceptance-3-pins-2026-09-13.json).
-Приватный корень: `.dock/node14-autonomous-acceptance-3/`.
+Приватный корень: `unavailable:artifact-a0b6013c9a3447cd`.
 Полный evidence SHA:
 `5ab0cc93d3f2dbf6bcb17c64ce529fcd8f8e33755a5c4f91fb0241a1806df5da`.
 Evidence index SHA:

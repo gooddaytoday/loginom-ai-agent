@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-872ff1e94409` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 > Пакет разрешён пользователем и выполнен командой
 > `node11:saveas-integration:1:direct-user-20260913`.
 > [Результат и новые pins](11-saveas-integration-results-2026-09-13.md).
@@ -29,21 +31,21 @@ Hermes, сборка и stage в этой фазе не выполнялись.
 
 | Файл | Точный объём будущего переноса | Проверенная применимость |
 | --- | --- | --- |
-| `client/lib/executor.mjs` | Единственный hunk коммита, `browserCapability`, исходная строка992: ожидание native Save As перед `if (keepOpen)` | `git apply --check` прошёл, код не применялся |
-| `client/test/executor.test.mjs` | Только новый тест `overwrite waits for native Save As menu dismissal before reopening its Close command` | Исходный hunk не применяется из-за отличающегося контекста EOF; добавить этот тест отдельно после нынешнего последнего теста |
+| `packages/loginom-runtime/client/lib/executor.mjs` | Единственный hunk коммита, `browserCapability`, исходная строка992: ожидание native Save As перед `if (keepOpen)` | `git apply --check` прошёл, код не применялся |
+| `packages/loginom-runtime/client/test/executor.test.mjs` | Только новый тест `overwrite waits for native Save As menu dismissal before reopening its Close command` | Исходный hunk не применяется из-за отличающегося контекста EOF; добавить этот тест отдельно после нынешнего последнего теста |
 
 Контекст конфликта установлен: у узла12 перед новым тестом имеется отдельный
 `save/reopen graph proof retains links with semicolons in automatic node labels`,
 которого в узле11 нет. Кроме того, ранее узел12 изменил распознавание связей с `;`
 в `graphSnapshot` (около строки415 executor). Эти изменения предшествуют выбранному
 коммиту и не являются зависимостью ожидания Save As. Main/Partial/Typed/Preserved
-не содержат `;`. Не заменять целиком executor/test и не переносить эти изменения
-вместе с ожиданием. Общий `client/test/support/executor-fixture.mjs` совпадает
+не содержат `;`. Не заменять целиком unavailable:artifact-e31e521c0e5fdbf9 и не переносить эти изменения
+вместе с ожиданием. Общий `packages/loginom-runtime/client/test/support/executor-fixture.mjs` совпадает
 между родителем source commit и целевым HEAD; новые fixture-зависимости не выявлены.
 
 Остальные пять файлов source commit исключены: `duplicates_node_acceptance.py`,
 `full_read_evidence.py`, `persisted_import_evidence.py`, `test_full_read_evidence.py`,
-`test_persisted_import_schema.py` в `tools/loginom-acceptance/` относятся к аудиту
+`test_persisted_import_schema.py` в `unavailable:artifact-6c9840df3f4b6129` относятся к аудиту
 узла12. Для переноса ожидания они не требуются. Принятые A1–A3 и эталоны Replacement
 не пересматриваются. Наш persistence-аудитор допускает дополнительное событие
 `save_flow_completed` перед close, сохраняя обязательные checkpoint и reopening.
@@ -66,7 +68,7 @@ Hermes, сборка и stage в этой фазе не выполнялись.
 
 ## Focused-проверка после разрешённого применения
 
-1. Запустить собственным Node24 набор `client/test/executor.test.mjs`: он содержит
+1. Запустить собственным Node24 набор `packages/loginom-runtime/client/test/executor.test.mjs`: он содержит
    новый overwrite race test и существующие keepOpen, conflict fail, точный path/
    graph, закрытие меню и delayed Open проверки. Не повторять полный A1–A3 аудит.
 2. В отдельном видимом source-browser профиле, `--start-maximized`, viewport=null,

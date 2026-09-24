@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-96f54632f672` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: диагностика устаревшей ссылки — 13 сентября 2026
 
 **Исходный отказ не воспроизведён. Код не изменён.** В назначении
@@ -84,4 +86,4 @@ tests не требовались для документации и прива�
 свежие deadline/cancel checks. Новая Hermes-приёмка этим отчётом не разрешается.
 
 [Pins и квитанции](missing-values-stale-target-diagnosis-pins-2026-09-13.json).
-Private root: `.dock/node14-stale-target-diagnosis/`.
+Private root: `unavailable:artifact-989a1a43cffaf1b1`.

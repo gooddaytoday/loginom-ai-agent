@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-97c1b1437689` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # 05. Обработчик «Параметры полей»
 
 После ревью исправления перепроверены на живом Loginom; [отчёт и новая
@@ -43,7 +45,7 @@
 - E2E: в той же папке `reform_columns_change_field.ts`,
   `reform_columns_convert_types.ts`, `reform_columns_exclude.ts`, `reform_columns_errors.ts`.
 
-На старте подплана `client/lib/workspace-ui.mjs` распознавал `field_parameters`, читал строки
+На старте подплана `packages/loginom-runtime/client/lib/workspace-ui.mjs` распознавал `field_parameters`, читал строки
 и поддерживал применение/отмену редактора поля. Эти строительные блоки сами по себе
 не являлись принятым полным обработчиком `node.apply`; каталог и тесты не доказывают live-готовность.
 Существующий `apply_reform_column` подтверждает изменение черновика мастера.

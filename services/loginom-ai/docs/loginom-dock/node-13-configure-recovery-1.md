@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-f9478f8383cf` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # N13-R1: восстановление configure после потерянного ответа
 
 13 сентября 2026, ветка `codex/node-13-date-time`, исходный HEAD `b8363af89de9a35f6151dc6896a9a59af4aef2a8`.
@@ -70,7 +72,7 @@ catalog использован только для прямой диагност
 PASS; negative auditor отверг **8/8** подмен (квитанция, матрица, ID, завершение,
 повторные эффекты и отрицательный кейс).
 
-Evidence: `.dock/stream-runtime/sessions/1de08440-613a-404d-a56d-1b3243bbde2c/`:
+Evidence: `unavailable:artifact-339a59e97cd14fab`:
 `execution-events.jsonl`, `public-api.jsonl`, `r1-loss.json`, `r1-negative.json`,
 `r1-inspect.json`, `r1-resume.json`, `r1-repeat.json`,
 `date-time-continuation-audit.json`, `date-time-continuation-negative-audit.json`,

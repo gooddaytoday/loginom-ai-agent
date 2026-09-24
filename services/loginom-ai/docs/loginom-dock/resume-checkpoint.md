@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-09f5441bfe4d` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел11 дорабатывается после одного ревью — 13 сентября 2026
 
 Ревью кандидата «Замена» `8aaf6a8a425d94974d65b5bd8b27a55f362fac4d` завершено.
@@ -11,7 +13,7 @@
 проверки обеих форм запроса, неизменность прежней конфигурации при отказе и
 положительные неконфликтующие переходы. Повторное ревью после этого раунда не
 назначать. Обязательная автономная приёмка Hermes ещё не начата, слот не выделен.
-Отчёт ревью: `docs/plans/loginom-dock/11-code-review-2026-09-13.md` в worktree11.
+Отчёт ревью: `services/loginom-ai/docs/plans/loginom-dock/11-code-review-2026-09-13.md` в worktree11.
 Потоки12/13/14 продолжают разработку; периодического мониторинга нет.
 
 ---
@@ -58,7 +60,7 @@ Astra medium в их отдельных постоянных worktree и вет�
 Повторный допуск окружений после паузы пока ожидается; обработчики не приняты.
 
 OpenViking: health, авторизация, system status, доступ к памяти пользователя и
-MCP tools/list прошли; auto-recall вновь поступил. Dock diagnostics подтвердил
+MCP unavailable:artifact-b7721731a8ca0e97 прошли; auto-recall вновь поступил. Dock diagnostics подтвердил
 сервер и три источника. [Доказательства и ограничения](dock-availability-2026-09-13.md).
 Ревью, Hermes, следующие узлы, слияние и выпуск остаются отдельными назначениями.
 
@@ -122,7 +124,7 @@ Loginom7.4.2. Статусы coverage не использованы как ед�
 
 Работают четыре обычные задачи Astra/medium в отдельных постоянных worktree и ветках.
 База первой тройки — `a3b419bd`, потока4 — `0f085c53` (только последующие правки
-документации); точные ID записаны в реестре. Первые три `.dock/stream-preflight.json`
+документации); точные ID записаны в реестре. Первые три `unavailable:artifact-22950d6e897487a2`
 подтверждают source runtime, собственный профиль, вход и личный каталог Loginom
 7.4.2, геометрию окна и отдельный диагностический пакет. Поток4 подтвердил
 test-4 и /test-4 в UI; его checkpoint допуска проверен, создан отдельный пакет
@@ -308,10 +310,10 @@ Hermes Sol/low завершилась, но независимый аудит Н
   Никакой код обработчиков09/11/13 не интегрирован.
 - Четыре субагента остановлены. Рабочие копии и файлы не удалены;
   дополнительный снимок исходников/patch с SHA:
-  `.dock/parallel-pilot-20260911/sequential-checkpoint/manifest.json`.
-- Реестр `.dock/parallel-pilot-20260911/state.json`: `phase=paused`,
+  `unavailable:artifact-15373c3cece37ce9`.
+- Реестр `unavailable:artifact-b7f3f644efe0905b`: `phase=paused`,
   `execution_mode=sequential`, `automatic_dispatch=false`, `active_node=null`.
-- В `.worktrees/parallel-join` осталось незавершённое общее исправление
+- В `unavailable:artifact-5b67f3b4f6a1acdf` осталось незавершённое общее исправление
   `process-node-focus.mjs`, изменения `workspace-ui.mjs`, тест и harness.
   Оно не принято. Исследования Замены11 и Даты/времени13 сохранены отдельно;
   обработчики этих узлов не реализованы.
@@ -322,7 +324,7 @@ Hermes Sol/low завершилась, но независимый аудит Н
 - Созданные пользователем аккаунты `test-1/2/3` и их каталоги проверены.
   Отдельный каталог действий `2026.09.11-parallel-pilot.1-candidate` размещён
   на VPS и проверен чтением; он не активирован в production. Pins — в
-  [operations](operations.md), подробные наработки — в [архиве пилота](parallel-node-pilot.md).
+  [operations](../../../../docs/node-development/history/supplements/docs/loginom-dock/operations.md), подробные наработки — в [архиве пилота](parallel-node-pilot.md).
   Глобальные профили и установленный плагин сохранены.
 
 ## Условия последующего продолжения
@@ -338,7 +340,7 @@ pins; оценить непринятое общее исправление; р�
 обычный Hermes на `openai-codex / gpt-5.6-sol / low`, независимый аудит сохранённого
 пакета, затем разрешённая поставка. Исследование UI и черновик исправления
 не заменяют приёмку. Рабочие копии пилота использовать как источник наработок;
-не объединять их целиком и не переносить `client/node_modules` в Git.
+не объединять их целиком и не переносить `unavailable:artifact-9637440cbfc8d9fa` в Git.
 
 ---
 
@@ -611,8 +613,8 @@ save/reopen и источника не ослаблялась. Модель по
 и промежуточных сохранениях. Не запускать модель повторно ради уже полученных
 показателей и не переписывать первоначальные FAIL-доказательства.
 
-Приватные доказательства: `.dock/rename-diagnosis/` и
-`.dock/user-sales-trial/runs/20260910-125653/` (275 frozen source files).
+Приватные доказательства: `unavailable:artifact-5818d7b382ec56ec` и
+`unavailable:artifact-8f860d206165854b` (275 frozen source files).
 
 ---
 
@@ -727,7 +729,7 @@ openai-codex / gpt-5.6-sol / low, без fallback. Frozen audit SHA256:
 сохранён по SHA; текущие28 сценарных проверок совпали с frozen audit.
 Client1029 PASS/1 SKIP и shell46 PASS; Python387 PASS. Все собственные прогоны
 завершены, соответствующих процессов в проверенном live process list нет.
-Индекс27 проверенных свидетельств: `.dock/text-import-v3/subplan03-completion-evidence-index.json`.
+Индекс27 проверенных свидетельств: `unavailable:artifact-5bceec89c040f0db`.
 
 Работы по цели03 не осталось. Следующий подплан04 — отдельная задача.
 Подпланы04–10 и выпуск V5 не приняты; production и установленный клиент не менялись.
@@ -830,8 +832,8 @@ Preflight PASS: existing ChatGPT openai-codex / gpt-5.6-sol / low, fallback=fals
 подтверждена стадия model_started (Sol/low). Перед продолжением опросить тот же
 handle; не запускать новый run из-за отсутствия вывода. Результат модели и
 полный аудит пока не получены. Подплан03 и release gates остаются открытыми.
-Evidence: `.dock/text-import-v3/remote-final-20260908-215200-a64d819b/`
-и `.dock/text-import-v3/hermes-runs/20260908-220328-c2a6b6f2/`.
+Evidence: `unavailable:artifact-88a023defa46f468`
+и `unavailable:artifact-6472705dd6356a65`.
 
 ---
 
@@ -1362,7 +1364,7 @@ import evidence: **59 PASS**. Полный подплан ещё не приня
 Следом Execute/Close, identity нового запуска и точный выход; затем остальные
 требования подплана, включая сохранение/восстановление и финальный Hermes Sol/low.
 [Точный checkpoint и evidence](text-import-node.md). Для продолжения UI:
-живой source diagnostic process `76234`, папка `.dock/text-import-v3/live-1788821789307`,
+живой source diagnostic process `76234`, папка `unavailable:artifact-341e381a2cb296c7`,
 Import03 уже выполнен вручную. `process-selected-node.json` подтверждает
 единственное выбранное vertex `MF;TF-1;Graph;Import03` после ShowNode процесса 1.1.
 Перед продолжением проверить, что process handle жив; не повторять Execute.
@@ -1482,10 +1484,10 @@ Runtime SHA `9e1ca2e5ef7a8180675d7d3d7e442d2734440f04f5144890af51a2fd7a8a8f5d`.
 
 ## 7 сентября 2026 — продолжение после тематической фиксации
 
-Наработки сохранены коммитами, [проверки и состав](implementation-status.md)
+Наработки сохранены коммитами, [проверки и состав](../../../../docs/node-development/history/supplements/docs/loginom-dock/implementation-status.md)
 зафиксированы. Runtime клиента сохранил SHA d35ee7f6…fa3; новые Hermes-прогоны,
 deploy и установка не выполнялись. Резервная копия исходного состояния:
-`.dock/commit-split-20260907-211544/`.
+`unavailable:artifact-1d57fe2460b43f32`.
 Продолжать с [подплана 02](../plans/loginom-dock/02-add-nodes.md) и контрактов 03.
 После отдельной просьбы об очистке пять штатных файлов benchmark/locomo/openclaw
 восстановлены из Git. Удалены временные браузерные файлы и копии для проверок;
@@ -1501,7 +1503,7 @@ identity и именованные ожидания; повтор не созд�
 Sol/low закреплён в launcher, evidence, audit и admission.
 
 Последний самостоятельный прогон `20260907-205626-3110e56a`: **17/17 PASS**,
-3 API calls; активных прогонов нет. Private evidence `.dock/open-draft-v1/`.
+3 API calls; активных прогонов нет. Private evidence `unavailable:artifact-7d3cddcf270d9f0b`.
 Следующий этап — 02, общий драйвер добавления/связей с проверкой полученного
 workflow и drag readiness. 03 реализует полный node.apply. Production и
 установленный клиент не обновлялись. Прежние checkpoint-записи ниже — история.
@@ -1559,7 +1561,7 @@ text_import_format, операция idle. Hermes отказался от про
 Сохранение через «Готово» и сохранение пакета не подтверждены. Это последнее
 записанное UI-состояние; сохранность черновика после закрытия браузера не доказана.
 
-В `client/lib/session.mjs` внесено `timeouts.settle: 0` для executor-preview /
+В `packages/loginom-runtime/client/lib/session.mjs` внесено `timeouts.settle: 0` для executor-preview /
 executor-replay. Playwright dependency и guards не изменены. MCP-native проход
 `mcp-zero-1788790834304`: 24,948 с, 65 шагов, локальный независимый proof PASS.
 Тесты: 405 client PASS, 1 Windows-only skip; 228 Python PASS. Runtime последней
@@ -1624,7 +1626,7 @@ Codex; Hermes / ChatGPT / gpt-5.6-luna / medium запускается посл�
 около 55 секунд фиксированных пауз. Это почти вся наблюдаемая разница 57,772 с;
 доля оставшихся накладных расходов отдельно не измерена.
 
-По команде пользователя «давай уберем» `client/lib/session.mjs` теперь задаёт
+По команде пользователя «давай уберем» `packages/loginom-runtime/client/lib/session.mjs` теперь задаёт
 `timeouts.settle: 0` для executor-preview и executor-replay. Classic/research
 сохраняют свой прежний default. Зависимость Playwright не изменяется; штатные
 семантические ожидания и guards Dock сохранены.
@@ -1641,8 +1643,8 @@ maximized/viewport:null и фактическое окно 2044×1035. Тест�
 
 ## Вариант 2 — текущая реализация
 
-Добавлены локальные модули `client/lib/node-procedure.mjs` и
-`client/lib/text-import-procedure.mjs`; операция `node.configure_text_import`
+Добавлены локальные модули `packages/loginom-runtime/client/lib/node-procedure.mjs` и
+`packages/loginom-runtime/client/lib/text-import-procedure.mjs`; операция `node.configure_text_import`
 интегрирована в общий mutation/pending gate, registry, capability ABI 1.2.0,
 каталог кандидата и runtime pins (49 файлов). До настройки требуется завершённая
 проверенная загрузка с точным путём. Каждый внутренний шаг имеет durable journal,
@@ -1656,7 +1658,7 @@ maximized/viewport:null и фактическое окно 2044×1035. Тест�
 исчезнуть вместе с выполнением целевого условия; неизвестный диалог блокирует
 процедуру. Проверка отсутствия ещё не появившегося toast удалена из диагностики.
 
-Реальный интегрированный проход `.dock/node-pilot-20260907/integrated-1788788401659`
+Реальный интегрированный проход `unavailable:artifact-55ac9ad2ceeef77d`
 подтвердил загрузку/байты, настройку, «Готово», повторное открытие, readback всех
 страниц и повторное «Готово» за 65 внутренних шагов. Независимый локальный
 verifier PASS. Это Codex-диагностика, не Hermes acceptance и не сохранение пакета.
@@ -1696,7 +1698,7 @@ Production activation не выполнялась. Новая отдельная
 Handle 8554 завершён, активных Hermes runs нет. Операция заняла 82,818 секунды
 вместо 258,439; снимков 44 вместо 175. Полный клиентский набор: 405 PASS,
 1 Windows-only skip. Подробности и пределы результата — сверху
-[implementation-status.md](implementation-status.md). Следующий этап — расширение
+[implementation-status.md](../../../../docs/node-development/history/supplements/docs/loginom-dock/implementation-status.md). Следующий этап — расширение
 по §13.3; независимая приёмка одного импорта не закрывает P3.
 
 Ограничения текущего кандидата: 1–8 полностью видимых столбцов, один явный путь,
@@ -1710,7 +1712,7 @@ Handle 8554 завершён, активных Hermes runs нет. Операц�
 158 API calls, completed=true, returncode=0, timed_out=false. Активных прогонов
 Hermes нет; handle29775 завершён. ChatGPT / openai-codex / gpt-5.6-luna / medium.
 Единственный frozen audit: **52/59**, P3 не принят. Файл:
-`.dock/post-mvp-p0/runs/20260907-133241-682396db/audit.json`, SHA256
+`unavailable:artifact-136aeed033acd9e7`, SHA256
 `c5bf61263a4d84b51f12210b3b8cb33f417426cf1e2799eeec9c057f36f9534e`.
 Контрольная сумма повторно проверена при остановке; аудит не пересчитывался.
 
@@ -1747,7 +1749,7 @@ calculator-roundtrip. Выполненные проверки: 218 Python, 188 w
 8 catalog PASS. Private `candidate-group-native` (Group, group_output,
 reform_settings) — 14 synthetic tests PASS, **не интегрирован**, полного
 живого source chain PASS нет. Файлы находятся в
-`.dock/post-mvp-p0/resume-20260907/candidate-group-native/`; не перегенерировать
+`unavailable:artifact-6b800ea5688fd175`; не перегенерировать
 старыми скриптами поверх последних дополнений.
 
 Каталог agent5 собран на VPS и staged/readback проверен, activated=false.
@@ -1851,7 +1853,7 @@ Build /opt/loginom-dock/releases/20260907-catalog-agent5-reform/.
 
 ## Размер окна — проверено по запросу пользователя
 
-В client/lib/session.mjs видимый запуск получил --start-maximized и viewport:null.
+В packages/loginom-runtime/client/lib/session.mjs видимый запуск получил --start-maximized и viewport:null.
 Настоящий createSession→MCP на Mac подтвердил native maximized и2044×1035;
 отдельно fullscreen дал2048×1152. Используется обычное развёрнутое окно.
 Headless сохраняет1280×800. Source change относится к следующим source runs;
@@ -1936,7 +1938,7 @@ Private proofs calc-output-complete.txt/output-port-finish-live.txt.
 Далее один цельный data-pipeline на новом maximize runtime и прежнем
 ChatGPT/Luna/medium. Первый import gate уже принят; пока Hermes выполняется,
 продолжать private journal-bound Calculator v2 и остальные verifier. Не менять
-client/runtime/harness/goal до terminal, не подключать старый synthetic Calculator
+unavailable:artifact-a25f70f3e1270ea0 до terminal, не подключать старый synthetic Calculator
 с output_mapping внутри node wizard. Своя диагностика: TF1 graph, три узла,
 импорт связан отдельно с Выражение1 и Параметры полей, пакет не сохранён.
 
@@ -1986,7 +1988,7 @@ browser_file_upload без paths. Ни один файл ручной диагн
 
 Созданы через живой UI `/user/dock-p3` и `/user/dock-p3/packages`; повторное
 открытие подтвердило каталоги. Отдельный приватный config нового origin:
-`.dock/post-mvp-p0/resume-20260907/dock-config.json` (не публиковать: содержит ключ).
+`unavailable:artifact-fd045533b7c91e7f` (не публиковать: содержит ключ).
 На VPS собран и staged/read-back candidate `2026.09.07-agent.4-candidate`,
 manifest SHA `85ac2d532245d2da2c9428c499cfa74ba3cc0b3a6e0732c51e6b96cf9f96b0fa`,
 URI `viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.07-agent.4-candidate/manifest.json`.
@@ -1994,7 +1996,7 @@ Profile loginom-7.4.2-macos-chromium-ru; save allowed root `/user/dock-p3/packag
 Server build/report `/opt/loginom-dock/releases/20260907-catalog-agent4-loginom742/`.
 Production current не переключался. Стартует новый import-roundtrip: account user,
 storage /user/dock-p3, ChatGPT/Luna/medium, max_turns100/timeout1200.
-Во время run не менять client runtime и tools/loginom-acceptance; terminal→audit один раз.
+Во время run не менять client runtime и unavailable:artifact-abdc500409930ca3; terminal→audit один раз.
 
 ## Новый стенд — выбор пользователя 7 сентября
 
@@ -2075,8 +2077,8 @@ Hermes не прочитал output_mapping после reopen (после UI_EPO
 к закрытию), а после последней коррекции UnitPrice не собрал чистую baseline.
 Это реальная недоделка; исправление экспортёра не превратило её в PASS.
 
-Private evidence и диагностика: `.dock/post-mvp-p0/runs/<run>/` и
-`.dock/post-mvp-p0/resume-20260906/run215646-export-diagnostic.json`.
+Private evidence и диагностика: `unavailable:artifact-e79d7f15ef45d856<run>/` и
+`unavailable:artifact-903ebdb4e6ec9596`.
 Старые audits и исходный evidence неизменны.
 
 ## Последние изменения исходников

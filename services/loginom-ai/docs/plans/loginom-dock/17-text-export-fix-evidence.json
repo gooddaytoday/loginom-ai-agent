@@ -14,76 +14,76 @@
     "pass": 91,
     "fail": 0,
     "skip": 0,
-    "log": ".dock/node17/fix/focused-final.log"
+    "log": "unavailable:artifact-0a426022cab529be"
   },
-  "before_evidence_directory": ".dock/text-export/live-1789301416218",
+  "before_evidence_directory": "unavailable:artifact-dea8c3459daf2f91",
   "after_evidence": [
     {
-      "path": ".dock/text-export/live-1789301890244/r1-live-after.json",
+      "path": "unavailable:artifact-27d7875f275e3511",
       "sha256": "8e96f5bc917ace00b2645ab6ae8a4c9a1d6da1e449f31a0e906488cf533eb882"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/r1-deadline-after-next.json",
+      "path": "unavailable:artifact-1fcbe7db07a92575",
       "sha256": "a3ee7c23efee640a8d8f5b701d081ac3145b994177ebd73421f20e7028073528"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/r1-live-inflight-cancel.json",
+      "path": "unavailable:artifact-b74f8a91ca6243f6",
       "sha256": "5370cf0d88d4d34d8346bca211ed02c91eadf6ce3bfae3c80dd96a84ec8e0b28"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/r2-refuse-new-v2.json",
+      "path": "unavailable:artifact-41b7e841d56e784d",
       "sha256": "c59b595f4587b325ca6a6820c121bfb41f3dea32d88011b0bd1e24b7145ba345"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/r2-refuse-existing-v2.json",
+      "path": "unavailable:artifact-989c40e3dbfa92f5",
       "sha256": "c9d2cca583e42618814e7efd160de8f871f13ba7b1d1538c9c33278bc7656f8c"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/r2-qualifier-refuse.json",
+      "path": "unavailable:artifact-7351115d3af61cf0",
       "sha256": "49259db79eafdbdab5ac5ebbfa958c0a9262a003a09b1fd5de6ae42777f8599b"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/supported-reject.json",
+      "path": "unavailable:artifact-d51ec3ccc56d2953",
       "sha256": "681682dba897d7eb3a4a8785db4b42bbc253d6d063662b7db3c0b1e6b23fae64"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/supported-override.json",
+      "path": "unavailable:artifact-f6bfe0d5290a518a",
       "sha256": "a6a8952b11f3fb0f4cd6bef84328b86e7825ef5591533476f3f3a966439dc7ac"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/supported-replace.json",
+      "path": "unavailable:artifact-27ea4b3499f43f35",
       "sha256": "66af16bc0d4e606163df20c5baccedf9309e613a29239389cda7b4d43c4db214"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/audit-supported-override.json",
+      "path": "unavailable:artifact-575c5da1a13e4fb1",
       "sha256": "47ae2ee2fbccf11597e1428b789ae15b4d2f5d5e9171dd4d588f1fde3040450d"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/audit-supported-replace.json",
+      "path": "unavailable:artifact-bbf3f5969f381787",
       "sha256": "d85e3e90414921c2f1fcf40dea7948a3848a33de9fd80e1ed8a476ce8cb2102d"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/audit-r2-preservation.json",
+      "path": "unavailable:artifact-61b7face6e391786",
       "sha256": "e2da3adfebb940bfa8a2d195476edcb664cc1c8f5b9349c810d21ae11254c701"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/audit-post-reject-preservation.json",
+      "path": "unavailable:artifact-aae549196d899140",
       "sha256": "2f88b345a83a1fefad28b6f9dc9b644891165823582f9138f50c9119cbc0dab9"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/audit-refusal-events.json",
+      "path": "unavailable:artifact-4307776a55225e0f",
       "sha256": "33799eed3c82824def6c833254043a70403926ab85cf62729fe1ac344b422c50"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/audit-runtime-current.json",
+      "path": "unavailable:artifact-9cefe168da402c48",
       "sha256": "a18bbd16a56441b90aebf233bebe1cdff0afdd48f80829ffd7da635cdf5d270c"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/fix-save-close.json",
+      "path": "unavailable:artifact-535d4340ca6e85fc",
       "sha256": "06b90166faed4c66e3ad46ad819560a6101dedd88b18f6c4a1acd291664afd1a"
     },
     {
-      "path": ".dock/text-export/live-1789301890244/fix-logout-check.json",
+      "path": "unavailable:artifact-670c796bdbe08b45",
       "sha256": "a6dac78768795e1584973479f83f9bd249fb0028215541f97d717af4801d6742"
     }
   ],
@@ -153,5 +153,11 @@
   "hermes_run": false,
   "autonomous_accepted": false,
   "package_reopen_verified_in_fix_round": false,
-  "old_development_evidence_modified": false
+  "old_development_evidence_modified": false,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-7f67b6e7d121",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

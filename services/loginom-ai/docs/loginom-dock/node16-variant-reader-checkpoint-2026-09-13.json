@@ -4,7 +4,7 @@
   "thread_id": "01a0992c-6ce0-7f10-bd53-9bf92ed7ae8a",
   "phase": "development",
   "control_message_id": "node16:variant-ui-followup:1:live-1789276952774",
-  "source_evidence_directory": ".worktrees/node-16-collapse-columns/.dock/node16/live-1789276952774",
+  "source_evidence_directory": "unavailable:artifact-6675f661a7025194",
   "source_evidence_sha256": {
     "wizard-stores-after.json": "690abfc3a5e594ac7a6892120de0d6ae0c481c92e4cc6caae835441821ca9b1b",
     "preview-records.json": "42287f6f43651addd00e3018f8d07f40f8f5bafa17d402be879e737caa03a1b5",
@@ -27,7 +27,7 @@
   "review_started": false,
   "developer_guidance_sent": true,
   "memory_health": "healthy; actor retrieval found relevant prior Table reader memory",
-  "new_shared_knowledge_evidence": "docs/loginom-dock/node16-shared-memory-knowledge-2026-09-13.json",
+  "new_shared_knowledge_evidence": "historical-ref:ref-2a161f8d2480a658",
   "resume_after_usage_limit": {
     "checked_at": "2026-09-13T08:16:42.452457+00:00",
     "previous_turn": "01a09933-04c7-7383-a7ce-2a77892f9492",
@@ -44,7 +44,7 @@
   },
   "types_off_probe": {
     "checked_at": "2026-09-13T08:25:06.666639+00:00",
-    "evidence_directory": ".worktrees/node-16-collapse-columns/.dock/node16/live-1789278261737",
+    "evidence_directory": "unavailable:artifact-a40dacdc4e1410f6",
     "evidence_sha256": {
       "preview-bound-evidence.json": "40cbb4f11d0ea798be12539627074fc6e19f68e532c1205c6de52769b2b2a14a",
       "preview-local-types-off.json": "57eff98fefe9a279d4cd560bc82064d4b08a74e4e397226f783d6ed4e4a40b1d",
@@ -68,7 +68,7 @@
     "full_variant_io_accepted": false,
     "new_read_transport_selected": false,
     "raw_rpc_added": false,
-    "developer_report": ".worktrees/node-16-collapse-columns/docs/loginom-dock/collapse-variant-blocker-2026-09-13.md",
+    "developer_report": "unavailable:artifact-a60ae12561c642b2",
     "developer_guidance_id": "node16:variant-blocker-response:1:types-off-1789278261737",
     "remaining_work": "Continue independent handler and narrowly verified exclusion label normalization; prepare concrete source/transport option without invoking native API",
     "independent_read_only_check": {
@@ -80,5 +80,11 @@
       "new_rpc_justified_by_this_evidence": false,
       "scope": "Saved evidence and source file inventory only; no browser, RPC, tests or mutations"
     }
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-e6fe828fac6e",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

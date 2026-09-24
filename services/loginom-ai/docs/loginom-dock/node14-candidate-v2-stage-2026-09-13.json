@@ -49,5 +49,11 @@
   },
   "health_status": 200,
   "activated": false,
-  "full_autonomous_acceptance_passed": false
+  "full_autonomous_acceptance_passed": false,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-855a17543791",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

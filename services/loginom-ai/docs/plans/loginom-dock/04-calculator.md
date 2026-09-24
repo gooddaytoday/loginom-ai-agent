@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-c91961e77ffe` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # 04. Настройка Калькулятора
 
 Статус: **implemented / live_verified (source runtime)**. Этап V3; не released.
@@ -19,15 +21,15 @@ Hermes45/45 PASS. [Итоговая матрица](04-completion-audit.md),
 
 ## Исходная точка и источники
 
-В [workspace-ui.mjs](../../../client/lib/workspace-ui.mjs) и
-[node-procedure.mjs](../../../client/lib/node-procedure.mjs) есть наблюдение
+В [workspace-ui.mjs](../../../../../packages/loginom-runtime/client/lib/workspace-ui.mjs) и
+[node-procedure.mjs](../../../../../packages/loginom-runtime/client/lib/node-procedure.mjs) есть наблюдение
 Калькулятора и ограниченные операции редактора служили исходной точкой.
-Полный handler реализован в [calculator-node.mjs](../../../client/lib/calculator-node.mjs),
+Полный handler реализован в [calculator-node.mjs](../../../../../packages/loginom-runtime/client/lib/calculator-node.mjs),
 параметры и сохранность выражений — в calculator-parameters/calculator-procedure,
 независимые проверки — в calculator_configuration_evidence и calculator_output_evidence.
-Использовать [calculator_evidence.py](../../../tools/loginom-acceptance/calculator_evidence.py),
-[calculator_receipts.py](../../../tools/loginom-acceptance/calculator_receipts.py)
-и [calculator_test_fixtures.py](../../../tools/loginom-acceptance/calculator_test_fixtures.py).
+Использовать [calculator_evidence.py](../../../../../packages/loginom-runtime/tools/loginom-acceptance/calculator_evidence.py),
+[calculator_receipts.py](../../../../../packages/loginom-runtime/tools/loginom-acceptance/calculator_receipts.py)
+и [calculator_test_fixtures.py](../../../../../packages/loginom-runtime/tools/loginom-acceptance/calculator_test_fixtures.py).
 Прежний незавершённый roundtrip не является приёмкой новой операции.
 
 [Help Калькулятора](https://help.loginom.ru/userguide/processors/transformation/calc/),

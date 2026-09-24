@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-75fda2b3c729` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Подплан 03 завершён — 8 сентября 2026, 22:49 МСК
 
 Статус: **implemented / live_verified (source runtime)**. Общий node.apply,
@@ -20,7 +22,7 @@ openai-codex / gpt-5.6-sol / low, без fallback. Frozen audit SHA256:
 сохранён по SHA; текущие28 сценарных проверок совпали с frozen audit.
 Client1029 PASS/1 SKIP и shell46 PASS; Python387 PASS. Все собственные прогоны
 завершены, соответствующих процессов в проверенном live process list нет.
-Индекс27 проверенных свидетельств: `.dock/text-import-v3/subplan03-completion-evidence-index.json`.
+Индекс27 проверенных свидетельств: `unavailable:artifact-5bceec89c040f0db`.
 
 Работы по цели03 не осталось. Следующий подплан04 — отдельная задача.
 Подпланы04–10 и выпуск V5 не приняты; production и установленный клиент не менялись.
@@ -123,8 +125,8 @@ Preflight PASS: existing ChatGPT openai-codex / gpt-5.6-sol / low, fallback=fals
 подтверждена стадия model_started (Sol/low). Перед продолжением опросить тот же
 handle; не запускать новый run из-за отсутствия вывода. Результат модели и
 полный аудит пока не получены. Подплан03 и release gates остаются открытыми.
-Evidence: `.dock/text-import-v3/remote-final-20260908-215200-a64d819b/`
-и `.dock/text-import-v3/hermes-runs/20260908-220328-c2a6b6f2/`.
+Evidence: `unavailable:artifact-88a023defa46f468`
+и `unavailable:artifact-6472705dd6356a65`.
 
 ---
 
@@ -159,7 +161,7 @@ Diagnostic `execute-1788892967560` на6e78b9a1…58811b прошёл без э�
 
 ## Текущий принятый source replacement
 
-`.dock/text-import-v3/execute-1788893151897/`, полный pin
+`unavailable:artifact-04b10fd52e85492a`, полный pin
 `8d8967cac2c274b7988596b04534570da13a6528fddc3a3fea15d7099cc5e9d5`.
 `independent-replacement-output-audit.json` PASS/8 negatives;
 `independent-replacement-schema-negative-audits.json`:4 negatives;
@@ -174,7 +176,7 @@ Harness30853 exit0; это component, не persistence/Hermes acceptance.
 
 ## Неверные числовые значения
 
-`.dock/text-import-v3/execute-1788893263296/` на том же полном pin.
+`unavailable:artifact-6034fb521ab96a31` на том же полном pin.
 Private fixture `invalid-values-diagnostic.mjs` (первый запуск до браузера
 отказал из-за относительного import; исправлены только harness imports).
 Исходные строки: 1/valid/1.5; bad/invalid integer/2.5; 3/invalid real/bad.
@@ -189,7 +191,7 @@ Execution `1788893265452-22n3xu3ddy7:588:1`, replay без browser; harness61597
 Матрица очищена от устаревших верхних баннеров; уточнены сохранность свойств,
 реальная граница обязательных import outputs и existing full-pin delivery audits.
 Не повторять уже принятые mode8/66fields/Close/delivery компоненты без нового
-пробела. Следом `tools/loginom-acceptance/remote-node-rehearsal.mjs` с новым
+пробела. Следом `packages/loginom-runtime/tools/loginom-acceptance/remote-node-rehearsal.mjs` с новым
 run directory и текущим pin: полный public node.apply/import, intermediate/final
 save, reopen без settings/mappings и свежий output. Только после независимого
 полного Codex verdict — Hermes openai-codex/gpt-5.6-sol/low, без fallback.
@@ -207,7 +209,7 @@ d5d46052…ec2c4b/82files: независимый journal audit PASS/7 negatives
 итоговый Codex import/save/reopen цикл, Hermes Sol/low и release gates.
 ## Принятый общий driver
 
-`.dock/text-import-v3/process-stop-1788892494212/`, полный pin
+`unavailable:artifact-06e4065a2a436104`, полный pin
 `d5d46052fc116eb02a8a1508abcfb0ad7840b2657b83b5fc14215bac03ec2c4b`.
 `independent-runtime-source-audit.json`:82files PASS.
 `driver-launch.json`, `multiple-stop-selected-driver.json`, execution-events.jsonl,
@@ -229,7 +231,7 @@ JavaScript handler и не самостоятельная полная node.appl
 
 ## Missing-source на полном текущем pin
 
-`.dock/text-import-v3/execute-1788892659203/`: fixture upload/download byte proof,
+`unavailable:artifact-c6191dcf8eb2a9a4`: fixture upload/download byte proof,
 затем удаление только этого fixture и новый import. Результат AMBIGUOUS,
 pending configure, WIZARD_SOURCE_VALIDATION_FAILED, без Execute/Done/выхода,
 replay без browser. `independent-source-error-audit.json` PASS/9 negatives;
@@ -260,7 +262,7 @@ Live принят на прежнем pin2843807e…448f9e; изменённый
 не принят. Следующий шаг — новый pinned harness на сохранённом fixture:
 `/user/dock-p3/packages/Multi-stop-1788891779759.lgp`, затем driver stop/replay audit.
 Пакет закрыт, harness8540 завершился exit0. Полный03 открыт, Hermes не запускался.
-Evidence: `.dock/text-import-v3/process-stop-1788891779759/`:
+Evidence: `unavailable:artifact-015e291c38048f32`:
 `multi-stop-with-output-schema.json`, `multi-stop-current.json`,
 `multi-stop-terminal-settled.json`, `multi-stop-independent-audit.json`.
 Execution `1788891782417-3wl7v4jrhv9:154:3`, group record194,
@@ -304,7 +306,7 @@ Help: `loginom-help/data/interface/processes-panel.md`; E2E:
 настройки визуализатора. Прежний отказ после raw operator Save As не воспроизвёлся
 через canonical package.save_checkpoint: штатный refresh navigation уже реализован.
 Остались multi-process stop, полная сверка матрицы, Hermes и release gates.
-Evidence: `.dock/text-import-v3/done-1788891175743/`:
+Evidence: `unavailable:artifact-cf2f5bd2a438d7bc`:
 `canonical-save-continuation.json`, `single-node-apply-result.json`,
 `single-apply-replay.json` (326→326), `canonical-final-save.json`,
 `final-reopened.json`, `final-execution-completed.json`, `final-reopened-output.json`.
@@ -325,7 +327,7 @@ save, обновление workflow navigation, свежий owned process и о
 
 # Подплан 03 — один node.apply с отдельным портом принят, 8 сентября 2026, 21:10 МСК
 
-Component PASS: `.dock/text-import-v3/done-1788890847120/single-apply-audit.json`,
+Component PASS: `unavailable:artifact-d608b458bf12aa7d`,
 5 negatives, проверен полный runtime pin
 `2843807e9a8ddfe1ca77e2cd1f698c312b3d9699951545afa7acc75bf0448f9e`/82files.
 Full client1009 PASS/1 SKIP (1010), exit0: `separate-journal-client-tests.txt`.
@@ -461,7 +463,7 @@ native tooltip «Выполнить узел», DOM qtip «Выполнить у
 scoped graph reader не включал toolbar. Это исправлено и покрыто regression.
 Копия Process-owner-1788889705006.lgp закрыта через UI до выхода harness99798.
 
-Успешный run `.dock/text-import-v3/done-1788889866132`:
+Успешный run `unavailable:artifact-cdfcec6876a6a278`:
 полный runtime `b57a583df4b9e24b7d9e2650bb63a904d492c81690c80622020b22a8592f42e5`,82files.
 Пакет `/user/dock-p3/packages/Process-owner-1788889705006.lgp` открыт writable.
 `graph-execution-baseline.json` root172, empty history; `common-graph-launch.json`
@@ -539,8 +541,8 @@ Sol/low. Полный03 не завершён. Production не менялся.
 node.apply и многопроцессная отмена этим изменением ещё не завершены.
 
 Focused tests55 PASS; полный client973 PASS/1 SKIP (974 total), exit0:
-`.dock/text-import-v3/process-owner-focused-tests.txt` и
-`.dock/text-import-v3/process-owner-client-tests.txt`.
+`unavailable:artifact-26cee433c272adf8` и
+`unavailable:artifact-3812f19aba9a8018`.
 Новые проверки покрывают чужой/похожий proxy, duplicate GUID/shared model,
 wizard surface, неоднозначную или неподтверждённую принадлежность процесса.
 
@@ -616,7 +618,7 @@ root discovery не включал Derived target grid в глобальные g
 положительными/отрицательными тестами. `batch-editor-current-reader.json`
 подтвердил live portal_bound и выбранный Id. Оба неполных draft отменены, без save.
 
-**Принятый полный batch run:** `.dock/text-import-v3/execute-1788887985822`.
+**Принятый полный batch run:** `unavailable:artifact-1cb56a03c44f97c8`.
 `batch-mapping-audit.json` — независимый PASS, полные82 runtime sources,
 15 journaled mutations,8 negatives. Проверены raw browser/native definitions,
 журнал prepared/completed, source preservation, типы и незапрошенные свойства:
@@ -662,7 +664,7 @@ Table reader показали MappedId/Код,Expr1 и строки `(1,0),(2,0)
   frozen Hermes FAIL не переоценён. Не считать component PASS заменой этой цели.
 
 Проверено: client **960 PASS / 1 SKIP** (961total),
-`.dock/text-import-v3/batch-editor-context-client-tests.txt`; earlier focused259
+`unavailable:artifact-0249bd4139046efb`; earlier focused259
 PASS и отдельный новый discovery regression PASS. Последние два аудитора повторены
 после закрытия run, `git diff --check` PASS. OpenViking healthy.
 Все handles участка terminal:47596,4585,51423,71608,56646 exit0;55686 exit1;
@@ -698,7 +700,7 @@ journal и browser receipt wrapper. Это ещё не готовая публи
   может отсутствовать; точные DOM/native hit, native parent и port tree index
   всё равно обязательны. Чужой явно заданный индекс отклоняется.
 
-**Основное evidence:** `.dock/text-import-v3/execute-1788886511372`.
+**Основное evidence:** `unavailable:artifact-0a0e29a14ee615b1`.
 `exclusion-channel-audit.json` — independent PASS, полные82 runtime sources,
 6 durable mutations (open,4 selection/exclusion clicks,1 typed Done),9 negatives.
 Аудитор сопоставляет raw browser replies, native source/target snapshots и journal;
@@ -740,7 +742,7 @@ operator execution, без полного process-freshness audit и без Herm
    открытия. Продуктовый opener уже использовал новый prepared prefix.
 
 Проверено: client **954 PASS / 1 SKIP** (955total),
-`.dock/text-import-v3/exclusion-final-client-tests.txt`; оба independent audit
+`unavailable:artifact-8568e448bbe1044b`; оба independent audit
 повторены после закрытия harness; git diff --check PASS. OpenViking healthy.
 Handles30025,41425,85883 terminal exit0. Run41425 завершил seed без operator
 команд из-за закрытого stdin; повтор85883 запущен только после terminal exit.
@@ -774,7 +776,7 @@ verified opening receipt и совпадении всех владельцев. 
 Это пока private primitive: **ещё не подключён к общей runtime operation gate,
 фазовому журналу node.apply и driver исключения**. Не считать готовым public API.
 
-Live evidence `.dock/text-import-v3/execute-1788883746976`:
+Live evidence `unavailable:artifact-4f9d2d0eb4b1eb31`:
 - Native `menu-wizard-binding.json`: graph node.data === tree.FModelNode;
   graph port.data === tree.FModelNodePort; правильный node GUID и native index0.
 - После выбора порта mxGraph shape.node становится отдельным hover-рисунком
@@ -795,7 +797,7 @@ Live evidence `.dock/text-import-v3/execute-1788883746976`:
   сессия начиналась на pin6baaa6a2…fdb2, исходники уточнялись в ходе диагностики.
 
 Проверено: focused34 PASS; client **947 PASS / 1 SKIP**, всего948.
-Логи `.dock/text-import-v3/optional-port-focused-tests.txt` и
+Логи `unavailable:artifact-da3315dc153fcb0b` и
 `optional-port-open-client-tests-final.txt`. Tests покрывают чужое меню, чужой
 мастер/порт, повтор операции, отказ до жеста и17 подмен native ownership.
 `git diff --check` PASS. Handles3759,22595,34512 terminal exit0.
@@ -819,7 +821,7 @@ Required=false, IsDerived=false, пустые SourceDisplayName/SourceDataType.
 Неизвестные группы, два видимых мастера и противоречивые записи отвергаются.
 Семантика прежнего ColumnsMappingEngineOutputPortWizard сохранена.
 
-Live diagnostic `.dock/text-import-v3/execute-1788883220223`:
+Live diagnostic `unavailable:artifact-26c0677b2c9dc42a`:
 - Новый импорт Execute/read3×3, затем отдельный Calculator `OptionalPortProbe`.
   Expression `0` → Next/done → Done → выходной порт; переход Next/done принят.
 - `groups-before.json` / `groups-after.json`: Title исключён одним кликом;
@@ -848,7 +850,7 @@ Live diagnostic `.dock/text-import-v3/execute-1788883220223`:
 матрицы и новый frozen Hermes Sol/low. Третий Hermes frozen FAIL не изменён.
 
 Client **940 PASS / 1 SKIP**, focused22 PASS (18 отрицательных вариантов
-исключения внутри теста). Лог `.dock/text-import-v3/optional-group-client-tests.txt`.
+исключения внутри теста). Лог `unavailable:artifact-bcc69a2ed7eeed6a`.
 `git diff --check` PASS. Handle48923 закрыт, exit0; handle66319 tests exit0;
 старый83426 отсутствует. Пакет диагностического Calculator не сохранялся.
 Production, установленный клиент и модель не менялись; Hermes не запускался.
@@ -942,7 +944,7 @@ Production/installed client unchanged; коммиты и deploy не выпол�
 # Подплан 03 — ожидание MCP перед Hermes исправлено, 8 сентября 2026, 17:53 МСК
 
 Подплан03 открыт. После принятого source-name/full-save цикла запущен второй
-Hermes run `.dock/text-import-v3/hermes-runs/20260908-174554-c8a23a63`,
+Hermes run `unavailable:artifact-0bdc1778e7aa13f8`,
 openai-codex/gpt-5.6-sol/low, тот же runtime3d4f64e6…faaa. Он завершился без
 инструментальных действий: модель сообщила, что Dock tools отсутствуют.
 Process0/completed=true не признан успехом; independent frozen audit FAIL:
@@ -987,7 +989,7 @@ Client935 PASS/1 SKIP (`source-binding-client-tests.txt`, handle12132 exit0),
 Python import116 PASS, node_apply16 PASS; старый sales persistence audit также
 повторно PASS. git diff --check прошёл.
 
-Real remote MCP run `.dock/text-import-v3/remote-binding-20260908-174000-b10dc217`,
+Real remote MCP run `unavailable:artifact-bd386923d2cf7fa3`,
 runtime `3d4f64e6dfc69e9244ca974199106948d9dc1960bae43573b8049bb2f37cfaaa`.
 81 runtime file independently verified. Использован смысловой запрос Hermes:
 source fields перечислены по типам, JSON keys сортированы. Новый импорт
@@ -1009,7 +1011,7 @@ FAIL без переписывания. Полная матрица03, новы�
 # Подплан 03 — Hermes выявил привязку полей по позиции, 8 сентября 2026, 17:36 МСК
 
 Подплан03 открыт. Автономный Hermes run
-`.dock/text-import-v3/hermes-runs/20260908-172751-b7e388d1` был действительно
+`unavailable:artifact-0b6dccc27d03654d` был действительно
 запущен на openai-codex/gpt-5.6-sol/low с frozen runtime c8dc7e60…d442.
 Delivery/SHA прошли. Первый node.apply отказал NOT_APPLIED/cleanup=true ДО
 создания узла: одинаковые navigation crumbs с порядком ключей label,tid
@@ -1022,7 +1024,7 @@ model, efficiency, tool_scope, two_import_operations. Старый аудит н
 
 Исправлен node-workflow-activation.mjs: сравнение tid/label по значениям,
 с сохранением проверки порядка breadcrumbs и отклонения реального изменения.
-Client **934 PASS / 1 SKIP**, `.dock/text-import-v3/json-order-client-tests.txt`,
+Client **934 PASS / 1 SKIP**, `unavailable:artifact-5007372272162257`,
 handle25901 exit0. Дополнительная ошибка экспорта: generic clean скрывал
 числовые *_tokens и весь efficiency.tokens. Теперь разрешены только неотрицательные
 int/None counters в process.usage и efficiency.usage_counts; строки/объекты/bool
@@ -1031,7 +1033,7 @@ counter_note. 11 focused Python tests и 4 export tests PASS. Старые от�
 не исправлялись задним числом; для новых runs действуют новые exporter/auditor.
 
 Реальное воспроизведение через remote MCP:
-`.dock/text-import-v3/remote-order-20260908-173300-aec90217`, pin
+`unavailable:artifact-582c3dd0642ddbbd`, pin
 `d72b2aab93f009dfcc6f5df967a74cb4ec7b1f99bcc631ea1e8aabb75022abe8`.
 Полные 81 runtime files проверены. Переслан исходный запрос Hermes с новой
 verified source identity и алфавитным порядком JSON keys. Workflow принят,
@@ -1043,7 +1045,7 @@ verified source identity и алфавитным порядком JSON keys. Wor
 **Точный следующий fix:** Hermes передал исходные поля с точным source_name,
 но сгруппировал по типам: Id, Quantity, UnitPrice, Region, Comment. CSV имеет
 порядок Id, Region, Quantity, UnitPrice, Comment. configureImport в
-client/lib/text-import-procedure.mjs связывает parameters.columns[i] с native
+packages/loginom-runtime/client/lib/text-import-procedure.mjs связывает parameters.columns[i] с native
 column i. Для нового fieldsOnly режима нужно связать каждое запрошенное поле
 по уникальному source_name (или name) с полностью наблюдённой parsed schema,
 сохранив native порядок; отвергать отсутствующие/дублирующиеся/неполные refs.
@@ -1062,7 +1064,7 @@ runtime_inventory_incomplete (`mode-provenance-audit-20260908-1728.json`).
 
 # Подплан 03 — измерения и матрица приёмки, 8 сентября 2026, 17:25 МСК
 
-Подплан03 открыт. Добавлен `tools/loginom-acceptance/node_efficiency.py`: отдельные
+Подплан03 открыт. Добавлен `packages/loginom-runtime/tools/loginom-acceptance/node_efficiency.py`: отдельные
 интервалы node_phase по original operation/receipt IDs, количество внешних вызовов
 по tool и provider-reported input/output/total/cache/reasoning tokens. Отсутствующие,
 отрицательные, bool/string counters не превращаются в нули. Cache/reasoning не
@@ -1079,7 +1081,7 @@ model usage counters: Hermes в этом прогоне не было. Данн�
 
 Текущий output auditor повторно принял восемь исторических режимов: empty,
 Windows-1251/1252, UTF-16LE/BE, TSV+skip+decimal comma, headerless и Boolean/datetime.
-Результаты: `.dock/text-import-v3/mode-evidence-recheck-20260908-1725.json`.
+Результаты: `unavailable:artifact-bc6cba3719807125`.
 Проверены исходные bytes и журналы settings/execution/output; это НЕ подтверждение
 полного inventory старых source pins. Режимы не запускались повторно в браузере.
 
@@ -1109,13 +1111,13 @@ verified source identity и тот же workflow; исходные configure/tot
 
 Изменены node-apply.mjs, executor.mjs, node-target-browser.mjs и
 node-workflow-activation.mjs. Полная client suite: **933 PASS / 1 SKIP**,
-`.dock/text-import-v3/workflow-recovery-client-tests-final.txt`, handle67830 exit0.
+`unavailable:artifact-e350c2edee98cb1e`, handle67830 exit0.
 Тесты проверяют раннее восстановление, блокировку конкурентного действия,
 истечение исходного срока, journal failure и чтение реального Page ledger
 без повторного переключения. git diff --check и Python compile прошли.
 
 Real Loginom operator fault diagnostic:
-`.dock/text-import-v3/execute-1788876971222`, runtime
+`unavailable:artifact-d5d35160b1e84e66`, runtime
 `c8dc7e600734e99c92b594b4f8f7492fe5ffbf489ee2e9539f273684a953d442`.
 `runtime-source-audit.json` независимо подтвердил все 81 runtime file и journal pin.
 Browser viewport=null, inner2044×1035, outer2044×1122, available2048×1122.
@@ -1126,7 +1128,7 @@ Browser viewport=null, inner2044×1035, outer2044×1122, available2048×1122.
 `1788876973340-omwb6r0051t:510:1`. Activation вызвана один раз, receipt read дважды.
 Повтор completed ID не обращался к браузеру. Harness handle61491 закрыт EOF, exit0.
 
-Новый `tools/loginom-acceptance/workflow_recovery_evidence.py` проверяет порядок
+Новый `packages/loginom-runtime/tools/loginom-acceptance/workflow_recovery_evidence.py` проверяет порядок
 pause → исходная квитанция → reconcile → explicit resume → live/source check → target.
 `workflow-recovery-audit.json`: recovery PASS и независимый полный import/output
 PASS. `workflow-recovery-negative-audit.json`: 10 подмен evidence отвергнуты.
@@ -1145,7 +1147,7 @@ sales save/reopen прогон на предыдущем pin остаётся о
 # Подплан 03 — полный remote sales цикл принят Codex, 8 сентября 2026, 17:09 МСК
 
 Подплан03 остаётся открыт. Реальный MCP-прогон
-`.dock/text-import-v3/remote-sales-20260908-165900-c97d23ef` завершён;
+`unavailable:artifact-021676fc2e083617` завершён;
 operator bridge handle79598 закрыт явной командой, exit0. Hermes не запускался.
 На runtime pin `23a3605277240ec2f3f41941422f3262c6a4e7c9d77933766f10f6afb87ee84a`
 проверены доставка 230 bytes/SHA f628…7eb3, полный node.apply нового импорта,
@@ -1168,10 +1170,10 @@ operator bridge handle79598 закрыт явной командой, exit0. Her
 контрактов PASS; git diff --check PASS. Новых изменений client runtime не было.
 
 Уточнён незакрытый recovery path по текущим исходникам: `inspectApply` в
-`client/lib/executor.mjs` пока возвращает результат только при durable node checkpoint;
+`packages/loginom-runtime/client/lib/executor.mjs` пока возвращает результат только при durable node checkpoint;
 для pending workflow отдельного чтения Page receipt нет. `activateWorkflow` в
-`client/lib/node-target-browser.mjs` читает исходную квитанцию только сразу после
-transport exception. `verifyContinuation` в `client/lib/text-import-node.mjs`
+`packages/loginom-runtime/client/lib/node-target-browser.mjs` читает исходную квитанцию только сразу после
+transport exception. `verifyContinuation` в `packages/loginom-runtime/client/lib/text-import-node.mjs`
 допускает лишь configure/output_mapping/finish и требует созданный channel/configured.
 Поэтому поздняя успешная workflow-квитанция пока не даёт проверенного продолжения
 до создания узла. Нужна согласованная read-only reconciliation исходной квитанции
@@ -1195,7 +1197,7 @@ transport exception. `verifyContinuation` в `client/lib/text-import-node.mjs`
 phase остаётся pending; полного позднего workflow inspect/resume ещё отдельно
 не подтверждено. Не объявлять его проверенным по completed receipt recovery alone.
 
-Real remote rehearsal `.dock/text-import-v3/remote-sales-20260908-165300-b17c20ad`,
+Real remote rehearsal `unavailable:artifact-323d8b3d63a7eb3a`,
 handle26281 завершён explicit close/exit0. Live pin
 `de4880ac07fea909874c669448005352675439b579fafa19bb4cbd4cd8788f4c`.
 Новый документ1788875532508-720aup1mia, viewport1508×862, outer1508×949 при
@@ -1220,8 +1222,8 @@ schema enum. Исходный результат прочитан обычным
 output.value (включая typed domain refusals). Тест проводит plain native object и
 NOT_APPLIED через реальный parseCapabilityResult. New client pin
 `23a3605277240ec2f3f41941422f3262c6a4e7c9d77933766f10f6afb87ee84a` пока без live.
-Source preflight254files PASS `.dock/text-import-v3/workflow-transport-preflight-20260908-1658.json`.
-Client **927 PASS / 1 SKIP** `.dock/text-import-v3/workflow-activation-client-tests.txt`,
+Source preflight254files PASS `unavailable:artifact-df055b36488f65d2`.
+Client **927 PASS / 1 SKIP** `unavailable:artifact-0d193131805626c1`,
 handle23472 terminal/exit0. Python import113 PASS, diff check PASS.
 
 Новый workflow_activation_evidence.py проверяет phase pair, original document/
@@ -1257,7 +1259,7 @@ node=null, только source; тот же ID не повторяет граф.
 AMBIGUOUS, cleanup=false, без node_phase_refused. Node apply/runtime52 PASS;
 node target/runtime23 PASS. Всего75 focused tests PASS; source preflight и diff check PASS.
 Текущий pin `dc7e07700a6db598da95d42cd760c6d2f635c15061b533e1191bea082e6388aa`.
-Evidence `.dock/text-import-v3/target-refusal-source-preflight-20260908-1648.json`.
+Evidence `unavailable:artifact-345dd5dda1d4ff0a`.
 Новый pin пока не проходил live; старый remote failure не переписан.
 
 Следующий шаг остаётся обязательным: explicit journalled активация исходной
@@ -1280,14 +1282,14 @@ Production/candidate/installed client не менялись, общий client s
 Текущий goal turn дал новое живое evidence, изменяющее следующий шаг. Подплан03
 открыт. Outer auditor предыдущего turn подключён, но live rehearsal не принят.
 
-Добавлен `tools/loginom-acceptance/remote-node-rehearsal.mjs`: отдельный настоящий
-client/bin/loginom-dock.mjs → remote candidate → браузер, операторские JSON-запросы,
+Добавлен `packages/loginom-runtime/tools/loginom-acceptance/remote-node-rehearsal.mjs`: отдельный настоящий
+packages/loginom-runtime/client/bin/loginom-dock.mjs → remote candidate → браузер, операторские JSON-запросы,
 реальные call/reply и execution journal, без модели/Hermes. Изолированные Dock
 state/profile, существующий browser cache; private-config читается по пути без
 публикации key. После проверки source-кода harness исправлен canonical PTY limit:
 raw stdin и явный {"operator":"close"}. Это исправление не меняет client runtime.
 
-Live evidence: `.dock/text-import-v3/remote-sales-20260908-163900-a83b04de`.
+Live evidence: `unavailable:artifact-ab564ec1b3a796a0`.
 Process handle81373 / PID29160 завершён EOF/exit0; bridge/browser закрыты.
 Session7bd23a32-3d18-4f3c-87cd-4b2bdf76346c, document1788874760255-vy6znglk9p.
 Настоящий candidate SHA936ef…44, оба save revision2, Loginom7.4.2.
@@ -1383,7 +1385,7 @@ phase-proof и не принимается straight-through компоненто
 Public delivery связывает prepared artifact/grant, destination/SHA/bytes и original
 upload ID с delivery request, completed journal и ответом, полученным до node.apply.
 Эти части ещё нужно подключить к outer auditor и полному effect accounting:
-они не заменяют проверку всех неподдержанных tools/вмешательств/фоновых эффектов.
+они не заменяют проверку всех неподдержанных unavailable:artifact-ac826a522baaeebf эффектов.
 
 `artifact_delivery_evidence.py`: выделен `verify_delivered_import_output` для
 обычной доставки без требования специального повторного вызова. Прежний
@@ -1392,7 +1394,7 @@ upload ID с delivery request, completed journal и ответом, получе
 legacy replay PASS, отсутствующий legacy replay отклонён, четыре подмены
 SHA/bytes/path/completion отклонены. Это проверка старого journal pin5b48…c1a53,
 не новая live-приёмка текущего source. Evidence:
-`.dock/text-import-v3/delivery-core-reaudit-20260908-1629.json`.
+`unavailable:artifact-ba5b92b9a8604ce0`.
 
 41 focused tests PASS, включая 5 новых public tests с 14 подменами node/save
 и 5 подменами delivery; diff check PASS. Client/runtime source не менялся.
@@ -1451,7 +1453,7 @@ Hermes до готовности auditor и Codex live rehearsal intermediate→
 реализационным прогрессом; после возобновления добавлены две независимые части
 будущего полного auditor, проверены исходники и состояние памяти (healthy).
 
-Goal-only `tools/loginom-acceptance/goals/node-apply-complete.txt` и run.py теперь
+Goal-only `packages/loginom-runtime/tools/loginom-acceptance/goals/node-apply-complete.txt` и run.py теперь
 задают полный импорт sales.csv: пять полей, mapping UnitPrice→Price/Цена первым,
 все шесть строк, промежуточный пакет, final save/reopen и повторное выполнение.
 Native Hermes skill описывает полные node/delivery tools и границы persistence.
@@ -1471,7 +1473,7 @@ negative cases включают 15 неверных бизнес-запросо�
 Source preflight PASS, 252 packaged files, build_inputs_match_commit=false.
 Текущий source pin после изменения native skill:
 `841e54de3e896f922303dbe340449c0ecaa04e75486206363f43100d4695e8f5`.
-Evidence: `.dock/text-import-v3/goal-contract-source-preflight-20260908-1618.json`.
+Evidence: `unavailable:artifact-cf62272716cbcdca`.
 Этот новый pin ещё не прошёл live-приёмку; прежний live PASS относится к pin5b48…c1a53.
 
 Следующий обязательный участок: связать новые проверки с actual bridge events,
@@ -1493,7 +1495,7 @@ Candidate/production/installed client не менялись; новых browser/
 
 ## Контракт и исправления
 
-client/lib/node-result-schema.mjs задаёт выходные схемы MCP для node job и delivery:
+packages/loginom-runtime/client/lib/node-result-schema.mjs задаёт выходные схемы MCP для node job и delivery:
 running/settled, stop/cancel, progress, полный node result, schema/rows/sample,
 precision/Null и частичные эффекты. node-contracts.d.ts согласован с текущими
 результатами, включая FAILED/cancelled, configuration, cleanup и локальный checkpoint.
@@ -1511,7 +1513,7 @@ node_apply_prepared также возвращает полную структу�
 
 ## Диагностика отказа upload и ограниченное обновление наблюдения
 
-`.dock/text-import-v3/execute-1788871931579`, pinffd6afce…21aa, handle69418
+`unavailable:artifact-d7a13ee4dd4324fe`, pinffd6afce…21aa, handle69418
 завершён EOF/exit1. Original upload deliver-source:upload был **resolved NOT_APPLIED**,
 UPLOAD_CONTEXT_CHANGED, effect_possible=false, cleanup=true. Это отказ ДО выбора
 файла, не потерянная отправка; original-upload-inspect.json и no-upload-effect-audit
@@ -1529,7 +1531,7 @@ NOT_APPLIED/cleanup=true, не начинает download и не разреша�
 
 ## Принятый live public результат
 
-`.dock/text-import-v3/execute-1788872268313`, handle82197 завершён exit0.
+`unavailable:artifact-ab515b7d7aee40c9`, handle82197 завершён exit0.
 Полный pin `5b48f9d876587b4cd33e622b5f57751d42aa6cbed4312c89ecf5d2b0eeec1a53`,80 files.
 Public MCP с выходными схемами → delivery → mapped import → fresh3×3 → final save/
 reopen → unchanged existing patch → новое3×3 output. Executions
@@ -1538,7 +1540,7 @@ reopen → unchanged existing patch → новое3×3 output. Executions
 Independent source/delivery/saved/public audits PASS; delivery8 negatives rejected;
 public15 calls. Это operator wire, не автономная Hermes приёмка.
 
-Client **919 PASS / 1 SKIP**, `.dock/text-import-v3/result-schema-refresh-client-tests.txt`,
+Client **919 PASS / 1 SKIP**, `unavailable:artifact-10544196d5912532`,
 handle7728 exit0; Python import113 PASS, preflight4 и provenance3 PASS, diff check PASS.
 26 ранее сохранённых public replies отдельно прошли schema compatibility — это
 проверка формы, не новая live-приёмка старых pins.
@@ -1554,7 +1556,7 @@ VPS release `/opt/loginom-dock/releases/20260908-catalog-node-apply1-5b48f9d8`.
 
 Реальный MCP bridge проверен с этим exact manifest: typed node/delivery tools и
 обе persistence actions доступны. Evidence в
-`.dock/text-import-v3/bridge-precheck-result-schema/candidate-verified.json` и
+`unavailable:artifact-64eae78b10680bd6` и
 `describe-node-apply1.json`; MCP config-node-apply1.json указывает на изолированную
 private-config.json с целевым стендом. Она содержит credentials: не печатать и не
 включать в публикацию. Native skill/модель/браузер эта проверка не запускала.
@@ -1591,7 +1593,7 @@ public MCP requests и независимые audits. Подплан03 ещё н
 Полный pin `56996d5effef78a8d1c9189c25c082268cb277d75eea34440f9e39b81e7ffc05`;
 независимо сверены79 файлов в обоих runs. Client runtime в этом участке не менялся;
 последний полный client suite911 PASS/1 SKIP относится к этим исходникам.
-Новый tools/loginom-acceptance/public-node-wire.mjs использует MCP Client/Server,
+Новый packages/loginom-runtime/tools/loginom-acceptance/public-node-wire.mjs использует MCP Client/Server,
 JSON input/output и тот же dispatchNodeApi, что bridge.mjs. --public-api подключает
 его к реальному браузеру из node-import-done-live.mjs. Node wait возвращает тот же
 worker, исходный apply/replay не повторяет effects. Save также проходит MCP.
@@ -1602,7 +1604,7 @@ worker, исходный apply/replay не повторяет effects. Save та
 
 ## Полная финализация
 
-`.dock/text-import-v3/execute-1788870945688`, handle74096 завершён exit0:
+`unavailable:artifact-a800ab9259fd47c9`, handle74096 завершён exit0:
 public delivery → mapped import → fresh3×3 → package.save_as → exact reopen →
 existing no-op patch → отдельное новое execution/output. Исходный execution
 `1788870947996-b5kw85ce5hk:489:1`, после reopen `1788870947996-b5kw85ce5hk:489:3`.
@@ -1615,7 +1617,7 @@ PASS/8 negatives. Public15 calls, две node operations. Проверены с�
 
 ## Возврат из другого каталога и промежуточное сохранение
 
-`.dock/text-import-v3/execute-1788871257106`, handle43147 завершён exit0:
+`unavailable:artifact-6c6e04eedc9246c7`, handle43147 завершён exit0:
 operator fixture по E2E filestorage.CreateFolderInCurrent создал и открыл
 `/user/dock-p3/Dock03-start-1788871262103`. Наблюдённые native toolbar/prompt и
 точный breadcrumb сохранены в browser replies / delivery-start-directory.json.
@@ -1663,7 +1665,7 @@ runs после двух terminal PASS не осталось на этом уч�
 `dock_node_apply`, `dock_node_resume`, `dock_node_status`, `dock_node_wait`,
 `dock_node_cancel`, `dock_node_stop`, `dock_artifact_deliver`,
 `dock_artifact_delivery_status`, `dock_artifact_delivery_resume`.
-Машинные входные схемы и dispatcher находятся в client/lib/node-api.mjs.
+Машинные входные схемы и dispatcher находятся в packages/loginom-runtime/client/lib/node-api.mjs.
 Новый импорт требует полных настроек; existing принимает patch. Проверка схемы
 дополняется исходным handler validator до UI effects. Node apply/resume возвращает
 background snapshot; wait timeout не завершает worker и не создаёт повтор.
@@ -1682,7 +1684,7 @@ full_node_apply_available остаётся false. Другие семь handlers
 Обычный executor-preview этих candidate tools не получает.
 
 Проверки: client **911 PASS / 1 SKIP**, exit0, handle27605 завершён.
-Evidence: `.dock/text-import-v3/public-node-api-client-tests.txt`.
+Evidence: `unavailable:artifact-afda8c904f361d81`.
 Проверены public schema + installed handler на complete new import / existing patch,
 некорректные/отменённые запросы без dispatch, lifecycle/delivery ID, MCP registration,
 capability cards, отказы до browser calls и фоновая взаимная блокировка.
@@ -1730,12 +1732,12 @@ Resume сначала inspect-ит исходный upload и пишет resume_
 Полный runtime pin `f34ec440017aff2f2da4e1cf4bdcc39348c1e948e0ad925675f07ab2a9b86b24`;
 в новых audits независимо сверены78 файлов.
 
-- `.dock/text-import-v3/execute-1788869725278`: AbortController после upload receipt,
+- `unavailable:artifact-d5889466e6d1f4c6`: AbortController после upload receipt,
   сохранён AMBIGUOUS исходного deliver; явный resume → inspect того же upload →
   единственный download/verify → import/mapping → новое Execute/output3×3.
   Execution `1788869727665-4t5mhucwtf6:483:1`. Independent delivery audit PASS,
   12 negatives rejected, runtime inventory audit PASS.
-- `.dock/text-import-v3/execute-1788869799702`: пауза после verification_completed.
+- `unavailable:artifact-3043fbd3eea914e8`: пауза после verification_completed.
   Resume подтвердил уже resolved transfer без нового upload/download, затем
   import/mapping → Execute/output3×3. Execution `1788869802590-33qvx79scqs:485:1`.
   Independent delivery audit PASS, 12 negatives rejected, runtime inventory PASS.
@@ -1748,7 +1750,7 @@ delivery-pause-checkpoint, delivery-result/replay, execution-events и independe
 
 ## Утрата исходного UI документа — принятый отказ
 
-`.dock/text-import-v3/done-1788869898408`: после той же паузы upload исходная
+`unavailable:artifact-3c84ddab3bb4ff5e`: после той же паузы upload исходная
 вкладка действительно закрыта. Начальная проверка diagnostic сравнила два разных
 вида document ID (prepare context против workspace-ui epoch) и отказала ДО закрытия.
 После адресного чтения актуального workspace-ui epoch operator продолжил ТОТ ЖЕ
@@ -1806,7 +1808,7 @@ node-mapping-context, node-operation-runner, port-mapping-procedure и agent-com
 В частности, diagnostic `execute-1788869080117` успешно прошёл controlled loss,
 но ещё использовал неполный старый pin f970f196…544c; он не принят как full pin.
 
-`runtime-pin.mjs` теперь автоматически включает все .mjs и .d.ts в client/lib,
+`runtime-pin.mjs` теперь автоматически включает все .mjs и .d.ts в unavailable:artifact-47995fe672cb178a,
 включая вложенные каталоги, плюс прежние явные внешние inputs (CLI, lockfiles,
 plugins/skills). Пути сортируются и дедуплицируются, source symlinks отвергаются.
 Session хранит clientSourceManifest с per-file SHA и общий clientRevision.
@@ -1838,7 +1840,7 @@ submission или terminal rejection; ни upload, ни выбор конфли�
 `c631c031099f8df977f7aacd81fe9de7d290af8fce642ee7da7fb8d3ed8dd2b0`.
 Независимо сверены все **78 source files** в каждом новом прогоне.
 
-- `.dock/text-import-v3/execute-1788869178263`: реальные upload и download
+- `unavailable:artifact-944a25bbe7491f65`: реальные upload и download
   завершились в браузере; operator harness намеренно потерял оба ответа ПОСЛЕ
   сохранения browser receipt. Оригинальные upload/verification ID восстановлены
   через inspect, затем mapping → новый Execute/output3×3 завершены.
@@ -1848,11 +1850,11 @@ submission или terminal rejection; ни upload, ни выбор конфли�
   **12 negatives rejected**, включая ложный transport code, чужой recovery ID,
   pending verification и отсутствие recovered receipt. Runtime inventory audit
   PASS и **4 negatives rejected**. Replay delivery/node ID не вызвал browser calls.
-- `.dock/text-import-v3/done-1788869311492`: reject повторно проверен на полном
+- `unavailable:artifact-0db6e291d358edaa`: reject повторно проверен на полном
   pin; исходные bytes сохранены, original upload terminal FAILED/resolved,
   independent post-decision download подтверждает исходный SHA. Audit PASS,
   10 negatives rejected и runtime source audit PASS.
-- `.dock/text-import-v3/done-1788869368492`: replace повторно проверен на полном
+- `unavailable:artifact-66f06b6e1ba32f74`: replace повторно проверен на полном
   pin; новые35 bytes подтверждены product verifier и отдельным operator download.
   Audit PASS, 10 negatives rejected и runtime source audit PASS.
 
@@ -1919,15 +1921,15 @@ replace-only семантику и schema; новые режимы относя�
 Общий fixed runtime:
 `f970f19680c4184800be2d87c8b353e4c684619a41ddc952fa743a3614d4544c`.
 
-- `.dock/text-import-v3/execute-1788868571590`: обычная доставка → imports.text
+- `unavailable:artifact-5ac656f2150eda98`: обычная доставка → imports.text
   с mapping → новое execution `1788868574101-65zqk2lgx78:469:1` → свежая таблица3×3.
   `independent-delivery-audit.json` PASS, 8 negatives rejected.
-- `.dock/text-import-v3/done-1788868695742`: seed64 bytes, затем новый разрешённый
+- `unavailable:artifact-9685a58fc1e7897c`: seed64 bytes, затем новый разрешённый
   кандидат35 bytes с тем же именем и overwrite=reject. Один «Пропустить»;
   original `deliver-conflict:upload` terminal resolved/FAILED. Повтор delivery ID
   без browser calls. Отдельное operator download после отказа подтвердило прежние
   64 bytes / SHA `98e7948fe81ddc0bf6911cf7235a521b90d79db239e25468e2f80a74a09f4a2f`.
-- `.dock/text-import-v3/done-1788868735576`: аналогичный seed и overwrite=replace.
+- `unavailable:artifact-fe4141f238571ef0`: аналогичный seed и overwrite=replace.
   Один «Заменить», новый кандидат35 bytes передан и проверен прежним product
   download verifier. Дополнительный независимый operator download подтвердил
   35 bytes / SHA `2293c73de3fd087e3133796e58019f7276883decce4e851e212add1f10da49c6`.
@@ -1979,7 +1981,7 @@ Live diagnostic50160 подтверждён живым. `delivery-navigation-ins
 зафиксировал native anchor без role. `delivery-root-live.json` подтвердил
 выдачу click, `delivery-root-click.json` — один жест с cleanup, затем отдельное
 чтение `delivery-root-after.json` подтвердило каталог `/` и отсутствие маски.
-Все evidence в `.dock/text-import-v3/execute-1788866367565`.
+Все evidence в `unavailable:artifact-d6681697b44fcae4`.
 Это operator diagnostic текущего сериализованного workspace reader; runtime
 старого процесса не обновлялся. Integrated acceptance нового pin из чужой ветви
 пока НЕ выполнен. Diagnostic50160 теперь в корне Files, а не в /user/dock-p3.
@@ -1995,7 +1997,7 @@ reject conflict/recovery, public contracts и полная Hermes приёмка
 
 # Подплан 03 — объединённая доставка и импорт приняты независимо, 8 сентября 2026
 
-Fixed-pin live `.dock/text-import-v3/execute-1788867498730` завершился exit0;
+Fixed-pin live `unavailable:artifact-25b08d273e8606a0` завершился exit0;
 runtime `b35140e09b86ee130e46a909c29995b50edbdc1edc7972a335f942eab283b960`.
 Private coordinator выполнил delivery → import configure/mapping → один новый
 Execute → свежий output3×3. Source `/user/dock-p3/Dock03-done-1788867503155.csv`,
@@ -2078,11 +2080,11 @@ identity и runtime facade gate. Full client868 PASS/1 SKIP
 Harness получил opt-in --integrated-delivery; остальной старый uploadSource путь
 сохранён. В integrated mode request source ссылается на child upload ID delivery.
 
-Live diagnostic `.dock/text-import-v3/execute-1788866367565`, handle **50160**
+Live diagnostic `unavailable:artifact-d6681697b44fcae4`, handle **50160**
 жив и ждёт stdin. Startup pin `9b1d9da842e750d559f4cdcfeb0a2be5868a2b40c24fc3d333394ee68788c11d`.
 Initial deliver-source остановился до навигации: Files button находился на следующей
 странице наблюдения. Исправление пагинации проверялось через cache-busted module
-в operator script `.dock/text-import-v3/delivery-debug.js`; это НЕ fixed-pin
+в operator script `unavailable:artifact-31d77ea93e793990`; это НЕ fixed-pin
 приёмка полного coordinator/facade. Последующие diagnostics исправили loading
 и спуск из текущего родительского каталога. Не перепутать с production acceptance.
 
@@ -2123,7 +2125,7 @@ failure; timeout записывается в журнал. Execution driver пр
 Transport errors, смена root/group и terminal failure не повторяются как timeout.
 Completed проверяется до stop signal, сохраняя уже принятую семантику гонки.
 
-Fixed-pin live diagnostic `.dock/text-import-v3/process-stop-1788865826349`, runtime
+Fixed-pin live diagnostic `unavailable:artifact-7f0fa9d6f359363a`, runtime
 `002cfe04e67d47f7dd9abbe6197426e006c75332e0366a1093db2b4625bb609c`.
 JS fixture конечный60s, вне release node-type inventory. Prepared document
 `1788865828869-00dq2hd3pho7k`, node `96387aea-c6c2-481b-9786-d81241b497a5`.
@@ -2138,14 +2140,14 @@ Independent `verify_long_execution_stop` подтвердил runtime/session/jo
 неизменный running group до и после timeout, terminal cancellation, cleanup,
 один Cancel и отсутствие replay. PASS/9 negatives:
 `independent-long-wait-audit.json`, `independent-long-wait-negatives.json`.
-Local runner `.dock/text-import-v3/audit-long-wait-stop.py`.
+Local runner `unavailable:artifact-1019d2f61448d4e2`.
 Full client859 PASS/1 SKIP (`long-wait-client-tests.txt`), focused49 PASS;
 Python compile и git diff --check PASS. Handle99583 ждёт stdin с terminal cancelled
 и несохранённым package. Это generic execution-driver acceptance, не полный
 runtime stopNodeApply на длительном imports.text.
 
 Также выполнен новый реальный typed import450000 rows (даты/boolean),
-`.dock/text-import-v3/execute-1788865649321`, прежний pin65c670d2…5d5b.
+`unavailable:artifact-87c79aeff4875aab`, прежний pin65c670d2…5d5b.
 Execution `1788865651580-h7bhel9tm1r:461:1` уже completed к stop request;
 свежий typed output и completed race приняты independent audit/7 negatives.
 Handle2021 exit0, browser закрыт, audit88029 exit0. Повторять этот быстрый fixture
@@ -2186,7 +2188,7 @@ Source runtime tests: cancellation держит gate до cleanup, retains parti
 не читает выход, не повторяет stop/start, отказывает до execution identity,
 сохраняет unknown stop. Full client857 PASS/1 SKIP (`runtime-stop-client-tests.txt`).
 
-Fixed-pin live import `.dock/text-import-v3/execute-1788865424381`, runtime
+Fixed-pin live import `unavailable:artifact-00dbf59da4c1c8c7`, runtime
 `65c670d288d36044040bee24b2ce128963c52f45b7a09a9eabe198e02bc25d5b`.
 Запущен harness --async-node --request-server-stop --execute --read-output
 --mapped-output. Stop был запрошен из завершившегося browser observation при
@@ -2222,7 +2224,7 @@ Expected proof формируется по process inventory, но разреш�
 cancelled. Source tests покрывают foreign owner, unknown receipt, replaced
 terminal record, completed race и повторный вызов.
 
-Fixed-pin live run `.dock/text-import-v3/process-stop-1788865003876`, runtime
+Fixed-pin live run `unavailable:artifact-fc8ebc15231ddaab`, runtime
 `40184250f2f51b6fb44a48bb10c359979bc70c11c2ca209e42c0243e7afd9faf`.
 Prepared document `1788865006494-oqtfu18q6ji`; JS diagnostic node
 `d82b2904-94cc-435d-b2bf-8a93f0f986c6`. Execution
@@ -2239,7 +2241,7 @@ Independent `verify_journalled_process_stop` в `process_stop_evidence.py`
 PASS, 7 negatives rejected: runtime/replay/duplicate/missing receipt/missing
 terminal/foreign owner/unsafe retry. Evidence:
 `independent-stop-driver-audit.json`, `independent-stop-driver-negatives.json`.
-Local audit runner `.dock/text-import-v3/audit-stop-driver.py`.
+Local audit runner `unavailable:artifact-eddf735953345711`.
 Полный client854 PASS/1 SKIP (`stop-driver-client-tests.txt`), focused32 PASS.
 
 Следующий участок — общий stop lifecycle в runtime и imports.text. Нельзя
@@ -2265,7 +2267,7 @@ Private UI primitive `cancel_process` добавлен. Меню выдаёт т
 signature и повторно сверяется перед кликом. Generic click/press на Cancel,
 header/cancel-all и небезопасная подмена node не допускаются.
 
-Live evidence: `.dock/text-import-v3/process-stop-1788863665780`.
+Live evidence: `unavailable:artifact-fba85dc27f8b3855`.
 Новый execution `1788863667979-qk793g3tfro:142:2`, group145/child146.
 `stop-typed-live.json` содержит baseline и running; первая отдельная act была
 NOT_APPLIED/UI_EPOCH_CHANGED/effect_possible=false, без клика. Она НЕ означала
@@ -2304,7 +2306,7 @@ E2E `tests/toreview/acceptance/wizards/javascript/js_general.ts` подтвер�
 выполнение JS без входных/выходных данных; это только diagnostic fixture,
 не JavaScript handler и не расширение release scope03.
 
-Живой session: `.dock/text-import-v3/process-stop-1788863665780`, handle **64929**.
+Живой session: `unavailable:artifact-fba85dc27f8b3855`, handle **64929**.
 Runtime e5c5f7b3…ec37d04. Prepared doc `1788863667979-qk793g3tfro`, workflow с
 суффиксом `-1`, JS GUID `42b740a4-924d-4cb0-925a-a0c7da1c1aaf`.
 Один запуск F9 после проверки выбранного native node; execution
@@ -2324,9 +2326,9 @@ pointer полезен для будущего pre-gesture ownership guard. Capt
 привязку. Group cancel-all/header никогда не использовался.
 
 Подготовка воспроизводится стартовым harness
-`tools/loginom-acceptance/node-process-stop-live.mjs --loginom-url ... --loginom-user user`
+`packages/loginom-runtime/tools/loginom-acceptance/node-process-stop-live.mjs --loginom-url ... --loginom-user user`
 с tty. Он проверяет maximized/viewport:null и ждёт stdin scripts.
-Локальные operator scripts в `.dock/text-import-v3/`: `stop-add-js.js`,
+Локальные operator scripts в `unavailable:artifact-e03d84ff00f108c4`: `stop-add-js.js`,
 `stop-js-open.js` (теперь Setting), `stop-js-next.js` (input → columns → code;
 после code → Done), `stop-js-code.js`, `stop-js-done.js` (сохраняет node settings
 без Execute и создаёт ctx.binding), `stop-js-launch-inspect.js`,
@@ -2370,7 +2372,7 @@ long/recovery/unknown/delivery/public/Hermes требования03.
 Оба independent audits PASS, по 7 negatives. Evidence: `async-cancel.json`,
 `async*-start/probes/final.json`, `independent-async-cancel-audit.json`,
 `independent-async-cancel-negatives.json` в соответствующих run-dir.
-Скрипт `.dock/text-import-v3/audit-async-cancel-resume.py`; predicate
+Скрипт `unavailable:artifact-ee0e96f63fdd4583`; predicate
 `verify_background_cancel_resume` в `import_continuation_evidence.py`.
 Процессы92310 и95094 завершились exit0, приёмочные браузеры закрыты.
 Пакеты не сохранялись. Server stop этим не доказан.
@@ -2385,7 +2387,7 @@ failed/parent_cancelled/parent_failed. Числовые enum ordinals кроме
 проверены focused fixtures, не live acceptance.
 Источник: E2E `bg/sels/sProgressForm.ts` и статический UI source
 `http://logi-test-plan.bg.local/app/bg/progress/ProgressForm.js`, локальная
-диагностическая копия `.dock/text-import-v3/ProgressForm.js`. DoActionStop/DoCancelProcess
+диагностическая копия `unavailable:artifact-901096de91053b3c`. DoActionStop/DoCancelProcess
 (391–407) отменяют точную запись; header stop (155–169) относится ко всем процессам
 и не должен использоваться для адресной отмены. Никаких RPC Cancel напрямую
 не вызывалось, серверная остановка ещё не реализована.
@@ -2432,7 +2434,7 @@ start + повтор start → status/wait → один Execute → output3×3, 
 PASS. Execution `1788862941193-upbu49ih65:451:1`; семь evidence mutations
 отвергнуты. Файлы в run-dir: `async-start.json`, `async-probes.json`,
 `async-final.json`, `independent-async-audit.json`, `independent-async-negatives.json`.
-Скрипт `.dock/text-import-v3/audit-async-node.py`, predicate
+Скрипт `unavailable:artifact-c65a8427bc8822c0`, predicate
 `verify_async_import_run` в `import_continuation_evidence.py`.
 Harness: `--async-node` с обычным new import; старые pause fixtures отдельно.
 Процесс20148 завершился exit0, приёмочный браузер закрыт. Сохранение пакета,
@@ -2464,7 +2466,7 @@ read-only continuity check → wait/Show Node ownership → output3×3.
 Evidence в run-dir: `independent-finished-resume-audit.json`,
 `independent-finished-resume-negatives.json`, `paused-result.json`,
 `paused-inspect.json`, `result.json`. Скрипт `audit-finished-resume.py` находится
-в `.dock/text-import-v3/`; независимый predicate — `import_continuation_evidence.py`.
+в `unavailable:artifact-e03d84ff00f108c4`; независимый predicate — `import_continuation_evidence.py`.
 
 Finish receipt теперь содержит continuity surface: UI document/revision,
 prepared graph node, native process inventory и выходной порт. Resume допускается
@@ -2547,7 +2549,7 @@ prepared wizard, полную последовательность native header
 в run-dir подтверждают малую схему. Wide66 run `execute-1788861563443` на том же
 runtime завершился успешно: independent audit PASS, 66 полей / 132 значения,
 восемь подмен отвергнуты. Процесс завершился, приёмочный браузер закрыт.
-Независимый скрипт `.dock/text-import-v3/audit-mapped-resume.py <run-dir>`
+Независимый скрипт `unavailable:artifact-ff0c282e094f0004 <run-dir>`
 проверяет исходные bytes, resume и output; wide результат принят в этом scope.
 
 Следом: live отказ при изменении
@@ -2591,7 +2593,7 @@ Evidence: `paused-ui-mutation.json`, `independent-refused-resume-audit.json`,
 
 Контекст handle61074: execute/session/dir/fs/runtime/request/prep,
 `ctx.continuationBinding`. stdin protocol:
-`{"file":".dock/text-import-v3/<script>.js","id":"<result>"}`.
+`{"file":"unavailable:artifact-e03d84ff00f108c4<script>.js","id":"<result>"}`.
 Deadline исходной операции ограничен и истекает; не сбрасывать его вручную.
 Пакет не сохранён, узел не выполнен. При продолжении проверить handle и UI.
 Старые diagnostic handles67499/66047 перечислены ниже; сейчас не перепроверялись.
@@ -2653,7 +2655,7 @@ node/document/workflow при Done/Execute (до двух раз), без пов
 - tool handle66047: `execute-1788860656516`, failed post-Execute наблюдение,
   граф/консоль процессов, unsaved; `ctx.continuationBinding`,
   `finish-inspect.json`, `completed-process-inspect.json`. Deadline истёк.
-stdin protocol: `{"file":".dock/text-import-v3/<script>.js","id":"<result>"}`.
+stdin protocol: `{"file":"unavailable:artifact-e03d84ff00f108c4<script>.js","id":"<result>"}`.
 Контекст: execute/session/dir/fs/runtime/request/prep и diagnostic bindings.
 Никаких продолжающихся жестов или Hermes в этих сессиях нет; новые acceptance
 процессы завершены. Изменения остаются незакоммиченными в рабочем дереве.
@@ -2668,7 +2670,7 @@ stdin protocol: `{"file":".dock/text-import-v3/<script>.js","id":"<result>"}`.
 
 Адресный Field66 diagnostic прошёл независимый аудит после добавления проверки
 строго привязанной прокрутки в аудитор; четыре негативные подмены отвергнуты.
-Evidence: `.dock/text-import-v3/execute-1788851953134/independent-resumed-point-audit.json`
+Evidence: `unavailable:artifact-4c96861c6ccc7ec7`
 и `independent-resumed-point-negatives.json`. Это draft, не fixed-pin persistence.
 
 Новый wide66 run `execute-1788859588975`, runtime `65c77641…af51e`, завершил
@@ -2696,7 +2698,7 @@ port mapping 6 PASS, git diff --check PASS.
 того же неизменённого run PASS, source runtime после него не менялся.
 После исправления аудитора Python import evidence **120 PASS**; mapping **6 PASS**.
 Полный client suite после правки: **827 PASS / 1 SKIP**,
-`.dock/text-import-v3/post-pages-client-tests.txt`; процесс завершился exit0.
+`unavailable:artifact-f1841a63046f96db`; процесс завершился exit0.
 
 Следом: выполнить живую диагностику безопасного continuation/recovery и
 закрыть остальные обязательства 03: integrated file
@@ -2744,7 +2746,7 @@ Live `wide-mapping-diagnose.json` доказал: строка Field66 част�
 наблюдение видит доступную точку y793.75, но действие проверяло скрытый центр
 ячейки y799.5. Viewport1508×862, native window1508×949 подтверждены.
 
-В `client/lib/workspace-ui.mjs` выходные cells теперь используют свежую
+В `packages/loginom-runtime/client/lib/workspace-ui.mjs` выходные cells теперь используют свежую
 `interaction.point`, затем повторно проверяют реальное попадание перед жестом.
 Добавлен тест частичного перекрытия и отказа, если ячейку закрыли после чтения.
 Весь workspace-ui suite **225 PASS** (`mapping-visible-point-tests.txt`).
@@ -2760,16 +2762,16 @@ fixed-pin полного 66-field acceptance после исправления �
 ## Живые процессы и состояние черновиков
 
 1. **25375**: operator diagnostic, каталог
-   `.dock/text-import-v3/execute-1788851953134`.
+   `unavailable:artifact-4bbfe488c8887a2b`.
    TF-1 Import03Done, основной output mapping wizard открыт, редактора поля нет.
    Все 66 source полей настроены. Только Field66 переименован адресным diagnostic;
    Field65 и перестановка двух последних полей ещё не сделаны, autosync ещё true.
    Node Done/Execute не выполнены; пакет этого запуска не сохранён.
    `ctx.mappingBinding` подготовлен в `wide-mapping-diagnose.js`;
    `ctx.mappingFieldChannel`/operation — последний diagnostic, deadline истечёт.
-   stdin protocol: `{"file":".dock/text-import-v3/<script>.js","id":"<result>"}`.
+   stdin protocol: `{"file":"unavailable:artifact-e03d84ff00f108c4<script>.js","id":"<result>"}`.
    Context здесь: execute/session/dir/fs плюс сохранённые diagnostic bindings.
-2. **7127**: исходный `.dock/text-import-v3/live-1788831557489`.
+2. **7127**: исходный `unavailable:artifact-3d794832fdc91822`.
    TF-4 на графе; Import03Done ранее выполнен, output order:
    Id(string из Title), AmountMapped(real из Amount), Title(integer из Id).
    Последние изменения `/user/dock-p3/Dock03-refresh-1788846018997.lgp` не сохранены.
@@ -2810,7 +2812,7 @@ native схеме и двусторонним связям records. Отсутс
 
 Fixed-pin полный verified upload → configure → rename cycle/order/autosync=false →
 Execute → новый Table/read 3×3 → возврат в граф: **independent audit PASS**,
-`.dock/text-import-v3/execute-1788851403379`, runtime
+`unavailable:artifact-4671501a4288d00b`, runtime
 `f32f94540a30289713b6f81a9f54be91b4c7fd674207980232db8031213fb352`.
 Выход: AmountMapped/«Сумма выхода» из Amount, Id/«Название» из Title,
 Title/«Номер» из Id. Все девять значений проверены по исходным bytes;
@@ -2851,8 +2853,8 @@ Production, опубликованный catalog, установленный к�
 
 ## Диагностический checkpoint
 
-Persistent process **7127** жив, `.dock/text-import-v3/diagnostic.mjs`,
-`.dock/text-import-v3/live-1788831557489`. `ctx.mappingBinding` актуален для TF-4:
+Persistent process **7127** жив, `unavailable:artifact-25545c09daa18f0f`,
+`unavailable:artifact-3d794832fdc91822`. `ctx.mappingBinding` актуален для TF-4:
 workflow `1788831561418-ie6zeq98eb-2`, node
 `f317ab92-e07f-49b1-bb98-2eac13150080`. Старый `ctx.savedPrep` не использовать.
 После отдельного port wizard вернулись в граф, снова открыли основной мастер
@@ -3266,7 +3268,7 @@ run содержит package_saved=false для исходного node.apply; �
 Проверки: **client 774 PASS, 1 SKIP**, **все Python evidence 161 PASS**
 (в том числе import 114 PASS), syntax check harness и git diff --check PASS.
 Логи `saved-import-client-tests.txt`, `saved-all-evidence-tests.txt` в
-`.dock/text-import-v3/`. Production/installed client не менялись, Hermes не запускался.
+`unavailable:artifact-e03d84ff00f108c4`. Production/installed client не менялись, Hermes не запускался.
 
 Следующий шаг: отдельное промежуточное сохранение без close/reopen с независимым
 persisted-state verifier, затем конфликты и безопасное восстановление. Полный
@@ -3432,7 +3434,7 @@ Production не менялся; весь scope подплана сохранён
 ограниченную cause в NODE_APPLY_STOPPED; остальные raw receipt данные не копируются.
 
 Живой diagnostic `source-validation-new-path` в
-`.dock/text-import-v3/live-1788831557489/` подтвердил отказ для нового пути
+`unavailable:artifact-2625d74df7df8754` подтвердил отказ для нового пути
 `/user/dock-p3/Dock03-missing-1788841151511.csv`: один Next,
 ошибка через 784 ms, cleanup_complete=true, stage остался text_import_file.
 Это диагностический channel, не fixed-pin целый node.apply acceptance.
@@ -3546,7 +3548,7 @@ format (изменения); это навигация внутри одного
 `source.encoding=Windows-1251`, `format.null_marker=NA` при сохранении остальных
 source/format/column properties. Fixed-pin цепочка seed Execute → этот patch →
 новый Execute/read/возврат в сценарий прошла independent audit:
-`.dock/text-import-v3/execute-1788838656571`, runtime
+`unavailable:artifact-ac148199ec1ae409`, runtime
 `6b538b16f1c9af748d5f4602caff0891b10fad7cc3e0ea0ed87d611afc300ea3`.
 Выход 3 × 3 сверен с исходными bytes: прежнее Null теперь строка `NULL`, значения
 чисел сохранены. Файл этого patch-прогона ASCII; приёмка разных кодировок с
@@ -3594,7 +3596,7 @@ view GUID и port GUID; после — тот же узел, активный п
 
 Fixed-pin цепочка **verified bytes/upload → seed Execute/read → возврат →
 existing partial label → Execute/read → возврат** прошла independent audit:
-`.dock/text-import-v3/execute-1788838091682/`, runtime
+`unavailable:artifact-2f3787e233385295`, runtime
 `6313491fe43be085417768dba56f5e031845e895f01ed64528d6e066828091e3`.
 Оба выхода 3 × 3 проверены по исходному файлу; разные Table GUID и execution IDs.
 Повтор каждого operation ID не обращался к браузеру. Приёмочный процесс `57712`
@@ -3733,7 +3735,7 @@ Pager и независимое сравнение raw/delivered evidence сох
 отбрасывает смешанный снимок и допускает до двух повторных чтений того же GUID;
 это не повтор жеста и не разрешение сменить пакет/узел.
 
-Evidence `.dock/text-import-v3/live-1788831557489/`:
+Evidence `unavailable:artifact-2625d74df7df8754`:
 - `deactivation-open-3.json`, operation deactivation-open-diagnostic-3:
   открытие настроек активного Import03 → точный вопрос → обычное «Да» → мастер;
   `independent-deactivation-open-audit.json` PASS.
@@ -3752,7 +3754,7 @@ Evidence `.dock/text-import-v3/live-1788831557489/`:
 Новый wizard_open_evidence.py независимо проверяет последовательность opening,
 связь исходного control с вопросом, native GUID и окончательный wizard owner.
 Python evidence **139 PASS**. Итоговый client suite: **732 PASS, 1 SKIP**
-(733 tests), `.dock/text-import-v3/deactivation-full-client.txt`.
+(733 tests), `unavailable:artifact-68582e5e5cd87fd9`.
 `git diff --check` и syntax check нового модуля — PASS.
 
 Границы: всё это Codex source diagnostics с обновлением модулей между этапами;
@@ -3785,7 +3787,7 @@ source_name. Сохраняются порядок, остальные поля,
 Параметры caller не изменяются. Сохранность незаданных format проверяется также
 после редактирования колонок. Для нового узла остаётся полный контракт.
 
-Живая диагностика в `.dock/text-import-v3/live-1788831557489/`:
+Живая диагностика в `unavailable:artifact-2625d74df7df8754`:
 - `existing-patch-run.json`: только Amount.label = «Сумма», 33 внутренних шага,
   исходные Id/Title, типы/виды/used, источник и формат сохранились.
 - `independent-patch-draft-audit.json`: PASS. Новый import_patch_evidence.py
@@ -3835,7 +3837,7 @@ recovery и финальный Hermes Sol/low. Все требования ка�
 encoding и числовой rows_to_skip; пустой путь нового узла остаётся допустимым.
 Private openWizard использует это условие перед чтением исходных параметров.
 
-Evidence в `.dock/text-import-v3/live-1788831557489/`:
+Evidence в `unavailable:artifact-2625d74df7df8754`:
 `existing-setup-configure.json`, `existing-setup-execute.json`,
 `existing-deactivation-probe.json`, `existing-deactivation-confirm.json`,
 `existing-source-settled.json`, `source-readiness-evidence.json`.
@@ -3986,7 +3988,7 @@ Windows-1251, Windows-1252, UTF-16 LE и UTF-16 BE; неизвестные ко�
 Все прогоны проверили verified upload → configuration → новый Execute →
 Table output и повтор завершённого ID без browser calls. Каждый браузер закрыт.
 Полные журналы и `independent-output-audit.json` находятся в указанных
-каталогах `.dock/text-import-v3/`. Это не persistence/reopen/Hermes evidence.
+каталогах `unavailable:artifact-e03d84ff00f108c4`. Это не persistence/reopen/Hermes evidence.
 
 Неуспешные попытки сохранены без PASS:
 - `execute-1788829734063`: до upload общий список файлов превысил scan work.
@@ -4072,11 +4074,11 @@ binding, так и в каждой data page. Table dialogs в общем sequen
 
 **Fixed-pin live acceptance на неизменном source runtime**
 `010f8ca8108208221a9f1b5e0d4d5a8bcd7fb9b43b757249ab2b7a0e04e35f00`:
-- `.dock/text-import-v3/execute-1788829061870`: 3 поля × 3 строки,
+- `unavailable:artifact-d1c01ede821583d6`: 3 поля × 3 строки,
   `independent-output-audit.json` PASS. Execution ID
   `1788829066109-tofm1xq73t:239:1`. Проверены quoted delimiter, empty, Null,
   положительная дробь, отрицательная дробь, ноль и integer; replay без browser calls.
-- `.dock/text-import-v3/execute-1788829365991`: 66 полей × 2 строки,
+- `unavailable:artifact-92aacd272be33148`: 66 полей × 2 строки,
   `independent-output-audit.json` PASS, 1367 внутренних шагов; execution ID
   `1788829370272-onf7n5z5lpa:241:1`. Полный source/configuration/new execution/output
   chain, 132 ячейки, offscreen format/data pages, replay без browser calls.
@@ -4090,7 +4092,7 @@ binding, так и в каждой data page. Table dialogs в общем sequen
   происхождение произвольного переданного файла.
 
 Client **707 PASS, 1 SKIP** (708 tests),
-`.dock/text-import-v3/typed-output-full-client.txt`.
+`unavailable:artifact-b13b9b165ae453e5`.
 Python import evidence **79 PASS**, procedure evidence **15 PASS**:
 `typed-import-evidence-tests.txt`, `typed-procedure-evidence-tests.txt`.
 Проверяются отсутствующие/чужие данные, старый Table, чужой execution/port/node,
@@ -4140,7 +4142,7 @@ Zero rows/schema-only поддержаны source tests; их live acceptance е
 по-прежнему не разрешает повтор. Новая проверка покрывает этот случай.
 
 Live evidence (mixed source diagnostics, **не fixed-pin whole-goal acceptance**):
-- `.dock/text-import-v3/live-1788826828762/wide-data-prepare.json`: Cancel старого
+- `unavailable:artifact-749e4b0aa10f90bc`: Cancel старого
   диагностического Format, включение Null/type icons, применение filter=false.
 - `wide-data-scroll-native.json`: actual horizontal grid x=81, width=1420,
   scrollWidth=5420, overflowX=auto; последний header вне окна. Это UI scroller,
@@ -4157,14 +4159,14 @@ Live evidence (mixed source diagnostics, **не fixed-pin whole-goal acceptance*
   Проверены все имена/порядок/строки, integer values и точное IEEE-754 binary64
   равенство real после разбора локализованной UI-строки. PASS относится только
   к этому сравнению; upload/execution ownership/persistence этим не проверены.
-- `.dock/text-import-v3/live-1788824197802/small-output-pages-read.json`: 3 × 3,
+- `unavailable:artifact-d76fdfd86d5e7615`: 3 × 3,
   1 шаг, строка `one;two`, empty, Null и точные real display strings.
 
 Client **692 PASS, 1 SKIP**, всего 693 tests:
-`.dock/text-import-v3/horizontal-final-client.txt`. Native context/paging guards,
+`unavailable:artifact-e2df5476e36292c9`. Native context/paging guards,
 Table scroller owner, отсутствие движения, schema changes и page refresh покрыты.
 `git diff --check` PASS. Новый helper входит в runtime inputs.
-Source preflight `.dock/text-import-v3/horizontal-preflight.json`:
+Source preflight `unavailable:artifact-a261df892cf92ba7`:
 `1fa47a0c84a7a7195814c70049f7909245d7e65a3cee09bddcce1b554b3749d6`.
 Python import evidence не менялся; полный независимый Table auditor ещё нужен.
 Production, установленный клиент и Hermes не изменены.
@@ -4206,7 +4208,7 @@ Integer=4, String=5, Variant=6).
 сообщение о смене владельца. Новый helper включён в client revision inputs.
 
 Живые диагностические свидетельства (mixed source, **не fixed-pin acceptance**):
-- `.dock/text-import-v3/live-1788826828762/wide-table-create.json`: новая Table
+- `unavailable:artifact-f99df1d6b3e6a0e9`: новая Table
   выхода 0, 11 шагов. Узел уже выполнен один раз; `execute-wide-once.json`.
 - `wide-format-page-boolean.json`: 66 полей, первая страница 8, видимое окно 0–12.
   Первые два read probes ошибочно возвращали строку вместо boolean readiness;
@@ -4220,17 +4222,17 @@ Integer=4, String=5, Variant=6).
 - `wide-precision-roundtrip.json`: отдельный диагностический reopen Format,
   все 66 cached masks совпали (65 integer и 1 real), mismatches=[]; всего 883
   шага канала, включая отдельные проверки после отказа.
-- `.dock/text-import-v3/live-1788824197802/paged-small-precision.json`: обновлённый
+- `unavailable:artifact-17ed03371593c348`: обновлённый
   paged driver, включая native stored mask check и закрытие диалога, завершился
   на трёх полях за 25 шагов. Это diagnostic существующего браузера, не полный
   цикл source bytes → execution → Table → persistence.
 
 Client **670 PASS, 1 SKIP**, всего 671 тест; лог
-`.dock/text-import-v3/wide-format-full-client.txt`. Новые проверки покрывают
+`unavailable:artifact-2fc84b343e7a0592`. Новые проверки покрывают
 подмену DOM record/type/label, дубликаты metadata, accessor без вызова getter,
 изменение схемы между страницами, отсутствие движения прокрутки и transient
 закрытие связанного диалога. `git diff --check` PASS.
-Source preflight `.dock/text-import-v3/wide-format-preflight.json`:
+Source preflight `unavailable:artifact-6991db229ba0b6a5`:
 `9a141cbf329ec9932a91461d24124b2f57b9f6a09abd383cb3c93bc4e2015f9c`.
 Python evidence не менялся; прежние 66 PASS не переносить на новый Table audit,
 которого ещё нет. Production, установленный клиент и Hermes не менялись.
@@ -4295,7 +4297,7 @@ reader; лимиты DOM scan не увеличены. Generic public UI reader 
 табличного обзора. Форматный список пока использует прежний complete_visible_rows
 reader до 16 строк; широкая настройка и горизонтальная выдача страниц ещё нужны.
 
-Проверено в mixed diagnostic `.dock/text-import-v3/live-1788824197802`:
+Проверено в mixed diagnostic `unavailable:artifact-30d8a858b0fe9eff`:
 - `table-ui-creation.json`: новая Table нужного порта за 11 шагов канала.
 - `table-configure-precision-current.json`: masks/readback/Apply подтверждены.
 - `table-prepare-read.json`: filter=false, Null/type icons, 3 строки × 3 поля;
@@ -4305,8 +4307,8 @@ reader до 16 строк; широкая настройка и горизонт
 
 Client **653 PASS, 1 SKIP**, включая 24 Table reader tests, 11 numeric format tests,
 Table dialog ownership и native viewer-card binding. Лог:
-`.dock/text-import-v3/table-final-client-tests.txt`. `git diff --check` PASS.
-Source preflight `.dock/text-import-v3/table-preflight.json`:
+`unavailable:artifact-112a5fa2aabd3bb8`. `git diff --check` PASS.
+Source preflight `unavailable:artifact-b969573571e12852`:
 `94a78e70bffa706f3e9c48bd8936bb8ff543bcc217e79cf7dbefe59abfb036da`.
 Живые probes выполнялись обновлёнными сериализованными helpers в прежнем браузере;
 это не фиксированная связанная приёмка новой ревизии. Исторический Execute PASS
@@ -4365,12 +4367,12 @@ prepared node до/после, состояние загрузки, видимо
 Execute-квитанция явно оставляет `execution_completed:false` до проверки процесса.
 Обычный Done сохранил прежние квитанции и семантику.
 
-Живой audit `.dock/text-import-v3/execute-1788824763884/independent-audit.json`:
+Живой audit `unavailable:artifact-25afdc3155900809`:
 **PASS**, 3 поля, исходные bytes/SHA, upload/download verification, настройки,
 выходная identity schema, один Execute, новое выполнение и точный owner.
 Execution ID `1788824767970-h6260nkvf1l:237:1`.
 Runtime `8eebe5c3d27ed61ceda52709429c5bbca8d5fd58fb8d8ffdcf6bcd8666c01a4f`;
-`.dock/text-import-v3/execution-preflight.json` подтвердил тот же pin.
+`unavailable:artifact-d5c1c13dd6b888ff` подтвердил тот же pin.
 Повтор ID не вызвал браузер. Это не проверка содержимого выхода или persistence.
 Первичная summary harness ошибочно оставила `execution_verified:false`, читая
 внешнюю обёртку; исходный result и независимый audit подтверждают выполнение.
@@ -4388,7 +4390,7 @@ Python import evidence **66 PASS**, `git diff --check` PASS. Независим�
 не заявляет output_data, package persistence, journal authentication или Hermes.
 Production, установленные клиенты и модели не менялись; Hermes 03 не запускался.
 
-Точка продолжения: process `2745`, `.dock/text-import-v3/live-1788824197802`,
+Точка продолжения: process `2745`, `unavailable:artifact-30d8a858b0fe9eff`,
 prepared document `1788824201737-f3xi19bh7o`, workflow suffix `-1`,
 node `c9fdce25-fc20-45de-a40e-337b322e71a7`, граф Import03 и открытая консоль.
 В нём узел уже выполнен один раз; execution group 1, child 1.1, root 131.
@@ -4405,7 +4407,7 @@ Null/empty, количеством строк, пагинацией и широ�
 # Подплан 03 — принадлежность выхода и точный Table, 8 сентября 2026
 
 **in progress, source only; Execute и полный подплан ещё не приняты.**
-Добавлен `client/lib/node-output-context.mjs`: связывает индекс выхода с native
+Добавлен `packages/loginom-runtime/client/lib/node-output-context.mjs`: связывает индекс выхода с native
 GUID порта на графе, а Table — с тем же GUID через локальные UI descriptors,
 PortPanel и точный DOM активного BrowseView. Проверяет prepared node до и после
 чтения. `node-context.mjs` теперь узнаёт ViewsForm по исходному ModelNodeTreeNode
@@ -4422,7 +4424,7 @@ source-сессии. Это probe обновлённых сериализова�
 
 ## Проверенные UI-факты для следующего execution/read driver
 
-Живой процесс **76234**, папка `.dock/text-import-v3/live-1788821789307`:
+Живой процесс **76234**, папка `unavailable:artifact-341e381a2cb296c7`:
 Import03 выполнен один раз вручную, сейчас открыт его Table; не повторять Execute.
 - Execute в мастере: точный `WizrdMCF;btnExecute`. Новая группа процессов 1,
   дочерний процесс 1.1 / Import03, оба completed. До выполнения надо фиксировать
@@ -4485,7 +4487,7 @@ stop/resume, package reopen/reexecute и финальная независима
 - `done-1788821788143`: **PASS**, 66 исходных / 65 выходных полей, 446 внутренних
   шагов, переименование первого, исключение второго, метка скрытого последнего;
   полный mapping, Done, повтор ID без browser calls.
-- `.dock/text-import-v3/metadata-preflight.json`: runtime pin совпал.
+- `unavailable:artifact-88ef14636db88c79`: runtime pin совпал.
 - Неуспешный `done-1788821609986` сохранён: слишком строгая проверка метки
   во время ввода. Ему не присвоен PASS.
 
@@ -4494,7 +4496,7 @@ node-procedure evidence **15 PASS**; исходники этого провер�
 `git diff --check` прошёл. Production, установленный клиент и каталог не менялись.
 
 Следующий участок — Execute/Close, свежий execution ID и точный Table.
-Текущая отдельная UI-диагностика `.dock/text-import-v3/live-1788821789307`
+Текущая отдельная UI-диагностика `unavailable:artifact-341e381a2cb296c7`
 выполнила Import03 через `btnExecute`. После включения отображения завершённых
 процессов видна группа №1 `Активация узлов`, completed, но её `Показать узел`
 неактивно. После подтверждённого раскрытия дерева виден дочерний completed
@@ -4538,8 +4540,8 @@ Done → тот же граф. Повтор ID не вызвал browser calls. 
 проверена отдельно: `done-1788821223647`, **independent audit PASS**, 66 полей,
 228 внутренних шагов, две native scroll операции; повтор ID без browser calls.
 Source preflight подтвердил неизменность runtime pin. Локальные evidence:
-`.dock/text-import-v3/done-1788821223647/independent-audit.json`,
-`.dock/text-import-v3/window-preflight.json`. Все диагностические сессии закрыты.
+`unavailable:artifact-e265ca4bdad9d425`,
+`unavailable:artifact-15615797d03103f4`. Все диагностические сессии закрыты.
 Ранее также прошёл Done с 12 полями: `done-1788819197835`, runtime
 `1096240f764d38c67a6c557213fdc476327b1dad4cc878853959ae972b404cc5`.
 Неуспешный `done-1788820289857` сохранён как отказ на output mapping;
@@ -4592,7 +4594,7 @@ UTF-8 нормализуется в числовой код 65001: поле Logi
 
 ## Реализованный участок
 
-`client/lib/node-procedure.mjs` получил внутренний `perform`: именованное
+`packages/loginom-runtime/client/lib/node-procedure.mjs` получил внутренний `perform`: именованное
 наблюдение, разрешение действия по свежему объекту, проверка неизменности
 предметной идентичности и намерения. Уже записанное наблюдение можно использовать
 без дополнительного чтения. При `UI_EPOCH_CHANGED` разрешены максимум два
@@ -4608,7 +4610,7 @@ UTF-8 нормализуется в числовой код 65001: поле Logi
 пакета она не выполняет. Проверка verified upload в её публичном executor-входе
 сохранена. Диагностический прямой вызов обработчика эту проверку не заменяет.
 
-`client/lib/node-apply.mjs` — **внутренняя основа**, подключённая к
+`packages/loginom-runtime/client/lib/node-apply.mjs` — **внутренняя основа**, подключённая к
 `createActionRuntime.runNodeApply`. Готового браузерного диспетчера пока нет.
 Она валидирует запрос до эффектов и последовательно вызывает типизированные
 локальные драйверы: источник, цель, входной mapping, открытие, настройка,
@@ -4657,12 +4659,12 @@ real с форматированием; эта диагностика не до�
 ## Проверки и воспроизведение
 
 Новый операторский harness:
-`tools/loginom-acceptance/node-procedure-refresh-live.mjs`.
+`packages/loginom-runtime/tools/loginom-acceptance/node-procedure-refresh-live.mjs`.
 Он использует существующий явно заданный серверный файл только для проверки UI;
 не загружает файл и не утверждает соответствие его bytes/SHA.
-Все диагностические прогоны и неудачные попытки сохранены в `.dock/text-import-v3/`.
+Все диагностические прогоны и неудачные попытки сохранены в `unavailable:artifact-e03d84ff00f108c4`.
 
-Финальный локальный прогон: `.dock/text-import-v3/refresh-1788814398307/`.
+Финальный локальный прогон: `unavailable:artifact-45e55f93bde98589`.
 Фиксированная runtime SHA256:
 `0f2fcb17db35e0bfb6000da0232ccb854a3ea08e6146ae288e5c1ba063fd294f`.
 
@@ -4683,9 +4685,9 @@ real с форматированием; эта диагностика не до�
 
 ```sh
 ~/.loginom-dock/current/runtime/node \
-  tools/loginom-acceptance/node-procedure-refresh-live.mjs \
+  packages/loginom-runtime/tools/loginom-acceptance/node-procedure-refresh-live.mjs \
   --loginom-url 'http://logi-test-plan.bg.local/app/?testable=true' \
-  --loginom-user user --settings .dock/text-import-v3/qa-settings.json
+  --loginom-user user --settings unavailable:artifact-9f6c58393931f024
 ```
 
 Финальные проверки: клиент — **490 PASS, 1 SKIP, 0 FAIL**;
@@ -4748,7 +4750,7 @@ Dropdown читается через единственный наблюдённ
 ### Свидетельства этой итерации
 
 Отдельная доставка 12-column CSV прошла существующие admit/upload/inspect/verify:
-`.dock/text-import-v3/live-1788814808122/verified-wide.json`, destination
+`unavailable:artifact-925e0148d8658bdd`, destination
 `/user/dock-p3/Dock03-wide-1788815413372.csv`, 176 bytes,
 SHA256 `2e4ff0aa62a90c50f5bfa5787f57499c41a79e632803834fb3c6f435123926fd`.
 Это отдельный диагностический сеанс, не сквозной source binding нового node.apply.
@@ -4756,14 +4758,14 @@ SHA256 `2e4ff0aa62a90c50f5bfa5787f57499c41a79e632803834fb3c6f435123926fd`.
 по ним не заявлена приёмка закреплённой версии.
 
 Финальная настройка на свежем source runtime:
-`.dock/text-import-v3/fields-1788816551910/`, 67 шагов, 12 полей,
+`unavailable:artifact-009184dd73dbf887`, 67 шагов, 12 полей,
 `independent-audit.json`: PASS. Runtime до/после совпал:
 `824a1436f2f137f903e35f13d5d9d18ee7eeb5f50e3ce23dceacf68860a10960`.
 Audit `import_fields_evidence.py` читает source/format/страницы и квитанции
 мутаций. Он не требует продуктового reopen и явно оставляет settings saved,
 upload, execution, persistence и Hermes acceptance неподтверждёнными.
 
-Воспроизведение: `tools/loginom-acceptance/node-import-fields-live.mjs`
+Воспроизведение: `packages/loginom-runtime/tools/loginom-acceptance/node-import-fields-live.mjs`
 с обязательными `--loginom-url`, `--loginom-user`, `--settings`.
 Это только QA настройки уже существующего явно указанного серверного файла;
 он не подтверждает его bytes/SHA. Пример параметров сохранён в указанном run-dir
@@ -4774,7 +4776,7 @@ upload, execution, persistence и Hermes acceptance неподтверждённ
 `build_inputs_match_commit=false`. Живой полный node.apply не проверялся.
 
 Старый QA roundtrip дополнительно проверен на той же текущей runtime SHA:
-`.dock/text-import-v3/refresh-1788816938751/`, 61 шаг, одна намеренная смена DOM,
+`unavailable:artifact-1c7ab8b06724fe6b`, 61 шаг, одна намеренная смена DOM,
 независимый audit PASS. Сохранены Done → reopen → Done и строгий recovery picker.
 Оба свежих harness завершились и закрыли свои браузеры.
 

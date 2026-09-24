@@ -2,5 +2,11 @@
   "profile_id": "loginom-7.4.2-macos-chromium-ru",
   "loginom_build": "7.4.2",
   "platform": "macos",
-  "browser": "chromium"
+  "browser": "chromium",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-0336ae9671a0",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

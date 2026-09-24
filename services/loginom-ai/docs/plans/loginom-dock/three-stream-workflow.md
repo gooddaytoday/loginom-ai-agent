@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-1a8a9bc5041b` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Управляемые потоки разработки узлов
 
 Дата плана: 12 сентября 2026; актуализация 13 сентября. **Начинать новый узел
@@ -5,7 +7,7 @@
 11/12 завершили единственный раунд доработок и ожидают candidate/Hermes;
 13/14 продолжили разработку после остановки пользователем и перезапуска приложения.
 Общий actor-доступ OpenViking проверен у всех четырёх. Статусы ниже — сохранённый
-снимок, не мониторинг. [Подробный checkpoint](../../loginom-dock/agent-handoff.md).
+снимок, не мониторинг. [Подробный checkpoint](../../../../../docs/node-development/history/supplements/docs/loginom-dock/agent-handoff.md).
 
 Исходный запуск: **четыре отдельных рабочих чата**.
 По следующему запросу пользователя и после проверки текущих потоков добавлен
@@ -32,7 +34,7 @@ roots и OpenViking workspacePeerId указывают на правильный
 при последующем возобновлении снова проверить реальный cwd и область записи.
 Расхождение сводки не доказывает исполнение из `/` и не снимает изоляцию worktree.
 
-Checkpoint14 `.dock/stream-preflight.json` проверен координатором: source manifest
+Checkpoint14 `unavailable:artifact-22950d6e897487a2` проверен координатором: source manifest
 совпадает с файлами ветки, архив не активирован, Node24.19.0 и отдельный профиль.
 Создан `/test-4/Node14-20260912-diagnostic.lgp`; viewport:null, окно развёрнуто.
 После добавления найдены пять раздельных профилей у четырёх потоков (у13 два
@@ -67,7 +69,7 @@ Mac: 16 GiB RAM, memory_pressure -Q сообщает 38% свободной па
 
 ## Проверенная исходная точка
 
-Проверены реестр обработчиков `client/lib/node-support.mjs`, контракты и API,
+Проверены реестр обработчиков `packages/loginom-runtime/client/lib/node-support.mjs`, контракты и API,
 подпланы и сохранённые отчёты приёмки. На момент проверки основной checkout чист,
 HEAD main: `7317cc57b7e59318a0d63d3452ee74b6b929f01e`.
 Это снимок для планирования; точный общий базовый commit закрепляется при подготовке
@@ -134,19 +136,19 @@ HEAD main: `7317cc57b7e59318a0d63d3452ee74b6b929f01e`.
 
 Ветки и постоянные каталоги **11/12/13 созданы** от общего commit
 `a3b419bde8a660e1905284ee62a46362d5a49e09` с согласованным планом.
-Узел14 создан в `.worktrees/node-14-missing-values`, ветка
+Узел14 создан в `unavailable:artifact-56539dddc4ac5b92`, ветка
 `codex/node-14-missing-values`, база `0f085c5310c67820f6f6386ae16a7df768c152ca`.
 Эта база добавляет к общей базе первой тройки только запись запуска в документах.
 Имена для15/16 пока предложены; перед созданием проверить отсутствие коллизий.
 
 | Узел | Ветка | Каталог относительно основного checkout |
 | --- | --- | --- |
-| 11 | codex/node-11-replacement | .worktrees/node-11-replacement |
-| 12 | codex/node-12-duplicates | .worktrees/node-12-duplicates |
-| 13 | codex/node-13-date-time | .worktrees/node-13-date-time |
-| 14 | codex/node-14-missing-values | .worktrees/node-14-missing-values |
-| 15 | codex/node-15-cross-table | .worktrees/node-15-cross-table |
-| 16 | codex/node-16-collapse-columns | .worktrees/node-16-collapse-columns |
+| 11 | codex/node-11-replacement | unavailable:artifact-9d68aacf086e9b1e |
+| 12 | codex/node-12-duplicates | unavailable:artifact-5772167ca5d6f0a8 |
+| 13 | codex/node-13-date-time | unavailable:artifact-1764d0de98c72e7c |
+| 14 | codex/node-14-missing-values | unavailable:artifact-56539dddc4ac5b92 |
+| 15 | codex/node-15-cross-table | unavailable:artifact-3bb34970bcae0508 |
+| 16 | codex/node-16-collapse-columns | unavailable:artifact-473c939875d2f6d1 |
 
 Предпочтительны постоянные worktree: один узел — одна ветка — один каталог.
 Обычная задача приложения должна работать именно в этом каталоге. На подготовке
@@ -156,7 +158,7 @@ HEAD main: `7317cc57b7e59318a0d63d3452ee74b6b929f01e`.
 
 Проверка запуска показала, что архивирование задачи удаляет временный worktree
 приложения даже при наличии Git worktree lock. Для рабочих потоков выбран
-постоянный каталог `.worktrees/node-*`, открытый как самостоятельный проект через
+постоянный каталог `unavailable:artifact-7b51148252f60442`, открытый как самостоятельный проект через
 `codex app <path>`, и задача в его local environment. Временные подготовительные
 задачи оставлены в архиве; в них код обработчиков ещё не менялся. Ветки сохранены
 и восстановлены в постоянных каталогах. Рабочие чаты не архивировать ради reload.
@@ -179,7 +181,7 @@ HEAD main: `7317cc57b7e59318a0d63d3452ee74b6b929f01e`.
 Это необходимая часть запуска, а не отдельная автоматическая задача.
 
 1. Проверить действующие задачи, worktree и владельцев браузеров/аккаунтов.
-   Старые каталоги `.worktrees/parallel-*` сохранять. Из них переносить только
+   Старые каталоги `unavailable:artifact-fafede83c2358cfa` сохранять. Из них переносить только
    проверенные полезные исследования 11/13; основу брать из актуального main.
 2. Закрепить окружение каждого разрешённого потока со своими config, state, очередью архива,
    артефактами, source MCP и browser profile в Dock-owned путях. Для нового узла
@@ -225,9 +227,9 @@ HEAD main: `7317cc57b7e59318a0d63d3452ee74b6b929f01e`.
 
 В каждой постоянной рабочей копии **до создания чата** записана приватная
 `.codex/config.toml`. Обычный `mcp_servers.loginom-dock` запускает собственный
-`client/bin/loginom-dock.mjs` на Node 24.19.0 с явными config, stateDir, agent,
+`packages/loginom-runtime/client/bin/loginom-dock.mjs` на Node 24.19.0 с явными config, stateDir, agent,
 adapter revision и режимом classic для прямой диагностики Codex.
-State и браузерные профили находятся внутри `.dock/stream-runtime` своего worktree;
+State и браузерные профили находятся внутри `unavailable:artifact-fabc7308cdee9821` своего worktree;
 бинарники браузера и зависимости используются только для чтения.
 
 Настройка `plugins."loginom-dock@loginom-dock".enabled=false` применяется только
@@ -339,7 +341,7 @@ Hermes `openai-codex/gpt-5.6-sol/low` в единственном слоте к�
 предыдущего владельца. При занятости сохраняет очередь, при неуспехе возвращает
 узел на диагностику. Повторный аудит неизменного успешно проверенного кандидата
 не нужен при доказанном совпадении полного объёма и pins. Текущий владелец слота
-и этапы записываются в `.dock/node-streams-20260912/state.json`.
+и этапы записываются в `unavailable:artifact-e0a5b485a1f5c041`.
 
 Реестр ниже меняет координатор. При запуске добавить к строке: branch/worktree,
 base/candidate commit, task ID и название, учётную запись/пакет, окружение и pins,
@@ -348,10 +350,10 @@ base/candidate commit, task ID и название, учётную запись/
 
 | Поток | Узел | Состояние | Задача / ветка / окружение | Следующее действие |
 | --- | --- | --- | --- | --- |
-| 1 | 11. Замена | Единственная доработка N11-R1 завершена; не принят | `01a0971e-804e-7f42-923a-4cdb1de181be`; `codex/node-11-replacement`; `.worktrees/node-11-replacement`; test-2 | Проверить candidate и выделить слот Hermes; повторного ревью нет |
-| 2 | 12. Дубликаты и противоречия | Единственная доработка N12-R1 завершена; не принят | `01a0971e-9324-7cd1-8610-cf343b3838b1`; `codex/node-12-duplicates`; `.worktrees/node-12-duplicates`; test-1 | Проверить candidate и выделить слот Hermes; повторного ревью нет |
-| 3 | 13. Дата и время | Разработка: source/UI-окружение проверено | `01a0971e-a2c3-7e21-898b-9b865527a484`; `codex/node-13-date-time`; `.worktrees/node-13-date-time`; test-3 | Закончить прямые проверки, сохранить checkpoint перед Hermes |
-| 4 | 14. Заполнение пропусков | Разработка: source/UI-окружение проверено | `01a09738-2d64-7dc2-8cb3-634663d0b406`; `codex/node-14-missing-values`; `.worktrees/node-14-missing-values`; test-4 | Реализовать подплан и прямые проверки до checkpoint перед Hermes |
+| 1 | 11. Замена | Единственная доработка N11-R1 завершена; не принят | `01a0971e-804e-7f42-923a-4cdb1de181be`; `codex/node-11-replacement`; `unavailable:artifact-9d68aacf086e9b1e`; test-2 | Проверить candidate и выделить слот Hermes; повторного ревью нет |
+| 2 | 12. Дубликаты и противоречия | Единственная доработка N12-R1 завершена; не принят | `01a0971e-9324-7cd1-8610-cf343b3838b1`; `codex/node-12-duplicates`; `unavailable:artifact-5772167ca5d6f0a8`; test-1 | Проверить candidate и выделить слот Hermes; повторного ревью нет |
+| 3 | 13. Дата и время | Разработка: source/UI-окружение проверено | `01a0971e-a2c3-7e21-898b-9b865527a484`; `codex/node-13-date-time`; `unavailable:artifact-1764d0de98c72e7c`; test-3 | Закончить прямые проверки, сохранить checkpoint перед Hermes |
+| 4 | 14. Заполнение пропусков | Разработка: source/UI-окружение проверено | `01a09738-2d64-7dc2-8cb3-634663d0b406`; `codex/node-14-missing-values`; `unavailable:artifact-56539dddc4ac5b92`; test-4 | Реализовать подплан и прямые проверки до checkpoint перед Hermes |
 
 Созданные диагностические пакеты:
 
@@ -360,8 +362,8 @@ base/candidate commit, task ID и название, учётную запись/
 - 13: `/test-3/Node13-20260912-diagnostic.lgp`.
 - 14: `/test-4/Node14-20260912-diagnostic.lgp`.
 
-Локальный реестр координатора: `.dock/node-streams-20260912/state.json`.
-Каждый разработчик сохраняет собственный `.dock/stream-preflight.json` с реальными
+Локальный реестр координатора: `unavailable:artifact-e0a5b485a1f5c041`.
+Каждый разработчик сохраняет собственный `unavailable:artifact-22950d6e897487a2` с реальными
 результатами входа, хранилища, окна и подготовки skill. ID рабочих чатов выше
 заменяют ID предварительных задач в удалённых временных worktree.
 

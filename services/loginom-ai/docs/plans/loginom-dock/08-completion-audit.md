@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-6f597f595186` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 > Дополнение после исходной приёмки 10 сентября 2026: короткий пользовательский
 > промпт с другим sales.csv выявил ошибку чтения перенесённой подписи графа.
 > Исправление принято отдельным run `20260910-125653` на runtime `d023c3ab…`;
@@ -51,7 +53,7 @@ Source CSV SHA `44880a6c4a442226889c06d9703f8ba77316b42b35bd82da14a43dc25c039a6b
 Общий итог182.75. Эти строки независимо проверены до и после открытия; равные
 товарные суммы упорядочены вторым ключом ASC с учётом регистра, binary mode.
 
-Evidence root: `.dock/sorting-v3/runs/20260910-113507-53ef2ba4`.
+Evidence root: `unavailable:artifact-5ba2e3b74e912ce6`.
 Зафиксированы и побайтно проверены275files:109 runtime +166 harness.
 Повтор `audit_directory` из frozen-source дал побайтно одинаковый результат56/56.
 Аудитор задачи намеренно возвращает `subplan_complete=false`: он проверяет sales
@@ -100,9 +102,9 @@ reasoning1126; счётчики cache/reasoning могут входить в д�
 ## Проверки исходников
 
 Client: **1141 PASS, 1 SKIP**; Python: **425 PASS**. Полные журналы:
-`.dock/sorting-v3/all-client-tests-final.log` и
-`.dock/sorting-v3/all-python-tests-audit-fix.log`.
-Live evidence: `.dock/calculator-v3/live-1789021537858`.
+`unavailable:artifact-6ca67d5160593f39` и
+`unavailable:artifact-33c9db84e590c184`.
+Live evidence: `unavailable:artifact-42ef6234fe4682dd`.
 
 ## Границы доказательств
 

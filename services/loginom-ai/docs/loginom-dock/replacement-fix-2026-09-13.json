@@ -243,7 +243,7 @@
     "passed": 1405,
     "skipped": 1,
     "failed": 0,
-    "log": ".dock/replacement/client-tests-r1-refresh-20260913.log"
+    "log": "unavailable:artifact-077c4ca69e4d7979"
   },
   "targeted_tests": {
     "passed": 75,
@@ -264,9 +264,15 @@
     "home_verified": true,
     "harness_exit_code": 0
   },
-  "evidence_root": ".dock/stream-runtime/sessions/c6874c61-d27b-41b6-a618-00074f6c9bf4",
+  "evidence_root": "unavailable:artifact-dab414d0f387bbd8",
   "limitations": [
     "Hermes openai-codex / gpt-5.6-sol / low requires coordinator slot",
     "Final diagnostic save was not reopened; earlier development persistence evidence remains historical"
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-339ae06e530e",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

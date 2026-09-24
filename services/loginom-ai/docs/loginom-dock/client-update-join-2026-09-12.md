@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-5c58353dc5f3` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Обновление установленного клиента: Слияние — 12 сентября 2026
 
 По выбранному пользователем варианту 3 на Mac установлен
@@ -11,8 +13,8 @@
 `/opt/loginom-dock/client-build/join-20260912-ac6b510f`.
 Чистый установочный снимок: `0337cf7585d9a16176212241cde7f060e6746539`.
 361 build input совпал с принятым main. Четыре файла сохранили установленную
-локальную диагностику API: `client/bin/diagnostic.mjs`,
-`client/lib/local-diagnostics.mjs`, `client/test/local-diagnostics.test.mjs`,
+локальную диагностику API: `packages/loginom-runtime/client/bin/diagnostic.mjs`,
+`packages/loginom-runtime/client/lib/local-diagnostics.mjs`, `packages/loginom-runtime/client/test/local-diagnostics.test.mjs`,
 `plugins/loginom-dock-hermes/__init__.py`. Они побайтно сверены с прежним клиентом.
 Установочный снимок с этой диагностикой не опубликован в GitHub;
 Hermes зарегистрирован на его закреплённую ревизию через локальное Git-зеркало.
@@ -69,7 +71,7 @@ Loginom 7.4.2, отдельная сессия под `test-1`, пакет
 **58/58 frozen PASS**, 7/7 подмен полного доказательного пакета отклонены.
 Новая установка не объявляется новым автономным прогоном.
 
-Доказательства: `.dock/client-update-join-20260912/`, включая
+Доказательства: `unavailable:artifact-85332bfb9559a297`, включая
 `bundle-verification.json`, `final-bundle-verification.json`, `installation.json`,
 `configuration-verification.json`, `installed-runtime-verification.json`,
 `gateway-verification.json`, `mcp-smoke.json`, `client-tests.log`,

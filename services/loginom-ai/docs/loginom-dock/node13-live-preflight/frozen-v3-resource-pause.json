@@ -30,5 +30,11 @@
     "pause-readonly.json": "41db4fe3389aa8ae119e9a36fb40f50d4840772713c27afebdb9ca23426d3486",
     "execution-events.jsonl": "86c3d8c19dd9cc41232ff35b28869fcbf8af3d91ccbbbc0e6eacc9950cdf9898",
     "public-api.jsonl": "15c8858868964c2b8163d1b62052af847ac5a8c7fc4e786565e52225642eaee9"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-0a6b1929cb86",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

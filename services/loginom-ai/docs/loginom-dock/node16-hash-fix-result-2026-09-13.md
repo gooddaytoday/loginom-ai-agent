@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-090cb015ef92` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node16: отпечаток схемы до первого выполнения
 
 Статус: **локальное исправление проверено; полная автономная приёмка НЕ пройдена**.
@@ -18,7 +20,7 @@ Uint8Array, хотя существовали 25 полей. GetColumnsHash(1|19
 непустой схемы по-прежнему отклоняется. Маски повторно сверяются после await.
 Это наблюдаемая стабильность, **не атомарный снимок или монотонная версия**.
 
-Проверено на свежем source harness `.dock/node16/live-1789325659001`:
+Проверено на свежем source harness `unavailable:artifact-fbef31390fc4e63b`:
 
 - Новая собственная копия и тот же проверенный wide CSV; источник выполнен.
 - Новый узел `eeca59ac-f0f8-44b4-abca-8bb3872921f0`: Done с Id + M1…M24.
@@ -44,10 +46,10 @@ Uint8Array, хотя существовали 25 полей. GetColumnsHash(1|19
 семантических подмен отклонены; отдельно 14 runner/admission tests PASS.
 Повторный разбор исходных данных подтвердил те же 9 случаев и 3 negatives,
 но не превратил прерванный run в full PASS. Дельта verifier описана в
-`tools/node16-audit-reevaluation/README.md` и отдельных versioned reports.
+`services/loginom-ai/tools/node16-audit-reevaluation/README.md` и отдельных versioned reports.
 
 Для coordinator staging подготовлен минимальный пакет
-`.dock/node16/candidate-b0709ec0`: 184 записи, 1 957 088 байтов исходников.
+`unavailable:artifact-0630aec25a3bb8bd`: 184 записи, 1 957 088 байтов исходников.
 Все записи tar сверены с manifest; относительно предыдущего candidate изменены
 только три production-файла collapse-existing-input*. Credentials, `.dock` и
 тесты в пакет не включены. Четыре ранее разрешённых служебных acceptance-файла
@@ -68,7 +70,7 @@ Tar SHA256: `d795ee74825b270d152d9ba253e4b6218047af5a2ca91e17efb192b0677e6a08`.
 `3b74bd5f23b400542dcdcb300495406541a5e298feef4c7caeefd3c6c6f4284f`;
 server stage/readback 4 PASS, без activation. Свежая actual MCP user-v1 сессия
 `badf4b51-7932-44f5-ad62-bac26a96dc4a` в
-`.dock/node16/candidate3-rehearsal-20260913` подтвердила READY7.4.2, runtimee4e9,
+`unavailable:artifact-3ebf931a1b2ab1b3` подтвердила READY7.4.2, runtimee4e9,
 manifest/action/selectors и только выделенный storage root. Окно1508×862,
 outer1508×949 при available1512×949; viewport=null/start-maximized.
 Проверочный bridge/browser закрыт, процессов этой сессии нет. Обновлены только

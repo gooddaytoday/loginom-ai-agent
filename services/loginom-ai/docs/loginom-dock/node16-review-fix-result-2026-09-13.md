@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-1e49846d126b` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node16 — один раунд исправлений R16-1–3
 
 Назначение `node16:review-fix:1:6d086da4:R16-1-3`; проверенный review HEAD
@@ -10,7 +12,7 @@
 **R16-1 подтверждён live.** В собственной копии пакета файл A был заменён файлом B
 по тому же пути. Старые import и exact вернули SUCCEEDED и значение
 `9007199254740995` из B при сохранённом доказательстве A (`9aac…`, вместо `76da…`).
-Доказательство: `.dock/node16/live-1789303045205/fix-reproduce-upload.json` и
+Доказательство: `unavailable:artifact-3a202e4a01dc7609` и
 привязанные browser/journal записи.
 
 Теперь executor предоставляет внутреннюю полную упорядоченную историю загрузок,
@@ -27,7 +29,7 @@ cleanup_complete=true. Current B и восстановленный A успеш�
 сохранила успешное полное чтение 60 ячеек. Отдельная подтверждённая перезапись
 после выполнения дала отказ внутреннего exact gate.
 
-В отдельной `.dock/node16/live-1789305127771` native upload завершил submit,
+В отдельной `unavailable:artifact-8ca547184f7db605` native upload завершил submit,
 после чего операторский harness потерял ответ. Inspect/recovery/replay этого
 upload не выполнялись. Private history сохранила transport_uncertain; production
 import source lineage отклонила proofA. Использованы настоящий private completed
@@ -77,8 +79,8 @@ text/structured replies, бюджет1MiB, private source lineage, 53 loaded pin
 сопоставления и настройки текстового импорта. Диагностическое повторное
 допущение и проверка исходного CSV не заменяет проверку сохранных настроек.
 
-Manifest: `tools/loginom-acceptance/collapse/review-fix/provenance.json`.
-Verifier: `python3 tools/loginom-acceptance/collapse/review-fix/verify.py`.
+Manifest: `packages/loginom-runtime/tools/loginom-acceptance/collapse/review-fix/provenance.json`.
+Verifier: `python3 packages/loginom-runtime/tools/loginom-acceptance/collapse/review-fix/verify.py`.
 Локальные исходные browser/journal свидетельства находятся в игнорируемой `.dock`;
 для переноса проверки нужны эти файлы по manifest, один checkout недостаточен.
 
@@ -86,17 +88,17 @@ Verifier: `python3 tools/loginom-acceptance/collapse/review-fix/verify.py`.
 
 - Исторические exact-wiring manifest и старый evidence hole не переписаны.
   Их прежние live PASS относятся к прежнему runtime72c…, а не к текущему.
-- В промежуточной сессии `.dock/node16/live-1789303712898` deliveryD закончилась
+- В промежуточной сессии `unavailable:artifact-41346488f818d41c` deliveryD закончилась
   destination AMBIGUOUS/UI_ROOT_STALE до native upload; её не повторяли и не
   переобозначали. Отдельное exact-чтение60cells закончилось AMBIGUOUS при
   подтверждении журнала: redactor скрыл token. Это исправлено binding_id, а
   исходный результат оставлен без изменения.
-- В итоговой `.dock/node16/live-1789304119268` header-only upload также остановился
+- В итоговой `unavailable:artifact-7d637d3315c57c6c` header-only upload также остановился
   destination AMBIGUOUS. После наблюдения закрыты только собственные Files tabs.
   Другой all-null fixture загрузился и импортировался; Collapse остановился
   finish AMBIGUOUS, console_not_ready, execution not_requested. Операцию не
   повторяли. All-null/all-null-ignore/restored не засчитаны как финальные PASS.
-- Запуск `.dock/node16/live-1789304814545` по ошибочному URL без /app/ завершился
+- Запуск `unavailable:artifact-4ad6cad38c918407` по ошибочному URL без /app/ завершился
   до login; его браузер закрыт. Это не продуктовый отказ.
 - Первая диагностическая инъекция потери upload-ответа не сработала, поскольку
   native upload возвращает submitted/AMBIGUOUS до серверной проверки, а harness

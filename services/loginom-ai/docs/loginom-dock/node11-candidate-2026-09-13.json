@@ -47,5 +47,11 @@
   "runtime_revision": "b99b922033e87b7580f14c2eec8cd0744c23bab29ee45b2548212cdac8c394ca",
   "preparation_commit": "be4d31bf9e15e1ea4ab4e1868010871927c34d8b",
   "existing_server_and_current_preserved": true,
-  "autonomous_acceptance_passed": false
+  "autonomous_acceptance_passed": false,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-fa7dbc9cdf71",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

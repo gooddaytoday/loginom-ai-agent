@@ -1,7 +1,9 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-41623ade354e` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Разработка, сборка и источники Dock
 
-Порядок входа в проект — в [памятке агенту](agent-handoff.md), текущая серверная
-установка и безопасное развёртывание — в [operations.md](operations.md).
+Порядок входа в проект — в [памятке агенту](../../../../docs/node-development/history/supplements/docs/loginom-dock/agent-handoff.md), текущая серверная
+установка и безопасное развёртывание — в [operations.md](../../../../docs/node-development/history/supplements/docs/loginom-dock/operations.md).
 Производственные сборки выполняются на VPS. Этот документ также описывает
 изолированное окружение разработчика; команды первичной настройки не нужно
 повторять на уже работающем сервере.
@@ -75,7 +77,7 @@ Compose-проект `loginom-dock` владеет томами `dock_data`, `ca
 
 Локальные credentials, конфиги и Assets State храните в `.dock/` с ограниченными
 правами. Каталог исключён из Git и Docker build context. Туда же можно положить
-файл переменных и передавать его через `docker compose --env-file .dock/deploy.env`.
+файл переменных и передавать его через `docker compose --env-file unavailable:artifact-c70e1a5cef2152d3`.
 Не помещайте credentials в Docker build args, команды, README или архивы сборки.
 
 ## Сборка на сервере
@@ -229,7 +231,7 @@ docker exec loginom-dock-openviking-1 ov add-resource \
 Все файлы с credentials остаются закрытыми. Восстановление через `restore-server.py`
 проверено в отдельном стеке; он создаёт собственные сеть, тома и контейнеры с
 loopback-портами, без переключения production. Команды, текущие пути и ограничения —
-в [operations.md](operations.md) и [deploy README](../../deploy/loginom-dock/README.md).
+в [operations.md](../../../../docs/node-development/history/supplements/docs/loginom-dock/operations.md) и [deploy README](../../deploy/loginom-dock/README.md).
 
 ## Studio
 
@@ -265,7 +267,7 @@ NODE_OPTIONS=--no-experimental-webstorage npm test
 - Клиент: из `client/` выполнить `npm test` закреплённым Node после `npm ci --ignore-scripts`.
   Это запуск из полного checkout. Изолированный комплект следующего выпуска требует
   устранить зависимость `landing.test.mjs` от неупакованного `landing/` — см. памятку.
-- Лендинг: из корня checkout `node --test client/test/landing.test.mjs`, затем
+- Лендинг: из корня checkout `node --test packages/loginom-runtime/client/test/landing.test.mjs`, затем
   серверная сборка и браузерная проверка. Один `caddy validate` не подтверждает headers.
 - Для документационных изменений достаточно проверить ссылки, пути, команды и diff;
   полный набор тестов и запросы к моделям не требуются.

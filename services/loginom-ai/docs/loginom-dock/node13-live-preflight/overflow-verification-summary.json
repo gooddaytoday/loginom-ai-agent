@@ -28,12 +28,18 @@
     "owned_processes_absent_after_interruption": true
   },
   "evidence": {
-    ".dock/node13-live-preflight/overflow-owner-client-tests.log": "9af92ed536f6c8e332ffce750e50c0212e74ff12ef6219e92c96322127f07d36",
-    ".dock/node13-live-preflight/overflow-owner-system-retest.log": "437c10b197d839d16df25827585ebdcd1429a43d508f2ba87d83ca6c8c56537d",
-    ".dock/node13-live-preflight/overflow-owner-python-tests.log": "23b08670b2d9ee57ed5a2bfb8024911935a827db8a663b0f3e816612040a9883",
-    ".dock/node13-live-preflight/overflow-owner-focused-tests-2.log": "7fc33da28137464541ae2c0b77133adb6530470ccff3e6e0d0f396441b50f197",
-    ".dock/node13-live-preflight/audit-overflow-persistence.py": "860f092ea9276e9b0bc3265b59fd5d4165b223757ac9f64f3f9ac82b65c770ff",
-    ".dock/node13-live-preflight/reopen-r2-overflow-failure.json": "447706fe150258fe34cf9952dd66cd355991f9ac44bc34b427fbc5c0e4506e7e",
-    ".dock/node13-live-preflight/python-hermes-clarification-tests.log": "3574f94eacfa2c7f2a31d0d4c553e8d79a76058b31d13991b17359e52a157fe3"
+    "unavailable:artifact-aebff037e4996f2f": "9af92ed536f6c8e332ffce750e50c0212e74ff12ef6219e92c96322127f07d36",
+    "unavailable:artifact-535c3b812ec5ec83": "437c10b197d839d16df25827585ebdcd1429a43d508f2ba87d83ca6c8c56537d",
+    "unavailable:artifact-0f709044c3c480d5": "23b08670b2d9ee57ed5a2bfb8024911935a827db8a663b0f3e816612040a9883",
+    "unavailable:artifact-eef390bf461644d7": "7fc33da28137464541ae2c0b77133adb6530470ccff3e6e0d0f396441b50f197",
+    "unavailable:artifact-c73f4bc069351edc": "860f092ea9276e9b0bc3265b59fd5d4165b223757ac9f64f3f9ac82b65c770ff",
+    "unavailable:artifact-c9347bf25fff6493": "447706fe150258fe34cf9952dd66cd355991f9ac44bc34b427fbc5c0e4506e7e",
+    "unavailable:artifact-e9a340f9cd8a1b85": "3574f94eacfa2c7f2a31d0d4c553e8d79a76058b31d13991b17359e52a157fe3"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-41111fd70457",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

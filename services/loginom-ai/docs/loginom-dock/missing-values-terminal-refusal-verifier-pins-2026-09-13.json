@@ -268,7 +268,7 @@
   "candidate_manifest_sha256": null,
   "candidate_staged": false,
   "candidate_activated": false,
-  "packet_archive": ".dock/node14-refusal-verifier/catalog-packet/catalog-source.tar",
+  "packet_archive": "unavailable:artifact-7fd04aa4ff4f0035",
   "packet_archive_sha256": "d120d055300863f2e0594e04ccc38147c79ba55296fc24a942270e36fef6cfcd",
   "packet_manifest_sha256": "3f6469795170fa313e3c45f5c1a03f050287d66b41167cd5848ae4caf2b878fe",
   "packet_files": 11,
@@ -276,7 +276,7 @@
     "bytes": 100327,
     "sha256": "953a13c333561117983b2b0dc2a04002f62fd496b301c2d368ac3e5eebeb175c"
   },
-  "evidence_index": ".dock/node14-refusal-verifier/evidence-files.json",
+  "evidence_index": "unavailable:artifact-19bf5772fd5cd0c8",
   "evidence_index_sha256": "26b90773e0b5e3d25f0bb69ab1f03e0c10a3c5b0e1d4bb59bf03fceee51e3fda",
   "live_evidence": {
     "bytes": 69694908,
@@ -317,5 +317,11 @@
   "process_check": {
     "bytes": 149,
     "sha256": "510f551bd8e6f967654e757116b29a25e8833b0b8e266c3430ec747cddb9fe73"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-2e187cafd1cc",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

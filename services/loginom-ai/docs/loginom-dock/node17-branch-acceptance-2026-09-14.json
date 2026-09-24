@@ -15,5 +15,11 @@
     0
   ],
   "old_failures_preserved": true,
-  "evidence": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs/20260914-000803-18fad485/reevaluation-v5-full-final.json"
+  "evidence": "unavailable:artifact-b322e78604dbc807",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-9d25d9064b0d",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

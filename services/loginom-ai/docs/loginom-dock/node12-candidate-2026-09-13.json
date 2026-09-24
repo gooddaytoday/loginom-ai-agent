@@ -47,5 +47,11 @@
     "model_started": false,
     "documents_commit": "8475e8adc78a8812054af250627dcb8fc4d7c93f",
     "hermes_slot_granted": false
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-39b347a7e0b3",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

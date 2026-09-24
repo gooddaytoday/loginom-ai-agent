@@ -58,5 +58,11 @@
   "manual_capture_commit_remember": false,
   "route_or_cursor_changed": false,
   "node_acceptance_proven": false,
-  "limitation": "Read-back/retrieval verifies durable memory records, not a new independent live acceptance of node16. No manual capture, commit, remember, route or cursor changes."
+  "limitation": "Read-back/retrieval verifies durable memory records, not a new independent live acceptance of node16. No manual capture, commit, remember, route or cursor changes.",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-2a161f8d2480",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

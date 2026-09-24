@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-39f18b056145` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Обновление клиента: возврат к сценарию и компактные результаты — 12 сентября 2026
 
 Установлен **0.1.0-dev.20260910.3-c68743ca2658**. Код отправлен в GitHub main:
@@ -11,8 +13,8 @@
 `/opt/loginom-dock/client-build/process-focus-20260912-8da19462`.
 Чистый установочный снимок: `4a492a1707021e3b523c86637502b860edcf29d3`.
 346 build inputs совпали с принятым main; четыре файла сохранили прежнюю локальную
-диагностику API: `client/bin/diagnostic.mjs`, `client/lib/local-diagnostics.mjs`,
-`client/test/local-diagnostics.test.mjs`, `plugins/loginom-dock-hermes/__init__.py`.
+диагностику API: `packages/loginom-runtime/client/bin/diagnostic.mjs`, `packages/loginom-runtime/client/lib/local-diagnostics.mjs`,
+`packages/loginom-runtime/client/test/local-diagnostics.test.mjs`, `plugins/loginom-dock-hermes/__init__.py`.
 Эти файлы побайтно сверены с предыдущим установленным клиентом. Локальный снимок
 не опубликован в GitHub. Все 4164 файла комплекта проверены до и после установки.
 
@@ -54,7 +56,7 @@ SHA-256 полученного установочного архива:
 подтверждены отдельной исходной приёмкой 31/31, не подменены этой диагностикой.
 Диагностический браузер закрыт; новый черновик не объявляется сохранённым пакетом.
 
-Доказательства в `.dock/client-update-process-focus-20260912/`:
+Доказательства в `unavailable:artifact-c2469498eac47703`:
 `bundle-verification.json`, `final-bundle-verification.json`, `configuration-verification.json`,
 `mcp-smoke.json`, `installation.json`, `client-tests.log`, `live-audit.json`,
 `installed-compact-check.json`, `live-1789164481602/`.

@@ -32,37 +32,43 @@
   "old_failed_run_original_hashes_unchanged": true,
   "evidence": {
     "native/native-audit.json": {
-      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/native/native-audit.json",
+      "path": "unavailable:artifact-8fb0641c757c14c0",
       "sha256": "4a5f195666f7413b044b0460cb3ae8decdcd02e6de43865da568ed64e89cfaca"
     },
     "native/negative-audit.json": {
-      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/native/negative-audit.json",
+      "path": "unavailable:artifact-72bf8556232c006a",
       "sha256": "1cdcfae33885e42980137f42377ab895a467d8bbbe56c581c058a2855e6ffdce"
     },
     "native/settings-diagnostic-audit.json": {
-      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/native/settings-diagnostic-audit.json",
+      "path": "unavailable:artifact-42affc005eb0c725",
       "sha256": "5efa3d12b13830c1ac38b64c2f66cb42710304a3ff58d6e56035bab2ddba840b"
     },
     "native/evidence.json": {
-      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/native/evidence.json",
+      "path": "unavailable:artifact-9a6d66c92e5634b2",
       "sha256": "053f403be2138be9644cace472bf6917d31e647f8a055179692c4aea1b5830a5"
     },
     "old-run-reaudit-final.json": {
-      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/old-run-reaudit-final.json",
+      "path": "unavailable:artifact-886b3cbc2679d813",
       "sha256": "c56d60efa238bec773f475d1d2a520a89b87774b4a30b6c3eb38f8e4b81d3efe"
     },
     "source-preflight.json": {
-      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/source-preflight.json",
+      "path": "unavailable:artifact-e07f338aee91c524",
       "sha256": "f5548e431d51a5dd07c21747148d68d42735da660f0b527a1dd7aa86de177870"
     },
     "ui-7.json": {
-      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/ui-7.json",
+      "path": "unavailable:artifact-8dbea6810bd340a2",
       "sha256": "9736a490a09ae5539d97ba477c7710e45cbf3cbb09b3232542c7a2f9513443d9"
     },
     "process-check-final.json": {
-      "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-followup-1/process-check-final.json",
+      "path": "unavailable:artifact-2a31b5d97c61cfef",
       "sha256": "454f692d4c572501b2b1e42685cf1f47fea309d7fb1838dcea26785d25ceceb9"
     }
   },
-  "own_processes_remaining": []
+  "own_processes_remaining": [],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-fbbc9823b63a",
+    "provenance": "../../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

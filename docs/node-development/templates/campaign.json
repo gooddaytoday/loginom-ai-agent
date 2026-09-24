@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "campaign_id": "example-not-started",
+  "mode": "single",
+  "authorized_nodes": [],
+  "developer_slots": 1,
+  "acceptance_slots": 1,
+  "auto_continue_authorized_queue": true,
+  "base": {
+    "repository": "loginom-ai-agent",
+    "branch": "loginom",
+    "commit": null
+  },
+  "models": {
+    "developer": {
+      "model": "gpt-6-astra",
+      "effort": "medium"
+    },
+    "review": {
+      "model": "gpt-6-astra",
+      "effort": "medium"
+    },
+    "acceptance": {
+      "model": "openai/gpt-5.6-sol",
+      "variant": "low",
+      "credential_source": "existing-chatgpt-oauth"
+    }
+  },
+  "acceptance_timeout_seconds": 1800,
+  "memory": {
+    "status": "not_enrolled",
+    "root": null,
+    "evidence": null
+  },
+  "assignments": [],
+  "resources": {
+    "host_registry": "~/.local/state/loginom-ai-agent/node-development/host-resources.json",
+    "host_registry_owner": null,
+    "developer_leases": [],
+    "acceptance_lease": null,
+    "shared_contract_owners": []
+  },
+  "dispatches": [],
+  "events": [],
+  "updated_at": null
+}

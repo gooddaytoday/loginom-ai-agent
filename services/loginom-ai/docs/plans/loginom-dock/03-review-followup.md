@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-a6211f76c181` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Исправления после ревью b24310ea — 9 сентября 2026
 
 Три исходных замечания исправлены и перепроверены в source runtime.
@@ -34,8 +36,8 @@ UI epoch. Полная нативная схема привязанного ма
 ## Проверки
 
 - Полный клиентский набор: **1083 PASS, 1 SKIP**, ошибок нет.
-  `.dock/review03-client-final.log`; запуск после последнего изменения runtime.
-- Python verifiers: **400 PASS**, `.dock/review03-python-final.log`.
+  `unavailable:artifact-ba51df4b2935fc1f`; запуск после последнего изменения runtime.
+- Python verifiers: **400 PASS**, `unavailable:artifact-ce969d29a15f42b4`.
   Синтаксис изменённого live harness и `git diff --check` проверены.
 - Реальная процедура настройки на полных синтетических схемах 400/1000 полей:
   неизменённые поля и изменение всех меток, включая превышение прежних 2048 шагов.
@@ -67,7 +69,7 @@ readback. Execution `1788964878210-z9gh39dbym:644:1` сохранился без
 `ENVIRONMENT_INTERRUPTED`, без утверждения о сохранности пакета.
 
 Итоговый индекс 18 проверенных файлов с SHA256:
-`.dock/text-import-review-20260909/final-evidence-index.json`.
+`unavailable:artifact-679ad63f3107edd2`.
 Прежние диагностические неудачи сохранены отдельно от успешных проверок.
 
 ## Финальная автономная приёмка
@@ -90,7 +92,7 @@ SHA256 исходного `calculator-node-audit.json`:
 SHA256 `frozen-source-audit.json`:
 `3296b62130f0d6561420ab91437376e8df6304cfc2704f31b055a6691f6f14dc`.
 Финальные отчёты и frozen-source находятся в
-`.dock/text-import-review-20260909/hermes-runs/20260909-175609-3c41b0a2`.
+`unavailable:artifact-83805a2c80c56e6a`.
 Собственные процессы приёмки и диагностики завершены; process list проверен.
 
 Предыдущий frozen Hermes `20260909-175113-1e50a8fb` сохранил **FAIL** до операций

@@ -99,7 +99,7 @@
   },
   "evidence": [
     {
-      "path": ".dock/stream-runtime/sessions/bafafea6-df03-4bce-b438-1c4c1579a98c/node13-manual-add-audit.json",
+      "path": "unavailable:artifact-ce606f63214d9f61",
       "sha256": "7099cb7477aa5abe7f6ff112e47c02490a085473b4e984c80471ed925d37a590",
       "result": {
         "passed": true,
@@ -186,7 +186,7 @@
       }
     },
     {
-      "path": ".dock/stream-runtime/sessions/bafafea6-df03-4bce-b438-1c4c1579a98c/date-time-manual-output-audit.json",
+      "path": "unavailable:artifact-9f1d9a1da8931260",
       "sha256": "e73855abc84ea8464a13bd97b0cf1a320e2f03ea6107cd95cab7f6972c33d09d",
       "result": {
         "passed": true,
@@ -196,7 +196,7 @@
       }
     },
     {
-      "path": ".dock/stream-runtime/sessions/bafafea6-df03-4bce-b438-1c4c1579a98c/manual-negative-audit.json",
+      "path": "unavailable:artifact-d9537625b59a7197",
       "sha256": "ea6339e17ef097c78444c462aac86088495bba4cd3b434dd89683b43dc6f21f4",
       "result": {
         "passed": true,
@@ -261,7 +261,7 @@
       }
     },
     {
-      "path": ".dock/stream-runtime/sessions/df361bf1-66a2-4dae-9283-f74c8caa39d7/node13-manual-reopen-audit.json",
+      "path": "unavailable:artifact-39bf09f3a6426c71",
       "sha256": "8ebf498e2abfe97e21f5ae1a079e2254af31b6f4b1de682fd4ce36aac0d28717",
       "result": {
         "passed": true,
@@ -348,7 +348,7 @@
       }
     },
     {
-      "path": ".dock/stream-runtime/sessions/df361bf1-66a2-4dae-9283-f74c8caa39d7/date-time-persistence.json",
+      "path": "unavailable:artifact-aa1a2a611262839e",
       "sha256": "c5ea8a2db5a299dfe82b47bef791ff6ce15f6ad28827ca7ccaf73c6b5bf2cd49",
       "result": {
         "passed": true,
@@ -361,22 +361,28 @@
   ],
   "journals": [
     {
-      "path": ".dock/stream-runtime/sessions/bafafea6-df03-4bce-b438-1c4c1579a98c/execution-events.jsonl",
+      "path": "unavailable:artifact-2640716ab5fef7fe",
       "sha256": "ced55a56f9253ac91de23426929442de65d7b747b9d2836e43b2138e85964092"
     },
     {
-      "path": ".dock/stream-runtime/sessions/bafafea6-df03-4bce-b438-1c4c1579a98c/public-api.jsonl",
+      "path": "unavailable:artifact-58e89233d42fce29",
       "sha256": "51c66946329c195dce45f8abeb7550429f29b46ae5d0575cf522f0aa795d4b36"
     },
     {
-      "path": ".dock/stream-runtime/sessions/df361bf1-66a2-4dae-9283-f74c8caa39d7/execution-events.jsonl",
+      "path": "unavailable:artifact-87a2bd206819c302",
       "sha256": "c5c99d2cfc34d61abd0249c20829d999f9c217ebe7ead5bdf2a6bd9f30650542"
     },
     {
-      "path": ".dock/stream-runtime/sessions/df361bf1-66a2-4dae-9283-f74c8caa39d7/public-api.jsonl",
+      "path": "unavailable:artifact-f65eafe4c97a0f0d",
       "sha256": "83ee03e2a51a97a72202ab93ecb429345c84929389daf236f0d67490ee4a0112"
     }
   ],
   "hermes_acceptance": false,
-  "r2_applied": false
+  "r2_applied": false,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-14ca8418eb57",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

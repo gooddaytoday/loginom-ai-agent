@@ -4,7 +4,7 @@
   "component_id": "component.transform.ColumnFlipping",
   "thread_id": "01a0992c-6ce0-7f10-bd53-9bf92ed7ae8a",
   "project_id": "a5df758e-6136-46d6-bde4-6b543090461f",
-  "worktree": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns",
+  "worktree": "unavailable:artifact-d562fb96eb757371",
   "branch": "codex/node-16-collapse-columns",
   "base": "a3b419bde8a660e1905284ee62a46362d5a49e09",
   "model": "gpt-6-astra",
@@ -55,7 +55,7 @@
       "manual_capture_or_commit": false
     },
     "new_project_knowledge_verified": true,
-    "substantive_extraction_evidence": "docs/loginom-dock/node16-shared-memory-knowledge-2026-09-13.json"
+    "substantive_extraction_evidence": "historical-ref:ref-2a161f8d2480a658"
   },
   "bootstrap_turn_id": "01a0992c-6e83-7033-ad26-c1302c08c68a",
   "actor_probe_turn_id": "01a0992f-414a-7702-aa57-8777127bfe13",
@@ -64,5 +64,11 @@
   "live_environment_verified": false,
   "hermes_started": false,
   "merged": false,
-  "verified_at": "2026-09-13T05:19:20.776896+00:00"
+  "verified_at": "2026-09-13T05:19:20.776896+00:00",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-3af5b22c0696",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

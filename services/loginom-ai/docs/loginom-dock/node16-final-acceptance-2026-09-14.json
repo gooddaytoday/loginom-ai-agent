@@ -44,14 +44,14 @@
       {
         "kind": "spill",
         "tool_call_id": "call_ds4RRqm9WyhkDdxTCDHkwWaG@135:0",
-        "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/hermes-runs/20260914-004604-475bb0c8/private/hermes-home/cache/spillover/call_ds4RRqm9WyhkDdxTCDHkwWaG.txt",
+        "path": "unavailable:artifact-7ad3e4135543a25e",
         "sha256": "28da00b7020e6be17c3e74400d81c3913c9bdcd02b98ddb4b85d7e86fc3352b5",
         "characters": 66209
       },
       {
         "kind": "spill",
         "tool_call_id": "call_M1Tu1ESGFE6XGjOgL5SNocHo@143:0",
-        "path": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/hermes-runs/20260914-004604-475bb0c8/private/hermes-home/cache/spillover/call_M1Tu1ESGFE6XGjOgL5SNocHo.txt",
+        "path": "unavailable:artifact-ff94a2ad1c93523b",
         "sha256": "5b132fe3e5b32b9511ffec124981f7a90642323d9e36cbcced61552026e5dd77",
         "characters": 69332
       }
@@ -125,7 +125,7 @@
       "persisted_settings": true,
       "model_run": false,
       "autonomous_acceptance": false,
-      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375534983"
+      "directory": "unavailable:artifact-1eca900230a244b0"
     },
     {
       "case": "header-only-ignore",
@@ -141,7 +141,7 @@
       "persisted_settings": true,
       "model_run": false,
       "autonomous_acceptance": false,
-      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375572152"
+      "directory": "unavailable:artifact-c215480b5daee37a"
     },
     {
       "case": "all-null",
@@ -157,7 +157,7 @@
       "persisted_settings": true,
       "model_run": false,
       "autonomous_acceptance": false,
-      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375608725"
+      "directory": "unavailable:artifact-42fed8078fc9c4b9"
     },
     {
       "case": "all-null-ignore",
@@ -173,7 +173,7 @@
       "persisted_settings": true,
       "model_run": false,
       "autonomous_acceptance": false,
-      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375644772"
+      "directory": "unavailable:artifact-eb6cc31d84ed1906"
     },
     {
       "case": "mixed",
@@ -189,7 +189,7 @@
       "persisted_settings": true,
       "model_run": false,
       "autonomous_acceptance": false,
-      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375681094"
+      "directory": "unavailable:artifact-fb743cc72d4b243a"
     },
     {
       "case": "ignore",
@@ -205,7 +205,7 @@
       "persisted_settings": true,
       "model_run": false,
       "autonomous_acceptance": false,
-      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375719375"
+      "directory": "unavailable:artifact-ea79a4c129fcda61"
     },
     {
       "case": "mapped",
@@ -221,7 +221,7 @@
       "persisted_settings": true,
       "model_run": false,
       "autonomous_acceptance": false,
-      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375756181"
+      "directory": "unavailable:artifact-86a80565cea68dd3"
     },
     {
       "case": "mapped-ignore",
@@ -237,7 +237,7 @@
       "persisted_settings": true,
       "model_run": false,
       "autonomous_acceptance": false,
-      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375793818"
+      "directory": "unavailable:artifact-4f34f0373d795ea1"
     },
     {
       "case": "reconfigured",
@@ -253,7 +253,7 @@
       "persisted_settings": true,
       "model_run": false,
       "autonomous_acceptance": false,
-      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375831259"
+      "directory": "unavailable:artifact-9016f7e4c06307ec"
     },
     {
       "case": "wide",
@@ -269,7 +269,7 @@
       "persisted_settings": true,
       "model_run": false,
       "autonomous_acceptance": false,
-      "directory": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-16-collapse-columns/.dock/node16/live-1789375868256"
+      "directory": "unavailable:artifact-7ff599bc1db558e8"
     }
   ],
   "loss": {
@@ -301,5 +301,11 @@
     "Original wrapper failure retained; separate versioned full audit passed",
     "No repeated model or production change in resumed audit",
     "Branch not merged; no server/current/shared-plugin release"
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-f68585468c7b",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

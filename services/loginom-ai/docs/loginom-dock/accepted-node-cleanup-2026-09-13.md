@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-b589bd6a6f2d` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Удалены записи принятых узлов, вошедших в main
 
 Пользователь явно разрешил удаление и самостоятельное завершение начатых узлов.
@@ -9,22 +11,22 @@
 
 Удалённые каталоги:
 
-- `.dock/calculator-v3`
-- `.dock/text-import-v3`
-- `.dock/union-20260912`
-- `.dock/join-20260912`
-- `.dock/field-parameters`
-- `.dock/row-filter`
-- `.dock/row-filter-review`
-- `.dock/grouping-v3`
-- `.dock/sorting-v3`
-- `.dock/join-review-20260912`
-- `.dock/union-review-20260912`
+- `unavailable:artifact-812b689e159d3c78`
+- `unavailable:artifact-6382bddadbeb28a1`
+- `unavailable:artifact-1be4ef5443b6cc90`
+- `unavailable:artifact-b7dc04677bd65def`
+- `unavailable:artifact-3f66224c1841beb3`
+- `unavailable:artifact-6f3dbbf5b519fad6`
+- `unavailable:artifact-3285f2fb29d23eb3`
+- `unavailable:artifact-6e2e85d303edac36`
+- `unavailable:artifact-b22a7a61ab04a2a9`
+- `unavailable:artifact-1c6935d921dee803`
+- `unavailable:artifact-f639a353de17cd8c`
 
 Все11каталогов проверены отсутствующими. Свободное место: до
 1.03GiB, после95.61GiB;
 фактический прирост94.58GiB.
-Receipt `.dock/accepted-node-cleanup-20260913.json`.
+Receipt `unavailable:artifact-914dcab297bf9e46`.
 
 Старые ссылки отчётов на эти raw файлы теперь исторические: повторный аудит
 удалённых прогонов по ним недоступен. Это разрешённое удаление, не потеря

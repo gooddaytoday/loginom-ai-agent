@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-0da6bd985436` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Подплан 04 — проверка требований
 
 Статус: **implemented / live_verified (source runtime)**. Компонентная матрица
@@ -6,14 +8,14 @@
 
 ## Матрица реализации и проверки
 
-Все пути свидетельств ниже относятся к приватной `.dock/calculator-v3/`.
+Все пути свидетельств ниже относятся к приватной `unavailable:artifact-18a7dfafd3298bff`.
 Исторические снимки закреплены своими runtime pin; их проверки не выдаются
 за повторный прогон последней ревизии. Независимые verifiers сопоставляют
 публичный результат с исходными наблюдениями, фазами и отдельным expected.
 
 | Требование | Свидетельство | Результат и граница |
 |---|---|---|
-| Реальный UI, Help/E2E до реализации | `sources/`, первичная диагностика в `.dock/text-import-v3/execute-1788942658614`; дальнейшие source/live проходы | Loginom7.4.2; редактор выражений, отдельные порты и условная внутренняя страница исследованы до окончательной реализации |
+| Реальный UI, Help/E2E до реализации | `sources/`, первичная диагностика в `unavailable:artifact-9fc9d4e7e62d181b`; дальнейшие source/live проходы | Loginom7.4.2; редактор выражений, отдельные порты и условная внутренняя страница исследованы до окончательной реализации |
 | Полный локальный handler | `calculator-node.mjs`, общий node.apply, реальный public MCP в live-прогонах | Один вызов добавляет/находит узел, связывает, настраивает, завершает, выполняет и читает; внутри нет модели или интерпретатора сценария |
 | Типизированные параметры и карточка | `calculator-parameters.mjs`, node API/contracts/result schema, calculator/node tests | Expression-only; integer, real, boolean, string, datetime; ограничения проверяются до UI. JavaScript не поддержан |
 | Зависимые формулы и новые/заменяемые поля | `live-1788947535660`: matrix; `live-1788948971356/calculator-new-1788949190457` | Revenue, Adjusted, замена Amount, строка и дата; вычисляет Loginom |
@@ -45,7 +47,7 @@ start-maximized/viewport null; конфигурация стенда изоли�
 Catalog candidate `2026.09.08-node-apply.1-candidate`, manifest SHA256:
 `936ef73d933e85bfd8429b8b0f2b515c543ca415a2b22ba57e108232c54ddf44`.
 Audit SHA256: `a7af79db2e9487dfcdc7aad13b53185b12ffef52bfd7452eb0bb61b783f5d7f5`.
-Evidence: `.dock/calculator-v3/hermes-runs/20260909-145157-ee05c9e3/`.
+Evidence: `unavailable:artifact-4109cb85a15c2ca7`.
 Все146 файлов harness сохранены в frozen-harness и проверены по SHA;
 после прогона runtime и проверяющие исходники не изменялись.
 
@@ -74,7 +76,7 @@ CSV230 байт, SHA256
 После усиления отрицательных проверок readback также прошёл целевой suite.
 Проверены diff и относительные ссылки изменённых документов. Приватные конфигурации,
 профили и журналы `.dock/` исключены из Git. Индекс12 компонентных отчётов с SHA256:
-`.dock/calculator-v3/subplan04-component-evidence-index.json`.
+`unavailable:artifact-5944f3e461333bf7`.
 
 Токены Hermes: input79124, output5289, total884157, cache_read799744,
 cache_write0, reasoning1081. Это сообщённые провайдером пересекающиеся счётчики;

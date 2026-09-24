@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-69f5c0d846e7` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node13: полный автономный прогон и независимый reopen прошли — 14 сентября 2026
 
 Полный frozen-v4 аудит дал **45/45 PASS**, включая **30/30 PASS** проверок
@@ -58,7 +60,7 @@ Loginom 7.4.2, macOS/Chromium, под test-3. Проверены фактиче�
 [Полный неизменённый итог аудитора](node13-live-preflight/hermes-full-3-audit.json)
 и [машинная сводка с путями и SHA](node13-live-preflight/hermes-full-3-summary.json)
 содержат точные pins и результаты. Исходная выгрузка:
-`.dock/node13-acceptance/runs/20260914-091807-4289644a/evidence.json`, SHA
+`unavailable:artifact-0a8e6dd60de09611`, SHA
 `bfc391763cb74698f4ff874d850be006f3786cda2af5f647e1eacfe0bef67a7c`.
 
 Пять точных транспортных ссылок Hermes на прежний running poll разрешены

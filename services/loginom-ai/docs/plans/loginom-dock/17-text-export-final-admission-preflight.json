@@ -112,5 +112,11 @@
     "user_projection_python": 6
   },
   "next_owner": "coordinator",
-  "next_trigger": "bounded account-observation method for real stdio entry before any further user-v1 native component attempt; private fixed native account probe was already observed to work in the earlier diagnostic harness, whereas public bounded UI output omits the plain account label and full-snapshot cursor invalidated"
+  "next_trigger": "bounded account-observation method for real stdio entry before any further user-v1 native component attempt; private fixed native account probe was already observed to work in the earlier diagnostic harness, whereas public bounded UI output omits the plain account label and full-snapshot cursor invalidated",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-4bd3cc455363",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

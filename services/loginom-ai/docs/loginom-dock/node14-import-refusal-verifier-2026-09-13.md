@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-100cc1b57834` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: проверка отказа размещения текстового импорта — 13 сентября 2026
 
 **Scoped PASS; готов комплект следующей автономной приёмки. Полная цель не принята.**
@@ -7,7 +9,7 @@
 
 ## Что изменилось
 
-Добавлен `tools/loginom-acceptance/import_placement_refusals.py`, подключённый
+Добавлен `packages/loginom-runtime/tools/loginom-acceptance/import_placement_refusals.py`, подключённый
 к существующему partition-аудитору. Область строго `imports.text / delimited / new`.
 Источник здесь — доставленный CSV; Missing Values source-node preflight не применяется.
 
@@ -73,7 +75,7 @@ partial effects/pending, пропавшие и повторные квитанц
 ## Pins и следующий комплект
 
 [Полный индекс и pins](node14-import-refusal-verifier-pins-2026-09-13.json).
-Приватные доказательства: `.dock/node14-import-refusal-verifier/`,33 индексированных файла.
+Приватные доказательства: `unavailable:artifact-9afc0190f5b89582`,33 индексированных файла.
 Индекс SHA: `45e05e50e6e48a9f11cae9230a228b990bec5d9768ec7df9cc927fc9b761cd30`.
 
 - Runtime: `71f73d81d758c746bd2111c93de08691c85aebddf80a411f294b8ed3f56ab4ff`,156 inputs.
@@ -90,7 +92,7 @@ partial effects/pending, пропавшие и повторные квитанц
 
 `acceptance-launch-plan.json` сохраняет `launch_authorized=false`, один будущий
 прогон, лимит3600с/200turns, существующую подписку `openai-codex / gpt-5.6-sol / low`
-и каталог `.dock/node14-autonomous-acceptance-4/runs`. Read-only subscription
+и каталог `unavailable:artifact-8330c41533799ae5`. Read-only subscription
 preflight прошёл без модели/MCP/браузера; freeze после коммита повторно совпал.
 Перед запуском требуется свежая проверка комплекта и отдельный слот координатора.
 Текущая диагностическая сессия не является подготовкой всех8 artifacts для нового run.

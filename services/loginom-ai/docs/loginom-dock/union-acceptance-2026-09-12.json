@@ -18,7 +18,7 @@
     "source_pin": "c5c6a69e69d91b64231617833f7f97354fcd04a4ff0986ad8d4766766270348c",
     "manifest_sha256": "4ac827fc9e0cefa609bf2cb8fd7d3d79318dd3fe92999decc7e385fae51fc6e2",
     "package_path": "/test-1/packages/Dock-acceptance-20260912-174232-0449c132.lgp",
-    "evidence_directory": ".dock/union-20260912/runs/20260912-174232-0449c132"
+    "evidence_directory": "unavailable:artifact-2eaf98f97fe2698c"
   },
   "tests": {
     "client_passed": 1378,
@@ -48,23 +48,29 @@
     "usage_complete": true
   },
   "evidence_files": {
-    ".dock/union-20260912/runs/20260912-174232-0449c132/request.json": "b667fb03e681062fd175dfa246ea7eae9e04321eb2fe0723bc5604bf8b54812f",
-    ".dock/union-20260912/runs/20260912-174232-0449c132/evidence.json": "ef49dddb27e3d10cdaeae85c6922c6b4b9ab9308cba04875bdce2644b2da2eee",
-    ".dock/union-20260912/runs/20260912-174232-0449c132/efficiency.json": "933d0facf3f1850c367e9c496321bd355c06a53bab1ac18650dad9d8ae5f3c83",
-    ".dock/union-20260912/runs/20260912-174232-0449c132/union-node-audit.json": "1d5dfef229f9f89eab8604f8bade674711e1e07d4e96bc574b6c608010972545"
+    "unavailable:artifact-148be82cc8c6e8a7": "b667fb03e681062fd175dfa246ea7eae9e04321eb2fe0723bc5604bf8b54812f",
+    "unavailable:artifact-161f0f6f5ac1554e": "ef49dddb27e3d10cdaeae85c6922c6b4b9ab9308cba04875bdce2644b2da2eee",
+    "unavailable:artifact-9e7be4e0b21a07c9": "933d0facf3f1850c367e9c496321bd355c06a53bab1ac18650dad9d8ae5f3c83",
+    "unavailable:artifact-cc2f000333a38f85": "1d5dfef229f9f89eab8604f8bade674711e1e07d4e96bc574b6c608010972545"
   },
   "additional_live_reports": [
-    ".dock/union-20260912/live-1789217551256/union-negative-audit.json",
-    ".dock/union-20260912/live-1789218432011/prefix-empty-audit.json",
-    ".dock/union-20260912/live-1789218432011/persisted-toggle-audit.json",
-    ".dock/union-20260912/live-1789219323954/final-negative-prefix-audit.json",
-    ".dock/union-20260912/live-1789219323954/final-persistence-audit.json",
-    ".dock/union-20260912/live-1789222933291/process-fresh-audit.json"
+    "unavailable:artifact-fe4462c5804122a0",
+    "unavailable:artifact-ffba4fc37e5d30bf",
+    "unavailable:artifact-6e803842a5edeac7",
+    "unavailable:artifact-4c83ddbe33967033",
+    "unavailable:artifact-be673cd7948f6dbb",
+    "unavailable:artifact-a097b6e3b52edec4"
   ],
   "limitations": [
     "Live verified on Loginom 7.4.2 with two/three inputs; maximum 15 is contract tested.",
     "Cancellation and lost-reply paths covered by fault-injection tests, not a live long-running Union cancellation.",
     "No build, deployment, installation, commit or push performed.",
     "Global V4/V5 and further nodes remain separate work."
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-2a37b19f17a4",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

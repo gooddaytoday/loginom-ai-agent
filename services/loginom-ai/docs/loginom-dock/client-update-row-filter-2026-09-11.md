@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-0a42c6f82bdf` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Установка клиента с «Фильтром строк» — 11 сентября 2026
 
 На Mac установлен **`0.1.0-dev.20260910.3-38f8be0b843b`** с подпланом06 и
@@ -13,8 +15,8 @@
 
 Установочный снимок **`668d9f95a1f67d085592f800d65c6f38f3bef1cc`** — отдельный
 локальный потомок main-коммита. Сохранена прежняя диагностика API в четырёх файлах:
-`client/bin/diagnostic.mjs`, `client/lib/local-diagnostics.mjs`,
-`client/test/local-diagnostics.test.mjs`, `plugins/loginom-dock-hermes/__init__.py`.
+`packages/loginom-runtime/client/bin/diagnostic.mjs`, `packages/loginom-runtime/client/lib/local-diagnostics.mjs`,
+`packages/loginom-runtime/client/test/local-diagnostics.test.mjs`, `plugins/loginom-dock-hermes/__init__.py`.
 Они побайтно совпали с предыдущим клиентом; 343 остальных build inputs — с main.
 Все 344 исходных файла, вошедшие в комплект, также сверены побайтно.
 Локальный снимок не публиковался в main или GitHub Release.
@@ -102,7 +104,7 @@ Loginom **7.4.2**, видимое максимизированное окно Ch
 `~/.loginom-dock/previous` указывает на
 `releases/0.1.0-dev.20260910.3-7adeb19b4c91`; все 4152 файла предыдущей версии
 проверены. Снимки настроек и регистраций:
-`.dock/client-update-row-filter-20260911/before-install/`.
+`unavailable:artifact-45cc9371ac5b7800`.
 Полный откат включает runtime и регистрации обоих плагинов.
 Hermes закреплён на локальное зеркало
 `~/.loginom-dock/native-sources/loginom-dock-668d9f95a1f67d085592f800d65c6f38f3bef1cc.git`.
@@ -114,7 +116,7 @@ Hermes закреплён на локальное зеркало
 Общий `UI_SCAN_LIMIT` при preflight preview нового узла на 1000 полях остаётся
 отдельным ограничением; широкая диагностика фильтра не подменяет этот публичный путь.
 
-Приватные доказательства: `.dock/client-update-row-filter-20260911/` —
+Приватные доказательства: `unavailable:artifact-f6a34b46ad32ddcd` —
 `combined-source.json`, `combined-runtime.json`, `combined.tar.gz.manifest.json`,
 `bundle-verification.json`, `installation.json`, `configuration-verification.json`,
 `native-after.json`, `mcp-smoke.json`, `final-bundle-verification.json`,

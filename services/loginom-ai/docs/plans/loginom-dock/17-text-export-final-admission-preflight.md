@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-9e0f45e29f18` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Node17 — final admission preflight
 
 Assignment: `node17:final-admission-preflight:1:79e648b2`.
@@ -47,7 +49,7 @@ an admission boolean. Its `user_v1` field remains null.
 ## Real entry observations and bounded correction
 
 Both runs used `StdioClientTransport` → `text-export-observer-client.mjs` → the
-unchanged `client/bin/loginom-dock.mjs`, explicit isolated config, the actual
+unchanged `packages/loginom-runtime/client/bin/loginom-dock.mjs`, explicit isolated config, the actual
 Loginom browser, and preserved original MCP replies plus internal journals.
 Both effective session profiles were user-v1. Browser launch was visible,
 `--start-maximized`, viewport null, actual window 1508×862.
@@ -79,7 +81,7 @@ Both own browsers were closed; exact-session process checks returned no PIDs.
 Global config content was unchanged in both runs. Server logout remains
 unverified. Final free disk: 97,027,256,320 bytes. Private configs are not in Git
 or in the published evidence digest manifest; raw original wire and journals
-remain local under `.dock/node17/user-v1-component/`.
+remain local under `unavailable:artifact-c05d1b1a853c9319`.
 
 ## Checks and next trigger
 

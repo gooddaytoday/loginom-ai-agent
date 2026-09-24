@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-3bda1c62d95d` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: диагностика ожидания REMOVE_LINK — 13 сентября 2026
 
 Назначение координатора: `node14:remove-link-diagnosis:1:67865596`.
@@ -95,7 +97,7 @@ Blob E2E `d910d13379b0a6ed0d39042df3ab63d19ed5531a` одинаков в теку
 `cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad`.
 Полный список квитанций и SHA — в
 [машинном отчёте](missing-values-remove-link-diagnosis-pins-2026-09-13.json).
-Private evidence: `.dock/node14-remove-link-diagnosis/`.
+Private evidence: `unavailable:artifact-5b6398152f85dfc0`.
 
 Hermes не запускался; full-goal auditor и его закреплённые inputs не изменялись.
 Для следующего автономного прогона координатор должен отдельно выдать слот и

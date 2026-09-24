@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-6289ec332a2a` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: диагностика в расширенном контексте — 13 сентября 2026
 
 **Остановлено до целевого прохода.** Единственная новая копия восстановила
@@ -93,4 +95,4 @@ selection со свежими domain identity/deadline/cancel checks. Это п�
 не запущенная работа. Новая Hermes-приёмка не разрешена.
 
 [Pins и квитанции](missing-values-stale-full-context-diagnosis-pins-2026-09-13.json).
-Private root: `.dock/node14-stale-full-context-diagnosis/`.
+Private root: `unavailable:artifact-161f610b9787b6e5`.

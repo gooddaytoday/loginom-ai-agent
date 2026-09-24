@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-ea00db028445` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Кандидат узла14 для test-4: запрос серверной подготовки
 
 Статус: **ожидает отдельного назначения координатора**. Это описание входов,
@@ -7,11 +9,11 @@
 
 ## Состав локальных изменений
 
-- `executor/catalog/actions.json`: candidate node.add revision4 допускает
+- `packages/loginom-runtime/executor/catalog/actions.json`: candidate node.add revision4 допускает
   `preprocessing.data_recovery`, добавлен selector dependency.
-- `executor/catalog/selectors.json`: `component.preprocessing.data_recovery` →
+- `packages/loginom-runtime/executor/catalog/selectors.json`: `component.preprocessing.data_recovery` →
   `ModelForm;colVendors_Компоненты>Предобработка>Заполнение_пропусков`.
-- `executor/catalog/source-index.json`: dependency добавлена к node.add.
+- `packages/loginom-runtime/executor/catalog/source-index.json`: dependency добавлена к node.add.
 - Версия исходного шаблона: `2026.09.13-node14.1-candidate`.
 - Selector evidence: E2E `2cad5602158fd2e4836d821d644a2b8d92f571a2`,
   `bg/selectors.ts:470–474`, SHA256

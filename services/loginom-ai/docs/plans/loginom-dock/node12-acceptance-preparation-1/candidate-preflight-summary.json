@@ -13,6 +13,12 @@
   "model_started": false,
   "browser_started": false,
   "slot_granted": false,
-  "preflight_report": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-acceptance-preparation-1/candidate-preflight.json",
-  "preflight_report_sha256": "0003c315158004ac41a9f3d0b61e49bc541e462e050ee56e626877b64f1358b5"
+  "preflight_report": "unavailable:artifact-14e686c2945e800e",
+  "preflight_report_sha256": "0003c315158004ac41a9f3d0b61e49bc541e462e050ee56e626877b64f1358b5",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-85ee25587abf",
+    "provenance": "../../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

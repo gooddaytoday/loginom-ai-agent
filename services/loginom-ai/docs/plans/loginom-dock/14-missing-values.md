@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-45fd40465656` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # 14. Заполнение пропусков: среднее и строковая константа
 
 Статус: **review и единственный fix round завершены в source; автономная приёмка не выполнена**.
@@ -34,7 +36,7 @@ Production runtime не менялся; VPS stage/native save/Hermes/full reopen
 
 ## Что есть сейчас и источники
 
-В `executor/inventory/palette-2026-09-05.json` есть `Заполнение_пропусков`;
+В `packages/loginom-runtime/executor/inventory/palette-2026-09-05.json` есть `Заполнение_пропусков`;
 Стабильный coverage ID `component.preprocessing.DataRecovery` соответствует
 локальному runtime type `preprocessing.data_recovery` и режиму `impute`.
 Тип `preprocessing.data_recovery / impute` зарегистрирован в исходном коде;

@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-1a4dd570732d` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Пилот параллельной разработки узлов
 
 Актуализация 12 сентября: подготовлен [новый план управляемых потоков](../plans/loginom-dock/three-stream-workflow.md),
@@ -15,20 +17,20 @@
 
 Рабочие копии, исходники и наблюдения сохранены. Дополнительная локальная копия
 изменений четырёх потоков с контрольными суммами:
-`.dock/parallel-pilot-20260911/sequential-checkpoint/manifest.json`.
+`unavailable:artifact-15373c3cece37ce9`.
 Общий реестр: `phase=paused`, `execution_mode=sequential`,
 `automatic_dispatch=false`, `resume_requires_user_request=true`.
 Никакой код новых узлов не принят в main и не установлен.
 
-- Слияние: в `.worktrees/parallel-join` начато общее исправление
-  `client/lib/process-node-focus.mjs`, `workspace-ui.mjs` и соответствующий тест.
+- Слияние: в `unavailable:artifact-5b67f3b4f6a1acdf` начато общее исправление
+  `packages/loginom-runtime/client/lib/process-node-focus.mjs`, `workspace-ui.mjs` и соответствующий тест.
   Оно не прошло законченное ревью/приёмку. После нового запроса сначала оценить
   это изменение, затем последовательно продолжать подплан09.
 - Замена: сохранены диагностический harness, CSV и исследование мастера;
-  обработчик не реализован. Продолжение — из `.worktrees/parallel-replacement`.
+  обработчик не реализован. Продолжение — из `unavailable:artifact-675ecaf692dbdcaf`.
 - Дата и время: сохранены диагностический harness и наблюдения матрицы;
-  обработчик не реализован. Продолжение — из `.worktrees/parallel-date-time`.
-- Проверяющий: отчёт подготовки сохранён в `.worktrees/parallel-review/docs/`
+  обработчик не реализован. Продолжение — из `unavailable:artifact-aa0bdbfa70f1e373`.
+- Проверяющий: отчёт подготовки сохранён в `unavailable:artifact-ef2b3155e6257735`
   `loginom-dock/parallel-pilot-review-preflight-2026-09-11.md`; это не ревью готового кода.
 
 Диагностические браузеры с черновиками оставлены открытыми, чтобы не потерять
@@ -61,10 +63,10 @@
 
 | Поток | Подплан | Ветка | Рабочая копия |
 | --- | --- | --- | --- |
-| 1 | [09. Слияние](../plans/loginom-dock/09-join.md) | codex/parallel-join-20260911 | .worktrees/parallel-join |
-| 2 | [11. Замена](../plans/loginom-dock/11-replacement.md) | codex/parallel-replacement-20260911 | .worktrees/parallel-replacement |
-| 3 | [13. Дата и время](../plans/loginom-dock/13-date-time.md) | codex/parallel-date-time-20260911 | .worktrees/parallel-date-time |
-| Ревью | Кандидаты трёх потоков | codex/parallel-review-20260911 | .worktrees/parallel-review |
+| 1 | [09. Слияние](../plans/loginom-dock/09-join.md) | codex/parallel-join-20260911 | unavailable:artifact-5b67f3b4f6a1acdf |
+| 2 | [11. Замена](../plans/loginom-dock/11-replacement.md) | codex/parallel-replacement-20260911 | unavailable:artifact-675ecaf692dbdcaf |
+| 3 | [13. Дата и время](../plans/loginom-dock/13-date-time.md) | codex/parallel-date-time-20260911 | unavailable:artifact-aa0bdbfa70f1e373 |
+| Ревью | Кандидаты трёх потоков | codex/parallel-review-20260911 | unavailable:artifact-ec3efb648289bb48 |
 
 ## Изоляция и передача результата
 
@@ -105,7 +107,7 @@ Manifest SHA: `4ac827fc9e0cefa609bf2cb8fd7d3d79318dd3fe92999decc7e385fae51fc6e2`
 `--start-maximized`, `viewport:null`, проверка фактической геометрии.
 Буфер обмена использует одну host-wide блокировку без обхода.
 
-Реестр владельцев ведёт только координатор в `.dock/parallel-pilot-20260911/state.json`.
+Реестр владельцев ведёт только координатор в `unavailable:artifact-b7f3f644efe0905b`.
 Рабочие документы, журналы и configs отдельных потоков лежат в их собственных
 каталогах; секреты и сырые журналы не попадают в Git. Память остаётся в actor scope
 текущей задачи; никаких глобальных Peer overrides или чтения чужих проектов.

@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-e711850cef08` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Текущий результат R2 — целевой gate PASS
 
 По отдельному разрешению пользователя точный подготовленный патч был применён,
@@ -23,24 +25,24 @@
 Коммит владельца14: `a63586fe096f4fd7f17f346c391834d3e34bdaa4`
 «Исправлены схема заполнения пропусков и завершение ошибок исполнения».
 Отчёт: `e88cb6182cdc2b6c051d772c02ac53df5b331016`, файл
-`docs/loginom-dock/missing-values-fix-r1-2026-09-13.md` в ветке14.
+`services/loginom-ai/docs/loginom-dock/missing-values-fix-r1-2026-09-13.md` в ветке14.
 Коммит смешанный: для R2 требуются только следующие изменения.
 
 | Файл | Необходимая часть |
 | --- | --- |
-| `client/lib/node-process-context.mjs` | Native ErrorDetails для завершившегося с ошибкой процесса |
-| `client/lib/node-execution-evidence.mjs` | verifyFailedExecution: полная история, принадлежность свежей группе исполнения, завершённость и причина |
-| `client/lib/node-execution-procedure.mjs` | Распознавание подтверждённой ошибки, повторная проверка перед закрытием панели, возврат с cleanup |
-| `client/lib/node-apply.mjs` | Принятие подтверждённой ошибки исполнения, FAILED/local_node_failed, отсутствие чтения устаревшего выхода |
-| `client/lib/node-operation-runner.mjs` | Повтор и resume терминальной ошибки возвращают прежний результат без нового исполнения |
-| `client/lib/node-result-schema.mjs` | Только execution failed и local_node_failed; схема missing_values не нужна для R2 |
-| `client/lib/node-contracts.d.ts` | Типы failed execution и local_node_failed |
-| `client/test/node-execution-evidence.test.mjs` | Положительное доказательство и отказы на неполных/чужих данных |
-| `client/test/node-execution-focus.test.mjs` | Завершение панели после подтверждённой ошибки |
-| `client/test/node-operation-failure.test.mjs` | Публичный терминальный результат и отсутствие повторных эффектов |
-| `client/test/node-apply.test.mjs` | Только новые проверки terminal failure |
+| `packages/loginom-runtime/client/lib/node-process-context.mjs` | Native ErrorDetails для завершившегося с ошибкой процесса |
+| `packages/loginom-runtime/client/lib/node-execution-evidence.mjs` | verifyFailedExecution: полная история, принадлежность свежей группе исполнения, завершённость и причина |
+| `packages/loginom-runtime/client/lib/node-execution-procedure.mjs` | Распознавание подтверждённой ошибки, повторная проверка перед закрытием панели, возврат с cleanup |
+| `packages/loginom-runtime/client/lib/node-apply.mjs` | Принятие подтверждённой ошибки исполнения, FAILED/local_node_failed, отсутствие чтения устаревшего выхода |
+| `packages/loginom-runtime/client/lib/node-operation-runner.mjs` | Повтор и resume терминальной ошибки возвращают прежний результат без нового исполнения |
+| `packages/loginom-runtime/client/lib/node-result-schema.mjs` | Только execution failed и local_node_failed; схема missing_values не нужна для R2 |
+| `packages/loginom-runtime/client/lib/node-contracts.d.ts` | Типы failed execution и local_node_failed |
+| `packages/loginom-runtime/client/test/node-execution-evidence.test.mjs` | Положительное доказательство и отказы на неполных/чужих данных |
+| `packages/loginom-runtime/client/test/node-execution-focus.test.mjs` | Завершение панели после подтверждённой ошибки |
+| `packages/loginom-runtime/client/test/node-operation-failure.test.mjs` | Публичный терминальный результат и отсутствие повторных эффектов |
+| `packages/loginom-runtime/client/test/node-apply.test.mjs` | Только новые проверки terminal failure |
 
-`client/test/missing-values-readback.test.mjs` и ветка схемы missing_values
+`packages/loginom-runtime/client/test/missing-values-readback.test.mjs` и ветка схемы missing_values
 не входят в минимальный R2. Input-mapping recovery14 также не является его
 предпосылкой. Локальное расширение configure recovery13 затрагивает node-apply;
 при последующей разрешённой интеграции потребуется совместить отдельные изменения,

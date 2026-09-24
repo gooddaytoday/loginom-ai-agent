@@ -1,6 +1,8 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-095a8ddea46d` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # P4: управляемое завершение и clipboard lease
 
-6 сентября 2026. Добавлен `client/lib/managed-shutdown.mjs`, подключённый CLI и
+6 сентября 2026. Добавлен `packages/loginom-runtime/client/lib/managed-shutdown.mjs`, подключённый CLI и
 включённый в runtime digest. Все управляемые SIGINT/SIGTERM/stdin EOF используют
 один shutdown request. Повторные сигналы не повторяют неопределённое закрытие.
 

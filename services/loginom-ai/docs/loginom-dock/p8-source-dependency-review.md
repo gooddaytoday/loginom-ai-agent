@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-b37c2e9755c0` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # P8: подготовка проверки транзитивных исходников
 
 6 сентября 2026. Реализован отдельный offline review tool
@@ -81,7 +83,7 @@ mount, parent gitlink commit, resource URI и manifest SHA. Затем пров�
 ```sh
 node deploy/loginom-dock/review-source-dependencies.mjs \
   --repository /path/to/e2e-tests \
-  --index executor/catalog/source-index.json \
+  --index packages/loginom-runtime/executor/catalog/source-index.json \
   --submodules /private/reviewed-local-submodules.json \
   --typescript /path/to/typescript/lib/typescript.js \
   --typescript-sha256 REVIEWED_PARSER_SHA256 \

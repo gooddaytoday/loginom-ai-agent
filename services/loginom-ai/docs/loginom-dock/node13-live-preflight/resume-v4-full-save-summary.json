@@ -28,30 +28,36 @@
   },
   "refs": {
     "full-business-audit.json": {
-      "path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/full-business-audit.json",
+      "path": "unavailable:artifact-ee1b4166c2a02ee1",
       "sha256": "d1a3aa0245fa10c2b2591c5d0af0b78b9f4a26685e5588beec001c7cbbca49c9",
       "passed": true,
       "status": null
     },
     "node13-full-empty-done-split-negative.json": {
-      "path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/node13-full-empty-done-split-negative.json",
+      "path": "unavailable:artifact-7f55996524a4ed2c",
       "sha256": "f732a4f64d4cd9978ebd75cf7b460bbb1abb4c691e7849a13e10c9c2a6c708d4",
       "passed": true,
       "status": null
     },
     "full-save.json": {
-      "path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/full-save.json",
+      "path": "unavailable:artifact-1edf67bc7c0ec1d6",
       "sha256": "5a46830740666e0139c105b9bfb7229f8de4326160c32b6eff0fb36125fba777",
       "passed": null,
       "status": "SUCCEEDED"
     },
     "inspect-close-full.json": {
-      "path": ".dock/stream-runtime/sessions/9d3ccd0a-7196-495c-9179-a02cc2581032/inspect-close-full.json",
+      "path": "unavailable:artifact-890bba454ddbe988",
       "sha256": "efe745e16dbbf9731483dec8faa4cb7db72616804caddeea1a7c24fa079b4fa0",
       "passed": null,
       "status": null
     }
   },
   "independent_reopen_pending": true,
-  "hermes_acceptance": false
+  "hermes_acceptance": false,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-aaf434c84657",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

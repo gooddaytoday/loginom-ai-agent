@@ -2,8 +2,8 @@
   "passed": true,
   "runtime_unchanged": true,
   "fixtures_unchanged": {
-    "tools/loginom-acceptance/fixtures/date-time/sales.csv": true,
-    "tools/loginom-acceptance/fixtures/date-time/expected.json": true
+    "historical-ref:ref-7db65127747973c7": true,
+    "historical-ref:ref-a23e05c9a1cdc6d3": true
   },
   "requests": {
     "done": 2,
@@ -13,5 +13,11 @@
   "prompt_revision": 2,
   "goal_sha256": "711d1cec738c444e9c90bc806218fe36dc1feeb877ee1f23d13f38e7c386e750",
   "inputs_sha256": "d7a56a96361f3652bb8e4c32039f903ee47bd35de34e0f8e4d1c934ffebe1310",
-  "source_parent": "c99bc9e2d07802b09c460d79eadb64f55584e3a5"
+  "source_parent": "c99bc9e2d07802b09c460d79eadb64f55584e3a5",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-1b83a53af377",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

@@ -1,3 +1,11 @@
+## Node development — актуально 2026-09-24
+
+Для разработки обработчиков узлов сначала прочитать [канонический регламент](docs/node-development/README.md).
+Он определяет orchestration/single/plan-authoring, принятые модели, изоляцию и CLI-приёмку.
+Для новых обработчиков продуктовая база — явно закреплённый SHA ветки `loginom`
+в loginom-ai-agent. Прежние Hermes/Dock node workflows — исторические источники.
+Документация сама не запускает очередь; слияние и выпуск требуют отдельной команды.
+
 - To regenerate the legacy JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit `src/generated` or `src/generated-effect` directly.
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk-next` composes Client, Core, and Server.

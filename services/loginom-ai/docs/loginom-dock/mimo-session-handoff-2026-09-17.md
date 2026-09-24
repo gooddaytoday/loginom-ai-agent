@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-42e3177948c8` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # MiMo: передача работы в новую сессию, 17 сентября 2026
 
 **Статус: ОСТАНОВЛЕНО по явной просьбе пользователя 17 сентября. Полная приёмка НЕ достигнута.**
@@ -41,7 +43,7 @@ run не засчитывать в приёмку. Далее остальные
 после них неизменная финальная серия38. Исключение Xiaomi и исходные вложения
 явно разрешены пользователем; повторного разрешения не требуется.
 
-Evidence: `.dock/mimo-stability-20260916/resume-checkpoint-20260917-current.json`,
+Evidence: `unavailable:artifact-9121b270fb5d655e`,
 `task19-composite-diagnostic-audit.json`, `runs/20260917-165351-f4fc705e/user-stop.json`.
 
 ## 1. Цель и обязательные ограничения
@@ -53,7 +55,7 @@ mimo-v2.5 / medium**, существующее подписочное подкл
 эффективный профиль по SQLite Hermes; это подтверждает конфигурацию агента,
 но не отдельный wire-параметр medium на стороне Xiaomi.
 
-- Рабочий каталог `/Users/kartamyshev/Git/loginom-dock`.
+- Рабочий каталог `unavailable:artifact-cf88a7be2dd0c277`.
 - Ветка `codex/mimo-scenario-stability`; HEAD/base
   `9b46c85f68d054a27afad732d74785332098c0ba`.
 - Все изменения остаются незакоммиченными. Есть чужие/параллельные изменения,
@@ -77,7 +79,7 @@ mimo-v2.5 / medium**, существующее подписочное подкл
 
 Шесть основных задач **02,47,21,19,34,38 по три запуска с нуля**, остальные
 20 допущенных задач по одному: **38 запусков**. Реестр
-`.dock/mimo-stability-20260916/final-acceptance-ledger.json` проверен:
+`unavailable:artifact-2377330c73d51a52` проверен:
 **38 PENDING**, final series не начата. Предварительная классификация корпуса
 не является приёмкой. Пропуски требуют конкретной причины и исключаются из доли успеха.
 
@@ -111,7 +113,7 @@ mimo-v2.5 / medium**, существующее подписочное подкл
   замену входного поля, а не редактирование существующего выражения. Исправление
   отказа — тот же узел, новый operation_id, inputs:[]/mappings:[], replace:false
   для сохранённого пустого Expr1. Дополнительные соединения не объявлять безопасными.
-- Живой calculator recovery `.dock/calculator-v3/live-1789646734022`:
+- Живой calculator recovery `unavailable:artifact-eafa32c1851e5a03`:
   syntax refusal → replace refusal → исправление того же узла, 1узел/1связь,
   повтор same-ID: 0 browser calls. 120 строк по количеству, численно только 3 строки;
   это адресная проверка, не полный аудит. Cleanup диагностической копии подтверждён.
@@ -142,18 +144,18 @@ cleanup+managed shutdown24, read-only warning3, Python oracle11 и другие 
 |19 / `20260917-145906-f6691f46`|Импорт прошёл|Остановлен на восстановлении Calculator; затем исправлен контракт и проведён live replay |
 |19 / `20260917-151127-b640c212`|Импорт/прибыль/группировки/ROI/сортировка прошли|Остановлен на выходном мастере группировки; детали ниже |
 
-Task47 audit: `.dock/mimo-stability-20260916/task47-readonly-acknowledged/`.
+Task47 audit: `unavailable:artifact-e4f216cddef8b021`.
 Он выполнялся на отличающемся runtime (изменялся cleanup), scope явно diagnostic,
 не следует выдавать его за финальную same-version приёмку. Первое прерывание
 аудита47 было вызвано перезагрузкой Mac, подтверждённой пользователем.
 
-Task02: `.dock/mimo-stability-20260916/task02-current-independent/full-audit-identity-checked.json`.
+Task02: `unavailable:artifact-71d100199f4a5474`.
 Добавлены audit-only oracle04/17 и тесты, но они не подтверждают выполнение
 полных бизнес-заданий. Нельзя выводить причинность из описательных сравнений.
 
 ## 4. Последний прогон19 — остановлен, не возобновлять вслепую
 
-`.dock/mimo-stability-20260916/runs/20260917-151127-b640c212/`
+`unavailable:artifact-7736f6f743662376`
 
 - Runtime `952003a177eb4485076e7e5c632ad936b6677ab502cb0294184e01338ca2f1d3`.
 - storage `/mimo/MiMo-task19-diagnostic-retry2-20260917`, плановый `scenario.lgp`.
@@ -173,8 +175,8 @@ Task02: `.dock/mimo-stability-20260916/task02-current-independent/full-audit-ide
 Успешная `grp-channel-001` выполнилась с read.ports=[]. Последующий
 `read-grp-ch-001` отвергнут `buildNodeReadRequest`: нет ранее прочитанной схемы.
 Модель создала лишнюю `grp-channel-003` с read.ports=[0], чтобы получить данные.
-Файлы: `client/lib/node-read-contract.mjs`, `node-read-driver.mjs`,
-`client/test/node-read.test.mjs`; вход `executor.mjs:startNodeRead`.
+Файлы: `packages/loginom-runtime/client/lib/node-read-contract.mjs`, `node-read-driver.mjs`,
+`packages/loginom-runtime/client/test/node-read.test.mjs`; вход `executor.mjs:startNodeRead`.
 **Исправление не сделано.** Нужно получить проверенную схему из подтверждённого
 output mapping/свежего наблюдения при сохранении owner/runtime/port/execution
 проверок. Не разрешать caller-provided произвольные схемы/идентификаторы.
@@ -189,7 +191,7 @@ output mapping/свежего наблюдения при сохранении o
 radioLinks=true, table=false. Причина последующего переключения ещё НЕ доказана.
 Нельзя утверждать, что исходный запрос загрузки точно вызвал гонку.
 
-Живая отдельная копия `.dock/calculator-v3/live-1789647904764`:
+Живая отдельная копия `unavailable:artifact-d8e89992687f38e5`:
 - seed `/mimo/MiMo-task47-diagnostic-current-20260917/scenario.lgp`;
 - copy `/mimo/MiMo-task19-diagnostic-retry2-20260917/output-diagnostic.lgp`;
 - `output-view-probe.json`: открытие точного выходного порта PASS;
@@ -199,14 +201,14 @@ radioLinks=true, table=false. Причина последующего перек
   следующий readOutputDefinitionPages воспроизвёл тот же timeout.
 Это подтверждает класс дефекта, но не окончательную причину самопереключения в run19.
 
-Скрипты сохранены в `.dock/mimo-stability-20260916/`:
+Скрипты сохранены в `unavailable:artifact-c32940cc6c91c155`:
 `output-view-probe.operator.js`, `source-fetch-probe.operator.js`,
 `links-mode-probe.operator.js`. Не зависеть от временных `/tmp` файлов.
 
 ### Незавершённая правка — проверить первой
 
-Создан **`client/lib/mapping-table-view.mjs`** и добавлен вызов в
-`client/lib/port-mapping-procedure.mjs:configureOutputField` перед чтением definitions.
+Создан **`packages/loginom-runtime/client/lib/mapping-table-view.mjs`** и добавлен вызов в
+`unavailable:artifact-c4c65e5105233449` перед чтением definitions.
 Helper пытается выбрать «Таблица», сохраняя owner/native mapping и проверяя radio.
 **Это черновик: тестов нет, live проверки исправления нет, ещё не считать исправленным.**
 Нужны негативные тесты смены owner/root/schema/links, корректный no-op table,
@@ -238,9 +240,9 @@ Helper пытается выбрать «Таблица», сохраняя owne
 ## 6. Практические команды и файлы
 
 Node: `/Users/kartamyshev/.loginom-dock/current/runtime/node`.
-Запускатель: `python3 tools/loginom-acceptance/analytic_corpus.py --task N
+Запускатель: `python3 packages/loginom-runtime/tools/loginom-acceptance/analytic_corpus.py --task N
 --phase diagnostic --storage /mimo/NEW_UNIQUE_DIR
---dock-config .dock/mimo-stability-20260916/operator-config.json
+--dock-config unavailable:artifact-961f26703fde4b94
 --timeout 3600 --max-turns 120` (одной командой).
 Создать/проверить каталог через `scenario-storage.mjs` до запуска.
 Не печатать operator-config: содержит секреты.
@@ -250,7 +252,7 @@ Node: `/Users/kartamyshev/.loginom-dock/current/runtime/node`.
 `audit_corpus_tables.py` и специализированные аудиторы проверяют полные таблицы.
 Read-only diagnostic допускается лишь явно с acceptance_eligible=false.
 
-Существующий интерактивный harness: `tools/loginom-acceptance/calculator-live.mjs`,
+Существующий интерактивный harness: `packages/loginom-runtime/tools/loginom-acceptance/calculator-live.mjs`,
 TTY обязателен, одна строка `{ "id":"step", "file":"/absolute/operator.js" }`.
 Закрывать browser только после подтверждённого cleanup; не считать browser_close
 доказательством закрытия серверного сеанса.

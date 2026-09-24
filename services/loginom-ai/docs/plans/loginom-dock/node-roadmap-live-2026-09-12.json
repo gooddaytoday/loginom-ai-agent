@@ -459,5 +459,11 @@
     "Собственный исследовательский пакет создан; после добавления узлов нажато Сохранить, независимое переоткрытие не выполнялось.",
     "Кросс-таблица наблюдалась в палитре; добавление в исследовательский граф не подтверждено.",
     "Все узлы исследования оставлены ненастроенными; приёмка существующих четырёх веток отдельно."
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-f1b6cdce568e",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

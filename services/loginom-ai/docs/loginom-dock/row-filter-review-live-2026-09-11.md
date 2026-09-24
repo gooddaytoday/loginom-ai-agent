@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-a75d65e92883` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 Поставка завершена: [main, установленный клиент и проверка установки](client-update-row-filter-2026-09-11.md).
 
 # Проверка и исправление замечаний Row Filter — 11 сентября 2026
@@ -23,21 +25,21 @@
 
 По сравнению с предыдущей принятой ревизией изменены ровно три runtime-файла:
 `filter-context.mjs`, `filter-procedure.mjs`, `workspace-ui.mjs`.
-Доказательство: `.dock/row-filter-review/runtime-change-scope.json`.
+Доказательство: `unavailable:artifact-a5e66ae58b5eff04`.
 
 ## Живые доказательства
 
-- `.dock/calculator-v3/live-1789132602814/`: ошибка порядка ключей, 100 сохранённых
+- `unavailable:artifact-3cb2f3375246112a`: ошибка порядка ключей, 100 сохранённых
   условий, отказ исходной процедуры и успешная замена. Файлы
   `review-many-reopen-owned.json`, `review-many-replace-before.json`,
   `review-many-replace-visible.json`, `review-manual-save.json`.
 - Копия с исправленной заменой сохранена и закрыта:
   `/user/dock-p3/packages/RowFilter-review-fixed-rows-20260911.lgp`.
-- `.dock/calculator-v3/live-1789133491979/`: подготовка CSV из 1000 integer-полей
+- `unavailable:artifact-8839a91543912f25`: подготовка CSV из 1000 integer-полей
   Field0001..Field1000 и двух строк (1..1000 и -1..-1000). При чтении определения
   столбца 944 прервалась связь; сессия восстановлена штатным диалогом, импорт
   завершён вручную. Публичная попытка сохранена как AMBIGUOUS, не как успех.
-- `.dock/calculator-v3/live-1789133885013/`: `review-wide-count-confirmed.json`
+- `unavailable:artifact-204b29a1d5047816`: `review-wide-count-confirmed.json`
   и `review-wide-count-fixed.json`; `review-wide-picker-confirmed.json`,
   `review-near-field-fixed.json`, `review-wide-field-final.json`.
 - Широкий фильтр Field1000 > 0 выполнен. `wide-output-audit.json` независимо
@@ -58,8 +60,8 @@
 ## Тесты и автономная приёмка
 
 - Client: **1287 PASS / 1 SKIP**, 0 FAIL;
-  `.dock/row-filter-review/client-tests-final.log`.
-- Python: **475 PASS**; `.dock/row-filter-review/python-tests.log`.
+  `unavailable:artifact-3fbd6301176c2947`.
+- Python: **475 PASS**; `unavailable:artifact-94fb8eb36b8b5cfa`.
 - Новые тесты проверяют порядок ключей, дальнее и соседнее невидимое поле,
   длинный фильтр, отсутствие прогресса, изменение инвентаря/схемы, границу 1000
   полей и краткое наблюдение с 100 строками.
@@ -83,10 +85,10 @@ Codex повторно проверил целевой стенд 7.4.2 в UI:
 Пять node.apply завершились успешно: импорт, исходный фильтр 8/2, замена условий
 5/5, реальное reopen, повторный импорт и фильтр 5/5 без перенастройки.
 Runtime, harness, native skill и подключение ChatGPT остались неизменными.
-Доказательства: `.dock/row-filter-review/hermes-runs/20260911-181616-1338ee3f/`
+Доказательства: `unavailable:artifact-825b2a9a9f44fb9d`
 — `filter-node-audit.json`, `negative-audit.json`, `evidence.json`, `request.json`.
 Временная конфигурация проверки удалена после завершения; сохранность основной
-подтверждена в `.dock/row-filter-review/config-preservation.json`.
+подтверждена в `unavailable:artifact-37d01bd8aa953fd4`.
 
 ## Граница доказательств
 

@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-7ad70119b19b` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Подплан 03 — итоговая приёмка
 
 8 сентября 2026, 22:49 МСК. Статус: **implemented / live_verified (source runtime)**.
@@ -19,7 +21,7 @@ Candidate остаётся staged; production не переключался.
 `openai-codex / gpt-5.6-sol / low`: **30/30 independent checks PASS**.
 Frozen audit SHA256:
 `bcddd145fd525cedd1bd74b9185eaec27aae44d8c9f2ee46809b489c975f5317`.
-Evidence: `.dock/text-import-v3/hermes-runs/20260908-222819-2e3cc755/`.
+Evidence: `unavailable:artifact-e4e46df92e36412c`.
 Пакет: `/user/dock-p3/packages/Dock-acceptance-20260908-222819-2e3cc755.lgp`.
 Оба выхода6×5; после открытия выполнен тот же узел с settings={} и mappings=[].
 Настройки/readback, bytes/SHA, mapping, новые execution IDs, два сохранения,
@@ -35,7 +37,7 @@ Evidence: `.dock/text-import-v3/hermes-runs/20260908-222819-2e3cc755/`.
 
 ## Проверка каждого обязательства
 
-Пути прогонов ниже относятся к `.dock/text-import-v3/`. Компонентные результаты
+Пути прогонов ниже относятся к `unavailable:artifact-e03d84ff00f108c4`. Компонентные результаты
 принадлежат указанным в их отчётах фиксированным исходникам; они не объявляются
 повторными прогонами текущего runtime. Новая проекция readback не меняет UI-драйверы.
 
@@ -65,7 +67,7 @@ Evidence: `.dock/text-import-v3/hermes-runs/20260908-222819-2e3cc755/`.
 | Экономия контекста и измерения | Hermes `evidence.json` efficiency и `timing-summary.json` | 15 public calls,16 model API calls; измерены20 локальных фаз. Между сообщениями задачи236.688с; ходы модели171.214с, включая сеть/оркестрацию, не изолированное время inference |
 
 Индекс27 повторно прочитанных отчётов с SHA256 сохранён в
-`.dock/text-import-v3/subplan03-completion-evidence-index.json`. Он связывает
+`unavailable:artifact-5bceec89c040f0db`. Он связывает
 артефакты с этой ручной проверкой требований и не заменяет независимые verifiers.
 
 ## Проверки и ограничения

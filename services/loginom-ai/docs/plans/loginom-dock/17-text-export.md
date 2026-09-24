@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-e8f25ec962cf` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # 17. Экспорт — Текстовый файл
 
 Исходный коммит: `110da29abe5d247c76ed71b09f7e6b7f6d0b588b`.
@@ -8,7 +10,7 @@ round R1/R2 завершены; автономная приёмка Hermes ещ�
 установленного клиента.
 
 Ветка `codex/node-17-text-export`, постоянный worktree
-`.worktrees/node-17-text-export`, принятая база
+`unavailable:artifact-56a53afe8ac6fecc`, принятая база
 `a3b419bde8a660e1905284ee62a46362d5a49e09`. Назначение
 `node17:development:1`, component `component.exports.Text`, аккаунт `test-2`,
 хранилище `/test-2`. Непрослитые изменения node11 не переносились.
@@ -131,7 +133,7 @@ loading=false) подтвердил отсутствие файлов Done и Cl
 
 Полная матрица с SHA, execution_id, runtime, путями локальных доказательств:
 [17-text-export-evidence.json](17-text-export-evidence.json). Воспроизведение
-аудита: [text-export README](../../../tools/loginom-acceptance/text-export-README.md).
+аудита: [text-export README](../../../../../packages/loginom-runtime/tools/loginom-acceptance/text-export-README.md).
 Финальный source runtime:
 `afc199953de8a6a7e0d1e3a04247a98e69d85d832e26d0168a06b2c0bb6b8cab`.
 

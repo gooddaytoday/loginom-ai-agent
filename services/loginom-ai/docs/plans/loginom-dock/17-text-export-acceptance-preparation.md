@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-367ec33f094d` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Node17 Text export: пакет подготовки автономной приёмки
 
 **Обновление после проверки координатора:** запуск закрыт из-за отсутствия
@@ -23,7 +25,7 @@ Runtime: `347615cbae29323d80b57488b794ecce607b5b9e0d2fbe86aa88b7460241311c`.
 
 ## Полный объявленный goal
 
-[Текст задания](../../../tools/loginom-acceptance/goals/text-export-node-complete.txt)
+[Текст задания](../../../../../packages/loginom-runtime/tools/loginom-acceptance/goals/text-export-node-complete.txt)
 передаётся Hermes через существующий `run.py`, без нового интерпретатора сценариев.
 22 полные операции: три импорта, фильтр пустого входа, четыре новых экспорта,
 patch пустого файла и TSV, default reject, explicit replace, Done, Close,
@@ -31,7 +33,7 @@ patch пустого файла и TSV, default reject, explicit replace, Done, 
 Отдельно три доставки fixtures, save_checkpoint, явное save_as/reopen и итоговое
 save_checkpoint. Никаких зашитых старых GUID в задании нет.
 
-[Контракт fixtures и байтов](../../../tools/loginom-acceptance/fixtures/text-export/contract.json)
+[Контракт fixtures и байтов](../../../../../packages/loginom-runtime/tools/loginom-acceptance/fixtures/text-export/contract.json)
 содержит три исходных CSV и семь независимых golden outputs. Имена файлов
 формируются из уникального run ID; source bytes и golden bytes раздельны.
 Golden outputs не загружаются вместо результатов Loginom.
@@ -59,7 +61,7 @@ Loginom 7.4.2 Linux, `http://logi-test-plan.bg.local/app/?testable=true`,
 Оба окна: viewport:null, inner 1508×862, outer 1508×949. Отдельный test-2 вход
 и его хранилище подтверждены текущим UI. Source harness не использовал Hermes.
 
-1. Новая сессия `.dock/text-export/live-1789303099350` открыла исправленный
+1. Новая сессия `unavailable:artifact-5593263f4fdf843f` открыла исправленный
    `/test-2/node17-review-fix-20260913.lgp`. CSV, typed, wide и прежний Done
    выполнены с inputs=[], mappings=[] и только destination patch. Для CSV
    независимо сравнён baseline именно исправленного source, включая GUID,
@@ -73,7 +75,7 @@ Loginom 7.4.2 Linux, `http://logi-test-plan.bg.local/app/?testable=true`,
    в полном обновлённом native store. Подготовительная копия сохранена отдельно
    как `/test-2/node17-preparation-20260913.lgp` через public save_as.
 4. После logout/закрытия первого браузера новая сессия
-   `.dock/text-export/live-1789303884824` открыла именно подготовительную копию.
+   `unavailable:artifact-f23b7616bb5ba034` открыла именно подготовительную копию.
    Changed/typed/wide/zero выполнены только с новым destination. Для всех четырёх
    совпали GUID, вся входная схема и mapping, сохранённые параметры; документ и
    выполнение новые. Все байты совпали с golden. Empty перед этим повторно
@@ -86,7 +88,7 @@ Loginom 7.4.2 Linux, `http://logi-test-plan.bg.local/app/?testable=true`,
 
 Default reject, explicit replace и независимое повторное скачивание baseline
 уже проверены в correction round на том же runtime 347615cb. Эти доказательства
-сохранены в `.dock/text-export/live-1789301890244`; они не относятся к старому
+сохранены в `unavailable:artifact-a41ad843d3ab3f80`; они не относятся к старому
 runtime afc19995. R1/R2 исходные FAIL сохранены. Историческая wide/empty матрица
 разработки не используется вместо перечисленных новых gates.
 
@@ -107,7 +109,7 @@ file evidence, целиком байты и типы, source links, отказ/D
 inventory; PASS-флаги из стороннего отчёта не заменяют их. Проверка отсутствия
 требует count=total=len(entries), а не только видимых строк или фильтрованной
 выборки. Manifest внешней сессии и порядок сбора описаны в
-[text-export README](../../../tools/loginom-acceptance/text-export-README.md).
+[text-export README](../../../../../packages/loginom-runtime/tools/loginom-acceptance/text-export-README.md).
 
 Пройдена 21 целевая Python-проверка: новые fixtures/параметры запуска/persistence,
 user-result verifier, byte auditor, subscription и runtime preflight. Внутри

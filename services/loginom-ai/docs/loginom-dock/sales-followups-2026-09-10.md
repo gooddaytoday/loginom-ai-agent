@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-9ebd9e039820` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Закрытие замечаний пользовательского сценария — 10 сентября 2026
 
 **Четыре замечания закрыты в проверенном объёме.** Hermes сохранил порядок
@@ -40,7 +42,7 @@
 
 Codex воспроизвёл ошибку в реальном Loginom, просмотрел `label-editor.png`,
 сверил E2E `bg/sels/import/sColumnDefsTuning.ts` и `bg/helpers/columnDefsTuning.ts`.
-В `client/lib/workspace-ui.mjs` адресно включён INPUT активного текстового
+В `packages/loginom-runtime/client/lib/workspace-ui.mjs` адресно включён INPUT активного текстового
 редактора. Лимиты обхода, guards и правила сохранения не ослаблялись. Fixture
 теперь воспроизводит редактор внутри сетки и проверяет name/label при полном
 и сокращённом наблюдении. Четыре целевых проверки прошли.
@@ -211,7 +213,7 @@ HTTPS clone плагина Hermes превысил его штатный лим�
 
 ## Закреплённые доказательства
 
-Приватный корень: `.dock/followups-20260910/`, успешный опыт —
+Приватный корень: `unavailable:artifact-544d39a58ff75499`, успешный опыт —
 `runs/20260910-150238/`. Файлы: `verified-facts.json`, `natural-sales-audit.json`
 (исходный отказ), `natural-sales-audit-reviewed.json`, `audit-replay-reviewed.json`,
 `source-manifest.json`, `reviewed-source-manifest.json`, `auditor-review-changes.json`.

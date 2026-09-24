@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-133d74687f74` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 13: единственный раунд доработки после ревью
 
 Команда: `node13:fix:1:4d6f632e61b7a183fb63bb090e93ab3e29bf52a5:N13-R3`.
@@ -41,7 +43,7 @@ Loginom 7.4.2, test-3, /test-3; отдельные профили, viewport=null
 inner 1508×862/outer 1508×949. Собственный source harness, публичный MCP dispatcher.
 Клиентские исходники не менялись в fix round; обе новые сессии закрепили
 runtime `dd0979bf175bd4164ab0d0647daecd69782b1c8ab0d10b2e690d313b9704b6d0`.
-Python audit pins записаны отдельно в `.dock/node13-fix/auditor-pins.json`.
+Python audit pins записаны отдельно в `unavailable:artifact-d66253ffc41189d8`.
 Сводный SHA256 отсортированных строк `filename:sha256\n` восьми audit-файлов:
 `af91c8bfa81dbe051550f7dc01021a5f580d6220907b0c8627d322b50b61c35a`.
 Использован прежний immutable диагностический каталог
@@ -73,7 +75,7 @@ Python audit pins записаны отдельно в `.dock/node13-fix/auditor
    Strict persistence audit dcb→cef PASS: package_persistence_verified=true.
    Дополнительные 8/8 отрицательных проверок свежего выхода PASS.
 
-Логи fix round: `.dock/node13-fix/positive-audit.json`,
+Логи fix round: `unavailable:artifact-b5204b73f32452dc`,
 `positive-negative.json`, `full-reopen-audit.json`, `full-persistence.json`,
 `full-negative.json`, `historical-audit-regression.json`, `python-tests.log`.
 SDK strict schema проверила **180** публичных ответов двух новых сессий без ошибок

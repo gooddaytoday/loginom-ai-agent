@@ -62,5 +62,11 @@
     "private/dock-state/sessions/a6869b09-6f05-44d1-b777-c3db49aaf4e7/session.json": "c7cbf33b0c3846b31df0fcddc6e79c964cf67db72e5b9636787ae6f91f051987",
     "private/dock-state/sessions/a6869b09-6f05-44d1-b777-c3db49aaf4e7/execution-events.jsonl": "32af383c4ec42f835c63f16d04c91086f73a662c7ef96427fd06deb9954ba0ce",
     "private/dock-state/sessions/a6869b09-6f05-44d1-b777-c3db49aaf4e7/playwright.json": "d4959647ba9106e008b0df9924b76b2d02b59c6f01c9b8c7a8bfd73bf8c359de"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-9f47b3cc9290",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-a53d126b9840` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: подготовка пятой приёмки — 13 сентября 2026
 
 Назначение: `node14:acceptance5-preparation:1:611a9f0c`.
@@ -8,7 +10,7 @@
 ## Новый комплект
 
 Версия `2026.09.13-node14-acceptance5.1`, private root
-`.dock/node14-acceptance5-preparation/kit-2026.09.13-node14-acceptance5.1/`.
+`unavailable:artifact-1c8d003997574b09`.
 Runtime code commit `611a9f0c2e159e7fe0f8f3e9b8b9c42d5908243c`;
 привязки комплекта сохранены коммитом `34c64710`.
 Runtime SHA256 `68e8e7a7cac00b8afa45ac8f5b60bdcfa8832efc86ed34445f2bd4f1baf10e62`.
@@ -46,7 +48,7 @@ Python и 7 import-placement-refusal Python — все прошли.
 допуск. Затем создаётся единственный эксклюзивный маркер запуска. При отказе
 любого gate модель не запускается, отказ не считается попыткой полной приёмки.
 
-Новые пути: `.dock/node14-autonomous-acceptance-5/runs/<fresh-run-id>/`,
+Новые пути: `unavailable:artifact-0ed81c607f751ca0<fresh-run-id>/`,
 отдельные `private/hermes-home`, `private/dock-state`, session/document/profile,
 новые имена файлов и `/test-4/packages/Dock-acceptance-<fresh-run-id>.lgp`.
 Ни run4, ни текущая диагностическая копия не возобновляются как новая приёмка.

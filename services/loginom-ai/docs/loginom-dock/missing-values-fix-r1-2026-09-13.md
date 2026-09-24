@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-0b7b41878868` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: единственный раунд исправлений review 1
 
 Команда: `node14:fix:1:cecb30012ae81ea3bf5268c0a9c952f41cfc8d2a:N14-R1+N14-R2`.
@@ -17,7 +19,7 @@ Code SHA: **`a63586fe096f4fd7f17f346c391834d3e34bdaa4`**.
 
 В новом исходном сеансе Done завершился SUCCEEDED, но SDK Ajv отверг его
 readback. Доказательства до правки:
-`.dock/node14-live-1789265939328/baseline-done.json` (сводка проверки),
+`unavailable:artifact-ac7bbde44e7867af` (сводка проверки),
 `baseline-done-checkpoint.json` (полный результат из durable node_checkpoint)
 и исходный `execution-events.jsonl`.
 
@@ -45,7 +47,7 @@ readback verifier. Схема сама по себе не доказывает �
 `1789265962000-me2nwatnn3j:187:1`, native `terminal:failed`, публичный
 AMBIGUOUS/pending execute/cleanup:false. Точная причина в native ErrorDetails:
 `Файл "/test-4/node14-20260913-reordered1.csv" не найден`.
-Доказательства: каталог `.dock/node14-live-1789265939328/`,
+Доказательства: каталог `unavailable:artifact-a790db30c2a49e7d`,
 `execution-failure-result.json`, `execution-failure-inspected.json`,
 `native-errors.json`, `restore-source.json`.
 
@@ -98,7 +100,7 @@ recovery. Исходный pending не сбрасывался и не пере�
 
 ## Проверки и pins
 
-Итоговые live evidence: **`.dock/node14-live-1789266537702/`**.
+Итоговые live evidence: **`unavailable:artifact-b8790f17db36e6fc`**.
 Session `74bfc6b5-9a9b-488a-8a59-5fdc7c56bc51`, Loginom **7.4.2**,
 аккаунт **test-4**, пакет `/test-4/Node14-20260913-final.lgp`.
 Окно 1508×949, viewport null, фактическая область 1508×862.
@@ -109,7 +111,7 @@ Runtime pin **`53473c2ac1f4dcfef339115303d1b8cda6757e101c5cf6ffadacacad42afba51`
 Catalog manifest и SHA не менялись; точные значения в `catalog-pins.json`.
 
 - Клиент: **1426 PASS, 1 SKIP, 0 FAIL**;
-  `.dock/node14-fix-r1/full-client2.log`. Первая полная попытка получила девять
+  `unavailable:artifact-f756837d021df656`. Первая полная попытка получила девять
   отказов sandbox (loopback EPERM/зависимые shutdown timeouts); её лог сохранён.
   Повтор прошёл с разрешёнными изолированными тестовыми сокетами.
 - Python `test_missing_values_contract.py`: **3 PASS**.

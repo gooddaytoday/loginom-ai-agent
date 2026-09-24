@@ -81,8 +81,8 @@
     "negative_evidence_mutations_rejected": 50
   },
   "live": {
-    "run_directory": ".dock/node17/user-v1-component/20260913-205523-3f16316a",
-    "report": "docs/plans/loginom-dock/17-text-export-reveal-component-success.json",
+    "run_directory": "unavailable:artifact-feb06e4a2042e0e0",
+    "report": "historical-ref:ref-f4218cab30220ee0",
     "report_sha256": "17efde63ab50a4fef91204c659732156adb27658258bd2703f4aacf11dcc6929",
     "initial_interaction": {
       "state": "outside_viewport",
@@ -154,17 +154,17 @@
     "observer/observer-responses.jsonl": "2254b3c241328ceb05e01c7bf366459959aedaeb99b5d99a35c83dba42e59e7e"
   },
   "launch": {
-    "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export",
+    "cwd": "unavailable:artifact-d88e6354ae46b3ef",
     "argv": [
       "python3",
-      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/tools/loginom-acceptance/run.py",
+      "historical-ref:ref-0674e0822e4a813a",
       "--run",
       "--goal",
       "text-export-node-complete",
       "--model-profile",
       "chatgpt-sol",
       "--runs-root",
-      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs",
+      "unavailable:artifact-37ba8a48fd33b829",
       "--node",
       "/Users/kartamyshev/.loginom-dock/releases/0.1.0-dev.20260910.3-80ca61417ec7/runtime/node",
       "--hermes-home",
@@ -199,5 +199,11 @@
   },
   "requires_new_coordinator_slot": true,
   "retry_model_started": false,
-  "preflight_sha256": "ebb198056846788c0a23bdaa531c50aea595bab15ebcd631aea4ad7b63105b4d"
+  "preflight_sha256": "ebb198056846788c0a23bdaa531c50aea595bab15ebcd631aea4ad7b63105b4d",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-11316e7124af",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

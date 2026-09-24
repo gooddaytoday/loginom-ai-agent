@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-0a7e8a2cdc71` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 14: строгий учёт доказанного отказа размещения — 2026-09-13
 
 Выполнено назначение `node14:terminal-refusal-verifier:1:f3165f39972bdda3da5985163e0930a76049e87a`.
@@ -68,7 +70,7 @@ Runtime: `bdddbd1b922f99b0f8db4a6fa47b7e7c89315b4f5632d914531fdd6befaea77e`,
 коммитом. Harness содержит 252 файла; SHA карты:
 `a07e20a505fbd578bf3f14f7d81f305fb13658ba6c6c3a691da789975428eea5`.
 
-Свежий пакет `.dock/node14-refusal-verifier/catalog-packet/catalog-source.tar`
+Свежий пакет `unavailable:artifact-7fd04aa4ff4f0035`
 экспортирован из указанного source commit для `2026.09.13-node14-test4.2-candidate`.
 Все 11 файлов проверены по SHA при распаковке; import builder и publisher --help
 прошли. Каталог локально не собирался. Archive SHA:
@@ -79,7 +81,7 @@ source-manifest SHA:
 свежий source-manifest закрепляет новый коммит.
 
 [Машинные pins и индекс доказательств](missing-values-terminal-refusal-verifier-pins-2026-09-13.json).
-Приватные доказательства: `.dock/node14-refusal-verifier/`, итоговый компонентный
+Приватные доказательства: `unavailable:artifact-5b60c60bd7728667`, итоговый компонентный
 аудит: `live-2/accounting-audit-final.json`.
 
 Candidate test4.2 не staged и не activated. VPS, production, main, общий плагин и

@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-7e90e9ddd131` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел11 «Замена»: source-разработка
 
 Статус: исследование UI; обработчик пока не реализован. Ветка
@@ -12,13 +14,13 @@ MCP0.0.80, Chromium153.0.8010.12/revision1243. Source revision
 все элементы clientSourceManifest сверены с файлами этой ветки.
 
 Первичная сессия `f451c7ae-3f1e-46ac-bc74-a880740d30ab`; собственные config/state,
-profile/artifacts лежат в `.dock/stream-runtime`. Полный skill получен через
+profile/artifacts лежат в `unavailable:artifact-fabc7308cdee9821`. Полный skill получен через
 `dock_prepare`, revision `afa295bf48dc48da5d3c995665a06ef2190ff620bae3243d46557e0371536790`.
 OpenViking health успешен, actor retrieval выполнен без обращения к Peer main.
 Loginom7.4.2, вход test-2 и личный каталог /test-2 подтверждены UI.
 Окно1508×949, viewport:null, доступная область1512×949; launch --start-maximized.
 `archiveActive=false`; отсутствие исполнения всех глобальных hooks не доказано.
-Безопасный приватный допуск: `.dock/stream-preflight.json`.
+Безопасный приватный допуск: `unavailable:artifact-22950d6e897487a2`.
 
 ## Диагностические пакеты
 
@@ -29,7 +31,7 @@ Loginom7.4.2, вход test-2 и личный каталог /test-2 подтв�
 - `/test-2/Node11-Rules-88e87e25.lgp`: собственная редактируемая копия, исследование
   строковых и вещественных правил; текущие последующие правки ещё требуют сохранения.
 
-Harness `.dock/replacement/harness.mjs` создаёт полный source bridge, вызывает
+Harness `unavailable:artifact-6ee4b92a6baa566c` создаёт полный source bridge, вызывает
 `dock_prepare` и pinActionCatalog, затем публичный MCP wire существующего executor.
 Рабочая сессия `88e87e25-0f56-476d-a4dc-dcaa1273141e`; её `prepare.json`,
 `remote-pins.json`, `browser-*.json` и именованные результаты — приватные evidence.
@@ -388,8 +390,8 @@ Hermes Sol/low — только после выдачи единственног
 negative evidence. Итоговая сводка содержит19 PASS-групп. Последний snapshot
 подтвердил Home без Graph/Wizard, harness e1368ffd завершился exit0.
 Ограничения и дальнейшие требования находятся в
-`docs/plans/loginom-dock/11-development-audit.md`, машинные результаты —
-`docs/loginom-dock/replacement-development-2026-09-13.json`.
+`services/loginom-ai/docs/plans/loginom-dock/11-development-audit.md`, машинные результаты —
+`services/loginom-ai/docs/loginom-dock/replacement-development-2026-09-13.json`.
 Автономная приёмка не подменена этими проверками. Настройки, модели, production
 и общий плагин не изменялись. Передано на локальный commit в текущей ветке;
 bootstrap `.gitignore` не включается.
@@ -398,7 +400,7 @@ bootstrap `.gitignore` не включается.
 
 Единственное ревью рассмотрело полный диапазон a3b419bde8a660e1905284ee62a46362d5a49e09
 → 8aaf6a8a425d94974d65b5bd8b27a55f362fac4d. Отчёт:
-`docs/plans/loginom-dock/11-code-review-2026-09-13.md`. Повторное ревью и Hermes
+`services/loginom-ai/docs/plans/loginom-dock/11-code-review-2026-09-13.md`. Повторное ревью и Hermes
 не запускались; координатор назначил один раунд исправления N11-R1.
 
 Обе формы дефекта подтверждены на неизменённом кандидате, в отдельных source

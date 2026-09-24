@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-ef187f274f39` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 ## RC7 опубликован и установлен — 15 сентября 2026
 
 Исправлена изоляция чатов Hermes и передача вложений. Клиент c63b3b36 / RC7
@@ -87,7 +89,7 @@ deadline. Неизвестный эффект или неподтверждён�
 ## Runtime source identity — 8 September 2026
 
 The client revision now includes every `.mjs` and `.d.ts` file recursively under
-`client/lib`, plus explicitly listed CLI/package/plugin inputs. `runtime-pin.mjs`
+`unavailable:artifact-47995fe672cb178a`, plus explicitly listed CLI/package/plugin inputs. `runtime-pin.mjs`
 produces a sorted, deduplicated inventory and rejects source symlinks. Session
 metadata retains `clientSourceManifest` with per-file SHA256, in addition to
 `clientRevision`. The independent acceptance audit compares this inventory and
@@ -414,7 +416,7 @@ uncertain effects. Root discovery intentionally does not read directory contents
 Канонический проектный URI: `viking://resources/loginom-dock`.
 Этот документ сохраняет архитектуру уже реализованной системы. Текущая доработка
 E2E-исполнителя описана в [активном плане](../plans/2026-09-02-loginom-dock-implementation-plan.md),
-статус и история реализации — в [отдельном журнале](implementation-status.md).
+статус и история реализации — в [отдельном журнале](../../../../docs/node-development/history/supplements/docs/loginom-dock/implementation-status.md).
 
 ## Основа и совместимость
 

@@ -268,7 +268,7 @@
   "manifest_sha256": "cadd80dfd8490f40c851475008a1ccd68d7a617dbcf6a77de25034ff8da7b2ad",
   "candidate_staged": true,
   "candidate_activated": false,
-  "candidate_directory": ".dock/node14-candidate-preflight-2/candidate",
+  "candidate_directory": "unavailable:artifact-4bf90e8b15e8ae92",
   "candidate_files": [
     {
       "name": "actions.json",
@@ -324,11 +324,11 @@
     "bytes": 157,
     "sha256": "824dbb240397760c493d34e70ac215ec80fd95bebeec6cfb4dc084b931205be3"
   },
-  "evidence_index": ".dock/node14-candidate-preflight-2/evidence-files.json",
+  "evidence_index": "unavailable:artifact-51cd66615977e722",
   "evidence_index_sha256": "79acefa9abed70879ff75468080f0f38e688eb5c0c360de76fec51412bd4468a",
   "evidence_files": 23,
   "old_fail_receipts_unchanged": 13,
-  "launch_plan": ".dock/node14-candidate-preflight-2/acceptance-launch-plan.json",
+  "launch_plan": "unavailable:artifact-1238084df31ff246",
   "launch_plan_sha256": "44992721e96dbe9d1335ede16825a0b151ba866554426014119cae47788e8e8f",
   "required": {
     "successful_operations": 27,
@@ -337,5 +337,11 @@
     "native_save": true,
     "independent_reopen": true
   },
-  "startup_tests_passed": 2
+  "startup_tests_passed": 2,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-c9fe9e5d6667",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

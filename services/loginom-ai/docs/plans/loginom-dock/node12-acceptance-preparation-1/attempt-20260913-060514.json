@@ -3,7 +3,7 @@
   "slot_status": "released",
   "command_id": "node12:autonomous-acceptance:2:1a5a46312501d20ec7e23a2db12ed95bf34d784ead45628b12cdcf1492a276ce",
   "run_id": "20260913-060514-47b236af",
-  "run_dir": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates/.dock/node12-autonomous/runs/20260913-060514-47b236af",
+  "run_dir": "unavailable:artifact-0eb880f7f47552b8",
   "full_audit_passed": false,
   "checks_passed": 103,
   "checks_total": 112,
@@ -31,5 +31,11 @@
     "evidence.json": "8f2ae03ab784e62ca7ba6887929d0c23a712c41d77d91f24adec0aaf7efff1af",
     "duplicates-node-audit.json": "502933cc9ec454000d42cedb1de8a9122b614c0cc50bec1a187554fa54cd7430",
     "attempt.json": "d71cd3e56b06c9f84f2dc194020081995d3f171b358958c891591aa81b2ef533"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-5596dde0982b",
+    "provenance": "../../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

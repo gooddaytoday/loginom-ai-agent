@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-d85e67cc5d7c` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node16: третий Hermes остановлен на Close; диагностика продолжается — 13 сентября 2026
 
 Run `20260913-205733-a38816e5`, candidate97809b7a/source721cf71f/runtimecd997be4,
@@ -11,7 +13,7 @@ Exit-15, timeout=false,103 calls/12698 events; original runtime/harness unchange
 Девять завершённых случаев дают278 точных ячеек (60+44+20+75+55+24, пустые случаи0).
 Это НЕполный успех. Координатор явно разрешил отдельную versioned reevaluation
 того же raw export: исходный verifier не менялся; новый независимый verifier
-в `tools/node16-audit-reevaluation` исправляет только documented user-v1 проекцию
+в `unavailable:artifact-dd08b8faee38be4e` исправляет только documented user-v1 проекцию
 (schema.header_tid и совпадающий sample.value/display_text) и единственную явную
 привязку reconfigured→reconfigured-final. Исходная операция имела NOT_APPLIED,
 effect=false,cleanup=true,0steps; cached replay совпал, resume отказан; между
@@ -22,7 +24,7 @@ Original model identity не повышена до успешной: model бы�
 full fresh/currentloss отсутствуют. Исходный audit не переписан.
 
 Прямая UI-диагностика в отдельной копии `Node16-input-hash-20260913-205733.lgp`,
-сессия `.dock/node16/live-1789324568980`: на переоткрытом старом широком узле
+сессия `unavailable:artifact-c7a69cc483715c17`: на переоткрытом старом широком узле
 native hash Uint8Array20/25fields/usage192,active=false,105/105references released.
 Это пока не воспроизведение модельного отказа. Проверяется отличие нового узла
 после Done до первого выполнения. После удаления старого узла в собственной
@@ -38,7 +40,7 @@ native hash Uint8Array20/25fields/usage192,active=false,105/105references releas
 `node16-hermes-20260913-97809b7a`. Candidate721cf71f собран на VPS, четыре файла
 прошли побайтный readback, активации нет. Manifest SHA
 `97809b7a970c7d2af1f802087c1422ef39a26882034c92d4d36cbefbad2799e2`.
-Свежая настоящая user-v1 MCP rehearsal в `.dock/node16/candidate2-rehearsal-20260913`
+Свежая настоящая user-v1 MCP rehearsal в `unavailable:artifact-2320dfeb00b6f9a6`
 подтвердила READY7.4.2, текущий runtimecd997be4, расширенное окно и единственный
 разрешённый каталог test-1/node16. Создан отдельный новый черновик; старая
 диагностическая копия не использована. Bridge закрыт. Admission TOOLING_PASS/ready.
@@ -75,13 +77,13 @@ FAIL/-15; исходный результат сохранён. Координа
 **60/60 ячеек**, настройки, полная схема, source lineage и подтверждённые байты
 совпали с замороженным oracle. Сохранение подтвердилось реальным публичным ответом
 и журналом; empty/conflict/missing дали проверенные отказы до мутаций. Доказательства:
-`.dock/node16/profile-rehearsal-reopen-final/{operator-evidence,targeted-audit}.json`.
+`unavailable:artifact-93393996ea3b9e71{operator-evidence,targeted-audit}.json`.
 Это операторская диагностика, НЕ автономная приёмка. Предыдущие десять случаев
 на runtime51 остаются историческими. Native/auditor suite: **38 PASS** (исторические
 файлы явно заданы только историческим тестам); runner suite: **14 PASS**.
 
 Общий Dock config не имел hermes_profile и выдавал diagnostic. Создана отдельная
-закрытая копия `.dock/node16/hermes-user-v1-config.json` (0600) с user-v1 /
+закрытая копия `unavailable:artifact-7a571049187216b8` (0600) с user-v1 /
 executor-replay. Она содержит секреты, не входит в Git/комплект. Runner теперь
 отклоняет профиль без этой явной настройки до запуска модели. Внешний аудитор
 связывает короткий workflow_id только с последней выданной ссылкой того же caller,
@@ -97,8 +99,8 @@ Logout через ограниченный публичный UI не подтв
 Для следующего шага требуется пересобрать кандидат на VPS из нового минимального
 комплекта184, проверить stage/readback, затем выполнить свежую user-v1 rehearsal
 и получить новый эксклюзивный слот. Отличия от комплекта621bf7a4: изменены только
-`client/lib/variant-native-read.mjs` и `tools/loginom-acceptance/run.py`; добавлен
-ранее согласованный `executor/capability-abi.json`. Полный исходник не передаётся.
+`packages/loginom-runtime/client/lib/variant-native-read.mjs` и `packages/loginom-runtime/tools/loginom-acceptance/run.py`; добавлен
+ранее согласованный `packages/loginom-runtime/executor/capability-abi.json`. Полный исходник не передаётся.
 Старый stage56b73b83 и старые rehearsal не переобозначены: admission сейчас BLOCKED.
 Следующий Hermes сохраняет openai-codex/gpt-5.6-sol/low, timeout7200/max-turns140,
 обязательный --dock-config с указанной частной копией, test-1 и прежний каталог.
@@ -229,7 +231,7 @@ Files вкладку. Existing Import patch остановился с AMBIGUOUS:
 runner, минимальный coordinator-owned candidate packet. Все недоказанные gates
 остаются OPEN. `READONLY_PRODUCER=None`, Hermes заблокирован.
 
-Raw evidence сохраняется под `.dock/node16/`; исторические manifest/receipts
+Raw evidence сохраняется под `unavailable:artifact-1f3f00ac9e4d7670`; исторические manifest/receipts
 не исправляются задним числом. Рабочие `native-gates` инструменты не являются
 приёмочным допуском только потому, что локальный verifier вернул PASS.
 
@@ -251,7 +253,7 @@ Raw evidence сохраняется под `.dock/node16/`; историческ
 
 Решение координатора `node16:null-marker-transfer:1:814f3146` разрешило hunks
 из `814f31467b8e93fa9bd27225edb3ec0074d4bd15` только для
-`client/lib/text-import-procedure.mjs` и `client/test/text-import-wide.test.mjs`.
+`packages/loginom-runtime/client/lib/text-import-procedure.mjs` и `packages/loginom-runtime/client/test/text-import-wide.test.mjs`.
 Patch применился без конфликтов; ordered upload lineage не менялся. Дополнен
 focused тест произвольного `\N` marker. Перенос закоммичен:
 `370020bcff06e1ab39f9d6b13b6066b2733c453a`.
@@ -358,7 +360,7 @@ Hash — native schema bytes с верхним регистром имён и т
 Назначение node16:hermes-full:1:be4073fc. Координатор собрал/staged/readback
 кандидат2026.09.13-node16-621bf7a4-candidate, SHA
 56b73b83ad8ccaf5da652fbed5ce80752658723635c15ec0eaafeaf15e619c4d, без активации.
-Настоящий MCP rehearsal .dock/node16/candidate-rehearsal-20260913 подтвердил
+Настоящий MCP rehearsal unavailable:artifact-c80601301a714d17 подтвердил
 READY7.4.2, текущий runtimee33, тот же manifest/action/selectors, candidate Collapse,
 exactstorage root и окно1508×862/outer1508×949/available1512×949, viewportnull.
 Обработчик здесь не выполнялся; пакет открыт без редактирования, bridge/browser закрыты.

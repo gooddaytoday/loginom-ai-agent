@@ -309,5 +309,11 @@
   "overflow_observations_with_actionable_done": 5,
   "source_evidence_sha256": "f91cf7974e178efe95dd946242e5184d87315474165535a98309a591ae8308b6",
   "diagnostic_events_sha256": "8999d2087dd1d39dcc02a976337d43b2531bbec0802697b354032595a9ce2d73",
-  "public_api_sha256": "e5ca06bba4a34d4e8bbd4670e030ce91848feae4b068b4317fc956c0490868a6"
+  "public_api_sha256": "e5ca06bba4a34d4e8bbd4670e030ce91848feae4b068b4317fc956c0490868a6",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-f7b39a932977",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

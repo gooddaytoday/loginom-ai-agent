@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-a4e131534176` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Узел11: candidate v2 preflight — 13 сентября 2026
 
 **candidate_preflight_passed / awaiting_hermes_slot**.
@@ -34,7 +36,7 @@ Loginom7.4.2, собственный черновик, verified ownership. Пр�
 обязательное место для будущего явно назначенного слота, сейчас слот не назначен.
 
 ```sh
-python3 tools/loginom-acceptance/replacement_launch.py --run --candidate-pin /Users/kartamyshev/Git/loginom-dock/.worktrees/node-11-replacement/docs/loginom-dock/node11-candidate-v2-pin-2026-09-13.json --slot-id COORDINATOR_ASSIGNED_SLOT
+python3 packages/loginom-runtime/tools/loginom-acceptance/replacement_launch.py --run --candidate-pin services/loginom-ai/docs/loginom-dock/node11-candidate-v2-pin-2026-09-13.json --slot-id COORDINATOR_ASSIGNED_SLOT
 ```
 
 Hermes11 не запускался; слот остаётся node14. Полная автономная приёмка ещё не

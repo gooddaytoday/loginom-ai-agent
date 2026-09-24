@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-9d0a510a2cbe` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел16: граница точного чтения variant
 
 2026-09-13, Loginom7.4.2, ветка `codex/node-16-collapse-columns`, базовый SHA
@@ -45,7 +47,7 @@ Date.prototype методы. Reader продукта с догадками не 
 
 ## Доказательства
 
-Локальный каталог `.dock/node16/live-1789278261737/`:
+Локальный каталог `unavailable:artifact-7b79a25deed57d9a`:
 
 - `import-types.json`: публичный импорт с точными scalar-значениями.
 - `apply-types.json`: роли успешно настроены обработчиком; output mapping
@@ -76,7 +78,7 @@ execution freshness, schema identity, offset и row identity; проверять
 
 Прочитаны три статических frontend-файла по URL из document.scripts собственного
 браузера (только GET JavaScript, не native API). Локальные копии в
-`.dock/node16/frontend/`. Точные SHA256:
+`unavailable:artifact-700c17a01192d267`. Точные SHA256:
 
 - `rpc.js`: `afeb91811a02da1f7841fb8c03e3003686c98a051f09186af082a3c44a12b4cc`.
 - `bg.rtl.rpc.js`: `11ac2c63d2e8162b974f57d14e0f4f57b19cc80d3d39797be377e22eced6a973`.

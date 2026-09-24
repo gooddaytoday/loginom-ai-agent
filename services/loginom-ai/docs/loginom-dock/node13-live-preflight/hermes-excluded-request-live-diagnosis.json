@@ -35,20 +35,26 @@
   "settings_changed": false,
   "execution_started": false,
   "package_saved": false,
-  "session": ".dock/stream-runtime/sessions/466a9082-0b78-4b41-96de-4eb82f6e3258",
+  "session": "unavailable:artifact-cdc947a249d9bc1a",
   "closed_without_save": true,
   "refs": {
     "execution-events.jsonl": {
-      "path": ".dock/stream-runtime/sessions/466a9082-0b78-4b41-96de-4eb82f6e3258/execution-events.jsonl",
+      "path": "unavailable:artifact-fc5c3b51287f7459",
       "sha256": "b49b6998f7de9af41ca061b1b4fcf841cb01a612bfb87c110650f028fb6f439e"
     },
     "excluded-source-live.json": {
-      "path": ".dock/stream-runtime/sessions/466a9082-0b78-4b41-96de-4eb82f6e3258/excluded-source-live.json",
+      "path": "unavailable:artifact-ca5995875e4ce9ef",
       "sha256": "dac7725756807d8ad72fd262b6afacd78fc4846498e058a9ef5d5c4eba30f9cb"
     },
     "close-excluded-inspection.json": {
-      "path": ".dock/stream-runtime/sessions/466a9082-0b78-4b41-96de-4eb82f6e3258/close-excluded-inspection.json",
+      "path": "unavailable:artifact-297fdb8893280f0b",
       "sha256": "8684c32db0d4965b9866213e38ec737aa09c661fde9a5cfeb30a6f6f66df3511"
     }
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-f7dd33063a3e",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

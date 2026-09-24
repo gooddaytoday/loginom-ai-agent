@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-79b91d61e64c` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Фильтр строк: реализация подплана 06
 
 Статус: **implemented / live_verified (source runtime)**, не released.
@@ -19,10 +21,10 @@ dev-test staging; диагностика отдельно запущена на 
 Окно 2044×1035, outer 2044×1122, available 2048×1122, viewport null;
 штатный session launcher использует `--start-maximized`.
 
-Используется `tools/loginom-acceptance/calculator-live.mjs` — общий operator
+Используется `packages/loginom-runtime/tools/loginom-acceptance/calculator-live.mjs` — общий operator
 harness с настоящим MCP для публичных вызовов и отдельной UI-диагностикой.
-Доказательства: `.dock/calculator-v3/live-1789116641797/`.
-Исходники Help/E2E получены через Dock, сохранены в `.dock/row-filter/sources.txt`:
+Доказательства: `unavailable:artifact-774c8a6d8cd91612`.
+Исходники Help/E2E получены через Dock, сохранены в `unavailable:artifact-acc5d95b3f3a6fa2`:
 `sFilterData.ts`, `filterdataTr.ts`, row-filter `README.md`, `filtering-criteria.md`.
 
 Принятый пакет параметров полей открыт только как источник, затем создана
@@ -108,7 +110,7 @@ CaseSensitive фиксируется только после выхода из �
 
 ### Первый полный публичный проход и typed golden
 
-В новой source-сессии `.dock/calculator-v3/live-1789118961710/` (runtime
+В новой source-сессии `unavailable:artifact-25a392b12f73db8b` (runtime
 `9a68cbd7fedc5606fb5f081c45fc178537c708d2d63f678065fedbf153043dd4`) полный
 `filter-public-scalar.json` прошёл SUCCEEDED через MCP: existing Id>=4,
 новое выполнение, оба выхода по три строки и конфигурационный readback.
@@ -118,7 +120,7 @@ range/list: Loginom не хранит неиспользуемое CompareValue.
 Список доступных полей после reopen сортируется независимо от схемы mapping;
 readback сопоставляет точные name/label/type независимо от порядка selector list.
 
-Введён golden fixture `tools/loginom-acceptance/fixtures/row-filter/golden.csv`:
+Введён golden fixture `packages/loginom-runtime/tools/loginom-acceptance/fixtures/row-filter/golden.csv`:
 10 строк, полный дубликат, Null/empty, пять scalar types, дроби >2 знаков, секунды.
 CSV доставлен с байтовой верификацией; новый import Golden прошёл публичную
 операцию (`golden-import-2.json`) и прочитал все 10 ожидаемых строк.
@@ -163,7 +165,7 @@ readback; семь подмен отвергнуты в `live-1789121026091/conf
 без их переприсваивания. Новые/пустые/неподдержанные условия по-прежнему отвергаются.
 Source test подтверждает отсутствие конфигурационных жестов; live roundtrip ещё нужен.
 Общий client suite: 1270 tests, 1269 passed, 1 skipped, 0 failed
-(`.dock/row-filter/all-client-tests.log`). Это не Hermes acceptance.
+(`unavailable:artifact-fb1eab2e725c0fdd`). Это не Hermes acceptance.
 
 Текущая серия `live-1789121026091` проверяет integer comparisons публично. При
 одностолбцовом выходе выявлено ограничение independent Table restoration auditor:
@@ -195,7 +197,7 @@ UI_ROOT_STALE / observing / effect_possible=false после закрытия in
 Общий bounded refresh расширен на этот конкретный pre-gesture отказ, с теми же
 identity/intent, не более двух попыток и прежним deadline. Effects/foreign targets
 не разрешают повтор; 50 JS procedure tests и 20 Python sequence tests прошли.
-Серия `.dock/row-filter/matrix-driver-3.log` запущена на новом source runtime.
+Серия `unavailable:artifact-aeefd0e3ee6f9fa6` запущена на новом source runtime.
 Все предыдущие неуспешные попытки сохранены; план остаётся in progress.
 
 ### Матрица, крайние случаи и независимые проверки
@@ -232,7 +234,7 @@ preview tests прошли. В `live-1789123295209` existing `{}` после reo
 независимым аудитором: readiness elapsed_ms=-90 после обратной коррекции системных
 часов. Не ослабляя аудит, ожидания переведены на монотонный таймер с исходным parent
 deadline. 51 procedure test прошёл, включая clock rollback и timeout. Матрица
-перезапущена с case 24 (`.dock/row-filter/matrix-driver-6.log`). Старые попытки сохранены.
+перезапущена с case 24 (`unavailable:artifact-a0d9acd03585db65`). Старые попытки сохранены.
 
 Документирован source-контракт `row-filter-node.md`, обновлена инструкция Hermes.
 Preflight существующей ChatGPT подписки подтвердил `openai-codex/gpt-5.6-sol/low`,
@@ -333,7 +335,7 @@ preTAIL, preTail. Fixture-only oracle отделяет алфавитный по
 non-ASCII ordering им намеренно не моделируется. Source handler по-прежнему использует
 нативное сравнение Loginom. 3 oracle tests и 23 filter tests прошли.
 
-Driver 11 (`.dock/row-filter/matrix-driver-11.log`) перезапущен с case36 после
+Driver 11 (`unavailable:artifact-b42191e9133d528d`) перезапущен с case36 после
 обновления oracle и dropdown reveal. Cases0–35 полностью приняты; все ранние
 отказы и ошибочные ожидания сохранены. Current typed session `live-1789125798606`
 закрыла незавершённый changed wizard с подтверждением discard; сохраняется
@@ -367,7 +369,7 @@ uppercase-first относится к отображаемому списку з
 сравнение фильтра. До очередной правки ожидаемых результатов закреплены две новые
 независимые проверки `< Alpha` и `> preTail` с case_sensitive=true, по гипотезе
 lowercase-first и отдельному Intl comparator. Они выполняются в
-`live-1789126596945`, `.dock/row-filter/collation-probes.json`. Пока их результат
+`live-1789126596945`, `unavailable:artifact-46ab14597f727d4b`. Пока их результат
 не подтверждён, batch42 не считается принятым. Последующие изменения oracle должны
 оставаться ограниченными frozen fixture; не заявлять общую Unicode/locale модель.
 

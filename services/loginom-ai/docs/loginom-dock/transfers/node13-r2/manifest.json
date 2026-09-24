@@ -6,7 +6,7 @@
   "source_selected_patch_sha256": "1b43387b8aea140978f41ef9104274721096cbc23f2e8997808703fd2a2ba994",
   "files": [
     {
-      "path": "client/lib/node-apply.mjs",
+      "path": "historical-ref:ref-747cb21d0b0490e2",
       "source_parent_blob": "622efe8d453e8f18daa643d3d94bfbe22c4465f6",
       "source_blob": "88edfe16713279906d858165435d1301e5586ed4",
       "target_blob": "b7baa287ba2728e0d368213f197b668540ddd2ae",
@@ -27,7 +27,7 @@
       ]
     },
     {
-      "path": "client/lib/node-execution-evidence.mjs",
+      "path": "historical-ref:ref-8d6586ab6b4a4e81",
       "source_parent_blob": "ebbf954b8d413f4fb8bf3b22ca3a8c1eb7ae8d0c",
       "source_blob": "256bf96fc9d78caaba2e96bb0b664dd6b77fd737",
       "target_blob": "ebbf954b8d413f4fb8bf3b22ca3a8c1eb7ae8d0c",
@@ -48,7 +48,7 @@
       ]
     },
     {
-      "path": "client/lib/node-execution-procedure.mjs",
+      "path": "historical-ref:ref-d26a68d508673c71",
       "source_parent_blob": "6b25a35de8b82f15cd159e632c811ebca9b76e74",
       "source_blob": "a327ccce949edffe0faed0cd24b06ef49833f5c9",
       "target_blob": "6b25a35de8b82f15cd159e632c811ebca9b76e74",
@@ -85,7 +85,7 @@
       ]
     },
     {
-      "path": "client/lib/node-operation-runner.mjs",
+      "path": "historical-ref:ref-38c976c9b48faa20",
       "source_parent_blob": "b80240a538aa1b1362985c609c11ffebda42ee1d",
       "source_blob": "94d749691f5acfbbd9aa614b87e970812b127249",
       "target_blob": "b80240a538aa1b1362985c609c11ffebda42ee1d",
@@ -106,7 +106,7 @@
       ]
     },
     {
-      "path": "client/lib/node-process-context.mjs",
+      "path": "historical-ref:ref-dda4566bdf9825d8",
       "source_parent_blob": "c032f4c32fa64ce7750a006f8c7419a7df154b74",
       "source_blob": "0c84115a2199401e06e3186eae6994ceb0da8683",
       "target_blob": "c032f4c32fa64ce7750a006f8c7419a7df154b74",
@@ -127,7 +127,7 @@
       ]
     },
     {
-      "path": "client/lib/node-result-schema.mjs",
+      "path": "historical-ref:ref-c72b4e7eaf2bf883",
       "source_parent_blob": "953ceb8a95496640c21225b78d28a563ead0c8fb",
       "source_blob": "65c139c440fc5acbe3d8ae66c3bc2f93be9227e3",
       "target_blob": "47894ed995b9464dc5d3cc71a83c928ca5d391d0",
@@ -156,7 +156,7 @@
       ]
     },
     {
-      "path": "client/lib/node-contracts.d.ts",
+      "path": "historical-ref:ref-8762e8255b09c4b2",
       "source_parent_blob": "257c3a9ae8bc8bdc7934a1962549bc4328b54c53",
       "source_blob": "446f4e5b580e2c7a42f815f79edc076b5d49baae",
       "target_blob": "2ed172f8eb7dff5c44ba5bfe7de1a0bce956a94e",
@@ -185,7 +185,7 @@
       ]
     },
     {
-      "path": "client/test/node-apply.test.mjs",
+      "path": "historical-ref:ref-3b14c8e92d86c2f3",
       "source_parent_blob": "30f719dc4443dccae8cbeef4c206e02665bd394a",
       "source_blob": "995062b44e0049e87b6a15af7e2e60c0869519ed",
       "target_blob": "fd6b6edd3740be1556cf5a25eb92beb299ee2f28",
@@ -214,7 +214,7 @@
       ]
     },
     {
-      "path": "client/test/node-execution-evidence.test.mjs",
+      "path": "historical-ref:ref-d3cf7731f8494a0e",
       "source_parent_blob": "299f12763268d6014541beaf9ae38b2328ab33a3",
       "source_blob": "7667cd58050e3d79dcf8a0f8666bf1fb3b78dddf",
       "target_blob": "299f12763268d6014541beaf9ae38b2328ab33a3",
@@ -235,7 +235,7 @@
       ]
     },
     {
-      "path": "client/test/node-execution-focus.test.mjs",
+      "path": "historical-ref:ref-4eb671300f51d068",
       "source_parent_blob": "47e374d64eb2828b0bcbdb5b005b4fa64c2fe759",
       "source_blob": "51a87e1c7db9c5b5171a3a837d35a022b4acf938",
       "target_blob": "47e374d64eb2828b0bcbdb5b005b4fa64c2fe759",
@@ -272,7 +272,7 @@
       ]
     },
     {
-      "path": "client/test/node-operation-failure.test.mjs",
+      "path": "historical-ref:ref-60a6509bd1f4b3ab",
       "source_parent_blob": null,
       "source_blob": "afaa00c69cea722af293c358e4031f21c361c25b",
       "target_blob": null,
@@ -306,5 +306,11 @@
     "missing_values configuration schema/readback test",
     "input_mapping recovery",
     "new node14 target-placement fix"
-  ]
+  ],
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-d95b76c01f2c",
+    "provenance": "../../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

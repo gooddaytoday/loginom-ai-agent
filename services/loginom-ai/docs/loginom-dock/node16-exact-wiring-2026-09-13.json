@@ -22,6 +22,12 @@
   "subplan_complete": false,
   "installed_plugin_acceptance": false,
   "enospc_uncertain_operation": "preserved_not_replayed",
-  "report": "docs/loginom-dock/node16-exact-wiring-result-2026-09-13.md",
-  "provenance": "tools/loginom-acceptance/collapse/exact-wiring/provenance.json"
+  "report": "historical-ref:ref-42d7bbdd036b9c15",
+  "provenance": "historical-ref:ref-d9e08528197b21fe",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-9c0c15c77c78",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

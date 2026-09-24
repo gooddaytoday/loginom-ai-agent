@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-6b9ec98f2b99` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node13: первый Hermes FAIL, причина исправлена в задании
 
 Первый полный прогон `20260913-183818-3412861d` не принят.
@@ -41,10 +43,10 @@ CSV, expected tables, девять запросов и runtime/candidate не и
 
 ## Следующий запуск
 
-Готов новый документ `.dock/node13-live-preflight/final-admission-2/admission.json`
+Готов новый документ `unavailable:artifact-32d636f195faed37`
 с актуальными source/pins и ссылкой на адресную диагностику. Старый filled
 admission и исходная slot assignment сохранены в каталоге первого прогона.
 Новые run_id/budget/slot остаются пустыми до нового слота координатора.
-Команда: `python3 tools/loginom-acceptance/date_time_launch.py --admission .dock/node13-live-preflight/final-admission-2/admission.json --run`.
+Команда: `python3 packages/loginom-runtime/tools/loginom-acceptance/date_time_launch.py --admission unavailable:artifact-32d636f195faed37 --run`.
 После полного выполнения модели обязательны fresh reopen6/direct saved-import
 и независимый итоговый аудит. Новые узлы/main/merge/push/deploy/plugin не запускались.

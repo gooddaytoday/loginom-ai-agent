@@ -73,8 +73,8 @@
     "return_refusal_recovery": "synthetic fault injection only; live return succeeded without retry"
   },
   "live": {
-    "run_directory": ".dock/node17/user-v1-component/20260913-173210-2776aeab",
-    "report": "docs/plans/loginom-dock/17-text-export-return-component-success.json",
+    "run_directory": "unavailable:artifact-65c74f92666a522f",
+    "report": "historical-ref:ref-4c496b4f500d8495",
     "report_sha256": "aa486e409189a7d73e94dc4219d8feba04939176f98588850ded722622faa4b3",
     "observer_elapsed_ms": 1807.5992090000072,
     "downloads": 1,
@@ -95,17 +95,17 @@
     "observer/observer-responses.jsonl": "f99b1b7be3d7b0689a0bc23235aa3d8e6635469be3d7c68502993bede1239315"
   },
   "launch": {
-    "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export",
+    "cwd": "unavailable:artifact-d88e6354ae46b3ef",
     "argv": [
       "python3",
-      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/tools/loginom-acceptance/run.py",
+      "historical-ref:ref-0674e0822e4a813a",
       "--run",
       "--goal",
       "text-export-node-complete",
       "--model-profile",
       "chatgpt-sol",
       "--runs-root",
-      "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-17-text-export/.dock/node17/acceptance/runs",
+      "unavailable:artifact-37ba8a48fd33b829",
       "--node",
       "/Users/kartamyshev/.loginom-dock/releases/0.1.0-dev.20260910.3-80ca61417ec7/runtime/node",
       "--hermes-home",
@@ -140,5 +140,11 @@
   },
   "requires_new_coordinator_slot": true,
   "retry_model_started": false,
-  "preflight_sha256": "b381c6f1e849e8e57c02050a8d6435dd718e18b1e4ab1150f942ede1deb09532"
+  "preflight_sha256": "b381c6f1e849e8e57c02050a8d6435dd718e18b1e4ab1150f942ede1deb09532",
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-8504732726dd",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

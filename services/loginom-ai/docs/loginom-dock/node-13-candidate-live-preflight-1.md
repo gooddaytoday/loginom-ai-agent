@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-0ca5c90ec3ab` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 13: живая проверка кандидата — контрольная точка
 
 Назначение `node13:candidate-live-preflight:1:db38f7f2`, исходный HEAD
@@ -43,7 +45,7 @@ upload/verify receipts. Первый журнал не содержал target i
 `node13:excluded-DateB-label:1` разрешена единственная коррекция метки исключённого
 DateB на «Дата». В frozen-v2 изменены только эта метка и соответствующее указание
 ТЗ; значения, имена, типы, размеры, операции и критерии переоткрытия сохранены.
-[Версия и SHA](../../tools/loginom-acceptance/fixtures/date-time/version.json). Черновик Package1 закрыт без сохранения; браузер завершён.
+[Версия и SHA](../../../../packages/loginom-runtime/tools/loginom-acceptance/fixtures/date-time/version.json). Черновик Package1 закрыт без сохранения; браузер завершён.
 Загруженный собственный CSV `N13-preflight-dd1f6b0c.csv` сохранён как диагностика.
 
 ## Исправления проверочных инструментов

@@ -185,7 +185,7 @@
       "order": 1,
       "status": "accepted_in_branch",
       "subplan_number": 11,
-      "subplan_path": "docs/plans/loginom-dock/11-replacement.md",
+      "subplan_path": "historical-ref:ref-8c72056c1860d698",
       "first_scope": "Сохранить подплан 11: замена по внутренней таблице, поддержанные правила и признак _Replaced.",
       "scope_basis": "existing_subplan_preserved",
       "complexity_band": "L",
@@ -209,7 +209,7 @@
       "help_source_uri": "viking://resources/loginom-dock/sources/loginom-help/data/processors/transformation/substitution/README.md",
       "source_review_scope": "Каталожный путь Help; детальная сверка режима обязательна при подготовке подплана. Обзор источников не равен живой приёмке.",
       "accepted_branch_head": "dc0eadde4ede29cb9b548c53046a1be083ca8953",
-      "acceptance_report": "docs/loginom-dock/node11-branch-acceptance-2026-09-13.json"
+      "acceptance_report": "historical-ref:ref-f51296c9caa64685"
     },
     {
       "component_id": "component.exports.Text",
@@ -219,7 +219,7 @@
       "order": 2,
       "status": "in_progress",
       "subplan_number": 17,
-      "subplan_path": "docs/plans/loginom-dock/17-text-export.md",
+      "subplan_path": "historical-ref:ref-e8f25ec962cf36fe",
       "first_scope": "Экспорт одной таблицы в CSV/TSV с явными кодировкой, заголовком и разделителем; новый файл в выбранном каталоге.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "complexity_band": "M",
@@ -858,7 +858,7 @@
       "order": 1,
       "status": "accepted_in_branch",
       "subplan_number": 12,
-      "subplan_path": "docs/plans/loginom-dock/12-duplicates.md",
+      "subplan_path": "historical-ref:ref-3d01eca92d437814",
       "first_scope": "Сохранить подплан 12: разметка дубликатов и противоречий без удаления исходных строк.",
       "scope_basis": "existing_subplan_preserved",
       "complexity_band": "L",
@@ -882,7 +882,7 @@
       "help_source_uri": "viking://resources/loginom-dock/sources/loginom-help/data/processors/scrutiny/duplicates.md",
       "source_review_scope": "Каталожный путь Help; детальная сверка режима обязательна при подготовке подплана. Обзор источников не равен живой приёмке.",
       "accepted_branch_head": "e609e645fec2f3a86fa72f017c981799aa5598db",
-      "acceptance_evidence": "docs/loginom-dock/node12-branch-acceptance-2026-09-13.json",
+      "acceptance_evidence": "historical-ref:ref-7beb641d4c090ca8",
       "merged": false,
       "shared_plugin_updated": false
     },
@@ -894,7 +894,7 @@
       "order": 2,
       "status": "in_progress",
       "subplan_number": 16,
-      "subplan_path": "docs/plans/loginom-dock/16-collapse-columns.md",
+      "subplan_path": "historical-ref:ref-5a7eb66ba18ebc53",
       "first_scope": "Сохранить подплан 16: информационные/транспонируемые поля, оба режима пустых значений и точный variant.",
       "scope_basis": "existing_subplan_preserved",
       "complexity_band": "XL",
@@ -920,7 +920,7 @@
       "source_review_scope": "Каталожный путь Help; детальная сверка режима обязательна при подготовке подплана. Обзор источников не равен живой приёмке.",
       "thread_id": "01a0992c-6ce0-7f10-bd53-9bf92ed7ae8a",
       "project_id": "a5df758e-6136-46d6-bde4-6b543090461f",
-      "worktree": ".worktrees/node-16-collapse-columns",
+      "worktree": "unavailable:artifact-473c939875d2f6d1",
       "base_commit": "a3b419bde8a660e1905284ee62a46362d5a49e09",
       "preparation_phase": "completed_actor_verified",
       "development_turn_id": "01a09933-04c7-7383-a7ce-2a77892f9492",
@@ -1461,7 +1461,7 @@
       "order": 1,
       "status": "in_progress",
       "subplan_number": 13,
-      "subplan_path": "docs/plans/loginom-dock/13-date-time.md",
+      "subplan_path": "historical-ref:ref-c764f3273deb14d4",
       "first_scope": "Сохранить подплан 13: календарные производные и нативные границы периодов для подтверждённых режимов.",
       "scope_basis": "existing_subplan_preserved",
       "complexity_band": "L",
@@ -1493,7 +1493,7 @@
       "order": 2,
       "status": "queued",
       "subplan_number": 15,
-      "subplan_path": "docs/plans/loginom-dock/15-cross-table.md",
+      "subplan_path": "historical-ref:ref-507ed0c1cc447ffe",
       "first_scope": "Сохранить подплан 15: фиксированные и скользящие колонки, агрегаты и изменение схемы; календарные поля можно задать в CSV.",
       "scope_basis": "existing_subplan_preserved",
       "complexity_band": "XL",
@@ -2054,7 +2054,7 @@
       "order": 1,
       "status": "in_progress",
       "subplan_number": 14,
-      "subplan_path": "docs/plans/loginom-dock/14-missing-values.md",
+      "subplan_path": "historical-ref:ref-45fd40465656eb83",
       "first_scope": "Сохранить подплан 14: среднее для непрерывных чисел и константа для дискретных строк; явный порог пропусков.",
       "scope_basis": "existing_subplan_preserved",
       "complexity_band": "XL",
@@ -2554,19 +2554,19 @@
   ],
   "source_files": [
     {
-      "path": "executor/coverage.json",
+      "path": "historical-ref:ref-f9fa02878634959b",
       "sha256": "bf8d8600b040a1489bf04df59a5009bcd6b974afd1a7fe340b72a4fb4681d98f"
     },
     {
-      "path": "client/lib/node-support.mjs",
+      "path": "historical-ref:ref-3ca05b3a7a3d86c2",
       "sha256": "48026324c0521c6a0eae22a496bcb0cbbc20e1d802b1e237877325cf1dd21e81"
     },
     {
-      "path": "executor/inventory/palette-2026-09-05.json",
+      "path": "historical-ref:ref-0f9d3755813be95c",
       "sha256": "256e7faa65c7d9ea9c0f344b7e5f87c0e3e18e92f785a9a2c4489beb5b189baf"
     },
     {
-      "path": "docs/plans/loginom-dock/three-stream-workflow.md",
+      "path": "historical-ref:ref-1a8a9bc5041bea2c",
       "scope": "текущие назначения и принятые режимы; изменяется вместе с реестром"
     }
   ],
@@ -2584,7 +2584,7 @@
     "merge": "ONLY separate user command in coordinator thread; no automatic merge, main push or release",
     "blocked_item": "При выдаче записать причину недоступности и взять ближайшую подходящую строку того же потока; сохранять владельца и порядок пропущенного пункта. Резерв не запускать без подтверждённого допуска.",
     "fixes": "one correction round in same developer task: gpt-6-astra/medium, live confirmation then correction and targeted verification; no repeat review",
-    "policy": "docs/plans/loginom-dock/automatic-node-workflow.md",
+    "policy": "historical-ref:ref-e459b1ed7e3b5981",
     "repeat_review": false,
     "review_rounds": 1,
     "periodic_polling": false,
@@ -2597,7 +2597,7 @@
       "keep_own_peer": false,
       "sibling_worktrees_allowed": false,
       "periodic_recall": false,
-      "policy": "docs/loginom-dock/shared-project-memory.md",
+      "policy": "historical-ref:ref-d697e9d53ab419eb",
       "target_peer": "-Users-kartamyshev-Git-loginom-dock",
       "preserve_separate_sessions": true,
       "routing_status": "20260913.3 active for node11–14; independent 20260913.5 enrollment installed; first fresh app-task bootstrap/actor/capture checks pending",
@@ -2612,12 +2612,12 @@
         "first_phase_capture_extraction_gate_required": true,
         "legacy_routes_unchanged": true,
         "global_reload_required_by_installation": false,
-        "procedure": "tools/project-memory/README.md",
-        "evidence": "docs/loginom-dock/memory-enrollment-2026-09-13.json",
+        "procedure": "historical-ref:ref-7a4f7aac11d3aeab",
+        "evidence": "historical-ref:ref-3f70e9e76db7844f",
         "checked_at": "2026-09-13T02:04:08.039041+00:00"
       }
     },
-    "runbook": "docs/plans/loginom-dock/node-workflow-runbook.md"
+    "runbook": "historical-ref:ref-6849ecf0a0affba6"
   },
   "accepted_components": [
     {
@@ -2625,7 +2625,7 @@
       "handler": "imports.text",
       "subplan": "03",
       "name": "Текстовый импорт",
-      "evidence": "docs/plans/loginom-dock/03-completion-audit.md",
+      "evidence": "historical-ref:ref-7ad70119b19be31a",
       "scope": "только принятые режимы; последующие исправления см. three-stream-workflow.md"
     },
     {
@@ -2633,7 +2633,7 @@
       "handler": "transform.calculator",
       "subplan": "04",
       "name": "Калькулятор",
-      "evidence": "docs/plans/loginom-dock/04-completion-audit.md",
+      "evidence": "historical-ref:ref-0da6bd985436a215",
       "scope": "только принятые режимы; последующие исправления см. three-stream-workflow.md"
     },
     {
@@ -2641,7 +2641,7 @@
       "handler": "transform.reform_columns",
       "subplan": "05",
       "name": "Параметры полей",
-      "evidence": "docs/plans/loginom-dock/05-completion-audit.md",
+      "evidence": "historical-ref:ref-61ee286836b7e46c",
       "scope": "только принятые режимы; последующие исправления см. three-stream-workflow.md"
     },
     {
@@ -2649,7 +2649,7 @@
       "handler": "transform.filter_data",
       "subplan": "06",
       "name": "Фильтр строк",
-      "evidence": "docs/plans/loginom-dock/06-completion-audit.md",
+      "evidence": "historical-ref:ref-62b624dcd8158ef7",
       "scope": "только принятые режимы; последующие исправления см. three-stream-workflow.md"
     },
     {
@@ -2657,7 +2657,7 @@
       "handler": "transform.group_data",
       "subplan": "07",
       "name": "Группировка",
-      "evidence": "docs/plans/loginom-dock/07-completion-audit.md",
+      "evidence": "historical-ref:ref-4ef5618f2276bfd9",
       "scope": "только принятые режимы; последующие исправления см. three-stream-workflow.md"
     },
     {
@@ -2665,7 +2665,7 @@
       "handler": "transform.sorting",
       "subplan": "08",
       "name": "Сортировка",
-      "evidence": "docs/plans/loginom-dock/08-completion-audit.md",
+      "evidence": "historical-ref:ref-6f597f5951860f04",
       "scope": "только принятые режимы; последующие исправления см. three-stream-workflow.md"
     },
     {
@@ -2673,7 +2673,7 @@
       "handler": "transform.join_data",
       "subplan": "09",
       "name": "Слияние",
-      "evidence": "docs/plans/loginom-dock/09-completion-audit.md",
+      "evidence": "historical-ref:ref-325f0d31714a8938",
       "scope": "только принятые режимы; последующие исправления см. three-stream-workflow.md"
     },
     {
@@ -2681,7 +2681,7 @@
       "handler": "transform.union_data",
       "subplan": "10",
       "name": "Объединение",
-      "evidence": "docs/plans/loginom-dock/10-completion-audit.md",
+      "evidence": "historical-ref:ref-03aee6ff1591c319",
       "scope": "только принятые режимы; последующие исправления см. three-stream-workflow.md"
     }
   ],
@@ -2694,10 +2694,10 @@
     "not_started": 66,
     "queued": 63,
     "conditional_reserve": 3,
-    "coverage_status_caveat": "Статусы executor/coverage.json не синхронизированы с шестью позднее принятыми handlers; готовность сверена с node-support.mjs и аудитами03–10. Coverage не изменялся."
+    "coverage_status_caveat": "Статусы historical-ref:ref-f9fa02878634959b не синхронизированы с шестью позднее принятыми handlers; готовность сверена с node-support.mjs и аудитами03–10. Coverage не изменялся."
   },
   "live_evidence": {
-    "path": "docs/plans/loginom-dock/node-roadmap-live-2026-09-12.json",
+    "path": "historical-ref:ref-f1b6cdce568e7544",
     "loginom_version": "7.4.2",
     "account": "orcestrator",
     "scope": "палитра, добавление выбранных узлов, открытие отдельных мастеров; без выполнения и приёмки новых handlers"
@@ -2815,5 +2815,11 @@
     "2": "component.transform.ColumnFlipping",
     "3": "component.transform.DateTimeReform",
     "4": "component.preprocessing.DataRecovery"
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-530bbe0c208d",
+    "provenance": "../../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

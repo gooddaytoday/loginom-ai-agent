@@ -8,8 +8,8 @@
   "transfer": {
     "source": "0e11a3fb24ca40a9f855008d2b0d1856d6f771ad",
     "verified_target_blobs": {
-      "client/lib/executor.mjs": "c6369c00533ac3fee3c0aa6e4c25b60cb084ad93",
-      "client/test/executor.test.mjs": "0d6e2c4ce07164df769f3e1a884aaac7659fedcd"
+      "historical-ref:ref-06f3d8b406a9f434": "c6369c00533ac3fee3c0aa6e4c25b60cb084ad93",
+      "historical-ref:ref-9eb5be60dc3a75cf": "0d6e2c4ce07164df769f3e1a884aaac7659fedcd"
     },
     "runtime_patch_sha256": "a7d1b5e5e3e484c335b9388b5d11b4b877658cdb6ee925d977dcf2aa553a205b",
     "test_sha256": "abf806c181f318c79d251485ea3cb09eae282dad77503af34cd8ed822aa35272",
@@ -252,12 +252,12 @@
     "auditor-components.json": true
   },
   "source_archive": {
-    "path": ".dock/replacement/saveas-integration/client-source-b0571534.tar.gz",
+    "path": "unavailable:artifact-6d1689c6c531187b",
     "sha256": "396026de516792499c9d21f00981ea0044d9d47fced7f052b65c307150ebbf50",
     "bytes": 1020063
   },
   "source_manifest": {
-    "path": ".dock/replacement/saveas-integration/client-source-b0571534.tar.gz.manifest.json",
+    "path": "unavailable:artifact-b70b30ac7bdc4099",
     "sha256": "6e75707b69281fc34608ac4c193550f98d025b2b2f05866967a6f881aa96384a",
     "bytes": 82407
   },
@@ -693,193 +693,199 @@
   ],
   "artifacts": {
     "transfer.json": {
-      "path": ".dock/replacement/saveas-integration/transfer.json",
+      "path": "unavailable:artifact-ab1c958fe59613cf",
       "sha256": "5c37c67ff38cd222ce679fecda4cea709c728c8902701dad974973e0cd1a53f4",
       "bytes": 578
     },
     "executor-tests.log": {
-      "path": ".dock/replacement/saveas-integration/executor-tests.log",
+      "path": "unavailable:artifact-826ec5334d85f07d",
       "sha256": "407590e5396d83820e472cf7a165cfbcd9d20cc86324b6630456feb69ba37b7d",
       "bytes": 3980
     },
     "audit.py": {
-      "path": ".dock/replacement/saveas-integration/audit.py",
+      "path": "unavailable:artifact-e408064c840f2833",
       "sha256": "0d3ef485cb23385dbe710ceb6345a865d3e0d35a20a3add04b82f61126955153",
       "bytes": 4769
     },
     "component-audit.json": {
-      "path": ".dock/replacement/saveas-integration/component-audit.json",
+      "path": "unavailable:artifact-eccb705cbd37afaa",
       "sha256": "feec40f1c843706e6a4dfe7c684fe9ee37b9b8bd87d50d2113657684700931ef",
       "bytes": 5732
     },
     "cleanup.json": {
-      "path": ".dock/replacement/saveas-integration/cleanup.json",
+      "path": "unavailable:artifact-3cfb5a2212601718",
       "sha256": "e1e31918870b3f52aaec7e75602d55280d21940949ba1a0e459a77757e5fb1d2",
       "bytes": 203
     }
   },
   "session_artifacts": {
     "session.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/session.json",
+      "path": "unavailable:artifact-9b3878e0723ba454",
       "sha256": "da5b2f9a3bafc2bee624aade5972d928c7a62da1768e820d45e344f1322e0ef1",
       "bytes": 29325
     },
     "remote-pins.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/remote-pins.json",
+      "path": "unavailable:artifact-4289d11b364fe4c9",
       "sha256": "326e5e0002c3d993c1e8a2ee8365778e97c4a6237d0e5943aefbe5f5be3f7d14",
       "bytes": 61982
     },
     "integration-prepare.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/integration-prepare.json",
+      "path": "unavailable:artifact-cf4e7e1fe6f5c030",
       "sha256": "f9016a7bbcd552a5265c931ccb3a3660d08cacb14b3930bed07fa4ea46ccd479",
       "bytes": 4306
     },
     "integration-deliver.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/integration-deliver.json",
+      "path": "unavailable:artifact-dc6c23f9b3609818",
       "sha256": "c717a5701c57808a73b359c52a3c6d070f81843a6ea627c545d9908d10e382aa",
       "bytes": 576
     },
     "execution-events.jsonl": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/execution-events.jsonl",
+      "path": "unavailable:artifact-a256407d469a43f0",
       "sha256": "365947e138294300a80b676054c71046fa11a7154bfb471cbb628649fc8ef832",
       "bytes": 79143962
     },
     "public-api.jsonl": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/public-api.jsonl",
+      "path": "unavailable:artifact-71dc9f8b427d1fdb",
       "sha256": "206b63055cb0a645f918577ca13c9e8e3200484b8bf0d6258693d1c7ec945fc0",
       "bytes": 235958
     },
     "main-request.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/main-request.json",
+      "path": "unavailable:artifact-c22da249420757ae",
       "sha256": "56478455590dc5f2badee5dd3b65392c94bd37eebad10949d8b29f580bd6049d",
       "bytes": 2807
     },
     "typed-request.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/typed-request.json",
+      "path": "unavailable:artifact-fee0a8c3c67fa2f2",
       "sha256": "0baba7e23a60cf22866f96e409a1e424c91928c1f87755744ed8e5ec52a71ecf",
       "bytes": 5348
     },
     "checkpoint-full.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/checkpoint-full.json",
+      "path": "unavailable:artifact-19d4ffd05760a313",
       "sha256": "8d8e8ff30f035cad80a33d59f96c465bda57209239ac2d930e73da4f3a93c11b",
       "bytes": 8984
     },
     "reopen-full.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/reopen-full.json",
+      "path": "unavailable:artifact-1bdc7debac1464c0",
       "sha256": "f13116553a58a1579d9a71f5e6cee4c4eb31d608bb34b54f0a47dc372a9cbc3a",
       "bytes": 3750
     },
     "integration-prepare-reopened.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/integration-prepare-reopened.json",
+      "path": "unavailable:artifact-66c0881772c72f88",
       "sha256": "b4222111d178120c9bcf9e6accbe746cd85438cca11affb77a01d7195d42fad2",
       "bytes": 2488
     },
     "main-reopened-rejected-request.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/main-reopened-rejected-request.json",
+      "path": "unavailable:artifact-4633f6f08573ab62",
       "sha256": "8422ff390cc695080bb0b38cbad3cf4dc18efabf880903f607e4aca28d6d445d",
       "bytes": 1716
     },
     "main-reopened-request.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/main-reopened-request.json",
+      "path": "unavailable:artifact-6cb72e587665273a",
       "sha256": "c30d733344541386a53342880077c512dc4ba4f02d7208764dfab4b01b51c3b6",
       "bytes": 3139
     },
     "typed-reopened-request.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/typed-reopened-request.json",
+      "path": "unavailable:artifact-41da754c67b46d62",
       "sha256": "5637457bae04ca604a5ffda2e03b07308833775bd4d7e57d716d24c6ad67d492",
       "bytes": 1726
     },
     "main-reopened-full.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/main-reopened-full.json",
+      "path": "unavailable:artifact-85b725ecb751e7c8",
       "sha256": "a85b5478e8c8f65738381eee143ec5a629ffa06d7018cb773e34d4f432fee7c7",
       "bytes": 25432
     },
     "typed-reopened-full.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/typed-reopened-full.json",
+      "path": "unavailable:artifact-2f77f6600e5f9d8b",
       "sha256": "efedb07439d24585e54f553706c8d288aaf0c4000c43c6619a139eed3f35b02d",
       "bytes": 46505
     },
     "integration-close-observe.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/integration-close-observe.json",
+      "path": "unavailable:artifact-2c39a89f8b4f6f8a",
       "sha256": "1c2c1137ac775202709c4a30b9030aa51c922c9184aaece06af7baef42fcea75",
       "bytes": 3764
     },
     "integration-close-confirm.json": {
-      "path": ".dock/stream-runtime/sessions/b66417e1-30c2-4e8b-bf97-6a102ad05677/integration-close-confirm.json",
+      "path": "unavailable:artifact-64e04587705aa946",
       "sha256": "05a8fed34453940721ef00cd8d83298830726273f972bc10b6cc2aa569b96147",
       "bytes": 109
     }
   },
   "diagnostic_harness": {
-    "path": ".dock/replacement/harness-saveas-integration.mjs",
+    "path": "unavailable:artifact-8fd91e16fe4a70c0",
     "sha256": "7272f5567a4fd7b8fbd5177d16c053cd7a30e33ee8997610170d474123248b45",
     "bytes": 3527
   },
   "diagnostic_commands": {
     "integration-close-buttons.mjs": {
-      "path": ".dock/replacement/commands/integration-close-buttons.mjs",
+      "path": "unavailable:artifact-31a5eab1af5b3afd",
       "sha256": "c57dd7730ced6e6a418b9d41de42a713689ab48ed1b9ac05b3cbb61e99f34171",
       "bytes": 324
     },
     "integration-close-confirm.mjs": {
-      "path": ".dock/replacement/commands/integration-close-confirm.mjs",
+      "path": "unavailable:artifact-201704921531dad7",
       "sha256": "d93833c159d46ae99abb86fa6755330abb1b09e67d47f7f68ba585d7ed997967",
       "bytes": 808
     },
     "integration-close-observe.mjs": {
-      "path": ".dock/replacement/commands/integration-close-observe.mjs",
+      "path": "unavailable:artifact-9265de767c577de6",
       "sha256": "1c54ad78d01a14fa8204c6c439a0b08c6ad5d2a047eb75315ce536bff5d209bf",
       "bytes": 395
     },
     "integration-deliver.mjs": {
-      "path": ".dock/replacement/commands/integration-deliver.mjs",
+      "path": "unavailable:artifact-50ad9296446a1b73",
       "sha256": "2f70dec6eddd6e203be0426c1a08746244bd13e47f6c0ae0fa9280d941675e5f",
       "bytes": 814
     },
     "integration-main-again.mjs": {
-      "path": ".dock/replacement/commands/integration-main-again.mjs",
+      "path": "unavailable:artifact-3d923beadad1dd16",
       "sha256": "c5800392a78fe54ec8c343b33cc792a0bfafc1ef1002af9581aec20260f1a41a",
       "bytes": 690
     },
     "integration-main.mjs": {
-      "path": ".dock/replacement/commands/integration-main.mjs",
+      "path": "unavailable:artifact-8c8c69ea5c1bdfb3",
       "sha256": "7e2eb0a8275e35a9c4d8c92f011a730fe810d2f12f8569dd65bf8dbea69b0712",
       "bytes": 1364
     },
     "integration-prepare-reopened.mjs": {
-      "path": ".dock/replacement/commands/integration-prepare-reopened.mjs",
+      "path": "unavailable:artifact-acd94ca997e8e14f",
       "sha256": "8e5b64a6e795ae19ef84a8d62084146bff6c5882d5d5d8dc6901b496bf01cce9",
       "bytes": 514
     },
     "integration-prepare.mjs": {
-      "path": ".dock/replacement/commands/integration-prepare.mjs",
+      "path": "unavailable:artifact-ca1667777ba8c1cd",
       "sha256": "35dc091f9192f8a2fc35906b8cabb2472308655ed9972e1f5fbf85ca387fa675",
       "bytes": 2341
     },
     "integration-reopen.mjs": {
-      "path": ".dock/replacement/commands/integration-reopen.mjs",
+      "path": "unavailable:artifact-244a730594f0a013",
       "sha256": "0d41cbee74035d1c61bb2f8e355fef0aee6b26729d754ae678cfa9acbd214260",
       "bytes": 408
     },
     "integration-save.mjs": {
-      "path": ".dock/replacement/commands/integration-save.mjs",
+      "path": "unavailable:artifact-9065ed1769ef205b",
       "sha256": "12c0144a6510b21487dc3902158ddd480855a96cde6fd3157feaeb53cccc663f",
       "bytes": 400
     },
     "integration-typed-again.mjs": {
-      "path": ".dock/replacement/commands/integration-typed-again.mjs",
+      "path": "unavailable:artifact-867771b4a79e075c",
       "sha256": "b9a2307be5331ae9fce080bc3a294450d3792653af88ef2b1e6142c7751e172c",
       "bytes": 695
     },
     "integration-typed.mjs": {
-      "path": ".dock/replacement/commands/integration-typed.mjs",
+      "path": "unavailable:artifact-3fb15a6771e4c0f5",
       "sha256": "dbbd9b05fc793d017664703b3262096fd7e47766e6b244abdcdd072abf326f4c",
       "bytes": 1177
     }
   },
   "stage_script": {
-    "path": "tools/loginom-acceptance/replacement-stage-vps.sh",
+    "path": "historical-ref:ref-0257e651428b732d",
     "sha256": "b2d85cc3a4df8928d7b9fe8d30efaf9116f96a7c9b7a7f7b13b0ce748160ef86",
     "bytes": 2301
+  },
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-f0b5b031860f",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
   }
 }

@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-8f0e99f8e3ee` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Node14: восстановление исходной фазы input_mapping
 
 Результат: development recovery реализовано и проверено в Loginom 7.4.2.
@@ -13,7 +15,7 @@ Code SHA: **`c32a5d5e163fe174afba59abce973ac405742cdc`**.
 ## Наблюдения и решение
 
 До изменения исходников выполнена живая инъекция в исходном runtime:
-`.dock/node14-live-1789267426953/`. Ответ внутренней `n7` действительно потерян
+`unavailable:artifact-142444df366f23f5`. Ответ внутренней `n7` действительно потерян
 после успешного input `finish_wizard`. Browser receipt подтвердил Done и возврат
 на граф, но сам по себе не подтвердил сохранённую семантику mapping.
 Явное диагностическое открытие порта, чтение пяти полей и Cancel показали:
@@ -58,7 +60,7 @@ viewport null, фактическая область 1508×862.
 
 ### Положительный случай
 
-Evidence `.dock/node14-live-1789268655942/`, сессия
+Evidence `unavailable:artifact-aa5faacbf7726f27`, сессия
 `804a8a6b-a876-40b8-8abc-f9115a3c1e3a`.
 `node14-recovery-success:n7` — реально выполненный Done с потерянным ответом.
 Исходный job: AMBIGUOUS/input_mapping, execution not_requested,
@@ -85,7 +87,7 @@ execution, потерянная строка, неверное значение,
    без Execute. `mismatch-native-receipt.json` сохраняет исходное доказательство.
    Это ожидаемая консервативная граница; случай не объявлен recovery success.
 2. Отдельный случай на исходном невыполненном узле:
-   `.dock/node14-live-1789268970324/`, сессия
+   `unavailable:artifact-362e4bb8f7425c9b`, сессия
    `d34e1944-d36d-466d-8aad-df6c0ea89fe9`. Внутри всего случая сохранены один
    runtime и ID `node14-recovery-mismatch`. После потери n7 диагностическое UI
    редактирование поменяло метку Note на RECOVERY_MISMATCH. Resume прочитал
@@ -104,7 +106,7 @@ execution, потерянная строка, неверное значение,
 ## Регрессии и проверки
 
 - Полный клиентский набор итогового кода: **1432 PASS / 1 SKIP / 0 FAIL**,
-  `.dock/node14-recovery/full-client-final.log`.
+  `unavailable:artifact-b6172c5aa4f45f60`.
 - После добавления отрицательной проверки origin_type: **51/51** целевых тестов,
   `focused-final.log`; production source pin не изменился.
 - Python Missing Values contract: **3/3**.

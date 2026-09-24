@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-bfb263327982` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Missing Values: исправлен блокирующий импорт120
 
 **Готово к следующему выделенному Hermes-слоту.** Source commit
@@ -21,7 +23,7 @@ partial из-за15пикселей пустой полосы. Полная defi
 останавливалась. Старое AMBIGUOUS не переоценивалось и не повторялось.
 
 В workspace-ui разрешён только наблюдённый случай полосы: overflowY=scroll,
-нулевой scrollLeft, scrollWidth=offsetWidth, измеренные client/offset размеры,
+нулевой scrollLeft, scrollWidth=offsetWidth, измеренные unavailable:artifact-212c261c149e0a24 размеры,
 нулевой clientLeft, одинаковая клиентская ширина header/body. Все native
 заголовки и каждую ячейку дополнительно проверяем внутри клиентской ширины,
 включая правый край редактора. Прежние проверки уникальности, ownership,
@@ -54,7 +56,7 @@ E2E columnDefsTuning.ts/sColumnDefsTuning.ts и Help import/txt/README.md
 
 ## Комплект полного прогона8
 
-`.dock/node14-acceptance8-preparation/kit-2026.09.14-node14-acceptance8.1/`.
+`unavailable:artifact-c8525a798dd68a1e`.
 Скопированы и сверены412файлов (156runtime +256harness). Штатный preflight
 прошёл без модели. В harness изменены только две literal runtime-привязки;
 весь goal, fixtures, oracle и аудиторы совпадают с предыдущим комплектом.

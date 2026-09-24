@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-3e9f5e0f154a` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Node17 Text export: исправления R1/R2
 
 13.09.2026 выполнен один correction round `node17:review-fix:1:110da29a:R1R2`
@@ -81,9 +83,9 @@ package.save_checkpoint, save_completed=true. Затем пакет закрыт
 
 [Машиночитаемый отчёт с hashes](17-text-export-fix-evidence.json).
 Приватные исходные доказательства до исправления:
-`.dock/text-export/live-1789301416218`; после:
-`.dock/text-export/live-1789301890244`; диагностические скрипты/тестовый лог:
-`.dock/node17/fix`. Они содержат наблюдения реального браузера и отдельные
+`unavailable:artifact-dea8c3459daf2f91`; после:
+`unavailable:artifact-a41ad843d3ab3f80`; диагностические скрипты/тестовый лог:
+`unavailable:artifact-522e299bbd6364fa`. Они содержат наблюдения реального браузера и отдельные
 исходные FAIL; в Git сохранены только отчёты и проверяемый код.
 
 Историческая матрица разработки и её 1398 PASS/1 SKIP относятся к прежним

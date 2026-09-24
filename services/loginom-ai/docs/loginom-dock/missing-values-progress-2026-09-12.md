@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-011e2de32df1` и изменения: [происхождение](../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../docs/node-development/README.md).
+
 # Узел 14 — исследование и реализация
 
 Статус: реализован черновой обработчик; идут live QA. Автономная приёмка не выполнена.
@@ -15,7 +17,7 @@ OpenViking доступен. Метаданные app read_thread ошибочн
 Source MCP: Node 24.19.0, Playwright 1.63.0-alpha-2026-08-31,
 Chromium 153.0.8010.12 (1243), adapter `node-14-source-development`.
 Полный manifest, hashes и UI-подтверждения сохранены в приватном
-`.dock/stream-preflight.json` (0600). Archive не активирован; отсутствие
+`unavailable:artifact-22950d6e897487a2` (0600). Archive не активирован; отсутствие
 всех глобальных hook-процессов не доказано.
 
 Вход passwordless `test-4`, версия Loginom 7.4.2 и `/test-4` подтверждены UI.
@@ -41,7 +43,7 @@ E2E commit общей основы: `2cad5602158fd2e4836d821d644a2b8d92f571a2`.
 E2E именует строковую замену «Заменять заданным значением» и использует
 `trg_SetNullValue`; это пока источник для live-проверки, а не готовый handler.
 
-Приватный fresh harness `.dock/node14-live.mjs` использует исходники этой ветки,
+Приватный fresh harness `unavailable:artifact-b118a888a825c26f` использует исходники этой ветки,
 отдельные session/profile/artifacts, общий `createActionRuntime` и готовые
 обработчики 03/05. Pins старого immutable candidate проверены загрузчиком;
 совместимость 7.4.2/macOS/Chromium совпала. Это только каталог общей основы,
@@ -82,7 +84,7 @@ navigation TID, захваченных сразу после SaveAs. Её усп
 guard не отключался. Исходник сменён отдельными наблюдаемыми жестами диагностики.
 Пакет сохранён обычной командой, закрыт в Loginom и открыт в свежей сессии;
 новая preparation вернула READY и актуальные navigation TID. Старый harness закрыт.
-Свежий source harness: `.dock/node14-live-1789245846788`, session
+Свежий source harness: `unavailable:artifact-f3e5e0d43339bef0`, session
 `16b7f957-6fce-404a-9b0b-9ef3503a67f1`, source revision
 `8626db6830ba276d4991041ceae371fc7fd3eada60cc5587c1918e823f639c02`.
 Это приватная диагностика, не релиз и не автономная приёмка.
@@ -108,7 +110,7 @@ handler ещё не проверено новым прогоном. Старый
 В сессии `16b7...` был разрыв WebSocket Loginom. Штатное восстановление сначала
 отказало, затем удалось; UI подтвердил начальную страницу и закрытый пакет.
 Состояние последнего сохранения независимо не проверено. Новая сессия
-`0da0b541-6f1b-47df-a964-789585ffdc39`, каталог `.dock/node14-live-1789246388382`,
+`0da0b541-6f1b-47df-a964-789585ffdc39`, каталог `unavailable:artifact-210cc370151d5fb0`,
 дошла до входа test-4 с прежней проверенной геометрией. Bootstrap каталога дважды
 вернул `fetch failed`; штатный `loginom_dock.read` также вернул эту ошибку,
 независимый HTTPS-запрос к `https://loginom.duckdns.org/mcp` завершился SSL timeout.
@@ -120,8 +122,8 @@ handler ещё не проверено новым прогоном. Старый
 readback/API), 267/267 общих API/contracts/support/workspace UI tests на предыдущем
 снимке до последующих локальных уточнений, 2/2 Python auditor tests: положительный
 синтетический пример и 11 отрицательных подмен. Это локальные тесты, не live acceptance.
-Fixtures с отдельными ожиданиями: `tools/loginom-acceptance/fixtures/missing-values/`.
-Auditor: `tools/loginom-acceptance/missing_values_contract.py`; ему требуется
+Fixtures с отдельными ожиданиями: `unavailable:artifact-e055b0ecc21486f5`.
+Auditor: `packages/loginom-runtime/tools/loginom-acceptance/missing_values_contract.py`; ему требуется
 отдельно собранная полная таблица, не sample из node.apply для 12/120 строк.
 Интеграция сборщика live evidence, независимый reopen и приёмочный отчёт ещё нужны.
 
@@ -139,7 +141,7 @@ Worktree/ветка/HEAD/Node24.19.0 и сохранность status entries п
 
 Исправлен найденный live дефект Table selector: наблюдаемый radio-контрол
 `rbTable;DisplayEl` используется через set_checked вместо поиска контейнера.
-В свежем harness `.dock/node14-live-1789250671537` (session
+В свежем harness `unavailable:artifact-b8a54a2702ac20e6` (session
 `9b227a65-a1e2-453f-8fd1-718f9d3e45d5`, source revision
 `f0e3c0a61a8f479d6721092cbacc7c522687145fcafa45fdf58c36cb7110d84c`)
 `node14-preserve-20260913` прошёл все фазы. Полный выход 3×5 с точными числами:
@@ -158,7 +160,7 @@ Untouched 10/Null/20. Прежние AMBIGUOUS остаются диагност
 Прочие идентификаторы должны совпадать; максимум два повтора. Тесты подтверждают
 успешный переход, отказ при чужом node_id и ограничение при бесконечном переходе.
 277/277 workspace-ui и missing-values tests прошли на этом коде.
-Свежий harness `.dock/node14-live-1789251375999`, session
+Свежий harness `unavailable:artifact-0b3cc6e94feeabc5`, session
 `112994f4-a61c-4d16-95fc-a647694a5be2`, source revision
 `196ef7c8c45eacc77442f0c3512d2b8cac7b396fb87a8acd895381766705f5d1`;
 геометрия maximized/viewport:null подтверждена. Продолжается live-матрица.
@@ -177,7 +179,7 @@ Explicit core2 импорт на pin 196ef7c8 прошёл полностью: �
 диалога и пустую константу. 279/279 общих/focused tests плюс 5/5 procedure tests
 с последним дополнительным сценарием прошли; git diff --check прошёл.
 
-Свежий harness `.dock/node14-live-1789251869149`, session
+Свежий harness `unavailable:artifact-f24b2ffab2fd51d7`, session
 `8fb4a7cd-6575-4376-ab53-562b331cfdbd`, source revision
 `440239e7c2d2bc6a4de9aa93f8e2787443a70e656b12899396488be339b4d757`.
 Сохранённый источник теперь core2 (4 строки); строковая константа до новой
@@ -194,7 +196,7 @@ node-procedure + missing-values-procedure tests прошли, включая о�
 подмены заголовка/поля/метода/контрола/signature. Старый мастер штатно отменён,
 пакет сохранён/закрыт, harness закрыт; неуспех не переименован в успех.
 
-Следующий свежий harness `.dock/node14-live-1789252182267`, session
+Следующий свежий harness `unavailable:artifact-3695fd4dd1252e28`, session
 `af08cb98-dd21-4129-9778-3c69e6fc71ac`, source revision
 `8c2ed16ce4ac17f74673cb63ae0371fc4ec331775870ebf3e3e24ff0dfbcc833`.
 Проверка изменения константы продолжается. В успешном core2 import независимо
@@ -246,7 +248,7 @@ missing values теперь читает тип/вид из этого маст�
 Готовность к автономной приёмке по-прежнему не достигнута.
 
 383/383 затронутых Node tests прошли на новой source-kind реализации.
-Свежий harness `.dock/node14-live-1789253968904`, session
+Свежий harness `unavailable:artifact-de8e65f3bf8b11ed`, session
 `b985d6f7-0d5f-491c-bbed-6eaf1f5f25f4`, source revision
 `044ca48ccddbdef54c3600d4ba782484ab9f8b75c0d1dfa5f2800f8a1bf9cb0a`.
 Maximized/viewport:null подтверждены, собственный test-4 package открыт.
@@ -259,7 +261,7 @@ Preserve existing прошёл с precision данными; новый узел 
 подтверждён отдельно после проверки вопроса, источник восстановлен, свой пакет
 сохранён/закрыт. Добавлен наблюдённый icon; 3/3 точечных теста прошли.
 
-Свежая сессия `.dock/node14-live-1789254535902`,
+Свежая сессия `unavailable:artifact-94ded8b81185bb27`,
 `85b46bc9-a972-46b8-b5d3-1ac4a635ee6d`, pin
 `465fb90324712072010990f7d3cb9ecb61558865f8b569c382976c13c6b50cbd`.
 Maximized/viewport:null и test-4 подтверждены; preserve существующего узла
@@ -276,7 +278,7 @@ SUCCEEDED с precision таблицей (execution `1789254560426-zjjrudxcgnd:18
 preflight), а не ложный NOT_APPLIED без эффектов. 50/50 node-apply tests прошли,
 включая чистый отказ и сохранение неопределённости при неполной квитанции.
 
-Свежий harness `.dock/node14-live-1789254818664`, session
+Свежий harness `unavailable:artifact-6104a94736075900`, session
 `e2b18f9d-e8d5-4381-bade-531f28f33a8b`, pin
 `343624e094bcfee51cc2744058b331b310f989dbc5da1b2efe35e26b538d4cd6`.
 Свой test-4 пакет открыт с проверенными viewport:null/maximized. Запрос new4
@@ -292,11 +294,11 @@ Unit tests проверяют три группы и отказ disabled-ком�
 отказал: такой случай не может стать effect_possible:false. Тест этого отказа
 прошёл.
 
-Текущий fresh harness `.dock/node14-live-1789255043530`, session
+Текущий fresh harness `unavailable:artifact-d1085478dec9979e`, session
 `217c5b57-0e61-4146-928c-1c303e207920`, pin
 `404d331c7ada6ea9eafb868c97e7812ff59946aac4fc80a3b880e25235b6efd8`.
 Независимый полный UI collector перенесён из приватного скрипта в
-`tools/loginom-acceptance/collect_missing_values_table.mjs` для воспроизводимости
+`packages/loginom-runtime/tools/loginom-acceptance/collect_missing_values_table.mjs` для воспроизводимости
 review; wrapper остался в .dock. Синтаксис проверен; новое полное чтение впереди.
 
 `new5` нашёл правильную группу, но drag остановился NOT_APPLIED до эффекта:
@@ -308,7 +310,7 @@ review; wrapper остался в .dock. Синтаксис проверен; н
 свежий harness после изменения runtime.
 
 На pin `2527be50b085f353eb4619b7764b5762e857f593abc426f32a8deca3b369013b`
-(harness `.dock/node14-live-1789255218897`, session
+(harness `unavailable:artifact-81d74c1e2f674b1b`, session
 `339d6bf9-7789-4d0e-a216-64102f7b1653`) new6 создал/подключил target
 `ba871909-932a-426e-bf96-b51b6217d701`, затем остановился AMBIGUOUS/configure:
 после выбора среднего combo.value=3, но record.ActionNull ещё 4 (медиана).
@@ -332,7 +334,7 @@ find/read общей записи fourth_stream_added.md прошли; штат�
 расширялась. Настройки/записи памяти не менялись. Однократный отчёт координатору
 отправлен; это не завершение этапа разработки.
 
-Следующий fresh harness `.dock/node14-live-1789255759035`, session
+Следующий fresh harness `unavailable:artifact-0e5fa91babbbc27f`, session
 `9d5b7a95-1d07-4f95-ab56-b12682f2c565`, pin
 `4d216be2c5ca9119d6e1643a5dc8e51ea2598dfd35067c9de1c4f6685688f714`.
 New7 создал/подключил `31072ad6-909e-4099-be52-d5a1401c2616`, но Tab не завершил
@@ -345,7 +347,7 @@ New7 создал/подключил `31072ad6-909e-4099-be52-d5a1401c2616`, н�
 Подготовлен отдельный skew.csv/expected: 0,0,9,Null → 3, чтобы среднее отличалось
 от медианы и выбранные поля содержали реальные нули. Полный live-прогон впереди.
 
-New8 полный PASS на harness `.dock/node14-live-1789256039749`, session
+New8 полный PASS на harness `unavailable:artifact-d51f510583e996b8`, session
 `4a859f38-aba7-4b8a-9a38-2097008eee2b`, pin
 `81716075174eedbb137b19b1ed893dcb0dd0a16186779e4ca4019fad557d7c07`.
 Создан/подключён target `65e2fa00-1daf-40d2-a061-ed6fb753bef5`; настройка, выполнение
@@ -377,7 +379,7 @@ preprocessing.data_recovery/impute. 21/21 catalog tests прошли. Катал
 публиковался, production/current и shared client не менялись; live harness всё
 ещё использовал прежний изолированно закреплённый base candidate.
 
-Fresh harness `.dock/node14-live-1789256602857`, session
+Fresh harness `unavailable:artifact-ff395c715e9ec7eb`, session
 `ddec01dd-2572-4121-8c7b-6c32001bca5e`, pin
 `c88556f8a07214f16bc29f74a4e154779c75f88d34baab925c70efa9c34d57b3`.
 Skew2 полный 4×5 и независимый audit PASS/source_verified:true: среднее3,
@@ -400,7 +402,7 @@ hit-test. Для полностью скрытых add/enter карточек р
 состав и требуемый root отражены в missing-values-candidate-request-2026-09-13.md;
 повторный запрос этого же блокера не отправляется.
 
-Fresh harness `.dock/node14-live-1789257444202`, session
+Fresh harness `unavailable:artifact-5d543bf87e5ad143`, session
 `856b06cb-f116-42ad-9190-71eeb945accb`, pin
 `0d087883e7b775b1bd1a0bc1eb3c2af26e33a0baece968f043d1dc7143ad1d73`.
 Boundary2-41 и boundary2-42: оба независимых аудита PASS, source_verified:true,
@@ -427,7 +429,7 @@ large2 — в fresh source harness. All-null ещё не запускался.
 Auditor дополнительно проверяет тип/вид/метки processing и полной схемы;
 15 отрицательных подмен отклонены. Повтор boundary2-41 с усиленным auditor PASS.
 
-Fresh harness `.dock/node14-live-1789258530114`, session
+Fresh harness `unavailable:artifact-616857a92397887e`, session
 `1ed97093-9ab4-447c-aaee-86155ffedac5`, pin
 `7113e52f0261705955cd8e8042f4166649697bbc969cf646fb6842158079628a`.
 Large2 прошёл import/execute/sample и создание 25-й Table без scan-limit;
@@ -442,7 +444,7 @@ node-table-context: после строгой привязки record/row/view �
 полной таблицы и подтвердить возврат в граф без повторного исполнения.
 Полный120 аудит ещё не завершён; следующий large3 требует fresh runtime.
 
-Harness `.dock/node14-live-1789258970325`, session
+Harness `unavailable:artifact-5d16c8ad9ab07282`, session
 `ed843f44-ff5d-4b40-b001-d7a369562d79`, pin
 `f5f4d6ac2c71c63ee2e8aa1b4b1fd87e69f9b4dc1fc10b20659e529c66709b15`.
 Large3 диагностически пробовал import execute без чтения source sample. Импорт
@@ -454,7 +456,7 @@ wait и остановился AMBIGUOUS/open. Позднее прямое на�
 не замаскировано успехом. Diagnostic import возвращён к прежнему source sample;
 следующий large4 в новой сессии, общий deadline не расширялся.
 
-Harness `.dock/node14-live-1789259227193`, session
+Harness `unavailable:artifact-6305993d9de55138`, session
 `d01336df-1759-4bdb-8bc5-90da8922a3f3`, тот же pin f5f4d6...
 Large4 прошёл import/execute/sample и полный обход до row93. Реальный UI
 показал одинаковый test-id suffix124 в строках93 и100 с разными native record
@@ -469,13 +471,13 @@ recordid/data-recordindex/data-boundview и cache/DOM сохраняются. 38
 подмен отклонены; добавлены type/kind/label проверки, отдельный graph collector
 и fixture reordered с одинаковыми Amount/Note labels (live ещё не запускался).
 
-Текущий fresh harness `.dock/node14-live-1789259644441`, session
+Текущий fresh harness `unavailable:artifact-5015fecce1911d4b`, session
 `a3702bab-7698-43db-a3e2-f40b428ef4f3`, pin
 `71ad8762badfc799c4f6939f2bbe4e94a00ae3a7c9d87cfb47c118282b889054`.
 Large5 полный reader прочитал все120 native row indices0–119. На момент этой
 записи завершается восстановление формата/аудит; PASS ещё не заявлен.
 Остальные подготовленные прямые этапы: all-null5 в текущей серии,
-empty1/omitted1 (`.dock/node14-empty-and-omitted.mjs`), done/close/preserve
+empty1/omitted1 (`unavailable:artifact-a4465075ca3d101c`), done/close/preserve
 (`node14-lifecycle.mjs`), reordered1 с graph audit (`node14-reordered.mjs`),
 new9 с полным source+graph audit (`node14-new9.mjs`), live preflight negatives
 (`node14-preflight-negatives.mjs`), controlled lost reply (`node14-lost-reply.mjs`).
@@ -512,7 +514,7 @@ full-read оборвался после step19 при остановке при�
 audит omitted1 не заявляется. Потеря серверного/UI сеанса — конкретная причина
 нового omitted2 из сохранённого пакета; прежний operation ID не переигрывается.
 Empty1 full audit PASS подтверждён на диске. Текущий клиентский набор1420 PASS,
-1 SKIP, 0 FAIL. Продолжение: harness .dock/node14-live-1789261570730,
+1 SKIP, 0 FAIL. Продолжение: harness unavailable:artifact-d5f3b0917673b338,
 session5ee7a2cb-1565-4721-b4e2-a326e99aea72, runtime71ad8762...; использует
 тот же собственный старый browser-profile после проверки отсутствия процессов.
 
@@ -520,7 +522,7 @@ Omitted2 остановлен на download verification: дочерний бр�
 Not connected; сам harness остался жив. Import/node.apply не запускались,
 неподтверждённая загрузка не принята и не использована. Свежий обычный профиль
 с обезличенным stderr/connection журналом прошёл omitted3 без повторного разрыва.
-Harness `.dock/node14-live-1789261946921`, session
+Harness `unavailable:artifact-5514bf0162fd6d56`, session
 `a811a8ee-db1a-4134-afdd-5a9e6bf7e40f`, runtime71ad8762...
 **Omitted3 PASS/source_verified:true**, полный3×5: только Note заполнен ONLY_NOTE,
 Amount/Count Null сохранены, Untouched Null сохранён, precision исходных чисел
@@ -580,7 +582,7 @@ execution-failure-inspected.json, restore-file.json. Штатная квитан
 пакета проверены; исходный файл не перезаписан. Свой новый package закрыт, прежний
 harness завершён. Сохранение не приравнивается к native package.save_checkpoint.
 
-Свежий harness `.dock/node14-live-1789263912227`, session
+Свежий harness `unavailable:artifact-2b673bc24e20e2f8`, session
 `f28cfabe-8bb7-4bc5-888a-121a272e8458`, runtime71ad8762..., viewportnull1508×862.
 Копия открыта с новым document1789263948645-kxbdqu6izx8,7 native GUID сохранены.
 Initial independent inspect остановился без мутаций на workflow_unbound:

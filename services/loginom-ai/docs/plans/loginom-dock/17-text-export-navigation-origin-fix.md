@@ -1,3 +1,5 @@
+> Исторический документ, адаптированный для навигации в Loginom AI Agent. Даты, версии, SHA и результаты относятся к прежним проверкам. Пути к коду указаны относительно нового репозитория; это не доказательство проверки текущих файлов. Исходник `source-27c4d0bde866` и изменения: [происхождение](../../../../../docs/node-development/provenance.json). `unavailable:artifact-*` означает [неперенесённый материал](../../../../../docs/node-development/history/unavailable.md). Актуальная работа: [регламент](../../../../../docs/node-development/README.md).
+
 # Node17 — navigation/origin harness correction
 
 Assignment: `node17:observer-navigation-origin-fix:1:e74d14d2`.
@@ -78,5 +80,5 @@ save/reopen goal. Hermes was not started. The coordinator owns the next trigger:
 assess these evidence/pins and separately allocate the exclusive Sol/low slot.
 The old INCOMPLETE and its original `KeyError: 'origin'` audit remain unchanged.
 
-Evidence: `.dock/node17/native-observer-smoke/20260913-145112-3a826200/`;
+Evidence: `unavailable:artifact-959af2a036805846`;
 [durable checks, source/runtime/harness pins and evidence digests](17-text-export-navigation-origin-fix.json).

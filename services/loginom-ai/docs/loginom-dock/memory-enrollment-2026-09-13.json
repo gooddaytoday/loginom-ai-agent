@@ -37,31 +37,31 @@
   ],
   "normal_hook_trust": [
     {
-      "cwd": "/Users/kartamyshev/Git/loginom-dock",
+      "cwd": "unavailable:artifact-cf88a7be2dd0c277",
       "project_hooks": 10,
       "trusted": true,
       "original_memory_hooks": 5
     },
     {
-      "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-11-replacement",
+      "cwd": "unavailable:artifact-f4373de5e91099c0",
       "project_hooks": 10,
       "trusted": true,
       "original_memory_hooks": 0
     },
     {
-      "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-12-duplicates",
+      "cwd": "unavailable:artifact-86de2b2a9fd3c09e",
       "project_hooks": 10,
       "trusted": true,
       "original_memory_hooks": 0
     },
     {
-      "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-13-date-time",
+      "cwd": "unavailable:artifact-6d6fd528bdbb608d",
       "project_hooks": 10,
       "trusted": true,
       "original_memory_hooks": 0
     },
     {
-      "cwd": "/Users/kartamyshev/Git/loginom-dock/.worktrees/node-14-missing-values",
+      "cwd": "unavailable:artifact-a924fe5ececcf8a3",
       "project_hooks": 10,
       "trusted": true,
       "original_memory_hooks": 0
@@ -101,8 +101,8 @@
     "extraction_completed": true,
     "extracted_memory_changes": 6,
     "new_project_knowledge_verified": true,
-    "first_capture_evidence": "docs/loginom-dock/node16-start-2026-09-13.json",
-    "substantive_capture_evidence": "docs/loginom-dock/node16-shared-memory-knowledge-2026-09-13.json",
+    "first_capture_evidence": "historical-ref:ref-3af5b22c0696e76c",
+    "substantive_capture_evidence": "historical-ref:ref-2a161f8d2480a658",
     "substantive_capture_checked_at": "2026-09-13T08:19:55.751741+00:00",
     "project_additions": 5,
     "global_profile_updates": 1
@@ -114,5 +114,11 @@
   "app_restart": false,
   "shared_dock_plugin_reinstalled": false,
   "per_task_registration_required": true,
-  "first_fresh_app_task_end_to_end_verified": true
+  "first_fresh_app_task_end_to_end_verified": true,
+  "_documentation_adaptation": {
+    "historical": true,
+    "source_id": "source-3f70e9e76db7",
+    "provenance": "../../../../docs/node-development/provenance.json",
+    "path_semantics": "historical-ref identifies the original source; its recorded hash is not the hash of the current resolved_path. unavailable identifies evidence without a confirmed new location."
+  }
 }

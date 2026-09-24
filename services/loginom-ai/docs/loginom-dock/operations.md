@@ -1,3 +1,5 @@
+> Исторический документ старого проекта; для актуальной работы используйте [регламент Loginom AI Agent](../../../../docs/node-development/README.md). Прежний checkout обозначен как неперенесённая среда; оригинал закреплён Git-ревизией в [происхождении](../../../../docs/node-development/provenance.json).
+
 ## RC8 опубликован и установлен — 15 сентября 2026
 
 Исправлено чтение предпросмотра перед группировкой. Client/tag 2712a9a9,
@@ -64,12 +66,12 @@ Hermes11 не назначен: слот остаётся14.
 Manifest SHA: `d0c9a5bedc170754dd251c982508e0ad8568d300091eda0027962c496df62adf`.
 [Полный комплект проверенных pins](node12-candidate2-2026-09-13.json).
 
-Архив source содержит 628 файлов, включая executor/capability-abi.json;
+Архив source содержит 628 файлов, включая packages/loginom-runtime/executor/capability-abi.json;
 контрольная сумма `39876dd6a497762bf1ea2f8626d6d3dde2b2c279c564f964448c3adec4939192`.
 Сборка и stage выполнены на VPS Node 24.19.0; каталог и отчёты:
 `/opt/loginom-dock/releases/20260913-node12.2-candidate/`.
 Source inbox: `/opt/loginom-dock/releases/20260913-node12-preparation2/`.
-Локальная проверенная копия: `.dock/node12-candidate2-20260913/server-candidate/`.
+Локальная проверенная копия: `unavailable:artifact-49434b3415c399d8`.
 Все четыре catalog-файла совпали при server readback и после скачивания.
 Save roots обеих операций: `/test-1/packages`; Loginom 7.4.2 / macOS / Chromium;
 E2E revision `2cad5602`, stale_actions пуст.
@@ -96,7 +98,7 @@ Current server и отсутствие preview/current сохранились; a
 [Проверенные pins](node14-candidate-2026-09-13.json).
 
 Первоначальный10-file source packet был неполон: publisher импортирует
-executor/capability-abi.json. Builder прошёл, публикация остановилась до записи.
+packages/loginom-runtime/executor/capability-abi.json. Builder прошёл, публикация остановилась до записи.
 Координатор добавил11-й tracked файл из того же c32a5d5e, сохранив остальные
 байты и исходный пакет; validation/stage/readback прошли. Исправленный archive
 SHAff8f6ae7433da30824dcf38c0c3ad60ffd495d36d1980216e7dd29a062223504.
@@ -106,7 +108,7 @@ credentials/SSH-настройки не менялись, причина еди�
 
 VPS evidence: `/opt/loginom-dock/releases/20260913-node14-test4.1-candidate/`;
 source inbox: `20260913-node14-preparation`. Локально
-`.dock/node14-candidate-20260913/server-candidate/` хранит реальные байты/отчёты,
+`unavailable:artifact-f5ccbce66cb3faa5` хранит реальные байты/отчёты,
 `complete-source-packet/` — полный исправленный source packet.
 
 После completed/idle подготовки14 в той же задаче на Astra medium назначен
@@ -170,7 +172,7 @@ Hermes и commit документов подготовки. Новый ход
 Это проверка каталога, не автономная приёмка узла. Новые узлы/merge/push не запускались.
 
 [Проверенная сводка](node12-candidate-2026-09-13.json). Локальные исходники и
-readback: `.dock/node12-candidate-20260913` в основном checkout.
+readback: `unavailable:artifact-b43a4d2329e46fdb` в основном checkout.
 
 ---
 
@@ -335,7 +337,7 @@ Mac и VPS: по **1192 PASS, 1 SKIP**; установленный клиент 
 Провайдер основного Hermes установлен: `openai-codex`, модель `gpt-5.6-sol`,
 `agent.reasoning_effort=low`, без fallback. Иные параметры Hermes сохраняются.
 Перед установкой сохранены исходные конфигурации, runtime pointer и native source
-в `.dock/hermes-user-20260910/before-install/` (приватно, не Git). Установлен комплект `0.1.0-dev.20260910.3`, собранный на VPS; runtime
+в `unavailable:artifact-1d36eadf89406bc0` (приватно, не Git). Установлен комплект `0.1.0-dev.20260910.3`, собранный на VPS; runtime
 `84a47863909ad7ca90389e9e54a12da85af12e531a0562821234723c9695901e`.
 Source commit — в `~/.loginom-dock/current/release.json`, тот же pin у native-плагина.
 [Обычная приёмка и независимый аудит](hermes-user-diagnostics-2026-09-10.md) прошли.
@@ -432,11 +434,11 @@ VPS Dock — **82.22.23.10**, Ubuntu 24.04, Docker/Compose уже установ
 `127.0.0.1:1933`; Ollama доступна внутри Docker-сети. DNS обоих доменов указывает
 на этот VPS. Сертификатами управляет Caddy.
 
-На машине разработки checkout находится в `/Users/kartamyshev/Git/loginom-dock`.
+На машине разработки checkout находится в `unavailable:artifact-cf88a7be2dd0c277`.
 Локальный `.env` содержит `LOGINOM_DOCK_SSH_HOST`, `LOGINOM_DOCK_SSH_PORT`,
 `LOGINOM_DOCK_SSH_USER`, `LOGINOM_DOCK_SSH_PASSWORD`, `LOGINOM_DOCK_DOMAIN`,
 `LOGINOM_TARGET_URL` и `OPENROUTER_API_KEY`. Проверенный SSH host key хранится в
-`.dock/known_hosts`. Содержимое `.env` не исполнять через `source` и не печатать.
+`unavailable:artifact-b40a42378cf52df1`. Содержимое `.env` не исполнять через `source` и не печатать.
 
 Для неинтерактивного SSH уже используется `sshpass -e`: пароль передаётся только
 через окружение дочернего процесса. Пример **read-only** проверки из корня checkout:
@@ -456,7 +458,7 @@ env = dict(os.environ, SSHPASS=config['LOGINOM_DOCK_SSH_PASSWORD'])
 ssh = ['sshpass', '-e', 'ssh', '-p', config.get('LOGINOM_DOCK_SSH_PORT', '22'),
        '-o', 'PreferredAuthentications=password', '-o', 'PubkeyAuthentication=no',
        '-o', 'StrictHostKeyChecking=yes',
-       '-o', f'UserKnownHostsFile={root / ".dock/known_hosts"}',
+       '-o', f'UserKnownHostsFile={root / "unavailable:artifact-b40a42378cf52df1"}',
        '-o', 'ConnectTimeout=30',
        f'{config["LOGINOM_DOCK_SSH_USER"]}@{config["LOGINOM_DOCK_SSH_HOST"]}']
 subprocess.run(ssh + ['curl --connect-timeout 5 --max-time 10 --fail --silent --show-error http://127.0.0.1:1933/health'],
@@ -618,8 +620,8 @@ Python-пакете; он не переносит изменения backend. И
 ```sh
 dock_revision=$(git rev-parse HEAD)
 mkdir -p .dock
-git archive --format=tar "$dock_revision" | gzip -n > ".dock/server-$dock_revision.tar.gz"
-shasum -a 256 ".dock/server-$dock_revision.tar.gz"
+git archive --format=tar "$dock_revision" | gzip -n > "unavailable:artifact-fbb327c6e6a2dc89"
+shasum -a 256 "unavailable:artifact-fbb327c6e6a2dc89"
 ```
 
 Перед передачей проверить состав архива: только исходники, без credentials,
@@ -712,12 +714,12 @@ python3 deploy/loginom-dock/gitlab-tunnel.py --env-file .env --state-dir .dock
 ```
 
 Он работает на переднем плане. Предварительно проверить host key, права и отсутствие
-другого владельца socket. Импорт запускать установленным `tools/import-sources.sh`:
+другого владельца socket. Импорт запускать установленным `unavailable:artifact-48ba1ffdc934a6bc`:
 он сериализуется с backup и завершает работу полным аудитом. До запуска подготовить
 baseline нужных ревизий. Порядок и адресный повтор — в [development.md](development.md).
 Чтение уже импортированных данных не требует запуска туннеля или повторного импорта.
 
-Полный skill публикуется из проверенного ZIP через `tools/publish-skill.py` с
+Полный skill публикуется из проверенного ZIP через `unavailable:artifact-9ccd1a4150353244` с
 явными `--archive`, `--admin`, `--report`. Сначала читать текущий manifest, затем
 проверять результат и целостность. Отчёт — `assets/skill-publication.json`.
 Не менять закреплённый skill текущей сессии. Полная процедура относится к изменению
@@ -764,10 +766,10 @@ Hermes должен использовать существующий выбра
 явный `--hermes-home`) и уже подключённую подписку ChatGPT; личный memory provider
 не менять. Полные transcript/config не выводить для поиска версии или имени профиля.
 
-Релизные доказательства — `.dock/releases/v0.1.0-rc.2/`; Windows-результат и
+Релизные доказательства — `unavailable:artifact-5967002a19741213`; Windows-результат и
 скриншот — в его подкаталоге `evidence/`. Предыдущая приёмка Hermes —
-`.dock/native-hermes-chatgpt-result.json` и `.dock/hermes-chatgpt-archive-verification.json`,
-лендинг — `.dock/landing-preview/`. Эти файлы не входят в Git; новый checkout может
+`unavailable:artifact-343a2bd4bffac840` и `unavailable:artifact-72544d9b5afe8f40`,
+лендинг — `unavailable:artifact-ea2039e8ad752319`. Эти файлы не входят в Git; новый checkout может
 их не иметь. Подтверждённые выводы и хеши сохраняются в журнале.
 
 ### Windows-машина для live-проверок
@@ -793,14 +795,14 @@ WebSocket; запись hosts, туннели и временная задача
 Первый запускается каждые пять минут; второй — в 05:00 **Europe/Moscow**, независимо
 от часового пояса, которым `systemctl list-timers` отображает даты.
 
-`tools/backup-server.sh` сохраняет пять томов, образы всех пяти контейнеров,
+`unavailable:artifact-c56c562b10cd445e` сохраняет пять томов, образы всех пяти контейнеров,
 config, assets, source archive и эксплуатационные файлы. Он кратко останавливает
 сервисы, сериализуется с импортом и возобновляет их при ошибке. Для переноса нужны
 каталог копии и все файлы `backups/images`, на которые ссылается `image-checksums`.
 Копии содержат credentials; права и закрытое хранение обязательны.
 
 На момент проверки `latest-backup` указывает на `backups/20260903T020016Z`.
-Восстановление выполняется `tools/restore-server.py --backup ... --name ... --root ...`
+Восстановление выполняется `unavailable:artifact-ed08e53638d7109b --backup ... --name ... --root ...`
 в отдельные сеть, тома и контейнеры; порты по умолчанию 19433/19443 только на loopback.
 Проверить свободные порты, место и контрольные суммы до запуска. Оно не переключает
 production DNS или публичные порты. Подробности — в [deploy README](../../deploy/loginom-dock/README.md).
