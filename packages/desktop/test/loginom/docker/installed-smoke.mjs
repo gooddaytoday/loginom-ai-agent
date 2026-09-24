@@ -29,7 +29,7 @@ try {
   const form = page.locator('[data-component="settings-loginom"]')
   await form.waitFor({ timeout: 120_000 })
   if ((await form.locator("input:not([type=checkbox])").count()) !== 4) throw Error("FOUR_FIELDS_REQUIRED")
-  if ((await form.locator("input[type=url]").inputValue()) !== "http://logi-test-plan.bg.local/app/")
+  if ((await form.locator("input[type=url]").inputValue()) !== "https://app.loginom.ai")
     throw Error("URL_DEFAULT_INVALID")
   if ((await form.locator("input[autocomplete=username]").inputValue()) !== "user") throw Error("USER_DEFAULT_INVALID")
   if (

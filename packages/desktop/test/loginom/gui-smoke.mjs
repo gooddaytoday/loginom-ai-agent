@@ -33,7 +33,7 @@ try {
       passwordPlaceholders: inputs
         .filter((input) => input.type === "password")
         .map((input) => input.getAttribute("placeholder")),
-      urlDefault: inputs.some((input) => input.value === "http://logi-test-plan.bg.local/app/"),
+      urlDefault: inputs.some((input) => input.value === "https://app.loginom.ai"),
       usernameDefault: inputs.some((input) => input.value === "user"),
       secretValuesEmpty: inputs.filter((input) => input.type === "password").every((input) => input.value === ""),
     }

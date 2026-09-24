@@ -1,4 +1,4 @@
-# Public endpoint release 0.1.13 — 2026-09-24
+# Public endpoint release 0.1.14 — 2026-09-24
 
 ## Changes and acceptance contract
 
@@ -14,7 +14,7 @@ The browser login address therefore resolves that specific public root to
 `/app/?testable=true`; displayed/stored defaults remain the requested root URL.
 Other origins and custom paths retain their existing behavior.
 
-Version 0.1.13 is synchronized using `script/set-version.ts`. Release targets:
+Version 0.1.14 is synchronized using `script/set-version.ts`. Release targets:
 Desktop and CLI for Linux x64, Windows x64 and macOS arm64, channel prod,
 published GitHub pre-release after all release gates and artifact verification.
 
@@ -33,6 +33,30 @@ published GitHub pre-release after all release gates and artifact verification.
 - Source attribution: 5045 files verified. Updated setup/docs hashes and repaired
   stale attribution for the unchanged `session.mjs` browser-download change from
   commit `75bc5d86e`; no additional runtime change was made for that repair.
+
+## Superseded v0.1.13 attempt
+
+Tag `v0.1.13` remains at `f3fd53b5d13e85a49f7085ed3b27a58481dc49c0` and is
+not published. The user selected v0.1.14 rather than moving that tag.
+[Run 36011972407](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/36011972407)
+built all three platforms successfully; Desktop, e2e and typecheck passed.
+The unit gate hit the previously observed Host kill/cleanup race; five isolated
+local repeats passed without source changes. The branch's full test run passed.
+Linux smoke failed because the test expected the old URL; both installed/GUI
+smoke expectations are corrected for v0.1.14. Ubuntu 24.04 additionally hit a
+404 while downloading libexpat from an Ubuntu mirror. Attempt 2 was cancelled
+once the deterministic outdated assertion was identified.
+
+Downloaded macOS 0.1.13 source/DMG/ZIP hashes match its manifest; native source,
+build, static and offline reports passed. The corrected GUI defaults test also
+passed on that binary in an isolated profile. Authenticated check/save and
+restart migration from the old URL passed on the exact downloaded macOS binary,
+with credentials and the old generation preserved. Early acceptance harness
+attempts encountered incompatible Playwright matchers/premature async waiting;
+the final probe uses one Playwright runtime and explicit status polling. Some
+live login attempts timed out behind a transient Loginom mask; a diagnostic
+copy exposed the intercepted click, and the complete final installed run passed.
+This does not establish that server-side mask delays have been eliminated.
 
 ## Release checkpoint
 
