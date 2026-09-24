@@ -10,7 +10,7 @@ export function parseMacosSettings(input: string): SystemProxySettings {
   const enabled = (key: string) => flag(parsed.values, key, settings)
   settings.automatic = enabled("ProxyAutoConfigEnable") || enabled("ProxyAutoDiscoveryEnable")
   settings.simpleHostnames = enabled("ExcludeSimpleHostnames")
-  settings.pacUrl = parsed.values.get("ProxyAutoConfigURLString") ?? ""
+  settings.pacUrl = enabled("ProxyAutoConfigEnable") ? (parsed.values.get("ProxyAutoConfigURLString") ?? "") : ""
   settings.bypass = parsed.exceptions
   const http = endpoint("HTTP", enabled, parsed.values, settings)
   const https = endpoint("HTTPS", enabled, parsed.values, settings)

@@ -24,10 +24,51 @@ const PROXY_KEYS = [
   "NODE_USE_ENV_PROXY",
 ]
 
+export class SidecarStartError extends Error {
+  reason: "exit" | "error" | "stall"
+  constructor(reason: "exit" | "error" | "stall", message?: string) {
+    super(message ?? reason)
+    this.reason = reason
+  }
+}
+
+export async function startWithProxyFallback<T>(input: {
+  proxy?: Record<string, string>
+  start: (proxy: Record<string, string> | undefined) => Promise<T>
+}) {
+  const proxy = hasProxy(input.proxy) ? input.proxy : undefined
+  try {
+    return { value: await input.start(proxy), fallback: false }
+  } catch (error) {
+    if (!proxy || !(error instanceof SidecarStartError) || error.reason === "stall") throw error
+    return { value: await input.start(undefined), fallback: true }
+  }
+}
+
+export function configuredProxy(environment: NodeJS.ProcessEnv) {
+  const proxy: Record<string, string> = {}
+  for (const key of PROXY_KEYS) {
+    const value = environment[key]
+    if (typeof value === "string" && value.trim()) proxy[key] = value
+  }
+  return Object.keys(proxy).length ? proxy : undefined
+}
+
+function hasProxy(proxy: Record<string, string> | undefined) {
+  if (!proxy) return false
+  return PROXY_KEYS.some((key) => Boolean(proxy[key]?.trim()))
+}
+
 export function assignProxyEnvironment(target: NodeJS.ProcessEnv, proxy: Record<string, string>) {
   for (const key of PROXY_KEYS) {
     if (proxy[key] !== undefined) target[key] = proxy[key]
   }
+}
+
+export function withoutProxyEnvironment(base: NodeJS.ProcessEnv) {
+  const env = { ...base }
+  for (const key of PROXY_KEYS) delete env[key]
+  return env
 }
 
 export function sidecarEnvironment(base: NodeJS.ProcessEnv, proxy?: Record<string, string>) {

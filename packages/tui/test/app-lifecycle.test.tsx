@@ -127,6 +127,46 @@ test("app.exit prints the session epilogue after scoped cleanup", async () => {
   }
 })
 
+test("startup warning from args is shown as a toast", async () => {
+  const setup = await createTestRenderer({ width: 80, height: 24, useThread: false })
+  const core = await import("@opentui/core")
+  mock.module("@opentui/core", () => ({ ...core, createCliRenderer: async () => setup.renderer }))
+  const events = createEventSource()
+  const calls = createFetch()
+  let started!: () => void
+  const ready = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  try {
+    const { run } = await import("../src/app")
+    const task = Effect.runPromise(
+      run({
+        url: "http://test",
+        directory,
+        config: createTuiResolvedConfig({ plugin_enabled: {} }),
+        fetch: calls.fetch,
+        events: events.source,
+        args: { warning: "SYSTEM_PROXY_NOT_APPLIED: read-failed" },
+        pluginHost: {
+          async start() {
+            started()
+          },
+          async dispose() {},
+        },
+      }).pipe(Effect.provide(AppNodeBuilder.build(Global.node))),
+    )
+    await ready
+    await setup.renderOnce()
+    await setup.renderOnce()
+    expect(setup.captureCharFrame()).toContain("SYSTEM_PROXY_NOT_APPLIED: read-failed")
+    setup.renderer.destroy()
+    await task
+  } finally {
+    if (!setup.renderer.isDestroyed) setup.renderer.destroy()
+    mock.restore()
+  }
+})
+
 test("fatal startup errors set a nonzero exit after scoped cleanup", async () => {
   const setup = await createTestRenderer({ width: 80, height: 24, useThread: false })
   const core = await import("@opentui/core")

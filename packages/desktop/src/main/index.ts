@@ -34,7 +34,7 @@ import {
   spawnLocalServer,
   type SidecarListener,
 } from "./server"
-import { probeProxyUrl } from "@loginom-ai-agent/loginom-host/system-proxy"
+import { configuredProxy, startWithProxyFallback } from "./proxy-env"
 import {
   formatSystemProxyLog,
   loopbackNoProxy,
@@ -368,16 +368,6 @@ const main = Effect.gen(function* () {
     if (proxyResult) {
       logger.log(formatSystemProxyLog(proxyResult))
       publishSystemProxyStatus(statusFromResult(proxyResult, systemProxyEnabled()))
-      const address = proxyResult.summary.http ?? proxyResult.summary.https
-      if (proxyResult.state === "applied" && address)
-        void probeProxyUrl(`http://${address}`, 1500).then((status) => {
-          if (status !== "closed" && status !== "timeout") return
-          logger.log("system proxy: unreachable", { proxy: address })
-          publishSystemProxyStatus({
-            ...statusFromResult(proxyResult, systemProxyEnabled()),
-            notices: [...proxyResult.notices, { code: "unreachable", detail: address }],
-          })
-        })
     }
 
     ensureLoopbackNoProxy()
@@ -430,16 +420,39 @@ const main = Effect.gen(function* () {
     const password = randomUUID()
 
     if (stopping) return
+    let attempt = 0
+    const testSidecarProxy = TEST_ONBOARDING ? process.env.LOGINOM_AI_AGENT_TEST_SIDECAR_PROXY : undefined
     logger.log("spawning sidecar", { url })
-    serverStarting = spawnLocalServer(hostname, port, password, {
-      userDataPath: app.getPath("userData"),
-      proxyEnvironment: proxyResult?.environment,
-      loginom,
-      onStdout: (message) => writeLog("server", message),
-      onStderr: (message) => writeLog("server", message),
-      onExit: (code) => writeLog("server", "sidecar exited", { code }, code === 0 ? "info" : "error"),
-    })
-    const { listener, health } = yield* Effect.promise(() => serverStarting!)
+    const started = yield* Effect.promise(() =>
+      startWithProxyFallback({
+        proxy: testSidecarProxy
+          ? { HTTPS_PROXY: testSidecarProxy, https_proxy: testSidecarProxy, NODE_USE_ENV_PROXY: "1" }
+          : (proxyResult?.environment ?? configuredProxy(process.env)),
+        start: (proxy) => {
+          attempt += 1
+          const starting = spawnLocalServer(hostname, port, password, {
+            userDataPath: app.getPath("userData"),
+            proxyEnvironment: proxy,
+            withoutProxy: attempt > 1,
+            loginom,
+            onStdout: (message) => writeLog("server", message),
+            onStderr: (message) => writeLog("server", message),
+            onExit: (code) => writeLog("server", "sidecar exited", { code }, code === 0 ? "info" : "error"),
+          })
+          serverStarting = starting
+          return starting
+        },
+      }),
+    )
+    if (started.fallback) {
+      logger.log("system proxy: fallback")
+      publishSystemProxyStatus({
+        state: "failed",
+        enabled: systemProxyEnabled(),
+        notices: [{ code: "internal", detail: "sidecar" }],
+      })
+    }
+    const { listener, health } = started.value
     server = listener
     if (stopping) {
       void health.wait.catch(() => undefined)

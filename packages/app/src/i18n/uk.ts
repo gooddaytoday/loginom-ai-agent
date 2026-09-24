@@ -1038,6 +1038,7 @@ export const dict = {
   "systemProxy.notice.auth-required": "The system proxy requires a password. Credentials from the operating system are not copied.",
   "systemProxy.notice.automatic-unsupported": "Automatic proxy configuration could not be applied.",
   "systemProxy.notice.environment-socks": "ALL_PROXY uses SOCKS, which this runtime does not apply.",
+  "systemProxy.notice.routes-merged": "Different proxies were found for {{address}}. One proxy is used for all model requests.",
   "settings.general.row.shell.title": "Командна оболонка термінала",
   "settings.general.row.shell.description":
     "Виберіть оболонку для термінала. Сумісні оболонки також використовуються для викликів інструментів агента.",

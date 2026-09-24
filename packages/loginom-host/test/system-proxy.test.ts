@@ -55,6 +55,6 @@ test("chromium supplies the proxy when the operating system has no manual route"
     chromium: [{ url: "https://auth.openai.com/oauth/token", resolution: "PROXY 127.0.0.1:7890" }],
   })
   expect(result.state).toBe("applied")
-  expect(result.environment?.HTTP_PROXY).toBe("http://127.0.0.1:7890")
+  expect(result.environment?.HTTPS_PROXY).toBe("http://127.0.0.1:7890")
   expect(result.summary.source).toBe("chromium")
 })

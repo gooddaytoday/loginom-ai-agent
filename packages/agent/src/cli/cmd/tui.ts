@@ -22,6 +22,11 @@ export function setTuiLoginomHost(port?: Port) {
   loginom.port = port
 }
 
+const startup = { warning: undefined as string | undefined }
+export function setTuiStartupWarning(warning?: string) {
+  startup.warning = warning
+}
+
 declare global {
   const LOGINOM_AI_AGENT_WORKER_PATH: string
 }
@@ -315,6 +320,7 @@ export const TuiThreadCommand = cmd({
               prompt,
               fork: args.fork,
               auto: args.auto || args.yolo || args["dangerously-skip-permissions"],
+              warning: startup.warning,
             },
           }),
         )

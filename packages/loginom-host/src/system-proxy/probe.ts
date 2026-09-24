@@ -17,10 +17,15 @@ export function probeProxyPort(host: string, port: number, timeoutMs = 1000): Pr
     const socket = connect({ host, port })
     const timer = setTimeout(() => finish("timeout"), timeoutMs)
     socket.once("error", (error: NodeJS.ErrnoException) => finish(error.code === "ECONNREFUSED" ? "closed" : "other"))
+    socket.once("end", () => finish("other"))
+    socket.once("close", () => finish("other"))
     socket.once("connect", () => {
       socket.write("CONNECT proxy-probe.invalid:443 HTTP/1.1\r\nHost: proxy-probe.invalid:443\r\n\r\n")
     })
-    socket.once("data", (chunk) => finish(chunk.toString("utf8").startsWith("HTTP/") ? "http" : "other"))
+    socket.once("data", (chunk) => {
+      const code = Number(/^HTTP\/\d(?:\.\d)? (\d+)/.exec(chunk.toString("utf8"))?.[1])
+      finish([200, 403, 407, 502, 503, 504].includes(code) ? "http" : "other")
+    })
   })
 }
 
