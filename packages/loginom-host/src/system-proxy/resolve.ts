@@ -131,7 +131,12 @@ async function resolveSystemProxyUnsafe(input: ResolveSystemProxyInput): Promise
     if (windowsDefault && !notices.some((notice) => notice.code === "timeout")) return directResult()
     if (notices.length === 0) return directResult()
     const blocking = notices.some((notice) => notice.code === "internal" || notice.code === "timeout")
-    if (blocking) notices.splice(0, notices.length, ...notices.filter((notice) => notice.code === "internal" || notice.code === "timeout"))
+    if (blocking)
+      notices.splice(
+        0,
+        notices.length,
+        ...notices.filter((notice) => notice.code === "internal" || notice.code === "timeout"),
+      )
     return {
       state: blocking ? "failed" : "direct",
       summary: { source: settings.source, noProxy: "", skipped: [] },
@@ -147,8 +152,7 @@ async function resolveSystemProxyUnsafe(input: ResolveSystemProxyInput): Promise
   const notices: SystemProxyNotice[] = [...settings.issues]
   if (settings.reversedExceptions) notices.push({ code: "approximated", detail: "reversed" })
   if (translated.skipped.length) notices.push({ code: "rules-skipped", detail: translated.skipped.join(",") })
-  if (translated.approximated.length)
-    notices.push({ code: "approximated", detail: translated.approximated.join(",") })
+  if (translated.approximated.length) notices.push({ code: "approximated", detail: translated.approximated.join(",") })
   if (settings.authRequired) notices.push({ code: "auth-required" })
   if (input.probe) {
     const probe = input.probe
@@ -214,7 +218,8 @@ async function loadRead(read: () => Promise<SystemProxySnapshot | undefined>, in
     return { ok: false as const, code: "read-failed" as const }
   }
   const waited = await deadline(reading, input.deadlineMs ?? 8000)
-  if (waited.ok === false) return { ok: false as const, code: waited.reason === "timeout" ? ("timeout" as const) : ("read-failed" as const) }
+  if (waited.ok === false)
+    return { ok: false as const, code: waited.reason === "timeout" ? ("timeout" as const) : ("read-failed" as const) }
   if (!waited.value) return { ok: true as const }
   return { ok: true as const, settings: snapshotSettings(waited.value, input) }
 }
@@ -274,31 +279,33 @@ async function chromiumView(input: ResolveSystemProxyInput) {
   try {
     const rows = Array.isArray(input.chromium) ? input.chromium : await chromiumRows(input)
     if (!rows) return { ...empty, timedOut: true }
+    const routes = rows.map((row) => ({ url: row.url, proxy: parseChromiumResolution(row.resolution) }))
     const directHosts: string[] = []
-    const merged: string[] = []
     let http = ""
     let https = ""
     let socks = ""
     let sawProxy = false
-    for (const row of rows) {
-      const parsed = parseChromiumResolution(row.resolution)
-      if (parsed.direct) {
+    for (const row of routes) {
+      if (row.proxy.direct) {
         const host = hostOf(row.url)
         if (host) directHosts.push(host)
         continue
       }
-      if (parsed.http || parsed.socks) sawProxy = true
+      if (row.proxy.http || row.proxy.socks) sawProxy = true
       const secure = !row.url.startsWith("http://")
-      const chosen = secure ? https : http
-      if (parsed.http && chosen && chosen !== parsed.http) {
-        const host = hostOf(row.url)
-        if (host) merged.push(host)
-        continue
-      }
-      if (parsed.http && !secure && !http) http = parsed.http
-      if (parsed.http && secure && !https) https = parsed.http
-      if (parsed.socks && !socks) socks = parsed.socks
+      if (row.proxy.http && !secure && !http) http = row.proxy.http
+      if (row.proxy.http && secure && !https) https = row.proxy.http
+      if (row.proxy.socks && !socks) socks = row.proxy.socks
     }
+    // HTTP имеет приоритет даже после SOCKS; сравниваем с выбранными маршрутами после всего обхода.
+    const merged = routes.flatMap((row) => {
+      const address = row.proxy.http || row.proxy.socks
+      if (!address) return []
+      const chosen = row.url.startsWith("http://") ? http : https || http
+      if (address === (chosen || (!http && !https ? socks : ""))) return []
+      const host = hostOf(row.url)
+      return host ? [host] : []
+    })
     return {
       directHosts: sawProxy ? directHosts : [],
       http,

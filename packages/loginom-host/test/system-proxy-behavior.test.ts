@@ -102,6 +102,33 @@ test("a split-tunnel PAC stays unsupported", async () => {
   expect(clash.environment?.HTTP_PROXY).toBe("http://127.0.0.1:8080")
 })
 
+test("a URL literal does not hide a DIRECT branch in PAC", async () => {
+  const result = await resolveSystemProxy({
+    platform: "linux",
+    gnome: "org.gnome.system.proxy mode 'auto'\n",
+    pacScript: `function FindProxyForURL(url, host) {
+      if (url.indexOf("https://internal.example/") === 0) return "DIRECT";
+      // PROXY unused.example:9090
+      return "PROXY 127.0.0.1:8080";
+    }`,
+  })
+  expect(result.environment).toBeUndefined()
+  expect(result.notices).toContainEqual({ code: "automatic-unsupported" })
+})
+
+test("quotes inside a PAC URL literal do not hide its DIRECT branch", async () => {
+  const result = await resolveSystemProxy({
+    platform: "linux",
+    gnome: "org.gnome.system.proxy mode 'auto'\n",
+    pacScript: `function FindProxyForURL(url, host) {
+      if (url.indexOf("https://internal.example/don't") === 0) return "DIRECT";
+      return "PROXY 127.0.0.1:8080";
+    }`,
+  })
+  expect(result.environment).toBeUndefined()
+  expect(result.notices).toContainEqual({ code: "automatic-unsupported" })
+})
+
 test("IPv6 proxy URLs keep a single pair of brackets", () => {
   const parsed = parseProxyAddress("http://[::1]:8080")
   expect(parsed.kind).toBe("http")
@@ -180,6 +207,26 @@ test("different proxies per provider are reported", async () => {
   })
   expect(result.environment?.HTTPS_PROXY).toBe("http://127.0.0.1:8080")
   expect(result.notices).toContainEqual({ code: "routes-merged", detail: "api.anthropic.com" })
+})
+
+test("different Chromium routes include SOCKS conflicts in either order", async () => {
+  for (const [first, second, ignored] of [
+    ["PROXY proxy-a.test:8080", "SOCKS5 proxy-b.test:1080", "api.anthropic.com"],
+    ["SOCKS5 proxy-b.test:1080", "PROXY proxy-a.test:8080", "api.openai.com"],
+    ["SOCKS5 proxy-a.test:8080", "SOCKS5 proxy-b.test:1080", "api.anthropic.com"],
+  ]) {
+    const result = await resolveSystemProxy({
+      platform: "linux",
+      gnome: "org.gnome.system.proxy mode 'auto'\n",
+      chromium: [
+        { url: "https://api.openai.com/v1/models", resolution: first },
+        { url: "https://api.anthropic.com/v1/messages", resolution: second },
+      ],
+      probe: async () => "http",
+    })
+    expect(result.environment?.HTTPS_PROXY).toBe("http://proxy-a.test:8080")
+    expect(result.notices).toContainEqual({ code: "routes-merged", detail: ignored })
+  }
 })
 
 test("Chromium SOCKS answers reach the mixed-port check", async () => {
@@ -567,14 +614,16 @@ test("explicit environment and the switch outrank system settings", async () => 
   const explicit = await resolveSystemProxy({
     platform: "linux",
     environment: { HTTPS_PROXY: "http://explicit.test:9", NO_PROXY: "keep.test" },
-    gnome: "org.gnome.system.proxy mode 'manual'\norg.gnome.system.proxy.http host '127.0.0.1'\norg.gnome.system.proxy.http port 8080\n",
+    gnome:
+      "org.gnome.system.proxy mode 'manual'\norg.gnome.system.proxy.http host '127.0.0.1'\norg.gnome.system.proxy.http port 8080\n",
   })
   expect(explicit.state).toBe("environment")
   expect(explicit.environment).toBeUndefined()
   expect(explicit.summary.http).toBe("explicit.test:9")
   const socks = await resolveSystemProxy({
     environment: { ALL_PROXY: "socks5://127.0.0.1:1080" },
-    gnome: "org.gnome.system.proxy mode 'manual'\norg.gnome.system.proxy.http host '127.0.0.1'\norg.gnome.system.proxy.http port 8080\n",
+    gnome:
+      "org.gnome.system.proxy mode 'manual'\norg.gnome.system.proxy.http host '127.0.0.1'\norg.gnome.system.proxy.http port 8080\n",
   })
   expect(socks.state).toBe("environment")
   expect(socks.notices.map((notice) => notice.code)).toEqual(["environment-socks"])
@@ -584,7 +633,8 @@ test("linux environment keeps both spellings and merges an existing bypass list"
   const result = await resolveSystemProxy({
     platform: "linux",
     environment: { NO_PROXY: "keep.test, .already.test" },
-    gnome: "org.gnome.system.proxy mode 'manual'\norg.gnome.system.proxy.http host '127.0.0.1'\norg.gnome.system.proxy.http port 8080\n",
+    gnome:
+      "org.gnome.system.proxy mode 'manual'\norg.gnome.system.proxy.http host '127.0.0.1'\norg.gnome.system.proxy.http port 8080\n",
   })
   expect(result.environment?.http_proxy).toBe(result.environment?.HTTP_PROXY)
   expect(result.environment?.no_proxy).toBe(result.environment?.NO_PROXY)

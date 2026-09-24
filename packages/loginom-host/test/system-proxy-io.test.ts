@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { once } from "node:events"
+import { pathToFileURL } from "node:url"
 
 import { probeProxyPort, probeProxyUrl, readSystemProxy, resolveSystemProxy } from "../src/system-proxy"
 
@@ -93,7 +94,8 @@ test("an HTTPS proxy probe checks TCP reachability", async () => {
 test("a closed HTTPS-only proxy is reported as unreachable", async () => {
   const result = await resolveSystemProxy({
     platform: "linux",
-    gnome: "org.gnome.system.proxy mode 'manual'\norg.gnome.system.proxy.https host '127.0.0.1'\norg.gnome.system.proxy.https port 1\n",
+    gnome:
+      "org.gnome.system.proxy mode 'manual'\norg.gnome.system.proxy.https host '127.0.0.1'\norg.gnome.system.proxy.https port 1\n",
     probe: (url) => probeProxyUrl(url, 500),
   })
   expect(result.state).toBe("applied")
@@ -224,10 +226,7 @@ test("linux readers honor a fake gsettings and a temporary kioslaverc", async ()
     expect(manual.ok).toBe(true)
     const config = join(directory, "config")
     await mkdir(config)
-    await writeFile(
-      join(config, "kioslaverc"),
-      "[Proxy Settings]\nProxyType=1\nhttpProxy=http://127.0.0.1 9090\n",
-    )
+    await writeFile(join(config, "kioslaverc"), "[Proxy Settings]\nProxyType=1\nhttpProxy=http://127.0.0.1 9090\n")
     const kde = await readSystemProxy({
       platform: "linux",
       environment: { XDG_CURRENT_DESKTOP: "KDE", XDG_CONFIG_HOME: config, HOME: directory },
@@ -332,6 +331,97 @@ test("a PAC server that never answers or returns an oversized script is skipped 
     huge.close()
   }
 })
+
+test("an oversized PAC response is cancelled before its body finishes", async () => {
+  const closed = Promise.withResolvers<void>()
+  let finished = false
+  const pac = createServer((request, response) => {
+    response.write(Buffer.alloc(1024 * 1024 + 1, " "))
+    const timer = setTimeout(() => {
+      finished = true
+      response.end("return 'PROXY 127.0.0.1:8080';")
+    }, 1000)
+    request.socket.once("close", () => {
+      clearTimeout(timer)
+      closed.resolve()
+    })
+  })
+  pac.listen(0, "127.0.0.1")
+  await once(pac, "listening")
+  const address = pac.address()
+  if (!address || typeof address === "string") throw new Error("port unavailable")
+  try {
+    const result = await resolveSystemProxy({
+      platform: "linux",
+      gnome: `org.gnome.system.proxy mode 'auto'\norg.gnome.system.proxy autoconfig-url 'http://127.0.0.1:${address.port}/proxy.pac'\n`,
+    })
+    expect(result.environment).toBeUndefined()
+    expect(result.notices).toContainEqual({ code: "automatic-unsupported" })
+    expect(finished).toBe(false)
+    await closed.promise
+  } finally {
+    pac.closeAllConnections()
+    pac.close()
+  }
+})
+
+test("file PAC accepts a small script and rejects more than one MiB of UTF-8 bytes", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-pac-file-"))
+  const path = join(directory, "proxy.pac")
+  const input = {
+    platform: "linux" as const,
+    gnome: `org.gnome.system.proxy mode 'auto'\norg.gnome.system.proxy autoconfig-url '${pathToFileURL(path).href}'\n`,
+  }
+  try {
+    await writeFile(path, "return 'PROXY 127.0.0.1:8080';")
+    expect((await resolveSystemProxy(input)).environment?.HTTP_PROXY).toBe("http://127.0.0.1:8080")
+    await writeFile(path, `/*${"я".repeat(600 * 1024)}*/return 'PROXY 127.0.0.1:8080';`)
+    const result = await resolveSystemProxy(input)
+    expect(result.environment).toBeUndefined()
+    expect(result.notices).toContainEqual({ code: "automatic-unsupported" })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test.skipIf(process.platform !== "linux")(
+  "a stalled file PAC does not block proxy resolution",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "loginom-pac-pipe-"))
+    const path = join(directory, "proxy.pac")
+    try {
+      expect(await Bun.spawn(["mkfifo", path], { stdout: "ignore", stderr: "pipe" }).exited).toBe(0)
+      const child = Bun.spawn(
+        [
+          process.execPath,
+          "-e",
+          `import { resolveSystemProxy } from ${JSON.stringify(join(import.meta.dir, "../src/system-proxy/index.ts"))};
+const result = await resolveSystemProxy({
+  platform: "linux",
+  gnome: ${JSON.stringify(`org.gnome.system.proxy mode 'auto'\norg.gnome.system.proxy autoconfig-url '${pathToFileURL(path).href}'\n`)},
+});
+console.log(JSON.stringify(result));`,
+        ],
+        { stdout: "pipe", stderr: "pipe" },
+      )
+      const timer = setTimeout(() => child.kill(), 3000)
+      try {
+        const output = await new Response(child.stdout).text()
+        expect(await child.exited).toBe(0)
+        const result = JSON.parse(output)
+        expect(result.environment).toBeUndefined()
+        expect(result.notices).toContainEqual({ code: "automatic-unsupported" })
+      } finally {
+        clearTimeout(timer)
+        if (child.exitCode === null) child.kill()
+        await child.exited
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+  5000,
+)
 
 test("Desktop never downloads PAC", async () => {
   let hits = 0
