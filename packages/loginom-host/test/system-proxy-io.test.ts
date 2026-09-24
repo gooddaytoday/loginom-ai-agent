@@ -90,6 +90,36 @@ test("an HTTPS proxy probe checks TCP reachability", async () => {
   }
 })
 
+test("a closed HTTPS-only proxy is reported as unreachable", async () => {
+  const result = await resolveSystemProxy({
+    platform: "linux",
+    gnome: "org.gnome.system.proxy mode 'manual'\norg.gnome.system.proxy.https host '127.0.0.1'\norg.gnome.system.proxy.https port 1\n",
+    probe: (url) => probeProxyUrl(url, 500),
+  })
+  expect(result.state).toBe("applied")
+  expect(result.environment?.HTTPS_PROXY).toBe("http://127.0.0.1:1")
+  expect(result.notices).toContainEqual({ code: "unreachable", detail: "127.0.0.1:1" })
+})
+
+test("a TLS proxy that waits for a handshake is not reported as unreachable", async () => {
+  const tls = createNetServer((socket) => {
+    socket.on("data", () => undefined)
+  })
+  await listen(tls)
+  try {
+    const result = await resolveSystemProxy({
+      platform: "linux",
+      gnome: "org.gnome.system.proxy mode 'none'\n",
+      chromium: [{ url: "https://api.openai.com/v1/models", resolution: `HTTPS 127.0.0.1:${port(tls)}` }],
+      probe: (url) => probeProxyUrl(url, 300),
+    })
+    expect(result.environment?.HTTPS_PROXY).toBe(`https://127.0.0.1:${port(tls)}`)
+    expect(result.notices.map((notice) => notice.code)).not.toContain("unreachable")
+  } finally {
+    tls.close()
+  }
+})
+
 test("a hung probe is bounded", async () => {
   const silent = createNetServer((socket) => {
     socket.on("data", () => undefined)
