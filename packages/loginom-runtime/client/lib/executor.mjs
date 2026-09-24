@@ -354,7 +354,42 @@ export function rebindNodeTargetLinkEpochs(context,observed) {
   });
 }
 
-function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs) {
+// Cached UI state only: calling Loginom's validation methods here would start
+// another server request. The held native drag owns that request and its cache.
+export async function readNodeTargetLinkValidation(page, context, parameters) {
+  return page.evaluate(({context,parameters})=>{
+    const preparation=globalThis.__loginomDockPreparationV1,request=context.request;
+    const receipt=preparation&&[...preparation.receipts.values()].find(r=>r.workflowId===request.workflow_ref.workflow_id&&r.phase==='verified');
+    const roots=document.querySelectorAll('[data-tid='+JSON.stringify(request.workflow_ref.prefix+';ModelForm;cmpDiagram')+']');
+    const diagram=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab()?.Controller?.FController?.FDiagram;
+    const graph=diagram?.FmxGraph;
+    if(preparation?.document!==document||preparation.id!==request.document_id||!receipt||roots.length!==1||graph?.container!==roots[0]
+      ||preparation.nodeTargetDomEpochs?.objects.get(roots[0])!==context.dom_epoch)throw Error('Link validation workflow changed');
+    const bind=(expected,direction,port)=>{
+      const nodes=diagram.FNodes.FCollection.filter(n=>n.FGuid===expected.id);
+      if(nodes.length!==1)throw Error('Link validation node changed');
+      const node=nodes[0],tid=request.workflow_ref.prefix+';Graph;'+expected.tid+';'+direction+'_'+(port.kind==='add'?'Add':'Data-'+port.index);
+      const ports=node.FPorts.flatMap(p=>p.FCollection).filter(p=>p.parent===node&&p.FCell?.parent===node.FCell
+        &&(graph.view.getState(p.FCell)?.shape?.node?.getAttribute('data-tid')===tid||receipt.nodeTargetPortIdentities?.get(p)?.tid===tid));
+      const elements=[...roots[0].querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
+      if(ports.length!==1||elements.length!==1)throw Error('Link validation port changed');
+      return {port:ports[0],element:elements[0]};
+    };
+    const source=bind(context.nodes[0],'Output',parameters.source_port),target=bind(context.nodes[1],'Input',parameters.target_port);
+    const handler=graph.connectionHandler;
+    if(!graph.isMouseDown||!handler.first||handler.previous?.cell!==source.port.FCell
+      ||diagram.FHandlers?.FConnectionHandler?.FDelegationHandler?.FMouseDown!==true)throw Error('Link validation drag owner changed');
+    const value=diagram.FValidatedConnectionsCache?.FCache?.[source.port.FCell.id]?.[target.port.FCell.id];
+    if(value!==undefined&&value!==null&&typeof value!=='boolean')throw Error('Unknown link validation state');
+    const box=target.element.getBoundingClientRect();
+    if(!(box.width>0&&box.height>0))throw Error('Link validation target is hidden');
+    return {state:value===true?'ready':value===false?'rejected':'pending',
+      point:{x:box.x+box.width/2,y:box.y+box.height/2},
+      target_ready:handler.error==null&&handler.marker?.validState?.cell===target.port.FCell};
+  },{context,parameters});
+}
+
+function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, readLinkValidation) {
   const started = Date.now();
   const deadline = task.deadline_at ?? started + task.action.timeout_ms;
   const trace = [];
@@ -630,7 +665,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs) 
     }
     return { actual_svg: actual, expected_svg: expected.svg, logical: expected.snapped };
   };
-  const drag = async (source, targetPoint, { sourcePoint, steps = 20 } = {}) => {
+  const drag = async (source, targetPoint, { sourcePoint, steps = 20, beforeRelease } = {}) => {
     const box = await source.boundingBox();
     if (!box) throw new Error('Drag source lost its geometry');
     const start = sourcePoint ?? { x: box.x + box.width / 2, y: box.y + box.height / 2 };
@@ -640,6 +675,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs) 
     try {
       await interact(() => page.mouse.down(), true);
       await interact(() => page.mouse.move(targetPoint.x, targetPoint.y, { steps }), true);
+      if(beforeRelease)await beforeRelease();
     } finally {
       await page.mouse.up();
       mouseHeld = false;
@@ -830,7 +866,24 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs) 
       const sourcePoint = { x: sourceBox.x + sourceBox.width / 2, y: sourceBox.y + sourceBox.height / 2 };
       const targetPoint = { x: targetBox.x + targetBox.width / 2 + correction.x, y: targetBox.y + targetBox.height / 2 + correction.y };
       record('port_drag_attempt', { attempt: attempt + 1, correction, source_point: sourcePoint, target_point: targetPoint });
-      await drag(freshSource, targetPoint, { sourcePoint, steps: 10 + attempt * 4 });
+      await drag(freshSource, targetPoint, { sourcePoint, steps: 10 + attempt * 4,
+        beforeRelease:task.node_target_context?async()=>{
+          // Port compatibility is asynchronous. Keep this one drag held until
+          // its exact native cache settles, within the original action deadline.
+          let validation;
+          do{
+            validation=await interact(()=>readLinkValidation(page,task.node_target_context,task.parameters));
+            if(validation.state==='rejected')throw Error('Link validation rejected the requested ports');
+            if(validation.state==='pending')await wait(50);
+          }while(validation.state==='pending');
+          await ensureReady();
+          // Validation enlarges the target SVG. Re-enter its current center so
+          // mxGraph refreshes the marker after the asynchronous result arrived.
+          await interact(()=>page.mouse.move(validation.point.x,validation.point.y),true);
+          const settled=await interact(()=>readLinkValidation(page,task.node_target_context,task.parameters));
+          if(settled.state!=='ready'||!settled.target_ready)throw Error('Validated link target is no longer ready');
+          record('link_validation_settled',{attempt:attempt+1});
+        }:undefined });
       await wait(150);
       await waitForNoMask();
       const observed = await reconcileLink(before, { stage: 'after_drag', attempt: attempt + 1 });
@@ -1216,7 +1269,7 @@ export function makeCapabilityCode(action, selectors, parameters, options = {}) 
   const handler = requireCapability(action).handler;
   const allowedSelectors = Object.fromEntries(action.selector_symbols.map(symbol => [symbol, selectors.get(symbol)]));
   const task = { action: structuredClone(action), selectors: structuredClone(allowedSelectors), parameters: structuredClone(parameters), ...structuredClone(serializableOptions), handler };
-  const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()})`;
+  const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()}, ${readNodeTargetLinkValidation.toString()})`;
   return ['apply', 'recover_link'].includes(task.mode) && task.receipt_namespace
     ? withBrowserReceipt(body, task) : `async (page) => ${body}`;
 }

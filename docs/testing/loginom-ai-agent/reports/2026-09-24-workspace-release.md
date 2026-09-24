@@ -32,6 +32,39 @@ After the final report, publication requires the user's separate confirmation.
 
 ## Release status
 
-Version synchronized to 0.1.15. CI, downloadable artifact verification and live
-acceptance are pending. This section must be updated with exact commit/run IDs,
-artifact hashes and acceptance results before requesting publication.
+**Publication blocked; v0.1.15 remains a draft pre-release.** The annotated tag
+is immutable at `594a47b02b305d33cef9a506033ab56532390b02`.
+
+- [Release CI run 36049223320](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/36049223320)
+  passed all required jobs, three native builds and the complete Linux 5/5 matrix.
+- All 30 downloaded release assets matched GitHub size/digest metadata and the
+  29 SHA256SUMS entries. All three manifests identify the tagged clean commit.
+- macOS ZIP and DMG passed native static verification (4447 resources) and deep
+  strict signature verification. The standalone CLI manifest/signature passed.
+- Exact macOS CLI artifact: GPT-6 Sol low imported the control CSV, grouped by
+  Product and returned A / 55, then saved the package. A fresh model process
+  reopened it. An independent cold reader freshly executed the saved node and
+  confirmed 55 without reapplying settings, then closed the owned package and
+  logged out. The model catalog was refreshed using the official CLI command.
+- Exact macOS Desktop artifact: isolated profile, ordinary public root saved,
+  connection ready, original CSV imported. Group creation and rename succeeded,
+  but connecting its input exhausted native drag attempts without a verified link.
+  `group-0115` remained AMBIGUOUS; no completed result or saved package was claimed.
+  Reopening could not pass because that package was never saved. A driver exit code
+  of zero is not a successful scenario result.
+- Windows/Linux: full CI only; no live scenario acceptance claimed. The Linux
+  container matrix covers DEB, not an installed AppImage live workflow.
+
+Local private evidence: `.local/node-development/evidence/release-0115/`;
+`cli-accepted`, `cli-cold-2/result.json`, `desktop-final` and its execution journal.
+Downloaded verification evidence: `~/Downloads/loginom-ai-agent-0.1.15/`.
+Secrets and raw journals are excluded from Git. Installed user applications and
+sessions were not replaced or restarted; auto-update remains disabled.
+
+## Authorized continuation: 0.1.16
+
+The user authorized fixing the separate node-connection failure and preparing
+v0.1.16. Preserve the v0.1.15 tag and draft. Diagnose the actual drag failure,
+add targeted regression coverage, then repeat the complete release gates on a
+new fixed commit and its exact artifacts. Publication still requires successful
+Desktop and CLI acceptance and a separate final authorization.

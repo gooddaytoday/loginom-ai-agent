@@ -46,9 +46,9 @@ jobs:
       - name: Setup Loginom pinned inputs
         uses: ./.github/actions/setup-loginom-inputs
 
-      - name: Verify Loginom login and workspace address contract
+      - name: Verify Loginom workspace address and native link contracts
         working-directory: packages/loginom-runtime
-        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/connection-check.test.mjs client/test/workspace.test.mjs'
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/connection-check.test.mjs client/test/workspace.test.mjs client/test/node-link-validation.test.mjs client/test/node-link-hover.test.mjs client/test/node-link-rebind.test.mjs client/test/node-target.test.mjs client/test/text-export-connect.test.mjs client/test/executor.test.mjs'
 
       - name: Verify explicit proxy environment with real Node networking
         working-directory: packages/desktop

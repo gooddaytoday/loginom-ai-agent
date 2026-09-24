@@ -1,0 +1,63 @@
+# Workspace and link readiness release 0.1.16 — 2026-09-24
+
+## Scope
+
+Desktop and standalone CLI, prod channel, macOS arm64 / Windows x64 / Linux x64.
+The user authorized v0.1.16 after the v0.1.15 Desktop scenario failed. Preserve
+v0.1.15 as an immutable tag and unpublished draft; see the [0.1.15 report](2026-09-24-workspace-release.md).
+
+Includes the shared canonical workspace address and hidden `testable` fixes from
+0.1.15. Adds waiting for asynchronous native port compatibility during one held
+managed drag. Reads only Loginom's cached validation result, with exact graph,
+source/target and drag ownership checks. Refreshes the target center and verifies
+its native marker before mouse-up. Cancellation, rejection, identity changes and
+the original deadline still stop work and release the mouse. No validation RPC,
+new browser session, retry of an unknown gesture or deadline extension is added.
+
+## Diagnosis and source acceptance
+
+The original Desktop trace created/renamed grouping successfully, then exhausted
+10 link gestures without an exact link. It did not record validation latency, so
+its precise server response duration cannot be established retrospectively.
+Live inspection of Loginom 7.4.2 confirmed that port validation returns a Promise,
+fills `FValidatedConnectionsCache` asynchronously and enlarges compatible ports.
+The previous drag released immediately after its move and could exhaust all
+attempts before that result arrived.
+
+A controlled 20-second delay of the existing UI validation promise reproduced
+AMBIGUOUS / graph reconciliation required on the old artifact. With the source
+fix, the same delay succeeded with one held drag: validation settled at 20864 ms,
+mouse-up at 20865 ms, exact link verified at 21795 ms. A complete graph read
+confirmed the requested edge. The isolated diagnostic package was closed with
+explicit discard of its own temporary changes and logout; the saved CLI fixture
+and the user's installed application were preserved.
+
+Private diagnostic evidence: `.local/node-development/evidence/release-0115/link-repl-1/`
+(`delayed-old.json`, `fixed-delay20.json`, `fixed-delay20-graph.json`,
+`fixed-cleanup.json`). These are source diagnostics, not v0.1.16 artifact acceptance.
+One intervening diagnostic attempt failed during creation while the old delayed
+UI was still settling; it is retained and is not counted as a pass.
+
+- Runtime full suite: 2382 PASS, 4 platform/environment SKIP, 0 FAIL, pinned Node 24.19.0.
+- Targeted executor/target/hover/rebind/validation suite: 130 PASS, including
+  19 new regression cases for pending/ready/rejected caches, changed owners,
+  delayed validation, deadline expiry, foreign context and missing target marker.
+- Desktop connection and packaging: 48 PASS, 0 FAIL.
+- Host and Desktop typechecks: PASS, Bun 1.3.14.
+- Source attribution: 5045 files verified.
+- Host full suite: 127 PASS, 8 platform SKIP, 0 FAIL.
+
+The shared CI gate includes the new regression and surrounding link suites.
+Generated release notes also correct the Linux DEB matrix scope and Desktop
+system-proxy description; runtime proxy behavior is unchanged.
+
+## Release gates
+
+Version synchronized to 0.1.16. Source commit/tag, full CI, all 30 assets and hashes,
+three native manifests, Linux matrix 5/5, and exact-artifact macOS Desktop/CLI
+live acceptance are pending. Use `openai/gpt-6-sol`, variant `low`, isolated
+profiles and original CSV; require import, execution, sum 55, package save,
+reopen and fresh execution after restart. Do not substitute a successful login
+or driver exit code for the scenario result. Windows/Linux live acceptance is
+not claimed. After all gates pass, request separate authorization to publish
+the draft pre-release. Auto-update and the user's installation remain unchanged.

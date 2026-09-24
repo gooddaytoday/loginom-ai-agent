@@ -11,8 +11,8 @@
   },
   "packages/loginom-runtime/client/lib/executor.mjs": {
     "baseHash": "df21720858bb89bb40d6c4fe46620728b1d6e86b0d9d7aafa4992c8f2cf93a6e",
-    "hash": "4b9f8749a8aa50cf2f5785f3ea26a670627c72722122b7c5b9599a4d47aaadf7",
-    "reason": "Merge main retained-uncertainty host leases for bounded status/resume with RC9 settled pre-upload checkpoint semantics. Inspect a retained node operation before claiming the action gate, so saves return its outcome instead of a phantom active call; list no available actions in refusals while an operation is pending. Refuse impossible node resumes at admission through the shared resume predicate."
+    "hash": "430222a937bf805a14aa2354c7f375ff9794591f8f2c6e64447c5d828a729cff",
+    "reason": "Merge main retained-uncertainty host leases for bounded status/resume with RC9 settled pre-upload checkpoint semantics. Inspect a retained node operation before claiming the action gate, so saves return its outcome instead of a phantom active call; list no available actions in refusals while an operation is pending. Refuse impossible node resumes at admission through the shared resume predicate. Hold a single managed port drag until the exact cached asynchronous compatibility result settles within its original deadline, refresh the native target marker, and retain identity and cleanup guards."
   },
   "packages/loginom-runtime/client/lib/session.mjs": {
     "baseHash": "db89431390466874ef7ea709f5e8c866d1558dd54fc776c9ea1befd3bf286ef3",

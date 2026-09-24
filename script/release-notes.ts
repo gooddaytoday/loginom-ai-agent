@@ -59,7 +59,7 @@ for (const name of ["macos-build-report.json", "macos-source-checks.json", "maco
   if ((await report(name))?.status !== "PASS") throw new Error(`Passing report required: ${name}`)
 const expected: [file: string, status: string][] = [
   ["loginom-ai-agent-linux-amd64.deb", `${await staticStatus("static-deb.json")} + ${matrixStatus}`],
-  ["loginom-ai-agent-linux-x86_64.AppImage", `${await staticStatus("static-appimage.json")} + ${matrixStatus}`],
+  ["loginom-ai-agent-linux-x86_64.AppImage", `${await staticStatus("static-appimage.json")}; Docker matrix covers the DEB only`],
   [
     `loginom-ai-agent-cli-${version}-linux-x64.tar.gz`,
     "static verify PASS (cli-manifest); Docker matrix covers the DEB only",
@@ -93,14 +93,14 @@ const notes = [
   `- Version: ${version}`,
   `- Channel: ${args.channel}`,
   `- Commit: ${commit}`,
-  "- Linux x64 DEB/AppImage/CLI: static verification and offline Docker matrix from this run (reports attached)",
+  "- Linux x64 DEB/AppImage/CLI: static verification; DEB offline Docker matrix from this run (reports attached)",
   "- Windows x64: native CI build, settings regression tests, installer/payload and CLI archive verification",
   "- macOS 14+ Apple Silicon arm64: native CI build, source tests, DMG/ZIP verification and offline Desktop/CLI smoke",
   "- Pre-release: Linux/Windows unsigned; macOS own code ad-hoc signed, without Developer ID or notarization. OS security warnings are expected.",
   "- CI is credential-free and does not replace installed GUI, Keychain/DPAPI or live Loginom/provider acceptance for this exact build.",
   "- Settings: saved-key indicator, Save closes after success, Check tests the current draft, Close/Escape confirm unsaved changes.",
   "- Public automatic update feed remains disabled; install updates manually.",
-  "- Proxy behavior follows OpenCode: configure HTTP_PROXY/HTTPS_PROXY/NO_PROXY explicitly. Desktop/CLI no longer import OS proxy settings at startup; Chromium/browser proxy handling remains independent.",
+  "- Desktop applies detected system proxy settings to its backend with a startup fallback; explicit proxy environment and Chromium/browser proxy handling remain supported.",
   "",
   "## Assets",
   "",
