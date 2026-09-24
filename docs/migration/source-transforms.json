@@ -16,8 +16,8 @@
   },
   "packages/loginom-runtime/client/lib/session.mjs": {
     "baseHash": "db89431390466874ef7ea709f5e8c866d1558dd54fc776c9ea1befd3bf286ef3",
-    "hash": "687de9f3d6829f0ba79a9e0f5fcdd43c8b77a69d7f7a36bd1a16cf85304284d6",
-    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events."
+    "hash": "81ab34c12d9211ede9ff19b20ed888c64246093531761b2c45e3bc2c04bcc56b",
+    "reason": "Use explicit bundled resources; managed bridge can receive an in-memory Playwright MCP transport bound to the privately authenticated live context, preserving authentication and download events. Record the browser-download init script already introduced in 75bc5d86e; runtime source is unchanged in this release."
   },
   "packages/loginom-runtime/client/lib/workspace-ui.mjs": {
     "baseHash": "cd5898556ca838c2a00e9b5a5a717c614de72f7962c034d95fcdc26b832a7624",
@@ -268,5 +268,15 @@
     "baseHash": "1182580cc60adeb720d6fbfa002e56699254765d18ae8dbf96f34c1e7cb59fbd",
     "hash": "4f5525f0f62923d5c8798fb9896d72a60fa4921d2426dce8e64075720447b579",
     "reason": "Cover saves behind a retained ambiguous configure and empty refusal action lists. Cover resume admission refusal of an unresumable pending configure."
+  },
+  "packages/loginom-runtime/client/bin/setup.mjs": {
+    "baseHash": "7b306aa69c6a4ccc9caf7a0ce841c15d15fdea0f40e49177563ab0b8d22fb328",
+    "hash": "1a9919446661c57279b7edbe3c6530e64549e19d0b90d1b786f7477a413c9657",
+    "reason": "Update the default MCP endpoint to https://mcp.loginom.ai/mcp for the public Loginom AI service."
+  },
+  "packages/loginom-runtime/client/INSTALL.md": {
+    "baseHash": "7561c163bcf926c95c821838218941596cf1e4f3bdaa453ac3b795bf684f2501",
+    "hash": "f1b25423e441ee420987e916f750a196cbf298eeb636f54c74f5243048fdff36",
+    "reason": "Update the default MCP endpoint to https://mcp.loginom.ai/mcp for the public Loginom AI service."
   }
 }

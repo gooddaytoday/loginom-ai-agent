@@ -1,6 +1,7 @@
 import { onCleanup } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import type { Loginom } from "@loginom-ai-agent/schema/loginom"
+import { Product } from "@loginom-ai-agent/product"
 
 export function loginomError(value: unknown) {
   const code = value instanceof Error ? value.message.match(/LOGINOM_[A-Z_]+/)?.[0] : undefined
@@ -52,8 +53,8 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
   const [state, setState] = createStore({
     view: undefined as Loginom.View | undefined,
     baseline: undefined as Loginom.View | undefined,
-    url: "http://logi-test-plan.bg.local/app/",
-    username: "user",
+    url: Product.connection.url as string,
+    username: Product.connection.username as string,
     apiKey: "",
     password: "",
     passwordMode: "empty" as "preserve" | "replace" | "empty",

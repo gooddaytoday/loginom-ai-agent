@@ -13,8 +13,8 @@ export const Product = Object.freeze({
   documentation: "https://github.com/gooddaytoday/loginom-ai-agent#readme",
   support: "https://github.com/gooddaytoday/loginom-ai-agent/issues",
   artifactName: "loginom-ai-agent-${os}-${arch}.${ext}",
-  knowledgeEndpoint: "https://loginom.duckdns.org/mcp",
-  connection: Object.freeze({ url: "http://logi-test-plan.bg.local/app/", username: "user" }),
+  knowledgeEndpoint: "https://mcp.loginom.ai/mcp",
+  connection: Object.freeze({ url: "https://app.loginom.ai", username: "user" }),
   stores: Object.freeze({ settings: "loginom-ai-agent.settings", updater: "loginom-ai-agent.updater" }),
   config: Object.freeze({
     directory: ".loginom-ai-agent",

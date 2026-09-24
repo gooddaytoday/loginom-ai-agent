@@ -142,11 +142,11 @@ try {
     data = existingData;
   } else {
     const prompts = createInterface({ input: process.stdin, output: process.stdout });
-    const endpoint = await prompts.question('Адрес Dock [https://loginom.duckdns.org/mcp]: ');
+    const endpoint = await prompts.question('Адрес Dock [https://mcp.loginom.ai/mcp]: ');
     const loginom = await prompts.question('Адрес Loginom с ?testable=true: ');
     prompts.close();
     const api_key = await secretPrompt();
-    data = { endpoint: endpoint.trim() || 'https://loginom.duckdns.org/mcp', loginom_url: loginom.trim(), api_key, account: 'loginom-dock', user: 'loginom-dock' };
+    data = { endpoint: endpoint.trim() || 'https://mcp.loginom.ai/mcp', loginom_url: loginom.trim(), api_key, account: 'loginom-dock', user: 'loginom-dock' };
   }
   let storageRoot=values['storage-root'] ?? null;
   if(storageRoot===null && !data.workflow_profile?.storage_directories){

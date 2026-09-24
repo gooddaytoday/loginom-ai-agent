@@ -4,7 +4,7 @@
   "playwrightMcp": "0.0.80",
   "playwright": "1.63.0-alpha-2026-08-31",
   "chromiumRevision": "1243",
-  "endpoint": "https://loginom.duckdns.org/mcp",
+  "endpoint": "https://mcp.loginom.ai/mcp",
   "actionManifestUri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-linux-candidate/manifest.json",
   "actionManifestSha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
   "target": "linux-x64",

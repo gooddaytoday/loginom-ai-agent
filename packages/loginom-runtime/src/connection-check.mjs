@@ -16,6 +16,8 @@ export function browserLoggingArguments(profile) {
 export function loginomAddress(value) {
   const url = new URL(value)
   if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw Error("LOGINOM_URL_INVALID")
+  // The public root redirects to /app/ without preserving the testable query.
+  if (url.origin === "https://app.loginom.ai" && url.pathname === "/") url.pathname = "/app/"
   url.searchParams.set("testable", "true")
   return url.href
 }

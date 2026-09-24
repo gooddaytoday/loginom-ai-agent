@@ -1,5 +1,12 @@
 import { expect, test } from "bun:test"
 import { Product, productChannel, productName, productSlug } from "../src/index"
+import release from "../loginom-release.json"
+
+test("bundled MCP and first-run Loginom defaults use the public service addresses", () => {
+  expect(Product.knowledgeEndpoint).toBe("https://mcp.loginom.ai/mcp")
+  expect(release.endpoint).toBe(Product.knowledgeEndpoint)
+  expect(Product.connection.url).toBe("https://app.loginom.ai")
+})
 
 test("release channels cannot share application storage identity", () => {
   const channels = ["prod", "beta", "dev"] as const

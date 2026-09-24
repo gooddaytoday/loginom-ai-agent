@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { createRoot } from "solid-js"
+import { Product } from "@loginom-ai-agent/product"
 import type { Loginom } from "@loginom-ai-agent/schema/loginom"
 import { createLoginomSettings, watchLoginomApplication } from "../src/components/settings-loginom-state"
 
@@ -54,6 +55,15 @@ function setup(initial: Partial<Loginom.View> = {}) {
 }
 
 describe("Loginom settings", () => {
+  test("initial form uses the product connection defaults", () => {
+    const f = setup()
+    try {
+      expect(f.form.state.url).toBe(Product.connection.url)
+      expect(f.form.state.username).toBe(Product.connection.username)
+    } finally {
+      f.dispose()
+    }
+  })
   test("recovery sends cloneable IDs across the Desktop bridge", async () => {
     const ids = ["11111111-1111-4111-8111-111111111111"]
     const f = setup({ state: "recoverable-error", recoveries: [...ids] })

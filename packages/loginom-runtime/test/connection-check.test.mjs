@@ -2,6 +2,13 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { loginomAddress, loginPage } from "../src/connection-check.mjs"
 
+test("public Loginom root bypasses the redirect that drops testable", () => {
+  assert.equal(loginomAddress("https://app.loginom.ai"), "https://app.loginom.ai/app/?testable=true")
+  assert.equal(loginomAddress("https://app.loginom.ai/?lang=ru"), "https://app.loginom.ai/app/?lang=ru&testable=true")
+  assert.equal(loginomAddress("https://app.loginom.ai/custom/"), "https://app.loginom.ai/custom/?testable=true")
+  assert.equal(loginomAddress("https://private.example/"), "https://private.example/?testable=true")
+})
+
 test("Loginom URL preserves parameters and replaces testable without credentials", () => {
   assert.equal(
     loginomAddress("http://example.test/app/?a=b&testable=false"),
