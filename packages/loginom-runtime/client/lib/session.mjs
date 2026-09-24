@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { executableExists, privateDirectory } from './platform.mjs';
 import {createArtifactStore} from './artifacts.mjs';
+import {browserDownloadScript} from './browser-downloads.mjs';
 
 const require = createRequire(import.meta.url);
 const packagePath = (name) => require.resolve(`${name}/package.json`);
@@ -56,6 +57,8 @@ export async function createSession(config, { headless = false, managed = null }
     '../../plugins/loginom-dock-hermes/plugin.yaml', '../../plugins/loginom-dock-hermes/__init__.py',
     '../../plugins/loginom-dock-hermes/skills/loginom/SKILL.md']);
   const browserConfig = join(directory, 'playwright.json');
+  const downloadScript = join(directory, 'browser-downloads.js');
+  await writeFile(downloadScript, browserDownloadScript(config.loginomUrl), { mode: 0o600 });
   // Let visible Loginom use the actual maximized window. A fixed emulated
   // viewport stays small even when the native window is enlarged. Headless
   // checks retain a deterministic size; live geometry guards still apply.
@@ -65,7 +68,7 @@ export async function createSession(config, { headless = false, managed = null }
   // default settle adds 500 ms even to every read-only internal observation.
   const executorMode = ['executor-preview', 'executor-replay'].includes(config.mode);
   await writeFile(browserConfig, JSON.stringify({
-    browser: { browserName: 'chromium', userDataDir: profile,
+    browser: { browserName: 'chromium', userDataDir: profile, initScript: [downloadScript],
       launchOptions: { executablePath, headless, ...(managed ? { chromiumSandbox: true } : {}), ...(!headless ? { args: ['--start-maximized'] } : {}) }, contextOptions: { viewport: browserViewport } },
     capabilities: ['core', 'vision'], outputDir: artifacts,
     saveSession: false, timeouts: { action: 15000, navigation: 120000, ...(executorMode ? { settle: 0 } : {}) },

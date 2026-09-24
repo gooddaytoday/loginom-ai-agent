@@ -1,6 +1,7 @@
 import { createRequire } from "node:module"
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
+import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 
@@ -97,6 +98,9 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       throw Error("LOGINOM_BROWSER_START_FAILED")
     })
   try {
+    // This authenticated page predates MCP; its capability choice must already
+    // match the executor's download/byte-verification path on the first load.
+    await context.addInitScript({ content: browserDownloadScript(candidate.url) })
     const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate)
     if (!keepOpen) {
       await context.close()

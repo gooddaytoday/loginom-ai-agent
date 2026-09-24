@@ -24,10 +24,10 @@
 
 **Interface:** `browserDownloadScript(loginomUrl)` returns an initialization script string. A configured URL limits it to that exact origin; an omitted URL covers the dedicated legacy Dock context.
 
-- [ ] Write ordinary Node tests executing the returned script in a VM: same origin disables save picker, another origin retains it, absent API is harmless, open picker remains, URL query is absent from code, repeated invocation is harmless.
-- [ ] Write a real-browser regression using `LOGINOM_DOCK_TEST_BROWSER=/absolute/path/to/chrome`. A local HTTP fixture records API availability synchronously, provides a Blob download and file input, and exposes the identity needed by `loginBrowser`. Exercise both `createSession` → MCP-owned browser and `loginBrowser` → MCP `contextGetter`. Check downloaded bytes, actual file input contents, reload/new page, and another origin.
-- [ ] Run regression before implementation and confirm failure at the missing early download policy, not a missing tool/browser.
-- [ ] Implement the script builder, generated private `browser-downloads.js` (`mode: 0o600`) in the session, `browser.initScript: [absolutePath]`, and `context.addInitScript({content: browserDownloadScript(candidate.url)})` before `loginPage`.
+- [x] Write ordinary Node tests executing the returned script in a VM: same origin disables save picker, another origin retains it, absent API is harmless, open picker remains, URL query is absent from code, repeated invocation is harmless.
+- [x] Write a real-browser regression using `LOGINOM_DOCK_TEST_BROWSER=/absolute/path/to/chrome`. A local HTTP fixture records API availability synchronously, provides a Blob download and file input, and exposes the identity needed by `loginBrowser`. Exercise both `createSession` → MCP-owned browser and `loginBrowser` → MCP `contextGetter`. Check downloaded bytes, actual file input contents, reload/new page, and another origin.
+- [x] Run regression before implementation and confirm failure at the missing early download policy, not a missing tool/browser.
+- [x] Implement the script builder, generated private `browser-downloads.js` (`mode: 0o600`) in the session, `browser.initScript: [absolutePath]`, and `context.addInitScript({content: browserDownloadScript(candidate.url)})` before `loginPage`.
 
 ```js
 export function browserDownloadScript(loginomUrl) {
@@ -36,7 +36,7 @@ export function browserDownloadScript(loginomUrl) {
 }
 ```
 
-- [ ] Run new unit/browser tests and artifact download, upload, delivery, verification, runtime pin and connection tests with `/home/kiselev/git/loginom-ai-agent/evals/.bundle/bin/node --test ...` from `packages/loginom-runtime/client`.
+- [x] Run new unit/browser tests and artifact download, upload, delivery, verification, runtime pin and connection tests with `/home/kiselev/git/loginom-ai-agent/evals/.bundle/bin/node --test ...` from `packages/loginom-runtime/client`.
 
 ## Task 2: Live managed acceptance and durable result
 
@@ -44,8 +44,14 @@ export function browserDownloadScript(loginomUrl) {
 
 **Interfaces:** use existing `stageResources`, `supervise`, `inputStore`, `dock_prepare`, `dock_artifact_deliver`, `dock_node_apply`, `dock_node_wait`, `dock_action_run`; credentials are read privately and sent through IPC only.
 
-- [ ] Stage current runtime sources in a new isolated resource directory with the unchanged pinned Node/Chromium. Verify its resource manifest, without rewriting the user's eval bundle/profile.
-- [ ] Through managed-entry, admit the original 23-byte sales CSV under a unique input identity. In both headless/headed, prepare a draft, deliver, check `SUCCEEDED`, expected hash and completed cleanup. Inspect the journal for real download/verification events and absence of the original error.
-- [ ] In the acceptance session, also deliver TSV, import the CSV, execute a text export and check the actual output bytes/hash receipt, then save the package with `package.save_checkpoint`. Close the owned saved package and log out through the existing acceptance cleanup hook.
-- [ ] Run the full Node client suite. Only broaden testing for a new change or unresolved failure.
-- [ ] Record actual checks and limitations in the diagnosis, add the pre-navigation ownership rule to AGENTS, and mark completed checklist items. Review the final diff against the spec before claiming completion.
+- [x] Stage current runtime sources in a new isolated resource directory with the unchanged pinned Node/Chromium. Verify its resource manifest, without rewriting the user's eval bundle/profile.
+- [x] Through managed-entry, admit the original 23-byte sales CSV under a unique input identity. In both headless/headed, prepare a draft, deliver, check `SUCCEEDED`, expected hash and completed cleanup. Inspect the journal for real download/verification events and absence of the original error.
+- [x] In the acceptance session, also deliver TSV, import the CSV, execute a text export and check the actual output bytes/hash receipt, then save the package with `package.save_checkpoint`. Close the owned saved package and log out through the existing acceptance cleanup hook.
+- [x] Run the full Node client suite. Only broaden testing for a new change or unresolved failure.
+- [x] Record actual checks and limitations in the diagnosis, add the pre-navigation ownership rule to AGENTS, and mark completed checklist items. Review the final diff against the spec before claiming completion.
+
+## Completion evidence — 2026-09-24
+
+Spec review approved before implementation. Both real-browser regression paths failed before the fix and passed afterward, including headed coverage. Targeted suite: 88/88. Full client suite: 2329 passed, 4 skipped, 0 failed; opt-in browser tests ran separately in both modes. Host `bun typecheck` passed.
+
+Live managed acceptance returned `passed: true` for headless and headed. Each mode delivered CSV/TSV, imported three rows, exported both formats with exact expected hashes, saved a clean `.lgp`, closed the package and logged out without discarding changes. Source/resource hash equality and the completed download/verification journal phases were checked. See [full report and limitations](../../testing/loginom-ai-agent/artifact-save-picker.md).
