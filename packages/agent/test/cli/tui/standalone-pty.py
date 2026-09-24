@@ -13,6 +13,7 @@ latest_mode = "--latest" in sys.argv
 assert not latest_mode or resume_mode, "--latest requires --resume"
 assert not resume_mode or (prompt_mode and not attachment_mode), "--resume requires --prompt without --attachment"
 assert not attachment_mode or prompt_mode, "--attachment requires --prompt"
+proxy_notice = "--proxy-notice" in sys.argv
 unconfigured = "--unconfigured" in sys.argv
 cancel_setup = "--cancel-setup" in sys.argv
 password_setup = "--password" in sys.argv
@@ -115,6 +116,15 @@ if resume_mode:
  session_id=sessions[0][0]
  phase['call']='call_resume'
  state.update(tool_advertised=False,tool_result=False,finished=False)
+if proxy_notice:
+ gsettings_bin=root/'gsettings-bin'; gsettings_bin.mkdir()
+ script=gsettings_bin/'gsettings'
+ script.write_text('#!/bin/sh\nexit 1\n')
+ script.chmod(0o755)
+ env['PATH']=str(gsettings_bin)+os.pathsep+env.get('PATH','')
+ env['XDG_CURRENT_DESKTOP']='GNOME'
+ for key in ['HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','NO_PROXY','http_proxy','https_proxy','all_proxy','no_proxy','NODE_USE_ENV_PROXY']:
+  env.pop(key, None)
 master,slave=pty.openpty(); fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',35,120,0,0))
 child=subprocess.Popen(command+(['--session','not-a-session'] if invalid_session else [])+([str(workspace)] if attachment_mode else [])+(['--no-headless'] + (['--continue'] if latest_mode else ['--session',session_id]) if resume_mode else ['--headless']) + (['--model','test/test-model','--dangerously-skip-permissions'] + ([] if attachment_mode or resume_mode else ['--prompt',('Say hello without Loginom' if unconfigured else 'Call loginom_probe and report the result')]) if prompt_mode else []),cwd=repo/'packages/agent',env=env,stdin=slave,stdout=slave,stderr=slave,start_new_session=True)
 os.close(slave); output=bytearray(); start=time.monotonic(); sent=0; setup_skipped=False; ready_at=None; setup_step=0; attachment_step=0; attachment_at=None; resumed=False
@@ -188,6 +198,9 @@ if attachment_mode:
  (root/'result.json').write_text(json.dumps(result))
  assert result['attachment_verified'], 'TUI attachment must reach private admission as exact original bytes'
  assert any(p.get('type')=='file' and p.get('url')=='data:text/plain;base64,'+__import__('base64').b64encode(csv).decode() for p in parts), 'TUI history must retain the snapshot'
+if proxy_notice:
+ assert b'SYSTEM_PROXY_NOT_APPLIED' in output, 'Proxy warning must stay inside the TUI screen'
+ result['proxy_notice']=True
 print(json.dumps(result))
 if invalid_session:
  sys.exit(0 if child.returncode==2 and not forced and not result['guard'] and not alive and b'CLI_ARGUMENT_INVALID' in output else 1)

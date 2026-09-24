@@ -125,11 +125,28 @@ function useSystemCertificates() {
 }
 
 function useEnvProxy() {
+  assertProxyUrls()
   try {
     ;(http as NodeHttpWithEnvProxy).setGlobalProxyFromEnv()
   } catch (error) {
+    // Неразбираемый URL роняет sidecar до ready, и главный процесс поднимает его без прокси.
+    if (isProxyConfigError(error)) throw error
     console.warn("failed to load proxy environment", error)
   }
+}
+
+function assertProxyUrls() {
+  for (const key of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]) {
+    const value = process.env[key]
+    if (!value?.trim()) continue
+    if (URL.canParse(value)) continue
+    throw Object.assign(new Error(`Invalid proxy URL: ${value}`), { code: "ERR_INVALID_URL" })
+  }
+}
+
+function isProxyConfigError(error: unknown) {
+  if (!error || typeof error !== "object" || !("code" in error)) return false
+  return error.code === "ERR_PROXY_INVALID_CONFIG" || error.code === "ERR_INVALID_URL"
 }
 
 function parseCommand(value: unknown): SidecarCommand | undefined {

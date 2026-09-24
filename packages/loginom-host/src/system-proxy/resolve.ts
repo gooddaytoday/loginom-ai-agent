@@ -6,7 +6,7 @@ import { appliedResult, explicitProxy, systemProxyDisabled } from "./environment
 import { parseGnomeSettings } from "./gnome"
 import { parseKdeSettings } from "./kde"
 import { parseMacosSettings } from "./macos"
-import { parseChromiumResolution, proxyFromPacScript } from "./pac"
+import { loadPacScript, parseChromiumResolution, proxyFromPacScript } from "./pac"
 import { readSystemProxy, type SystemProxySnapshot } from "./readers"
 import {
   directResult,
@@ -36,6 +36,7 @@ export type ResolveSystemProxyInput = {
   kde?: string
   pacScript?: string
   chromium?: ChromiumResolution[] | ((url: string) => Promise<string>)
+  chromiumTimeoutMs?: number
   urls?: string[]
   probe?: ProxyProbe
   read?: () => Promise<SystemProxySnapshot | undefined>
@@ -78,7 +79,12 @@ async function resolveSystemProxyUnsafe(input: ResolveSystemProxyInput): Promise
   if (loaded.settings?.invalid && !input.chromium) return failedResult("internal")
   const settings = settingsFor(loaded.settings, input)
   if (!settings) return directResult()
-  const pac = input.pacScript ? proxyFromPacScript(input.pacScript) : undefined
+  const downloaded =
+    !input.chromium && !input.pacScript && !settings.http && !settings.https && settings.pacUrl
+      ? await loadPacScript(settings.pacUrl)
+      : undefined
+  const pacScript = input.pacScript || downloaded
+  const pac = pacScript ? proxyFromPacScript(pacScript) : undefined
   if (pac?.http) {
     settings.http = pac.http
     settings.https = pac.http
@@ -88,10 +94,14 @@ async function resolveSystemProxyUnsafe(input: ResolveSystemProxyInput): Promise
 
   const chromium = await chromiumView(input)
   if (chromium.failed) settings.issues.push({ code: "internal" })
+  if (chromium.timedOut && !settings.http && !settings.https) settings.issues.push({ code: "timeout" })
   const directHosts = chromium.directHosts
-  if (chromium.http) {
-    settings.http = chromium.http
-    settings.https = chromium.https || chromium.http
+  if (chromium.merged.length) settings.issues.push({ code: "routes-merged", detail: chromium.merged.join(",") })
+  if (!settings.socks && chromium.socks) settings.socks = chromium.socks
+  if (chromium.http || chromium.https) {
+    if (chromium.http) settings.http = chromium.http
+    if (chromium.https) settings.https = chromium.https
+    else if (chromium.http && !settings.https) settings.https = chromium.http
     settings.mode = "manual"
   }
 
@@ -113,14 +123,17 @@ async function resolveSystemProxyUnsafe(input: ResolveSystemProxyInput): Promise
     const windowsDefault = settings.source === "windows" && settings.automatic && !settings.pacUrl
     if (
       !windowsDefault &&
+      !chromium.resolvedDirect &&
       (settings.automatic || settings.mode === "pac" || settings.pacUrl) &&
       !notices.some((notice) => notice.code === "automatic-unsupported")
     )
       notices.push({ code: "automatic-unsupported" })
-    if (windowsDefault) return directResult()
+    if (windowsDefault && !notices.some((notice) => notice.code === "timeout")) return directResult()
     if (notices.length === 0) return directResult()
+    const blocking = notices.some((notice) => notice.code === "internal" || notice.code === "timeout")
+    if (blocking) notices.splice(0, notices.length, ...notices.filter((notice) => notice.code === "internal" || notice.code === "timeout"))
     return {
-      state: notices.some((notice) => notice.code === "internal") ? "failed" : "direct",
+      state: blocking ? "failed" : "direct",
       summary: { source: settings.source, noProxy: "", skipped: [] },
       notices: dedupe(notices),
     }
@@ -142,7 +155,9 @@ async function resolveSystemProxyUnsafe(input: ResolveSystemProxyInput): Promise
     if (status === "closed" || status === "timeout")
       notices.push({ code: "unreachable", detail: proxyHostPort(settings.http) })
   }
-  const source = chromium.http ? "chromium" : settings.source
+  // Node завершает процесс с ERR_PROXY_INVALID_CONFIG, если URL прокси не разбирается.
+  if (!runtimeAccepts(settings.http) || !runtimeAccepts(settings.https)) return failedResult("internal")
+  const source = chromium.http || chromium.https ? "chromium" : settings.source
   return appliedResult({
     platform,
     environment,
@@ -243,19 +258,26 @@ async function deadline<T>(work: Promise<T>, timeoutMs: number) {
 }
 
 async function chromiumView(input: ResolveSystemProxyInput) {
-  if (!input.chromium) return { directHosts: [] as string[], http: "", https: "", failed: false }
+  const empty = {
+    directHosts: [] as string[],
+    http: "",
+    https: "",
+    socks: "",
+    merged: [] as string[],
+    resolvedDirect: false,
+    failed: false,
+    timedOut: false,
+  }
+  if (!input.chromium) return empty
   try {
-    const rows = Array.isArray(input.chromium)
-      ? input.chromium
-      : await Promise.all(
-          (input.urls ?? MODEL_PROXY_URLS).map(async (url) => ({
-            url,
-            resolution: await (input.chromium as (url: string) => Promise<string>)(url),
-          })),
-        )
+    const rows = Array.isArray(input.chromium) ? input.chromium : await chromiumRows(input)
+    if (!rows) return { ...empty, timedOut: true }
     const directHosts: string[] = []
+    const merged: string[] = []
     let http = ""
     let https = ""
+    let socks = ""
+    let sawProxy = false
     for (const row of rows) {
       const parsed = parseChromiumResolution(row.resolution)
       if (parsed.direct) {
@@ -263,13 +285,55 @@ async function chromiumView(input: ResolveSystemProxyInput) {
         if (host) directHosts.push(host)
         continue
       }
-      if (parsed.http && !http) http = parsed.http
-      if (parsed.http && !https) https = parsed.http
+      if (parsed.http || parsed.socks) sawProxy = true
+      const secure = !row.url.startsWith("http://")
+      const chosen = secure ? https : http
+      if (parsed.http && chosen && chosen !== parsed.http) {
+        const host = hostOf(row.url)
+        if (host) merged.push(host)
+        continue
+      }
+      if (parsed.http && !secure && !http) http = parsed.http
+      if (parsed.http && secure && !https) https = parsed.http
+      if (parsed.socks && !socks) socks = parsed.socks
     }
-    return { directHosts, http, https, failed: false }
+    return {
+      directHosts: sawProxy ? directHosts : [],
+      http,
+      https,
+      socks,
+      merged,
+      resolvedDirect: directHosts.length > 0 && !sawProxy,
+      failed: false,
+      timedOut: false,
+    }
   } catch {
-    return { directHosts: [] as string[], http: "", https: "", failed: true }
+    return {
+      directHosts: [] as string[],
+      http: "",
+      https: "",
+      socks: "",
+      merged: [] as string[],
+      resolvedDirect: false,
+      failed: true,
+      timedOut: false,
+    }
   }
+}
+
+async function chromiumRows(input: ResolveSystemProxyInput) {
+  const resolveProxy = input.chromium as (url: string) => Promise<string>
+  const waited = await deadline(
+    Promise.all(
+      (input.urls ?? MODEL_PROXY_URLS).map(async (url) => ({
+        url,
+        resolution: await resolveProxy(url),
+      })),
+    ),
+    input.chromiumTimeoutMs ?? 3000,
+  )
+  if (waited.ok === false) return undefined
+  return waited.value
 }
 
 async function probeSafe(probe: ProxyProbe, url: string) {
@@ -292,6 +356,13 @@ function safeHostname() {
   } catch {
     return ""
   }
+}
+
+function runtimeAccepts(url: string) {
+  if (!url) return true
+  if (!URL.canParse(url)) return false
+  const parsed = new URL(url)
+  return (parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname !== ""
 }
 
 function hostOf(url: string) {

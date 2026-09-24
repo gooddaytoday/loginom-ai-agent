@@ -11,11 +11,11 @@ export function parseGnomeSettings(input: string): SystemProxySettings {
   }
   const settings = emptySettings("gnome", "gnome")
   const mode = values.get("org.gnome.system.proxy.mode")
-  const same = values.get("org.gnome.system.proxy.use-same-proxy") === true
+  const manual = mode === "manual"
   settings.bypass = gnomeBypass(values.get("org.gnome.system.proxy.ignore-hosts"))
-  const http = gnomeProxy("http", values, settings)
-  const https = same ? http : gnomeProxy("https", values, settings)
-  const socks = gnomeProxy("socks", values, settings)
+  const http = manual ? gnomeProxy("http", values, settings) : ""
+  const https = manual ? gnomeProxy("https", values, settings) || http : ""
+  const socks = manual ? gnomeProxy("socks", values, settings) : ""
   settings.http = http
   settings.https = https
   settings.socks = socks
@@ -23,6 +23,8 @@ export function parseGnomeSettings(input: string): SystemProxySettings {
   if (mode === "auto") {
     settings.mode = "automatic"
     settings.automatic = true
+    const url = values.get("org.gnome.system.proxy.autoconfig-url")
+    if (typeof url === "string" && url.trim()) settings.pacUrl = url.trim()
   }
   if (mode === "manual" && (http || https || socks)) settings.mode = "manual"
   if (mode !== "none" && mode !== "manual" && mode !== "auto" && mode !== undefined) settings.invalid = true
@@ -39,14 +41,28 @@ function gnomeProxy(scheme: string, values: Map<string, unknown>, settings: Syst
     settings.invalid = true
     return ""
   }
-  if (!host && port === 0) return ""
-  const parsed = parseProxyAddress(host.includes("://") ? host : `${host}:${port}`)
+  if (!host || port === 0) return ""
+  const parsed = parseProxyAddress(joinHostPort(host, port))
   if (parsed.kind !== "http") {
     settings.invalid = true
     return ""
   }
   if (parsed.auth) settings.authRequired = true
   return parsed.url
+}
+
+function joinHostPort(host: string, port: number) {
+  const stripped = host.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
+  if (stripped.startsWith("[")) {
+    const end = stripped.indexOf("]")
+    const name = end > 1 ? stripped.slice(1, end) : stripped
+    return `[${name}]:${port}`
+  }
+  const colon = stripped.lastIndexOf(":")
+  const hostPort = colon > 0 && stripped.indexOf(":") === colon && /^\d+$/.test(stripped.slice(colon + 1))
+  const bare = hostPort ? stripped.slice(0, colon) : stripped
+  if (bare.includes(":")) return `[${bare}]:${port}`
+  return `${bare}:${port}`
 }
 
 function gnomeBypass(value: unknown) {

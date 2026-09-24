@@ -942,6 +942,7 @@ export const dict: Record<string, string> = {
   "systemProxy.notice.auth-required": "The system proxy requires a password. Credentials from the operating system are not copied.",
   "systemProxy.notice.automatic-unsupported": "Automatic proxy configuration could not be applied.",
   "systemProxy.notice.environment-socks": "ALL_PROXY uses SOCKS, which this runtime does not apply.",
+  "systemProxy.notice.routes-merged": "Different proxies were found for {{address}}. One proxy is used for all model requests.",
   "settings.general.row.shell.title": "টার্মিনাল শেল",
   "settings.general.row.shell.description": "টার্মিনাল এবং এজেন্ট সরঞ্জাম দ্বারা ব্যবহৃত শেল",
   "settings.general.row.shell.autoDefault": "স্বয়ংক্রিয় (ডিফল্ট)",

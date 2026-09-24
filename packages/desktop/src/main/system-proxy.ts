@@ -2,6 +2,7 @@ import type { SystemProxyStatus } from "@loginom-ai-agent/app/system-proxy"
 import {
   directResult,
   failedResult,
+  probeProxyUrl,
   readSystemProxy,
   resolveSystemProxy,
   type SystemProxyResult,
@@ -12,8 +13,10 @@ export { loopbackNoProxy, sidecarEnvironment } from "./proxy-env"
 
 export function formatSystemProxyLog(result: SystemProxyResult) {
   const target = result.summary.http ?? result.summary.https
-  if (result.state === "applied" && target) return `system proxy: applied ${target}`
-  return `system proxy: ${result.state}`
+  const notices = result.notices.map((notice) => notice.code).join(",")
+  const suffix = notices ? ` ${notices}` : ""
+  if (result.state === "applied" && target) return `system proxy: applied ${target}${suffix}`
+  return `system proxy: ${result.state}${suffix}`
 }
 
 export type SystemProxyDetection = {
@@ -27,6 +30,7 @@ export function startSystemProxyDetection(input: {
   environment?: NodeJS.ProcessEnv
   enabled?: boolean
   deadlineMs?: number
+  timeoutMs?: number
   read?: () => Promise<SystemProxySnapshot | undefined>
 } = {}): SystemProxyDetection {
   const environment = input.environment ?? {}
@@ -38,12 +42,19 @@ export function startSystemProxyDetection(input: {
     release = () => resolve()
   })
   const timer = setTimeout(release, deadlineMs)
+  let capTimer: ReturnType<typeof setTimeout> | undefined
+  const capped = new Promise<SystemProxyResult>((resolve) => {
+    capTimer = setTimeout(() => resolve(failedResult("timeout")), input.timeoutMs ?? 10_000)
+  })
   const skipped = input.enabled === false || disabled(environment)
   const emptySnapshot: SystemProxySnapshot = {}
   const readPromise = skipped
     ? Promise.resolve({ ok: true as const, snapshot: emptySnapshot })
     : loadSnapshot(input, abort.signal, deadlineMs)
-  const result = detect().finally(() => clearTimeout(timer))
+  const result = Promise.race([detect(), capped]).finally(() => {
+    clearTimeout(timer)
+    if (capTimer) clearTimeout(capTimer)
+  })
   return {
     result,
     useChromium(resolveProxy) {
@@ -52,6 +63,7 @@ export function startSystemProxyDetection(input: {
     },
     stop() {
       clearTimeout(timer)
+      if (capTimer) clearTimeout(capTimer)
       abort.abort()
       release()
     },
@@ -66,17 +78,18 @@ export function startSystemProxyDetection(input: {
       if (snapshot === "aborted" || abort.signal.aborted) return directResult()
       if (!snapshot.ok) return failedResult(snapshot.code)
       clearTimeout(timer)
-      return await resolveSystemProxy({
-        platform: input.platform,
-        environment,
-        enabled: input.enabled,
-        deadlineMs,
-        windows: snapshot.snapshot.windows,
-        macos: snapshot.snapshot.macos,
-        gnome: snapshot.snapshot.gnome,
-        kde: snapshot.snapshot.kde,
-        chromium,
-      })
+      return await Promise.race([
+        resolveSystemProxy({
+          platform: input.platform,
+          environment,
+          enabled: input.enabled,
+          deadlineMs,
+          read: async () => snapshot.snapshot,
+          chromium,
+          probe: (url) => probeProxyUrl(url, 1000),
+        }),
+        aborted(abort.signal).then(() => directResult()),
+      ])
     } catch {
       return failedResult("internal")
     }

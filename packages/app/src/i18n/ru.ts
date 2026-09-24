@@ -987,6 +987,7 @@ export const dict = {
   "systemProxy.notice.auth-required": "Системный прокси требует пароль. Учётные данные операционной системы не копируются.",
   "systemProxy.notice.automatic-unsupported": "Автоматическую настройку прокси применить не удалось.",
   "systemProxy.notice.environment-socks": "ALL_PROXY указывает на SOCKS, а этот runtime его не применяет.",
+  "systemProxy.notice.routes-merged": "Для разных адресов найдены разные прокси ({{address}}). Для запросов к моделям используется один.",
   "settings.general.row.shell.title": "Оболочка терминала",
   "settings.general.row.shell.description":
     "Выберите оболочку для терминала. Совместимые оболочки также используются агентом при вызове инструментов.",

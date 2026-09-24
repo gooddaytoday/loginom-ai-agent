@@ -9,6 +9,7 @@ export const systemProxyNoticeCodes = [
   "environment-socks",
   "rules-skipped",
   "approximated",
+  "routes-merged",
 ] as const
 
 export type SystemProxyNoticeCode = (typeof systemProxyNoticeCodes)[number]

@@ -8,7 +8,7 @@ import { getLogger } from "./logging"
 import { getUserShell, loadShellEnv } from "./shell-env"
 import { getStore } from "./store"
 import { DEFAULT_SERVER_URL_KEY } from "./store-keys"
-import { sidecarEnvironment } from "./proxy-env"
+import { sidecarEnvironment, SidecarStartError, withoutProxyEnvironment } from "./proxy-env"
 import { CHANNEL } from "./constants"
 
 export type HealthCheck = { wait: Promise<void> }
@@ -27,6 +27,7 @@ const SIDECAR_STOP_TIMEOUT = 6_000
 type SpawnLocalServerOptions = {
   userDataPath: string
   proxyEnvironment?: Record<string, string>
+  withoutProxy?: boolean
   loginom?: Awaited<ReturnType<typeof desktopLoginom>>
   onStdout?: (message: string) => void
   onStderr?: (message: string) => void
@@ -70,7 +71,7 @@ export async function spawnLocalServer(
   const sidecar = join(dirname(fileURLToPath(import.meta.url)), "sidecar.js")
   const child = utilityProcess.fork(sidecar, [], {
     cwd: process.cwd(),
-    env: createSidecarEnv(options.proxyEnvironment),
+    env: createSidecarEnv(options.proxyEnvironment, options.withoutProxy),
     serviceName: SIDECAR_SERVICE_NAME,
     stdio: "pipe",
   })
@@ -111,7 +112,7 @@ export async function spawnLocalServer(
     const refreshTimeout = () => {
       clearTimeout(timeout)
       timeout = setTimeout(() => {
-        fail(new Error(`Sidecar did not become ready within ${SIDECAR_START_STALL_TIMEOUT}ms: ${sidecar}`))
+        fail(new SidecarStartError("stall", `Sidecar did not become ready within ${SIDECAR_START_STALL_TIMEOUT}ms: ${sidecar}`))
       }, SIDECAR_START_STALL_TIMEOUT)
     }
 
@@ -124,11 +125,13 @@ export async function spawnLocalServer(
         return
       }
       if (message.type === "error") {
-        fail(Object.assign(new Error(message.error.message), { stack: message.error.stack }))
+        const error = new SidecarStartError("error", message.error.message)
+        if (message.error.stack) error.stack = message.error.stack
+        fail(error)
       }
     }
     const onExit = (code: number) => {
-      fail(new Error(`Sidecar exited before ready with code ${code}`))
+      fail(new SidecarStartError("exit", `Sidecar exited before ready with code ${code}`))
     }
     const cleanup = () => {
       clearTimeout(timeout)
@@ -221,8 +224,9 @@ export async function checkHealth(url: string, password?: string | null): Promis
   return false
 }
 
-function createSidecarEnv(proxy?: Record<string, string>): Record<string, string> {
-  return sidecarEnvironment(process.env, proxy)
+function createSidecarEnv(proxy?: Record<string, string>, withoutProxy?: boolean): Record<string, string> {
+  const base = withoutProxy ? withoutProxyEnvironment(process.env) : process.env
+  return sidecarEnvironment(base, withoutProxy ? undefined : proxy)
 }
 
 function serializeError(error: unknown) {

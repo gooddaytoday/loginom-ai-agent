@@ -15,6 +15,7 @@ const toastCodes = new Set([
   "auth-required",
   "automatic-unsupported",
   "environment-socks",
+  "routes-merged",
 ])
 
 export function proxyToastKey(code: string) {

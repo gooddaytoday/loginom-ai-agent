@@ -95,11 +95,10 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     // Configure the existing v1 backend only after the profile and Loginom preflight.
     process.env.LOGINOM_AI_AGENT_DISABLE_AUTOUPDATE = "1"
     process.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH = "1"
-    const { applyCliSystemProxy, publishCliProxyToast } = await import("./standalone-proxy")
-    await applyCliSystemProxy()
+    const { applyCliSystemProxy, systemProxyNoticeLine } = await import("./standalone-proxy")
+    const systemProxy = await applyCliSystemProxy()
     LoginomHost.connect(host.port)
     const { AppRuntime } = await import("../effect/app-runtime")
-    if (mode === "tui") await publishCliProxyToast()
     cleanup.dispose = async () => {
       const { HttpApiApp } = await import("../server/routes/instance/httpapi/server")
       try {
@@ -125,9 +124,13 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
       if (signal?.aborted) throw Error("CLI_CANCELLED")
       await parser.command(RunCommand).parseAsync(filtered)
     } else {
-      const { TuiThreadCommand, setTuiLoginomHost } = await import("./cmd/tui")
+      const { TuiThreadCommand, setTuiLoginomHost, setTuiStartupWarning } = await import("./cmd/tui")
       setTuiLoginomHost(host.port)
-      cleanup.detach = () => setTuiLoginomHost()
+      setTuiStartupWarning(systemProxyNoticeLine(systemProxy))
+      cleanup.detach = () => {
+        setTuiLoginomHost()
+        setTuiStartupWarning()
+      }
       await parser.command(TuiThreadCommand).parseAsync(filtered)
     }
     const final = Schema.decodeUnknownOption(Loginom.View)(await host.request("connection.status", {}))

@@ -9,14 +9,14 @@ export function parseKdeSettings(input: string): SystemProxySettings {
   if (!Number.isInteger(type) || type < 0 || type > 4) return invalidSettings("kde", "kde")
   settings.reversedExceptions = /^(1|true)$/i.test(section.get("ReversedException") ?? "")
   settings.authRequired = /^(1|true)$/i.test(section.get("AuthMode") ?? "") && section.get("AuthMode") !== "0"
-  settings.pacUrl = section.get("Proxy Config Script") ?? ""
+  settings.pacUrl = type === 2 ? (section.get("Proxy Config Script") ?? "") : ""
   settings.bypass = (section.get("NoProxyFor") ?? "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean)
-  const http = kdeProxy(section.get("httpProxy") ?? "")
-  const https = kdeProxy(section.get("httpsProxy") ?? "")
-  const socks = kdeProxy(section.get("socksProxy") ?? "")
+  const http = type === 1 ? kdeProxy(section.get("httpProxy") ?? "") : ""
+  const https = type === 1 ? kdeProxy(section.get("httpsProxy") ?? "") : ""
+  const socks = type === 1 ? kdeProxy(section.get("socksProxy") ?? "") : ""
   if (http === "invalid" || https === "invalid" || socks === "invalid") return invalidSettings("kde", "kde")
   settings.http = http
   settings.https = https
@@ -38,11 +38,21 @@ function kdeProxy(value: string) {
   const raw = value.trim()
   if (!raw) return ""
   const spaced = /^(?:[a-z][a-z0-9+.-]*:\/\/)?(\S+)\s+(\d+)$/i.exec(raw)
-  const address = spaced ? `${spaced[1]}:${spaced[2]}` : raw
+  const address = spaced ? joinHostPort(spaced[1], Number(spaced[2])) : raw.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
   const parsed = parseProxyAddress(address)
   if (parsed.kind === "invalid") return "invalid"
   if (parsed.kind === "empty") return ""
   return parsed.url
+}
+
+function joinHostPort(host: string, port: number) {
+  if (host.startsWith("[")) {
+    const end = host.indexOf("]")
+    const name = end > 1 ? host.slice(1, end) : host
+    return `[${name}]:${port}`
+  }
+  if (host.includes(":")) return `[${host}]:${port}`
+  return `${host}:${port}`
 }
 
 function readProxySection(input: string) {

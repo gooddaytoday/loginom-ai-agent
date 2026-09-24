@@ -479,6 +479,12 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
 
   const args = useArgs()
   onMount(() => {
+    if (args.warning)
+      toast.show({
+        variant: "warning",
+        message: args.warning,
+        duration: 8000,
+      })
     batch(() => {
       if (args.agent) local.agent.set(args.agent)
       if (args.model) {

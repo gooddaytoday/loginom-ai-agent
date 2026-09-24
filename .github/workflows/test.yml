@@ -61,6 +61,10 @@ jobs:
           fi
           ELECTRON_RUN_AS_NODE=1 "$electron_dir/dist/electron" test/loginom/no-proxy-contract.mjs
 
+      - name: Verify resolved proxy environment does not crash Electron Node
+        working-directory: packages/desktop
+        run: bun test/loginom/sidecar-proxy-contract.mjs
+
       - name: Configure git identity
         run: |
           git config --global user.email "bot@opencode.ai"
