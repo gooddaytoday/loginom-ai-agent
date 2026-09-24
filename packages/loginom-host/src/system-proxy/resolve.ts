@@ -150,10 +150,12 @@ async function resolveSystemProxyUnsafe(input: ResolveSystemProxyInput): Promise
   if (translated.approximated.length)
     notices.push({ code: "approximated", detail: translated.approximated.join(",") })
   if (settings.authRequired) notices.push({ code: "auth-required" })
-  if (input.probe && settings.http) {
-    const status = await probeSafe(input.probe, settings.http)
-    if (status === "closed" || status === "timeout")
-      notices.push({ code: "unreachable", detail: proxyHostPort(settings.http) })
+  if (input.probe) {
+    const probe = input.probe
+    const routes = [...new Set([settings.http, settings.https].filter(Boolean))]
+    const statuses = await Promise.all(routes.map((route) => probeSafe(probe, route)))
+    const closed = routes.find((_, index) => statuses[index] === "closed" || statuses[index] === "timeout")
+    if (closed) notices.push({ code: "unreachable", detail: proxyHostPort(closed) })
   }
   // Node завершает процесс с ERR_PROXY_INVALID_CONFIG, если URL прокси не разбирается.
   if (!runtimeAccepts(settings.http) || !runtimeAccepts(settings.https)) return failedResult("internal")

@@ -1,10 +1,22 @@
 import { connect } from "node:net"
 
-import { proxyHostPort } from "./address"
-
 export type ProbeStatus = "http" | "other" | "closed" | "timeout"
 
 export function probeProxyPort(host: string, port: number, timeoutMs = 1000): Promise<ProbeStatus> {
+  return probeSocket(host, port, timeoutMs, true)
+}
+
+export async function probeProxyUrl(url: string, timeoutMs = 1000): Promise<ProbeStatus> {
+  if (!URL.canParse(url)) return "other"
+  const parsed = new URL(url)
+  const secure = parsed.protocol === "https:"
+  const host = parsed.hostname.replace(/^\[|\]$/g, "")
+  const port = Number(parsed.port) || (secure ? 443 : 80)
+  // TLS-прокси ждёт рукопожатие и молчит на открытый CONNECT, поэтому для него проверяем только TCP.
+  return probeSocket(host, port, timeoutMs, !secure)
+}
+
+function probeSocket(host: string, port: number, timeoutMs: number, handshake: boolean): Promise<ProbeStatus> {
   return new Promise((resolve) => {
     let settled = false
     const finish = (status: ProbeStatus) => {
@@ -20,6 +32,7 @@ export function probeProxyPort(host: string, port: number, timeoutMs = 1000): Pr
     socket.once("end", () => finish("other"))
     socket.once("close", () => finish("other"))
     socket.once("connect", () => {
+      if (!handshake) return finish("other")
       socket.write("CONNECT proxy-probe.invalid:443 HTTP/1.1\r\nHost: proxy-probe.invalid:443\r\n\r\n")
     })
     socket.once("data", (chunk) => {
@@ -27,28 +40,4 @@ export function probeProxyPort(host: string, port: number, timeoutMs = 1000): Pr
       finish([200, 403, 407, 502, 503, 504].includes(code) ? "http" : "other")
     })
   })
-}
-
-export async function probeProxyUrl(url: string, timeoutMs = 1000): Promise<ProbeStatus> {
-  const shown = proxyHostPort(url)
-  if (!shown) return "other"
-  const parsed = split(shown)
-  if (!parsed) return "other"
-  return probeProxyPort(parsed.host, parsed.port, timeoutMs)
-}
-
-function split(value: string) {
-  if (value.startsWith("[")) {
-    const end = value.indexOf("]")
-    if (end < 0) return undefined
-    const host = value.slice(1, end)
-    const port = Number(value.slice(end + 2))
-    if (!Number.isInteger(port)) return undefined
-    return { host, port }
-  }
-  const index = value.lastIndexOf(":")
-  if (index < 0) return { host: value, port: 80 }
-  const port = Number(value.slice(index + 1))
-  if (!Number.isInteger(port)) return undefined
-  return { host: value.slice(0, index), port }
 }
