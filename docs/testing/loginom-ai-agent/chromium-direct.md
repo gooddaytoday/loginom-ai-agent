@@ -77,5 +77,19 @@ dconf-сессии восстановлены с read-back. Backend: 52 host-т�
 Node HTTP/fetch/HTTPS CONNECT — PASS.
 `bun typecheck` в `loginom-host` и `desktop` — PASS; адреса/диагностика/скрипт
 download проверены закреплённым Node в трёх дополнительных test-файлах.
-Native GitHub-матрица Windows/macOS/Linux: выполнение продолжается.
+Native GitHub-матрица на коммите `275f1d0cae74a713b5d2765d2214e01217028e67`:
+
+| Платформа | Результат | Свидетельство |
+| --- | --- | --- |
+| Ubuntu 24.04 x64 | 11/11 PASS | [CI job](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/36144018333/job/108100654225) |
+| Windows Server 2022 x64 | 11/11 PASS | [CI job](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/36144018333/job/108100654078) |
+| macOS 14 arm64 | 11/11 PASS | [CI job](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/36144018333/job/108100654415) |
+
+На всех трёх ОС включалась проверка публичного HTTPS Loginom. Native-настройки
+восстановлены с read-back; проверялись реальные Chromium и Node из Product pin.
+[Общий typecheck](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/36144018412)
+и [Desktop CI](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/36144018333/job/108100654152)
+— PASS. Общие unit и app e2e jobs этого workflow на момент фиксации отчёта ещё
+выполнялись; их завершение этот отчёт не утверждает.
+
 Это приёмка исходников на закреплённых ресурсах, а не установленного нового релиза.
