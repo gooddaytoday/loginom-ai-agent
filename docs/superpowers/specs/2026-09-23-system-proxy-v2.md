@@ -7,6 +7,15 @@
 
 ## Что уходит через прокси
 
+Уточнение 2026-09-25: браузер Chromium для Loginom всегда запускается с
+`--no-proxy-server`: Desktop, CLI, проверка подключения, вход и браузер Playwright
+MCP, с окном и headless. Это отключает системные прокси/PAC и proxy-переменные
+именно для браузерного трафика, для любого адреса. Ошибка прямого подключения
+не разрешает повтор через прокси. Флаг не передаётся Electron: его
+`session.resolveProxy` по-прежнему нужен для настройки backend. Окружение
+runtime и сетевое поведение серверного MCP не меняются. Подробности и границы:
+[приёмка Chromium без прокси](../../testing/loginom-ai-agent/chromium-direct.md).
+
 Запросы к моделям и OAuth (в том числе `auth.openai.com`, device flow, refresh,
 ChatGPT, Anthropic, Google, OpenRouter, GitHub). Окружение с прокси получает
 только backend: sidecar Desktop или процесс CLI после запуска хоста Loginom.

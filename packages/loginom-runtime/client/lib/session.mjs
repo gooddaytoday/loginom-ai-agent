@@ -69,7 +69,8 @@ export async function createSession(config, { headless = false, managed = null }
   const executorMode = ['executor-preview', 'executor-replay'].includes(config.mode);
   await writeFile(browserConfig, JSON.stringify({
     browser: { browserName: 'chromium', userDataDir: profile, initScript: [downloadScript],
-      launchOptions: { executablePath, headless, ...(managed ? { chromiumSandbox: true } : {}), ...(!headless ? { args: ['--start-maximized'] } : {}) }, contextOptions: { viewport: browserViewport } },
+      launchOptions: { executablePath, headless, ...(managed ? { chromiumSandbox: true } : {}),
+        args: ['--no-proxy-server', ...(!headless ? ['--start-maximized'] : [])] }, contextOptions: { viewport: browserViewport } },
     capabilities: ['core', 'vision'], outputDir: artifacts,
     saveSession: false, timeouts: { action: 15000, navigation: 120000, ...(executorMode ? { settle: 0 } : {}) },
   }), { mode: 0o600 });
