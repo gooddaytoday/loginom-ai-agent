@@ -37,6 +37,7 @@ test('Loginom Chromium connects directly with a configured proxy', {
   assert.ok(address, 'A non-loopback interface is required: localhost would falsely pass via implicit proxy bypass');
   const directory = await mkdtemp(join(tmpdir(), 'direct-browser-'));
   const requests = [];
+  const connectivityProbes = [];
   const pacReads = [];
   const sockets = new Set();
   const origin = createServer((request, response) => {
@@ -48,7 +49,20 @@ test('Loginom Chromium connects directly with a configured proxy', {
     }
     response.setHeader('Content-Type', 'text/html'); response.end(html);
   });
-  const proxy = createServer((request, response) => { requests.push(request.url); response.end('PROXY'); });
+  const proxy = createServer((request, response) => {
+    // WinINET changes trigger OS connectivity probes independently of Chromium.
+    // Ignore only these observed NCSI GETs, never arbitrary background traffic:
+    // https://techcommunity.microsoft.com/blog/networkingblog/ncsi-change-notification/3866600
+    if (process.platform === 'win32' && request.method === 'GET' && [
+      'http://www.msftconnecttest.com/connecttest.txt',
+      'http://ipv6.msftconnecttest.com/connecttest.txt',
+    ].includes(request.url)) {
+      connectivityProbes.push(request.url);
+      response.end('Microsoft Connect Test');
+      return;
+    }
+    requests.push(request.url); response.end('PROXY');
+  });
   const state = {};
   t.after(async () => {
     try { await state.native?.restore(); }
@@ -117,4 +131,5 @@ test('Loginom Chromium connects directly with a configured proxy', {
       });
     }
   }
+  if (connectivityProbes.length) t.diagnostic(`Separate Windows NCSI probes: ${connectivityProbes.length}`);
 });

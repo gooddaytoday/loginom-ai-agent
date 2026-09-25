@@ -52,6 +52,11 @@ LOGINOM_DOCK_TEST_BROWSER=/absolute/path/to/pinned/chromium \
   и получают сообщение через настоящий WebSocket. Счётчики прокси/PAC после
   контроля не растут. Сервер привязан к non-loopback адресу: localhost скрывает ошибку
   за встроенным bypass Chromium.
+- Windows при смене WinINET proxy самостоятельно отправляет NCSI GET на
+  `http://www.msftconnecttest.com/connecttest.txt` и IPv6-вариант. Только эти два
+  точных служебных URL учитываются отдельно, с количеством в журнале;
+  любой другой запрос к прокси остаётся ошибкой.
+  [Описание NCSI Microsoft](https://techcommunity.microsoft.com/blog/networkingblog/ncsi-change-notification/3866600).
 - Командная строка читается через CDP со страницы `chrome://version`: закреплённый
   Playwright не добавляет `--enable-automation`, поэтому `Browser.getBrowserCommandLine`
   недоступен. Проверяются DIRECT, отсутствие конфликтующих proxy-флагов и сохранение sandbox.
@@ -68,7 +73,8 @@ TDD: оба запуска отдельно падали на отсутстви
 Локальная Linux-приёмка: 11/11 тестов, включая все восемь сочетаний proxy/mode,
 upload/download и HTTPS Loginom с активным системным прокси. Настройки изолированной
 dconf-сессии восстановлены с read-back. Backend: 52 host-теста, 50 Desktop-тестов,
-4 standalone CLI proxy-теста и реальные Node HTTP/fetch/HTTPS CONNECT — PASS.
+4 standalone CLI proxy-теста, 2 теста WebSocket transport/proxy errors и реальные
+Node HTTP/fetch/HTTPS CONNECT — PASS.
 `bun typecheck` в `loginom-host` и `desktop` — PASS; адреса/диагностика/скрипт
 download проверены закреплённым Node в трёх дополнительных test-файлах.
 Native GitHub-матрица Windows/macOS/Linux: выполнение продолжается.
