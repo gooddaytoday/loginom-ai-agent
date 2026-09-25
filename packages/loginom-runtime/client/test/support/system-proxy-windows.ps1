@@ -74,12 +74,25 @@ foreach ($item in (Import-Clixml -Path $Snapshot)) {
   $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($item.Path)
   try {
     if ($item.Present) {
-      $key.SetValue($item.Name, $item.Value, [Microsoft.Win32.RegistryValueKind] $item.Kind)
+      # Export-Clixml unwraps some registry arrays into Object[]; SetValue
+      # requires their exact native type, notably byte[] for connection flags.
+      $value = switch ($item.Kind) {
+        'Binary' { ,([byte[]] $item.Value) }
+        'None' { ,([byte[]] $item.Value) }
+        'DWord' { [int] $item.Value }
+        'QWord' { [long] $item.Value }
+        'MultiString' { ,([string[]] $item.Value) }
+        default { [string] $item.Value }
+      }
+      $key.SetValue($item.Name, $value, [Microsoft.Win32.RegistryValueKind] $item.Kind)
     } else {
       $key.DeleteValue($item.Name, $false)
     }
     if ($item.Present -ne ($key.GetValueNames() -contains $item.Name)) { throw 'Proxy restore failed' }
-    if ($item.Present -and (Compare-Object @($item.Value) @($key.GetValue($item.Name)))) { throw 'Proxy restore mismatch' }
+    if ($item.Present -and ($key.GetValueKind($item.Name).ToString() -ne $item.Kind -or
+        (ConvertTo-Json -InputObject $value -Compress) -ne (ConvertTo-Json -InputObject $key.GetValue($item.Name) -Compress))) {
+      throw 'Proxy restore mismatch'
+    }
   } finally { $key.Dispose() }
 }
 [LoginomProxyFixture]::Refresh()

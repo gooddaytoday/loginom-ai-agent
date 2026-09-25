@@ -112,7 +112,7 @@ test('Loginom Chromium connects directly with a configured proxy', {
         const pacBefore = pacReads.length;
         await run('managed');
         await run('mcp');
-        assert.equal(requests.length, before, 'Product navigation must never reach the proxy');
+        assert.deepEqual(requests.slice(before), [], 'Product navigation must never reach the proxy');
         assert.equal(pacReads.length, pacBefore, 'Product browsers must not load a PAC');
       });
     }
