@@ -40,8 +40,8 @@ test('viewport rebinding ignores only node DOM epochs and preserves graph root a
 });
 const view=()=>({x:324,y:100,width:1178,height:756,viewportWidth:1508,viewportHeight:862,scale:1,translate:{x:0,y:0},scroll:{x:0,y:0}});
 test('model coordinates account for zoom, translation, scroll and grid before screen rounding',()=>{
- for(const scale of [1,.8264462809917354,1.5]){
-  const v={...view(),scale,translate:{x:32,y:-16},scroll:{x:40,y:24}};
+ for(const scale of [.5,1,.8264462809917354,1.5,2]){
+  const v={...view(),x:324.125,y:100.375,scale,translate:{x:32.25,y:-16.125},scroll:{x:40.375,y:24.125}};
   const point=nodePlacementPoint(v,{x:1300,y:100});
   assert.deepEqual(nodePlacementPosition(v,point),{x:1304,y:104});
   assert.deepEqual(nodePlacementPosition(v,{x:Math.round(point.x),y:Math.round(point.y)}),{x:1304,y:104});

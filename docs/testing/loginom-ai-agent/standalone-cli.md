@@ -567,3 +567,9 @@ Binary не запускался на macOS; полная поставка ре�
 Active-import driver также принимает SIGINT. Для этого случая требуется code4
 при сохранённой неопределённости, guard=false, recovery JSON и recoverable-error
 в новом status. Code130 применяется к обычной отмене без pending recovery.
+
+
+## Приёмка исправления масштаба (2026-09-24)
+
+Обязательная матрица и текущие исходные доказательства: [browser-scale](browser-scale.md).
+Исторические результаты этого runbook не подтверждают исправленный payload.

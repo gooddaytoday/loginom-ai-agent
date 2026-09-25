@@ -342,3 +342,21 @@ headed TUI `--session`, затем headless `run --continue`; два новых 
 exit=0, guard=false, окна закрыты. Evidence `/tmp/loginom-live-resume-jAOvyh`;
 подробности в `docs/testing/loginom-ai-agent/reports/2026-09-17-cli-live-resume/report.md`.
 Это частичное покрытие resume matrix со scripted provider; общие release gates открыты.
+
+
+## Browser scale — checkpoint 2026-09-24
+
+В рабочем дереве реализованы общая политика headed DPR=1 и допуски CSS-геометрии
+с диагностикой. [План](../superpowers/plans/2026-09-24-browser-scale.md),
+[проверки и открытые gates](../testing/loginom-ai-agent/browser-scale.md).
+Исходные тесты и Linux Chromium отделены от ещё не выполненной приёмки новых
+установленных Desktop/CLI на Windows, Linux и macOS. Release pins не обновлялись
+на основании временного диагностического payload.
+
+Проверено: client 2339 PASS/0 FAIL/9 SKIP; runtime 28 PASS; Python journal
+verifier 14 PASS; реальные Chromium fixtures 7 PASS и headed GDK_SCALE=2
+managed/MCP 2 PASS. Изолированный текущий runtime на нативном X11 прошёл CSV
+55/101, сохранение, подтверждённое закрытие и независимое холодное чтение обоих
+пакетов. DPR=1, viewport1920×966. Устаревший oracle потребовал временного удаления
+запрещённого `budgets`; автоматический resume в диагностической копии отключён.
+Подробности и хеши — в browser-scale отчёте. Официальные установщики не пересобраны.

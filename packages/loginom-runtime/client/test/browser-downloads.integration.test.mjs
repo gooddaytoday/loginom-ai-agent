@@ -77,6 +77,9 @@ for (const owner of ['mcp', 'managed']) {
         ${owner === 'mcp' ? `await page.goto(${JSON.stringify(url)});` : ''}
         return await page.evaluate(() => window.initialPicker);
       }`), 'undefined');
+      const geometry=await code('async page => ({viewport:page.viewportSize(),dpr:await page.evaluate(()=>devicePixelRatio)})');
+      assert.equal(geometry.dpr,1,'agent browser normalizes OS scale at default page zoom');
+      assert.deepEqual(geometry.viewport,headless?{width:1280,height:800}:null);
       const downloaded = await code(`async page => {
         const event = page.waitForEvent('download', {timeout:5000});
         await page.locator('#save').click();

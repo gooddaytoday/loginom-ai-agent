@@ -113,7 +113,7 @@ class Page {
     }
     this.context = vm.createContext({ document: this.document, location: this.location, bg: { app: this.app },
       MutationObserver: MutationObserverFixture,
-      getComputedStyle: element => ({ display: 'block', visibility: 'visible', opacity: '1', ...element.style }), Date: clock, Math });
+      getComputedStyle: element => ({ display: 'block', visibility: 'visible', opacity: '1', transform:'none', zoom:'1', scale:'none', rotate:'none', borderLeftWidth:'0px', ...element.style }), Date: clock, Math });
     this.keyboard = { type: async text => {
       this.events.push('keyboard_type'); const element = this.document.activeElement;
       element.value = this.selectedAll ? text : element.value + text; this.selectedAll = false;
@@ -3860,6 +3860,7 @@ test('native Table coverage survives actual pager and independent journal compar
  const {page}=smallTableCoverageFixture(),raw=await page.execute({mode:'observe'});
  const delivered=createObservationPages().retain(clone(raw)),{spawnSync}=await import('node:child_process');
  assert.deepEqual(delivered.output.table_coverage,raw.output.table_coverage);
+ assert.deepEqual(delivered.output.geometry,raw.output.geometry);
  const script="import sys,json,copy;from rename_effect import journal_equal;r,d=json.load(sys.stdin);d['output'].pop('operation',None);assert journal_equal(r,d);d['output']['table_coverage']['rendered_rows']['count']=7;assert not journal_equal(r,d)";
  const check=spawnSync('python3',['-B','-c',script],{cwd:new URL('../../tools/loginom-acceptance/',import.meta.url),input:JSON.stringify([raw,delivered]),encoding:'utf8'});
  assert.equal(check.status,0,check.stderr);
@@ -4993,5 +4994,116 @@ test('completed graph node exposes only deactivation from rendered native mode a
  if(drift){f.button.attrs['data-qtip']='Выполнить узел (F9)';f.button.children[0].attrs.class='bg-icon-run_current';}
  const result=await f.execute({mode:'act',action:{verb:'deactivate_graph_node',ref:e.ref},snapshot:r.output});
  assert.equal(result.status==='SUCCEEDED',!drift);assert.equal(f.page.events.filter(e=>e==='click').length,drift?0:1);
+ }
+});
+
+// Independent float32 measurements reproduce Chromium's fractional device scale.
+function fractionalRows(container, rows, scale) {
+  const start=container.box.y, height=27/scale;
+  for(const [index,row] of rows.entries()) {
+    const before={...row.box};
+    for(const element of [row,...row.descendants()])element.box={...element.box,
+      y:Math.fround(start+index*height+(element.box.y-before.y)*height/before.height),
+      height:Math.fround(element.box.height*height/before.height)};
+  }
+  container.box={...container.box,height:Math.fround(rows.length*height)};
+}
+
+test('fractional geometry keeps ordinary and addressed output definitions complete',async()=>{
+  for(const family of ['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard'])for(const scale of [1,1.25,1.5,1.75,2]) {
+    const page=new Page(),c=mappingCoverageFixture(page,6);
+    for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(c.base))e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard',family);
+    fractionalRows(c.container,c.rows,scale);
+    const read=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+    assert.equal(read.output.wizard.output_columns.definition_coverage.status,'complete_configured_rows',family+':'+scale);
+    assert.equal(read.output.wizard.output_columns.page.status,'complete_definition_page',family+':'+scale);
+  }
+});
+
+test('fractional geometry accepts only bounded edge error and retains refusal diagnostics',async()=>{
+  for(const extra of [0,0.000025,1/128,1/64,1/64+0.00001,0.25,0.5,1,NaN,Infinity]) {
+    const page=new Page(),c=mappingCoverageFixture(page);
+    c.rows[0].box={...c.rows[0].box,width:500+extra};
+    const observed=await page.observe();
+    assert.equal(observed.wizard.output_columns.definition_coverage.status,
+      Number.isFinite(extra)&&extra<=1/64?'complete_configured_rows':'partial',String(extra));
+    if(Number.isFinite(extra)&&extra>1/64){
+      assert.equal(observed.geometry.failure.condition,'right_containment');
+      assert.equal(observed.geometry.failure.tolerance,1/64);
+      assert.ok(observed.geometry.failure.delta>1/64);
+    }
+  }
+});
+
+test('fractional geometry preserves calculator definitions and buffered native identities',async()=>{
+  for(const scale of [1,1.25,1.5,1.75,2]) {
+    const f=calculatorManifestFixture(3);
+    fractionalRows(f.container,f.records.map(r=>r.row),scale);
+    assert.equal((await f.page.observe()).wizard.calculator_expressions.definition_coverage.status,'complete_configured_rows',String(scale));
+    const b=bufferedMappingFixture();
+    fractionalRows(b.c.container,b.c.rows,scale);
+    const r=await b.page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+    assert.equal(r.output.wizard.output_columns.page.status,'complete_definition_page',String(scale));
+    b.c.rows[0].attrs['data-recordid']='foreign';
+    assert.equal((await b.page.execute({mode:'observe',output_column_page:{offset:0,limit:8}})).output.wizard.output_columns.page.status,'unverified_definition_page');
+  }
+});
+
+test('fractional geometry tolerates SVG measurement noise but rejects real transforms',async()=>{
+  for(const noise of [0,4.47034836e-8,1e-7,1.01e-7,0.01]) {
+    const f=await inputMappingLiveFixture();
+    for(const p of f.pathNodes){const m=p.getScreenCTM();p.getScreenCTM=()=>({...m,a:1+noise,d:1+noise,e:m.e+1/128,f:m.f+1/128});}
+    const r=await f.page.observe();
+    assert.equal(r.wizard.input_mapping.status,noise<=1e-7?'rendered_mapping_links':'unobserved',String(noise));
+    if(noise<=1e-7)assert.equal(r.geometry.failure,undefined,'matching another candidate is not a geometry failure');
+  }
+});
+
+test('fractional geometry validates rounded gutter widths without admitting clipped content',async()=>{
+  for(const mode of ['valid','clip_quarter','clip_half','transform','zoom','border','unmeasured']) {
+    const page=new Page(),c=importCoverageFixture(page,5);
+    for(const e of [c.grid,c.header,c.body]){e.box.width=718.75;e.clientWidth=e.scrollWidth=719;}
+    for(const e of [c.header,c.body]){e.clientWidth=704;e.clientLeft=0;e.offsetWidth=719;}
+    c.body.scrollWidth=704;c.header.scrollLeft=0;c.header.style.overflowY='scroll';
+    if(mode.startsWith('clip'))c.cols[4].header.box={...c.cols[4].header.box,x:100+703.75-135+(mode==='clip_quarter'?0.25:0.5)};
+    if(mode==='transform')c.grid.style.transform='scale(1.01)';
+    if(mode==='zoom')c.grid.style.zoom='1.25';
+    if(mode==='border')c.header.style.borderLeftWidth='0.25px';
+    if(mode==='unmeasured')delete c.header.offsetWidth;
+    assert.equal((await page.observe()).wizard.import_columns.definition_coverage.status,mode==='valid'?'complete_configured_columns':'partial',mode);
+  }
+});
+
+test('fractional import container borders do not hide complete field definitions',async()=>{
+  for(const extra of [1/128,1/64,0.25]) {
+    const page=new Page(),c=importCoverageFixture(page);
+    c.header.box={...c.header.box,width:c.header.box.width+extra};
+    const r=await page.observe();
+    assert.equal(r.wizard.import_columns.definition_coverage.status,extra<=1/64?'complete_configured_columns':'partial');
+  }
+});
+
+
+test('fractional Reform rows retain complete definitions and native record bindings',async()=>{
+ for(const scale of [1,1.25,1.5,1.75,2]){
+  const page=new Page(),c=mappingCoverageFixture(page),old=c.base;
+  c.base=old.replace('ColumnsMappingEngineOutputPortWizard','ReformColumnsWizard');
+  for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(old))e.attrs['data-tid']=e.attrs['data-tid'].replace(old,c.base);
+  page.document.querySelectorAll('[data-tid="'+c.base+'btnAddMappingColumn"]')[0].remove();
+  c.tableMode.remove();c.linksMode.remove();c.auto.remove();c.body.id='bound-grid';
+  const records=c.rows.map((row,i)=>{row.attrs['data-recordid']=String(100+i);return {isModel:true,internalId:100+i,data:{ID:i,Name:'Field'+i,DisplayName:'Field'+i}};});
+  const store={$className:'Ext.data.Store',isLoading:()=>false,getAt:i=>records[i]};
+  page.context.Ext={getCmp:()=>({el:{dom:c.body},getStore:()=>store})};
+  c.container.box.width=600;
+  for(const [i,row] of c.rows.entries()){
+   row.box.width=600;
+   const source=row.children[2];source.attrs['data-tid']=c.base+'colCachingMethod_Field'+i;source.ownText='Отключено';source.children=[];
+   const cell=page.add('td',c.base+'colExcluded_Field'+i,'',{x:600,y:row.box.y,width:100,height:25},row);
+   page.add('img',null,'',cell.box,cell).attrs.class='x-grid-checkcolumn';
+  }
+  fractionalRows(c.container,c.rows,scale);
+  const s=await page.observe();
+  assert.equal(s.wizard.reform_columns.definition_coverage.status,'complete_configured_fields',String(scale));
+  for(const field of s.wizard.reform_columns.fields)assert.ok(s.ui.elements.find(e=>e.ref===field.name_ref)?.allowed_actions.includes('double_click'));
  }
 });

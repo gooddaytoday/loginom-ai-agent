@@ -9,6 +9,12 @@ async function observeGeometry(page, binding) {
     inner_width: innerWidth, inner_height: innerHeight,
     outer_width: outerWidth, outer_height: outerHeight,
     screen_x: screenX, screen_y: screenY,
+    device_pixel_ratio: globalThis.devicePixelRatio ?? null,
+    screen_width: screen.width ?? null, screen_height: screen.height ?? null,
+    visual_viewport: globalThis.visualViewport ? {
+      width: visualViewport.width, height: visualViewport.height, scale: visualViewport.scale,
+      offset_left: visualViewport.offsetLeft, offset_top: visualViewport.offsetTop,
+    } : null,
     available_left: screen.availLeft, available_top: screen.availTop,
     available_width: screen.availWidth, available_height: screen.availHeight,
   }));

@@ -27,7 +27,7 @@ def compact_receipt_equal(record, reply):
         or not re.fullmatch(r'[a-f0-9]{64}',actual.get('observation_revision',''))):return False
     if {k:v for k,v in record.items() if k!='output'}!={k:v for k,v in reply.items() if k!='output'}:return False
     metadata=('origin','authenticated','loginom_build','workflow_ref','active_identity','active_tab_ref','navigation_context','wizard_pending_owner','workflow_navigation','node_context','graph_identity','package_identity',
-              'workarea','verification_required','gesture_applied','scan','dom_epoch', 'observation_root', 'observation_kind', 'file_storage', 'observation_filter', 'wizard', 'table_settings', 'table_coverage', 'process_console')
+              'workarea','verification_required','gesture_applied','scan','dom_epoch', 'observation_root', 'observation_kind', 'file_storage', 'observation_filter', 'wizard', 'table_settings', 'table_coverage', 'process_console', 'geometry')
     if set(source)-set(metadata)-{'nodes','links','ui'}:return False
     expected={k:copy.deepcopy(source[k]) for k in metadata if k in source}
     ui=source.get('ui',{});rows=[]

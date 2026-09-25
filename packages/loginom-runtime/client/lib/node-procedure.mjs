@@ -206,7 +206,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const observationNow = () => started + monotonicNow() - monotonicStarted;
       const deadline = Math.min(operation.deadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
-      let result, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
+      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
       try {
       for (let sample = 0; sample < 80; sample++) {
         signal?.throwIfAborted();
@@ -334,6 +334,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             condition, reason:error.message, outcome:structuredClone(result)});
           throw error;
         }
+        if(result.output.geometry)lastGeometry=structuredClone(result.output.geometry);
         if(readNavigation)result.output.node_navigation_read=true;
         if(boundWizardConfirmation(result.output,wizardConfirmation))result.output.node_wizard_confirmation=structuredClone(wizardConfirmation);
         // These are bounded reads of native UI caches and DOM, guarded by the
@@ -380,6 +381,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       }
       if (!satisfied || confirmations < (confirmIdentity ? 2 : 1) || observationNow() >= deadline) {
         const timedOut=await entry('node_observation_timeout',{step,internal_operation_id:id,condition,
+          ...(lastGeometry?{geometry:lastGeometry}:{}),
           elapsed_ms:observationNow()-started,effect_possible:false});
         if(timedOut?.condition!==condition||timedOut.effect_possible!==false)throw Error('Observation timeout was not durably acknowledged');
         throw new NodeReadinessTimeout(condition);

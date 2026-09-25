@@ -338,6 +338,30 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     for (const element of all) { const tid = element.getAttribute('data-tid'); const list = tids.get(tid) ?? []; list.push(element); tids.set(tid, list); }
     const getTid = element => element?.getAttribute?.('data-tid') ?? null;
     const boxOf = element => { const b = element.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; };
+    // Independent DOM/SVG reads contain float32 noise at fractional DPI. All
+    // bounds here are CSS pixels; integer scroll extents and identities remain exact.
+    const geometryEpsilon=1/64;
+    const geometry={device_pixel_ratio:globalThis.devicePixelRatio??null,
+      viewport:{width:globalThis.innerWidth,height:globalThis.innerHeight},
+      screen:globalThis.screen?{width:screen.width,height:screen.height,x:globalThis.screenX,y:globalThis.screenY}:null,
+      visual_viewport:globalThis.visualViewport?{width:visualViewport.width,height:visualViewport.height,
+        scale:visualViewport.scale,offset_left:visualViewport.offsetLeft,offset_top:visualViewport.offsetTop}:null};
+    const geometryCheck=(actual,expected,condition,element,tolerance=geometryEpsilon,equality=true)=>{
+      const delta=actual-expected;
+      const valid=Number.isFinite(actual)&&Number.isFinite(expected)
+        && (equality?actual>=expected-tolerance&&actual<=expected+tolerance:actual<=expected+tolerance);
+      // Only the first failed geometric predicate, never DOM text or an unbounded list.
+      if(!valid&&!geometry.failure)geometry.failure={condition,
+        actual:Number.isFinite(actual)?actual:null,expected:Number.isFinite(expected)?expected:null,
+        delta:Number.isFinite(delta)?delta:null,tolerance,...(element?{ref:refOf(element)}:{})};
+      return valid;
+    };
+    const geometryInside=(b,p,element)=>[b.x,b.y,b.width,b.height,p.x,p.y,p.width,p.height].every(Number.isFinite)
+      && geometryCheck(p.x,b.x,'left_containment',element,geometryEpsilon,false)
+      && geometryCheck(p.y,b.y,'top_containment',element,geometryEpsilon,false)
+      && geometryCheck(b.x+b.width,p.x+p.width,'right_containment',element,geometryEpsilon,false)
+      && geometryCheck(b.y+b.height,p.y+p.height,'bottom_containment',element,geometryEpsilon,false);
+
     // One evaluate is synchronous: no gesture or event-loop yield occurs in
     // this scan. Reusing native visibility/sensitivity checks within this read
     // avoids repeatedly walking the same ancestors for every definition cell.
@@ -914,8 +938,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           if(!visible(e) || sensitive(e))return false;
           const b=boxOf(e),p=boxOf(parent),vw=globalThis.innerWidth,vh=globalThis.innerHeight;
           return [b.x,b.y,b.width,b.height,p.x,p.y,p.width,p.height,vw,vh].every(Number.isFinite)
-            && vw>0 && vh>0 && b.x>=0 && b.y>=0 && b.x+b.width<=vw && b.y+b.height<=vh
-            && b.x>=p.x && b.y>=p.y && b.x+b.width<=p.x+p.width && b.y+b.height<=p.y+p.height;
+            && vw>0 && vh>0 && geometryInside(b,{x:0,y:0,width:vw,height:vh},e) && geometryInside(b,p,e);
         };
         const dimensions=[body.clientWidth,body.clientHeight,body.scrollWidth,body.scrollHeight,body.scrollLeft,body.scrollTop];
         const fields=wizard.output_columns.fields;
@@ -931,7 +954,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const direct=[...container.children];charge();
           const bodyChildren=[...body.children];charge();
           const boundId=body.getAttribute('id');
-          const valid=boundId && inside(container,body) && cb.y===bb.y && cb.x===bb.x
+          const valid=boundId && inside(container,body) && geometryCheck(cb.y,bb.y,'container_top',container) && geometryCheck(cb.x,bb.x,'container_left',container)
             && direct.length===rows.length && direct.every(e=>rows.includes(e))
             && bodyChildren.every(e=>e===container || !visible(e))
             && rows.every((row,index)=>{
@@ -940,14 +963,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               const nameCells=all.filter(e=>{charge();return row.contains(e) && (getTid(e)??'').startsWith(base+'colName_');});
               if(row.parentElement!==container || row.getAttribute('data-recordindex')!==String(index)
                 || row.getAttribute('data-boundview')!==boundId || !inside(row,container)
-                || rb.y!==(previous?previous.y+previous.height:cb.y) || matches.length!==1 || matches[0].status!=='observed'
+                || !geometryCheck(rb.y,previous?previous.y+previous.height:cb.y,'row_continuity',row) || matches.length!==1 || matches[0].status!=='observed'
                 || nameCells.length!==1)return false;
               const key=getTid(nameCells[0]).slice((base+'colName_').length);
               return ['colName_','colDisplayName_',...(roleGrid?[]:['colSourceDisplayName_']),'colDataKind_',wizard.stage==='input_mapping'?'colUsageType_':'colDefaultUsageType_'].every(prefix=>{
                 const es=tids.get(base+prefix+key)??[];
                 return es.length===1 && row.contains(es[0]) && inside(es[0],row);
               });
-            }) && boxOf(rows.at(-1)).y+boxOf(rows.at(-1)).height===cb.y+cb.height;
+            }) && geometryCheck(boxOf(rows.at(-1)).y+boxOf(rows.at(-1)).height,cb.y+cb.height,'rows_end',rows.at(-1));
           if(valid)coverage={status:'complete_configured_rows',count:rows.length,body_ref:refOf(body),container_ref:refOf(container),
             first_row_ref:refOf(rows[0]),last_row_ref:refOf(rows.at(-1)),filter_ref:refOf(inputs[0]),table_mode_ref:refOf(tableMode),source_identity_verified:false};
         }
@@ -963,12 +986,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const nativeInside=(e,parent)=>{
           if(!visible(e)||sensitive(e))return false;
           const b=boxOf(e),p=boxOf(parent);
-          // A grouped Ext table can exceed its container by half a layout
-          // unit (observed 1/128 CSS px). Never allow a whole clipped pixel.
-          const epsilon=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard'].includes(forms[0])?1/64:0;
-          return [b.x,b.y,b.width,b.height,p.x,p.y,p.width,p.height].every(Number.isFinite)
-            && b.width>0 && b.height>0 && b.x>=p.x-epsilon && b.y>=p.y-epsilon
-            && b.x+b.width<=p.x+p.width+epsilon && b.y+b.height<=p.y+p.height+epsilon;
+          return b.width>0 && b.height>0 && geometryInside(b,p,e);
         };
         const container=containers[0],boundId=body?.getAttribute('id');
         const noEditors=!all.some(e=>{charge();return ((getTid(e)??'').startsWith(base+'grdTargetColumns;tbl;celleditor')
@@ -992,12 +1010,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               const names=all.filter(e=>{charge();return row.contains(e)&&(getTid(e)??'').startsWith(base+'colName_');});
               if(row.parentElement!==container || row.getAttribute('data-recordindex')!==String(index)
                 || row.getAttribute('data-boundview')!==boundId || !nativeInside(row,container)
-                || rb.y!==(previous?previous.y+previous.height:cb.y) || matches.length!==1 || matches[0].status!=='observed' || names.length!==1)return false;
+                || !geometryCheck(rb.y,previous?previous.y+previous.height:cb.y,'row_continuity',row) || matches.length!==1 || matches[0].status!=='observed' || names.length!==1)return false;
               const key=getTid(names[0]).slice((base+'colName_').length);
               return ['colName_','colDisplayName_',...(roleGrid?[]:['colSourceDisplayName_']),'colDataKind_',wizard.stage==='input_mapping'?'colUsageType_':'colDefaultUsageType_'].every(prefix=>{
                 const es=tids.get(base+prefix+key)??[];return es.length===1 && row.contains(es[0]) && nativeInside(es[0],row);
               });
-            }) && boxOf(rows.at(-1)).y+boxOf(rows.at(-1)).height===cb.y+cb.height;
+            }) && geometryCheck(boxOf(rows.at(-1)).y+boxOf(rows.at(-1)).height,cb.y+cb.height,'rows_end',rows.at(-1));
         }
         // Ext buffers rendered rows even though this definition store is local
         // and complete. Bind each rendered row to its cached UI record; never
@@ -1046,7 +1064,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
                 });
                 return completeCells && row.parentElement===container && row.getAttribute('data-boundview')===boundId
                   && row.getAttribute('data-recordindex')===String(index) && row.getAttribute('data-recordid')===String(r.internalId)
-                  && nativeInside(row,container) && (!previous || b.y===previous.y+previous.height)
+                  && nativeInside(row,container) && (!previous || geometryCheck(b.y,previous.y+previous.height,'row_continuity',row))
                   && f.status==='observed' && f.row_ref===refOf(row) && f.name===r.data.Name && f.label===r.data.DisplayName;
               });
             if(valid)window={first,total:records.length,signature:JSON.stringify({root:wizard.root_ref,
@@ -1087,8 +1105,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           if(!visible(e) || sensitive(e))return false;
           const b=boxOf(e),p=boxOf(parent),vw=globalThis.innerWidth,vh=globalThis.innerHeight;
           return [b.x,b.y,b.width,b.height,p.x,p.y,p.width,p.height,vw,vh].every(Number.isFinite)
-            && vw>0 && vh>0 && b.x>=0 && b.y>=0 && b.x+b.width<=vw && b.y+b.height<=vh
-            && b.x>=p.x && b.y>=p.y && b.x+b.width<=p.x+p.width && b.y+b.height<=p.y+p.height;
+            && vw>0 && vh>0 && geometryInside(b,{x:0,y:0,width:vw,height:vh},e) && geometryInside(b,p,e);
         };
         const dimensions=[body.clientWidth,body.clientHeight,body.scrollWidth,body.scrollHeight,body.scrollLeft,body.scrollTop];
         const fields=wizard.reform_columns.fields;
@@ -1103,7 +1120,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const direct=[...container.children];charge();
           const bodyChildren=[...body.children];charge();
           const boundId=body.getAttribute('id');
-          const valid=boundId && inside(container,body) && cb.y===bb.y && cb.x===bb.x
+          const valid=boundId && inside(container,body) && geometryCheck(cb.y,bb.y,'container_top',container) && geometryCheck(cb.x,bb.x,'container_left',container)
             && direct.length===rows.length && direct.every(e=>rows.includes(e))
             && bodyChildren.every(e=>e===container || !visible(e))
             && rows.every((row,index)=>{
@@ -1112,14 +1129,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               const nameCells=all.filter(e=>{charge();return row.contains(e) && (getTid(e)??'').startsWith(base+'colName_');});
               if(row.parentElement!==container || row.getAttribute('data-recordindex')!==String(index)
                 || row.getAttribute('data-boundview')!==boundId || !inside(row,container)
-                || rb.y!==(previous?previous.y+previous.height:cb.y) || matches.length!==1 || matches[0].status!=='observed' || typeof matches[0].excluded!=='boolean' || !matches[0].caching || !matches[0].data_kind || !matches[0].usage
+                || !geometryCheck(rb.y,previous?previous.y+previous.height:cb.y,'row_continuity',row) || matches.length!==1 || matches[0].status!=='observed' || typeof matches[0].excluded!=='boolean' || !matches[0].caching || !matches[0].data_kind || !matches[0].usage
                 || nameCells.length!==1)return false;
               const key=getTid(nameCells[0]).slice((base+'colName_').length);
               return ['colName_','colDisplayName_','colDataKind_','colDefaultUsageType_','colCachingMethod_','colExcluded_'].every(prefix=>{
                 const es=tids.get(base+prefix+key)??[];
                 return es.length===1 && row.contains(es[0]) && inside(es[0],row);
               });
-            }) && boxOf(rows.at(-1)).y+boxOf(rows.at(-1)).height===cb.y+cb.height;
+            }) && geometryCheck(boxOf(rows.at(-1)).y+boxOf(rows.at(-1)).height,cb.y+cb.height,'rows_end',rows.at(-1));
           if(valid)coverage={status:'complete_configured_fields',count:rows.length,body_ref:refOf(body),container_ref:refOf(container),
             first_row_ref:refOf(rows[0]),last_row_ref:refOf(rows.at(-1)),filter_ref:refOf(inputs[0]),source_identity_verified:false};
         }
@@ -1175,8 +1192,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const inside=(e,parent)=>{
           const b=boxOf(e),p=boxOf(parent),vw=globalThis.innerWidth,vh=globalThis.innerHeight;
           return visible(e) && !sensitive(e) && [b.x,b.y,b.width,b.height,p.x,p.y,p.width,p.height,vw,vh].every(Number.isFinite)
-            && b.x>=0 && b.y>=0 && b.x+b.width<=vw && b.y+b.height<=vh
-            && b.x>=p.x && b.y>=p.y && b.x+b.width<=p.x+p.width && b.y+b.height<=p.y+p.height;
+            && geometryInside(b,{x:0,y:0,width:vw,height:vh},e) && geometryInside(b,p,e);
         };
         const bounds=[grid.clientWidth,grid.clientHeight,grid.scrollWidth,grid.scrollHeight,grid.scrollLeft,grid.scrollTop];
         const noEditor=!all.some(e=>{charge();return visible(e) && ((getTid(e)??'').startsWith(gridTid+';celleditor')
@@ -1189,7 +1205,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const nativeRows=[...grid.querySelectorAll('table.x-grid-item')];charge();
           const cb=boxOf(container),gb=boxOf(grid),boundId=grid.getAttribute('id');
           let valid=!!boundId && rows.length>0 && rows.length<=8 && rows.length===nativeRows.length
-            && rows.every(e=>nativeRows.includes(e)) && cb.x===gb.x && cb.y===gb.y
+            && rows.every(e=>nativeRows.includes(e)) && geometryCheck(cb.x,gb.x,'container_left',container) && geometryCheck(cb.y,gb.y,'container_top',container)
             && [...grid.children].every(e=>e===container || !visible(e));
           const fields=[],names=new Set(),types={dtInteger:'integer',dtFloat:'real',dtString:'string',dtBoolean:'boolean',dtDateTime:'datetime',dtVariant:'variant'};
           for(const [index,row] of rows.entries()) {
@@ -1199,7 +1215,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             const cells=all.filter(e=>{charge();return row.contains(e) && (getTid(e)??'').startsWith(base+'colExpressionName_');});
             if(!row.matches('table.x-grid-item') || row.parentElement!==container || !inside(row,container)
               || row.getAttribute('data-recordindex')!==String(index) || row.getAttribute('data-boundview')!==boundId
-              || rb.y!==(previous?previous.y+previous.height:cb.y) || dataRows.length!==1
+              || !geometryCheck(rb.y,previous?previous.y+previous.height:cb.y,'row_continuity',row) || dataRows.length!==1
               || !dataRows[0].classList.contains('x-grid-row') || cells.length!==1){valid=false;break;}
             const cell=cells[0],key=getTid(cell).slice((base+'colExpressionName_').length),name=String(cell.textContent??'');
             const labels=tids.get(base+'colExpressionDisplayName_'+key)??[],peers=tids.get(getTid(cell))??[];
@@ -1213,7 +1229,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             fields.push({index,name,label,type:matched[0][1],row_ref:refOf(row),name_ref:refOf(cell),label_ref:refOf(labels[0]),
               selected:row.classList.contains('x-grid-item-selected')});names.add(name);
           }
-          if(valid && fields.length===rows.length && boxOf(rows.at(-1)).y+boxOf(rows.at(-1)).height===cb.y+cb.height)
+          if(valid && fields.length===rows.length && geometryCheck(boxOf(rows.at(-1)).y+boxOf(rows.at(-1)).height,cb.y+cb.height,'rows_end',rows.at(-1)))
             Object.assign(manifest,{status:'rendered_expression_definitions',fields,
               definition_coverage:{status:'complete_configured_rows',count:fields.length,grid_ref:refOf(grid),container_ref:refOf(container),
                 first_row_ref:refOf(rows[0]),last_row_ref:refOf(rows.at(-1)),source_identity_verified:false}});
@@ -1230,11 +1246,10 @@ function readRenderedInputMapping(observation) {
     const require = (ok,reason) => { if(!ok)throw new Error(reason); };
     const cls=(n,c)=>String(n?.classes??'').split(/\s+/).includes(c);
     const finite=r=>r&&['x','y','width','height','right','bottom'].every(k=>Number.isFinite(r[k]))
-      && r.width>0&&r.height>0&&r.right===r.x+r.width&&r.bottom===r.y+r.height;
+      && r.width>0&&r.height>0&&geometryCheck(r.right,r.x+r.width,'rect_right')&&geometryCheck(r.bottom,r.y+r.height,'rect_bottom');
     const shown=n=>n?.visible===true&&finite(n.rect)&&n.style?.visibility==='visible'
       &&n.style.display!=='none'&&Number(n.style.opacity)>0;
-    const inside=(n,p)=>shown(n)&&finite(p.rect)&&n.rect.x>=p.rect.x&&n.rect.y>=p.rect.y
-      &&n.rect.right<=p.rect.right&&n.rect.bottom<=p.rect.bottom;
+    const inside=(n,p)=>shown(n)&&finite(p.rect)&&geometryInside(n.rect,p.rect);
     require(d?.status==='dom_observation'&&/^MF;TF(?:-\d+)?;WizrdMCF$/.test(d.owner?.tid),'owner_unverified');
     require(Number.isFinite(d.viewport?.width)&&Number.isFinite(d.viewport?.height),'viewport_unverified');
     const viewport={rect:{x:0,y:0,width:d.viewport.width,height:d.viewport.height,right:d.viewport.width,bottom:d.viewport.height}};
@@ -1264,12 +1279,12 @@ function readRenderedInputMapping(observation) {
       require(g.tid===base+gridName+';tbl'&&inside(g,d.owner)&&noScroll(g),'grid_bounds_unverified');
       const containers=g.children.filter(n=>cls(n,'x-grid-item-container'));
       require(containers.length===1&&g.children.every(n=>n===containers[0]||!n.visible),'container_not_unique');
-      const c=containers[0];require(inside(c,g)&&noScroll(c)&&c.rect.x===g.rect.x&&c.rect.y===g.rect.y,'container_bounds_unverified');
+      const c=containers[0];require(inside(c,g)&&noScroll(c)&&geometryCheck(c.rect.x,g.rect.x,'container_left')&&geometryCheck(c.rect.y,g.rect.y,'container_top'),'container_bounds_unverified');
       const rows=c.children;require(rows.length>0&&rows.length<=8,'row_bound_exceeded');
       const keys=new Set();
       const fields=rows.map((r,index)=>{
         require(r.tag==='TABLE'&&cls(r,'x-grid-item')&&r.recordindex===String(index)&&r.boundview===g.id
-          &&inside(r,c)&&r.rect.y===(index?rows[index-1].rect.bottom:c.rect.y),'row_structure_unverified');
+          &&inside(r,c)&&geometryCheck(r.rect.y,index?rows[index-1].rect.bottom:c.rect.y,'row_continuity'),'row_structure_unverified');
         require(r.rows.length===1&&cls(r.rows[0],'x-grid-row')&&inside(r.rows[0],r),'data_row_unverified');
         const cells=r.rows[0].cells.filter(n=>n.tid?.startsWith(base+cellName));
         require(cells.length===1&&inside(cells[0],r),'field_cell_unverified');
@@ -1283,7 +1298,7 @@ function readRenderedInputMapping(observation) {
           type_verified:Array.isArray(cell.icons)&&cell.icons.length===1&&inside(cell.icons[0],cell)
             &&cls(cell.icons[0],iconClasses[0]),cell_tid:cell.tid,rect:cell.rect};
       });
-      require(rows.at(-1).rect.bottom===c.rect.bottom,'rows_end_unverified');return {fields,grid:g};
+      require(geometryCheck(rows.at(-1).rect.bottom,c.rect.bottom,'rows_end'),'rows_end_unverified');return {fields,grid:g};
     };
     const source=grid('source'),target=grid('target');
     require(d.draws?.length===1,'draw_not_unique');const draw=d.draws[0];
@@ -1294,12 +1309,12 @@ function readRenderedInputMapping(observation) {
     const linePattern=new RegExp('^M('+number+'),('+number+')L('+number+'),('+number+')L('+number+'),('+number+')L('+number+'),('+number+')$');
     const point=(m,x,y)=>({x:m.a*x+m.c*y+m.e,y:m.b*x+m.d*y+m.f});
     for(const [index,p] of svg.paths.entries()) {
-      const m=p.screenCTM;require(m&&['a','b','c','d','e','f'].every(k=>Number.isFinite(m[k]))&&m.a===1&&m.b===0&&m.c===0&&m.d===1&&m.e===draw.rect.x&&m.f===draw.rect.y,'path_transform_unverified');
+      const m=p.screenCTM;require(m&&['a','b','c','d','e','f'].every(k=>Number.isFinite(m[k]))&&geometryCheck(m.a,1,'svg_scale_x',null,1e-7)&&m.b===0&&m.c===0&&geometryCheck(m.d,1,'svg_scale_y',null,1e-7)&&geometryCheck(m.e,draw.rect.x,'svg_translation_x')&&geometryCheck(m.f,draw.rect.y,'svg_translation_y'),'path_transform_unverified');
       require(p.style.visibility==='visible'&&p.style.display!=='none'&&Number(p.style.opacity)===1,'path_hidden');
       const match=linePattern.exec(p.d);
       if(match&&p.style.stroke==='rgb(247, 147, 30)'&&Number(p.style.strokeOpacity)===1&&Number(p.style.strokeWidth.replace('px',''))===2&&p.style.fill==='rgba(0, 0, 0, 0)') {
         const v=match.slice(1).map(Number);
-        require(v[0]===0&&v[2]===20&&v[4]===80&&v[6]===100&&v[1]===v[3]&&v[5]===v[7]&&draw.rect.width===100,'line_shape_unverified');
+        require(v[0]===0&&v[2]===20&&v[4]===80&&v[6]===100&&v[1]===v[3]&&v[5]===v[7]&&geometryCheck(draw.rect.width,100,'svg_width'),'line_shape_unverified');
         lines.push({index,start:point(m,v[0],v[1]),end:point(m,v[6],v[7]),local:v});
       } else if(p.d.endsWith('Z')&&p.style.fill==='rgb(247, 147, 30)'&&p.style.stroke==='rgb(255, 255, 255)'&&Number(p.style.fillOpacity)===1)arrows.push(p);
       else if(p.d.endsWith('Z')&&p.style.fill==='rgb(255, 255, 255)'&&Number(p.style.fillOpacity)===0.01&&Number(p.style.strokeOpacity)===0.01)hitAreas.push(p);
@@ -1307,14 +1322,17 @@ function readRenderedInputMapping(observation) {
     }
     require(lines.length>0&&lines.length===arrows.length&&lines.length===hitAreas.length,'path_count_unverified');
     const usedSources=new Set(),usedTargets=new Set();
+    // Candidate mismatches are normal during association, not failed guards.
+    const matchesPoint=(point,x,y)=>[point.x,point.y,x,y].every(Number.isFinite)
+      && Math.abs(point.x-x)<=geometryEpsilon && Math.abs(point.y-y)<=geometryEpsilon;
     const links=lines.map(line=>{
-      const src=source.fields.filter(f=>line.start.x===f.rect.right+1&&line.start.y===f.rect.y+f.rect.height/2);
-      const dst=target.fields.filter(f=>line.end.x===f.rect.x-1&&line.end.y===f.rect.y+f.rect.height/2);
+      const src=source.fields.filter(f=>matchesPoint(line.start,f.rect.right+1,f.rect.y+f.rect.height/2));
+      const dst=target.fields.filter(f=>matchesPoint(line.end,f.rect.x-1,f.rect.y+f.rect.height/2));
       require(src.length===1&&dst.length===1,'endpoint_ambiguous');const a=src[0],b=dst[0];
       require(!usedSources.has(a.key)&&!usedTargets.has(b.key),'duplicate_endpoint');usedSources.add(a.key);usedTargets.add(b.key);
       const y=line.local[7];
       const arrow=`M90,${y-6}L90,${y+6}L100,${y}L90,${y-6}Z`;
-      require(arrows.filter(p=>p.d===arrow&&p.screenCTM.e===draw.rect.x&&p.screenCTM.f===draw.rect.y).length===1,'arrow_unverified');
+      require(arrows.filter(p=>p.d===arrow&&geometryCheck(p.screenCTM.e,draw.rect.x,'arrow_translation_x')&&geometryCheck(p.screenCTM.f,draw.rect.y,'arrow_translation_y')).length===1,'arrow_unverified');
       const sy=line.local[1],delta=(y-sy)/40,n=v=>Number(v.toFixed(8));
       const hit=`M0,${sy-5}L${n(20+delta)},${sy-5}L${n(80+delta)},${y-5}L100,${y-5}L100,${y+5}L${n(80-delta)},${y+5}L${n(20-delta)},${sy+5}L0,${sy+5}Z`;
       require(hitAreas.filter(p=>p.d===hit).length===1,'hit_area_unverified');
@@ -1702,8 +1720,8 @@ function readRenderedInputMapping(observation) {
         if(!visible(element) || sensitive(element))return false;
         const b=boxOf(element),c=boxOf(container),vw=globalThis.innerWidth,vh=globalThis.innerHeight;
         return [b.x,b.y,b.width,b.height,c.x,c.y,c.width,c.height,vw,vh].every(Number.isFinite)
-          && vw>0 && vh>0 && b.x>=0 && b.y>=0 && b.x+b.width<=vw && b.y+b.height<=vh
-          && b.x>=c.x && b.y>=c.y && b.x+b.width<=c.x+c.width && b.y+b.height<=c.y+c.height;
+          && vw>0 && vh>0 && geometryInside(b,{x:0,y:0,width:vw,height:vh},element)
+          && geometryInside(b,c,element);
       };
       const noOverflow=e=>Number.isFinite(e.clientWidth) && Number.isFinite(e.scrollWidth)
         && e.clientWidth>0 && e.scrollWidth<=e.clientWidth;
@@ -1720,11 +1738,22 @@ function readRenderedInputMapping(observation) {
         // Its scrollWidth can include that empty gutter even when every field
         // fits. Accept only the measured gutter, with all content inside the
         // actual client area; real horizontal clipping remains partial.
+        const untransformed=ancestorCheck(element=>{
+          const style=getComputedStyle(element);
+          return ['none','matrix(1, 0, 0, 1, 0, 0)','matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)'].includes(style.transform)
+            && ['normal','1'].includes(style.zoom) && ['none','1','1 1','1 1 1'].includes(style.scale)
+            && ['none','0deg'].includes(style.rotate);
+        });
         const clientContainsX=(element,owner)=>{
           const b=boxOf(element),v=boxOf(owner);
-          return owner.clientLeft===0 && owner.offsetWidth===v.width
-            && Number.isFinite(owner.clientWidth) && owner.clientWidth>0
-            && b.x>=v.x && b.x+b.width<=v.x+owner.clientWidth;
+          return untransformed(owner) && getComputedStyle(owner).borderLeftWidth==='0px'
+            && owner.clientLeft===0 && Number.isInteger(owner.offsetWidth) && owner.offsetWidth>0
+            && Number.isInteger(owner.clientWidth) && owner.clientWidth>0
+            && geometryCheck(v.width,owner.offsetWidth,'rounded_offset_width',owner,0.5+geometryEpsilon)
+            && geometryCheck(v.x,b.x,'client_left',element,geometryEpsilon,false)
+            // clientWidth is rounded too: its lower bound is the only proved
+            // visible extent. The uncertain half pixel cannot authorize coverage.
+            && geometryCheck(b.x+b.width,v.x+owner.clientWidth-0.5,'client_right',element,geometryEpsilon,false);
         };
         const headerGutterOnly=globalThis.getComputedStyle(container).overflowY==='scroll'
           && container.scrollLeft===0 && container.scrollWidth===container.offsetWidth
@@ -1804,7 +1833,7 @@ function readRenderedInputMapping(observation) {
         signature:{tag:element.tagName.toLowerCase()},bounding_box:boxOf(element)}));
       return {origin:location.origin,authenticated:!!tids.get('MF;cntMain;tlbMainToolbar;btnAvatar')?.some(visible),
         loginom_build:globalThis.bg?.app?.Version ?? null,workflow_ref:workflow,graph_identity:graphIdentity,active_identity:active ? textOf(active) : null,
-        dom_epoch:{document:state.epoch,revision:state.revision},observation_kind:'roots',wizard,
+        dom_epoch:{document:state.epoch,revision:state.revision},observation_kind:'roots',wizard,geometry,
         ...(storageName===null?{}:{observation_filter:{storage_name:storageName}}),
         scan:{complete:true,mutation_counts:{...state.mutations},visited_elements:dom.length,detail_elements:0,max_elements:maxElements,max_work:maxWork,max_ms:maxMs,
           ...(definitionPrefix?{scope:omittedRegions.has('table_data_cells')?'node_output_controls':'node_definition_controls',omitted_regions:[...omittedRegions]}:{})},
@@ -3132,7 +3161,7 @@ function readRenderedInputMapping(observation) {
     }
     return { origin: location.origin, authenticated: !!tids.get('MF;cntMain;tlbMainToolbar;btnAvatar')?.some(visible), loginom_build: globalThis.bg?.app?.Version ?? null,
       workflow_ref: workflow, graph_identity:graphIdentity, active_tab_ref:active?refOf(active):null, active_identity: active ? textOf(active) : null, package_identity: packageIdentity,
-      file_storage:fileStorage,wizard,wizard_pending_owner:pendingWizardOwner,workflow_navigation:workflowNavigation,navigation_context:navigationContext,node_context:nodeContext,table_settings:tableSettings,table_coverage:tableCoverage,process_console:processConsole,
+      geometry,file_storage:fileStorage,wizard,wizard_pending_owner:pendingWizardOwner,workflow_navigation:workflowNavigation,navigation_context:navigationContext,node_context:nodeContext,table_settings:tableSettings,table_coverage:tableCoverage,process_console:processConsole,
       dom_epoch: {document:state.epoch,revision:state.revision},
       ...(selectedRoot ? {observation_root:{ref:rootRef,identity:identityOf(selectedRoot),detail_scope:'elements_and_cells',global_scan:false,global_guards:'fixed_native_queries'}} : {}),
       scan: { complete: true, mutation_counts:{...state.mutations}, visited_elements: dom.length, detail_elements:detailElements, max_elements: maxElements, max_work: maxWork, max_ms: maxMs,

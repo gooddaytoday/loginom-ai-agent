@@ -2,6 +2,7 @@ import { createRequire } from "node:module"
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
+import { browserLaunch } from "../client/lib/browser-launch.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 
@@ -71,6 +72,7 @@ export async function checkKnowledge(endpoint, apiKey) {
 
 export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false }) {
   const { chromium } = require("playwright-core")
+  const launch = browserLaunch(headless)
   await mkdir(profile, { recursive: true, mode: 0o700 })
   const context = await chromium
     .launchPersistentContext(profile, {
@@ -83,9 +85,9 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       env: browserEnvironment(profile),
       args: [
         ...browserLoggingArguments(profile),
+        ...launch.args,
         ...(!headless
           ? [
-              "--start-maximized",
               ...(process.platform === "linux" &&
               process.env.WAYLAND_DISPLAY &&
               (process.env.XDG_SESSION_TYPE === "wayland" || !process.env.DISPLAY)
@@ -94,7 +96,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
             ]
           : []),
       ],
-      viewport: headless ? { width: 1280, height: 800 } : null,
+      viewport: launch.viewport,
     })
     .catch(() => {
       throw Error("LOGINOM_BROWSER_START_FAILED")

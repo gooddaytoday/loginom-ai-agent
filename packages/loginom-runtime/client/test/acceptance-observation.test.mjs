@@ -49,11 +49,18 @@ test('native router origin is distinct from direct stdio evidence', async () => 
 test('geometry reads actual page and viewport with binding, without mutating a window', async () => {
   const globals={__loginomDockPreparationV1:{id:'doc'},location:{origin:'https://loginom.test',pathname:'/app/'},
     document:{visibilityState:'visible'},innerWidth:1508,innerHeight:862,outerWidth:1508,outerHeight:949,
-    screenX:2,screenY:33,screen:{availLeft:0,availTop:33,availWidth:1512,availHeight:949}};
+    screenX:2,screenY:33,devicePixelRatio:1.25,screen:{width:1536,height:864,availLeft:0,availTop:33,availWidth:1512,availHeight:949},
+    visualViewport:{width:1508,height:862,scale:1,offsetLeft:0,offsetTop:0}};
   const page={viewportSize:()=>null,evaluate:async fn=>runInNewContext(`(${fn.toString()})()`,globals)};
   const value=await runInNewContext(makeBrowserGeometryCode({session_id:'own',document_id:'doc'}))(page);
   assert.equal(value.viewport,null);assert.equal(value.observed.outer_width,1508);
   assert.equal(value.observed.document_id,'doc');assert.equal(value.session_id,'own');
+  assert.equal(value.observed.device_pixel_ratio,1.25);
+  assert.equal(value.observed.screen_width,1536);
+  assert.equal(value.observed.screen_height,864);
+  assert.equal(value.observed.visual_viewport.scale,1);
+  delete globals.visualViewport;
+  assert.equal((await runInNewContext(makeBrowserGeometryCode({session_id:'own',document_id:'doc'}))(page)).observed.visual_viewport,null);
   assert.deepEqual(parseBrowserGeometry({content:[{type:'text',text:'### Result\n'+JSON.stringify(value)}]}),JSON.parse(JSON.stringify(value)));
   assert.throws(()=>parseBrowserGeometry({isError:true,content:[]}),/missing/);
   assert.throws(()=>parseBrowserGeometry({content:[{type:'text',text:'{"browserWindowMode":"maximized"}'}]}),/missing/);

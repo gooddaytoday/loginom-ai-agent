@@ -651,3 +651,22 @@ test('bound completion gives mask settlement only the remaining parent deadline'
     assert.equal(operation.deadline,65000);
   }
 });
+
+test('readiness expiry retains last geometry without a diagnostic browser round trip',async()=>{
+  let time=1,reads=0;
+  const f=fixture({now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms},onRead:()=>{time+=250;reads++}});
+  f.state.geometry={device_pixel_ratio:1.25,failure:{condition:'rows_end',actual:200.25,expected:200,delta:0.25,tolerance:1/64}};
+  await assert.rejects(f.channel.observe({condition:'complete definitions',ready:()=>false,timeoutMs:1000}),/readiness timeout/);
+  assert.deepEqual(f.records.find(r=>r.phase==='node_observation_timeout').geometry,f.state.geometry);
+  assert.equal(reads,4);
+  assert.ok(!f.events.includes('mutated'));
+});
+
+test('readiness expiry retains geometry across a final incomplete scan',async()=>{
+  let time=1;
+  const f=fixture({now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms},onRead:()=>{time+=250},
+    readRefusal:n=>n===4?timedScanRefusal():undefined});
+  f.state.geometry={device_pixel_ratio:1.75,failure:{condition:'rows_end',actual:200.25,expected:200,delta:0.25,tolerance:1/64}};
+  await assert.rejects(f.channel.observe({condition:'complete definitions',ready:()=>false,timeoutMs:1000}),/readiness timeout/);
+  assert.deepEqual(f.records.find(r=>r.phase==='node_observation_timeout').geometry,f.state.geometry);
+});

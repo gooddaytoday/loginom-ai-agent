@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { executableExists, privateDirectory } from './platform.mjs';
 import {createArtifactStore} from './artifacts.mjs';
 import {browserDownloadScript} from './browser-downloads.mjs';
+import {browserLaunch} from './browser-launch.mjs';
 
 const require = createRequire(import.meta.url);
 const packagePath = (name) => require.resolve(`${name}/package.json`);
@@ -62,14 +63,15 @@ export async function createSession(config, { headless = false, managed = null }
   // Let visible Loginom use the actual maximized window. A fixed emulated
   // viewport stays small even when the native window is enlarged. Headless
   // checks retain a deterministic size; live geometry guards still apply.
-  const browserViewport = headless ? { width: 1280, height: 800 } : null;
-  const browserWindowMode = headless ? 'headless' : 'maximized';
+  const launch = browserLaunch(headless);
+  const browserViewport = launch.viewport;
+  const browserWindowMode = launch.windowMode;
   // Executor actions own explicit readiness and pre-gesture guards. MCP's
   // default settle adds 500 ms even to every read-only internal observation.
   const executorMode = ['executor-preview', 'executor-replay'].includes(config.mode);
   await writeFile(browserConfig, JSON.stringify({
     browser: { browserName: 'chromium', userDataDir: profile, initScript: [downloadScript],
-      launchOptions: { executablePath, headless, ...(managed ? { chromiumSandbox: true } : {}), ...(!headless ? { args: ['--start-maximized'] } : {}) }, contextOptions: { viewport: browserViewport } },
+      launchOptions: { executablePath, headless, ...(managed ? { chromiumSandbox: true } : {}), ...(!headless ? { args: launch.args } : {}) }, contextOptions: { viewport: browserViewport } },
     capabilities: ['core', 'vision'], outputDir: artifacts,
     saveSession: false, timeouts: { action: 15000, navigation: 120000, ...(executorMode ? { settle: 0 } : {}) },
   }), { mode: 0o600 });
