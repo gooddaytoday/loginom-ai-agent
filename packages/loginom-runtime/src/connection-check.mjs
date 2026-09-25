@@ -84,6 +84,8 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       // browser state and diagnostics inside the disposable session profile.
       env: browserEnvironment(profile),
       args: [
+        // Browser traffic is always direct; backend proxy policy is independent.
+        "--no-proxy-server",
         ...browserLoggingArguments(profile),
         ...launch.args,
         ...(!headless

@@ -28,6 +28,56 @@ defaults:
     shell: bash
 
 jobs:
+  chromium-direct:
+    name: chromium-direct (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup pinned Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: packages/loginom-runtime/client/.node-version
+
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+
+      # setup-loginom-inputs may hit its browser cache without installing npm dependencies.
+      - name: Install locked runtime dependencies
+        working-directory: packages/loginom-runtime/client
+        run: npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
+
+      - name: Prepare isolated Linux desktop
+        if: runner.os == 'Linux'
+        working-directory: packages/loginom-runtime/client
+        run: |
+          "$LOGINOM_AI_AGENT_TEST_NODE" node_modules/playwright/cli.js install-deps chromium
+          sudo apt-get install -y xvfb xauth dbus-x11 dconf-gsettings-backend gsettings-desktop-schemas
+          # Preserve the Chromium sandbox, as in the existing Linux release matrix.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Verify direct Chromium and browser downloads
+        working-directory: packages/loginom-runtime/client
+        env:
+          LOGINOM_DOCK_TEST_PUBLIC_APP: "1"
+        run: |
+          "$LOGINOM_AI_AGENT_TEST_NODE" test/support/run-direct-browser-tests.mjs 2>&1 | tee "$RUNNER_TEMP/direct-browser-tests.log"
+
+      - name: Upload native browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: chromium-direct-${{ matrix.os }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/direct-browser-tests.log
+          if-no-files-found: error
+          retention-days: 14
+
   unit:
     name: unit
     runs-on: ubuntu-24.04
