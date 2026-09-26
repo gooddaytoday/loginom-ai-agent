@@ -15,6 +15,31 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### G2 operator26: fresh profile PASS, generic selection deny — 2026-09-27
+
+На unchanged freeze13 operator25 новый выделенный профиль подтвердил download
+и bytes/hash CSV, полный typed input6×5 и двухсторонний input0 mapping5. JS GUID
+`4856d23f-c0d9-4cb6-8c72-1e15447762da`; source/storage этой отдельной пробы —
+`/jsteach/js-g2-64ff0659-3f76-4f1f-93fb-ca07761d9d13`. Source JS не вводился.
+
+Отказ до открытия мастера: `Prepared graph node has no observed selection point`.
+Journal652: prepared node verified, graph/unlocked, body и label visible/enabled,
+оба `interaction.state=point_observed`, но **allowed_actions=[]**. Общий UI deny
+JavaScript действует штатно; `selectPreparedGraphNode` требует разрешённый click
+и поэтому неприменим для этой discovery-пробы. Screenshot подтверждает отсутствие
+Setting, а не маску/потерю native owner. Все652 journal references SHA проверены.
+
+Все штатные cleanup flags true: package_closed/logged_out/browser_closed.
+Recovery26 не нужна. Это успешное прохождение прежнего download участка в новом
+профиле, не доказанное устранение первопричины Chromium crash.
+
+Разработчику назначен operator27: отдельный private diagnostic selection с
+native/DOM/owner/hit-test binding и одним жестом под прежним opening deadline,
+по аналогии существующих operator port/Setting clicks. Generic UI deny сохраняется;
+не подделывать allowed_actions и не добавлять преждевременный public handler.
+После выбора обязательно повторное same-node наблюдение Setting. Следующий live
+только после source handoff; G2/G3 остаются открытыми.
+
 ### Изоляция Chromium download crash и новый профиль — 2026-09-27
 
 В `~/.config/google-chrome-for-testing/Crash Reports` найдены minidumps21/23/25.
