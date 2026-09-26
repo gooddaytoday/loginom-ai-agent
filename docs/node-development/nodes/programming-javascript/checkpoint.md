@@ -15,6 +15,40 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch34: выбранный JS без панели, hover не раскрыл Visualizers — 2026-09-27
+
+Freshprofile07/freeze34, новый JS Execute completed/verified/owner_verified.
+Root проверил свежесть launch и все1066 journal refs SHA.
+Passive opening остановлен через90s после единственного hover632,232;
+opening_dispatched=false, hover_dispatched=true. Повторного Execute не было.
+Output6×2 NOT_READ. Cleanup package/logout/browser=true, process exit1.
+
+Root просмотрел work-refusal.png и snapshot: выбранный синий JS имеет active
+output, но NodesControls/Setting/Visualizers/Launch действительно отсутствуют.
+Native selection не доказывает наличие панели. Прежняя root-предпосылка
+«selected исключает body-click» была слишком строгой: shared reader делает
+body-click также при отсутствии open_node_views. Причина исчезновения панели
+ещё не установлена.
+
+Fix35 назначен прежней задаче: один guarded private body selection для
+материализации нужных controls при selected+toolbar absent, аналогично
+существующему private Setting-selection; это новое предусмотренное действие,
+а не повтор неизвестного click. Сохранить active output admission/owner/hit,
+запрет Execute/Setting effects, ограниченный deadline и добавить диагностику
+control count/visibility/hit. Новый live только после handoff на freshprofile08.
+
+### Freeze34 и headed batch34 — 2026-09-27
+
+Root повторил45 operator tests и51 output procedure/context/navigation tests:
+96 PASS. Проверены21 hashes, после тестов исходники неизменны. Private JS
+Visualizers opening проверяет активный native output0, сохраняет selected node,
+допускает один guarded hover скрытого toolbar и один opening click; затем
+используется штатный Table reader с проверкой node/port ownership.
+Публичные descriptors/allowed_actions не менялись, read не вызывает Execute.
+
+На freshprofile07 запущен новый batch34, предыдущий06 сохранён. Полный output
+и downstream mapping/reopen пока ожидаются; G2/G3 остаются открыты.
+
 ### Batch33: первое подтверждённое Execute JS, output ещё не прочитан — 2026-09-27
 
 Freshprofile06/freeze33. Exact native auto-link принят с effect_dispatched=false;
