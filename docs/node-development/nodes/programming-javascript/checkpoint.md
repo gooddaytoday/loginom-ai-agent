@@ -163,6 +163,24 @@ blockers подтверждены. Оператор ошибочно требо�
 порядок, но учитывать наблюдённые пропуски условных страниц. Done/Preview не
 нажимались. Evidence — `g1-operator-16/report.json`; очистка прошла штатно.
 
+## Подготовка G2/G3
+
+Координатор проверил `execution-probe-design.md` разработчика: собственный
+закреплённый CSV → наблюдённые typed input6×5 → отдельные declared/code trials,
+sentinel положительно доказывает исполнение, отсутствие sentinel его не
+отрицает; passive table read не должен повторять Execute. Execution runner
+ещё разрабатывается, live G2/G3 не запускался.
+
+Независимый private oracle подготовлен стандартным Python csv из source с
+проверенным SHA `4fce338d2edd2901ba35732ed148a1a80eba4a5fbf927f2828f3cdbe6b8fa09e`.
+Сохранены пробелы Customer, кириллица и все30 входных значений. Ожидаемый
+результат — 6×2: ObservedID Integer1..6 и PhaseMarker String JS_G2_TABLE_V1,
+исходный порядок, numerical tolerance0. Technical names входа ещё должны быть
+наблюдены на стенде; позиционное совпадение не заменяет binding.
+`g2-independent-oracle.json` в кампании, SHA256
+`d61d649ed91c41c4961f51855508a893b17d6fc75b11c30419d3836186e8f97a`.
+Статус expected_not_live_validated; это не финальный business CLI oracle.
+
 ## CLI-профиль: offline reconciliation после отменённого OAuth
 
 Старый guard отменённого сеанса (nonce `b0e663b1-6c9f-48f0-9e32-54150f220415`)
