@@ -15,6 +15,39 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch33: первое подтверждённое Execute JS, output ещё не прочитан — 2026-09-27
+
+Freshprofile06/freeze33. Exact native auto-link принят с effect_dispatched=false;
+input mapping, мастер, code mode и полный source readback подтверждены.
+Source SHA `d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`.
+Свежий Execute: baseline groups1/2/3 → новая group4/process4.1,
+execution `1790464285727-mc37kcdyj3m:223:4`, completed/verified/owner_verified.
+Root сверил launch gesture, отличие от baseline и все1042 journal refs SHA.
+
+Проба остановилась ПОСЛЕ исполнения: readPassive→openNewOutputTable попытался
+generic body click при JS allowed_actions=[] после возврата из process console.
+Ошибка UI reference unsupported. Выходная6×2 таблица пока NOT_READ; это не
+PASS аналитического результата или G2/G3. Cleanup package/logout/browser=true.
+
+Fix34 назначен прежней задаче: перед пассивным output reader использовать
+существующую private native selection, затем штатное открытие Table; проверить
+маршрут open_node_views и active output до UI effects. ReadPassive не должен
+вызывать Execute. Public code guards не менять. Следующий live после handoff
+на freshprofile07; browser33 закрыт.
+
+### Freeze33 и headed batch33 — 2026-09-27
+
+Root проверил18 SHA, 38 operator/topology/batch tests и39 shared node-target
+тестов:77 PASS. После тестов все operator hashes неизменны. Native snapshot
+до drag сохраняет старые node/data/FCell/ports; после добавления shared
+create-delta допускает только новый JS и точную исходную связь0→0 либо её
+отсутствие. Принятие наблюдённой связи не отправляет connect; пустой input
+использует прежний single gesture. Admission baseline одноразовый.
+
+Batch33 запущен headed на новом profile06, предыдущие профили сохранены.
+Результат ожидается; весь G2/G3 scope и запрет повторных неизвестных эффектов
+сохранены. Публичный JS handler ещё не реализован.
+
 ### Shared file-delivery исправление зафиксировано — 2026-09-27
 
 В node-javascript отдельный commit `a66ca792c9`: artifact-discovery,
