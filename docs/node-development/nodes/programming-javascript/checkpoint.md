@@ -15,6 +15,47 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Доказана зависимость crash от рестарта профиля — 2026-09-27
+
+Exact1246 `chromium1246-restart-matrix/report.json`: три fresh profiles,
+каждый запускался в трёх отдельных процессах. Первые3PASS; все6 последующих
+REUSE завершились native crash (4SIGSEGV,2SIGTRAP). Контроль fresh-per-process:
+**9/9PASS**,22bytes и1500ms survival. Все local browsers закрыты. Это установление
+условия воспроизведения, не доказательство конкретной ошибки native lifetime.
+
+Discovery адаптирован к уже существующему product lifecycle: отдельный fresh
+profile на попытку, как managed-entry attempts/randomUUID. Assignment/host lease
+переназначены на `javascript-discovery-profile-03`; receipt
+`profile-reassignment-03.json` содержит прежний assignment SHA и основания.
+Profile02/старые данные сохранены; они не очищались. Это не retry прежнего
+server effect. Trial30 code-sentinel-next начат с unchanged freeze29 и новым
+UUID/evidence; результат ещё ожидается. Для следующей попытки нужен новый
+профиль, а не повторное использование03 после download и рестарта.
+
+### Live29: SIGSEGV на1246; проверка повторного профиля — 2026-09-27
+
+Operator29 freeze13 и22 operator tests PASS, но live не дошёл до selection:
+Chromium1246 закрылся при download/saveAs. Outcome AMBIGUOUS, cleanup исходного
+прогона не подтверждён;41 journal refs SHA проверены. Fresh dump
+`957fc655-cbca-4fbc-8851-28e8c8bdbd5d`: PID894822, exception11/SIGSEGV,
+faultaddr0, RIPchrome+0x44941db. Это не прежний SIGTRAP; общая причина неизвестна.
+Следовательно обновление1246 **не доказало устранение crash**. Результаты
+local15PASS и live28PASS сохраняются как ограниченные наблюдения.
+
+Отдельный headed recovery29: packages0, logout/browserClosed=true, без
+package mutations и без повтора неопределённого download. Следующая диагностика
+не меняет прежние server files или исходный profile02.
+
+[Playwright42506](https://github.com/microsoft/playwright/issues/42506) описывает
+аналогичный crash при повторном persistent profile на Edge152/Windows; это
+гипотеза, не доказательство нашей причины. Root начал exact1246 local matrix:
+три группы по три отдельных browser processes с reuse против fresh-each.
+Все headed/sandbox=true; проверяются bytes и1500ms post-save survival.
+Прежняя15-file матрица выполняла пять downloads внутри каждого одного процесса
+и не проверяла последовательные рестарты. Product managed-entry создаёт
+fresh attempt profile; discovery operator повторно использовал assignedprofile02.
+Решение по профилям — только после результатов и сверки product lifecycle.
+
 ### Live28: Chromium1246 прошёл download; DOM selection отказ — 2026-09-27
 
 Infrastructure зафиксирована отдельным commit **58d85fe07c** в node-javascript:

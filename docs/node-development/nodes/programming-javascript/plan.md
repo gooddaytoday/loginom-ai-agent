@@ -116,6 +116,13 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
    и общий [журнал хоста](../../templates/host-resources.json). Назначить отдельный
    разрешённый аккаунт Loginom, profile/browser/storage/package, все owners/leases.
    Если используется системный clipboard, учитывать его как общий ресурс.
+   Для каждого отдельного запуска discovery на Ubuntu назначать новый пустой
+   browser profile с записью в assignment/host lease и receipt смены; старые
+   профили сохранять. Повторный persistent profile воспроизводит native download
+   crash (см. [checkpoint](checkpoint.md)); штатный managed runtime уже создаёт
+   профиль под новым attempts/randomUUID. Один held context внутри запуска
+   допускает несколько отдельно привязанных проб. Recovery прежнего сеанса
+   выполняется отдельно, без повторения неопределённых скачиваний.
 4. Подготовить pinned Node24.19.0, Bun1.3.14 с требуемым revision, Playwright/MCP,
    Chromium согласованной версии и платформенный action manifest. Исходная база
    закрепляла Chromium1243; выявленные на Ubuntu аварии и проверку кандидата1246
