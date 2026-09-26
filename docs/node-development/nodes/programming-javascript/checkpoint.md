@@ -17,6 +17,11 @@
 
 ### Live28: Chromium1246 прошёл download; DOM selection отказ — 2026-09-27
 
+Infrastructure зафиксирована отдельным commit **58d85fe07c** в node-javascript:
+17 файлов dependencies/pins/packaging/credits/MCP ownership tests/docs.
+Незавершённые operator/shared discovery changes в этот commit не включены.
+Root не выполнял merge/cherry-pick в продуктовую ветку или выпуск.
+
 Новая связка прошла реальный upload/download157bytes с точным SHA256,
 полный typed input6×5 и input0 mapping. Аварии Chromium нет. JS GUID
 `f263f739-ba85-4385-b98b-584470434edb`; storage новой пробы
