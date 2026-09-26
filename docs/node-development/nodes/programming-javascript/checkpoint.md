@@ -15,6 +15,25 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Operator27: preflight selection audit — 2026-09-27
+
+Первый source handoff27 заменил неприменимый generic selection отдельным
+private native body click и наблюдением Setting. Root повторил121 адресный
+тест PASS, но **live27 не запускал**: `shape.contains(hit)` допускает попадание
+во вложенный Execute/Preview/port overlay, если Setting ещё недоступен.
+Это риск неверного действия, а не наблюдённое исполнение JavaScript.
+
+Разработчику возвращена одна конкретная поправка до freeze: проверять ближайший
+`data-tid`/владельца hit отдельно для body и Setting; descendant Execute должен
+давать ноль кликов, собственный body/icon — допустимый выбор. Общий UI deny
+не менять. На момент записи задача разработчика активна; требуется обновлённый
+handoff и повтор адресных checks перед первой live27. Source manifest27 ещё нет.
+
+Дополнительно отмечены неготовые downstream paths: `reopen()` требует generic
+begin_wizard, Execute при невыбранном узле может попасть в generic body selection.
+Они не вызываются в следующем `code-sentinel-next`, но должны быть исправлены
+до соответствующих G2/G3 trials; готовность всего operator/плана не заявляется.
+
 ### G2 operator26: fresh profile PASS, generic selection deny — 2026-09-27
 
 На unchanged freeze13 operator25 новый выделенный профиль подтвердил download
