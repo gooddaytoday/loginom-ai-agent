@@ -1,0 +1,23 @@
+{
+  "kind": "independent_business_oracle_specification",
+  "status": "authored_not_live_validated",
+  "schema": [
+    {"name": "RowID", "type": "integer"},
+    {"name": "CustomerKey", "type": "string"},
+    {"name": "NetCents", "type": "integer"},
+    {"name": "Status", "type": "string"}
+  ],
+  "numeric_tolerance": 0,
+  "ordered_rows": [
+    [1, "alpha", 1800, "продажа"],
+    [2, "beta", 0, "ноль"],
+    [3, "alpha", -750, "возврат"],
+    [4, "гамма", 400, "продажа"],
+    [5, "ёж", 0, "ноль"],
+    [6, "delta", 500, "продажа"]
+  ],
+  "total_net_cents": 1950,
+  "changed": {"row_id": 1, "net_cents": 2700, "total_net_cents": 2850},
+  "reordered_columns": "same ordered rows and schema",
+  "empty": {"row_count": 0, "schema": "same schema"}
+}

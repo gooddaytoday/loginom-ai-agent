@@ -1,0 +1,355 @@
+{
+  "kind": "javascript_plan_research_sources",
+  "observed_date": "2026-09-26",
+  "live_target": {
+    "url": "http://logi-test-plan.bg.local/app/",
+    "basis": "explicit_user_assignment",
+    "connectivity": "not_checked",
+    "version": "not_checked",
+    "edition": "not_checked",
+    "test_account": "not_checked"
+  },
+  "product": {
+    "commit": "a8ad59766dbdb4f2da0b54367a755ce00891dd71",
+    "observed_branch": "javascript",
+    "local_loginom_ref_equals_commit": true,
+    "local_origin_loginom_ref_equals_commit": true,
+    "remote_ref_refreshed": false,
+    "files": [
+      {
+        "path": "packages/product/loginom-release.json",
+        "bytes": 799,
+        "sha256": "ec1298f0f6557f924c9281291f4cc2cf76958852dc166a03f403ae9f8d779aac"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/node-contracts.mjs",
+        "bytes": 9392,
+        "sha256": "8cd9f420678106657e06e0a01032d4b4515c216a0cfe65e57d855aa1a0d2bcc3"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/node-api.mjs",
+        "bytes": 28566,
+        "sha256": "9f3191d49b1a1fb2b2345a25a396ac6b83d8f566b69e01ba9167d3e3192cca81"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/node-support.mjs",
+        "bytes": 3742,
+        "sha256": "ad4e46a95b88681128bd25b6628b78ebe2014a8f1be1ba576d9b3077e3757352"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/node-apply.mjs",
+        "bytes": 30712,
+        "sha256": "15510617c4456311804b023265766e3845bd03fb79ad5ed60f59ddbbe942f831"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/node-result-schema.mjs",
+        "bytes": 18578,
+        "sha256": "534b71c4605fcdac44ce1dced6e1b2d25e05a68ccdab0e8c686beb002018c9d9"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/node-procedure.mjs",
+        "bytes": 44235,
+        "sha256": "5979141125f2f10f086f13e414fbcb6eb4464a1d3bbef9711b199338e13fd8aa"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/workspace-ui.mjs",
+        "bytes": 366270,
+        "sha256": "7452f81705ecd06f5888bca02fcf5f0fd79cf2df87b5fb257a8ab2670cf3099b"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/user-results.mjs",
+        "bytes": 22573,
+        "sha256": "eac6f265dbc083c8be2e17331681a063d4b91d332c5e634dcb2204439962af9a"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/user-workflow.mjs",
+        "bytes": 8868,
+        "sha256": "24cf4aaf66f9fe78bbc7221877e91c3c9d9457af3f38b6d917172c6cf73248c3"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/bridge.mjs",
+        "bytes": 40224,
+        "sha256": "094bd0b14fcfd082ba18e9ccbe4187f1a571467338706b15af529b81904a0760"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/redact.mjs",
+        "bytes": 5852,
+        "sha256": "bf5ccc8a571e455666bc03316c945aae6d48b80e807555c1ba13b041a7ae2229"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/execution-journal.mjs",
+        "bytes": 1429,
+        "sha256": "ffdd2c6909eba4a7a001128ee8aae3ecc2bb039a36f0c03881052e9bbcf5f842"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/runtime-pin.mjs",
+        "bytes": 1066,
+        "sha256": "3e48c2c382efd8c59751ff1cd1b8b6a5a85846bb0d12e68a61089440221c83b1"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/node-target-browser.mjs",
+        "bytes": 41380,
+        "sha256": "377c44afce18a8d420f83827df7053544d06184a0431fc007d1a985334a05c76"
+      },
+      {
+        "path": "packages/loginom-host/script/build-cli.ts",
+        "bytes": 12245,
+        "sha256": "27777abd6ff17b60f7cd50b0a707b7385a657e533de21731ed6172c3d52409e8"
+      }
+    ]
+  },
+  "user_reference": {
+    "path": "js_node_loginom_system_prompt.md",
+    "bytes": 51570,
+    "sha256": "c9c2d44d4dc4cf34b8f21a98504cf9f6acfc70cac510c36fe2725e7c0d7c2d16",
+    "git_status_at_research": "untracked",
+    "modified_by_plan_authoring": false,
+    "automatically_bundled": false
+  },
+  "e2e": {
+    "root": "/home/george/git/testing/e2e-tests",
+    "commit": "7a41b5adbb9c45dca8d756a8220615554301c2e0",
+    "branch": "master",
+    "working_tree_clean": true,
+    "submodule_ci_common": "bbdd0ab231f2e0f007d75a2583e0e22c08b2ef85",
+    "core_declarations": 45,
+    "core_active_declarations": 35,
+    "core_skipped_declarations": 10,
+    "executed": false,
+    "lgp_xml_inventory": {
+      "packages_scanned": 496,
+      "packages_with_javascript": 45,
+      "javascript_nodes": 134,
+      "unreadable": 0
+    },
+    "files": [
+      {
+        "path": "tests/toreview/acceptance/wizards/javascript/js_code.ts",
+        "bytes": 4679,
+        "sha256": "b54054d5f8d85c7ca09e1227067af6bd4453b9890c091bbda3ccb9ac6f389df1"
+      },
+      {
+        "path": "tests/toreview/acceptance/wizards/javascript/js_data_input.ts",
+        "bytes": 3097,
+        "sha256": "e056c1cf29b9c29cccd62ae498d37d81fe0968c3b1ab33d1efffa005d95f7b3f"
+      },
+      {
+        "path": "tests/toreview/acceptance/wizards/javascript/js_data_output.ts",
+        "bytes": 24202,
+        "sha256": "f1bd7c9c72e4621b756020b3b794cdca9de1b7259bb08039dbf7e0e25645fde0"
+      },
+      {
+        "path": "tests/toreview/acceptance/wizards/javascript/js_errors.ts",
+        "bytes": 13967,
+        "sha256": "de733b551c933190f82e1fca9866e6608a4f8181cbd59aea7a14dd09838fb512"
+      },
+      {
+        "path": "tests/toreview/acceptance/wizards/javascript/js_general.ts",
+        "bytes": 3959,
+        "sha256": "8cddcdf8bf6be8b22a469338cef2ca989900bc739557643752248f19c165afac"
+      },
+      {
+        "path": "tests/toreview/acceptance/wizards/javascript/js_helpers.ts",
+        "bytes": 38209,
+        "sha256": "1b208511333c1f005dc206d013ed3464eec2bf0a81fac4b3aa6e4f2fcd97a8ad"
+      },
+      {
+        "path": "tests/toreview/acceptance/wizards/javascript/js_interface.ts",
+        "bytes": 11422,
+        "sha256": "4ae242ad4b74363dbeeb329510d6019afb32fb6599eb51cf8dd589d81e8cc1dc"
+      },
+      {
+        "path": "tests/toreview/acceptance/wizards/javascript/js_module.ts",
+        "bytes": 7633,
+        "sha256": "e78aa902861100b67456f6502b3e4b1997b6c3a81a3e2a4f999dccfafc095a24"
+      },
+      {
+        "path": "bg/helpers/wizards/wizardPreview.ts",
+        "bytes": 35688,
+        "sha256": "8553ee6a75a24cc34e2fcc4d5bb49f1a90e8ed617915785b0b829db1ce3e7eec"
+      },
+      {
+        "path": "bg/sets/allTypesSmallSet.ts",
+        "bytes": 2373,
+        "sha256": "51860e3e7aabc8ee825ef0367cd0075adc967af0b3fa95796b21c34d43048bad"
+      },
+      {
+        "path": "testdata/wizards/javascript/JavaScript.lgp",
+        "bytes": 6288,
+        "sha256": "22ee58493d1f07c2d343ad80cbe9dfcb3d11d7d73446500405ff198e0f259637"
+      },
+      {
+        "path": "testdata/common/lgd/AllTypesSmall.lgd",
+        "bytes": 1067,
+        "sha256": "7318ac4b5632170ff34f744bdfc9b3ca2f977dddd15dc0cb822d90ddcc2a7ecd"
+      },
+      {
+        "path": "testdata/common/lgp/AllTypesSmall.lgp",
+        "bytes": 5738,
+        "sha256": "adab704991a94a91e9713602de48304f5a70460b5079ed005d4aac37768dc06d"
+      },
+      {
+        "path": "testdata/common/txt/AllTypesSmall.txt",
+        "bytes": 764,
+        "sha256": "d1dfdcf90eed81e6374d93f41c294d1c709d7e206fbdaa7c580ebf5f43eef0ee"
+      },
+      {
+        "path": "testdata/helpers/WizardPreview.lgp",
+        "bytes": 27137,
+        "sha256": "4ce7d809e82edff078464ce44ec1cdfe36e563898b3707d86e96a4711f42fc52"
+      },
+      {
+        "path": "testdata/wizards/javascript/lib/export.js",
+        "bytes": 757,
+        "sha256": "45bc7151de94439ceb33f77f2c63795528514a6653a7fcec51bf7aaae08d137e"
+      },
+      {
+        "path": "testdata/wizards/javascript/lib/optimization.cut.js",
+        "bytes": 4382,
+        "sha256": "82eb51a782d6a0f8a4bb80979c009a64d5845155f0777d5f5aac3fd6aab2420b"
+      },
+      {
+        "path": "testdata/wizards/programming/ProgrammingLabels.lgp",
+        "bytes": 8508,
+        "sha256": "a4a48368d5ea2e5eefa89a8d09e7557a00a76de8dbaa676725c83945253dd1c7"
+      },
+      {
+        "path": "testdata/workflow/layout/result_check/JSTableCompare.lgp",
+        "bytes": 84451,
+        "sha256": "3dcc6e6e85705230e9d6ecd6bad7a3ac803ef3e62c288a384d74f9449c9639e3"
+      }
+    ]
+  },
+  "official_sources": [
+    {
+      "url": "https://help.loginom.ru/7.0/userguide/processors/programming/java-script/api-description.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/admin/parameters/security-parameters.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/admin/parameters/server-parameters.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/data/datasetfieldfeatures.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/data/datatype.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/location_user_files.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/data-trees/calculator-tree/javascript.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/programming/java-script/api-description.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/programming/java-script/calc-functions.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/programming/java-script/console.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/programming/java-script/enum.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/programming/java-script/external-modules.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/programming/java-script/fetch-api.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/programming/java-script/fileapi.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/programming/java-script/global-function.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/programming/java-script/index.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/programming/java-script/input-tables.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/programming/java-script/input-variables.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/programming/java-script/output-tables.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/processors/transformation/calc/javascript.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/workflow/ports/automapping-of-fields.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://help.loginom.ru/userguide/workflow/ports/connections-interface.html",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://loginom.ru/blog/loginom-technique",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://loginom.ru/blog/release-644",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://loginom.ru/blog/release-73",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    },
+    {
+      "url": "https://loginom.ru/blog/use-javascript-python",
+      "accessed": "2026-09-26",
+      "target_version_match": "not_checked"
+    }
+  ]
+}

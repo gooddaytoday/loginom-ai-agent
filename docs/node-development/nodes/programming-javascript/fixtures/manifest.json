@@ -1,0 +1,52 @@
+{
+  "kind": "javascript_plan_fixtures",
+  "version": 1,
+  "status": "authored_not_live_validated",
+  "model_workspace_files": [
+    "model-input/sales.csv",
+    "model-input/task.md"
+  ],
+  "operator_only_must_not_be_delivered_to_model": true,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6080,
+      "sha256": "a8ecc48be9f8efb728023df4acf6518497278c59192326001b01c7ecbb950a8b"
+    },
+    {
+      "path": "model-input/sales.csv",
+      "bytes": 157,
+      "sha256": "4fce338d2edd2901ba35732ed148a1a80eba4a5fbf927f2828f3cdbe6b8fa09e"
+    },
+    {
+      "path": "model-input/task.md",
+      "bytes": 1438,
+      "sha256": "f866e451a6594a4ea7b8cb15ac311be7a067b46e6cef393a8d6cc9321d4a9957"
+    },
+    {
+      "path": "operator-only/empty.csv",
+      "bytes": 46,
+      "sha256": "9f20a282b37003a861e94cf6ee7ec54cc91f33d32a8fadfa5fd2997d3b8f4b2d"
+    },
+    {
+      "path": "operator-only/expected.json",
+      "bytes": 788,
+      "sha256": "72934b72200e141f7b0c66717b6736fa2a153f5fb08df3cbdd92d35fa0dc65b9"
+    },
+    {
+      "path": "operator-only/sales-changed.csv",
+      "bytes": 157,
+      "sha256": "97b2be2549ab389a1b5e2fd1605125ab2b158cd788b1c6c43a24ed85d84e32d7"
+    },
+    {
+      "path": "operator-only/sales-reordered.csv",
+      "bytes": 157,
+      "sha256": "405a8f4515087df2ca0eecbc8169df235dc81f2eb6981d36baaabbbf96202c0b"
+    },
+    {
+      "path": "operator-only/typed-cases.json",
+      "bytes": 1706,
+      "sha256": "35dd2d1e145ff186b83582b8981af3e8510cfbc53cd078ae660d2bbfb4fd1046"
+    }
+  ]
+}
