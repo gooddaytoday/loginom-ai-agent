@@ -52,3 +52,38 @@ test("macOS test packages use explicit ad-hoc arm64 signing without rewriting ve
   expect(config.mac?.signIgnore).toEqual(["/Contents/Resources/loginom/bin/", "/Contents/Resources/loginom/browsers/"])
   expect(JSON.stringify(config.extraResources)).not.toContain("native/")
 })
+
+test.skipIf(process.platform !== "darwin")("the read-only PR workflow enables only the configured ad-hoc signing gate", async () => {
+  const workflow = Bun.YAML.parse(await Bun.file(new URL("../../.github/workflows/loginom-macos.yml", import.meta.url)).text()) as {
+    on: Record<string, unknown>
+    permissions: Record<string, string>
+    jobs: { macos: { env: Record<string, string>; steps: { name?: string; env?: Record<string, string> }[] } }
+  }
+  expect(workflow.permissions).toEqual({ contents: "read" })
+  expect(workflow.on.pull_request_target).toBeUndefined()
+  expect(JSON.stringify(workflow)).not.toContain("secrets.")
+  expect(workflow.jobs.macos.env.CSC_IDENTITY_AUTO_DISCOVERY).toBe("false")
+  const build = workflow.jobs.macos.steps.find((step) => step.name === "Build and verify both products")
+  expect(build?.env?.CSC_FOR_PULL_REQUEST).toBe("true")
+  const config = (await import("./electron-builder.config")).default
+  expect(config.mac?.identity).toBe("-")
+  expect(config.mac?.notarize).toBe(false)
+  expect(config.publish).toBeNull()
+  // Exercise electron-builder's real PR decision in isolated child environments.
+  // No signing identity lookup, certificate, keychain or application is invoked.
+  const script = `
+    import { createRequire } from 'node:module';
+    const require = createRequire(import.meta.resolve('electron-builder'));
+    const { isSignAllowed } = require('app-builder-lib/out/codeSign/macCodeSign');
+    console.log(JSON.stringify(isSignAllowed(false)));
+  `
+  for (const [flag, expected] of [["false", false], [build?.env?.CSC_FOR_PULL_REQUEST, true]] as const) {
+    const child = Bun.spawnSync([process.execPath, "-e", script], {
+      cwd: import.meta.dir,
+      env: { PATH: process.env.PATH, GITHUB_BASE_REF: "loginom", CSC_FOR_PULL_REQUEST: flag },
+    })
+    expect(child.exitCode).toBe(0)
+    expect(child.stderr.toString()).toBe("")
+    expect(JSON.parse(child.stdout.toString())).toBe(expected)
+  }
+})

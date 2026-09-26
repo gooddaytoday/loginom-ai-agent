@@ -29,6 +29,20 @@ proxy/PAC, navigation и WebSocket сохранены. Три локальных
 дали по 4 PASS. Системный proxy пользовательского Mac не менялся; native
 proxy-сценарии выполняются только в disposable CI.
 
+Следующие candidate CI выявили две ошибки настройки самих проверок. Windows
+ACL tests запускались elevated runner вместо существующего isolated standard-user
+helper; workflow теперь вызывает этот helper с закреплённым Bun. ACL продукта
+не менялись. Сборка helper bundle и статические PowerShell/YAML проверки прошли;
+на Mac его bundle дал 1 PASS/2 native Windows skips.
+
+Electron-builder пропускал подпись macOS PR, оставляя переименованный bundle
+с неподходящей vendor signature. Только build step теперь разрешает существующую
+ad-hoc подпись: identity `-`, discovery/notarization выключены, workflow имеет
+лишь `contents: read` и не использует secrets. Строгий ZIP verifier не менялся.
+Проверки реального PR-gate electron-builder и synthetic подписанного `.app`,
+включая повреждённые/отсутствующие resources и code, дали 14 PASS; Desktop
+typecheck прошёл. Нативные candidate CI на этом исправлении ещё необходимы.
+
 ## Политика профиля
 
 `LOGINOM_AI_AGENT_STRICT_RECOVERY=1` включает строгий режим Desktop и CLI.

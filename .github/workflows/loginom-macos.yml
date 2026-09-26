@@ -57,6 +57,9 @@ jobs:
       - name: Build and verify both products
         env:
           CANDIDATE_VERSION: ${{ inputs.version || format('0.1.4-macos.{0}', github.run_number) }}
+          # The config fixes identity to '-' (ad-hoc); no certificate or notarization secrets.
+          # Otherwise electron-builder skips even this local signature on pull requests.
+          CSC_FOR_PULL_REQUEST: "true"
           # Bundling the backend into Electron exceeds Node's default 2 GiB heap on this runner.
           NODE_OPTIONS: --max-old-space-size=4096
         run: bun packages/desktop/scripts/build-macos.ts --output "$RUNNER_TEMP/candidate" --version "$CANDIDATE_VERSION"

@@ -8,6 +8,7 @@ on:
       - "bun.lock"
       - "package.json"
       - "script/build-windows.ps1"
+      - "script/test-windows-profile.ps1"
       - "packages/agent/**"
       - "packages/app/**"
       - "packages/desktop/**"
@@ -100,9 +101,12 @@ jobs:
           try {
             & $env:LOGINOM_CI_BUN_PATH typecheck
             if ($LASTEXITCODE -ne 0) { throw "Agent typecheck failed" }
-            & $env:LOGINOM_CI_BUN_PATH test test/cli/profile-windows.test.ts
-            if ($LASTEXITCODE -ne 0) { throw "Windows profile tests failed" }
           } finally { Pop-Location }
+
+      - name: Verify profile ACLs as a standard user
+        shell: pwsh
+        run: |
+          & .\script\test-windows-profile.ps1 -BunPath $env:LOGINOM_CI_BUN_PATH
 
       - name: Verify unsigned candidate outputs
         shell: pwsh
