@@ -14,8 +14,9 @@ Component ID: `component.programming.JavaScript`.
 Целевой build обучения — **Loginom 7.4.2** (решение пользователя 2026-09-26).
 К нему относится исходный [справочник](references/js_node_loginom_system_prompt.md),
 и тот же build допускает текущий graph adapter (`node-target-browser.mjs:318`).
-Фактические build/edition стенда и ОС сервера ещё не проверены: подтвердить
-в 0A. Иной build — блокер подготовки, а не основание переносить знания 7.4.2.
+В 0A подтверждён фактический Loginom **Enterprise 7.4.2** под выделенным
+аккаунтом; evidence — [checkpoint](checkpoint.md). ОС сервера ещё не установлена.
+Иной build — блокер подготовки, а не основание переносить знания 7.4.2.
 Первая платформа приёмки — Linux x64; остальные не сертифицируются этим планом.
 Все браузерные действия, диагностические пробы и CLI-приёмка выполняются
 **только в headed-режиме** (назначение пользователя 2026-09-26). Использовать
@@ -112,14 +113,24 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
    разрешённый аккаунт Loginom, profile/browser/storage/package, все owners/leases.
    Если используется системный clipboard, учитывать его как общий ресурс.
 4. Подготовить pinned Node24.19.0, Bun1.3.14 с требуемым revision, Playwright/MCP,
-   Chromium1243 и платформенный action manifest. Найденный Node проверен,
-   целый bundle ещё нет. Версии/hash брать из product pin, не shell PATH.
+   Chromium1243 и платформенный action manifest. Версии/hash брать из product pin,
+   не shell PATH; проверенные Ubuntu toolchain и source bundle описаны в checkpoint.
+   `verifyResources` проверяет целостность относительно собственного manifest;
+   отдельно сравнить его поля с product release pin. В Ubuntu source bundle
+   обнаружен прежний MCP endpoint при совпадающих остальных release fields:
+   его нельзя принять как candidate только по успешному hash-check. Собрать
+   новый candidate по актуальным pins; подробности в checkpoint.
 5. Использовать назначенный `http://logi-test-plan.bg.local/app/`; до live
    проверить DNS/сеть, отдельный разрешённый аккаунт, редакцию Loginom, доступность
    JS в палитре, storage и графическую сессию. Отображаемый build стенда должен
    быть ровно 7.4.2; записать также ОС сервера Loginom, от которой зависят
    Atomics и поведение движка. Не занимать пользовательский
    браузер; только штатные Dock/runtime scripts в собственной среде.
+   `loginBrowser` подтверждает account, но не готовность рабочего интерфейса.
+   Перед навигацией дождаться видимой страницы «Начало», а после перехода —
+   нужного native active tab. В 0A ранний переход «О программе» дал NodeIndex
+   error; после ожидания страницы и проверки active About node переход прошёл.
+   Не применять фиксированную задержку или повторять действия с неизвестным эффектом.
    Для прямых runtime-проб effective URL содержит `?testable=true`;
    managed Host добавляет его штатно. Исторические `test-2`/`test-4` не являются
    текущим назначением аккаунта. Нужен подтверждённый владелец ресурсов;
