@@ -15,6 +15,29 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Перезапуск Codex и exact1246 — 2026-09-27
+
+Повторная MCP health/actor search и установленный Doctor: PASS, 0 failures.
+Авторизация, system/status, 15 MCP tools и /ready подтверждены. Единственное
+предупреждение относится к прежним ENOENT чужих rollout; конфигурация не менялась.
+
+`chromium-1246-matrix-report.json`: exact Chromium1246/154.0.8037.0 прошёл
+три независимых headed запуска, 15/15 local blob файлов с точными bytes;
+все процессы exit0. Linux executable SHA256
+`1e0652a37f41d22ca22066c40896398cb7acce71f2746028061064369b299ab9`.
+Это локальная диагностическая проверка; managed/MCP Loginom acceptance нового
+комплекта ещё предстоит. Source operator27 и прежние неопределённые эффекты
+не повторялись.
+
+Root установил MCP0.0.82 в client worktree с pinned Node (npm exit0, changed3).
+Разработчик продолжает согласование pins, config, staging и проверок в той же
+задаче; root готовит платформенные executable hashes из официальных архивов.
+Экспорт chrome://credits/ выполнен exact1246 с новым Playwright в видимом браузере,
+sandbox=true: 768 sections, 8454009 UTF-8 bytes; браузер штатно закрыт.
+Text SHA256 `cea255da4312bb6d32ec752e911c2074f5fba89463d773e6c004f5b56e1dc36d`,
+gzip SHA256 `7113fe981e2d1031f3c40cc7408231dd918bef487d9a2e36ad466a68fc0c6507`.
+Native Windows/macOS acceptance этим не подтверждается.
+
 ### Сравнение версий Chromium — 2026-09-27
 
 `chromium-version-matrix-report.json`: по три независимые копии profile02,
