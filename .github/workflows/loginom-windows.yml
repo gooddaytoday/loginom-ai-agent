@@ -46,8 +46,8 @@ jobs:
       - name: Resolve pinned portable inputs
         shell: pwsh
         run: |
-          $node = (Get-Command node.exe -CommandType Application -ErrorAction Stop).Source
-          $bun = (Get-Command bun.exe -CommandType Application -ErrorAction Stop).Source
+          $node = (Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+          $bun = (Get-Command bun.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
           if ((& $node --version) -ne "v24.19.0") { throw "Unexpected Node version" }
           if ((& $bun --version) -ne "1.3.14") { throw "Unexpected Bun version" }
           $browsers = Join-Path $env:RUNNER_TEMP "loginom-browsers"

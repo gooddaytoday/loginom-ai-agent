@@ -5,6 +5,22 @@
 инструмент модели и не запускает node/eval кампании. Локальные fixture проверки
 не являются приёмкой Desktop, CLI или живого Loginom.
 
+После первого CI дополнительно проверены полный Desktop gate (157 PASS,
+3 Windows skips; документированный `draft-store` исключён) и семь CLI suites
+(25 PASS, 6 platform skips). Привилегированный Electron mock перенесён в
+отдельный fixture-процесс: он больше не меняет импорты соседних WSL tests.
+CLI fixture теперь проверяет sticky strict после снятия env и сохранение
+pending до явного восстановления. Windows workflow выбирает первый Application
+из `Get-Command`; версии Node/Bun и их точная проверка сохранены. Native Windows
+подтверждение ожидается от CI, локального PowerShell нет.
+
+Desktop typecheck прошёл. Локальный Agent typecheck заблокирован конфликтом
+номинальных Plugin/SDK типов из двух корней общего кеша зависимостей; код
+продукта ради этого не менялся. Обе CI-проверки типов исходного PR commit
+`636700656784e6072097173167d75db61afc5227` прошли. На этом же SHA парные
+Chromium jobs дали разные результаты (PASS и fixture socket `ECONNRESET`);
+это не объявляется успешным общим CI.
+
 ## Политика профиля
 
 `LOGINOM_AI_AGENT_STRICT_RECOVERY=1` включает строгий режим Desktop и CLI.

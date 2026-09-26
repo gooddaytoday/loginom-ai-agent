@@ -261,10 +261,20 @@ test("management commands share durable setup and recovery semantics through the
     expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
     const dropped = await journal.begin("c".repeat(64), 2)
     await journal.settle(dropped, false)
-    const advisory = await command(["status"])
-    expect(advisory.code).toBe(0)
-    expect(advisory.result.state).toBe("ready")
-    expect(advisory.result.recoveries).toBeUndefined()
+    const retained = await command(["status"])
+    expect(retained).toMatchObject({
+      code: 0,
+      result: { state: "recoverable-error", recoveryMode: "strict", recoveries: [dropped] },
+    })
+    expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([dropped])
+    expect(await command(["recover"])).toMatchObject({
+      code: 4,
+      result: { code: "LOGINOM_RECOVERY_CONFIRMATION_REQUIRED" },
+    })
+    expect(await command(["recover", "--acknowledge", dropped])).toMatchObject({
+      code: 0,
+      result: { state: "ready", recoveryMode: "strict" },
+    })
     expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
     const run = Bun.spawn(
       [
