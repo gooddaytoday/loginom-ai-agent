@@ -86,6 +86,27 @@ Recovery13 отдельно подтвердил `jsteach`, packages0, logout/co
 Private evidence — `g1-operator-13/report.json`, `g1-recovery-13.json`.
 Режим `--inspect-pages` подготовлен, но ещё не запущен. G1 не закрыт.
 
+Operator14 подтвердил исправление маски: cached native mask identity,
+отсутствие видимого сообщения и все ownership predicates прошли; overlays1,
+blockers0. Source SHA оператора —
+`20a2553407442e4231a832659f6f7772f4f427182c27c2b439218f8f8b494f45`.
+Штатный Ext `Element.mask()` содержит presentation/message subtree:
+[официальный исходник](https://docs.sencha.com/ext/6.2.0/classic/src/Element.js-1.html).
+Live проверка cache identity подтверждена на самом стенде.
+
+Первый `--inspect-pages` остановился до Next: поиск `input[type=radio]` вернул
+0 при существующих Ext indicators, index=null. Это неверное предположение об
+HTML controls, не доказательство отсутствия страниц. Single Close и подтверждение
+успешно вернули исходный WorkFlowTreeNode/граф с тем же JS GUID
+`8f607965-3a27-4b81-96a6-5ef070f5e3ee` (`wizard-close-settled`). Cleanup затем
+истёк в `wait-owned-package-ui`: код использовал observation до закрытия мастера
+и fallback visibility только по размерам. Разработчику переданы исправления
+наблюдения native indicators и обновления observation после Close.
+
+Report14 остаётся `CLEANUP_UNCONFIRMED`; отдельный recovery14 подтвердил
+`jsteach`, packages0, logout/context close. Evidence: `g1-operator-14/report.json`,
+`g1-recovery-14.json`. Editor/source/engine не проверены; G1 остаётся открытым.
+
 ## История остановки: MCP при возобновлении разработчика
 
 После recovery11 задача разработчика подтвердила отсутствие OpenViking tools
