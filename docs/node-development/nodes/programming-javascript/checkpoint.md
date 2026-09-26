@@ -15,6 +15,38 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Изоляция Chromium download crash и новый профиль — 2026-09-27
+
+В `~/.config/google-chrome-for-testing/Crash Reports` найдены minidumps21/23/25.
+Offline-разбор metadata/registers/frame pointers: общий RIP `chrome+0x850d1fb`
+после `int3`, совпадают 12 последовательных return addresses. Сохранённый EDX
+после `sub 6`: 21/25=`0xcdcdcdc7`, 23=`0x7468`; все проходят unsigned `>3`
+в trap. Это подтверждает одинаковый путь отказа, но не причину неверного состояния.
+Exact-tag Chromium153.0.8010.12 source и disassembly согласуются с гипотезой
+`DownloadItemImpl::IsDone`/`InternalToExternalState`; matching symbols пока нет.
+Архив официальных Google Chrome symbols скачан, но Build ID
+`f911272ebbb5182d003df59dfe2ab1cd347e18ea` отличается от используемого CfT
+`801e223ae2df0c3aa4d000dd388ed8048a864b9e`: символизация им недопустима.
+Dumps/heap не отправлялись наружу; runtime source не менялся.
+
+Дополнительные независимые **headed** local download trials, same pinned
+Chromium/Playwright/sandbox, без Loginom и без повторов прежних server effects:
+
+- 01: HTTP + fresh profile — PASS22bytes; 02: HTTP + campaign profile — PASS22bytes.
+- 03/04: invalid diagnostic HTML (`URL` в onclick разрешался как document.URL),
+  download не возник; эти пробы ничего не доказывают о blob-пути.
+- 05: исправленный `window.URL`, blob22bytes + campaign profile — SIGSEGV,
+  RIP `chrome+0x4449bca`, другая сигнатура; равенство причин с SIGTRAP не доказано.
+- 06: тот же valid blob + fresh profile — PASS22bytes; 07: повторное открытие
+  профиля06 и новое независимое blob-скачивание — PASS22bytes.
+
+Профиль `connection-preflight-profile` сохранён для диагностики. Для продолжения
+discovery назначен `javascript-discovery-profile-02`; private assignment/lease
+обновлены с backup и `profile-reassignment-02.json`. Это изоляция наблюдаемого
+сбоя, не доказанное исправление Chromium и не ослабление продуктовых guards.
+Operator26 запущен на неизменённом freeze13 operator25, отдельные draft/storage.
+Текущий результат проверять по `g2-operator-26/report.json`; запуск не равен PASS.
+
 ### G2 operator25: Chromium SIGTRAP подтверждён — 2026-09-27
 
 Root повторил 118 адресных тестов, freeze13 и syntax: PASS. Same-owner busy
