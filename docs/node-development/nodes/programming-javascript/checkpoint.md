@@ -15,6 +15,36 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Новый MCP: интеграционная проверка и cleanup — 2026-09-27
+
+Root запустил existing browser-downloads.integration.test.mjs с exact1246,
+новой связкой MCP/Playwright, DISPLAY=:1, LOGINOM_DOCK_TEST_HEADED=1.
+Оба режима подтвердили download/upload/geometry/navigation assertions, но
+MCP-owned browser остался после finally; **общий PASS не засчитан**.
+Source freeze шести файлов до/после совпал. Evidence: campaign
+`browser-1246-integration.txt`, `browser-1246-integration-source.json`,
+`browser-1246-integration-cleanup.json`.
+
+Installed coreBundle.js:createConnection создаёт BrowserBackend без dispose
+callback; Context.dispose освобождает listeners/tabs, но не браузер. CLI backend
+передаёт закрывающий callback. Existing test использовал in-process API и для
+MCP-owned варианта, хотя продуктовый createBridge запускает CLI через stdio.
+Разработчику передана проверка реальных ownership paths: stdio для MCP owner,
+переданный context + явный close для managed. Исправление ещё не проверено.
+Зависший собственный local-fixture Chromium закрыт SIGTERM после проверки
+точных PID/PPID/profile; тестовый Node завершился. Это forced cleanup, не
+штатное завершение. Loginom и его пакеты в этой проверке не открывались.
+
+Во время подготовки OpenViking read дважды дал timeout15s; повторный Doctor
+показал timeout /mcp при исправных authorization/systemstatus/ready. Работа
+была приостановлена. Затем MCP health и чтение **той же** URI прошли за <1s
+без правки настроек; точная причина транзитного сбоя не установлена.
+
+Официальные native архивы154.0.8037.0 скачаны и executable hashes измерены:
+Windows `e3390ab4c5d43b720a4aac16cb5c3889857a449d1aaeeda4ec86005beb98ff37`;
+macOS arm64 `ae4d66517f6879a70239c073f7be3d3b4d82bb3158938c6cb456bcd66f8f386e`.
+Provenance сохранены в campaign, native execution NOT_RUN.
+
 ### Перезапуск Codex и exact1246 — 2026-09-27
 
 Повторная MCP health/actor search и установленный Doctor: PASS, 0 failures.
