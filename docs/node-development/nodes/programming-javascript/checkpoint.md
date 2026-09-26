@@ -15,6 +15,16 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Shared file-delivery исправление зафиксировано — 2026-09-27
+
+В node-javascript отдельный commit `a66ca792c9`: artifact-discovery,
+executor download diagnostics и два адресных test файла. Все4 SHA совпадают
+с freeze32, который прошёл живую доставку CSV и полный input oracle.
+Root дополнительно выполнил58 delivery/verification tests: PASS; вместе
+с прежними70 =128. Operator/topology и stale worktree checkpoint не включены.
+Проверка native auto-link33 продолжается в прежней задаче; нового live пока нет.
+Это source commit в worktree, не merge/release или готовность JS-handler.
+
 ### Batch32: input PASS, созданный JS уже имеет видимую связь — 2026-09-27
 
 Freshprofile05, freeze32. Download SUCCEEDED, import и полный typed input6×5
