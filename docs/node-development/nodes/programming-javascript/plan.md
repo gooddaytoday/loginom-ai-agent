@@ -17,6 +17,11 @@ Component ID: `component.programming.JavaScript`.
 Фактические build/edition стенда и ОС сервера ещё не проверены: подтвердить
 в 0A. Иной build — блокер подготовки, а не основание переносить знания 7.4.2.
 Первая платформа приёмки — Linux x64; остальные не сертифицируются этим планом.
+Все браузерные действия, диагностические пробы и CLI-приёмка выполняются
+**только в headed-режиме** (назначение пользователя 2026-09-26). Использовать
+общий `client/lib/browser-launch.mjs`: `headless: false`, maximized,
+`--force-device-scale-factor=1`, viewport `null`. Не заменять видимый запуск
+headless или виртуальным экраном без отдельного назначения пользователя.
 
 Это результат plan-authoring, не назначение разработки. Наличие подплана
 не запускает Goal, новую задачу, очередь, установку или live-операции.
@@ -89,12 +94,19 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
    До переноса проверить ancestry и отсутствие изменений вне `docs/node-development/`;
    после — hashes плана/fixtures/справочника и новый HEAD. Не переносить
    незакоммиченные файлы автоматически и не подменять base SHA регистрации.
+   Ubuntu-адаптация координаторских helpers может быть отдельным code-коммитом
+   основного checkout: записать его SHA в checkpoint и не включать автоматически
+   в набор docs-only commits. Проверять каждый выбранный commit, а не считать
+   все изменения между product base и plan source документационными.
 2. Подготовить локальную регистрацию памяти по
    [CURRENT.md](../../../../services/loginom-ai/tools/project-memory/CURRENT.md):
    build generation, preview/install hooks, отдельный bootstrap, реальные
    metadata/receipts, затем activation и actor health/find/read. Peer выводит
    механизм из cwd; не копировать macOS URI или авторизацию из исторической среды.
    После первого содержательного этапа проверить capture/extraction/read-back.
+   На Ubuntu учитывать фактический plugin ID, доступный Codex executable и
+   права файлов из актуального `CURRENT.md`; подтверждение прежней установки
+   на macOS не закрывает этот gate. Ход исполнения — в [checkpoint](checkpoint.md).
 3. Оформить минимальную single campaign по [шаблону](../../templates/campaign.json)
    и общий [журнал хоста](../../templates/host-resources.json). Назначить отдельный
    разрешённый аккаунт Loginom, profile/browser/storage/package, все owners/leases.
