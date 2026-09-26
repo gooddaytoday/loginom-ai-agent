@@ -15,6 +15,29 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Сравнение версий Chromium — 2026-09-27
+
+`chromium-version-matrix-report.json`: по три независимые копии profile02,
+до пяти local blob22bytes download на запуск, same Playwright1.63-alpha,
+headed/sandbox=true,1500ms post-save наблюдение. Chromium153.0.8010.12:
+два FAILED до первого подтверждённого download, один PASS5. CfT154.0.8037.57:
+три PASS, все15 файлов точны. Это проверка зависимости от версии, не доказательство
+конкретного upstream fix; sandbox/защита скачивания не отключались.
+
+Diagnostic binary154.0.8037.57 SHA
+`e528b77a8b250c48a5bbd7aeeabbc2813940c0a2fe39b1b11fbaf1f01fb04f18`, official
+CfT URL/metadata сохранены в `cft-154-diagnostic-pin.json`/`cft-available-builds.json`.
+Он не принят как product pin и не использовался для G2 Loginom.
+
+Primary npm metadata: @playwright/mcp0.0.82 закрепляет playwright/core
+`1.64.0-alpha-1789764292000`, Chromium1246/154.0.8037.0; стабильный Playwright1.63.0
+всё ещё содержит Chromium1243/153.0.8010.12. Root начал скачивание **точного1246**
+для отдельной диагностической проверки; результат154.0.8037.57 на него не переносится.
+Developer делает read-only аудит согласованного обновления dependencies/lock,
+release pins, resource verification и Linux acceptance. Источники27 frozen;
+продуктовые версии пока прежние. До нового G2 нужны точная browser-проба и
+согласованное решение по связке, без обхода проверки pins оператора.
+
 ### Operator27: busy settlement PASS, Chromium crash повторился — 2026-09-27
 
 После preflight поправки root повторил122 теста PASS, freeze13/syntax. Private
