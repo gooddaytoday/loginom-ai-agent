@@ -15,6 +15,38 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch32: input PASS, созданный JS уже имеет видимую связь — 2026-09-27
+
+Freshprofile05, freeze32. Download SUCCEEDED, import и полный typed input6×5
+подтверждены; root независимо сверил все30 значений/типы/порядок и пробелы,
+как после import, так и после passive reread перед первым case. Все905 journal
+refs SHA проверены. Очистка package/logout/browser=true, process exit1.
+
+Первый code-table-execute остановлен в connectInput до явного connect:
+`JavaScript single input/output baseline differs`. Снимок created-node уже
+содержит rendered edge JSInput|Output_Data-0|JavaScript|Input_Data-0.
+Это наблюдение DOM, а не достаточный native proof для принятия связи.
+Вероятное авто-соединение при palette drop требует проверки полного native diff.
+JS source/Execute ещё не выполнялись.
+
+Назначен fix33 той же задаче: полный baseline nodes/ports/links до drag,
+проверка точного delta после; уже созданная правильная связь принимается только
+при доказанном сохранении всего прежнего графа, без второго connect. Чужие,
+лишние или изменённые связи дают отказ. Пустой исход сохраняет прежний single
+connect path. До handoff новый live не запускается; следующий профиль06.
+
+### Freeze32 и новая серия — 2026-09-27
+
+Same-owner busy непосредственно перед Refresh теперь ожидается read-only с
+исходным held binding/deadline55s, затем заново проверяются directory/context/
+control/native generation. Максимум16 preflight, gesture один; unknown click
+не повторяется. Изменены artifact-discovery и его адресные tests.
+Root проверил16 SHA freeze32 и70 тестов: PASS. Разработчик отдельно сообщил98
+PASS discovery/delivery/download/verification. Это ещё не live-подтверждение.
+
+Новый batch32 запущен headed на freshprofile05, прежний04 сохранён. Свой новый
+UUID/server folder/evidence; попытка31 не повторяется. Результат ожидается.
+
 ### Batch31: отказ перед Refresh, JS не запускался — 2026-09-27
 
 Свежий profile04, freeze31, headed Chromium1246. Подготовка input остановилась:
