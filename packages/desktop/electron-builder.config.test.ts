@@ -1,6 +1,13 @@
 import { expect, test } from "bun:test"
 import type { Configuration } from "electron-builder"
 import { Product, productName, productSlug } from "@loginom-ai-agent/product"
+import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
+import release from "../product/loginom-release.json"
+import { execFile } from "node:child_process"
+import { promisify } from "node:util"
+import { pathToFileURL } from "node:url"
 
 for (const channel of ["dev", "beta", "prod"] as const) {
   test(`isolates the ${channel} package and cannot publish upstream`, async () => {
@@ -51,4 +58,29 @@ test("macOS test packages use explicit ad-hoc arm64 signing without rewriting ve
   ])
   expect(config.mac?.signIgnore).toEqual(["/Contents/Resources/loginom/bin/", "/Contents/Resources/loginom/browsers/"])
   expect(JSON.stringify(config.extraResources)).not.toContain("native/")
+})
+
+test.skipIf(process.platform !== "linux")("Linux afterPack restores the current pinned Chromium sandbox mode", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-afterpack-"))
+  try {
+    const sandbox = join(root, `resources/loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`)
+    await mkdir(dirname(sandbox), { recursive: true })
+    await writeFile(sandbox, "fixture", { mode: 0o700 })
+    const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+    if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node executable")
+    // electron-builder executes this hook in Node. Bun 1.3.14's fs.chmod drops
+    // setuid bits, so running the hook in the Bun test process is not faithful.
+    const bundle = await Bun.build({ entrypoints: [join(import.meta.dir, "electron-builder.config.ts")], target: "node" })
+    if (!bundle.success) throw Error("Could not bundle packaging hook")
+    const module = join(root, "hook.mjs")
+    await writeFile(module, await bundle.outputs[0].text())
+    await promisify(execFile)(node, ["--input-type=module", "-e",
+      `import config from ${JSON.stringify(pathToFileURL(module).href)};
+       if (process.versions.node !== ${JSON.stringify(release.nodeVersion)}) throw Error('Unexpected Node version');
+       await config.afterPack({appOutDir:${JSON.stringify(root)},electronPlatformName:'linux'});`,
+    ])
+    expect((await stat(sandbox)).mode & 0o7777).toBe(0o4755)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })

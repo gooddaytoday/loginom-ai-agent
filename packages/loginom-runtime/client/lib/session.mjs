@@ -73,6 +73,8 @@ export async function createSession(config, { headless = false, managed = null }
     browser: { browserName: 'chromium', userDataDir: profile, initScript: [downloadScript],
       launchOptions: { executablePath, headless, ...(managed ? { chromiumSandbox: true } : {}),
         args: ['--no-proxy-server', ...launch.args] }, contextOptions: { viewport: browserViewport } },
+    // Keep the browser catalog independent of page-provided WebMCP tools.
+    webmcp: false,
     capabilities: ['core', 'vision'], outputDir: artifacts,
     saveSession: false, timeouts: { action: 15000, navigation: 120000, ...(executorMode ? { settle: 0 } : {}) },
   }), { mode: 0o600 });

@@ -5,6 +5,7 @@ import { promisify } from "node:util"
 import { linuxPermissions } from "./scripts/linux-permissions"
 import type { Configuration } from "electron-builder"
 import { Product, productChannel, productName, productSlug } from "@loginom-ai-agent/product"
+import release from "../product/loginom-release.json"
 
 const execFileAsync = promisify(execFile)
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
@@ -46,7 +47,7 @@ const config: Configuration = {
     // before DEB ownership becomes root.
     await execFileAsync("/bin/chmod", [
       "4755",
-      path.join(context.appOutDir, "resources/loginom/browsers/chromium-1243/chrome-linux64/chrome-sandbox"),
+      path.join(context.appOutDir, `resources/loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`),
     ])
   },
   directories: { output: "dist", buildResources: "resources" },
