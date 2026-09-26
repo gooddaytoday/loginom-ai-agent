@@ -15,6 +15,22 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch31: отказ перед Refresh, JS не запускался — 2026-09-27
+
+Свежий profile04, freeze31, headed Chromium1246. Подготовка input остановилась:
+ready/loadCount4/empty-parent → все context predicates true → native readiness
+loading=true, same-owner FileStorageForm mask. Ошибка
+DISCOVERY_REFRESH_NATIVE_CHANGED возникла до Refresh dispatch.
+artifact.verify NOT_APPLIED; общий delivery AMBIGUOUS после upload.
+Не повторять прежние upload/download; server UUID path сохранён в evidence.
+
+Проверены 45 journal refs SHA256. Cleanup package/logout/browser=true,
+process exit1, аварии браузера не наблюдалось. До cases выполнение не дошло.
+Той же задаче передан bounded fix32: различить native replacement и same-owner
+busy непосредственно перед Refresh, ограниченное read-only ожидание и полная
+повторная проверка до единственного gesture. Следующий live — после handoff,
+новые UUID/evidence и profile05; профиль04 не переиспользовать.
+
 ### Повторная проверка памяти и batch31 — 2026-09-27
 
 После перезапуска OpenViking: MCP health, actor search и точное чтение
