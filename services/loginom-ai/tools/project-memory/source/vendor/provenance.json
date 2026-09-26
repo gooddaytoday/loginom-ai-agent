@@ -1,0 +1,13 @@
+{
+  "source": "loginom-dock/examples/codex-memory-plugin/scripts/shared",
+  "version": "0.8.1",
+  "source_commit": "18b7249f54667f31752e5accb42ab559c929af4d",
+  "description": "Unmodified installed plugin snapshot; hashes identify exact bytes independently of repository HEAD.",
+  "files": {
+    "mcp-proxy-core.mjs": "14a95ce3d9dda476ea25b7803c9363a3e1b1bbeee98ff4abb198aefd3dc44986",
+    "http-fetch.mjs": "b8be01b7e6bda436d9c9d539d83320b9e5430c2bb41b426a3c41e932cff5a267",
+    "workspace-peer.mjs": "075d47f71fc757d2e62fbe2b63dc945a2d227d8cb1aa47b698281373f55a7fab",
+    "credentials.mjs": "8cacbf4885933033838639b857c44c39a7d9000e6bd34505a065c7c5e285aa63",
+    "LICENSE": "081a54b68d890cdbcfdfb97b79f32504b4ed320f52d5f8abdae806e5cbee2ad6"
+  }
+}

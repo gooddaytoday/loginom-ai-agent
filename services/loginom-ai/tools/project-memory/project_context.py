@@ -5,7 +5,7 @@ import re
 import subprocess
 from pathlib import Path
 
-GENERATION = '20260924.1'
+GENERATION = '20260926.2'
 NAMESPACE = 'loginom-ai-agent'
 
 

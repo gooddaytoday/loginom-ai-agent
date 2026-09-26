@@ -161,7 +161,7 @@ export function readMappedState(context, route) {
   if (!route.workspaces.includes(context.cwd)) fail('Project routing state workspace is not registered.');
   const state = readProtectedJson(join(route.stateDir, `${context.threadId}.json`), 'hook state', { parentPrivate: true });
   if (!state || state.codexSessionId !== context.threadId ||
-      state.workspacePeerId !== '' ||
+      !['', route.canonicalPeerId].includes(state.workspacePeerId) ||
       (state.ovSessionId != null && state.ovSessionId !== `cx-${context.threadId}`) ||
       !Number.isInteger(state.capturedTurnCount) || state.capturedTurnCount < 0)
     fail('Project routing official hook state disagrees with the explicit project Peer or task session.');

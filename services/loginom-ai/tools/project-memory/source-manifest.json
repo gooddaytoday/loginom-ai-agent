@@ -1,0 +1,24 @@
+{
+  "generation": "20260926.2",
+  "description": "Repository-owned adapter with unchanged vendored transport and enrollment overlay. Historical upstream-manifest.json is not this generation.",
+  "files": {
+    "source/adapter.mjs": "01bf8add24b01dad1f51e1a8bd031c8921d2cc2867b5387f8527c3071d156ec6",
+    "source/server.mjs": "db8caf9c1573c7e5237c161c75157fdf4311b8df00f0fff5f968e908ccfed8ab",
+    "source/test/adapter.test.mjs": "e134157f0b69fc0900aa135b0bbf8dbaed3c669f01854da096a5a079984256a9",
+    "source/vendor/LICENSE": "081a54b68d890cdbcfdfb97b79f32504b4ed320f52d5f8abdae806e5cbee2ad6",
+    "source/vendor/credentials.mjs": "8cacbf4885933033838639b857c44c39a7d9000e6bd34505a065c7c5e285aa63",
+    "source/vendor/http-fetch.mjs": "b8be01b7e6bda436d9c9d539d83320b9e5430c2bb41b426a3c41e932cff5a267",
+    "source/vendor/mcp-proxy-core.mjs": "14a95ce3d9dda476ea25b7803c9363a3e1b1bbeee98ff4abb198aefd3dc44986",
+    "source/vendor/provenance.json": "09eeba606e3b73576b42802f0b81d03ba498184c5e5cf1775b873378d3c7ce08",
+    "source/vendor/workspace-peer.mjs": "075d47f71fc757d2e62fbe2b63dc945a2d227d8cb1aa47b698281373f55a7fab",
+    "overlay/deployment.mjs": "654ef043efb7f033ea54e2c35ec36f000e39ce92f3b6729112afe808726d8eb0",
+    "overlay/enrollment-management.mjs": "0ad39d9a5a64fe3d897ed0370536756ab2b3c5e952f83b35a7562767bb3afe6f",
+    "overlay/enrollment-routing.mjs": "96d20bb43aff625f729b8b5a5d871a4addf7c8316b47d4f7c87512f30b6fe129",
+    "overlay/hook-router.mjs": "a9f28fd7840d31a8dc0b96bcef75460bee0339df9c688d23b69cd9153b80e795",
+    "overlay/project-routing.mjs": "d0e6bcc9eaa8a09a56d08d86841e0929d65c850a787f8674d45201fd6fbf0a08",
+    "overlay/test/deployment.test.mjs": "4c35ac671020d5683068a305277ce10fb62045eebe5dda4abae6a80bd57a4fd4",
+    "overlay/test/enrollment.test.mjs": "6202121589b74a8da2f8cb6f0de087de1c89f6e379d3dac341dd3c0391f8d110",
+    "overlay/test/hook-router.test.mjs": "abf52164724c60b371a85fdb627e923a40278b45748e02b2c3b2a8368973c72f",
+    "overlay/test/project-routing.test.mjs": "652725a8c2ef0444f8c601178f732b7e8246f1ca9f00465b52cc5a2a9a44264f"
+  }
+}

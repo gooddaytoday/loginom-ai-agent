@@ -187,3 +187,12 @@ test('concurrent mapped read/write calls use common actor and distinct immutable
     assert.deepEqual(new Set(calls.map(call => call.peer)), new Set([f.route.canonicalPeerId]));
   } finally { await adapter.close(); }
 });
+
+test('official Stop writes the canonical explicit Peer; subsequent reads preserve cursor', t => {
+  const f = fixture(t);
+  writeFileSync(f.statePath(0), JSON.stringify({ ...f.state(0), workspacePeerId: f.route.canonicalPeerId, capturedTurnCount: 13 }));
+  assert.equal(readMappedState(f.context(0), f.route).capturedTurnCount, 13);
+  assert.equal(resolveContext(f.meta(), undefined, f.config).peerId, f.route.canonicalPeerId);
+  writeFileSync(f.statePath(0), JSON.stringify({ ...f.state(0), workspacePeerId: 'unrelated-project' }));
+  assert.throws(() => readMappedState(f.context(0), f.route), /disagrees/);
+});

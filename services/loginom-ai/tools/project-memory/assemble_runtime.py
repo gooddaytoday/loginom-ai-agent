@@ -18,28 +18,35 @@ def assemble(source, output, definition, identity):
     if output.is_symlink():
         raise ValueError('Runtime output must not be a symlink')
     output = output.resolve()
-    manifest = json.loads((definition / 'upstream-manifest.json').read_text())
-    source = source.resolve(strict=True)
+    legacy = source is not None
+    manifest = json.loads((definition / ('upstream-manifest.json' if legacy else 'source-manifest.json')).read_text())
+    source = (source if legacy else definition).resolve(strict=True)
+    if not legacy and manifest['generation'] != identity['generation']:
+        raise ValueError('Source manifest and deployment generation disagree')
     for name, expected in manifest['files'].items():
         path = source / name
-        if path.is_symlink() or digest(path) != expected:
-            raise ValueError('Original adapter changed; reconcile before assembly: ' + name)
+        if path.is_symlink() or path.resolve(strict=True) != path or digest(path) != expected:
+            raise ValueError('Pinned source changed; reconcile before assembly: ' + name)
     output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with tempfile.TemporaryDirectory(prefix='memory-assembly-', dir=output.parent) as temporary:
         stage = Path(temporary)
         for name in manifest['files']:
-            target = stage / name
+            target = stage / (name if legacy else str(Path(name).relative_to(Path(name).parts[0])))
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source / name, target)
-        patch = subprocess.run(['patch', '--batch', '-p1', '-i', str((definition / 'adapter.patch').resolve())],
-                               cwd=stage, capture_output=True, text=True)
-        if patch.returncode:
-            raise RuntimeError('Reviewed adapter patch did not apply; active files unchanged')
-        for path in (definition / 'overlay').rglob('*'):
-            if path.is_file():
-                target = stage / path.relative_to(definition / 'overlay')
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(path, target)
+            if target.exists():
+                raise ValueError('Duplicate runtime destination: ' + str(target))
+            shutil.copyfile(source / name, target)
+            target.chmod(0o600)
+        if legacy:
+            patch = subprocess.run(['patch', '--batch', '-p1', '-i', str((definition / 'adapter.patch').resolve())],
+                                   cwd=stage, capture_output=True, text=True)
+            if patch.returncode:
+                raise RuntimeError('Reviewed adapter patch did not apply; active files unchanged')
+            for path in (definition / 'overlay').rglob('*'):
+                if path.is_file():
+                    target = stage / path.relative_to(definition / 'overlay')
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(path, target)
         (stage / 'deployment.json').write_text(json.dumps(identity, indent=2) + '\n')
         (stage / 'deployment.json').chmod(0o600)
         expected = {str(path.relative_to(stage)): digest(path) for path in stage.rglob('*') if path.is_file()}
@@ -56,8 +63,8 @@ def assemble(source, output, definition, identity):
 if __name__ == '__main__':
     definition = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--source', type=Path, required=True,
-                        help='Local original adapter directory matching upstream-manifest.json')
+    parser.add_argument('--source', type=Path,
+                        help='Historical adapter only: exact source matching upstream-manifest.json')
     parser.add_argument('--project-root', type=Path)
     parser.add_argument('--generation', default=GENERATION)
     parser.add_argument('--output', type=Path)
