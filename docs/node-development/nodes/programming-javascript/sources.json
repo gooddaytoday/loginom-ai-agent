@@ -99,11 +99,13 @@
     ]
   },
   "user_reference": {
-    "path": "js_node_loginom_system_prompt.md",
+    "path": "docs/node-development/nodes/programming-javascript/references/js_node_loginom_system_prompt.md",
+    "original_path_at_research": "js_node_loginom_system_prompt.md",
     "bytes": 51570,
     "sha256": "c9c2d44d4dc4cf34b8f21a98504cf9f6acfc70cac510c36fe2725e7c0d7c2d16",
     "git_status_at_research": "untracked",
     "modified_by_plan_authoring": false,
+    "relocated_without_content_changes": true,
     "automatically_bundled": false
   },
   "e2e": {

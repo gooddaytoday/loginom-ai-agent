@@ -8,6 +8,13 @@
 относительны этому checkout. Прочитаны тесты, helpers и XML fixtures;
 ни один e2e здесь не запускался. `active` означает отсутствие skip в исходнике.
 
+Это исследовательский каталог сценариев, selectors и fixtures. Канонический
+[процесс](../../workflow/new-node-plan.md#2-исследовать-до-проектирования)
+требует сопоставлять Help/E2E с UI и кодом, но не требует запускать этот
+внешний TestCafe suite. В подплане JS он имеет статус `not_run` и не входит
+в условия готовности. Нужное покрытие обеспечивается адресными тестами
+handler/runtime, live-проверками, независимым oracle и автономным CLI.
+
 ## Основной suite
 
 Каталог: `tests/toreview/acceptance/wizards/javascript/`.
@@ -145,7 +152,11 @@ output. Проверено чтение 496 LGP ZIP/XML, найдено 134 JS n
 он пригоден как пример API, но не как независимый oracle нового JS handler.
 Хеши выбранных assets закреплены в [sources.json](sources.json).
 
-## Среда и точечный запуск
+## Необязательная диагностика: среда и ограничения
+
+Условия ниже нужны только при отдельном обоснованном решении использовать
+исторический TestCafe для диагностики. Устанавливать зависимости или
+восстанавливать этот suite ради выполнения JS-подплана не требуется.
 
 E2E требует **Node16.20.2** по своему AGENTS, Git LFS, `ci/common` и npm deps
 в корне/submodule; TestCafe заявлен `^3.6.0`. Локально Node16.20.2 и Google
@@ -164,26 +175,29 @@ BeforeTest входит в Loginom, AfterTest может закрывать па
 OpenPackage по умолчанию запускает узлы. Поэтому сначала нужен изолированный
 аккаунт/target/storage и проверка lifecycle hooks.
 
-Будущая команда после этой подготовки; здесь не запускалась:
+Если такой диагностический запуск понадобится:
 
-В собственной рабочей копии e2e перед запуском явно задать
-`_cu.MyRemoteAppUrl = "http://logi-test-plan.bg.local/app/"`
-в `bg/consts/user_consts.ts:46`; локальный target override не переносить
-в общий репозиторий. Для этого local run проверить, что CI и ENV_TEST_LOCAL
-не переопределяют target (`bg/consts/url.ts:112–123,190`). Контроллер запуска
-должен до BeforeTest подтвердить effective origin/path именно назначенного
-стенда без credentials; при расхождении завершить подготовку без запуска тестов.
-Ни команда ниже, ни `--fixture-grep` адрес сами не задают. В planning текущий
-e2e config не изменялся.
+1. В собственной рабочей копии e2e явно задать
+   `_cu.MyRemoteAppUrl = "http://logi-test-plan.bg.local/app/"`
+   в `bg/consts/user_consts.ts:46`. Проверить, что CI и ENV_TEST_LOCAL
+   не переопределяют target (`bg/consts/url.ts:112–123,190`). До BeforeTest
+   подтвердить effective origin/path без credentials.
+2. Согласовать фактического TestCafe-пользователя и пути с выделенными ресурсами.
+   `FAppUrl()` использует `users.Default` (`bg/users.ts:11–18`), а testdata и
+   temp paths отдельно содержат `user` (`bg/testdata.ts:737–743`,
+   `bg/consts/folders.ts:81`). Настройка runtime/CLI profile эти значения не меняет.
+   До первого fixture проверить account, fixture root и temp root; локальные
+   настройки и секреты не переносить в общий репозиторий или evidence.
+3. Выбрать только нужные случаи и составить точную команду под них; использовать
+   Node16.20.2 и single concurrency. Не запускать весь `js_*.ts` wildcard:
+   активный `js_interface.ts:213–232` содержит `for(;;);` без гарантированного
+   Stop после ошибки, а `bg/helpers/main.ts:443` выполняет cleanup условно.
+   Исключить этот случай; Stop в основном подплане проверяется конечным
+   длительным скриптом. Таймаут TestCafe не доказывает завершения на сервере.
+4. Не добавлять `.only` в общий checkout. Сохранить JUnit, фактические
+   selected/skip counts, build и результат cleanup. Недоступность такого
+   запуска относится к дополнительной диагностике и не блокирует обязательную
+   матрицу JS-подплана.
 
-```sh
-# Из /home/george/git/testing/e2e-tests, с явно выбранным разрешённым target.
-export PATH=/home/george/.nvm/versions/node/v16.20.2/bin:$PATH
-./node_modules/.bin/testcafe 'chrome:headless --lang=ru-RU' \
-  'tests/toreview/acceptance/wizards/javascript/js_*.ts' \
-  --fixture-grep 'Узел JavaScript' --concurrency 1
-```
-
-Передавать файл/фильтр, не добавлять `.only` в общий checkout. Сохранять JUnit,
-фактические selected/skip counts и build. Source-read, TestCafe PASS, прямой
-runtime PASS и автономный CLI PASS — четыре разные категории доказательств.
+В planning e2e config не изменялся. Source-read, TestCafe PASS, прямой runtime
+PASS и автономный CLI PASS — четыре разные категории доказательств.
