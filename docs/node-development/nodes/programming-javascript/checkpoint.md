@@ -15,6 +15,30 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### G2 operator20: доказана ошибка Playwright wait predicate — 2026-09-26
+
+Freeze11/syntax и **105 адресных тестов PASS** повторены root. Новый headed
+operator20 опять остановился до JS, но доказал точную причину мгновенных waits:
+в два новых `page.waitForFunction` передавалась **строка arrow-функции**.
+Установленный `playwright-core/lib/coreBundle.js` (client60579/server24345)
+передаёт `isFunction=false` для строки и возвращает результат eval(expression)
+без вызова; сам function object truthy. Это локально проверенный контракт,
+не гипотеза о скорости сервера. Прежние VM fixtures неверно моделировали его.
+
+Journal20: discovery before/terminal показывают loading=true и собственную
+`FileStorageForm.bg-mask-message`, отказ `DISCOVERY_READY_CHANGED`. Cleanup
+before20:40:08.670Z/after20:40:08.676Z оба ready=false, blocker «Загрузка»;
+60-секундный срок не исчерпан, ожидание ложно завершилось примерно за 6ms.
+Upload20 отправлен однократно, серверные bytes неизвестны; повтор не разрешён.
+Исходный cleanup unconfirmed, browser закрыт. Отдельная headed recovery20
+подтвердила packages0/logout/context close без package mutations.
+
+Назначено исправить оба waits на реальные functions с poll/diagnostic режимом
+того же predicate. Regression обязан моделировать фактический Playwright
+контракт и проверять false initial sample, ожидание settlement и исходный
+deadline. Следующий source handoff/live — operator21. Native empty-store proof
+operator19 остаётся действительным; закрытие G2/G3 из этих проб не следует.
+
 ### G2 operator19: native empty-store proof — 2026-09-26
 
 Root сверил freeze 11 файлов, syntax и повторил **102 адресных теста PASS**:
