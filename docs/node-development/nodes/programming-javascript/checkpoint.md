@@ -15,6 +15,26 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Live30: selection/source/Next наблюдены, G2 ещё открыт — 2026-09-27
+
+Freshprofile03, unchanged operator29, Chromium1246: status OBSERVED, process0.
+Полный typed input и mapping подтверждены; selection допустил одну новую DOM
+shape при сохранённых native owner/cell. Мастер открыт, режим code установлен,
+контрольный source прочитан целиком с SHA256
+`e0ea9794bb7e640ed0918f8bbdb48d4b0ae5b097959d248528a48ba7aa8f8749`.
+Next UI transition terminal/owner verified, но sentinel не найден:
+**execution=ambiguous, gate_passed=false**. Отсутствие сообщения не доказывает,
+что JS не исполнялся. Все668 journal references SHA проверены.
+Cleanup package_closed/logged_out/browser_closed=true, crash не было.
+
+Следующий этап назначен той же задаче разработчика: bounded batch независимых
+G2 cases в одном fresh-profile heldcontext, общий проверенный input и новый
+JS-node/UUID/source binding на каждый случай. Один общий30min предел, прежние
+phase deadlines, no replay неизвестных UI effects, общий cleanup. Подтверждённый
+UI transition с отсутствующим sentinel не приравнивать к потерянному dispatch;
+такое наблюдение не закрывает G2 и допускает только проверенное закрытие draft
+перед независимым следующим узлом. Profile03 после этого запуска не переиспользовать.
+
 ### Доказана зависимость crash от рестарта профиля — 2026-09-27
 
 Exact1246 `chromium1246-restart-matrix/report.json`: три fresh profiles,
