@@ -107,6 +107,30 @@ Report14 остаётся `CLEANUP_UNCONFIRMED`; отдельный recovery14 �
 `jsteach`, packages0, logout/context close. Evidence: `g1-operator-14/report.json`,
 `g1-recovery-14.json`. Editor/source/engine не проверены; G1 остаётся открытым.
 
+Operator15 (SHA256 `e1cf0472b21357ef621c55dc4abeef6855529f180518d4b5dd20a35c7b24a128`)
+подтвердил переходы 0 `TuneDataSourceInputPortWizard` → 1
+`JavaScriptColumnsWizard` → 2 `JavaScriptCodeWizard`. Всего пять native
+`Ext.form.field.Radio`, их `InputEl` — HTML `input type=button`; ownership и
+согласование native checked/DOM прошли. Два Next выполнены по одному.
+
+Полный CodeMirror read: 2 строки, 130 UTF-8 байт, SHA256
+`6eb6e2f9e8395c9b00185f1fa9f77cae18c041784f2b2033da946e74aebecc64`,
+`source_redaction_changed=false`; owner `JavaScriptCodeWizard;cmpCodeCM`.
+Настройки: readOnly=false, mode=javascript, indentUnit=4, indentWithTabs=false,
+smartIndent=true, electricChars=true. Это чтение исходного шаблона, не проверка
+ввода, исполнения или сохранения. Версия CodeMirror и оставшиеся страницы ещё
+не наблюдены. Single Close/confirmation с code page вернули собственный граф.
+
+Cleanup15 остановился при закрытии пакета: ожидание по одному размеру hidden
+messagebox могло завершиться раньше появления нового Save dialog, затем
+одноразовый dialog.count() пропустил discard. `cleanup-refusal` подтверждает
+ожидаемый вопрос о сохранении Package1 и кнопку «Не сохранять». Разработчику
+передана замена на bounded observation видимого exact dialog либо packages0,
+с записью эффектов до single dispatch. Report сохраняет CLEANUP_UNCONFIRMED.
+Recovery15 отдельно подтвердил `jsteach`, packages0, logout/context close.
+Evidence: `g1-operator-15/report.json`, `g1-recovery-15.json`. G1 частично закрыт
+наблюдениями identity/editor, полный gate и G2–G7 ещё открыты.
+
 ## История остановки: MCP при возобновлении разработчика
 
 После recovery11 задача разработчика подтвердила отсутствие OpenViking tools
