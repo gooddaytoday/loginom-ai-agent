@@ -15,6 +15,35 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### G2 operator19: native empty-store proof — 2026-09-26
+
+Root сверил freeze 11 файлов, syntax и повторил **102 адресных теста PASS**:
+discovery16/delivery51/download13/verification7/workflow-activation7/operator8.
+Live SHA `b6da61a61a86519c6596c806eb9eb81a18f16be23a3889a3563ffaed9624cced`;
+shared discovery SHA `4d72a6e51e0a79236953882aa9e2741f3f76c7aeabb5e45a26815523743c6d5d`.
+
+Новый headed operator19 подтвердил empty-directory binding: native
+`bg.filedialog.FileStore`, loadCount4, count/total/materialized1, полный cache,
+единственная parent-row `..`, собственный empty placeholder, masks/dialogs0.
+После `artifact_empty_directory_pending` получен
+`NOT_APPLIED / DISCOVERY_EMPTY_DIRECTORY_UNCONFIRMED`; Refresh не подтверждён,
+download не отправлялся. Upload отправлен один раз, bytes остаются неизвестны.
+Storage `/jsteach/js-g2-dca583e7-176f-46ca-94af-ff26ea6ec85e` сохранён;
+загрузку этой попытки не повторять. Root проверил **40/40** journal references.
+
+Cleanup допущен по исходному native package/workflow, но activation вернул
+`NOT_APPLIED / Workflow activation blocked`. Исходный итог снова
+`CLEANUP_UNCONFIRMED`, browser закрыт. Отдельная headed recovery19 подтвердила
+0 packages, logout/context close без package mutations. До JS/import не дошло.
+
+Разработчику переданы точные observations для operator20: диагностировать
+конкретный ранний отказ refreshDirectory (control уже наблюдался enabled/visible),
+снять bounded inventory блокеров activation и ждать их settlement в исходном
+cleanup deadline. Guards, uncertain upload и запрет повторных эффектов сохранить.
+Перед этим разработчик ошибочно завершил один ход старым memory bootstrap;
+основное задание восстановлено в той же задаче, память healthy, нового enrollment
+нет. Исторические memory instructions не являются текущим заданием.
+
 ### G2 operator18: upload verification readiness — 2026-09-26
 
 Исправлены conditional initial page admission (только после same-node input-port
