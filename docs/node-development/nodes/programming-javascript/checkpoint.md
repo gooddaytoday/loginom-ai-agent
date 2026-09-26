@@ -55,6 +55,23 @@ hooks само по себе не подтверждает разрешение 
 Доступ обеих задач восстановлен, продуктовая работа возобновлена.
 Исходники адаптера и его generation не менялись.
 
+## Продолжение G1 после восстановления памяти
+
+Operator12 запущен координатором в headed Chromium под `jsteach` на прежнем
+стенде и профиле. Проверки native ownership мастера (GUID, исходный `FModelNode`,
+workflow, tab, package ancestry и root) прошли. Единственное false-условие —
+`no_visible_blockers`: начальные маски загрузки исчезли, к deadline осталась
+ровно одна `.x-mask.x-border-box` над `TuneDataSourceInputPortWizard;colTargetDelete`,
+размер 30×27. Поэтому полное отсутствие любой `.x-mask` не является корректным
+условием готовности этой страницы. Нельзя исключать все маски: разработчику
+поручена точная проверка принадлежности маски disabled control.
+
+Private evidence: `g1-operator-12/report.json`. Результат прогона —
+`CLEANUP_UNCONFIRMED`, browser closed, Close не отправлялся, logout не подтверждён
+самим оператором. Отдельный readonly recovery12 подтвердил аккаунт `jsteach`,
+0 пакетов, успешные UI logout и закрытие browser context; evidence —
+`g1-recovery-12.json`. Source insertion, Next, Done, Preview и engine probes не выполнялись.
+
 ## История остановки: MCP при возобновлении разработчика
 
 После recovery11 задача разработчика подтвердила отсутствие OpenViking tools
