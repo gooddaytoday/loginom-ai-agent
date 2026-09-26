@@ -15,6 +15,32 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Operator27: busy settlement PASS, Chromium crash повторился — 2026-09-27
+
+После preflight поправки root повторил122 теста PASS, freeze13/syntax. Private
+selection теперь отклоняет descendant Execute/Preview/port/control; body/icon
+с точным владельцем допускаются. Live27 до этой проверки не дошёл.
+
+На profile02 download снова завершился SIGTRAP (PID816917, 21:38:51.838Z).
+Смена профиля **не является надёжным исправлением**. Перед этим впервые live
+подтверждён same-owner busy settlement: ready/loadCount4 → busy/loading4 →
+ready/loadCount5/count2/file_ready, без Refresh/upload replay. UI157bytes видны,
+download gesture SUCCEEDED, saveAs target_closed; hash не подтверждён.
+Все41 journal references проверены. Путь этой отдельной пробы сохранён:
+`/jsteach/js-g2-6d4cd820-1ab1-4f1e-b0d7-6650c3b7aaf7`.
+Headed recovery27: packages0, logout/browserClosed=true, без package mutations.
+
+Локальная диагностическая матрица на шести отдельных копиях profile02:
+`download_bubble.partial_view_enabled=true` — 3/3 PASS; false — 2/3 PASS,
+одна SIGTRAP. Все пробы headed, sandbox=true, same pins, blob22bytes, с1500ms
+наблюдением после сохранения. Следовательно отключение панели не доказано
+как исправление и не применяется к продукту/исходному профилю.
+
+CfT official metadata от2026-09-26 перечисляет Stable154.0.8037.57. Root готовит
+отдельную локальную пробу этой версии для сравнения; product pins, runtime и
+operator27 пока не меняются. Не переносить результаты другого бинарника на
+Chromium1243/153.0.8010.12. Developer выполняет bounded offline source/crash audit.
+
 ### Operator27: preflight selection audit — 2026-09-27
 
 Первый source handoff27 заменил неприменимый generic selection отдельным
