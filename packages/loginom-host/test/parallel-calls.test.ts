@@ -113,11 +113,11 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
           "LOGINOM_CALL_BUSY",
         )
         expect(host.journal.pending()).toEqual([])
-        expect(await readdir(join(root, "recovery"))).toHaveLength(1)
+        expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toHaveLength(1)
         await runtime.request("finish")
         await held
         expect(await run.call("describe", {}, "original")).toEqual({ name: "describe" })
-        expect(await readdir(join(root, "recovery"))).toEqual([])
+        expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toEqual([])
         await run.release()
         return
       }
@@ -157,7 +157,9 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
         expect(await runtime.request("inspect")).toEqual(["upload"])
       }
       expect(host.journal.pending()).toHaveLength(ending === "uncertain" ? 1 : 0)
-      expect(await readdir(join(root, "recovery"))).toHaveLength(ending === "uncertain" ? 1 : 0)
+      expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toHaveLength(
+        ending === "uncertain" ? 1 : 0,
+      )
       await run.release()
     } finally {
       LoginomHost.disconnect()

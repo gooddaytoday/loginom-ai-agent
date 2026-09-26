@@ -15,7 +15,9 @@ const decodeCandidate = Schema.decodeUnknownOption(Loginom.Candidate)
 export async function connectionService(
   store: ReturnType<typeof connectionStore>,
   runtime: ConnectionRuntime,
-  recovery?: Pick<Awaited<ReturnType<typeof recoveryStore>>, "pending" | "acknowledge">,
+  recovery?: Pick<Awaited<ReturnType<typeof recoveryStore>>, "pending" | "acknowledge"> & {
+    mode?: "strict" | "advisory"
+  },
 ) {
   const state: {
     active?: ActiveConnection
@@ -30,6 +32,7 @@ export async function connectionService(
     closing?: boolean
     recovering?: Promise<void>
   } = { revision: 0, generation: 0, phase: "unconfigured" }
+  const checks = new Set<Promise<void>>()
   const validations = new Map<
     string,
     { candidate: ActiveConnection; expiresAt: number; timer: ReturnType<typeof setTimeout> }
@@ -105,6 +108,7 @@ export async function connectionService(
       folder: `/${current?.username ?? Product.connection.username}`,
       hasApiKey: !!current?.apiKey,
       hasPassword: !!current?.password,
+      recoveryMode: recovery?.mode ?? "advisory",
       state:
         recovery?.pending().length || state.failure === "LOGINOM_STORE_READ_FAILED" ? "recoverable-error" : state.phase,
       ...(recovery?.pending().length ? { recoveries: recovery.pending() } : {}),
@@ -246,21 +250,29 @@ export async function connectionService(
         apiKey,
         password,
       }
-      await runtime.check(record).catch((error: unknown) => {
-        const code =
-          error instanceof Error &&
-          [
-            "LOGINOM_KNOWLEDGE_AUTH_FAILED",
-            "LOGINOM_KNOWLEDGE_UNAVAILABLE",
-            "LOGINOM_LOGIN_REJECTED",
-            "LOGINOM_ACCOUNT_MISMATCH",
-            "LOGINOM_LOGIN_UNAVAILABLE",
-            "LOGINOM_BROWSER_START_FAILED",
-          ].includes(error.message)
-            ? error.message
-            : "LOGINOM_CONNECTION_CHECK_FAILED"
-        throw new Error(code)
+      const checking = Promise.resolve().then(() => {
+        if (state.closing) throw Error("LOGINOM_HOST_CLOSED")
+        return runtime.check(record)
       })
+      checks.add(checking)
+      await checking
+        .catch((error: unknown) => {
+          const code =
+            error instanceof Error &&
+            [
+              "LOGINOM_HOST_CLOSED",
+              "LOGINOM_KNOWLEDGE_AUTH_FAILED",
+              "LOGINOM_KNOWLEDGE_UNAVAILABLE",
+              "LOGINOM_LOGIN_REJECTED",
+              "LOGINOM_ACCOUNT_MISMATCH",
+              "LOGINOM_LOGIN_UNAVAILABLE",
+              "LOGINOM_BROWSER_START_FAILED",
+            ].includes(error.message)
+              ? error.message
+              : "LOGINOM_CONNECTION_CHECK_FAILED"
+          throw new Error(code)
+        })
+        .finally(() => checks.delete(checking))
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
       if (candidate.revision !== state.revision || state.applying || state.writing)
         throw new Error("LOGINOM_REVISION_CONFLICT")
@@ -318,6 +330,12 @@ export async function connectionService(
   progress()
   return {
     api,
+    idle: () =>
+      !checks.size &&
+      !state.closing &&
+      !state.applying &&
+      !state.writing &&
+      ![...leases.values()].some((lease) => lease.active),
     acquire(run: string) {
       if (
         state.closing ||
@@ -363,6 +381,7 @@ export async function connectionService(
       clearValidations()
       await state.recovering?.catch(() => undefined)
       await state.applying
+      await Promise.allSettled([...checks])
       await state.handle?.close()
       state.handle = undefined
       state.phase = state.active ? "recoverable-error" : "unconfigured"

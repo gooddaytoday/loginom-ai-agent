@@ -41,3 +41,9 @@ for (const [label, patch] of [
   test("managed start rejects invalid " + label, () => {
     assert.throws(() => validateStartInput({ ...base, ...patch }), /^Error: LOGINOM_START_INVALID$/)
   })
+
+test("trusted attempt registration is private, bounded and string-only", () => {
+  assert.deepEqual(validateStartInput({...base, trustedAttempt:{attemptId:"attempt-1"}}), {acceptanceCleanupPackage:null})
+  for (const trustedAttempt of [{attemptId:123}, {attemptId:""}, {attemptId:"../escape"}, {attemptId:"safe", extra:true}, null])
+    assert.throws(() => validateStartInput({...base, trustedAttempt}), /LOGINOM_START_INVALID/)
+})

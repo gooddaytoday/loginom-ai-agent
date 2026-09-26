@@ -25,6 +25,7 @@ import { compactActionResult, compactNodeRequestFailure, userResultSchema, compa
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory } from './user-workflow.mjs';
 import { makePackageCleanupCode, parsePackageCleanupResult } from './package-cleanup.mjs';
+import {createSessionCompletion} from './session-completion.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity } from './storage-policy.mjs';
 
@@ -124,6 +125,26 @@ export async function createBridge(config, session, { browserTransport: managedB
   const browserGate = createSerialGate();
   const heldLeases = new Set();
   const savedPackages = new Map();
+  const completion = createSessionCompletion({
+    identity() {
+      const prepared = session.metadata.workspacePreparation?.state;
+      return {attemptId:config.trustedAttempt?.attemptId, generation:config.trustedAttempt?.generation,
+        chat:config.trustedAttempt?.chat, sessionId:session.metadata.sessionId,
+        documentId:prepared?.document_id, account:prepared?.loginom_account};
+    },
+    persist: receipt => writeFile(join(session.directory,'session-completion.json'), JSON.stringify(receipt)+'\n', {mode:0o600,flush:true}),
+    async execute(binding) {
+      return browserGate(async () => {
+        actionRuntime.assertPreparationAllowed();
+        const prepared = session.metadata.workspacePreparation?.state;
+        const options = {sessionId:binding.sessionId, documentId:binding.documentId, account:binding.account,
+          packagePath:binding.packagePath, tabTid:prepared?.workflow_ref?.tab_tid,
+          loginomUrl:config.loginomUrl, loginomBuild:session.metadata.targetIdentity?.loginom_build};
+        const result = await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:makePackageCleanupCode(options)}},undefined,{timeout:30000});
+        return parsePackageCleanupResult(result,options);
+      });
+    },
+  });
   let closing, shutdownStarted = false;
   const skill = createSkillLoader({ directory: session.directory, transport: skillTransport(config) });
   let clipboardUncertain = false;
@@ -189,6 +210,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: structuredClone(catalog.tools) }));
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
+      completion.assertOpen();
       const owner = catalog.routes.get(request.params.name);
       if (!owner) throw new McpError(ErrorCode.InvalidParams, 'Unknown Dock tool');
       if (request.params.name === 'dock_diagnostics') {
@@ -233,6 +255,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           let workspace = null;
           if (actionRuntime) {
             workspace = await browserGate(async () => {
+              completion.mutated();
               const state = await prepareWorkspaceSession({ metadata: session.metadata,
               request: preparationRequest, signal: extra.signal,
               assertAllowed() { extra.signal.throwIfAborted(); actionRuntime.assertPreparationAllowed(); },
@@ -296,6 +319,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           if(isNodeApiTool(request.params.name)) {
             const invoke=async()=>{
               requirePreparedWorkspace(session.metadata);
+              if(!['dock_node_status','dock_node_wait','dock_artifact_delivery_status'].includes(request.params.name)) completion.mutated();
               let args=request.params.arguments??{};
               if(userProfile && ['dock_node_apply','dock_node_resume','dock_node_read'].includes(request.params.name)) {
                 validateActionParameters(userNodeTool(actionRuntime.tools.find(tool=>tool.name===request.params.name)).inputSchema,args);
@@ -322,6 +346,8 @@ export async function createBridge(config, session, { browserTransport: managedB
           }
           return await browserGate(async () => {
             extra.signal.throwIfAborted();
+            completion.assertOpen();
+            if(!['dock_workspace_observe','dock_operation_inspect','dock_artifact_verify'].includes(request.params.name)) completion.mutated();
             const args = request.params.arguments ?? {};
             if(userProfile&&request.params.name==='dock_action_run'&&!['package.save_as','package.save_checkpoint'].includes(args.action_key))
               throw Error('Use dock_node_apply for supported nodes. Low-level actions require the diagnostic profile.');
@@ -344,7 +370,10 @@ export async function createBridge(config, session, { browserTransport: managedB
                     : await actionRuntime.run(args.action_key, args.parameters, { signal: extra.signal, operationId: args.operation_id });
             await logResult(request.params.name,outcome);
             if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
-                && outcome.output?.package_ref?.path) savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);
+                && outcome.output?.package_ref?.path) {
+              savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);
+              completion.saved(outcome.output.package_ref.path,outcome.operation_id);
+            }
             if (userProfile && outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key))
               for (const continuation of outcome.output?.workflow_continuations ?? []) userWorkflows.remember(continuation);
             const reply = actionReply(userProfile?compactActionResult(outcome):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });
@@ -394,6 +423,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         });
         return await browserGate(async () => {
           extra.signal.throwIfAborted();
+          completion.mutated();
           if (clipboardUncertain) throw new Error('Clipboard completion is uncertain; restart this Dock client before further browser operations');
           if (request.params.name !== 'dock_clipboard_transfer') {
             return browser.callTool(request.params, undefined, { signal: extra.signal, timeout: 360000 });
@@ -428,7 +458,14 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
     });
-    return { server, catalog, hasActiveWork: () => !clipboardUncertain && !!actionRuntime?.hasActiveWork(),
+    return { server, catalog,
+      sessionCompletionOptions() {
+        actionRuntime.assertPreparationAllowed();
+        return completion.options();
+      },
+      finishOwnSession: request => completion.finish(request),
+      sessionCompletionStatus: completionId => completion.status(completionId),
+      hasActiveWork: () => !clipboardUncertain && !!actionRuntime?.hasActiveWork(),
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {

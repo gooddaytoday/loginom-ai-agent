@@ -23,7 +23,7 @@ class ExternalClient {
   async callTool({arguments:{code}}){
     let value;
     if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
-      target,document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
+      target,document_id:'own-doc',loginom_account:'test-2',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
     else if(code.includes('function readSavedPackageState')){
       this.f.events.push('saved-state');
@@ -33,6 +33,7 @@ class ExternalClient {
     }
     else if(code.includes('async function closeOwnedPackage')){
       this.f.events.push('package-cleanup');
+      if(this.f.scenario==='lost-response')throw Error('Lost cleanup response');
       value={version:1,session_id:'own-session',document_id:'own-doc',status:this.f.scenario==='native-blocked'?'BLOCKED':'SUCCEEDED',package_closed:this.f.scenario!=='native-blocked',
         logged_out:this.f.scenario!=='native-blocked',account:'test-2',package_path:path,unsaved_changes_discarded:false,packages_before:1,packages_after:0,reason:null};
     } else throw Error('Unexpected browser code');
@@ -49,7 +50,8 @@ mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExport
   makeWorkspacePrepareCode:options=>workspace.makeWorkspacePrepareCode({...options,platform:'darwin'})}});
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>{
   const f=current;return {tools:[],describe:()=>({}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},
-    run:async(key,parameters,{operationId})=>{f.saves++;return {status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};},
+    run:async(key,parameters,{operationId})=>{f.outcomes??=new Map(); if(f.outcomes.has(operationId))return f.outcomes.get(operationId);
+      f.saves++;const outcome={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};f.outcomes.set(operationId,outcome);return outcome;},
   };
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
@@ -97,4 +99,47 @@ for(const scenario of ['success','unprepared','no-save','native-blocked','busy',
     }
     assert.equal(f.events.filter(e=>e==='package-cleanup').length,['success','native-blocked','dirty-after-save','state-unavailable'].includes(scenario)?1:0);
   }finally{await client?.close();await bridge?.close();await rm(directory,{recursive:true,force:true});}
+});
+
+for(const scenario of ['success','native-blocked','mutation-after-save','lost-response','cached-save-replay']) test('private completion through real bridge: '+scenario,async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'private-completion-bridge-'));
+  const f=current={scenario,events:[],busy:false,saves:0};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>[],async releaseUploads(){}}};
+  let bridge,client;
+  try{
+    bridge=await createBridge({mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+      loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',
+      trustedAttempt:{attemptId:'attempt-fixture',generation:7,chat:'b'.repeat(64)}},session);
+    client=new AgentClient({name:'test',version:'1'}); const [a,b]=InMemoryTransport.createLinkedPair(); await bridge.server.connect(b); await client.connect(a);
+    const catalog=await client.listTools(); assert.equal(catalog.tools.some(tool=>/session.*finish|completion/.test(tool.name)),false);
+    await client.callTool({name:'dock_prepare',arguments:{}});
+    const save=()=>client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'own-save-'+f.saves}});
+    await save();
+    const binding=bridge.sessionCompletionOptions();
+    assert.equal(binding.attemptId,'attempt-fixture');assert.equal(binding.generation,7);assert.equal(binding.account,'test-2');
+    const request={completionId:'complete-private',binding};
+    if(scenario==='cached-save-replay'){
+      await client.callTool({name:'dock_prepare',arguments:{operation_id:'prepare-again'}});
+      await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'own-save-0'}});
+      assert.equal(f.saves,1,'cached save must not execute twice');
+      assert.throws(()=>bridge.sessionCompletionOptions(),/LOGINOM_SESSION_SAVE_REQUIRED/);
+      await assert.rejects(bridge.finishOwnSession(request),/LOGINOM_SESSION_SAVE_REQUIRED/);
+      await save();request.binding=bridge.sessionCompletionOptions();
+    }
+    if(scenario==='mutation-after-save'){
+      await save();
+      await assert.rejects(bridge.finishOwnSession(request),/LOGINOM_SESSION_COMPLETION_CONFLICT/);
+      assert.equal(f.events.includes('package-cleanup'),false);
+      request.binding=bridge.sessionCompletionOptions();
+    }
+    const receipt=await bridge.finishOwnSession(request);
+    assert.equal(receipt.status,scenario==='native-blocked'?'BLOCKED':scenario==='lost-response'?'UNKNOWN':'SUCCEEDED');
+    assert.deepEqual(await bridge.finishOwnSession(request),receipt);
+    assert.equal(f.events.filter(event=>event==='package-cleanup').length,1);
+    assert.deepEqual(bridge.sessionCompletionStatus(request.completionId),receipt);
+    assert.deepEqual(JSON.parse(await readFile(join(directory,'session-completion.json'),'utf8')),receipt);
+    await assert.rejects(client.callTool({name:'dock_prepare',arguments:{}}),/LOGINOM_SESSION_COMPLETION_PENDING/);
+  } finally {await client?.close();await bridge?.close();await rm(directory,{recursive:true,force:true});}
 });

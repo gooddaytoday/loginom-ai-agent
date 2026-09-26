@@ -3,7 +3,7 @@ import type { IpcMainInvokeEvent } from "electron"
 import { Option, Schema } from "effect"
 import { Loginom } from "@loginom-ai-agent/schema/loginom"
 
-export function registerLoginomIpc(api: Loginom.API) {
+export function registerLoginomIpc(api: Loginom.API, sessions: Loginom.SessionAPI) {
   function sender(event: IpcMainInvokeEvent) {
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window || event.senderFrame !== event.sender.mainFrame || window.isDestroyed())
@@ -16,6 +16,18 @@ export function registerLoginomIpc(api: Loginom.API) {
         url.origin === new URL(process.env.ELECTRON_RENDERER_URL).origin)
     if (!valid) throw new Error("LOGINOM_SENDER_INVALID")
   }
+  ipcMain.handle("loginom-session-completion-options", (event, value: unknown) => {
+    sender(event)
+    const decoded = Schema.decodeUnknownOption(Loginom.SessionCompletionTarget)(value)
+    if (Option.isNone(decoded)) throw new Error("LOGINOM_SESSION_BINDING_INVALID")
+    return sessions.sessionCompletionOptions(decoded.value)
+  })
+  ipcMain.handle("loginom-finish-own-session", (event, value: unknown) => {
+    sender(event)
+    const decoded = Schema.decodeUnknownOption(Loginom.FinishOwnSession)(value)
+    if (Option.isNone(decoded)) throw new Error("LOGINOM_SESSION_BINDING_INVALID")
+    return sessions.finishOwnSession(decoded.value)
+  })
   const candidate = Schema.decodeUnknownOption(Loginom.Candidate)
   const save = Schema.decodeUnknownOption(Loginom.Save)
   const cancel = Schema.decodeUnknownOption(Loginom.Cancel)

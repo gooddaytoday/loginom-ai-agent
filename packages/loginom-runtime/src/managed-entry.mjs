@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
+import { closeManagedHandles } from "./close-managed-handles.mjs"
 import { loginBrowser, checkConnection, loginomAddress } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts } from "../client/lib/artifacts.mjs"
@@ -36,13 +37,9 @@ function close() {
   state.controller?.abort()
   state.closing = (async () => {
     await Promise.allSettled([...requests])
-    const results = []
-    for (const handle of [state.client, state.bridge, state.browserServer, state.browser]) {
-      results.push(...(await Promise.allSettled([Promise.resolve().then(() => handle?.close())])))
-    }
-    if (state.browserProfile)
-      results.push(...(await Promise.allSettled([rm(state.browserProfile, { recursive: true, force: true })])))
-    if (results.some((result) => result.status === "rejected")) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    await closeManagedHandles({ ...state,
+      removeProfile: state.browserProfile ? () => rm(state.browserProfile, { recursive: true, force: true }) : undefined,
+    })
   })()
   return state.closing
 }
@@ -120,6 +117,9 @@ async function handle(message) {
         // Acceptance-only shutdown cleanup; the bridge binds it to the observed
         // prepared account, so no replay login account is needed here.
         acceptanceCleanupPackage,
+        trustedAttempt: input.trustedAttempt
+          ? { attemptId: input.trustedAttempt.attemptId, generation: input.generation, chat: input.chat }
+          : undefined,
         storageDirectories: {
           inputs: `/${input.connection.username}`,
           exports: `/${input.connection.username}`,
@@ -167,6 +167,18 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "session-completion-options") {
+      send({ id: message.id, result: state.bridge.sessionCompletionOptions() })
+      return
+    }
+    if (message.operation === "session-completion-status") {
+      send({ id: message.id, result: state.bridge.sessionCompletionStatus(message.input?.completionId) })
+      return
+    }
+    if (message.operation === "session-finish") {
+      send({ id: message.id, result: await state.bridge.finishOwnSession(message.input) })
+      return
+    }
     if (message.operation === "admit") {
       if (typeof message.input.userMessage !== "string" || !message.input.userMessage)
         throw Error("LOGINOM_INPUT_INVALID")
