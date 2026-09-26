@@ -21,6 +21,14 @@ Desktop typecheck прошёл. Локальный Agent typecheck заблок�
 Chromium jobs дали разные результаты (PASS и fixture socket `ECONNRESET`);
 это не объявляется успешным общим CI.
 
+`ECONNRESET` воспроизведён на закреплённых Node 24.19.0/Chromium 1243:
+ошибка приходила от raw CONNECT socket после намеренного ответа 502 и закрытия.
+Fixture теперь принимает только такой reset после `writableEnded`; ранний reset,
+EPIPE и остальные ошибки по-прежнему проваливают проверку. Все проверки обхода
+proxy/PAC, navigation и WebSocket сохранены. Три локальных повтора headless/headed
+дали по 4 PASS. Системный proxy пользовательского Mac не менялся; native
+proxy-сценарии выполняются только в disposable CI.
+
 ## Политика профиля
 
 `LOGINOM_AI_AGENT_STRICT_RECOVERY=1` включает строгий режим Desktop и CLI.

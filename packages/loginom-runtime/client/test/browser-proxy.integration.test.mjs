@@ -8,9 +8,31 @@ import {mkdtemp, rm} from 'node:fs/promises';
 import {networkInterfaces, tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {PassThrough} from 'node:stream';
 import {systemProxyFixture} from './support/system-proxy-fixture.mjs';
 
 const execute = promisify(execFile);
+
+function rejectedTunnelError(socket, error) {
+  // Chromium may reset a CONNECT tunnel after our explicit 502 + close.
+  // HTTP no longer owns this socket; keep every other transport failure visible.
+  if (error.code === 'ECONNRESET' && socket.writableEnded) return;
+  throw error;
+}
+
+test('rejected proxy tunnels tolerate only resets after the response ends', () => {
+  const socket = new PassThrough();
+  const reset = Object.assign(new Error('read ECONNRESET'), {code:'ECONNRESET'});
+  assert.throws(() => rejectedTunnelError(socket, reset), error => error === reset);
+  socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n');
+  assert.doesNotThrow(() => rejectedTunnelError(socket, reset));
+  for (const code of ['EPIPE', 'ECONNABORTED', 'ETIMEDOUT']) {
+    const error = Object.assign(new Error(code), {code});
+    assert.throws(() => rejectedTunnelError(socket, error), value => value === error);
+  }
+  socket.destroy();
+});
+
 const html = `<!doctype html><body>
 <div data-tid="LoginForm;Login;edtUsername"><input></div>
 <div data-tid="LoginForm;Login;edtPassword"><input type="password"></div>
@@ -75,7 +97,11 @@ test('Loginom Chromium connects directly with a configured proxy', {
       await rm(directory, {recursive:true, force:true, maxRetries:5});
     }
   });
-  proxy.on('connect', (request, socket) => { requests.push(request.url); socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n'); });
+  proxy.on('connect', (request, socket) => {
+    requests.push(request.url);
+    socket.on('error', error => rejectedTunnelError(socket, error));
+    socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n');
+  });
   origin.on('upgrade', (request, socket) => {
     sockets.add(socket);
     socket.on('close', () => sockets.delete(socket));
