@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### G2 operator22: input-port proof PASS, Setting absent — 2026-09-26
+
+Root повторил **110 адресных тестов PASS**, syntax/freeze13. Live operator SHA
+`0cba99eaf3da0700eb3e1a454615cb47ee8ce790210d54a77fe402b279f3342f`.
+Download и серверные bytes подтверждены; imports.text дал полный typed6×5 PASS.
+JS GUID `d7eef805-0b69-46b6-a16b-de9c1b5d5050` соединён input0. Отдельный
+native port reader подтвердил полный same-node schema/mapping пяти колонок,
+RowID Integer; port GUID `9dc72a3f-56bf-3bfc-84ec-f979daf4da6b`.
+
+После закрытия port wizard основной мастер не открыт: `Unique bound Setting
+control required`. GUID и `MF;TF-1;Graph;JavaScript` до/после совпадают, node
+rendered=true. Screenshot показывает JS с выделенным входным портом без Setting.
+Зависимость Setting от hover/selection пока гипотеза; разработчик проверяет
+штатный механизм открытия и добавляет наблюдаемое UI-раскрытие control.
+JS source/Next ещё не отправлялись.
+
+**Все штатные cleanup flags true**: package_closed/logged_out/browser_closed.
+Recovery22 не нужна. Новый fsync lifecycle journal содержит download и затем
+явно запрошенное оператором закрытие → page_close/context_close/disconnected;
+crash/неожиданное закрытие не наблюдались. Это не объясняет прерывание operator21.
+Следующий source handoff/live — operator23; матрица полного плана остаётся открытой.
+
 ### G2 operator21: ожидание загрузки PASS, download interrupted — 2026-09-26
 
 Root повторил **107 адресных тестов PASS**, сверил freeze11 и syntax.
