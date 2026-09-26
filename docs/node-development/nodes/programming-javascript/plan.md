@@ -93,8 +93,11 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
    документами этой ветки. На продуктовой базе этих документов ещё нет.
    Создать worktree от product base, пройти регистрацию памяти на этом HEAD,
    затем перенести перечисленные docs-only commits до `plan_source_sha`.
-   До переноса проверить ancestry и отсутствие изменений вне `docs/node-development/`;
-   после — hashes плана/fixtures/справочника и новый HEAD. Не переносить
+   До переноса проверить ancestry и отсутствие продуктовых изменений. Основная
+   область — `docs/node-development/`; отдельно разрешены только актуальные
+   `services/loginom-ai/tools/project-memory/CURRENT.md` и `ubuntu-adapter.md`,
+   на которые ссылается регламент. Code-коммиты memory kit не переносить.
+   После переноса — hashes плана/fixtures/справочника и новый HEAD. Не переносить
    незакоммиченные файлы автоматически и не подменять base SHA регистрации.
    Ubuntu-адаптация координаторских helpers может быть отдельным code-коммитом
    основного checkout: записать его SHA в checkpoint и не включать автоматически
