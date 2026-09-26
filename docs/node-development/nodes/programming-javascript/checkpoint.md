@@ -15,6 +15,31 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### G2 operator21: ожидание загрузки PASS, download interrupted — 2026-09-26
+
+Root повторил **107 адресных тестов PASS**, сверил freeze11 и syntax.
+Оба новых waits используют настоящие functions с poll flag; regression проверяет
+ложный initial sample и deadline. В headed operator21 исправление подтверждено:
+native store loading=true/loadCount4/count1 перешёл к loading=false/loadCount5/
+count2/file_ready=true. Появилась уникальная `sales.csv`, UI bytes157 проверены.
+Refresh и повторный upload для этого результата не потребовались.
+
+После `download_gesture_result=SUCCEEDED` получен **AMBIGUOUS /
+DOWNLOAD_BROWSER_CALL_FAILED**, cleanup=false. До создания failure snapshot
+page/context/browser уже закрыт; оператор не мог завершить package/logout.
+Причина закрытия не установлена. User/system journal в 23:44:34 MSK содержит
+завершение `app-org.chromium.Chromium-730200.scope`; в проверенном интервале
+нет записей OOM/segfault, что не доказывает отсутствие сбоя. chrome-debug.log
+в профиле отсутствует. Пользователю задан фактический вопрос о ручном закрытии,
+ответ пока не получен; молчание не трактуется как подтверждение причины.
+
+Upload/download gesture выполнены однократно. Серверный hash неизвестен;
+путь `/jsteach/js-g2-a7457f4f-fc5a-480c-b8b3-a20a62da374e` сохранён. Повторять
+эти эффекты нельзя. Отдельная headed recovery21 подтвердила packages0/logout/
+context close без package mutations. Разработчик исследует download lifecycle
+и добавляет доказательства close/crash/error cause для source handoff operator22.
+До JS/import этот run не дошёл; G2/G3 не закрыты.
+
 ### G2 operator20: доказана ошибка Playwright wait predicate — 2026-09-26
 
 Freeze11/syntax и **105 адресных тестов PASS** повторены root. Новый headed
