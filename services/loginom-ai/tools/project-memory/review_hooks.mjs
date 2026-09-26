@@ -4,12 +4,14 @@
 // This does not reload the running app or start any thread/model.
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isAbsolute, join, resolve } from 'node:path';
 
 const option = name => { const i=process.argv.indexOf(name); return i<0?null:process.argv[i+1]; };
+const codex = option('--codex');
+if (!codex || !isAbsolute(codex)) throw new Error('Pass --codex with the absolute path to the installed Codex executable');
+accessSync(codex, constants.X_OK);
 if (!option('--manifest')) throw new Error('Pass the exact prepared --manifest path');
 const manifestPath = resolve(option('--manifest'));
 const rollout = resolve(manifestPath, '..');
@@ -23,7 +25,7 @@ const eventNames = {SessionStart:'sessionStart', UserPromptSubmit:'userPromptSub
   PreCompact:'preCompact', SessionEnd:'sessionEnd'};
 if (readFileSync(manifest.canonical_hooks_path, 'utf8') !== readFileSync(join(rollout,'hooks.json.pending'),'utf8'))
   throw new Error('Canonical hook definitions differ from the reviewed preparation');
-const child = spawn('/Applications/ChatGPT.app/Contents/Resources/codex', ['app-server','--listen','stdio://'],
+const child = spawn(codex, ['app-server','--listen','stdio://'],
   {cwd:root,stdio:['pipe','pipe','pipe']});
 let id = 0; const pending = new Map(); let stderrBytes = 0;
 child.stderr.on('data', b => {stderrBytes += b.length;});
@@ -35,6 +37,7 @@ createInterface({input:child.stdout}).on('line', line => {
   }
 });
 child.on('exit', code => {for(const p of pending.values()){clearTimeout(p.timer);p.reject(new Error(`App API exited ${code}; stderrBytes=${stderrBytes}`));}pending.clear();});
+child.on('error', error => {for(const p of pending.values()){clearTimeout(p.timer);p.reject(new Error(`Cannot start Codex app API: ${error.code}`));}pending.clear();});
 function request(method,params){return new Promise((accept,reject)=>{const seq=++id;const timer=setTimeout(()=>{pending.delete(seq);reject(new Error(`RPC timeout: ${method}`));},20000);pending.set(seq,{resolve:accept,reject,timer});child.stdin.write(JSON.stringify({id:seq,method,params})+'\n');});}
 const extra = option('--workspace');
 const cwds = [...new Set([root, ...manifest.tasks.map(x=>x.cwd), ...(extra?[resolve(extra)]:[])])];
@@ -45,6 +48,8 @@ function checkedHooks(result, trusted = false) {
   const summaries = [];
   for (const entry of result.data) {
     if(!cwds.includes(entry.cwd)||entry.errors.length||entry.warnings.length) throw new Error('Workspace hook inventory needs reconciliation');
+    const originalMemoryHooks=entry.hooks.filter(x=>x.pluginId?.startsWith('openviking-memory@'));
+    if(entry.cwd!==root && originalMemoryHooks.length) throw new Error('Original memory plugin hooks remain in a worktree; reconcile before bootstrap');
     const hooks=entry.hooks.filter(x=>x.sourcePath===manifest.canonical_hooks_path);
     if(hooks.length!==expectedCount) throw new Error('Canonical project hook inventory differs from reviewed definitions');
     for(const [event,groups] of Object.entries(expected.hooks)) for(const group of groups) for(const definition of group.hooks) {
@@ -57,7 +62,7 @@ function checkedHooks(result, trusted = false) {
       keys.set(h.key,h.currentHash);
     }
     summaries.push({cwd:entry.cwd,projectHooks:hooks.map(x=>({key:x.key,event:x.eventName,trustStatus:x.trustStatus,currentHash:x.currentHash})),
-      originalMemoryHooks:entry.hooks.filter(x=>x.pluginId==='openviking-memory@openviking').map(x=>({event:x.eventName,enabled:x.enabled}))});
+      originalMemoryHooks:originalMemoryHooks.map(x=>({event:x.eventName,enabled:x.enabled}))});
   }
   if(keys.size!==expectedCount) throw new Error('Worktrees do not share the reviewed canonical hook identities');
   return {keys,summaries};
@@ -72,7 +77,7 @@ try {
    const after=checkedHooks(await request('hooks/list',{cwds}),true);
    const receipt={generation,trusted_hooks:after.keys.size,checkedAt:new Date().toISOString(),
      hooksSha256:createHash('sha256').update(readFileSync(manifest.canonical_hooks_path)).digest('hex'),
-     mechanism:'normal hooks/list + config/batchWrite',runtimeReloaded:false,workspaces:after.summaries};
+     mechanism:'normal hooks/list + config/batchWrite',codexExecutable:codex,runtimeReloaded:false,workspaces:after.summaries};
    const receiptPath=option('--output')?resolve(option('--output')):join(rollout,'hooks-trust-verified.json');
    writeFileSync(receiptPath,JSON.stringify(receipt,null,2)+'\n',{mode:0o600});
    process.stdout.write(JSON.stringify({generation,trusted_hooks:receipt.trusted_hooks,runtimeReloaded:false,

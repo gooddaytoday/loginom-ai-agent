@@ -22,6 +22,9 @@ SPEC.loader.exec_module(MODULE)
 
 class PreparationTest(unittest.TestCase):
     def setUp(self):
+        # Fixtures must satisfy the same ownership contract under Ubuntu's 0002 umask.
+        previous_umask = os.umask(0o077)
+        self.addCleanup(os.umask, previous_umask)
         self.temp = tempfile.TemporaryDirectory(prefix='memory-git-preparation-')
         self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name).resolve()
@@ -89,6 +92,41 @@ class PreparationTest(unittest.TestCase):
         self.config.write_text('changed')
         with self.assertRaises(ValueError): MODULE.prepare(self.cwd, self.branch, self.sha, True)
         self.assertEqual(self.config.read_text(), 'changed')
+
+    def test_marketplace_id_from_manifest_disables_actual_plugin(self):
+        manifest_path = self.rollout / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        manifest['official_plugin_id'] = 'openviking-memory@loginom-dock'
+        manifest_path.write_text(json.dumps(manifest))
+        MODULE.prepare(self.cwd, self.branch, self.sha, True)
+        parsed = MODULE.tomllib.loads(self.config.read_text())
+        self.assertFalse(parsed['plugins']['openviking-memory@loginom-dock']['enabled'])
+        self.assertNotIn('openviking-memory@openviking', parsed['plugins'])
+
+    def test_other_marketplace_existing_memory_requires_reconciliation(self):
+        original = self.original + b'\n[plugins."openviking-memory@loginom-dock"]\nenabled=true\n'
+        self.config.write_bytes(original)
+        with self.assertRaises(ValueError): MODULE.prepare(self.cwd, self.branch, self.sha, True)
+        self.assertEqual(self.config.read_bytes(), original)
+
+    def test_old_manifest_preserves_original_marketplace(self):
+        manifest_path = self.rollout / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        del manifest['official_plugin_id']
+        manifest_path.write_text(json.dumps(manifest))
+        MODULE.prepare(self.cwd, self.branch, self.sha, True)
+        parsed = MODULE.tomllib.loads(self.config.read_text())
+        self.assertFalse(parsed['plugins']['openviking-memory@openviking']['enabled'])
+
+    def test_invalid_plugin_identity_does_not_write_configuration(self):
+        with self.assertRaises(ValueError):
+            prepare_project(self.root, self.node, self.plugin, plugin_id='other@marketplace')
+        manifest_path = self.rollout / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        manifest['official_plugin_id'] = 'openviking-memory@bad"id'
+        manifest_path.write_text(json.dumps(manifest))
+        with self.assertRaises(ValueError): MODULE.prepare(self.cwd, self.branch, self.sha, True)
+        self.assertEqual(self.config.read_bytes(), self.original)
 
     def test_existing_legacy_workspace_is_rejected(self):
         (self.home / '.openviking/project-memory-routing.json').write_text(json.dumps({'projects':[{'workspaces':[str(self.cwd)]}]}))

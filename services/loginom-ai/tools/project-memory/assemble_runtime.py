@@ -56,7 +56,8 @@ def assemble(source, output, definition, identity):
 if __name__ == '__main__':
     definition = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--source', type=Path, default=Path('/Users/kartamyshev/Git/openviking/integrations/codex-mcp-adapter'))
+    parser.add_argument('--source', type=Path, required=True,
+                        help='Local original adapter directory matching upstream-manifest.json')
     parser.add_argument('--project-root', type=Path)
     parser.add_argument('--generation', default=GENERATION)
     parser.add_argument('--output', type=Path)

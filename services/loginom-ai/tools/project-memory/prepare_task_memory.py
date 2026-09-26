@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import tempfile
 import tomllib
@@ -54,6 +55,10 @@ def prepare(cwd, branch, base, install=False, root=None, generation=GENERATION):
     if any(str(cwd) in x['workspaces'] for x in legacy['projects']):
         raise ValueError('Existing legacy routes are immutable; this helper only prepares fresh workspaces')
     runtime, rollout, manifest = read_manifest(root, generation)
+    # Old, already reviewed manifests predate marketplace-aware preparation.
+    plugin_id = manifest.get('official_plugin_id', 'openviking-memory@openviking')
+    if not re.fullmatch(r'openviking-memory@[A-Za-z0-9][A-Za-z0-9_-]*', plugin_id):
+        raise ValueError('Prepared official plugin ID is invalid')
     directory = Path(manifest['deployment']['enrollmentsDir'])
     private(directory, True)
     record_path = directory / (sha(str(cwd).encode()) + '.json')
@@ -76,14 +81,15 @@ def prepare(cwd, branch, base, install=False, root=None, generation=GENERATION):
         return {'status': 'already-prepared', 'cwd': str(cwd), 'registrationId': record['registrationId'],
                 'lifecycle': record['status'], 'state_reset': False}
     parsed = tomllib.loads(original.decode())
-    if 'openviking' in parsed.get('mcp_servers', {}) or 'openviking-memory@openviking' in parsed.get('plugins', {}) or \
+    if 'openviking' in parsed.get('mcp_servers', {}) or any(
+            name.startswith('openviking-memory@') for name in parsed.get('plugins', {})) or \
             'hooks' in parsed or (config.parent / 'hooks.json').exists():
         raise ValueError('Existing memory configuration requires reconciliation, not fresh enrollment')
     addition = '\n# Shared project memory: coordinator enrollment before development.\n'
     addition += '[mcp_servers.openviking]\ncommand = ' + json.dumps(manifest['node']) + '\n'
     addition += 'args = ' + json.dumps([str(runtime / 'server.mjs')]) + '\n'
     addition += 'enabled = true\nstartup_timeout_sec = 30\ntool_timeout_sec = 120\n'
-    addition += '[plugins."openviking-memory@openviking"]\nenabled = false\n'
+    addition += '[plugins.' + json.dumps(plugin_id) + ']\nenabled = false\n'
     updated = original + addition.encode()
     tomllib.loads(updated.decode())
     route_spec = dict(manifest['new_task_route'])

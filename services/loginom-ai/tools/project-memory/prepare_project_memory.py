@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shlex
 import subprocess
 import tempfile
@@ -32,7 +33,9 @@ def save_prepared(path, data):
         stream.write(data)
 
 
-def prepare(root, node, plugin, generation=GENERATION, install=False):
+def prepare(root, node, plugin, generation=GENERATION, install=False, plugin_id='openviking-memory@openviking'):
+    if not re.fullmatch(r'openviking-memory@[A-Za-z0-9][A-Za-z0-9_-]*', plugin_id):
+        raise ValueError('Use the installed OpenViking plugin ID from codex plugin list --json')
     root = project_root(root)
     runtime, rollout = locations(root, generation)
     identity = deployment(root, generation)
@@ -57,7 +60,7 @@ def prepare(root, node, plugin, generation=GENERATION, install=False):
     target = root / '.codex/hooks.json'
     manifest = {'generation': generation, 'deployment': identity, 'runtime': str(runtime), 'node': str(node),
                 'canonical_hooks_path': str(target), 'runtime_files': runtime_files, 'tasks': [],
-                'official_plugin_pin': plugin_pin,
+                'official_plugin_pin': plugin_pin, 'official_plugin_id': plugin_id,
                 'hooks_sha256': hashlib.sha256(content).hexdigest(), 'expected_hook_count': 5,
                 'new_task_route': {'projectRoot': str(root), 'stateDir': identity['stateDir'],
                                    'pluginRoot': str(plugin), 'generation': generation}}
@@ -92,6 +95,7 @@ if __name__ == '__main__':
     parser.add_argument('--generation', default=GENERATION)
     parser.add_argument('--node', type=Path, required=True)
     parser.add_argument('--plugin', type=Path, required=True)
+    parser.add_argument('--plugin-id', required=True, help='Exact installed ID from codex plugin list --json')
     parser.add_argument('--install', action='store_true')
     args = parser.parse_args()
-    print(json.dumps(prepare(args.project_root, args.node, args.plugin, args.generation, args.install)))
+    print(json.dumps(prepare(args.project_root, args.node, args.plugin, args.generation, args.install, args.plugin_id)))

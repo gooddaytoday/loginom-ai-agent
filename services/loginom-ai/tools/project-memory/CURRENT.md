@@ -30,10 +30,32 @@ generation, каталоги регистраций и состояния. Peer 
 Команды выполнять из корня нового репозитория. `NODE` ниже — настоящий абсолютный
 путь к исполняемому файлу Node (с разрешёнными symlink), `PLUGIN` — путь к проверенному
 установленному OpenViking 0.8.1. Скрипты не читают и не печатают значения ключей.
+`PLUGIN_ID` брать из `codex plugin list --json`: на Ubuntu 2026-09-26 это
+`openviking-memory@loginom-dock`, в прежней macOS-установке —
+`openviking-memory@openviking`. Не подменять marketplace по имени плагина.
+`CODEX` — абсолютный путь к установленному исполняемому файлу Codex,
+поддерживающему `app-server`, `hooks/list` и `config/batchWrite`.
+На Ubuntu проверен `/home/george/.local/bin/codex` (0.153.4);
+на macOS можно явно передать app-bundled binary. Helpers не выбирают путь за ОС.
+
+`SOURCE` — доступная локальная копия исходного `codex-mcp-adapter`, совпадающая
+со всеми hashes `upstream-manifest.json`. Исторический `/Users/...` в manifest
+означает происхождение, а не доступный путь Ubuntu. Установленный официальный
+плагин не заменяет этот отдельный адаптер. При отсутствии копии сборка не готова;
+не снимать проверку hashes и не считать локальные тестовые fixtures runtime.
+
+Проверить ownership/modes до установки: проект, worktree и файлы plugin pin
+не допускают group/world write, state/enrollment directories требуют `0700`,
+приватные файлы — `0600`. Ubuntu с umask `0002` создаёт `0775`/`0664`:
+это не совместимо с текущим контрактом. Подготовку новых приватных материалов
+выполнять с umask `0077`; существующие права согласовать отдельно, без рекурсивного
+chmod всего checkout и без ослабления validators. Если cache плагина имеет
+неподходящие modes, допустима отдельная защищённая копия неизменённых файлов
+с тем же content pin; установленный плагин и другие проекты не менять.
 
 ```sh
-python3 -B services/loginom-ai/tools/project-memory/assemble_runtime.py
-python3 -B services/loginom-ai/tools/project-memory/prepare_project_memory.py --node <NODE> --plugin <PLUGIN>
+python3 -B services/loginom-ai/tools/project-memory/assemble_runtime.py --source <SOURCE>
+python3 -B services/loginom-ai/tools/project-memory/prepare_project_memory.py --node <NODE> --plugin <PLUGIN> --plugin-id <PLUGIN_ID>
 ```
 
 Сборка: `.local/project-memory/runtime/20260924.1/`. Preview:
@@ -46,9 +68,9 @@ Preview пишет только материалы подготовки в `.loc
 `--enrollments-only` hooks и каталоги `0700`; основной plugin config не изменяется:
 
 ```sh
-python3 -B services/loginom-ai/tools/project-memory/prepare_project_memory.py --node <NODE> --plugin <PLUGIN> --install
-node services/loginom-ai/tools/project-memory/review_hooks.mjs --manifest .local/project-memory/rollouts/20260924.1/manifest.json
-node services/loginom-ai/tools/project-memory/review_hooks.mjs --manifest .local/project-memory/rollouts/20260924.1/manifest.json --trust --output <private-receipt.json>
+python3 -B services/loginom-ai/tools/project-memory/prepare_project_memory.py --node <NODE> --plugin <PLUGIN> --plugin-id <PLUGIN_ID> --install
+node services/loginom-ai/tools/project-memory/review_hooks.mjs --codex <CODEX> --manifest .local/project-memory/rollouts/20260924.1/manifest.json
+node services/loginom-ai/tools/project-memory/review_hooks.mjs --codex <CODEX> --manifest .local/project-memory/rollouts/20260924.1/manifest.json --trust --output <private-receipt.json>
 ```
 
 Доверие оформляется штатным `hooks/list` и `config/batchWrite` по фактически
@@ -72,6 +94,17 @@ Helper сохраняет исходную конфигурацию, добав�
 `~/.openviking/project-memory-enrollments/loginom-ai-agent/<sha256(cwd)>.json`,
 файл `0600`. Новая регистрация не меняет hash соседней. В состоянии `pending`
 MCP отказывает; hooks сохраняют только фактические metadata SessionStart.
+
+До bootstrap проверить inventory подготовленного cwd через настоящий App API:
+
+```sh
+node services/loginom-ai/tools/project-memory/review_hooks.mjs --codex <CODEX> --manifest .local/project-memory/rollouts/20260924.1/manifest.json --workspace <exact-worktree>
+```
+
+Helper отказывает при любых оставшихся `openviking-memory@<marketplace>` hooks
+в worktree. Исправить конкретный plugin ID до создания задачи: иначе штатный
+плагин успеет начать независимый capture. В основном checkout оригинальные hooks
+должны оставаться; его эта проверка не отключает.
 
 3. Создать настоящую задачу Astra medium для одного подготовительного хода:
    подтвердить cwd/branch/base, не разрабатывать узел и не обращаться к памяти.
@@ -99,7 +132,7 @@ receipts — десять минут; устаревшие сведения пр
    worktree, затем активировать зарегистрированную задачу:
 
 ```sh
-node services/loginom-ai/tools/project-memory/review_hooks.mjs --manifest .local/project-memory/rollouts/20260924.1/manifest.json --workspace <exact-worktree> --trust --output <private-hooks-receipt.json>
+node services/loginom-ai/tools/project-memory/review_hooks.mjs --codex <CODEX> --manifest .local/project-memory/rollouts/20260924.1/manifest.json --workspace <exact-worktree> --trust --output <private-hooks-receipt.json>
 node services/loginom-ai/tools/project-memory/enroll_task.mjs --runtime .local/project-memory/runtime/20260924.1 --cwd <exact-worktree> --thread <actual-task-ID> --evidence <private-bootstrap-evidence.json> --hooks-receipt <private-hooks-receipt.json>
 ```
 
