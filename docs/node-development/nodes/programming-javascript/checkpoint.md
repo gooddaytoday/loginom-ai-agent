@@ -15,6 +15,39 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### G2 operator17: вход проверен, условная первая страница — 2026-09-26
+
+После source handoff в прежней задаче выполнен headed `code-sentinel-next`.
+SHA оператора `ed6493c7895676e869bf9d83cbce5cdab326f8c6dfa56930b00dbfcb45b5d496`;
+freeze всех девяти модулей — приватный `g2-operator-17-source.json`. Перед запуском
+root повторил шесть адресных тестов и syntax checks: PASS.
+
+В собственном context успешно созданы UUID storage directory и серверная копия
+157-byte CSV с закреплённым SHA, без overwrite. Штатный `imports.text` выполнился,
+полный typed input **6×5 PASS**: все значения, порядок, exact integers и пробелы.
+JS GUID `62507b20-f268-4eab-8a7b-23136b462108` создан, input0 link подтверждён
+graph diff. Storage `/jsteach/js-g2-108ed9e6-c209-4b58-abc0-c95c9ad240bc` с CSV
+оставлен как диагностический ресурс; удаление не выполнялось.
+
+У connected JS первая native page — **JavaScriptColumnsWizard index0**, четыре
+индикатора. У прежнего unconnected node первой была TuneDataSourceInputPortWizard.
+На deadline все ownership/readiness predicates истинны, blockers пуст,
+единственный отказ — `input_page_expected`. Ни JS source replacement, ни
+Next/Done/Preview/Execute с probe source не выполнялись. **G2 не закрыт**.
+
+Operator завершился `CLEANUP_UNCONFIRMED`: close снова потребовал initial input
+page с истекшим opening deadline; package/logout не подтверждены, browser закрыт.
+Отдельная headed `g2-recovery-17.json` в 20:11:45Z подтвердила account `jsteach`,
+**0 packages**, logout и context close, без package mutations. Она не заменяет
+неуспешный cleanup исходного прогона.
+
+Разработчику передано исправление admission условной первой страницы с отдельным
+подтверждением input mapping, самостоятельного once-only cleanup deadline и
+избыточного копирования полного journal в report (33MB report/17MB journal).
+Полные fsync receipts должны сохраниться. Следующий live — только после нового
+source handoff, новый evidence directory operator18; source/probes G4 run16
+повторять не требуется. Серверная ОС, полный G1–G7 и CLI-приёмка остаются открыты.
+
 Пользователь попросил перепроверить причину и сообщил, что ничего не менял.
 Журнал владеющего Desktop App Server подтверждает для той же задачи:
 `17:17:27.465Z starting → 17:17:42.445Z failed`, затем

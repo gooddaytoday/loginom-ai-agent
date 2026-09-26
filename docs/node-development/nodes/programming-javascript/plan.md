@@ -187,6 +187,14 @@ observations. Источники: Help JS/API/output-tables/ports; e2e `js_helpe
 | G6 diagnostics/lifecycle | Parse error vs sync throw, ownership ошибки, Stop/Close/cancel, потерянные ответы | Классифицированный terminal/ambiguous outcome; сохранён прежний исходник и соседний граф |
 | G7 persistence | Полный исходник/options/schema после save/new open, свежий execution | Независимое чтение без перенастройки expected; доказано сохранение последней редакции |
 
+Наблюдение Ubuntu operator17: у JS с подключённым input0 мастер начинается
+с JavaScriptColumnsWizard (index0, четыре индикатора); отдельной первой страницы
+TuneDataSourceInputPortWizard, наблюдённой у несоединённого узла, нет. Admission
+и переходы должны учитывать native page identity, а не фиксированные индексы.
+При пропуске input page подтвердить полную входную schema/mapping отдельным
+принадлежащим узлу port reader. Cleanup имеет собственный ограниченный срок
+и не повторяет истёкший opening admission. Это наблюдение не закрывает G2/G3.
+
 Отдельно проверить синтаксис `??`, `?.`, top-level await, async function,
 lookbehind, BigInt, globalThis изолированными snippets: один parse error не
 должен скрыть результаты остальных. Так ограничения справочника 7.4.2
@@ -687,19 +695,24 @@ oracle и CLI-приёмку; ядро не считается «всем JavaSc
 Подтверждено: статическое исследование процесса/docs/код/Help/e2e; исходные
 SHA; отсутствие handler; условия окружения; набор fixtures и независимые
 ожидания; baseline 24/24 и document validation; целевой build 7.4.2 и
-принадлежность ему справочника (решение пользователя). Продуктовый код не менялся.
+принадлежность ему справочника (решение пользователя). Публичный JS-handler
+ещё не реализован; выполненный Host URL fix учитывается отдельно в checkpoint.
 
 На Ubuntu подтверждены аккаунт `jsteach`, Enterprise 7.4.2, изолированный
-worktree и полный цикл общей памяти поколения `20260926.2`.
-Открыто: G1–G7 и runtime/CLI строки матрицы, ОС сервера и storage,
+worktree и полный цикл общей памяти поколения `20260926.2`. В operator17
+подтверждены создание собственной storage UUID-папки, upload без overwrite,
+штатный CSV import и полный точный typed input6×5; затем JS input0 link.
+Серверный диагностический CSV сохранён, session recovery/logout подтверждены.
+Открыто: G1–G7 и runtime/CLI строки матрицы, ОС сервера,
 полный candidate, JS auditor. Внешний e2e suite
 остаётся `not_run`; его зависимости не являются предусловием этого подплана.
 Решения по всем [рекомендациям](review-recommendations.md) и границы доказательств
 зафиксированы в [проверке ревью](review-verification.md). Требования новых probes
 приняты; их наличие в плане не означает выполненного live discovery.
 URL стенда уже назначен: `http://logi-test-plan.bg.local/app/`; повторно
-спрашивать выбор адреса не нужно. Владелец продолжения — назначенный single-разработчик; next trigger — команда
-выполнить этот подплан, затем закрытие 0A и live discovery.
+спрашивать выбор адреса не нужно. Владелец продолжения — назначенный single-разработчик;
+исполнение уже разрешено. Следующий шаг — исправление conditional wizard admission
+по operator17, новый source handoff и headed operator18 по текущему checkpoint.
 
 При таком назначении Astra/medium создаёт Goal до готовности к первому ревью,
 без самоназначенного token_budget; checkpoint сохраняется на каждой границе.
