@@ -402,6 +402,14 @@ G4 сначала сравнивает `keyboard.type`, `insertText` и, есл�
 кириллицу, пустые строки и завершающую `}`. Замерить максимум 32 KiB/1024 строки
 относительно configure budget. Если точного ввода нет, G4 не закрыт.
 
+Наблюдение operator16 на 7.4.2/CodeMirror4.11.1: для реализации выбран
+`keyboard.insertText` с обязательным полным readback. `keyboard.type` изменил
+проверочный sample; insertText сохранил sample и документ ровно 32768 байт/
+1024 строки, затем точно восстановил baseline. Clipboard не понадобился,
+editor options не менялись. Это частичное доказательство G4; cold persistence,
+execution и остальные сценарии остаются обязательными. Подробности и hashes —
+[checkpoint](checkpoint.md), private evidence `g1-operator-16/report.json`.
+
 Создать JS-specific modules (предлагаемые имена `javascript-parameters.mjs`,
 `javascript-context.mjs`, `javascript-node.mjs`, `javascript-readback.mjs`)
 и узкий private intent замены текста. До/после жеста проверить тот же

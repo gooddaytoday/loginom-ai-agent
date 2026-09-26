@@ -131,6 +131,29 @@ Recovery15 отдельно подтвердил `jsteach`, packages0, logout/co
 Evidence: `g1-operator-15/report.json`, `g1-recovery-15.json`. G1 частично закрыт
 наблюдениями identity/editor, полный gate и G2–G7 ещё открыты.
 
+Operator16 завершён с **подтверждённым полным cleanup**: package closed,
+UI logout и browser closed true; дополнительный recovery не потребовался.
+Source SHA оператора `4c335c766c4622b93ade7d69b6f7ad127eaf14d5733184b582ec1f4163f244c5`.
+CodeMirror на стенде — **4.11.1**, настройки совпадают с operator15.
+
+G4 input probe: keyboard.type изменил sample (896 вместо 849 байт); insertText
+передал sample точно (849 байт/8 строк, 20ms). Граничный insertText: ровно
+32768 UTF-8 байт/1024 строки, полное совпадение SHA256
+`5aead120eaa874ee7b1f02c0e2971dd79eac6ddf091528053b59ccf343b186e0`, 1007ms.
+Baseline восстановлен точно, прежний SHA `6eb6e2f9…ebecc64`, 22ms.
+Aggregate `PROBE_PASS`, selected_method=insertText, full_g4_status=not_closed.
+Это доказательство выбранного способа ввода и readback на этом редакторе;
+сохранение, исполнение и вся матрица G4 ещё не доказаны.
+
+После восстановления шаблона единственный Next со страницы code2 открыл
+`DoneWizard`, «Описание узла», checked native indicator4. Indicator3 оказался
+скрытым; его назначение не установлено. Остальные native owners и отсутствие
+blockers подтверждены. Оператор ошибочно требовал видимость всех индикаторов
+и переход строго index+1, потому финальный work status FAILED на
+`expected_page_transition`. Исправление должно сохранять owner и ограниченный
+порядок, но учитывать наблюдённые пропуски условных страниц. Done/Preview не
+нажимались. Evidence — `g1-operator-16/report.json`; очистка прошла штатно.
+
 ## История остановки: MCP при возобновлении разработчика
 
 После recovery11 задача разработчика подтвердила отсутствие OpenViking tools
