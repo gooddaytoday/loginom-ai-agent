@@ -4815,7 +4815,7 @@
           "evidence": []
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "Завершить live discovery по [подплану JavaScript](nodes/programming-javascript/plan.md) на назначенном стенде, затем реализовать согласованный scope; handler и CLI-приёмка ещё не выполнены.",
       "plan": "nodes/programming-javascript/plan.md",
       "plan_status": "discovery_required"
     },

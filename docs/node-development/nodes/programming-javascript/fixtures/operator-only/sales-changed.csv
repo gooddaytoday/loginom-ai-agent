@@ -1,0 +1,7 @@
+RowID,Customer,Qty,UnitPriceCents,DiscountPct
+1,"  Alpha  ",3,1000,10
+2,BETA,0,375,0
+3,Alpha,-3,250,0
+4,Гамма,4,125,20
+5,Ёж,1,999,100
+6,delta,5,100,0
