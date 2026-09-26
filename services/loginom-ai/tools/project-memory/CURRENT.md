@@ -7,12 +7,13 @@ Peer основного checkout. Он не копирует серверную 
 
 ## Область и состояние
 
-Поколение исходников: `20260924.1`. Точная идентичность записывается в приватный
+Поколение исходников: `20260926.2`. Точная идентичность записывается в приватный
 `deployment.json` собранной версии: Git root, namespace `loginom-ai-agent`,
 generation, каталоги регистраций и состояния. Peer вычисляет существующий
 `project-routing.mjs` из корня репозитория. Аргументы модели его не выбирают.
-Живая установка и полный цикл чтения/записи проверены 2026-09-24 на двух
-независимых регистрациях. Результаты и границы —
+Историческое поколение `20260924.1` проверялось 2026-09-24 на macOS.
+Новое поколение содержит собственные исходники адаптера в `source/`; результаты
+его Ubuntu-проверки приведены в [отчёте поколения](ubuntu-adapter.md). История —
 [подтверждение готовности](../../../../docs/node-development/workflow/shared-memory.md).
 Каждая следующая задача всё равно требует собственного допуска.
 
@@ -21,23 +22,46 @@ generation, каталоги регистраций и состояния. Peer 
 Новые узлы создаются в `<repo>/.worktrees/<короткая-ветка>`, по одной задаче на cwd.
 Существующие задачи и capture cursors не переносить этим fresh-enrollment helper.
 
-Официальные scripts OpenViking 0.8.1 и исходный adapter не меняются: сборщик
-проверяет прежний upstream manifest и применяет адаптацию только к отдельной
-локальной копии. Старые runtime, registry и настройки Loginom Dock не меняются.
+Официальные lifecycle scripts OpenViking 0.8.1 не меняются. Новый адаптер
+использует их через прежний enrollment/hook router. Неизменённые transport,
+credentials и workspace-peer включены в `source/vendor` с лицензией и provenance.
+`source-manifest.json` закрепляет новые исходники и overlay. Старые
+`upstream-manifest.json` и `adapter.patch` остаются историческими свидетельствами.
 
 ## Однократная подготовка проекта
 
 Команды выполнять из корня нового репозитория. `NODE` ниже — настоящий абсолютный
 путь к исполняемому файлу Node (с разрешёнными symlink), `PLUGIN` — путь к проверенному
 установленному OpenViking 0.8.1. Скрипты не читают и не печатают значения ключей.
+`PLUGIN_ID` брать из `codex plugin list --json`: на Ubuntu 2026-09-26 это
+`openviking-memory@loginom-dock`, в прежней macOS-установке —
+`openviking-memory@openviking`. Не подменять marketplace по имени плагина.
+`CODEX` — абсолютный путь к установленному исполняемому файлу Codex,
+поддерживающему `app-server`, `hooks/list` и `config/batchWrite`.
+На Ubuntu проверен `/home/george/.local/bin/codex` (0.153.4);
+на macOS можно явно передать app-bundled binary. Helpers не выбирают путь за ОС.
+
+Сборка текущего поколения полностью из Git; внешний `SOURCE` не нужен.
+`--source` оставлен только для воспроизведения исторического адаптера
+по прежнему manifest с явно выбранным историческим generation. Не приписывать
+старые hashes новым файлам и не переустанавливать изменённый runtime поверх активного.
+
+Проверить ownership/modes до установки: проект, worktree и файлы plugin pin
+не допускают group/world write, state/enrollment directories требуют `0700`,
+приватные файлы — `0600`. Ubuntu с umask `0002` создаёт `0775`/`0664`:
+это не совместимо с текущим контрактом. Подготовку новых приватных материалов
+выполнять с umask `0077`; существующие права согласовать отдельно, без рекурсивного
+chmod всего checkout и без ослабления validators. Если cache плагина имеет
+неподходящие modes, допустима отдельная защищённая копия неизменённых файлов
+с тем же content pin; установленный плагин и другие проекты не менять.
 
 ```sh
 python3 -B services/loginom-ai/tools/project-memory/assemble_runtime.py
-python3 -B services/loginom-ai/tools/project-memory/prepare_project_memory.py --node <NODE> --plugin <PLUGIN>
+python3 -B services/loginom-ai/tools/project-memory/prepare_project_memory.py --node <NODE> --plugin <PLUGIN> --plugin-id <PLUGIN_ID>
 ```
 
-Сборка: `.local/project-memory/runtime/20260924.1/`. Preview:
-`.local/project-memory/rollouts/20260924.1/manifest.json` и `hooks.json.pending`.
+Сборка: `.local/project-memory/runtime/20260926.2/`. Preview:
+`.local/project-memory/rollouts/20260926.2/manifest.json` и `hooks.json.pending`.
 Эти приватные материалы не включать в Git. Сборщик отказывается перезаписывать
 отличающуюся версию; для новой работающей версии требуется новая generation.
 Preview пишет только материалы подготовки в `.local/project-memory`, не настройки.
@@ -46,9 +70,9 @@ Preview пишет только материалы подготовки в `.loc
 `--enrollments-only` hooks и каталоги `0700`; основной plugin config не изменяется:
 
 ```sh
-python3 -B services/loginom-ai/tools/project-memory/prepare_project_memory.py --node <NODE> --plugin <PLUGIN> --install
-node services/loginom-ai/tools/project-memory/review_hooks.mjs --manifest .local/project-memory/rollouts/20260924.1/manifest.json
-node services/loginom-ai/tools/project-memory/review_hooks.mjs --manifest .local/project-memory/rollouts/20260924.1/manifest.json --trust --output <private-receipt.json>
+python3 -B services/loginom-ai/tools/project-memory/prepare_project_memory.py --node <NODE> --plugin <PLUGIN> --plugin-id <PLUGIN_ID> --install
+node services/loginom-ai/tools/project-memory/review_hooks.mjs --codex <CODEX> --manifest .local/project-memory/rollouts/20260926.2/manifest.json
+node services/loginom-ai/tools/project-memory/review_hooks.mjs --codex <CODEX> --manifest .local/project-memory/rollouts/20260926.2/manifest.json --trust --output <private-receipt.json>
 ```
 
 Доверие оформляется штатным `hooks/list` и `config/batchWrite` по фактически
@@ -72,6 +96,17 @@ Helper сохраняет исходную конфигурацию, добав�
 `~/.openviking/project-memory-enrollments/loginom-ai-agent/<sha256(cwd)>.json`,
 файл `0600`. Новая регистрация не меняет hash соседней. В состоянии `pending`
 MCP отказывает; hooks сохраняют только фактические metadata SessionStart.
+
+До bootstrap проверить inventory подготовленного cwd через настоящий App API:
+
+```sh
+node services/loginom-ai/tools/project-memory/review_hooks.mjs --codex <CODEX> --manifest .local/project-memory/rollouts/20260926.2/manifest.json --workspace <exact-worktree>
+```
+
+Helper отказывает при любых оставшихся `openviking-memory@<marketplace>` hooks
+в worktree. Исправить конкретный plugin ID до создания задачи: иначе штатный
+плагин успеет начать независимый capture. В основном checkout оригинальные hooks
+должны оставаться; его эта проверка не отключает.
 
 3. Создать настоящую задачу Astra medium для одного подготовительного хода:
    подтвердить cwd/branch/base, не разрабатывать узел и не обращаться к памяти.
@@ -99,8 +134,8 @@ receipts — десять минут; устаревшие сведения пр
    worktree, затем активировать зарегистрированную задачу:
 
 ```sh
-node services/loginom-ai/tools/project-memory/review_hooks.mjs --manifest .local/project-memory/rollouts/20260924.1/manifest.json --workspace <exact-worktree> --trust --output <private-hooks-receipt.json>
-node services/loginom-ai/tools/project-memory/enroll_task.mjs --runtime .local/project-memory/runtime/20260924.1 --cwd <exact-worktree> --thread <actual-task-ID> --evidence <private-bootstrap-evidence.json> --hooks-receipt <private-hooks-receipt.json>
+node services/loginom-ai/tools/project-memory/review_hooks.mjs --codex <CODEX> --manifest .local/project-memory/rollouts/20260926.2/manifest.json --workspace <exact-worktree> --trust --output <private-hooks-receipt.json>
+node services/loginom-ai/tools/project-memory/enroll_task.mjs --runtime .local/project-memory/runtime/20260926.2 --cwd <exact-worktree> --thread <actual-task-ID> --evidence <private-bootstrap-evidence.json> --hooks-receipt <private-hooks-receipt.json>
 ```
 
 5. В следующем ходе той же задачи проверить зарегистрированные actor
@@ -123,14 +158,15 @@ node services/loginom-ai/tools/project-memory/enroll_task.mjs --runtime .local/p
 ## Локальные проверки
 
 ```sh
-cd .local/project-memory/runtime/20260924.1
+cd .local/project-memory/runtime/20260926.2
+umask 077
 node --test test/*.test.mjs
 ```
 
-Из корня репозитория:
+Из каталога `services/loginom-ai/tools/project-memory`:
 
 ```sh
-python3 -B -m unittest discover -s services/loginom-ai/tools/project-memory/test -p '*_test.py' -v
+python3 -B -m unittest discover -s test -p '*_test.py' -v
 ```
 
 Python-проверки создают временные настоящие Git worktrees и отдельный HOME fixture.

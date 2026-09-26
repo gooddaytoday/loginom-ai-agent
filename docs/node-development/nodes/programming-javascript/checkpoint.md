@@ -1,8 +1,47 @@
 # JavaScript: checkpoint исполнения
 
-Дата: 2026-09-26. Фаза **0A, подготовка заблокирована отсутствующим исходным adapter**. Пользователь назначил
-исполнение [плана](plan.md), адаптацию под Ubuntu и только headed-браузеры.
-Разработка handler, discovery 0B, ревью реализации и CLI-приёмка ещё не начаты.
+Дата: 2026-09-26. Фаза **0A: блокировка памяти снята, полный цикл проверен**.
+Пользователь назначил исполнение [плана](plan.md), Ubuntu и только headed-браузеры.
+JS-handler, discovery 0B, ревью реализации и CLI-приёмка ещё не выполнены.
+
+## Актуальное состояние после реализации адаптера
+
+- В Git добавлены собственные исходники project-memory, generation `20260926.2`,
+  source commit `1419ec3906b80a30be91cdd5bab9af35ad88e548`.
+  Внешний macOS adapter больше не требуется. Старые hashes/runtime сохраняют
+  историческое значение; [отчёт реализации и проверки](../../../../services/loginom-ai/tools/project-memory/ubuntu-adapter.md).
+- В прежнем worktree `.worktrees/node-javascript` создана настоящая задача
+  `01a0de3e-6a07-7661-aa88-ed4807aef6ec` — «JavaScript: общая память и допуск Ubuntu»,
+  Astra medium. HEAD по-прежнему `a8ad59766dbdb4f2da0b54367a755ce00891dd71`, дерево чистое.
+- Registration `22ccfcf0-7919-4954-9342-82450a28a6f3` активна. Пять project hooks
+  trusted, original memory hooks в worktree отсутствуют; основной плагин сохранён.
+- Реальные host metadata Codex совпали с thread/cwd. Успешны actor health/find/read,
+  официальный Stop/capture, native PreCompact/commit, exact read-back и semantic
+  find результата из основного проекта. Cursor `0 → 13 → 22`, сервер: 22 сообщения,
+  один commit. При смене поколения capture state сохранён побайтно; сброса не было.
+- Извлечённая запись:
+  `viking://user/kiselev/peers/-home-george-git-loginom-ai-agent/memories/events/2026/09/26/memory_verification_success.md`.
+  Ручных remember/write не было. Локально: 59 runtime Node + 13 Python + 23 helper
+  Node checks PASS. Документационный validator и diff whitespace checks PASS.
+- Runtime и квитанции приватны: `.local/project-memory/{runtime,rollouts}/20260926.2/`.
+  Неуспешный первый runtime/rollout `20260926.1` сохранён. Основной checkout и корень
+  worktree получили `0755` вместо `0775`; cache плагина не менялся, hooks используют
+  отдельную защищённую копию с теми же bytes. Validators ownership не ослаблены.
+- Compaction turn completed подтверждён приложением; задача notLoaded, model/hook
+  writer не оставлен работающим. Capture cursor 22, ovSessionId null, own lock отсутствует.
+  Browser/CLI в этой проверке не запускались; выделенный headed profile закрыт ранее.
+
+Следующий шаг: в **этой же** задаче после переноса явно выбранных docs-only commits
+продолжить фазу 0A/0B по плану. Повторная регистрация не нужна. Использовать Ubuntu
+Node/Bun, `jsteach`, заданный стенд, только headed; установить server OS и storage,
+подготовить независимый CLI profile/candidate, выполнить JS discovery. Полный план
+обучения пока не завершён; снята его блокирующая зависимость от внешнего adapter.
+
+## История подготовки до нового адаптера
+
+Ниже сохранены прежние проверки и причины остановки. Статусы «не создана»,
+«adapter отсутствует» и прежний next trigger относятся к прошлым шагам;
+актуальный допуск и следующий шаг указаны выше.
 
 ## Изоляция и владельцы
 
