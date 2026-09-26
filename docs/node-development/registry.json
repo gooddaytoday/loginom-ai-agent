@@ -4633,7 +4633,7 @@
       "legacy_subplan": null,
       "queue_class": "backlog",
       "handler": null,
-      "card": null,
+      "card": "nodes/programming-javascript/README.md",
       "initial_scope": "Ограниченный детерминированный табличный пример: вход, вычисленные поля, выход и ошибка исполнения.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
@@ -4681,7 +4681,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения."
+      "next_action": "Завершить live discovery по [подплану JavaScript](nodes/programming-javascript/plan.md) на назначенном стенде, затем реализовать согласованный scope; handler и CLI-приёмка ещё не выполнены.",
+      "plan": "nodes/programming-javascript/plan.md",
+      "plan_status": "discovery_required"
     },
     {
       "component_id": "component.programming.Python",
