@@ -45,6 +45,17 @@ test('TSV download retains exact-name, destination and event ownership checks',a
     assert.deepEqual(other.calls,[]);
   }
 });
+test('download failure preserves bounded stage and cause flags without URLs or private errors',async()=>{
+ const f=fixture();f.page.isClosed=()=>true;
+ f.download.saveAs=async()=>{throw new Error('save https://private.invalid/?secret=hidden',{cause:new Error('Target page, context or browser has been closed')});};
+ f.download.cancel=async()=>{throw new Error('private cancellation detail');};
+ const result=await f.run();assert.equal(result.status,'AMBIGUOUS');assert.equal(result.cleanup_complete,false);
+ const failure=result.trace.find(e=>e.event==='download_browser_failure');
+ assert.equal(failure.step,'download.saveAs');assert.equal(failure.page_closed,true);assert.equal(failure.causes[1].target_closed,true);
+ assert.equal(result.trace.find(e=>e.event==='download_cleanup_failure').step,'download.cancel');
+ assert.ok(!JSON.stringify(result).includes('secret=hidden'));assert.ok(!JSON.stringify(result).includes('private cancellation'));
+ assert.deepEqual(f.calls,['listen','click']);
+});
 
 test('download refuses a different file label, formatted-name collision or package before the browser',()=>{
   for(const change of [f=>{f.options.artifact.name='other.csv';},f=>{f.options.artifact.name='sales.lgp';},
