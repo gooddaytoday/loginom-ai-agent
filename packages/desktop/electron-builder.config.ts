@@ -6,6 +6,7 @@ import { chmod } from "node:fs/promises"
 import { linuxPermissions } from "./scripts/linux-permissions"
 import type { Configuration } from "electron-builder"
 import { Product, productChannel, productName, productSlug } from "@loginom-ai-agent/product"
+import release from "../product/loginom-release.json"
 
 const execFileAsync = promisify(execFile)
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
@@ -45,7 +46,7 @@ const config: Configuration = {
     await linuxPermissions(context.appOutDir)
     // Resource copying normalizes modes. Restore the Chromium fallback before DEB ownership becomes root.
     await chmod(
-      path.join(context.appOutDir, "resources/loginom/browsers/chromium-1243/chrome-linux64/chrome-sandbox"),
+      path.join(context.appOutDir, `resources/loginom/browsers/chromium-${release.chromiumRevision}/chrome-linux64/chrome-sandbox`),
       0o4755,
     )
   },

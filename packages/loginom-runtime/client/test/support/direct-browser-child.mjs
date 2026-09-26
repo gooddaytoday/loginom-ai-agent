@@ -3,10 +3,12 @@ import {readFile} from 'node:fs/promises';
 import {dirname, join} from 'node:path';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
+import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {createConnection} from '@playwright/mcp';
 import {chromium} from 'playwright-core';
 import {createSession} from '../../lib/session.mjs';
 import {loginBrowser} from '../../../src/connection-check.mjs';
+import {browserProcessEnvironment} from '../../lib/bridge.mjs';
 
 const [owner, directory, url, mode, proxy] = process.argv.slice(2);
 const browserPath = process.env.LOGINOM_DOCK_TEST_BROWSER;
@@ -36,11 +38,19 @@ try {
       handles.context = authenticated.context;
       await handles.context.pages()[0].evaluate(() => { window.contextToken = 'same-authenticated-page'; });
     }
-    handles.server = await createConnection(JSON.parse(await readFile(session.browserConfig, 'utf8')),
-      owner === 'managed' ? async () => handles.context : undefined);
-    const [local, remote] = InMemoryTransport.createLinkedPair();
-    await handles.server.connect(remote);
-    await client.connect(local);
+    if (owner === 'managed') {
+      handles.server = await createConnection(JSON.parse(await readFile(session.browserConfig, 'utf8')), async () => handles.context);
+      const [local, remote] = InMemoryTransport.createLinkedPair();
+      await handles.server.connect(remote);
+      await client.connect(local);
+    } else {
+      handles.transport = new StdioClientTransport({command:process.execPath,
+        args:[session.browserCli, '--config', session.browserConfig],
+        env:browserProcessEnvironment(session.browserRoot), cwd:session.directory, stderr:'pipe'});
+      handles.transport.stderr?.on('data', () => {});
+      handles.transport.onclose = () => { handles.transportClosed = true; };
+      await client.connect(handles.transport);
+    }
     handles.connected = true;
     const reply = await client.callTool({name:'browser_run_code_unsafe', arguments:{code:`async page => {
       // The pinned Playwright omits --enable-automation, which disables
@@ -86,8 +96,17 @@ try {
   }
 } finally {
   // Close the owned browser before the MCP transport, including assertion failures.
-  if (handles.connected) await client.callTool({name:'browser_close', arguments:{}}, undefined, {timeout:15000});
-  await client.close();
-  await handles.server?.close();
-  await handles.context?.close();
+  try {
+    if (handles.connected) {
+      const closed = await client.callTool({name:'browser_close', arguments:{}}, undefined, {timeout:15000});
+      assert.equal(closed.isError ?? false, false, JSON.stringify(closed));
+    }
+  } finally {
+    try { await client.close(); }
+    finally {
+      try { await handles.server?.close(); }
+      finally { await handles.context?.close(); }
+    }
+  }
+  if (handles.transport) assert.equal(handles.transportClosed, true, 'MCP child transport must close');
 }

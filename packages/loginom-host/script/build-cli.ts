@@ -105,7 +105,7 @@ try {
   if (process.platform === "linux" && process.arch === "x64") {
     if (release.browserSha256 !== chromiumNotice.browserSha256 || release.chromiumRevision !== chromiumNotice.revision)
       throw Error("LOGINOM_CHROMIUM_NOTICE_REVISION_MISMATCH")
-    const compressed = await readFile(join(import.meta.dir, "../licenses/chromium/linux-x64-1243.txt.gz"))
+    const compressed = await readFile(join(import.meta.dir, `../licenses/chromium/linux-x64-${chromiumNotice.revision}.txt.gz`))
     if (createHash("sha256").update(compressed).digest("hex") !== chromiumNotice.gzipSha256)
       throw Error("LOGINOM_CHROMIUM_NOTICE_HASH_MISMATCH")
     const credits = Bun.gunzipSync(compressed)
