@@ -5,8 +5,11 @@
     "url": "http://logi-test-plan.bg.local/app/",
     "basis": "explicit_user_assignment",
     "connectivity": "not_checked",
+    "target_build": "7.4.2",
+    "target_build_basis": "explicit_user_decision_2026-09-26",
     "version": "not_checked",
     "edition": "not_checked",
+    "server_os": "not_checked",
     "test_account": "not_checked"
   },
   "product": {
@@ -106,6 +109,8 @@
     "git_status_at_research": "untracked",
     "modified_by_plan_authoring": false,
     "relocated_without_content_changes": true,
+    "loginom_build": "7.4.2",
+    "loginom_build_basis": "explicit_user_statement_2026-09-26",
     "automatically_bundled": false
   },
   "e2e": {
@@ -353,5 +358,78 @@
       "accessed": "2026-09-26",
       "target_version_match": "not_checked"
     }
-  ]
+  ],
+  "recommendation_verification": {
+    "date": "2026-09-26",
+    "report": "review-verification.md",
+    "evidence": "review-evidence.json",
+    "loginom_live_executed": false,
+    "additional_product_files": [
+      {
+        "path": "packages/loginom-runtime/client/lib/user-preview-budget.mjs",
+        "bytes": 3142,
+        "sha256": "c08d10a697035a18b1f214c0f906708b6ca83508979f0d376d3ce0805abd01a0"
+      },
+      {
+        "path": "packages/agent/src/tool/truncate.ts",
+        "bytes": 6170,
+        "sha256": "2c14a0602da4f8badb3d42b49aef63a78e2e8d5e0fbd03f83fda7c274fda82fc"
+      },
+      {
+        "path": "packages/agent/src/session/tools.ts",
+        "bytes": 29927,
+        "sha256": "d8c92841adbb6e57cd4eead9e8272979179e84af9b2abe2f6f0b1f1f34b7c0bb"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/node-read-contract.mjs",
+        "bytes": 5743,
+        "sha256": "48381128aa5b19e0246f7653612c550a9e3c54e3bae41a811eb64c8552ac7ef4"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/node-read-driver.mjs",
+        "bytes": 4292,
+        "sha256": "3275e61017813cec3fdba6c083a3edcc8049c25cba6e7ae02b9644d42bb425f5"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/node-operation-runner.mjs",
+        "bytes": 5518,
+        "sha256": "3743c9996b0a3a5e5791cdaa512c4eb834b805b26e18550de5fbf1bebe53560a"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/runtime-pin.mjs",
+        "bytes": 1066,
+        "sha256": "3e48c2c382efd8c59751ff1cd1b8b6a5a85846bb0d12e68a61089440221c83b1"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/action-catalog.mjs",
+        "bytes": 32238,
+        "sha256": "906022e59fa8150ec209368f1ce0210df5adc14e98d7d7b24b61a3c6d837434e"
+      },
+      {
+        "path": "packages/loginom-runtime/client/lib/redact.mjs",
+        "bytes": 5852,
+        "sha256": "bf5ccc8a571e455666bc03316c945aae6d48b80e807555c1ba13b041a7ae2229"
+      },
+      {
+        "path": "packages/loginom-host/script/stage-resources.ts",
+        "bytes": 11062,
+        "sha256": "e5ba960261675b8ee58870c42e37bdc78603d2f539aeb518b8f0abe876a43f87"
+      },
+      {
+        "path": "packages/loginom-host/src/connection/connection-service.ts",
+        "bytes": 14485,
+        "sha256": "5d7a74c9805b167d80d1406dd7d47f6c42dac658a5bd511e289ced34778306ed"
+      },
+      {
+        "path": "packages/loginom-host/test/connection-migration.test.ts",
+        "bytes": 5585,
+        "sha256": "5911446a802cb12cccbd63b7e207e2bda6c05169454d9acd9ae1ea979b057ceb"
+      },
+      {
+        "path": "packages/product/src/index.ts",
+        "bytes": 1676,
+        "sha256": "ca4a8d50e01b1b9610d601baa2a69ea10bcc91b124cf1430eca9ee69fcc9f6da"
+      }
+    ]
+  }
 }

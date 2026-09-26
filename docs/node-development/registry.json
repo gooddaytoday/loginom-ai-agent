@@ -4644,7 +4644,8 @@
         "accepted_base",
         "shared_contract",
         "tabular",
-        "programming_runtime"
+        "programming_runtime",
+        "dynamic_schema"
       ],
       "historical_subplan": null,
       "help_reference": {
