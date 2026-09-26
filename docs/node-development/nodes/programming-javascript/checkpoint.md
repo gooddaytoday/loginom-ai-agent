@@ -15,6 +15,38 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Live28: Chromium1246 прошёл download; DOM selection отказ — 2026-09-27
+
+Новая связка прошла реальный upload/download157bytes с точным SHA256,
+полный typed input6×5 и input0 mapping. Аварии Chromium нет. JS GUID
+`f263f739-ba85-4385-b98b-584470434edb`; storage новой пробы
+`/jsteach/js-g2-6ae16eee-7cea-4500-8143-49846c25a0d5`.
+После единственного private body click оператор отказал в open-wizard:
+`Private selection DOM changed` (dispatch/returned/refused записаны).
+Это не доказательство смены native node: требуется различить обычную
+перерисовку selected shape и реальную потерю owner. JS source не вводился.
+
+Все648 references проверены SHA256 по полным journal lines с LF.
+Cleanup package_closed/logged_out/browser_closed=true, recovery не нужна.
+Назначен operator29: доказуемая привязка нового DOM к сохранённым native
+workflow/graph/node/GUID/cell после выбора, без повторного click; отдельно
+закрыть известные private reopen/execute paths до следующих G2/G3 cases.
+Общий public JS deny не изменять. G2/G3 и весь план остаются открытыми.
+
+### Source gates перед live28 — 2026-09-27
+
+Root повторил operator/shared suites плюс новый MCP-contract: **123 PASS**.
+Bridge, managed-shutdown, action-catalog-lifecycle: **23 PASS**; отдельный
+catalog suite: **11 PASS**. Прежние отказы этих четырёх suites в среде задачи
+разработчика не воспроизвелись. Evidence: `operator28-tests.txt`,
+`browser-1246-runtime-regressions.txt`, `browser-1246-action-catalog.txt`.
+Freeze27 всех13 операторских/shared файлов совпал; новые dependencies/product
+pins/session config дополнительно закреплены в `g2-operator-28-source.json`.
+
+Начата live28 `code-sentinel-next` на assigned profile02 и exact1246. Это новая
+независимая проба с новым UUID/evidence, не replay прежнего upload/download.
+Результат и cleanup ещё ожидаются; не считать запуск закрытием G2.
+
 ### Exact1246: реальные MCP paths и staging PASS — 2026-09-27
 
 После перевода MCP-owned integration ветки на продуктовый stdio transport:
