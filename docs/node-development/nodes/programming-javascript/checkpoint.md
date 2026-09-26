@@ -15,6 +15,25 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Exact1246: реальные MCP paths и staging PASS — 2026-09-27
+
+После перевода MCP-owned integration ветки на продуктовый stdio transport:
+`browser-1246-integration-02.txt` — **2 PASS, 0 FAIL**, process exit0 за7.7s.
+Оба браузера headed/sandbox=true, download/upload bytes, picker scoping,
+geometry, reload/new tab подтверждены; оставшихся fixture Chromium процессов
+нет. Source hashes до последующей сверки неизменны. Managed explicit context
+ownership сохранён, продуктовый shutdown не ослаблялся. Первая leak-проба
+остаётся failed cleanup и не заменяется этим результатом задним числом.
+
+Shared stageResources(flavor=cli) собрал `resources-1246-01`; bundled Node
+выполнил verifyResources и независимую сверку product fields/runtime sources:
+**PASS4375files, mismatches=[]**. Manifest SHA256
+`cc6aa31baeb0426ea0fadcc143d26245b8630d087580b08f89912179e54fd736`.
+Evidence: `stage-1246-01.txt`, `resources-1246-01-verification.json` в campaign.
+Это staging/source acceptance, не compiled CLI бизнес-приёмка или Desktop build.
+Live Loginom на новой связке ещё не запускался; следующий шаг — завершение
+source handoff/checks и новая независимая G2 проба с новым evidence directory.
+
 ### Новый MCP: интеграционная проверка и cleanup — 2026-09-27
 
 Root запустил existing browser-downloads.integration.test.mjs с exact1246,

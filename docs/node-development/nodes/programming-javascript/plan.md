@@ -117,7 +117,9 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
    разрешённый аккаунт Loginom, profile/browser/storage/package, все owners/leases.
    Если используется системный clipboard, учитывать его как общий ресурс.
 4. Подготовить pinned Node24.19.0, Bun1.3.14 с требуемым revision, Playwright/MCP,
-   Chromium1243 и платформенный action manifest. Версии/hash брать из product pin,
+   Chromium согласованной версии и платформенный action manifest. Исходная база
+   закрепляла Chromium1243; выявленные на Ubuntu аварии и проверку кандидата1246
+   учитывать по [checkpoint](checkpoint.md). Версии/hash брать из product pin,
    не shell PATH; проверенные Ubuntu toolchain и source bundle описаны в checkpoint.
    `verifyResources` проверяет целостность относительно собственного manifest;
    отдельно сравнить его поля с product release pin. В Ubuntu source bundle
