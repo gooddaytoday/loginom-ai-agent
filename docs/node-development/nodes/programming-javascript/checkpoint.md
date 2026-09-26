@@ -12,7 +12,11 @@ JS-handler, discovery 0B, ревью реализации и CLI-приёмка 
   историческое значение; [отчёт реализации и проверки](../../../../services/loginom-ai/tools/project-memory/ubuntu-adapter.md).
 - В прежнем worktree `.worktrees/node-javascript` создана настоящая задача
   `01a0de3e-6a07-7661-aa88-ed4807aef6ec` — «JavaScript: общая память и допуск Ubuntu»,
-  Astra medium. HEAD по-прежнему `a8ad59766dbdb4f2da0b54367a755ce00891dd71`, дерево чистое.
+  Astra medium. Product base `a8ad59766dbdb4f2da0b54367a755ce00891dd71` сохранён.
+  После передачи документации исходный чистый HEAD разработчика —
+  `b21a63f01ad326870c70c2479508508bc59825c1`; plan source —
+  `14a4fa47b676f087eac06de21a2654737788f8ef`. Все 30 отличающихся от base файлов
+  документации совпали с источником побайтно; product code не переносился.
 - Registration `22ccfcf0-7919-4954-9342-82450a28a6f3` активна. Пять project hooks
   trusted, original memory hooks в worktree отсутствуют; основной плагин сохранён.
 - Реальные host metadata Codex совпали с thread/cwd. Успешны actor health/find/read,
@@ -31,8 +35,9 @@ JS-handler, discovery 0B, ревью реализации и CLI-приёмка 
   writer не оставлен работающим. Capture cursor 22, ovSessionId null, own lock отсутствует.
   Browser/CLI в этой проверке не запускались; выделенный headed profile закрыт ранее.
 
-Следующий шаг: в **этой же** задаче после переноса явно выбранных docs-only commits
-продолжить фазу 0A/0B по плану. Повторная регистрация не нужна. Использовать Ubuntu
+Продолжение назначено **этой же** задаче после переноса явно выбранных docs-only
+commits: фазы 0A/0B и разработка до первого ревью. Browser/account/profile lease
+передан разработчику; основной координатор не открывает параллельную Loginom-сессию. Повторная регистрация не нужна. Использовать Ubuntu
 Node/Bun, `jsteach`, заданный стенд, только headed; установить server OS и storage,
 подготовить независимый CLI profile/candidate, выполнить JS discovery. Полный план
 обучения пока не завершён; снята его блокирующая зависимость от внешнего adapter.
@@ -203,3 +208,19 @@ Ubuntu-адаптация и дополнительные live-проверки 
 Goal не завершён. Next trigger — доступная копия adapter с проверяемыми hashes
 или новое явное решение о замене механизма регистрации. ОС сервера также ожидает
 подтверждения; работающий штатный OpenViking основного checkout не отключён.
+
+## Передача разработчику — 2026-09-26
+
+Задача подтверждена active/inProgress через App API. Разработчику назначен Goal
+до ready-for-review, без запуска нового ревью/CLI-приёмки; scope обоих output
+режимов и всей матрицы сохранён. Одно same-task review и acceptance будут
+назначены отдельно на соответствующих границах. Product base и memory
+registration не менялись. В docs-only transfer конфликт CURRENT.md разрешён
+точной закреплённой версией документа, code-коммиты kit исключены.
+
+Координатор отдельно готовит CLI provider/OAuth prerequisites. Source CLI
+`providers list` в собственном приватном `cli-profile` завершился до model/Host
+dispatch с CLI_START_FAILED. Диагностика import обнаружила отсутствующую
+зависимость https-proxy-agent; это ещё не дефект продукта. Запущена установка
+по lockfile закреплённым Bun с `--frozen-lockfile --ignore-scripts`. Guard
+этого профиля сохранён до адресной проверки cleanup; browser не запускался.
