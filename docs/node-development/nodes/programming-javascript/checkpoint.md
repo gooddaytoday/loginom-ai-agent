@@ -15,6 +15,39 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### G2 operator23/24: download interruption и transient busy — 2026-09-27
+
+После перезапуска root снова проверил MCP health, actor search и read записи
+`operator24_diagnostic_launch.md`: PASS. Doctor 0.8.1: 0 failures, прежнее
+предупреждение о недоступных исторических rollout. Настройки не менялись.
+
+Operator23 подготовлен с native `selectPreparedGraphNode` перед поиском Setting
+и единым 90-секундным opening deadline; 116 адресных тестов PASS. Live source
+`javascript-live.mjs` SHA `5401250fe91b080061bbe28ad3049e386a6774d70dd792713f0208ac1684c219`.
+Оба прогона использовали одни frozen13 исходники. До открытия JS wizard они
+не дошли, поэтому исправление раскрытия Setting пока live не проверено.
+
+Operator23 подтвердил Refresh собственной файловой панели: native loadCount4→6,
+появление CSV и UI bytes157. Но на download.saveAs page/context/browser закрылись
+до operator close request; target_closed=true, события page_crash нет. Причина
+не установлена. Upload/download не повторялись. Отдельная headed recovery23:
+packages0, logout/browserClosed=true, packageMutation=false. Серверный путь
+`/jsteach/js-g2-9a452876-5845-4477-9206-e7d00e8881bb` сохранён, hash неизвестен.
+
+Operator24 — самостоятельная новая проба с приватным `DEBUG=pw:browser` log.
+Здесь браузер завершился штатно: exitCode0, signal=null, после operator cleanup;
+package_closed/logged_out/browser_closed=true. Recovery24 не требуется.
+До download gesture не дошло: readiness ready=true/loading=false/loadCount4,
+затем refresh preconditions сохранили все owner predicates, но увидели busy mask
+`MF;TF-2;FileStorageForm`. Получен `DISCOVERY_EMPTY_DIRECTORY_UNCONFIRMED`.
+Это подтверждённый переход ready→busy между двумя наблюдениями, не crash.
+Путь `/jsteach/js-g2-02238f91-5242-49c5-9fbb-0f7f0e7a2c52` сохранён.
+
+Разработчику назначен operator25: ограниченное исходным deadline ожидание
+same-owner busy и повторная полная проверка контекста до единственного Refresh,
+без replay upload/download и без ослабления guards. Root продолжает владеть
+браузером; следующая проба только после source handoff. G2/G3 остаются открытыми.
+
 ### G2 operator22: input-port proof PASS, Setting absent — 2026-09-26
 
 Root повторил **110 адресных тестов PASS**, syntax/freeze13. Live operator SHA
