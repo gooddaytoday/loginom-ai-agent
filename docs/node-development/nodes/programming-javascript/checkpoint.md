@@ -74,6 +74,34 @@ UI logout и context close. Следующий шаг — ограниченна
 фактического элемента в точке захвата и сообщения cleanup; не повторять drag
 без устранения причины. Все 14 engine probes по-прежнему not_run.
 
+Последующее уточнение `g1-hit-test-04`: элемент перекрывала `bg-mask-message`
+формы сценария. При раннем закрытии наблюдён диалог Loginom
+`Cannot read properties of null (reading 'GetNodes')`. Ожидание снятия маски
+в 05 устранило это препятствие. В 05 также обнаружена ошибка атрибуции оператора:
+системный узел переменных был принят за новый; JS creation этим не доказан.
+В 06 после нового drag появился отдельный GUID/label JavaScript, но проверка
+ошибочно отвергла промежуточные null icon/DOM. Сохранён фактический prompt
+отбрасывания своего пакета и кнопка «Не сохранять». Recovery06 прошла.
+В 07 создание пакета подтвердилось, но workflow не загрузился за 30 секунд;
+это ошибка подготовки графа, не JS-кода. Screenshot показывает загрузочную
+маску без сообщения об ошибке. Для 08 owner пакета связывается до ожидания
+графа; отдельный диагностический предел графа — 90 секунд, без повторного create.
+
+Независимая readonly-проверка `storage-platform-01.json` подтвердила отсутствие
+пакетов до/после навигации (reconciliation07), собственный каталог `/jsteach`,
+native `DefaultStorageDirectoryTreeNode`, доступные Upload/CreateDirectory,
+UI logout и context close. Файлы/каталоги не создавались: write/readback ещё
+not_checked. Assignment обновлён этим наблюдённым storage; server OS не установлен.
+
+В worktree разработчика зафиксирован отдельный Host commit `9d75933fac`:
+валидированный явный URL сохраняет внутренний `urlSource: explicit`, поэтому
+не мигрирует на product default при restart. Старые записи без provenance
+сохраняют legacy migration. Проверки разработчика: 44 tests PASS, включая
+6 отдельных процессов для Desktop/CLI codec; Host typecheck PASS. Координатор
+прочитал diff и выполнил commit, поскольку sandbox разработчика запрещает
+запись worktree git index. Это source-проверка J27, не actual candidate CLI gate
+и не формальное ревью фазы 5. Product base регистрации не изменялся.
+
 CLI dependency preparation завершена закреплённым Bun по lockfile. После
 адресной reconciliation собственного неуспешного старта команда source CLI
 `providers list` завершилась с exit 0 и показала 0 credentials в отдельном
