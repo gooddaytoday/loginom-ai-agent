@@ -1,6 +1,6 @@
 # JavaScript: checkpoint исполнения
 
-Дата: 2026-09-26. Фаза **0A/0B: MCP разработчика запущен; чтение блокирует политика подтверждений**.
+Дата: 2026-09-26. Фаза **0A/0B: OpenViking восстановлен; discovery JavaScript продолжается**.
 Пользователь назначил исполнение [плана](plan.md), Ubuntu и только headed-браузеры.
 Начаты операторские наблюдения 0B. JS-handler, полное discovery, ревью реализации
 и CLI-приёмка ещё не выполнены.
@@ -34,16 +34,26 @@ VPN, proxy, credentials или sandbox.
 согласуется с timeout, но не доказывает его. Улучшение безопасной диагностики
 требует отдельного изменения исходников/поколения; текущие pins не переписаны.
 
-Подготовлено, **не применено**: per-tool `approval_mode = "approve"` только
-для `health/find/search/read/list/tree/grep/glob/list_watches` в этом worktree.
-Запись/удаление, global config, approval_policy, hooks и capture остаются прежними.
-Форма настройки проверена по [документации MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
-Приватный proposal SHA256:
-`709d4b6839226a9b27c4c9554fc3a7f55a8123edd76729b7ae31790b3ea4f546`.
-Пользователю задан вопрос о разрешении чтения после явного policy refusal.
-После разрешения понадобится согласованное обновление config SHA регистрации
-на idle-границе, штатное обновление подключения и actor health/find/read той же
-задачи; нельзя менять файл, оставляя несовпавший registration hash.
+Пользователь явно разрешил **все операции памяти, включая запись**. На idle-границе
+в существующем worktree установлено `mcp_servers.openviking.default_tools_approval_mode
+= "approve"`; согласованно обновлён config SHA регистрации:
+`54994d52ba430d7acb76517fa71cd52cda20a3658dda1a2fb2e9cd5aab8617d9`.
+Прежнее предложение только девяти операций чтения заменено этим решением.
+Global config, approval_policy и sandbox не менялись. Побайтная проверка
+подтвердила сохранение capture state, activation, routing receipt и hooks;
+новый enrollment не выполнялся, cursor не сбрасывался. Backup и receipt —
+приватный `.local/project-memory/rollouts/20260926.2/approval-all-20260926/`.
+Свежий App Server `config/read` увидел настройку; проверка hooks сохранила пять
+trusted project hooks и отсутствие original memory hooks в worktree. Доверие
+hooks само по себе не подтверждает разрешение вызовов MCP.
+
+Пользователь перезапустил Codex. Root health и точное чтение ранее извлечённого
+результата успешны. В той же задаче разработчика запущен turn
+`01a0df0d-b86b-73e2-ab7f-b1778a97a466`: проверить actor health/find/read после
+перезапуска, затем продолжить bounded диагностику wizard-ready11. Разработчик
+в 18:50:41Z подтвердил успешные health, find (один результат) и exact read.
+Доступ обеих задач восстановлен, продуктовая работа возобновлена.
+Исходники адаптера и его generation не менялись.
 
 ## История остановки: MCP при возобновлении разработчика
 
