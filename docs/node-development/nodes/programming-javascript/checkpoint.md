@@ -15,6 +15,43 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch35: toolbar материализован, переход Views не подтверждён — 2026-09-27
+
+Freshprofile08/freeze35. Input/source/auto-link и новый JS Execute completed
+подтверждены. Body click раскрыл NodesControls/Visualizers; затем один click
+Visualizers618,246 вернулся. Но это НЕ доказательство открытия Views:
+сразу после штатный observer отказал `Node procedure roots could not be observed`.
+Root просмотрел screenshot: ещё graph/WorkFlowTreeNode, breadcrumb пуст;
+точная причина отказа roots пока не сохранена. Все1046 journal refs SHA проверены.
+Output6×2 NOT_READ.
+
+Original cleanup: package_closed/logged_out=false, browser_closed=true,
+close-owned-package wait60s timeout. Отдельный headed recovery35 на profile08
+без download и без повторения opening/Execute: packages0, logout/browser PASS,
+packageMutation=false. Оригинальный cleanup не переписан в PASS.
+
+Fix36 назначен прежней задаче: сохранять ограниченный roots refusal outcome,
+подтверждать реальный native Views node/port после единственного click под
+исходным deadline; отдельное read-only settlement и корректный owned cleanup.
+Не повторять неизвестный opening. Исторический bootstrap из памяти не выполнять.
+Следующий live после handoff — новый profile09. Root source/worktree refs прежние.
+
+### Freeze35 принят root; headed batch35 — 2026-09-27
+
+Разработчик фактически выполнил fix35, но финальный ответ ошибочно вернулся
+к историческому bootstrap. Root проверил завершение задачи и исходники,
+повторил29 затронутых tests после последней правки runtime (PASS); ранее96
+PASS, прочие tested files неизменны. Syntax21 и worktree docs validator PASS.
+Handoff35 с21 SHA составлен root по реальным файлам. Новый enrollment не нужен.
+
+Private selection теперь требует доступный Visualizers, а не только selected.
+При selected+toolbar absent отправляется один guarded body click; active output
+повторно проверяется до жеста, одна DOM replacement допускается только для
+сохранённого native cell. Hover fallback удалён. Повтор unknown effect запрещён.
+
+Batch35 запущен headed на freshprofile08 с новым UUID/evidence; результат
+ожидается. Публичный handler и полная приёмка остаются впереди.
+
 ### Batch34: выбранный JS без панели, hover не раскрыл Visualizers — 2026-09-27
 
 Freshprofile07/freeze34, новый JS Execute completed/verified/owner_verified.
