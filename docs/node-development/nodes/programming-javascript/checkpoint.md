@@ -72,6 +72,20 @@ Private evidence: `g1-operator-12/report.json`. Результат прогон�
 0 пакетов, успешные UI logout и закрытие browser context; evidence —
 `g1-recovery-12.json`. Source insertion, Next, Done, Preview и engine probes не выполнялись.
 
+Operator13 (operator SHA256
+`fa4f618d047035b8529d3f63088b04ae908b8714758bd77467f112a556313675`)
+подтвердил native `Ext.grid.column.Action`, `disabled=true`, exact DOM identity,
+цепочку владельцев grid/page/wizard и совпадение геометрии оставшейся маски.
+Не прошли только предполагаемые `empty_mask` и `no_dialog_role`; реальная маска
+содержит дочерние элементы и role. Эти предположения не подтверждены source и
+не должны считаться доказательством загрузки. Разработчик уточняет структуру
+штатной Ext mask; blanket-исключение всех масок не вводится.
+
+Report13: `CLEANUP_UNCONFIRMED`, browser closed, Close/Next не отправлены.
+Recovery13 отдельно подтвердил `jsteach`, packages0, logout/context close.
+Private evidence — `g1-operator-13/report.json`, `g1-recovery-13.json`.
+Режим `--inspect-pages` подготовлен, но ещё не запущен. G1 не закрыт.
+
 ## История остановки: MCP при возобновлении разработчика
 
 После recovery11 задача разработчика подтвердила отсутствие OpenViking tools
