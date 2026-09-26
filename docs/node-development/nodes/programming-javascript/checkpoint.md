@@ -15,6 +15,32 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### G2 operator25: Chromium SIGTRAP подтверждён — 2026-09-27
+
+Root повторил 118 адресных тестов, freeze13 и syntax: PASS. Same-owner busy
+settlement исправлен под исходным deadline, перед Refresh повторяется полный
+контекст и удерживаемый native store. Regression N→N+1 исключает засчитывание
+фоновой загрузки за результат Refresh; замена store до dispatch даёт ноль кликов.
+
+Live25 сразу увидел готовый CSV157/loadCount5/count2, поэтому ветка busy/Refresh
+не была задействована. Download gesture SUCCEEDED; saveAs завершился closed-target.
+Private process log впервые подтвердил **exitCode=null, signal=SIGTRAP** в
+21:11:27.448Z. Download event — 21:11:27.273Z; page/context закрылись до запроса
+operator cleanup. Crashpad сообщил `elf_dynamic_array_reader.h:64 tag not found`;
+это не доказательство причины crash. JS/import не запускались. Upload/download
+не повторять; путь `/jsteach/js-g2-4468f056-303e-40fe-972f-542cddf4848f` сохранён.
+
+Отдельная headed recovery25: packages0, logout/browserClosed=true,
+packageMutation=false. Затем независимая локальная HTTP download-проба с новым
+профилем, теми же Chromium/Playwright и sandbox=true прошла: saveAs, точные22bytes,
+exit0/signalnull. Это ограниченная проверка базового скачивания; она не воспроизводит
+Loginom/blob/старый профиль и не устанавливает причину SIGTRAP. Evidence:
+`chromium-download-diagnostic-01/report.json` в приватной кампании. Raw logs вне git.
+
+Разработчик выполняет read-only разбор download/launch пути; source25 frozen.
+Следующий live run пока не назначен: сначала ограниченная диагностическая проба
+для локализации crash. G2/G3 и весь план остаются незавершёнными.
+
 ### G2 operator23/24: download interruption и transient busy — 2026-09-27
 
 После перезапуска root снова проверил MCP health, actor search и read записи
