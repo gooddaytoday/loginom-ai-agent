@@ -116,3 +116,45 @@ Loginom под выделенным аккаунтом. Отдельно уст�
 или pending browser operations нет. Приватный profile/evidence сохранён.
 При возобновлении сверить worktree, процессы, account lease и receipts;
 не создавать вторую кампанию и не сбрасывать состояние существующих задач.
+
+## Продолжение 0A: интерфейс и целостность bundle
+
+Повторная проверка 2026-09-26, после docs source
+`ed45485ac032ff6bc4921a2ca4a55a5650356719`. Worktree остаётся чистым на product
+base; разработчик/bootstrap ещё не созданы, исходный adapter по-прежнему отсутствует.
+Запрос его доступной копии остаётся без ответа. Предыдущий этап дал реальный
+прогресс (Ubuntu helpers/toolchain/login), этот — следующие наблюдения.
+
+- Штатный `verifyResources` выполнен bundled Node: **4668 файлов PASS**,
+  manifest SHA256 `ff80b90e2c543a0f3afcdddae843af28372fad43c27c51cce0d58a7f9c66a9b4`.
+  Приватный receipt — `source-bundle-verification.json` в каталоге кампании.
+  При отдельном сравнении с product release pin найдено одно различие:
+  `endpoint=https://loginom.duckdns.org/mcp` у этого bundle вместо актуального
+  `https://mcp.loginom.ai/mcp`. Поэтому целостность подтверждена, но **допуск
+  candidate не выдан**. Новый candidate должен собираться из исходников и pins
+  по фазе 6; существующий source bundle не подменять именем нового candidate.
+  Action manifest URI/hash и остальные release fields совпали с product pin.
+- В собственном headed context под `jsteach` ранний переход «О программе»
+  после успешного login показал `Cannot read properties of undefined (reading
+  'NodeIndex')`. Доказательство сохранено: `platform-preflight.json` и screenshot.
+  About metadata не прочитаны, logout первой пробы **не подтверждён**, context
+  закрыт. Попытка сохранена как неуспешная, не переписана последующей проверкой.
+- Отдельная recovery-проба подтвердила тот же account, 0 пакетов, отсутствие
+  открытых сообщений, затем успешные UI logout и context close:
+  `platform-recovery.json`. Серверных объектов/пакетов не создавалось.
+- Проба с ожиданием видимой страницы «Начало» установила `homeVisible=true`,
+  `bg.app.PlatformEdition=Enterprise`, успешные logout/context close:
+  `platform-readiness.json`. Это отделяет login admission от загрузки интерфейса.
+- Повтор чтения «О программе» после ожидания HomePage и подтверждения native
+  active tab == `FAboutNode` прошёл. Фактически прочитаны
+  `MF;TF-1;About;lblPlatformEditionValue=Enterprise` и
+  `MF;TF-1;About;lblVersionValue=7.4.2`. Успешные UI logout/context close —
+  `platform-ready.json`; screenshot — `platform-ready.png`. Полные локальные
+  observations остаются приватными. Страница не содержит ОС сервера;
+  эта характеристика запрошена у пользователя и не выведена из ОС агента.
+
+Последний Loginom context закрыт, logout подтверждён. Browser lease хранит
+профиль и evidence, но не объявляет работающий процесс; CLI slot свободен.
+Содержимое установленного bundle не менялось. Блокирующее условие регистрации
+памяти прежнее: нужна точная копия исходного adapter либо отдельно реализованное
+и проверенное новое поколение; ослабление manifest/routing guards не допускается.
