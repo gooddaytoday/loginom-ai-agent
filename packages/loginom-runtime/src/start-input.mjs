@@ -17,6 +17,10 @@ export function validateStartInput(input) {
     !isAbsolute(input.stateDir)
   )
     throw Error("LOGINOM_START_INVALID")
+  if (input.trustedAttempt !== undefined && (!input.trustedAttempt || typeof input.trustedAttempt !== 'object'
+      || Object.keys(input.trustedAttempt).join() !== 'attemptId'
+      || typeof input.trustedAttempt.attemptId !== 'string'
+      || !/^[a-zA-Z0-9_-]{1,160}$/.test(input.trustedAttempt.attemptId))) throw Error('LOGINOM_START_INVALID')
   // Acceptance-only: the exact saved package the bridge closes during shutdown.
   const cleanup = input.acceptanceCleanupPackage ?? null
   if (

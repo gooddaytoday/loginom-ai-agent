@@ -46,6 +46,7 @@ export type FatalRendererError = {
 
 export type ElectronAPI = {
   loginom: Loginom.API
+  loginomSession: Loginom.SessionAPI
   killSidecar: () => Promise<void>
   awaitInitialization: () => Promise<ServerReadyData>
   getSystemProxyStatus: () => Promise<SystemProxyStatus>

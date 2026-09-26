@@ -89,7 +89,7 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       expect((await recoveryStore(join(root, "recovery"), { strict: true })).pending()).toHaveLength(2)
       if (ending === "finish") {
         expect(await call("finish")).toEqual({ action: "finish" })
-        expect(await readdir(join(root, "recovery"))).toEqual([])
+        expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toEqual([])
         await client.request("release", { run: "one" })
         expect(await client.request("acquire", { run: "next", session: "chat" })).toEqual({ generation: 1 })
         await client.request("release", { run: "next" })
@@ -291,11 +291,18 @@ test("an uncertain run releases the chat and applies connection changes saved du
       apiKey: { operation: "preserve" },
       password: { operation: "preserve" },
     })
+    expect(await host.api.save({ revision: 1, validationId: validation.validationId })).toMatchObject({
+      state: "pending",
+      generation: 1,
+      username: "user",
+    })
     expect(
-      await host.api.save({ revision: 1, validationId: validation.validationId }),
-    ).toMatchObject({ state: "pending", generation: 1, username: "user" })
-    expect(
-      await client.request("call", { run: "one", name: "dock_node_wait", args: { action: "uncertain" }, userMessage: "original" }),
+      await client.request("call", {
+        run: "one",
+        name: "dock_node_wait",
+        args: { action: "uncertain" },
+        userMessage: "original",
+      }),
     ).toEqual({ action: "uncertain" })
     await client.request("release", { run: "one" })
     await host.settled()
@@ -311,7 +318,7 @@ test("an uncertain run releases the chat and applies connection changes saved du
   }
 }, 15000)
 
-test("restarting the host drops an uncertain record without replaying it", async () => {
+test("restarting the host preserves strict uncertainty without the original opt-in or replay", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "loginom-advisory-restart-"))
@@ -368,11 +375,12 @@ test("restarting the host drops an uncertain record without replaying it", async
   try {
     await host.settled()
     const status = await host.api.status()
-    expect(status.recoveries).toBeUndefined()
-    expect(status.state).toBe("ready")
-    expect(await client.request("acquire", { run: "next", session: "chat" })).toEqual({ generation: 1 })
+    expect(status.recoveries).toEqual([id])
+    expect(status.recoveryMode).toBe("strict")
+    expect(status.state).toBe("recoverable-error")
+    expect(await client.request("acquire", { run: "next", session: "chat" })).toBeNull()
     expect(await readFile(calls, "utf8")).toBe("")
-    expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toEqual([])
+    expect((await readdir(join(root, "recovery"))).filter((name) => name.endsWith(".json"))).toEqual([`${id}.json`])
   } finally {
     client.close()
     await port.close()

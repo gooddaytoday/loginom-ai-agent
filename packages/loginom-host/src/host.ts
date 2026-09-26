@@ -7,6 +7,7 @@ import { connectionService } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
 import { recoveryStore } from "./connection/recovery-store"
+import { readSessionRegistration, sessionCompletion } from "./session-completion"
 
 export async function createLoginomHost(options: {
   root: string
@@ -21,7 +22,10 @@ export async function createLoginomHost(options: {
   const resources = options.resources
   const environment = { ...(options.environment ?? process.env) }
   const inputs = inputStore(join(root, "inputs"))
-  const journal = await recoveryStore(join(root, "recovery"), { strict: options.strictRecovery === true })
+  const registration = await readSessionRegistration(root)
+  const journal = await recoveryStore(join(root, "recovery"), {
+    strict: options.strictRecovery === true || !!registration,
+  })
   const generations = new Map<
     number,
     { connection: ActiveConnection; children: Map<string, Promise<Awaited<ReturnType<typeof supervise>>>> }
@@ -65,12 +69,21 @@ export async function createLoginomHost(options: {
       endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
       actionManifestUri: manifest.actionManifestUri,
       actionManifestSha256: manifest.actionManifestSha256,
+      trustedAttempt: registration ? { attemptId: registration.attemptId } : undefined,
     })
   }
+  const sessions = await sessionCompletion({
+    root,
+    registration,
+    journal,
+    idle: () => service.idle(),
+    runtime: async (generation, chat) => generations.get(generation)?.children.get(chat),
+  })
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
     {
       async check(connection) {
+        if (sessions.blocked() || sessions.completed()) throw Error("LOGINOM_SESSION_BUSY")
         const chat = randomUUID()
         try {
           const child = await launch(connection, chat, true)
@@ -83,6 +96,7 @@ export async function createLoginomHost(options: {
         }
       },
       async prepare(connection) {
+        if (sessions.blocked() || sessions.completed()) throw Error("LOGINOM_SESSION_BUSY")
         const child = await launch(connection, "readiness")
         const generation = { connection, children: new Map<string, Promise<Runtime>>() }
         generations.set(connection.generation, generation)
@@ -114,11 +128,48 @@ export async function createLoginomHost(options: {
     journal,
   )
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
+  async function view() {
+    return {
+      ...(await service.api.read()),
+      ...(registration
+        ? {
+            sessionCompletion: sessions.completed()
+              ? ("completed" as const)
+              : sessions.blocked()
+                ? ("pending" as const)
+                : ("open" as const),
+          }
+        : {}),
+    }
+  }
   return {
     ...service,
+    acquire(run: string) {
+      if (sessions.blocked() || sessions.completed()) return
+      return service.acquire(run)
+    },
+    sessionApi: {
+      sessionCompletionOptions: sessions.options,
+      finishOwnSession: sessions.finish,
+    },
     api: {
       ...service.api,
+      read: view,
+      status: view,
+      async check(input: Parameters<typeof service.api.check>[0]) {
+        if (sessions.blocked() || sessions.completed()) throw Error("LOGINOM_SESSION_BUSY")
+        return service.api.check(input)
+      },
+      async save(input: Parameters<typeof service.api.save>[0]) {
+        if (sessions.blocked() || sessions.completed()) throw Error("LOGINOM_SESSION_BUSY")
+        return service.api.save(input)
+      },
+      async cancelPending(input: Parameters<typeof service.api.cancelPending>[0]) {
+        if (sessions.blocked() || sessions.completed()) throw Error("LOGINOM_SESSION_BUSY")
+        return service.api.cancelPending(input)
+      },
       async acknowledgeRecovery(input: Parameters<typeof service.api.acknowledgeRecovery>[0]) {
+        if (sessions.blocked()) throw Error("LOGINOM_RECOVERY_BUSY")
         const view = await service.api.acknowledgeRecovery(input)
         recoveries.clear()
         return view

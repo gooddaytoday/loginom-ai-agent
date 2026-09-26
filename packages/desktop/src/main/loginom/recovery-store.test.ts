@@ -77,7 +77,7 @@ test("crash recovery gates a durable pending generation until explicit acknowled
       expect(await service.api.status()).toMatchObject({ state: "ready", generation: 2, username: "other" })
       expect((await store.read())?.generation).toBe(2)
       expect(await store.pending()).toBeUndefined()
-      expect(await readdir(location)).toEqual([])
+      expect(await readdir(location)).toEqual([".strict-policy"])
     } finally {
       await service.close()
     }

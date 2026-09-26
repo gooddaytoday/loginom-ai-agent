@@ -128,6 +128,16 @@ async function dispatch(message: unknown) {
 
 async function management(method: string, input: unknown, host: Awaited<ReturnType<typeof createLoginomHost>>) {
   if (method === "connection.status" || method === "connection.read") return host.api.status()
+  if (method === "connection.session-completion-options") {
+    const value = Schema.decodeUnknownOption(Loginom.SessionCompletionTarget)(input)
+    if (Option.isNone(value)) throw Error("LOGINOM_SESSION_BINDING_INVALID")
+    return host.sessionApi.sessionCompletionOptions(value.value)
+  }
+  if (method === "connection.finish-own-session") {
+    const value = Schema.decodeUnknownOption(Loginom.FinishOwnSession)(input)
+    if (Option.isNone(value)) throw Error("LOGINOM_SESSION_BINDING_INVALID")
+    return host.sessionApi.finishOwnSession(value.value)
+  }
   if (method === "connection.check") {
     const value = candidate(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_CANDIDATE_INVALID")

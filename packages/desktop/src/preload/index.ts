@@ -20,6 +20,10 @@ const api: ElectronAPI = {
     cancelPending: (input) => ipcRenderer.invoke("loginom-cancel-pending", input),
     acknowledgeRecovery: (input) => ipcRenderer.invoke("loginom-acknowledge-recovery", input),
   },
+  loginomSession: {
+    sessionCompletionOptions: (input) => ipcRenderer.invoke("loginom-session-completion-options", input),
+    finishOwnSession: (input) => ipcRenderer.invoke("loginom-finish-own-session", input),
+  },
   killSidecar: () => ipcRenderer.invoke("kill-sidecar"),
   awaitInitialization: () => ipcRenderer.invoke("await-initialization"),
   getSystemProxyStatus: () => ipcRenderer.invoke("get-system-proxy-status"),

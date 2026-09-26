@@ -315,7 +315,7 @@ const main = Effect.gen(function* () {
   loginomStarting = desktopLoginom()
   const loginom = yield* Effect.promise(() => loginomStarting!)
   if (stopping) return
-  registerLoginomIpc(loginom.api)
+  registerLoginomIpc(loginom.api, loginom.sessionApi)
   registerIpcHandlers({
     killSidecar: () => killSidecar(),
     relaunch,

@@ -29,12 +29,47 @@ export const View = Schema.Struct({
   state: State,
   failure: Schema.optionalKey(Schema.String),
   recoveries: Schema.optionalKey(Schema.Array(Schema.String)),
+  sessionCompletion: Schema.optionalKey(Schema.Literals(["open", "pending", "completed"])),
+  recoveryMode: Schema.optionalKey(Schema.Literals(["strict", "advisory"])),
 })
 export type View = typeof View.Type
 export const Validation = Schema.Struct({ validationId: Schema.String, expiresAt: Schema.Number })
 export const Save = Schema.Struct({ validationId: Schema.String, revision: NonNegativeInt })
 export const Cancel = Schema.Struct({ revision: NonNegativeInt })
 export const AcknowledgeRecovery = Schema.Struct({ revision: NonNegativeInt, ids: Schema.Array(Schema.String) })
+
+// Private controller/desktop IPC only. These are never model tool parameters.
+export const SessionCompletionTarget = Schema.Struct({ generation: NonNegativeInt, chat: Schema.NonEmptyString })
+export const SessionCompletionBinding = Schema.Struct({
+  attemptId: Schema.NonEmptyString,
+  generation: NonNegativeInt,
+  chat: Schema.NonEmptyString,
+  sessionId: Schema.NonEmptyString,
+  documentId: Schema.NonEmptyString,
+  account: Schema.NonEmptyString,
+  packagePath: Schema.NonEmptyString,
+  saveOperationId: Schema.NonEmptyString,
+  mutationRevision: NonNegativeInt,
+})
+export type SessionCompletionBinding = typeof SessionCompletionBinding.Type
+export const FinishOwnSession = Schema.Struct({
+  completionId: Schema.NonEmptyString,
+  binding: SessionCompletionBinding,
+})
+export const SessionCompletionReceipt = Schema.Struct({
+  version: Schema.Literal(1),
+  completionId: Schema.NonEmptyString,
+  binding: SessionCompletionBinding,
+  status: Schema.Literals(["SUCCEEDED", "BLOCKED", "UNKNOWN"]),
+  packageClosed: Schema.Boolean,
+  loggedOut: Schema.Boolean,
+  reason: Schema.NullOr(Schema.String),
+})
+export type SessionCompletionReceipt = typeof SessionCompletionReceipt.Type
+export type SessionAPI = {
+  sessionCompletionOptions(input: typeof SessionCompletionTarget.Type): Promise<SessionCompletionBinding>
+  finishOwnSession(input: typeof FinishOwnSession.Type): Promise<SessionCompletionReceipt>
+}
 
 export type API = {
   read(): Promise<View>

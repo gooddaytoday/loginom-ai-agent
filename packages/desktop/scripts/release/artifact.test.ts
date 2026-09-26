@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { $ } from "bun"
-import { verifyMacBrowserSignature } from "./verify-macos"
+import { verifyMacArtifact, verifyMacBrowserSignature } from "./verify-macos"
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -309,6 +309,78 @@ test.skipIf(process.platform !== "darwin")(
       await writeFile(executable, original)
       await $`codesign --force --sign - ${bundle}`.quiet()
       expect(await verifyMacBrowserSignature(executable)).toBe("bundle-and-code")
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+)
+
+test.skipIf(process.platform !== "darwin")(
+  "macOS ZIP verification requires the own bundle seal and rejects altered or missing resources and code",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "loginom-own-signature-"))
+    const application = join(directory, "Fixture.app")
+    const executable = join(application, "Contents/MacOS/Fixture")
+    const resources = join(application, "Contents/Resources/loginom")
+    const sealed = join(application, "Contents/Resources/sealed.txt")
+    try {
+      await mkdir(join(application, "Contents/MacOS"), { recursive: true })
+      await mkdir(resources, { recursive: true })
+      await writeFile(join(directory, "main.c"), "int main(void) { return 0; }\n")
+      await writeFile(
+        join(application, "Contents/Info.plist"),
+        `<?xml version="1.0"?><plist version="1.0"><dict>
+          <key>CFBundleExecutable</key><string>Fixture</string>
+          <key>CFBundleIdentifier</key><string>com.loginom.signature-fixture</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+          <key>CFBundleDisplayName</key><string>Fixture</string>
+          <key>CFBundleShortVersionString</key><string>1.0.0</string>
+          <key>LSMinimumSystemVersion</key><string>14.0</string>
+        </dict></plist>`,
+      )
+      await $`clang -arch arm64 -mmacosx-version-min=14.0 ${join(directory, "main.c")} -o ${executable}`.quiet()
+      const binary = await readFile(executable)
+      for (const file of ["node", "chrome"]) await writeFile(join(resources, file), binary, { mode: 0o755 })
+      const inventory = JSON.stringify({
+        protocol: 1, target: "darwin-arm64", node: "node", browser: "chrome",
+        files: ["node", "chrome"].map((path) => ({ path, sha256: hash(binary) })),
+      })
+      await writeFile(join(resources, "resource-manifest.json"), inventory)
+      await writeFile(sealed, "sealed resource\n")
+      const base = releaseManifest("linux")
+      const manifest = decodeManifest({
+        ...base,
+        target: { platform: "darwin", arch: "arm64", minimumOS: "14.0", backend: "v1" },
+        installation: { ...base.installation, scope: "user" },
+        signing: { status: "ad-hoc", identity: "-", notarized: false },
+        product: { ...base.product, name: "Fixture", appId: "com.loginom.signature-fixture", executable: "Fixture" },
+        runtime: { ...base.runtime, resourcesSha256: hash(inventory) },
+        paths: { ...base.paths, node: "Contents/Resources/loginom/node", chromium: "Contents/Resources/loginom/chrome" },
+        artifacts: [{ file: "fixture.zip", kind: "zip", bytes: 1, sha256: "a".repeat(64) }],
+      })
+      const verify = async (name: string) => {
+        const artifact = join(directory, `${name}.zip`)
+        const output = join(directory, name)
+        await mkdir(output)
+        await $`ditto -c -k --keepParent ${application} ${artifact}`.quiet()
+        return verifyMacArtifact({ manifest, artifact, kind: "zip", directory: output })
+      }
+      await expect(verify("unsigned")).rejects.toThrow()
+      await $`codesign --force --sign - ${application}`.quiet()
+      expect(await verify("signed")).toMatchObject({ signing: "ad-hoc", vendorCodeSignaturesVerified: true })
+      await writeFile(sealed, "modified resource\n")
+      await expect(verify("altered-resource")).rejects.toThrow()
+      await unlink(sealed)
+      await expect(verify("missing-resource")).rejects.toThrow()
+      await writeFile(sealed, "sealed resource\n")
+      const signed = await readFile(executable)
+      const changed = Buffer.from(signed)
+      changed[1024] ^= 1
+      await writeFile(executable, changed)
+      await expect(verify("altered-code")).rejects.toThrow()
+      await writeFile(executable, signed)
+      await unlink(join(application, "Contents/_CodeSignature/CodeResources"))
+      await expect(verify("missing-seal")).rejects.toThrow()
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

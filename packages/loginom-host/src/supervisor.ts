@@ -20,6 +20,7 @@ export type Launch = {
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.
   acceptanceCleanupPackage?: string
+  trustedAttempt?: { attemptId: string }
 }
 
 export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = process.platform) {
