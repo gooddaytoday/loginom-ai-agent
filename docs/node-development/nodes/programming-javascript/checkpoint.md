@@ -15,6 +15,35 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### G2 operator18: upload verification readiness — 2026-09-26
+
+Исправлены conditional initial page admission (только после same-node input-port
+proof) и отдельный cleanup deadline. Полные journal events заменены в report
+ссылками line/SHA; fsync journal и полная acknowledgement сохранены. Восемь
+адресных тестов, syntax/freeze девяти модулей PASS; live SHA
+`05069877d8cbc21e813a94cfc924307375550a105f84df2a4ecebe3537c373d0`.
+
+Headed `code-sentinel-next` остановился **до импорта и JS**. Новый upload
+отправлен один раз; receipt `upload_native_input_settled` требует проверки
+серверных bytes. Немедленный download verification вернул `NOT_APPLIED /
+DISCOVERY_GRID_BLOCKED`, итог delivery — **AMBIGUOUS, inspection_required**.
+Повтор upload запрещён. Папка `/jsteach/js-g2-f8d8b105-d7fc-4688-8de1-1970af704758`
+создана; наличие/bytes серверного файла в этом прогоне не подтверждены.
+В screenshot список пуст. Связь отказа с устранением медленного report write —
+гипотеза для проверки semantic readiness, не доказанная первопричина.
+
+Исходный cleanup снова unconfirmed: `Owned draft changed`, хотя packages1,
+Package1/path empty/running false; активная вкладка — StorageDirectoryTreeNode,
+не прежний workflow. Browser закрыт. Отдельная headed recovery18 подтвердила
+0 packages, logout/context close без package mutations. Разработчику назначено
+исправить readiness download и безопасный возврат к собственному workflow
+для cleanup; проверку принадлежности пакета не ослаблять.
+
+Root независимо проверил **38/38** line/SHA references against actual journal
+bytes, report 30016 bytes. Следующий новый evidence directory — operator19
+после source handoff. Изменения admission из operator18 до live JS не дошли;
+они пока подтверждены только локальными тестами. Полный scope плана сохранён.
+
 ### G2 operator17: вход проверен, условная первая страница — 2026-09-26
 
 После source handoff в прежней задаче выполнен headed `code-sentinel-next`.
