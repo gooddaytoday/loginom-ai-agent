@@ -15,6 +15,16 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Повторная проверка OpenViking — 2026-09-27
+
+После перезапуска Codex фактически выполнены MCP health, actor search и read
+найденной записи: PASS. Doctor0.8.1 подтвердил credentials, system/status,
+15 MCP tools, все подсистемы ready; 0 failures, 1 warning о прежних hook errors
+и отменённых запросах. Текущие операции памяти ими не заблокированы.
+Конфигурация и разрешения не менялись. Прежняя задача fix36 активна;
+root проверяет переход Views и защиту cleanup от повторного navigation после
+потерянного ответа. Browser lease closed_logout_verified, новый live не начат.
+
 ### Batch35: toolbar материализован, переход Views не подтверждён — 2026-09-27
 
 Freshprofile08/freeze35. Input/source/auto-link и новый JS Execute completed
