@@ -184,6 +184,17 @@ async function browserArtifactReveal(page,task,snapshot) {
 }
 
 async function browserArtifactDownload(page,task,observe,act,reveal) {
+  let browserStep='preconditions';
+  const failureEvidence=error=>{
+    const causes=[];const seen=new Set();
+    for(let current=error;current&&causes.length<3&&!seen.has(current);current=current.cause){
+      seen.add(current);const message=String(current.message??'');
+      causes.push({kind:['Error','TimeoutError','TargetClosedError','AbortError'].includes(current.name)?current.name:'OtherError',
+        target_closed:/Target page, context or browser has been closed/i.test(message),
+        crashed:/crash/i.test(message),timeout:/timeout|timed out/i.test(message),cancelled:/cancel|abort/i.test(message)});
+    }
+    return {step:browserStep,causes,page_closed:typeof page.isClosed==='function'?page.isClosed():null};
+  };
   let phase='preconditions',gesture=false,download=null,completed=false,event,revealed=false;
   const trace=[],destination=task.output_binding??task.artifact.upload;
   const result=(status,code,output={})=>({status,action_key:'artifact.download',action_revision:'1',operation_id:task.operation_id,
@@ -261,15 +272,18 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       return result(gesture?'AMBIGUOUS':'NOT_APPLIED','DOWNLOAD_OUTPUT_SIZE_CHANGED');
     // Register BEFORE the checked gesture; native download may fire before
     // the click promise settles. Only this Page's event is eligible.
-    event=page.waitForEvent('download',{timeout:15000}).then(value=>value,()=>null);
+    event=page.waitForEvent('download',{timeout:15000}).then(value=>value,error=>{
+      trace.push({event:'download_event_failure',...failureEvidence(error),step:'download.event'});return null;
+    });
     phase='requesting';gesture=true;
     completed=false;
+    browserStep='download.gesture';
     const action=await act(page,before.output);
     gesture=revealed || action.effect_possible===true;
     trace.push({event:'download_gesture_result',status:action.status,effect_possible:action.effect_possible===true,
       cleanup_complete:action.cleanup_complete===true,
       error_code:/^[A-Z][A-Z0-9_]{0,79}$/.test(action.error?.code??'')?action.error.code:null});
-    download=await event;
+    browserStep='download.event';download=await event;
     if(action.status!=='SUCCEEDED' || action.output?.gesture_applied!==true) {
       if(download) {gesture=true;await download.cancel();completed=true;}
       else if(action.effect_possible===false && action.cleanup_complete===true)completed=true;
@@ -278,6 +292,7 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     gesture=true;
     if(!download)return result('AMBIGUOUS','DOWNLOAD_EVENT_MISSING');
     // Do not persist the URL (it may carry credentials); compare only origin.
+    browserStep='download.metadata';
     const url=download.url(),originPrefix=task.expected_origin+'/';
     if(typeof url!=='string' || !(url.startsWith(originPrefix) || url.startsWith('blob:'+originPrefix))) {
       await download.cancel();completed=true;
@@ -289,9 +304,12 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       return result('AMBIGUOUS','DOWNLOAD_FILENAME_MISMATCH');
     }
     phase='downloading';
+    browserStep='download.saveAs';
     await download.saveAs(task.download_path);
+    browserStep='download.failure';
     if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
     completed=true;
+    browserStep='post_download_observation';
     const after=await observe(page);
     if(after.status!=='SUCCEEDED' || !contextMatches(after.output)
       ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes)return result('AMBIGUOUS','DOWNLOAD_CONTEXT_CHANGED');
@@ -299,11 +317,14 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     return result('SUCCEEDED',null,{artifact_id:task.artifact.artifact_id,...(task.output_binding?{output_binding:task.output_binding}:{upload_grant_id:task.artifact.upload.grant_id,upload_operation_id:task.upload_operation_id}),destination:destination.destination,
       suggested_name:name,download_completed:true,bytes_verification_required:true,
       file_ref:task.file_ref,observation_id:task.observation_id});
-  } catch {
+  } catch(error) {
+    trace.push({event:'download_browser_failure',...failureEvidence(error)});
     // An unexpected gesture exception may have emitted a download already.
     // Drain the bounded listener and cancel any captured transfer before exit.
     if(event && !download)try{download=await event;}catch{}
-    if(download && !completed)try{await download.cancel();completed=true;}catch{}
+    if(download && !completed)try{await download.cancel();completed=true;}catch(error){
+      browserStep='download.cancel';trace.push({event:'download_cleanup_failure',...failureEvidence(error)});
+    }
     return result(gesture || event?'AMBIGUOUS':'NOT_APPLIED','DOWNLOAD_BROWSER_CALL_FAILED');
   }
 }
