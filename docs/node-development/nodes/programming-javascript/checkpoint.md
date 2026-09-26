@@ -15,6 +15,27 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Повторная проверка памяти и batch31 — 2026-09-27
+
+После перезапуска OpenViking: MCP health, actor search и точное чтение
+batch_execution_design.md успешны. Doctor: 0 failures, 15 MCP tools,
+credentials/system/status/ready PASS; одно предупреждение о прежних ошибках
+журнала. Конфигурация не менялась. Историческая память не заменяет checkpoint.
+
+Root повторил 30 операторских тестов: PASS, проверил все16 SHA freeze31.
+Назначен свежий profile04 с отдельной квитанцией; profile03 сохранён.
+Запущен headed batch31: один input,11 независимых JS cases,30min предел,
+исходные guards и общий cleanup. Результат пока ожидается; G2/G3 не закрыты.
+
+### Отдельное предусловие CLI model catalog — 2026-09-27
+
+Read-only сверка product/models.json: у provider openai есть gpt-5.6-sol и
+gpt-6-astra, но нет требуемого планом gpt-6-sol. Это снимок build-time, не
+результат authenticated OAuth model-list; доступность gpt-6-sol пока не
+проверена. До CLI-приёмки проверить реальный разрешённый каталог и точное
+разрешение model ID. Не подменять модель автоматически и не выдавать проверку
+другой моделью за prescribed acceptance. JS discovery может продолжаться.
+
 ### Live30: selection/source/Next наблюдены, G2 ещё открыт — 2026-09-27
 
 Freshprofile03, unchanged operator29, Chromium1246: status OBSERVED, process0.
