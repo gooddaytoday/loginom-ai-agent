@@ -55,8 +55,10 @@ token_budget. Последующее исправление продолжает
    не является отказом памяти.
 
 Актуальная процедура — [CURRENT.md](../../../services/loginom-ai/tools/project-memory/CURRENT.md),
-поколение `20260924.1`, namespace `loginom-ai-agent`. **[Установка и полный цикл записи проверены](shared-memory.md).** Общий корень нового проекта:
-`viking://user/kartamyshev/peers/-Users-kartamyshev-Git-loginom-ai-agent/memories`.
+поколение `20260926.2`, namespace `loginom-ai-agent`. **[Установка и полный цикл записи проверены](shared-memory.md).** Общий корень
+определяется текущей авторизованной identity и Peer основного checkout. На Ubuntu:
+`viking://user/kiselev/peers/-home-george-git-loginom-ai-agent/memories`.
+Исторический macOS URI не использовать как global Peer или текущий адрес.
 Разовая подготовка проекта и допуск каждого worktree — разные действия. Основной
 checkout сохраняет штатный плагин; только зарегистрированные worktrees получают
 проектные hooks и отдельные cursors. Подготовленный проектный MCP отказывает
