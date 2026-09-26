@@ -181,6 +181,14 @@ sentinel положительно доказывает исполнение, о�
 `d61d649ed91c41c4961f51855508a893b17d6fc75b11c30419d3836186e8f97a`.
 Статус expected_not_live_validated; это не финальный business CLI oracle.
 
+Source oracle в новом `javascript-execution-evidence.mjs` независимо сверён
+координатором с Python oracle: все30 входных и12 выходных значений и обе схемы
+совпали (pinned Node, package directory). Live correctness этим не доказана.
+В review передано требование fresh sentinel messages для конкретного
+once-effect/node/source SHA: прежняя запись консоли не подтверждает исполнение
+после нового Next/Done/Preview; terminal outcome проверяется отдельно.
+
+
 ## CLI-профиль: offline reconciliation после отменённого OAuth
 
 Старый guard отменённого сеанса (nonce `b0e663b1-6c9f-48f0-9e32-54150f220415`)
