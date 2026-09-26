@@ -81,7 +81,7 @@ LLM, обучение статистической модели или отде�
 - `loginom-ai-agent-cli` отсутствует в PATH и проверенном стандартном
   `~/.local/bin`; стандартный payload `~/.local/share/loginom-ai-agent-cli`
   отсутствует. Это не глобальный поиск всех возможных нестандартных установок.
-- На этой машине отсутствуют `.local/node-development`,
+- На момент первоначального исследования отсутствовали `.local/node-development`,
   `.local/project-memory/runtime/20260924.1` и стандартный
   `~/.local/state/loginom-ai-agent/node-development/host-resources.json`.
   Аккаунт, изолированный CLI profile, OAuth, Loginom build, доступность

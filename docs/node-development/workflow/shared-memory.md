@@ -1,5 +1,32 @@
 # Общая память: готовность и следующий worktree
 
+## Ubuntu: текущее поколение 20260926.2
+
+На 2026-09-26 **установлено и проверено** новое поколение адаптера с исходниками
+в репозитории. Внешний macOS-каталог больше не нужен. Детали реализации, hashes,
+неуспешная первая попытка и исправления — [отчёт адаптера](../../../services/loginom-ai/tools/project-memory/ubuntu-adapter.md).
+
+- Настоящая задача `01a0de3e-6a07-7661-aa88-ed4807aef6ec`, worktree
+  `.worktrees/node-javascript`, регистрация `22ccfcf0-7919-4954-9342-82450a28a6f3`.
+- Codex 0.153.4, Astra medium, Node 24.19.0; реальные `threadId` и file-URI cwd
+  получены в MCP metadata. Пять trusted project hooks, ноль original hooks в worktree.
+- В задаче успешно выполнены actor `health/find/read`; root plugin сохранён.
+- Штатный Stop: cursor `0 → 13 → 22`; смена поколения сохранила cursor 13
+  побайтно. Native `thread/compact/start` вызвал PreCompact; на сервере
+  `total_message_count=22`, `commit_count=1`, после commit локальный cursor 22.
+- Основная задача прочитала извлечённый результат и нашла его semantic `find`:
+  `viking://user/kiselev/peers/-home-george-git-loginom-ai-agent/memories/events/2026/09/26/memory_verification_success.md`.
+  Ручные remember/write не использовались. Compaction turn завершён,
+  проверено через read_thread приложения; task сейчас notLoaded.
+- Приватные runtime/manifests и receipts:
+  `.local/project-memory/{runtime,rollouts}/20260926.2/`.
+  Старый Ubuntu rollout `20260926.1` сохранён отдельно.
+
+Это допуск памяти данной задачи и проверка механизма; JS-handler ещё не реализован.
+Новая задача в другом worktree всё равно требует собственного bootstrap/enrollment.
+
+## Историческая macOS-проверка
+
 Состояние macOS-установки на 2026-09-24: **установлена и проверена**, поколение `20260924.1`,
 namespace `loginom-ai-agent`. Полный цикл чтения, штатного захвата, извлечения
 и чтения результата из основного checkout подтверждён настоящими задачами Codex.
@@ -50,8 +77,8 @@ metadata и доверие hooks, активировать регистраци�
 служит запасным путём. Ещё не подготовленный worktree сохраняет обычный плагин,
 поэтому порядок «сначала конфигурация, затем задача» обязателен.
 
-Подготовка проекта выполнена на историческом macOS-хосте; это не свидетельство
-установки на Ubuntu. На другом хосте сначала проверить локальные runtime,
+Историческая проверка ниже относится к macOS; текущая Ubuntu-проверка приведена
+выше и имеет отдельное поколение/receipts. На другом хосте сначала проверить локальные runtime,
 manifest, plugin ID и API Codex по `CURRENT.md`. Проверенную установку не переустанавливать перед
 каждым узлом и не использовать проверочные задачи для разработки других узлов.
 Старые внешние worktrees требуют отдельного перехода с сохранением их состояния.
