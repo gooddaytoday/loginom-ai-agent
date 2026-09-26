@@ -46,7 +46,8 @@ Plan-authoring завершён; статус `discovery_required`. Создан
 
 Продуктовый код и содержимое исходного справочника не изменялись;
 его актуальный путь — [references/js_node_loginom_system_prompt.md](references/js_node_loginom_system_prompt.md).
-Стенд не открывался; version/build/edition/account/network не проверены.
+Стенд не открывался; фактический build (ожидается 7.4.2), edition, ОС сервера,
+account и network не проверены.
 E2E не запускались, зависимости не устанавливались. Handler, JS auditor,
 CLI candidate, live discovery и автономная модельная приёмка ещё предстоят.
 
@@ -84,3 +85,44 @@ scope не требуется; недоступное существенное �
   файла в корне больше нет. `validate.py` — PASS в рабочей копии и чистом
   Git-экспорте staged tree (63 active / 278 total Markdown);
   `git diff --cached --check` — PASS. Live/TestCafe/CLI не запускались.
+- Целевой build обучения — Loginom 7.4.2; исходный справочник относится
+  к этому build (решение пользователя). Он совпадает с build, который допускает
+  текущий graph adapter. Фактический build стенда и ОС сервера подтверждаются
+  в 0A; иной build — блокер подготовки. Runtime-редакция знаний получает
+  `validated_for` 7.4.2 (фаза 1B, J01).
+- Исходные замечания ревью сохранены в
+  [review-recommendations.md](review-recommendations.md); их последующая
+  проверка и решения описаны ниже.
+
+## Перепроверка внешнего ревью, 2026-09-26
+
+Все десять разделов разобраны в [review-verification.md](review-verification.md).
+Внесены подтверждённые требования; ошибочные обоснования отклонены, свойства
+целевого Loginom оставлены live gates. Существовавшие до этой работы правки
+про целевую версию 7.4.2 и исходный текст рекомендаций сохранены.
+
+- Учтены две стадии ограничения ответов, bounded source-read без Execute,
+  stale digest precondition, знания в prepare/describe, точный ввод и decoded
+  save/reopen source, отказ cross-process resume, semantic import preflight,
+  диагностика и различие static/dynamic bindings.
+- Записан перенос docs-коммитов после регистрации worktree от product base;
+  добавлены `dynamic_schema`, declared-задание и пары input files по режимам.
+- Условия первого ревью отделены от candidate/CLI проверок, расширена матрица.
+  Полная ES conformance, выполнение всего внешнего TestCafe и всего исходного
+  FS/Fetch-справочника не стали обязательными задачами.
+- Найдена дополнительная предпосылка: текущий Host мигрирует exact URL стенда
+  при запуске. До автономной приёмки нужен подтверждённый явный target между
+  процессами; если срабатывает legacy migration, требуется адресное исправление
+  owning Host. Source-only проверки не заменяют эту CLI-проверку.
+- Выполнены чистые Node24 probes бюджетов/redactor/схем/process-local runner,
+  30 локальных браузерных случаев CodeMirror и анализ 496 исторических LGP.
+  [Evidence](review-evidence.json) отличает stand-in и исторический формат
+  от реального Loginom. Продуктовый код не изменён; live стенд и CLI не запускались.
+- Проверка документов: `validate.py --render`, затем `validate.py` — PASS;
+  чистый Git-экспорт staged tree — PASS (66 active / 281 total Markdown);
+  `git diff --cached --check` — PASS. Проверены 9 fixture hashes и 14 hashes
+  дополнительных исходников/справочника; исходные sales/code-task/expected/
+  typed-cases не изменены. Readiness всех 78 компонентов совпадает с прежним.
+- Повторная проверка новых решений уточнила effective source preflight для
+  existing/omitted source и output reread, а также redaction полного текста
+  до chunking. Новые требования не объявлены готовой реализацией.

@@ -1,17 +1,13 @@
 {
   "kind": "javascript_plan_fixtures",
-  "version": 1,
+  "version": 2,
   "status": "authored_not_live_validated",
-  "model_workspace_files": [
-    "model-input/sales.csv",
-    "model-input/task.md"
-  ],
   "operator_only_must_not_be_delivered_to_model": true,
   "files": [
     {
       "path": "README.md",
-      "bytes": 6080,
-      "sha256": "a8ecc48be9f8efb728023df4acf6518497278c59192326001b01c7ecbb950a8b"
+      "bytes": 6201,
+      "sha256": "6ba72faa5189f80e60acbc080c15e42656d82b787694bb3041006eb3336e06b7"
     },
     {
       "path": "model-input/sales.csv",
@@ -22,6 +18,11 @@
       "path": "model-input/task.md",
       "bytes": 1438,
       "sha256": "f866e451a6594a4ea7b8cb15ac311be7a067b46e6cef393a8d6cc9321d4a9957"
+    },
+    {
+      "path": "model-input/task-declared.md",
+      "bytes": 1542,
+      "sha256": "455dd0b38fdd289e1e0319595a8750345b7445b47a1b46b31a5102ea06bcaa40"
     },
     {
       "path": "operator-only/empty.csv",
@@ -48,5 +49,15 @@
       "bytes": 1706,
       "sha256": "35dd2d1e145ff186b83582b8981af3e8510cfbc53cd078ae660d2bbfb4fd1046"
     }
-  ]
+  ],
+  "model_workspace_files_by_mode": {
+    "code": [
+      "model-input/sales.csv",
+      "model-input/task.md"
+    ],
+    "declared": [
+      "model-input/sales.csv",
+      "model-input/task-declared.md"
+    ]
+  }
 }

@@ -1,8 +1,8 @@
 # JavaScript: подплан исследования, разработки и приёмки
 
 [Карточка](README.md) · [исследование](research.md) · [e2e](e2e-coverage.md) ·
-[fixtures/oracle](fixtures/README.md) · [регламент](../../README.md) ·
-[реестр](../../registry.json).
+[fixtures/oracle](fixtures/README.md) · [рекомендации ревью](review-recommendations.md) ·
+[проверка рекомендаций](review-verification.md) · [регламент](../../README.md) · [реестр](../../registry.json).
 
 Дата: 2026-09-26. Подготовительный статус: **discovery_required**.
 Component ID: `component.programming.JavaScript`.
@@ -11,8 +11,11 @@ Component ID: `component.programming.JavaScript`.
 Исследованная база `loginom`: `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Живой стенд по назначению пользователя:
 **[http://logi-test-plan.bg.local/app/](http://logi-test-plan.bg.local/app/)**.
-Целевой Loginom version/build/edition: **не проверен**. Текущий graph adapter
-допускает 7.4.2; иной build требует отдельного подтверждения совместимости.
+Целевой build обучения — **Loginom 7.4.2** (решение пользователя 2026-09-26).
+К нему относится исходный [справочник](references/js_node_loginom_system_prompt.md),
+и тот же build допускает текущий graph adapter (`node-target-browser.mjs:318`).
+Фактические build/edition стенда и ОС сервера ещё не проверены: подтвердить
+в 0A. Иной build — блокер подготовки, а не основание переносить знания 7.4.2.
 Первая платформа приёмки — Linux x64; остальные не сертифицируются этим планом.
 
 Это результат plan-authoring, не назначение разработки. Наличие подплана
@@ -60,7 +63,7 @@ fine-tuning модели и train/apply аналитической модели 
 Вне первого accepted scope: отсутствие входа, дополнительные таблицы/выходы,
 variables ports, Variant, гарантированная арифметика всего int64, async/timers,
 Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
-большие таблицы и другие платформы. Loginom умеет больше; это граница handler v1,
+большие таблицы, другие build Loginom и платформы. Loginom умеет больше; это граница handler v1,
 а не ограничение продукта. Не заявлять поддержку исключённого режима по Help.
 Ограниченный scope не является песочницей для произвольного JS: не обещать
 доказательство отсутствия побочных эффектов простым поиском слов в исходнике.
@@ -78,6 +81,14 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
    его содержимое сохранять, runtime-редакцию готовить отдельно в фазе 1B. Подготовить
    отдельный постоянный worktree под `.worktrees/<короткая-ветка>` по регламенту.
    Не считать текущий checkout уже изолированной средой разработки.
+   `product_base_sha` — полный `a8ad59766dbdb4f2da0b54367a755ce00891dd71`;
+   `plan_source_sha` — отдельно закреплённый полный commit с согласованными
+   документами этой ветки. На продуктовой базе этих документов ещё нет.
+   Создать worktree от product base, пройти регистрацию памяти на этом HEAD,
+   затем перенести перечисленные docs-only commits до `plan_source_sha`.
+   До переноса проверить ancestry и отсутствие изменений вне `docs/node-development/`;
+   после — hashes плана/fixtures/справочника и новый HEAD. Не переносить
+   незакоммиченные файлы автоматически и не подменять base SHA регистрации.
 2. Подготовить локальную регистрацию памяти по
    [CURRENT.md](../../../../services/loginom-ai/tools/project-memory/CURRENT.md):
    build generation, preview/install hooks, отдельный bootstrap, реальные
@@ -92,15 +103,31 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
    Chromium1243 и платформенный action manifest. Найденный Node проверен,
    целый bundle ещё нет. Версии/hash брать из product pin, не shell PATH.
 5. Использовать назначенный `http://logi-test-plan.bg.local/app/`; до live
-   проверить DNS/сеть, отдельный разрешённый аккаунт/build/редакцию Loginom, доступность
-   JS в палитре, storage и графическую сессию. Не занимать пользовательский
+   проверить DNS/сеть, отдельный разрешённый аккаунт, редакцию Loginom, доступность
+   JS в палитре, storage и графическую сессию. Отображаемый build стенда должен
+   быть ровно 7.4.2; записать также ОС сервера Loginom, от которой зависят
+   Atomics и поведение движка. Не занимать пользовательский
    браузер; только штатные Dock/runtime scripts в собственной среде.
+   Для прямых runtime-проб effective URL содержит `?testable=true`;
+   managed Host добавляет его штатно. Исторические `test-2`/`test-4` не являются
+   текущим назначением аккаунта. Нужен подтверждённый владелец ресурсов;
+   имя `user` само по себе не доказывает ни занятость, ни изоляцию.
+   **Отдельная предпосылка CLI:** `connection-service.ts:61–74,381–383`
+   при запуске мигрирует сохранённый exact URL этого стенда на текущий
+   `Product.connection.url` (`https://app.loginom.ai`). Исторический default
+   нельзя путать с текущим. До CLI-приёмки доказать сохранение явно назначенного
+   origin/path между setup/status и новым процессом. Если кандидат мигрирует
+   профиль, это блокер подключения: отдельно исправить различение legacy default
+   и явного назначения тестового URL в owning Host с адресной regression-проверкой.
+   Не обходить проблему чужим адресом, скрытым URL alias или ослаблением проверки
+   origin; до её решения direct source probes не засчитываются как CLI-приёмка.
 6. Для приёмки понадобится самостоятельный CLI candidate и собственный OAuth
    profile; Desktop auth и shell proxy автоматически не засчитывать.
    Нужную модель проверить как `openai/gpt-6-sol`, variant `low`.
 
 **Проверка выхода 0A:** заполненное assignment, действительные receipts
-изолированных ресурсов/памяти, explicit base/source/build/pins. Здесь уже
+изолированных ресурсов/памяти, explicit base/source/pins, подтверждённый build
+стенда 7.4.2 и записанная ОС сервера. Здесь уже
 обнаруженные пробелы — отсутствие CLI в проверенных путях, кампании/локальной
 регистрации, mismatch shell Node/Bun; это устранимые задачи подготовки.
 Неизвестный аккаунт/доступ — уточнить у пользователя только если его нельзя
@@ -112,6 +139,16 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
 приёмки как отладчик. Записывать version/build, собственные identities и очищенные
 observations. Источники: Help JS/API/output-tables/ports; e2e `js_helpers.ts`,
 `js_general.ts`, `js_data_output.ts`; runtime `node-target-browser.mjs`.
+
+Инструмент исследования — операторский
+`packages/loginom-runtime/tools/loginom-acceptance/javascript-live.mjs`
+(**TO_IMPLEMENT**) по архитектуре соседних `*-live.mjs`: одна принадлежащая
+задаче runtime/browser session, наблюдаемые UI-жесты, bounded snippets,
+очищенные evidence и обязательный cleanup. Общий `dock_ui_action` запрещает
+редакторы кода, JS handler ещё отсутствует. Не снимать этот запрет ради discovery.
+В образцах заменить устаревшие macOS profile/browser paths на pinned Linux
+ресурсы из 0A; не копировать raw dumps и зашитый build как доказательство версии.
+Пробы не запускают сторонний чат-помощник или ещё одну LLM.
 
 | Gate | Что установить | Условие закрытия |
 | --- | --- | --- |
@@ -125,9 +162,32 @@ observations. Источники: Help JS/API/output-tables/ports; e2e `js_helpe
 
 Отдельно проверить синтаксис `??`, `?.`, top-level await, async function,
 lookbehind, BigInt, globalThis изолированными snippets: один parse error не
-должен скрыть результаты остальных. Подтвердить минимум используемого subset,
+должен скрыть результаты остальных. Так ограничения справочника 7.4.2
+проверяются на движке того же build; результаты записать вместе с build
+и ОС сервера. Подтвердить минимум используемого subset,
 не пытаться заявить полную ECMAScript conformance. Async probes характеризуют
 среду, но не расширяют accepted scope v1.
+
+Обязательный профиль движка охватывает предпосылки задания и runtime-справки:
+`trim`, кириллические `toLowerCase`/`toUpperCase` (включая Ё/ё), strict-mode
+diagnostics и все примеры будущей v1-редакции. Проверить отдельно литералы
+и строки из наблюдённого входа. В G5 ограниченными случаями установить
+Integer coercion для fraction/string/NaN/±Infinity; exact integer oracle
+от этого не меняется. Неудача сначала локализуется по коду/входу/native output;
+ожидания не подгоняются и причина не объявляется «отсутствие ICU» без доказательства.
+
+`Intl`, locale formatting/comparison, non-ISO Date.parse, расширенные regex/
+ES2016–2022 — дополнительная диагностика, пока их нет в v1-примерах.
+Для Date основным остаётся native/civil roundtrip. Не полагаться на сохранение
+globals: несколько rerun не доказывают их сброс во всём пуле. Профиль хранит
+source hash каждого snippet, build/ОС, observed/not_checked, результат и свой hash;
+он не подтверждает свойства другого сервера или полную ECMAScript conformance.
+
+В G1 наблюдать реальную версию/настройки редактора и наличие помощника либо
+переключателя движка. Их существование пока не установлено. Если переключатель
+есть и влияет на исполнение, закрепить выбранный режим в контракте/readback;
+с помощником не взаимодействовать. В G3 отдельно проверить допустимость и
+нормализацию кириллических/недопустимых Name, возвращать реальные technical names.
 
 **Выход 0B:** `discovery.md` (создать при выполнении) с наблюдениями, версией,
 подтверждённым порядком действий и ограничениями. Для G1–G7 здесь доказывается
@@ -154,6 +214,9 @@ checkpoint с owner/next trigger. Никаких вымышленных controls
   Уже существующий `parameters.source` — объект импорта `imports.text`;
   его форму не менять. JS schema привязать к своему type и проверить
   совместимость import/JS в compact и full envelopes.
+  Для замены existing-кода требовать `parameters.expected_source_sha256`
+  из полного source-read; несовпадение свежего observed digest отклоняется
+  до замены. Новый узел и existing без изменения source этого поля не требуют.
 - `parameters.schema_mode`: `declared|code`; для new обязателен.
   `parameters.columns` — полный упорядоченный declared-набор с name, label,
   scalar type, data_kind и usage. В code режиме структура создаётся программой;
@@ -161,11 +224,55 @@ checkpoint с owner/next trigger. Никаких вымышленных controls
 - Existing `{}` сохраняет исходник и настройки, но возвращает наблюдённую
   конфигурацию; изменение режима не должно очищать несогласованные manual mappings.
 - Входные/выходные mappings, finish/read и lifecycle — существующая оболочка.
-  Валидировать names, duplicates, типы, форму списка, режим и bindings до эффекта.
+  До эффекта проверить форму запроса, names/duplicates, declared types, режим
+  и доступные input identities. Существование generated output fields
+  проверять после owned materialization; ошибка не означает отсутствия уже
+  выполненных эффектов. Зафиксировать их и выполнить предусмотренный cleanup.
 - Предлагаемый v1 bound исходника: **32 KiB UTF-8, 1024 LF-строки**, без CR/NUL.
   Это выбранный инженерный предел, не предел ChakraCore. Public schema и
   локальная проверка байтов должны согласоваться. Source выше лимита — отказ
   до мутации, не обрезание. Изменять предел только явно по результату G4.
+
+В ответе apply полный исходник не дублируется: вернуть наблюдённые SHA-256,
+UTF-8 bytes, число строк, равенство принятому запросу и конфигурацию/выход.
+32 KiB — предел входа, а не обещание размера JSON-ответа. Уменьшение до 16 KiB
+не устраняет worst-case экранирование; бюджет доставки проверяется отдельно.
+
+Для чтения existing-кода до исполнения запланировать явно новую source-ветку
+`dock_node_read` с `kind: "source"` (**TO_IMPLEMENT**); прежний output-read без
+этого discriminator сохраняет контракт. Source-запрос содержит operation ID,
+prepared document/workflow и existing JS node ref, но не source/settings,
+output options или разрешение Execute. Completed execution/source_operation_id
+не требуется: существующий output-read заново выполняет узел и здесь непригоден.
+Первая квитанция возвращает bounded text chunk, raw digest/общие bytes/lines,
+owner identity и opaque cursor. Продолжение связано с тем же digest/owner и
+отклоняется при изменении исходника. Границы chunks не разрывают Unicode.
+G1/G2 должны подтвердить безопасные open/read/discard своего мастера, отсутствие
+исполнения/commit и cleanup. Это UI-навигация, не автоматически readOnlyHint.
+До первого chunk проверить redaction полного canonical source с тем же
+known-secrets контекстом: проверка отдельных chunks может пропустить шаблон
+на их границе. Если redactor изменяет исходник, сообщить отказ точного чтения;
+очищенный текст не выдавать за полный оригинал и не использовать как основу
+автоматической замены. Общие схемы/bridge/user-v1 обновить согласованно.
+
+Поддержанный module policy v1: статический импорт `builtIn/Data`.
+Явные static imports/re-exports других модулей, direct `require(...)` и
+`import(...)` отклонять до мутации. В фазе 1A реализовать и проверить
+синтаксический preflight, различающий комментарии, литералы, templates и
+декодированные module specifiers; regex-поиск слов не является реализацией.
+Если анализ не может классифицировать исходник, вернуть отдельный preflight
+refusal, не угадывать разрешённость. Это новое ограничение контракта, не
+существующая возможность runtime и не доказательство отсутствия косвенных
+побочных эффектов JS. Нативные parse/runtime diagnostics проверить отдельно
+операторскими probes, включая исходник, проходящий preflight, но не ChakraCore.
+Preflight относится к effective source: переданному новому тексту либо полному
+наблюдённому тексту existing-узла, включая `{}`/omitted source. Для existing
+выполнить доказанное безопасное open/read/discard до изменений graph, mappings
+и конфигурации; общий shell с input_mapping до configure этого ещё не обеспечивает.
+Перед materialization/Execute сверить тот же source digest и policy, в том числе
+на output-ветке `dock_node_read`, которая сама запускает код. Synthetic read request
+не освобождается от проверки preserved source. При расхождении — отказ/явное
+состояние уже выполненных эффектов, а не исполнение неизвестной новой редакции.
 
 Это предварительная форма, не пример существующего callable API. Если discovery
 покажет несовместимость, исправить спецификацию до объявления ready; не оставлять
@@ -174,18 +281,52 @@ owner этой single-задачи; согласовать перенос при
 
 ### 1B. Knowledge
 
-Подготовить одну версионированную редакцию справки с provenance исходного
-пользовательского файла и официальных страниц. Исправления перечислены в
+Подготовить одну версионированную редакцию справки для Loginom 7.4.2 с
+provenance исходного пользовательского файла и официальных страниц. Исходный
+файл относится к 7.4.2; онлайн-справка не закреплена за build и применяется
+только после сверки с ним. Исправления перечислены в
 [аудите](research.md#5-официальная-документация-и-особенности-chakracore).
 Сам [исходный файл](references/js_node_loginom_system_prompt.md) сохраняется
 неизменным; его перенос в документацию не подключает знания к runtime.
+Knowledge manifest и ответ describe указывают `validated_for`: build 7.4.2,
+SHA исходного файла и ОС сервера, на которой выполнены probes. При ином
+наблюдённом build — отказ до мутации, согласованный с graph adapter; знания
+7.4.2 не выдавать за проверенные для другой версии.
 
-Короткие обязательные правила и scalar Data API доставлять on-demand в
-описании JS через `dock_action_describe`; полные материалы/будущие расширения
+Создать `client/lib/javascript-knowledge.mjs`: версия, `validated_for`,
+короткие правила и примеры. `.mjs` входит в вычисление clientRevision;
+проверить также staged bundle/resource manifest и мутационный тест pin.
+5–7 критичных правил поместить в `limitations` JS-карточки, доступные уже
+через `dock_prepare`/compactKnowledgeBundle: область 7.4.2/v1, static Data,
+проверенный синтаксис, Number precision, schema-before-Append, независимость
+от globals и чтение фактического состояния. Подробный scalar Data API —
+on-demand через `dock_action_describe`; полные материалы/будущие расширения
 разделить по версиям и feature scope. Не вставлять весь 51-KiB документ во все
 разговоры. Не считать remote SKILL или root Markdown автоматически прочитанным.
 Новый knowledge asset должен входить в resource manifest и runtime pin;
 отдельно фиксировать knowledge SHA, clientRevision и skillRevision.
+
+Правила прежнего советника адаптировать к handler: состояние/код наблюдаются
+инструментом; autosync только по фазе 3 с сохранением existing mappings.
+Сохранение пакета остаётся обязательным v1; внешние модули/FS/Fetch/Calc и
+настольные пути не включаются в v1-примеры. Все исполняемые примеры новой
+редакции проверить на назначенном 7.4.2 и связать с профилем в `discovery.md`.
+
+Бюджеты: `previewWireSize` считает двойное JSON-экранирование, 46 000 bytes —
+цель сокращения preview, не универсальный hard cap. Exact-table признаки
+обходят это сокращение, но не лимит Agent. Его defaults — 50 KiB/2000 строк,
+возможен override конфигурацией; зафиксировать эффективные значения candidate.
+Для JS describe принять внутренний бюджет 20 000 wire bytes, для всего ответа
+(включая multi-type describe, envelope, diagnostics и rows) — одновременно
+46 000 wire bytes и эффективные Agent bytes/lines. Это проектные пределы,
+не измеренная гарантия для будущего handler. Проверять худшие допустимые
+quotes/backslashes/control characters/Unicode и максимальное число строк.
+Входной source cap, размер каждого source chunk и describe budgets независимы.
+Сокращение карточки/ответа не теряет обязательную схему и правила; если набор
+describe не помещается, вернуть явную bounded ошибку с предложением меньшего
+набора типов. Нельзя полагаться на сохранённый backend dump как доставку модели.
+В actual CLI J01/J18/J21 требуют `metadata.truncated=false`, отсутствие
+`readback_summary` и полный заявленный маленький результат.
 
 Контекст узла содержит наблюдённые порты/technical names/types, schema_mode,
 mapping, код либо явный отказ полного чтения, source digest и identities.
@@ -203,6 +344,16 @@ ownership/права/retention; не добавлять скрытый общи�
 равенство исходника изменённому redactor тексту. Публичные URL/password-like
 строки должны проходить без изменения программы и без снятия очистки.
 
+В v1 нет автоматического cross-process resume. Новый process не восстанавливает
+operation ID только из digest или snapshot: текущие owners/jobs живут в памяти.
+После рестарта — явный отказ старого resume, проверка сохранённых evidence/
+состояния и новое назначение после разрешения неизвестного эффекта. Snapshot
+0600 сам по себе не восстанавливает owner, checkpoints и исходный deadline.
+Redactor cases: URL, `Basic <слово>`, `токен: …`, `PRIMARY_KEY = …` и password-like
+строки. Имя `source_text` предотвращает конфликт с import-параметром `source`;
+его нельзя обосновывать общим запретом ключа `code`: remote action-definition
+scanner не проверяет локальную node parameter schema.
+
 **Проверка фазы:** новые pure parameter tests, согласованность compact/full
 schemas/handler, factual model-visible describe, digest/pin mutation test,
 redactor regression на несекретных литералах. Отрицательные inputs не вызывают
@@ -214,6 +365,15 @@ graph/editor. Запрет generic browser JS остаётся действую�
 `workspace-ui.mjs:2536–2597,3482–3501`; pure readback:
 `calculator-readback.mjs`; компактный handler: `reform-node.mjs:25–46`.
 Копировать принципы ownership/полного чтения, не selectors калькулятора.
+
+G4 сначала сравнивает `keyboard.type`, `insertText` и, если нужен, native paste
+под host clipboard lease на фактическом редакторе. CodeMirror 5 stand-in
+показал изменения autoindent/electric chars даже у части insertText-вводов;
+это не доказательство настроек Loginom. Не выбирать способ только по названию API
+и не отключать editor options вслепую. Проверочный source содержит вложенные
+блоки, tabs, начальные/конечные пробелы, длинные строки, кавычки/backslashes,
+кириллицу, пустые строки и завершающую `}`. Замерить максимум 32 KiB/1024 строки
+относительно configure budget. Если точного ввода нет, G4 не закрыт.
 
 Создать JS-specific modules (предлагаемые имена `javascript-parameters.mjs`,
 `javascript-context.mjs`, `javascript-node.mjs`, `javascript-readback.mjs`)
@@ -278,6 +438,12 @@ deny тест остаётся зелёным.
 не является техническим recovery. После ошибки исправляется только установленная
 причина при сохранении согласованного намерения. Чужие пакеты/связи не меняются.
 
+Диагностика модели: наблюдённые класс и текст ошибки, позиция только если дана
+Loginom, source digest и owner/execution. Применять redactor и явный признак
+усечения/очистки; не выдумывать позицию или переводить текст под шаблоны V8.
+Краткие примеры ChakraCore-сообщений в знаниях подтверждать своим 7.4.2,
+исторические английские строки e2e не делать обязательным exact matcher.
+
 **Проверка фазы:** fixed/code schema, 0/1/N rows, both Close/Done/Execute,
 изменённый upstream, разрешённая смена схемы, known failure, lost reply,
 ограниченный long-running stop и успешный последующий rerun. Настройка и эффект
@@ -308,6 +474,14 @@ exact value/native-byte equality: числа точно представимы �
 нового кода/expected. Сопоставить полный исходник или independently obtained
 digest, оба schema modes, все связи/выходы. Save receipt и ZIP/XML inspection
 полезны, но без cold execution не доказывают воспроизводимость.
+
+Digest source считать по UTF-8 декодированного текста в принятой LF-форме;
+hash всего `.lgp` хранить отдельно. ZIP/XML escaping не является изменением
+программы. На стенде проверить roundtrip перевода строк и XML entities;
+не применять trim, форматирование, схлопывание пробелов или произвольную
+CRLF-нормализацию ради совпадения. Если UI сохраняет другую форму, до реализации
+явно пересмотреть контракт канонизации и его отрицательные тесты, а не oracle
+после неуспешной приёмки.
 
 **Проверка фазы:** oracle отвергает заранее внесённые подмены значения, типа,
 порядка, количества, source digest, mode/mapping, execution и усечение.
@@ -352,6 +526,13 @@ Help/E2E служат источниками для сопоставления �
 в той же задаче, затем один раунд исправлений подтверждённых live-дефектов
 и адресная перепроверка. Это не независимое контекстное ревью.
 
+**ready_for_first_review / завершение development Goal:** 0B и фазы 1–4
+выполнены, G1–G7 подтверждены реализацией, source/direct-runtime часть J01/J21,
+J02–J17/J19/J20/J23–J26 проходят, J22 проверен или доказанно неприменим.
+Адресные тесты зелёные; `discovery.md`, fixtures, evidence и commit SHA сохранены.
+`not_checked` не закрывает обязательную проверку. J01/J21 на immutable candidate
+выполняются после ревью/сборки, J18 — в фазе 6: не создавать циклический gate.
+
 Из зафиксированного source собрать отдельный immutable standalone candidate
 по [runbook](../../../testing/loginom-ai-agent/standalone-cli.md) и
 `packages/loginom-host/script/build-cli.ts` из owning package. Нужны новые
@@ -361,7 +542,9 @@ absolute output directory, `LOGINOM_AI_AGENT_NODE_SOURCE`,
 пользовательскую установку. Candidate включает knowledge asset и его pin.
 
 **ready_for_acceptance:** G1–G7 закрыты; code/source tests и live matrix имеют
-результаты; ревью/исправления завершены; exact auditor invocation, fixtures,
+успешные результаты; candidate-часть J01/J21 и target persistence J27 пройдены;
+ревью/исправления завершены;
+exact auditor invocation, fixtures (включая отдельное declared-задание),
 oracle и candidate зафиксированы; собственный OAuth/profile готов; есть слот.
 
 ## Фаза 6. Автономный CLI и критерий завершения
@@ -380,15 +563,15 @@ oracle и candidate зафиксированы; собственный OAuth/pro
 узлами без проверяемого JS handler, это не его приёмка.
 
 На каждую попытку отводится **30 минут** от отправки задания; контроллер
-предела внешний, у `run` нет флага node acceptance deadline. По истечении
-останавливать свой CLI штатно, сохранять исход и проверять cleanup.
-Raw stdout/БД/system/reasoning не архивировать: сначала отбор публичных событий
-и redactor, затем evidence. Не использовать `--thinking`, `--continue`,
-старое безусловное `recover --acknowledge` или fallback модель.
+предела, остановка, очистка evidence и cleanup — по CLI-регламенту.
+Длительности прямых probes записываются для планирования; они не доказывают,
+что модель уложится в тот же срок. Отдельный прямой полный прогон исключительно
+ради подтверждения стандартных 30 минут не требуется. Изменение лимита
+обосновать до попытки по регламенту.
 
 После каждого прогона независимый аудитор проверяет:
 
-1. Input hashes, фактические model/variant/build/source/candidate/knowledge SHA.
+1. Input hashes, фактические model/variant/source/candidate/knowledge SHA и build стенда 7.4.2.
 2. Исполнен component JavaScript через новый handler, правильный schema mode,
    исходник не содержит подставленных ответов, вход действительно подключён.
 3. Полная схема/порядок/6×4 ячейки/NULL rules и свежий execution; суммы вторичны.
@@ -407,7 +590,7 @@ baseline 24/24, указанных в research. Идентификаторы п�
 
 | ID / требование | Проверка | Ожидаемый результат | Evidence |
 | --- | --- | --- | --- |
-| J01 knowledge | Actual describe/prepare в candidate | Версия/hash и Data API доступны модели; нет ложного editor context | Очищённый tool response + knowledge manifest |
+| J01 knowledge | Actual describe/prepare в candidate | Версия/hash, validated_for=7.4.2 и Data API доступны модели; нет ложного editor context; при ином build — отказ | Очищённый tool response + knowledge manifest |
 | J02 input/schema | Imported sales, technical names/types | 6×5, пробелы и порядок сохранены до JS | Input receipt + hash |
 | J03 code output | Sales task, code mode | expected.json 6×4 exact | Native execution + полный typed output |
 | J04 declared output | Те же данные, declared mode | Тот же бизнес-результат, другое проверенное setting | Configuration + typed output |
@@ -426,6 +609,14 @@ baseline 24/24, указанных в research. Идентификаторы п�
 | J17 UI regression | Общий deny и соседний calculator | Generic code запрещён, прежние узлы работают | Адресные source tests |
 | J18 autonomy | Две Sol low попытки | Без технических подсказок, полный заявленный scope | Sessions/events/completion |
 | J19 context | Изменённые поля/старый код, label/comment с текстом инструкции | Используется текущее наблюдение; содержимое данных не меняет задачу | Context/source identities + tool evidence |
+| J20 engine profile | Business/API primitives и все v1 knowledge examples на 7.4.2 | Нужные возможности подтверждены; дополнительные features явно not_checked | Build/ОС, snippet hashes, профиль |
+| J21 response budgets | Prepare/describe (включая multi-type), apply/output/source chunks с worst-case source | Соблюдены оба бюджета; нет backend truncation, readback summary или потери полного результата | Source/direct проверка до ревью, candidate/CLI delivery после сборки |
+| J22 assistant isolation | Наблюдение мастера и действия своего handler | Встроенный помощник не вызывается; отсутствие отмечено наблюдением | UI profile + журнал действий |
+| J23 editor fidelity | Вложенные блоки/tabs/пробелы/Unicode, saved Code | Совпадает декодированный canonical source и cold readback | Source/artifact hashes + live receipts |
+| J24 column names | Кириллица/недопустимые Name в code mode | Фактические имена/ошибки установлены без догадок | Native schema + knowledge rule |
+| J25 diagnostics | Preflight refusal, native parse error и sync throw | Доставлены наблюдённые класс/текст/позиция либо явное отсутствие, digest и owner | Очищённые diagnostics + delivery |
+| J26 import policy | Data import, явные unsupported declarations/calls и похожий текст в comments/strings/templates | Preflight различает синтаксис, неподдержанное отклонено до мутации; не заявлена sandbox-гарантия | Pure parser tests + журнал без editor effects |
+| J27 target persistence | Exact назначенный URL в новом CLI profile и после restart | Origin/path остаются назначенными; legacy migration не уводит приёмку на другой сервер | Host regression + actual CLI status; gate перед приёмкой |
 
 ## Следующие расширения узла
 
@@ -460,11 +651,16 @@ oracle и CLI-приёмку; ядро не считается «всем JavaSc
 
 Подтверждено: статическое исследование процесса/docs/код/Help/e2e; исходные
 SHA; отсутствие handler; условия окружения; набор fixtures и независимые
-ожидания; baseline 24/24 и document validation. Продуктовый код не менялся.
+ожидания; baseline 24/24 и document validation; целевой build 7.4.2 и
+принадлежность ему справочника (решение пользователя). Продуктовый код не менялся.
 
-Открыто: G1–G7 и все runtime/CLI строки матрицы, фактический аккаунт/build,
+Открыто: G1–G7 и все runtime/CLI строки матрицы, фактический аккаунт,
+подтверждение build 7.4.2 и ОС сервера на стенде,
 изоляция/память worktree, полный candidate, JS auditor. Внешний e2e suite
 остаётся `not_run`; его зависимости не являются предусловием этого подплана.
+Решения по всем [рекомендациям](review-recommendations.md) и границы доказательств
+зафиксированы в [проверке ревью](review-verification.md). Требования новых probes
+приняты; их наличие в плане не означает выполненного live discovery.
 URL стенда уже назначен: `http://logi-test-plan.bg.local/app/`; повторно
 спрашивать выбор адреса не нужно. Владелец продолжения — назначенный single-разработчик; next trigger — команда
 выполнить этот подплан, затем закрытие 0A и live discovery.
