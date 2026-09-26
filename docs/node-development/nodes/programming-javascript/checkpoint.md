@@ -163,6 +163,27 @@ blockers подтверждены. Оператор ошибочно требо�
 порядок, но учитывать наблюдённые пропуски условных страниц. Done/Preview не
 нажимались. Evidence — `g1-operator-16/report.json`; очистка прошла штатно.
 
+## CLI-профиль: offline reconciliation после отменённого OAuth
+
+Старый guard отменённого сеанса (nonce `b0e663b1-6c9f-48f0-9e32-54150f220415`)
+архивирован только после проверки отсутствия процессов со ссылками на собственный
+профиль в args/environment/cwd/fd, пустого state/locks и отсутствия auth.json.
+Недоступные служебные процессы отдельно идентифицированы как sd-pam/ssh-agent.
+Acceptance lease свободен; проверка/архивирование выполнены под registry lock.
+
+Первый source `providers list` в developer worktree завершился CLI_START_FAILED:
+AppRuntime import не находил cross-spawn в SDK. Pinned Bun1.3.14 выполнил
+`install --frozen-lockfile --ignore-scripts`, установлено2 пакета. bun.lock SHA256
+до/после совпал: `e97377f2000cd858fa0d4d770cc5f03d0012312edc4606267cb3c3b3513184ff`.
+Guard этого неуспешного запуска тоже архивирован после отдельной offline-проверки.
+Повтор `providers list` завершился exit0, **0 credentials**; штатный выход снял
+.writer, state/locks пуст, auth.json отсутствует. OAuth не возобновлялся, прежний
+код входа не используется. Это подготовка source CLI, не приёмка candidate.
+
+Private receipt/backups: `cli-oauth-offline-reconciliation-20260926/` в прежней
+кампании. CLI profile остаётся прежним, новый профиль/кампания не создавались.
+Требуется новый собственный OAuth перед приёмкой собранного кандидата.
+
 ## История остановки: MCP при возобновлении разработчика
 
 После recovery11 задача разработчика подтвердила отсутствие OpenViking tools
