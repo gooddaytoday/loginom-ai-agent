@@ -64,6 +64,16 @@ JS-узел не создан. Закрытие черновика подтве�
 тот же аккаунт, ноль пакетов, UI logout и закрытие browser context. Обе попытки
 сохранены вне Git. Server OS/storage остаются не установленными; G1 не закрыт.
 
+Дополнительные наблюдения: `g1-palette-02` завершился с полным cleanup, но снял
+пустое дерево до загрузки строк. В `g1-operator-03` ожидание строк подтвердило
+палитру и элемент JavaScript; отказ произошёл при hit-test после прокрутки,
+до drag. Сообщение — `Palette item covered after scroll`, а не timeout.
+Cleanup остановился на неизвестном подтверждении, его последний native snapshot
+показал Count=0. Отдельный `g1-recovery-03.json` подтвердил `jsteach`, ноль пакетов,
+UI logout и context close. Следующий шаг — ограниченная диагностика координат,
+фактического элемента в точке захвата и сообщения cleanup; не повторять drag
+без устранения причины. Все 14 engine probes по-прежнему not_run.
+
 CLI dependency preparation завершена закреплённым Bun по lockfile. После
 адресной reconciliation собственного неуспешного старта команда source CLI
 `providers list` завершилась с exit 0 и показала 0 credentials в отдельном
