@@ -58,7 +58,7 @@ export async function connectionService(
     }),
   )
   const restored = state.pending ?? state.active
-  if (restored && isLegacyDefaultUrl(restored.url) && state.phase !== "recoverable-error") {
+  if (restored && restored.urlSource !== "explicit" && isLegacyDefaultUrl(restored.url) && state.phase !== "recoverable-error") {
     // Keep old generations immutable and use the normal durable activation path.
     // A pending user edit takes precedence over the previously active connection.
     const migrated = {
@@ -72,7 +72,7 @@ export async function connectionService(
     state.generation = migrated.generation
     state.revision = migrated.revision
   }
-  if (state.active && !(state.pending && isLegacyDefaultUrl(state.active.url))) {
+  if (state.active && !(state.pending && state.active.urlSource !== "explicit" && isLegacyDefaultUrl(state.active.url))) {
     state.phase = "starting"
     state.applying = runtime
       .prepare(state.active)
@@ -139,6 +139,7 @@ export async function connectionService(
           if (
             previous.revision !== candidate.revision ||
             previous.url !== candidate.url ||
+            previous.urlSource !== candidate.urlSource ||
             previous.username !== candidate.username ||
             previous.apiKey !== candidate.apiKey ||
             previous.password !== candidate.password
@@ -242,6 +243,9 @@ export async function connectionService(
         generation: state.generation + 1,
         revision: state.revision + 1,
         url: settingsAddress(candidate.url),
+        // A validated user choice must survive startup even if it equals a
+        // former product default. Old records without provenance stay legacy.
+        urlSource: "explicit" as const,
         username: candidate.username,
         apiKey,
         password,

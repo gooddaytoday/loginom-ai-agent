@@ -30,6 +30,7 @@ async function fixture(codec: CredentialCodec) {
     },
   }
   return {
+    directory,
     store,
     prepared,
     runtime,
@@ -53,6 +54,71 @@ for (const [name, codec] of [
   ["Desktop", credentials("linux")],
   ["CLI", cliCredentials("linux")],
 ] as const) {
+  for (const url of [original.url, original.url.slice(0, -1), `${original.url}?testable=true`]) {
+    test(`${name}: explicit old-default URL survives setup, status and a fresh process (${url})`, async () => {
+      const f = await fixture(codec)
+      try {
+        const first = await f.start()
+        const validation = await first.api.check({
+          revision: 0, url, username: original.username,
+          apiKey: { operation: "replace", value: original.apiKey }, password: { operation: "empty" },
+        })
+        await first.api.save({ revision: 0, validationId: validation.validationId })
+        await first.settled()
+        const expected = url.includes("?") ? original.url : url
+        expect(await first.api.status()).toMatchObject({ url: expected, generation: 1, state: "ready" })
+        expect(await f.store.read()).toMatchObject({ url: expected, urlSource: "explicit", generation: 1 })
+        expect(await first.api.read()).not.toHaveProperty("urlSource")
+        const history = await f.history()
+        await first.close()
+        // Real process boundary; no Loginom/browser or model invocation. The
+        // runtime adapter is the same no-I/O test boundary used by this suite.
+        const child = Bun.spawn([process.execPath, "--eval", `
+          import { connectionStore } from ${JSON.stringify(new URL("../src/connection/connection-store.ts", import.meta.url).href)};
+          import { connectionService } from ${JSON.stringify(new URL("../src/connection/connection-service.ts", import.meta.url).href)};
+          import { credentials } from ${JSON.stringify(new URL("../src/connection/credentials.ts", import.meta.url).href)};
+          import { cliCredentials } from ${JSON.stringify(new URL("../src/connection/cli-credentials.ts", import.meta.url).href)};
+          const store = connectionStore(process.argv[1], ${name === "CLI" ? "cliCredentials" : "credentials"}("linux"));
+          const service = await connectionService(store, {async check(){}, async prepare(){return {async close(){}}}});
+          await service.settled();
+          console.log(JSON.stringify(await service.api.status()));
+          await service.close();
+        `, f.directory], { stdout: "pipe", stderr: "pipe" })
+        const output = await new Response(child.stdout).text()
+        const error = await new Response(child.stderr).text()
+        expect(await child.exited, error).toBe(0)
+        expect(JSON.parse(output)).toMatchObject({ url: expected, generation: 1, state: "ready" })
+        expect(await f.history()).toBe(history)
+        expect(await f.store.latestGeneration()).toBe(1)
+      } finally { await f.close() }
+    })
+  }
+
+  test(`${name}: explicit pending old-default choice survives failed preparation and restart`, async () => {
+    const f = await fixture(codec)
+    try {
+      await f.store.stage(original)
+      await f.store.activate(1)
+      const first = await f.start()
+      const validation = await first.api.check({
+        revision: 2, url: original.url, username: original.username,
+        apiKey: { operation: "preserve" }, password: { operation: "preserve" },
+      })
+      const prepare = f.runtime.prepare
+      f.runtime.prepare = async () => { throw Error("unavailable") }
+      await first.api.save({ revision: 2, validationId: validation.validationId })
+      await first.settled()
+      expect(await f.store.pending()).toMatchObject({ url: original.url, urlSource: "explicit", generation: 3 })
+      await first.close()
+      f.runtime.prepare = prepare
+      const restarted = await f.start()
+      expect(await restarted.api.status()).toMatchObject({ url: original.url, generation: 3, state: "ready" })
+      expect(await f.store.read()).toMatchObject({ url: original.url, urlSource: "explicit", apiKey: original.apiKey, password: original.password })
+      expect(await f.store.latestGeneration()).toBe(3)
+      expect(await f.store.pending()).toBeUndefined()
+    } finally { await f.close() }
+  })
+
   for (const url of [original.url, original.url.slice(0, -1)]) {
     test(`${name}: migrates ${url}, preserves secrets/history and does not repeat after restart`, async () => {
       const f = await fixture(codec)
