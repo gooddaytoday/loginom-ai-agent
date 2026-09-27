@@ -15,6 +15,34 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch41: code Preview полностью подтверждён — 2026-09-27
+
+Первый code-sentinel-preview OBSERVED/gate_passed=true/safe_to_continue=true.
+Root-аудит:1328journalSHA, три input6×5/90cells; один Preview dispatch,
+sourceSHA e0ea9794bb7e640ed0918f8bbdb48d4b0ae5b097959d248528a48ba7aa8f8749;
+свежее exact sentinel сообщение в owned PreviewPanel;cntErrorInfo, его hash
+пересчитан независимо. Все code_checks=true,4wizarditems/1match, reciprocal
+Preview form/view=true,FLoaded=true,pending=false. Один Preview Close,
+успешное закрытие мастера и подтверждённый переход к следующему case.
+Это положительное доказательство выполнения JS при code-mode Preview.
+
+Второй declared-sentinel-preview отказал после единственного schema-add-0:
+немедленный evaluateHandle не нашёл edtName. Root просмотрел оба screenshots:
+сразу empty target/no editor, на cleanup спустя60s открыто «Добавить столбец»
+и новая строка COL1. Async opening подтверждён. Original cleanup не смог закрыть
+мастер при незавершённом editor; package/logout=false,browser_closed=true.
+Connection/account/build здесь оставались прежними. Отдельный headed recovery41
+на profile14: packages0/logout/browser PASS, no packageMutation; lease закрыта.
+
+Root прочитал client ColumnDefsMappingWizard.DoAddMappingColumn: AddDefault→
+LoadTargetItem→new EditColumnDefForm с Records=[new record], AddMode=true,
+View.show(). Источники/хеши приватно в preview-source-40/declared-columns-manifest.json.
+Прежней задаче назначен fix42: bounded read-only ожидание единственной исходной
+Add-операции, native form→new owned target record binding вместо Ext ownerCt,
+исключение foreign/duplicate формы и отдельный cleanup pending editor без replay.
+Следующий freshprofile15 после handoff/tests. G2/G3 целиком, public handler,
+остальные gates и CLI-приёмка ещё не завершены.
+
 ### Freeze41 проверен, адресный headed run запущен — 2026-09-27
 
 Root53tests PASS,28 окончательных SHA сверены; протестированные source файлы
