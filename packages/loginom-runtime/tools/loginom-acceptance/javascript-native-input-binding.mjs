@@ -32,10 +32,34 @@ export function javascriptNativeInputSnapshot(b){
     &&nodes.filter(n=>n!==node).every(n=>n.FIconCls==='bg-vendor-icon-modelvariables'&&n.FStatus===0&&n.FRunning===false),'no JS/dynamic nodes');
   need(model.FCreateDraggedNodeStarted===false&&model.FDraggingOverGraph===false&&!model.FDraggedNode,'graph interaction');
   const manager=v(model,'FPreviewManager'),form=v(manager,'FPreviewForm'),port=v(form,'FCurrentPreviewPort');
-  need(v(manager,'FPreviewVisible')===true&&v(form,'FCurrentPreviewNode')===node&&port?.parent===node&&port.FGuid===b.port_guid
-    &&node.FPorts[1].FCollection.length===1&&node.FPorts[1].FCollection[0]===port
-    &&node.FPorts[0].FCollection.length===0&&port.FType===1&&port.FSubType===1&&port.FParam===0&&port.FStatus===1
-    &&manager.FShowDataLastCall.Node===node&&manager.FShowDataLastCall.Port===port,'owned import output0 Preview');
+  // Keep every admission predicate; expose bounded booleans/enums on refusal so
+  // a live probe can distinguish ownership from the port-inventory assumptions.
+  const previewChecks={
+    preview_visible:v(manager,'FPreviewVisible')===true,
+    preview_node_matches:v(form,'FCurrentPreviewNode')===node,
+    port_parent_matches:port?.parent===node,
+    port_guid_matches:port?.FGuid===b.port_guid,
+    one_output:node.FPorts?.[1]?.FCollection?.length===1,
+    output_identity_matches:node.FPorts?.[1]?.FCollection?.[0]===port&&!!port,
+    no_input_ports:node.FPorts?.[0]?.FCollection?.length===0,
+    output_type:port?.FType===1,
+    data_subtype:port?.FSubType===1,
+    param_zero:port?.FParam===0,
+    port_active:port?.FStatus===1,
+    last_call_node_matches:manager?.FShowDataLastCall?.Node===node,
+    last_call_port_matches:manager?.FShowDataLastCall?.Port===port&&!!port
+  };
+  if(!Object.values(previewChecks).every(Boolean)){
+    const inputs=node.FPorts?.[0]?.FCollection;
+    const enumValue=x=>x===undefined?'missing':Number.isInteger(x)&&x>=0&&x<=16?String(x):'other';
+    const diagnostic={checks:previewChecks,input_inventory:{
+      count:!Array.isArray(inputs)?'invalid':inputs.length<=4?String(inputs.length):'more_than_four',
+      ports:Array.isArray(inputs)?inputs.slice(0,4).map(p=>({parent_matches:p?.parent===node,
+        type:enumValue(v(p,'FType')),subtype:enumValue(v(p,'FSubType')),param:enumValue(v(p,'FParam')),
+        status:enumValue(v(p,'FStatus'))})):[]
+    },output_param:enumValue(v(port,'FParam'))};
+    need(false,'owned import output0 Preview '+JSON.stringify(diagnostic));
+  }
   const tree=document.querySelector('[data-tid="ConsoleForm;ProgressForm;trpProgress;treepanel;tree"]');need(tree,'process tree');
   const processStore=Ext.getCmp(tree.id).getStore(),processRoot=processStore.getRoot();
   need(!processStore.isLoading()&&processRoot.data.loaded===true,'loaded process root');
