@@ -1,3 +1,4 @@
+import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -23,16 +24,17 @@ const cookieSources={constructor:'function(objectOwnerID, objectID) {\n\t\trpc.T
   interface:'function() {\n\t\t\treturn 206;\n\t\t}'};
 const values=[null,0,-1.25,10.125];
 const clone=x=>JSON.parse(JSON.stringify(x));
-export function sourceEvidence(){
+export function sourceEvidence(fixtureId='real'){
+  const nativeInputFixture=javascriptNativeFixture(fixtureId);
   const prepared={document_id:'d',workflow_ref:{workflow_id:'w'}},artifact={artifact_id:'a',...nativeInputFixture};
-  const request=nativeInputRequest({prepared,artifact,storage:'/jsteach/js-g2-00000000-0000-0000-0000-000000000000',uploadOperationId:'u',totalMs:600000});
+  const request=nativeInputRequest({prepared,artifact,storage:'/jsteach/js-g2-00000000-0000-0000-0000-000000000000',uploadOperationId:'u',totalMs:600000,fixtureId});
   const destination=request.parameters.settings.source.source_path;
   const proof={status:'SUCCEEDED',bytes_verified:true,upload_completion_verified:true,verification_id:'v',destination,bytes:artifact.bytes,sha256:artifact.sha256};
   const upload={operation_id:'u',artifact,outcome:{operation_id:'u',action_key:'artifact.upload',status:'SUCCEEDED',cleanup_complete:true,
     output:{artifact_id:'a',bytes:artifact.bytes,sha256:artifact.sha256,destination,server_copy_verification:proof}}};
   const history={complete:true,records:[{...upload,sequence:1,destination,cleanup_confirmed:true,transport_uncertain:false}]};
   const fields=x=>({fields:Object.fromEntries(Object.entries(x).map(([k,value])=>[k,{status:'observed',value}]))});
-  const column={index:0,name:'Value',label:'Value',type:'real',data_kind:'Непрерывный',used:true,status:'observed'};
+  const column={index:0,name:'Value',label:'Value',type:nativeInputFixture.type,data_kind:nativeInputFixture.data_kind,used:true,status:'observed'};
   const source={record_id:'s',...column};
   const receipts={configure:{source:fields({source_path:destination,connection:'Локальное',encoding:'UTF-8 (65001)',rows_to_skip:'0',first_line_as_title:true}),
     format:fields(request.parameters.settings.format),columns:[column]},
@@ -41,12 +43,13 @@ export function sourceEvidence(){
   const operation={id:request.operation_id,nodeApply:{request,pending:{phase:'read'},phases:Object.entries(receipts).map(([phase,value])=>({phase,status:'verified',receipt_id:request.operation_id+':'+phase,value:{verified:true,cleanup_complete:true,...value}}))}};
   const execution={verified:true,owner_verified:true,cleanup_complete:true,status:'completed',execution_id:'d:1:2',group_id:'2',process_id:'2.1',process_record_id:'3'};
   const ctx={document_id:'d',workflow_ref:prepared.workflow_ref,node:{document_id:'d',workflow_id:'w',node_id:'n'},execution:{status:'completed',execution_id:execution.execution_id}};
-  return {operation,ctx,execution,upload,history,verifiedUploads:()=>[upload],uploadHistory:()=>history,exclusiveNodeOperation:()=>true};
+  return {fixtureId,operation,ctx,execution,upload,history,verifiedUploads:()=>[upload],uploadHistory:()=>history,exclusiveNodeOperation:()=>true};
 }
 function ui(){return {row_count:4,sample_rows:4,sample_complete:true,filter_enabled:false,precision:{numbers_verified:true,limitations:[]},limitations:[],
   schema:[{name:'Value',label:'Value',type:'real'}],sample:values.map((value,i)=>[{type:'real',value,is_null:i===0,precision:i===0?'exact_null':'17_significant_digits'}])};}
 
-export async function fake({deferred=false,change,beforeBind,bind=true,afterRelease}={}){
+export async function fake({deferred=false,change,beforeBind,bind=true,afterRelease,fixtureId='real'}={}){
+  const fixture=javascriptNativeFixture(fixtureId),values=fixture.values;
   class Workflow{} class Package{}
   const pack=new Package(),workflow=new Workflow();workflow.ParentNode=pack;
   const node={FGuid:'n',FIconCls:'bg-vendor-icon-importtextfile',FStatus:1,FRunning:false,data:{}},port={parent:node,FGuid:'p',FType:1,FSubType:1,FParam:0,FStatus:1};
@@ -59,15 +62,21 @@ export async function fake({deferred=false,change,beforeBind,bind=true,afterRele
   const cookieClass=vm.runInNewContext('('+cookieSources.constructor+')');
   Object.defineProperty(cookieClass,'name',{value:'$bg_rpc_TIBGDelegateConnectionCookie_Proxy'});
   cookieClass.prototype.$II=vm.runInNewContext('('+cookieSources.interface+')');
-  const helper={$FCacheInitialized:true,$FData:{},$FRowCount:4};
+  const helper={$FCacheInitialized:true,$FData:{},$FRowCount:fixture.rows};
   const session={$M:{GetDynamicData:()=>{
     const id=++nextId;return {set_StaticDataSize:()=>{},InitializeMethodCallMessage:(...a)=>assert.deepEqual(a,[0,9,321,0]),
       WriteParameter(offset,row){assert.equal(offset,0);this.row=row;},WriteParameter$a:(offset,column)=>assert.deepEqual([offset,column],[8,0]),
       get_MessageID:()=>id,Release:()=>{counters.requests++;afterRelease?.(result);}};}},
     DispatchMessageAsync(request,exceptions){assert.equal(exceptions,false);counters.sent++;
-      const bytes=new Uint8Array(60),view=new DataView(bytes.buffer);view.setInt16(12,request.row===0?1:5,true);
-      if(request.row)view.setFloat64(14,values[request.row],true);
-      const response={$FData:bytes,$FDataSize:60,get_MessageType:()=>1,get_MessageID:()=>request.get_MessageID(),set_StaticDataSize:()=>{},Release:()=>counters.responses++};
+      const value=values[request.row],utf8=typeof value==='string'?new TextEncoder().encode(value):null;
+      const bytes=new Uint8Array(Math.max(60,utf8?.length?28+utf8.length:60)),view=new DataView(bytes.buffer);
+      view.setInt16(12,value===null?1:fixtureId==='real'?5:fixtureId==='boolean'?11:8,true);
+      if(value!==null){
+        if(fixtureId==='real')view.setFloat64(14,value,true);
+        if(fixtureId==='boolean')bytes[14]=value?1:0;
+        if(fixtureId==='string'){view.setInt32(22,utf8.length,true);if(utf8.length){view.setUint16(26,65001,true);bytes.set(utf8,28);}}
+      }
+      const response={$FData:bytes,$FDataSize:bytes.length,get_MessageType:()=>1,get_MessageID:()=>request.get_MessageID(),set_StaticDataSize:()=>{},Release:()=>counters.responses++};
       return {continueWith:callback=>{
         const complete=error=>{change?.(result,response);callback({getAwaitedResult:()=>{if(error)throw Error('transport lost');return response;}});};
         if(typeof deferred==='function'?deferred():deferred)callbacks.push(complete);else complete();
@@ -77,8 +86,8 @@ export async function fake({deferred=false,change,beforeBind,bind=true,afterRele
   helper.$FDataChangeCookie=Object.assign(Object.create(cookieClass.prototype),{$S:session,$FRefCount:1,$:{$OW:0,$O:10,$I:206,$RRC:1}});
   helper.$FStateChangeCookie=Object.assign(Object.create(cookieClass.prototype),{$S:session,$FRefCount:1,$:{$OW:0,$O:11,$I:206,$RRC:1}});
   const ds={$S:session,$:{'$I':116,'$OW':0,'$O':9},$FHelper:helper};helper.FBaseProxy=ds;
-  const store={loading:false,proxy:{dataSource:ds,read(){}}},dt={FDataSource:ds,FDataSourceStore:store,FTotalRowCount:4};
-  const dc={FModelNode:node.data,FDataSource:ds,FDataTable:dt,FColumnInfosStore:{data:{items:[{data:{Name:'Value',DisplayName:'Value',DataType:3}}]}},PrepareColumnInfoAndRowCount(){},InitOutput(){}};
+  const store={loading:false,proxy:{dataSource:ds,read(){}}},dt={FDataSource:ds,FDataSourceStore:store,FTotalRowCount:fixture.rows};
+  const dc={FModelNode:node.data,FDataSource:ds,FDataTable:dt,FColumnInfosStore:{data:{items:[{data:{Name:'Value',DisplayName:'Value',DataType:fixture.native_type}}]}},PrepareColumnInfoAndRowCount(){},InitOutput(){}};
   const tab={classList:{contains:()=>true}},preview={id:'preview',checkVisibility:()=>true},tree={id:'tree'};
   const document={querySelector:q=>q.includes('ConsoleForm')?tree:q.includes('DataSetForm')?preview:tab};
   const manager={FPreviewVisible:true,FPreviewForm:{FCurrentPreviewNode:node,FCurrentPreviewPort:port},FShowDataLastCall:{Node:node,Port:port}};
@@ -91,9 +100,9 @@ export async function fake({deferred=false,change,beforeBind,bind=true,afterRele
   const context=vm.createContext(env),page={evaluate:(fn,arg)=>{context.arg=arg;return vm.runInContext('('+fn.toString()+')(arg)',context);}};
   // A separate executor realm deliberately has no module imports/closures.
   const execute=code=>vm.runInNewContext('('+code+')(page)',{page});
-  const b={binding_id:'binding',runtime_binding_id:'binding',package_id:'pkg',method:321,interface:116,port:0,offset:0,rows:4,columns:[0],
+  const b={...(fixtureId==='real'?{}:{fixture_id:fixtureId}),binding_id:'binding',runtime_binding_id:'binding',package_id:'pkg',method:321,interface:116,port:0,offset:0,rows:fixture.rows,columns:[0],
     execution:{status:'completed',execution_id:'d:1:2'},completed_child:{group_id:'2',process_id:'2.1',process_record_id:'3'},document_id:'d',workflow_id:'w',tab_tid:'tab',prefix:'TF',node_id:'n',port_guid:'p',origin:'http://test',
-    schema:[{name:'Value',label:'Value',type:3}],row_count:4,deadline:Date.now()+30000};
+    schema:[{name:'Value',label:'Value',type:fixture.native_type}],row_count:fixture.rows,deadline:Date.now()+30000};
   const result={page,execute,env,context,b,node,port,root,group,child,helper,dc,dt,store,model,session,counters,callbacks};
   beforeBind?.(result);
   if(bind)result.b=await execute(javascriptNativeInputCode(b));
@@ -422,6 +431,7 @@ test('completed ID cannot replay and tight byte budget dispatches nothing',async
   const f=await fake();await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{maxBytes:60}),/byte budget/);assert.equal(f.counters.sent,0);
   await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'once'});
   await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'once'}),/reused/);assert.equal(f.counters.sent,4);
+  await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'new-id'}),/binding reused/);assert.equal(f.counters.sent,4);
 });
 test('expired parent deadline cannot dispatch even with a fresh child timeout',async()=>{const f=await fake();f.b.deadline=Date.now()-1;await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{timeoutMs:30000}),/deadline/);assert.equal(f.counters.sent,0);});
 
@@ -450,8 +460,8 @@ test('production operator rejects incompatible JS flags/batch before browser/con
 
 // Orchestration tests replace only browser/network boundaries. Actual host
 // provenance, native envelope adapter, journal acknowledgement and Close paths run.
-async function driverFixture(mode){
-  const x=sourceEvidence(),f=await fake(),actions=[],events=[],states=[];
+async function driverFixture(mode,fixtureId='real'){
+  const fixture=javascriptNativeFixture(fixtureId),x=sourceEvidence(fixtureId),f=await fake({fixtureId}),actions=[],events=[],states=[];
   const id='js-native-input-'+createHash('sha256').update(x.operation.id+':'+x.ctx.execution.execution_id).digest('hex').slice(0,40);
   const raw=clone(await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:id}));
   const lifecycle=clone(await javascriptNativeInputStatus(f.page));raw.package_id='d:w';
@@ -461,11 +471,14 @@ async function driverFixture(mode){
   Object.assign(x.ctx.workflow_ref,{tab_tid:'tab',prefix:'TF'});
   const graph={prepared_node_context:{...x.ctx.node,verified:true,surface:'graph'},wizard:{status:'absent'},node_outputs:{verified:true,ports:[{index:0,active:true,tid:'port',port_guid:'p'}]},
     ui:{elements:[{tid:'port',ref:'port',allowed_actions:['click','press']},{tid:'preview;p.h;close',ref:'close',allowed_actions:['click']}]},
-    node_preview_schema:{verified:true,port_guid:'p',port:0,root_tid:'preview',fields:[{name:'Value',label:'Value',type:'real'}]}};
+    node_preview_schema:{verified:true,port_guid:'p',port:0,root_tid:'preview',fields:[{name:'Value',label:'Value',type:fixture.type}]}};
   Object.assign(x,{now:Date.now,receiptOptions:()=>({}),onRecord:async e=>{events.push(e);return mode==='journal'&&e.phase==='javascript_native_input_cells_verified'?{}:e;},execute:async code=>{
     if(code.includes('function bindJavascriptNativeRuntime'))return {};
     if(code.includes('function bindJavascriptNativeInput')){
-      if(mode==='binding')return fake({beforeBind:f=>{
+      assert.ok(code.includes(JSON.stringify({fixture_id:fixtureId}).slice(1,-1)));
+      assert.ok(code.includes('"rows":'+fixture.rows));
+      assert.ok(code.includes('"type":'+fixture.native_type));
+      if(mode==='binding')return fake({fixtureId,beforeBind:f=>{
         // Observed port kinds, deliberately no invented param/status values.
         f.node.FPorts[0].FCollection=[6,3].map(FSubType=>({parent:f.node,FType:0,FSubType}));
       }});
@@ -482,23 +495,23 @@ async function driverFixture(mode){
     perform:async({ready,resolve,identity})=>{assert.equal(ready(graph),true);assert.ok(identity());const action=resolve(graph);actions.push(action.ref==='close'?'close':action.verb);
       if(mode==='close'&&action.ref==='close')throw Error('close lost');}
   })};
-  return {x,actions,events,states,run:()=>readNativeInputDuringImport({options:x,ctx:x.ctx,provenance:nativeInputProvenance(x),targetOrigin:'http://test',targetBuild:'7.4.2',onState:async s=>states.push(s)},dependencies)};
+  return {x,actions,events,states,run:()=>readNativeInputDuringImport({fixtureId,options:x,ctx:x.ctx,provenance:nativeInputProvenance(x),targetOrigin:'http://test',targetBuild:'7.4.2',onState:async s=>states.push(s)},dependencies)};
 }
 test('owning driver journal acknowledgement precedes scoped Close and proof return',async()=>{
   const f=await driverFixture(),proof=await f.run();assert.equal(proof.exact.native_bytes_verified,true);
   assert.deepEqual(f.actions,['click','press','native','close']);assert.deepEqual(f.events.map(e=>e.phase),['javascript_native_input_cells_verified','javascript_native_input_preview_closed']);
   assert.equal(f.states.at(-1).releasedResponses,4);
 });
-for(const wrongAck of [false,true])test('production journal full proof, disk, secrets and exact ACK: '+wrongAck,async t=>{
+for(const fixtureId of ['real','boolean','string'])for(const wrongAck of [false,true])test(fixtureId+' production journal full proof, disk, secrets and exact ACK: '+wrongAck,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'javascript-native-proof-'));
   t.after(()=>rm(directory,{recursive:true,force:true}));
   const journal=createExecutionJournal({directory,metadata:{sessionId:'test',clientRevision:'test'},knownSecrets:['private-secret']});
-  const f=await driverFixture(),proofs=[];
+  const fixture=javascriptNativeFixture(fixtureId),f=await driverFixture(undefined,fixtureId),proofs=[];
   f.x.onRecord=async event=>{
     const saved=await journal(event);
     if(event.phase==='javascript_native_input_cells_verified'){
       assert.equal(JSON.stringify(saved.proof),JSON.stringify(event.proof));proofs.push(event.proof);
-      if(wrongAck)saved.proof.lifecycle.releasedResponses=3;
+      if(wrongAck)saved.proof.lifecycle.releasedResponses=fixture.rows-1;
     }
     return saved;
   };
@@ -509,8 +522,8 @@ for(const wrongAck of [false,true])test('production journal full proof, disk, se
   assert.deepEqual(proof.runtime.functions,nativeRuntimePins.functions);assert.deepEqual(proof.runtime.constants,nativeRuntimePins.constants);
   assert.equal(proof.frontends.length,Object.keys(nativeFrontendPins).length);assert.equal(Object.keys(proof.count_loader_sha256).length,3);
   assert.deepEqual(proof.subscription_proxy_source_sha256,verifyNativeInputCookieRuntime(cookieSources));
-  assert.equal(proof.binding.origin,'http://test/');assert.equal(proof.raw.cells.length,4);
-  assert.equal(proof.lifecycle.releasedRequests,4);assert.equal(proof.lifecycle.releasedResponses,4);
+  assert.equal(proof.binding.origin,'http://test/');assert.equal(proof.raw.cells.length,fixture.rows);
+  assert.equal(proof.lifecycle.releasedRequests,fixture.rows);assert.equal(proof.lifecycle.releasedResponses,fixture.rows);
   const sensitive=await journal({phase:'redaction_check',authorization:'Bearer credential-sentinel',password:'password-sentinel',cookie_runtime_sha256:'legacy-sensitive-key',message:'contains private-secret'});
   for(const key of ['authorization','password','cookie_runtime_sha256'])assert.equal(sensitive[key],'[redacted]');
   assert.ok(!sensitive.message.includes('private-secret'));
@@ -541,8 +554,8 @@ test('changed loaded cookie class source stops owning driver before cells and cl
 test('lost Close refuses proof and marks cleanup uncertain',async()=>{
   const f=await driverFixture('close');await assert.rejects(f.run,/close lost/);assert.equal(f.x.operation.transportUncertain,true);assert.equal(f.states.at(-1).uncertain,true);
 });
-for(const mode of ['status','read-and-status'])test('unknown native lifecycle blocks UI cleanup: '+mode,async()=>{
-  const f=await driverFixture(mode);await assert.rejects(f.run,error=>{
+for(const fixtureId of ['real','boolean','string'])for(const mode of ['status','read-and-status'])test(fixtureId+' unknown native lifecycle blocks UI cleanup: '+mode,async()=>{
+  const f=await driverFixture(mode,fixtureId);await assert.rejects(f.run,error=>{
     if(mode==='read-and-status'){assert.match(error.observationError.message,/lost native reply/);assert.match(error.cleanupError.message,/lost status/);}return true;
   });assert.ok(!f.actions.includes('close'));assert.equal(f.x.operation.transportUncertain,true);assert.equal(f.states.at(-1).uncertain,true);
 });

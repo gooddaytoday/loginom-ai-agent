@@ -1,4 +1,5 @@
-import {nativeRoundtripProbe,verifyNativeRoundtripMapping} from './javascript-native-roundtrip-contract.mjs';
+import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
+import {javascriptNativeRoundtripProbe,verifyNativeRoundtripMapping} from './javascript-native-roundtrip-contract.mjs';
 import {bindJavascriptNativeRoundtripSource,bindJavascriptNativeRoundtripSchema,prepareJavascriptNativeRoundtripWizard,sealJavascriptNativeRoundtripDone} from './javascript-native-roundtrip-owner.mjs';
 import {withJavascriptWizardAddress} from './javascript-wizard-settlement.mjs';
 import {cleanupJavascriptColumnEditor} from './javascript-column-editor.mjs';
@@ -32,8 +33,8 @@ let cleaning=false;
 const phaseDeadline=ms=>Math.min(cleaning?Infinity:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=batchDeadline-Date.now();if(!cleaning&&ms<=0)throw Error('Original batch deadline expired');return cleaning?Infinity:ms;};
 const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
-if (args.includes('--help')) { console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nPrivate real/NULL input admission then one Data-only identity JS Execute, native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nPrivate input-only Value:real [null,0,-1.25,10.125]; one import Execute, typed UI + native4-cell read; no JS creation.':usage); return; }
-const allowed = new Set(['--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe']);
+if (args.includes('--help')) { console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string] Private typed/NULL input admission then one Data-only identity JS Execute, native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
+const allowed = new Set(['--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
@@ -43,9 +44,10 @@ for (let i=0;i<args.length;i++) {
 }
 if(batch&&options['--execution-case'])throw Error('Batch cannot also select a single case');
 if(nativeInputOnly||nativeRoundtrip){
-  if(batch||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence'].includes(k)))throw Error('Native input-only requires its separate private entrypoint and no JS modes');
+  if(batch||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence','--native-fixture'].includes(k)))throw Error('Native input-only requires its separate private entrypoint and no JS modes');
   options['--create-node']=true;
 }
+const nativeFixtureId=options['--native-fixture']??'real',nativeFixture=javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=javascriptNativeRoundtripProbe(nativeFixtureId);
 const discoveryProbe=options['--discovery-probe']?javascriptDiscoveryProbe(options['--discovery-probe']):null;
 if(discoveryProbe&&(batch||options['--execution-case']))throw Error('Discovery requires one isolated probe, not a batch or execution case');
 let executionCase=nativeRoundtrip?'code-table-execute':discoveryProbe?'code-table-execute':batch?.[0]??options['--execution-case'];
@@ -440,7 +442,7 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
       const schema=await page.evaluate(readJavascriptSchema,schemaContext());await executionRecord({phase:'input_mapping_inventory',schema});
       if(!schema.verified)throw Error('Native JavaScript input schema contract unconfirmed');
       const fields=schema.grids.find(grid=>grid.tid===schema.page_tid+';grdTargetColumns;tbl')?.fields;
-      if(nativeRoundtrip?fields?.length!==1||fields[0].Name!=='Value'||fields[0].DataType!==3:fields?.length!==5||!fields.some(field=>field.Name==='RowID'&&field.DataType===4))throw Error('Verified fixed input mapping unavailable');
+      if(nativeRoundtrip?fields?.length!==1||fields[0].Name!=='Value'||fields[0].DataType!==nativeFixture.native_type:fields?.length!==5||!fields.some(field=>field.Name==='RowID'&&field.DataType===4))throw Error('Verified fixed input mapping unavailable');
     }
     if(executionCase&&!remainingPages&&current.tid.endsWith(';JavaScriptColumnsWizard')){
       if(readingExisting){
@@ -938,7 +940,7 @@ const runPreparedCase=async()=>{
       report.stage='link-js-input';executionNode=await executionRuntime.connectInput(executionInput.node,node.id,executionDrop);
       report.stage='verify-js-input-port';
       const mapping=await executionRuntime.readPortMapping(executionNode,'input');
-      executionInputProof=(nativeRoundtrip?verifyNativeRoundtripMapping:verifyJavascriptInputMapping)(mapping,executionNode);
+      executionInputProof=(nativeRoundtrip?verifyNativeRoundtripMapping:verifyJavascriptInputMapping)(mapping,executionNode,nativeFixtureId);
       if(nativeRoundtrip)await executionRuntime.bindNativeRoundtripGraph(executionNode,executionInputProof.port_guid);
       await executionRecord({phase:'javascript_input_port_verified',proof:executionInputProof,mapping});
       report.execution_input_port=executionInputProof;
@@ -1105,11 +1107,11 @@ try {
     report.stage='graph-ready';await waitGraphReady(createRemaining());
     await snapshot('graph-ready-baseline');
     if(executionCase||nativeInputOnly){
-      report.scope=nativeRoundtrip?'private native real/NULL identity roundtrip':nativeInputOnly?'private native real input-only admission':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
+      report.scope=nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
       if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=1;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
-        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip});
+        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
       if(nativeRoundtrip)await executionRuntime.armNativeRoundtrip(executionInput);

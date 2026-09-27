@@ -1,3 +1,4 @@
+import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {createHash} from 'node:crypto';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
 import {createNodeProcedure} from '../../client/lib/node-procedure.mjs';
@@ -7,7 +8,7 @@ import {decodeVariantFrame} from '../../client/lib/variant-native-decode.mjs';
 import {javascriptNativeInputCode,javascriptNativeRuntimeCode,verifyNativeInputCookieRuntime} from './javascript-native-input-binding.mjs';
 import {verifyLoadedNativeRuntime} from '../../client/lib/collapse-native-runtime.mjs';
 import {readJavascriptNativeInput,cancelJavascriptNativeInput,javascriptNativeInputStatus} from './javascript-native-input-read.mjs';
-import {nativeInputProvenance,verifyNativeInputUi,verifyNativeInputRead,nativeInputFixture} from './javascript-native-input-contract.mjs';
+import {nativeInputProvenance,verifyNativeInputUi,verifyNativeInputRead} from './javascript-native-input-contract.mjs';
 
 const need=(v,m)=>{if(!v)throw Error('Native input driver: '+m);};
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -37,15 +38,16 @@ export async function verifyNativeInputFrontends(execute,origin,deadline,signal)
   need(proofs.length===5,'complete frontend provenance');return proofs;
 }
 
-export async function readNativeInputDuringImport({options,ctx,provenance,targetOrigin,targetBuild,onState},
+export async function readNativeInputDuringImport({options,ctx,provenance,targetOrigin,targetBuild,onState,fixtureId='real'},
   {createProcedure=createNodeProcedure,verifyFrontends=verifyNativeInputFrontends,verifyRuntime=verifyLoadedNativeRuntime,
     verifyCountLoaders=verifyNativeInputCountLoaders,verifyCookieRuntime=verifyNativeInputCookieRuntime}={}){
+  const nativeInputFixture=javascriptNativeFixture(fixtureId);
   const {execute,operation,onRecord,now}=options;
   const deadline=ctx.deadline;
   const check=()=>{ctx.signal?.throwIfAborted();need(now()<deadline,'original deadline expired');
     need(options.exclusiveNodeOperation()===true,'owning read lock lost');
     // Revalidate ordered upload history even after entering the native read.
-    nativeInputProvenance({...options,ctx,execution:provenance.execution});};
+    nativeInputProvenance({...options,ctx,execution:provenance.execution,fixtureId});};
   check();const frontends=await verifyFrontends(execute,targetOrigin,deadline,ctx.signal);check();
   const channel=createProcedure({operation,execute,record:onRecord,now,signal:ctx.signal,maxSteps:128,targetOrigin,targetBuild,
     preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
@@ -65,13 +67,13 @@ export async function readNativeInputDuringImport({options,ctx,provenance,target
     preview=await channel.observe({condition:'native input Preview schema',readPreview:true,ready:s=>s.node_preview_schema?.verified===true
       &&s.node_preview_schema.port_guid===port.port_guid&&s.node_preview_schema.port===0});
     need(preview.node_preview_schema.fields.length===1&&preview.node_preview_schema.fields[0].name==='Value'
-      &&preview.node_preview_schema.fields[0].label==='Value'&&preview.node_preview_schema.fields[0].type==='real','Preview fixed schema');
+      &&preview.node_preview_schema.fields[0].label==='Value'&&preview.node_preview_schema.fields[0].type===nativeInputFixture.type,'Preview fixed schema');
     const readId='js-native-input-'+hash(operation.id+':'+ctx.execution.execution_id).slice(0,40);
-    const args={binding_id:readId,runtime_binding_id:readId,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,
+    const args={fixture_id:fixtureId,binding_id:readId,runtime_binding_id:readId,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,
       package_id:ctx.document_id+':'+ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id,port_guid:port.port_guid,
       origin:targetOrigin,tab_tid:ctx.workflow_ref.tab_tid,prefix:ctx.workflow_ref.prefix,execution:ctx.execution,
-      completed_child:provenance.execution,deadline,method:321,interface:116,port:0,offset:0,rows:4,row_count:4,columns:[0],
-      schema:[{name:'Value',label:'Value',type:3}]};
+      completed_child:provenance.execution,deadline,method:321,interface:116,port:0,offset:0,rows:nativeInputFixture.rows,row_count:nativeInputFixture.rows,columns:[0],
+      schema:[{name:'Value',label:'Value',type:nativeInputFixture.native_type}]};
     check();
     // Fixed local builders, not user code. bind runtime needs the imported
     // verifier in the host, so return its proof through the owning transport.
@@ -102,7 +104,7 @@ export async function readNativeInputDuringImport({options,ctx,provenance,target
   }catch(error){observationError=error;throw error;
   }finally{
     if(readDispatched&&(!lifecycle||lifecycle.retired||lifecycle.pending||lifecycle.status!=='completed'
-      ||lifecycle.releasedRequests!==4||lifecycle.releasedResponses!==4)){
+      ||lifecycle.releasedRequests!==nativeInputFixture.rows||lifecycle.releasedResponses!==nativeInputFixture.rows)){
       operation.transportUncertain=true;await onState({...lifecycle,uncertain:true});
     }
     else if(preview){
@@ -121,8 +123,9 @@ export async function readNativeInputDuringImport({options,ctx,provenance,target
   }
 }
 
-export function createJavascriptNativeInputSupport({targetOrigin,targetBuild,onProof,onState,
+export function createJavascriptNativeInputSupport({targetOrigin,targetBuild,onProof,onState,fixtureId='real',
   createSupport=createTextImportNodeSupport,readNative=readNativeInputDuringImport}){
+  const nativeInputFixture=javascriptNativeFixture(fixtureId);
   const support=createSupport({targetOrigin,targetBuild});
   return {...support,nodeApplyDriverFactory:options=>{
     const base=support.nodeApplyDriverFactory(options);let executed=false,readStarted=false,execution;
@@ -135,9 +138,9 @@ export function createJavascriptNativeInputSupport({targetOrigin,targetBuild,onP
       waitExecution:async ctx=>(execution=await base.waitExecution(ctx)),
       readOutput:async(read,ctx)=>{
         need(!readStarted,'native input read already reserved; no replay');readStarted=true;
-        const ui=await base.readOutput(read,ctx);verifyNativeInputUi(ui.ports?.[0]);
-        const provenance=nativeInputProvenance({...options,ctx,execution});
-        const proof=await readNative({options,ctx,provenance,targetOrigin,targetBuild,onState});
+        const ui=await base.readOutput(read,ctx);verifyNativeInputUi(ui.ports?.[0],fixtureId);
+        const provenance=nativeInputProvenance({...options,ctx,execution,fixtureId});
+        const proof=await readNative({options,ctx,provenance,targetOrigin,targetBuild,onState,fixtureId});
         await onProof({ui,native:proof},{options,ctx,provenance});return ui;
       }};
   }};

@@ -13,8 +13,9 @@ export async function readJavascriptNativeInput(page,b,decode,options={}) {
   need(receipt&&receipt.tab===document.querySelector('[data-tid='+JSON.stringify(b.tab_tid)+']')&&receipt.tab.classList.contains('x-tab-active'),'workflow receipt');
   const captured=globalThis.__loginomJavascriptNativeInputBindingV1;
   need(captured?.document===document&&captured.id===b.runtime_binding_id,'private native input binding required');
-  need(b.rows===4&&b.row_count===4&&b.columns.length===1&&b.columns[0]===0
-    &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:3}]),'fixed real4x1 slice');
+  const slice={real:[4,3],boolean:[3,1],string:[8,5]}[b.fixture_id??'real'];
+  need(Array.isArray(slice)&&b.rows===slice[0]&&b.row_count===slice[0]&&b.columns.length===1&&b.columns[0]===0
+    &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:slice[1]}]),'fixed native slice');
   const snapshot=()=>captured.capture(b);
   const bound=()=>{const s=snapshot();need(Object.keys(captured.initial).every(k=>captured.initial[k]===s[k]),'native input changed since binding');return s;};
   need(Object.keys(options).every(k=>['operationId','timeoutMs','requireAtomicSnapshot','maxBytes'].includes(k)),'diagnostic option allowlist');
@@ -29,6 +30,7 @@ export async function readJavascriptNativeInput(page,b,decode,options={}) {
   const op={id:options.operationId??'read-'+Date.now(),status:'running',pending:0,requests:0,releasedRequests:0,releasedResponses:0,lateResponses:0,published:false,nativeCancelled:false,receivedBytes:0,serializedBytes:new TextEncoder().encode(JSON.stringify(b)).length};
   need(typeof op.id==='string'&&op.id.length>0&&op.id.length<=128,'operation id');
   need(state.used.size<128&&!state.used.has(op.id),'operation id reused or diagnostic session limit');state.used.add(op.id);
+  need(!captured.readStarted,'native read binding reused; no replay');
   state.active=op;
   const deadline=Math.min(Date.now()+timeoutMs,b.deadline);
   let stopPending;
@@ -43,6 +45,7 @@ export async function readJavascriptNativeInput(page,b,decode,options={}) {
    const releaseRequest=()=>{if(request){request.Release();request=null;op.releasedRequests++;}};
    const releaseResponse=x=>{if(x){x.Release();op.releasedResponses++;}};
    try{
+    captured.readStarted=true; // Reserve before the first native request; new IDs cannot replay this binding.
     request=session.$M.GetDynamicData();runtime.check(session,request);request.set_StaticDataSize(32);
     request.InitializeMethodCallMessage(initial.owner,initial.object,321,0);
     request.WriteParameter(0,row);request.WriteParameter$a(8,column);

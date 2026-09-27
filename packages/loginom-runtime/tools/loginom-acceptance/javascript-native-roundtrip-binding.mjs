@@ -46,6 +46,9 @@ export function javascriptNativeRoundtripSnapshot(b){
     // Subscription metadata, not a data-generation/version counter. Never walk $S.
     return {identity,identityPrototype:Object.getPrototypeOf(identity),value:JSON.stringify([owner,object,type,remoteRefs,refs])};
   };
+  const fixtureId=b.fixture_id??'real',slice={real:[4,3],boolean:[3,1],string:[8,5]}[fixtureId];
+  need(Array.isArray(slice)&&b.rows===slice[0]&&b.row_count===slice[0]
+    &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:slice[1]}]),'fixed native fixture schema/count');
   const prep=globalThis.__loginomDockPreparationV1;
   need(prep?.document===document&&prep.id===b.document_id&&location.origin===b.origin&&bg.app.Version==='7.4.2','document/build');
   const receipts=[...prep.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_id&&r.nodeTargetWorkflowNode);
@@ -60,7 +63,7 @@ export function javascriptNativeRoundtripSnapshot(b){
   need(workflow===receipt.nodeTargetWorkflowNode&&pack===receipt.packageNode,'workflow/package owner');
   const diagram=model.FDiagram,nodes=diagram.FNodes.FCollection,links=diagram.FLinks.FCollection;
   const roundtrip=globalThis.__loginomJavascriptNativeRoundtripV1;
-  need(roundtrip?.document===document&&roundtrip.stage==='completed'&&roundtrip.source_sha256===b.source_sha256,'roundtrip capability');
+  need(roundtrip?.document===document&&roundtrip.input.fixtureId===fixtureId&&roundtrip.stage==='completed'&&roundtrip.source_sha256===b.source_sha256,'roundtrip capability');
   roundtrip.check();
   const completed=b.roundtrip_role==='output'?roundtrip.execution:roundtrip.binding.completed_child;
   need(b.execution.execution_id===(b.roundtrip_role==='output'?roundtrip.execution.execution_id:roundtrip.binding.execution.execution_id)
@@ -139,8 +142,8 @@ export function javascriptNativeRoundtripSnapshot(b){
   need(!store.loading&&v(helper,'$FCacheInitialized')===true&&v(helper,'$FData'),'loaded cache');
   const fields=v(v(v(dc,'FColumnInfosStore'),'data'),'items');
   need(Array.isArray(fields)&&fields.length===1,'one field');const field=v(fields[0],'data');
-  need(field.Name==='Value'&&field.DisplayName==='Value'&&field.DataType===3,'fixed real schema');
-  need(v(dt,'FTotalRowCount')===4&&v(helper,'$FRowCount')===4,'four native rows');
+  need(field.Name==='Value'&&field.DisplayName==='Value'&&field.DataType===slice[1],'fixed native schema');
+  need(v(dt,'FTotalRowCount')===slice[0]&&v(helper,'$FRowCount')===slice[0],'fixed native row count');
   const runtime=globalThis.__loginomJavascriptNativeRuntimeV1;
   need(runtime?.document===document&&runtime.binding_id===b.runtime_binding_id,'loaded runtime binding');runtime.check(v(ds,'$S'));
   const dataCookie=v(helper,'$FDataChangeCookie'),stateCookie=v(helper,'$FStateChangeCookie');
@@ -151,7 +154,7 @@ export function javascriptNativeRoundtripSnapshot(b){
     nodePorts,inputCollection,inputPorts,connectionInput:inputPorts[0],variablesInput:inputPorts[1],
     processStore,processRoot,group:groups[0],child:child[0],
     processFingerprint:JSON.stringify(records.map(r=>[r.internalId,r.data.id,parents.get(r)?.internalId,r.data.Status,r.data.ErrorDetails,r.data.ModelNode===node.data])),
-    root,dc,dt,ds,store,helper,identity,count:4,cache:v(helper,'$FData'),owner:v(identity,'$OW'),object:v(identity,'$O'),
+    root,dc,dt,ds,store,helper,identity,fixtureId,typeCode:slice[1],count:slice[0],cache:v(helper,'$FData'),owner:v(identity,'$OW'),object:v(identity,'$O'),
     dataCookie,stateCookie,dataCookieIdentity:dataCookieState.identity,stateCookieIdentity:stateCookieState.identity,
     dataCookieIdentityPrototype:dataCookieState.identityPrototype,stateCookieIdentityPrototype:stateCookieState.identityPrototype,
     dataCookieValue:dataCookieState.value,stateCookieValue:stateCookieState.value};
@@ -166,7 +169,7 @@ export async function bindJavascriptNativeRoundtrip(page,args,snapshot){
       const output=state.bindings.get('output'),read=globalThis.__loginomJavascriptNativeRoundtripReadV1;
       if(!output||read?.document!==document||read.poisoned||read.active||read.last?.id!==output.readId
         ||read.last.status!=='completed'||!read.last.published||read.last.pending!==0
-        ||read.last.releasedRequests!==4||read.last.releasedResponses!==4)throw Error('Completed output read required before upstream');
+        ||read.last.releasedRequests!==state.input.count||read.last.releasedResponses!==state.input.count)throw Error('Completed output read required before upstream');
     }
     state.bindings.set(args.roundtrip_role,null);
     const capture=eval('('+code+')'),initial=capture(args);

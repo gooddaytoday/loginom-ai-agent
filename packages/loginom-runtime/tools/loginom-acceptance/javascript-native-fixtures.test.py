@@ -1,0 +1,55 @@
+"""Independent CSV/bytes audit; run separately from Node's sandboxed runner.
+
+This checks immutable fixture inputs, never fabricates native/live evidence.
+"""
+import csv
+import hashlib
+import io
+import json
+from pathlib import Path
+import struct
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[4]
+HERE = Path(__file__).resolve().parent
+CATALOG = json.loads((HERE / "javascript-native-fixtures.mjs").read_text().split("const fixtures=", 1)[1].split(";", 1)[0])
+CASES = json.loads((ROOT / "docs/node-development/nodes/programming-javascript/fixtures/operator-only/typed-cases.json").read_text())["cases"]
+
+
+def verify(kind, data):
+    fixture = CATALOG[kind]
+    assert len(data) == fixture["bytes"]
+    assert hashlib.sha256(data).hexdigest() == fixture["sha256"]
+    rows = list(csv.reader(io.StringIO(data.decode("utf-8"), newline=""), delimiter=";", quotechar='"'))
+    assert rows[0] == ["Value"] and all(len(row) == 1 for row in rows)
+    values = [None if row[0] == "__JS_NULL__" else {"true": True, "false": False}[row[0]] if kind == "boolean" else float(row[0]) if kind == "real" else row[0] for row in rows[1:]]
+    expected = next(case["values"] for case in CASES if case["id"] == {"real": "null-number", "boolean": "null-bool", "string": "null-text"}[kind])
+    assert values == expected == fixture["values"] and len(values) == fixture["rows"]
+    encoded = [None if value is None else struct.pack("<d", value).hex() if kind == "real" else bytes([int(value)]).hex() if kind == "boolean" else value.encode("utf-8").hex() for value in values]
+    assert encoded == fixture["expected_bytes"]
+    if kind == "string":
+        assert data.startswith(b'Value\n__JS_NULL__\n""\n')
+        assert values[1] == "" and encoded[1] == "" and values[0] is None
+
+
+class FixtureAudit(unittest.TestCase):
+    def test_real(self):
+        verify("real", (HERE / "fixtures" / CATALOG["real"]["file"]).read_bytes())
+
+    def test_boolean(self):
+        verify("boolean", (HERE / "fixtures" / CATALOG["boolean"]["file"]).read_bytes())
+
+    def test_string(self):
+        verify("string", (HERE / "fixtures" / CATALOG["string"]["file"]).read_bytes())
+
+    def test_changed_inputs_refused(self):
+        for kind in CATALOG:
+            data = (HERE / "fixtures" / CATALOG[kind]["file"]).read_bytes()
+            for changed in [data + b" ", data.replace(b"__JS_NULL__", b""), data.replace(b"Value", b"value")]:
+                with self.subTest(kind=kind, changed=changed), self.assertRaises(AssertionError):
+                    verify(kind, changed)
+
+
+if __name__ == "__main__":
+    unittest.main()

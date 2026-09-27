@@ -1,0 +1,86 @@
+// Fixed private slices only. CSV pins and oracles are not native evidence.
+const fixtures={
+  "real": {
+    "id": "real",
+    "file": "javascript-native-input-real.csv",
+    "rows": 4,
+    "columns": 1,
+    "bytes": 33,
+    "sha256": "4d731645c25b4aafbdd4c96a477341fcc5ef086ad2bda3dc9a2bfcce7966df84",
+    "type": "real",
+    "native_type": 3,
+    "js_type": "Float",
+    "data_kind": "Непрерывный",
+    "values": [
+      null,
+      0,
+      -1.25,
+      10.125
+    ],
+    "expected_bytes": [
+      null,
+      "0000000000000000",
+      "000000000000f4bf",
+      "0000000000402440"
+    ]
+  },
+  "boolean": {
+    "id": "boolean",
+    "file": "javascript-native-input-boolean.csv",
+    "rows": 3,
+    "columns": 1,
+    "bytes": 29,
+    "sha256": "bb1c31553e26a6c0a82e2c947df83a4491ff2b81761d069a0ce4c6f7272d3d46",
+    "type": "boolean",
+    "native_type": 1,
+    "js_type": "Boolean",
+    "data_kind": "Дискретный",
+    "values": [
+      null,
+      false,
+      true
+    ],
+    "expected_bytes": [
+      null,
+      "00",
+      "01"
+    ]
+  },
+  "string": {
+    "id": "string",
+    "file": "javascript-native-input-string.csv",
+    "rows": 8,
+    "columns": 1,
+    "bytes": 94,
+    "sha256": "c3adece846a9998d8003d2b4de019a4dda7940b471166ab0ca4c9fa364b34ce6",
+    "type": "string",
+    "native_type": 5,
+    "js_type": "String",
+    "data_kind": "Дискретный",
+    "values": [
+      null,
+      "",
+      "null",
+      "NULL",
+      "0",
+      "false",
+      "Привет, Ёж 😀",
+      "quote\"\\slash\nline"
+    ],
+    "expected_bytes": [
+      null,
+      "",
+      "6e756c6c",
+      "4e554c4c",
+      "30",
+      "66616c7365",
+      "d09fd180d0b8d0b2d0b5d1822c20d081d0b620f09f9880",
+      "71756f7465225c736c6173680a6c696e65"
+    ]
+  }
+};
+for(const f of Object.values(fixtures)){Object.freeze(f.values);Object.freeze(f.expected_bytes);Object.freeze(f);}
+Object.freeze(fixtures);
+export function javascriptNativeFixture(id='real'){
+  if(!Object.hasOwn(fixtures,id))throw Error('Unknown private native fixture');return fixtures[id];
+}

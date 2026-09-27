@@ -2,26 +2,34 @@ import {verifyTextImportSource} from '../../client/lib/text-import-node.mjs';
 import {textImportConfigurationReadback} from '../../client/lib/text-import-readback.mjs';
 import {createHash} from 'node:crypto';
 import {adaptRead} from '../../client/lib/variant-native-values.mjs';
-import {nativeInputFixture} from './javascript-native-input-contract.mjs';
+import {verifyNativeFixtureCells} from './javascript-native-input-contract.mjs';
+import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 
 const need=(v,m)=>{if(!v)throw Error('Native roundtrip: '+m);};
-const source='import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
-  +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Float}]);\n'
+export function javascriptNativeRoundtripProbe(fixtureId='real'){
+ const f=javascriptNativeFixture(fixtureId);
+ const source='import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+  +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.'+f.js_type+'}]);\n'
   +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n';
-export const nativeRoundtripProbe=Object.freeze({id:'native-real-identity-copy',schema_mode:'code',source,
+return Object.freeze({id:'native-'+f.id+'-identity-copy',schema_mode:'code',source,
   source_sha256:createHash('sha256').update(source).digest('hex')});
+}
+export const nativeRoundtripProbe=javascriptNativeRoundtripProbe();
 
-export function verifyNativeRoundtripInput(input){
+export function verifyNativeRoundtripInput(input,fixtureId='real'){
+  const nativeInputFixture=javascriptNativeFixture(fixtureId);
   const proof=input?.native_input?.native;
-  need(proof?.exact.contract==='javascript-native-input-real-1'&&proof.exact.native_bytes_verified===true
+  need(proof?.exact.contract==='javascript-native-input-'+nativeInputFixture.id+'-1'&&proof.exact.native_bytes_verified===true
     &&proof.exact.js_created===false&&proof.exact.js_executed===false&&proof.exact.provenance.source.sha256===nativeInputFixture.sha256,
     'input-before-JS attestation required');
   need(proof.lifecycle.status==='completed'&&!proof.lifecycle.retired&&proof.lifecycle.pending===0
-    &&proof.lifecycle.releasedRequests===4&&proof.lifecycle.releasedResponses===4,'input release required');
-  need(proof.binding.node_id===input.node.node_id&&proof.binding.port_guid===input.table.port_guid,'input owner differs');
+    &&proof.lifecycle.releasedRequests===nativeInputFixture.rows&&proof.lifecycle.releasedResponses===nativeInputFixture.rows,'input release required');
+  need((proof.binding.fixture_id??'real')===nativeInputFixture.id&&proof.binding.node_id===input.node.node_id&&proof.binding.port_guid===input.table.port_guid,'input owner differs');
+  verifyNativeFixtureCells(proof.exact,nativeInputFixture.id);
   return proof;
 }
-export function verifyNativeRoundtripMapping(mapping,node){
+export function verifyNativeRoundtripMapping(mapping,node,fixtureId='real'){
+  const fixture=javascriptNativeFixture(fixtureId);
   const context=mapping?.node_context,port=context?.input_port;
   need(mapping?.verified===true&&mapping.inventory_complete===true&&mapping.source_identity_verified===true
     &&mapping.mapping_wizard==='TuneDataSourceMappingWizard'&&typeof mapping.autosync==='boolean'
@@ -29,25 +37,27 @@ export function verifyNativeRoundtripMapping(mapping,node){
     &&port?.direction==='input'&&port.port===0&&typeof port.port_guid==='string'&&port.port_guid
     &&mapping.source_fields?.length===1&&mapping.target_fields?.length===1,'complete owned input mapping required');
   const a=mapping.source_fields[0],b=mapping.target_fields[0];
-  need([a,b].every(f=>f.name==='Value'&&f.type==='real'&&typeof f.required==='boolean')
-    &&b.source?.record_id===a.record_id&&b.source?.field_id===a.field_id&&b.source?.name==='Value'&&b.source?.type==='real','Value identity mapping required');
+  need([a,b].every(f=>f.name==='Value'&&f.type===fixture.type&&typeof f.required==='boolean')
+    &&b.source?.record_id===a.record_id&&b.source?.field_id===a.field_id&&b.source?.name==='Value'&&b.source?.type===fixture.type,'Value identity mapping required');
   return {verified:true,node:{...node},port:0,port_guid:port.port_guid,columns:1,input_technical_name:'Value'};
 }
 export function verifyNativeRoundtripRead(raw,{binding,lifecycle,input,role}){
+  const fixture=javascriptNativeFixture(binding.fixture_id),nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixture.id);
+  need((input.binding.fixture_id??'real')===fixture.id,'input fixture differs');
   need(['output','upstream'].includes(role)&&binding.roundtrip_role===role,'private read role');
   need(binding.source_sha256===nativeRoundtripProbe.source_sha256,'identity script digest');
   const exact=adaptRead(raw,{expected:binding,lifecycle,consistency:{kind:'observed_local',changed:false,
     exclusive_operation:true,stability_basis:'owned_static_completed_fixture'}});
-  need(exact.coverage.table_complete&&exact.row_count===4&&exact.cells.length===4&&exact.schema.length===1
-    &&exact.schema[0].name==='Value'&&exact.schema[0].label==='Value'&&exact.schema[0].type==='real','full real4x1');
+  verifyNativeFixtureCells(input.exact,fixture.id);verifyNativeFixtureCells(exact,fixture.id);
   need(exact.cells.every((cell,i)=>{const before=input.exact.cells[i];return cell.row===i&&cell.column===0
-    &&cell.is_null===before.is_null&&cell.native.tag===before.native.tag
-    &&(cell.is_null?cell.value===null:cell.native.bytes_le===before.native.bytes_le);}), 'roundtrip significant bytes differ');
-  return {...exact,contract:'javascript-native-real-roundtrip-read-1',role,source_sha256:nativeRoundtripProbe.source_sha256,
+    &&cell.is_null===before.is_null&&JSON.stringify(cell.native)===JSON.stringify(before.native)
+    &&cell.value===before.value;}), 'roundtrip significant bytes differ');
+  return {...exact,contract:'javascript-native-'+fixture.id+'-roundtrip-read-1',fixture_id:fixture.id,role,source_sha256:nativeRoundtripProbe.source_sha256,
     input_read_id:input.raw.read_id,g5_complete:false};
 }
 
-export function verifyNativeRoundtripExecution(execution,node){
+export function verifyNativeRoundtripExecution(execution,node,fixtureId='real'){
+  const nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixtureId);
   need(execution?.verified===true&&execution.owner_verified===true&&execution.cleanup_complete===true
     &&execution.status==='completed'&&execution.trial?.phase==='initial'
     &&execution.trial.source_sha256===nativeRoundtripProbe.source_sha256&&execution.trial.node_id===node.node_id
