@@ -15,6 +15,27 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze66: JS input param3; roundtrip probe03 запущен
+
+Source node-javascript `d54080e092df20c03570c4167642295ed37abccc` требует observed
+JS input FParam===3;0/1/2 и прочие значения не допускаются. Единственная edge,
+source/target identity, snapshots и no replay сохранены. Import/output admission
+не расширялся. Graph-bound evidence дополнено bounded per-port inventory:
+[type,subtype,param,status,index] для input/output; это наблюдение, не разрешение
+неизвестной формы output. RG1 сохраняется.
+
+Root независимо **693/693 PASS**, fail/skip0,73pins до/после совпадают;syntax2files PASS.
+Новые negatives покрывают wrong param при bind, до read, после response, между
+ячейками и перед publication; release/retirement/no-publication сохраняются.
+Private operator66-root-test-source.json и native-roundtrip-probe-03-source.json.
+
+Разработчик idle_freeze66. Native-roundtrip-probe03 запущен на fresh profile45,
+headed DISPLAY=:1/sandbox, после binary SHA verification. Profile44 сохранён с
+cleanupALLPASS. На момент checkpoint RUNNING; ни прохождение graph admission,
+ни JS source/Execute/output/cleanup этого прогона ещё не подтверждены.
+Полный план и G5 остаются active/incomplete.
+
+
 ### Roundtrip probe02: наблюдён JS input FParam=3
 
 Source65/profile44 завершён exit1 FAILED до JS source/Execute. Actual RG1:
