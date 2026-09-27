@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch39: Preview виден, native ownership не подтверждён — 2026-09-27
+
+Прогон завершён CLEANUP_UNCONFIRMED. Первый code-table-execute повторно прошёл
+полностью. Root проверил1658journalSHA, три input6×5/90cells и output6×2/12cells.
+Оба Alt-drag сохранили прежние связи, новые автоматические связи отсутствуют.
+
+После единственного Preview: original wizard owner=true, preview_visible=true,
+preview_owned=false, pending=false, messages[]. Десятиминутное read-only ожидание
+не изменило этот результат. Текущая проверка DOM/Ext ownerCt недостаточна для
+наблюдаемого окна; правильная native связь ещё не установлена. Отсутствие
+распознанного sentinel не доказывает отсутствие выполнения JavaScript.
+Screenshot просмотрен, но содержимое окна скрыто маскированием evidence.
+
+Original cleanup отказал из-за неподтверждённого владельца Preview;
+package_closed/logged_out=false, browser_closed=true. Отдельный headed recovery39
+на profile12 без download/package mutation подтвердил packages0 и logout/browser
+PASS. Оригинальный результат не переписан. Browser lease закрыта.
+Прежней задаче назначен fix40: bounded native Preview diagnostics/строгая
+проверка принадлежности, changed-state наблюдения и регрессии; без повторения
+эффектов и без ослабления до data-tid-only. Следующий live — freshprofile13.
+Public handler, остальные G1–G7/J01–J27 и CLI-приёмка не завершены.
+
 ### Batch39 частично: Alt-drag двух узлов подтверждён — 2026-09-27
 
 Текущий процесс batch39 всё ещё RUNNING. Root проверил две palette delta:
