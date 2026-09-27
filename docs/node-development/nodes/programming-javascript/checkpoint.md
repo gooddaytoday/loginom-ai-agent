@@ -15,6 +15,22 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Fix73: Date/civil design проверен; реализация назначена
+
+Сохранён [канонический Date/civil дизайн](native-datetime-design.md) на базе
+source72. Root сверил существующие пути input/native/table precision и отсутствие
+civil OUTPUT в текущем roundtrip. Допуск требует полного civil INPUT с123/999ms,
+затем замороженных native tag7 bytes до создания JS; OUTPUT/upstream проверяют
+одновременно civil values и исходные bytes. Epoch/timezone не предполагаются.
+
+Прежней задаче назначается Fix73: fixed civil-datetime fixture, private input
+attestation, отдельные civil OUTPUT/upstream reads и строгий final outcome,
+отрицательные проверки и Freeze73. Root владеет commits/live. Сначала отдельный
+INPUT-only probe, затем при его PASS — roundtrip в другом fresh профиле.
+Browser CLOSED, последний profile53 сохранён, следующий ещё не назначен.
+Полный план не сужен и не завершён.
+
+
 ### Outside-safe int64: изменение точности подтверждено
 
 Source72/profile53 native-integer-outside-safe-roundtrip-probe-01 завершён

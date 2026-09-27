@@ -236,7 +236,9 @@ Integer coercion для fraction/string/NaN/±Infinity; exact integer oracle
 
 `Intl`, locale formatting/comparison, non-ISO Date.parse, расширенные regex/
 ES2016–2022 — дополнительная диагностика, пока их нет в v1-примерах.
-Для Date основным остаётся native/civil roundtrip. Не полагаться на сохранение
+Для Date основным остаётся native/civil roundtrip. Его ограниченный
+[дизайн и условия допуска](native-datetime-design.md) закрепляют отдельные
+civil/native INPUT до JS и проверки OUTPUT/upstream. Не полагаться на сохранение
 globals: несколько rerun не доказывают их сброс во всём пуле. Профиль хранит
 source hash каждого snippet, build/ОС, observed/not_checked, результат и свой hash;
 он не подтверждает свойства другого сервера или полную ECMAScript conformance.
