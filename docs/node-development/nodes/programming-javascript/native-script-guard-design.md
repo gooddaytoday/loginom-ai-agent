@@ -233,3 +233,24 @@ accessor descriptors без вызова getter, holey collection, неверн�
 renderer, gated failure integration с сохранением исходного error/cleanup.
 Root выделил profile64; browser CLOSED. Live только после source freeze и
 независимых тестов, DISPLAY=:1/headed/sandbox. Полный empty roundtrip/G5 не принят.
+
+
+## Коррекция по live empty03: FItems
+
+Диагностика source80 установила первый отказ `Items`: inherited accessor на
+глубине4. Сохранённый vendor ViewController.js, SHA
+`69a209465619fa56670ab767b040c91b00b5cec950c3b56a9151f4dfcd00dbb8`,
+определяет Items getter как `return this.FItems`, а own FItems создаёт в
+PrepareItemsController. Это подтверждённое основание заменить own Items в
+classifier на own FItems. Чтение произвольных getters либо универсальный обход
+унаследованных значений не вводится; прежние model/container/native ownership
+проверки остаются. Следующий live должен подтвердить текущий FItems path.
+
+Fixtures должны отражать vendor форму: унаследованный Items accessor и собственное
+FItems. Проверить отсутствие вызовов getter, отказ на missing/accessor/wrong
+FItems, renamed JS denial и обычный import. Diagnostic должен проверять новый
+путь, сохраняя различие classifier failure и собственных диагностических границ.
+Обязательны full client regression и JS/native/Python наборы, root freeze/pin
+проверка и следующий headed empty roundtrip на fresh profile65. Профиль выделен;
+браузер остаётся CLOSED до независимой проверки. Повтор по старому профилю64
+не выполняется. Прежний неуспешный empty03 сохранён без изменения результата.
