@@ -16,6 +16,16 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Integer coercion fraction-negative01 RUNNING
+
+Source82 unchanged/1259 pins повторно проверены; original exec session93764
+RUNNING, fresh profile67, DISPLAY=:1/headed/sandbox. Evidence
+native-integer-coercion-fraction-negative-probe-01. INPUT Real−1.75;
+scalar OUTPUT неизвестен. Исходный deadline600000ms, no replay.
+Matrix:1 characterized, negative unresolved/running,5 not_run.
+Проверять тот же original session93764 до terminal, затем cleanup и independent audit.
+
+
 ### Integer coercion fraction-positive01: independent characterization PASS
 
 Source87332cec9804c761465dad766f989fb458c4d997/profile66,
