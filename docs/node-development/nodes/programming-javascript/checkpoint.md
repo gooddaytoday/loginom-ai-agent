@@ -16,6 +16,28 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze54: changed-source execution; batch55 запущен — 2026-09-27
+
+Source commit `67628e1c82bc0ab58241acbd96e43db979f0634a`, семь private source/test
+файлов. Root сверил40/40 SHA финального Freeze54 и соответствие95 адресным PASS:
+mismatch15, execution-evidence72, batch8. Все shared client pins прежние;
+полный workspace-ui288 PASS остаётся применимым. Разработчик сообщил474 проверки
+(471 direct+3 targeted); root не выдаёт этот счётчик за свой повторный запуск.
+
+Новая фаза generated-mismatch разрешает ровно одно отдельное выполнение изменённого
+исходника после initial. SHA не создаёт права повторять ту же фазу. До запуска
+проверяются persisted code/mode и прежняя native process identity; после — fresh
+execution, неизменность graph/input, фактические native mapping и typed output.
+PASS требует сохранённого manual layout, точных source record/field bindings,
+IDs1..6 и JS_G2_TABLE_V1 без NULL. Иные исходы остаются наблюдениями без PASS.
+
+Batch55 запущен root: только code-table-mismatch, freshprofile28,
+headed DISPLAY=:1, sandbox enabled. Задача разработчика подтверждённо idle.
+Private g2-batch-55-source.json закрепляет commit,40SHA,профиль и test receipts.
+На момент записи RUNNING; terminal и original cleanup ещё не подтверждены.
+Публичный JS handler, G1–G7 и автономная CLI-приёмка остаются открытыми.
+
+
 ### Повторная проверка OpenViking и аудит changed-source пробы — 2026-09-27 06:16 UTC
 
 После запроса пользователя повторно выполнены MCP health, actor find и exact URI
