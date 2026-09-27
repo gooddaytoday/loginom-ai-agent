@@ -16,6 +16,31 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze71 проверен root; headed boolean probe01 запущен
+
+Source node-javascript `0115eccd20` закрепляет18 runtime/test/CSV файлов.
+Фиксированные real/boolean/string family проходят private import/provenance,
+UI/native INPUT, JS source/mapping/execution, OUTPUT и upstream guards.
+Новый binding нельзя перечитать с другим operation ID после первого native
+запроса. Public deny/RPC bounds сохранены. Exact destination отклоняет лишние
+сегменты и trailing newline; real source SHA unchanged.
+
+Root повторил **886main/3deny/4Python PASS**, syntax15mjs PASS и81pins before/after.
+Private operator71-root-test-source.json фиксирует проверенный набор.
+Разработчик idle/completed turn01a0e2e1-17fd-70b0-be76-8a3be1a4e645,
+Freeze71/handoff переданы. Старый ошибочный bootstrap final не считался передачей.
+Документы worktree не копировались поверх root checkpoint.
+
+Отдельный native-boolean-roundtrip-probe-01 запущен на profile50,
+DISPLAY=:1, sandbox enabled, pinned Node/Chromium, fresh evidence.
+Unified exec session **66890**, пока running; lease RUNNING. Source receipt
+native-boolean-roundtrip-probe-01-source.json сохранён. До terminal и проверки
+cleanup нельзя запускать другой browser/profile или повторять unknown effects.
+Boolean INPUT/OUTPUT/upstream live результат ещё не подтверждён; ожидается
+независимый audit9cells, journal refs/sourcepins/lifecycle/source/execution.
+String требует отдельного свежего профиля после закрытия этой попытки.
+
+
 ### После перезапуска: registered memory PASS, Fix71 выполняется
 
 Root отдельно проверил кандидаты CSV стандартным Python csv.reader:
