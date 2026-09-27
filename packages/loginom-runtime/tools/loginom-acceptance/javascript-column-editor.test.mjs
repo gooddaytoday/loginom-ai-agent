@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {observeJavascriptColumnEditor,openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,cleanupJavascriptColumnEditor,waitJavascriptColumnEditor,fillJavascriptColumnField,javascriptColumnFieldMatches,recordJavascriptColumnHelperSource,openJavascriptColumnTypePicker} from './javascript-column-editor.mjs';
+import {observeJavascriptColumnEditor,openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,cleanupJavascriptColumnEditor,waitJavascriptColumnEditor,fillJavascriptColumnField,javascriptColumnFieldMatches,recordJavascriptColumnHelperSource,openJavascriptColumnTypePicker,selectJavascriptColumnTypeOption,closeJavascriptColumnTypePicker} from './javascript-column-editor.mjs';
 
 function fixture({count=0,globalForm=true}={}) {
   const prefix='MF;TF-1',pageTid=prefix+';WizrdMCF;JavaScriptColumnsWizard',nodes=[],controls={};
@@ -39,8 +39,9 @@ function fixture({count=0,globalForm=true}={}) {
     const match=selector.match(/^\[data-tid=(.*)\]$/);return match?nodes.filter(e=>e.tid===JSON.parse(match[1])):[];
   }},getComputedStyle:e=>e.style,Ext:{getCmp:id=>controls[id]},
     bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:connection},Items:{Workspace:{getActiveTab:()=>tab}}}}}}}});
-  const invoke=(fn,arg)=>vm.runInContext('('+fn.toString()+')',realm)({...arg,held:arg?.held?.value??arg?.held});
-  const page={evaluate:async(fn,arg)=>invoke(fn,arg),evaluateHandle:async(fn,arg)=>({value:invoke(fn,arg),evaluate:async function(fn){return fn(this.value);},dispose:async()=>{disposed++;}}),
+  const invoke=(fn,arg)=>vm.runInContext('('+fn.toString()+')',realm)({...arg,held:arg?.held?.value??arg?.held,option:arg?.option?.value??arg?.option});
+  const elementHandle=node=>({value:node,asElement(){return node?this:null;},async click(options){await node.onClick(options);},async dispose(){}});
+  const page={evaluate:async(fn,arg)=>invoke(fn,arg),evaluateHandle:async(fn,arg)=>({value:invoke(fn,arg),evaluate:async function(fn){return fn(this.value);},evaluateHandle:async function(fn){return elementHandle(fn(this.value));},dispose:async()=>{disposed++;}}),
     waitForTimeout:async()=>{waits++;await onWait(waits);},locator:selector=>({filter(){return this;},async click(){
       assert.equal(selector,'[data-tid='+JSON.stringify(base+';btnCancel')+']');effects.push('cancel');hide();records.splice(records.indexOf(added),1);
     }})};
@@ -330,4 +331,88 @@ test('type opening tolerates a lazy or not-yet-rendered owned picker without cal
       }});
     assert.equal(clicks,1);assert.equal(f.events.at(-1).snapshot.picker.picker_owned,true);
   }
+});
+
+
+test('selection clicks only the proven item handle, with whitespace and no global text locator',async()=>{
+  const f=fixture();await f.open();const t=typeFixture(f);t.option.textContent=' \nЦелый \n';f.setHit(()=>t.option);
+  await f.page.evaluate(observeJavascriptColumnEditor,{held:f.state.pending.held,phase:'editing',readPicker:true,expectedType:4,expectedLabel:'Целый'});
+  f.page.locator=()=>{throw Error('global locator forbidden');};let clicks=0;
+  t.option.onClick=async({timeout})=>{clicks++;assert.ok(timeout<=5000);};
+  await selectJavascriptColumnTypeOption({page:f.page,state:f.state,record:f.record,once:f.once,deadline:Date.now()+1000,
+    id:'type-select',expectedType:4,expectedLabel:'Целый'});
+  assert.equal(clicks,1);assert.equal(f.effects.filter(e=>e==='type-select').length,1);
+});
+
+test('selection refuses replaced native record before gesture and never repeats a lost handle click',async()=>{
+  for(const lost of [false,true]){
+    const f=fixture();await f.open();const t=typeFixture(f);f.setHit(()=>t.option);let clicks=0;
+    await f.page.evaluate(observeJavascriptColumnEditor,{held:f.state.pending.held,phase:'editing',readPicker:true,expectedType:4,expectedLabel:'Целый'});
+    t.option.onClick=async()=>{clicks++;throw Error('lost option click');};
+    const once=async(id,identity,perform)=>{if(!lost)t.records[0]={...t.records[0]};await f.once(id,identity,perform);};
+    const select=()=>selectJavascriptColumnTypeOption({page:f.page,state:f.state,record:f.record,once,deadline:Date.now()+1000,
+      id:'type-select',expectedType:4,expectedLabel:'Целый'});
+    await assert.rejects(select());await assert.rejects(select(),/do not replay/);assert.equal(clicks,lost?1:0);
+  }
+});
+
+function enableTypeCleanup(f,t,{lostOpening=false}={}) {
+  Object.assign(f.state.pending,{typeOpening:true,typeOpeningDispatched:true,typeOpeningResponseObserved:!lostOpening,typeOpeningObserved:!lostOpening});
+  f.setHit(()=>t.triggerDom);
+}
+
+test('cleanup closes only owned expanded picker once, waits collapse, then freshly dispatches Cancel',async()=>{
+  const f=fixture();await f.open();const t=typeFixture(f);enableTypeCleanup(f,t);
+  const locate=f.page.locator;let closes=0;
+  f.page.locator=selector=>selector.includes(';trg_picker')?{filter(){return this;},async click(){closes++;f.setWait(()=>{
+    t.combo.isExpanded=false;t.pickerDom.shown=false;t.option.shown=false;f.setHit(()=>f.form.FItems.btnCancel.el.dom);
+  });}}:locate(selector);
+  await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
+  assert.equal(closes,1);assert.equal(f.effects.filter(e=>e==='cancel').length,1);assert.equal(f.state.pending,null);
+  const collapsed=f.events.findIndex(e=>e.phase==='column_type_close_observed'&&e.stage==='collapsed'&&e.snapshot.status==='ready');
+  assert.ok(collapsed>=0&&collapsed<f.events.findIndex(e=>e.phase==='column_editor_cancel_dispatch'));
+});
+
+test('unknown or foreign picker and lost collapse never permit Cancel or another close gesture',async()=>{
+  for(const fault of ['foreign','lost','journal','lost-opening']){
+    const f=fixture();await f.open();const t=typeFixture(f,{expanded:fault!=='lost-opening'});enableTypeCleanup(f,t,{lostOpening:fault==='lost-opening'});
+    if(fault==='foreign')t.picker.pickerField={};let clicks=0;
+    f.page.locator=()=>({filter(){return this;},async click(){clicks++;throw Error('lost collapse');}});
+    const record=async e=>{await f.record(e);if(fault==='journal'&&e.phase==='column_type_close_dispatch')throw Error('journal');};
+    const cleanup=()=>cleanupJavascriptColumnEditor({page:f.page,state:f.state,record,deadline:Date.now()+15});
+    await assert.rejects(cleanup());await assert.rejects(cleanup());
+    assert.equal(clicks,fault==='lost'?1:0);assert.equal(f.state.pending.cancelDispatched,false);
+    assert.equal(f.events.some(e=>e.phase==='column_editor_cancel_dispatch'),false);
+  }
+});
+
+test('lost opening may close only after proving its late owned expanded picker; Apply never closes it',async()=>{
+  const f=fixture();await f.open();const t=typeFixture(f);enableTypeCleanup(f,t,{lostOpening:true});let closes=0;
+  f.page.locator=()=>({filter(){return this;},async click(){closes++;t.combo.isExpanded=false;t.pickerDom.shown=false;t.option.shown=false;}});
+  await closeJavascriptColumnTypePicker({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
+  assert.equal(closes,1);
+  const a=fixture();await a.open();const at=typeFixture(a);enableTypeCleanup(a,at);a.state.pending.applyDispatched=true;
+  a.page.locator=()=>{throw Error('UI effect forbidden');};
+  await assert.rejects(cleanupJavascriptColumnEditor({page:a.page,state:a.state,record:a.record,deadline:Date.now()+15}));
+  assert.equal(a.events.some(e=>e.phase==='column_type_close_dispatch'||e.phase==='column_editor_cancel_dispatch'),false);
+});
+
+
+test('proven option rejects replaced picker store even with the same records and text',async()=>{
+  const f=fixture();await f.open();const t=typeFixture(f);f.setHit(()=>t.option);let clicks=0;
+  await f.page.evaluate(observeJavascriptColumnEditor,{held:f.state.pending.held,phase:'editing',readPicker:true,expectedType:4,expectedLabel:'Целый'});
+  const replacement={...t.store};t.combo.store=t.picker.store=t.picker.dataSource=replacement;
+  t.option.onClick=async()=>{clicks++;};
+  await assert.rejects(selectJavascriptColumnTypeOption({page:f.page,state:f.state,record:f.record,once:f.once,deadline:Date.now()+1000,
+    id:'type-select',expectedType:4,expectedLabel:'Целый'}));
+  assert.equal(clicks,0);assert.equal(f.events.at(-1).snapshot.reason,'type_picker_owner_changed');
+});
+
+
+test('acknowledged opening with an already collapsed picker needs no close gesture before Cancel',async()=>{
+  const f=fixture();await f.open();const t=typeFixture(f,{expanded:false});enableTypeCleanup(f,t);
+  f.setHit(()=>f.form.FItems.btnCancel.el.dom);
+  await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
+  assert.equal(f.effects.filter(e=>e==='cancel').length,1);
+  assert.equal(f.events.some(e=>e.phase==='column_type_close_dispatch'),false);
 });

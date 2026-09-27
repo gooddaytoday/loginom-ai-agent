@@ -130,7 +130,7 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
   // Retain only proven native identities in the operator-owned holder.
   if(!held.editor)held.editor={record,element,control,form,controls,inputs,base:editorBase};
   let pickerSnapshot;
-  if(readPicker||target==='cbxDataType'&&(kind==='trigger'||kind==='option')){
+  if(readPicker||target==='cbxDataType'&&(kind==='trigger'||kind==='trigger-close'||kind==='option')){
     const combo=controls.cbxDataType,triggers=dense(value(combo,'orderedTriggers'),8);
     const matches=(triggers??[]).filter(trigger=>value(trigger,'id')==='picker');
     const trigger=matches.length===1?matches[0]:null,triggerDom=dom(trigger),wrap=value(value(combo,'triggerWrap'),'dom');
@@ -164,12 +164,17 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
     const valueConfig=configField('valueField'),displayConfig=configField('displayField'),valueField=valueConfig.value,displayField=displayConfig.value;
     const pickerChecks={present:!!picker,dom:!!pickerDom,backref:value(picker,'pickerField')===combo,
       ext:!!pickerDom&&globalThis.Ext?.getCmp?.(pickerDom.id)===picker,store:!!pickerStore&&pickerStore===comboStore,
-      data_source:!!pickerStore&&value(picker,'dataSource')===pickerStore};
+      data_source:!!pickerStore&&value(picker,'dataSource')===pickerStore,
+      original_picker:!held.editor.typePicker||held.editor.typePicker===picker,original_store:!held.editor.typeStore||held.editor.typeStore===pickerStore,
+      original_dom:!held.editor.typePickerDom||held.editor.typePickerDom===pickerDom};
     checks.picker_owner=Object.values(pickerChecks).every(Boolean);
     const shown=visible(pickerDom);
-    if(picker&&(!pickerChecks.backref||!pickerChecks.store||!pickerChecks.data_source||pickerDom&&!pickerChecks.ext||held.editor.typePicker&&held.editor.typePicker!==picker))
+    if(picker&&(!pickerChecks.backref||!pickerChecks.store||!pickerChecks.data_source||pickerDom&&!pickerChecks.ext
+      ||held.editor.typePicker&&held.editor.typePicker!==picker||held.editor.typeStore&&held.editor.typeStore!==pickerStore
+      ||held.editor.typePickerDom&&held.editor.typePickerDom!==pickerDom))
       return result('refused','type_picker_owner_changed',{...counts,trigger:triggerDiagnostic,picker_checks:pickerChecks,value_config:valueConfig,display_config:displayConfig});
-    if(picker&&!held.editor.typePicker)held.editor.typePicker=picker;
+    if(picker&&!held.editor.typePicker){held.editor.typePicker=picker;held.editor.typeStore=pickerStore;}
+    if(pickerDom&&!held.editor.typePickerDom)held.editor.typePickerDom=pickerDom;
     const options=checks.picker_owner?[...pickerDom.querySelectorAll('.x-boundlist-item')]:[];
     const typed=options.length<=64&&pickerRecords&&typeof valueField==='string'&&typeof displayField==='string'?options.filter(item=>{
       const recs=pickerRecords.filter(rec=>String(value(rec,'internalId'))===item.getAttribute('data-recordId'));
@@ -177,7 +182,8 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
       return item.getAttribute('data-boundView')===pickerDom.id&&cache&&recs[0].isModel===true&&value(cache,valueField)===expectedType
         &&value(cache,displayField)===expectedLabel&&item.textContent?.trim()===expectedLabel&&visible(item);
     }):[];
-    pickerSnapshot={expanded,picker_visible:shown,picker_owned:checks.picker_owner,trigger_tid:triggerTid,trigger:triggerDiagnostic,
+    const pickerLoading=pickerStore?.isLoading?.()===true;
+    pickerSnapshot={expanded,picker_loading:pickerLoading,picker_visible:shown,picker_owned:checks.picker_owner,trigger_tid:triggerTid,trigger:triggerDiagnostic,
       checks:pickerChecks,value_config:valueConfig,display_config:displayConfig,
       record_count:pickerRecords?.length??null,option_count:options.length,typed_option_count:typed.length,
       expected_type:expectedType??null,expected_label:expectedLabel??null};
@@ -188,18 +194,21 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
         return result('refused','type_option_changed',{...counts,picker:pickerSnapshot});
       if(!previous)held.editor.typeOption={item,record:nativeRecord,cache:value(nativeRecord,'data')};
     }
+    if(kind==='trigger-close'&&(!expanded||!shown||!checks.picker_owner))return result('refused','type_picker_not_open',{...counts,picker:pickerSnapshot});
     if(kind==='trigger'&&(expanded||shown))return result('refused','type_picker_already_open',{...counts,picker:pickerSnapshot});
     if(kind==='option'&&(!expanded||!shown||typed.length!==1||typed[0]!==option))
       return result('refused','type_option_unconfirmed',{...counts,picker:pickerSnapshot});
-    if(readPicker&&(!expanded||!shown||typed.length!==1||pickerStore?.isLoading?.()===true))return result('pending','type_picker_opening',{...counts,picker:pickerSnapshot});
+    if(readPicker==='state'&&(expanded!==shown||expanded&&!checks.picker_owner||pickerLoading))return result('pending','type_picker_transition',{...counts,picker:pickerSnapshot});
+    if(readPicker==='collapsed'&&(expanded||shown||pickerLoading))return result('pending','type_picker_collapsing',{...counts,picker:pickerSnapshot});
+    if(readPicker===true&&(!expanded||!shown||typed.length!==1||pickerLoading))return result('pending','type_picker_opening',{...counts,picker:pickerSnapshot});
   }
   if(target){
-    const field=controls[target],input=kind==='fill'?inputs[target]:kind==='trigger'?held.editor.typeTrigger?.dom:kind==='option'?option:dom(field);
+    const field=controls[target],input=kind==='fill'?inputs[target]:(kind==='trigger'||kind==='trigger-close')?held.editor.typeTrigger?.dom:kind==='option'?option:dom(field);
     const picker=kind==='option'?dom(value(field,'picker')):null;
     checks.option_owner=kind!=='option'||!!option&&!!picker&&option.closest('.x-boundlist')===picker&&picker.contains(option)&&option.classList.contains('x-boundlist-item');
     const rect=input?.getBoundingClientRect(),x=rect?rect.x+rect.width/2:-1,y=rect?rect.y+rect.height/2:-1;
     const hit=rect?document.elementFromPoint(x,y):null;
-    checks.target_enabled=!!field&&field.disabled!==true&&!!input&&input.disabled!==true&&(kind!=='trigger'||field.readOnly!==true)
+    checks.target_enabled=!!field&&field.disabled!==true&&!!input&&input.disabled!==true&&(!['trigger','trigger-close'].includes(kind)||field.readOnly!==true)
       &&(kind!=='fill'||input.readOnly!==true&&['INPUT','TEXTAREA'].includes(input.tagName));
     checks.target_visible=!!input&&visible(input)&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight;
     checks.target_hit=!!hit&&!!input&&(hit===input||input.contains(hit));
@@ -284,6 +293,8 @@ export async function cleanupJavascriptColumnEditor({page,state,record,deadline}
     if(pending.applyDispatched||pending.cancelDispatched){
       await settleJavascriptColumnEditor({page,state,record,deadline,phase:pending.applyDispatched?'applied':'cancelled'});return;
     }
+    await waitJavascriptColumnEditor({page,pending,phase:'editing',deadline,record});
+    await closeJavascriptColumnTypePicker({page,state,record,deadline});
     const snapshot=await waitJavascriptColumnEditor({page,pending,phase:'editing',deadline,record});
     pending.cancelDispatched=true;
     await record({phase:'column_editor_cancel_dispatch',snapshot});
@@ -348,17 +359,71 @@ export async function openJavascriptColumnTypePicker({page,state,record,once,dea
   pending.typeOpening=true;
   await once(id,{trigger_tid:before.picker.trigger_tid,expected_type:expectedType},async()=>{
     await verifyJavascriptColumnEditor({page,state,record,deadline:limit,target:'cbxDataType',kind:'trigger',expectedType,expectedLabel});
+    pending.typeOpeningDispatched=true;
     await click(before.picker.trigger_tid,Math.max(1,limit-Date.now()));
+    pending.typeOpeningResponseObserved=true;
   });
   let fingerprint,count=0,last;
   while(Date.now()<limit){
     last=await page.evaluate(observeJavascriptColumnEditor,{held:pending.held,phase:'editing',readPicker:true,expectedType,expectedLabel});
     const key=JSON.stringify(last);
     if(key!==fingerprint&&count<8){fingerprint=key;count++;await record({phase:'column_type_opening',observation:count,snapshot:last});}
-    if(last.status==='ready')return last;
+    if(last.status==='ready'){pending.typeOpeningObserved=true;return last;}
     if(last.status==='refused')break;
     await page.waitForTimeout(Math.min(100,Math.max(1,limit-Date.now())));
   }
   await record({phase:'column_type_opening_refused',snapshot:last??null,deadline_expired:Date.now()>=limit});
   throw Error('Column type picker opening unconfirmed');
+}
+
+
+export async function selectJavascriptColumnTypeOption({page,state,record,once,deadline,id,expectedType,expectedLabel}) {
+  const pending=state.pending;
+  if(pending.typeSelectAttempted)throw Error('Column type selection already attempted; do not replay');
+  const handle=await pending.held.evaluateHandle(h=>h.editor?.typeOption?.item??null);
+  try {
+    const option=handle.asElement();
+    if(!option){await record({phase:'column_type_option_refused',reason:'held_item_unavailable'});throw Error('Proven column type option unavailable');}
+    const snapshot=await verifyJavascriptColumnEditor({page,state,record,deadline,target:'cbxDataType',kind:'option',option,expectedType,expectedLabel});
+    await record({phase:'column_type_option_bound',snapshot});
+    pending.typeSelectAttempted=true;
+    await once(id,{expected_type:expectedType,expected_label:expectedLabel},async()=>{
+      await verifyJavascriptColumnEditor({page,state,record,deadline,target:'cbxDataType',kind:'option',option,expectedType,expectedLabel});
+      await option.click({timeout:Math.max(1,Math.min(5000,deadline-Date.now()))});
+    });
+  } finally {await handle.dispose();}
+}
+
+export async function closeJavascriptColumnTypePicker({page,state,record,deadline}) {
+  const pending=state.pending;
+  if(!pending.typeOpeningDispatched)return;
+  if(pending.applyDispatched)throw Error('Apply dispatched; picker cleanup is not authorized');
+  if(pending.pickerClosePromise)return pending.pickerClosePromise;
+  pending.pickerClosePromise=(async()=>{
+    const limit=Math.min(deadline,Date.now()+5000);
+    const wait=async phase=>{
+      let fingerprint,count=0,last;
+      while(Date.now()<limit){
+        last=await page.evaluate(observeJavascriptColumnEditor,{held:pending.held,phase:'editing',readPicker:phase});
+        if(phase==='state'&&last.status==='ready'&&!last.picker.expanded&&!pending.typeOpeningResponseObserved&&!pending.typeOpeningObserved)
+          last={...last,status:'pending',reason:'lost_type_opening_unconfirmed'};
+        const key=JSON.stringify(last);
+        if(key!==fingerprint&&count<8){fingerprint=key;count++;await record({phase:'column_type_close_observed',stage:phase,observation:count,snapshot:last});}
+        if(last.status==='ready')return last;
+        if(last.status==='refused')break;
+        await page.waitForTimeout(Math.min(100,Math.max(1,limit-Date.now())));
+      }
+      await record({phase:'column_type_close_refused',stage:phase,snapshot:last??null,deadline_expired:Date.now()>=limit});
+      throw Error('Owned column picker close unconfirmed');
+    };
+    const before=await wait('state');
+    if(!before.picker.expanded&&!before.picker.picker_visible)return;
+    const ready=await verifyJavascriptColumnEditor({page,state,record,deadline:limit,target:'cbxDataType',kind:'trigger-close'});
+    pending.pickerCloseDispatched=true;
+    await record({phase:'column_type_close_dispatch',snapshot:ready});
+    await verifyJavascriptColumnEditor({page,state,record,deadline:limit,target:'cbxDataType',kind:'trigger-close'});
+    await page.locator('[data-tid='+JSON.stringify(ready.picker.trigger_tid)+']').filter({visible:true}).click({timeout:Math.max(1,limit-Date.now())});
+    await wait('collapsed');
+  })();
+  return pending.pickerClosePromise;
 }
