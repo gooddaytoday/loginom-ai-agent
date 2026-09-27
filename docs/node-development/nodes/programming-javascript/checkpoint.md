@@ -18,6 +18,18 @@
 
 ### Batch42: native Add подтверждён, field/readback и Cancel открыты — 2026-09-27
 
+
+Подготовка fix43: root получил точные статические client sources стенда;
+private manifest `preview-source-40/fix43-source-manifest.json`. Ext debug SHA
+`5b8f534947c4396d72aa6f264721ab8e5bf190b3284969baf8aad9785798e2c5`:
+getTotalCount возвращает сохранённый totalCount, remove меняет локальные records,
+успешный destroy очищает removed. Проверка Cancel должна различать эти состояния.
+Root-review промежуточного fix43 также выявил недопустимое самоподтверждение
+readback: Ext getRawValue пишет rawValue, getValue пишет value и через
+Text.processRawValue может вызвать setRawValue. Эти методы не являются пассивным
+наблюдением; разработчику передано требование читать DOM/own cached descriptors
+без их вызова и проверить отсутствие таких вызовов тестом. Live43 ещё not_run.
+
 Один Add дошёл до ready: новая запись исходного store, standalone
 EditColumnDefForm, form↔record, vendor/page/controls/connection/owner — true.
 Техническое edtName=ObservedID записалось/прочиталось успешно; затем
