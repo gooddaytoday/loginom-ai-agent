@@ -16,6 +16,33 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source82 принят; первый headed Integer coercion RUNNING
+
+Developer revision51 idle передал freeze82:16 changed+14 new files,1259 pins.
+Root независимо проверил все hashes до/после suites, relative import closure
+(130 files с Python entrypoint),22 MJS syntax и git diff --check.
+Root full client original session95365 exit0: **2480 PASS,10 SKIP,0 FAIL**,
+178583ms; skips сохраняют прежние Windows/opt-in browser ограничения.
+Root main original session51890 exit0: **1859 PASS,0 FAIL,0 SKIP**;
+public deny3/Python13 PASS. Developer client202 file-PASS/9 file-FAIL сохранён
+как отдельный ограниченный результат, не заменён выдуманной общей причиной.
+Private logs operator82-root-* и receipt operator82-root-test-source.json.
+
+Точные30 runtime/CSV files закоммичены в node-javascript:
+87332cec9804c761465dad766f989fb458c4d997.
+Исторические dirty child docs не включены; root runtime не интегрирован/не pushed.
+Freeze manifest SHA505f5305ec6b0cc57bd29c7bb84ee1fb5cc4edf5607fbe2ce0d0c21250605666;
+JSON SHAe97b5ddfb911e3246c702a172dca377283f4fb244274a9726dc53ee1b9998fe8.
+
+Root запустил только integer-coercion-fraction-positive с исходным Real1.75,
+profile66, DISPLAY=:1/headed/sandbox, pinned Node/Chromium. Original exec session97032
+**RUNNING**, evidence native-integer-coercion-fraction-positive-probe-01.
+Предварительно проверены fresh profile/evidence, X11, отсутствие pinned Chromium,
+все1259 pins и свободный собственный browser lease. Исходный deadline600000ms;
+не перезапускать при timeout observation. Остальные6 cases not_run. Результат
+движка ещё не принят; нужен terminal/cleanup и независимый полный evidence audit.
+
+
 ### Source82: full-success live audit draft и ожидание regression
 
 Root подготовил private audit-coercion-success-live.py, SHA 1a4fe79891bee2cea0d8f7a7e36851d1bda1814766d257f90e2cc5fd49af06da.
