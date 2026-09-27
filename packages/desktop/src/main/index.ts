@@ -1,3 +1,4 @@
+import { managedDesktopControl } from "./loginom/managed-control"
 import { desktopLoginom } from "./loginom/desktop-service"
 import { registerLoginomIpc } from "./loginom/ipc"
 import { randomUUID } from "node:crypto"
@@ -170,6 +171,7 @@ const main = Effect.gen(function* () {
   let stopping: Promise<void> | undefined
   let systemProxy: SystemProxyDetection | undefined
   const stopSidecars = () => {
+    managedDesktopControl?.stop()
     systemProxy?.stop()
     stopping ??= (async () => {
       try {
@@ -178,7 +180,11 @@ const main = Effect.gen(function* () {
         await killSidecar()
       } finally {
         wslServers.stopAll()
-        await (await loginomStarting)?.close()
+        try {
+          await (await loginomStarting)?.close()
+        } finally {
+          managedDesktopControl?.close()
+        }
       }
     })()
     return stopping
@@ -211,12 +217,15 @@ const main = Effect.gen(function* () {
   if (!app.isPackaged) app.commandLine.appendSwitch("remote-debugging-port", "9222")
 
   if (!app.requestSingleInstanceLock()) {
+    managedDesktopControl?.close()
     app.quit()
     return
   }
   startSession()
   // Явный прокси из login shell должен быть известен до запуска читателей ОС.
   const shellEnv = preferAppEnv(app.getPath("userData"))
+  // A login shell must not reintroduce the launcher capability into descendants.
+  delete process.env.LOGINOM_AI_AGENT_DESKTOP_CONTROL_FD
   systemProxy = startSystemProxyDetection({
     environment: process.env,
     enabled: systemProxyEnabled(),
@@ -312,7 +321,15 @@ const main = Effect.gen(function* () {
     relaunch,
   }
   if (stopping) return
-  loginomStarting = desktopLoginom()
+  const managedLogin = managedDesktopControl
+  const loginBarrier = managedLogin
+    ? yield* Effect.promise(() => managedLogin.bind(join(app.getPath("userData"), "loginom"), () => {
+        setAppQuitting()
+        void stopSidecars().then(() => app.quit(), () => app.exit(1))
+      }))
+    : undefined
+  if (stopping) return
+  loginomStarting = desktopLoginom(loginBarrier)
   const loginom = yield* Effect.promise(() => loginomStarting!)
   if (stopping) return
   registerLoginomIpc(loginom.api, loginom.sessionApi)
@@ -521,6 +538,7 @@ void Effect.runPromise(
 )
 
 function exitFailedStartup(cause: Cause.Cause<unknown>) {
+  managedDesktopControl?.abort()
   const message = Cause.pretty(cause)
   try {
     writeLog("main", "main process failed", { cause: message }, "error")

@@ -1,15 +1,17 @@
 import { app, safeStorage } from "electron"
 import { join, resolve } from "node:path"
 import { createLoginomHost } from "@loginom-ai-agent/loginom-host/host"
+import type { LoginBarrier } from "@loginom-ai-agent/loginom-host/supervisor"
 import { credentials } from "./credentials"
 
-export function desktopLoginom() {
+export function desktopLoginom(loginBarrier?: LoginBarrier) {
   return createLoginomHost({
     root: join(app.getPath("userData"), "loginom"),
     resources: app.isPackaged
       ? join(process.resourcesPath, "loginom")
       : resolve(import.meta.dirname, "../../resources/loginom"),
     codec: credentials(process.platform, safeStorage),
+    loginBarrier,
     environment: process.env,
     strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
     headless:

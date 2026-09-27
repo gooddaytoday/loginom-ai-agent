@@ -1,5 +1,17 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-09-28 — Desktop managed login: проверка исходников
+
+В изолированной ветке `desktop-managed-login` от `ef8636c88844a1f5b67910a347f5fd4c256fdac5`
+подготовлен доверенный inherited-FD канал Desktop → controller для существующего
+Host login barrier v2. Обычный запуск без selector сохранён, renderer grants
+не добавлялись; ACK/EOF/timeout остаются fail-closed, остановка ожидает Host.
+75 пакетных тестов (189 assertions) и Desktop typecheck прошли. Реальный Node/Host
+runtime не наследует control socket; Electron sidecar пока проверен только по
+исходникам. [Контракт и границы](../testing/loginom-ai-agent/desktop-managed-login.md).
+Сборка, установленный Desktop, Loginom/модели и cold-readback не запускались.
+Это не технический PASS и не изменение существующих EF артефактов.
+
 ## 2026-09-25 — scale-fix Desktop 0.1.16 установлен локально
 
 Из `scale-fix` commit `9b68f346d6784cd0a7ad65ee211a568810c78e91`
