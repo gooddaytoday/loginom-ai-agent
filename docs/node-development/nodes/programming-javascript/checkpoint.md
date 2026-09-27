@@ -16,6 +16,25 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### A-get-exact PASS; A-getcolumn-index RUNNING
+
+A-get-exact/profile74 original15883 terminal exit0/CHARACTERIZED,cleanup3/3.
+Root audit12cells,616refs,1265pins PASS; всеInteger/NULL значения точны,
+original upstream unchanged. Report SHA
+637fb623e9f2fc27eaf7a1489fee450f39eeeddac4d661361fd5658d89a9a6df.
+После cleanup/no pinned Chromium/source pins выделен profile75.
+**A-getcolumn-index original exec session42738 RUNNING**, evidence
+native-named-getcolumn-index-probe-01, DISPLAY=:1/headed/sandbox,original600000ms.
+Не replay: ждать эту session до terminal, затем full audit. Matrix A2accepted/
+1running/5not_run; B/C/D not_run. Full goal active.
+
+Developer получил только новый design-only native-error-attribution-design.md
+для будущих B/G6/J25; изучить текущие code/старые error reports/Help, без изменения
+source83/старых docs/tests/fixtures/manifests и без браузера. wait_threads подтвердил
+revision58 active,turn01a0e47e-dc05-7f13-b838-f01bd2eedfb0. Это отдельная подготовка
+минимального attribution, не разрешение runtime/новой матрицы. Root browser owner.
+
+
 ### A-get-index PASS; A-get-exact RUNNING
 
 A-get-index/profile73 original28189 terminal exit0/CHARACTERIZED,cleanup3/3.

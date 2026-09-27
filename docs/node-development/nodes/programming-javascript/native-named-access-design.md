@@ -636,4 +636,12 @@ c67e5a8abb884352ef16076178e23e9b3a7d44f95be1428c302cf47ada4d58ba;
 integer-safe input contract не выдаёт coercion/cardinality native_baseline_sha256.
 Root сравнил полный before proof с предшествующей JS записью журнала, отдельно
 вычислил digest; не заявляет сравнение с отсутствующим runtime полем.
-Один случай из8 A принят, весь G5/J24/handler/CLI остаётся открытым.
+Два случая из8 A приняты, весь G5/J24/handler/CLI остаётся открытым.
+
+
+A-get-exact/profile74, original session15883 terminal exit0/CHARACTERIZED,
+cleanup3/3. Independent audit12cells,616refs,1265pins; exact INPUT/OUTPUT/upstream
+[NULL,−9007199254740991,0,9007199254740991]. Report SHA
+637fb623e9f2fc27eaf7a1489fee450f39eeeddac4d661361fd5658d89a9a6df;
+root-computed baseline180350575ad57a31c8ee1a17a1a29586afd420994565b6503fd7f6c225117173.
+Подтверждён точный вызов Get(row,"Value"); регистр/отсутствующее имя не проверены.
