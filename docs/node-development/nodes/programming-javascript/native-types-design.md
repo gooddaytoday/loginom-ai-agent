@@ -1,20 +1,20 @@
 # G5 native types: следующий ограниченный шаг
 
-Статус на 2026-09-27: **private input-only runtime реализован; четыре native
-значения независимо проверены, полный live admission ещё не принят**. Source62:
-`c535b67b890eb4eb237de1e672120c5691075e31`, 350 адресных тестов PASS; shared UI
-source57 ранее прошёл 292/292. Probe08 прочитал NULL/+0/−1.25/10.125; Python
-scalar oracle подтвердил tags и bytes всех четырёх ячеек. Однако proof не прошёл
-exact durable acknowledgement: production redactor заменил поле с хешами
-subscription proxy из-за слова cookie в имени. Оператор завершился FAILED с
-полной очисткой. 450 journal refs и 66 source pins проверены; квитанция, SHA и
-исправление Freeze63 описаны в [checkpoint](checkpoint.md). Scalar PASS не
-заменяет успешный journal ACK или полную G5-приёмку.
+Статус на 2026-09-27: **private real/NULL input-only admission подтверждён;
+JS identity roundtrip ещё не реализован**. Source63:
+`ab76a768b2d5c3190b79f11dbebec2ff7c0b246d`, root352/352теста PASS.
+Headed probe09/profile42 завершён exit0 OBSERVED/native-input-observed, durable
+journal ACK и original cleanup ALL PASS. Root Python scalar oracle независимо
+подтвердил четыре native значения NULL/+0/−1.25/10.125, tags1/5 и binary64 bytes;
+438journal refs/66pins проверены. SHA и private receipt — в [checkpoint](checkpoint.md).
+Probe08 сохраняет FAILED из-за прежнего redaction имени поля; source63 исправляет
+имя без ослабления redactor/ACK. Проверка ограничена owned static import-only
+fixture и observed_local; она не закрывает JS OUTPUT, ABA или весь G5.
 
 Реализован отдельный `javascript-native-input-live.mjs` и import-only binding;
 JS-output binding, identity roundtrip и остальные семейства ниже ещё предстоят.
 Далее сохранён дизайн и анализ **исходного source55**, поэтому указания
-«текущий» внутри анализа относятся к этой базе, а не к source62.
+«текущий» внутри анализа относятся к этой базе, а не к source63.
 Основание source55: `520ce1f78ce39859d3ce30a65db93e80c9081747`.
 Текущие42 pins сохраняются для root engine probes. Их UI/string PASS не закрывает G5.
 
@@ -70,8 +70,8 @@ remote source owner/object/interface, schema/count/cache identities и loading.
 класс/own shape, session identity, объекты proxy/remote identity и скалярные поля
 между запросами; не сериализовать рекурсивно `$S`. Это проверка стабильности
 подписок/владельца, не deep immutability данных. Отдельные проверки cache/schema,
-execution и границы `observed_local`/ABA по-прежнему обязательны. Source62 прошёл этот допуск и выполнил native read в probe08; весь прогон
-остался FAILED на последующей проверке durable journal acknowledgement.
+execution и границы `observed_local`/ABA по-прежнему обязательны. Source62 прошёл этот допуск в probe08; source63 в probe09 подтвердил также
+durable journal acknowledgement и полную очистку input-only прогона.
 Повторный input read после JS — новый read ID при доказанном неизменном upstream;
 он выявляет наблюдаемое изменение, но не устраняет ABA/отсутствие server snapshot.
 
@@ -182,8 +182,7 @@ root. После подтверждённого read — scoped own Preview Clos
   false precision guarantee; original cleanup и server-cancel status раздельны.
 
 Probe08 подтвердил получение native frames через interface116/method321 для
-import-only Preview и tags1/5 четырёх real/NULL ячеек. Полный журналируемый
-input-only admission ещё не принят. Неизвестны применимость этого пути к JS-output,
+import-only Preview и tags1/5 четырёх real/NULL ячеек. Source63/probe09 подтвердил также полный журналируемый input-only admission. Неизвестны применимость этого пути к JS-output,
 parser empty/date/int64,
 стабильность datasource после JS, Date civil↔serial связь и full native cleanup.
 ОС сервера также не установлена. Ни G5, ни persistence/полный discovery не закрыты.

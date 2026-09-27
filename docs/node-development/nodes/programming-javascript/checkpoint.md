@@ -15,6 +15,31 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Probe09: input-only native admission и durable ACK подтверждены
+
+Source63 `ab76a768b2d5c3190b79f11dbebec2ff7c0b246d`, headed fresh profile42:
+terminal exit0, OBSERVED / native-input-observed. Exact journal ACK принят;
+subscription source hashes сохранены, owned Preview Close записан. Original
+cleanup ALL PASS: package_closed, logged_out, browser_closed. Profile42 сохранён,
+lease browser closed. Исторический probe08 FAILED не изменён.
+
+Root независимо сверил **все4 scalar cells** через Python struct: NULL tag1 и
++0/−1.25/10.125 tag5 с exact IEEE754 binary64 bytes; 438journal refs и66pins.
+Report SHA256:
+`a465913a7b60ccda533fa7905387a2197d27110935db1f46d777c44f1eff7b29`.
+Private native-input-probe-09-verification.json. Scalar oracle отдельно не
+проверяет ownership: последний подтверждается только в пределах source-pinned
+оператора и его binding/lifecycle доказательств. Это read текущего статического
+import-only fixture, observed_local, без server snapshot/доказательства отсутствия ABA.
+
+Следующий назначенный этап прежней задачи разработчика: private real/NULL
+identity roundtrip с INPUT до JS, отдельным JS OUTPUT binding, exact source и
+completed process, повторной проверкой INPUT после JS. Source-only реализация и
+регрессии; следующий browser run выполняет root после freeze. Никакого JS в
+probe09 не создано. G5 целиком, public handler, остальные типы, persistence,
+формальное ревью и автономная CLI-приёмка остаются незавершёнными.
+
+
 ### Freeze63: exact journal ACK исправлен; probe09 запущен
 
 Source node-javascript `ab76a768b2d5c3190b79f11dbebec2ff7c0b246d` переименовывает
