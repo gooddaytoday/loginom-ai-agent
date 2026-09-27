@@ -1,4 +1,5 @@
 import {beginCalibrationWizard,readCalibrationWizard,finishCalibrationWizardObservation,checkCalibrationWizardBaseline} from './javascript-calibration-wizard.mjs';
+import {acknowledgeJavascriptCalibrationRecord} from './javascript-calibration-journal.mjs';
 import {javascriptCalibrationIds,captureCalibrationWizard} from './javascript-calibration-cases.mjs';
 import {createJavascriptCalibrationTrial} from './javascript-calibration-run.mjs';
 import {javascriptNamedIds,javascriptNamedCase} from './javascript-native-named-cases.mjs';
@@ -120,8 +121,9 @@ const executionRecord=async event=>{
     const readback=report.execution_probe.existing_readback;
     readback.generated_schema_mismatch_trial=javascriptMismatchExecutionProgress(readback.generated_schema_mismatch_trial,event.terminal);
   }
-  const saved=await executionJournal({...event,...(report.case_id?{case_id:report.case_id,execution_case:executionCase}:{})});
-  if(calibrationTrial&&!Object.keys(event).every(k=>JSON.stringify(saved?.[k])===JSON.stringify(event[k])))throw Error('Calibration journal ACK differs');
+  const submitted=calibrationTrial?structuredClone({...event,...(report.case_id?{case_id:report.case_id,execution_case:executionCase}:{})}):{...event,...(report.case_id?{case_id:report.case_id,execution_case:executionCase}:{})};
+  const saved=await executionJournal(submitted),line=++executionJournalLine;
+  const acknowledged=calibrationTrial?acknowledgeJavascriptCalibrationRecord(submitted,saved):saved;
   if(nativeRoundtrip&&report.stage==='prepare-typed-input'&&saved.phase==='node_observation_completed'
     &&saved.outcome?.output?.prepared_node_context?.verified===true
     &&saved.outcome.output.prepared_node_context.surface==='graph') {
@@ -129,8 +131,8 @@ const executionRecord=async event=>{
     nativeClassifierBinding={context:{verified:true,surface:'graph',node_id:context.node_id,tid:context.tid},
       prefix:saved.outcome.output.workflow_ref?.prefix};
   }
-  (report.execution_records??=[]).push(compactJavascriptJournalRecord(saved,++executionJournalLine));
-  await save();return saved;
+  (report.execution_records??=[]).push(compactJavascriptJournalRecord(saved,line));
+  await save();return acknowledged;
 };
 const createRemaining=()=>{const remaining=createDeadline-Date.now();if(remaining<=0)throw Error('Original package preparation deadline expired');return remaining;};
 const save=async()=>{
