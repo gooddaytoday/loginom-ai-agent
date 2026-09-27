@@ -223,7 +223,7 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
     if(tab!==binding.tab||found.length!==1)throw Error('Private selection binding unavailable');
     return {document,controller:tab.Controller,model:tab.Controller.FController,diagram,graph:diagram.FmxGraph,container:diagram.FmxGraph.container,native:found[0],cell:found[0].FCell,shape:diagram.FmxGraph.view.getState(found[0].FCell)?.shape?.node,replacements:0};
   },{binding,node});
-  const inspect=({binding,node,icon,retained:r,requireSettings,requireVisualizers,poll=false,afterGesture=false})=>{
+  const inspect=({binding,node,icon,retained:r,requireSettings,requireVisualizers,inspectPhase,deadline,poll=false,afterGesture=false})=>{
     const app=globalThis.bg?.app,tab=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
     const diagram=tab?.Controller?.FController?.FDiagram,nodes=diagram?.FNodes?.FCollection;
     const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===node.id):[];
@@ -246,7 +246,32 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
       r.shape=shape;r.replacements++;
     }
     const visible=e=>e.isConnected&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
-    if([...document.querySelectorAll('[role="dialog"],.x-mask,.bg-mask-message,.x-mask-msg')].some(visible))throw Error('Private selection blocked');
+    let blockers,diagnostics=[],diagnosticFailed=false;
+    try {
+      blockers=[...document.querySelectorAll('[role="dialog"],.x-mask,.bg-mask-message,.x-mask-msg')].filter(visible);
+      diagnostics=blockers.slice(0,12).map(e=>{
+        const rect=e.getBoundingClientRect(),box={x:rect.x,y:rect.y,width:rect.width,height:rect.height};
+        if(!Object.values(box).every(Number.isFinite))throw Error('Nonfinite blocker geometry');
+        const bounded=value=>typeof value==='string'?value.slice(0,200):null;
+        return {selectors:['[role="dialog"]','.x-mask','.bg-mask-message','.x-mask-msg'].filter(selector=>e.matches(selector)),
+          tid:bounded(e.getAttribute('data-tid')),id:bounded(e.id),role:bounded(e.getAttribute('role')),
+          classes:bounded(e.getAttribute('class')),parent_tid:bounded(e.parentElement?.getAttribute('data-tid')),
+          box,connected:e.isConnected===true,visibility:bounded(getComputedStyle(e).visibility),
+          graph_contains_blocker:graph.contains(e),blocker_contains_graph:e.contains(graph)};
+      });
+    }catch{diagnosticFailed=true;diagnostics=[];}
+    if(diagnosticFailed||blockers.length){
+      const snapshot={blocked:true,ready:false,inspect_phase:inspectPhase,deadline,native_owner_verified:true,held_dom_verified:true,
+        native_selection_count:Array.isArray(selected)?selected.length:null,dom_replacements:r.replacements,
+        blocker_count:blockers?.length??null,blockers:diagnostics,descriptors_truncated:(blockers?.length??0)>12,
+        diagnostic_failed:diagnosticFailed};
+      const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
+      freeze(snapshot);
+      if(inspectPhase!=='terminal'&&!r.selectionBlocker)r.selectionBlocker=snapshot;
+      // A truthy blocked result must never satisfy the existing post-gesture wait.
+      if(poll)throw Error('Private selection blocked');
+      return snapshot;
+    }
     const point=element=>{
       if(!visible(element)||element.closest('.x-item-disabled,.x-grid-row-disabled')||element.getAttribute('aria-disabled')==='true')return null;
       const box=element.getBoundingClientRect();
@@ -268,15 +293,20 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
       visualizers_count:visualizers.length,visualizers_visible:visualizers.length===1&&visible(visualizers[0]),visualizers_point:visualizer,body_point:point(shape)};
     return poll?(result.ready?result:false):result;
   };
-  const args={binding,node,icon,retained,requireSettings,requireVisualizers};let dispatched=false,openingDispatched=false;
+  const args={binding,node,icon,retained,requireSettings,requireVisualizers,deadline};let dispatched=false,openingDispatched=false,blockerSnapshot=null;
+  const read=async inspectPhase=>{
+    const result=await page.evaluate(inspect,{...args,inspectPhase});
+    if(result.blocked===true){blockerSnapshot=result;throw Error('Private selection blocked');}
+    return result;
+  };
   try {
-    const before=await page.evaluate(inspect,args);await record({phase:'javascript_private_selection_before',node_id:node.id,...before});
+    const before=await read('initial');await record({phase:'javascript_private_selection_before',node_id:node.id,...before});
     if(Date.now()>=deadline)throw Error('Private selection deadline');
     if(!before.ready){
       if(!before.body_point)throw Error('Private selection body covered');
       await record({phase:'javascript_private_selection_dispatch',node_id:node.id,point:before.body_point,deadline,require_visualizers:requireVisualizers});
       await beforeSelect();
-      const checked=await page.evaluate(inspect,args);
+      const checked=await read('pre_select_click');
       if(JSON.stringify(checked)!==JSON.stringify(before))throw Error('Private selection changed before click');
       if(Date.now()>=deadline)throw Error('Private selection deadline');
       dispatched=true;
@@ -284,17 +314,17 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
       await record({phase:'javascript_private_selection_gesture_returned',node_id:node.id});
       args.afterGesture=true;
       const remaining=deadline-Date.now();if(remaining<=0)throw Error('Private selection deadline');
-      const ready=await page.waitForFunction(inspect,{...args,poll:true},{timeout:remaining,polling:100});await ready.dispose();
+      const ready=await page.waitForFunction(inspect,{...args,inspectPhase:'post_select_poll',poll:true},{timeout:remaining,polling:100});await ready.dispose();
     }
-    const after=await page.evaluate(inspect,args);
+    const after=await read('final');
     await record({phase:'javascript_private_selection_after',node_id:node.id,...after});
     if(!after.ready||Date.now()>=deadline)throw Error('Private selection requested controls unconfirmed');
     if(openSettings){
       await beforeOpen();
-      const opening=await page.evaluate(inspect,args);
+      const opening=await read('pre_open');
       if(!opening.ready)throw Error('Private Setting no longer ready');
       await record({phase:'javascript_private_open_dispatch',node_id:node.id,point:opening.setting_point,deadline});
-      const checked=await page.evaluate(inspect,args);
+      const checked=await read('pre_open_click');
       if(JSON.stringify(checked)!==JSON.stringify(opening)||Date.now()>=deadline)throw Error('Private Setting changed before click');
       openingDispatched=true;
       await page.mouse.click(opening.setting_point.x,opening.setting_point.y);
@@ -302,8 +332,21 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
     }
     return {verified:true,selected:dispatched,opening_dispatched:openingDispatched,dom_replacements:after.dom_replacements};
   }catch(error){
-    const observed=await page.evaluate(inspect,args).catch(()=>({owner_verified:false}));
-    await record({phase:'javascript_private_selection_refused',node_id:node.id,effect_possible:dispatched||openingDispatched,opening_dispatched:openingDispatched,deadline,reason:String(error.message),...observed});throw error;
+    const capture=blockerSnapshot?{snapshot:blockerSnapshot,available:true}:
+      await page.evaluate(r=>({snapshot:r.selectionBlocker??null,available:true}),retained).catch(()=>({snapshot:null,available:false}));
+    const snapshot=capture.snapshot;
+    if(snapshot){
+      const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
+      freeze(snapshot);
+      const event=Object.freeze({phase:'javascript_private_selection_blocked',node_id:node.id,
+        effect_possible:dispatched||openingDispatched,opening_dispatched:openingDispatched,deadline,snapshot});
+      const expected=JSON.stringify(event),saved=await record(event);
+      if(JSON.stringify(Object.fromEntries(Object.keys(event).map(key=>[key,saved?.[key]])))!==expected)
+        throw Error('Private selection blocker journal ACK differs');
+    }
+    const terminal=await page.evaluate(inspect,{...args,inspectPhase:'terminal'}).catch(()=>({observation_status:'unavailable'}));
+    await record({phase:'javascript_private_selection_refused',node_id:node.id,effect_possible:dispatched||openingDispatched,
+      opening_dispatched:openingDispatched,deadline,reason:String(error.message),blocker_snapshot:snapshot,snapshot_observation_available:capture.available,terminal_observation:terminal});throw error;
   }finally{await retained.dispose();}
 }
 
@@ -321,9 +364,10 @@ export function javascriptWizardBinding(state,node) {
 
 export async function openJavascriptWizard(page,{binding,node,icon,reference,prepared,deadline,record,channel,lifecycle={}}) {
   await selectJavascriptForSettings(page,{binding,node,icon,deadline,record:async event=>{
-    await record(event);
+    const saved=await record(event);
     // Reserved conservatively before dispatch: uncertain opening is never replayed.
     if(event.phase==='javascript_private_open_dispatch')lifecycle.openingDispatched=true;
+    return saved;
   },openSettings:true,beforeOpen:async()=>{
     const state=await channel.observe({condition:'private JavaScript Setting owner',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
     lifecycle.confirmation=javascriptWizardBinding(state,reference);
