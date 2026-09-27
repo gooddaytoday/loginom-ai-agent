@@ -16,6 +16,41 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch50: оба sentinel Execute FULL PASS; manual mapping admission bug — 2026-09-27
+
+Root-аудит2229 journalSHA,4 full input reads/120cells,2fresh failed JS children
+с реальным ShowNode и последующим selected native process proof,1fresh completed
+execution с full typed6×2/12cells. Code-sentinel-execute и declared-sentinel-execute
+оба OBSERVED/gate_passed/safe_to_continue=true. Их ошибка взята из доказанного
+child, ownership_source=native_process_model_identity_and_show_node. Source50
+34/34 hashes после terminal совпали. Это live подтверждение fix50 для обоих modes.
+
+Третий code-table-mismatch прошёл table, exact reopened source digest,
+mode и semantic input/output mappings before==after. Затем prepareManualMapping
+отказал «Configured source differs from the native mapping schema» до изменения
+JavaScript-кода. Причина подтверждена кодом: private caller передаёт
+javascriptOutputColumns без used; shared resolveConfiguredOutputMapping фильтрует
+configured по used и получает0 полей вместо2 native sources. Shared guard корректен.
+manual_mapping_prepared отсутствует, generated_schema_mismatch_trial=not_run.
+Оставшиеся4 Next/Done cases NOT_RUN; сам mismatch gate не закрыт.
+
+Original terminal exit1 CLEANUP_UNCONFIRMED: output mapping wizard остался открытым,
+cleanup close-confirmation timeout24905ms, package/logout=false,browser_closed=true.
+Отдельный headed recovery50 на profile23 без downloads подтвердил Home/accountjsteach/
+packages0, logout/browser PASS, packageMutation=false. Он не меняет original result.
+Приватные auditor-v3/verification/boundary receipts различают failed group и
+строго доказанный failed child; strong receipt проверен по actual ShowNode gesture
+receipt и свежему native snapshot. Table source/mapping boundary проверен отдельно.
+
+Lease closed, profile23 сохранён, freshprofile24 назначен с backup/receipt.
+Разработчик выполняет fix51 в прежней задаче: адаптация configured schema shape
+в caller и безопасный cleanup собственного standalone output wizard после
+известного отказа до изменения mapping. Не ослаблять source identity guard,
+не повторять unknown gestures. Следующий прогон планируется с5 оставшимися cases.
+Public handler, остальной полный scope, итоговое ревью и автономная CLI-приёмка
+по-прежнему открыты; цель активна.
+
+
 ### Freeze50: failed-child ownership tests PASS, batch50 запущен — 2026-09-27
 
 Root проверил final source diff,276 tests PASS и34/34 hashes до/после.
