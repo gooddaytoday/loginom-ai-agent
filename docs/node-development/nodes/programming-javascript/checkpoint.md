@@ -16,6 +16,31 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch52: три Next/Done перехода; code-Done ещё не выполнен — 2026-09-27
+
+На неизменном Freeze51/7274cca5e5 root проверил1983 journalSHA,5полных input reads/
+150cells и34/34 source hashes. Declared-next,declared-done,code-next — OBSERVED,
+safe_to_continue=true: exact sentinel source digest, owned before-state,
+Next→другая страница/Done→wizard hidden, затем подтверждённый quiet graph.
+Sentinel не наблюдался, gate_passed=false,execution=ambiguous,
+absence_proves_no_execution=false. Это не доказательство отсутствия исполнения.
+Отдельный boundary receipt сверил actual stage events, owner/page transitions.
+
+Четвёртый code-sentinel-done остановился до ввода кода на link-js-input:
+«Node label is not bound to its rendered identity» после palette drag. Причина
+ещё не установлена. Не повторяли drag/не ослабляли identity guard.
+Original terminal exit1 FAILED; package_closed/logged_out/browser_closed всеtrue.
+Отдельный recovery не требовался. Profile25 сохранён; freshprofile26 назначен.
+
+Разработчику разрешена реализация fix52: scoped observer для DataSetOutputSocketWizard
+теряет btnAddMappingColumn при editor-root read, хотя portal_bound=true; selected_column
+становитсяnull. Причина воспроизведена на production observer; временный кандидат
+в /tmp восстанавливает selection без снятия native ownership. Runtime ещё ожидает
+финальную проверку/Freeze52. Следующий live: code-sentinel-done первым, затем
+code-table-mismatch. Public handler и полная CLI-приёмка отсутствуют; цель открыта.
+
+
+
 ### Batch51: source admission пройден; field editor отказ — 2026-09-27
 
 Root проверил1330 journal refs,60 input cells,1fresh completed execution,
