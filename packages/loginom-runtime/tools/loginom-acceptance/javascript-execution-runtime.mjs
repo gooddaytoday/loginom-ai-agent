@@ -418,7 +418,8 @@ export function javascriptManualMappingRequest() {
 }
 
 // A separate port wizard is not the node wizard retained by the outer runner.
-// Cleanup is allowed only for its proven opening and no possible mapping edits.
+// Cleanup is allowed only for its proven opening and no possible mapping edits,
+// including one confirmed field-editor opening followed by verified cancellation.
 export async function configureJavascriptManualMapping({reader,cleanupReader,reference,record,verifyGraph,lifecycle}) {
   if(lifecycle.started)throw Error('Manual mapping already attempted; no replay');
   lifecycle.started=true;lifecycle.attempts=0;
@@ -443,12 +444,38 @@ export async function configureJavascriptManualMapping({reader,cleanupReader,ref
     },
     async observe(options){
       const state=await reader.observe(options);
-      if(!lifecycle.binding)lifecycle.binding=bind(state);
+      if(!lifecycle.binding){
+        lifecycle.binding=bind(state);
+        lifecycle.mapping=structuredClone(state.node_mapping);
+      }
       return state;
     },
     async perform(options){
       lifecycle.attempts++;
-      try{return await reader.perform(options);}
+      let editorOpening;
+      try{
+        const result=await reader.perform({...options,resolve:state=>{
+          const action=options.resolve(state);
+          // Only one confirmed opening of the exact native field editor can
+          // be cancelled here. Any later field/Apply/Done dispatch stays unsafe.
+          if(lifecycle.attempts===1&&options.condition==='select the exact output field editor'&&action.verb==='double_click'){
+            bind(state);
+            const original=options.identity(state),native=lifecycle.mapping?.target_fields?.filter(f=>f.record_id===original.record_id);
+            const rows=state.wizard.output_columns?.fields?.filter(f=>f.status==='observed'&&f.index===original.index
+              &&['name','label','type'].every(k=>f[k]===original[k])&&f.name_ref===action.ref);
+            const cell=state.ui.elements.find(e=>e.ref===action.ref);
+            if(native?.length===1&&JSON.stringify(native[0])===JSON.stringify(original)&&rows?.length===1
+              &&cell?.output_column?.wizard_root_ref===lifecycle.binding.root_ref
+              &&['name','label','type','row_ref','index'].every(k=>cell.output_column[k]===rows[0][k])
+              &&['name','label','type','data_kind','usage','name_ref','label_ref','row_ref'].every(k=>typeof rows[0][k]==='string'&&rows[0][k]))
+              editorOpening={row:structuredClone(rows[0])};
+          }
+          return action;
+        }});
+        if(editorOpening&&result?.status==='SUCCEEDED'&&result.cleanup_complete===true&&typeof result.operation_id==='string')
+          lifecycle.editorOpening={...editorOpening,operation_id:result.operation_id};
+        return result;
+      }
       catch(error){
         if(error instanceof NodeProcedureStepError&&error.receipt?.status==='REFUSED'
           &&error.receipt.effect_possible===false&&error.receipt.cleanup_complete===true)lifecycle.attempts--;
@@ -462,7 +489,7 @@ export async function configureJavascriptManualMapping({reader,cleanupReader,ref
   }catch(error){
     await record({phase:'manual_mapping_refused',node:reference,opening_verified:!!lifecycle.binding,
       mapping_effect_possible:lifecycle.attempts>0,reason:String(error.message).slice(0,300)});
-    if(!lifecycle.binding||lifecycle.attempts>0)throw error;
+    if(!lifecycle.binding||lifecycle.attempts>0&&!(lifecycle.attempts===1&&lifecycle.editorOpening))throw error;
     const deadline=lifecycle.cleanupDeadline=Date.now()+60000,cleanup=cleanupReader(deadline);
     // Pin the original root/port/opening receipt before every observation and
     // gesture; readPreparedNodeContext supplies its retained native identities.
@@ -477,6 +504,38 @@ export async function configureJavascriptManualMapping({reader,cleanupReader,ref
       observe:options=>cleanup.observe({...options,ready:state=>{owned(state);return options.ready(state);}}),
       perform:options=>cleanup.perform({...options,ready:state=>{owned(state);return options.ready(state);}})};
     lifecycle.cleanupAttempted=true;
+    if(lifecycle.editorOpening){
+      const row=lifecycle.editorOpening.row;
+      const editorReady=state=>{
+        const p=state.wizard?.column_parameters;
+        const types={integer:'Целый',real:'Вещественный',string:'Строковый',boolean:'Логический',datetime:'Дата/Время',variant:'Переменный'};
+        return p?.status==='observed'&&p.portal_bound===true&&p.root_tid==='EditColumnDefForm'
+          &&p.selected_column?.status==='observed'&&p.selected_column.selected===true
+          &&['name','label','type','data_kind','usage','name_ref','label_ref','row_ref'].every(k=>p.selected_column[k]===row[k])
+          &&Object.entries({name:row.name,label:row.label,type_label:types[row.type],data_kind:row.data_kind,usage:row.usage})
+            .every(([k,value])=>value&&p.fields?.[k]?.status==='observed'&&p.fields[k].truncated===false&&p.fields[k].value===value)
+          &&state.ui.masks.length===0&&state.ui.dialogs.length===1&&state.ui.dialogs[0].ref===p.root_ref;
+      };
+      const initial=await bound.observe({condition:'original manual mapping editor can be cancelled',ready:editorReady});
+      const editor=initial.wizard.column_parameters;
+      await bound.perform({condition:'cancel the original manual mapping field editor',initialObservation:initial,
+        ready:s=>editorReady(s)&&s.wizard.column_parameters.root_ref===editor.root_ref,
+        identity:()=>({opening:lifecycle.editorOpening,root_ref:editor.root_ref}),resolve:s=>{
+          const controls=s.ui.elements.filter(e=>e.column_close?.scope==='output'&&e.column_close.mode==='cancel'
+            &&e.column_close.root_ref===editor.root_ref&&e.column_close.wizard_root_ref===lifecycle.binding.root_ref
+            &&JSON.stringify(e.column_close.original_row)===JSON.stringify(s.wizard.column_parameters.selected_column)
+            &&e.allowed_actions.includes('cancel_output_column'));
+          if(controls.length!==1)throw Error('Original manual mapping editor Cancel unavailable');
+          return {verb:'cancel_output_column',ref:controls[0].ref};
+        }});
+      const after=await bound.observe({condition:'original native mapping after editor cancellation',readMappings:true,
+        ready:s=>s.wizard?.status==='observed'&&!s.wizard.column_parameters&&s.ui.dialogs.length===0&&s.ui.masks.length===0
+          &&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true});
+      const semantic=m=>Object.fromEntries(Object.entries(m).filter(([k])=>k!=='rendered_indices'));
+      if(JSON.stringify(semantic(after.node_mapping))!==JSON.stringify(semantic(lifecycle.mapping)))
+        throw Error('Native mapping changed after editor cancellation');
+      await record({phase:'manual_mapping_editor_cancel_verified',node:reference,opening:lifecycle.editorOpening,native_mapping_unchanged:true});
+    }
     const closed=await closePreparedWizard(bound);
     if(Date.now()>=deadline)throw Error('Manual port cleanup deadline expired');
     await verifyGraph(deadline);

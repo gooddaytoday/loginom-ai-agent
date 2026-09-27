@@ -730,9 +730,9 @@ function manualMappingFixture({foreignSource=true,foreignCleanup=false,lostClose
   wizard:phase===2?{status:'absent'}:{status:'observed',stage:'output_mapping',root_tid:'W',root_ref:'root',
    port_context:{status:'observed',kind:'output_data',node:{ref:'node'},port:{ref:'port'}},
    output_columns:{page:{status:'complete_definition_page',schema_id:'schema',offset:0,limit:8,total_columns:2,returned:2,next_offset:null},
-    fields:mapping.target_fields.map((f,i)=>({...f,status:'observed',name_ref:'name'+i}))}},node_mapping:mapping,
+    fields:mapping.target_fields.map((f,i)=>({...f,status:'observed',name_ref:'name'+i,label_ref:'label'+i,row_ref:'row'+i,usage:'Не задано'}))}},node_mapping:mapping,
   ui:{masks:phase===1?[{kind:'modal_background',ref:'root'}]:[],dialogs:phase===1?[{ref:'dialog',title:'Подтвердить',text:'Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'}]:[],
-   elements:[...sources.map((_,i)=>({ref:'name'+i,allowed_actions:['double_click']})),{tid:'W;btnClose',ref:'close',allowed_actions:['click']},...['yes','no'].map(name=>({tid:'msgbox;tlb;'+name,ref:name,label:name==='yes'?'Да':'Нет',signature:{dialog_ref:'dialog'},allowed_actions:['click']}))]}});
+   elements:[...sources.map((f,i)=>({ref:'name'+i,output_column:{name:f.name,label:f.label,type:f.type,row_ref:'row'+i,index:i,wizard_root_ref:'root'},allowed_actions:['double_click']})),{tid:'W;btnClose',ref:'close',allowed_actions:['click']},...['yes','no'].map(name=>({tid:'msgbox;tlb;'+name,ref:name,label:name==='yes'?'Да':'Нет',signature:{dialog_ref:'dialog'},allowed_actions:['click']}))]}});
  const channel={openOutputPort:async()=>{opened++;return {status:'SUCCEEDED',operation_id:'opening',output:{verified:true,...reference,...port}};},
   observe:async options=>{
    if(editorDispatched&&!cleanup)throw mutationError;
@@ -749,7 +749,7 @@ function manualMappingFixture({foreignSource=true,foreignCleanup=false,lostClose
    else throw Error('Unexpected cleanup action');
    return {status:'SUCCEEDED'};
   }};
- return {reference,lifecycle,events,actions,mapping,channel,get opened(){return opened;},get graphChecks(){return graphChecks;},
+ return {reference,lifecycle,events,actions,mapping,channel,readState:state,get opened(){return opened;},get graphChecks(){return graphChecks;},
   run:()=>configureJavascriptManualMapping({reader:channel,reference,lifecycle,record:async r=>events.push(r),
    cleanupReader:deadline=>{assert.ok(deadline-Date.now()>55000&&deadline-Date.now()<=60000);cleanup=true;return channel;},
    verifyGraph:async()=>{graphChecks++;assert.equal(phase,2);if(graphError)throw graphError;}})};
@@ -829,4 +829,87 @@ test('production manual mapping binds full prepared identity and retains unresol
   assert.equal(!!realm.pendingMapping,!closed);assert.deepEqual(steps,closed?['dispose']:[]);
   if(!closed)await assert.rejects(operator.prepareManualMapping(node),/Previous manual mapping/);
  }
+});
+
+// Batch51 journal1329: DataSetOutputSocketWizard, native-owned global
+// EditColumnDefForm, PhaseMarker name/label, masks=[], one selected record.
+// Keep only this public contract; raw journal and run-specific IDs stay private.
+function manualEditorFixture(fault='none'){
+ const f=manualMappingFixture({foreignSource:false}),observe=f.channel.observe,perform=f.channel.perform;
+ const failure=Error('Editor observation refused'),gestures=[],draft={name:'PhaseMarker',label:'PhaseMarker'};let editor=false,cancelled=false;
+ f.mapping.mapping_wizard='DataSetOutputSocketWizard';
+ const row={...f.readState().wizard.output_columns.fields[1],selected:true};
+ const state=()=>{
+  const s=structuredClone(f.readState());
+  if(editor){
+   const selected={...row,...(fault==='foreign_row'?{row_ref:'foreign'}:{})};
+   const params={status:'observed',portal_bound:fault!=='foreign_native',root_tid:'EditColumnDefForm',root_ref:'editor',selected_column:selected,
+    fields:Object.fromEntries(Object.entries({...draft,type_label:'Строковый',data_kind:'Дискретный',usage:'Не задано'})
+     .map(([k,value])=>[k,{status:'observed',value,truncated:false,input_ref:k}]))};
+   if(fault==='changed_draft')params.fields.name.value='external change';
+   s.wizard.column_parameters=params;s.ui.dialogs=[{ref:'editor',identity:{anchor_tid:'EditColumnDefForm'}}];
+   if(fault==='foreign_dialog')s.ui.dialogs.push({ref:'other'});
+   s.ui.elements.push(...['name','label'].map(k=>({ref:k,wizard_field:{scope:'output_column',name:k},allowed_actions:['set_wizard_field']})));
+   s.ui.elements.push({ref:'apply-editor',column_close:{scope:'output'},allowed_actions:['apply_output_column']});
+   s.ui.elements.push({ref:'cancel-editor',column_close:{scope:'output',mode:'cancel',root_ref:'editor',wizard_root_ref:'root',original_row:selected},allowed_actions:['cancel_output_column']});
+  }
+  return s;
+ };
+ f.channel.observe=async options=>{
+  if(editor&&options.condition==='bound output field name editor'&&!['after_field','lost_apply','after_apply'].includes(fault))throw failure;
+  if(editor&&options.condition==='bound output field label editor'&&fault==='after_field')throw failure;
+  if(editor&&!options.condition.startsWith('original manual mapping')){
+   const s=state();if(!options.ready(s))throw failure;return s;
+  }
+  if(!editor&&gestures.includes('apply_output_column'))throw failure;
+  if(options.condition==='original manual mapping editor can be cancelled'){
+   const s=state();if(!options.ready(s))throw Error('Editor owner refused');return s;
+  }
+  return observe(options);
+ };
+ f.channel.perform=async options=>{
+  if(options.condition==='select the exact output field editor'){
+   const s=state();assert.ok(options.ready(s));options.identity(s);const action=options.resolve(s);gestures.push(action.verb);editor=true;
+   if(fault==='lost_open')throw Error('Lost editor opening reply');
+   return {status:'SUCCEEDED',cleanup_complete:true,operation_id:'editor-open'};
+  }
+  if(options.condition.startsWith('set output field ')||options.condition==='apply the bound output field changes'){
+   const s=state();assert.ok(options.ready(s));options.identity(s);const action=options.resolve(s);gestures.push(action.verb);
+   if(action.verb==='set_wizard_field')draft[action.ref]=action.text;
+   else {editor=false;if(fault==='lost_apply')throw Error('Lost Apply reply');}
+   return {status:'SUCCEEDED',cleanup_complete:true,operation_id:'editor-edit'};
+  }
+  if(options.condition==='cancel the original manual mapping field editor'){
+   const s=state();assert.ok(options.ready(s));options.identity(s);const action=options.resolve(s);assert.equal(action.verb,'cancel_output_column');gestures.push(action.verb);
+   editor=false;cancelled=true;
+   if(fault==='lost_cancel')throw Error('Lost Cancel reply');
+   if(fault==='mapping_changed')f.mapping.target_fields[1].label='changed';
+   return {status:'SUCCEEDED',cleanup_complete:true,operation_id:'editor-cancel'};
+  }
+  return perform(options);
+ };
+ return {...f,failure,gestures,get cancelled(){return cancelled;}};
+}
+
+test('shared manual mapping cancels its confirmed first editor then proves unchanged mapping and graph',async()=>{
+ const f=manualEditorFixture();await assert.rejects(f.run(),e=>e===f.failure);
+ assert.deepEqual(f.gestures,['double_click','cancel_output_column']);assert.deepEqual(f.actions.map(a=>a.ref),['close','yes']);
+ assert.equal(f.lifecycle.closed,true);assert.ok(f.events.some(r=>r.phase==='manual_mapping_editor_cancel_verified'));
+ await assert.rejects(f.run(),/no replay/);assert.equal(f.gestures.length,2);
+});
+
+for(const fault of ['foreign_native','foreign_row','foreign_dialog','changed_draft','lost_open','lost_cancel','mapping_changed'])
+ test('manual editor cleanup refuses changed owners or unknown effects: '+fault,async()=>{
+  const f=manualEditorFixture(fault);await assert.rejects(f.run());
+  assert.notEqual(f.lifecycle.closed,true);assert.equal(f.actions.length,0);
+  assert.deepEqual(f.gestures,['double_click',...(['lost_cancel','mapping_changed'].includes(fault)?['cancel_output_column']:[])]);
+  await assert.rejects(f.run(),/no replay/);
+ });
+
+for(const fault of ['after_field','lost_apply','after_apply'])test('manual editor cleanup never discards or replays a later possible edit: '+fault,async()=>{
+ const f=manualEditorFixture(fault);await assert.rejects(f.run());
+ assert.ok(f.lifecycle.attempts>1);assert.notEqual(f.lifecycle.closed,true);
+ assert.equal(f.actions.length,0);assert.equal(f.gestures.includes('cancel_output_column'),false);
+ assert.deepEqual(f.gestures,fault==='after_field'?['double_click','set_wizard_field']:['double_click','set_wizard_field','set_wizard_field','apply_output_column']);
+ await assert.rejects(f.run(),/no replay/);
 });

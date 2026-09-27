@@ -4476,11 +4476,11 @@ test('scrolled process window refuses detached, foreign and clipped row bindings
 });
 
 test('global output editor is typed only when its native record belongs to the active mapping',async()=>{
- for(const mappingForm of ['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard']) for(const mode of ['bound','foreign_record','foreign_wizard','wrong_index']) {
+ for(const mappingForm of ['DataSetOutputSocketWizard','ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard']) for(const mode of ['bound','foreign_record','foreign_wizard','wrong_index','add_mode','multiple_records','wrong_view','unselected']) {
   const page=new Page(),base='MF;TF-1;WizrdMCF;',wizard=page.add('div',base.slice(0,-1));
   const stem=base+mappingForm+';';page.add('button',stem+'btnAddMappingColumn','',undefined,wizard);
   const grid=page.add('div',stem+'grdTargetColumns;tbl','',undefined,wizard);grid.id='mapping-view';grid.attrs.id=grid.id;
-  const row=page.add('table',null,'',undefined,grid);row.attrs={class:'x-grid-item-selected','data-recordindex':mode==='wrong_index'?'1':'0','data-recordid':'r1','data-boundview':grid.id};
+  const row=page.add('table',null,'',undefined,grid);row.attrs={class:mode==='unselected'?'x-grid-item':'x-grid-item-selected','data-recordindex':mode==='wrong_index'?'1':'0','data-recordid':'r1','data-boundview':mode==='wrong_view'?'foreign':grid.id};
   page.add('td',stem+'colName_A','A',undefined,row);
   const label=page.add('td',stem+'colDisplayName_A','A',undefined,row);page.add('span',null,'',undefined,label).attrs.class='bg-TBGDataType-dtInteger';
   page.add('td',stem+'colDataKind_A','Дискретный',undefined,row);page.add('td',stem+'colDefaultUsageType_A','Не задано',undefined,row);
@@ -4489,13 +4489,15 @@ test('global output editor is typed only when its native record belongs to the a
    const owner=page.add('div','EditColumnDefForm;'+key,'',undefined,form),input=page.add('input',null,'',undefined,owner);input.value=value;
   }
   const record={isModel:true,internalId:'r1'},store={$className:'Ext.data.Store',isLoading:()=>false,getAt:i=>i===0?record:null};
-  const native={FView:{el:{dom:form}},FAddMode:false,Records:[mode==='foreign_record'?{...record}:record]};
+  const native={FView:{el:{dom:form}},FAddMode:mode==='add_mode',Records:mode==='multiple_records'?[record,record]:[mode==='foreign_record'?{...record}:record]};
   page.context.Ext={getCmp:id=>id===form.id?{Controller:native}:id===grid.id?{el:{dom:grid},getStore:()=>store}:null};
   page.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:{FView:{el:{dom:mode==='foreign_wizard'?form:wizard}}}}})}}}}};
-  for(const discover_roots of [false,true]) {
-   const reply=await page.execute({mode:'observe',discover_roots});assert.equal(reply.status,'SUCCEEDED');const s=reply.output;
+  const full=await page.observe(),formRef=full.ui.dialogs[0].ref;
+  for(const discover_roots of [false,true,'editor_root']) {
+   const reply=await page.execute({mode:'observe',...(discover_roots==='editor_root'?{root_ref:formRef}:{discover_roots})});assert.equal(reply.status,'SUCCEEDED');const s=reply.output;
    assert.equal(s.wizard.column_parameters.status,mode==='bound'?'observed':'ambiguous',mappingForm+':'+mode+':'+discover_roots);
-   if(!discover_roots)assert.equal(s.ui.elements.some(e=>e.wizard_field?.scope==='output_column'),mode==='bound',mode);
+   if(mode==='bound')assert.equal(s.wizard.column_parameters.selected_column?.name,'A',mappingForm+':'+discover_roots);
+   if(discover_roots!==true)assert.equal(s.ui.elements.some(e=>e.wizard_field?.scope==='output_column'),mode==='bound',mode);
   }
  }
 });
