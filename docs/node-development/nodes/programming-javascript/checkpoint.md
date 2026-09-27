@@ -15,6 +15,22 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Root reproduced concrete K2 ACK mismatch: origin normalization
+
+Actual failed journal line7 stores outcome.output.origin with trailing slash.
+Pinned workspace-ui.mjs:1926/3254 returns location.origin without slash;
+executor.mjs:1958 sends structuredClone to journal. createRedactor.text normalizes
+HTTP URL via url.href. Root independently replayed createExecutionJournal and
+reproduced blanket calibration ACK refusal for this transformation.
+
+Private root-calibration-ACK-reproduction-01/verification.json and journal retain
+input/persisted origin and original line SHA85fcb3be38bad705261b5c92a3571fb7f415b3ce97587e2d93ce003ac44c80e6.
+Reproducer uses stored observation with only origin reconstructed from verified
+source contract; it is not a retained raw original whole event. At least this
+mismatch is established; no browser interference inferred. Finding sent to same
+active source89 turn01a0e532-38c5-7e90-b292-c5ce6592b040/revision21. No new browser.
+
+
 ### K2/profile95 terminal admission failure; separate recovery complete
 
 Original84825 exit1/CLEANUP_UNCONFIRMED at prepare-typed-input:
