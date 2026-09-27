@@ -15,6 +15,21 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze40 проверен, адресный headed Preview run запущен — 2026-09-27
+
+Разработчик передал28 файлов и остановился; root сверил все SHA.
+Root48tests PASS; финальное изменение terminal predicate отдельно9tests PASS.
+Preview требует native цепочку code page→wizard/preview form, reciprocal DOM,
+видимость с ancestor/viewport проверкой и local FLoaded=true. Свежая ошибка
+до завершения Preview не разрешает ранний terminal/Close. Changed-state journal
+ограничен16 записями на исходный dispatch; финальный snapshot сохраняется всегда.
+
+После recovery39 выделен freshprofile13; старые профили сохранены. Batch40
+запущен на том же pinned Chromium1246, headed DISPLAY=:1/sandbox, cases
+code-sentinel-preview,declared-sentinel-preview. Source receipt g2-batch-40-source.json.
+Тесты доказывают логику observer, а live equalities/результаты ещё ожидаются.
+Полный batch и остальные требования плана не объявляются выполненными.
+
 ### Preview40: native связь установлена по исходникам стенда — 2026-09-27
 
 Root прочитал клиентские JS самого стенда через read-only HTTP GET:
