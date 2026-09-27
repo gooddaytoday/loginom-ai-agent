@@ -16,6 +16,29 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze68 проверен; headed roundtrip probe05 запущен
+
+Source node-javascript `5bacf283acde15d12421b0582e1b18ce93c9608e` добавляет частное
+открытие JS native Preview через один owned-port click и F3. Проверяются исходный
+document/workflow/node/execution/source, активный data0, native/DOM identities,
+unique shape, hit-test, selection и keyboard focus. Intent/result требуют exact
+journal ACK; потерянные ответы и неизвестные эффекты не повторяются. Upstream
+остаётся на общем маршруте. Общий workspace deny runtime не менялся.
+
+Root независимо: main778/778PASS, public-deny3/3PASS, fail/skip0;75pins до/после
+совпали,syntax5PASS. Private operator68-root-test-source.json содержит 17 main
+entrypoints; отдельный targeted workspace-ui run сохранён в operator68-root-deny.*.
+Новые негативные проверки покрывают owner/port/source/execution, подмену DOM,
+focus/overlay, wrong ACK, lost click/F3/transport reply и отсутствие Preview.
+
+Native-roundtrip-probe05 запущен на fresh profile47, headed DISPLAY=:1/sandbox,
+после проверки Node/Chromium SHA и источников. Source receipt:
+native-roundtrip-probe-05-source.json. Unified process session31763; разработчик
+idle, cursor150. На момент записи RUNNING, live результат и cleanup ещё не
+подтверждены. Profile46 сохранён с ALL PASS cleanup. Полный G5/план не закрыты.
+
+
+
 ### Fix68 возобновлён: память разработчика проверена
 
 2026-09-27T11:30:50Z разработчик подтвердил все три реальные MCP-проверки:
