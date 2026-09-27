@@ -17,6 +17,15 @@
 
 ### Fix73: Date/civil design проверен; реализация назначена
 
+Root подготовил независимый private audit-native-datetime.py, SHA
+`113a77f382ec2199a71e09a7386ffa301f0c2352d6edf013d39f962474ed9892`.
+Он проверяет canonical civil values/миллисекунды/NULL и native tag7 significant
+bytes, захватывает INPUT bytes без epoch и сравнивает последующие стадии с ними.
+Synthetic2positive/17negative selfchecks PASS; произвольные synthetic serials
+не доказывают соответствие датам. Ownership, applied-format и execution receipts
+проверяются отдельно; live Date ещё не было. Receipt сохранён приватно.
+
+
 Сохранён [канонический Date/civil дизайн](native-datetime-design.md) на базе
 source72. Root сверил существующие пути input/native/table precision и отсутствие
 civil OUTPUT в текущем roundtrip. Допуск требует полного civil INPUT с123/999ms,
