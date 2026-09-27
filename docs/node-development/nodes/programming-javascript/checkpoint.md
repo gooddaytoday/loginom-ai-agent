@@ -15,6 +15,25 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Date INPUT-only PASS; отдельный roundtrip запущен
+
+Source73/profile54 native-datetime-input-probe-01 завершён exit0,
+session87548 terminal, OBSERVED/native-input-observed, original cleanup3/3.
+Независимый Python audit проверил3native cells +3civil values сNULL/.123/.999,
+465journalrefs/190pins, applied ms format, default restoration, graph return,
+source/owner/full-child associations и lifecycle3/3. Baseline digest отдельно
+пересчитан Node crypto и совпал. ReportSHA
+`6fa89f18a42402a68eb0c631ec9d8cc1ae02275c79021d9b35f4af15441002ec`.
+Observed input bytes `[null,83b6eaffff24e640,74a4aaaac283e640]`; epoch/timezone
+не выводятся. Private verification сохранён; JS не создавался/не исполнялся.
+
+После terminal cleanup profile54 сохранён, назначен fresh profile55.
+Начат native-datetime-roundtrip-probe-01, session27875, тот же source73/190pins,
+headed DISPLAY=:1/sandbox. Lease RUNNING; до terminal cleanup новый браузер
+не запускать. Roundtrip заново аттестует свой INPUT и замораживает bytes до JS;
+baseline из input-only не переносится. ПолныйG5/public handler/CLI открыты.
+
+
 ### Freeze73 root checks PASS; Date INPUT-only запущен
 
 Root подтвердил1029main+228shared+3public-deny+7Python PASS,190sourcepins
