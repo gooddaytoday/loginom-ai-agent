@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### K2/profile95 terminal admission failure; separate recovery complete
+
+Original84825 exit1/CLEANUP_UNCONFIRMED at prepare-typed-input:
+Calibration journal ACK differs. Journal line7 содержит успешный read-only
+workspace.observe, затем blanket comparison в executionRecord отказал. JS probe,
+input и calibration_result отсутствуют; JS Execute не наблюдался. Cleanup original
+package/workflow/current surface changed; package_closed/logged_out=false,
+browser_closed=true. Причина mismatch ещё не установлена; не приписывать клику.
+Original report/evidence не менялись, attempt1 остаётся неуспешным.
+
+Fresh headed recovery profile96, original25462 exit0: accountjsteach/packages0,
+loggedOut=true/browserClosed=true,packageMutation=false. Private
+native-calibration-recovery-01.json; no pinned Chromium проверен. Registry current
+closed_logout_verified отражает отдельный recovery, не успех исходного cleanup.
+Calibration attempts ledger сохранён, automatic retry отсутствует.
+
+В ту же developer задачу назначен source89: воспроизвести mismatch реального
+production journal/observed event, исправить узко без ослабления redaction/critical
+ACK/owner/source и сохранить old evidence. Browser/CLI/commit/newtask запрещены.
+До frozen source89 новая K2 попытка не назначена; K1/K3/K4 ещё не запускались.
+
+
 ### Source88 accepted for bounded diagnostics; K2/profile95 RUNNING
 
 Developer completed revision20, exact8 runtime/test files commit
