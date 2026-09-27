@@ -20,9 +20,11 @@
 
 Root непосредственно прочитал developer main log: **1292 PASS**, failed/skipped0.
 Это ещё не независимая приёмка frozen source79: manifest/handoff не переданы.
-Полный client suite подтверждён живым Node process2579529; workspace-ui child
-2583127 также реально работает. Observation timeout не трактуется как остановка,
-root не перезапускает и не прерывает этот handle.
+Полный client suite был подтверждён живым Node process2579529/workspace-ui child2583127.
+Позднейшая проверка установила отсутствие обоих процессов и terminal failures
+в client-tests log (включая clipboard/shutdown/cleanup suites); зелёная full
+regression не заявляется. Observation timeout не использовался как основание
+перезапуска; root этот handle не прерывал.
 
 В отдельном developer diagnostic сохранены3 отказа action-catalog/agent-command,
 в том числе `EPERM` при запуске временного executable shim. Их нельзя без
