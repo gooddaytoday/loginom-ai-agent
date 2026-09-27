@@ -22,7 +22,7 @@ import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false}={}) {
 process.umask(0o077);
 const batch=batchCases===null?null:javascriptBatchCases(batchCases);
 const batchDeadline=batch?Date.now()+1800000:Infinity;
@@ -30,7 +30,7 @@ let cleaning=false;
 const phaseDeadline=ms=>Math.min(cleaning?Infinity:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=batchDeadline-Date.now();if(!cleaning&&ms<=0)throw Error('Original batch deadline expired');return cleaning?Infinity:ms;};
 const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
-if (args.includes('--help')) { console.log(usage); return; }
+if (args.includes('--help')) { console.log(nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nPrivate input-only Value:real [null,0,-1.25,10.125]; one import Execute, typed UI + native4-cell read; no JS creation.':usage); return; }
 const allowed = new Set(['--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe']);
 const options = {};
 for (let i=0;i<args.length;i++) {
@@ -40,6 +40,10 @@ for (let i=0;i<args.length;i++) {
   if (options[key]===undefined) throw Error(usage);
 }
 if(batch&&options['--execution-case'])throw Error('Batch cannot also select a single case');
+if(nativeInputOnly){
+  if(batch||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence'].includes(k)))throw Error('Native input-only requires its separate private entrypoint and no JS modes');
+  options['--create-node']=true;
+}
 const discoveryProbe=options['--discovery-probe']?javascriptDiscoveryProbe(options['--discovery-probe']):null;
 if(discoveryProbe&&(batch||options['--execution-case']))throw Error('Discovery requires one isolated probe, not a batch or execution case');
 let executionCase=discoveryProbe?'code-table-execute':batch?.[0]??options['--execution-case'];
@@ -72,7 +76,7 @@ const directory=resolve(options['--evidence']);
 // Refuse reuse: no old evidence is overwritten and no uncertain run is replayed.
 await mkdir(directory,{mode:0o700});
 const redactor=createRedactor([config.password]);
-if(batch||discoveryProbe){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
+if(batch||discoveryProbe||nativeInputOnly){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},knownSecrets:[config.password]});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
   node:process.versions.node,headless:false,server_os:{status:'not_observed'},storage:{status:'not_observed'},
@@ -1030,7 +1034,7 @@ try {
     createDeadline=phaseDeadline(120000);
     report.package_preparation_deadline=new Date(createDeadline).toISOString();
     report.effects.push({at:new Date().toISOString(),action:'create-draft',state:'dispatching'});await save();
-    if(executionCase){
+    if(executionCase||nativeInputOnly){
       const code=makeWorkspacePrepareCode({loginomUrl:config.url,compatibility:{profile_id:'javascript-ubuntu',loginom_build:'7.4.2',platform:'linux',browser:'chromium'},
         sessionId:'javascript-g2',operationId:'javascript-g2-prepare',timeoutMs:createRemaining()});
       executionPrepared=await Function('return ('+code+')')()(page);
@@ -1070,11 +1074,11 @@ try {
     report.effects.push({at:new Date().toISOString(),action:'create-draft',state:'observed',package_name:owner.package_name,prefix:owner.prefix});
     report.stage='graph-ready';await waitGraphReady(createRemaining());
     await snapshot('graph-ready-baseline');
-    if(executionCase){
-      report.scope=discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
+    if(executionCase||nativeInputOnly){
+      report.scope=nativeInputOnly?'private native real input-only admission':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
       if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
-        record:executionRecord,effectScope:()=>report.case_id,deadline:batch?batchDeadline:Date.now()+1200000});
+        record:executionRecord,effectScope:()=>report.case_id,deadline:batch?batchDeadline:Date.now()+1200000,nativeInputOnly});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
       if(batch||discoveryProbe){
@@ -1090,7 +1094,12 @@ try {
         },executionInput);
       }
     }
-    if(!batch)await runPreparedCase();
+    if(nativeInputOnly){
+      if(!executionInput.native_input?.native.exact.native_bytes_verified)throw Error('Complete native input admission required');
+      report.native_input=executionInput.native_input;report.js_created=false;report.js_executed=false;report.gates_closed=[];
+      report.stage='native-input-observed';await save();
+    }
+    else if(!batch)await runPreparedCase();
     else {
       rootReport.scope='G2/G3 bounded batch';delete rootReport.execution_case;rootReport.execution_cases=batch;rootReport.batch_deadline=new Date(batchDeadline).toISOString();rootReport.cases=[];
       try {
@@ -1144,6 +1153,7 @@ try {
   cleaning=true;report.work_stage=report.stage;report.stage='cleanup';
   try {
     if (page) {
+      if(executionRuntime?.nativeReadUncertain)throw Error('Native input pending/retired or buffer cleanup unconfirmed; UI cleanup refused, close own browser');
       if(paletteAdmission?.inputReleaseConfirmed===false)throw Error('Palette mouse/Alt release unconfirmed; UI cleanup refused, browser must close');
       if(createDeadline&&!packageHandle){
         report.cleanup.stage='inspect-pending-create';
