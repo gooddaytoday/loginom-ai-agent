@@ -229,7 +229,7 @@ source70/probe07 (12 native cells); source71 отдельно подтверди
 outside-safe probe отдельно показал 9007199254740993 →9007199254740992
 при точных INPUT/upstream (9 cells), без общей гарантии int64. Source74
 подтвердил Date identity:9native+9civil observations, NULL и обе canonical даты
-с миллисекундами сохранены; epoch/timezone не установлены. Кардинальности,
+с миллисекундами сохранены; epoch/timezone не установлены. Кардинальности (см. [дизайн отдельных случаев](native-cardinality-design.md)),
 Integer coercion и весь G5 остаются открыты,
 точные доказательства и ограничения — в checkpoint. В G5 ограниченными случаями установить
 Integer coercion для fraction/string/NaN/±Infinity; exact integer oracle

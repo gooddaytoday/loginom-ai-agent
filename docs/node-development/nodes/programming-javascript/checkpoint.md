@@ -15,6 +15,24 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Cardinality design принят; Fix75 nonempty назначен
+
+Root проверил и сохранил [cardinality дизайн](native-cardinality-design.md).
+Canonical empty обязателен в UI declared mode, generation=false, ровно Value
+integer и source без AssignColumns/Append/Set. Code-empty его не заменяет.
+Будущий zero proof должен сохранить наблюдаемые before/final counts/schema/
+idle/cache сведения, а не только empty_count_attested=true.
+
+Первый bounded Fix75 назначается прежней задаче: INPUT[1,2,3], три fixed code
+cases keep2->[2], odd->[1,3], duplicate->[1,1,2,2,3,3], role-specific counts,
+immutable pre-JS baseline, точный upstream и независимые ordered-byte expectations.
+Empty/declared остаётся обязательным следующим этапом; selector0 пока закрыт.
+Root private audit-native-cardinality-nonempty.py прошёл synthetic9positive/
+13negative, SHA `68bcd1756b9be14808ba8f07c4da8dd6953b961e053231b627936227e111e60f`.
+Это подготовка oracle, не live proof. Browser CLOSED, profile56 сохранён,
+следующий профиль ещё не назначен. Полный план остаётся активным.
+
+
 ### Date roundtrip02 PASS; следующий срез — cardinality
 
 Source74/profile56 native-datetime-roundtrip-probe-02 завершён exit0,
