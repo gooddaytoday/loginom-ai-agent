@@ -16,6 +16,17 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Integer coercion string-invalid01 RUNNING
+
+Source82 unchanged/1259 pins повторно проверены; original exec session53900
+RUNNING, fresh profile69, DISPLAY=:1/headed/sandbox. Evidence
+native-integer-coercion-string-invalid-probe-01. INPUT native String
+«not-an-integer»; OUTPUT/ошибка заранее неизвестны. Исходный deadline600000ms,
+no replay. Matrix3 characterized, string-invalid unresolved/running,3 not_run.
+Проверять original session53900 до terminal, затем cleanup и независимый audit.
+При owned failed без source mapping case остаётся unresolved; OUTPUT не читать.
+
+
 ### Integer coercion string-numeric01: independent characterization PASS
 
 Source82/profile68 original session88544 terminal exit0, CHARACTERIZED,
