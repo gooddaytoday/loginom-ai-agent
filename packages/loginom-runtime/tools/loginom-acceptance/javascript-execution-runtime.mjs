@@ -11,6 +11,8 @@ import {randomUUID} from 'node:crypto';
 import {createArtifactStore} from '../../client/lib/artifacts.mjs';
 import {createActionRuntime,withBrowserReceipt} from '../../client/lib/executor.mjs';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
+import {createJavascriptNativeInputSupport} from './javascript-native-input-driver.mjs';
+import {nativeInputFixture,verifyNativeInputFixture,nativeInputRequest,verifyNativeInputUi} from './javascript-native-input-contract.mjs';
 import {createNodeTargetBrowserAdapter} from '../../client/lib/node-target-browser.mjs';
 import {createNodeProcedure,NodeProcedureStepError} from '../../client/lib/node-procedure.mjs';
 import {createNodeExecutionProcedure} from '../../client/lib/node-execution-procedure.mjs';
@@ -547,24 +549,38 @@ export async function configureJavascriptManualMapping({reader,cleanupReader,ref
   }
 }
 
-export async function createJavascriptExecutionRuntime({page,prepared,directory,record,account,deadline,effectScope=()=>null}) {
+export async function createJavascriptExecutionRuntime({page,prepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false}) {
   if(account!=='jsteach'||prepared.status!=='READY'||prepared.package_ref?.persisted!==false)throw Error('Own JavaScript draft required');
   const origin='http://logi-test-plan.bg.local',build='7.4.2',sessionId='js-g2-'+randomUUID();
   const journalOnce=createJavascriptEffectJournal({record,deadline});
   const once=(id,identity,perform)=>journalOnce(caseEffect(effectScope(),id),identity,perform);
+  let nativeInputEvidence,nativeReadUncertain=false;
   const executeUntil=async(code,until)=>{
     if(Date.now()>=until)throw Error('Original JavaScript operation deadline expired');
     // The module supplies these fixed local builders; this function is never
     // exposed to a model or evaluated in the browser's application realm.
     return await Function('return ('+code+')')()(page);
   };
-  const execute=code=>executeUntil(code,deadline);
+  const execute=async(code,options={})=>{
+    if(!nativeInputOnly)return executeUntil(code,deadline);
+    const until=Math.min(deadline,Date.now()+(options.timeout??deadline-Date.now()));
+    if(until<=Date.now())throw Error('Original native input deadline expired');
+    let timer;
+    try{return await Promise.race([executeUntil(code,until),new Promise((_,reject)=>{
+      timer=setTimeout(()=>{nativeReadUncertain=true;reject(Error('Native input transport deadline; cancellation unproven'));},until-Date.now());
+    })]);}finally{clearTimeout(timer);}
+  };
   const actions=JSON.parse(await readFile(new URL('../../executor/catalog/actions.json',import.meta.url),'utf8')).actions;
   const selectors=JSON.parse(await readFile(new URL('../../executor/catalog/selectors.json',import.meta.url),'utf8')).selectors;
   const pinned={actions:new Map(actions.map(action=>[action.action_key,action])),selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
   const artifactStore=await createArtifactStore({directory:directory+'/input-artifacts',sessionId});
-  const runtime=createActionRuntime({pinned,execute,artifactStore,allowCandidate:true,onRecord:record,targetOrigin:origin,targetBuild:build,
-    ...createTextImportNodeSupport({targetOrigin:origin,targetBuild:build})});
+  const support=nativeInputOnly?createJavascriptNativeInputSupport({targetOrigin:origin,targetBuild:build,
+    onProof:async proof=>{nativeInputEvidence=proof;},
+    onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0
+      ||state.status!=='completed'||state.releasedRequests!==4||state.releasedResponses!==4;
+      await record({phase:'javascript_native_input_lifecycle',state,uncertain:nativeReadUncertain});}})
+    :createTextImportNodeSupport({targetOrigin:origin,targetBuild:build});
+  const runtime=createActionRuntime({pinned,execute,artifactStore,allowCandidate:true,onRecord:record,targetOrigin:origin,targetBuild:build,...support});
   const adapter=createNodeTargetBrowserAdapter({execute,origin,build,pinned});
   const graphRequest={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref};
   const workflowOwner=await page.evaluateHandle(prepared=>{
@@ -607,6 +623,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     return binding;
   };
   return {
+    get nativeReadUncertain(){return nativeReadUncertain;},
     graph,channel,once,
     get passiveSurfacePending(){return !!passiveSurface;},
     get wizardOpeningPending(){return !!pendingWizard;},
@@ -706,9 +723,10 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     },
 
     async prepareInput() {
-      const fixture=new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/model-input/sales.csv',import.meta.url);
-      const manifest=JSON.parse(await readFile(new URL('../manifest.json',fixture),'utf8'));
-      const pin=verifyJavascriptFixture(await readFile(fixture),manifest);
+      const fixture=nativeInputOnly?new URL('./fixtures/'+nativeInputFixture.file,import.meta.url)
+        :new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/model-input/sales.csv',import.meta.url);
+      const pin=nativeInputOnly?verifyNativeInputFixture(await readFile(fixture))
+        :verifyJavascriptFixture(await readFile(fixture),JSON.parse(await readFile(new URL('../manifest.json',fixture),'utf8')));
       const folder='js-g2-'+randomUUID(),storage='/jsteach/'+folder;
       await record({phase:'input_fixture_verified',pin,storage});
       await accountGuard();
@@ -742,16 +760,17 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       await once('storage-enter',{storage},()=>at(prefix+';FileStorageForm;colName_'+folder).dblclick());
       await at(nav+'>'+folder).waitFor();
       if(await observedDirectory()!==storage)throw Error('Own storage directory did not open');
-      const artifact=await artifactStore.admit({sourcePath:fileURLToPath(fixture),name:'sales.csv',bytes:pin.bytes,sha256:pin.sha256,upload:{directory:storage,overwrite:'reject'}});
+      const artifact=await artifactStore.admit({sourcePath:fileURLToPath(fixture),name:nativeInputOnly?nativeInputFixture.file:'sales.csv',bytes:pin.bytes,sha256:pin.sha256,upload:{directory:storage,overwrite:'reject'}});
       const delivered=await once('input-delivery',{storage,artifact_id:artifact.artifact_id,sha256:pin.sha256},()=>runtime.deliverArtifact({operation_id:'js-input-delivery',artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:Math.min(120000,deadline-Date.now())}));
       if(delivered.outcome?.status!=='SUCCEEDED'||!delivered.upload_operation_id)throw Error('JavaScript source delivery unconfirmed');
-      const request=javascriptInputRequest({prepared,storage,artifact,uploadOperationId:delivered.upload_operation_id,totalMs:deadline-Date.now()});
+      const request=(nativeInputOnly?nativeInputRequest:javascriptInputRequest)({prepared,storage,artifact,uploadOperationId:delivered.upload_operation_id,totalMs:deadline-Date.now()});
       const imported=await once('input-import',{artifact_id:artifact.artifact_id,source_path:request.parameters.settings.source.source_path},()=>runtime.runNodeApply(request));
       if(imported.status!=='SUCCEEDED')throw Error('JavaScript input import unconfirmed: '+JSON.stringify(imported.error??{}));
       const result=imported.output?.output?.ports?.find(p=>p.port===0);
-      const proof=verifyJavascriptTable(result,'input');
+      const proof=nativeInputOnly?verifyNativeInputUi(result):verifyJavascriptTable(result,'input');
+      if(nativeInputOnly&&(!nativeInputEvidence?.native.exact.native_bytes_verified||nativeReadUncertain))throw Error('Native input proof/cleanup unavailable');
       await record({phase:'input_verified',node:imported.output.node,pin,storage,proof,table:result});
-      return {node:imported.output.node,storage,pin,table:result,proof};
+      return {node:imported.output.node,storage,pin,table:result,proof,...(nativeInputOnly?{native_input:nativeInputEvidence}: {})};
     },
     async captureDropTopology() {
       await accountGuard();const before=await graph();requireJavascriptTopology(before);
