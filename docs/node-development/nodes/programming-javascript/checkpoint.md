@@ -15,6 +15,24 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Native INPUT draft: integration findings и возобновление — 2026-09-27
+
+Root проверил новые private binding/contract/read/driver и независимо подтвердил
+fixture33 bytes, SHA `4d731645c25b4aafbdd4c96a477341fcc5ef086ad2bda3dc9a2bfcce7966df84`.
+В draft найдены: отсутствующий snapshot.count при публикации row_count;
+несамодостаточная сериализация binders с module-local imports. Изолированный
+Node vm воспроизвёл ReferenceError collectNativeRuntime и javascriptNativeInputSnapshot.
+Private evidence: native-input-draft-serialization-audit.json. Это промежуточные
+findings, не заявление о дефектах будущего frozen candidate.
+
+Разработчик завершил turn01a0e1b3-d090-7191-80ae-a8809017f78d исторической
+проверкой памяти вместо текущей реализации. Ошибки памяти не было: health/find/read
+успешны. Root возобновил ту же задачу с явным текущим назначением и findings;
+App API подтвердил active/inProgress, turn01a0e1be-50d6-7730-82db-12a528a0fe55,
+revision117. Bootstrap/config/регистрация не менялись. Source handoff и тесты
+ещё не получены; браузер закрыт, G5 и полный план открыты.
+
+
 ### Подготовлен независимый scalar auditor для native INPUT — 2026-09-27
 
 Приватный `audit-native-real-input.py` проверяет полный набор четырёх адресов,
