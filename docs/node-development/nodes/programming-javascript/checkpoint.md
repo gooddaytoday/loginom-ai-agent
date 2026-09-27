@@ -16,6 +16,36 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Roundtrip probe05: private selection identity refusal; отдельное восстановление PASS
+
+Source68/profile47 завершён exit1 CLEANUP_UNCONFIRMED, session31763 terminal.
+Done sealing и explicit JS Execute прошли: completed, owner_verified=true.
+Private Preview prepare прошёл с point668.5,218 и exact ACK. После записи select
+intent возник `Private native Preview: opening identity changed`. Select result,
+F3 intent и output bytes отсутствуют. Сейчас нельзя установить по одному этому
+сообщению, до click или после selection произошёл mismatch; DOM redraw — только
+гипотеза. Не повторять неизвестный жест.
+
+Root проверил input4/4scalar,589journal refs,75source pins. Report SHA256:
+`60e67ba0725f8b751002d518304f8477b6396454b5882d30453ba256c786e9bd`.
+Private native-roundtrip-probe-05-verification.json. Исходный report сохраняет
+package_closed=false/logged_out=false/browser_closed=true; он не переписан.
+
+Отдельная headed recovery05 на том же profile47 без downloads/package mutation
+завершилась exit0: native account jsteach, packages0, logout=true,browserClosed=true.
+Private native-roundtrip-recovery-05.mjs/.json, unified session86456 terminal.
+Host lease CLOSED; profile47 сохранён. Recovery подтверждает итоговое отсутствие
+открытых пакетов и выход, но не превращает исходный прогон в успешный.
+
+Разработчику назначен Fix69: определить точный predicate/phase mismatch с bounded
+диагностикой; допустимый transition перерисовки разрешать лишь после source-backed
+проверки с сохранением native owner/port/data/cell/execution. Добавить negatives
+для чужих объектов/lost effects, сохранить no replay и public deny. Freeze69 ещё
+не передан, новый live не запускался. Следующий профиль должен быть fresh48.
+Полный roundtrip/G5/public handler/CLI ещё не приняты.
+
+
+
 ### Freeze68 проверен; headed roundtrip probe05 запущен
 
 Source node-javascript `5bacf283acde15d12421b0582e1b18ce93c9608e` добавляет частное
