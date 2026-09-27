@@ -636,7 +636,7 @@ c67e5a8abb884352ef16076178e23e9b3a7d44f95be1428c302cf47ada4d58ba;
 integer-safe input contract не выдаёт coercion/cardinality native_baseline_sha256.
 Root сравнил полный before proof с предшествующей JS записью журнала, отдельно
 вычислил digest; не заявляет сравнение с отсутствующим runtime полем.
-Три случая из8 A приняты, весь G5/J24/handler/CLI остаётся открытым.
+Пять случаев из8 A приняты, весь G5/J24/handler/CLI остаётся открытым.
 
 
 A-get-exact/profile74, original session15883 terminal exit0/CHARACTERIZED,
@@ -654,3 +654,17 @@ Report SHA70d4e965bf110e355ac46709db1c4dfd8dbc60b18b23ee6a368eaccf68631d71.
 пользователь сообщил случайный клик. FAILED evidence сохранён, новый run
 после проверенной очистки на неизменном source83 прошёл. Это наблюдение точного
 GetColumn(0), не доказательство всех вариантов имён/индексов.
+
+
+A-getcolumn-exact/profile77, original95451 terminal exit0/CHARACTERIZED,
+cleanup3/3; independent12cells/634refs/1265pins PASS. Report SHA
+ec53ccf5b735d344435335d024b091b9addb56032ddc1b5a8cb0f081ac2b8de1.
+A-columns-index/profile78, original16196 terminal exit0/CHARACTERIZED,
+cleanup3/3; independent12cells/608refs/1265pins PASS. Report SHA
+a57aadf361c3fd9d59cfe5842226f45bb864d19060978bf45c8d2d78678a6697.
+Оба результата относятся только к точным исходникам каталога на Loginom7.4.2.
+
+A-columns-exact/profile79 original10136 failed до импорта/JS: после upload
+серверная копия не проверена из-за DISCOVERY_READY_CHANGED. Cleanup подтверждён,
+JS семантика не наблюдалась. Не принят; original receipt требует read-only
+reconciliation, upload не повторять. Полные сведения в актуальном checkpoint.

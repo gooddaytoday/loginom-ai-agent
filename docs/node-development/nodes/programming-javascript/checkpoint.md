@@ -16,6 +16,62 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Возобновление: OpenViking работает; A5/8 PASS; проверка загрузки требует reconciliation
+
+MCP health/find/read успешны. Случайный клик пользователя относился к
+profile75; fresh profile76 прошёл без изменения source83. Дополнительно приняты
+A-getcolumn-exact/profile77 и A-columns-index/profile78. Текущая матрица:
+A-get-index, A-get-exact, A-getcolumn-index, A-getcolumn-exact, A-columns-index
+**characterized**; A-columns-exact **unresolved**, оба IsNull **not_run**.
+
+Последний A-columns-exact/profile79 original10136 **terminal exit1 FAILED**,
+evidence native-named-columns-exact-probe-01. Report SHA
+44a078c22e130a13b2de1613311b1437fb0aff3bd785d8f07509516d1986dbb4.
+Загрузка55-byte CSV была submitted; журнал line42/43: read-back отказал
+DISCOVERY_BROWSER_UNCERTAIN, причина DISCOVERY_READY_CHANGED. Между двумя
+наблюдениями тот же storage перешёл от ready/empty к loading/bg-mask-message;
+client/lib/artifact-discovery.mjs:81 намеренно отказывает при таком изменении.
+Line44: ARTIFACT_DELIVERY_INCOMPLETE, destination bytes требуют inspection.
+Это наблюдённая смена готовности UI, не доказательство повреждения файла,
+не ошибка Columns API и не подтверждённое новое вмешательство пользователя.
+Импорт и JS не начинались. Cleanup3/3 и отсутствие pinned Chromium подтверждены.
+Исходную загрузку **не повторяли**, серверные байты пока не проверены.
+
+Следующий шаг: отдельное headed **read-only reconciliation** точного пути
+из original upload receipt; не upload/JS replay и не обход новым operation ID.
+Сохранить SHA серверной копии или конкретный отказ. Затем решить вопрос
+обработки смены readiness перед новым фиксированным кейсом. Guard не ослаблять,
+исторический FAILED не превращать в PASS. Private diagnosis:
+`named-columns-exact-setup-diagnosis.json` в каталоге кампании.
+
+Все браузеры закрыты; host lease retained, browser_status=closed.
+Source83 commit562f8ffebf8f неизменён; полный G5/handler/CLI/цель открыты.
+Developer design-only task failed из-за Codex usage limit до начала работы;
+не считать attribution design готовым. Основная задача может продолжать
+проверку уже закреплённого кода и документации. Никакого merge/push/release.
+
+
+### A-columns-index PASS; A-columns-exact RUNNING
+
+Profile78/original16196 terminal exit0, cleanup3/3; independent audit12cells,
+608refs,1265pins PASS. Report SHA
+a57aadf361c3fd9d59cfe5842226f45bb864d19060978bf45c8d2d78678a6697.
+A5/8 accepted. A-columns-exact/profile79,
+evidence native-named-columns-exact-probe-01, **original10136 RUNNING**.
+Source83 unchanged, headed DISPLAY=:1/sandbox; ждать оригинальный процесс.
+
+
+### A-getcolumn-exact PASS; A-columns-index RUNNING
+
+Profile77/original95451 terminal exit0, cleanup3/3; independent audit12cells,
+634refs,1265pins PASS. Report SHA
+ec53ccf5b735d344435335d024b091b9addb56032ddc1b5a8cb0f081ac2b8de1.
+A4/8 accepted. Следующий A-columns-index/profile78,
+evidence native-named-columns-index-probe-01, **original16196 RUNNING**.
+Предыдущий Chromium отсутствует, toolchain/source hashes verified,
+headed DISPLAY=:1/sandbox; ждать оригинальный процесс до terminal.
+
+
 ### A-getcolumn-index PASS; A-getcolumn-exact RUNNING
 
 Fresh profile76/original80206 terminal exit0/CHARACTERIZED, cleanup3/3;
