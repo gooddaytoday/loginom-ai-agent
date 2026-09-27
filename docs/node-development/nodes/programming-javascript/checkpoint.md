@@ -18,6 +18,13 @@
 
 ### String roundtrip PASS; следующий bounded slice — int64
 
+Дополнительно подготовлен private audit-native-int64-roundtrip.py, SHA
+4d9f8521b52f26bbdb0796e12baf407c43ca88b7d97ff2b0024ec0c2c516e60f.
+Он связывает3scalar audits с различными read IDs, общими document/workflow/package,
+неизменным upstream node/port/execution и полной исходной completed_child receipt;
+JS node/execution должны отличаться. Synthetic3positive/12negativePASS, включая
+outside-safe rounding characterization без exactPASS. Live int64 ещё не запускался.
+
 Root подготовил private audit-native-int64.py SHA
 932fdd3bb5f93945cd17b7c0c02a5ca5616eb6d95a76a6b90540f5dd3505696f.
 Шесть canonical decimal→signed64LE encodings проверены Python struct без float;
