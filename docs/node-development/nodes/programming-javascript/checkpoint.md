@@ -15,6 +15,26 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze65: RG1 diagnostic проверен; roundtrip probe02 запущен
+
+Source node-javascript `16edaad6f863c9b6a865781fbd5aa257586ce7ba` сохраняет все8
+условий exact edge/port, включая param0 и nonempty edge GUID. На отказе RG1
+показывает booleans predicates, список отказов и bounded enum-классы type/subtype/
+param; raw GUID/labels/handles не выводятся. Это диагностическая правка, не
+исправление ещё неизвестной причины. Graph failure остаётся reserved/no-replay.
+
+Root **666/666 PASS**, fail/skip0,73pins unchanged до/после;syntax2changedfiles PASS.
+Проверены actual serialized graph binder, все8 отдельных отказов, bounded output,
+production operator1200char error/redactor/journal+disk и сохранность полного
+RG1 при Playwright prefix в пределах500chars. Прежние regression suites сохранены.
+Private operator65-root-test-source.json и native-roundtrip-probe-02-source.json.
+
+Разработчик idle_freeze65. После подтверждённого cleanup01 и сохранения profile43
+назначен fresh profile44; повторно проверены Node/Chromium SHA. Native-roundtrip-
+probe02 запущен headed DISPLAY=:1/sandbox. На момент checkpoint RUNNING; RG1,
+результат и cleanup ещё не получены. Full plan/G5 остаются active/incomplete.
+
+
 ### Roundtrip probe01: отказ exact edge/port до выполнения JS
 
 Source64/profile43 завершён exit1 FAILED, work_stage verify-js-input-port.
