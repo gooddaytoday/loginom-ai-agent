@@ -16,6 +16,32 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze48: пассивное ожидание execution toast, live запущен — 2026-09-27
+
+Повторная проверка OpenViking после перезапуска: MCP health, actor search и read
+успешны. Doctor0.8.1: credentials/system-status/MCP15tools/ready PASS,
+0failures; warning касается исторических aborted/transcript ошибок, текущих
+отказов нет. Конфигурация не менялась.
+
+Root проверил diff, exact ModelForm→NotifyErrMsg→NotifyMsgImpl→Ext.window.Toast
+и выполнил112 tests: column-editor36,stage-observer14,execution-evidence46,
+batch8,link-topology8.30/30 source hashes до/после совпали. Source commit
+`b4801d39d9`: только private execution-runtime и его regression tests.
+После единственного launch сохраняется dispatched evidence, original native
+binding удерживается до terminal observation. Passive wait ограничен исходным
+execution deadline и61500ms: только стандартные autoClose toast, без новых
+жестов/close/getter вызовов. Foreign modal, mask, подмена binding/notification
+или неподдержанный lifecycle дают refusal; timeout не повторяет Execute.
+Toast не получает ownership: terminal proof остаётся за свежими process records
+и прежними shared console guards.
+
+Batch48 RUNNING: семь оставшихся cases, начиная code-sentinel-execute;
+freshprofile21, DISPLAY=:1/headed, Chromium1246, sandbox enabled.
+Root-test/source receipts и exclusive host lease сохранены приватно.
+Developer idle/source frozen. Это ещё не live PASS: полный план, public handler,
+итоговое ревью и автономная CLI-приёмка остаются открыты.
+
+
 ### Batch47: declared table/reopen FULL PASS; error toast блокирует console — 2026-09-27
 
 Root-аудит1773 journalSHA,3 input reads/90cells,1 fresh completed execution,
