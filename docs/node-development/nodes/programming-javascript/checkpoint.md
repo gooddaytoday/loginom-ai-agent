@@ -15,6 +15,15 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-isnull-case/profile93 RUNNING
+
+Fresh profile93 после verified profile92 cleanup;1265pins/toolchains/no pinned
+Chromium проверены. Source86 unchanged, evidence native-named-isnull-case-probe-01,
+**original exec4394 RUNNING**, headed DISPLAY=:1/sandbox/original deadline.
+Ожидать terminal этой session; затем independent failed/completed audit по
+фактическому результату. Предыдущие Get/GetColumn/Columns исходы не переносить.
+
+
 ### B-columns-missing CHARACTERIZED: undefined
 
 Profile92/original7925 terminal exit0/CHARACTERIZED. Independent audit9cells/
