@@ -1,22 +1,22 @@
 # G5 native types: следующий ограниченный шаг
 
-Статус на 2026-09-27: **private real/NULL input-only admission подтверждён;
-private JS identity roundtrip реализован, live результат ещё не получен**. Source63:
-`ab76a768b2d5c3190b79f11dbebec2ff7c0b246d`, root352/352теста PASS.
-Headed probe09/profile42 завершён exit0 OBSERVED/native-input-observed, durable
-journal ACK и original cleanup ALL PASS. Root Python scalar oracle независимо
-подтвердил четыре native значения NULL/+0/−1.25/10.125, tags1/5 и binary64 bytes;
-438journal refs/66pins проверены. SHA и private receipt — в [checkpoint](checkpoint.md).
-Probe08 сохраняет FAILED из-за прежнего redaction имени поля; source63 исправляет
-имя без ослабления redactor/ACK. Проверка ограничена owned static import-only
-fixture и observed_local; она не закрывает JS OUTPUT, ABA или весь G5.
+Статус на 2026-09-27: **private real/NULL INPUT и JS identity roundtrip подтверждены live**.
+Source70 `c1ae171e50a2b3368d72831fb27ecca84d4a58a2`, root814 main+3deny PASS.
+Headed native-roundtrip-probe07/profile49 завершён exit0 OBSERVED, original cleanup
+ALL PASS. Независимый Python oracle проверил12/12 ячеек: INPUT до JS, JS OUTPUT и
+INPUT после JS; NULL/+0/−1.25/10.125, exact significant binary64 bytes, distinct
+read IDs и неизменное upstream execution.627journal refs/75pins проверены.
+Private receipt и SHA — в [checkpoint](checkpoint.md). Это observed_local;
+server atomic snapshot/отсутствие ABA и весь G5 не доказаны.
 
-Реализован отдельный `javascript-native-input-live.mjs` и import-only binding;
-Source64 добавляет отдельные JS-output/upstream bindings и private identity
-roundtrip (649 root tests PASS); первый headed-прогон завершён отказом exact edge/port после подготовки INPUT
-и подключения JS, до его исполнения. Диагностический probe02/source65 установил JS input
-FParam=3 (multiple+optional) при ожидании0; исправление готовится, подробности
-в checkpoint. Остальные семейства и G5 целиком ещё предстоят.
+Private input-only admission ранее подтверждён source63/probe09; source64–70
+добавили отдельные JS/upstream bindings, source/mode Done seal, точный AddPort
+admission и owned-port selection+F3 с проверенным postclick DOM transition.
+Следующий slice — отдельные bool/string fixtures с native INPUT до JS, точным
+NULL/empty/false/UTF8 и независимым roundtrip. Потом safe int64, outside-safe
+characterization, Date, cardinality и остальная матрица плана. Нельзя подгонять
+expected под importer или заменять независимый input JS-генератором.
+
 Далее сохранён дизайн и анализ **исходного source55**, поэтому указания
 «текущий» внутри анализа относятся к этой базе, а не к source63.
 Основание source55: `520ce1f78ce39859d3ce30a65db93e80c9081747`.

@@ -16,6 +16,38 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Roundtrip probe07 PASS: real/NULL вход → JS → повторное чтение входа
+
+Source70/profile49 завершён exit0 OBSERVED/native-roundtrip-observed, session67575
+terminal. Done sealed; explicit own JS Execute completed. Private select прошёл
+с shape_transition={rebound:true,previous_connected:false}; F3 открыл принадлежащий
+Preview. Прочитаны полный JS output4x1 и исходный input4x1 с новым read ID;
+оба Preview закрыты. Original package_closed/logged_out/browser_closed=true.
+
+Root независимый Python oracle проверил **12/12 ячеек на трёх стадиях**:
+NULL отдельно от +0, −1.25,10.125; tags1/5 и exact binary64 significant bytes.
+Проверены distinct read IDs, общий document/package/workflow, тот же upstream
+node/port/execution и отдельное JS execution. Oracle сам не доказывает ownership;
+оно дополнительно проверено runtime receipts, completed execution,75sourcepins,
+627journal refs, exact journal ACK/final event и release accounting4/4 каждой
+стадии. Нет server snapshot/гарантии отсутствия ABA; это observed_local.
+
+Report SHA256 `594fe2060b54a17785970a9ba344bd756996b0ddb98113bed998e47a3f6f2c2b`.
+Private native-roundtrip-probe-07-verification.json, report и journals сохранены.
+Lease CLOSED, profile49 сохранён. Recovery для этого успешного прогона не нужна.
+Source70 regression814+3PASS. Это первый подтверждённый private real/NULL JS
+roundtrip; весь G5, другие типы/кардинальности/сохранение и public handler/CLI
+ещё не закрыты. Next/Done остаются ambiguous относительно собственных эффектов.
+
+Разработчику назначен следующий bounded bool/string slice: explicit immutable
+fixtures/NULL marker, native INPUT до JS, NULL/empty/false/literalstrings/Unicode,
+потом fixed Data-only copy, OUTPUT и upstream reread. Expected не подгонять при
+отказе importer; Date/int64 отдельные будущие семейства. Source/tests/Freeze71
+перед live; browser и commit по-прежнему выполняет root. Следующий профиль50
+ещё не назначен.
+
+
+
 ### Freeze70: post-selection DOM transition; headed probe07 запущен
 
 Source node-javascript `c1ae171e50a2b3368d72831fb27ecca84d4a58a2` допускает новый
