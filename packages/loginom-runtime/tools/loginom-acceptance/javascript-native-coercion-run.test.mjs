@@ -134,7 +134,7 @@ for(const mode of ['integer','failed','package_closed','logged_out','browser_clo
  const report={status:'PENDING_EVIDENCE',cleanup:{...clean}};if(Object.hasOwn(report.cleanup,mode))report.cleanup[mode]=false;
  const source=readFileSync(new URL('./javascript-live.mjs',import.meta.url),'utf8');
  const start=source.lastIndexOf('  if (!report.cleanup.package_closed'),end=source.indexOf('  console.log(JSON.stringify({status:report.status',start);
- const publish=vm.runInNewContext('(async()=>{'+source.slice(start,end)+'})',{report,coercionTrial:trial,executionRecord:async e=>e,Date,
+ const publish=vm.runInNewContext('(async()=>{'+source.slice(start,end)+'})',{report,calibrationTrial:null,coercionTrial:trial,executionRecord:async e=>e,Date,
   save:async()=>{if(mode==='evidence')throw Error('fsync');},redactor:{text:x=>x}});
  await publish();
  assert.equal(report.status,mode==='integer'?'CHARACTERIZED':mode==='failed'?'UNRESOLVED':mode==='evidence'?'EVIDENCE_UNCONFIRMED':'CLEANUP_UNCONFIRMED');

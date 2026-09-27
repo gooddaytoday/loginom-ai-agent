@@ -161,7 +161,7 @@ for(const mode of ['pass','bad-ack','bad-lifecycle'])test('empty production orch
   const source=readFileSync(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
   const start=source.indexOf('    async readNativeRoundtrip(input,node,execution) {'),end=source.indexOf('    async readNativeCivil(',start);
   const runtime=vm.runInNewContext('({'+source.slice(start,end)+'})',{
-    nativeNamedCaseId:undefined,nativeFixtureId:fixtureId,nativeInputFixture:javascriptNativeFixture(fixtureId),nativeRoundtripProbe:javascriptNativeRoundtripProbe(fixtureId),
+    nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:fixtureId,nativeInputFixture:javascriptNativeFixture(fixtureId),nativeRoundtripProbe:javascriptNativeRoundtripProbe(fixtureId),
     verifyNativeRoundtripInput,verifyNativeRoundtripOutcome,verifyNativeRoundtripExecution:()=>{},validateNativeSource:()=>{},freezeCivilEvidence,
     page:{evaluate:async()=>{}},completeJavascriptNativeRoundtrip:()=>{},prepared:{document_id:'d',workflow_ref:{workflow_id:'w'}},
     deadline:Date.now()+10000,randomUUID:()=>String(events.length),execute:()=>{},nativeReadUncertain:false,sessionId:'test',origin:'http://test',build:'7.4.2',

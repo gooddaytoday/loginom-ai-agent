@@ -1,5 +1,6 @@
+import {javascriptCalibrationCase} from './javascript-calibration-cases.mjs';
 import {javascriptNamedCase} from './javascript-native-named-cases.mjs';
-import {verifyJavascriptNamedInput,verifyJavascriptNamedOutcome} from './javascript-native-named-contract.mjs';
+import {verifyJavascriptIntegerInput,verifyJavascriptNamedInput,verifyJavascriptNamedOutcome} from './javascript-native-named-contract.mjs';
 import {readNativeNamedFailure} from './javascript-native-named-failure-driver.mjs';
 import {verifyNativeCivil,freezeCivilEvidence} from './javascript-native-datetime-civil.mjs';
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
@@ -646,8 +647,9 @@ export async function configureJavascriptManualMapping({reader,cleanupReader,ref
   }
 }
 
-export async function createJavascriptExecutionRuntime({page,prepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real',nativeNamedCaseId}) {
-  const nativeInputFixture=javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=javascriptNativeRoundtripProbe(nativeFixtureId,nativeNamedCaseId);
+export async function createJavascriptExecutionRuntime({page,prepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real',nativeNamedCaseId,nativeCalibrationId}) {
+  if(nativeCalibrationId!==undefined&&(nativeNamedCaseId!==undefined||nativeFixtureId!=='integer-safe'))throw Error('Calibration identity conflict');
+  const nativeInputFixture=javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=nativeCalibrationId!==undefined?javascriptCalibrationCase(nativeCalibrationId):javascriptNativeRoundtripProbe(nativeFixtureId,nativeNamedCaseId);
   if(account!=='jsteach'||prepared.status!=='READY'||prepared.package_ref?.persisted!==false)throw Error('Own JavaScript draft required');
   const origin='http://logi-test-plan.bg.local',build='7.4.2',sessionId='js-g2-'+randomUUID();
   const journalOnce=createJavascriptEffectJournal({record,deadline});
@@ -674,7 +676,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
   const pinned={actions:new Map(actions.map(action=>[action.action_key,action])),selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
   const artifactStore=await createArtifactStore({directory:directory+'/input-artifacts',sessionId});
   const support=nativeInputOnly?createJavascriptNativeInputSupport({targetOrigin:origin,targetBuild:build,fixtureId:nativeFixtureId,
-    onProof:async(proof,owner)=>{nativeInputEvidence=nativeFixtureId==='civil-datetime'||nativeInputFixture.output_input_rows||nativeInputFixture.coercion||nativeNamedCaseId!==undefined?freezeCivilEvidence(structuredClone(proof)):proof;nativeInputOwner=owner;},
+    onProof:async(proof,owner)=>{nativeInputEvidence=nativeFixtureId==='civil-datetime'||nativeInputFixture.output_input_rows||nativeInputFixture.coercion||nativeNamedCaseId!==undefined||nativeCalibrationId!==undefined?freezeCivilEvidence(structuredClone(proof)):proof;nativeInputOwner=owner;},
     onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0
       ||state.status!=='completed'||state.requests!==nativeInputFixture.rows||state.releasedRequests!==nativeInputFixture.rows||state.releasedResponses!==nativeInputFixture.rows;
       await record({phase:'javascript_native_input_lifecycle',state,uncertain:nativeReadUncertain});}})
@@ -874,12 +876,12 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     },
     async armNativeRoundtrip(input) {
       if(!nativeInputOnly||nativeReadUncertain)throw Error('Private native input required');
-      const proof=nativeNamedCaseId!==undefined?verifyJavascriptNamedInput(input,nativeNamedCaseId):verifyNativeRoundtripInput(input,nativeFixtureId);validateNativeSource();
+      const proof=nativeCalibrationId!==undefined?verifyJavascriptIntegerInput(input):nativeNamedCaseId!==undefined?verifyJavascriptNamedInput(input,nativeNamedCaseId):verifyNativeRoundtripInput(input,nativeFixtureId);validateNativeSource();
       const saved=await record({phase:'native_roundtrip_input_before_js',proof});
-      if(JSON.stringify(saved.proof)!==JSON.stringify(proof)||(nativeFixtureId.startsWith('integer-coercion-')||nativeNamedCaseId!==undefined)&&saved.phase!=='native_roundtrip_input_before_js')throw Error('Pre-JS baseline ACK differs');
+      if(JSON.stringify(saved.proof)!==JSON.stringify(proof)||(nativeFixtureId.startsWith('integer-coercion-')||nativeNamedCaseId!==undefined||nativeCalibrationId!==undefined)&&saved.phase!=='native_roundtrip_input_before_js')throw Error('Pre-JS baseline ACK differs');
       const armed=await page.evaluate(armJavascriptNativeRoundtrip,{binding:{...proof.binding,read_id:proof.raw.read_id},...nativeRoundtripProbe});
       const event={phase:'native_roundtrip_armed',...armed},ack=await record(event);
-      if(nativeNamedCaseId!==undefined&&!Object.keys(event).every(k=>JSON.stringify(ack?.[k])===JSON.stringify(event[k])))throw Error('Named arm journal ACK differs');
+      if((nativeNamedCaseId!==undefined||nativeCalibrationId!==undefined)&&!Object.keys(event).every(k=>JSON.stringify(ack?.[k])===JSON.stringify(event[k])))throw Error('Named arm journal ACK differs');
       return armed;
     },
     async checkNativeRoundtripBeforeExecute() {
@@ -890,7 +892,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       validateNativeSource();
       const result=await page.evaluate(bindJavascriptNativeRoundtripGraph,{node,inputPortGuid});
       const event={phase:'native_roundtrip_graph_bound',...result},ack=await record(event);
-      if(nativeNamedCaseId!==undefined&&!Object.keys(event).every(k=>JSON.stringify(ack?.[k])===JSON.stringify(event[k])))throw Error('Named graph journal ACK differs');
+      if((nativeNamedCaseId!==undefined||nativeCalibrationId!==undefined)&&!Object.keys(event).every(k=>JSON.stringify(ack?.[k])===JSON.stringify(event[k])))throw Error('Named graph journal ACK differs');
     },
     async readNativeCoercionFailure(input,node,execution) {
       if(!nativeInputFixture.coercion||nativeReadUncertain)throw Error('Fixed coercion failed route required');
@@ -901,27 +903,28 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
         onState:async(state,uncertain)=>{nativeReadUncertain=uncertain;}});
     },
     async readNativeNamedFailure(input,node,execution) {
-      if(nativeNamedCaseId===undefined||nativeReadUncertain)throw Error('Fixed named failed route required');
-      return readNativeNamedFailure({page,input,node,execution,caseId:nativeNamedCaseId,workflow:prepared.workflow_ref,deadline,
+      if(nativeNamedCaseId===undefined&&nativeCalibrationId===undefined||nativeReadUncertain)throw Error('Fixed named/calibration failed route required');
+      return readNativeNamedFailure({page,input,node,execution,caseId:nativeCalibrationId??nativeNamedCaseId,workflow:prepared.workflow_ref,deadline,
         targetOrigin:origin,targetBuild:build,validateSource:validateNativeSource,
         options:{execute,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>!nativeReadUncertain,
           receiptOptions:(id,key,signature)=>({receipt_namespace:sessionId,receipt_id:id,receipt_signature:signature,operation_id:id})},
         onState:async(state,uncertain)=>{nativeReadUncertain=uncertain;}});
     },
     async checkNativeNamedEvidence() {
-      if(nativeNamedCaseId===undefined||nativeReadUncertain)throw Error('Named idle evidence required');
+      if(nativeNamedCaseId===undefined&&nativeCalibrationId===undefined||nativeReadUncertain)throw Error('Named/calibration idle evidence required');
       validateNativeSource();
       await page.evaluate(id=>{
         const s=globalThis.__loginomJavascriptNativeRoundtripV1,failed=globalThis.__loginomJavascriptNamedFailureV1;
-        if(s?.named_case_id!==id||s.input_fixture_id!=='integer-safe')throw Error('Named owner differs');
+        if((['K1-parse-v1','K2-sync-v1'].includes(id)?s?.calibration_id!==id||s.named_case_id!==undefined:s?.named_case_id!==id||s.calibration_id!==undefined)||s.input_fixture_id!=='integer-safe')throw Error('Named owner differs');
         s.check();if(failed)failed.checkIdle();
         const read=globalThis.__loginomJavascriptNativeRoundtripReadV1,upstream=s.bindings.get('upstream');
         if(!upstream||read?.document!==document||read.poisoned||read.active||read.last?.id!==upstream.readId
           ||read.last.status!=='completed'||!read.last.published||read.last.pending!==0||read.last.requests!==4
           ||read.last.releasedRequests!==4||read.last.releasedResponses!==4)throw Error('Named final upstream lifecycle differs');
-      },nativeNamedCaseId);
+      },nativeCalibrationId??nativeNamedCaseId);
     },
     async readNativeRoundtrip(input,node,execution) {
+      if(nativeCalibrationId!==undefined)throw Error('Calibration never reads OUTPUT');
       const before=nativeNamedCaseId!==undefined?verifyJavascriptNamedInput(input,nativeNamedCaseId):verifyNativeRoundtripInput(input,nativeFixtureId);validateNativeSource();
       verifyNativeRoundtripExecution(execution,node,nativeFixtureId,nativeNamedCaseId);
       await page.evaluate(completeJavascriptNativeRoundtrip,{execution,source_sha256:nativeRoundtripProbe.source_sha256});

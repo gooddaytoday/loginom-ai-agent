@@ -19,15 +19,16 @@ import assert from 'node:assert/strict';
 import {fake,sourceEvidence} from './javascript-native-input.test.mjs';
 import {readJavascriptNativeInput} from './javascript-native-input-read.mjs';
 import {decodeVariantFrame} from '../../client/lib/variant-native-decode.mjs';
+import {javascriptCalibrationCase} from './javascript-calibration-cases.mjs';
 import {nativeRoundtripProbe,javascriptNativeRoundtripProbe} from './javascript-native-roundtrip-contract.mjs';
 import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,bindJavascriptNativeRoundtripSource,bindJavascriptNativeRoundtripSchema,completeJavascriptNativeRoundtrip,prepareJavascriptNativeRoundtripWizard,sealJavascriptNativeRoundtripDone} from './javascript-native-roundtrip-owner.mjs';
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {readJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus,cancelJavascriptNativeRoundtrip} from './javascript-native-roundtrip-read.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
-export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real',namedCaseId,reply,sharedPortGuid,beforeSchema,beforeSource,coercionOutput}={}){
-  const nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixtureId,namedCaseId);
+export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real',namedCaseId,calibrationId,reply,sharedPortGuid,beforeSchema,beforeSource,coercionOutput}={}){
+  const nativeRoundtripProbe=calibrationId!==undefined?javascriptCalibrationCase(calibrationId):javascriptNativeRoundtripProbe(fixtureId,namedCaseId);
   let mutate,mutateAfter,defer=false;
-  const f=await fake({fixtureId,coercionOutput,beforeBind:f=>{if(namedCaseId!==undefined)f.b.completed_child={...sourceEvidence('integer-safe').execution};if(sharedPortGuid){f.port.FGuid=sharedPortGuid;f.b.port_guid=sharedPortGuid;}},change:(fixture,response,request)=>{mutate?.();reply?.(fixture,response,request);},deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
+  const f=await fake({fixtureId,coercionOutput,beforeBind:f=>{if(namedCaseId!==undefined||calibrationId!==undefined)f.b.completed_child={...sourceEvidence('integer-safe').execution};if(sharedPortGuid){f.port.FGuid=sharedPortGuid;f.b.port_guid=sharedPortGuid;}},change:(fixture,response,request)=>{mutate?.();reply?.(fixture,response,request);},deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
   const initialRead=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'before'});
   f.model.FPreviewManager.FPreviewVisible=false;
   await f.page.evaluate(armJavascriptNativeRoundtrip,{binding:{...f.b,read_id:'before'},...nativeRoundtripProbe});
@@ -222,7 +223,7 @@ test('production roundtrip trial revalidates before one Execute and never retrie
   for(const failure of ['none','characterized','admission','read','done-lost','done-unconfirmed','preflight-ack','seal-ack']){
     const steps=[],report={execution_probe:{}},deadline=Date.now()+10000;
     const runner=vm.runInNewContext(source.slice(start,end)+'\nrunExecutionTrial',{
-      nativeRoundtrip:true,coercionTrial:null,namedTrial:null,discoveryProbe:null,phaseDeadline:()=>deadline,executionCase:'code-table-execute',report,owner:{prefix:'p'},executionNode:{node_id:'js'},executionInput:{},
+      nativeRoundtrip:true,calibrationTrial:null,coercionTrial:null,namedTrial:null,discoveryProbe:null,phaseDeadline:()=>deadline,executionCase:'code-table-execute',report,owner:{prefix:'p'},executionNode:{node_id:'js'},executionInput:{},
       executionRuntime:{checkNativeRoundtripBeforeExecute:async()=>{steps.push('admission');if(failure==='admission')throw Error('changed input');},
         captureExecutionBoundary:async()=>({native:{dispose:async()=>steps.push('dispose')}}),verifyExecutionBoundary:async()=>steps.push('boundary'),
         executeNode:async(node,limit,trial)=>{assert.equal(limit,deadline);assert.equal(trial.source_sha256,nativeRoundtripProbe.source_sha256);steps.push('execute');return {};},

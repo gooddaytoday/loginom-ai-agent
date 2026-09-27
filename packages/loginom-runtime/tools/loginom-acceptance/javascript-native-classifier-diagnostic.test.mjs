@@ -96,7 +96,7 @@ for(const transportFails of [false,true])test('actual live catch/finally retains
     closed:()=>events.push('browser-close')});
   const outcome=await vm.runInContext(`(async()=>{
     const report={stage:'prepare-typed-input',cleanup:{package_closed:false,logged_out:false,browser_closed:false}},redactor={redact:x=>x,text:x=>x},javascriptProbeFailure=e=>({message:e.message});
-    const coercionTrial=null,namedTrial=null,nativeRoundtrip=true,nativeClassifierBinding={context:{node_id:'n'}},discoveryProbe=false;
+    const calibrationTrial=null,coercionTrial=null,namedTrial=null,nativeRoundtrip=true,nativeClassifierBinding={context:{node_id:'n'}},discoveryProbe=false;
     let cleaning=false;
     const executionRuntime=null,paletteAdmission=null,createDeadline=0,packageHandle=null,owner=null,initialOpening={},openedWizard=false,browserLifecycle=null;
     const noop=async()=>{}, locator={filter(){return this},locator(){return this},waitFor:noop,innerText:async()=> 'account'};
@@ -120,7 +120,7 @@ test('actual journal integration retains only verified completed graph binding a
   const sandbox=vm.createContext({});
   const result=await vm.runInContext(`(async()=>{
     let nativeClassifierBinding,executionJournalLine=0;
-    const nativeRoundtrip=true,discoveryProbe=false,report={stage:'prepare-typed-input'},save=async()=>{},compactJavascriptJournalRecord=()=>({});
+    const calibrationTrial=null,nativeRoundtrip=true,discoveryProbe=false,report={stage:'prepare-typed-input'},save=async()=>{},compactJavascriptJournalRecord=()=>({});
     let persist=true;
     const executionJournal=async e=>{if(!persist)throw Error('journal failure');return e;};
     ${code}

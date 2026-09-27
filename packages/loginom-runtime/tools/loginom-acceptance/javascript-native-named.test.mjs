@@ -6,6 +6,8 @@ import {readFileSync} from 'node:fs';
 import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {javascriptCalibrationIds,javascriptCalibrationCase} from './javascript-calibration-cases.mjs';
+import {verifyNativeRoundtripRead} from './javascript-native-roundtrip-contract.mjs';
 import {javascriptNamedIds,javascriptNamedCase,javascriptNamedProbe} from './javascript-native-named-cases.mjs';
 import {verifyJavascriptNamedInput,verifyJavascriptNamedRead,verifyJavascriptNamedOutcome} from './javascript-native-named-contract.mjs';
 import {createJavascriptNamedTrial,writeJavascriptNamedReport} from './javascript-native-named-run.mjs';
@@ -23,7 +25,7 @@ import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {runJavascriptOperator} from './javascript-live.mjs';
 const clone=x=>JSON.parse(JSON.stringify(x));
 const clean={package_closed:true,logged_out:true,browser_closed:true};
-function inputProof(x){
+export function inputProof(x){
  const binding={...x.f.b,origin:new URL(x.f.b.origin).href,read_id:'before'},raw=x.inputRaw??x.before,lifecycle={...clone(x.f.env.__loginomJavascriptNativeInputReadV1.last),retired:false};
  // Production input driver verifies these source texts, then removes them before journaling.
  delete binding.cookie_sources;delete binding.count_loader_sources;
@@ -45,28 +47,30 @@ async function stages(id,{marker=10n,tag=20}={}){
  }
  results.outcome=verifyJavascriptNamedOutcome(results,id);return {x,results,input:proof.input,execution:x.execution};
 }
-async function failedStage(id,{beforeSeal,reply,message='Error: unexpected test failure'}={}){
- const x=await roundtrip({fixtureId:'integer-safe',namedCaseId:id,wizardOnly:true,reply});
+export async function failedStage(id,{beforeSeal,reply,message='Error: unexpected test failure'}={}){
+ const calibration=javascriptCalibrationIds.includes(id);
+ const x=await roundtrip({fixtureId:'integer-safe',...(calibration?{calibrationId:id}:{namedCaseId:id}),wizardOnly:true,reply});
  await x.prepare();x.dispose();await x.seal();
- const proof=inputProof(x),node={document_id:'d',workflow_id:'w',node_id:'js'},c=javascriptNamedCase(id);
+ const proof=inputProof(x),node={document_id:'d',workflow_id:'w',node_id:'js'},c=calibration?{...javascriptCalibrationCase(id),id}:javascriptNamedCase(id);
  const execution={verified:true,status:'failed',failure_verified:true,owner_verified:true,cleanup_complete:true,output_refreshed:false,
   node,root_id:'1',group_id:'4',group_record_id:'4',process_id:'4.1',process_record_id:'5',execution_id:'d:1:4',
-  ownership_source:'native_process_model_identity_and_show_node',error_source:'native_child_error_details',error:{code:'NODE_EXECUTION_FAILED',message},
+  ownership_source:'native_process_model_identity_and_show_node',error_source:'native_child_error_details',error:{code:'NODE_EXECUTION_FAILED',message:message.trim().slice(0,1000)},
   trial:{phase:'initial',node_id:'js',source_sha256:c.source_sha256},fresh_baseline:{node,root_id:'1',roots:[{process_id:'2'}]},
   launch_identity:{node,root_id:'1',group_id:'4',group_record_id:'4',execution_id:'d:1:4'}};
  const child={internalId:5,data:{id:'4.1',Status:2,ErrorDetails:message,ModelNode:x.js.data,ProgressBarCls:'bg-progress-ptpsError',CanCancelProcess:false},childNodes:[]};
  const group={internalId:4,data:{id:'4',Status:2,ErrorDetails:'Failed child',loaded:true,ProgressBarCls:'bg-progress-ptpsError',CanCancelProcess:false},childNodes:[child]};
  x.f.root.childNodes.push(group);
- const seal=()=>x.f.page.evaluate(sealJavascriptNamedFailure,{named_case_id:id,source:c.source,source_sha256:c.source_sha256,execution});
+ const seal=()=>x.f.page.evaluate(sealJavascriptNamedFailure,{...(calibration?{calibration_id:id}:{named_case_id:id}),source:c.source,source_sha256:c.source_sha256,execution});
  const fixture={x,...proof,node,c,execution,child,group,seal};beforeSeal?.(fixture);return fixture;
 }
-async function readFailed(s){
+export async function readFailed(s){
+ const identity=javascriptCalibrationIds.includes(s.c.id)?{calibration_id:s.c.id}:{named_case_id:s.c.id};
  const failed=await s.seal();verifyNamedFailureWitness(failed,s.execution,s.node,s.c.id);
  s.x.f.model.FPreviewManager.FPreviewVisible=true;
- const binding=await s.x.f.execute(javascriptNativeRoundtripCode({...s.x.f.b,binding_id:'upstream',roundtrip_role:'upstream',named_case_id:s.c.id,input_fixture_id:'integer-safe',source_sha256:s.c.source_sha256,failed_terminal:failed}));
+ const binding=await s.x.f.execute(javascriptNativeRoundtripCode({...s.x.f.b,binding_id:'upstream',roundtrip_role:'upstream',...identity,input_fixture_id:'integer-safe',source_sha256:s.c.source_sha256,failed_terminal:failed}));
  const raw=await readJavascriptNativeRoundtrip(s.x.f.page,binding,decodeVariantFrame,{operationId:'upstream'});
  const lifecycle=await javascriptNativeRoundtripStatus(s.x.f.page),expected={...binding,read_id:'upstream'};
- const upstream={binding:expected,raw,lifecycle,exact:verifyJavascriptNamedRead(raw,{binding:expected,lifecycle,input:s.before,role:'upstream'})};
+ const upstream={binding:expected,raw,lifecycle,exact:verifyNativeRoundtripRead(raw,{binding:expected,lifecycle,input:s.before,role:'upstream'})};
  const results={before:s.before,failed,upstream,output:{status:'not_read_failed_execution'}};
  results.outcome=verifyNamedFailureOutcome(results,s.c.id);return {...s,results};
 }
@@ -170,7 +174,7 @@ for(const mode of ['success','failed','package_closed','logged_out','browser_clo
  await trial.run({runtime:runtime(receipt,[]),input:receipt.input,node:{node_id:'js'},sourceProbe:javascriptNamedProbe(id),deadline:Date.now()+30000,record:async e=>e,onExecution:async()=>{}});
  const report={status:'PENDING_EVIDENCE',cleanup:{...clean}};if(Object.hasOwn(report.cleanup,mode))report.cleanup[mode]=false;
  const source=readFileSync(new URL('./javascript-live.mjs',import.meta.url),'utf8'),start=source.lastIndexOf('  if (!report.cleanup.package_closed'),end=source.indexOf('  console.log(JSON.stringify({status:report.status',start);
- const publish=vm.runInNewContext('(async()=>{'+source.slice(start,end)+'})',{report,coercionTrial:null,namedTrial:trial,executionRecord:async e=>e,Date,save:async()=>{if(mode==='evidence')throw Error('fsync');},redactor:{text:x=>x}});
+ const publish=vm.runInNewContext('(async()=>{'+source.slice(start,end)+'})',{report,calibrationTrial:null,coercionTrial:null,namedTrial:trial,executionRecord:async e=>e,Date,save:async()=>{if(mode==='evidence')throw Error('fsync');},redactor:{text:x=>x}});
  await publish();assert.equal(report.status,mode==='success'?'CHARACTERIZED':mode==='failed'?'UNRESOLVED':mode==='evidence'?'EVIDENCE_UNCONFIRMED':'CLEANUP_UNCONFIRMED');
  assert.equal(trial.coverage.cases[0].case_complete,mode==='success');assert.equal(trial.coverage.cases[0].exact_pass,mode==='success');
 });
@@ -189,7 +193,7 @@ for(const mode of ['ok','pending','retired','source','input-field','named-case',
  if(mode==='release')f.env.__loginomJavascriptNativeRoundtripReadV1.last.releasedResponses=0;
  const source=readFileSync(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
  const start=source.indexOf('    async checkNativeNamedEvidence() {'),end=source.indexOf('    async readNativeRoundtrip(',start);
- const check=vm.runInNewContext('({'+source.slice(start,end)+'})',{nativeNamedCaseId:mode==='named-case'?javascriptNamedIds[1]:javascriptNamedIds[0],nativeReadUncertain:false,validateNativeSource:()=>{},page:f.page});
+ const check=vm.runInNewContext('({'+source.slice(start,end)+'})',{nativeCalibrationId:undefined,nativeNamedCaseId:mode==='named-case'?javascriptNamedIds[1]:javascriptNamedIds[0],nativeReadUncertain:false,validateNativeSource:()=>{},page:f.page});
  if(mode==='ok')await check.checkNativeNamedEvidence();else await assert.rejects(()=>check.checkNativeNamedEvidence());
 });
 
@@ -200,7 +204,7 @@ for(const mode of ['ok','input-ack','arm-ack','graph-ack'])test('named productio
  const source=readFileSync(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
  const start=source.indexOf('    async armNativeRoundtrip(input) {'),end=source.indexOf('    async readNativeCoercionFailure(',start);
  const runtime=vm.runInNewContext('({'+source.slice(start,end)+'})',{
-  nativeInputOnly:true,nativeReadUncertain:false,nativeNamedCaseId:javascriptNamedIds[0],nativeFixtureId:'integer-safe',
+  nativeCalibrationId:undefined,nativeInputOnly:true,nativeReadUncertain:false,nativeNamedCaseId:javascriptNamedIds[0],nativeFixtureId:'integer-safe',
   nativeRoundtripProbe:javascriptNamedProbe(javascriptNamedIds[0]),verifyJavascriptNamedInput,validateNativeSource:()=>{},
   armJavascriptNativeRoundtrip:()=>{},bindJavascriptNativeRoundtripGraph:()=>{},page:{evaluate:async()=>({verified:true})},
   record:async event=>{events.push(event.phase);const saved=await journal(event);
@@ -315,7 +319,7 @@ for(const mode of ['ok','lifecycle','ack','upstream'])test('B actual runtime met
  if(mode==='upstream')r.results.upstream.raw.cells[1].payload[2]^=1;
  const source=readFileSync(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
  const start=source.indexOf('    async readNativeRoundtrip(input,node,execution) {'),end=source.indexOf('    async readNativeCivil(',start);
- const context={nativeNamedCaseId:id,javascriptNamedCase,nativeFixtureId:'integer-safe',nativeInputFixture:{rows:4},nativeRoundtripProbe:javascriptNamedProbe(id),
+ const context={nativeCalibrationId:undefined,nativeNamedCaseId:id,javascriptNamedCase,nativeFixtureId:'integer-safe',nativeInputFixture:{rows:4},nativeRoundtripProbe:javascriptNamedProbe(id),
   verifyJavascriptNamedInput,verifyJavascriptNamedOutcome,verifyNativeRoundtripExecution,freezeCivilEvidence,validateNativeSource:()=>{},
   page:{evaluate:async()=>{}},completeJavascriptNativeRoundtrip,prepared:{document_id:'d',workflow_ref:{workflow_id:'w'}},
   deadline:Date.now()+10000,randomUUID:()=>String(steps.length),execute:()=>{},nativeReadUncertain:false,sessionId:'B',origin:'http://test',build:'7.4.2',Date,
