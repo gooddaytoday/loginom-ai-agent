@@ -16,6 +16,24 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### A-get-index PASS; A-get-exact RUNNING
+
+A-get-index/profile73 original28189 terminal exit0/CHARACTERIZED,cleanup3/3.
+Root full auditor PASS:12cells,620refs,1265pins; Integer values/NULL exact во всех
+трёх чтениях. Report SHAef8a559d5d992d0585131331ee868605e7f101d2c9e45215bb0f7004d74e5589.
+Draft auditor сначала ожидал coercion-only baseline field; source83 input contract
+integer-safe его не выдаёт. Исправлен только auditor: полное равенство before
+proof с pre-JS journal + independently computed digest. Runtime/report не менялись,
+никакого replay. Детали в [named design](native-named-access-design.md),§12.
+
+После подтверждённого cleanup и отсутствия pinned Chromium выделен fresh profile74,
+1265pins unchanged. Следующий fixed case A-get-exact:
+evidence native-named-get-exact-probe-01, **original exec session15883 RUNNING**,
+DISPLAY=:1/headed/sandbox, исходный600000ms. Проверять эту session до terminal,
+затем cleanup и тот же independent audit. Matrix A1accepted/1running/6not_run;
+B/C/D все not_run. Root owns browser, developer idle. Full goal active.
+
+
 ### Source83 принят; первый named A live RUNNING
 
 Root full client original session68476 terminal exit0:2480PASS/10SKIP/0FAIL,

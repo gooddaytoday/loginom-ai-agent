@@ -622,3 +622,18 @@ source closure включает новые imports, manifest сохраняет1
 реальным требованиям основного плана и обещаниям handler/knowledge. Нельзя ни
 объявлять весь интерфейс доказанным по одному Value, ни подменять выполнение
 основного плана бесконечным расширением диагностической матрицы.
+
+
+## 12. Наблюдённые исполнения стадии A
+
+Source83 commit562f8ffebf8f5c4e1d38eff6c65beddbfd087fbc.
+A-get-index/profile73, original session28189 terminal exit0/CHARACTERIZED,
+cleanup3/3. Independent live audit:12 native cells,620 journal refs,1265pins.
+INPUT/OUTPUT/upstream exact [NULL,−9007199254740991,0,9007199254740991].
+Report SHA ef8a559d5d992d0585131331ee868605e7f101d2c9e45215bb0f7004d74e5589.
+Root-computed baseline SHA
+c67e5a8abb884352ef16076178e23e9b3a7d44f95be1428c302cf47ada4d58ba;
+integer-safe input contract не выдаёт coercion/cardinality native_baseline_sha256.
+Root сравнил полный before proof с предшествующей JS записью журнала, отдельно
+вычислил digest; не заявляет сравнение с отсутствующим runtime полем.
+Один случай из8 A принят, весь G5/J24/handler/CLI остаётся открытым.
