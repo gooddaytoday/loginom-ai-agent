@@ -16,6 +16,22 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source80 independently PASS; headed diagnostic empty03 RUNNING
+
+Developer передал source80 и завершил turn (revision39). Root проверил
+1245 pins до/после тестов: **1321 main +3 deny +11 Python PASS**, syntax/diff-check.
+Exactly3 diagnostic source/test paths committed child:
+`0e29ee87c44a980b93001510169fc5e9e4baeea8`. Guard source79 не изменён.
+Manifest SHA `c1be6c4e6c0bd4248a4523eff5e4bb87119ca1c6eb9b2c1a2c1157616e5fe144`.
+Private root receipt operator80-root-test-source.json и matching freeze80 сохранены.
+
+Запущен native-cardinality-empty-probe-03/profile64, original session82166,
+DISPLAY=:1/headed/sandbox. Fresh profile, отсутствие других pinned Chromium,
+Node/browser hashes и source pins проверены; browser lease RUNNING.
+Цель этого запуска — дополнительные descriptor/gate факты при том же отказе,
+а не автоматическое принятие empty результата. Terminal ещё не получен.
+
+
 ### OpenViking восстановлен; empty02 завершён отказом до JS
 
 После трёх последовательных HTTP502 работа была остановлена по AGENTS.md.
