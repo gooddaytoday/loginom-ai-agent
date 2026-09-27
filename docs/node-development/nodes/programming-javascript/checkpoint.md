@@ -16,6 +16,31 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze47: актуальный native breadcrumb передан в live — 2026-09-27
+
+Root106 tests PASS: column-editor36,stage-observer14,execution-evidence40,batch8,
+link-topology8;30/30 hashes до/после. Developer commit
+`7b9897677f305a4aa735eb375d1ec0dbefa77703`:3 source/test файла.
+Readiness/cleanup читают текущий FLabel.FRawValue удержанного node и связывают
+обе breadcrumb-кнопки через Ext DOM/_node.data.node с доказанными tree/wizard.
+Own FParentNode заменяет ошибочное предположение об own ParentNode. Graph
+node/data/cell, label.parent/FCell.parent и wizard model identities проверяются;
+label/TID закреплены на host epoch открытия, внутри epoch изменение запрещено.
+Новое открытие разрешает актуальную метку даже при reused WizardTreeNode.
+Тесты покрывают renamed/foreign/spoofed/reused/duplicate/rollback/accessors и
+serialization observer. Shared runtime guards не ослаблены.
+
+Exact source dependencies (Trees/MapTree/NavigationPanel/Unit/Label/Vertex/
+Model/mxClient) получены со стенда и подтверждают новые own caches. Чтение
+исходников не засчитано live-проверкой конкретных instances.
+
+Batch47 RUNNING: те же8 cases начиная с declared-table-execute,
+freshprofile20,DISPLAY=:1/headed/Chromium1246/sandbox. Source receipt,
+root-test receipt и host lease сохранены приватно. Developer idle/source frozen;
+текущий browser процесс принадлежит root. Public handler, полный G1–G7/J01–J27,
+ревью и CLI-приёмка ещё не выполнены; цель активна.
+
+
 ### Fix47: новые bindings проверяются по exact client sources до live — 2026-09-27
 
 При source-review промежуточного fix47 root обнаружил неверную own-data
