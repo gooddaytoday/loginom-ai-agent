@@ -462,6 +462,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // submission belongs to dock_artifact_upload and its pinned grant.
       || !!element.closest('[data-tid$=";FileStorageForm;btnUpload"]')
       || element.matches('input[type="url"],input[type="file"],input[type="hidden"]')
+      || nativeGraphControl(element)?.status!=='non_script' && nativeGraphControl(element)!==null
       || /(?:^|[;_ -])(?:script|javascript|python|codeeditor)(?:[;_ -]|$)/i.test(controlCodeIdentity(element))
       || !!element.closest('.monaco-editor,.CodeMirror,.ace_editor,[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]');
     const dialogElements = select('[role="dialog"],.x-window,.bg-dialog').filter(visible)
@@ -497,6 +498,78 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const graphIdentity=graphPrefix?{status:'observed',container_ref:refOf(graphContainer),container_tid:getTid(graphContainer),native_prefix:graphPrefix}
       :{status:graphContainers.length>1 || namespaces.length>1?'ambiguous':'unobserved'};
     const ownedGraph=element=>!!graphPrefix && graphContainer.contains(element) && (getTid(element)??'').startsWith(graphPrefix);
+    // Native type, not an editable graph label, owns the extra script deny.
+    // Build once per observation; unconfirmed controls never inherit permission.
+    const nativeGraphControls=new Map(),nativeGraphLinks=new Set();
+    const nativeGraphControl=element=>ownedGraph(element)&&!nativeGraphLinks.has(element)
+      ?nativeGraphControls.get(element)??{status:'unconfirmed'}:null;
+    if(graphQueryable&&graphPrefix){
+      const value=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
+      const method=(o,k)=>{for(let n=0;o&&n<8;n++,o=Object.getPrototypeOf(o)){charge();const d=Object.getOwnPropertyDescriptor(o,k);if(d)return Object.hasOwn(d,'value')&&typeof d.value==='function'?d.value:null;}return null;};
+      const dense=(a,limit)=>{if(!Array.isArray(a)||a.length>limit)return null;const result=[];for(let i=0;i<a.length;i++){charge();const d=Object.getOwnPropertyDescriptor(a,String(i));if(!d||!Object.hasOwn(d,'value')||!d.value||typeof d.value!=='object')return null;result.push(d.value);}return result;};
+      const app=value(globalThis.bg,'app'),workspace=value(value(value(value(value(app,'Application'),'FInstance'),'FMainForm'),'Items'),'Workspace');
+      const activeTab=method(workspace,'getActiveTab'),card=activeTab?.call(workspace),controller=value(card,'Controller'),model=value(controller,'FController');
+      const modelClass=value(app,'ModelForm'),diagram=value(model,'FDiagram'),graph=value(diagram,'FmxGraph'),view=value(graph,'view');
+      const nodes=dense(value(value(diagram,'FNodes'),'FCollection'),200),getState=method(view,'getState');
+      const scoped=new Map();
+      for(const e of nativeGraphElements){charge();const tid=getTid(e);if(!scoped.has(tid))scoped.set(tid,[]);scoped.get(tid).push(e);}
+      const unique=e=>e&&graphContainer.contains(e)&&scoped.get(getTid(e))?.length===1&&scoped.get(getTid(e))[0]===e;
+      const bindings=new Map();
+      const retain=(element,objects,icon)=>{
+        if(!unique(element))return;
+        const receipt={status:icon==='bg-vendor-icon-javascript'?'script':'non_script',identity:objects.map(o=>refOf(o,false)),icon};
+        if(bindings.has(element))nativeGraphControls.set(element,{status:'unconfirmed'});
+        else {bindings.set(element,true);nativeGraphControls.set(element,receipt);}
+      };
+      if(typeof modelClass==='function'&&model instanceof modelClass&&value(graph,'container')===graphContainer&&nodes&&getState){
+        const guids=new Map(),cells=new Map();
+        for(const n of nodes){charge();const guid=value(n,'FGuid'),cell=value(n,'FCell');guids.set(guid,(guids.get(guid)??0)+1);cells.set(cell,(cells.get(cell)??0)+1);}
+        for(const node of nodes){
+          charge();const guid=value(node,'FGuid'),cell=value(node,'FCell'),icon=value(node,'FIconCls');
+          if(typeof guid!=='string'||!guid||guid.length>128||guids.get(guid)!==1||!cell||typeof cell!=='object'||cells.get(cell)!==1
+            ||typeof icon!=='string'||!/^bg-vendor-icon-[a-z0-9_-]{1,128}$/.test(icon))continue;
+          const rendered=getState.call(view,cell),shape=value(value(rendered,'shape'),'node'),tid=getTid(shape);
+          if(!unique(shape)||!tid?.startsWith(graphPrefix))continue;
+          const identity=[model,diagram,graph,view,node,cell];
+          const data=value(node,'data');if(data&&typeof data==='object')identity.push(data);
+          retain(shape,identity,icon);
+          const label=value(node,'FLabel'),labelCell=value(label,'FCell');
+          if(value(label,'parent')===node&&labelCell&&value(labelCell,'parent')===cell){
+            const text=value(value(getState.call(view,labelCell),'text'),'node');
+            if(getTid(text)===tid+';Label;Label')retain(text,[...identity,label,labelCell],icon);
+          }
+          for(const suffix of [';Setting',';Visualizers']){
+            charge();const elements=scoped.get(tid+suffix);if(elements?.length===1)retain(elements[0],identity,icon);
+          }
+          const groups=dense(value(node,'FPorts'),16);if(!groups)continue;
+          const collections=groups.map(group=>dense(value(group,'FCollection'),100));if(collections.some(list=>!list))continue;
+          const ports=collections.flat();
+          const portCells=new Map(),portGuids=new Map();
+          for(const p of ports){charge();const c=value(p,'FCell'),g=value(p,'FGuid');portCells.set(c,(portCells.get(c)??0)+1);portGuids.set(g,(portGuids.get(g)??0)+1);}
+          for(const port of ports){
+            charge();const portCell=value(port,'FCell'),portGuid=value(port,'FGuid'),type=value(port,'FType'),subtype=value(port,'FSubType');
+            // Service AddPort (subtype10) has no ordinary GUID/index contract.
+            // Leave only that control denied; it cannot poison sibling data0.
+            if(subtype===10)continue;
+            if(value(port,'parent')!==node||!portCell||typeof portCell!=='object'||value(portCell,'parent')!==cell
+              ||portCells.get(portCell)!==1||typeof portGuid!=='string'||!portGuid||portGuid.length>128||portGuids.get(portGuid)!==1
+              ||![0,1].includes(type)||!Number.isInteger(subtype)||subtype<1||subtype>9)continue;
+            const element=value(value(getState.call(view,portCell),'shape'),'node'),portTid=getTid(element);
+            if(!portTid?.startsWith(tid+';'+(type===0?'Input_':'Output_')))continue;
+            const portData=value(port,'data');retain(element,[...identity,port,portCell,...(portData&&typeof portData==='object'?[portData]:[])],icon);
+          }
+        }
+        // Links are out of this node-control policy only when their native
+        // cell/renderer proves it. A '|' in a node label is ordinary data.
+        const links=dense(value(value(diagram,'FLinks'),'FCollection'),2000);
+        if(links)for(const link of links){
+          charge();const cell=value(link,'FCell'),source=value(link,'FSourcePort'),target=value(link,'FTargetPort');
+          if(!cell||typeof cell!=='object'||!nodes.includes(value(source,'parent'))||!nodes.includes(value(target,'parent')))continue;
+          const element=value(value(getState.call(view,cell),'shape'),'node');
+          if(unique(element)&&!nativeGraphControls.has(element))nativeGraphLinks.add(element);
+        }
+      }
+    }
     const scopeOf = element => {
       if (dialogRef(element)) return 'dialog';
       if(/^(MF;TF(?:-\d+)?;Graph;)/.test(getTid(element)??''))return ownedGraph(element)?'graph':'inactive_workflow';
@@ -2765,7 +2838,7 @@ function readRenderedInputMapping(observation) {
         ...(wizardFields.has(element) ? {wizard_field:wizardFields.get(element)} : {}),
         ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),
         ...(filterCell?{filter_cell:filterCell}:{}),
-        signature: { ...(collapseField?{collapse_field:collapseField}:{}), ...(missingValuesField?{missing_values_field:missingValuesField}:{}), ...(dateTimeCell?{date_time_cell:dateTimeCell}:{}), ...(replacementField?{replacement_field:replacementField}:{}), ...(unionField?{union_field:unionField}:{}), ...(joinField?{join_field:joinField}:{}), ...(filterCell?{filter_cell:filterCell}:{}),tag, tid, role, type: element.getAttribute('type'), name: element.getAttribute('name'), label, ...fieldValue, dialog_ref: dialogRef(element), scroll, check_state:checkState, ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),...(groupingField?{grouping_field:groupingField}:{}),...(sortingField?{sorting_field:sortingField}:{}),...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}) },
+        signature: { ...(nativeGraphControl(element)?{native_graph:nativeGraphControl(element)}:{}), ...(collapseField?{collapse_field:collapseField}:{}), ...(missingValuesField?{missing_values_field:missingValuesField}:{}), ...(dateTimeCell?{date_time_cell:dateTimeCell}:{}), ...(replacementField?{replacement_field:replacementField}:{}), ...(unionField?{union_field:unionField}:{}), ...(joinField?{join_field:joinField}:{}), ...(filterCell?{filter_cell:filterCell}:{}),tag, tid, role, type: element.getAttribute('type'), name: element.getAttribute('name'), label, ...fieldValue, dialog_ref: dialogRef(element), scroll, check_state:checkState, ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),...(groupingField?{grouping_field:groupingField}:{}),...(sortingField?{sorting_field:sortingField}:{}),...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}) },
         enabled: isEnabled, visible: true, interaction, bounding_box: boxOf(element),
         // A bounded prefix is not a sufficient value precondition. A dedicated
         // large-field driver must establish its own complete read/write contract.
