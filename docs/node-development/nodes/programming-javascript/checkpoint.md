@@ -16,6 +16,41 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch49: native busy settlement PASS, failed child contract требует fix50 — 2026-09-27
+
+Batch49 terminal exit1 FAILED, original package/logout/browser cleanup ALLPASS.
+Root проверил1039 journalSHA,2 full input reads/60cells,1 fresh native failed group.
+Новый auditor-v2 отдельно считает completed executions и failed groups; failed
+receipt не приписывает JS-child ownership. Прежний auditor не поддерживал такие
+terminal failures, его исторические результаты сохранены.
+
+Первый code-sentinel-execute (case28f7f9ec-98cb-4840-8b9b-3d2cb768b100) подтвердил
+fix49:04:23:25.316Z native_owner_verified/owned_busy=true, mask target ModelForm;
+04:23:27.621Z masks/toasts0, тот же node, quiet509ms. Консоль затем открылась,
+свежая group4/record735/root285 завершилась failed с ожидаемым sentinel.
+Промежуточные polls не журналировались: это доказательство busy→quiet, а не
+отдельное доказательство фактически наблюдённого toast lifecycle во всех polls.
+
+В двух native console snapshots также уже есть child4.1/record736: terminal
+failed, can_cancel=false, собственный error_details с sentinel и owner.verified
+с source=native_process_model_identity для JS node
+3f523558-063d-4a22-b7c7-92a3850ad53d. Но child не selected и Show Node не выполнялся.
+Общий verifyFailedExecution возвращает group-only receipt без owner_verified
+намеренно: upstream может завершиться ошибкой до JS. Поэтому batch verdict
+корректно отказал «Batch mutation outcome or owner unconfirmed»; gate не закрыт,
+остальные6cases NOT_RUN. Source-only анализ разработчика подтвердил этот пробел
+ещё во время запуска, frozen files не менялись.
+
+Приватные g2-batch-49-verification.json/boundary-verification.json сохраняют
+различие group/native child/независимого ShowNode proof. Lease closed, profile22
+сохранён; freshprofile23 назначен с backup/receipt. Recovery не нужен.
+Same developer task выполняет fix50: строгий failed-child proof с current native
+owner, fresh group/process/record, собственной ошибкой и независимым Show Node,
+без ослабления обычной group failure ветки и без Execute replay. Нужны адресные
+regressions foreign/upstream/parent_failed/stale/ShowNode mismatch. Полная цель,
+public handler, остальная матрица, итоговое ревью и CLI-приёмка остаются открыты.
+
+
 ### Freeze49: native loading settlement проверен, batch49 запущен — 2026-09-27
 
 Root проверил final diff и source chain, повторил116 tests PASS:
