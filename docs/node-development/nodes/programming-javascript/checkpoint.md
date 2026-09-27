@@ -16,6 +16,21 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Подготовлена независимая проверка public deny observation
+
+Root private audit-js-output-denial.py SHA256
+`3059c627b31a6925f85059c6a2e7f512271d9f6c6813ef716b0bd3e715c6363a`
+проверяет current prepared node GUID/surface, own data0 TID, active/visible/enabled,
+kind/scope/identity и пустой allowed_actions. Synthetic1positive/9negative PASS;
+один negative — фактический empty01 observation, остальные — нарушение owner,
+видимости/активности, duplicate и foreign anchor/port. Positive синтетический,
+исправленный live deny **NOT_RUN**. Проверка не заменяет native classifier source,
+fresh-act tests и полный output/schema/zero/lifecycle audit.
+
+Fix79 подтверждён active/inProgress в прежней задаче (revision34); runtime
+может изменяться. Root не запускает тесты/браузер до frozen handoff. Browser CLOSED,
+profile63 reserved/unused. Полный план и критерии завершения не сужены.
+
 ### Принят дизайн независимого от имени JS deny; назначен Fix79
 
 Source-only investigation завершён; root проверил причинную цепочку и принял
