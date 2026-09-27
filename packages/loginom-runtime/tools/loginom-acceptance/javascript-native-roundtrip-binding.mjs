@@ -46,8 +46,9 @@ export function javascriptNativeRoundtripSnapshot(b){
     // Subscription metadata, not a data-generation/version counter. Never walk $S.
     return {identity,identityPrototype:Object.getPrototypeOf(identity),value:JSON.stringify([owner,object,type,remoteRefs,refs])};
   };
-  const fixtureId=b.fixture_id??'real',slice={real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2]}[fixtureId];
-  need(Array.isArray(slice)&&b.rows===slice[0]&&b.row_count===slice[0]
+  const fixtureId=b.fixture_id??'real',slice={real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6]}[fixtureId];
+  const rowCount=b.roundtrip_role==='output'?(slice?.[2]??slice?.[0]):slice?.[0];
+  need(Array.isArray(slice)&&b.rows===rowCount&&b.row_count===rowCount
     &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:slice[1]}]),'fixed native fixture schema/count');
   const prep=globalThis.__loginomDockPreparationV1;
   need(prep?.document===document&&prep.id===b.document_id&&location.origin===b.origin&&bg.app.Version==='7.4.2','document/build');
@@ -143,7 +144,7 @@ export function javascriptNativeRoundtripSnapshot(b){
   const fields=v(v(v(dc,'FColumnInfosStore'),'data'),'items');
   need(Array.isArray(fields)&&fields.length===1,'one field');const field=v(fields[0],'data');
   need(field.Name==='Value'&&field.DisplayName==='Value'&&field.DataType===slice[1],'fixed native schema');
-  need(v(dt,'FTotalRowCount')===slice[0]&&v(helper,'$FRowCount')===slice[0],'fixed native row count');
+  need(v(dt,'FTotalRowCount')===rowCount&&v(helper,'$FRowCount')===rowCount,'fixed native row count');
   const runtime=globalThis.__loginomJavascriptNativeRuntimeV1;
   need(runtime?.document===document&&runtime.binding_id===b.runtime_binding_id,'loaded runtime binding');runtime.check(v(ds,'$S'));
   const dataCookie=v(helper,'$FDataChangeCookie'),stateCookie=v(helper,'$FStateChangeCookie');
@@ -154,7 +155,7 @@ export function javascriptNativeRoundtripSnapshot(b){
     nodePorts,inputCollection,inputPorts,connectionInput:inputPorts[0],variablesInput:inputPorts[1],
     processStore,processRoot,group:groups[0],child:child[0],
     processFingerprint:JSON.stringify(records.map(r=>[r.internalId,r.data.id,parents.get(r)?.internalId,r.data.Status,r.data.ErrorDetails,r.data.ModelNode===node.data])),
-    root,dc,dt,ds,store,helper,identity,fixtureId,typeCode:slice[1],count:slice[0],cache:v(helper,'$FData'),owner:v(identity,'$OW'),object:v(identity,'$O'),
+    root,dc,dt,ds,store,helper,identity,fixtureId,typeCode:slice[1],count:rowCount,cache:v(helper,'$FData'),owner:v(identity,'$OW'),object:v(identity,'$O'),
     dataCookie,stateCookie,dataCookieIdentity:dataCookieState.identity,stateCookieIdentity:stateCookieState.identity,
     dataCookieIdentityPrototype:dataCookieState.identityPrototype,stateCookieIdentityPrototype:stateCookieState.identityPrototype,
     dataCookieValue:dataCookieState.value,stateCookieValue:stateCookieState.value};
@@ -169,7 +170,7 @@ export async function bindJavascriptNativeRoundtrip(page,args,snapshot){
       const output=state.bindings.get('output'),read=globalThis.__loginomJavascriptNativeRoundtripReadV1;
       if(!output||read?.document!==document||read.poisoned||read.active||read.last?.id!==output.readId
         ||read.last.status!=='completed'||!read.last.published||read.last.pending!==0
-        ||read.last.releasedRequests!==state.input.count||read.last.releasedResponses!==state.input.count)throw Error('Completed output read required before upstream');
+        ||read.last.requests!==output.initial.count||read.last.releasedRequests!==output.initial.count||read.last.releasedResponses!==output.initial.count)throw Error('Completed output read required before upstream');
     }
     state.bindings.set(args.roundtrip_role,null);
     const capture=eval('('+code+')'),initial=capture(args);

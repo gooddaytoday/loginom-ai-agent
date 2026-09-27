@@ -1,5 +1,5 @@
 import {verifyNativeCivil,nativeCivilExpectation,civilDigest} from './javascript-native-datetime-civil.mjs';
-import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
+import {javascriptNativeFixture,javascriptNativeReadFixture} from './javascript-native-fixtures.mjs';
 import {createHash} from 'node:crypto';
 import {verifyTextImportSource} from '../../client/lib/text-import-node.mjs';
 import {textImportConfigurationReadback} from '../../client/lib/text-import-readback.mjs';
@@ -78,16 +78,21 @@ export function verifyNativeInputRead(raw,{binding,lifecycle,provenance}){
   need(provenance.kind==='owned_import_read_phase'&&(provenance.fixture_id??'real')===fixture.id&&provenance.source.sha256===fixture.sha256,'private provenance required');
   need(['document_id','workflow_id','node_id'].every(k=>provenance.node[k]===binding[k])
     &&provenance.execution.execution_id===binding.execution.execution_id,'provenance owner differs');
+  if(fixture.output_input_rows){
+    need(binding.completed_child?.verified===true&&binding.completed_child.owner_verified===true&&binding.completed_child.cleanup_complete===true
+      &&binding.completed_child.status==='completed'&&['execution_id','group_id','process_id','process_record_id'].every(k=>binding.completed_child[k]===provenance.execution[k])
+      &&binding.execution.status==='completed'&&binding.execution.execution_id===binding.completed_child.execution_id,'full cardinality INPUT child association');
+  }
   if(fixture.type==='datetime')verifyNativeCivil(provenance.civil,nativeCivilExpectation(binding,'input',fixture.sha256));
   const exact=adaptRead(raw,{expected:binding,lifecycle,...(fixture.type==='datetime'?{dateProfile:temporalProfile}:{}),
     consistency:{kind:'observed_local',changed:false,exclusive_operation:true,stability_basis:'owned_static_completed_fixture'}});
   verifyNativeFixtureCells(exact,fixture.id);
   return {...exact,contract:'javascript-native-input-'+fixture.id+'-1',fixture_id:fixture.id,native_bytes_verified:true,js_created:false,
-    js_executed:false,g5_complete:false,provenance,...(fixture.type==='datetime'?{civil_baseline_sha256:civilDigest({civil:provenance.civil,cells:exact.cells,binding:exact.binding,source:binding.source,completed_child:binding.completed_child})}: {})};
+    js_executed:false,g5_complete:false,provenance,...(fixture.output_input_rows?{native_baseline_sha256:civilDigest({raw,binding:exact.binding,source:binding.source,completed_child:binding.completed_child,provenance})}:{}),...(fixture.type==='datetime'?{civil_baseline_sha256:civilDigest({civil:provenance.civil,cells:exact.cells,binding:exact.binding,source:binding.source,completed_child:binding.completed_child})}: {})};
 }
 
-export function verifyNativeFixtureCells(exact,fixtureId='real'){
-  const f=javascriptNativeFixture(fixtureId);
+export function verifyNativeFixtureCells(exact,fixtureId='real',role='input'){
+  const f=javascriptNativeReadFixture(fixtureId,role);
   need(exact.coverage.table_complete&&exact.row_count===f.rows&&exact.cells.length===f.rows&&exact.schema.length===1
     &&exact.schema[0].name==='Value'&&exact.schema[0].label==='Value'&&exact.schema[0].type===f.type,'full fixed native slice required');
   need(exact.cells.every((cell,i)=>cell.row===i&&cell.column===0&&cell.is_null===(f.values[i]===null)

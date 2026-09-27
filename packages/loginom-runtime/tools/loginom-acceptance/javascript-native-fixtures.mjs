@@ -141,10 +141,119 @@ const fixtures={
       "2026-03-29T01:59:59.999"
     ],
     "expected_bytes": null
+  },
+  "cardinality-keep2": {
+    "id": "cardinality-keep2",
+    "file": "javascript-native-input-cardinality.csv",
+    "rows": 3,
+    "columns": 1,
+    "bytes": 12,
+    "sha256": "10dd7b1596d2eab4d6145699462eb2cc7c30508f78d4c5b2760c207dbb427dd5",
+    "type": "integer",
+    "native_type": 4,
+    "js_type": "Integer",
+    "data_kind": "Дискретный",
+    "values": [
+      "1",
+      "2",
+      "3"
+    ],
+    "expected_bytes": [
+      "0100000000000000",
+      "0200000000000000",
+      "0300000000000000"
+    ],
+    "output_values": [
+      "2"
+    ],
+    "output_rows": 1,
+    "output_input_rows": [
+      1
+    ]
+  },
+  "cardinality-odd": {
+    "id": "cardinality-odd",
+    "file": "javascript-native-input-cardinality.csv",
+    "rows": 3,
+    "columns": 1,
+    "bytes": 12,
+    "sha256": "10dd7b1596d2eab4d6145699462eb2cc7c30508f78d4c5b2760c207dbb427dd5",
+    "type": "integer",
+    "native_type": 4,
+    "js_type": "Integer",
+    "data_kind": "Дискретный",
+    "values": [
+      "1",
+      "2",
+      "3"
+    ],
+    "expected_bytes": [
+      "0100000000000000",
+      "0200000000000000",
+      "0300000000000000"
+    ],
+    "output_values": [
+      "1",
+      "3"
+    ],
+    "output_rows": 2,
+    "output_input_rows": [
+      0,
+      2
+    ]
+  },
+  "cardinality-duplicate": {
+    "id": "cardinality-duplicate",
+    "file": "javascript-native-input-cardinality.csv",
+    "rows": 3,
+    "columns": 1,
+    "bytes": 12,
+    "sha256": "10dd7b1596d2eab4d6145699462eb2cc7c30508f78d4c5b2760c207dbb427dd5",
+    "type": "integer",
+    "native_type": 4,
+    "js_type": "Integer",
+    "data_kind": "Дискретный",
+    "values": [
+      "1",
+      "2",
+      "3"
+    ],
+    "expected_bytes": [
+      "0100000000000000",
+      "0200000000000000",
+      "0300000000000000"
+    ],
+    "output_values": [
+      "1",
+      "1",
+      "2",
+      "2",
+      "3",
+      "3"
+    ],
+    "output_rows": 6,
+    "output_input_rows": [
+      0,
+      0,
+      1,
+      1,
+      2,
+      2
+    ]
   }
 };
-for(const f of Object.values(fixtures)){Object.freeze(f.values);Object.freeze(f.expected_bytes);Object.freeze(f);}
+for(const f of Object.values(fixtures)){Object.freeze(f.values);Object.freeze(f.expected_bytes);Object.freeze(f.output_values);Object.freeze(f.output_input_rows);Object.freeze(f);}
 Object.freeze(fixtures);
 export function javascriptNativeFixture(id='real'){
   if(!Object.hasOwn(fixtures,id))throw Error('Unknown private native fixture');return fixtures[id];
+}
+
+// Host-owned fixed case/role resolver. No request can supply an arbitrary count,
+// row map, schema or script. Empty/declared remains outside this admission.
+export function javascriptNativeReadFixture(id='real',role='input'){
+  if(!['input','output','upstream'].includes(role))throw Error('Unknown native read role');
+  const f=javascriptNativeFixture(id);
+  if(role!=='output'||!f.output_input_rows)return f;
+  return Object.freeze({...f,rows:f.output_rows,values:f.output_values,
+    expected_bytes:Object.freeze(f.output_input_rows.map(row=>f.expected_bytes[row]))});
 }
