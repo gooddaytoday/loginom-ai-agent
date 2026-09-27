@@ -15,6 +15,15 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-isnull-missing/profile94 RUNNING
+
+Fresh profile94 после verified owned failure/cleanup profile93;1265pins/toolchains/
+no pinned Chromium проверены. Source86 unchanged, evidence
+native-named-isnull-missing-probe-01, **original exec54306 RUNNING**,
+headed DISPLAY=:1/sandbox/original deadline. Ожидать исходную session до terminal;
+затем независимый аудит и агрегирование8B без преждевременного attribution.
+
+
 ### B-isnull-case: owned failure подтверждён, attribution открыт
 
 Profile93/original4394 terminal exit1/UNRESOLVED, без harness failure.
