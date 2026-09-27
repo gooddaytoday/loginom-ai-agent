@@ -15,6 +15,22 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Сообщение пользователя о случайном клике; source87 handoff ещё отсутствует
+
+Пользователь сообщил случайный клик, нарушивший последний прогон. При текущей
+проверке pinned Chromium процессов нет; registry сохраняет profile94/original54306
+как closed_logout_verified. Сообщение фиксируется как возможное внешнее
+вмешательство; его время и связь с конкретным evidence не установлены. Причина
+ошибки не приписывается клику, старые запуски не повторяются и evidence не меняется.
+
+OpenViking health healthy. Developer turn01a0e503 завершён revision16, но final
+снова относится к историческому memory bootstrap, а freeze87 manifest/handoff
+отсутствуют. Source87 не принят. В ту же задачу отправлено исправляющее продолжение:
+завершить текущий frozen handoff и bounded wizard discovery request, без браузера,
+CLI, commit или новой задачи. Видимый main-final3 log2494 PASS остаётся промежуточным
+до привязки к окончательным hashes и независимой root-проверки.
+
+
 ### Source87 intermediate catalogue independently checked
 
 Root импортировал только closed catalogue: K1/K2 bytes/hash/schema/input_fixture
