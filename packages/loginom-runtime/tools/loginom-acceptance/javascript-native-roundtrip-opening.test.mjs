@@ -11,15 +11,16 @@ function fixture({fault,record,afterClick}={}){
   const tid='MF;TF-1;Graph;JavaScript',events=[],gestures=[],states=[];
   let renderChild=null;
   const element=(id)=>({isConnected:true,getAttribute:k=>k==='data-tid'?id:null,
-    getBoundingClientRect:()=>({x:100,y:100,width:15,height:24}),contains:e=>e===shape||e===nodeShape||e===renderChild,
+    getBoundingClientRect:()=>({x:100,y:100,width:15,height:24}),contains:e=>e===shape||e===nodeShape||e===renderChild||e===drawPane,
     closest:q=>q==='[data-tid]'?shape:null,querySelectorAll:q=>q.includes('Output_Data-0')?[shape]:[nodeShape]});
   let shape=element(tid+';Output_Data-0');
-  const nodeShape=element(tid),container=element('container'),body=element('body');
+  const nodeShape=element(tid),container=element('container'),body=element('body'),drawPane=element('draw-pane');
+  shape.parentNode=drawPane;nodeShape.parentNode=drawPane;
   const node={FGuid:'js',FStatus:1,FRunning:false,FCell:{},data:{}};
   const port={FGuid:'port',parent:node,FCell:{parent:node.FCell},data:{},FType:1,FSubType:1,FParam:2,FPortIndex:0,FStatus:1};
   node.FPorts=[{FCollection:[]},{FCollection:[port,{}]}];
   let selected=[],overlay=null,blockers=[],expired=false;
-  const graph={container,view:{getState:cell=>({shape:{node:cell===node.FCell?nodeShape:shape}})},getSelectionCells:()=>selected};
+  const graph={container,view:{getDrawPane:()=>drawPane,getState:cell=>({shape:{node:cell===node.FCell?nodeShape:shape}})},getSelectionCells:()=>selected};
   const diagram={FmxGraph:graph,selectedPorts:[]},model={FDiagram:diagram,FPreviewManager:{FPreviewVisible:false}},workflow={};
   const execution={verified:true,owner_verified:true,status:'completed',execution_id:'e',process_id:'3.1',group_id:'3',trial:{source_sha256:'a'.repeat(64)}};
   const document={body,activeElement:body,querySelectorAll:()=>blockers,elementFromPoint:()=>overlay??shape};
@@ -56,7 +57,7 @@ function fixture({fault,record,afterClick}={}){
   const run=()=>openJavascriptNativeRoundtripPreview({options,ctx,input,port:output,state,deadline:ctx.deadline,targetOrigin:'http://test/',targetBuild:'7.4.2',onState:async s=>states.push(s)});
   return {run,options,state,output,control,ctx,input,capability,port,node,get shape(){return shape;},document,diagram,events,gestures,states,operation,
     repaint:()=>{renderChild={closest:q=>q==='[data-tid]'?shape:null};overlay=renderChild;},
-    replaceShape:()=>{shape.isConnected=false;shape=element(tid+';Output_Data-0');},
+    replaceShape:()=>{shape.isConnected=false;shape=element(tid+';Output_Data-0');shape.parentNode=drawPane;},
     block:()=>{blockers=[shape];}};
 }
 
@@ -107,7 +108,7 @@ for(const at of ['before','after'])test('same native child repaint '+at+' select
   if(at==='before'){const record=f.options.onRecord;f.options.onRecord=async e=>{if(e.step==='select'&&e.phase.endsWith('intent'))f.repaint();return record(e);};}
   const original=f.shape;await f.run();assert.equal(f.shape,original);assert.deepEqual(f.gestures,['click','F3']);
 });
-for(const at of ['before','after'])test('root shape replacement '+at+' selection remains refused with exact phase diagnostic',async()=>{
+for(const at of ['before'])test('root shape replacement '+at+' selection remains refused with exact phase diagnostic',async()=>{
   const f=fixture({afterClick:()=>{if(at==='after')f.replaceShape();}});
   if(at==='before'){const record=f.options.onRecord;f.options.onRecord=async e=>{if(e.step==='select'&&e.phase.endsWith('intent'))f.replaceShape();return record(e);};}
   let error;try{await f.run();}catch(e){error=e;}
@@ -162,4 +163,56 @@ test('unknown lost click remains unknown in bounded refusal record and retains d
   const f=fixture({fault:'lost-select'});await assert.rejects(f.run,/lost select/);
   assert.deepEqual(f.events.at(-1),{phase:'native_roundtrip_preview_refused',step:'select',effect_possible:true,diagnostic:null});
   assert.equal(f.capability.previewOpening.status,'selection-dispatched');assert.equal(f.operation.transportUncertain,true);
+});
+
+test('observed postclick root replacement rebinds only after checks and journals exact transition',async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'js-native-rebind-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+  const f=fixture({afterClick:()=>f.replaceShape(),record:createExecutionJournal({directory,metadata:{sessionId:'test',clientRevision:'test'}})});
+  const old=f.shape;await f.run();assert.deepEqual(f.gestures,['click','F3']);
+  const held=f.capability.previewOpening;assert.equal(held.shape,f.shape);assert.notEqual(held.shape,old);
+  assert.equal(held.selectionShapeTransition.previous,old);assert.equal(held.selectionShapeTransition.current,f.shape);
+  const lines=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+  assert.deepEqual(lines.find(e=>e.step==='select'&&e.result).result.shape_transition,{rebound:true,previous_connected:false});
+  assert.equal(f.operation.transportUncertain,undefined);
+  await assert.rejects(f.run);assert.deepEqual(f.gestures,['click','F3']);
+});
+for(const fault of ['data','cell','port','node','execution','source','selected','tid','parent','overlay','focus','duplicate','renderer']){
+  test('postclick replacement plus '+fault+' never commits new shape or sends F3',async()=>{
+    const f=fixture({afterClick:()=>{
+      f.replaceShape();
+      if(fault==='data')f.port.data={};
+      if(fault==='cell')f.port.FCell={parent:f.node.FCell};
+      if(fault==='port')f.node.FPorts[1].FCollection[0]={...f.port};
+      if(fault==='node')f.capability.node={...f.node,FGuid:'foreign'};
+      if(fault==='execution')f.capability.execution={...f.ctx.execution,process_id:'foreign'};
+      if(fault==='source')f.capability.source_sha256='wrong';
+      if(fault==='selected')f.diagram.selectedPorts=[{}];
+      if(fault==='tid')f.shape.getAttribute=()=> 'foreign';
+      if(fault==='parent')f.shape.parentNode={};
+      if(fault==='overlay')f.document.elementFromPoint=()=>({closest:()=>null});
+      if(fault==='focus')f.document.activeElement={closest:()=>true};
+      if(fault==='duplicate')f.diagram.FmxGraph.container.querySelectorAll=()=>[f.shape,f.shape];
+      if(fault==='renderer')f.diagram.FmxGraph.view={...f.diagram.FmxGraph.view};
+    }});
+    const old=f.shape;await assert.rejects(f.run);assert.equal(f.capability.previewOpening.shape,old);
+    assert.equal(f.capability.previewOpening.status,'selection-dispatched');assert.equal(f.capability.previewOpening.selectionShapeTransition,undefined);
+    assert.deepEqual(f.gestures,['click']);assert.equal(f.operation.transportUncertain,true);
+    await assert.rejects(f.run);assert.deepEqual(f.gestures,['click']);
+  });
+}
+test('second root replacement before F3 is refused after one confirmed rebind',async()=>{
+  const f=fixture({afterClick:()=>f.replaceShape()}),record=f.options.onRecord;let selectedShape;
+  f.options.onRecord=async e=>{if(e.step==='preview'&&e.phase.endsWith('intent')){selectedShape=f.shape;f.replaceShape();}return record(e);};
+  let error;try{await f.run();}catch(e){error=e;}
+  assert.equal(parseJavascriptNativePreviewDiagnostic(error.message).p,'preview');
+  assert.equal(f.capability.previewOpening.shape,selectedShape);assert.equal(f.capability.previewOpening.status,'selected');
+  assert.deepEqual(f.gestures,['click']);assert.equal(f.operation.transportUncertain,true);
+});
+for(const fault of ['reply','ack'])test('lost postclick rebind '+fault+' cannot authorize F3 or replay',async()=>{
+  const f=fixture({afterClick:()=>f.replaceShape()}),execute=f.options.execute,record=f.options.onRecord;let calls=0;
+  f.options.execute=async code=>{const result=await execute(code);if(++calls===2&&fault==='reply')throw Error('lost rebound reply');return result;};
+  f.options.onRecord=async e=>{const saved=await record(e);if(fault==='ack'&&e.step==='select'&&e.result)saved.result.shape_transition.rebound=false;return saved;};
+  await assert.rejects(f.run);assert.equal(f.capability.previewOpening.shape,f.shape);
+  assert.equal(f.capability.previewOpening.status,'selected');assert.equal(f.operation.transportUncertain,true);
+  await assert.rejects(f.run);assert.deepEqual(f.gestures,['click']);
 });

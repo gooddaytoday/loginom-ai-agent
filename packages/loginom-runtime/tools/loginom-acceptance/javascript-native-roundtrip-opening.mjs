@@ -14,7 +14,8 @@ export function inspectJavascriptNativePreview({binding:b,phase}){
   need(node.FStatus===1&&node.FRunning===false&&ports.length===2&&port.FGuid===b.port_guid
     &&port.parent===node&&port.FCell.parent===node.FCell&&port.FType===1&&port.FSubType===1
     &&port.FParam===2&&port.FPortIndex===0&&port.FStatus===1,'same active data0 port');
-  const shape=graph.view.getState(port.FCell)?.shape?.node,nodeShape=graph.view.getState(node.FCell)?.shape?.node;
+  const view=graph.view,drawPane=view.getDrawPane();
+  const shape=view.getState(port.FCell)?.shape?.node,nodeShape=view.getState(node.FCell)?.shape?.node;
   const visible=e=>!!e?.isConnected&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0
     &&getComputedStyle(e).visibility!=='hidden'&&getComputedStyle(e).display!=='none';
   need(visible(nodeShape)&&nodeShape.getAttribute('data-tid')===b.node_tid&&container.contains(nodeShape)
@@ -25,10 +26,11 @@ export function inspectJavascriptNativePreview({binding:b,phase}){
   need(![...document.querySelectorAll('[role="dialog"],.x-window,.x-mask,.bg-mask-message,.x-mask-msg')].some(visible)
     &&model.FPreviewManager?.FPreviewVisible===false,'quiet graph without Preview');
   need(!shape.closest('.x-item-disabled,.x-grid-row-disabled')&&shape.getAttribute('aria-disabled')!=='true','enabled port');
+  need(shape.parentNode===drawPane&&container.contains(drawPane),'native renderer parent');
   const fingerprint=JSON.stringify(b);
   if(phase==='prepare'){
     need(!s.previewOpening,'opening already reserved');
-    s.previewOpening={fingerprint,model,diagram,graph,container,node,port,portData:port.data,cell:port.FCell,shape,status:'prepared'};
+    s.previewOpening={fingerprint,model,diagram,graph,view,drawPane,container,node,port,portData:port.data,cell:port.FCell,shape,status:'prepared'};
   }
   const held=s.previewOpening;
   const checks={binding:held?.fingerprint===fingerprint,model:held?.model===model,diagram:held?.diagram===diagram,
@@ -36,8 +38,12 @@ export function inspectJavascriptNativePreview({binding:b,phase}){
     data:held?.portData===port.data,cell:held?.cell===port.FCell,shape:held?.shape===shape};
   // Bounded booleans only; retain the original reservation even on refusal.
   // selected runs only after mouse.click returned; select runs before the click.
-  need(Object.values(checks).every(Boolean),'NP1 '+JSON.stringify({p:['prepare','select','selected','preview'].includes(phase)?phase:'other',
+  const rebind=phase==='selected'&&held?.status==='selection-dispatched'&&!checks.shape
+    &&Object.entries(checks).every(([key,value])=>key==='shape'||value);
+  need(Object.values(checks).every(Boolean)||rebind,'NP1 '+JSON.stringify({p:['prepare','select','selected','preview'].includes(phase)?phase:'other',
     h:['prepared','selection-dispatched','selected','preview-dispatched'].includes(held?.status)?held.status:'other',c:checks}));
+  need(held.view===view&&held.drawPane===drawPane,'same native renderer');
+  const previousConnected=rebind?held.shape?.isConnected===true:null;
   const box=shape.getBoundingClientRect(),point={x:box.x+box.width/2,y:box.y+box.height/2},hit=document.elementFromPoint(point.x,point.y);
   need(point.x>=0&&point.y>=0&&point.x<innerWidth&&point.y<innerHeight&&hit&&(hit===shape||shape.contains(hit))
     &&hit.closest('[data-tid]')===shape&&!hit.closest('button,a,input,select,textarea,[contenteditable="true"],[role="button"],[role="menuitem"]'),'native port hit-test');
@@ -52,10 +58,14 @@ export function inspectJavascriptNativePreview({binding:b,phase}){
     const focus=document.activeElement;
     need(focus&&(focus===document.body||container.contains(focus))
       &&!focus.closest('input,textarea,select,[contenteditable="true"],.CodeMirror,.monaco-editor'),'graph keyboard focus');
+    // Probe06 proves a same-native root replacement only after the click returned.
+    // Commit the new DOM binding after selected port, parent, hit-test and focus pass.
+    if(rebind){held.selectionShapeTransition={previous:held.shape,current:shape};held.shape=shape;}
     held.status=phase==='selected'?'selected':'preview-dispatched';
   }else need(phase==='prepare','known opening phase');
   return {phase,node_id:b.node_id,port_guid:b.port_guid,effect_id:b.effect_id,source_sha256:b.source_sha256,
-    execution_id:b.execution.execution_id,deadline:b.deadline,point,owner_verified:true};
+    execution_id:b.execution.execution_id,deadline:b.deadline,point,owner_verified:true,
+    shape_transition:{rebound:rebind,previous_connected:previousConnected}};
 }
 
 export async function dispatchJavascriptNativePreview(page,args,inspect){
