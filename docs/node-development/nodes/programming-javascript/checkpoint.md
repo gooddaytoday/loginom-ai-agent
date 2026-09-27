@@ -18,6 +18,14 @@
 
 ### Подготовка Fix72: CSV и профиль52
 
+Root уточнил independent audit-native-int64.py: outside-safe OUTPUT обязан
+сохранить native integer tag20; NULL/другой тип не принимается как precision
+characterization. Отдельная отрицательная проверка NULL PASS; прежний v1 сохранён.
+Текущий SHA1d0543617b8ce609829e96d19b2a812ad8510a76677c77c68c79ceebb6f48c84,
+receipt audit-native-int64-type-admission-selfcheck.json. Safe NULL по-прежнему
+разрешён. Wrapper использует этот scalar файл; ранее записанный scalar SHA ниже
+относится к сохранённому v1. Никаких live int64 ожиданий не подгонялось.
+
 Root независимо разобрал CSV без float/JS Number: safe55bytes/4rows (NULL и
 canonical3safe decimalstrings), SHA86983c730cec045020a014b5bd365b2cf604c5f214774eb4a31b9344f6d0865d;
 outside58bytes/3rows, SHA606534ae7c03a4cc31c963a14b3029576e2f7867411d27347ab9548ccf8aa1f6.
