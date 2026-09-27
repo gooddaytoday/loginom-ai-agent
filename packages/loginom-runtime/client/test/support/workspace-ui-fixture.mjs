@@ -153,12 +153,16 @@ export class Page {
       const model=new this.app.ModelForm(),states=new Map();
       model.FDiagram={FNodes:{FCollection:[]},FLinks:{FCollection:[]},FmxGraph:{container,view:{getState:cell=>states.get(cell)}}};
       this.graphModels.set(container,{model,states,byTid:new Map()});
-      this.app.Application??={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>{
+      // Saved vendor ViewItemsController: inherited Items getter, own FItems.
+      const itemsPrototype={get Items(){return this.FItems;}};
+      const mainForm=Object.create(Object.create(Object.create(Object.create(itemsPrototype))));
+      mainForm.FItems={Workspace:{getActiveTab:()=>{
         const active=this.document.all().find(e=>e.classList.contains('x-tab-active'))?.getAttribute('data-tid');
         const suffix=active?.match(/tb(-[0-9]+)?$/)?.[1]??'';
         const own=[...this.graphModels].find(([e])=>e.getAttribute('data-tid')==='MF;TF'+suffix+';ModelForm;cmpDiagram');
         return own?{Controller:{FController:own[1].model}}:null;
-      }}}}}};
+      }}};
+      this.app.Application??={FInstance:{FMainForm:mainForm}};
     }
     const f=this.graphModels.get(container);
     if(/^[^|]+\|Output_[^|]+\|[^|]+\|Input_[^|]+$/.test(key)){
