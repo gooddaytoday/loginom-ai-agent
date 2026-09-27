@@ -15,6 +15,17 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source87 intermediate catalogue independently checked
+
+Root импортировал только closed catalogue: K1/K2 bytes/hash/schema/input_fixture
+совпали с независимым proposal oracle;5посторонних IDs (включая K3/K4/B/произвольный)
+отвергнуты. Private calibration-source87-catalogue-intermediate.json сохраняет
+текущий catalogue hash. Это промежуточная проверка, не frozen87/live acceptance.
+Ранее отмеченные free-variable imports удалены из page-sealed function в текущем
+diff; подтверждение serialized regression ожидается в final tests/handoff.
+Developer active revision15; не перезапускать по timeout. Browser runs отсутствуют.
+
+
 ### Source87 intermediate review: page-realm free variable замечен
 
 Developer turn01a0e503 остаётся active revision15; frozen handoff отсутствует.
