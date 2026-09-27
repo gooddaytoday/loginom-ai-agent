@@ -16,6 +16,30 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source82: независимый scalar/association auditor подготовлен
+
+Private audit-coercion-native-association.py SHA
+7647e7f580286273faceea2876510440b14a6e89310c27911ac4d92666174dc4
+независимо проверяет Real/String INPUT и upstream по fixed design bytes,
+канонический Integer/NULL OUTPUT через ранее проверенный Python decoder,
+recorded read/owner/execution/source/lifecycle связи и characterization flags.
+Учитывается наблюдённая форма: INPUT execution compact, upstream содержит полный
+completed child; сопоставляются идентификатор и полная исходная запись.
+
+Input-scalar selfcheck **7 positive/49 negative PASS**; association selfcheck
+**7 positive/70 negative PASS**, включая changed upstream owner/child/scope,
+reused read ID, wrong source, pending/unreleased, неверный outcome/exact_pass.
+Все проверки синтетические, без нового Loginom execution. Private receipts:
+coercion-native-input-auditor-selfcheck.json, coercion-native-association-selfcheck.json.
+Native owner witness, source closure, journal/ACK и cleanup остаются отдельными
+обязательными частями будущего полного live audit. Нельзя считать эти selfchecks
+доказательством завершения ни одного из7 live cases.
+
+Developer revision50 active: live coercion dispatch добавлен, идут integration
+и full regression. Source82 freeze/handoff ещё не получен; browser закрыт,
+profile66 не использован. Root не запускал живой coercion до допуска исходников.
+
+
 ### Source82 failed-terminal route: root bounded regression PASS
 
 Developer revision49 передал отдельные javascript-native-coercion-failure.mjs,
