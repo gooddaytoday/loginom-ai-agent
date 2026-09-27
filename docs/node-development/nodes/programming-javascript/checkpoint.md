@@ -16,6 +16,25 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Root самостоятельно зафиксировал candidate и запустил full client
+
+Fix79 developer turn завершился idle (revision35), но вместо handoff снова
+ответил на историческое bootstrap-поручение памяти. Runtime изменения сохранены;
+это не объявляется ошибкой подключения OpenViking. Root не перезапускает
+разработчика во время независимого прогона и не принимает отсутствующий freeze.
+
+Для продолжения создан **root candidate snapshot**, не accepted freeze79:
+operator79-root-candidate-source.json с1243 pins (source78 closure плюс client и
+operator files) и точными5 изменёнными/new runtime/test paths. HEAD остаётся
+`66f0ad6e732fd9e9f717284d3bf93a2c9cbcafc1`. Это позволяет независимо проверить
+сохранённые изменения, не ожидая повторного исторического ответа.
+
+Root запустил полный client/test/*.test.mjs на pinned Node24.19.0 с concurrency2
+и PATH, начинающимся с pinned Node directory. Session47017 running;
+stdout/stderr — operator79-root-client-initial.*, итоговый receipt будет создан
+после terminal и повторной сверки pins. Source/tests root не редактирует.
+Browser CLOSED/profile63 unused. До разбора полного результата live запрещён.
+
 ### Fix79 regression: основной набор завершён, full client ещё работает
 
 Root непосредственно прочитал developer main log: **1292 PASS**, failed/skipped0.
