@@ -15,6 +15,23 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Cookie source investigation: загружены зависимости, admission не изменён
+
+Root получил с текущего стенда следующие source-backed зависимости Uses.js:
+rtl.imp.js, rpc.js, BG_Interfaces.js, CustomProxyClassBuilder.js,
+BG_DelegateHelpers.js и CustomClient.js. Приватные fix61-*-source manifests в
+preview-source-40 закрепляют URL/bytes/SHA. RPC hash совпал прежнему runtime pin;
+хеши остальных загрузок сами по себе не доказывают loaded-runtime identity.
+
+rpc.js подтверждает создание `$FHelper = new THelper(this)`, а
+BG_DelegateHelpers.js — DelegateCookie extends Out. Однако присваивания двум
+полям `$FDataChangeCookie`/`$FStateChangeCookie` пока не найдены: нельзя считать
+этот тип установленным или исключать произвольные поля только по названию.
+Разработчик active, исследует registration/helper; browser закрыт, новых live
+не было. При недостатке source следующий шаг — компактная structural diagnostic
+на owned helper без чтения произвольных значений и без ослабления admission.
+
+
 ### Probe06: optional ports пройдены; cookie representation ещё не установлена
 
 Headed profile39/source60 завершён exit1 FAILED. Исправленный Preview admission
