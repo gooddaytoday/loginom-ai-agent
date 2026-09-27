@@ -16,6 +16,26 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze49: native loading settlement проверен, batch49 запущен — 2026-09-27
+
+Root проверил final diff и source chain, повторил116 tests PASS:
+column-editor36,stage-observer14,execution-evidence50,batch8,link-topology8.
+30/30 source hashes до/после совпали. Source commit `931400b176` меняет только
+private execution-runtime и execution-evidence.test. Busy guard сверяет
+удержанные ModelForm view/DOM, текущий native AfterElementTextMaskContext через
+ElementSymb, FController/FElement/FIsActive, dense FSequence/FCurrent и cached
+bg-mask-text. Legacy Ext маски не допущены. Первый непустой toast закрепляется
+после busy; quiet требуется непрерывно500ms даже на первоначально пустом пути.
+Single wait сохраняет original deadline/cap61500ms; Execute не повторяется,
+shared console/process guards не менялись. Tests не заменяют live ownership.
+
+Batch49 RUNNING: семь прежних оставшихся G2 cases начиная code-sentinel-execute,
+freshprofile22,DISPLAY=:1/headed,Chromium1246,sandbox. Source/root-test receipts
+и host lease сохранены в private campaign. Developer idle/source frozen;
+единственный browser operator принадлежит root. Цель активна: public handler,
+полная матрица, формальное ревью и CLI-приёмка не завершены.
+
+
 ### Fix49: точная цепочка ModelForm loading mask — 2026-09-27
 
 Root получил со стенда по подтверждённым Uses.js путям HTTP200:
