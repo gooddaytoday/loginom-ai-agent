@@ -15,6 +15,29 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch40 частично: visible page отличается от controller view — 2026-09-27
+
+Batch40 RUNNING, lease занят. Новые changed-state snapshots полезны:
+Preview rect900×675 внутри viewport, ancestors/native el подтверждены,
+owner_verified=true, code_count1, но code_owned=false; pending сменился наfalse.
+Текущий frozen observer не раскладывает code_owned на отдельные проверки,
+поэтому конкретное несовпадение live ещё не доказано. Preview не повторялся.
+
+Root дополнительно прочитал WizardExtForm.JoinWizard со стенда: он переносит
+CHILD pages из controller.CardContainer в основной CardWizardPanel и сохраняет
+их в WizardItem.FPages. Сам controller хранится в WizardItem.FWizard; коллекция
+outer wizard — FWizardItems.FItems (ordinary array по Classes.js).
+Таким образом, видимый page не обязан быть FView самого JS controller.
+Это структурное расхождение требует привязки через единственный original
+WizardItem.FPages и reciprocal FWizardForm, затем прежний Preview controller.
+Эти runtime equalities ещё NOT_RUN. Разработчику разрешён пока только анализ;
+28 frozen исходников не менять до окончания живого процесса40.
+
+Дополнительные источники/хеши сохранены в preview-source-40/additional-manifest.json.
+WizardExtForm:c001607c5b4b78cd4b0292e03445ebde04138cadff5d9eb5da7b34e9117b556b;
+Classes:5cdedf823352d570f67c997021fc108318cf8e05f2eab1dca31b1f8a8e8583d8.
+Ожидание исходного Preview ограничено прежним deadline10min; cleanup ещё нет.
+
 ### Freeze40 проверен, адресный headed Preview run запущен — 2026-09-27
 
 Разработчик передал28 файлов и остановился; root сверил все SHA.
