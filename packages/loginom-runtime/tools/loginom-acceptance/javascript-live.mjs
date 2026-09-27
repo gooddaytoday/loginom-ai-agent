@@ -1,3 +1,4 @@
+import {captureJavascriptNativeClassifierDiagnostic} from './javascript-native-classifier-diagnostic.mjs';
 import {verifyJavascriptDeclaredEmpty} from './javascript-native-zero.mjs';
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {javascriptNativeRoundtripProbe,verifyNativeRoundtripMapping} from './javascript-native-roundtrip-contract.mjs';
@@ -94,6 +95,7 @@ let executionRuntime,executionInput,executionNode,executionPrepared,executionInp
 let browserLifecycle,inputBinding,previewCloseState={dispatched:false};
 const columnState={pending:null};
 let executionJournalLine=0;
+let nativeClassifierBinding;
 let readingExisting=false,initialOpening={};
 const schemaContext=()=>({root:wizardRoot,native:wizardHandle,binding:wizardBinding,prefix:owner.prefix,account:config.username,build:'7.4.2'});
 const executionRecord=async event=>{
@@ -106,6 +108,13 @@ const executionRecord=async event=>{
     readback.generated_schema_mismatch_trial=javascriptMismatchExecutionProgress(readback.generated_schema_mismatch_trial,event.terminal);
   }
   const saved=await executionJournal({...event,...(report.case_id?{case_id:report.case_id,execution_case:executionCase}:{})});
+  if(nativeRoundtrip&&report.stage==='prepare-typed-input'&&saved.phase==='node_observation_completed'
+    &&saved.outcome?.output?.prepared_node_context?.verified===true
+    &&saved.outcome.output.prepared_node_context.surface==='graph') {
+    const context=saved.outcome.output.prepared_node_context;
+    nativeClassifierBinding={context:{verified:true,surface:'graph',node_id:context.node_id,tid:context.tid},
+      prefix:saved.outcome.output.workflow_ref?.prefix};
+  }
   (report.execution_records??=[]).push(compactJavascriptJournalRecord(saved,++executionJournalLine));
   await save();return saved;
 };
@@ -1195,6 +1204,8 @@ try {
   report.status='OBSERVED';
 } catch(error) {
   report.status='FAILED';report.failure={stage:report.stage,...redactor.redact(javascriptProbeFailure(error))};
+  const diagnostic=await captureJavascriptNativeClassifierDiagnostic({nativeRoundtrip,stage:report.stage,page,binding:nativeClassifierBinding});
+  if(diagnostic)report.native_classifier_diagnostic=diagnostic;
   if(discoveryProbe)report.discovery_failure_context={source_sha256:discoveryProbe.source_sha256,
     terminal_receipt_observed:!!report.execution_probe?.execution,syntax_support:'not_determined'};
   if (page) await snapshot('failure').catch(()=>{report.failure.snapshot='unavailable';});
