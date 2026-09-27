@@ -15,6 +15,27 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Probe06: optional ports пройдены; cookie representation ещё не установлена
+
+Headed profile39/source60 завершён exit1 FAILED. Исправленный Preview admission
+пройден; следующий отказ `Native input binding: cookie bound` возникает в
+сериализации native data/state cookie до nativecell dispatch. Generic own-property
+encoder требует1..16keys и depth<3; причина несовместимости реальной структуры
+ещё исследуется. Нельзя повышать bound или менять equality по synthetic `{value:1}`.
+
+Original cleanup ALL PASS, recovery не требуется. Root проверил434journal refs
+и66source pins. Private native-input-probe-06-verification.json; report SHA256:
+`b21530d6b3af1b28e13a108d79994bc28125878a6e4cf581c52e0793b3167ae0`.
+Browser closed, profile39 сохранён; G5/native values не подтверждены.
+
+Существующей задаче поручено определить source-backed cookie value shape и
+сохранить проверки object identity/value mutation. Root получил bg.model.rpc.js
+и bg.rtl.rpc.js с целевого сервера: hashes совпали nativeFrontendPins;
+private preview-source-40/fix61-cookie-source-manifest.json закрепляет загрузки.
+При недостатке source потребуется bounded structural diagnostic, не произвольная
+сериализация объектов. JS-output/public handler/CLI остаются незавершёнными.
+
+
 ### Freeze60: optional input admission исправлен; probe06 запущен
 
 Source node-javascript `6e8efd36c5da4576a0c76685acd6e0399a13833c` допускает ровно
