@@ -13,8 +13,8 @@ fixture и observed_local; она не закрывает JS OUTPUT, ABA или 
 
 Реализован отдельный `javascript-native-input-live.mjs` и import-only binding;
 Source64 добавляет отдельные JS-output/upstream bindings и private identity
-roundtrip (649 root tests PASS); первый headed-прогон начат, результат ещё не
-получен. Остальные семейства и G5 целиком ещё предстоят.
+roundtrip (649 root tests PASS); первый headed-прогон завершён отказом exact edge/port после подготовки INPUT
+и подключения JS, до его исполнения; причина локализуется по checkpoint. Остальные семейства и G5 целиком ещё предстоят.
 Далее сохранён дизайн и анализ **исходного source55**, поэтому указания
 «текущий» внутри анализа относятся к этой базе, а не к source63.
 Основание source55: `520ce1f78ce39859d3ce30a65db93e80c9081747`.

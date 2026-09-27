@@ -15,6 +15,30 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Roundtrip probe01: отказ exact edge/port до выполнения JS
+
+Source64/profile43 завершён exit1 FAILED, work_stage verify-js-input-port.
+Input-before-JS успешно прочитан и armed; создан/соединён JS, mapping Value:real
+проверен, исходный graph после закрытия mapping сохранён (3nodes/13ports).
+Далее bindJavascriptNativeRoundtripGraph отказал на составном exact edge/port
+условии. Какой именно predicate не совпал, текущая диагностика не раскрывает;
+причина пока не установлена. JS source/Execute/native OUTPUT не достигнуты.
+
+Root независимо: INPUT scalar4/4 PASS,476journal refs,73source pins. Original
+cleanup ALL PASS; browser closed, profile43 сохранён. Report SHA256:
+`8980dd9a34523850f40b61cb4522ed6788f72d1539922c2db682ea65a71092cf`.
+Private native-roundtrip-probe-01-verification.json; исторический report не менялся.
+
+Root загрузил публичные клиентские Link/LinkAbstract/Edge/Port/PortAbstract в
+private preview-source-40/fix64-* с SHA manifests. Edge содержит FSourcePort и
+FTargetPort; cached ModelForm.AddLink вызывает SetData(link,link.Guid,...), а
+Unit.SetData задаёт FGuid. Поэтому отсутствие FGuid не доказано. Возможная
+необязательность JS input/FParam — только гипотеза; required=false у поля mapping
+не доказывает optional port. Разработчику поручена адресная диагностика predicates
+и проверка source/evidence перед изменением admission. Следующий headed run
+только после нового freeze. G5/full plan остаются active/incomplete.
+
+
 ### Freeze64: private roundtrip реализован; первый headed run запущен
 
 Source node-javascript `7e583ca0ec7cefc97326bb28949672faea50b9dd`:12 runtime/test
