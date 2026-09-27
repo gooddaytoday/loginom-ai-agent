@@ -16,6 +16,30 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze52: editor ownership проверен; batch53 запущен — 2026-09-27
+
+Source commit `9b49c28b3a23124609fa892e7093dd6cece819e6`:4 source/test файла.
+Root проверил diff,451 direct tests +3 targeted workspace-ui tests PASS,
+36/36 hashes до/после. В freeze добавлены общий workspace-ui и его tests;
+остальные ранее неизменённые pins сохранены. Полный workspace-ui233 suite
+в задаче разработчика не завершился за более6min и был остановлен exit130;
+он НЕ считается PASS. Адресные три observer-теста завершились отдельно.
+
+Global guard включает DataSetOutputSocketWizard;btnAddMappingColumn при scoped
+editor-root/discovery read. Native portal/record/row bindings не ослаблены.
+Private cleanup допускает typed Cancel только после одного подтверждённого
+открытия точного initial editor, с неизменными значениями и original row/port/root.
+Затем доказывает unchanged native mapping, Close и unchanged native/semantic graph.
+Later field/Apply/Done dispatch, потерянный open/Cancel, foreign owner/changed draft
+не разрешают Close/replay. Эта ветка проверена локально, live PASS ещё не заявлен.
+
+Batch53: freshprofile26,headed DISPLAY=:1,sandbox enabled. Cases code-sentinel-done
+первым, затем code-table-mismatch. Source36 hashes закреплены private receipt;
+разработчик idle, браузером владеет root. На момент записи RUNNING.
+Public handler, остальные G1–G7/J01–J27 и автономная CLI-приёмка остаются открыты.
+
+
+
 ### Batch52: три Next/Done перехода; code-Done ещё не выполнен — 2026-09-27
 
 На неизменном Freeze51/7274cca5e5 root проверил1983 journalSHA,5полных input reads/
