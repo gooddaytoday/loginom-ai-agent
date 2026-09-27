@@ -15,6 +15,35 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-get-case повторил отказ: обнаружен toast в проверке готовности
+
+Profile86/original93557 terminal exit1: тот же FAILED inspect-pages после
+execution_launched, без execution_terminal. Cleanup3/3, закреплённых Chromium
+процессов нет. Report SHA b39749e15b1fdb527c5b7112a5aec505f47715945c290bb049968128631814a7.
+Private native-named-get-case-probe-02-diagnosis.json сравнивает обе попытки.
+В первом false observation обеих попыток prepared_node_context verified=true,
+graph/locked=false/правильный JS owner. Причина false predicate — ui.dialogs
+с anchor_tid=toast, при masks=[]; generic channel запрещает этот диалог.
+Это корректирует первоначальную гипотезу о потере выбранного узла.
+Перед этим notification wait сообщил ready=true/count=0; точная причина
+неучёта toast ещё исследуется. Нажатие пользователя не доказывает причину сбоя.
+
+Существующей задаче разработчика назначены диагностика и минимальный fix
+source86 при доказанном дефекте; новых browser runs до freeze нет.
+Не ослаблять общий foreign-dialog guard, ownership, deadline и запрет replay.
+Оба FAILED сохранены, B не принят; A8/8 и полный scope остаются без изменений.
+
+
+### B-get-case: отдельный прогон profile86 RUNNING
+
+После terminal63969/cleanup3 и отсутствия закреплённого Chromium создан
+fresh profile86. Все1265pins source85, Node/Chrome hashes и DISPLAY=:1 проверены.
+Original exec93557 RUNNING, native-named-get-case-probe-02; source85 неизменён.
+Это отдельный новый пакет/кейс, не повтор Execute в прежнем пакете.
+Ждать original session до terminal; затем проверить полный native/journal proof.
+Предыдущий FAILED и сообщение пользователя сохранены; A8/8 без изменений.
+
+
 
 ### B-get-case: последний прогон завершился; пользователь сообщил о нажатии
 
