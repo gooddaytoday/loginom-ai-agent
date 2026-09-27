@@ -18,6 +18,19 @@
 
 ### После перезапуска: registered memory PASS, Fix71 выполняется
 
+Root отдельно проверил кандидаты CSV стандартным Python csv.reader:
+boolean29bytes/3rows SHA bb1c31553e26a6c0a82e2c947df83a4491ff2b81761d069a0ce4c6f7272d3d46;
+string94bytes/8rows SHA c3adece846a9998d8003d2b4de019a4dda7940b471166ab0ca4c9fa364b34ce6.
+Значения совпали с canonical oracle, включая quoted empty и multiline string;
+это CSV preflight, не native admission. Private typed-csv-preflight-71.json.
+Подготовлен audit-native-typed-roundtrip.py SHA
+7c9edcc6b639923a0b39f0d534be9b44dd10271d709fef88f0a4be5b4ee219c4:
+scalar audit всех трёх стадий плюс read IDs/context/schema/execution association.
+Synthetic2positive/12negativePASS; ownership/source execution требуют отдельного
+runtime evidence. Разработчику передано замечание о точном destination path;
+полный anchored путь восстановлен, отрицательные тесты ожидаются вместе с
+Freeze71. App API по-прежнему подтверждает активный ход; live не запущен.
+
 Пользователь продолжил работу. В прежней задаче разработчика штатные MCP
 health5800ms/find24500ms/exact read4600ms прошли; find завершился дольше15s.
 Это подтверждает устранение наблюдавшегося ограничения в её текущем процессе.
