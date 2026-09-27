@@ -15,6 +15,15 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-getcolumn-missing/profile90 RUNNING
+
+Fresh profile90 после CHARACTERIZED/cleanup profile89;1265pins/toolchains
+и no competing Chromium проверены. Source86 unchanged, evidence
+native-named-getcolumn-missing-probe-01, **original exec72243 RUNNING**,
+headed DISPLAY=:1/sandbox/original deadline. Не повторять по observation timeout.
+После terminal — соответствующий независимый B audit и cleanup verification.
+
+
 ### B-getcolumn-case CHARACTERIZED: undefined
 
 Profile89/original64389 terminal exit0/CHARACTERIZED. Root independent completed
