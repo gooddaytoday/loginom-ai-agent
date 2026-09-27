@@ -16,6 +16,27 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze67: Done lifecycle и JS output; roundtrip probe04 запущен
+
+Source node-javascript `5e80c795ed694a981a04594fdef05f0b57ee101c` (7 файлов):
+source/mode проверяются перед собственным Done; только подтверждённый terminal
+Done с тем же effect/node/source, скрытым исходным мастером и исходным графом
+позволяет закрепить receipt. Законно уничтоженный DOM далее не читается.
+Preflight/seal journal ACK обязательны до Execute, unknown outcome не повторяется.
+JS output допускается как data0/param2 плюс точный служебный mx.AddPort;
+constructor hash `38bbd3e2f5143859e0c963aeb9c1389304c140d32484a88af1b2ec8f6ba0a72c`.
+Native read требует active status1; status2 до исполнения не считается готовностью.
+Замена объектов, лишние data outputs и деактивация после output запрещены.
+
+Root независимо: **738/738 PASS**, fail/skip0;73pins до/после совпали,syntax7PASS.
+Private operator67-root-test-source.json и native-roundtrip-probe-04-source.json.
+Headed native-roundtrip-probe04 запущен на fresh profile46, DISPLAY=:1/sandbox,
+Node/Chromium hashes проверены. Unified process session36485. Разработчик idle.
+На момент записи RUNNING: source/Execute/output/upstream/cleanup live ещё не
+подтверждены. Profile45 сохранён с cleanupALLPASS. G5/full plan incomplete.
+
+
+
 ### OpenViking: устранён преждевременный тайм-аут поиска (2026-09-27)
 
 После повторного запуска Codex health, авторизация, список инструментов и каталог
