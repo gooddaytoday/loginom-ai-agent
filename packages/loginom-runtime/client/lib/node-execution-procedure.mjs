@@ -1,5 +1,5 @@
 import {NodeReadinessTimeout} from './node-procedure.mjs';
-import {captureExecutionBaseline,identifyNewExecution,verifyCompletedExecution,verifyFailedExecution,selectExecutionChild,expectedExecutionStopProof,verifyCancelledExecution} from './node-execution-evidence.mjs';
+import {captureExecutionBaseline,identifyNewExecution,verifyCompletedExecution,verifyFailedExecution,selectFailedExecutionChild,verifyFailedChildExecution,selectExecutionChild,expectedExecutionStopProof,verifyCancelledExecution} from './node-execution-evidence.mjs';
 
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,message)=>{requireValue(xs.length===1,message);return xs[0];};
@@ -75,8 +75,8 @@ export async function revealExecutionControl(channel,node,initial,process,tid,ve
   throw new Error('Process reveal exceeded bounded scroll steps');
 }
 
-export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false}={}) {
-  let baseline,execution,stopPromise,launchAttempted=false,deactivationAttempted=false;
+export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false,verifyFailedChild=false}={}) {
+  let baseline,execution,stopPromise,launchAttempted=false,deactivationAttempted=false,failedChildAttempted=false;
   const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,...extra});
   const control=(s,tid,verb='click')=>{const current=typeof tid==='function'?tid(s):tid;
     return typeof current==='string'&&current.length?s.ui.elements.filter(e=>e.tid===current&&e.allowed_actions.includes(verb)):[];};
@@ -278,35 +278,53 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         }
       }
       const group=one(s.node_processes.processes.filter(p=>p.process_id===execution.group_id&&p.record_id===execution.group_record_id),'Execution group replaced');
-      if(group.progress_state?.state==='failed') {
+      const failed=group.progress_state?.state==='failed';
+      if(failed&&!verifyFailedChild) {
         const receipt=verifyFailedExecution(execution,s.node_processes);
         await act(s,'ConsoleForm;btnClose','click',fresh=>verifyFailedExecution(execution,fresh.node_processes));
         await observe('failed execution console closed',s=>!consoleVisible(s));
         await returnToExecutedWorkflow(channel,node);
         return {...receipt,cleanup_complete:true,effect_possible:false};
       }
+      if(failed){
+        requireValue(!failedChildAttempted,'Failed child ownership already attempted; no gesture replay');
+        failedChildAttempted=true;
+      }
       s=await revealChildren(s,group);
-      const child=selectExecutionChild(execution,s.node_processes);
+      const child=failed?selectFailedExecutionChild(execution,s.node_processes):selectExecutionChild(execution,s.node_processes);
+      const checkChild=(state,selected=false)=>{
+        if(!failed)return;
+        const fresh=selectFailedExecutionChild(execution,state.node_processes,child);
+        if(selected)requireValue(fresh.selected===true&&fresh.rendered===true
+          &&state.node_processes.processes.filter(p=>p.selected).length===1,'Failed child selection changed');
+      };
       const childTid=processControl(child);
       s=await revealExecutionControl(channel,node,s,child,childTid,'right_click');
       await act(s,childTid,'right_click',s=>{
+        checkChild(s);
         requireValue(s.node_processes.processes.some(p=>p.process_id===child.process_id&&p.record_id===child.record_id&&p.rendered),'Process row changed');
         return {node,process_id:child.process_id,record_id:child.record_id};
       });
-      s=await observe('Show Node available for the new process',s=>processes(s)&&control(s,showNode,'show_process_node').length===1
-        &&s.node_processes.processes.filter(p=>p.selected).length===1&&s.node_processes.processes.some(p=>p.selected&&p.record_id===child.record_id));
-      await act(s,showNode,'show_process_node',s=>({node,process_id:child.process_id,record_id:child.record_id,
-        selected:s.node_processes.processes.filter(p=>p.selected).map(p=>p.record_id)}));
+      s=await observe('Show Node available for the new process',s=>{
+        checkChild(s,true);return processes(s)&&control(s,showNode,'show_process_node').length===1
+          &&s.node_processes.processes.filter(p=>p.selected).length===1&&s.node_processes.processes.some(p=>p.selected&&p.record_id===child.record_id);
+      });
+      await act(s,showNode,'show_process_node',s=>{
+        checkChild(s,true);return {node,process_id:child.process_id,record_id:child.record_id,
+          selected:s.node_processes.processes.filter(p=>p.selected).map(p=>p.record_id)};
+      });
       // Switching back from Files can hide the process panel. Reopen it for
       // a fresh check of the same execution; this never launches the node.
       await openConsole();
       s=await observe('new process selects the prepared graph node',s=>processes(s)&&s.node_outputs?.verified===true
         &&s.node_outputs.node_selected===true&&s.prepared_node_context.surface==='graph',{readOutputs:true});
-      const receipt=verifyCompletedExecution(execution,s.node_processes,{verified:true,process_id:child.process_id,record_id:child.record_id,
-        node_selected:s.node_outputs.node_selected,node:s.prepared_node_context});
+      const owner={verified:true,process_id:child.process_id,record_id:child.record_id,
+        node_selected:s.node_outputs.node_selected,node:s.prepared_node_context};
+      const receipt=failed?verifyFailedChildExecution(execution,s.node_processes,child,owner)
+        :verifyCompletedExecution(execution,s.node_processes,owner);
       await closeConsole(s);
       await returnToExecutedWorkflow(channel,node);
-      return receipt;
+      return failed?{...receipt,cleanup_complete:true,effect_possible:false}:receipt;
     },
   });
 }
