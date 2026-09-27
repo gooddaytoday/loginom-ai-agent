@@ -33,8 +33,8 @@ export function verifyNativeInputUi(table,fixtureId='real'){
     &&table.precision?.numbers_verified===true&&table.precision.limitations?.length===0&&!table.limitations?.length
     &&table.schema?.length===1&&table.schema[0].name==='Value'&&table.schema[0].label==='Value'&&table.schema[0].type===fixture.type
     &&table.sample?.length===fixture.rows&&table.sample.every((row,i)=>row.length===1&&row[0].type===fixture.type
-      &&row[0].is_null===(i===0)&&Object.is(row[0].value,expectedValues[i])
-      &&row[0].precision===(i===0?'exact_null':fixture.id==='real'?'17_significant_digits':fixture.id==='boolean'?'exact_boolean':'display_text')),'complete typed UI oracle differs');
+      &&row[0].is_null===(expectedValues[i]===null)&&Object.is(row[0].value,expectedValues[i])
+      &&row[0].precision===(expectedValues[i]===null?'exact_null':fixture.type==='integer'?'exact_integer':fixture.id==='real'?'17_significant_digits':fixture.id==='boolean'?'exact_boolean':'display_text')),'complete typed UI oracle differs');
   return {verified:true,rows:fixture.rows,columns:1,native_bytes_verified:false};
 }
 
@@ -88,10 +88,11 @@ export function verifyNativeFixtureCells(exact,fixtureId='real'){
   const f=javascriptNativeFixture(fixtureId);
   need(exact.coverage.table_complete&&exact.row_count===f.rows&&exact.cells.length===f.rows&&exact.schema.length===1
     &&exact.schema[0].name==='Value'&&exact.schema[0].label==='Value'&&exact.schema[0].type===f.type,'full fixed native slice required');
-  need(exact.cells.every((cell,i)=>cell.row===i&&cell.column===0&&cell.is_null===(i===0)
-    &&cell.native.tag===(i===0?1:f.id==='real'?5:f.id==='boolean'?11:8)
-    &&(i===0?cell.value===null:f.id==='string'?cell.value===f.values[i]&&cell.native.utf8_hex===f.expected_bytes[i]
-      :cell.native.bytes_le===f.expected_bytes[i]&&(f.id==='real'||cell.value===f.values[i]))),
+  need(exact.cells.every((cell,i)=>cell.row===i&&cell.column===0&&cell.is_null===(f.values[i]===null)
+    &&cell.native.tag===(f.values[i]===null?1:f.type==='integer'?20:f.id==='real'?5:f.id==='boolean'?11:8)
+    &&(f.values[i]===null?cell.value===null:f.id==='string'?cell.value===f.values[i]&&cell.native.utf8_hex===f.expected_bytes[i]
+      :cell.native.bytes_le===f.expected_bytes[i]&&(f.id==='real'||cell.value===f.values[i])
+        &&(f.type!=='integer'||cell.decimal===f.values[i]&&cell.native.bits===64&&cell.native.encoding==='signed-int64-le'))),
     'actual native values/bytes differ from independent oracle');
   return exact;
 }

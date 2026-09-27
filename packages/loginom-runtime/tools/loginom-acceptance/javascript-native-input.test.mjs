@@ -70,15 +70,16 @@ export async function fake({deferred=false,change,beforeBind,bind=true,afterRele
     DispatchMessageAsync(request,exceptions){assert.equal(exceptions,false);counters.sent++;
       const value=values[request.row],utf8=typeof value==='string'?new TextEncoder().encode(value):null;
       const bytes=new Uint8Array(Math.max(60,utf8?.length?28+utf8.length:60)),view=new DataView(bytes.buffer);
-      view.setInt16(12,value===null?1:fixtureId==='real'?5:fixtureId==='boolean'?11:8,true);
+      view.setInt16(12,value===null?1:fixtureId==='real'?5:fixtureId==='boolean'?11:fixture.type==='integer'?20:8,true);
       if(value!==null){
         if(fixtureId==='real')view.setFloat64(14,value,true);
         if(fixtureId==='boolean')bytes[14]=value?1:0;
+        if(fixture.type==='integer')view.setBigInt64(14,BigInt(value),true);
         if(fixtureId==='string'){view.setInt32(22,utf8.length,true);if(utf8.length){view.setUint16(26,65001,true);bytes.set(utf8,28);}}
       }
       const response={$FData:bytes,$FDataSize:bytes.length,get_MessageType:()=>1,get_MessageID:()=>request.get_MessageID(),set_StaticDataSize:()=>{},Release:()=>counters.responses++};
       return {continueWith:callback=>{
-        const complete=error=>{change?.(result,response);callback({getAwaitedResult:()=>{if(error)throw Error('transport lost');return response;}});};
+        const complete=error=>{change?.(result,response,request);callback({getAwaitedResult:()=>{if(error)throw Error('transport lost');return response;}});};
         if(typeof deferred==='function'?deferred():deferred)callbacks.push(complete);else complete();
       }};
     }};
@@ -502,7 +503,7 @@ test('owning driver journal acknowledgement precedes scoped Close and proof retu
   assert.deepEqual(f.actions,['click','press','native','close']);assert.deepEqual(f.events.map(e=>e.phase),['javascript_native_input_cells_verified','javascript_native_input_preview_closed']);
   assert.equal(f.states.at(-1).releasedResponses,4);
 });
-for(const fixtureId of ['real','boolean','string'])for(const wrongAck of [false,true])test(fixtureId+' production journal full proof, disk, secrets and exact ACK: '+wrongAck,async t=>{
+for(const fixtureId of ['real','boolean','string','integer-safe','integer-outside-safe'])for(const wrongAck of [false,true])test(fixtureId+' production journal full proof, disk, secrets and exact ACK: '+wrongAck,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'javascript-native-proof-'));
   t.after(()=>rm(directory,{recursive:true,force:true}));
   const journal=createExecutionJournal({directory,metadata:{sessionId:'test',clientRevision:'test'},knownSecrets:['private-secret']});
@@ -554,7 +555,7 @@ test('changed loaded cookie class source stops owning driver before cells and cl
 test('lost Close refuses proof and marks cleanup uncertain',async()=>{
   const f=await driverFixture('close');await assert.rejects(f.run,/close lost/);assert.equal(f.x.operation.transportUncertain,true);assert.equal(f.states.at(-1).uncertain,true);
 });
-for(const fixtureId of ['real','boolean','string'])for(const mode of ['status','read-and-status'])test(fixtureId+' unknown native lifecycle blocks UI cleanup: '+mode,async()=>{
+for(const fixtureId of ['real','boolean','string','integer-safe','integer-outside-safe'])for(const mode of ['status','read-and-status'])test(fixtureId+' unknown native lifecycle blocks UI cleanup: '+mode,async()=>{
   const f=await driverFixture(mode,fixtureId);await assert.rejects(f.run,error=>{
     if(mode==='read-and-status'){assert.match(error.observationError.message,/lost native reply/);assert.match(error.cleanupError.message,/lost status/);}return true;
   });assert.ok(!f.actions.includes('close'));assert.equal(f.x.operation.transportUncertain,true);assert.equal(f.states.at(-1).uncertain,true);

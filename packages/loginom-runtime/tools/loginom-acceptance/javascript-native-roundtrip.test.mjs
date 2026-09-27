@@ -22,10 +22,10 @@ import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,bindJava
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {readJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus,cancelJavascriptNativeRoundtrip} from './javascript-native-roundtrip-read.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
-export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real'}={}){
+export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real',reply}={}){
   const nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixtureId);
   let mutate,mutateAfter,defer=false;
-  const f=await fake({fixtureId,change:()=>mutate?.(),deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
+  const f=await fake({fixtureId,change:(fixture,response,request)=>{mutate?.();reply?.(fixture,response,request);},deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
   const initialRead=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'before'});
   f.model.FPreviewManager.FPreviewVisible=false;
   await f.page.evaluate(armJavascriptNativeRoundtrip,{binding:{...f.b,read_id:'before'},...nativeRoundtripProbe});
@@ -122,7 +122,7 @@ test('roundtrip rejects expired deadline and insufficient bytes without cell dis
   await assert.rejects(()=>readJavascriptNativeRoundtrip(x.f.page,b,decodeVariantFrame,{operationId:'small',maxBytes:60}),/byte budget/);
   assert.equal(x.f.counters.sent,4);
 });
-for(const fixtureId of ['real','boolean','string'])for(const mode of ['ok','wrong-ack','lost-preview'])test(fixtureId+' roundtrip production journal ACK/disk across actual serialized native read: '+mode,async t=>{
+for(const fixtureId of ['real','boolean','string','integer-safe','integer-outside-safe'])for(const mode of ['ok','wrong-ack','lost-preview'])test(fixtureId+' roundtrip production journal ACK/disk across actual serialized native read: '+mode,async t=>{
   const wrongAck=mode==='wrong-ack';
   const fixture=javascriptNativeFixture(fixtureId),x=await roundtrip({fixtureId}),f=x.f;
   f.model.FPreviewManager.FPreviewVisible=true;
@@ -170,18 +170,18 @@ test('fresh process contract refuses replay, stale baseline, wrong launch or sou
   }
 });
 
-for(const mode of ['cancel','timeout'])test('roundtrip '+mode+' retains pending buffers until late response and prohibits replay',async()=>{
-  const x=await roundtrip({deferred:true}),b=await x.bind('output');
+for(const fixtureId of ['real','integer-safe','integer-outside-safe'])for(const mode of ['cancel','timeout'])test(fixtureId+' roundtrip '+mode+' retains pending buffers until late response and prohibits replay',async()=>{
+  const rows=javascriptNativeFixture(fixtureId).rows,x=await roundtrip({fixtureId,deferred:true}),b=await x.bind('output');
   const running=readJavascriptNativeRoundtrip(x.f.page,b,decodeVariantFrame,{operationId:mode,timeoutMs:mode==='timeout'?10:1000});
   const rejected=assert.rejects(running,/cancellation unproven/);
   await new Promise(resolve=>setImmediate(resolve));
   if(mode==='cancel')assert.equal((await cancelJavascriptNativeRoundtrip(x.f.page,mode)).cancelled,true);
   await rejected;
   const pending=await javascriptNativeRoundtripStatus(x.f.page);assert.equal(pending.pending,1);assert.equal(pending.retired,true);
-  assert.deepEqual(x.f.counters,{sent:5,requests:4,responses:4});
+  assert.deepEqual(x.f.counters,{sent:rows+1,requests:rows,responses:rows});
   x.f.callbacks.shift()();
   const settled=await javascriptNativeRoundtripStatus(x.f.page);assert.equal(settled.pending,0);assert.equal(settled.lateResponses,1);assert.equal(settled.published,false);
-  assert.deepEqual(x.f.counters,{sent:5,requests:5,responses:5});
+  assert.deepEqual(x.f.counters,{sent:rows+1,requests:rows+1,responses:rows+1});
   await assert.rejects(()=>readJavascriptNativeRoundtrip(x.f.page,b,decodeVariantFrame,{operationId:'retry'}),/retired/);
 });
 
@@ -189,14 +189,14 @@ test('production roundtrip trial revalidates before one Execute and never retrie
   const {default:vm}=await import('node:vm');
   const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
   const start=source.indexOf('const runExecutionTrial=async probe=>'),end=source.indexOf('const verifyBatchInputIdentity=',start);
-  for(const failure of ['none','admission','read','done-lost','done-unconfirmed','preflight-ack','seal-ack']){
+  for(const failure of ['none','characterized','admission','read','done-lost','done-unconfirmed','preflight-ack','seal-ack']){
     const steps=[],report={execution_probe:{}},deadline=Date.now()+10000;
     const runner=vm.runInNewContext(source.slice(start,end)+'\nrunExecutionTrial',{
       nativeRoundtrip:true,discoveryProbe:null,phaseDeadline:()=>deadline,executionCase:'code-table-execute',report,owner:{prefix:'p'},executionNode:{node_id:'js'},executionInput:{},
       executionRuntime:{checkNativeRoundtripBeforeExecute:async()=>{steps.push('admission');if(failure==='admission')throw Error('changed input');},
         captureExecutionBoundary:async()=>({native:{dispose:async()=>steps.push('dispose')}}),verifyExecutionBoundary:async()=>steps.push('boundary'),
         executeNode:async(node,limit,trial)=>{assert.equal(limit,deadline);assert.equal(trial.source_sha256,nativeRoundtripProbe.source_sha256);steps.push('execute');return {};},
-        readNativeRoundtrip:async()=>{steps.push('native');if(failure==='read')throw Error('lost read');return {before:{},output:{},upstream:{}};},once:async(id,args,perform)=>perform()},
+        readNativeRoundtrip:async()=>{steps.push('native');if(failure==='read')throw Error('lost read');return {before:{},output:{},upstream:{},...(failure==='characterized'?{outcome:{characterization_only:true,exact_pass:false}}:{})};},once:async(id,args,perform)=>perform()},
       page:{evaluate:async fn=>fn===prepareJavascriptNativeRoundtripWizard||fn===sealJavascriptNativeRoundtripDone?{verified:true}:{owner_verified:true,messages:[]},mouse:{click:async()=>{steps.push('done');if(failure==='done-lost')throw Error('lost Done');}}},
       prepareJavascriptNativeRoundtripWizard,sealJavascriptNativeRoundtripDone,schemaContext:()=>({}),readJavascriptStage:()=>{},
       guard:async()=>{},digest:s=>s,caseEffect:(id,effect)=>effect,requireJavascriptStageAdmission:async()=>{},
@@ -205,7 +205,8 @@ test('production roundtrip trial revalidates before one Execute and never retrie
       waitWizardReady:async()=>({page:{tid:'p;DoneWizard'}}),waitGraphReady:async()=>{},openedWizard:true,save:async()=>{},Date
     });
     if(failure==='none'){await runner(nativeRoundtripProbe);assert.equal(report.stage,'native-roundtrip-observed');}
-    if(failure!=='none')await assert.rejects(()=>runner(nativeRoundtripProbe),{admission:/changed input/,read:/lost read/,'done-lost':/lost Done/,'done-unconfirmed':/unconfirmed/,'preflight-ack':/preflight journal ACK/,'seal-ack':/Done seal journal ACK/}[failure]);
+    if(failure==='characterized'){await runner(nativeRoundtripProbe);assert.equal(report.stage,'native-roundtrip-characterized');assert.equal(report.native_roundtrip.outcome.exact_pass,false);}
+    if(!['none','characterized'].includes(failure))await assert.rejects(()=>runner(nativeRoundtripProbe),{admission:/changed input/,read:/lost read/,'done-lost':/lost Done/,'done-unconfirmed':/unconfirmed/,'preflight-ack':/preflight journal ACK/,'seal-ack':/Done seal journal ACK/}[failure]);
     assert.deepEqual(steps,failure==='preflight-ack'?[]:['done-lost','done-unconfirmed','seal-ack'].includes(failure)?['done']:failure==='admission'?['done','admission']:failure==='read'?['done','admission','execute','boundary','native','dispose']:['done','admission','execute','boundary','native','boundary','dispose']);
   }
 });
