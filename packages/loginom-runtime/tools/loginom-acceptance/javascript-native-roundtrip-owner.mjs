@@ -7,7 +7,8 @@ export function armJavascriptNativeRoundtrip({binding,source,source_sha256}){
   need(captured?.document===document&&input&&captured.id===binding.runtime_binding_id
     &&read?.document===document&&!read.poisoned&&!read.active&&read.last?.published===true
     &&read.last.id===binding.read_id&&read.last.status==='completed'&&read.last.pending===0
-    &&read.last.releasedRequests===4&&read.last.releasedResponses===4,'completed input before JS');
+    &&read.last.releasedRequests===input.count&&read.last.releasedResponses===input.count
+    &&(binding.fixture_id??'real')===input.fixtureId,'completed input before JS');
   need(input.diagram.FNodes.FCollection===input.nodes&&input.diagram.FLinks.FCollection===input.links
     &&input.links.length===0&&!input.nodes.some(n=>n.FIconCls==='bg-vendor-icon-javascript'),'input-only baseline');
   const inputCell=input.node.FCell,portCell=input.port.FCell;
@@ -24,7 +25,7 @@ export function armJavascriptNativeRoundtrip({binding,source,source_sha256}){
       &&[6,3].every((subtype,i)=>input.inputPorts[i].parent===input.node&&input.inputPorts[i].FType===0&&input.inputPorts[i].FSubType===subtype&&input.inputPorts[i].FParam===1&&input.inputPorts[i].FStatus===1),'upstream node/port');
     need(input.ds.$===input.identity&&value(input.identity,'$OW')===input.owner&&value(input.identity,'$O')===input.object
       &&value(input.ds,'$FHelper')===input.helper&&value(input.helper,'$FData')===input.cache
-      &&value(input.helper,'$FCacheInitialized')===true&&value(input.helper,'$FRowCount')===4
+      &&value(input.helper,'$FCacheInitialized')===true&&value(input.helper,'$FRowCount')===input.count
       &&value(input.helper,'$FDataChangeCookie')===input.dataCookie&&value(input.helper,'$FStateChangeCookie')===input.stateCookie
       &&tuple(input.dataCookie)===input.dataCookieValue&&tuple(input.stateCookie)===input.stateCookieValue
       &&value(input.dataCookie,'$')===input.dataCookieIdentity&&value(input.stateCookie,'$')===input.stateCookieIdentity
@@ -32,7 +33,7 @@ export function armJavascriptNativeRoundtrip({binding,source,source_sha256}){
       &&Object.getPrototypeOf(input.dataCookieIdentity)===input.dataCookieIdentityPrototype&&Object.getPrototypeOf(input.stateCookieIdentity)===input.stateCookieIdentityPrototype
       &&value(input.cookiePrototype,'constructor')===input.cookieClass&&value(input.cookiePrototype,'$II')===input.cookieInterface
       &&value(input.dataCookie,'$S')===input.ds.$S&&value(input.stateCookie,'$S')===input.ds.$S
-      &&input.field.Name==='Value'&&input.field.DisplayName==='Value'&&input.field.DataType===3,'upstream dataset/subscriptions');
+      &&input.field.Name==='Value'&&input.field.DisplayName==='Value'&&input.field.DataType===input.typeCode,'upstream dataset/subscriptions');
     need(input.child.data.ModelNode===input.nodeData&&input.child.data.Status===3&&input.child.data.ErrorDetails===''
       &&String(input.child.data.id)===binding.completed_child.process_id&&String(input.child.internalId)===binding.completed_child.process_record_id
       &&input.processStore.getRoot()===input.processRoot&&!input.processStore.isLoading(),'upstream execution');

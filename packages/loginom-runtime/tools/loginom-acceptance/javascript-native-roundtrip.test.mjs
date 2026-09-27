@@ -1,3 +1,4 @@
+import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import vm from 'node:vm';
 import {javascriptProbeFailure} from './javascript-mismatch-probe.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
@@ -16,14 +17,15 @@ import assert from 'node:assert/strict';
 import {fake,sourceEvidence} from './javascript-native-input.test.mjs';
 import {readJavascriptNativeInput} from './javascript-native-input-read.mjs';
 import {decodeVariantFrame} from '../../client/lib/variant-native-decode.mjs';
-import {nativeRoundtripProbe} from './javascript-native-roundtrip-contract.mjs';
+import {nativeRoundtripProbe,javascriptNativeRoundtripProbe} from './javascript-native-roundtrip-contract.mjs';
 import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,bindJavascriptNativeRoundtripSource,bindJavascriptNativeRoundtripSchema,completeJavascriptNativeRoundtrip,prepareJavascriptNativeRoundtripWizard,sealJavascriptNativeRoundtripDone} from './javascript-native-roundtrip-owner.mjs';
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {readJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus,cancelJavascriptNativeRoundtrip} from './javascript-native-roundtrip-read.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
-async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false}={}){
+export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real'}={}){
+  const nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixtureId);
   let mutate,mutateAfter,defer=false;
-  const f=await fake({change:()=>mutate?.(),deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
+  const f=await fake({fixtureId,change:()=>mutate?.(),deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
   const initialRead=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'before'});
   f.model.FPreviewManager.FPreviewVisible=false;
   await f.page.evaluate(armJavascriptNativeRoundtrip,{binding:{...f.b,read_id:'before'},...nativeRoundtripProbe});
@@ -120,9 +122,9 @@ test('roundtrip rejects expired deadline and insufficient bytes without cell dis
   await assert.rejects(()=>readJavascriptNativeRoundtrip(x.f.page,b,decodeVariantFrame,{operationId:'small',maxBytes:60}),/byte budget/);
   assert.equal(x.f.counters.sent,4);
 });
-for(const mode of ['ok','wrong-ack','lost-preview'])test('roundtrip production journal ACK/disk across actual serialized native read: '+mode,async t=>{
+for(const fixtureId of ['real','boolean','string'])for(const mode of ['ok','wrong-ack','lost-preview'])test(fixtureId+' roundtrip production journal ACK/disk across actual serialized native read: '+mode,async t=>{
   const wrongAck=mode==='wrong-ack';
-  const x=await roundtrip(),f=x.f;
+  const fixture=javascriptNativeFixture(fixtureId),x=await roundtrip({fixtureId}),f=x.f;
   f.model.FPreviewManager.FPreviewVisible=true;
   // Select the completed JS Preview without consuming a native role binding.
   Object.assign(f.model.FPreviewManager.FPreviewForm,{FCurrentPreviewNode:x.js,FCurrentPreviewPort:x.output});
@@ -137,20 +139,21 @@ for(const mode of ['ok','wrong-ack','lost-preview'])test('roundtrip production j
   const node={document_id:'d',workflow_id:'w',node_id:'js'},ctx={document_id:'d',node,workflow_ref:{workflow_id:'w',tab_tid:'tab',prefix:'TF'},execution:x.execution,deadline:Date.now()+30000};
   const state={prepared_node_context:{...node,verified:true,surface:'graph'},wizard:{status:'absent'},node_outputs:{verified:true,ports:[{index:0,active:true,tid:'output',port_guid:'js-output'}]},
     ui:{elements:[{tid:'output',ref:'output',allowed_actions:[]},{tid:'preview;p.h;close',ref:'close',allowed_actions:['click']}]},
-    node_preview_schema:{verified:true,port_guid:'js-output',port:0,root_tid:'preview',fields:[{name:'Value',label:'Value',type:'real'}]}};
+    node_preview_schema:{verified:true,port_guid:'js-output',port:0,root_tid:'preview',fields:[{name:'Value',label:'Value',type:fixture.type}]}};
   const actions=[],records=[],states=[],operation={id:'roundtrip-test'};
   const run=()=>readNativeRoundtrip({options:{operation,execute:f.execute,now:Date.now,exclusiveNodeOperation:()=>true,receiptOptions:()=>({}),
-    onRecord:async event=>{const saved=await journal(event);records.push(event);if(wrongAck&&event.proof)saved.proof.lifecycle.releasedResponses=3;return saved;}},ctx,input,role:'output',targetOrigin:'http://test',targetBuild:'7.4.2',onState:async state=>states.push(state)},
+    onRecord:async event=>{const saved=await journal(event);records.push(event);if(wrongAck&&event.proof)saved.proof.lifecycle.releasedResponses=fixture.rows-1;return saved;}},ctx,input,role:'output',targetOrigin:'http://test',targetBuild:'7.4.2',onState:async state=>states.push(state)},
     {openPreview:async args=>{assert.equal(args.port.port_guid,'js-output');assert.deepEqual(args.state.ui.elements[0].allowed_actions,[]);actions.push({ref:'private-F3'});},verifyFrontends:async()=>Object.entries(nativeFrontendPins).map(([name,sha256])=>({name,url:'http://test/'+name,sha256})),verifyCountLoaders:()=>({fixture:'count-loader-source'}),
       createProcedure:()=>({observe:async({ready,condition})=>{if(mode==='lost-preview'&&condition==='native roundtrip Preview schema')throw Error('lost Preview observation');assert.equal(ready(state),true);return state;},perform:async({ready,resolve,identity})=>{assert.equal(ready(state),true);assert.ok(identity());actions.push(resolve(state));}})});
   if(mode==='lost-preview'){
     await assert.rejects(run,/lost Preview observation/);assert.equal(operation.transportUncertain,true);
     assert.equal(states.at(-1).uncertain,true);assert.deepEqual(actions,[{ref:'private-F3'}]);
-    assert.equal(f.counters.sent,4);assert.equal(records.some(e=>e.proof),false);return;
+    assert.equal(f.counters.sent,fixture.rows);assert.equal(records.some(e=>e.proof),false);return;
   }
   if(wrongAck)await assert.rejects(run,/acknowledgement/);
   if(!wrongAck){const proof=await run();assert.equal(proof.exact.role,'output');
-    const bad=clone(proof.raw);bad.cells[1].payload[2]=1;
+    assert.equal(proof.binding.fixture_id,fixtureId);assert.equal(proof.lifecycle.releasedRequests,fixture.rows);assert.equal(proof.lifecycle.releasedResponses,fixture.rows);
+    const bad=clone(proof.raw);bad.cells[1].payload[0]=1;
     assert.throws(()=>verifyNativeRoundtripRead(bad,{binding:proof.binding,lifecycle:proof.lifecycle,input,role:'output'}));}
   const lines=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
   assert.deepEqual(lines.find(e=>e.proof).proof,clone(records.find(e=>e.proof).proof));assert.deepEqual(actions.map(a=>a.ref),['private-F3','close']);

@@ -1,5 +1,6 @@
+import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,completeJavascriptNativeRoundtrip} from './javascript-native-roundtrip-owner.mjs';
-import {nativeRoundtripProbe,verifyNativeRoundtripInput,verifyNativeRoundtripExecution,verifyNativeRoundtripProvenance} from './javascript-native-roundtrip-contract.mjs';
+import {javascriptNativeRoundtripProbe,verifyNativeRoundtripInput,verifyNativeRoundtripExecution,verifyNativeRoundtripProvenance} from './javascript-native-roundtrip-contract.mjs';
 import {readNativeRoundtrip} from './javascript-native-roundtrip-driver.mjs';
 import {waitJavascriptWizardSettlement} from './javascript-wizard-settlement.mjs';
 // All generated runtime code runs against the caller's authenticated page.
@@ -15,7 +16,7 @@ import {createArtifactStore} from '../../client/lib/artifacts.mjs';
 import {createActionRuntime,withBrowserReceipt} from '../../client/lib/executor.mjs';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
 import {createJavascriptNativeInputSupport} from './javascript-native-input-driver.mjs';
-import {nativeInputFixture,verifyNativeInputFixture,nativeInputRequest,verifyNativeInputUi} from './javascript-native-input-contract.mjs';
+import {verifyNativeInputFixture,nativeInputRequest,verifyNativeInputUi} from './javascript-native-input-contract.mjs';
 import {createNodeTargetBrowserAdapter} from '../../client/lib/node-target-browser.mjs';
 import {createNodeProcedure,NodeProcedureStepError} from '../../client/lib/node-procedure.mjs';
 import {createNodeExecutionProcedure} from '../../client/lib/node-execution-procedure.mjs';
@@ -552,7 +553,8 @@ export async function configureJavascriptManualMapping({reader,cleanupReader,ref
   }
 }
 
-export async function createJavascriptExecutionRuntime({page,prepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false}) {
+export async function createJavascriptExecutionRuntime({page,prepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real'}) {
+  const nativeInputFixture=javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=javascriptNativeRoundtripProbe(nativeFixtureId);
   if(account!=='jsteach'||prepared.status!=='READY'||prepared.package_ref?.persisted!==false)throw Error('Own JavaScript draft required');
   const origin='http://logi-test-plan.bg.local',build='7.4.2',sessionId='js-g2-'+randomUUID();
   const journalOnce=createJavascriptEffectJournal({record,deadline});
@@ -578,10 +580,10 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
   const selectors=JSON.parse(await readFile(new URL('../../executor/catalog/selectors.json',import.meta.url),'utf8')).selectors;
   const pinned={actions:new Map(actions.map(action=>[action.action_key,action])),selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
   const artifactStore=await createArtifactStore({directory:directory+'/input-artifacts',sessionId});
-  const support=nativeInputOnly?createJavascriptNativeInputSupport({targetOrigin:origin,targetBuild:build,
+  const support=nativeInputOnly?createJavascriptNativeInputSupport({targetOrigin:origin,targetBuild:build,fixtureId:nativeFixtureId,
     onProof:async(proof,owner)=>{nativeInputEvidence=proof;nativeInputOwner=owner;},
     onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0
-      ||state.status!=='completed'||state.releasedRequests!==4||state.releasedResponses!==4;
+      ||state.status!=='completed'||state.releasedRequests!==nativeInputFixture.rows||state.releasedResponses!==nativeInputFixture.rows;
       await record({phase:'javascript_native_input_lifecycle',state,uncertain:nativeReadUncertain});}})
     :createTextImportNodeSupport({targetOrigin:origin,targetBuild:build});
   const runtime=createActionRuntime({pinned,execute,artifactStore,allowCandidate:true,onRecord:record,targetOrigin:origin,targetBuild:build,...support});
@@ -729,7 +731,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     async prepareInput() {
       const fixture=nativeInputOnly?new URL('./fixtures/'+nativeInputFixture.file,import.meta.url)
         :new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/model-input/sales.csv',import.meta.url);
-      const pin=nativeInputOnly?verifyNativeInputFixture(await readFile(fixture))
+      const pin=nativeInputOnly?verifyNativeInputFixture(await readFile(fixture),nativeFixtureId)
         :verifyJavascriptFixture(await readFile(fixture),JSON.parse(await readFile(new URL('../manifest.json',fixture),'utf8')));
       const folder='js-g2-'+randomUUID(),storage='/jsteach/'+folder;
       await record({phase:'input_fixture_verified',pin,storage});
@@ -767,18 +769,18 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       const artifact=await artifactStore.admit({sourcePath:fileURLToPath(fixture),name:nativeInputOnly?nativeInputFixture.file:'sales.csv',bytes:pin.bytes,sha256:pin.sha256,upload:{directory:storage,overwrite:'reject'}});
       const delivered=await once('input-delivery',{storage,artifact_id:artifact.artifact_id,sha256:pin.sha256},()=>runtime.deliverArtifact({operation_id:'js-input-delivery',artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:Math.min(120000,deadline-Date.now())}));
       if(delivered.outcome?.status!=='SUCCEEDED'||!delivered.upload_operation_id)throw Error('JavaScript source delivery unconfirmed');
-      const request=(nativeInputOnly?nativeInputRequest:javascriptInputRequest)({prepared,storage,artifact,uploadOperationId:delivered.upload_operation_id,totalMs:deadline-Date.now()});
+      const request=(nativeInputOnly?nativeInputRequest:javascriptInputRequest)({prepared,storage,artifact,uploadOperationId:delivered.upload_operation_id,totalMs:deadline-Date.now(),fixtureId:nativeFixtureId});
       const imported=await once('input-import',{artifact_id:artifact.artifact_id,source_path:request.parameters.settings.source.source_path},()=>runtime.runNodeApply(request));
       if(imported.status!=='SUCCEEDED')throw Error('JavaScript input import unconfirmed: '+JSON.stringify(imported.error??{}));
       const result=imported.output?.output?.ports?.find(p=>p.port===0);
-      const proof=nativeInputOnly?verifyNativeInputUi(result):verifyJavascriptTable(result,'input');
+      const proof=nativeInputOnly?verifyNativeInputUi(result,nativeFixtureId):verifyJavascriptTable(result,'input');
       if(nativeInputOnly&&(!nativeInputEvidence?.native.exact.native_bytes_verified||nativeReadUncertain))throw Error('Native input proof/cleanup unavailable');
       await record({phase:'input_verified',node:imported.output.node,pin,storage,proof,table:result});
       return {node:imported.output.node,storage,pin,table:result,proof,...(nativeInputOnly?{native_input:nativeInputEvidence}: {})};
     },
     async armNativeRoundtrip(input) {
       if(!nativeInputOnly||nativeReadUncertain)throw Error('Private native input required');
-      const proof=verifyNativeRoundtripInput(input);validateNativeSource();
+      const proof=verifyNativeRoundtripInput(input,nativeFixtureId);validateNativeSource();
       await record({phase:'native_roundtrip_input_before_js',proof});
       const armed=await page.evaluate(armJavascriptNativeRoundtrip,{binding:{...proof.binding,read_id:proof.raw.read_id},...nativeRoundtripProbe});
       await record({phase:'native_roundtrip_armed',...armed});return armed;
@@ -793,8 +795,8 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       await record({phase:'native_roundtrip_graph_bound',...result});
     },
     async readNativeRoundtrip(input,node,execution) {
-      const before=verifyNativeRoundtripInput(input);validateNativeSource();
-      verifyNativeRoundtripExecution(execution,node);
+      const before=verifyNativeRoundtripInput(input,nativeFixtureId);validateNativeSource();
+      verifyNativeRoundtripExecution(execution,node,nativeFixtureId);
       await page.evaluate(completeJavascriptNativeRoundtrip,{execution,source_sha256:nativeRoundtripProbe.source_sha256});
       const results={before};
       for(const role of ['output','upstream']){
@@ -804,7 +806,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
         const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node:owner,execution:completed,deadline};
         results[role]=await readNativeRoundtrip({options:{operation,execute,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>!nativeReadUncertain,
           receiptOptions:(id,key,signature)=>({receipt_namespace:sessionId,receipt_id:id,receipt_signature:signature,operation_id:id})},ctx,input:before,role,targetOrigin:origin,targetBuild:build,
-          onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0||state.status!=='completed'||state.releasedRequests!==4||state.releasedResponses!==4;
+          onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0||state.status!=='completed'||state.releasedRequests!==nativeInputFixture.rows||state.releasedResponses!==nativeInputFixture.rows;
             await record({phase:'native_roundtrip_lifecycle',role,state,uncertain:nativeReadUncertain});}});
       }
       await page.evaluate(()=>globalThis.__loginomJavascriptNativeRoundtripV1.check());

@@ -1,3 +1,4 @@
+import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {openJavascriptNativeRoundtripPreview} from './javascript-native-roundtrip-opening.mjs';
 import {createHash} from 'node:crypto';
 import {createNodeProcedure} from '../../client/lib/node-procedure.mjs';
@@ -7,13 +8,14 @@ import {verifyNativeInputFrontends,verifyNativeInputCountLoaders} from './javasc
 import {verifyNativeInputCookieRuntime} from './javascript-native-input-binding.mjs';
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {readJavascriptNativeRoundtrip,cancelJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus} from './javascript-native-roundtrip-read.mjs';
-import {nativeRoundtripProbe,verifyNativeRoundtripRead,verifyNativeRoundtripAddPortRuntime} from './javascript-native-roundtrip-contract.mjs';
+import {javascriptNativeRoundtripProbe,verifyNativeRoundtripRead,verifyNativeRoundtripAddPortRuntime} from './javascript-native-roundtrip-contract.mjs';
 const need=(v,m)=>{if(!v)throw Error('Native roundtrip driver: '+m);};
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 
 export async function readNativeRoundtrip({options,ctx,input,role,targetOrigin,targetBuild,onState},
   {createProcedure=createNodeProcedure,verifyFrontends=verifyNativeInputFrontends,
     verifyCountLoaders=verifyNativeInputCountLoaders,verifyCookieRuntime=verifyNativeInputCookieRuntime,openPreview=openJavascriptNativeRoundtripPreview}={}){
+  const fixture=javascriptNativeFixture(input.binding.fixture_id),nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixture.id);
   const {execute,operation,onRecord,now}=options;
   const deadline=Math.min(ctx.deadline,input.binding.deadline);
   const check=()=>{ctx.signal?.throwIfAborted();need(now()<deadline,'original deadline expired');
@@ -43,13 +45,13 @@ export async function readNativeRoundtrip({options,ctx,input,role,targetOrigin,t
     preview=await channel.observe({condition:'native roundtrip Preview schema',readPreview:true,ready:s=>s.node_preview_schema?.verified===true
       &&s.node_preview_schema.port_guid===port.port_guid&&s.node_preview_schema.port===0});
     need(preview.node_preview_schema.fields.length===1&&preview.node_preview_schema.fields[0].name==='Value'
-      &&preview.node_preview_schema.fields[0].label==='Value'&&preview.node_preview_schema.fields[0].type==='real','Preview fixed schema');
+      &&preview.node_preview_schema.fields[0].label==='Value'&&preview.node_preview_schema.fields[0].type===fixture.type,'Preview fixed schema');
     const readId='js-native-roundtrip-'+hash(operation.id+':'+role+':'+ctx.execution.execution_id).slice(0,40);
-    const args={binding_id:readId,runtime_binding_id:input.binding.runtime_binding_id,roundtrip_role:role,source_sha256:nativeRoundtripProbe.source_sha256,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,
+    const args={fixture_id:fixture.id,binding_id:readId,runtime_binding_id:input.binding.runtime_binding_id,roundtrip_role:role,source_sha256:nativeRoundtripProbe.source_sha256,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,
       package_id:ctx.document_id+':'+ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id,port_guid:port.port_guid,
       origin:targetOrigin,tab_tid:ctx.workflow_ref.tab_tid,prefix:ctx.workflow_ref.prefix,execution:ctx.execution,
-      completed_child:ctx.execution,deadline,method:321,interface:116,port:0,offset:0,rows:4,row_count:4,columns:[0],
-      schema:[{name:'Value',label:'Value',type:3}]};
+      completed_child:ctx.execution,deadline,method:321,interface:116,port:0,offset:0,rows:fixture.rows,row_count:fixture.rows,columns:[0],
+      schema:[{name:'Value',label:'Value',type:fixture.native_type}]};
     check();
     // Retain the original attested runtime; page-local checks reject rebinding.
     const runtime=input.runtime;
@@ -80,7 +82,7 @@ export async function readNativeRoundtrip({options,ctx,input,role,targetOrigin,t
   }finally{
     if(openingReturned&&!preview){operation.transportUncertain=true;await onState({uncertain:true});}
     if(readDispatched&&(!lifecycle||lifecycle.retired||lifecycle.pending||lifecycle.status!=='completed'
-      ||lifecycle.releasedRequests!==4||lifecycle.releasedResponses!==4)){
+      ||lifecycle.releasedRequests!==fixture.rows||lifecycle.releasedResponses!==fixture.rows)){
       operation.transportUncertain=true;await onState({...lifecycle,uncertain:true});
     }
     else if(preview){
