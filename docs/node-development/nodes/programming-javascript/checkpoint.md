@@ -16,6 +16,17 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Named A: независимый intermediate suite PASS
+
+Root original session19742 terminal exit0: pinnedNode24.19.0 --test
+--test-isolation=none javascript-native-named.test.mjs из packages/loginom-runtime.
+858PASS/0FAIL/0SKIP,8966.5ms.129 relative-import files хешированы до/после,
+drift0. Private named-root-intermediate-suite.json/log содержат source pins
+и полный результат. Это named module + импортированные tests, не full client/
+main/public/Python regression и не frozen source83 admission. Developer
+revision56 active продолжает назначенный полный набор; браузер закрыт.
+
+
 ### Named finalization: исправлен success flag при ошибке записи
 
 Root code review обнаружил: catch после failed persist сохранял exact_pass:true
