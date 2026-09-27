@@ -16,6 +16,33 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Продолжение 2026-09-27: bool/string ожидает восстановления поиска памяти
+
+Пользователь подтвердил продолжение. Проверка существующей задачи разработчика
+вернула idle/completed, cursor156: Fix71 остановлен до изменений из-за MCP
+transport −32003 и подтверждённого Doctor DNS EAI_AGAIN. Freeze71 и дизайн
+bool/string пока не созданы; последний проверенный source остаётся source70.
+
+Root повторно проверил подключение установленным плагином 0.8.1: MCP health
+успешен, точное read существующей project-memory записи
+`memory_verification_success.md` успешно. Оба actor find (подробный запрос и
+короткий JavaScript, limit1) завершились −32001/Abort примерно через15s.
+Doctor с per-probe5000ms подтвердил credentials, protected fs/ls200,
+MCP tools/list15 и /ready всех подсистем; system/status получил timeout.
+Таким образом, сервер не полностью недоступен, но поиск памяти не восстановлен;
+успешный health/read не доказывает исправления find или применения request60s
+к уже работающему MCP proxy. Конфигурация, Peer и сервер не менялись.
+
+По правилу OpenViking в AGENTS.md реализация приостановлена. Разработчик idle,
+новый live/browser не запускался, профиль50 не назначен. Успешный real/NULL
+roundtrip probe07 и его cleanup остаются последним live-результатом.
+Следующий шаг — восстановить и подтвердить поиск через штатный MCP, затем
+продолжить ту же задачу с bounded bool/string дизайном и Freeze71. Независимый
+Python oracle для bool/string ещё не создан; канонические значения перечитаны:
+boolean `[null,false,true]`, string восемь значений включая empty, литералы,
+Unicode и строку с переводом строки. Полная цель обучения остаётся незавершённой.
+
+
 ### Roundtrip probe07 PASS: real/NULL вход → JS → повторное чтение входа
 
 Source70/profile49 завершён exit0 OBSERVED/native-roundtrip-observed, session67575
