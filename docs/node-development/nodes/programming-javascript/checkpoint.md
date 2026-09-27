@@ -15,6 +15,20 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze38 проверен, headed batch38 запущен — 2026-09-27
+
+Root64 tests PASS;25 SHA итогового handoff проверены, tested source неизменён.
+Один classifier с прежними15 native/cache/geometry checks используется в
+основном wizard readiness и новом settlement. Посторонние masks блокируют;
+ограничение12 диагностических записей не сокращает проверку остальных masks.
+Проверена сериализация inspector для браузера без host-side imports/closures.
+
+На freshprofile11/Chromium1246 запущен batch38: headed DISPLAY=:1/sandbox.
+Результат ожидается. Source/mapping readback, полный batch и G2/G3 не закрыты.
+Дополнительно root-аудит batch37 сверил оба чтения входа6×5 (60cells total)
+с SHA-pinned CSV, включая пробелы/Unicode/целые: PASS. Квитанция приватная,
+g2-batch-37-input-verification.json; original cleanup остаётся неуспешной.
+
 ### Batch37: wizard найден, одна маска блокирует settlement — 2026-09-27
 
 Freshprofile10/freeze37. Root-аудит:1252 journal refs SHA, один свежий launch,
