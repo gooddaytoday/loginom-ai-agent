@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Roundtrip probe02: наблюдён JS input FParam=3
+
+Source65/profile44 завершён exit1 FAILED до JS source/Execute. Actual RG1:
+source/parent/collection/guid/type/subtype/edge_guid=true, param=false;
+failed=[param], enums [FType,FSubType,FParam]=[0,1,3]. Таким образом, единственный
+отказ — ожидание param0 для реального JS input с param3. Не отсутствие edge GUID
+и не неправильная связь. Cached ModelForm.PortParam (lines1137–1146) складывает
+2 за spMultiple и1 за spOptional: observed3 означает multiple+optional.
+
+Root независимо: input scalar4/4 PASS,476journal refs,73source pins; original
+cleanup ALL PASS/browser closed. Profile44 сохранён. Report SHA256:
+`2dcaefba2e04f33d22f87d3a7f38d38f2e395325441debc3ddf4f181c780fcb9`.
+Private native-roundtrip-probe-02-verification.json содержит полный RG1.
+
+Разработчику назначено точное ожидание JS input param3 с прежним ограничением
+одной edge и проверками identity/mutation. Не разрешать несколько произвольных
+значений и не переносить это на import или JS-output. Параметры output ещё не
+наблюдены; предложено bounded per-port evidence после graph admission, без
+ослабления его допуска. Новый freeze66 предшествует следующему headed run.
+G5/native JS output/roundtrip и полный план остаются active/incomplete.
+
+
 ### Freeze65: RG1 diagnostic проверен; roundtrip probe02 запущен
 
 Source node-javascript `16edaad6f863c9b6a865781fbd5aa257586ce7ba` сохраняет все8
