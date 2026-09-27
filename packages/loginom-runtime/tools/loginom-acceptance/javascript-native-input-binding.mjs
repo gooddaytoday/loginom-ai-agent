@@ -32,8 +32,9 @@ export function javascriptNativeInputSnapshot(b){
     &&nodes.filter(n=>n!==node).every(n=>n.FIconCls==='bg-vendor-icon-modelvariables'&&n.FStatus===0&&n.FRunning===false),'no JS/dynamic nodes');
   need(model.FCreateDraggedNodeStarted===false&&model.FDraggingOverGraph===false&&!model.FDraggedNode,'graph interaction');
   const manager=v(model,'FPreviewManager'),form=v(manager,'FPreviewForm'),port=v(form,'FCurrentPreviewPort');
-  // Keep every admission predicate; expose bounded booleans/enums on refusal so
-  // a live probe can distinguish ownership from the port-inventory assumptions.
+  const nodePorts=v(node,'FPorts'),inputCollection=v(nodePorts,0),inputPorts=v(inputCollection,'FCollection');
+  // Probe05: exactly Connection(6), Variables(3), both input0/param1/status1.
+  // The input-only topology guard above separately rejects every graph link.
   const previewChecks={
     visible:v(manager,'FPreviewVisible')===true,
     node:v(form,'FCurrentPreviewNode')===node,
@@ -41,7 +42,10 @@ export function javascriptNativeInputSnapshot(b){
     guid:port?.FGuid===b.port_guid,
     outputs:node.FPorts?.[1]?.FCollection?.length===1,
     output:node.FPorts?.[1]?.FCollection?.[0]===port&&!!port,
-    inputs:node.FPorts?.[0]?.FCollection?.length===0,
+    inputs:Array.isArray(nodePorts)&&nodePorts.length===2&&Array.isArray(inputPorts)&&inputPorts.length===2
+      &&inputPorts[0]!==inputPorts[1]&&[6,3].every((subtype,i)=>inputPorts[i]?.parent===node
+        &&v(inputPorts[i],'FType')===0&&v(inputPorts[i],'FSubType')===subtype
+        &&v(inputPorts[i],'FParam')===1&&v(inputPorts[i],'FStatus')===1),
     type:port?.FType===1,
     subtype:port?.FSubType===1,
     param:port?.FParam===0,
@@ -50,7 +54,7 @@ export function javascriptNativeInputSnapshot(b){
     last_port:manager?.FShowDataLastCall?.Port===port&&!!port
   };
   if(!Object.values(previewChecks).every(Boolean)){
-    const inputs=node.FPorts?.[0]?.FCollection;
+    const inputs=inputPorts;
     const enumValue=x=>x===undefined?'missing':Number.isInteger(x)&&x>=0&&x<=16?String(x):'other';
     // NI1 inventory comes first. Port tuples are [parentMatches,type,subtype,param,status].
     // Short failed-check names keep even every failure below the 500-char transport cap.
@@ -92,6 +96,7 @@ export function javascriptNativeInputSnapshot(b){
   const runtime=globalThis.__loginomJavascriptNativeRuntimeV1;
   need(runtime?.document===document&&runtime.binding_id===b.runtime_binding_id,'loaded runtime binding');runtime.check(v(ds,'$S'));
   return {prep,receipt,card,model,diagram,nodes,links,node,nodeData:node.data,port,portData:port.data,manager,form,workflow,pack,fields,field,
+    nodePorts,inputCollection,inputPorts,connectionInput:inputPorts[0],variablesInput:inputPorts[1],
     processStore,processRoot,group:groups[0],child:child[0],
     processFingerprint:JSON.stringify(records.map(r=>[r.internalId,r.data.id,parents.get(r)?.internalId,r.data.Status,r.data.ErrorDetails,r.data.ModelNode===node.data])),
     root,dc,dt,ds,store,helper,identity,count:4,cache:v(helper,'$FData'),owner:v(identity,'$OW'),object:v(identity,'$O'),
