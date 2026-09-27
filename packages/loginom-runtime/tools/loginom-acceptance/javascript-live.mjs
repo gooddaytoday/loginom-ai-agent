@@ -1,3 +1,4 @@
+import {beginCalibrationWizard,readCalibrationWizard,finishCalibrationWizardObservation,checkCalibrationWizardBaseline} from './javascript-calibration-wizard.mjs';
 import {javascriptCalibrationIds,captureCalibrationWizard} from './javascript-calibration-cases.mjs';
 import {createJavascriptCalibrationTrial} from './javascript-calibration-run.mjs';
 import {javascriptNamedIds,javascriptNamedCase} from './javascript-native-named-cases.mjs';
@@ -137,8 +138,8 @@ const save=async()=>{
     rootReport.calibration=calibrationTrial.coverage;
     const cleaned=redactor.redact(rootReport);
     cleaned.calibration_delivery={redacted:JSON.stringify(cleaned.calibration_result)!==JSON.stringify(rootReport.calibration_result),
-      native_text_complete:rootReport.calibration_result?.failed?.native_error_complete===true,
-      truncation_status:rootReport.calibration_result?.failed?(rootReport.calibration_result.failed.native_error_complete?'not_truncated':'truncated'):'not_established'};
+      native_text_complete:rootReport.calibration_result?.failed?.native_error_complete===true||rootReport.calibration_result?.wizard?.native_text_complete===true,
+      truncation_status:rootReport.calibration_result?.failed?(rootReport.calibration_result.failed.native_error_complete?'not_truncated':'truncated'):rootReport.calibration_result?.wizard?.native_text_complete===true?'not_truncated':'not_established'};
     return writeJavascriptNamedReport(directory,cleaned);
   }
   if(namedTrial){rootReport.native_named=namedTrial.coverage;return writeJavascriptNamedReport(directory,redactor.redact(rootReport));}
@@ -674,9 +675,11 @@ const readOwnedExecutionSource=()=>page.evaluate(({root,native,binding})=>{
     },schemaContext());
 const runExecutionTrial=async probe=>{
   const deadline=phaseDeadline(600000),trigger=executionCase.split('-').at(-1),sentinel=executionCase.includes('-sentinel-');
-  let trialPhase='initial',sourceSha=probe.source_sha256,roundtripDone;
+  let trialPhase='initial',sourceSha=probe.source_sha256,roundtripDone,calibrationObserving=false;
   const read=async()=>{
     const snapshot=await page.evaluate(readJavascriptStage,schemaContext());
+    if(calibrationObserving&&snapshot.wizard_visible&&!snapshot.pending&&!snapshot.boundary_refusal)
+      snapshot.calibration_native_exception=await page.evaluate(readCalibrationWizard);
     return {...snapshot,messages:snapshot.messages.map(message=>({...message,id:digest(message.key+'\n'+message.text)}))};
   };
   const dispatch=async(stage,tid,index)=>{
@@ -694,6 +697,13 @@ const runExecutionTrial=async probe=>{
         const attestation=await page.evaluate(prepareJavascriptNativeRoundtripWizard,{context:schemaContext(),before,identity,stage,deadline});
         const saved=await executionRecord({phase:'native_roundtrip_wizard_preflight',attestation});
         if(JSON.stringify(saved.attestation)!==JSON.stringify(attestation))throw Error('Wizard preflight journal ACK differs');
+        if(calibrationTrial){
+          const baseline=await page.evaluate(beginCalibrationWizard,{id:nativeCalibrationId,stage,identity,deadline});
+          const savedBaseline=await executionRecord({phase:'calibration_wizard_baseline',baseline});
+          if(JSON.stringify(savedBaseline.baseline)!==JSON.stringify(baseline))throw Error('Calibration baseline journal ACK differs');
+          await page.evaluate(checkCalibrationWizardBaseline);
+          calibrationObserving=true;
+        }
       }
       await page.mouse.click(point.x,point.y);
     });
@@ -705,13 +715,14 @@ const runExecutionTrial=async probe=>{
       messages:(after?.messages??[]).map(message=>({...message,...identity})),ownerVerified:after?.owner_verified===true,terminal});
     await executionRecord({phase:'execution_stage_observed',identity,before,after,outcome});
     if(after?.boundary_refusal)throw Error('Execution stage boundary refused: '+after.boundary_refusal);
-    if(calibrationTrial&&after?.messages?.some(m=>!before.messages.some(old=>old.id===m.id))){
+    if(calibrationTrial&&after?.calibration_native_exception?.present){
       const witness=await page.evaluate(captureCalibrationWizard,{id:nativeCalibrationId,stage,identity,before,after});
-      report.calibration_result=await calibrationTrial.wizard({witness,record:executionRecord});await save();
+      report.calibration_result=await calibrationTrial.wizard({witness,record:executionRecord});calibrationObserving=false;await save();
       return {...outcome,calibration_diagnostic:true};
     }
     if(nativeRoundtrip&&after?.messages?.some(m=>!before.messages.some(old=>old.id===m.id)))throw Error('Native roundtrip wizard diagnostic; no replay');
     if(!terminal)throw Error('Execution stage result remains unconfirmed: '+stage);
+    if(calibrationTrial){await page.evaluate(finishCalibrationWizardObservation);calibrationObserving=false;}
     if(discoveryProbe){
       const diagnostic=javascriptDiscoveryWizardDiagnostic({probe,identity,stage,before,after});
       if(diagnostic){report.discovery_result=diagnostic;await executionRecord({phase:'discovery_wizard_diagnostic',diagnostic});

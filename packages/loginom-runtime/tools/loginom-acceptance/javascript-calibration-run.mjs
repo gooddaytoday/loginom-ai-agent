@@ -26,9 +26,12 @@ export function createJavascriptCalibrationTrial(id){
    need(prior&&!reserved&&!finished,'one wizard diagnostic; no execution after diagnostic');reserved=true;
    need(witness?.calibration_id===id&&witness.source===probe.source&&witness.source_sha256===probe.source_sha256
     &&witness.node_id===prior.node.node_id&&witness.native_owner_verified===true&&witness.draft_source_verified===true
-    &&witness.explicit_execute_dispatched===false&&witness.native_text_complete===false
-    &&witness.committed_source_status==='not_established','owned incomplete wizard witness');
-   const captured=freezeCivilEvidence({status:'wizard_diagnostic_incomplete',prior,wizard:structuredClone(witness),
+    &&witness.explicit_execute_dispatched===false&&typeof witness.native_text_complete==='boolean'
+    &&witness.diagnostic?.present===true&&witness.diagnostic.fresh===true
+    &&witness.diagnostic.native_text_complete===witness.native_text_complete
+    &&witness.committed_source_status==='not_established','owned native wizard witness');
+   verifyWizardDiagnostic(witness.diagnostic);
+   const captured=freezeCivilEvidence({status:witness.native_text_complete?'wizard_diagnostic_observed':'wizard_diagnostic_incomplete',prior,wizard:structuredClone(witness),
     output:{status:'not_read_wizard_diagnostic'},upstream:{status:'not_read',reason:'draft_discard_committed_source_proof_unavailable'},
     case_complete:false,attribution:'none',implicit_execution:'unknown'});
    await ack(record,{phase:'calibration_wizard_diagnostic_captured',result:captured});result=captured;return result;
@@ -72,4 +75,25 @@ export function createJavascriptCalibrationTrial(id){
    }catch(error){finalized=false;throw error;}
   }
  };
+}
+
+function verifyWizardDiagnostic(diagnostic){
+ need(diagnostic.native_owner_verified===true&&diagnostic.truncated===false&&diagnostic.normalization_applied==='none'
+  &&diagnostic.completeness_scope==='retained_wizard_exception_text_tree'&&diagnostic.source_span===null
+  &&diagnostic.server_stack_origin==='not_established','native diagnostic provenance');
+ if(!diagnostic.native_text_complete){
+  need(diagnostic.tree===null&&diagnostic.position_status==='incomplete'&&typeof diagnostic.refusal==='string'&&diagnostic.refusal.length<200,'explicit incomplete diagnostic');return;
+ }
+ need(diagnostic.position_status==='not_attributed'&&Number.isSafeInteger(diagnostic.text_units),'complete diagnostic status');
+ let nodes=0,units=0;
+ const visit=(node,depth)=>{
+  need(node&&depth<=8&&++nodes<=32&&Array.isArray(node.children)&&node.children.length<=32,'diagnostic tree bound');
+  for(const key of ['message','name','stack']){
+   const value=node[key];
+   need(key!=='message'&&value===null||typeof value==='string'&&value.length<=8192,'diagnostic field type/bound');
+   if(typeof value==='string')units+=value.length;
+  }
+  node.children.forEach(child=>visit(child,depth+1));
+ };
+ visit(diagnostic.tree,0);need(units<=32768&&units===diagnostic.text_units,'complete diagnostic text length');
 }
