@@ -15,6 +15,20 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze41 проверен, адресный headed run запущен — 2026-09-27
+
+Root53tests PASS,28 окончательных SHA сверены; протестированные source файлы
+не менялись. Подтверждённая source цепочка использует unique dense bounded
+FWizardItems.FItems/FPages→FWizard.FWizardForm. До Preview code_owned обязателен;
+отказ записывает effect_dispatched=false. Lazy Preview controller допускается.
+Connection/account/build и foreign-dialog boundary проверяются при наблюдении;
+loss завершает ожидание сразу, без reconnect/replay, с финальным evidence.
+
+Freshprofile14 назначен после проверенного recovery40; прежние сохранены.
+Batch41 запущен на pinned Chromium1246, headed DISPLAY=:1/sandbox, cases
+code-sentinel-preview,declared-sentinel-preview. Source receipt g2-batch-41-source.json;
+результат живого прогона ожидается. Полный batch/план и CLI-приёмка не завершены.
+
 ### Batch40 завершён: привязка страницы и разрыв сессии — 2026-09-27
 
 Original result CLEANUP_UNCONFIRMED. Root проверил959journalSHA и два полных
