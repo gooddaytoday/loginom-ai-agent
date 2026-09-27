@@ -17,6 +17,15 @@
 
 ### Fix73: Date/civil design проверен; реализация назначена
 
+Root уточнил независимый civil receipt auditor по существующему shared
+restoreEmptyDateTimeDefaults: исходная пустая стандартная маска подтверждается
+через default_datetime_restoration/verified_after_apply, а не applied_format.
+Создан отдельный audit-civil-receipts-v2.py, прежний v1 сохранён; SHA
+`6beee4bb22ec43fe6af2e4672900c425c27cca83366852e297d91bc09b71e1a6`.
+Synthetic2positive/19negative PASS, включая4 отрицательных случая empty-default.
+Значения дат/native expectations не менялись; live ещё не было.
+
+
 Root независимо проверил новый CSV:66bytes/3rows, SHA
 `38f67790aa3c944c1fb465023157a128087e6781c9b8e22eca9e277468cdc708`.
 DMY→canonical civil проверен перестановкой компонентов, без Date/epoch/timezone.
