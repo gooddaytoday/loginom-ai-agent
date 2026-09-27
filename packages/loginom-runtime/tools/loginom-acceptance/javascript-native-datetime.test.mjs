@@ -29,8 +29,8 @@ function civil(binding,role='input',empty=true){
    workflow_return:{verified:true,source_table:table,node_context:{verified:true,surface:'graph',document_id:binding.document_id,workflow_id:binding.workflow_id,node_id:binding.node_id},execution_started:false,reopen_performed:false}}};
 }
 function binding(){const x=sourceEvidence(id);return {...x.ctx.node,port_guid:'p',execution:x.ctx.execution,completed_child:x.execution};}
-async function stages(){
- const x=await roundtrip({fixtureId:id}),binding={...x.f.b,read_id:'before'},lifecycle={...clone(x.f.env.__loginomJavascriptNativeInputReadV1.last),retired:false};
+async function stages(options={}){
+ const x=await roundtrip({fixtureId:id,...options}),binding={...x.f.b,read_id:'before'},lifecycle={...clone(x.f.env.__loginomJavascriptNativeInputReadV1.last),retired:false};
  const provenance={...nativeInputProvenance(sourceEvidence(id)),civil:civil(binding)};
  const before={binding,raw:x.before,lifecycle,exact:verifyNativeInputRead(x.before,{binding,lifecycle,provenance})},results={before};
  for(const role of ['output','upstream']){
@@ -206,4 +206,40 @@ for(const mode of ['pass','bad-ack','civil-drift'])test('production Date final o
  else await assert.rejects(run);
  assert.deepEqual(steps.slice(0,4),['civil-output','native-output','civil-upstream','native-upstream']);
  if(mode==='civil-drift')assert.equal(steps.includes('final'),false);
+});
+
+// source73/profile55: output0 GUID repeats across the import and JS nodes.
+// Reproduce that identity shape through the real serialized binding/read code;
+// synthetic cell serials remain unrelated to any asserted epoch/civil mapping.
+const sharedPortGuid='58f7e6c3-511e-39d7-8853-036e0a1a7612';
+test('Date same output0 GUID on distinct owned nodes completes exact composite-identity roundtrip',async()=>{
+ const {x,results}=await stages({sharedPortGuid});
+ assert.equal(results.before.binding.port_guid,sharedPortGuid);
+ assert.equal(results.output.binding.port_guid,sharedPortGuid);
+ assert.notEqual(results.output.binding.node_id,results.before.binding.node_id);
+ assert.notEqual(x.output,x.f.port);assert.notEqual(x.output.parent,x.f.port.parent);
+ assert.equal(verifyNativeRoundtripOutcome(results,id).exact_pass,true);
+ assert.deepEqual(x.f.counters,{sent:9,requests:9,responses:9});
+});
+const compositeFaults={
+ 'same input node':p=>{p.binding.node_id=p.raw.node_id=p.civil.node.node_id=p.civil.receipts.workflow_return.node_context.node_id='n';},
+ 'foreign document':p=>{p.binding.document_id=p.raw.document_id=p.civil.node.document_id=p.civil.receipts.workflow_return.node_context.document_id='foreign';},
+ 'foreign workflow':p=>{p.binding.workflow_id=p.raw.workflow_id=p.civil.node.workflow_id=p.civil.receipts.workflow_return.node_context.workflow_id='foreign';},
+ 'foreign package':p=>{p.binding.package_id=p.raw.package_id='foreign';},
+ 'foreign port binding':p=>p.binding.port_guid='foreign',
+ 'stale execution':p=>p.binding.completed_child.fresh_baseline.roots=[{process_id:p.binding.completed_child.group_id}],
+ 'foreign native source':p=>{p.raw.source={...p.raw.source,object:p.raw.source.object+1};},
+ 'missing native owner':p=>p.raw.owner_rechecked=false,
+ 'missing native cache':p=>p.raw.cache_identity_rechecked=false,
+ 'foreign read binding':p=>p.binding.read_id='foreign',
+ 'foreign script':p=>p.binding.source_sha256='0'.repeat(64),
+};
+for(const [name,mutate]of Object.entries(compositeFaults))test('Date shared GUID still refuses '+name,async()=>{
+ const {results}=await stages({sharedPortGuid});mutate(results.output);
+ assert.throws(()=>verifyNativeRoundtripOutcome(results,id));
+});
+test('Date shared GUID cannot substitute input port parent for JS native owner',async()=>{
+ const x=await roundtrip({fixtureId:id,sharedPortGuid,change:x=>{x.output.parent=x.f.node;}});
+ const b=await x.bind('output');
+ await assert.rejects(()=>readJavascriptNativeRoundtrip(x.f.page,b,decodeVariantFrame,{operationId:'output'}));
 });

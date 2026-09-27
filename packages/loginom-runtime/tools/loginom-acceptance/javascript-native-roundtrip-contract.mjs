@@ -58,7 +58,9 @@ export function verifyNativeRoundtripRead(raw,{binding,lifecycle,input,role,civi
       &&JSON.stringify(binding.source)===JSON.stringify(input.binding.source)
       &&['execution_id','group_id','process_id','process_record_id'].every(k=>binding.completed_child[k]===input.binding.completed_child[k]),'original civil upstream differs');
     if(role==='output'){
-      need(binding.node_id!==input.binding.node_id&&binding.port_guid!==input.binding.port_guid,'civil output must belong to JS');
+      // Loginom output0 GUIDs can repeat across nodes. The bound node/port pair,
+      // native source and completed child establish ownership, not GUID inequality.
+      need(binding.node_id!==input.binding.node_id,'civil output must belong to JS');
       verifyNativeRoundtripExecution(binding.completed_child,binding,fixture.id);
     }
   }
