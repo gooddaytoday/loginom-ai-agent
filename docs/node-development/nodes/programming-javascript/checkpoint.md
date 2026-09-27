@@ -16,6 +16,34 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source78 проверен и закоммичен; начат declared-empty live
+
+Developer завершил Fix78 и подтвердил idle. Root независимо повторил **1289 main
++3 public-deny +11 Python PASS**, syntax для16 MJS, diff-check и все195 pins
+до/после тестов. Manifest SHA
+`5ea0ddf64a98633e7529139b3f9395f71ca0f2f0801f7a77b5a93d26edb68cc6`,
+JSON SHA `61c69789e9e5e8d0fb81c084360dd2e57c1847cc07f7b78f43a5565f5abb576b`.
+17 exact runtime/test files сохранены коммитом child
+`66f0ad6e732fd9e9f717284d3bf93a2c9cbcafc1`; старые dirty docs не включены.
+Private root receipt: operator78-root-test-source.json.
+
+Запущен единственный native-cardinality-empty-probe-01, profile62,
+source78, session20932. DISPLAY=:1, headed=true, sandbox=true, Node/Chromium
+hashes проверены, других процессов закреплённого браузера перед стартом нет.
+Source/pins/test receipt сохранён; browser lease RUNNING. Ожидаемый результат:
+INPUT[1,2,3], UI-declared Value Integer / generation=false, OUTPUT[], original
+upstream[1,2,3]. Terminal result ещё не получен; повторный запуск запрещён.
+
+Финальная версия фиксирует фактический interface116 в before/final receipts.
+Root auditor дополнен независимой проверкой этого поля:
+- audit-declared-zero-receipts-v2.py SHA
+  `111172b25f86dd5b62db1eff1275d6f3428f13b0505b6a1ba887a4da1590c6a7`;
+  interface1positive/9negative PASS поверх прежних association1positive/23negative.
+- audit-cardinality-empty-live78-v2.py SHA
+  `8a81dbca9f0bce12003d19b40774774efcf573a5670879a326ef8cfe0bac907e`;
+  syntax PASS, полный empty audit ещё NOT_RUN. Предыдущий auditor также
+  правильно отверг реальный nonempty odd03 как доказательство empty.
+
 ### Подготовлен полный empty audit; ожидание frozen handoff
 
 Root подготовил audit-cardinality-empty-live78.py SHA256
