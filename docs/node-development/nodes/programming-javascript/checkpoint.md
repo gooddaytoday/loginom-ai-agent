@@ -16,6 +16,27 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source83 принят; первый named A live RUNNING
+
+Root full client original session68476 terminal exit0:2480PASS/10SKIP/0FAIL,
+195677.1ms. Пропуски прежние:2 Windows и8 opt-in Chromium. Main2198PASS,
+deny3PASS, Python14PASS;1265pins after checks unchanged. Developer client FAIL
+сохранён как отдельный результат. Root source83 accepted;20 exact runtime/test
+files закоммичены в node-javascript:
+562f8ffebf8f5c4e1d38eff6c65beddbfd087fbc. Старые dirty docs untouched.
+
+Первый named case A-get-index: fresh profile73, DISPLAY=:1/headed/sandbox,
+Node/Chromium SHA проверены, до запуска pinned Chromium отсутствовал.
+Evidence native-named-get-index-probe-01; **original exec session28189 RUNNING**.
+1265 source pins повторно сверены; one explicit JS Execute, original600000ms
+без replay. Matrix selected unresolved/running, остальные24 not_run.
+Проверять исходную session28189 до terminal; затем cleanup и root audit.
+Private draft audit-named-success-live.py подготовлен, но ещё не проверен на
+настоящем named report; helper selfchecks не заменяют live acceptance.
+Браузер принадлежит root, developer idle, acceptance lease null. Full G5/J24/
+public handler/CLI остаются открытыми.
+
+
 ### Source83: frozen source и root regression
 
 Developer revision57 terminal/idle передал source83:14 modified+6new runtime/test
