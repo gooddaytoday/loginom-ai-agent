@@ -15,6 +15,21 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze73 root checks PASS; Date INPUT-only запущен
+
+Root подтвердил1029main+228shared+3public-deny+7Python PASS,190sourcepins
+до/после тестов и syntax изменённых modules. Только18runtime/test/fixture файлов
+закоммичены в node-javascript: `c642e6bab3ffd6e60b370d9b51148e96632b22c9`.
+Варианты compact/full input execution, transport origin normalization и empty
+Date format restoration покрыты; public JS deny не расширен.
+
+Начат native-datetime-input-probe-01/profile54, session87548, input-only,
+headed DISPLAY=:1/sandbox, pinned Node/Chromium hashes проверены.
+Lease RUNNING, разработчик idle Freeze73. До terminal и independent civil/native
+INPUT audit/cleanup не запускать roundtrip или другой браузер. Готовый source
+не является live Date proof; полный план остаётся открытым.
+
+
 ### Fix73: Date/civil design проверен; реализация назначена
 
 Root уточнил независимый civil receipt auditor по существующему shared
