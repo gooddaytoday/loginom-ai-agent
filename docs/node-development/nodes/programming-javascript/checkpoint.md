@@ -16,6 +16,24 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### После перезапуска: registered memory PASS, Fix71 выполняется
+
+Пользователь продолжил работу. В прежней задаче разработчика штатные MCP
+health5800ms/find24500ms/exact read4600ms прошли; find завершился дольше15s.
+Это подтверждает устранение наблюдавшегося ограничения в её текущем процессе.
+Root health также PASS. App API подтвердил active/inProgress
+turn01a0e2d5-0cc5-7e00-a8c9-b22450a6d491. Fix71 начат: bounded private runner
+для одного фиксированного real/boolean/string варианта на запуск; immutable
+fixture/type/count/source, INPUT admission до JS и OUTPUT/upstream read.
+
+Root назначил fresh profile50 под registry.lock после повторной проверки SHA
+probe07 и original cleanup3/3PASS. assignment-before-profile50.json и
+profile-reassignment-50.json сохранены приватно, profile49 сохранён.
+Browser остаётся CLOSED, acceptance lease свободна. Live до Freeze71 и root
+source/test проверки не запускать. Предыдущие записи о блокировке исторические;
+полная цель и границы оставшихся gates не изменились.
+
+
 ### Отдельный таймаут зарегистрированной задачи исправлен в конфигурации
 
 Проверка после изменения завершена: task health PASS1673ms; find −32003
