@@ -15,6 +15,32 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Native probe02: network failure и подтверждённое восстановление — 2026-09-27
+
+После перезапуска Codex MCP health и actor find успешны; Doctor 0.8.1:
+0 failures, auth/system/status/storage/ready и 15 MCP tools PASS. Предупреждение
+относится к историческим hook errors. Настройки подключения не менялись.
+
+Native-input-probe-02 завершился до импорта: Loginom сообщил NetworkError при
+загрузке `thirdparty/mxgraph/js/mxClient.js`, поэтому созданный черновик не открыл
+схему. Исходный report сохраняет CLEANUP_UNCONFIRMED; его результат не переписан.
+SHA256: `1a76ae08646c4c02c6ed98da63fe95954b9a186241c7eefb7f4f555758677e2a`.
+Root проверил 66 source pins и единственную journal reference (с завершающим LF).
+Import/download/native read и JS не выполнялись.
+
+Отдельный headed recovery на profile35 в 08:16 UTC подтвердил account jsteach,
+zero packages, logout и browser close. Пакеты не создавались и не изменялись;
+скачивания не выполнялись. Private evidence: native-input-recovery-02.json и
+native-input-probe-02-verification.json. Lease переведён в browser closed.
+
+Прямой HTTP GET mxClient.js после отказа: 200, 663786 bytes, SHA256
+`34a4824d66358bbb5815cc3ab1fcdb1af14e632de9164c7989cb81b811c39a21`.
+Это подтверждает текущую доступность ресурса, но не объясняет прошлый отказ в
+браузере. Следующий шаг — отдельный headed native-input прогон с новым профилем
+на прежнем проверенном source57, без повторения неизвестного действия в старой
+сессии. G5, public handler и CLI-приёмка остаются незавершёнными.
+
+
 ### Filename fix + bounded Python harness: full PASS; native probe02 — 2026-09-27
 
 Исправление source57 закоммичено в node-javascript:
