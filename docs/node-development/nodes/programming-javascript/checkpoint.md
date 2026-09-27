@@ -18,6 +18,22 @@
 
 ### A8/8 завершена; следующий шаг — реализация B
 
+
+Дополнительно root B recorded-association auditor SHA
+bc598da36f80e0a4c1bd523ccfbf0083a7f9397f737b439ca1431cee73f03209:
+16syntheticpositive/192negative PASS, связывает9cells/source/owner/child/lifecycle;
+не заменяет live witnesses/journal/finalization audit. Промежуточный каталог16A/B
+точно совпал с независимо собранными root sources:8A unchanged+8B exact/hash.
+Candidate ещё не frozen; эти проверки не являются source85/live acceptance.
+
+
+Root подготовил независимый B scalar auditor по §5: strict4/1/4, API-specific
+Integer markers,99 unresolved. Private audit-named-b-scalar.py SHA
+3cc1c41f6c4bf3a13d9f3c55c87730aa105b50e659ad3571f1e23200d178c3f4;
+named-b-scalar-selfcheck.json:50positive shapes/24negative mutations PASS.
+Synthetic output + прежний INPUT/upstream — не B live и не owner/source proof.
+A auditor не менялся; full B association/outcome audit ждёт frozen candidate.
+
 Назначение source85B отправлено; wait_threads подтвердил active revision7,
 turn01a0e4b7-23be-7d61-beac-4c41781283d9, cursor2cc6c517-0ccb-49e9-bb9b-9daa2c14c7b8:7.
 Не создавать новую задачу и не перезапускать по timeout. Root ожидает frozen handoff.
