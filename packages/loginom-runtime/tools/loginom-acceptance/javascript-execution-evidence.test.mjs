@@ -1,3 +1,4 @@
+import {javascriptExecutionIdentity} from './javascript-mismatch-probe.mjs';
 import {withJavascriptWizardMasks} from './javascript-wizard-masks.mjs';
 import {waitJavascriptWizardSettlement,inspectJavascriptWizardAddress,withJavascriptWizardAddress} from './javascript-wizard-settlement.mjs';
 import {test} from 'node:test';
@@ -704,14 +705,14 @@ test('production executeNode waits after one launch before identify and never re
     const driver={prepare:async()=>{steps.push('prepare');return {};},launchGraph:async()=>{steps.push('launch');return {verified:true};},
       identify:async()=>{steps.push('identify');return {};},waitCompleted:async()=>{steps.push('terminal');return {verified:true};}};
     const operator=vm.runInNewContext('({'+source.slice(start,end)+'})',{
-      deadline:limit,createNodeExecutionProcedure:(channel,node,options)=>{assert.equal(options.verifyFailedChild,true);return driver;},channel:()=>({}),privateGraphBinding:async()=>binding,
+      deadline:limit,executionPhases:new Map(),javascriptExecutionIdentity,createNodeExecutionProcedure:(channel,node,options)=>{assert.equal(options.verifyFailedChild,true);return driver;},channel:()=>({}),privateGraphBinding:async()=>binding,
       page:{evaluate:async()=>({node:{id:'js'},icon:'js'})},selectJavascriptForSettings:async()=>steps.push('select'),
       once:async(id,identity,action)=>{steps.push('once');return action();},record:async r=>steps.push(r.phase),
       waitJavascriptExecutionNotifications:async(page,args)=>{assert.equal(args.binding,binding);assert.equal(args.deadline,limit);
         steps.push('settlement');if(fail)throw Error('notification retained');}
     });
-    if(fail)await assert.rejects(operator.executeNode(node,limit),/notification retained/);
-    else assert.equal((await operator.executeNode(node,limit)).verified,true);
+    if(fail)await assert.rejects(operator.executeNode(node,limit,{phase:'initial',source_sha256:'a'.repeat(64)}),/notification retained/);
+    else assert.equal((await operator.executeNode(node,limit,{phase:'initial',source_sha256:'a'.repeat(64)})).verified,true);
     assert.deepEqual(steps,['prepare','select','once','launch','execution_launched','settlement',
       ...(!fail?['identify','terminal','execution_terminal']:[]),'dispose']);
   }

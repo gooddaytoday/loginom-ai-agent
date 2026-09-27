@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {verifyJavascriptTable} from './javascript-execution-evidence.mjs';
+import {javascriptMismatchVerdict} from './javascript-mismatch-probe.mjs';
 
 export const javascriptBatchOrder=Object.freeze([
   'code-table-execute','code-sentinel-preview','declared-sentinel-preview',
@@ -43,10 +44,8 @@ export function javascriptBatchVerdict(executionCase,probe,settled) {
     throw Error('Batch table proof incomplete');
   verifyJavascriptTable(probe.output,'output');
   const mismatch=probe.existing_readback.generated_schema_mismatch_trial;
-  if(executionCase==='code-table-mismatch'&&(mismatch?.status!=='observed'||mismatch.reset_dispatched!==false
-    ||mismatch.execution_started!==false))throw Error('Batch mismatch observation incomplete');
-  return {safe_to_continue:true,gate_passed:executionCase!=='code-table-mismatch'||mismatch.mapping_preserved===true,
-    execution:'confirmed',absence_proves_no_execution:false};
+  if(executionCase==='code-table-mismatch')return javascriptMismatchVerdict(mismatch,probe.execution);
+  return {safe_to_continue:true,gate_passed:true,execution:'confirmed',absence_proves_no_execution:false};
 }
 
 export async function runJavascriptBatch({cases,deadline,begin,run,settle,record,now=Date.now}) {

@@ -41,7 +41,7 @@ test('table and mismatch verdicts require typed output, execution and source/map
   assert.throws(()=>javascriptBatchVerdict('code-table-mismatch',probe,settled));
   assert.throws(()=>javascriptBatchVerdict('code-table-execute',{...probe,output:{...output,row_count:5}},settled),/oracle/);
   const mismatch={status:'observed',mapping_preserved:false,reset_dispatched:false,execution_started:false};
-  assert.equal(javascriptBatchVerdict('code-table-mismatch',{...probe,existing_readback:{...probe.existing_readback,generated_schema_mismatch_trial:mismatch}},settled).gate_passed,false);
+  assert.throws(()=>javascriptBatchVerdict('code-table-mismatch',{...probe,existing_readback:{...probe.existing_readback,generated_schema_mismatch_trial:mismatch}},settled),/materialization/);
 });
 
 test('batch allocates independent cases and never continues an unknown mutation or lost owner',async()=>{

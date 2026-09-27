@@ -15,6 +15,7 @@ import {javascriptSourceSample,javascriptSourceBoundary} from './javascript-sour
 import {makeWorkspacePrepareCode} from '../../client/lib/workspace.mjs';
 import {createJavascriptExecutionRuntime,selectJavascriptForSettings} from './javascript-execution-runtime.mjs';
 import {javascriptExecutionProbes} from './javascript-execution-probes.mjs';
+import {javascriptMismatchSource,runJavascriptMismatchMaterialization} from './javascript-mismatch-probe.mjs';
 import {readJavascriptSchema,configureJavascriptSchema} from './javascript-schema-probe.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
@@ -408,8 +409,8 @@ const waitWizardReady=async({deadline=wizardDeadline,inputOnly=true,afterIndex=n
   report.wizard_address=readyState.address;await save();
   return readyState;
 };
-const inspectWizardPages=async({remainingPages=false}={})=>{
-  const deadline=phaseDeadline(180000),visited=new Set();
+const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(180000)}={})=>{
+  const visited=new Set();
   report.page_inspection_deadline=new Date(deadline).toISOString();await save();
   for(let step=0;step<=8;step++){
     const state=await waitWizardReady({deadline,inputOnly:false}),current=state.page;
@@ -599,6 +600,17 @@ const closeWizardOnce=async()=>{
   if(!after.nodes?.some(n=>n.id===report.owned_node.id&&n.icon_class===report.owned_node.icon_class&&n.rendered))throw Error('Closed wizard did not restore owned node');
   openedWizard=false;
 };
+const readOwnedExecutionSource=()=>page.evaluate(({root,native,binding})=>{
+      const tab=globalThis.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+      if(tab!==binding.tab||tab.Controller.Node.data.node!==native||tab.Controller.FController.FView.el.dom!==root)throw Error('Existing source owner changed');
+      const wrappers=[...root.querySelectorAll('.CodeMirror')].filter(e=>e.getBoundingClientRect().width&&e.getBoundingClientRect().height);
+      if(wrappers.length!==1)throw Error('Existing source editor ambiguous');
+      const doc=wrappers[0].CodeMirror?.getDoc?.(),count=doc?.lineCount?.();
+      if(!Number.isInteger(count)||count<1||count>1024||doc.firstLine()!==0||doc.lastLine()!==count-1)throw Error('Existing source outside bounds');
+      const lines=[];let bytes=0;
+      for(let i=0;i<count;i++){const line=doc.getLine(i);if(typeof line!=='string'||/[\r\n\0]/.test(line))throw Error('Existing source line differs');bytes+=new TextEncoder().encode(line).length+(i?1:0);if(bytes>32768)throw Error('Existing source outside byte bound');lines.push(line);}
+      return lines.join('\n');
+    },schemaContext());
 const runExecutionTrial=async probe=>{
   const deadline=phaseDeadline(600000),trigger=executionCase.split('-').at(-1),sentinel=executionCase.includes('-sentinel-');
   let trialPhase='initial',sourceSha=probe.source_sha256;
@@ -654,12 +666,12 @@ const runExecutionTrial=async probe=>{
   await exact(owner.prefix+';WizrdMCF').waitFor({state:'hidden',timeout:Math.max(1,deadline-Date.now())});
   openedWizard=false;await waitGraphReady(Math.max(1,deadline-Date.now()));
   if(trigger==='done'){report.execution_probe.outcome=outcome;return;}
-  const execution=await executionRuntime.executeNode(executionNode,deadline);
+  const execution=await executionRuntime.executeNode(executionNode,deadline,{phase:'initial',source_sha256:probe.source_sha256});
   report.execution_probe.execution=execution;
   if(sentinel){
     // Failed launch groups may fail in an upstream dependency. Retain the
     // fresh execution identity, but do not claim JS-body ownership from it.
-    const identity={effect_id:caseEffect(report.case_id,'execute-'+executionNode.node_id),node_id:executionNode.node_id,source_sha256:probe.source_sha256};
+    const identity={...execution.trial,effect_id:caseEffect(report.case_id,execution.trial.effect_id)};
     report.execution_probe.outcome=javascriptSentinelOutcome({stage:'execute',identity,baselineIds:[],
       messages:execution.error?[{...identity,id:execution.execution_id,text:execution.error.message}]:[],
       ownerVerified:execution.owner_verified===true,terminal:execution.verified===true});
@@ -676,17 +688,7 @@ const runExecutionTrial=async probe=>{
     await executionRecord({phase:'existing_wizard_opened',reopened});
     await waitWizardReady();readingExisting=true;
     await inspectWizardPages();
-    const source=await page.evaluate(({root,native,binding})=>{
-      const tab=globalThis.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
-      if(tab!==binding.tab||tab.Controller.Node.data.node!==native||tab.Controller.FController.FView.el.dom!==root)throw Error('Existing source owner changed');
-      const wrappers=[...root.querySelectorAll('.CodeMirror')].filter(e=>e.getBoundingClientRect().width&&e.getBoundingClientRect().height);
-      if(wrappers.length!==1)throw Error('Existing source editor ambiguous');
-      const doc=wrappers[0].CodeMirror?.getDoc?.(),count=doc?.lineCount?.();
-      if(!Number.isInteger(count)||count<1||count>1024||doc.firstLine()!==0||doc.lastLine()!==count-1)throw Error('Existing source outside bounds');
-      const lines=[];let bytes=0;
-      for(let i=0;i<count;i++){const line=doc.getLine(i);if(typeof line!=='string'||/[\r\n\0]/.test(line))throw Error('Existing source line differs');bytes+=new TextEncoder().encode(line).length+(i?1:0);if(bytes>32768)throw Error('Existing source outside byte bound');lines.push(line);}
-      return lines.join('\n');
-    },schemaContext());
+    const source=await readOwnedExecutionSource();
     if(source!==probe.source)throw Error('Existing JavaScript source differs from applied trial');
     await executionRecord({phase:'existing_source_verified',source_sha256:digest(source)});
     await closeWizardOnce();
@@ -705,19 +707,44 @@ const runExecutionTrial=async probe=>{
       wizardHandle=null;wizardRoot=null;openedWizard=true;closeDispatched=false;closeConfirmed=false;closeDeadline=0;wizardDeadline=phaseDeadline(90000);
       await executionRuntime.handoffReopenedWizard();
       await waitWizardReady();await inspectWizardPages();
-      const changed=probe.source.replaceAll('PhaseMarker','GeneratedMarker');
-      await probeOwnedSource(probe.source,changed);
-      trialPhase='generated-mismatch';sourceSha=digest(changed);
+      const changed=javascriptMismatchSource(probe);
+      await probeOwnedSource(probe.source,changed.source);
+      trialPhase=changed.phase;sourceSha=changed.source_sha256;
       // Unknown mapping pages/dialogs stop through the existing ownership
       // gates. No reset/autosync gesture is sent to make this trial succeed.
       await inspectWizardPages({remainingPages:true});
       const changedDone=await dispatch('done',owner.prefix+';WizrdMCF;btnDone',0);
       if(changedDone.sentinel_observed)throw Error('Unexpected sentinel in changed-schema trial');
-      await exact(owner.prefix+';WizrdMCF').waitFor({state:'hidden'});openedWizard=false;await waitGraphReady();
-      const mapping=await executionRuntime.readPortMapping(executionNode,'output');
-      report.execution_probe.existing_readback.generated_schema_mismatch_trial={status:'observed',source_sha256:digest(changed),
-        baseline_manual_mapping:manual.definition,mapping,reset_dispatched:false,execution_started:false,
-        mapping_preserved:mapping.autosync===false&&mapping.target_fields.some(field=>field.name==='ManualMarker')};
+      await exact(owner.prefix+';WizrdMCF').waitFor({state:'hidden',timeout:Math.max(1,deadline-Date.now())});openedWizard=false;
+      await waitGraphReady(Math.max(1,deadline-Date.now()));
+      const postDone=await executionRuntime.readPortMapping(executionNode,'output',{characterize:true,operationDeadline:deadline});
+      report.execution_probe.existing_readback.generated_schema_mismatch_trial={status:'pending_materialization',
+        phase:changed.phase,source_sha256:changed.source_sha256,post_done:postDone,execution_started:false};
+      await save();
+      // Read persisted code/mode after Done; navigation itself is not evidence
+      // of execution. The next driver captures history after these transitions.
+      if(Date.now()>=deadline)throw Error('Original mismatch deadline expired before persisted source read');
+      await executionRuntime.reopen(executionNode,deadline);wizardAddressEpoch++;
+      wizardHandle=null;wizardRoot=null;openedWizard=true;closeDispatched=false;closeConfirmed=false;closeDeadline=0;wizardDeadline=Math.min(deadline,phaseDeadline(90000));
+      await executionRuntime.handoffReopenedWizard();
+      report.execution_existing_schema=null;
+      await waitWizardReady();await inspectWizardPages({deadline:Math.min(deadline,phaseDeadline(180000))});
+      if(report.execution_existing_schema?.verified!==true||report.execution_existing_schema.generation?.checked!==true)
+        throw Error('Persisted changed source generation mode unconfirmed');
+      if(await readOwnedExecutionSource()!==changed.source)throw Error('Persisted changed source differs before Execute');
+      const sourceProof={...executionNode,verified:true,owner_verified:true,schema_mode:'code',source_sha256:changed.source_sha256};
+      await executionRecord({phase:'changed_source_persisted_verified',...sourceProof});
+      await closeWizardOnce();
+      const boundary=await executionRuntime.captureExecutionBoundary();
+      try{
+        report.stage='generated-schema-materialization';
+        report.execution_probe.existing_readback.generated_schema_mismatch_trial=await runJavascriptMismatchMaterialization({
+          node:executionNode,changed,sourceProof,manual,postDone,baseline:execution,deadline,
+          verifyBoundary:async()=>{await executionRuntime.verifyExecutionBoundary(boundary);await verifyBatchInputIdentity();},
+          execute:identity=>executionRuntime.executeNode(executionNode,deadline,identity),
+          readMapping:()=>executionRuntime.readPortMapping(executionNode,'output',{characterize:true,operationDeadline:deadline}),
+          readOutput:()=>executionRuntime.readPassive(executionNode,'mismatch',deadline),record:executionRecord});
+      }finally{await boundary.native.dispose();}
     }
   }
   await save();
