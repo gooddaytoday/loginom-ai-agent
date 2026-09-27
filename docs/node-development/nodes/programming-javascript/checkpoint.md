@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source86 принят; B-get-case/profile87 RUNNING
+
+Developer revision12 completed/idle, turn01a0e4d9. Изменены только два acceptance
+файла: inventory notifications включает `.x-window,.bg-dialog`, тестовый DOM
+реально отбирает элементы по selector. Generic guard/native lifecycle/owner/
+deadline/no-replay неизменны. Root просмотрел diff и vendor Message/Toast sources.
+1265pins,1263 unchanged, source/log/handoff/evidence/old-doc hashes проверены.
+Manifest JSON SHA5138d9a4fa7f5e3543e7951d65b1ae3e632472c16d76d12ae9af9575db658827.
+Root main original67760 terminal exit0:2444PASS/0FAIL/0SKIP,25960.945236ms;
+два syntax checks/gitdiff PASS, pins повторно неизменны. Developer targeted136,
+main2444,Python15,deny3 PASS; первый fixture run135/1FAIL сохранён и исправлен.
+Full client не повторялся: client runtime/tests неизменны; прежний source85
+root2484PASS/10SKIP — историческая проверка, не новый запуск.
+
+Child commit f30244f37d90a2f23e61bd07d95028babacda5f7 содержит только два файла.
+Private operator86-root-checks.json хранит независимую проверку.
+Fresh profile87, B-get-case, native-named-get-case-probe-03:
+**original exec54042 RUNNING**, headed DISPLAY=:1, sandbox/original deadline.
+Ждать оригинальную session до terminal; fresh native/owner/journal/cleanup audit
+обязателен. B по-прежнему не принят, A8/8 сохраняется, полный goal открыт.
+
+
 ### Source86: восстановлено актуальное назначение после ошибочного bootstrap
 
 Корректирующий turn01a0e4d9-551a-7321-896d-78cbcb083e18 подтверждён active,
