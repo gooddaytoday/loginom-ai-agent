@@ -27,6 +27,8 @@ integer-safe CSV и signed64 bytes. Private named-design-preflight.json PASS.
 copy/IsNull oracles, отдельные case/source identities, прежние guards сохраняются.
 B/C/D остаются planned, live не назначен. Следующий шаг — implementation A,
 регрессия и frozen source83 для root review. Full goal остаётся active.
+Реализация назначена той же задаче; wait_threads подтвердил revision56 active,
+turn01a0e45e-8311-7203-9c79-08dbc6ec4db7. Никакого live до source handoff.
 
 
 ### Следующий этап: named/index/case и J24 design
