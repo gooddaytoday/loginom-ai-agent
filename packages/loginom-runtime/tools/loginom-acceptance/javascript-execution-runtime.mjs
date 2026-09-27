@@ -33,6 +33,75 @@ export function javascriptInputRequest({prepared,storage,artifact,uploadOperatio
     budgets:{configure_ms:240000,execute_ms:60000,total_ms:Math.min(600000,totalMs)}};
 }
 
+// Waiting for notification auto-close does not attribute the notification to
+// this node. Only the existing fresh process-record proof can do that.
+export function inspectJavascriptExecutionNotifications({binding:b,poll=false}) {
+  const own=(object,key)=>object&&Object.getOwnPropertyDescriptor(object,key)?.value;
+  const cached=(object,key)=>{
+    for(let depth=0;object&&depth<16;depth++,object=Object.getPrototypeOf(object)){
+      const descriptor=Object.getOwnPropertyDescriptor(object,key);
+      if(descriptor)return 'value' in descriptor?descriptor.value:Symbol('accessor');
+    }
+  };
+  const app=globalThis.bg?.app,card=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
+  const nodes=b.diagram?.FNodes?.FCollection;
+  if(document!==b.document||location.origin!=='http://logi-test-plan.bg.local'||app?.Version!=='7.4.2'
+    ||card!==b.tab||card?.Controller!==b.controller||b.controller.Node?.data?.node!==b.workflow
+    ||b.controller.FController!==b.model||b.model.FDiagram!==b.diagram||b.diagram.FmxGraph!==b.graph
+    ||b.graph.container!==b.container||!Array.isArray(nodes)||nodes.length>20
+    ||nodes.filter(n=>n.FGuid===b.node.id).length!==1||!nodes.includes(b.native)
+    ||b.native.data!==b.nodeData||b.native.FCell!==b.cell)
+    throw Error('Post-execution original native graph changed');
+  const visible=e=>e.isConnected&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0
+    &&getComputedStyle(e).visibility!=='hidden'&&getComputedStyle(e).display!=='none';
+  const masks=[...document.querySelectorAll('.x-mask,.bg-mask-message,.x-mask-msg')].filter(visible);
+  if(masks.length)throw Error('Post-execution busy or modal mask remains');
+  const dialogs=[...document.querySelectorAll('[role="dialog"],.x-message-box,.x-toast')].filter(visible);
+  if(dialogs.length>4)throw Error('Post-execution notification count exceeded');
+  const toasts=dialogs.map(element=>{
+    const control=globalThis.Ext?.getCmp?.(element.id),delay=own(control,'autoCloseDelay');
+    const modal=cached(control,'modal'),hover=cached(control,'mouseIsOver');
+    if(element.getAttribute('data-tid')!=='toast'||!globalThis.Ext?.window?.Toast
+      ||!(control instanceof globalThis.Ext.window.Toast)||cached(control,'$className')!=='Ext.window.Toast'
+      ||own(own(control,'el'),'dom')!==element||own(control,'autoClose')!==true
+      ||!Number.isFinite(delay)||delay<=0||delay>60000||(modal!==undefined&&modal!==false)
+      ||(hover!==undefined&&hover!==false)||cached(control,'closeOnMouseOut')!==false
+      ||cached(control,'hideDuration')!==500)
+      throw Error('Post-execution foreign dialog or unsupported notification lifecycle');
+    return {element,control,delay};
+  });
+  if(!b.executionToasts)b.executionToasts=toasts;
+  if(toasts.some(t=>!b.executionToasts.some(p=>p.element===t.element&&p.control===t.control&&p.delay===t.delay)))
+    throw Error('Post-execution notification replaced during passive wait');
+  const result={ready:toasts.length===0,native_owner_verified:true,node_id:b.node.id,
+    notification_count:toasts.length,auto_close_delays:toasts.map(t=>t.delay),notification_owner_verified:false,
+    execution_dispatched:true,execution_completed:false};
+  return poll?(result.ready?result:false):result;
+}
+
+export async function waitJavascriptExecutionNotifications(page,{binding,deadline,record}) {
+  // Message.js caps auto-close at 60s; Ext Toast fades for another 500ms.
+  // Retain the caller's deadline; this phase never extends execution's budget.
+  const until=Math.min(deadline,Date.now()+61500),args={binding};
+  const inspect=()=>page.evaluate(inspectJavascriptExecutionNotifications,args);
+  try{
+    if(Date.now()>=until)throw Error('Post-execution notification deadline expired');
+    const before=await inspect();await record({phase:'execution_notification_wait_before',...before,deadline:until});
+    if(!before.ready){
+      const remaining=until-Date.now();if(remaining<=0)throw Error('Post-execution notification deadline expired');
+      const ready=await page.waitForFunction(inspectJavascriptExecutionNotifications,{...args,poll:true},{timeout:remaining,polling:250});
+      await ready.dispose();
+    }
+    const after=await inspect();
+    if(!after.ready||Date.now()>=until)throw Error('Post-execution notifications did not settle');
+    await record({phase:'execution_notification_wait_verified',...after,deadline:until});return after;
+  }catch(error){
+    await record({phase:'execution_notification_wait_refused',execution_dispatched:true,execution_completed:false,
+      ...(await inspect().catch(()=>({native_owner_verified:false}))),deadline:until,reason:String(error.message).slice(0,300)});
+    throw error;
+  }
+}
+
 // Cleanup waits are read-only and retain both the original workflow and the
 // currently displayed native surface. A foreign owner never becomes ready.
 export async function waitJavascriptCleanupReady(page,{owner,prepared,account,deadline,record}) {
@@ -534,10 +603,12 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       try {
         const identity=await page.evaluate(b=>({node:b.node,icon:b.icon}),binding);
         await selectJavascriptForSettings(page,{...identity,binding,deadline:Math.min(executionDeadline,Date.now()+90000),record,requireSettings:false});
+        const launch=await once('execute-'+node.node_id,{node,baseline},()=>driver.launchGraph());
+        await record({phase:'execution_launched',node,baseline,launch,execution_dispatched:true,execution_completed:false});
+        await waitJavascriptExecutionNotifications(page,{binding,deadline:executionDeadline,record});
+        const identified=await driver.identify(),terminal=await driver.waitCompleted({});
+        await record({phase:'execution_terminal',node,baseline,launch,identified,terminal});return terminal;
       }finally{await binding.dispose();}
-      const launch=await once('execute-'+node.node_id,{node,baseline},()=>driver.launchGraph());
-      const identified=await driver.identify(),terminal=await driver.waitCompleted({});
-      await record({phase:'execution_terminal',node,baseline,launch,identified,terminal});return terminal;
     },
     async readPassive(node,kind='output') {
       if(!['input','output'].includes(kind))throw Error('Unknown passive JavaScript table kind');
