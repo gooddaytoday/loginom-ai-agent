@@ -15,6 +15,26 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source88 accepted for bounded diagnostics; K2/profile95 RUNNING
+
+Developer completed revision20, exact8 runtime/test files commit
+6f14ac145f307320383359e339dfc03f2db751fb. Root final manifest verification:
+1272pins,5changed+3new/1264unchanged,149closure files/443edges,90old docs,
+7syntax/diff-check PASS; before/after root main hashes match final manifest.
+JSON SHA2d466b529d1479e964bd44aa34072b8fdcef93529202d93d4a7f0a590f11f695;
+handoff SHAfc0c31eb921df111f006593a9c826d05794cfaf63461549c12fb82e02a2eae93.
+Private copies/source88-developer-logs/operator88-root-manifest-verification.json
+retained. Client unchanged, no redundant full-client rerun. Это private source
+admission, не handler/G6/J25 acceptance; committed-source rollback ещё не доказан.
+
+Первый calibration attempt из общего maximum5: K2-sync-v1, fresh profile95,
+evidence native-calibration-k2-probe-01, **original exec84825 RUNNING**.
+Все1272pins/toolchains/previous cleanup/no Chromium проверены перед launch.
+Headed DISPLAY=:1, sandbox и исходный deadline; ждать этот же handle до terminal,
+не перезапускать по timeout. Registry/assignment/calibration-live-attempts.json
+обновлены. K1/K3/K4 ещё не запускались; K2 не даёт автоматического B attribution.
+
+
 ### Source88 independent tests PASS; final handoff still pending
 
 Root main original34398 terminal exit0:2550PASS/0FAIL/0SKIP,26938.921522ms.
