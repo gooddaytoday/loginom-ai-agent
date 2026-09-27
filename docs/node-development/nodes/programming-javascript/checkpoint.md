@@ -15,6 +15,24 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+
+### Freeze42: ожидание declared editor передано в live — 2026-09-27
+
+Прежняя developer-задача завершила fix42. Root сверил30/30 source hashes
+с окончательным handoff и своим receipt66 PASS (column-editor13,
+stage-observer14, execution-evidence31,batch8). Native editor привязан к
+единственной новой записи исходного target store; Add не повторяется.
+Перед fill/click проверяются родная форма, enabled и hit-test конкретной цели;
+option дополнительно принадлежит picker этого cbxDataType. Отдельный bounded
+cleanup ждёт завершения Apply либо единственного Cancel и восстановления baseline.
+Lost reply не разрешает replay или встречный Cancel после Apply.
+
+Запущен адресный batch42 `declared-sentinel-preview,declared-table-execute`:
+freshprofile15, Chromium1246, sandbox=true, headed DISPLAY=:1. Приватные source
+pins/test receipt и lease сохранены; итог live ещё не получен. Нового public
+handler и закрытия gates эта передача не означает. Повторный MCP health успешен.
+
+
 ### Batch41: code Preview полностью подтверждён — 2026-09-27
 
 Первый code-sentinel-preview OBSERVED/gate_passed=true/safe_to_continue=true.
