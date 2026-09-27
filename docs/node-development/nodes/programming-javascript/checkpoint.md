@@ -16,6 +16,15 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Принят дизайн независимого от имени JS deny; назначен Fix79
+
+Source-only investigation завершён; root проверил причинную цепочку и принял
+[native-script-guard-design.md](native-script-guard-design.md) с уточнениями
+для service AddPort, targeted unknown-owner отказа, actual classifier→opening
+integration и полного client test suite. Реализация разрешена прежней задаче.
+Private opening остаётся строгим; source/schema/zero и публичное исполнение не
+расширяются. Root HEAD не содержит runtime Fix79, live пока не запускался.
+
 ### Продолжение разбора renamed JS; fresh profile63 reserved
 
 Повторное чтение source подтвердило: workspace-ui dangerous guard основан на
