@@ -16,6 +16,30 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Повторная проверка OpenViking и аудит changed-source пробы — 2026-09-27 06:16 UTC
+
+После запроса пользователя повторно выполнены MCP health, actor find и exact URI
+read: все успешны, Peer автоматически определён как текущий проект. Doctor0.8.1
+подтвердил credentials, system/status, 15 MCP tools, пять trusted hooks и все
+подсистемы ready; 0 failures. Одно предупреждение относится к историческим
+transcript_unreadable/aborted от 26–27 сентября; текущие запросы его не воспроизводят.
+Настройки и права памяти не менялись, сервер не перезапускался.
+
+Работа продолжена в существующей задаче разработчика. Root проверил промежуточную
+версию fix54 и непосредственно запустил javascript-mismatch-probe.test.mjs:
+15 PASS,0 fail. Проверены отказ повторного Execute той же фазы даже с другим SHA,
+сохранность native identity прежнего процесса, полный document/workflow/node,
+ожидание неполного mapping cache и независимые ожидаемые значения. Это проверка
+текущих исходников, ещё не финального Freeze54 и не live-подтверждение.
+
+Приватный независимый verify-mismatch-transition.py дополнен проверками сохранности
+первого процесса, labels/types и полноты output. На batch54 он корректно возвращает
+changed_materialization_completed=false/full_mapping_gate_verified=false.
+Доказательств нового выполнения в прежнем прогоне нет; gate не повышен.
+Ожидается финальная передача Freeze54; freshprofile28 пока не использован,
+браузер не запущен. Полная цель остаётся активной.
+
+
 ### Batch54: manual mapping сохранён; изменённый код требует отдельного materialization — 2026-09-27
 
 Root аудит1450 journalSHA,60 input cells,1fresh completed baseline execution,
