@@ -15,6 +15,35 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### K2/profile97 завершён; независимая проверка PASS
+
+Original session83954 terminal exit1, report DIAGNOSTIC_OBSERVED, без failure;
+результат owned_failure_observed. Это ожидаемая диагностика намеренного throw,
+не успешное вычисление таблицы. Cleanup package_closed/logged_out/browser_closed
+все true; отсутствие закреплённого Chromium независимо проверено.
+
+Native child ErrorDetails полностью сохранён,88 JS units, без redaction/усечения:
+`Error: JS_CAL_K2_SYNC_V1`, frames `Anonymous function (<main>:4:1)` и
+`module (<main>:1:1)`. Root сопоставил точные291байт source/SHA, node/process/group
+и свежую execution identity,4INPUT+4upstream native cells (NULL, −9007199254740991,
+0,9007199254740991), исходные LE payload, отсутствие OUTPUT read, порядок phases,
+все604 ссылки на604 journal events и1274 source pins. Независимый аудит
+`operator89-root-k2-verification.json` и скрипт `audit-calibration-k2-source89.py`
+хранятся в приватной кампании.
+
+Report SHA9f64074a37207a12e3b56e60e29c55c2e099d6f6cf4422ed10846e39bf0bdc7c;
+journal SHA67e2053717052b807ebfcf626e73e2650ed4eb53a479b2413d01316823da9b7d.
+Зафиксирован literal controlled-throw candidate с единственным marker в проверенном
+source. Runtime outcome не переписан: controlled_throw_verified=false,
+mapping_status=unverified, case/G6/J25=false. Кадр4:1 — наблюдение K2, не универсальная
+карта native-call offsets и не автоматическая атрибуция прежних B ошибок.
+
+Использованы2 из общего лимита5 calibration attempts, включая неуспешный profile95.
+Следующее действие: K1-parse-v1 на том же принятом source89 в новом headed profile98,
+после обычной проверки свободного браузера/registry/pins. K3/K4 условные и ещё не
+назначены. Same-node repair, committed-source restoration, model delivery и CLI
+acceptance не выполнены. Последний прогон окончен; active live process отсутствует.
+
 ### Source89 принят; K2/profile97 запущен
 
 Три runtime/test файла зафиксированы в developer worktree коммитом
