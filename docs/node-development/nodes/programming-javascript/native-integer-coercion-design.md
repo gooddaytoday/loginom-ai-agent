@@ -248,7 +248,7 @@ Source `87332cec9804c761465dad766f989fb458c4d997`, pinned Loginom frontend7.4.2.
 29aa1bd6c1f9c0de7b2436607fa0860264201a8699ab27b86092147faa461c93.
 Это characterization одного fixed case; никакой общий rounding/truncation
 алгоритм и внутренний механизм ChakraCore не объявляются доказанными.
-Матрица6/7 characterized, последний случай not_run. Подробности и актуальное
+Матрица7/7 characterized; все семь private случаев независимо проверены. Подробности и актуальное
 продолжение — [checkpoint](checkpoint.md); full G5/handler/CLI не закрыты.
 
 Отдельный fraction-negative01/profile67 на том же source: native Real−1.75
@@ -280,3 +280,13 @@ fixed source candidate +Infinity=input/0, Integer OUTPUT−9223372036854775808
 cleanup3/3; report SHA
 f981135e99df70b88af12637ee4ad5309ef2a1bd4ca7a1d921ddc74f5be7fa6f.
 Внутренний механизм и общий overflow/clamping algorithm этим не доказываются.
+
+
+Отдельный negative-infinity01/profile72: native Real−1 INPUT/upstream exact;
+fixed source candidate −Infinity=input/0, Integer OUTPUT−9223372036854775808
+(signed64 LE0000000000000080). Root audit3 cells,613 refs,1259 pins,cleanup3/3;
+original session52877 exit0. Report SHA
+f789e7587d168d6e1d395ab511d9ec9fb0d0a5f139fa9afb9a4984f36965cbd7.
+Оба знака Infinity проверены независимо; общего conversion algorithm это
+не устанавливает. Все7 receipts и report hashes повторно сверены root.
+Ограниченная матрица завершена:21 native cells, full G5/handler/CLI открыты.

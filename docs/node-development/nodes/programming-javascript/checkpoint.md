@@ -16,6 +16,28 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source82: семь Integer coercion случаев подтверждены
+
+2026-09-27: повторные MCP health/find и Doctor0.8.1 успешны: auth/system/status,
+fs/ls, MCP15 tools, ready всех подсистем. Исторические hook errors не являются
+текущим отказом. Конфигурация памяти не менялась.
+
+Original session52877 завершилась exit0/CHARACTERIZED без replay; profile72,
+headed DISPLAY=:1/sandbox. Independent audit negative-infinity01 PASS:
+3 native cells,613 journal refs,1259 source pins,cleanup3/3. INPUT/upstream
+Real−1 exact; вычисленный −Infinity дал native Integer−9223372036854775808,
+bytes0000000000000080. Report SHA
+f789e7587d168d6e1d395ab511d9ec9fb0d0a5f139fa9afb9a4984f36965cbd7;
+baseline SHA75a8baec5601934af3856d27379d32c22a3f2dc24383881339f5ac67d4170ae3.
+
+Root повторно сверил все7 receipts с hashes reports; private matrix coverage7/7,
+21 native cells суммарно. Expected scalar остаётся unknown: observed результаты
+не превращены в заранее ожидаемые. Full G5, public handler и CLI не закрыты.
+Pinned Chromium отсутствует, browser lease CLOSED, acceptance lease null.
+Далее — bounded named/index/case и J24 design; прежняя задача разработчика idle
+не доставила запрошенный файл, исторический bootstrap не принят как результат.
+
+
 ### Integer coercion negative-infinity01 RUNNING
 
 Source82 unchanged/1259 pins повторно проверены; original exec session52877

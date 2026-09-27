@@ -237,9 +237,13 @@ outside-safe probe отдельно показал 9007199254740993 →900719925
 Source81/empty04 подтвердил UI declared-empty/nativezero: [1,2,3] →[] →[1,2,3],
 6 native cells,655 refs,1245 pins; все4 private cardinality cases проверены
 (см. [дизайн отдельных случаев](native-cardinality-design.md)).
-Integer coercion и весь G5 остаются открыты,
-точные доказательства и ограничения — в checkpoint. В G5 ограниченными случаями установить
-Integer coercion для fraction/string/NaN/±Infinity по [семи фиксированным случаям](native-integer-coercion-design.md); exact integer oracle
+Source82 подтвердил все [семь фиксированных Integer coercion случаев](native-integer-coercion-design.md)
+в независимых headed runs: ±1.75 →±1, String «42» →42,
+String «not-an-integer» и вычисленный NaN →native NULL,
+вычисленные ±Infinity →−9223372036854775808. INPUT/upstream проверены отдельно;
+21 native cells суммарно. Это bounded observations, не общий алгоритм conversion.
+Весь G5 остаётся открытым, включая named/index/case и J24;
+точные доказательства и ограничения — в checkpoint. Exact integer oracle
 от этого не меняется. Неудача сначала локализуется по коду/входу/native output;
 ожидания не подгоняются и причина не объявляется «отсутствие ICU» без доказательства.
 
