@@ -35,30 +35,30 @@ export function javascriptNativeInputSnapshot(b){
   // Keep every admission predicate; expose bounded booleans/enums on refusal so
   // a live probe can distinguish ownership from the port-inventory assumptions.
   const previewChecks={
-    preview_visible:v(manager,'FPreviewVisible')===true,
-    preview_node_matches:v(form,'FCurrentPreviewNode')===node,
-    port_parent_matches:port?.parent===node,
-    port_guid_matches:port?.FGuid===b.port_guid,
-    one_output:node.FPorts?.[1]?.FCollection?.length===1,
-    output_identity_matches:node.FPorts?.[1]?.FCollection?.[0]===port&&!!port,
-    no_input_ports:node.FPorts?.[0]?.FCollection?.length===0,
-    output_type:port?.FType===1,
-    data_subtype:port?.FSubType===1,
-    param_zero:port?.FParam===0,
-    port_active:port?.FStatus===1,
-    last_call_node_matches:manager?.FShowDataLastCall?.Node===node,
-    last_call_port_matches:manager?.FShowDataLastCall?.Port===port&&!!port
+    visible:v(manager,'FPreviewVisible')===true,
+    node:v(form,'FCurrentPreviewNode')===node,
+    parent:port?.parent===node,
+    guid:port?.FGuid===b.port_guid,
+    outputs:node.FPorts?.[1]?.FCollection?.length===1,
+    output:node.FPorts?.[1]?.FCollection?.[0]===port&&!!port,
+    inputs:node.FPorts?.[0]?.FCollection?.length===0,
+    type:port?.FType===1,
+    subtype:port?.FSubType===1,
+    param:port?.FParam===0,
+    status:port?.FStatus===1,
+    last_node:manager?.FShowDataLastCall?.Node===node,
+    last_port:manager?.FShowDataLastCall?.Port===port&&!!port
   };
   if(!Object.values(previewChecks).every(Boolean)){
     const inputs=node.FPorts?.[0]?.FCollection;
     const enumValue=x=>x===undefined?'missing':Number.isInteger(x)&&x>=0&&x<=16?String(x):'other';
-    const diagnostic={checks:previewChecks,input_inventory:{
-      count:!Array.isArray(inputs)?'invalid':inputs.length<=4?String(inputs.length):'more_than_four',
-      ports:Array.isArray(inputs)?inputs.slice(0,4).map(p=>({parent_matches:p?.parent===node,
-        type:enumValue(v(p,'FType')),subtype:enumValue(v(p,'FSubType')),param:enumValue(v(p,'FParam')),
-        status:enumValue(v(p,'FStatus'))})):[]
-    },output_param:enumValue(v(port,'FParam'))};
-    need(false,'owned import output0 Preview '+JSON.stringify(diagnostic));
+    // NI1 inventory comes first. Port tuples are [parentMatches,type,subtype,param,status].
+    // Short failed-check names keep even every failure below the 500-char transport cap.
+    const diagnostic={n:!Array.isArray(inputs)?'invalid':inputs.length<=4?String(inputs.length):'>4',
+      i:Array.isArray(inputs)?inputs.slice(0,4).map(p=>[p?.parent===node,
+        enumValue(v(p,'FType')),enumValue(v(p,'FSubType')),enumValue(v(p,'FParam')),enumValue(v(p,'FStatus'))]):[],
+      o:enumValue(v(port,'FParam')),f:Object.keys(previewChecks).filter(k=>!previewChecks[k])};
+    need(false,'NI1 '+JSON.stringify(diagnostic));
   }
   const tree=document.querySelector('[data-tid="ConsoleForm;ProgressForm;trpProgress;treepanel;tree"]');need(tree,'process tree');
   const processStore=Ext.getCmp(tree.id).getStore(),processRoot=processStore.getRoot();

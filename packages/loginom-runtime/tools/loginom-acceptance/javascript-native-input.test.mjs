@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createActionRuntime,parseCapabilityResult} from '../../client/lib/executor.mjs';
+import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {runJavascriptOperator} from './javascript-live.mjs';
 import {javascriptNativeInputCode,javascriptNativeRuntimeCode} from './javascript-native-input-binding.mjs';
 import {readJavascriptNativeInput,cancelJavascriptNativeInput,javascriptNativeInputStatus} from './javascript-native-input-read.mjs';
@@ -37,7 +42,7 @@ function sourceEvidence(){
 function ui(){return {row_count:4,sample_rows:4,sample_complete:true,filter_enabled:false,precision:{numbers_verified:true,limitations:[]},limitations:[],
   schema:[{name:'Value',label:'Value',type:'real'}],sample:values.map((value,i)=>[{type:'real',value,is_null:i===0,precision:i===0?'exact_null':'17_significant_digits'}])};}
 
-async function fake({deferred=false,change,beforeBind}={}){
+async function fake({deferred=false,change,beforeBind,bind=true}={}){
   class Workflow{} class Package{}
   const pack=new Package(),workflow=new Workflow();workflow.ParentNode=pack;
   const node={FGuid:'n',FIconCls:'bg-vendor-icon-importtextfile',FStatus:1,FRunning:false,data:{}},port={parent:node,FGuid:'p',FType:1,FSubType:1,FParam:0,FStatus:1};
@@ -82,31 +87,30 @@ async function fake({deferred=false,change,beforeBind}={}){
     schema:[{name:'Value',label:'Value',type:3}],row_count:4,deadline:Date.now()+30000};
   const result={page,execute,env,context,b,node,port,root,group,child,helper,dc,dt,store,model,session,counters,callbacks};
   beforeBind?.(result);
-  result.b=await execute(javascriptNativeInputCode(b));
+  if(bind)result.b=await execute(javascriptNativeInputCode(b));
   return result;
 }
 
 for(const [check,change]of Object.entries({
-  preview_visible:f=>f.model.FPreviewManager.FPreviewVisible=false,
-  preview_node_matches:f=>f.model.FPreviewManager.FPreviewForm.FCurrentPreviewNode={},
-  port_parent_matches:f=>f.port.parent={},
-  port_guid_matches:f=>f.port.FGuid='foreign-private-guid',
-  one_output:f=>f.node.FPorts[1].FCollection.push({}),
-  output_identity_matches:f=>f.node.FPorts[1].FCollection[0]={...f.port},
-  no_input_ports:f=>f.node.FPorts[0].FCollection.push({parent:f.node}),
-  output_type:f=>f.port.FType=0,
-  data_subtype:f=>f.port.FSubType=2,
-  param_zero:f=>f.port.FParam=1,
-  port_active:f=>f.port.FStatus=0,
-  last_call_node_matches:f=>f.model.FPreviewManager.FShowDataLastCall.Node={},
-  last_call_port_matches:f=>f.model.FPreviewManager.FShowDataLastCall.Port={}
+  visible:f=>f.model.FPreviewManager.FPreviewVisible=false,
+  node:f=>f.model.FPreviewManager.FPreviewForm.FCurrentPreviewNode={},
+  parent:f=>f.port.parent={},
+  guid:f=>f.port.FGuid='foreign-private-guid',
+  outputs:f=>f.node.FPorts[1].FCollection.push({}),
+  output:f=>f.node.FPorts[1].FCollection[0]={...f.port},
+  inputs:f=>f.node.FPorts[0].FCollection.push({parent:f.node}),
+  type:f=>f.port.FType=0,
+  subtype:f=>f.port.FSubType=2,
+  param:f=>f.port.FParam=1,
+  status:f=>f.port.FStatus=0,
+  last_node:f=>f.model.FPreviewManager.FShowDataLastCall.Node={},
+  last_port:f=>f.model.FPreviewManager.FShowDataLastCall.Port={}
 }))test('serialized binder preserves refusal and identifies '+check,async()=>{
   let fixture;
   await assert.rejects(()=>fake({beforeBind:f=>{fixture=f;change(f);}}),error=>{
-    const diagnostic=JSON.parse(error.message.split('owned import output0 Preview ')[1]);
-    assert.deepEqual(Object.entries(diagnostic.checks).filter(([,ok])=>!ok).map(([key])=>key),[check]);
-    assert.ok(Object.values(diagnostic.checks).every(ok=>typeof ok==='boolean'));
-    assert.ok(error.message.length<1600);assert.ok(!error.message.includes('foreign-private-guid'));return true;
+    const diagnostic=JSON.parse(error.message.split('NI1 ')[1]);
+    assert.deepEqual(diagnostic.f,[check]);
+    assert.ok(error.message.length<400);assert.ok(!error.message.includes('foreign-private-guid'));return true;
   });
   assert.deepEqual(fixture.counters,{sent:0,requests:0,responses:0});
   assert.equal(fixture.env.__loginomJavascriptNativeInputBindingV1,undefined);
@@ -119,13 +123,78 @@ test('refused inventory diagnostic is bounded, contains no data or getter evalua
     Object.defineProperty(f.node.FPorts[0].FCollection[2],'FSubType',{get(){getterCalls++;return 1;}});
     f.port.FParam='private payload';
   }}),error=>{
-    const diagnostic=JSON.parse(error.message.split('owned import output0 Preview ')[1]);
-    assert.equal(diagnostic.input_inventory.count,'more_than_four');assert.equal(diagnostic.input_inventory.ports.length,4);
-    assert.deepEqual(diagnostic.input_inventory.ports.map(p=>p.subtype),['2','3','missing','other']);
-    assert.equal(diagnostic.output_param,'other');assert.ok(!error.message.includes('private payload'));
-    assert.ok(error.message.length<1600);return true;
+    const diagnostic=JSON.parse(error.message.split('NI1 ')[1]);
+    assert.equal(diagnostic.n,'>4');assert.equal(diagnostic.i.length,4);
+    assert.deepEqual(diagnostic.i.map(p=>p[2]),['2','3','missing','other']);
+    assert.equal(diagnostic.o,'other');assert.ok(!error.message.includes('private payload'));
+    assert.ok(error.message.length<400);return true;
   });
   assert.equal(getterCalls,0);
+});
+
+for(const mode of ['two-inputs','all-checks','oversized-control'])test('production node error transport and journal preserve compact inventory: '+mode,async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'javascript-native-error-'));
+  t.after(()=>rm(directory,{recursive:true,force:true}));
+  const journal=createExecutionJournal({directory,metadata:{sessionId:'test',clientRevision:'test'},knownSecrets:['private-secret']});
+  const f=await fake({bind:false,beforeBind:f=>{
+    // Subtypes are source-backed. Status/param test values are not live evidence.
+    f.node.FPorts[0].FCollection=[6,3].map(FSubType=>({parent:f.node,FType:0,FSubType,FParam:1,FStatus:0}));
+    if(mode==='all-checks'){
+      const manager=f.model.FPreviewManager;
+      manager.FPreviewVisible=false;manager.FPreviewForm.FCurrentPreviewNode={};manager.FShowDataLastCall={};
+      Object.assign(f.port,{parent:{},FGuid:'foreign',FType:0,FSubType:0,FParam:'private-secret',FStatus:0});
+      f.node.FPorts[1].FCollection=[];
+      f.node.FPorts[0].FCollection=Array.from({length:5},()=>({parent:{}}));
+    }
+  }});
+  const evaluate=f.page.evaluate;
+  f.page.evaluate=async(...args)=>{
+    try{return await evaluate(...args);}catch(error){
+      // Browser boundary only: actual production transport below must truncate
+      // the Playwright-style prefix+message+stack, never a test copy of slice().
+      throw Error('page.evaluate: Error: '+error.message+'\n    at javascriptNativeInputSnapshot (eval at <anonymous>)'.repeat(30));
+    }
+  };
+  const workflow={workflow_id:'w',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
+  Object.assign(f.b,{prefix:workflow.prefix,tab_tid:workflow.tab_tid});
+  const graph={complete:true,document_id:'d',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
+  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},
+    positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),reconcile:async()=>({verified:true,cleanup_complete:true}),
+    mutate:async e=>{assert.equal(e.kind,'create');graph.nodes.push({ref:{document_id:'d',workflow_id:'w',node_id:'n'},
+      type:e.parameters.type,label:'NativeInput',position:e.parameters.position,inputs:[],outputs:[0]});return {status:'SUCCEEDED',cleanup_complete:true};}};
+  const ok=async()=>({verified:true,cleanup_complete:true,effect_possible:false});
+  const transport=[];
+  const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},
+    execute:async code=>{
+      const value=await f.execute(code);transport.push(clone(value));
+      return parseCapabilityResult({content:[{type:'text',text:JSON.stringify(value)}]});
+    },nodeTargetAdapterFactory:()=>adapter,
+    nodeApplyHandlers:new Map([['imports.text',{revision:'1',modes:['delimited'],validate:()=>{},configure:ok}]]),
+    nodeApplyDriverFactory:context=>({verifySource:ok,mapPorts:ok,openWizard:ok,verifyContinuation:async()=>true,
+      finish:async()=>({...await ok(),mode:'execute',execution_started:true,execution_id:'d:1:2'}),
+      waitExecution:async()=>({...await ok(),status:'completed',execution_id:'d:1:2'}),
+      readOutput:()=>context.execute(mode==='oversized-control'
+        ?'async page=>{throw Error("X".repeat(700))}' :javascriptNativeInputCode(f.b))}),onRecord:journal});
+  const result=await runtime.runNodeApply({operation_id:'apply',contract_revision:'1.0.0',document_id:'d',workflow_ref:workflow,
+    target:{kind:'new',type:'imports.text',label:'NativeInput',position:{x:320,y:280}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'execute',
+    read:{ports:[0],sample_rows:4,require_exact_numbers:true},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
+  assert.equal(result.status,'AMBIGUOUS');assert.equal(result.output.pending_phase,'read');assert.equal(result.error.code,'NODE_APPLY_STOPPED');
+  assert.equal(transport.length,1);assert.equal(transport[0].error.code,'NODE_APPLY_TRANSPORT');
+  assert.equal(transport[0].error.message.length,500);assert.equal(result.error.message,transport[0].error.message);
+  assert.equal(result.output.error.message,result.error.message);
+  const recorded=readFileSync(join(directory,'execution-events.jsonl'),'utf8').trim().split('\n').map(JSON.parse);
+  const final=recorded.findLast(e=>e.phase==='completed');assert.equal(final.outcome.error.message,result.error.message);
+  assert.equal(final.outcome.output.error.message,result.error.message);
+  if(mode==='oversized-control'){assert.equal(result.error.message,'X'.repeat(500));return;}
+  const message=result.error.message.split('\n')[0];assert.ok(message.startsWith('page.evaluate: Error: Native input binding: NI1 '));
+  assert.ok(message.length<400);assert.ok(!result.error.message.includes('private-secret'));
+  const diagnostic=JSON.parse(message.split('NI1 ')[1]);
+  if(mode==='two-inputs')assert.deepEqual(diagnostic,{n:'2',i:[[true,'0','6','1','0'],[true,'0','3','1','0']],o:'0',f:['inputs']});
+  if(mode==='all-checks'){
+    assert.deepEqual(diagnostic,{n:'>4',i:Array.from({length:4},()=>[false,'missing','missing','missing','missing']),o:'other',
+      f:['visible','node','parent','guid','outputs','output','inputs','type','subtype','param','status','last_node','last_port']});
+  }
+  assert.deepEqual(f.counters,{sent:0,requests:0,responses:0});assert.equal(f.env.__loginomJavascriptNativeInputBindingV1,undefined);
 });
 test('immutable33-byte fixture and explicit marker/request',()=>{
   const bytes=readFileSync(new URL('./fixtures/javascript-native-input-real.csv',import.meta.url));assert.deepEqual(verifyNativeInputFixture(bytes),nativeInputFixture);
@@ -266,9 +335,9 @@ test('owning driver journal acknowledgement precedes scoped Close and proof retu
 test('actual serialized binder diagnostic survives driver refusal and owned Close without native dispatch',async()=>{
   const f=await driverFixture('binding');
   await assert.rejects(f.run,error=>{
-    const diagnostic=JSON.parse(error.message.split('owned import output0 Preview ')[1]);
-    assert.equal(diagnostic.checks.no_input_ports,false);assert.equal(diagnostic.input_inventory.count,'2');
-    assert.deepEqual(diagnostic.input_inventory.ports,[6,3].map(subtype=>({parent_matches:true,type:'0',subtype:String(subtype),param:'missing',status:'missing'})));
+    const diagnostic=JSON.parse(error.message.split('NI1 ')[1]);
+    assert.deepEqual(diagnostic.f,['inputs']);assert.equal(diagnostic.n,'2');
+    assert.deepEqual(diagnostic.i,[6,3].map(subtype=>[true,'0',String(subtype),'missing','missing']));
     return true;
   });
   assert.deepEqual(f.actions,['click','press','close']);assert.deepEqual(f.events.map(e=>e.phase),['javascript_native_input_preview_closed']);
