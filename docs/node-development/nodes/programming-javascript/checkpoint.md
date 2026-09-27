@@ -16,6 +16,33 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch46: clean Apply и full output PASS, stale breadcrumb требует fix47 — 2026-09-27
+
+Первый declared-table-execute достиг полного правильного6×2 output. Root проверил
+1308 journalSHA,2 input reads/60cells,1 fresh completed execution/12outputcells.
+Отдельный boundary receipt подтверждает оба Apply: isSyncing/needsSync=false,
+removed/dirty/phantom/dropped/unknown=0; три input/output mapping close с proof
+неизменного native/semantic graph. Все закрылись штатно, специальная unlock
+reconciliation ветка46 **не была вызвана live** (source tests остаются её evidence).
+
+После existing_wizard_opened readiness90s истекла. Единственный failed predicate:
+node_breadcrumb. Все проверки native/document/workflow/tab/nodeGUID/root/class/
+ancestry прошли; фактическая метка JS: ObservedID, PhaseMarker вместо прежней
+JavaScript. Root просмотрел screenshot и проверил точный snapshot. Это stale-label
+предположение observer, не доказательство подмены узла. Cleanup тоже не подтвердил
+закрытие за60s; original package/logout=false,browser=true,terminal exit1
+CLEANUP_UNCONFIRMED. Остальные7 запланированных cases **NOT_RUN**.
+
+Отдельный headed recovery46 на profile19 без downloads подтвердил accountjsteach,
+packages0,logout/browser PASS,packageMutation=false. Исходный FAIL не переписан.
+Lease closed; freshprofile20 назначен, старый сохранён. Приватные receipts:
+g2-batch-46-verification.json,g2-batch-46-boundary-verification.json,
+g2-recovery-46.json. Same developer task выполняет fix47: актуальная метка из
+доказанного same native node при reopening/cleanup с сохранением ownership guards;
+адресные проверки renamed same node против foreign node, без повтора effects.
+Public handler, G2/G3 и полный план остаются открытыми.
+
+
 ### Freeze46: mapping unlock и Apply sync — live запущен — 2026-09-27
 
 Root независимо проверил100 tests PASS (column-editor36,stage-observer14,
