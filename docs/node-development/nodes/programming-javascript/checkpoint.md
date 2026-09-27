@@ -16,6 +16,30 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### OpenViking восстановлен; empty02 завершён отказом до JS
+
+После трёх последовательных HTTP502 работа была остановлена по AGENTS.md.
+По новому поручению пользователя MCP health и read снова PASS; конфигурация
+не менялась. Старый memory digest про boolean/string не является текущим этапом.
+
+Source79/profile63, native-cardinality-empty-probe-02: terminal FAILED на
+prepare-typed-input, `Initial bound observation is no longer current or ready`.
+Original cleanup: package_closed/logged_out/browser_closed — все true.
+Report SHA `b7978e8e137adadfb4ab0533d659c8710135e6f427feb1b36ac2ef21b3a37216`.
+Root повторно сверил все1243 source pins: изменений нет. Журнал содержит103 события.
+В строке101 body NativeInput имеет native_graph.status=unconfirmed и allowed_actions=[].
+Точная цепь: text-import-node.mjs openWizard получает graph-ready observation,
+затем perform требует click для того же body; эта проверка false.
+Общее сообщение node-procedure.mjs не доказывает устаревание snapshot.
+Какое именно условие native classifier не подтвердилось, ещё не установлено.
+JS, чтение native INPUT/OUTPUT и empty result в этом прогоне не достигнуты.
+
+Private failure receipt: native-cardinality-empty-probe-02-failure-verification.json.
+Разработчик в прежней задаче получил source-only расследование без изменений
+runtime и без браузера. Root сохраняет source79; следующий live разрешён только
+после определения необходимой диагностики и отдельного выделения профиля/lease.
+
+
 ### Source79 independently PASS, committed; empty02 headed RUNNING
 
 Root full client session47017 terminal exit0: **2472 PASS / 10 SKIP / 0 FAIL**
