@@ -15,6 +15,27 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Native probe03: import/Preview достигнут, native binder отказал — 2026-09-27
+
+Новый headed profile36/source57 завершён exit1 FAILED на prepare-typed-input.
+Сбой mxClient.js не повторился; filename download guard пройден. Import дошёл
+до typed UI и native Preview schema Value:real; binder отказал с
+`Native input binding: owned import output0 Preview` до чтения native cells.
+Совпадение UI/schema не доказывает native tags/bytes; G5 не закрыт.
+
+Original cleanup ALL PASS: own Preview закрыт с same graph proof, пакет закрыт,
+logout и browser close подтверждены. Recovery не требуется. Root проверил
+458 journal references и 66 неизменных source pins; private receipt
+native-input-probe-03-verification.json. Report SHA256:
+`87cbe208dff10ee0c9358b34fea8be3152c72fd55178042d8942053c25906d45`.
+
+Существующая задача разработчика продолжена с конкретной диагностикой binder:
+различить условия ownership guard по реальным данным/source; если записи
+недостаточны — bounded diagnostic до отказа и новый root headed probe.
+Ослабление ownership, повтор unknown effect и вывод native PASS по UI запрещены.
+Profile36 сохранён, lease browser closed. Public handler и CLI остаются открытыми.
+
+
 ### Native probe02: network failure и подтверждённое восстановление — 2026-09-27
 
 После перезапуска Codex MCP health и actor find успешны; Doctor 0.8.1:

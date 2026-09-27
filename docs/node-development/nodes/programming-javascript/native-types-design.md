@@ -1,6 +1,17 @@
 # G5 native types: следующий ограниченный шаг
 
-Статус: **source-only design**, runtime не реализован, live не запускался.
+Статус на 2026-09-27: **private input-only runtime реализован и проверен unit
+тестами; native live admission ещё не подтверждён**. Source57:
+`f24b82001fdbe9f50f1ae366dba1af25f4fe371c`; 66 актуальных pins находятся в private
+`operator57-root-full-result.json`. Input-only source56 прошёл 333 адресных и
+регрессионных теста; shared UI source57 — 292/292. Это разные наборы проверок,
+не доказательство live native значений. Первые два запуска остановились до
+импорта; причины и recovery отражены в [checkpoint](checkpoint.md).
+
+Реализован отдельный `javascript-native-input-live.mjs` и import-only binding;
+JS-output binding, identity roundtrip и остальные семейства ниже ещё предстоят.
+Далее сохранён дизайн и анализ **исходного source55**, поэтому указания
+«текущий» внутри анализа относятся к этой базе, а не к source57.
 Основание source55: `520ce1f78ce39859d3ce30a65db93e80c9081747`.
 Текущие42 pins сохраняются для root engine probes. Их UI/string PASS не закрывает G5.
 
