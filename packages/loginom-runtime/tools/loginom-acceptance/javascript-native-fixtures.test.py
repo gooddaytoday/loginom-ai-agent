@@ -24,6 +24,21 @@ def verify(kind, data):
     rows = list(csv.reader(io.StringIO(data.decode("utf-8"), newline=""), delimiter=";", quotechar='"'))
     assert rows[0] == ["Value"] and all(len(row) == 1 for row in rows)
     values = [None if row[0] == "__JS_NULL__" else {"true": True, "false": False}[row[0]] if kind == "boolean" else float(row[0]) if kind == "real" else row[0] for row in rows[1:]]
+    if kind == "civil-datetime":
+        import re
+        converted = []
+        for value in values:
+            if value is None:
+                converted.append(None)
+                continue
+            match = re.fullmatch(r"(\d{2})\.(\d{2})\.(\d{4}) (\d{2}:\d{2}:\d{2}\.\d{3})", value)
+            assert match
+            day, month, year, time = match.groups()
+            converted.append(f"{year}-{month}-{day}T{time}")
+        case = next(case for case in CASES if case["id"] == kind)
+        assert converted == case["local_values"] == fixture["values"]
+        assert len(converted) == fixture["rows"] and fixture["expected_bytes"] is None
+        return
     case_id = {"real": "null-number", "boolean": "null-bool", "string": "null-text"}.get(kind, kind)
     case = next(case for case in CASES if case["id"] == case_id)
     expected = ([None] if kind == "integer-safe" else []) + case["decimal_strings"] if fixture["type"] == "integer" else case["values"]
@@ -50,6 +65,9 @@ class FixtureAudit(unittest.TestCase):
 
     def test_integer_outside_safe(self):
         verify("integer-outside-safe", (HERE / "fixtures" / CATALOG["integer-outside-safe"]["file"]).read_bytes())
+
+    def test_civil_datetime(self):
+        verify("civil-datetime", (HERE / "fixtures" / CATALOG["civil-datetime"]["file"]).read_bytes())
 
     def test_changed_inputs_refused(self):
         for kind in CATALOG:

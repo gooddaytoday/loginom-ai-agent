@@ -13,7 +13,7 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
   need(receipt&&receipt.tab===document.querySelector('[data-tid='+JSON.stringify(b.tab_tid)+']')&&receipt.tab.classList.contains('x-tab-active'),'workflow receipt');
   const captured=globalThis.__loginomJavascriptNativeRoundtripV1?.bindings.get(b.roundtrip_role);
   need(captured?.document===document&&captured.id===b.runtime_binding_id,'private native input binding required');
-  const slice={real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4]}[b.fixture_id??'real'];
+  const slice={real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2]}[b.fixture_id??'real'];
   need(Array.isArray(slice)&&b.rows===slice[0]&&b.row_count===slice[0]&&b.columns.length===1&&b.columns[0]===0
     &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:slice[1]}]),'fixed native slice');
   const snapshot=()=>captured.capture(b);

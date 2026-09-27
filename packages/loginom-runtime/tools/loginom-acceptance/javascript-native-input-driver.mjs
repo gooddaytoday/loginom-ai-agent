@@ -1,3 +1,4 @@
+import {verifyNativeCivil,freezeCivilEvidence} from './javascript-native-datetime-civil.mjs';
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {createHash} from 'node:crypto';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
@@ -98,6 +99,7 @@ export async function readNativeInputDuringImport({options,ctx,provenance,target
     check();const expected={...binding,read_id:readId};
     const exact=verifyNativeInputRead(raw,{binding:expected,lifecycle,provenance});
     const proof={exact,raw,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,subscription_proxy_source_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
+    if(fixtureId==='civil-datetime')freezeCivilEvidence(proof);
     const event={phase:'javascript_native_input_cells_verified',operation_id:operation.id,proof};
     const saved=await onRecord(event);need(saved?.phase===event.phase&&JSON.stringify(saved.proof)===JSON.stringify(proof),'native journal acknowledgement differs');
     return proof;
@@ -126,7 +128,8 @@ export async function readNativeInputDuringImport({options,ctx,provenance,target
 export function createJavascriptNativeInputSupport({targetOrigin,targetBuild,onProof,onState,fixtureId='real',
   createSupport=createTextImportNodeSupport,readNative=readNativeInputDuringImport}){
   const nativeInputFixture=javascriptNativeFixture(fixtureId);
-  const support=createSupport({targetOrigin,targetBuild});
+  let civilReceipts;
+  const support=createSupport({targetOrigin,targetBuild,...(fixtureId==='civil-datetime'?{onTableRead:receipts=>{need(!civilReceipts,'civil input already captured');civilReceipts=structuredClone(receipts);}}:{})});
   return {...support,nodeApplyDriverFactory:options=>{
     const base=support.nodeApplyDriverFactory(options);let executed=false,readStarted=false,execution;
     return {...base,
@@ -140,6 +143,10 @@ export function createJavascriptNativeInputSupport({targetOrigin,targetBuild,onP
         need(!readStarted,'native input read already reserved; no replay');readStarted=true;
         const ui=await base.readOutput(read,ctx);verifyNativeInputUi(ui.ports?.[0],fixtureId);
         const provenance=nativeInputProvenance({...options,ctx,execution,fixtureId});
+        if(fixtureId==='civil-datetime'){
+          provenance.civil={role:'input',node:structuredClone(ctx.node),execution:structuredClone(execution),source_sha256:nativeInputFixture.sha256,receipts:civilReceipts};
+          verifyNativeCivil(provenance.civil,{role:'input',node:ctx.node,execution,portGuid:ui.ports[0].port_guid,sourceSha256:nativeInputFixture.sha256});
+        }
         const proof=await readNative({options,ctx,provenance,targetOrigin,targetBuild,onState,fixtureId});
         await onProof({ui,native:proof},{options,ctx,provenance});return ui;
       }};

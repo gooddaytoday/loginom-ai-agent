@@ -1,3 +1,4 @@
+import {verifyNativeCivil,freezeCivilEvidence} from './javascript-native-datetime-civil.mjs';
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,completeJavascriptNativeRoundtrip} from './javascript-native-roundtrip-owner.mjs';
 import {javascriptNativeRoundtripProbe,verifyNativeRoundtripInput,verifyNativeRoundtripExecution,verifyNativeRoundtripProvenance,verifyNativeRoundtripOutcome} from './javascript-native-roundtrip-contract.mjs';
@@ -581,7 +582,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
   const pinned={actions:new Map(actions.map(action=>[action.action_key,action])),selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
   const artifactStore=await createArtifactStore({directory:directory+'/input-artifacts',sessionId});
   const support=nativeInputOnly?createJavascriptNativeInputSupport({targetOrigin:origin,targetBuild:build,fixtureId:nativeFixtureId,
-    onProof:async(proof,owner)=>{nativeInputEvidence=proof;nativeInputOwner=owner;},
+    onProof:async(proof,owner)=>{nativeInputEvidence=nativeFixtureId==='civil-datetime'?freezeCivilEvidence(structuredClone(proof)):proof;nativeInputOwner=owner;},
     onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0
       ||state.status!=='completed'||state.releasedRequests!==nativeInputFixture.rows||state.releasedResponses!==nativeInputFixture.rows;
       await record({phase:'javascript_native_input_lifecycle',state,uncertain:nativeReadUncertain});}})
@@ -775,13 +776,15 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       const result=imported.output?.output?.ports?.find(p=>p.port===0);
       const proof=nativeInputOnly?verifyNativeInputUi(result,nativeFixtureId):verifyJavascriptTable(result,'input');
       if(nativeInputOnly&&(!nativeInputEvidence?.native.exact.native_bytes_verified||nativeReadUncertain))throw Error('Native input proof/cleanup unavailable');
+      if(nativeFixtureId==='civil-datetime')verifyNativeRoundtripInput({node:imported.output.node,table:result,native_input:nativeInputEvidence},nativeFixtureId);
       await record({phase:'input_verified',node:imported.output.node,pin,storage,proof,table:result});
       return {node:imported.output.node,storage,pin,table:result,proof,...(nativeInputOnly?{native_input:nativeInputEvidence}: {})};
     },
     async armNativeRoundtrip(input) {
       if(!nativeInputOnly||nativeReadUncertain)throw Error('Private native input required');
       const proof=verifyNativeRoundtripInput(input,nativeFixtureId);validateNativeSource();
-      await record({phase:'native_roundtrip_input_before_js',proof});
+      const saved=await record({phase:'native_roundtrip_input_before_js',proof});
+      if(JSON.stringify(saved.proof)!==JSON.stringify(proof))throw Error('Pre-JS baseline ACK differs');
       const armed=await page.evaluate(armJavascriptNativeRoundtrip,{binding:{...proof.binding,read_id:proof.raw.read_id},...nativeRoundtripProbe});
       await record({phase:'native_roundtrip_armed',...armed});return armed;
     },
@@ -804,8 +807,9 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
         const owner=role==='output'?node:input.node,completed=role==='output'?execution:before.exact.provenance.execution;
         const operation={id:'native-roundtrip-'+role+'-'+randomUUID(),action:{action_key:'diagnostic.javascript',revision:'1'},deadline};
         const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node:owner,execution:completed,deadline};
+        const civil=nativeFixtureId==='civil-datetime'?await this.readNativeCivil(owner,completed,role):undefined;
         results[role]=await readNativeRoundtrip({options:{operation,execute,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>!nativeReadUncertain,
-          receiptOptions:(id,key,signature)=>({receipt_namespace:sessionId,receipt_id:id,receipt_signature:signature,operation_id:id})},ctx,input:before,role,targetOrigin:origin,targetBuild:build,
+          receiptOptions:(id,key,signature)=>({receipt_namespace:sessionId,receipt_id:id,receipt_signature:signature,operation_id:id})},ctx,input:before,role,civil,targetOrigin:origin,targetBuild:build,
           onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0||state.status!=='completed'||state.releasedRequests!==nativeInputFixture.rows||state.releasedResponses!==nativeInputFixture.rows;
             await record({phase:'native_roundtrip_lifecycle',role,state,uncertain:nativeReadUncertain});}});
       }
@@ -815,6 +819,44 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       const saved=await record({phase:'native_roundtrip_verified',results,g5_complete:false});
       if(JSON.stringify(saved.results)!==JSON.stringify(results))throw Error('Roundtrip final journal ACK differs');
       return results;
+    },
+    async readNativeCivil(node,execution,role) {
+      if(nativeFixtureId!=='civil-datetime'||!['output','upstream'].includes(role)||nativeReadUncertain)throw Error('Fixed private civil role required');
+      validateNativeSource();
+      await page.evaluate(()=>globalThis.__loginomJavascriptNativeRoundtripV1.check());
+      return once('native-civil-'+role,{node,execution_id:execution.execution_id},async()=>{
+        const reader=channel(node),opened=await openNewOutputTable(reader,0,role==='upstream'?{}:{openViews:async({output})=>{
+          const binding=await privateGraphBinding(node);
+          const held=await page.evaluateHandle(({binding:b,output})=>{
+            const ports=b.native.FPorts.flatMap(list=>list.FCollection).filter(p=>p.FGuid===output.port_guid);
+            if(ports.length!==1)throw Error('Civil cleanup output identity unavailable');
+            return {port:ports[0],portData:ports[0].data,portCell:ports[0].FCell};
+          },{binding,output});
+          passiveSurface={binding,held,prepared:{...graphRequest,node},output};
+          const identity=await page.evaluate(b=>({node:b.node,icon:b.icon}),binding);
+          return openJavascriptOutputViews(page,{...identity,binding,reference:node,prepared:{...graphRequest,node},channel:reader,output,deadline,record,select:selectJavascriptForSettings});
+        }});
+        let formatProof,readSettings,raw,formatRestoration,workflowReturn;
+        try{
+          formatProof=await configureTablePrecision(reader,opened.table);
+          readSettings=await prepareTableRead(reader,opened.table);
+          raw=await readTableOutputPages(reader,opened.table,{sampleRows:3});
+        }finally{
+          if(formatProof)formatRestoration=await restoreTablePrecision(reader,formatProof);
+          if(role==='output'&&passiveSurface)passiveSurface.returnDispatched=true;
+          workflowReturn=await returnFromOutputTable(reader,opened.table);
+          if(role==='output'&&passiveSurface){await passiveSurface.held.dispose();await passiveSurface.binding.dispose();passiveSurface=undefined;}
+        }
+        await page.evaluate(()=>globalThis.__loginomJavascriptNativeRoundtripV1.check());
+        validateNativeSource();
+        const civil={role,node:structuredClone(node),execution:structuredClone(execution),source_sha256:nativeInputFixture.sha256,
+          receipts:{raw,table_creation:opened,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:workflowReturn}};
+        verifyNativeCivil(civil,{role,node,execution,portGuid:opened.port_guid,sourceSha256:nativeInputFixture.sha256});
+        freezeCivilEvidence(civil);
+        const saved=await record({phase:'native_civil_'+role+'_verified',civil});
+        if(JSON.stringify(saved.civil)!==JSON.stringify(civil))throw Error('Civil journal ACK differs');
+        return civil;
+      });
     },
     async captureDropTopology() {
       await accountGuard();const before=await graph();requireJavascriptTopology(before);

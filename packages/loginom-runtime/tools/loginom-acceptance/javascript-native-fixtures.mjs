@@ -123,6 +123,24 @@ const fixtures={
       "0000000000002000",
       "0100000000002000"
     ]
+  },
+  "civil-datetime": {
+    "id": "civil-datetime",
+    "file": "javascript-native-input-civil-datetime.csv",
+    "rows": 3,
+    "columns": 1,
+    "bytes": 66,
+    "sha256": "38f67790aa3c944c1fb465023157a128087e6781c9b8e22eca9e277468cdc708",
+    "type": "datetime",
+    "native_type": 2,
+    "js_type": "DateTime",
+    "data_kind": "Непрерывный",
+    "values": [
+      null,
+      "2024-02-29T23:59:59.123",
+      "2026-03-29T01:59:59.999"
+    ],
+    "expected_bytes": null
   }
 };
 for(const f of Object.values(fixtures)){Object.freeze(f.values);Object.freeze(f.expected_bytes);Object.freeze(f);}

@@ -1,3 +1,4 @@
+import {freezeCivilEvidence} from './javascript-native-datetime-civil.mjs';
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {openJavascriptNativeRoundtripPreview} from './javascript-native-roundtrip-opening.mjs';
 import {createHash} from 'node:crypto';
@@ -12,7 +13,7 @@ import {javascriptNativeRoundtripProbe,verifyNativeRoundtripRead,verifyNativeRou
 const need=(v,m)=>{if(!v)throw Error('Native roundtrip driver: '+m);};
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 
-export async function readNativeRoundtrip({options,ctx,input,role,targetOrigin,targetBuild,onState},
+export async function readNativeRoundtrip({options,ctx,input,role,civil,targetOrigin,targetBuild,onState},
   {createProcedure=createNodeProcedure,verifyFrontends=verifyNativeInputFrontends,
     verifyCountLoaders=verifyNativeInputCountLoaders,verifyCookieRuntime=verifyNativeInputCookieRuntime,openPreview=openJavascriptNativeRoundtripPreview}={}){
   const fixture=javascriptNativeFixture(input.binding.fixture_id),nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixture.id);
@@ -73,8 +74,9 @@ export async function readNativeRoundtrip({options,ctx,input,role,targetOrigin,t
       catch(statusError){if(!readError)throw statusError;
         throw Object.assign(new AggregateError([readError,statusError],readError.message),{observationError:readError,cleanupError:statusError});}}
     check();const expected={...binding,read_id:readId};
-    const exact=verifyNativeRoundtripRead(raw,{binding:expected,lifecycle,input,role});
-    const proof={exact,raw,add_port_source_sha256:addPortPins,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,subscription_proxy_source_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
+    const exact=verifyNativeRoundtripRead(raw,{binding:expected,lifecycle,input,role,civil});
+    const proof={exact,raw,...(civil?{civil}:{}),add_port_source_sha256:addPortPins,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,subscription_proxy_source_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
+    if(fixture.id==='civil-datetime')freezeCivilEvidence(proof);
     const event={phase:'javascript_native_roundtrip_'+role+'_cells_verified',operation_id:operation.id,proof};
     const saved=await onRecord(event);need(saved?.phase===event.phase&&JSON.stringify(saved.proof)===JSON.stringify(proof),'native journal acknowledgement differs');
     return proof;

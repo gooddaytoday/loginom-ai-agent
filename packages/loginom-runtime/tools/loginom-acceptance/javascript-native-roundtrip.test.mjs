@@ -62,6 +62,9 @@ export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,
   const child={internalId:5,data:{id:'4.1',Status:3,ErrorDetails:'',ModelNode:js.data},childNodes:[]};
   f.root.childNodes.push({internalId:4,data:{id:'4',Status:3,ErrorDetails:'',loaded:true},childNodes:[child]});
   const execution={verified:true,owner_verified:true,status:'completed',execution_id:'d:1:4',group_id:'4',process_id:'4.1',process_record_id:'5',trial:{source_sha256:nativeRoundtripProbe.source_sha256}};
+  if(fixtureId==='civil-datetime')Object.assign(execution,{cleanup_complete:true,
+    trial:{...execution.trial,phase:'initial',node_id:'js'},fresh_baseline:{node:{document_id:'d',workflow_id:'w',node_id:'js'},roots:[],root_id:'root'},
+    launch_identity:{execution_id:execution.execution_id,group_id:execution.group_id,root_id:'root',group_record_id:'4',node:{document_id:'d',workflow_id:'w',node_id:'js'}}});
   await f.page.evaluate(completeJavascriptNativeRoundtrip,{execution,source_sha256:nativeRoundtripProbe.source_sha256});
   output.FStatus=1;
   const source=f.dc.FDataSource,outputHelper={...f.helper,$FData:{}},outputDs={...source,$:{...source.$},$FHelper:outputHelper};outputHelper.FBaseProxy=outputDs;
