@@ -15,6 +15,33 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Probe08: байты прочитаны; durable ACK отклонён после redaction
+
+Headed profile41/source62 завершён FAILED. Original cleanup подтверждает
+package_closed, logged_out и browser_closed; lease закрыт, profile41 сохранён.
+В журнале ровно одна запись javascript_native_input_cells_verified. Независимый
+Python/struct oracle проверил все четыре native ячейки Value: NULL, +0, -1.25,
+10.125; теги 1/5, IEEE754 binary64 bytes и exact adapter согласованы. Это проверка
+scalar bytes, не полная приёмка native pipeline или закрытие G5.
+
+Причина отказа установлена по production redactor: поле cookie_runtime_sha256
+попадает под sensitiveKey и заменяется на [redacted]. В нём были хеши исходников
+subscription proxy, а не HTTP cookie. Exact journal acknowledgement закономерно
+отказал. Не ослаблять redaction или ACK; требуется корректное название поля и
+регрессия через настоящий createExecutionJournal со всем proof.
+
+Root проверил 450 journal refs и 66 pins source commit
+c535b67b890eb4eb237de1e672120c5691075e31. Report SHA256:
+`b0acfe33f7df022c2129f636202cc81189d9d974f906064fb13e4e2a1f3a9219`.
+Private receipt native-input-probe-08-verification.json. Исторический FAILED
+report не изменён. JS в этом input-only прогоне не создавался/не исполнялся.
+
+После перезапуска MCP health и actor find успешны; Doctor 0 failures, одно
+предупреждение о прежних отсутствующих rollout других задач. Конфигурация памяти
+не менялась. Прежняя задача разработчика продолжает адресное исправление
+Freeze63; нового live-прогона пока нет. Полный план остаётся active/incomplete.
+
+
 ### Freeze62: direct subscription cookie binding; probe08 запущен
 
 Source node-javascript `c535b67b890eb4eb237de1e672120c5691075e31`: recursive cookie
