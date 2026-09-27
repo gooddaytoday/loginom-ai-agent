@@ -16,6 +16,23 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source82 частично сохранён; преждевременный bootstrap-ответ не принят
+
+Developer turn завершился idle revision45 с историческим bootstrap-ответом
+памяти вместо handoff реализации. Это не подтверждает проблему подключения
+OpenViking и не отменяет реальные изменения. Root сохранил private
+operator82-partial-after-drift.json:16 изменённых/new runtime/CSV files,
+base HEAD14a9df5fcee360fd551c36e6410bd0bd6fa429b2. Это partial snapshot,
+не freeze82, не протестированная версия и не допуск к live.
+
+Та же задача возобновлена с конкретным bounded substep: завершить scalar
+coercion contract и реальные negative/positive tests. Полный failed-terminal
+witness, upstream-only error route, integration и full regression остаются
+обязательными следующими этапами; цель не сокращается до успешного пути.
+Browser CLOSED/profile66 unused. Старые dirty docs и частичная реализация
+сохранены; root runtime код на этом ходе не редактировал.
+
+
 ### Integer coercion: independent scalar audit подготовлен, live ещё нет
 
 Root создал private integer-coercion-case-matrix.json: все7 фиксированных слотов
