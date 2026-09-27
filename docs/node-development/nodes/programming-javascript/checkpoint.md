@@ -15,6 +15,14 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-columns-missing/profile92 RUNNING
+
+Fresh profile92 после verified profile91 cleanup;1265pins/toolchains и no pinned
+Chromium проверены. Source86 unchanged, evidence native-named-columns-missing-probe-01,
+**original exec7925 RUNNING**, headed DISPLAY=:1/sandbox/original deadline.
+Ожидать terminal этой session; потом independent audit и cleanup verification.
+
+
 ### B-columns-case CHARACTERIZED: undefined
 
 Profile91/original41062 terminal exit0/CHARACTERIZED. Independent audit9cells/
