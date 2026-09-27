@@ -15,6 +15,21 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-get-missing/profile88 RUNNING; failed auditor проверен негативными данными
+
+Fresh profile88 после verified owned failure/cleanup profile87;1265pins/Node/
+Chrome/no competing process проверены. Source86 unchanged, evidence
+native-named-get-missing-probe-01, **original exec16350 RUNNING**.
+Ожидать исходную session до terminal, затем полный independent audit.
+
+Root failed auditor86 дополнительно отверг8 точечных мутаций реального report:
+лишнее поле compact execution, другой upstream child, подмена error/source,
+owner=false, OUTPUT read, logout=false, преждевременный attribution=true.
+Положительный образец — фактический probe03 receipt; негативные копии временные,
+исходные evidence не изменялись. named-b-failed-auditor86-selfcheck.json сохранён.
+Это проверка аудитора, не дополнительное B live и не завершение attribution.
+
+
 ### Source86 live: B-get-case owned failure подтверждён, attribution открыт
 
 Profile87/original54042 terminal exit1/UNRESOLVED (не harness FAILED).
