@@ -1030,6 +1030,68 @@ test('file storage name cells expose E2E targets without requiring a button role
   assert.notEqual(result.status,'SUCCEEDED');assert.deepEqual(page.events,[]);
 });
 
+function scriptNamedStorageFixture(name='javascript-native-input-real.csv') {
+  const page=new Page(),prefix='MF;TF-1;FileStorageForm;',table=page.add('div',prefix+'pnlFileStorage;tbl','',{x:0,y:80,width:900,height:400});
+  const row=page.add('table',null,'',{x:20,y:100,width:800,height:25},table);row.attrs.class='x-grid-item';
+  const cell=page.add('td',prefix+'colName_'+name.replace(/\s/g,'_').replace(/,/g,''),name,{x:30,y:100,width:500,height:25},row);
+  return {page,table,row,cell,prefix};
+}
+
+test('storage filename code tokens are data, not editor identity: native-input-probe-01 regression',async()=>{
+  for(const name of ['javascript-native-input-real.csv','javascript-x.csv','python-script.csv','codeeditor-source.tsv','a'.repeat(90)+'.csv','sales.csv']){
+    const {page,cell}=scriptNamedStorageFixture(name),snapshot=await page.observe();
+    const target=snapshot.ui.elements.find(e=>e.tid===cell.getAttribute('data-tid'));
+    assert.equal(target.label,name);assert.ok(target.allowed_actions.includes('double_click'),name);
+    const result=await page.act({verb:'double_click',ref:target.ref},snapshot);
+    assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));assert.equal(page.events.filter(e=>e==='double_click').length,1);
+  }
+});
+
+test('storage filename exception preserves code-editor, link, secret and active-row guards',async()=>{
+  for(const mode of ['name','id','editor','href','secret','foreign','detached_row','wrong_label','wrong_tag','editable','duplicate']){
+    const f=scriptNamedStorageFixture(),{page,cell,table,row}=f;
+    if(mode==='name')cell.attrs.name='javascript-editor';
+    if(mode==='id')cell.attrs.id='script-editor';
+    if(mode==='editor')row.attrs.class+=' CodeMirror';
+    if(mode==='href'){cell.tagName='A';cell.attrs.href='javascript:void(0)';}
+    if(mode==='secret')cell.attrs.name='private_key';
+    if(mode==='foreign'){page.tab.attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';}
+    if(mode==='detached_row')row.attrs.class='other';
+    if(mode==='wrong_label')cell.ownText='sales.csv';
+    if(mode==='wrong_tag')cell.tagName='INPUT';
+    if(mode==='editable')cell.attrs.contenteditable='true';
+    if(mode==='duplicate')page.add('div',table.getAttribute('data-tid'));
+    const snapshot=await page.observe(),target=snapshot.ui.elements.find(e=>e.tid===cell.getAttribute('data-tid'));
+    assert.ok(!target?.allowed_actions.includes('double_click'),mode);assert.equal(page.events.length,0);
+  }
+});
+
+test('denied script control exposes bounded reference checks and never a gesture',async()=>{
+  const {page,cell}=scriptNamedStorageFixture();cell.attrs.id='javascript-editor';
+  const snapshot=await page.observe(),target=snapshot.ui.elements.find(e=>e.tid===cell.getAttribute('data-tid'));
+  // The private discovery downloader calls the serialized capability directly,
+  // after its own exact-file admission, rather than validateUiAction's builder.
+  const result=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {mode:'act',expected_build:build,expected_origin:origin,operation_id:'denied-download',snapshot,action:{verb:'double_click',ref:target.ref}}));
+  assert.equal(result.error.code,'UI_REFERENCE_STALE');assert.equal(result.effect_possible,false);
+  assert.deepEqual(result.trace.find(e=>e.event==='ui_reference_precondition_refused').checks,
+    {present:true,identity_matches:true,signature_matches:true,action_allowed:false});
+  assert.equal(page.events.filter(e=>e==='double_click').length,0);
+});
+
+test('storage filename download action retains fresh identity, DOM epoch and hit-test refusal',async()=>{
+  for(const mode of ['replacement','epoch','covered','geometry']){
+    const {page,cell,row}=scriptNamedStorageFixture(),snapshot=await page.observe();
+    const target=snapshot.ui.elements.find(e=>e.tid===cell.getAttribute('data-tid'));assert.ok(target.allowed_actions.includes('double_click'));
+    if(mode==='replacement'){cell.remove();row.append(new Element('td',cell.attrs,cell.ownText,cell.box));}
+    if(mode==='epoch')page.mutationObserver.pending.push({type:'attributes',target:cell,attributeName:'class'});
+    if(mode==='covered')page.document.elementFromPoint=()=>page.document.body;
+    if(mode==='geometry')page.beforeHandleGeometry=element=>{if(element===cell)element.box={...element.box,width:element.box.width+10};};
+    const result=await page.act({verb:'double_click',ref:target.ref},snapshot);
+    assert.equal(result.status,'NOT_APPLIED',mode);assert.equal(result.effect_possible,false,mode);assert.equal(page.events.filter(e=>e==='double_click').length,0,mode);
+  }
+});
+
 test('observation error codes cross a serialized browser boundary without exception text', async () => {
   for (const [code,expected] of [['UI_SCAN_LIMIT','UI_SCAN_LIMIT'],[undefined,'UI_OBSERVATION_FAILED']]) {
     const page=new Page(),evaluate=page.evaluate.bind(page);
@@ -3862,8 +3924,22 @@ test('native Table coverage survives actual pager and independent journal compar
  assert.deepEqual(delivered.output.table_coverage,raw.output.table_coverage);
  assert.deepEqual(delivered.output.geometry,raw.output.geometry);
  const script="import sys,json,copy;from rename_effect import journal_equal;r,d=json.load(sys.stdin);d['output'].pop('operation',None);assert journal_equal(r,d);d['output']['table_coverage']['rendered_rows']['count']=7;assert not journal_equal(r,d)";
- const check=spawnSync('python3',['-B','-c',script],{cwd:new URL('../../tools/loginom-acceptance/',import.meta.url),input:JSON.stringify([raw,delivered]),encoding:'utf8'});
- assert.equal(check.status,0,check.stderr);
+ const {mkdtempSync,writeFileSync,openSync,closeSync,rmSync}=await import('node:fs');
+ const {tmpdir}=await import('node:os');
+ const {join}=await import('node:path');
+ const directory=mkdtempSync(join(tmpdir(),'loginom-journal-test-'));
+ try {
+  const path=join(directory,'input.json');
+  writeFileSync(path,JSON.stringify([raw,delivered]),{mode:0o600,flag:'wx'});
+  // A finite file supplies EOF independently of the parent/child pipe lifecycle.
+  const input=openSync(path,'r');
+  try {
+   const check=spawnSync('python3',['-B','-c',script],{cwd:new URL('../../tools/loginom-acceptance/',import.meta.url),
+    stdio:[input,'pipe','pipe'],encoding:'utf8',timeout:10000,killSignal:'SIGKILL'});
+   assert.equal(check.error,undefined,check.error?.message);
+   assert.equal(check.status,0,check.stderr);
+  } finally {closeSync(input);}
+ } finally {rmSync(directory,{recursive:true,force:true});}
 });
 
 

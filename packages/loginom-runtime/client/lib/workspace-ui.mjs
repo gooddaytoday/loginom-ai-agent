@@ -442,12 +442,27 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return null;
     };
     const enabled = element => !element.matches(':disabled') && !element.closest('[aria-disabled="true"],.x-item-disabled,.x-btn-disabled,.x-menu-item-disabled');
+    const controlCodeIdentity = element => {
+      const tid=getTid(element),stem=workflow?.prefix+';FileStorageForm;colName_';
+      let controlTid=tid??'';
+      // colName_<filename> is data in a readonly storage cell, not an editor
+      // identity. Keep name/id and all other dangerous-control guards intact.
+      if(workflow&&element.tagName==='TD'&&!element.isContentEditable&&!element.closest('[contenteditable="true"]')&&tid?.startsWith(stem)){
+        const gridTid=workflow.prefix+';FileStorageForm;pnlFileStorage;tbl';
+        const grids=[...document.querySelectorAll('[data-tid='+JSON.stringify(gridTid)+']')];charge();
+        const row=element.closest('.x-grid-item'),label=element.textContent?.trim();
+        if(grids.length===1&&row&&grids[0].contains(row)&&row.contains(element)
+          &&typeof label==='string'&&label.length>0&&label.length<=240
+          &&tid===stem+label.replace(/\s/g,'_').replace(/,/g,''))controlTid=stem;
+      }
+      return [element.getAttribute('name')??'',element.getAttribute('id')??'',controlTid].join(' ');
+    };
     const dangerous = element => sensitive(element) || !!element.closest('a[href],iframe,object,embed')
       // The native chooser interrupts MCP's typed browser response. File
       // submission belongs to dock_artifact_upload and its pinned grant.
       || !!element.closest('[data-tid$=";FileStorageForm;btnUpload"]')
       || element.matches('input[type="url"],input[type="file"],input[type="hidden"]')
-      || /(?:^|[;_ -])(?:script|javascript|python|codeeditor)(?:[;_ -]|$)/i.test(['name', 'id', 'data-tid'].map(key => element.getAttribute(key) ?? '').join(' '))
+      || /(?:^|[;_ -])(?:script|javascript|python|codeeditor)(?:[;_ -]|$)/i.test(controlCodeIdentity(element))
       || !!element.closest('.monaco-editor,.CodeMirror,.ace_editor,[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]');
     const dialogElements = select('[role="dialog"],.x-window,.bg-dialog').filter(visible)
       .filter((element, index, items) => !items.some((other, i) => i !== index && other.contains(element)));
@@ -3257,8 +3272,10 @@ function readRenderedInputMapping(observation) {
     return graph?page.locator('[data-tid='+JSON.stringify(graph.container_tid)+']').locator(selector):page.locator(selector);
   };
   const checkedHandle = async (before, current) => {
-    if (!current || !same(before.identity, current.identity) || !same(before.signature, current.signature)
-      || !current.allowed_actions.includes(task.action.verb)
+    const referenceChecks={present:!!current,identity_matches:!!current&&same(before.identity,current.identity),
+      signature_matches:!!current&&same(before.signature,current.signature),action_allowed:!!current&&current.allowed_actions.includes(task.action.verb)};
+    if(!Object.values(referenceChecks).every(Boolean))record('ui_reference_precondition_refused',{checks:referenceChecks});
+    if (!Object.values(referenceChecks).every(Boolean)
       || task.action.verb==='replace_expression' && !same(before.calculator_editor,current.calculator_editor)
       || task.action.verb==='set_wizard_field' && !same(before.wizard_field,current.wizard_field)
       || task.action.verb==='cancel_expression_parameters' && !same(before.expression_cancel,current.expression_cancel)
