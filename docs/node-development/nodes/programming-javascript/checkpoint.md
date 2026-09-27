@@ -16,6 +16,27 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze70: post-selection DOM transition; headed probe07 запущен
+
+Source node-javascript `c1ae171e50a2b3368d72831fb27ecca84d4a58a2` допускает новый
+DOM shape только в selected при selection-dispatched, сохранённых девяти native
+NP1 identities, renderer view/drawPane и принадлежности нового shape этому pane.
+Exact current shape/TID/parent, selected port/cells, hit-test и keyboard focus
+проверяются до обновления held.shape. Prepare/select/preview не допускают rebind;
+повторная замена перед F3 и потерянный ответ не разрешают replay. Журнал получает
+shape_transition с rebound и observed previous_connected, без DOM-объектов.
+Общий deny, ViewsForm и native read guards неизменны.
+
+Root main814/814PASS + public-deny3/3PASS;75pins before/after совпали,syntax2PASS.
+Private operator70-root-test-source.json и native-roundtrip-probe-07-source.json.
+Fresh profile49 назначен после separate recovery06PASS; profile48 сохранён.
+Headed probe07 запущен с DISPLAY=:1/sandbox, проверенными Node/Chromium SHA.
+Unified session67575, разработчик idle/cursor154. На момент записи RUNNING:
+прохождение нового transition/F3/native bytes/cleanup пока не подтверждены.
+Полный G5/handler/CLI остаются незавершёнными.
+
+
+
 ### Roundtrip probe06: доказана замена DOM shape после click; recovery06 PASS
 
 Source69/profile48 завершён exit1 CLEANUP_UNCONFIRMED, session97252 terminal.
