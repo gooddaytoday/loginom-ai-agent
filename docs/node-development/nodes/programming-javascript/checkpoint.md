@@ -15,6 +15,16 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-getcolumn-case/profile89 RUNNING
+
+После verified B-get-missing/cleanup и no pinned Chromium закреплён fresh
+profile89;1265pins и Node/Chrome hashes совпали. Source86 unchanged.
+Evidence native-named-getcolumn-case-probe-01, **original exec64389 RUNNING**,
+headed DISPLAY=:1/sandbox/original deadline. Ждать этот process до terminal;
+проверить failed/completed native proof по фактическому исходу, не переносить Get.
+B:2owned failures observed/этот1running/5not_run; attribution/full goal открыты.
+
+
 ### B-get-missing: второе owned failure observation подтверждено
 
 Profile88/original16350 terminal exit1/UNRESOLVED, source86 unchanged.
