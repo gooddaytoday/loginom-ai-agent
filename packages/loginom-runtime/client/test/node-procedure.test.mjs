@@ -670,3 +670,18 @@ test('readiness expiry retains geometry across a final incomplete scan',async()=
   await assert.rejects(f.channel.observe({condition:'complete definitions',ready:()=>false,timeoutMs:1000}),/readiness timeout/);
   assert.deepEqual(f.records.find(r=>r.phase==='node_observation_timeout').geometry,f.state.geometry);
 });
+
+
+test('root refusal retains bounded code and trace without payloads, retries or usable references',async()=>{
+ const refusal={status:'NOT_APPLIED',action_key:'workspace.observe',phase:'observing',effect_possible:false,cleanup_complete:true,
+  error:{code:'PREPARED_NODE_CONTEXT_CHANGED',message:'secret payload'},output:{secret:'secret payload'},
+  trace:Array.from({length:20},()=>({event:'node_surface_wait',secret:'secret payload'}))};
+ let reads=0;const f=fixture({readRefusal:()=>{reads++;return refusal;}});
+ await assert.rejects(f.channel.observe({condition:'views ready',ready:()=>true}),e=>{
+   assert.match(e.message,/PREPARED_NODE_CONTEXT_CHANGED/);assert.equal(e.nodeObservationRefusal.trace.length,12);return true;
+ });
+ assert.equal(reads,1);const event=f.records.find(r=>r.phase==='node_observation_refused');
+ assert.equal(event.stage,'roots');assert.equal(JSON.stringify(event).includes('secret payload'),false);
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+ assert.ok(!f.events.includes('mutated'));
+});

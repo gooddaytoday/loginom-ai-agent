@@ -226,7 +226,20 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             satisfied=false;confirmations=0;previousIdentity=undefined;
             continue;
           }
-          throw new Error('Node procedure roots could not be observed');
+          // Retain only bounded, non-content diagnostics: a root refusal must
+          // not disappear behind a generic exception or leave usable refs.
+          const outcome={status:roots.status,action_key:roots.action_key,phase:roots.phase,
+            effect_possible:roots.effect_possible,cleanup_complete:roots.cleanup_complete,
+            error:{code:typeof roots.error?.code==='string'?roots.error.code.slice(0,100):null},
+            binding_reason:['surface_unavailable','document','receipt','workflow_unbound','tab','package_or_workflow','node_guid','navigation','graph_binding','graph_node','wizard_model','views_model','views_binding','surface_ambiguous']
+              .find(reason=>roots.error?.message?.endsWith(': '+reason))??null,
+            surface_pending:roots.output?.prepared_node_context?.surface_pending===true,
+            trace:Array.isArray(roots.trace)?roots.trace.slice(-12).map(e=>({event:String(e.event??'').slice(0,100),
+              ...(typeof e.limit_kind==='string'?{limit_kind:e.limit_kind.slice(0,40)}:{})})):[]};
+          await entry('node_observation_refused',{step,sample,internal_operation_id:id,condition,stage:'roots',outcome});
+          const error=new Error('Node procedure roots could not be observed'+(outcome.error.code?': '+outcome.error.code:''));
+          error.nodeObservationRefusal=outcome;
+          throw error;
         }
         const wizard = roots.output.wizard;
         const portals = wizard?.status === 'observed' ? (roots.output.ui?.elements??[]).filter(e =>
