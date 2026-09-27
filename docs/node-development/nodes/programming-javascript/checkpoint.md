@@ -15,6 +15,18 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source87 intermediate review: page-realm free variable замечен
+
+Developer turn01a0e503 остаётся active revision15; frozen handoff отсутствует.
+Root read-only просмотр промежуточного diff обнаружил в serialized
+sealJavascriptNamedFailure вызов calibrationDiagnostic(proof,caseId), где caseId
+не объявлен, а imported helper недоступен page realm; внутрь также попали unused
+helpers с внешними imports. Замечание отправлено в ту же работающую задачу,
+запрошена настоящая serialized K1/K2 failure regression. Root код не менял.
+Это промежуточное замечание, не final review/source87 acceptance; проверить
+устранение на окончательных исходниках/тестах. Новых live browser runs нет.
+
+
 ### Source87 K1/K2 implementation active; root acceptance criteria prepared
 
 Developer turn01a0e503-41b7-7080-9292-9e61ae5167aa active/inProgress подтверждён
