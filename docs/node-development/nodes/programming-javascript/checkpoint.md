@@ -16,6 +16,22 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Продолжение разбора renamed JS; fresh profile63 reserved
+
+Повторное чтение source подтвердило: workspace-ui dangerous guard основан на
+name/id/TID regex; readGraph уже сопоставляет native FIconCls с типом узла,
+а native renderer связывает port DOM с FCell/parent и GUID. В empty01 исходный
+native JS имел icon bg-vendor-icon-javascript; label изменился после настройки.
+Это основание расследовать name-independent port classification, не готовая
+реализация или разрешение нового эффекта. Задача source/evidence proposal
+подтверждена active/inProgress; root runtime не меняет и новый live не запускает.
+
+После terminal cleanup empty01 профиль62 сохранён. Assignment/host registry
+атомарно переназначены на fresh profile63 (пока не создан/не использован),
+backup assignment-before-profile63.json и profile-reassignment-63.json сохранены.
+Browser CLOSED, acceptance slot свободен. Следующий run только после принятого
+исправления и frozen source/tests; full empty audit ещё не выполнен.
+
 ### Empty01: UI schema и исполнение подтверждены, Preview отказал до чтения
 
 native-cardinality-empty-probe-01/source78/profile62 terminal exit1 (session20932),
