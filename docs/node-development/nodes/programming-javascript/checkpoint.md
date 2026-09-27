@@ -18,6 +18,14 @@
 
 ### Независимый scalar oracle для named A подготовлен
 
+Создан private `named-access-case-matrix.json`:25 fixed slots из проверенного
+дизайна (A8/B8/C4/D5), source hashes/input CSV pins/заранее заданные oracles,
+все not_run. A имеет только implementation admission, остальные design-only.
+Root статически сверил новый `javascript-native-named-cases.mjs` с8 A sources;
+receipt `named-catalogue-intermediate-audit.json`, catalogue SHA
+e6eb6f40f3f53a379647a68fc9d3c95123e1693e91b14782733ccfd5bd86ba07.
+Это промежуточный файл, source83 целиком ещё не frozen/принят.
+
 Private `audit-named-scalar.py` SHA
 5f9c3ed602c602ff1b699033d53bd03b28eaa3389e1ddb6a0e16deee488dec84
 проверяет8 fixed case IDs × INPUT/OUTPUT/upstream:4×1 Value/Value Integer,
