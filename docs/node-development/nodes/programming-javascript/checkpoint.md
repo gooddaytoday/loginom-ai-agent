@@ -16,6 +16,25 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Промежуточный review Fix79: label separator и неполные port collections
+
+Root прочитал текущий незавершённый classifier и передал два адресных замечания:
+`tid.includes('|')` не должен исключать заведомо native node/port только из-за
+символа имени; incident links отличать по actual native association, сохраняя
+их прежний scope. `dense(FCollection) ?? []` не должен превращать malformed/
+holey/oversized collection в доказанно пустую: affected ports остаются unconfirmed,
+законный AddPort и другие независимые узлы не должны блокироваться автоматически.
+Нужны tests и проверка окончательного source; это ещё открытые review points,
+не подтверждённый live-дефект новой версии. Разработчик active Fix79.
+
+Root также подготовил полный empty auditor с обязательным latest owned public
+deny observation перед первым Preview intent: audit-cardinality-empty-live79.py
+SHA `6db7c85145327752551ccaf302555717a5e65900c5f417cf875fdf09e5e01906`.
+Пока syntax PASS / live NOT_RUN. Перед живым применением сверить с frozen
+classifier и требовать положительно наблюдённую native JS classification,
+если она публикуется, а не принимать один unconfirmed→deny как доказательство
+устранения name-dependent классификации.
+
 ### Подготовлена независимая проверка public deny observation
 
 Root private audit-js-output-denial.py SHA256
