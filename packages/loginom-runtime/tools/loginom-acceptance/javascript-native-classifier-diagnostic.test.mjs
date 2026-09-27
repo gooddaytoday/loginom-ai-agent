@@ -16,7 +16,10 @@ function run(change='') {
     class ModelForm {}
     const model=new ModelForm();model.FDiagram=diagram;
     const card={Controller:{FController:model}},workspace={getActiveTab(){calls.tab++;return card;}};
-    globalThis.bg={app:{ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:workspace}}}}}};
+    const itemsPrototype={get Items(){calls.getter++;return this.FItems;}};
+    const mainForm=Object.create(Object.create(Object.create(Object.create(itemsPrototype))));
+    mainForm.FItems={Workspace:workspace};
+    globalThis.bg={app:{ModelForm,Application:{FInstance:{FMainForm:mainForm}}}};
     globalThis.document={querySelectorAll:()=>[container]};
     globalThis.binding={context:{verified:true,surface:'graph',node_id:'n',tid:'MF;TF-1;Graph;NativeInput'},prefix:'MF;TF-1'};
     ${change}
@@ -27,6 +30,8 @@ function run(change='') {
 
 test('serialized own-data path proves target gates without leaking values',()=>{
   const {output,calls}=run();assert.equal(output.status,'observed');assert.equal(output.first_failed,null);
+  assert.deepEqual(output.descriptors.find(d=>d.field==='Items'),{field:'Items',owner_depth:4,kind:'accessor',type:'unavailable'});
+  assert.deepEqual(output.descriptors.find(d=>d.field==='FItems'),{field:'FItems',owner_depth:0,kind:'data',type:'object'});
   assert.equal(output.gates.unique_tid,true);assert.equal(output.script,false);
   assert.deepEqual(calls,{getter:0,state:1,tab:1});
   assert.ok(!JSON.stringify(output).includes('NativeInput'));assert.ok(!JSON.stringify(output).includes('importtextfile'));
@@ -39,6 +44,10 @@ for(const [name,change,gate] of [
   ['wrong model class','bg.app.ModelForm=class Other {}','instanceof'],
   ['model class accessor','Object.defineProperty(bg.app,"ModelForm",{get(){calls.getter++;return ModelForm;}})','model_class'],
   ['custom instanceof getter','Object.defineProperty(ModelForm,Symbol.hasInstance,{get(){calls.getter++;return ()=>true;}})','instanceof_unavailable'],
+  ['missing FItems','delete mainForm.FItems','FItems'],
+  ['inherited FItems','Object.setPrototypeOf(mainForm,{FItems:mainForm.FItems});delete mainForm.FItems','FItems'],
+  ['accessor FItems','Object.defineProperty(mainForm,"FItems",{get(){calls.getter++;return {};}})','FItems'],
+  ['wrong FItems','mainForm.FItems={Workspace:{getActiveTab:()=>({Controller:{FController:{}}})}}','instanceof'],
   ['wrong container','graph.container={}','container'],
   ['holey collection','diagram.FNodes.FCollection.length=2','dense_nodes'],
   ['collection accessor','Object.defineProperty(diagram.FNodes.FCollection,"0",{get(){calls.getter++;return node;}})','dense_nodes'],
@@ -58,7 +67,7 @@ for(const [name,change,gate] of [
 ])test(name,()=>{
   const {output,calls}=run(change);assert.equal(output.first_failed,gate);assert.equal(output.status,'unavailable');
   assert.equal(calls.getter,0);assert.ok(!JSON.stringify(output).includes('SECRET'));
-  if(['bg','Application','model_class','instanceof','instanceof_unavailable','container','dense_nodes','getState','target_guid','icon','prepared_context'].includes(gate))assert.equal(calls.state,0);
+  if(['bg','Application','FItems','model_class','instanceof','instanceof_unavailable','container','dense_nodes','getState','target_guid','icon','prepared_context'].includes(gate))assert.equal(calls.state,0);
   if(['bg','instanceof_unavailable','prepared_context','target_guid','diagnostic_exception'].includes(gate))assert.equal(output.failure_scope,'diagnostic_only');
   if(name==='inherited guid')assert.equal(output.node_fields.FGuid.inherited_data,1);
   if(name==='inherited data')assert.deepEqual(output.descriptors.at(-1),{field:'Application',owner_depth:1,kind:'data',type:'object'});

@@ -507,7 +507,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       const value=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
       const method=(o,k)=>{for(let n=0;o&&n<8;n++,o=Object.getPrototypeOf(o)){charge();const d=Object.getOwnPropertyDescriptor(o,k);if(d)return Object.hasOwn(d,'value')&&typeof d.value==='function'?d.value:null;}return null;};
       const dense=(a,limit)=>{if(!Array.isArray(a)||a.length>limit)return null;const result=[];for(let i=0;i<a.length;i++){charge();const d=Object.getOwnPropertyDescriptor(a,String(i));if(!d||!Object.hasOwn(d,'value')||!d.value||typeof d.value!=='object')return null;result.push(d.value);}return result;};
-      const app=value(globalThis.bg,'app'),workspace=value(value(value(value(value(app,'Application'),'FInstance'),'FMainForm'),'Items'),'Workspace');
+      // Vendor ViewItemsController.Items is an inherited getter over own FItems.
+      const app=value(globalThis.bg,'app'),workspace=value(value(value(value(value(app,'Application'),'FInstance'),'FMainForm'),'FItems'),'Workspace');
       const activeTab=method(workspace,'getActiveTab'),card=activeTab?.call(workspace),controller=value(card,'Controller'),model=value(controller,'FController');
       const modelClass=value(app,'ModelForm'),diagram=value(model,'FDiagram'),graph=value(diagram,'FmxGraph'),view=value(graph,'view');
       const nodes=dense(value(value(diagram,'FNodes'),'FCollection'),200),getState=method(view,'getState');

@@ -34,7 +34,9 @@ export function diagnoseJavascriptNativeClassifier(binding) {
     // Follow precisely the classifier's own-data path. A prototype descriptor
     // is evidence of a difference, never permission to continue through it.
     let current=globalThis;
-    for(const key of ['bg','app','Application','FInstance','FMainForm','Items','Workspace']) {
+    for(const key of ['bg','app','Application','FInstance','FMainForm','FItems','Workspace']) {
+      // Retain historical Items descriptor evidence, without invoking it.
+      if(key==='FItems')field(current,'Items','Items');
       current=field(current,key,key);
       if(!object(current))return fail(key,key==='bg');
     }

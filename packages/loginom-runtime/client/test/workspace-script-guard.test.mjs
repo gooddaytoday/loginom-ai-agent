@@ -76,3 +76,50 @@ test('native classifier does not turn a lexical JavaScript denial into a non-JS 
   const port=s.ui.elements.find(e=>e.tid===f.output.getAttribute('data-tid'));
   assert.equal(port.signature.native_graph.status,'non_script');assert.deepEqual(port.allowed_actions,[]);
 });
+
+// Execute the exact production classifier block to distinguish its no-getter
+// contract from older, unrelated workspace readers that still use Items.
+const classifierSource=workspaceUiCapability.toString();
+const classifierBlock=classifierSource.slice(classifierSource.indexOf('const nativeGraphControls='),classifierSource.indexOf('const scopeOf = element =>'));
+function classifyOnly(f) {
+  const graphContainer=f.model.FDiagram.FmxGraph.container;
+  const context=vm.createContext({bg:{app:f.page.app},graphContainer,graphQueryable:true,graphPrefix:'MF;TF-1;Graph;',
+    nativeGraphElements:f.page.document.all().filter(e=>graphContainer.contains(e)&&e.getAttribute('data-tid')?.includes(';Graph;')),
+    ownedGraph:e=>graphContainer.contains(e)&&e.getAttribute('data-tid')?.startsWith('MF;TF-1;Graph;'),
+    getTid:e=>e?.getAttribute('data-tid'),charge:()=>{},refOf:()=> 'opaque-test-ref',target:f.body});
+  return vm.runInContext('(()=>{'+classifierBlock+'return nativeGraphControl(target);})()',context);
+}
+for(const icon of ['bg-vendor-icon-importtextfile','bg-vendor-icon-javascript'])test('own FItems classifier never invokes inherited Items: '+icon,()=>{
+  const f=scriptGraphFixture('Renamed',icon),form=f.page.app.Application.FInstance.FMainForm;
+  assert.equal(Object.hasOwn(form,'Items'),false);assert.equal(Object.hasOwn(form,'FItems'),true);
+  let prototype=form,depth=0;while(!Object.getOwnPropertyDescriptor(prototype,'Items')){prototype=Object.getPrototypeOf(prototype);depth++;}
+  assert.equal(depth,4);let calls=0;
+  Object.defineProperty(prototype,'Items',{get(){calls++;throw Error('getter forbidden');}});
+  const result=classifyOnly(f);assert.equal(result.status,icon.endsWith('javascript')?'script':'non_script');assert.equal(calls,0);
+});
+for(const fault of ['missing','accessor','inherited','wrong_model','wrong_container'])test('own FItems '+fault+' denies classifier and fresh act without accessor invocation',async()=>{
+  const f=scriptGraphFixture('NativeInput','bg-vendor-icon-importtextfile'),form=f.page.app.Application.FInstance.FMainForm;
+  const before=await f.page.observe(),target=before.ui.elements.find(e=>e.tid===f.tid);assert.ok(target.allowed_actions.includes('click'));
+  const original=form.FItems;let calls=0;
+  // Keep unrelated legacy readers on their prior model. The classifier must
+  // independently reject invalid FItems rather than fall back through Items.
+  Object.defineProperty(form,'Items',{value:original});
+  if(fault==='missing')delete form.FItems;
+  if(fault==='accessor')Object.defineProperty(form,'FItems',{get(){calls++;throw Error('getter forbidden');}});
+  if(fault==='inherited'){Object.setPrototypeOf(form,{FItems:original});delete form.FItems;}
+  if(fault==='wrong_model')form.FItems={Workspace:{getActiveTab:()=>({Controller:{FController:{}}})}};
+  if(fault==='wrong_container'){
+    const model=new f.page.app.ModelForm();model.FDiagram={...f.model.FDiagram,FmxGraph:{...f.model.FDiagram.FmxGraph,container:{}}};
+    form.FItems={Workspace:{getActiveTab:()=>({Controller:{FController:model}})}};
+  }
+  assert.equal(classifyOnly(f).status,'unconfirmed');assert.equal(calls,0);
+  const after=await f.page.observe();assert.deepEqual(after.ui.elements.find(e=>e.tid===f.tid).allowed_actions,[]);
+  const result=await f.page.act({verb:'click',ref:target.ref},before);
+  assert.notEqual(result.status,'SUCCEEDED');assert.equal(result.effect_possible,false);assert.equal(calls,0);assert.deepEqual(f.page.events,[]);
+});
+test('ordinary import body operates through vendor FItems fixture',async()=>{
+  const f=scriptGraphFixture('NativeInput','bg-vendor-icon-importtextfile'),s=await f.page.observe();
+  const target=s.ui.elements.find(e=>e.tid===f.tid);assert.equal(target.signature.native_graph.status,'non_script');
+  assert.ok(target.allowed_actions.includes('click'));
+  assert.equal((await f.page.act({verb:'click',ref:target.ref},s)).status,'SUCCEEDED');assert.deepEqual(f.page.events,['click']);
+});
