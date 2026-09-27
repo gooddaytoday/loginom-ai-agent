@@ -1,6 +1,6 @@
 # Renamed JavaScript graph controls — source78 investigation and bounded correction
 
-Статус: source/evidence proposal проверен root; Fix79 разрешён с уточнениями ниже. Реализация и live ещё не выполнены.
+Статус: Fix79 реализован в source `6d8b16e8c230ff5ea98ea8f4377a5cff66c34d8d`, root regression PASS (2472 client pass/10 skip,1292 main+3deny+11Python). Empty02 live запущен; результат ещё не принят. Ниже сохранены исходное обоснование и условия реализации.
 Source78 HEAD `66f0ad6e732fd9e9f717284d3bf93a2c9cbcafc1`.
 
 ## Установленная причина

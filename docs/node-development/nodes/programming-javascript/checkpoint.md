@@ -16,6 +16,33 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source79 independently PASS, committed; empty02 headed RUNNING
+
+Root full client session47017 terminal exit0: **2472 PASS / 10 SKIP / 0 FAIL**
+(211 files). Skips —2 Windows-only и8 opt-in Chromium; их запуск не заявляется.
+Ранее отказавшие developer launcher/catalog/clipboard tests на тех же
+зафиксированных исходниках здесь проходят; исходные отказы сохранены, причина
+каждого не обобщается одним предположением. Pinned Node directory передан в PATH.
+Все1243 source pins до/после совпали. Root повторил **1292 main +3 deny +11 Python
+PASS**, syntax/diff-check. Source/tests root не редактировал.
+
+Exact5 runtime/test files закоммичены child:
+`6d8b16e8c230ff5ea98ea8f4377a5cff66c34d8d`.
+Root оформил freeze79 JSON/manifest/handoff в child docs и private campaign,
+с явным авторством root после idle developer и отсутствовавшего handoff.
+Manifest SHA `4dcb7ff12cebd2f309537bb0b5b298afee4905210447df63dc9bd3e8fd1bd79e`.
+JSON SHA `749f2746552914c783ccdd5b49312f086e94d00485ff5c4ad25cd3664027714a`.
+1243 pins включают широкий client/operator snapshot для полного suite,
+а не только прежний195-file runtime subset. Старые dirty docs не коммитились.
+
+Запущен native-cardinality-empty-probe-02/source79/profile63, session32231.
+DISPLAY=:1/headed/sandbox, exact Node/Chromium и все1243pins проверены; других
+процессов закреплённого браузера до запуска нет. Source receipt сохранён,
+browser lease RUNNING. Root auditor audit-cardinality-empty-live79-v2.py требует
+positive native script classification до Preview, затем все declared/zero/input/
+upstream/source/journal/cleanup доказательства. Terminal ещё не получен;
+повторного запуска нет, output0 и полный G5 пока не приняты.
+
 ### Root самостоятельно зафиксировал candidate и запустил full client
 
 Fix79 developer turn завершился idle (revision35), но вместо handoff снова
