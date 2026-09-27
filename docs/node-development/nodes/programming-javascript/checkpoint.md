@@ -16,6 +16,25 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Fix68: маршрут Preview уточнён, задача остановлена на доступе к памяти
+
+После возобновления два последовательных хода задачи разработчика завершились
+без изменений runtime: Doctor получил EAI_AGAIN ov.kartamyshev.dev; во втором
+ходе MCP health прошёл, find дал transport -32003 примерно через15s. Последний
+ход terminal completed/idle, cursor148, turn01a0e29f-b33e-7d61-9354-20bb0271e84b.
+Это ошибка доступа в окружении разработчика; успешные root find/read не доказывают
+его доступ. Согласно AGENTS работа требует восстановления памяти. Freeze68 нет,
+новый live не запускался, profile47 остаётся неиспользованным.
+
+Root read-only проверил cached fix47-bg_app_ModelForm.js: PreviewKey F3 (298),
+OnHotkeyShowDataPreview (6641+) выбирает один output port; OnShowDataPreview
+(6664+) открывает FPreviewManager. Existing openJavascriptOutputViews ведёт в
+ViewsForm и не заменяет этот маршрут. Следующее исправление — narrow private
+selection+F3 с исходными ownership/deadline/no replay/native-read проверками,
+после восстановления доступа памяти. Общий UI deny не изменён.
+
+
+
 ### Возобновлено по команде пользователя — 2026-09-27
 
 Пауза ниже историческая: пользователь дал команду продолжить. Source67 и terminal
