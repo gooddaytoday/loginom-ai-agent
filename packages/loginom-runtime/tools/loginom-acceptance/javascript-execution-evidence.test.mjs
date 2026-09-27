@@ -10,7 +10,7 @@ import vm from 'node:vm';
 import {EventEmitter} from 'node:events';
 import {observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {javascriptInputColumns,javascriptInputRows,verifyJavascriptFixture,verifyJavascriptTable,javascriptSentinelOutcome,createJavascriptEffectJournal,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord} from './javascript-execution-evidence.mjs';
-import {javascriptInputRequest,waitJavascriptCleanupReady,selectJavascriptForSettings,javascriptWizardBinding,openJavascriptWizard,cleanupJavascriptWizardOpening,javascriptMappingUnlockReceipt,closeJavascriptPortMapping} from './javascript-execution-runtime.mjs';
+import {javascriptInputRequest,waitJavascriptCleanupReady,selectJavascriptForSettings,javascriptWizardBinding,openJavascriptWizard,cleanupJavascriptWizardOpening,javascriptMappingUnlockReceipt,closeJavascriptPortMapping,inspectJavascriptExecutionNotifications,waitJavascriptExecutionNotifications} from './javascript-execution-runtime.mjs';
 import {validateNodeApplyRequest} from '../../client/lib/node-apply.mjs';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
@@ -562,5 +562,97 @@ test('wizard address refuses accessors throughout native label and breadcrumb ca
     const f=wizardAddressFixture();const [object,key]=target(f);let reads=0;
     Object.defineProperty(object,key,{get(){reads++;throw Error('cache accessor');}});
     assert.equal(f.read().ready,false);assert.equal(reads,0);
+  }
+});
+
+function executionNotificationFixture() {
+  const element={id:'toast-1',isConnected:true,getAttribute:k=>k==='data-tid'?'toast':null,getBoundingClientRect:()=>({width:300,height:150})};
+  class Toast {}
+  Object.assign(Toast.prototype,{$className:'Ext.window.Toast',closeOnMouseOut:false,hideDuration:500});
+  const toast=new Toast();Object.assign(toast,{el:{dom:element},autoClose:true,autoCloseDelay:23000});
+  const node={FGuid:'js',data:{},FCell:{}},workflow={},container={},graph={container};
+  const diagram={FNodes:{FCollection:[node]},FmxGraph:graph},model={FDiagram:diagram};
+  const controller={FController:model,Node:{data:{node:workflow}}},tab={Controller:controller};
+  const state={dialogs:[element],masks:[]};
+  const document={querySelectorAll:s=>s.startsWith('.x-mask')?state.masks:state.dialogs};
+  const binding={document,tab,controller,model,diagram,graph,container,native:node,nodeData:node.data,cell:node.FCell,workflow,node:{id:'js'}};
+  const realm=vm.createContext({document,location:{origin:'http://logi-test-plan.bg.local'},getComputedStyle:()=>({display:'block',visibility:'visible'}),
+    Ext:{window:{Toast},getCmp:()=>toast},bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>tab}}}}}}}});
+  const run=(fn,args)=>vm.runInContext('('+fn.toString()+')',realm)(args);
+  return {binding,state,toast,node,element,run,read:()=>run(inspectJavascriptExecutionNotifications,{binding})};
+}
+
+test('post-execution notification waits for natural disappearance without claiming toast ownership',()=>{
+  const f=executionNotificationFixture(),before=f.read();assert.equal(before.ready,false);
+  assert.equal(before.execution_dispatched,true);assert.equal(before.execution_completed,false);
+  assert.equal(before.notification_owner_verified,false);assert.equal(before.auto_close_delays[0],23000);
+  f.state.dialogs=[];assert.equal(f.read().ready,true);
+});
+
+test('post-execution wait rejects foreign dialogs, busy masks, changed owners and unsupported lifecycle',()=>{
+  for(const change of [f=>f.state.masks.push(f.element),f=>f.element.getAttribute=()=> 'msgbox',
+    f=>f.toast.$className='ForeignToast',f=>f.toast.modal=true,f=>f.toast.autoClose=false,
+    f=>f.toast.autoCloseDelay=60001,f=>f.toast.autoCloseDelay=0,f=>f.toast.mouseIsOver=true,
+    f=>f.toast.closeOnMouseOut=true,f=>f.toast.hideDuration=1000,f=>f.toast.el.dom={},
+    f=>f.node.data={},f=>f.binding.controller.Node.data.node={},f=>f.state.dialogs=Array(5).fill(f.element)]){
+    const f=executionNotificationFixture();change(f);assert.throws(()=>f.read());
+  }
+});
+
+test('post-execution notification cache accessors and replacements never authorize continued waiting',()=>{
+  for(const key of ['autoClose','autoCloseDelay','el','mouseIsOver','modal','hideDuration']){
+    const f=executionNotificationFixture();let reads=0;
+    Object.defineProperty(f.toast,key,{get(){reads++;throw Error('getter');}});
+    assert.throws(()=>f.read());assert.equal(reads,0);
+  }
+  const f=executionNotificationFixture();f.read();f.toast.autoCloseDelay=24000;assert.throws(()=>f.read(),/replaced/);
+});
+
+test('post-execution settlement is passive, bounded and preserves dispatched evidence on failure',async()=>{
+  for(const fail of [false,true]){
+    const f=executionNotificationFixture(),records=[];let waits=0,disposed=0;
+    const deadline=Date.now()+5000;
+    const page={evaluate:async(fn,args)=>f.run(fn,args),waitForFunction:async(fn,args,options)=>{
+      waits++;assert.ok(options.timeout>0&&options.timeout<=5000);assert.equal(options.polling,250);
+      if(fail)throw Error('original wait timed out');
+      f.state.dialogs=[];assert.equal(f.run(fn,args).ready,true);return {dispose:async()=>disposed++};
+    }};
+    const promise=waitJavascriptExecutionNotifications(page,{binding:f.binding,deadline,record:async r=>records.push(r)});
+    if(fail)await assert.rejects(promise,/timed out/);else assert.equal((await promise).ready,true);
+    assert.equal(waits,1);assert.equal(disposed,fail?0:1);
+    assert.equal(records.at(-1).execution_dispatched,true);assert.equal(records.at(-1).execution_completed,false);
+    assert.equal(records.at(-1).phase,fail?'execution_notification_wait_refused':'execution_notification_wait_verified');
+  }
+});
+
+test('post-execution expired budget cannot start a wait and no notification needs no wait',async()=>{
+  const f=executionNotificationFixture();f.state.dialogs=[];let reads=0,waits=0;
+  const page={evaluate:async(fn,args)=>{reads++;return f.run(fn,args);},waitForFunction:async()=>{waits++;throw Error('unexpected wait');}};
+  assert.equal((await waitJavascriptExecutionNotifications(page,{binding:f.binding,deadline:Date.now()+5000,record:async()=>{}})).ready,true);
+  assert.equal(waits,0);reads=0;
+  await assert.rejects(waitJavascriptExecutionNotifications(page,{binding:f.binding,deadline:Date.now()-1,record:async()=>{}}),/deadline/);
+  // One final diagnostic read is allowed after refusal, never a wait or gesture.
+  assert.equal(reads,1);assert.equal(waits,0);
+});
+
+test('production executeNode waits after one launch before identify and never retries on settlement failure',async()=>{
+  const source=await readFile(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
+  const start=source.indexOf('    async executeNode('),end=source.indexOf('    async readPassive(',start);
+  assert.ok(start>0&&end>start);
+  for(const fail of [false,true]){
+    const steps=[],binding={dispose:async()=>steps.push('dispose')},node={node_id:'js'},limit=Date.now()+5000;
+    const driver={prepare:async()=>{steps.push('prepare');return {};},launchGraph:async()=>{steps.push('launch');return {verified:true};},
+      identify:async()=>{steps.push('identify');return {};},waitCompleted:async()=>{steps.push('terminal');return {verified:true};}};
+    const operator=vm.runInNewContext('({'+source.slice(start,end)+'})',{
+      deadline:limit,createNodeExecutionProcedure:()=>driver,channel:()=>({}),privateGraphBinding:async()=>binding,
+      page:{evaluate:async()=>({node:{id:'js'},icon:'js'})},selectJavascriptForSettings:async()=>steps.push('select'),
+      once:async(id,identity,action)=>{steps.push('once');return action();},record:async r=>steps.push(r.phase),
+      waitJavascriptExecutionNotifications:async(page,args)=>{assert.equal(args.binding,binding);assert.equal(args.deadline,limit);
+        steps.push('settlement');if(fail)throw Error('notification retained');}
+    });
+    if(fail)await assert.rejects(operator.executeNode(node,limit),/notification retained/);
+    else assert.equal((await operator.executeNode(node,limit)).verified,true);
+    assert.deepEqual(steps,['prepare','select','once','launch','execution_launched','settlement',
+      ...(!fail?['identify','terminal','execution_terminal']:[]),'dispose']);
   }
 });
