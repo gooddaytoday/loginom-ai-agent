@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,fillJavascriptColumnField,recordJavascriptColumnHelperSource,openJavascriptColumnTypePicker,selectJavascriptColumnTypeOption} from './javascript-column-editor.mjs';
 // Private native-cache observer for the two JavaScript wizard pages. A missing
 // cache contract is a refusal with inventory, never permission to read a proxy.
@@ -82,13 +83,18 @@ export function readJavascriptSchema({root,native,binding,prefix}) {
   }
 }
 
-export function javascriptDeclaredColumnsMatch(snapshot) {
+export function javascriptDeclaredColumnsMatch(snapshot,fixedCase) {
   const fields=snapshot?.grids?.find(grid=>grid.tid===snapshot.page_tid+';grdTargetColumns;tbl')?.fields;
+  if(fixedCase==='cardinality-empty')return snapshot?.verified===true&&snapshot.inventory_complete===true&&snapshot.generation?.checked===false&&fields?.length===1
+    &&fields[0].Name==='Value'&&fields[0].DisplayName==='Value'&&fields[0].DataType===4&&fields[0].Index===0&&typeof fields[0].Required==='boolean'&&fields[0].Broken!==true;
   return snapshot?.verified===true&&snapshot.generation?.checked===false&&fields?.length===2
     &&fields.every((field,i)=>field.Name===['ObservedID','PhaseMarker'][i]&&field.DataType===[4,5][i]);
 }
 
-export async function configureJavascriptSchema({page,context,mode,once,record,deadline,columnState}) {
+export async function configureJavascriptSchema({page,context,mode,once,record,deadline,columnState,fixedCase}) {
+  if(fixedCase!==undefined&&(fixedCase!=='cardinality-empty'||mode!=='declared'))throw Error('Fixed declared empty mode required');
+  let applied;
+  const names=fixedCase==='cardinality-empty'?['Value']:['ObservedID','PhaseMarker'];
   const read=()=>page.evaluate(readJavascriptSchema,context);
   const first=await read();await record({phase:'javascript_schema_before',snapshot:first});
   if(first.verified!==true||first.form!=='JavaScriptColumnsWizard')throw Error('JavaScript output schema contract unconfirmed');
@@ -106,7 +112,7 @@ export async function configureJavascriptSchema({page,context,mode,once,record,d
   if(mode==='declared') {
     const baseline=await read(),fields=baseline.grids.find(grid=>grid.tid===baseline.page_tid+';grdTargetColumns;tbl').fields;
     if(fields.length)throw Error('New declared trial must start with an empty schema');
-    for(const [index,name] of ['ObservedID','PhaseMarker'].entries()) {
+    for(const [index,name] of names.entries()) {
       const editor=await openJavascriptColumnEditor({page,context,index,state:columnState,once,record,deadline,
         add:()=>at(baseline.page_tid+';btnAddMappingColumn').click({timeout:Math.max(1,Math.min(10000,deadline-Date.now()))})});
       if(index===0)await recordJavascriptColumnHelperSource({page,state:columnState,record});
@@ -126,13 +132,24 @@ export async function configureJavascriptSchema({page,context,mode,once,record,d
         click:(tid,timeout)=>at(tid).click({timeout})});
       await selectJavascriptColumnTypeOption({page,state:columnState,record,once,deadline,id:'schema-type-select-'+index,expectedType,expectedLabel});
       await effect('schema-apply-'+index,{base,name},'btnApply','click',async()=>{columnState.pending.applyDispatched=true;await at(base+';btnApply').click({timeout:Math.max(1,deadline-Date.now())});});
-      await settleJavascriptColumnEditor({page,state:columnState,record,deadline,phase:'applied'});
+      applied=await settleJavascriptColumnEditor({page,state:columnState,record,deadline,phase:'applied'});
       const added=await read();await record({phase:'javascript_schema_added',index,snapshot:added});
       const observed=added.grids.find(grid=>grid.tid===added.page_tid+';grdTargetColumns;tbl').fields;
       if(observed.length!==index+1||observed[index].Name!==name||observed[index].DataType!==[4,5][index])throw Error('Declared column readback differs');
     }
   }
   const after=await read();await record({phase:'javascript_schema_after',snapshot:after});
-  if(mode==='declared'&&!javascriptDeclaredColumnsMatch(after)||mode==='code'&&after.generation?.checked!==true)throw Error('JavaScript schema mode readback differs');
+  if(mode==='declared'&&!javascriptDeclaredColumnsMatch(after,fixedCase)||mode==='code'&&after.generation?.checked!==true)throw Error('JavaScript schema mode readback differs');
+  if(fixedCase==='cardinality-empty'){
+    if(applied?.status!=='settled'||applied.checks?.applied!==true)throw Error('Owned declared Apply settlement required');
+    const field=after.grids.find(g=>g.tid===after.page_tid+';grdTargetColumns;tbl').fields[0];
+    const declaration={fixture_id:fixedCase,schema_mode:'declared',generation:false,apply_verified:true,
+      page_tid:after.page_tid,field:{record_id:field.record_id,name:field.Name,label:field.DisplayName,type:field.DataType,index:field.Index,required:field.Required}};
+    Object.freeze(declaration.field);Object.freeze(declaration);
+    const declaration_sha256=createHash('sha256').update(JSON.stringify(declaration)).digest('hex');
+    const saved=await record({phase:'javascript_declared_empty_verified',declaration,declaration_sha256});
+    if(saved?.phase!=='javascript_declared_empty_verified'||JSON.stringify(saved?.declaration)!==JSON.stringify(declaration)||saved?.declaration_sha256!==declaration_sha256)throw Error('Declared empty journal ACK differs');
+    return {...after,declaration,declaration_sha256};
+  }
   return after;
 }

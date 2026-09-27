@@ -1,3 +1,4 @@
+import {verifyJavascriptDeclaredEmpty,verifyJavascriptZeroAdmission} from './javascript-native-zero.mjs';
 import {verifyNativeCivil,nativeCivilExpectation} from './javascript-native-datetime-civil.mjs';
 import {verifyTextImportSource} from '../../client/lib/text-import-node.mjs';
 import {textImportConfigurationReadback} from '../../client/lib/text-import-readback.mjs';
@@ -14,10 +15,10 @@ export function javascriptNativeRoundtripProbe(fixtureId='real'){
   'cardinality-odd':'for (let row=0;row<InputTable.RowCount;row++) {\n  const value=InputTable.Get(row,"Value");\n  if (value % 2 === 1) { OutputTable.Append(); OutputTable.Set("Value",value); }\n}\n',
   'cardinality-duplicate':'for (let row=0;row<InputTable.RowCount;row++) {\n  const value=InputTable.Get(row,"Value");\n  OutputTable.Append(); OutputTable.Set("Value",value);\n  OutputTable.Append(); OutputTable.Set("Value",value);\n}\n'
  };
- const source='import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+ const source=f.id==='cardinality-empty'?'import {InputTable,OutputTable} from \"builtIn/Data\";\n// UI-declared Value Integer; deliberately emit no rows.\n':'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
   +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.'+f.js_type+'}]);\n'
   +(body[f.id]??'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n');
-return Object.freeze({id:'native-'+f.id+(f.output_input_rows?'-fixed-rows':'-identity-copy'),schema_mode:'code',source,
+return Object.freeze({id:'native-'+f.id+(f.output_input_rows?'-fixed-rows':'-identity-copy'),schema_mode:f.id==='cardinality-empty'?'declared':'code',source,
   source_sha256:createHash('sha256').update(source).digest('hex')});
 }
 export const nativeRoundtripProbe=javascriptNativeRoundtripProbe();
@@ -56,6 +57,16 @@ export function verifyNativeRoundtripRead(raw,{binding,lifecycle,input,role,civi
   need((input.binding.fixture_id??'real')===fixture.id,'input fixture differs');
   need(['output','upstream'].includes(role)&&binding.roundtrip_role===role,'private read role');
   need(binding.source_sha256===nativeRoundtripProbe.source_sha256,'identity script digest');
+  if(fixture.id==='cardinality-empty'){
+    verifyJavascriptDeclaredEmpty(binding.declaration,binding.declaration_sha256);
+    const done=binding.done_witness;
+    need(binding.schema_mode==='declared'&&done?.status==='sealed'&&done.schema_mode==='declared'
+      &&done.source===nativeRoundtripProbe.source&&done.source_sha256===nativeRoundtripProbe.source_sha256
+      &&done.declaration_sha256===binding.declaration_sha256&&JSON.stringify(done.declaration)===JSON.stringify(binding.declaration)
+      &&typeof done.effect_id==='string'&&!!done.effect_id&&Number.isFinite(done.deadline)
+      &&done.node_id===binding.javascript_node_id,'own sealed declared source/schema required');
+    if(role==='output'){need(binding.javascript_node_id===binding.node_id,'declared output owner');verifyJavascriptZeroAdmission(raw,binding);}
+  }
   if(fixture.type==='datetime'||fixture.output_input_rows){
     if(fixture.type==='datetime')verifyNativeCivil(civil,nativeCivilExpectation(binding,role,fixture.sha256));
     need(binding.completed_child?.execution_id===binding.execution?.execution_id&&binding.execution.status==='completed'
@@ -82,7 +93,7 @@ export function verifyNativeRoundtripRead(raw,{binding,lifecycle,input,role,civi
       &&cell.value===before.value;}), 'roundtrip significant bytes differ');
   }
   return {...exact,contract:'javascript-native-'+fixture.id+'-roundtrip-read-1',fixture_id:fixture.id,role,source_sha256:nativeRoundtripProbe.source_sha256,
-    input_read_id:input.raw.read_id,g5_complete:false,...(fixture.output_input_rows&&role==='output'?{input_row_map:[...fixture.output_input_rows]}:{}),...(characterization?{integer_characterization:characterization}:{})};
+    input_read_id:input.raw.read_id,g5_complete:false,...(fixture.id==='cardinality-empty'?{schema_mode:'declared',declaration:binding.declaration,declaration_sha256:binding.declaration_sha256,...(role==='output'?{zero_admission:raw.zero_admission}:{})}:{}),...(fixture.output_input_rows&&role==='output'?{input_row_map:[...fixture.output_input_rows]}:{}),...(characterization?{integer_characterization:characterization}:{})};
 }
 
 function characterizeOutsideSafeIntegers(exact,input){
@@ -112,6 +123,7 @@ export function verifyNativeRoundtripOutcome(results,fixtureId='real'){
   const output=verifyNativeRoundtripRead(results.output.raw,{binding:results.output.binding,lifecycle:results.output.lifecycle,input,role:'output',civil:results.output.civil});
   const upstream=verifyNativeRoundtripRead(results.upstream.raw,{binding:results.upstream.binding,lifecycle:results.upstream.lifecycle,input,role:'upstream',civil:results.upstream.civil});
   if(fixture.type==='datetime'||fixture.output_input_rows)need(JSON.stringify(input.exact)===JSON.stringify(before.exact),'final frozen civil/native baseline differs');
+  if(fixture.id==='cardinality-empty')need(results.output.binding.javascript_node_id===results.upstream.binding.javascript_node_id&&results.output.binding.declaration_sha256===results.upstream.binding.declaration_sha256,'same declared JS before upstream');
   if(fixture.output_input_rows){
     need(JSON.stringify(output)===JSON.stringify(results.output.exact)&&JSON.stringify(upstream)===JSON.stringify(results.upstream.exact),'stored cardinality proofs differ');
     return {fixture_id:fixture.id,status:'fixed_cardinality_observed',input_exact:true,upstream_exact:true,output_case_exact:true,

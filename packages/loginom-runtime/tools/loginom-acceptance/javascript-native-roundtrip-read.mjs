@@ -13,7 +13,7 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
   need(receipt&&receipt.tab===document.querySelector('[data-tid='+JSON.stringify(b.tab_tid)+']')&&receipt.tab.classList.contains('x-tab-active'),'workflow receipt');
   const captured=globalThis.__loginomJavascriptNativeRoundtripV1?.bindings.get(b.roundtrip_role);
   need(captured?.document===document&&captured.id===b.runtime_binding_id,'private native input binding required');
-  const slice={real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6]}[b.fixture_id??'real'];
+  const slice={real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6],'cardinality-empty':[3,4,0]}[b.fixture_id??'real'];
   const rowCount=b.roundtrip_role==='output'?(slice?.[2]??slice?.[0]):slice?.[0];
   need(Array.isArray(slice)&&b.rows===rowCount&&b.row_count===rowCount&&b.columns.length===1&&b.columns[0]===0
     &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:slice[1]}]),'fixed native slice');
@@ -32,6 +32,8 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
   need(typeof op.id==='string'&&op.id.length>0&&op.id.length<=128,'operation id');
   need(state.used.size<128&&!state.used.has(op.id),'operation id reused or diagnostic session limit');state.used.add(op.id);
   need(!captured.readStarted,'native read binding reused; no replay');
+  if(b.fixture_id==='cardinality-empty'&&b.roundtrip_role==='output')need(op.id===captured.readId,'zero read binding ID');
+  captured.readStarted=true; // Includes the empty loop: one binding has one admitted read.
   state.active=op;
   const deadline=Math.min(Date.now()+timeoutMs,b.deadline);
   let stopPending;
@@ -39,6 +41,13 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
   const timer=setTimeout(()=>op.stop('deadline_exceeded'),timeoutMs);
   const live=()=>{if(Date.now()>=deadline)op.stop('deadline_exceeded');need(op.status==='running',op.status+'; native cancellation unproven');};
   try {
+  const zeroReceipt=(observed,phase)=>({phase,read_id:op.id,fixture_id:b.fixture_id,role:b.roundtrip_role,
+    document_id:b.document_id,workflow_id:b.workflow_id,package_id:b.package_id,node_id:b.node_id,port_guid:b.port_guid,
+    source:{owner:observed.owner,object:observed.object},interface:v(observed.identity,'$I'),source_sha256:b.source_sha256,declaration_sha256:b.declaration_sha256,
+    execution:Object.fromEntries(['execution_id','group_id','process_id','process_record_id'].map(k=>[k,b.completed_child[k]])),
+    subscriptions:b.subscriptions,count_loader_sha256:b.count_loader_sha256,owner_verified:true,process_idle:true,held_identity_verified:true,
+    facts:JSON.parse(observed.zeroFacts)});
+  const zeroBefore=initial.zeroFacts?zeroReceipt(initial,'before'):null;
   const output=[];
   for(let row=b.offset;row<b.offset+b.rows;row++)for(const column of b.columns){
    live();need(maxBytes-op.receivedBytes>=60&&op.serializedBytes<maxBytes,'byte budget before dispatch');need(equal(snapshot()),'stale owner/schema/cache before read');
@@ -46,7 +55,6 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
    const releaseRequest=()=>{if(request){request.Release();request=null;op.releasedRequests++;}};
    const releaseResponse=x=>{if(x){x.Release();op.releasedResponses++;}};
    try{
-    captured.readStarted=true; // Reserve before the first native request; new IDs cannot replay this binding.
     request=session.$M.GetDynamicData();runtime.check(session,request);request.set_StaticDataSize(32);
     request.InitializeMethodCallMessage(initial.owner,initial.object,321,0);
     request.WriteParameter(0,row);request.WriteParameter$a(8,column);
@@ -79,8 +87,8 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
     const cost=new TextEncoder().encode(JSON.stringify(cell)).length+1;need(cost<=maxBytes-op.serializedBytes,'serialized byte budget before append');op.serializedBytes+=cost;output.push(cell);
    } finally {releaseResponse(response);if(!callbackOwns)releaseRequest();}
   }
-  live();need(equal(snapshot()),'final stale binding');
-  const result={empty_count_attested:b.row_count===0,read_id:op.id,workflow_id:b.workflow_id,package_id:b.package_id,method:321,interface:116,document_id:b.document_id,execution:b.execution,node_id:b.node_id,port_guid:b.port_guid,port:0,source:{owner:initial.owner,object:initial.object},row_count:initial.count,schema:b.schema,cells:output,owner_rechecked:true,cache_identity_rechecked:true,consistency:'observed_local_only',atomic_snapshot_verified:false,native_cancellation_supported:false};
+  live();const final=snapshot();need(equal(final),'final stale binding');
+  const result={...(zeroBefore?{zero_admission:{before:zeroBefore,final:zeroReceipt(final,'final')}}:{}),empty_count_attested:!!zeroBefore,read_id:op.id,workflow_id:b.workflow_id,package_id:b.package_id,method:321,interface:116,document_id:b.document_id,execution:b.execution,node_id:b.node_id,port_guid:b.port_guid,port:0,source:{owner:initial.owner,object:initial.object},row_count:initial.count,schema:b.schema,cells:output,owner_rechecked:true,cache_identity_rechecked:true,consistency:'observed_local_only',atomic_snapshot_verified:false,native_cancellation_supported:false};
   need(new TextEncoder().encode(JSON.stringify(result)).length<=maxBytes,'final serialization byte budget');op.status='completed';op.published=true;return result;
   }catch(e){if(op.status==='running')op.status='failed';if(op.requests>0)state.poisoned=true;throw e;}finally{clearTimeout(timer);delete op.stop;state.last=op;state.active=null;}
  },{b,decoder:decode.toString(),options});

@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {javascriptNativeFixture,javascriptNativeReadFixture} from './javascript-native-fixtures.mjs';
 import vm from 'node:vm';
 import {javascriptProbeFailure} from './javascript-mismatch-probe.mjs';
@@ -22,7 +23,7 @@ import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,bindJava
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {readJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus,cancelJavascriptNativeRoundtrip} from './javascript-native-roundtrip-read.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
-export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real',reply,sharedPortGuid}={}){
+export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real',reply,sharedPortGuid,beforeSchema,beforeSource}={}){
   const nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixtureId);
   let mutate,mutateAfter,defer=false;
   const f=await fake({fixtureId,beforeBind:sharedPortGuid?f=>{f.port.FGuid=sharedPortGuid;f.b.port_guid=sharedPortGuid;}:undefined,change:(fixture,response,request)=>{mutate?.();reply?.(fixture,response,request);},deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
@@ -41,15 +42,26 @@ export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,
   beforeGraph?.({f,js,edge,target,output,service,addPortClass});
   const graphProof=await f.page.evaluate(bindJavascriptNativeRoundtripGraph,{node:{node_id:'js'},inputPortGuid:'js-input'});
   const lines=nativeRoundtripProbe.source.split('\n'),doc={firstLine:()=>0,lineCount:()=>lines.length,getLine:i=>lines[i]};
-  const generation={id:'generation'},generationControl={el:{dom:generation},checked:true};
-  const oldGet=f.env.Ext.getCmp;f.env.Ext.getCmp=id=>id==='generation'?generationControl:oldGet(id);
+  const generation={id:'generation'},generationControl={el:{dom:generation},checked:nativeRoundtripProbe.schema_mode==='code'};
+  const declaredRecord={isModel:true,internalId:'declared-1',data:{Name:'Value',DisplayName:'Value',DataType:4,Index:0,Required:false,Broken:false}};
+  const declaredData={items:[declaredRecord]},declaredStore={$className:'Ext.data.Store',getData:()=>declaredData,isLoading:()=>false,getCount:()=>declaredData.items.length,getTotalCount:()=>declaredData.items.length};
+  const declaredElement={id:'declared-grid'},declaredView={el:{dom:declaredElement},getStore:()=>declaredStore};
+  const oldGet=f.env.Ext.getCmp;f.env.Ext.getCmp=id=>id==='generation'?generationControl:id==='declared-grid'?declaredView:oldGet(id);
   const currentPage={isConnected:true,getBoundingClientRect:()=>({width:1,height:1})};
   const root={isConnected:true,getBoundingClientRect:()=>({width:1,height:1}),querySelectorAll:q=>q==='.CodeMirror'
-    ?[{getBoundingClientRect:()=>({width:1,height:1}),CodeMirror:{getDoc:()=>doc}}]:q.includes('DoneWizard')?[currentPage]:[generation]};
+    ?[{getBoundingClientRect:()=>({width:1,height:1}),CodeMirror:{getDoc:()=>doc}}]:q.includes('DoneWizard')?[currentPage]:q.includes('grdTargetColumns')?[declaredElement]:[generation]};
   const card=f.env.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),native={};
   const previousNode=card.Controller.Node.data.node;card.Controller.Node.data.node=native;card.Controller.FController={FView:{el:{dom:root}}};
-  await f.page.evaluate(bindJavascriptNativeRoundtripSchema,{root,native,binding:{native:js,nodeData:js.data},schema:{verified:true,generation:{checked:true,tid:'generation;DisplayEl'}}});
-  await f.page.evaluate(bindJavascriptNativeRoundtripSource,{root,native,binding:{native:js,nodeData:js.data},schema:{verified:true,generation:{checked:true,tid:'generation;DisplayEl'}}});
+  const declaration={fixture_id:'cardinality-empty',schema_mode:'declared',generation:false,apply_verified:true,page_tid:'p;WizrdMCF;JavaScriptColumnsWizard',
+    field:{record_id:'declared-1',name:'Value',label:'Value',type:4,index:0,required:false}};
+  const declaration_sha256=createHash('sha256').update(JSON.stringify(declaration)).digest('hex');
+  const schema={verified:true,generation:{checked:generationControl.checked,tid:'generation;DisplayEl'},
+    ...(fixtureId==='cardinality-empty'?{form:'JavaScriptColumnsWizard',inventory_complete:true,page_tid:declaration.page_tid,declaration,declaration_sha256,
+      grids:[{tid:declaration.page_tid+';grdTargetColumns;tbl',count:1,total:1,fields:[{record_id:'declared-1',...declaredRecord.data}]}]}:{})};
+  beforeSchema?.({schema,generationControl,declaredRecord,declaredStore,declaredData,declaredView});
+  await f.page.evaluate(bindJavascriptNativeRoundtripSchema,{root,native,binding:{native:js,nodeData:js.data},schema});
+  beforeSource?.({schema,generationControl,declaredRecord,declaredStore,declaredData,declaredView});
+  await f.page.evaluate(bindJavascriptNativeRoundtripSource,{root,native,binding:{native:js,nodeData:js.data},schema});
   const context={root,native,binding:{native:js,nodeData:js.data},prefix:'p'};
   const identity={effect_id:'own-done',node_id:'js',source_sha256:nativeRoundtripProbe.source_sha256};
   const before={owner_verified:true,wizard_visible:true,pending:false,page_tid:'p;WizrdMCF;DoneWizard'};
@@ -57,7 +69,7 @@ export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,
   const dispose=(destroy=true)=>{card.Controller.Node.data.node=previousNode;card.Controller.FController=f.model;root.isConnected=false;if(destroy)generationControl.el=null;};
   const confirmation={effect_settled:true,terminal:true,after:{wizard_visible:false,pending:false},no_new_messages:true};
   const seal=(overrides={})=>f.page.evaluate(sealJavascriptNativeRoundtripDone,{identity,confirmation,...overrides});
-  if(wizardOnly)return {f,js,target,output,service,lines,generationControl,context,identity,before,prepare,dispose,seal,confirmation,root};
+  if(wizardOnly)return {f,js,target,output,service,lines,generationControl,declaredRecord,declaredStore,declaredData,declaredView,schema,context,identity,before,prepare,dispose,seal,confirmation,root};
   await prepare();dispose();await seal();
   const child={internalId:5,data:{id:'4.1',Status:3,ErrorDetails:'',ModelNode:js.data},childNodes:[]};
   f.root.childNodes.push({internalId:4,data:{id:'4',Status:3,ErrorDetails:'',loaded:true},childNodes:[child]});
@@ -68,9 +80,14 @@ export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,
   await f.page.evaluate(completeJavascriptNativeRoundtrip,{execution,source_sha256:nativeRoundtripProbe.source_sha256});
   output.FStatus=1;
   const source=f.dc.FDataSource,outputHelper={...f.helper,$FData:{},$FRowCount:javascriptNativeReadFixture(fixtureId,'output').rows},outputDs={...source,$:{...source.$},$FHelper:outputHelper};outputHelper.FBaseProxy=outputDs;
+  if(fixtureId==='cardinality-empty')Object.assign(outputHelper,{$FCacheInitialized:false,$FData:null,$FDataChangeCookie:null,$FStateChangeCookie:null});
   const bind=async role=>{
     const slice=javascriptNativeReadFixture(fixtureId,role);
     f.dt.FTotalRowCount=slice.rows;
+    if(fixtureId==='cardinality-empty'){
+      f.dc.FTotalRowCount=slice.rows;f.store.totalCount=slice.rows;f.store.pageRequests={};
+      Object.assign(f.store.proxy,{FTotalRowCount:slice.rows,FDataFieldNames:['Value'],FValueGetters:[()=>{}],pendingOperations:{}});
+    }
     f.model.FPreviewManager.FPreviewVisible=true;
     const node=role==='output'?js:f.node,port=role==='output'?output:f.port,ds=role==='output'?outputDs:source;
     Object.assign(f.model.FPreviewManager.FPreviewForm,{FCurrentPreviewNode:node,FCurrentPreviewPort:port});
@@ -80,7 +97,7 @@ export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,
       node_id:role==='output'?'js':'n',port_guid:port.FGuid,rows:slice.rows,row_count:slice.rows,
       execution:role==='output'?execution:f.b.execution,completed_child:role==='output'?execution:f.b.completed_child}));
   };
-  const result={f,before:initialRead,js,edge,target,output,service,outputDs,outputHelper,source,child,execution,lines,generationControl,graphProof,bind};
+  const result={f,before:initialRead,js,edge,target,output,service,outputDs,outputHelper,source,child,execution,lines,generationControl,declaredRecord,declaredStore,declaredData,declaredView,schema,graphProof,bind,closeOutput:()=>{f.model.FPreviewManager.FPreviewVisible=false;const entry=f.env.__loginomJavascriptNativeRoundtripV1.bindings.get('output'),facts=entry.zeroCheck();entry.zeroAcknowledge({phase:'javascript_native_zero_graph_verified',read_id:entry.readId,declaration_sha256:entry.initial.declaration_sha256,facts});return facts;}};
   mutate=change?()=>change(result):null;mutateAfter=afterRelease?()=>afterRelease(result):null;defer=deferred;return result;
 }
 test('separate native output and upstream bindings read twelve real/NULL cells without replay',async()=>{
@@ -127,10 +144,11 @@ test('roundtrip rejects expired deadline and insufficient bytes without cell dis
   await assert.rejects(()=>readJavascriptNativeRoundtrip(x.f.page,b,decodeVariantFrame,{operationId:'small',maxBytes:60}),/byte budget/);
   assert.equal(x.f.counters.sent,4);
 });
-for(const fixtureId of ['real','boolean','string','integer-safe','integer-outside-safe','cardinality-keep2','cardinality-odd','cardinality-duplicate'])for(const mode of ['ok','wrong-ack','lost-preview'])test(fixtureId+' roundtrip production journal ACK/disk across actual serialized native read: '+mode,async t=>{
+for(const fixtureId of ['real','boolean','string','integer-safe','integer-outside-safe','cardinality-keep2','cardinality-odd','cardinality-duplicate','cardinality-empty'])for(const mode of (fixtureId==='cardinality-empty'?['ok','wrong-ack','lost-preview','graph-ack','graph-drift']:['ok','wrong-ack','lost-preview']))test(fixtureId+' roundtrip production journal ACK/disk across actual serialized native read: '+mode,async t=>{
   const wrongAck=mode==='wrong-ack';
   const fixture=javascriptNativeFixture(fixtureId),slice=javascriptNativeReadFixture(fixtureId,'output'),x=await roundtrip({fixtureId}),f=x.f;
   f.dt.FTotalRowCount=slice.rows;
+  if(fixtureId==='cardinality-empty'){f.dc.FTotalRowCount=0;f.store.totalCount=0;f.store.pageRequests={};Object.assign(f.store.proxy,{FTotalRowCount:0,FDataFieldNames:['Value'],FValueGetters:[()=>{}],pendingOperations:{}});}
   if(fixture.output_input_rows){f.b.package_id='d:w';x.before.package_id='d:w';}
   f.model.FPreviewManager.FPreviewVisible=true;
   // Select the completed JS Preview without consuming a native role binding.
@@ -149,19 +167,21 @@ for(const fixtureId of ['real','boolean','string','integer-safe','integer-outsid
     node_preview_schema:{verified:true,port_guid:'js-output',port:0,root_tid:'preview',fields:[{name:'Value',label:'Value',type:fixture.type}]}};
   const actions=[],records=[],states=[],operation={id:'roundtrip-test'};
   const run=()=>readNativeRoundtrip({options:{operation,execute:f.execute,now:Date.now,exclusiveNodeOperation:()=>true,receiptOptions:()=>({}),
-    onRecord:async event=>{const saved=await journal(event);records.push(event);if(wrongAck&&event.proof)saved.proof.lifecycle.releasedResponses=slice.rows-1;return saved;}},ctx,input,role:'output',targetOrigin:'http://test',targetBuild:'7.4.2',onState:async state=>states.push(state)},
-    {openPreview:async args=>{assert.equal(args.port.port_guid,'js-output');assert.deepEqual(args.state.ui.elements[0].allowed_actions,[]);actions.push({ref:'private-F3'});},verifyFrontends:async()=>Object.entries(nativeFrontendPins).map(([name,sha256])=>({name,url:'http://test/'+name,sha256})),verifyCountLoaders:()=>({fixture:'count-loader-source'}),
-      createProcedure:()=>({observe:async({ready,condition})=>{if(mode==='lost-preview'&&condition==='native roundtrip Preview schema')throw Error('lost Preview observation');assert.equal(ready(state),true);return state;},perform:async({ready,resolve,identity})=>{assert.equal(ready(state),true);assert.ok(identity());actions.push(resolve(state));}})});
+    onRecord:async event=>{const saved=await journal(event);records.push(event);if(wrongAck&&event.proof)saved.proof.lifecycle.releasedResponses=slice.rows-1;if(mode==='graph-ack'&&event.phase==='javascript_native_zero_graph_verified')saved.phase='wrong';return saved;}},ctx,input,role:'output',targetOrigin:'http://test',targetBuild:'7.4.2',onState:async state=>states.push(state)},
+    {openPreview:async args=>{assert.equal(args.port.port_guid,'js-output');assert.deepEqual(args.state.ui.elements[0].allowed_actions,[]);actions.push({ref:'private-F3'});},verifyFrontends:async()=>Object.entries(nativeFrontendPins).map(([name,sha256])=>({name,url:'http://test/'+name,sha256})),verifyCountLoaders:()=>fixtureId==='cardinality-empty'?{PrepareColumnInfoAndRowCount:'d952415558676c3caf569a51d88bf026e661abdaaf08842d870ddba139730e3f',InitOutput:'c01544ac551e88997f9cea9b62314234ad435bc7632357861cdfc6013e89960e',DataSourceProxyRead:'6206671eaf111d80459c3ed1d5878125ef37918fb1abacc1cd19ce42c7fdf91d'}:{fixture:'count-loader-source'},
+      createProcedure:()=>({observe:async({ready,condition})=>{if(mode==='lost-preview'&&condition==='native roundtrip Preview schema')throw Error('lost Preview observation');assert.equal(ready(state),true);return state;},perform:async({ready,resolve,identity})=>{assert.equal(ready(state),true);assert.ok(identity());actions.push(resolve(state));if(fixtureId==='cardinality-empty'){f.model.FPreviewManager.FPreviewVisible=false;if(mode==='graph-drift')x.outputHelper.$FCacheInitialized=true;}}})});
   if(mode==='lost-preview'){
     await assert.rejects(run,/lost Preview observation/);assert.equal(operation.transportUncertain,true);
     assert.equal(states.at(-1).uncertain,true);assert.deepEqual(actions,[{ref:'private-F3'}]);
     assert.equal(f.counters.sent,fixture.rows);assert.equal(records.some(e=>e.proof),false);return;
   }
   if(wrongAck)await assert.rejects(run,/acknowledgement/);
+  if(mode==='graph-ack'||mode==='graph-drift'){await assert.rejects(run,/zero|Zero/);assert.equal(operation.transportUncertain,true);assert.equal(f.env.__loginomJavascriptNativeRoundtripV1.bindings.get('output').zeroGraphVerified,undefined);assert.equal(f.counters.sent,3);return;}
   if(!wrongAck){const proof=await run();assert.equal(proof.exact.role,'output');
     assert.equal(proof.binding.fixture_id,fixtureId);assert.equal(proof.lifecycle.releasedRequests,slice.rows);assert.equal(proof.lifecycle.releasedResponses,slice.rows);
-    const bad=clone(proof.raw);bad.cells[0].payload[0]=fixture.values[0]===null?5:1;
+    const bad=clone(proof.raw);if(fixtureId==='cardinality-empty'){bad.zero_admission.final.facts.counts.dc=1;assert.equal(f.env.__loginomJavascriptNativeRoundtripV1.bindings.get('output').zeroGraphVerified,true);assert.equal(f.counters.sent,3);}else bad.cells[0].payload[0]=fixture.values[0]===null?5:1;
     assert.throws(()=>verifyNativeRoundtripRead(bad,{binding:proof.binding,lifecycle:proof.lifecycle,input,role:'output'}));}
+  if(fixtureId==='cardinality-empty'&&wrongAck)assert.equal(f.env.__loginomJavascriptNativeRoundtripV1.bindings.get('output').zeroGraphVerified,undefined);
   const lines=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
   assert.deepEqual(lines.find(e=>e.proof).proof,clone(records.find(e=>e.proof).proof));assert.deepEqual(actions.map(a=>a.ref),['private-F3','close']);
   const saved=await journal({authorization:'secret-sentinel'});assert.equal(saved.authorization,'[redacted]');

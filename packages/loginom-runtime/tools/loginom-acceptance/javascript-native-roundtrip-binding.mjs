@@ -1,4 +1,5 @@
-export function javascriptNativeRoundtripSnapshot(b){
+import {captureJavascriptNativeZero} from './javascript-native-zero.mjs';
+export function javascriptNativeRoundtripSnapshot(b,zeroCapture){
   const v=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
   const need=(x,m)=>{if(!x)throw Error('Native input binding: '+m);};
   const cookieClass=v(v(bg,'rpc'),'TIBGDelegateConnectionCookie_Proxy');
@@ -46,7 +47,7 @@ export function javascriptNativeRoundtripSnapshot(b){
     // Subscription metadata, not a data-generation/version counter. Never walk $S.
     return {identity,identityPrototype:Object.getPrototypeOf(identity),value:JSON.stringify([owner,object,type,remoteRefs,refs])};
   };
-  const fixtureId=b.fixture_id??'real',slice={real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6]}[fixtureId];
+  const fixtureId=b.fixture_id??'real',slice={real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6],'cardinality-empty':[3,4,0]}[fixtureId];
   const rowCount=b.roundtrip_role==='output'?(slice?.[2]??slice?.[0]):slice?.[0];
   need(Array.isArray(slice)&&b.rows===rowCount&&b.row_count===rowCount
     &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:slice[1]}]),'fixed native fixture schema/count');
@@ -140,17 +141,26 @@ export function javascriptNativeRoundtripSnapshot(b){
     &&v(helper,'FBaseProxy')===ds&&v(ds,'$S')===node.data.$S,'datasource identity');
   need(v(identity,'$I')===116&&Number.isInteger(v(identity,'$OW'))&&v(identity,'$OW')>=0&&Number.isInteger(v(identity,'$O')),'interface116');
   if(b.source)need(v(identity,'$OW')===b.source.owner&&v(identity,'$O')===b.source.object,'remote source replaced');
-  need(!store.loading&&v(helper,'$FCacheInitialized')===true&&v(helper,'$FData'),'loaded cache');
+  const zero=fixtureId==='cardinality-empty'&&b.roundtrip_role==='output';
+  if(!zero)need(!store.loading&&v(helper,'$FCacheInitialized')===true&&v(helper,'$FData'),'loaded cache');
   const fields=v(v(v(dc,'FColumnInfosStore'),'data'),'items');
   need(Array.isArray(fields)&&fields.length===1,'one field');const field=v(fields[0],'data');
-  need(field.Name==='Value'&&field.DisplayName==='Value'&&field.DataType===slice[1],'fixed native schema');
+  need(v(field,'Name')==='Value'&&v(field,'DisplayName')==='Value'&&v(field,'DataType')===slice[1],'fixed native schema');
   need(v(dt,'FTotalRowCount')===rowCount&&v(helper,'$FRowCount')===rowCount,'fixed native row count');
   const runtime=globalThis.__loginomJavascriptNativeRuntimeV1;
   need(runtime?.document===document&&runtime.binding_id===b.runtime_binding_id,'loaded runtime binding');runtime.check(v(ds,'$S'));
   const dataCookie=v(helper,'$FDataChangeCookie'),stateCookie=v(helper,'$FStateChangeCookie');
-  const dataCookieState=cookie(dataCookie,'d'),stateCookieState=cookie(stateCookie,'s');
+  const cookieState=(key,kind)=>{
+    const descriptor=Object.getOwnPropertyDescriptor(helper,key),observed=descriptor?.value;
+    need(!descriptor||Object.hasOwn(descriptor,'value'),'subscription accessor');
+    if(zero&&observed==null)return {identity:null,identityPrototype:null,value:descriptor?observed===null?'null':'undefined':'missing'};
+    return cookie(observed,kind);
+  };
+  const dataCookieState=cookieState('$FDataChangeCookie','d'),stateCookieState=cookieState('$FStateChangeCookie','s');
+  const declaration=roundtrip.schemaWitness.declaration,declaration_sha256=roundtrip.schemaWitness.declaration_sha256;
+  const zeroState=zero?zeroCapture({dc,dt,ds,store,helper,fields,field,declaration,declaration_sha256}):{};
   if(b.roundtrip_role==='upstream')need(ds===roundtrip.input.ds&&helper===roundtrip.input.helper&&v(helper,'$FData')===roundtrip.input.cache&&fields===roundtrip.input.fields&&field===roundtrip.input.field,'upstream datasource/cache replaced');
-  return {addPortClass,addPortPrototype,addService,roundtrip,prep,receipt,card,model,diagram,nodes,links,node,nodeData:node.data,port,portData:port.data,manager,form,workflow,pack,fields,field,
+  return {...zeroState,declaration,declaration_sha256,addPortClass,addPortPrototype,addService,roundtrip,prep,receipt,card,model,diagram,nodes,links,node,nodeData:node.data,port,portData:port.data,manager,form,workflow,pack,fields,field,
     cookieClass,cookiePrototype,cookieInterface,
     nodePorts,inputCollection,inputPorts,connectionInput:inputPorts[0],variablesInput:inputPorts[1],
     processStore,processRoot,group:groups[0],child:child[0],
@@ -161,27 +171,53 @@ export function javascriptNativeRoundtripSnapshot(b){
     dataCookieValue:dataCookieState.value,stateCookieValue:stateCookieState.value};
 }
 
-export async function bindJavascriptNativeRoundtrip(page,args,snapshot){
-  return page.evaluate(({args,code})=>{
+export async function bindJavascriptNativeRoundtrip(page,args,snapshot,zeroSnapshot){
+  return page.evaluate(({args,code,zeroCode})=>{
     const state=globalThis.__loginomJavascriptNativeRoundtripV1;
     if(!state||state.bindings.has(args.roundtrip_role))throw Error('Roundtrip role already reserved; no replay');
     if(!['output','upstream'].includes(args.roundtrip_role))throw Error('Unknown roundtrip role');
     if(args.roundtrip_role==='upstream'){
       const output=state.bindings.get('output'),read=globalThis.__loginomJavascriptNativeRoundtripReadV1;
-      if(!output||read?.document!==document||read.poisoned||read.active||read.last?.id!==output.readId
+      if(!output||output.initial.zeroFacts&&!output.zeroGraphVerified||read?.document!==document||read.poisoned||read.active||read.last?.id!==output.readId
         ||read.last.status!=='completed'||!read.last.published||read.last.pending!==0
         ||read.last.requests!==output.initial.count||read.last.releasedRequests!==output.initial.count||read.last.releasedResponses!==output.initial.count)throw Error('Completed output read required before upstream');
     }
     state.bindings.set(args.roundtrip_role,null);
-    const capture=eval('('+code+')'),initial=capture(args);
-    state.bindings.set(args.roundtrip_role,{document,id:args.runtime_binding_id,readId:args.binding_id,initial,capture});
-    return {...args,source:{owner:initial.owner,object:initial.object},
+    const base=eval('('+code+')'),zero=eval('('+zeroCode+')'),capture=b=>base(b,zero),initial=capture(args);
+    const zeroCheck=()=>{
+      state.check();
+      if(initial.manager.FPreviewVisible!==false)throw Error('Original graph after zero Preview Close required');
+      const v=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
+      if(v(initial.dc,'FModelNode')!==initial.nodeData||v(initial.ds,'$S')!==initial.nodeData.$S||v(initial.dc,'FDataSource')!==initial.ds||v(initial.dc,'FDataTable')!==initial.dt||v(initial.dt,'FDataSource')!==initial.ds
+        ||v(initial.dt,'FDataSourceStore')!==initial.store||v(initial.zeroProxy,'dataSource')!==initial.ds
+        ||v(initial.ds,'$FHelper')!==initial.helper||v(initial.helper,'FBaseProxy')!==initial.ds||v(initial.ds,'$')!==initial.identity
+        ||v(initial.identity,'$OW')!==initial.owner||v(initial.identity,'$O')!==initial.object||v(initial.identity,'$I')!==116
+        ||v(v(v(initial.dc,'FColumnInfosStore'),'data'),'items')!==initial.fields)throw Error('Zero datasource changed after graph return');
+      for(const [key,cookie,identity,tuple,prototype]of [['$FDataChangeCookie',initial.dataCookie,initial.dataCookieIdentity,initial.dataCookieValue,initial.dataCookieIdentityPrototype],['$FStateChangeCookie',initial.stateCookie,initial.stateCookieIdentity,initial.stateCookieValue,initial.stateCookieIdentityPrototype]]){
+        const d=Object.getOwnPropertyDescriptor(initial.helper,key),c=d?.value;
+        if(d&&!Object.hasOwn(d,'value')||c!==cookie)throw Error('Zero subscription changed after graph return');
+        const current=c==null?(d?c===null?'null':'undefined':'missing'):JSON.stringify([v(v(c,'$'),'$OW'),v(v(c,'$'),'$O'),v(v(c,'$'),'$I'),v(v(c,'$'),'$RRC'),v(c,'$FRefCount')]);
+        if(current!==tuple||c!=null&&(v(c,'$')!==identity||Object.getPrototypeOf(identity)!==prototype||Reflect.ownKeys(identity).length!==4||Reflect.ownKeys(c).length!==3||Object.getPrototypeOf(c)!==initial.cookiePrototype||v(c,'$S')!==v(initial.ds,'$S')))throw Error('Zero cookie identity changed after graph return');
+      }
+      const current=zero(initial);
+      if(!Object.keys(current).every(k=>current[k]===initial[k]))throw Error('Zero held cache/metadata changed after graph return');
+      return JSON.parse(current.zeroFacts);
+    };
+    const zeroAcknowledge=receipt=>{
+      if(receipt?.phase!=='javascript_native_zero_graph_verified'||receipt.read_id!==args.binding_id
+        ||receipt.declaration_sha256!==initial.declaration_sha256||JSON.stringify(receipt.facts)!==JSON.stringify(zeroCheck()))throw Error('Zero graph acknowledgement differs');
+      state.bindings.get('output').zeroGraphVerified=true;
+    };
+    state.bindings.set(args.roundtrip_role,{document,id:args.runtime_binding_id,readId:args.binding_id,initial,capture,...(initial.zeroFacts?{zeroCheck,zeroAcknowledge}:{})});
+    return {...args,source:{owner:initial.owner,object:initial.object},schema_mode:state.schema_mode,javascript_node_id:state.node.FGuid,
+      ...(state.fixture_id==='cardinality-empty'?{declaration:initial.declaration,declaration_sha256:initial.declaration_sha256,done_witness:state.done}:{}),
+      ...(initial.zeroFacts?{subscriptions:{data:initial.dataCookieValue,state:initial.stateCookieValue}}:{}),
       add_port_sources:{constructor:Function.prototype.toString.call(initial.addPortClass)},
       cookie_sources:{constructor:Function.prototype.toString.call(initial.cookieClass),interface:Function.prototype.toString.call(initial.cookieInterface)},
       count_loader_sources:{PrepareColumnInfoAndRowCount:initial.dc.PrepareColumnInfoAndRowCount.toString(),
         InitOutput:initial.dc.InitOutput.toString(),DataSourceProxyRead:initial.store.proxy.read.toString()}};
-  },{args,code:snapshot.toString()});
+  },{args,code:snapshot.toString(),zeroCode:zeroSnapshot.toString()});
 }
 export function javascriptNativeRoundtripCode(args){
-  return `async page=>(${bindJavascriptNativeRoundtrip.toString()})(page,${JSON.stringify(args)},${javascriptNativeRoundtripSnapshot.toString()})`;
+  return `async page=>(${bindJavascriptNativeRoundtrip.toString()})(page,${JSON.stringify(args)},${javascriptNativeRoundtripSnapshot.toString()},${captureJavascriptNativeZero.toString()})`;
 }

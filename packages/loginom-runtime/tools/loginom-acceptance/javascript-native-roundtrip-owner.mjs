@@ -1,7 +1,10 @@
 // Page-local capabilities. Nothing here invokes model methods or remote RPCs.
-export function armJavascriptNativeRoundtrip({binding,source,source_sha256}){
+export function armJavascriptNativeRoundtrip({binding,source,source_sha256,schema_mode}){
   const need=(v,m)=>{if(!v)throw Error('Roundtrip owner: '+m);};
   need(!globalThis.__loginomJavascriptNativeRoundtripV1,'already armed');
+  const mode=binding.fixture_id==='cardinality-empty'?'declared':'code';
+  need(schema_mode===mode,'fixed case mode');
+  if(mode==='declared')need(source==="import {InputTable,OutputTable} from \"builtIn/Data\";\n// UI-declared Value Integer; deliberately emit no rows.\n"&&source_sha256==='0d6cddd9ca40a285c549076429f47f0a1cbf0086f208592ccfefdee98f267d30','fixed declared-empty source');
   const captured=globalThis.__loginomJavascriptNativeInputBindingV1,input=captured?.initial;
   const read=globalThis.__loginomJavascriptNativeInputReadV1;
   need(captured?.document===document&&input&&captured.id===binding.runtime_binding_id
@@ -49,6 +52,7 @@ export function armJavascriptNativeRoundtrip({binding,source,source_sha256}){
   const card=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
   need(card===input.card&&card.Controller.FController===input.model&&input.manager.FPreviewVisible===false,'owned graph after Preview Close');
   globalThis.__loginomJavascriptNativeRoundtripV1={document,input,binding,source,source_sha256,upstream,bindings:new Map(),stage:'armed'};
+  Object.defineProperties(globalThis.__loginomJavascriptNativeRoundtripV1,{schema_mode:{value:mode,enumerable:true},fixture_id:{value:binding.fixture_id??'real',enumerable:true}});
   return {armed:true,input_read_id:binding.read_id,source_sha256};
 }
 
@@ -115,14 +119,53 @@ export function bindJavascriptNativeRoundtripGraph({node,inputPortGuid}){
 export function bindJavascriptNativeRoundtripSchema({root,native,binding,schema}){
   const s=globalThis.__loginomJavascriptNativeRoundtripV1,need=(v,m)=>{if(!v)throw Error('Roundtrip schema: '+m);};
   need(s?.stage==='graph-bound'&&s.node===binding.native&&s.node.data===binding.nodeData,'owned schema stage');s.upstream();
+  const mode=s.fixture_id==='cardinality-empty'?'declared':'code',generated=mode==='code';
+  need(s.schema_mode===mode,'fixed case mode');
   const tab=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=tab.Controller.FController;
   need(tab===s.input.card&&tab.Controller.Node.data.node===native&&model.FView.el.dom===root
-    &&schema.verified===true&&schema.generation?.checked===true,'owned code schema');
+    &&schema.verified===true&&schema.generation?.checked===generated,'owned fixed schema');
   const tid=schema.generation.tid.replace(/;DisplayEl$/,'');
   const controls=[...root.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')],control=controls.length===1&&Ext.getCmp(controls[0].id);
-  need(control?.el?.dom===controls[0]&&control.checked===true,'generation control');
-  s.schemaWitness={root,native,model,control,element:controls[0]};s.stage='schema-bound';
-  return {verified:true,schema_mode:'code'};
+  need(control?.el?.dom===controls[0]&&control.checked===generated,'generation control');
+  const witness={root,native,model,control,element:controls[0],mode};
+  if(!generated){
+    need(schema.inventory_complete===true&&schema.form==='JavaScriptColumnsWizard'&&schema.declaration?.fixture_id===s.fixture_id
+      &&schema.declaration.schema_mode===mode&&schema.declaration.generation===false&&schema.declaration.apply_verified===true
+      &&schema.declaration.page_tid===schema.page_tid&&/^[a-f0-9]{64}$/.test(schema.declaration_sha256),'verified declared Apply witness');
+    const es=[...root.querySelectorAll('[data-tid='+JSON.stringify(schema.page_tid+';grdTargetColumns;tbl')+']')];
+    const view=es.length===1&&Ext.getCmp(es[0].id),store=view?.getStore?.(),data=store?.getData?.(),records=data?.items;
+    need(view?.el?.dom===es[0]&&Array.isArray(records)&&records.length===1,'held declared store/record');
+    const record=records[0],cache=record.data,source=data.getSource?.();
+    const value=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
+    const projection=()=>({record_id:String(record.internalId),name:value(cache,'Name'),label:value(cache,'DisplayName'),
+      type:value(cache,'DataType'),index:value(cache,'Index'),required:value(cache,'Required')});
+    const admitted=JSON.parse(JSON.stringify(schema.declaration));Object.freeze(admitted.field);Object.freeze(admitted);
+    const fingerprint=JSON.stringify(admitted.field),digest=schema.declaration_sha256;
+    const checkDeclared=()=>{
+      need(witness.declaration===admitted&&witness.declaration_sha256===digest,'held declaration identity');
+      need(view.getStore()===store&&store.$className==='Ext.data.Store'&&!store.isBufferedStore&&!store.isLoading()
+        &&store.getData()===data&&data.items===records&&records.length===1&&records[0]===record&&record.data===cache&&record.isModel===true
+        &&store.getCount()===1&&store.getTotalCount()===1&&data.getSource?.()===source
+        &&(!source||source.items?.length===1&&source.items[0]===record),'same complete declared store');
+      const f=projection();need(f.name==='Value'&&f.label==='Value'&&f.type===4&&f.index===0&&typeof f.required==='boolean'
+        &&value(cache,'Broken')!==true&&JSON.stringify(f)===fingerprint,'same declared Value field');
+    };
+    Object.assign(witness,{declaration:admitted,declaration_sha256:digest});checkDeclared();
+    const schemaField=schema.grids?.find(g=>g.tid===schema.page_tid+';grdTargetColumns;tbl');
+    need(schemaField?.count===1&&schemaField.total===1&&schemaField.fields?.length===1
+      &&schemaField.fields[0].record_id===admitted.field.record_id,'complete UI declaration association');
+    Object.assign(witness,{view,store,data,records,record,cache,checkDeclared,declaration:admitted,declaration_sha256:schema.declaration_sha256});
+  }
+  witness.check=()=>{
+    need(s.schema_mode===mode&&control.checked===generated&&control.el?.dom===witness.element,'same generation mode');
+    witness.checkDeclared?.();
+  };
+  witness.checkSurviving=()=>{
+    if(control.el?.dom)witness.check();
+    else if(witness.store&&!witness.store.destroyed&&!witness.store.isDestroyed)witness.checkDeclared();
+  };
+  witness.check();s.schemaWitness=witness;s.stage='schema-bound';
+  return {verified:true,schema_mode:mode,...(!generated?{declaration:witness.declaration,declaration_sha256:witness.declaration_sha256}:{})};
 }
 
 export function bindJavascriptNativeRoundtripSource({root,native,binding,schema}){
@@ -130,21 +173,24 @@ export function bindJavascriptNativeRoundtripSource({root,native,binding,schema}
   need(s?.stage==='schema-bound'&&s.node===binding.native&&s.node.data===binding.nodeData,'owned JS source');s.upstream();
   const tab=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
   need(tab===s.input.card&&tab.Controller.Node.data.node===native&&tab.Controller.FController.FView.el.dom===root
-    &&schema.verified===true&&schema.generation?.checked===true,'owned code schema');
+    &&schema.verified===true&&schema.generation?.checked===(s.schema_mode==='code'),'owned fixed schema');
   const witness=s.schemaWitness,control=witness.control;
   need(root===witness.root&&native===witness.native&&tab.Controller.FController===witness.model
-    &&control.checked===true&&control.el?.dom===witness.element,'same applied code mode');
+    &&control.checked===(s.schema_mode==='code')&&control.el?.dom===witness.element,'same applied fixed mode');
+  witness.check();
+  if(s.schema_mode==='declared')need(schema.declaration_sha256===witness.declaration_sha256&&JSON.stringify(schema.declaration)===JSON.stringify(witness.declaration),'same declared source association');
   const editors=[...root.querySelectorAll('.CodeMirror')].filter(e=>e.getBoundingClientRect().width&&e.getBoundingClientRect().height);
   need(editors.length===1,'one source editor');const cm=editors[0].CodeMirror,doc=cm.getDoc();
-  const admittedSource=s.source,admittedDigest=s.source_sha256;
-  const read=()=>{need(s.source===admittedSource&&s.source_sha256===admittedDigest,'admitted source changed');need(control.checked===true&&control.el?.dom===witness.element,'code-generation changed');need(cm.getDoc()===doc&&doc.firstLine()===0&&doc.lineCount()>=1&&doc.lineCount()<=32,'source identity');
+  const admittedSource=s.source,admittedDigest=s.source_sha256,admittedMode=s.schema_mode,admittedDeclaration=witness.declaration_sha256;
+  const read=()=>{need(s.source===admittedSource&&s.source_sha256===admittedDigest,'admitted source changed');need(s.schema_mode===admittedMode&&witness.declaration_sha256===admittedDeclaration,'fixed declaration changed');witness.check();need(cm.getDoc()===doc&&doc.firstLine()===0&&doc.lineCount()>=1&&doc.lineCount()<=32,'source identity');
     return Array.from({length:doc.lineCount()},(_,i)=>doc.getLine(i)).join('\n');};
   need(read()===s.source,'exact source readback');
   let applied;
   const verify=()=>{
     if(!applied)return read();
     need(s.done===applied&&applied.source===admittedSource&&applied.source===s.source&&applied.source_sha256===admittedDigest&&applied.source_sha256===s.source_sha256
-      &&applied.schema_mode==='code'&&['done-sealed','execution-reserved','completed'].includes(s.stage),'sealed source/mode changed');
+      &&applied.schema_mode===admittedMode&&applied.declaration_sha256===admittedDeclaration&&s.schema_mode===admittedMode&&witness.declaration_sha256===admittedDeclaration&&['done-sealed','execution-reserved','completed'].includes(s.stage),'sealed source/mode changed');
+    if(admittedMode==='declared')witness.checkSurviving();
     return applied.source;
   };
   const seal=receipt=>{
@@ -152,7 +198,7 @@ export function bindJavascriptNativeRoundtripSource({root,native,binding,schema}
     applied=Object.freeze({...receipt,status:'sealed'});s.done=applied;s.stage='done-sealed';
   };
   s.sourceWitness={doc,read,verify,seal};s.stage='source-bound';
-  return {verified:true,source_sha256:s.source_sha256,schema_mode:'code'};
+  return {verified:true,source_sha256:s.source_sha256,schema_mode:s.schema_mode,...(witness.declaration?{declaration:witness.declaration,declaration_sha256:witness.declaration_sha256}:{})};
 }
 
 // A live wizard attestation is reserved immediately before the one gesture.
@@ -172,9 +218,9 @@ export function prepareJavascriptNativeRoundtripWizard({context,before,identity,
   need(pages.length===1,'same visible page');s.upstream();need(s.sourceWitness.read()===s.source,'source changed before gesture');
   if(stage==='done'){
     s.pendingDone=Object.freeze({effect_id:identity.effect_id,node_id:identity.node_id,source_sha256:s.source_sha256,
-      source:s.source,schema_mode:'code',deadline});s.stage='done-prepared';
+      source:s.source,schema_mode:s.schema_mode,...(w.declaration?{declaration:w.declaration,declaration_sha256:w.declaration_sha256}:{}),deadline});s.stage='done-prepared';
   }
-  return {verified:true,stage,effect_id:identity.effect_id,node_id:identity.node_id,source_sha256:s.source_sha256,schema_mode:'code'};
+  return {verified:true,stage,effect_id:identity.effect_id,node_id:identity.node_id,source_sha256:s.source_sha256,schema_mode:s.schema_mode,...(w.declaration?{declaration:w.declaration,declaration_sha256:w.declaration_sha256}:{})};
 }
 
 export function sealJavascriptNativeRoundtripDone({identity,confirmation}){
@@ -182,7 +228,7 @@ export function sealJavascriptNativeRoundtripDone({identity,confirmation}){
   const receipt=s?.pendingDone,w=s?.schemaWitness;
   need(s?.document===document&&s.stage==='done-prepared'&&receipt&&Date.now()<receipt.deadline,'one pending Done within deadline');
   need(['effect_id','node_id','source_sha256'].every(k=>identity?.[k]===receipt[k])
-    &&receipt.source===s.source&&receipt.source_sha256===s.source_sha256&&receipt.schema_mode==='code','prepared source/mode/identity');
+    &&receipt.source===s.source&&receipt.source_sha256===s.source_sha256&&receipt.schema_mode===s.schema_mode&&receipt.declaration_sha256===w.declaration_sha256&&receipt.declaration===w.declaration,'prepared source/mode/identity');
   need(confirmation?.effect_settled===true&&confirmation.terminal===true&&confirmation.after?.wizard_visible===false
     &&confirmation.after.pending===false&&!confirmation.after.boundary_refusal&&confirmation.no_new_messages===true,'confirmed original Done required');
   const tab=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
@@ -191,9 +237,10 @@ export function sealJavascriptNativeRoundtripDone({identity,confirmation}){
   // If the original control survives, it must still agree. A disposed control
   // is accepted only at this matched, settled Done -> original-graph boundary.
   if(w.control.el?.dom)need(s.sourceWitness.read()===receipt.source,'surviving source/mode changed');
+  if(s.schema_mode==='declared')w.checkSurviving();
   s.checkGraph();s.sourceWitness.seal(receipt);s.check();
   return {verified:true,effect_id:receipt.effect_id,node_id:receipt.node_id,source_sha256:receipt.source_sha256,
-    schema_mode:'code',basis:'live_pre_done_attestation_and_confirmed_own_done_graph',execution_from_wizard:'ambiguous'};
+    schema_mode:s.schema_mode,...(w.declaration?{declaration:w.declaration,declaration_sha256:w.declaration_sha256}:{}),basis:'live_pre_done_attestation_and_confirmed_own_done_graph',execution_from_wizard:'ambiguous'};
 }
 
 export function completeJavascriptNativeRoundtrip({execution,source_sha256}){

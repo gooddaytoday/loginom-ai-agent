@@ -240,6 +240,31 @@ const fixtures={
       2,
       2
     ]
+  },
+  "cardinality-empty": {
+    "id": "cardinality-empty",
+    "file": "javascript-native-input-cardinality.csv",
+    "rows": 3,
+    "columns": 1,
+    "bytes": 12,
+    "sha256": "10dd7b1596d2eab4d6145699462eb2cc7c30508f78d4c5b2760c207dbb427dd5",
+    "type": "integer",
+    "native_type": 4,
+    "js_type": "Integer",
+    "data_kind": "Дискретный",
+    "values": [
+      "1",
+      "2",
+      "3"
+    ],
+    "expected_bytes": [
+      "0100000000000000",
+      "0200000000000000",
+      "0300000000000000"
+    ],
+    "output_values": [],
+    "output_rows": 0,
+    "output_input_rows": []
   }
 };
 for(const f of Object.values(fixtures)){Object.freeze(f.values);Object.freeze(f.expected_bytes);Object.freeze(f.output_values);Object.freeze(f.output_input_rows);Object.freeze(f);}
@@ -249,7 +274,7 @@ export function javascriptNativeFixture(id='real'){
 }
 
 // Host-owned fixed case/role resolver. No request can supply an arbitrary count,
-// row map, schema or script. Empty/declared remains outside this admission.
+// row map, schema or script. Canonical empty uses only its fixed declared-mode probe.
 export function javascriptNativeReadFixture(id='real',role='input'){
   if(!['input','output','upstream'].includes(role))throw Error('Unknown native read role');
   const f=javascriptNativeFixture(id);
