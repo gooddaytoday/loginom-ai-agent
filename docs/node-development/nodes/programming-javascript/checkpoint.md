@@ -16,6 +16,29 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Cardinality keep2 PASS; odd выполняется
+
+Source75/profile57 keep2 завершён terminal exit0 (session87717),
+OBSERVED/native-roundtrip-observed. Независимо проверены точные INPUT[1,2,3],
+OUTPUT[2], upstream[1,2,3]: **7cells/618journalrefs/192pins**. Проверены counts3/1/3,
+исходный upstream child, fresh own JS execution, runtime/source/owner/cache,
+pre-JS baseline и final ACK. Digest baseline пересчитан Node crypto: совпал.
+Original cleanup3/3, browser CLOSED, recovery не нужен.
+Report SHA `e9fc4f08cdb01db2918f730327e0c9f28c30e7720d6d034b22b4ea6f5f387b21`.
+JS SHA `4e0a74f97964576de2bd9500d4f6babe9c0255132ca1bb281b1e4d043ca76043`.
+Private audit-cardinality-live.py SHA
+`296da05603580716eaf822f55b68005009f231162f52f15cc3d680634325228c`;
+verification/source/test receipts сохранены вне Git.
+
+После проверки cleanup назначен fresh profile58 и отдельно начат
+native-cardinality-odd-probe-01, source75, headed DISPLAY=:1, sandbox=true,
+terminal session66016. Browser lease RUNNING. Продолжать ту же сессию до terminal;
+не повторять запуск. Ожидаются OUTPUT[1,3], native counts3/2/3 и8cells.
+Duplicate ещё не запускался. UI declared-empty/nativezero, G5/public handler/CLI
+остаются открыты; observed_local не доказывает server snapshot или отсутствие ABA.
+
+
+
 ### Source75 проверен; keep2 live запущен
 
 OpenViking health и actor find повторно успешны. Freeze75 проверен root:

@@ -1,6 +1,7 @@
 # JavaScript native cardinality — bounded proposal
 
-Статус: **дизайн проверен root; первый этап реализации назначен, live cardinality не выполнен**.
+Статус: **source75 реализовал непустые случаи; keep2 независимо проверен live, odd выполняется; duplicate и declared-empty не проверены live**.
+Актуальные evidence и границы — в [checkpoint](checkpoint.md). Описание исходных ограничений ниже относится к source74 перед реализацией.
 Source74 HEAD `cb3e608baac8ca9f0270540ac4c65e7930d08d21`.
 Координатор сообщил terminal OBSERVED для Date roundtrip02/source74/profile56:
 independent 9 native + 9 civil / 1025 refs / 190 pins PASS, baseline matched,
