@@ -571,22 +571,77 @@ function executionNotificationFixture() {
   Object.assign(Toast.prototype,{$className:'Ext.window.Toast',closeOnMouseOut:false,hideDuration:500});
   const toast=new Toast();Object.assign(toast,{el:{dom:element},autoClose:true,autoCloseDelay:23000});
   const node={FGuid:'js',data:{},FCell:{}},workflow={},container={},graph={container};
-  const diagram={FNodes:{FCollection:[node]},FmxGraph:graph},model={FDiagram:diagram};
+  const form={...element,id:'model-form',classList:{contains:c=>c==='bg-mask-message'},contains:e=>e===container,
+    getAttribute:k=>k==='data-tid'?'MF;TF-1;ModelForm':k==='bg-mask-text'?'Загрузка':null};
+  const view={el:{dom:form}},diagram={FNodes:{FCollection:[node]},FmxGraph:graph},model={FDiagram:diagram,FView:view};
+  class MaskContext {}
+  MaskContext.ElementSymb=Symbol('MaskWithText');
+  const mask=new MaskContext();Object.assign(mask,{FElement:form,FController:view,FIsActive:true,FSequence:['Загрузка'],FCurrent:0});
+  view[MaskContext.ElementSymb]=mask;
   const controller={FController:model,Node:{data:{node:workflow}}},tab={Controller:controller};
-  const state={dialogs:[element],masks:[]};
-  const document={querySelectorAll:s=>s.startsWith('.x-mask')?state.masks:state.dialogs};
-  const binding={document,tab,controller,model,diagram,graph,container,native:node,nodeData:node.data,cell:node.FCell,workflow,node:{id:'js'}};
-  const realm=vm.createContext({document,location:{origin:'http://logi-test-plan.bg.local'},getComputedStyle:()=>({display:'block',visibility:'visible'}),
-    Ext:{window:{Toast},getCmp:()=>toast},bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>tab}}}}}}}});
+  const state={dialogs:[element],masks:[],now:0};
+  const document={querySelectorAll:s=>s.startsWith('.x-mask')?state.masks:s.startsWith('[data-tid=')?[form]:state.dialogs};
+  const binding={document,tab,controller,model,view,form,diagram,graph,container,native:node,nodeData:node.data,cell:node.FCell,workflow,node:{id:'js',tid:'MF;TF-1;Graph;JavaScript'}};
+  const realm=vm.createContext({document,performance:{now:()=>state.now},location:{origin:'http://logi-test-plan.bg.local'},getComputedStyle:()=>({display:'block',visibility:'visible'}),
+    Ext:{window:{Toast},getCmp:id=>id===form.id?view:toast},bg:{ext:{AfterElementTextMaskContext:MaskContext},
+      app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>tab}}}}}}}});
   const run=(fn,args)=>vm.runInContext('('+fn.toString()+')',realm)(args);
-  return {binding,state,toast,node,element,run,read:()=>run(inspectJavascriptExecutionNotifications,{binding})};
+  return {binding,state,toast,node,element,form,view,mask,MaskContext,run,read:()=>run(inspectJavascriptExecutionNotifications,{binding})};
 }
 
 test('post-execution notification waits for natural disappearance without claiming toast ownership',()=>{
   const f=executionNotificationFixture(),before=f.read();assert.equal(before.ready,false);
   assert.equal(before.execution_dispatched,true);assert.equal(before.execution_completed,false);
   assert.equal(before.notification_owner_verified,false);assert.equal(before.auto_close_delays[0],23000);
-  f.state.dialogs=[];assert.equal(f.read().ready,true);
+  f.state.dialogs=[];assert.equal(f.read().ready,false);f.state.now+=500;assert.equal(f.read().ready,true);
+});
+
+test('post-execution owned ModelForm busy may publish its first toast before stable quiet',()=>{
+  const f=executionNotificationFixture();f.state.dialogs=[];f.state.masks=[f.form];
+  const busy=f.read();assert.equal(busy.ready,false);assert.equal(busy.owned_busy,true);
+  assert.equal(busy.mask_target_tid,'MF;TF-1;ModelForm');assert.equal(f.binding.executionNotifications.toasts,null);
+  // One empty poll between mask and toast is not yet quiet admission.
+  f.state.masks=[];assert.equal(f.read().ready,false);f.state.now=250;
+  f.state.dialogs=[f.element];const toast=f.read();assert.equal(toast.ready,false);assert.equal(toast.notification_count,1);
+  assert.equal(toast.quiet_for_ms,null);assert.equal(toast.notification_owner_verified,false);
+  f.state.dialogs=[];assert.equal(f.read().ready,false);f.state.now+=499;assert.equal(f.read().ready,false);
+  f.state.now++;assert.equal(f.read().ready,true);
+});
+
+test('post-execution native busy proof rejects foreign target, inactive/replaced cache and modal mixtures',()=>{
+  for(const change of [f=>f.state.masks=[{...f.form}],f=>f.mask.FElement={},f=>f.mask.FController={},
+    f=>f.mask.FIsActive=false,f=>f.mask.FSequence=[],f=>f.mask.FCurrent=1,f=>f.mask.FSequence=['Foreign'],
+    f=>delete f.view[f.MaskContext.ElementSymb],f=>f.view[f.MaskContext.ElementSymb]={...f.mask},
+    f=>f.binding.model.FView={},f=>f.form.contains=()=>false,f=>f.state.masks.push(f.element),
+    f=>f.state.dialogs=[{...f.element,getAttribute:()=> 'msgbox'}]]){
+    const f=executionNotificationFixture();f.state.dialogs=[];f.state.masks=[f.form];change(f);assert.throws(()=>f.read());
+  }
+});
+
+test('post-execution busy observes current native cache and never invokes mask getters or methods',()=>{
+  const f=executionNotificationFixture();f.state.dialogs=[];f.state.masks=[f.form];assert.equal(f.read().owned_busy,true);
+  // The proof follows the current native context cache, not a stale mask DOM snapshot.
+  const next=new f.MaskContext();Object.assign(next,f.mask);f.view[f.MaskContext.ElementSymb]=next;
+  assert.equal(f.read().owned_busy,true);
+  for(const key of ['FController','FElement','FIsActive','FSequence','FCurrent']){
+    const g=executionNotificationFixture();g.state.dialogs=[];g.state.masks=[g.form];let calls=0;
+    Object.defineProperty(g.mask,key,{get(){calls++;throw Error('mask getter');}});
+    assert.throws(()=>g.read());assert.equal(calls,0);
+  }
+});
+
+test('owned busy-to-toast-to-quiet uses one bounded wait without resetting the original deadline',async()=>{
+  const f=executionNotificationFixture();f.state.dialogs=[];f.state.masks=[f.form];let waits=0;
+  const records=[],deadline=Date.now()+5000;
+  const page={evaluate:async(fn,args)=>f.run(fn,args),waitForFunction:async(fn,args,options)=>{
+    waits++;assert.ok(options.timeout<=5000);assert.equal(f.run(fn,args),false);
+    f.state.masks=[];f.state.dialogs=[f.element];assert.equal(f.run(fn,args),false);
+    f.state.dialogs=[];assert.equal(f.run(fn,args),false);f.state.now=500;assert.equal(f.run(fn,args).ready,true);
+    return {dispose:async()=>{}};
+  }};
+  assert.equal((await waitJavascriptExecutionNotifications(page,{binding:f.binding,deadline,record:async r=>records.push(r)})).ready,true);
+  assert.equal(waits,1);assert.equal(records[0].owned_busy,true);assert.equal(records.at(-1).owned_busy,false);
+  assert.ok(records.every(r=>r.deadline===deadline));
 });
 
 test('post-execution wait rejects foreign dialogs, busy masks, changed owners and unsupported lifecycle',()=>{
@@ -615,7 +670,8 @@ test('post-execution settlement is passive, bounded and preserves dispatched evi
     const page={evaluate:async(fn,args)=>f.run(fn,args),waitForFunction:async(fn,args,options)=>{
       waits++;assert.ok(options.timeout>0&&options.timeout<=5000);assert.equal(options.polling,250);
       if(fail)throw Error('original wait timed out');
-      f.state.dialogs=[];assert.equal(f.run(fn,args).ready,true);return {dispose:async()=>disposed++};
+      f.state.dialogs=[];assert.equal(f.run(fn,args),false);f.state.now+=500;
+      assert.equal(f.run(fn,args).ready,true);return {dispose:async()=>disposed++};
     }};
     const promise=waitJavascriptExecutionNotifications(page,{binding:f.binding,deadline,record:async r=>records.push(r)});
     if(fail)await assert.rejects(promise,/timed out/);else assert.equal((await promise).ready,true);
@@ -625,11 +681,13 @@ test('post-execution settlement is passive, bounded and preserves dispatched evi
   }
 });
 
-test('post-execution expired budget cannot start a wait and no notification needs no wait',async()=>{
+test('post-execution no-notification path still requires stable quiet and expired budget cannot wait',async()=>{
   const f=executionNotificationFixture();f.state.dialogs=[];let reads=0,waits=0;
-  const page={evaluate:async(fn,args)=>{reads++;return f.run(fn,args);},waitForFunction:async()=>{waits++;throw Error('unexpected wait');}};
+  const page={evaluate:async(fn,args)=>{reads++;return f.run(fn,args);},waitForFunction:async(fn,args)=>{
+    waits++;assert.equal(f.run(fn,args),false);f.state.now+=500;assert.equal(f.run(fn,args).ready,true);return {dispose:async()=>{}};
+  }};
   assert.equal((await waitJavascriptExecutionNotifications(page,{binding:f.binding,deadline:Date.now()+5000,record:async()=>{}})).ready,true);
-  assert.equal(waits,0);reads=0;
+  assert.equal(waits,1);reads=0;waits=0;
   await assert.rejects(waitJavascriptExecutionNotifications(page,{binding:f.binding,deadline:Date.now()-1,record:async()=>{}}),/deadline/);
   // One final diagnostic read is allowed after refusal, never a wait or gesture.
   assert.equal(reads,1);assert.equal(waits,0);

@@ -54,8 +54,31 @@ export function inspectJavascriptExecutionNotifications({binding:b,poll=false}) 
     throw Error('Post-execution original native graph changed');
   const visible=e=>e.isConnected&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0
     &&getComputedStyle(e).visibility!=='hidden'&&getComputedStyle(e).display!=='none';
+  const formTid=b.node.tid?.split(';Graph;')[0]+';ModelForm',view=own(b.model,'FView'),form=own(own(view,'el'),'dom');
+  const forms=[...document.querySelectorAll('[data-tid='+JSON.stringify(formTid)+']')];
+  if(!view||view!==b.view||!form||form!==b.form||forms.length!==1||forms[0]!==form
+    ||globalThis.Ext?.getCmp?.(form.id)!==view||!form.contains(b.container)||!visible(form))
+    throw Error('Post-execution original ModelForm view changed');
   const masks=[...document.querySelectorAll('.x-mask,.bg-mask-message,.x-mask-msg')].filter(visible);
-  if(masks.length)throw Error('Post-execution busy or modal mask remains');
+  let busyContext=null;
+  if(masks.length){
+    const type=globalThis.bg?.ext?.AfterElementTextMaskContext,symbol=own(type,'ElementSymb');
+    const context=typeof symbol==='symbol'?own(view,symbol):null;
+    if(masks.length!==1||masks[0]!==form||!form.classList.contains('bg-mask-message')
+      ||typeof type!=='function'||!(context instanceof type))
+      throw Error('Post-execution foreign busy or modal mask');
+    const sequence=own(context,'FSequence'),index=own(context,'FCurrent');
+    if(own(context,'FElement')!==form||own(context,'FIsActive')!==true
+      ||own(context,'FController')!==view
+      ||!Array.isArray(sequence)||sequence.length<1||sequence.length>64
+      ||!Number.isInteger(index)||index<0||index>=sequence.length)
+      throw Error('Post-execution ModelForm mask cache unconfirmed');
+    const values=Array.from({length:sequence.length},(_,i)=>own(sequence,String(i)));
+    if(values.some(v=>v!==null&&typeof v!=='string')||typeof values[index]!=='string'
+      ||form.getAttribute('bg-mask-text')!==values[index])
+      throw Error('Post-execution ModelForm mask sequence changed');
+    busyContext=context;
+  }
   const dialogs=[...document.querySelectorAll('[role="dialog"],.x-message-box,.x-toast')].filter(visible);
   if(dialogs.length>4)throw Error('Post-execution notification count exceeded');
   const toasts=dialogs.map(element=>{
@@ -70,18 +93,27 @@ export function inspectJavascriptExecutionNotifications({binding:b,poll=false}) 
       throw Error('Post-execution foreign dialog or unsupported notification lifecycle');
     return {element,control,delay};
   });
-  if(!b.executionToasts)b.executionToasts=toasts;
-  if(toasts.some(t=>!b.executionToasts.some(p=>p.element===t.element&&p.control===t.control&&p.delay===t.delay)))
+  const settlement=b.executionNotifications??(b.executionNotifications={toasts:null,quietSince:null});
+  // Do not pin an empty toast inventory while launch is still settling. A
+  // native busy phase may finish by publishing its first notification.
+  if(toasts.length&&!settlement.toasts)settlement.toasts=toasts;
+  if(toasts.some(t=>!settlement.toasts.some(p=>p.element===t.element&&p.control===t.control&&p.delay===t.delay)))
     throw Error('Post-execution notification replaced during passive wait');
-  const result={ready:toasts.length===0,native_owner_verified:true,node_id:b.node.id,
+  const blocked=masks.length>0||toasts.length>0;
+  if(blocked)settlement.quietSince=null;
+  if(!blocked&&settlement.quietSince===null)settlement.quietSince=performance.now();
+  const quietFor=settlement.quietSince===null?null:performance.now()-settlement.quietSince;
+  const result={ready:!blocked&&quietFor>=500,native_owner_verified:true,node_id:b.node.id,
+    owned_busy:!!busyContext,mask_count:masks.length,mask_target_tid:busyContext?formTid:null,
     notification_count:toasts.length,auto_close_delays:toasts.map(t=>t.delay),notification_owner_verified:false,
+    quiet_for_ms:quietFor,
     execution_dispatched:true,execution_completed:false};
   return poll?(result.ready?result:false):result;
 }
 
 export async function waitJavascriptExecutionNotifications(page,{binding,deadline,record}) {
-  // Message.js caps auto-close at 60s; Ext Toast fades for another 500ms.
-  // Retain the caller's deadline; this phase never extends execution's budget.
+  // One budget covers owned busy -> notification -> quiet, without resetting
+  // on transitions. Message.js auto-close is capped at 60s plus a 500ms fade.
   const until=Math.min(deadline,Date.now()+61500),args={binding};
   const inspect=()=>page.evaluate(inspectJavascriptExecutionNotifications,args);
   try{
@@ -427,7 +459,9 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
         ||found.length!==1||!found[0].data||found[0].FIconCls!=='bg-vendor-icon-javascript')throw Error('Private JS graph binding unavailable');
       const shape=diagram.FmxGraph.view.getState(found[0].FCell)?.shape?.node,tid=shape?.getAttribute('data-tid');
       if(!tid||!shape.isConnected||!diagram.FmxGraph.container.contains(shape))throw Error('Private JS graph shape unavailable');
-      return {document,tab,controller:tab.Controller,model:tab.Controller.FController,diagram,graph:diagram.FmxGraph,container:diagram.FmxGraph.container,
+      return {document,tab,controller:tab.Controller,model:tab.Controller.FController,
+        view:tab.Controller.FController.FView,form:tab.Controller.FController.FView?.el?.dom,
+        diagram,graph:diagram.FmxGraph,container:diagram.FmxGraph.container,
         native:found[0],cell:found[0].FCell,workflow:owner.workflow,nodeData:found[0].data,node:{id:node.node_id,tid},icon:found[0].FIconCls};
     },{owner:workflowOwner,node});
     return binding;
