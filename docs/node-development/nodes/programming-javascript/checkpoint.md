@@ -16,6 +16,35 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Boolean roundtrip PASS; отдельный string probe01 запущен
+
+Source71/profile50 native-boolean-roundtrip-probe-01 завершён OBSERVED,
+work_stage native-roundtrip-observed, session66890 terminal exit0.
+Original package_closed/logged_out/browser_closed=true. Независимый scalar
+и association audit **9/9cells на3стадиях PASS**, NULL/false/true exact native
+теги/байты. Проверены570journal refs,81sourcepins, input fixtureSHA, JS sourceSHA,
+completed own execution, same upstream execution и lifecycle3/3 каждой стадии.
+Final verified event и три Preview-close events присутствуют. ReportSHA
+`9bbc781462360fccb38933d67bd55f60ccd66870609b5396ba97ca131c01a12f`;
+private native-boolean-roundtrip-probe-01-verification.json сохранён.
+
+При аудите v1 сравнивал целиком compact initial raw.execution и full upstream
+execution, поэтому отказал из-за формы. Наблюдение: initial binding.completed_child
+полностью совпадает с full upstream raw.execution, execution_id/status прежние.
+Отдельный v2 oracle проверяет именно это, сохраняя все scalar/schema/ID проверки;
+старый v1 сохранён. v2 SHA f1034198f3fe20a8b947de80387fc0298edd5a248cb2b71129c894783ef14ece,
+positive live-data и7negative association mutationsPASS. Значения/ожидания
+fixture не менялись. Ownership/runtime receipts проверяются отдельно от oracle.
+Это private boolean slice, не весьG5/public handler/CLI; observed_local/ABA остаются.
+
+После confirmed cleanup profile50 сохранён, назначен fresh profile51 под lock.
+String native-string-roundtrip-probe-01 запущен headed DISPLAY=:1/sandbox на тех
+же81проверенных pins, source receipt сохранён. Unified exec session **6459**
+running, lease RUNNING. Не повторять unknown effects/не открывать второй browser.
+String INPUT/JS/OUTPUT/upstream ещё не подтверждены; при изменении quoted empty,
+Unicode или multiline importer должен отказать до JS, expected не подгонять.
+
+
 ### Freeze71 проверен root; headed boolean probe01 запущен
 
 Source node-javascript `0115eccd20` закрепляет18 runtime/test/CSV файлов.
