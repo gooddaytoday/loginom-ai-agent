@@ -631,7 +631,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     },
     async executeNode(node,operationDeadline=deadline) {
       const executionDeadline=Math.min(deadline,operationDeadline);
-      const driver=createNodeExecutionProcedure(channel(node,executionDeadline),node);
+      const driver=createNodeExecutionProcedure(channel(node,executionDeadline),node,{verifyFailedChild:true});
       const baseline=await driver.prepare();
       const binding=await privateGraphBinding(node);
       try {

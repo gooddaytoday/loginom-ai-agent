@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {captureExecutionBaseline,identifyNewExecution,verifyCompletedExecution,selectExecutionChild} from '../lib/node-execution-evidence.mjs';
+import {captureExecutionBaseline,identifyNewExecution,verifyCompletedExecution,selectExecutionChild,verifyFailedExecution,selectFailedExecutionChild,verifyFailedChildExecution} from '../lib/node-execution-evidence.mjs';
 const node={document_id:'document',workflow_id:'workflow',node_id:'node'};
 const process=(id,parent=null)=>({process_id:id,parent_id:parent,record_id:'record-'+id,state:'completed',error:false,rendered:true,selected:parent!==null,children_loaded:true});
 const snapshot=(...ps)=>({verified:true,inventory_complete:true,show_completed:true,root_id:'root',node_context:{verified:true,...node},processes:ps});
@@ -95,4 +95,59 @@ test('failed launch retains its native group and reason without claiming that th
   x=>x.processes[1].progress_state.terminal=false,x=>x.processes[1].progress_state.can_cancel=true,x=>x.processes[1].progress_state.source='caption']){
   const bad=structuredClone(s);change(bad);assert.throws(()=>verifyFailedExecution(e,bad));
  }
+});
+
+function failedChildFixture(){
+  const s=structuredClone(next),e=identifyNewExecution(captureExecutionBaseline(initial,node),s);
+ s.node_context.surface='graph';
+ const failed={state:'pending_or_failed',error:true,progress_state:{verified:true,state:'failed',terminal:true,can_cancel:false,source:'native_progress_record'}};
+ Object.assign(s.processes[1],structuredClone(failed),{error_details:'Aggregated dependency error'});
+ Object.assign(s.processes[2],structuredClone(failed),{error_details:'Own JS error',owner:{...nativeOwner}});
+ const child=selectFailedExecutionChild(e,s),show={...owner,node:{...node,verified:true,surface:'graph'}};
+ return {s,e,child,show};
+}
+
+test('failed child proof uses native owner and own error, while ordinary group receipt stays unowned',()=>{
+ const {s,e,child,show}=failedChildFixture();
+ const result=verifyFailedChildExecution(e,s,child,show);
+ assert.equal(result.owner_verified,true);assert.equal(result.process_id,'2.1');assert.equal(result.process_record_id,'record-2.1');
+ assert.equal(result.error.message,'Own JS error');assert.equal(result.error_source,'native_child_error_details');assert.equal(result.output_refreshed,false);
+ const ordinary=verifyFailedExecution(e,s);assert.equal(ordinary.owner_verified,undefined);assert.equal(ordinary.error.message,'Aggregated dependency error');
+});
+
+for(const [name,change] of Object.entries({
+ upstream_only:f=>delete f.s.processes[2].owner,
+ single_foreign_child:f=>f.s.processes[2].owner.node_id='upstream',
+ caption_owner:f=>f.s.processes[2].owner.source='caption',
+ unverified_owner:f=>f.s.processes[2].owner.verified=false,
+ parent_failed:f=>f.s.processes[2].progress_state.state='parent_failed',
+ nonterminal:f=>f.s.processes[2].progress_state.terminal=false,
+ cancellable:f=>f.s.processes[2].progress_state.can_cancel=true,
+ unverified_state:f=>f.s.processes[2].progress_state.verified=false,
+ forged_state_source:f=>f.s.processes[2].progress_state.source='toast',
+ completed_state:f=>f.s.processes[2].state='completed',
+ no_error:f=>f.s.processes[2].error=false,
+ group_only_error:f=>f.s.processes[2].error_details='',
+ changed_error:f=>f.s.processes[2].error_details='Different error',
+ unloaded:f=>f.s.processes[1].children_loaded=false,
+ duplicate_owner:f=>f.s.processes.push({...f.s.processes[2],process_id:'2.2',record_id:'other',selected:false}),
+ stale_group:f=>f.e.group_id='1',
+ replaced_group:f=>f.s.processes[1].record_id='replaced',
+ replaced_child:f=>f.s.processes[2].record_id='replaced',
+ changed_process:f=>f.s.processes[2].process_id='2.2',
+ foreign_parent:f=>{f.s.processes[2].parent_id='1';f.s.processes[2].process_id='1.1';},
+ replaced_root:f=>f.s.root_id='replaced',
+ nongraph_inventory:f=>f.s.node_context.surface='wizard',
+ unselected:f=>f.s.processes[2].selected=false,
+ multiple_selected:f=>f.s.processes[1].selected=true,
+ unrendered:f=>f.s.processes[2].rendered=false,
+ show_wrong_node:f=>f.show.node.node_id='other',
+ show_wrong_workflow:f=>f.show.node.workflow_id='other',
+ show_wrong_process:f=>f.show.process_id='2.2',
+ show_wrong_record:f=>f.show.record_id='other',
+ show_unverified:f=>f.show.verified=false,
+ show_unselected:f=>f.show.node_selected=false,
+ show_not_graph:f=>f.show.node.surface='wizard',
+}))test('failed child proof rejects '+name,()=>{
+ const f=failedChildFixture();change(f);assert.throws(()=>verifyFailedChildExecution(f.e,f.s,f.child,f.show));
 });

@@ -702,7 +702,7 @@ test('production executeNode waits after one launch before identify and never re
     const driver={prepare:async()=>{steps.push('prepare');return {};},launchGraph:async()=>{steps.push('launch');return {verified:true};},
       identify:async()=>{steps.push('identify');return {};},waitCompleted:async()=>{steps.push('terminal');return {verified:true};}};
     const operator=vm.runInNewContext('({'+source.slice(start,end)+'})',{
-      deadline:limit,createNodeExecutionProcedure:()=>driver,channel:()=>({}),privateGraphBinding:async()=>binding,
+      deadline:limit,createNodeExecutionProcedure:(channel,node,options)=>{assert.equal(options.verifyFailedChild,true);return driver;},channel:()=>({}),privateGraphBinding:async()=>binding,
       page:{evaluate:async()=>({node:{id:'js'},icon:'js'})},selectJavascriptForSettings:async()=>steps.push('select'),
       once:async(id,identity,action)=>{steps.push('once');return action();},record:async r=>steps.push(r.phase),
       waitJavascriptExecutionNotifications:async(page,args)=>{assert.equal(args.binding,binding);assert.equal(args.deadline,limit);
