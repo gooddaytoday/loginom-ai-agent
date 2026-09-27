@@ -16,6 +16,27 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### A-getcolumn-index: setup failure, новый прогон profile76
+
+Original42738 terminal exit1: prepare-typed-input / NODE_APPLY_STOPPED,
+таймаут `bound import settings available`. Execution import not_requested;
+JS execution_probe отсутствует, в journal нет JS launch. Cleanup3/3 и отсутствие
+pinned Chromium подтверждены. Пользователь сообщил случайный клик в браузере;
+это внешнее вмешательство со слов пользователя, причинная связь отдельно не доказана.
+Исходный FAILED report сохранён; кейс не принят и код не изменён.
+
+OpenViking health/find успешны. После проверки1265pins и SHA Node/Chromium
+начат fresh headed/sandbox run profile76, evidence
+native-named-getcolumn-index-probe-02, **original session80206 RUNNING**.
+Ждать именно эту session до terminal; затем cleanup и независимый аудит.
+A2/8 accepted, G5/общая цель остаются открыты.
+
+Developer corrective design-only turn01a0e483-3aa1-79b3-b30b-85d1b7aa2d42
+завершился failed до работы: Codex usage limit (wait_threads authoritative).
+Нового attribution design нет. Source83 commit562f8ffebf8f остаётся замороженным;
+исторический bootstrap из revision59 не является выполнением design assignment.
+
+
 ### A-get-exact PASS; A-getcolumn-index RUNNING
 
 A-get-exact/profile74 original15883 terminal exit0/CHARACTERIZED,cleanup3/3.
