@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze57: filename fix проверен адресно; full-suite subprocess stall — 2026-09-27
+
+Причина native-input-probe-01 воспроизведена на прежнем source: `javascript` в
+TID файловой ячейки ошибочно попадает под editor deny. Fix ограничен readonly TD
+с совпадающим именем внутри уникального active FileStorage grid; name/id/editor,
+href/sensitive и freshness/hit-test guards сохранены. Root independently PASS:
+4 targeted workspace +15 downloader,66 pins unchanged. Private receipt:
+operator57-root-targeted-test-source.json. Полный suite не подменён этими тестами.
+
+Исходный child full workspace (handle28387) застопорился в тесте independent
+journal comparison: Node1755428 ожидал spawnSync, Python1758311 — json.load(stdin),
+оба процесса подтверждены root через /proc; stdout оставался пуст. После отдельного
+receipt operator57-full-test-stall.json root отправил SIGTERM только точному
+owned Python child. Python вышел, исходный Node продолжил работу; его terminal
+ещё ожидается. Прогон не считать PASS. Причина транспорта пока не установлена;
+разработчику поручен bounded harness fix без skip/ослабления journal_equal oracle.
+
+Fresh profile35 назначен с backup/reassignment receipt, profile34 сохранён.
+Браузер закрыт, нового live не было. Следующий шаг — actual terminal/full-test
+result, исправление harness при необходимости, freeze и headed native probe.
+
+
 ### Native-input-probe-01: stale download gesture до импорта — 2026-09-27
 
 Source56/profile34 завершён exit1 FAILED на prepare-typed-input. Upload дошёл до
