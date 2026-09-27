@@ -16,6 +16,23 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Engine-probe-03 Cyrillic lower PASS; upper запущен — 2026-09-27
+
+Source55/profile31 engine-literal-lower:exit0 OBSERVED,original cleanup ALL PASS.
+Root проверил871 journalSHA,30 input cells,один fresh completed JS execution,
+exact source1512b3e1fb9afed66bd864435646ff9e2248bcc4fbdc323288e3ffc299349c91,
+полную1×1 Result:string='абвёж' из литералаАБВЁЖ и42/42 unchanged source hashes.
+ReportSHA1e990ad99911d9aa3dc3afe1170bf2306c4fef03d81b28bf5677a3c947bbe65d.
+Journal/oracle receipts сохранены; engine-profile.json:3observed UI passes,
+27not_checked,native bytes/G5 не закрыты. Independent fixed-engine auditor
+дополнен заранее вычисляемым Python CSV/Unicode oracle для будущего input-text.
+
+После terminal/cleanup freshprofile32 назначен с backup/receipt;profile31 сохранён.
+Engine-probe-04 --discovery-probe engine-literal-upper запущен на source55,
+headed DISPLAY=:1,sandbox enabled. Ожидание:Result:string='АБВЁЖ' изабвёж.
+На момент записи RUNNING; текущий процесс не перезапускался.
+
+
 ### Engine-probe-02 Unicode trim PASS; lower запущен — 2026-09-27
 
 Source55/profile30 engine-literal-trim:exit0 OBSERVED,original cleanup ALL PASS.
