@@ -16,6 +16,19 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Fix76 назначен: диагностика selection blocker без изменения допуска
+
+Проверен и сохранён [source-backed дизайн](selection-blocker-design.md).
+Initial-open caller — javascript-live.mjs, не reopen openJavascriptWizard.
+Первый failing inspect должен сохранить bounded snapshot blocker в момент отказа;
+поздний catch/screenshot не заменяет его. Root разрешил только такую диагностику,
+строгую проверку journal ACK, новые regression tests и freeze76. Никаких ожиданий,
+повторных кликов, ослабления unknown/foreign mask guard или предположений о причине.
+Developer active; runtime после source75 может меняться. Браузер CLOSED, profile59
+сохранён. Следующий fresh odd запуск — только после idle/freeze76/root tests.
+
+
+
 ### Cardinality duplicate PASS
 
 Source75/profile59 native-cardinality-duplicate-probe-01 завершён terminal exit0
