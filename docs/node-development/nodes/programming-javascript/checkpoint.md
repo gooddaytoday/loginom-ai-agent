@@ -16,6 +16,39 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch43: field readback доказан; picker требует отдельного trigger — 2026-09-27
+
+Root-аудит962 journalSHA, два input6×5/60cells. После единственного edtName fill
+DOM уже ObservedID, caches ещё COL1; следующее пассивное чтение через~120ms
+подтвердило равенство DOM/value/rawValue. edtDisplayName затем буквально равен
+ObservedID во всех трёх представлениях: fill пропущен, отсутствие dispatch
+проверено независимо. Placeholder был пуст. Это подтверждает fix43 на этом
+поле; точное потерянное значение label42 задним числом не восстановлено.
+Diagnostic helper source380UTF-8bytes доступен, root пересчитал SHA
+`daeceef6c069503ca2de4963d1e2ab6f401bfc2830279c73756a91f6e71b5d51`;
+это wrapper, создающий AssociatedFieldsCustom, а не полная реализация класса.
+
+Затем один schema-type-open-0 щёлкнул тело combo. Root сделал только readonly
+X11 screenshot активного headed DISPLAY=:1 (Pillow ImageGrab): поле типа
+в фокусе, список закрыт. option.waitFor ошибочно использует остаток общего30min
+deadline. Чтобы не тратить оставшееся время на закрытый picker, root оформил
+private operator-abort receipt и завершил исключительно свой browser PID после
+проверки executable/profile/parent. Первая попытка проверки argv отказала без
+сигнала (Chrome хранит cmdline одной строкой); после корректного разбора проверка
+прошла, SIGTERM выполнен. Дополнительных UI gestures/повтора click не было.
+Original runner terminal exit1/CLEANUP_UNCONFIRMED, package/logout=false,
+browser_closed=true; отказ cleanup из-за закрытой page. Это операторское
+прерывание, не spontaneous browser crash и не доказательство Cancel settlement.
+
+Отдельный headed recovery43 на profile16, без downloads: packages0,
+logout/browser PASS, packageMutation=false. Lease закрыта, freshprofile17 назначен
+и отсутствует. Прежняя developer-задача получила fix44: exact own native picker
+trigger вместо тела combo, отдельный bounded opening, diagnostics и single effect.
+Exact Ext source onTriggerClick103120 и workspace-ui comboPart2028 (`trg_picker`)
+переданы как источники. Source43 сохранён в166d01077c; field/Cancel43 guards не
+подлежат ослаблению. Preview/Execute declared здесь ещё не выполнены, G2/G3 открыты.
+
+
 ### Freeze43: исходники закоммичены, адресный live запущен — 2026-09-27
 
 Root получил окончательный handoff и независимо выполнил72 tests PASS:
