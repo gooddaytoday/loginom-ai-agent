@@ -389,5 +389,24 @@ cookie=null не доказывает завершённый rollback. Нужн�
 Получены referenced Uses.js скрипты mscorlib/SysUtils/rtl.imp; отдельные manifests
 в private calibration-wizard-source87. ss.Exception использует _message,
 _innerException и _error, тогда как BG AggregateException — FInnerExceptions.
-Тождество ss.Exception и global Exception этим не установлено; поддержка одной
-структуры не должна выдаваться за полноту произвольного native exception.
+Эти три файла сами по себе не устанавливают тождество ss.Exception и global
+Exception; оно дополнительно проверено ниже. Поддержка одной структуры не должна
+выдаваться за полноту произвольного native exception.
+
+
+Root получил referenced `bg/js/bg.mscorlib.js`, SHA
+`a5b62e7dff9920b13b02b9affad6995316df6c6ae191fc078648a987950c4550`.
+Строки29–103 добавляют prototype accessors и выбирают `ns.Exception=ss.Exception`,
+если присутствует get_stack; он определён в полученном mscorlib.js.
+Независимый offline Node VM прогон полного retained mscorlib и точного bridge
+initialization prefix подтвердил alias и own keys экземпляра:
+`_message`, `_innerException`, `_error`. message/name/innerException/stack находятся
+на prototype как accessors; `_error` содержит browser stack. Evidence:
+`calibration-wizard-source87/root-exception-storage-vm.json` с hashes обоих файлов
+и выполненного prefix. Это не запуск Loginom или Chakra.
+
+Промежуточный source88 snapshot с allowlist только message/name/stack и
+FInnerExceptions отказал бы реальному этому storage. Root направил замечание в
+работающую задачу: поддержать подтверждённый backing storage без вызова getters,
+закрепить prototype/method identity и добавить regression на vendor constructors,
+а неизвестные структуры по-прежнему явно отвергать. Финальный фикс ещё не принят.

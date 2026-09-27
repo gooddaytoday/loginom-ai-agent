@@ -15,6 +15,18 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source88 intermediate review: actual Exception backing storage established
+
+Root получил referenced bg.mscorlib.js и независимо выполнил retained mscorlib+
+bridge initialization prefix в offline Node VM. Exception===ss.Exception;
+own _message/_innerException/_error, public fields prototype accessors.
+Intermediate source88 plain-field allowlist не поддерживает эту реальную форму;
+конкретное замечание с source hashes отправлено в текущую задачу. Evidence:
+calibration-wizard-source87/root-exception-storage-vm.json; design §10 дополнен.
+Это не live Loginom/Chakra и не final source88 acceptance. Developer active
+revision19; новые browser runs отсутствуют.
+
+
 ### Source88 active; configure cancellation source path independently checked
 
 Root подтвердил по TabForm.DoConfigureNode callback: Close/Cancel передают cancel
