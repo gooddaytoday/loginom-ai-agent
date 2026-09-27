@@ -97,3 +97,7 @@ Batch55 использует source commit `67628e1c82bc0ab58241acbd96e43db979f0
 Открыты установление эффектов Next/Done, безопасная обработка несовместимой schema
 в публичном контракте, другие строки G3 и проверки G5–G7. Успех отдельных наблюдений
 не повышает готовность реестра и не заменяет автономную CLI-приёмку.
+
+Профиль отдельных engine/type probes ведётся в [engine-profile.json](engine-profile.json).
+Он отделён от G2-сводки и runtime knowledge manifest; непроверенные cases остаются
+not_checked, а UI-proof не повышается до native byte roundtrip.
