@@ -16,6 +16,20 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Integer coercion string-invalid01: independent characterization PASS
+
+Source82/profile69 original session53900 terminal exit0, CHARACTERIZED,
+cleanup3/3. Root live auditor PASS:3 native cells,559 journal refs,1259 pins.
+Native String «not-an-integer» INPUT/upstream exact; OUTPUT schema Integer1×1,
+native NULL/tag1. Это не Integer0 и не failed execution. Report SHA
+e56fe58eb78f1fdcdbf6f05ee40a5dc78741ddace477dce5f3fbb59686918d9a;
+baseline SHAebaa997a87000815e751a2280a667e34a13bdb880ad8bba4c16ccba51c6f281a.
+Evidence native-integer-coercion-string-invalid-probe-01 и verification.json.
+Matrix4 characterized/3 not_run; общий parsing/invalid string rule не выводится
+из одного значения. Browser CLOSED/no pinned Chromium; fresh profile70
+зарезервирован для NaN candidate из exact native Real+0 через0/0.
+
+
 ### Integer coercion string-invalid01 RUNNING
 
 Source82 unchanged/1259 pins повторно проверены; original exec session53900

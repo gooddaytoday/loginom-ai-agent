@@ -248,7 +248,7 @@ Source `87332cec9804c761465dad766f989fb458c4d997`, pinned Loginom frontend7.4.2.
 29aa1bd6c1f9c0de7b2436607fa0860264201a8699ab27b86092147faa461c93.
 Это characterization одного fixed case; никакой общий rounding/truncation
 алгоритм и внутренний механизм ChakraCore не объявляются доказанными.
-Матрица3/7 characterized, остальные4 not_run. Подробности и актуальное
+Матрица4/7 characterized, остальные3 not_run. Подробности и актуальное
 продолжение — [checkpoint](checkpoint.md); full G5/handler/CLI не закрыты.
 
 Отдельный fraction-negative01/profile67 на том же source: native Real−1.75
@@ -261,3 +261,9 @@ INPUT/upstream exact, Integer OUTPUT−1 (ffffffffffffffff). Root audit3 cells,
 1259 pins,cleanup3/3; report SHA
 396ab09e70812da53ad804a5e9257950a4bda83127874392265b6232cd6dc562.
 Общий parsing algorithm по этому одному строковому значению не устанавливается.
+
+Отдельный string-invalid01/profile69: native String «not-an-integer» INPUT/upstream
+exact; successful JS terminal и Integer1×1 OUTPUT с native NULL/tag1, не ноль.
+Root audit3 cells,559 refs,1259 pins,cleanup3/3; report SHA
+e56fe58eb78f1fdcdbf6f05ee40a5dc78741ddace477dce5f3fbb59686918d9a.
+Это конкретное наблюдение, не универсальное правило для всех неверных строк.
