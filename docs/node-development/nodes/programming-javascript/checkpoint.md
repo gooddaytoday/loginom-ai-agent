@@ -16,6 +16,32 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Empty04 source81: независимый declared-empty roundtrip PASS
+
+Original session68506 terminal exit0, OBSERVED/native-roundtrip-observed,
+profile65/DISPLAY=:1/headed/sandbox. Cleanup package/logout/browser — все true;
+browser lease CLOSED. Root audit-cardinality-empty-live79-v2.py terminal exit0:
+**6 native cells, counts [3,0,3],655 journal refs,1245 source pins**.
+INPUT/upstream точно [1,2,3]; OUTPUT0 с UI-declared Value Integer, generation=false.
+Проверены исходная аттестация до JS, source/свежий execution/owner, zero counts,
+interface116, schema/declaration, отсутствие cell RPC у пустого результата,
+завершение/releases/pending, graph ACK и последующее чтение исходного узла.
+Renamed JS:_Value положительно классифицирован native JavaScript;
+публичные действия по output запрещены. Source81 устранил наблюдённый Items отказ.
+
+Report SHA `7e12ac20d5495432fa899a9afabfe7e03cc6fc236b3673f6ed95522395752efc`.
+Fixed JS SHA `0d6cddd9ca40a285c549076429f47f0a1cbf0086f208592ccfefdee98f267d30`.
+Baseline SHA `1d6a71ed7d1f01407df1e4cdf72d7b11b19af987ce3153af7b1689f2f12fec1e`.
+Private receipt native-cardinality-empty-probe-04-verification.json.
+Все4 fixed cardinality cases теперь имеют отдельные independent live proofs,
+суммарно33nativecells. Это private bounded admission, не весь G5, public handler,
+CLI или server snapshot; unobserved ABA limitation сохраняется.
+
+Следующий этап: source-only проектирование отдельных Integer coercion случаев
+fraction/string/NaN/±Infinity по плану. Разработчик получил поручение дизайн,
+без runtime edits/browser. Exact integer oracle не расширяется автоматически.
+
+
 ### Source81 independently PASS; empty04 headed RUNNING
 
 Developer full client завершился202 file PASS/9 file FAIL; исходные failures и

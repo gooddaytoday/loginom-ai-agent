@@ -234,7 +234,9 @@ outside-safe probe отдельно показал 9007199254740993 →900719925
 [1,2,3] →[1,1,2,2,3,3] (12 native cells), с неизменным upstream. Source77
 подтвердил odd: [1,2,3] →[1,3] (8 native cells), original upstream также точен.
 Предыдущие odd01/02 отказы до JS source сохранены как отдельные неуспешные runs.
-UI declared-empty/nativezero (см. [дизайн отдельных случаев](native-cardinality-design.md)),
+Source81/empty04 подтвердил UI declared-empty/nativezero: [1,2,3] →[] →[1,2,3],
+6 native cells,655 refs,1245 pins; все4 private cardinality cases проверены
+(см. [дизайн отдельных случаев](native-cardinality-design.md)).
 Integer coercion и весь G5 остаются открыты,
 точные доказательства и ограничения — в checkpoint. В G5 ограниченными случаями установить
 Integer coercion для fraction/string/NaN/±Infinity; exact integer oracle

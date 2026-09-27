@@ -1,6 +1,6 @@
 # JavaScript native cardinality — bounded proposal
 
-Статус: **source75 реализовал непустые случаи; keep2 и duplicate на source75, odd на source77 независимо проверены live; обязательный declared-empty реализован в Fix78; empty01 подтвердил UI schema и Execute, но отказал перед Preview, OUTPUT0 ещё не проверен**.
+Статус: **все4 фиксированных случая независимо проверены live: keep2/duplicate source75, odd source77, UI-declared empty source81/empty04. Всего33nativecells. Это private bounded evidence, не полный G5/public handler/CLI. Предыдущие отказы сохранены.**
 Актуальные evidence и границы — в [checkpoint](checkpoint.md). Описание исходных ограничений ниже относится к source74 перед реализацией.
 Source74 HEAD `cb3e608baac8ca9f0270540ac4c65e7930d08d21`.
 Координатор сообщил terminal OBSERVED для Date roundtrip02/source74/profile56:
