@@ -21,6 +21,9 @@ real/NULL, boolean, string, safe int64 и двух canonical Date значени
   12cells/620refs;192pins. OUTPUT соответственно[2] и[1,1,2,2,3,3], INPUT/upstream
   [1,2,3] неизменны. Root1146main+3deny+11Python PASS. Odd/profile58 остановлен
   до JS source по visible blocker выбора узла, его OUTPUT не проверен.
+- Source77 `f297b74d03`: odd03/profile61,8cells/625refs/193pins, OUTPUT[1,3],
+  INPUT/upstream[1,2,3] точны; initial opening lifecycle/journal проверены.
+  Root1207main+3deny+11Python PASS. Старые odd01/02 не объявляются успешными.
 
 Original cleanup3/3 подтверждён у каждого перечисленного прогона, включая
 остановленный odd. Его отказ не является проверкой JavaScript результата.
@@ -29,7 +32,7 @@ inequality. Source74 исправил её: один output0 GUID встреча
 принадлежность проверяется полным контекстом node/port/source/execution.
 Runtime/source seals, native ownership и single-use guards сохранены.
 
-Следующие проверки: оставшийся odd cardinality и пустой OUTPUT с UI declared-схемой,
+Следующие проверки: пустой OUTPUT с UI declared-схемой,
 Integer coercion и оставшаяся матрица плана. INPUT нельзя заменять JS-генератором
 или менять expected под поведение импорта. Atomic server snapshot и отсутствие
 unobserved ABA не доказаны. [Date/civil дизайн](native-datetime-design.md)

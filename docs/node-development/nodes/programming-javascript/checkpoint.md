@@ -16,6 +16,31 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Odd03 PASS; обязательный declared-empty назначен
+
+Source77/profile61 native-cardinality-odd-probe-03 terminal exit0 (session42834),
+OBSERVED/native-roundtrip-observed. Независимо подтверждены INPUT[1,2,3],
+OUTPUT[1,3], upstream[1,2,3]: **8cells/625journalrefs/193pins**, counts3/2/3,
+ordered native signed64 bytes. Проверены immutable baseline (hash пересчитан),
+original upstream child, own fresh JS execution/source, native ownership/cache,
+pre-JS/final ACK и initial opening lifecycle/journal before schema binding.
+Report SHA `4dabb48a23aeb25aca768f81334e3cfe9083c9e2a5e45855a5ebfe0cb0c72f12`.
+JS SHA `56e4401c5e8e8a899e97fcfffeea88f6df6270115f7fb3c9976391d48a069508`.
+Original cleanup3/3, browser CLOSED, profile61 сохранён, recovery не нужен.
+Diagnostic point/blocker events отсутствуют: новая ветка отказа live не проверена,
+причины odd01/odd02 по этому успеху не установлены.
+
+Все3непустых cases теперь подтверждены: keep2/duplicate source75 и odd source77,
+всего27native cells в отдельных fresh runs. Это не закрывает0rows/J08/fullG5.
+Fix78 назначен прежней задаче по принятому native-cardinality-design.md:
+canonical cardinality-empty только UIdeclared Value integer/generation=false,
+fixed source без AssignColumns/Append/Set, strict zero native schema/count/cache/
+idle attestation before/final, no cellRPC, single-use lifecycle0 и originalupstream3.
+Code-empty не заменяет эту проверку. Runtime теперь может меняться; следующий
+браузер только после frozen handoff/root checks. Public handler иCLI ещё открыты.
+
+
+
 ### Source77 проверен; odd03 выполняется
 
 Freeze77 root independently: **1207main+3public-deny+11Python PASS**,193pins

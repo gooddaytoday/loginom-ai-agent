@@ -24,8 +24,8 @@ source-read без исполнения и отдельное declared-зада�
 официальной справки, приложенного системного справочника и e2e-репозитория.
 Обработчика JavaScript в текущем runtime нет. Живое исследование мастера продолжается в Ubuntu headed-браузере; private
 пробы подтвердили real/boolean/string/safe-int64 и Date civil/native identity,
-а также keep2/duplicate cardinality с сохранением исходных данных и отдельно
-изменение точности outside-safe int64. Odd и UI declared-empty ещё не подтверждены. Доказательства и ограничения — в [checkpoint](checkpoint.md).
+а также keep2/odd/duplicate cardinality с сохранением исходных данных и отдельно
+изменение точности outside-safe int64. UI declared-empty ещё не подтверждён. Доказательства и ограничения — в [checkpoint](checkpoint.md).
 Разработка публичного обработчика, сборка кандидата и автономная CLI-приёмка
 ещё не завершены.
 Состояния реализации, аналитической проверки, интеграции и выпуска в реестре

@@ -231,8 +231,9 @@ outside-safe probe отдельно показал 9007199254740993 →900719925
 подтвердил Date identity:9native+9civil observations, NULL и обе canonical даты
 с миллисекундами сохранены; epoch/timezone не установлены. Source75 подтвердил
 кардинальности keep2: [1,2,3] →[2] (7 native cells) и duplicate:
-[1,2,3] →[1,1,2,2,3,3] (12 native cells), с неизменным upstream. Odd пока
-не проверен: первый run остановлен до JS source на visible blocker выбора узла.
+[1,2,3] →[1,1,2,2,3,3] (12 native cells), с неизменным upstream. Source77
+подтвердил odd: [1,2,3] →[1,3] (8 native cells), original upstream также точен.
+Предыдущие odd01/02 отказы до JS source сохранены как отдельные неуспешные runs.
 UI declared-empty/nativezero (см. [дизайн отдельных случаев](native-cardinality-design.md)),
 Integer coercion и весь G5 остаются открыты,
 точные доказательства и ограничения — в checkpoint. В G5 ограниченными случаями установить
