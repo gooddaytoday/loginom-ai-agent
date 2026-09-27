@@ -3,7 +3,7 @@ import {expandOutputChanges} from './output-mapping-changes.mjs';
 
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const mappingControl=(s,suffix)=>{
-  const tids=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','TuneDataSourceMappingWizard','DerivedDataSourceMappingEngineOutputPortWizard'].map(form=>s.wizard.root_tid+';'+form+';'+suffix);
+  const tids=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','TuneDataSourceMappingWizard','DerivedDataSourceMappingEngineOutputPortWizard'].map(form=>s.wizard.root_tid+';'+form+';'+suffix);
   const controls=s.ui.elements.filter(e=>tids.includes(e.tid)&&e.allowed_actions.includes('click'));
   if(controls.length!==1)throw Error('Unique output mapping control unavailable');
   return controls[0];
@@ -140,7 +140,7 @@ export async function reorderOutputFields(channel,recordIds) {
   const baseline=state.node_mapping;
   if(!Array.isArray(recordIds)||recordIds.length!==baseline.target_fields.length||new Set(recordIds).size!==recordIds.length
     ||recordIds.some(id=>!baseline.target_fields.some(f=>f.record_id===id)))throw Error('Reorder requires every native output record exactly once');
-  const grouped=['DerivedDataSourceOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard'].includes(baseline.mapping_wizard);
+  const grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard'].includes(baseline.mapping_wizard);
   if(grouped) {
     if(baseline.target_fields.some(f=>typeof f.excluded!=='boolean'))throw Error('Native output groups required for reorder');
     const excluded=new Set(baseline.target_fields.filter(f=>f.excluded).map(f=>f.record_id));
