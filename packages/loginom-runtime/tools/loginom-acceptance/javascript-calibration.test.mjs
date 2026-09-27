@@ -1,3 +1,4 @@
+import {beginCalibrationWizard,readCalibrationWizard,finishCalibrationWizardObservation,checkCalibrationWizardBaseline} from './javascript-calibration-wizard.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
@@ -14,6 +15,7 @@ import {verifyNamedFailureOutcome,verifyNamedFailureWitness} from './javascript-
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {runJavascriptOperator} from './javascript-live.mjs';
 import {armJavascriptNativeRoundtrip,prepareJavascriptNativeRoundtripWizard} from './javascript-native-roundtrip-owner.mjs';
+import {waitJavascriptStageObservation,javascriptStageTerminal} from './javascript-stage-observer.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
 const clone=x=>JSON.parse(JSON.stringify(x)),clean={package_closed:true,logged_out:true,browser_closed:true};
 const k2='Error: JS_CAL_K2_SYNC_V1\n   at Anonymous function (<main>:4:1)\n   at module (<main>:1:1)';
@@ -75,13 +77,17 @@ for(const text of ['source: throw new Error("JS_CAL_K2_SYNC_V1");',k2.replace('4
 for(const id of javascriptCalibrationIds)for(const fault of ['none','foreign','stale','source','not-visible','pending'])test(id+' serialized wizard capture '+fault,async()=>{
  const x=await roundtrip({fixtureId:'integer-safe',calibrationId:id,wizardOnly:true}),input=inputProof(x).input;
  const before={...x.before,messages:[]},after={...before,native_owner_verified:true,messages:[{id:'new',text:'native fixture diagnostic'}]};
- if(fault==='foreign')after.owner_verified=false;if(fault==='stale')before.messages=after.messages;
+ const model=x.f.env.__loginomJavascriptNativeRoundtripV1.schemaWitness.model;
+ if(fault==='stale')model.FException={message:'old'};
+ await x.f.page.evaluate(beginCalibrationWizard,{id,stage:'next',identity:x.identity,deadline:x.f.b.deadline});
+ if(fault!=='stale')model.FException={message:'native fixture diagnostic',name:'SyntaxError',stack:'browser stack'};
+ if(fault==='foreign')after.owner_verified=false;
  if(fault==='source')x.lines[0]+=' ';if(fault==='not-visible')after.wizard_visible=false;if(fault==='pending')after.pending=true;
- const capture=async()=>x.f.page.evaluate(captureCalibrationWizard,{id,stage:'next',identity:x.identity,before,after});
+ const capture=async()=>{after.calibration_native_exception=await x.f.page.evaluate(readCalibrationWizard);return x.f.page.evaluate(captureCalibrationWizard,{id,stage:'next',identity:x.identity,before,after});};
  if(fault!=='none'){await assert.rejects(capture);return;}
  const witness=await capture(),trial=createJavascriptCalibrationTrial(id);
  await trial.capturePrior({source:'prior editor',input,node:{node_id:'js'},record});
- const observed=await trial.wizard({witness,record});assert.equal(observed.wizard.native_text_complete,false);
+ const observed=await trial.wizard({witness,record});assert.equal(observed.wizard.native_text_complete,true);
  assert.equal(observed.wizard.committed_source_status,'not_established');assert.equal(observed.upstream.status,'not_read');
  await assert.rejects(()=>trial.run({}),/no replay/);await assert.rejects(()=>trial.wizard({}),/no execution/);
  assert.equal(await trial.finish({cleanup:clean,record,persist:async()=>{}}),'UNRESOLVED');assert.equal(trial.coverage.case_complete,false);
@@ -125,7 +131,7 @@ test('calibration real failed driver reuses strict original upstream reader',asy
 test('production calibration dispatch/finalization routes use the selected trial and exact report',async()=>{
  const r=await readFailed(await failedStage('K2-sync-v1',{message:k2})),trial=createJavascriptCalibrationTrial(r.c.id),calls=[];
  await trial.capturePrior({source:'prior',input:r.input,node:r.node,record});
- const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8'),start=source.indexOf('    if(calibrationTrial){'),end=source.indexOf('    if(coercionTrial){',start);
+ const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8'),start=source.lastIndexOf('    if(calibrationTrial){'),end=source.indexOf('    if(coercionTrial){',start);
  const report={execution_probe:{},cleanup:clean};
  await vm.runInNewContext('(async()=>{'+source.slice(start,end)+'})',{calibrationTrial:trial,report,executionRuntime:runtime(r,calls),executionInput:r.input,executionNode:r.node,
   probe:trial.probe,deadline:Date.now()+30000,executionRecord:record,save:async()=>{}})();
@@ -155,24 +161,25 @@ test('failed prior-source ACK prevents wizard capture and execution admission',a
  await assert.rejects(()=>trial.run({}),/reservation/);await assert.rejects(()=>trial.wizard({}),/wizard diagnostic/);
 });
 
-for(const stage of ['next','done'])test('production '+stage+' wizard diagnostic ends calibration without explicit Execute',async()=>{
+for(const stage of ['next','done'])for(const fault of ['none','baseline-ack','source-after-ack'])test('production '+stage+' wizard diagnostic/no-Execute '+fault,async()=>{
  const id='K1-parse-v1',x=await roundtrip({fixtureId:'integer-safe',calibrationId:id,wizardOnly:true}),input=inputProof(x).input,trial=createJavascriptCalibrationTrial(id);
  await trial.capturePrior({source:'prior',input,node:{node_id:'js'},record});
  const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8'),start=source.indexOf('const runExecutionTrial=async probe=>'),end=source.indexOf('const verifyBatchInputIdentity=',start);
- const before={...x.before,messages:[]},after={...before,native_owner_verified:true,messages:[{id:'new',key:'error',text:'diagnostic'}]},calls=[],report={execution_probe:{}};
+ const before={...x.before,messages:[]},after={...before,native_owner_verified:true,messages:[]},calls=[],report={execution_probe:{}};
  const stageReader=()=>{};
  const runner=vm.runInNewContext(source.slice(start,end)+'\nrunExecutionTrial',{
   nativeRoundtrip:true,nativeCalibrationId:id,calibrationTrial:trial,coercionTrial:null,namedTrial:null,discoveryProbe:null,
   phaseDeadline:()=>Date.now()+30000,executionCase:'code-table-execute',report,owner:{prefix:'p'},executionNode:{node_id:'js'},executionInput:input,
   executionRuntime:{once:async(id,b,action)=>action(),executeNode:async()=>assert.fail('no Execute')},
-  page:{evaluate:async(fn,args)=>fn===captureCalibrationWizard?x.f.page.evaluate(fn,args):fn===stageReader?before:{verified:true},mouse:{click:async()=>calls.push(stage)}},
-  prepareJavascriptNativeRoundtripWizard,captureCalibrationWizard,schemaContext:()=>x.context,readJavascriptStage:stageReader,
+  page:{evaluate:async(fn,args)=>[captureCalibrationWizard,beginCalibrationWizard,readCalibrationWizard,finishCalibrationWizardObservation,checkCalibrationWizardBaseline].includes(fn)?x.f.page.evaluate(fn,args):fn===stageReader?after:{verified:true},mouse:{click:async()=>{calls.push(stage);x.f.env.__loginomJavascriptNativeRoundtripV1.schemaWitness.model.FException={message:'parse fixture',name:'SyntaxError'};}}},
+  prepareJavascriptNativeRoundtripWizard,captureCalibrationWizard,beginCalibrationWizard,readCalibrationWizard,finishCalibrationWizardObservation,checkCalibrationWizardBaseline,schemaContext:()=>x.context,readJavascriptStage:stageReader,
   guard:async()=>{},digest:s=>s,caseEffect:(id,e)=>e,requireJavascriptStageAdmission:async()=>{},
-  exact:()=>({filter:()=>({evaluate:async()=>({x:1,y:1})})}),executionRecord:record,
-  waitJavascriptStageObservation:async()=>after,javascriptStageTerminal:()=>true,javascriptSentinelOutcome:()=>({sentinel_observed:false}),
+  exact:()=>({filter:()=>({evaluate:async()=>({x:1,y:1})})}),executionRecord:async e=>{if(e.phase==='calibration_wizard_baseline'){if(fault==='baseline-ack')return {};if(fault==='source-after-ack')x.lines[0]+=' ';}return record(e);},
+  waitJavascriptStageObservation,javascriptStageTerminal,javascriptSentinelOutcome:()=>({sentinel_observed:false}),
   waitWizardReady:async()=>({page:{tid:stage==='done'?'p;DoneWizard':'p;CodeWizard'}}),save:async()=>{},Date
  });
- await runner(trial.probe);assert.equal(report.calibration_result.status,'wizard_diagnostic_incomplete');assert.deepEqual(calls,[stage]);
+ if(fault!=='none'){await assert.rejects(()=>runner(trial.probe));assert.equal(calls.length,0);return;}
+ await runner(trial.probe);assert.equal(report.calibration_result.status,'wizard_diagnostic_observed');assert.deepEqual(calls,[stage]);
  assert.equal(trial.coverage.case_complete,false);
 });
 
@@ -183,4 +190,26 @@ test('production calibration report explicitly flags redaction and bounded nativ
   redactor:createRedactor(['private-text']),directory:'unused',writeJavascriptNamedReport:async(d,r)=>{saved=r;}})();
  assert.equal(saved.calibration_delivery.redacted,true);assert.equal(saved.calibration_delivery.truncation_status,'truncated');
  assert.equal(saved.calibration_delivery.native_text_complete,false);assert.equal(rootReport.calibration_result.failed.error_details,'Error: private-text');
+});
+
+for(const [fault,change]of Object.entries({units:w=>w.diagnostic.text_units++,tree:w=>w.diagnostic.tree=null,
+ span:w=>w.diagnostic.source_span={line:4},owner:w=>w.diagnostic.native_owner_verified=false,
+ completeness:w=>w.native_text_complete=false}))test('wizard host receipt refuses forged '+fault,async()=>{
+ const id='K1-parse-v1',x=await roundtrip({fixtureId:'integer-safe',calibrationId:id,wizardOnly:true}),trial=createJavascriptCalibrationTrial(id);
+ const before={...x.before,messages:[]};
+ await x.f.page.evaluate(beginCalibrationWizard,{id,stage:'next',identity:x.identity,deadline:x.f.b.deadline});
+ x.f.env.__loginomJavascriptNativeRoundtripV1.schemaWitness.model.FException={message:'fixture'};
+ const after={...before,native_owner_verified:true,calibration_native_exception:await x.f.page.evaluate(readCalibrationWizard)};
+ const witness=clone(await x.f.page.evaluate(captureCalibrationWizard,{id,stage:'next',identity:x.identity,before,after}));
+ await trial.capturePrior({source:'prior',input:inputProof(x).input,node:{node_id:'js'},record});change(witness);
+ await assert.rejects(()=>trial.wizard({witness,record}));await assert.rejects(()=>trial.run({}),/no replay/);
+});
+
+test('wizard native text delivery distinguishes exact capture from subsequent redaction',async()=>{
+ const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8'),start=source.indexOf('const save=async()=>{')+'const save=async()=>{'.length,end=source.indexOf('  if(namedTrial)',start);
+ const rootReport={calibration_result:{wizard:{native_text_complete:true,diagnostic:{tree:{message:'private wizard text'}}}}};let saved;
+ await vm.runInNewContext('(async()=>{'+source.slice(start,end)+'})',{rootReport,calibrationTrial:{coverage:{case_complete:false}},
+  redactor:createRedactor(['private wizard text']),directory:'unused',writeJavascriptNamedReport:async(d,r)=>{saved=r;}})();
+ assert.equal(saved.calibration_delivery.native_text_complete,true);assert.equal(saved.calibration_delivery.redacted,true);
+ assert.equal(saved.calibration_delivery.truncation_status,'not_truncated');
 });

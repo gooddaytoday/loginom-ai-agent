@@ -35,26 +35,4 @@ export function calibrationDiagnostic(proof,id){
   rejection_attributed:false,case_complete:false,g6_complete:false,j25_complete:false,server_os:{status:'not_observed'}};
 }
 
-export function captureCalibrationWizard({id,stage,identity,before,after}){
- const s=globalThis.__loginomJavascriptNativeRoundtripV1;
- const need=(v,m)=>{if(!v)throw Error('Calibration wizard: '+m);};
- need(['K1-parse-v1','K2-sync-v1'].includes(id)&&s?.document===document&&s.calibration_id===id&&!s.named_case_id
-  &&['source-bound','done-prepared'].includes(s.stage)&&['next','done'].includes(stage),'closed draft stage');
- s.upstream();
- const w=s.schemaWitness,tab=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
- need(w.root.isConnected&&tab===s.input.card&&tab.Controller.Node.data.node===w.native
-  &&tab.Controller.FController===w.model&&w.model.FView.el.dom===w.root,'current native wizard owner');
- need(before?.owner_verified===true&&after?.owner_verified===true&&after.native_owner_verified===true
-  &&after.wizard_visible===true&&!after.pending&&!after.boundary_refusal
-  &&identity.node_id===s.node.FGuid&&identity.source_sha256===s.source_sha256
-  &&typeof identity.effect_id==='string'&&identity.effect_id,'owned stage observation');
- const source=s.sourceWitness.read();need(source===s.source,'exact retained draft');
- const messages=after.messages.filter(m=>!before.messages.some(old=>old.id===m.id));
- need(messages.length>0&&messages.length<=64&&messages.every(m=>typeof m.id==='string'&&m.id&&typeof m.text==='string'
-  &&m.text.length>0&&m.text.length<=4096),'bounded fresh diagnostic');
- return {calibration_id:id,source,source_sha256:s.source_sha256,node_id:s.node.FGuid,stage,identity,
-  messages,diagnostic_origin:'wizard',native_owner_verified:true,draft_source_verified:true,
-  native_text_complete:false,completeness_reason:'native_message_backing_store_not_attested',
-  explicit_execute_dispatched:false,implicit_execution:'unknown',committed_source_status:'not_established',
-  position_status:'incomplete',class_observed:null,attribution:'none',case_complete:false};
-}
+export {captureCalibrationWizard} from './javascript-calibration-wizard.mjs';

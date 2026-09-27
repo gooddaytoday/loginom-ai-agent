@@ -121,6 +121,7 @@ export async function recordJavascriptStageChange({state,identity,snapshot,recor
     boundary_refusal:snapshot.boundary_refusal,connection_diagnostic:snapshot.connection_diagnostic,dialog_diagnostic:snapshot.dialog_diagnostic,wizard_visible:snapshot.wizard_visible,
     preview_visible:snapshot.preview_visible,preview_owned:snapshot.preview_owned,preview_settled:snapshot.preview_settled,
     page_tid:snapshot.page_tid,pending:snapshot.pending,preview_diagnostic:snapshot.preview_diagnostic,
+    ...(snapshot.calibration_native_exception?{calibration_native_exception:snapshot.calibration_native_exception}:{}),
     message_ids:snapshot.messages.map(message=>message.id)};
   const fingerprint=JSON.stringify(diagnostic);
   if(fingerprint===state.fingerprint||state.count>=16)return;
@@ -144,7 +145,8 @@ export async function closeJavascriptPreviewOnce({read,state,record,close,waitHi
 export function javascriptStageTerminal({stage,before,after}) {
   if(!after||after.pending||after.boundary_refusal)return false;
   if(stage==='preview')return after.owner_verified===true&&after.preview_owned===true&&after.preview_settled===true;
-  return after.messages.some(message=>!before.messages.some(old=>old.id===message.id))
+  return after.calibration_native_exception?.present===true&&after.calibration_native_exception.fresh===true&&after.calibration_native_exception.native_owner_verified===true
+    ||after.messages.some(message=>!before.messages.some(old=>old.id===message.id))
     ||stage==='next'&&after.owner_verified&&!!after.page_tid&&after.page_tid!==before.page_tid
     ||stage==='done'&&!after.wizard_visible;
 }
