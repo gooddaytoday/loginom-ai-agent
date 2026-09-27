@@ -16,6 +16,31 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze50: failed-child ownership tests PASS, batch50 запущен — 2026-09-27
+
+Root проверил final source diff,276 tests PASS и34/34 hashes до/после.
+Набор: client execution-evidence64,execution-focus19,execution-stop16,
+graph-launch10,process-context26,process-node-focus25; private execution-evidence50,
+column-editor36,stage-observer14,batch8,link-topology8. Source commit
+`6139df500a`:6 source/test файлов. Freeze расширен pins двух общих execution
+модулей и двух их tests; другие28 прежних файлов неизменны.
+
+Opt-in verifyFailedChild включён только private JS runner. Обычный failed group
+по умолчанию остаётся unowned. Новый verifier требует native identity ровно
+одного прямого child свежей группы, его собственные error/failed/terminal caches,
+стабильные root/group/process/record/error и независимый Show Node→same selected
+prepared graph. Проверки повторяются до/после owner gestures; одиночный чужой
+child, upstream-only и parent_failed не допускаются. В строгом receipt error_source
+равен native_child_error_details. Deadline/однократный Execute, source49 mask wait
+и общие workspace guards сохранены. Lost reply/cleanup и повтор ownership-попытки
+дают refusal. Публичный JS API всё ещё не добавлен.
+
+Batch50 RUNNING: семь оставшихся G2 cases, freshprofile23,DISPLAY=:1/headed,
+Chromium1246/sandbox. Source/root-test receipts и exclusive host lease сохранены
+приватно. Developer idle/source frozen. Live ShowNode failed-child proof ещё
+не подтверждён; полный план, ревью и CLI-приёмка остаются открыты.
+
+
 ### Batch49: native busy settlement PASS, failed child contract требует fix50 — 2026-09-27
 
 Batch49 terminal exit1 FAILED, original package/logout/browser cleanup ALLPASS.
