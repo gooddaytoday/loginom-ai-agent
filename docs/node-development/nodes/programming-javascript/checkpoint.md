@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Probe07: cookie — direct DelegateProxy, не Out/счётчик
+
+Headed profile40/source61 завершён exit1 FAILED, original cleanup ALL PASS.
+Полный NC1: data cookie, bound, depth1, >16keys; для обоих cookies chain равен
+`[[DelegateProxy,-oon----,3],[Object,----nnnn,4],[undefined,--------,0]]`.
+Mask order: value,$,$S,$FRefCount,$OW,$O,$I,$RRC. Следовательно, own поля proxy:
+`$`, `$S`, `$FRefCount`; identity `$` содержит4numeric поля. Generic encoder
+заходит в session `$S` и отказывает по bound; Out wrapper здесь не наблюдается.
+
+Root проверил458journal refs,66source pins и полный NC1. Report SHA256:
+`7def7dcd307429b6ba67eb44f7382e8513f5bb9409aef4003d6a002b5ae377c3`.
+Private receipt native-input-probe-07-verification.json; native cells не читались.
+
+Разработчику поручен direct-proxy admission: exact source-backed class/shape,
+own numeric identity, datasource session match, references/value checks между
+requests без рекурсивного обхода session и getter/native calls. Нельзя называть
+DelegateConnectionCookie счётчиком поколений данных без доказательства: proxy
+identity не даёт atomic snapshot или отсутствия ABA. Negatives должны покрыть
+foreign/replaced/mutated proxies, identities и sessions до/после response.
+Profile40 сохранён, browser closed. G5/full plan остаются active/incomplete.
+
+
 ### Freeze61: NC1 diagnostic проверен; headed probe07 запущен
 
 Source node-javascript `557871723aa4684d271bbc2aa6480d5caec3a57e` сохраняет
