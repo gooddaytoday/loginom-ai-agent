@@ -16,6 +16,34 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch44: trigger/picker/type-record подтверждены, выбор и cleanup требуют fix45 — 2026-09-27
+
+Root проверил948 journalSHA, два input6×5/60cells. Native type opening ready:
+все trigger predicates=true, expanded/visible/owned=true,6records/6options,
+ровно1 typed option с numeric4 и labelЦелый. valueField=Value own depth0,
+displayField=text inherited depth1: необходимость prototype-data lookup
+подтверждена live. Receipt g2-batch-44-picker-verification.json независим от
+итогового FAIL. Source44 committed fbc7e718fe, root78 tests PASS.
+
+Следующий отдельный global regex locator отказал `Unique native column type
+option unavailable`; actualcount/нетриммированный text в этом отказе не записаны,
+точную причину regex mismatch не утверждаем. Own typed item уже был однозначно
+доказан и сохранён в holder; повторный глобальный поиск избыточен. Option click,
+Apply/Preview/Execute не состоялись. Root просмотрел screenshots: раскрытый
+список перекрывает Cancel. Cleanup зарезервировал cancelDispatched, но свежий
+hit-test=false запретил фактический click. Не считать dispatch receipt доказательством
+UI gesture. Original cleanup package/logout=false,browser=true, exit1
+CLEANUP_UNCONFIRMED; никаких внешних abort в этом прогоне не было.
+
+Headed recovery44 на profile17 без downloads: packages0/logout/browser PASS,
+packageMutation=false. Lease закрыта; freshprofile18 назначен и отсутствует.
+Прежняя developer-задача выполняет fix45: exact held option ElementHandle вместо
+text locator, повторная проверка identities/hit до одного click; закрытие только
+своего открытого picker с bounded settlement перед Cancel, без replay или Cancel
+после ApplyDispatched. Успешные field43/trigger44 guards сохраняются. G2/G3,
+публичный handler и полный план остаются открытыми.
+
+
 ### Freeze44: native trigger передан в live — 2026-09-27
 
 Root независимо проверил78 tests PASS: column-editor25,stage-observer14,
