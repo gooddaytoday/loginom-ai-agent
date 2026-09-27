@@ -73,12 +73,20 @@ export function javascriptNativeRoundtripSnapshot(b){
   const nodePorts=v(node,'FPorts'),inputCollection=v(nodePorts,0),inputPorts=v(inputCollection,'FCollection');
   // Probe05: exactly Connection(6), Variables(3), both input0/param1/status1.
   // The input-only topology guard above separately rejects every graph link.
+  const jsOutputs=roundtrip.node.FPorts?.[1]?.FCollection,addPortClass=globalThis.mx?.AddPort;
+  const addPortPrototype=addPortClass?.prototype,addService=jsOutputs?.[1];
+  const undefinedData=key=>{const d=Object.getOwnPropertyDescriptor(addService??{},key);return !!d&&Object.hasOwn(d,'value')&&d.value===undefined;};
+  const serviceValid=Array.isArray(jsOutputs)&&jsOutputs.length===2&&typeof addPortClass==='function'
+    &&addPortPrototype?.constructor===addPortClass&&addService&&Object.getPrototypeOf(addService)===addPortPrototype
+    &&addService.parent===roundtrip.node&&v(addService,'FType')===1&&v(addService,'FSubType')===10
+    &&v(addService,'FStatus')===0&&undefinedData('FParam')&&undefinedData('FPortIndex');
+  need(serviceValid,'exact JS AddPort service layout');
   const previewChecks={
     visible:v(manager,'FPreviewVisible')===true,
     node:v(form,'FCurrentPreviewNode')===node,
     parent:port?.parent===node,
     guid:port?.FGuid===b.port_guid,
-    outputs:node.FPorts?.[1]?.FCollection?.length===1,
+    outputs:b.roundtrip_role==='output'?jsOutputs.length===2:node.FPorts?.[1]?.FCollection?.length===1,
     output:node.FPorts?.[1]?.FCollection?.[0]===port&&!!port,
     inputs:Array.isArray(nodePorts)&&nodePorts.length===2&&Array.isArray(inputPorts)
       &&(b.roundtrip_role==='upstream'
@@ -87,7 +95,8 @@ export function javascriptNativeRoundtripSnapshot(b){
         :inputPorts.includes(roundtrip.targetPort)&&roundtrip.targetPort.parent===node),
     type:port?.FType===1,
     subtype:port?.FSubType===1,
-    param:port?.FParam===0,
+    param:port?.FParam===(b.roundtrip_role==='output'?2:0),
+    index:b.roundtrip_role!=='output'||port?.FPortIndex===0,
     status:port?.FStatus===1,
     last_node:manager?.FShowDataLastCall?.Node===node,
     last_port:manager?.FShowDataLastCall?.Port===port&&!!port
@@ -137,7 +146,7 @@ export function javascriptNativeRoundtripSnapshot(b){
   const dataCookie=v(helper,'$FDataChangeCookie'),stateCookie=v(helper,'$FStateChangeCookie');
   const dataCookieState=cookie(dataCookie,'d'),stateCookieState=cookie(stateCookie,'s');
   if(b.roundtrip_role==='upstream')need(ds===roundtrip.input.ds&&helper===roundtrip.input.helper&&v(helper,'$FData')===roundtrip.input.cache&&fields===roundtrip.input.fields&&field===roundtrip.input.field,'upstream datasource/cache replaced');
-  return {roundtrip,prep,receipt,card,model,diagram,nodes,links,node,nodeData:node.data,port,portData:port.data,manager,form,workflow,pack,fields,field,
+  return {addPortClass,addPortPrototype,addService,roundtrip,prep,receipt,card,model,diagram,nodes,links,node,nodeData:node.data,port,portData:port.data,manager,form,workflow,pack,fields,field,
     cookieClass,cookiePrototype,cookieInterface,
     nodePorts,inputCollection,inputPorts,connectionInput:inputPorts[0],variablesInput:inputPorts[1],
     processStore,processRoot,group:groups[0],child:child[0],
@@ -163,6 +172,7 @@ export async function bindJavascriptNativeRoundtrip(page,args,snapshot){
     const capture=eval('('+code+')'),initial=capture(args);
     state.bindings.set(args.roundtrip_role,{document,id:args.runtime_binding_id,readId:args.binding_id,initial,capture});
     return {...args,source:{owner:initial.owner,object:initial.object},
+      add_port_sources:{constructor:Function.prototype.toString.call(initial.addPortClass)},
       cookie_sources:{constructor:Function.prototype.toString.call(initial.cookieClass),interface:Function.prototype.toString.call(initial.cookieInterface)},
       count_loader_sources:{PrepareColumnInfoAndRowCount:initial.dc.PrepareColumnInfoAndRowCount.toString(),
         InitOutput:initial.dc.InitOutput.toString(),DataSourceProxyRead:initial.store.proxy.read.toString()}};

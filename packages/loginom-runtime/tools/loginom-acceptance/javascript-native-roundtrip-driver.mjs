@@ -6,7 +6,7 @@ import {verifyNativeInputFrontends,verifyNativeInputCountLoaders} from './javasc
 import {verifyNativeInputCookieRuntime} from './javascript-native-input-binding.mjs';
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {readJavascriptNativeRoundtrip,cancelJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus} from './javascript-native-roundtrip-read.mjs';
-import {nativeRoundtripProbe,verifyNativeRoundtripRead} from './javascript-native-roundtrip-contract.mjs';
+import {nativeRoundtripProbe,verifyNativeRoundtripRead,verifyNativeRoundtripAddPortRuntime} from './javascript-native-roundtrip-contract.mjs';
 const need=(v,m)=>{if(!v)throw Error('Native roundtrip driver: '+m);};
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 
@@ -48,6 +48,7 @@ export async function readNativeRoundtrip({options,ctx,input,role,targetOrigin,t
     // Retain the original attested runtime; page-local checks reject rebinding.
     const runtime=input.runtime;
     const binding=await execute(javascriptNativeRoundtripCode(args),{timeout:Math.min(10000,deadline-now())});
+    const addPortPins=verifyNativeRoundtripAddPortRuntime(binding.add_port_sources);delete binding.add_port_sources;
     const cookiePins=verifyCookieRuntime(binding.cookie_sources);delete binding.cookie_sources;
     const pins=verifyCountLoaders(binding.count_loader_sources);
     delete binding.count_loader_sources;check();
@@ -65,7 +66,7 @@ export async function readNativeRoundtrip({options,ctx,input,role,targetOrigin,t
         throw Object.assign(new AggregateError([readError,statusError],readError.message),{observationError:readError,cleanupError:statusError});}}
     check();const expected={...binding,read_id:readId};
     const exact=verifyNativeRoundtripRead(raw,{binding:expected,lifecycle,input,role});
-    const proof={exact,raw,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,subscription_proxy_source_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
+    const proof={exact,raw,add_port_source_sha256:addPortPins,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,subscription_proxy_source_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
     const event={phase:'javascript_native_roundtrip_'+role+'_cells_verified',operation_id:operation.id,proof};
     const saved=await onRecord(event);need(saved?.phase===event.phase&&JSON.stringify(saved.proof)===JSON.stringify(proof),'native journal acknowledgement differs');
     return proof;

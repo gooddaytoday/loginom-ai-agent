@@ -71,3 +71,10 @@ export function verifyNativeRoundtripProvenance(owner){
   const readback=textImportConfigurationReadback({node:owner.ctx.node,phases:state.phases,operation_id:owner.options.operation.id});
   need(JSON.stringify(source)===JSON.stringify(owner.provenance.source)&&JSON.stringify(readback)===JSON.stringify(owner.provenance.readback),'import lineage/configuration changed');
 }
+
+export function verifyNativeRoundtripAddPortRuntime(sources){
+  const pin='38bbd3e2f5143859e0c963aeb9c1389304c140d32484a88af1b2ec8f6ba0a72c';
+  need(sources&&Object.keys(sources).length===1&&typeof sources.constructor==='string'
+    &&createHash('sha256').update(sources.constructor).digest('hex')===pin,'loaded AddPort constructor changed');
+  return {constructor:pin};
+}
