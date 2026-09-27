@@ -15,6 +15,25 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze61: NC1 diagnostic проверен; headed probe07 запущен
+
+Source node-javascript `557871723aa4684d271bbc2aa6480d5caec3a57e` сохраняет
+cookie admission/identity/equality, добавляя только bounded structural diagnostic
+NC1 на отказе. Он различает data/state, причину/глубину/key-count, class enums и
+типы восьми разрешённых own-полей по трём `$` уровням; не следует в session `$S`,
+не выводит значения или произвольные имена и не вызывает getters.
+
+Root **182/182 PASS**,fail/skip0;66pins unchanged до/после. Тесты включают actual
+production error/outcome/journal, byte limit и освобождение буферов при отказе.
+Private operator61-root-test-source.json + stdout/stderr. Browser-level форма
+cookie пока не установлена: synthetic Out/proxy case не заменяет наблюдение.
+
+Разработчик idle. Запущен native-input-probe-07 на fresh profile40, headed,
+DISPLAY=:1/sandbox; source receipt закрепляет66pins. На момент записи RUNNING,
+original cleanup/NC1 ещё не получены. Profile39 сохранён, cleanup06 ALL PASS.
+G5/native output/public handler/CLI остаются незавершёнными.
+
+
 ### Cookie source investigation: загружены зависимости, admission не изменён
 
 Root получил с текущего стенда следующие source-backed зависимости Uses.js:
