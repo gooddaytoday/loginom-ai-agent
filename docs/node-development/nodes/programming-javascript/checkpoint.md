@@ -16,6 +16,27 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Cardinality duplicate PASS
+
+Source75/profile59 native-cardinality-duplicate-probe-01 завершён terminal exit0
+(session29452), OBSERVED/native-roundtrip-observed. Независимый audit подтвердил
+INPUT[1,2,3] → OUTPUT[1,1,2,2,3,3] → upstream[1,2,3], exact signed64 native bytes
+и порядок: **12cells/620journalrefs/192pins**, counts3/6/3. Проверены source/own
+fresh JS execution, original upstream child, runtime/native ownership/cache,
+pre-JS baseline и final ACK. Native baseline hash отдельно пересчитан и совпал.
+Report SHA `9e9b3afe62addc18088238fccd42e8dfe5564cdc89620f13d2e59858a337ca80`.
+JS SHA `9128cb56c686f8344bc0dea6894b6c3daf054f28638790156b8e1c6fa6c1e6fd`.
+Original cleanup3/3, lease CLOSED, profile59 сохранён, recovery не нужен.
+
+Keep2 и duplicate подтверждены на source75. Odd пока не проверен: первый run
+отказал до JS source по visible blocker. Developer продолжает source/evidence
+investigation; прежний ход завершился историческим memory bootstrap-ответом
+вместо нужного файла, поэтому актуальное задание повторно уточнено без новых
+bootstrap вызовов. Это не сбой подключения памяти и не принятие старых инструкций.
+Mandatory UI declared-empty/nativezero и full G5/public handler/CLI открыты.
+
+
+
 ### Duplicate source75 запущен независимо от odd
 
 После terminal failure odd и подтверждённого cleanup3/3 назначен fresh profile59.
