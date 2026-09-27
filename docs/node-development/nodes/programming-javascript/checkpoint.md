@@ -16,6 +16,29 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Engine-probe-04 Cyrillic upper PASS; input-text запущен — 2026-09-27
+
+Source55/profile32 engine-literal-upper:exit0 OBSERVED,original cleanup ALL PASS.
+Root проверил865 journalSHA,30 input cells,один fresh completed JS execution,
+exact source28f91bf1c82bf90c6b26090f73229b6c1449e0df55da6e3a3b768eb0f9cd0115,
+полную1×1 Result:string='АБВЁЖ' из литералаабвёж и42/42 unchanged source hashes.
+ReportSHA3701ee69feea177e904482883f543e8340a56c75f71eee9c75142aed3d6d008d.
+Journal/oracle receipts сохранены; engine-profile.json:4observed UI passes,
+26not_checked,native bytes/G5 не закрыты.
+
+Freshprofile33 назначен с backup/receipt;profile32 сохранён. Engine-probe-05
+--discovery-probe engine-input-text запущен на source55,headed DISPLAY=:1,
+sandbox enabled. Проверяются все6 значений Customer:trim/lower/upper с сохранёнными
+исходными padding и кириллицей. Независимый Python oracle берёт только pinned CSV.
+На момент записи RUNNING; terminal и cleanup ещё не подтверждены.
+
+Параллельно существующая задача разработчика получила READ-ONLY исследование
+G5native:JS-specific binding/provenance,подготовка точных native inputs,
+int64/real/Date roundtrip и первый bounded slice. Разрешён только отдельный
+native-types-design.md;42 runtime/test pins менять нельзя до окончания этих проб.
+Новые задачи/браузеры не создаются,родительский live остаётся единственным.
+
+
 ### Engine-probe-03 Cyrillic lower PASS; upper запущен — 2026-09-27
 
 Source55/profile31 engine-literal-lower:exit0 OBSERVED,original cleanup ALL PASS.

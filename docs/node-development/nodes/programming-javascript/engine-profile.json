@@ -117,9 +117,31 @@
       "source_sha256": "28f91bf1c82bf90c6b26090f73229b6c1449e0df55da6e3a3b768eb0f9cd0115",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_pass",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "explicit_js_execute_count": 1,
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "string"
+        }
+      ],
+      "output_rows": 1,
+      "all_cells_verified": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-probe-04/report.json",
+        "report_sha256": "3701ee69feea177e904482883f543e8340a56c75f71eee9c75142aed3d6d008d",
+        "source_receipt": "engine-probe-04-source.json",
+        "journal_verifier": "engine-probe-04-verification.json",
+        "oracle_verifier": "engine-probe-04-oracle-verification.json"
+      }
     },
     {
       "id": "engine-nullish",
