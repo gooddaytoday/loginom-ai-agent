@@ -15,6 +15,25 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Подготовлен независимый scalar auditor для native INPUT — 2026-09-27
+
+Приватный `audit-native-real-input.py` проверяет полный набор четырёх адресов,
+схему Value:real, теги NULL/real, frame/logical length, binary64 bytes и точную
+проекцию значения. Python struct задаёт независимый oracle; импорт JS-декодера
+в аудитор отсутствует. SHA256:
+`94f9da74f5fd9aa65b8c8e77c9b0f05cdcf0c963f9d7926b4d6e65ffaabd6d83`.
+
+Self-check на синтетических данных через реальный adaptCell прошёл: один
+положительный случай и восемь отказов (value, bytes, tag, NULL→0, duplicate row,
+missing cell, float32, −0 вместо +0). Receipt: native-real-auditor-selfcheck.json.
+Это проверка аудитора, **не живое доказательство** native input. Ownership,
+provenance, lifecycle и журнал потребуют отдельного аудита фактического прогона.
+
+Существующая задача разработчика подтверждена active/inProgress App API:
+turn `01a0e1b3-d090-7191-80ae-a8809017f78d`, revision115. Она реализует input-only
+slice; новый браузер не запускался, source handoff ещё ожидается.
+
+
 ### Engine-probe-05 input-text PASS; переход к native INPUT — 2026-09-27
 
 После перезапуска OpenViking MCP health и actor find успешны; Doctor: 0 failures,
