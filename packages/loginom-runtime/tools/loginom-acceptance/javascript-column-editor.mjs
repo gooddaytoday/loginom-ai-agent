@@ -54,6 +54,20 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
   const busy=store.isLoading?.()===true;
   if(busy)return result(held?'pending':'refused','store_loading',cacheCounts);
   if(!checks.cache)return result('refused','filtered_or_incomplete_cache',cacheCounts);
+  // Ext defaults are false until the instance gets an own flag. Accessors or
+  // non-booleans are unknown, never evidence that a write has completed.
+  const flag=(object,key)=>{
+    const descriptor=Object.getOwnPropertyDescriptor(object,key);
+    return !descriptor?false:Object.hasOwn(descriptor,'value')&&typeof descriptor.value==='boolean'?descriptor.value:null;
+  };
+  const removed=dense(value(store,'removed'),64);
+  const writeState={is_syncing:flag(store,'isSyncing'),needs_sync:flag(store,'needsSync'),removed_count:removed?.length??null,
+    dirty_count:0,phantom_count:0,dropped_count:0,unknown_flags:0};
+  for(const record of records)for(const key of ['dirty','phantom','dropped']){
+    const current=flag(record,key);if(current===null)writeState.unknown_flags++;else if(current)writeState[key+'_count']++;
+  }
+  checks.writes_clean=writeState.is_syncing===false&&writeState.needs_sync===false&&writeState.removed_count===0
+    &&writeState.dirty_count===0&&writeState.phantom_count===0&&writeState.dropped_count===0&&writeState.unknown_flags===0;
   const recordFields=record=>{
     const cache=value(record,'data');if(!record.isModel||!cache)return null;
     const descriptors=Object.entries(Object.getOwnPropertyDescriptors(cache));
@@ -71,6 +85,7 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
   checks.quiet=blockers.length===0;
   if(!checks.quiet)return result(phase==='capture'?'refused':'pending','ui_busy',{mask_count:masks.length,blocker_count:blockers.length});
   if(phase==='capture'){
+    if(!checks.writes_clean)return result('refused','baseline_write_pending',{...cacheCounts,write_state:writeState});
     const baseline=records.map(recordFields);
     checks.baseline=records.length===expectedCount&&baseline.every(Boolean)&&store.getTotalCount()===records.length;
     if(!checks.baseline||editors.length)return result('refused','baseline_unconfirmed');
@@ -83,22 +98,22 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
   if(!checks.baseline)return result('refused','baseline_records_changed');
   const added=records.filter(record=>!held.baseline.some(entry=>entry.record===record));
   if(added.length>1||records.length!==held.baseline.length+added.length)return result('refused','unexpected_record_delta');
-  const counts={...cacheCounts,baseline_count:held.baseline.length,added_count:added.length,editor_count:editors.length};
-  if(phase==='baseline')return result(!added.length&&!editors.length?'prepared':'refused','baseline_recheck',counts);
+  const counts={...cacheCounts,write_state:writeState,baseline_count:held.baseline.length,added_count:added.length,editor_count:editors.length};
+  if(phase==='baseline')return result(!added.length&&!editors.length&&checks.writes_clean?'prepared':'refused','baseline_recheck',counts);
   if(phase==='cancelled'||phase==='applied'){
     if(editors.length)return result('pending','editor_still_visible',counts);
     if(phase==='cancelled'){
       checks.record_removed=added.length===0;checks.proxy_total_matches=totalCount===records.length;
       // Exact Ext source: remove changes the local collection; successful
       // destroy clears removed. totalCount remains the last proxy-load total.
-      const removed=dense(value(store,'removed'),64);
       checks.removals_synced=!!removed&&removed.length===0;
-      checks.records_clean=records.every(record=>value(record,'dirty')!==true&&value(record,'phantom')!==true&&value(record,'dropped')!==true);
-      return result(checks.record_removed&&checks.removals_synced&&checks.records_clean?'settled':'pending','cancel_settlement',
+      checks.records_clean=writeState.dirty_count===0&&writeState.phantom_count===0&&writeState.dropped_count===0&&writeState.unknown_flags===0;
+      return result(checks.record_removed&&checks.removals_synced&&checks.records_clean&&checks.writes_clean?'settled':'pending','cancel_settlement',
         {...counts,removed_count:removed?.length??null});
     }
     checks.applied=!!held.editor&&added.length===1&&added[0]===held.editor.record
-      &&value(held.editor.form,'ModalResultOk')===true&&store.getTotalCount()===records.length;
+      &&value(held.editor.form,'ModalResultOk')===true&&store.getTotalCount()===records.length
+      &&value(added[0],'data')===held.editor.cache&&!!recordFields(added[0])&&checks.writes_clean;
     return result(checks.applied?'settled':'pending','apply_settlement',counts);
   }
   if(!added.length||!editors.length)return result('pending','await_added_record_and_editor',counts);
@@ -128,7 +143,7 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
     if(!checks.original_editor)return result('refused','original_editor_changed',counts);
   }
   // Retain only proven native identities in the operator-owned holder.
-  if(!held.editor)held.editor={record,element,control,form,controls,inputs,base:editorBase};
+  if(!held.editor)held.editor={record,cache:value(record,'data'),element,control,form,controls,inputs,base:editorBase};
   let pickerSnapshot;
   if(readPicker||target==='cbxDataType'&&(kind==='trigger'||kind==='trigger-close'||kind==='option')){
     const combo=controls.cbxDataType,triggers=dense(value(combo,'orderedTriggers'),8);
@@ -279,7 +294,7 @@ export async function verifyJavascriptColumnEditor({page,state,record,deadline,t
 
 export async function settleJavascriptColumnEditor({page,state,record,deadline,phase}) {
   const pending=state.pending;
-  const snapshot=await waitJavascriptColumnEditor({page,pending,phase,deadline,record});
+  const snapshot=await waitJavascriptColumnEditor({page,pending,phase,deadline:Math.min(deadline,Date.now()+15000),record});
   await record({phase:'column_editor_closed',stage:phase,snapshot});
   await pending.held.dispose();state.pending=null;
 }
