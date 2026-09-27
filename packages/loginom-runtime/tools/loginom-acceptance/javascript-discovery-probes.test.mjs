@@ -138,7 +138,7 @@ test('production isolated runner uses one Execute or stops at an owned wizard di
  for(const wizardDiagnostic of [false,true]){
  const f=fixture(),steps=[],report={execution_probe:{},case_id:'only-case'},deadline=Date.now()+10000;
  const runner=vm.runInNewContext(source.slice(start,end)+'\nrunExecutionTrial',{
-  phaseDeadline:()=>deadline,executionCase:'code-table-execute',discoveryProbe:f.probe,report,owner:{prefix:'p'},executionNode:f.node,
+  phaseDeadline:()=>deadline,nativeRoundtrip:false,executionCase:'code-table-execute',discoveryProbe:f.probe,report,owner:{prefix:'p'},executionNode:f.node,
   executionRuntime:{captureExecutionBoundary:async()=>({native:{dispose:async()=>steps.push('dispose')}}),
     verifyExecutionBoundary:async()=>steps.push('boundary'),executeNode:async(node,limit,trial)=>{
       steps.push('execute');assert.equal(limit,deadline);assert.equal(trial.source_sha256,f.probe.source_sha256);return f.execution;},

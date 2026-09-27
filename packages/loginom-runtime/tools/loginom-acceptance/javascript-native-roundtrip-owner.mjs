@@ -1,0 +1,137 @@
+// Page-local capabilities. Nothing here invokes model methods or remote RPCs.
+export function armJavascriptNativeRoundtrip({binding,source,source_sha256}){
+  const need=(v,m)=>{if(!v)throw Error('Roundtrip owner: '+m);};
+  need(!globalThis.__loginomJavascriptNativeRoundtripV1,'already armed');
+  const captured=globalThis.__loginomJavascriptNativeInputBindingV1,input=captured?.initial;
+  const read=globalThis.__loginomJavascriptNativeInputReadV1;
+  need(captured?.document===document&&input&&captured.id===binding.runtime_binding_id
+    &&read?.document===document&&!read.poisoned&&!read.active&&read.last?.published===true
+    &&read.last.id===binding.read_id&&read.last.status==='completed'&&read.last.pending===0
+    &&read.last.releasedRequests===4&&read.last.releasedResponses===4,'completed input before JS');
+  need(input.diagram.FNodes.FCollection===input.nodes&&input.diagram.FLinks.FCollection===input.links
+    &&input.links.length===0&&!input.nodes.some(n=>n.FIconCls==='bg-vendor-icon-javascript'),'input-only baseline');
+  const inputCell=input.node.FCell,portCell=input.port.FCell;
+  const value=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
+  const tuple=c=>JSON.stringify([value(value(c,'$'),'$OW'),value(value(c,'$'),'$O'),value(value(c,'$'),'$I'),value(value(c,'$'),'$RRC'),value(c,'$FRefCount')]);
+  const upstream=()=>{
+    need(globalThis.__loginomDockPreparationV1===input.prep&&input.prep.document===document,'document');
+    need(input.node.data===input.nodeData&&input.node.FGuid===binding.node_id&&input.node.FStatus===1&&input.node.FRunning===false
+      &&input.node.FPorts===input.nodePorts&&input.node.FPorts[1].FCollection[0]===input.port
+      &&input.port.parent===input.node&&input.port.data===input.portData&&input.port.FGuid===binding.port_guid
+      &&input.node.FCell===inputCell&&input.port.FCell===portCell&&input.port.FType===1&&input.port.FSubType===1&&input.port.FParam===0&&input.port.FStatus===1
+      &&input.nodePorts[0]===input.inputCollection&&input.inputCollection.FCollection===input.inputPorts
+      &&input.inputPorts.length===2&&input.inputPorts[0]===input.connectionInput&&input.inputPorts[1]===input.variablesInput
+      &&[6,3].every((subtype,i)=>input.inputPorts[i].parent===input.node&&input.inputPorts[i].FType===0&&input.inputPorts[i].FSubType===subtype&&input.inputPorts[i].FParam===1&&input.inputPorts[i].FStatus===1),'upstream node/port');
+    need(input.ds.$===input.identity&&value(input.identity,'$OW')===input.owner&&value(input.identity,'$O')===input.object
+      &&value(input.ds,'$FHelper')===input.helper&&value(input.helper,'$FData')===input.cache
+      &&value(input.helper,'$FCacheInitialized')===true&&value(input.helper,'$FRowCount')===4
+      &&value(input.helper,'$FDataChangeCookie')===input.dataCookie&&value(input.helper,'$FStateChangeCookie')===input.stateCookie
+      &&tuple(input.dataCookie)===input.dataCookieValue&&tuple(input.stateCookie)===input.stateCookieValue
+      &&value(input.dataCookie,'$')===input.dataCookieIdentity&&value(input.stateCookie,'$')===input.stateCookieIdentity
+      &&Object.getPrototypeOf(input.dataCookie)===input.cookiePrototype&&Object.getPrototypeOf(input.stateCookie)===input.cookiePrototype
+      &&Object.getPrototypeOf(input.dataCookieIdentity)===input.dataCookieIdentityPrototype&&Object.getPrototypeOf(input.stateCookieIdentity)===input.stateCookieIdentityPrototype
+      &&value(input.cookiePrototype,'constructor')===input.cookieClass&&value(input.cookiePrototype,'$II')===input.cookieInterface
+      &&value(input.dataCookie,'$S')===input.ds.$S&&value(input.stateCookie,'$S')===input.ds.$S
+      &&input.field.Name==='Value'&&input.field.DisplayName==='Value'&&input.field.DataType===3,'upstream dataset/subscriptions');
+    need(input.child.data.ModelNode===input.nodeData&&input.child.data.Status===3&&input.child.data.ErrorDetails===''
+      &&String(input.child.data.id)===binding.completed_child.process_id&&String(input.child.internalId)===binding.completed_child.process_record_id
+      &&input.processStore.getRoot()===input.processRoot&&!input.processStore.isLoading(),'upstream execution');
+    const pending=[...input.processRoot.childNodes],seen=new Set();
+    while(pending.length){const r=pending.pop();need(r&&!seen.has(r)&&seen.size<2000&&!r.data.loading,'process loading/cycle');seen.add(r);
+      need(r.data.ModelNode!==input.nodeData||Number(String(r.data.id).split('.')[0])<=Number(binding.completed_child.group_id),'upstream reexecuted');
+      pending.push(...(r.childNodes??[]));}
+    need(seen.has(input.child)&&seen.has(input.group),'upstream process removed');
+    globalThis.__loginomJavascriptNativeRuntimeV1.check(input.ds.$S);
+    return seen;
+  };
+  upstream();
+  const card=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+  need(card===input.card&&card.Controller.FController===input.model&&input.manager.FPreviewVisible===false,'owned graph after Preview Close');
+  globalThis.__loginomJavascriptNativeRoundtripV1={document,input,binding,source,source_sha256,upstream,bindings:new Map(),stage:'armed'};
+  return {armed:true,input_read_id:binding.read_id,source_sha256};
+}
+
+export function bindJavascriptNativeRoundtripGraph({node,inputPortGuid}){
+  const s=globalThis.__loginomJavascriptNativeRoundtripV1,need=(v,m)=>{if(!v)throw Error('Roundtrip graph: '+m);};
+  need(s?.document===document&&s.stage==='armed','one graph admission');s.stage='graph-reserved';s.upstream();
+  const initial=s.input,diagram=initial.diagram,nodes=diagram.FNodes.FCollection,links=diagram.FLinks.FCollection;
+  const matches=nodes.filter(n=>n.FGuid===node.node_id&&n.FIconCls==='bg-vendor-icon-javascript');
+  need(matches.length===1&&nodes.length<=3&&nodes.includes(initial.node)&&links.length===1,'single import→JS topology');
+  const js=matches[0],edge=links[0],targetPort=edge.FTargetPort;
+  need(edge.FSourcePort===initial.port&&targetPort?.parent===js&&js.FPorts[0].FCollection.includes(targetPort)
+    &&targetPort.FGuid===inputPortGuid&&targetPort.FType===0&&targetPort.FSubType===1&&targetPort.FParam===0
+    &&typeof edge.FGuid==='string'&&edge.FGuid,'exact edge/port');
+  need(nodes.filter(n=>n!==js&&n!==initial.node).every(n=>n.FIconCls==='bg-vendor-icon-modelvariables'&&n.FStatus===0&&!n.FRunning),'foreign dynamic nodes');
+  const heldNodes=nodes.map(n=>({node:n,data:n.data,cell:n.FCell,guid:n.FGuid,icon:n.FIconCls,ports:n.FPorts,
+    groups:n.FPorts.map(group=>({group,collection:group.FCollection,ports:group.FCollection.map(p=>({port:p,data:p.data,cell:p.FCell,guid:p.FGuid,type:p.FType,subtype:p.FSubType,param:p.FParam,parent:p.parent}))}))}));
+  const edgeGuid=edge.FGuid,upstreamCheck=s.upstream;
+  const check=()=>{
+    const records=s.upstream();
+    need(s.check===check&&s.upstream===upstreamCheck,'owner checker replaced');
+    need(globalThis.__loginomJavascriptNativeRoundtripV1===s&&s.document===document,'capability replaced');
+    const card=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+    need(card===initial.card&&card.Controller.FController===initial.model&&initial.model.FDiagram===diagram
+      &&diagram.FNodes.FCollection===nodes&&diagram.FLinks.FCollection===links&&nodes.length===heldNodes.length
+      &&links.length===1&&links[0]===edge&&edge.FGuid===edgeGuid&&edge.FSourcePort===initial.port&&edge.FTargetPort===targetPort,'graph/edge identity');
+    need(!initial.model.FCreateDraggedNodeStarted&&!initial.model.FDraggingOverGraph&&!initial.model.FDraggedNode,'graph gesture');
+    for(const n of heldNodes){need(nodes.includes(n.node)&&n.node.data===n.data&&n.node.FCell===n.cell&&n.node.FGuid===n.guid
+      &&n.node.FIconCls===n.icon&&n.node.FPorts===n.ports&&n.ports.length===n.groups.length,'node identity');
+      for(const [i,g]of n.groups.entries()){need(n.ports[i]===g.group&&g.group.FCollection===g.collection&&g.collection.length===g.ports.length,'port collection');
+        for(const [j,p]of g.ports.entries())need(g.collection[j]===p.port&&p.port.data===p.data&&p.port.FCell===p.cell&&p.port.FGuid===p.guid
+          &&p.port.FType===p.type&&p.port.FSubType===p.subtype&&p.port.FParam===p.param&&p.port.parent===p.parent,'port identity');}}
+    if(s.sourceWitness)need(s.sourceWitness.read()===s.source,'source changed');
+    if(s.executionWitness){const w=s.executionWitness;
+      need(records.has(w.child)&&records.has(w.group)&&w.child.data.ModelNode===js.data&&w.child.data.Status===3&&w.child.data.ErrorDetails===''
+        &&String(w.child.data.id)===s.execution.process_id&&String(w.child.internalId)===s.execution.process_record_id
+        &&w.group.data.Status===3&&w.group.data.ErrorDetails===''&&w.group.data.loaded===true
+        &&initial.processRoot.childNodes.includes(w.group),'JS execution changed');
+      need(JSON.stringify([...records].map(r=>[r.internalId,r.data.id,r.data.Status,r.data.ErrorDetails,r.data.ModelNode===js.data]))===w.fingerprint,'process history changed');}
+
+  };
+  Object.assign(s,{node:js,targetPort,edge,check,stage:'graph-bound'});check();
+  return {bound:true,node_id:js.FGuid,input_port_guid:targetPort.FGuid,edge_guid:edgeGuid};
+}
+
+export function bindJavascriptNativeRoundtripSchema({root,native,binding,schema}){
+  const s=globalThis.__loginomJavascriptNativeRoundtripV1,need=(v,m)=>{if(!v)throw Error('Roundtrip schema: '+m);};
+  need(s?.stage==='graph-bound'&&s.node===binding.native&&s.node.data===binding.nodeData,'owned schema stage');s.upstream();
+  const tab=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=tab.Controller.FController;
+  need(tab===s.input.card&&tab.Controller.Node.data.node===native&&model.FView.el.dom===root
+    &&schema.verified===true&&schema.generation?.checked===true,'owned code schema');
+  const tid=schema.generation.tid.replace(/;DisplayEl$/,'');
+  const controls=[...root.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')],control=controls.length===1&&Ext.getCmp(controls[0].id);
+  need(control?.el?.dom===controls[0]&&control.checked===true,'generation control');
+  s.schemaWitness={root,native,model,control,element:controls[0]};s.stage='schema-bound';
+  return {verified:true,schema_mode:'code'};
+}
+
+export function bindJavascriptNativeRoundtripSource({root,native,binding,schema}){
+  const s=globalThis.__loginomJavascriptNativeRoundtripV1,need=(v,m)=>{if(!v)throw Error('Roundtrip source: '+m);};
+  need(s?.stage==='schema-bound'&&s.node===binding.native&&s.node.data===binding.nodeData,'owned JS source');s.upstream();
+  const tab=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+  need(tab===s.input.card&&tab.Controller.Node.data.node===native&&tab.Controller.FController.FView.el.dom===root
+    &&schema.verified===true&&schema.generation?.checked===true,'owned code schema');
+  const witness=s.schemaWitness,control=witness.control;
+  need(root===witness.root&&native===witness.native&&tab.Controller.FController===witness.model
+    &&control.checked===true&&control.el.dom===witness.element,'same applied code mode');
+  const editors=[...root.querySelectorAll('.CodeMirror')].filter(e=>e.getBoundingClientRect().width&&e.getBoundingClientRect().height);
+  need(editors.length===1,'one source editor');const cm=editors[0].CodeMirror,doc=cm.getDoc();
+  const read=()=>{need(control.checked===true&&control.el.dom===witness.element,'code-generation changed');need(cm.getDoc()===doc&&doc.firstLine()===0&&doc.lineCount()>=1&&doc.lineCount()<=32,'source identity');
+    return Array.from({length:doc.lineCount()},(_,i)=>doc.getLine(i)).join('\n');};
+  need(read()===s.source,'exact source readback');s.sourceWitness={doc,read};s.stage='source-bound';
+  return {verified:true,source_sha256:s.source_sha256,schema_mode:'code'};
+}
+
+export function completeJavascriptNativeRoundtrip({execution,source_sha256}){
+  const s=globalThis.__loginomJavascriptNativeRoundtripV1;
+  if(s?.stage!=='source-bound'||source_sha256!==s.source_sha256||execution?.verified!==true||execution.owner_verified!==true
+    ||execution.status!=='completed'||!execution.process_id||!execution.process_record_id||!execution.group_id
+    ||execution.trial?.source_sha256!==s.source_sha256)throw Error('Roundtrip completed JS child required');
+  s.stage='execution-reserved';s.check();
+  const records=[...s.upstream()],children=records.filter(r=>r.data.ModelNode===s.node.data&&String(r.data.id)===execution.process_id&&String(r.internalId)===execution.process_record_id);
+  const groups=records.filter(r=>String(r.data.id)===execution.group_id);
+  if(children.length!==1||groups.length!==1)throw Error('Exact JS process objects required');
+  s.execution=execution;s.executionWitness={child:children[0],group:groups[0],fingerprint:JSON.stringify(records.map(r=>[r.internalId,r.data.id,r.data.Status,r.data.ErrorDetails,r.data.ModelNode===s.node.data]))};
+  s.stage='completed';s.check();
+  return {verified:true,execution_id:execution.execution_id,source_sha256};
+}
