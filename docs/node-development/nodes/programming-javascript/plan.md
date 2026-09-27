@@ -239,7 +239,7 @@ Source81/empty04 подтвердил UI declared-empty/nativezero: [1,2,3] →[
 (см. [дизайн отдельных случаев](native-cardinality-design.md)).
 Integer coercion и весь G5 остаются открыты,
 точные доказательства и ограничения — в checkpoint. В G5 ограниченными случаями установить
-Integer coercion для fraction/string/NaN/±Infinity; exact integer oracle
+Integer coercion для fraction/string/NaN/±Infinity по [семи фиксированным случаям](native-integer-coercion-design.md); exact integer oracle
 от этого не меняется. Неудача сначала локализуется по коду/входу/native output;
 ожидания не подгоняются и причина не объявляется «отсутствие ICU» без доказательства.
 
