@@ -37,7 +37,7 @@ function sourceEvidence(){
 function ui(){return {row_count:4,sample_rows:4,sample_complete:true,filter_enabled:false,precision:{numbers_verified:true,limitations:[]},limitations:[],
   schema:[{name:'Value',label:'Value',type:'real'}],sample:values.map((value,i)=>[{type:'real',value,is_null:i===0,precision:i===0?'exact_null':'17_significant_digits'}])};}
 
-async function fake({deferred=false,change}={}){
+async function fake({deferred=false,change,beforeBind}={}){
   class Workflow{} class Package{}
   const pack=new Package(),workflow=new Workflow();workflow.ParentNode=pack;
   const node={FGuid:'n',FIconCls:'bg-vendor-icon-importtextfile',FStatus:1,FRunning:false,data:{}},port={parent:node,FGuid:'p',FType:1,FSubType:1,FParam:0,FStatus:1};
@@ -81,9 +81,52 @@ async function fake({deferred=false,change}={}){
     execution:{status:'completed',execution_id:'d:1:2'},completed_child:{group_id:'2',process_id:'2.1',process_record_id:'3'},document_id:'d',workflow_id:'w',tab_tid:'tab',prefix:'TF',node_id:'n',port_guid:'p',origin:'http://test',
     schema:[{name:'Value',label:'Value',type:3}],row_count:4,deadline:Date.now()+30000};
   const result={page,execute,env,context,b,node,port,root,group,child,helper,dc,dt,store,model,session,counters,callbacks};
+  beforeBind?.(result);
   result.b=await execute(javascriptNativeInputCode(b));
   return result;
 }
+
+for(const [check,change]of Object.entries({
+  preview_visible:f=>f.model.FPreviewManager.FPreviewVisible=false,
+  preview_node_matches:f=>f.model.FPreviewManager.FPreviewForm.FCurrentPreviewNode={},
+  port_parent_matches:f=>f.port.parent={},
+  port_guid_matches:f=>f.port.FGuid='foreign-private-guid',
+  one_output:f=>f.node.FPorts[1].FCollection.push({}),
+  output_identity_matches:f=>f.node.FPorts[1].FCollection[0]={...f.port},
+  no_input_ports:f=>f.node.FPorts[0].FCollection.push({parent:f.node}),
+  output_type:f=>f.port.FType=0,
+  data_subtype:f=>f.port.FSubType=2,
+  param_zero:f=>f.port.FParam=1,
+  port_active:f=>f.port.FStatus=0,
+  last_call_node_matches:f=>f.model.FPreviewManager.FShowDataLastCall.Node={},
+  last_call_port_matches:f=>f.model.FPreviewManager.FShowDataLastCall.Port={}
+}))test('serialized binder preserves refusal and identifies '+check,async()=>{
+  let fixture;
+  await assert.rejects(()=>fake({beforeBind:f=>{fixture=f;change(f);}}),error=>{
+    const diagnostic=JSON.parse(error.message.split('owned import output0 Preview ')[1]);
+    assert.deepEqual(Object.entries(diagnostic.checks).filter(([,ok])=>!ok).map(([key])=>key),[check]);
+    assert.ok(Object.values(diagnostic.checks).every(ok=>typeof ok==='boolean'));
+    assert.ok(error.message.length<1600);assert.ok(!error.message.includes('foreign-private-guid'));return true;
+  });
+  assert.deepEqual(fixture.counters,{sent:0,requests:0,responses:0});
+  assert.equal(fixture.env.__loginomJavascriptNativeInputBindingV1,undefined);
+});
+test('refused inventory diagnostic is bounded, contains no data or getter evaluation',async()=>{
+  let getterCalls=0;
+  await assert.rejects(()=>fake({beforeBind:f=>{
+    f.node.FPorts[0].FCollection=Array.from({length:100},(_,i)=>({parent:i?{}:f.node,FType:i?999:0,
+      FSubType:i===0?2:i===1?3:'private payload',FParam:0,data:{secret:'private payload'}}));
+    Object.defineProperty(f.node.FPorts[0].FCollection[2],'FSubType',{get(){getterCalls++;return 1;}});
+    f.port.FParam='private payload';
+  }}),error=>{
+    const diagnostic=JSON.parse(error.message.split('owned import output0 Preview ')[1]);
+    assert.equal(diagnostic.input_inventory.count,'more_than_four');assert.equal(diagnostic.input_inventory.ports.length,4);
+    assert.deepEqual(diagnostic.input_inventory.ports.map(p=>p.subtype),['2','3','missing','other']);
+    assert.equal(diagnostic.output_param,'other');assert.ok(!error.message.includes('private payload'));
+    assert.ok(error.message.length<1600);return true;
+  });
+  assert.equal(getterCalls,0);
+});
 test('immutable33-byte fixture and explicit marker/request',()=>{
   const bytes=readFileSync(new URL('./fixtures/javascript-native-input-real.csv',import.meta.url));assert.deepEqual(verifyNativeInputFixture(bytes),nativeInputFixture);
   assert.throws(()=>verifyNativeInputFixture(Buffer.from(bytes.toString().replace('__JS_NULL__',''))));
@@ -197,7 +240,13 @@ async function driverFixture(mode){
     node_preview_schema:{verified:true,port_guid:'p',port:0,root_tid:'preview',fields:[{name:'Value',label:'Value',type:'real'}]}};
   Object.assign(x,{now:Date.now,receiptOptions:()=>({}),onRecord:async e=>{events.push(e);return mode==='journal'&&e.phase==='javascript_native_input_cells_verified'?{}:e;},execute:async code=>{
     if(code.includes('function bindJavascriptNativeRuntime'))return {};
-    if(code.includes('function bindJavascriptNativeInput'))return binding;
+    if(code.includes('function bindJavascriptNativeInput')){
+      if(mode==='binding')return fake({beforeBind:f=>{
+        // Observed port kinds, deliberately no invented param/status values.
+        f.node.FPorts[0].FCollection=[6,3].map(FSubType=>({parent:f.node,FType:0,FSubType}));
+      }});
+      return binding;
+    }
     if(code.includes('function readJavascriptNativeInput')){actions.push('native');if(mode==='read-and-status')throw Error('lost native reply');return raw;}
     if(code.includes('function javascriptNativeInputStatus')){if(['status','read-and-status'].includes(mode))throw Error('lost status');return lifecycle;}
     throw Error('unexpected execute');
@@ -213,6 +262,17 @@ test('owning driver journal acknowledgement precedes scoped Close and proof retu
   const f=await driverFixture(),proof=await f.run();assert.equal(proof.exact.native_bytes_verified,true);
   assert.deepEqual(f.actions,['click','press','native','close']);assert.deepEqual(f.events.map(e=>e.phase),['javascript_native_input_cells_verified','javascript_native_input_preview_closed']);
   assert.equal(f.states.at(-1).releasedResponses,4);
+});
+test('actual serialized binder diagnostic survives driver refusal and owned Close without native dispatch',async()=>{
+  const f=await driverFixture('binding');
+  await assert.rejects(f.run,error=>{
+    const diagnostic=JSON.parse(error.message.split('owned import output0 Preview ')[1]);
+    assert.equal(diagnostic.checks.no_input_ports,false);assert.equal(diagnostic.input_inventory.count,'2');
+    assert.deepEqual(diagnostic.input_inventory.ports,[6,3].map(subtype=>({parent_matches:true,type:'0',subtype:String(subtype),param:'missing',status:'missing'})));
+    return true;
+  });
+  assert.deepEqual(f.actions,['click','press','close']);assert.deepEqual(f.events.map(e=>e.phase),['javascript_native_input_preview_closed']);
+  assert.deepEqual(f.states,[]);
 });
 test('lost journal acknowledgement refuses proof but still closes only owned Preview',async()=>{
   const f=await driverFixture('journal');await assert.rejects(f.run,/acknowledgement/);assert.equal(f.actions.at(-1),'close');
