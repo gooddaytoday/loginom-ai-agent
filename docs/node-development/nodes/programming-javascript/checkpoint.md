@@ -15,6 +15,24 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source89 принят; K2/profile97 запущен
+
+Три runtime/test файла зафиксированы в developer worktree коммитом
+`ddc625cdd467da0b7665d72ffcf533c610987f4e`. Root сверил1274 pins с сохранённым
+снимком перед независимыми тестами, все текущие hash,93 прежних документа,
+логи разработчика и исходные evidence. Literal import closure:151 файлов/448edges;
+три resource entries без edges нормализованы к пустым спискам при сравнении.
+Root main2583 PASS, deny3 PASS, Python15 PASS; syntax3/diff-check PASS.
+Private manifest SHA d941209dc96583570f2dc6bd2718c052d133c8dda347a3b87e8ed783a3674c90.
+Это допуск исходников к калибровке, не готовность JS handler или CLI-приёмка.
+
+Вторая попытка из общего лимита5: K2-sync-v1, новый headed profile97/DISPLAY1,
+original session83954, evidence native-calibration-k2-probe-02. Последний опрос
+подтвердил RUNNING/prepare-typed-input; исходный handle не перезапускался.
+Registry/assignment/ledger и launch/source receipts сохранены. Перед запуском
+проверены отсутствие закреплённого Chromium, отдельный recovery96 и pins Node/Chrome.
+Первый неуспешный K2 остаётся в истории; сообщение о клике не меняет его результат.
+
 ### Сообщение пользователя о случайном клике: состояние проверено
 
 Пользователь сообщил о случайном клике в браузере во время последнего прогона.
