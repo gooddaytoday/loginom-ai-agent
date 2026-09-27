@@ -15,6 +15,7 @@ import {createJavascriptNativeInputSupport,readNativeInputDuringImport,verifyNat
 import {createHash} from 'node:crypto';
 import {decodeVariantFrame} from '../../client/lib/variant-native-decode.mjs';
 import {nativeRuntimePins} from '../../client/lib/collapse-native-runtime-pins.mjs';
+import {nativeFrontendPins} from '../../client/lib/collapse-native-output.mjs';
 import {verifyLoadedNativeRuntime} from '../../client/lib/collapse-native-runtime.mjs';
 
 // Exact function text from pinned bg.rtl.rpc.js, lines9810/47244.
@@ -474,7 +475,9 @@ async function driverFixture(mode){
     if(code.includes('function javascriptNativeInputStatus')){if(['status','read-and-status'].includes(mode))throw Error('lost status');return lifecycle;}
     throw Error('unexpected execute');
   }});
-  const dependencies={verifyFrontends:async()=>[],verifyRuntime:()=>({}),verifyCountLoaders:()=>({}),createProcedure:()=>({
+  const dependencies={verifyFrontends:async()=>Object.entries(nativeFrontendPins).map(([name,sha256])=>({name,url:new URL('/app/bg/'+(name==='SysUtils.js'?'ts/':'js/')+name,'http://test').href,sha256})),
+    verifyRuntime:()=>({binding_id:id,document_id:binding.document_id,functions:nativeRuntimePins.functions,constants:nativeRuntimePins.constants}),
+    verifyCountLoaders:()=>({PrepareColumnInfoAndRowCount:'d952415558676c3caf569a51d88bf026e661abdaaf08842d870ddba139730e3f',InitOutput:'c01544ac551e88997f9cea9b62314234ad435bc7632357861cdfc6013e89960e',DataSourceProxyRead:'6206671eaf111d80459c3ed1d5878125ef37918fb1abacc1cd19ce42c7fdf91d'}),createProcedure:()=>({
     observe:async({ready})=>{assert.equal(ready(graph),true);return graph;},
     perform:async({ready,resolve,identity})=>{assert.equal(ready(graph),true);assert.ok(identity());const action=resolve(graph);actions.push(action.ref==='close'?'close':action.verb);
       if(mode==='close'&&action.ref==='close')throw Error('close lost');}
@@ -485,6 +488,37 @@ test('owning driver journal acknowledgement precedes scoped Close and proof retu
   const f=await driverFixture(),proof=await f.run();assert.equal(proof.exact.native_bytes_verified,true);
   assert.deepEqual(f.actions,['click','press','native','close']);assert.deepEqual(f.events.map(e=>e.phase),['javascript_native_input_cells_verified','javascript_native_input_preview_closed']);
   assert.equal(f.states.at(-1).releasedResponses,4);
+});
+for(const wrongAck of [false,true])test('production journal full proof, disk, secrets and exact ACK: '+wrongAck,async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'javascript-native-proof-'));
+  t.after(()=>rm(directory,{recursive:true,force:true}));
+  const journal=createExecutionJournal({directory,metadata:{sessionId:'test',clientRevision:'test'},knownSecrets:['private-secret']});
+  const f=await driverFixture(),proofs=[];
+  f.x.onRecord=async event=>{
+    const saved=await journal(event);
+    if(event.phase==='javascript_native_input_cells_verified'){
+      assert.equal(JSON.stringify(saved.proof),JSON.stringify(event.proof));proofs.push(event.proof);
+      if(wrongAck)saved.proof.lifecycle.releasedResponses=3;
+    }
+    return saved;
+  };
+  if(wrongAck)await assert.rejects(f.run,/native journal acknowledgement differs/);
+  if(!wrongAck)assert.deepEqual(await f.run(),proofs[0]);
+  const proof=proofs[0];
+  assert.deepEqual(Object.keys(proof),['exact','raw','binding','runtime','frontends','subscription_proxy_source_sha256','count_loader_sha256','lifecycle']);
+  assert.deepEqual(proof.runtime.functions,nativeRuntimePins.functions);assert.deepEqual(proof.runtime.constants,nativeRuntimePins.constants);
+  assert.equal(proof.frontends.length,Object.keys(nativeFrontendPins).length);assert.equal(Object.keys(proof.count_loader_sha256).length,3);
+  assert.deepEqual(proof.subscription_proxy_source_sha256,verifyNativeInputCookieRuntime(cookieSources));
+  assert.equal(proof.binding.origin,'http://test/');assert.equal(proof.raw.cells.length,4);
+  assert.equal(proof.lifecycle.releasedRequests,4);assert.equal(proof.lifecycle.releasedResponses,4);
+  const sensitive=await journal({phase:'redaction_check',authorization:'Bearer credential-sentinel',password:'password-sentinel',cookie_runtime_sha256:'legacy-sensitive-key',message:'contains private-secret'});
+  for(const key of ['authorization','password','cookie_runtime_sha256'])assert.equal(sensitive[key],'[redacted]');
+  assert.ok(!sensitive.message.includes('private-secret'));
+  const disk=readFileSync(join(directory,'execution-events.jsonl'),'utf8');
+  const records=disk.trim().split('\n').map(line=>JSON.parse(line));
+  assert.deepEqual(records.find(e=>e.phase==='javascript_native_input_cells_verified').proof,proof);
+  for(const secret of ['credential-sentinel','password-sentinel','legacy-sensitive-key','private-secret'])assert.ok(!disk.includes(secret));
+  assert.equal(f.actions.at(-1),'close');
 });
 test('actual serialized binder diagnostic survives driver refusal and owned Close without native dispatch',async()=>{
   const f=await driverFixture('binding');

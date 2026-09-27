@@ -95,7 +95,7 @@ export async function readNativeInputDuringImport({options,ctx,provenance,target
         throw Object.assign(new AggregateError([readError,statusError],readError.message),{observationError:readError,cleanupError:statusError});}}
     check();const expected={...binding,read_id:readId};
     const exact=verifyNativeInputRead(raw,{binding:expected,lifecycle,provenance});
-    const proof={exact,raw,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,cookie_runtime_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
+    const proof={exact,raw,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,subscription_proxy_source_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
     const event={phase:'javascript_native_input_cells_verified',operation_id:operation.id,proof};
     const saved=await onRecord(event);need(saved?.phase===event.phase&&JSON.stringify(saved.proof)===JSON.stringify(proof),'native journal acknowledgement differs');
     return proof;
