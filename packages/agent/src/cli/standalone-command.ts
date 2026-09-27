@@ -3,6 +3,8 @@ import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { loginomManagement } from "./loginom-management"
+import { standaloneSessionCompletion } from "./standalone-run"
+import { standaloneCancellation } from "./standalone-cancellation"
 import { standaloneBundle } from "./standalone-bundle"
 
 export async function standaloneCommand(args: string[], paths: ReturnType<typeof cliProfile>) {
@@ -71,28 +73,44 @@ export async function standaloneCommand(args: string[], paths: ReturnType<typeof
     failure("CLI_ARGUMENT_INVALID")
     return
   }
-  const bundle = await standaloneBundle().catch((error) => { failure(error); return undefined })
-  if (!bundle) return
-  const host = await launchNodeHost({
-    node: bundle.node,
-    entry: bundle.entry,
-    root: paths.loginom,
-    resources: bundle.resources,
-    headless: parsed.values.headless && !parsed.values["no-headless"],
-    environment: process.env,
-    strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
-  })
+  const control = await standaloneSessionCompletion(standaloneCancellation(), paths.loginom)
   try {
-    const result = await loginomManagement(host, parsed.positionals[1], {
-      stdinJSON: parsed.values["stdin-json"],
-      acknowledge: parsed.values.acknowledge,
-      ids: parsed.positionals.slice(2),
+    if (control && (control.version !== 2 || !["setup", "check"].includes(parsed.positionals[1])))
+      throw Error("CLI_CONTROL_INVALID")
+    const bundle = await standaloneBundle().catch((error) => {
+      failure(error)
+      return undefined
     })
-    process.stdout.write(JSON.stringify(result, null, parsed.values.format === "json" ? undefined : 2) + "\n")
-  } catch (error) {
-    failure(error)
+    if (!bundle) {
+      if (control) throw Error("CLI_CONTROL_UNCONFIRMED")
+      return
+    }
+    const host = await launchNodeHost({
+      loginBarrier: control?.loginBarrier,
+      node: bundle.node,
+      entry: bundle.entry,
+      root: paths.loginom,
+      resources: bundle.resources,
+      headless: parsed.values.headless && !parsed.values["no-headless"],
+      environment: process.env,
+      strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
+    })
+    try {
+      const result = await loginomManagement(host, parsed.positionals[1], {
+        stdinJSON: parsed.values["stdin-json"],
+        acknowledge: parsed.values.acknowledge,
+        ids: parsed.positionals.slice(2),
+      })
+      control?.managementComplete()
+      process.stdout.write(JSON.stringify(result, null, parsed.values.format === "json" ? undefined : 2) + "\n")
+    } catch (error) {
+      if (control) throw Error("CLI_CONTROL_UNCONFIRMED")
+      failure(error)
+    } finally {
+      await host.close()
+    }
   } finally {
-    await host.close()
+    control?.close()
   }
 }
 

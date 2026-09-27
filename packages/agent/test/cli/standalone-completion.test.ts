@@ -12,6 +12,8 @@ afterEach(async () => {
 
 async function fixture(
   options: {
+    managed?: "normal" | "duplicate" | "parallel" | "foreign" | "management" | "empty" | "missing-fd" | "abort"
+    managementCommand?: boolean
     status?: string
     wrongBinding?: boolean
     noSession?: boolean
@@ -25,6 +27,14 @@ async function fixture(
 ) {
   const root = await realpath(await mkdtemp(join(tmpdir(), "cli-completion-")))
   roots.push(root)
+  if (options.managed) {
+    await mkdir(join(root, "registration"))
+    await writeFile(
+      join(root, "registration/session-registration.json"),
+      JSON.stringify({ version: 2, attemptId: "trusted-attempt", loginBarrier: 2 }),
+      { mode: 0o600 },
+    )
+  }
   const directCode = `
     import { standalone } from './src/cli/standalone.ts';
     import { standaloneSessionCompletion } from './src/cli/standalone-run.ts';
@@ -37,13 +47,26 @@ async function fixture(
     let privateResult;
     const original = fstatSync(3);
     await standalone(['run'], async () => {
-      const control = await standaloneSessionCompletion(abort.signal);
+      if(options.managed === "missing-fd") delete process.env.LOGINOM_AI_AGENT_CLI_CONTROL_FD;
+      const control = await standaloneSessionCompletion(abort.signal, options.managed ? ${JSON.stringify(join(root, "registration"))} : undefined);
       const descendant = spawnSync(process.execPath, ['--eval',
         'import {fstatSync} from "node:fs"; let same=false;try{const s=fstatSync(3);same=s.dev==='+original.dev+'&&s.ino==='+original.ino+'}catch{}; console.log(JSON.stringify({same,hasKey:process.env.LOGINOM_AI_AGENT_CLI_CONTROL_FD!==undefined}))'],
         {env:process.env,encoding:'utf8'});
       privateResult = { envRemoved: process.env.LOGINOM_AI_AGENT_CLI_CONTROL_FD === undefined,
         descendant: JSON.parse(descendant.stdout) };
       try {
+        if (options.managed) {
+          const binding={attemptId:options.managed==='foreign'?'foreign':'trusted-attempt',loginId:'00112233-4455-4677-8899-aabbccddeeff',generation:7,purpose:options.managed==='management'?'validation':'readiness',chat:options.managed==='management'?'00112233-4455-4677-8899-aabbccddeeff':'readiness',account:'fresh-user'};
+          if(options.managed==='parallel') {
+            await Promise.all([control.loginBarrier({phase:'begin',binding}),control.loginBarrier({phase:'begin',binding})]);
+          } else if(options.managed!=='empty') {
+            await control.loginBarrier({phase:'begin',binding});
+            if(options.managed==='abort')abort.abort();
+            if(options.managed==='duplicate')await control.loginBarrier({phase:'begin',binding});
+            await control.loginBarrier({phase:'authenticated',binding});
+          }
+          if(options.managed==='management') { control.managementComplete();return }
+        }
         if (!options.noSession) control.session('ses_actual_backend');
         if (options.twice) control.session('ses_foreign');
         await control.complete({ request: async (method, input) => {
@@ -116,15 +139,56 @@ async function fixture(
     `,
     )
   }
-  const code = options.integration
+  if (options.managementCommand) {
+    const { acquireProfile } = await import("../../src/cli/profile")
+    const profile = await acquireProfile(join(root, "profile"), "dev")
+    await writeFile(
+      join(profile.paths.loginom, "session-registration.json"),
+      JSON.stringify({ version: 2, attemptId: "trusted-attempt", loginBarrier: 2 }),
+      { mode: 0o600 },
+    )
+    await profile.release()
+    const bundle = join(root, "bundle")
+    await mkdir(join(bundle, "host"), { recursive: true })
+    await mkdir(join(bundle, "bin"))
+    await symlink(process.env.LOGINOM_AI_AGENT_TEST_NODE!, join(bundle, "bin/node"))
+    await writeFile(join(bundle, "bin/loginom-keychain"), "")
+    await writeFile(
+      join(bundle, "host/node-host.mjs"),
+      `
+      import {randomUUID} from 'node:crypto';
+      import {writeFileSync} from 'node:fs';
+      let pending, ack;
+      process.on('message',m=>{
+        const reply=result=>process.send({id:m.id,result});
+        if(m.id===ack){process.send({id:pending,error:'LOGINOM_LOGIN_BARRIER_UNKNOWN'});return}
+        if(m.method==='start')return reply({protocol:1,ready:true,pid:process.pid});
+        if(m.method==='connection.status')return reply({revision:1,generation:7,url:'https://fixture.test/',username:'fresh-user',folder:'/',hasApiKey:true,hasPassword:false,state:'ready'});
+        if(m.method==='connection.check'){
+          pending=m.id;ack=randomUUID();
+          return process.send({id:ack,method:'login-barrier',input:{phase:'begin',binding:{attemptId:'trusted-attempt',loginId:'00112233-4455-4677-8899-aabbccddeeff',generation:7,purpose:'validation',chat:'00112233-4455-4677-8899-aabbccddeeff',account:'fresh-user'}}});
+        }
+        if(m.method==='close'){writeFileSync(${JSON.stringify(join(root, "managed-closed.json"))},JSON.stringify({closed:true}));process.send({id:m.id,result:{closed:true}},()=>process.exit(0))}
+      });
+    `,
+    )
+  }
+  const code = options.managementCommand
     ? `
+    import {standalone} from './src/cli/standalone.ts';
+    import {standaloneCommand} from './src/cli/standalone-command.ts';
+    await standalone(['loginom','check','--headless'],standaloneCommand).catch(()=>{process.exitCode=1});
+    console.log(JSON.stringify({finished:true}));
+  `
+    : options.integration
+      ? `
       import {fstatSync,writeFileSync} from 'node:fs';
       const original=fstatSync(3);
       // The local synthetic provider invokes this through the real backend bash tool.
       writeFileSync(${JSON.stringify(join(root, "capability-probe.ts"))},
         'import {fstatSync,writeFileSync} from "node:fs";let same=false;try{const s=fstatSync(3);same=s.dev==='+original.dev+'&&s.ino==='+original.ino+'}catch{};writeFileSync("capability-result.json",JSON.stringify({same,hasKey:process.env.LOGINOM_AI_AGENT_CLI_CONTROL_FD!==undefined,runtime:process.versions.bun}));');
       process.argv=['bun','standalone','run','--headless','--format','json','--dir',${JSON.stringify(root)},'--model','test/test-model','--dangerously-skip-permissions','--','fixture probe'];await import('./src/standalone.ts');`
-    : directCode
+      : directCode
   const relay = `
     const {spawn}=require('node:child_process');
     const child=spawn(${JSON.stringify(process.execPath)}, ['--eval', ${JSON.stringify(code)}], {
@@ -148,7 +212,7 @@ async function fixture(
       LOGINOM_AI_AGENT_CLI_PROFILE: join(root, "profile"),
       LOGINOM_AI_AGENT_CLI_CONTROL_FD: "3",
       LOGINOM_AI_AGENT_CHANNEL: "dev",
-      ...(options.integration
+      ...(options.integration || options.managementCommand
         ? {
             LOGINOM_AI_AGENT_CLI_BUNDLE: join(root, "bundle"),
             LOGINOM_AI_AGENT_PURE: "1",
@@ -203,7 +267,7 @@ async function fixture(
       },
     },
     send(method: string) {
-      child.stdin!.write(JSON.stringify({ version: 1, method }) + "\n")
+      child.stdin!.write(JSON.stringify({ version: options.managed ? 2 : 1, method }) + "\n")
     },
     async read() {
       return frames.length
@@ -365,4 +429,91 @@ test("actual standalone denies unregistered profile before any model call", asyn
     finishes: 0,
     acquires: [],
   })
+})
+
+const loginId = "00112233-4455-4677-8899-aabbccddeeff"
+async function acknowledgeLogin(
+  f: Awaited<ReturnType<typeof fixture>>,
+  phase: "begin" | "authenticated",
+  purpose: "readiness" | "validation" = "readiness",
+) {
+  expect(await f.read()).toEqual({
+    version: 2,
+    type: "login",
+    phase,
+    binding: {
+      attemptId: "trusted-attempt",
+      loginId,
+      generation: 7,
+      purpose,
+      chat: purpose === "validation" ? loginId : "readiness",
+      account: "fresh-user",
+    },
+  })
+  f.peer.write(JSON.stringify({ version: 2, method: "login-ack", loginId, phase }) + "\n")
+}
+test("managed v2 private FD registers before completion, keeps exact version and legacy receipt", async () => {
+  const f = await fixture({ managed: "normal" })
+  await acknowledgeLogin(f, "begin")
+  await acknowledgeLogin(f, "authenticated")
+  expect(await f.read()).toEqual({ version: 2, type: "ready" })
+  f.send("options")
+  expect(await f.read()).toMatchObject({ version: 2, type: "options" })
+  f.send("finish")
+  expect(await f.read()).toMatchObject({ version: 2, type: "receipt", receipt: { version: 1, status: "SUCCEEDED" } })
+  expect(await f.result()).toMatchObject({ code: 0, guarded: false })
+})
+test.each(["foreign", "parallel", "empty", "missing-fd"] as const)(
+  "managed %s refuses without successful login or completion",
+  async (managed) => {
+    const f = await fixture({ managed })
+    expect(await f.result()).toMatchObject({ code: 1, guarded: true })
+  },
+)
+test("managed duplicate begin is unknown after one acknowledged begin", async () => {
+  const f = await fixture({ managed: "duplicate" })
+  await acknowledgeLogin(f, "begin")
+  expect(await f.result()).toMatchObject({ code: 1, guarded: true })
+})
+test.each(["wrong-id", "wrong-phase", "extra", "duplicate-key", "eof"])(
+  "managed ACK %s denies authenticated step and retains guard",
+  async (mode) => {
+    const f = await fixture({ managed: "normal" })
+    expect(await f.read()).toMatchObject({ version: 2, type: "login", phase: "begin" })
+    if (mode === "eof") f.peer.end()
+    else if (mode === "duplicate-key")
+      f.peer.write('{"version":2,"version":2,"method":"login-ack","loginId":"' + loginId + '","phase":"begin"}\n')
+    else
+      f.peer.write(
+        JSON.stringify({
+          version: 2,
+          method: "login-ack",
+          loginId: mode === "wrong-id" ? "11112233-4455-4677-8899-aabbccddeeff" : loginId,
+          phase: mode === "wrong-phase" ? "authenticated" : "begin",
+          ...(mode === "extra" ? { extra: true } : {}),
+        }) + "\n",
+      )
+    const result = await f.result()
+    expect(result).toMatchObject({ code: 1, guarded: true })
+    expect(result.observation.events).toEqual(["host.close"])
+  },
+)
+test("management v2 closes after ACKs without producing a completion receipt", async () => {
+  const f = await fixture({ managed: "management" })
+  await acknowledgeLogin(f, "begin", "validation")
+  await acknowledgeLogin(f, "authenticated", "validation")
+  expect(await f.result()).toMatchObject({ code: 0, guarded: false, observation: { events: ["host.close"] } })
+})
+
+test("cancellation after begin ACK cannot authenticate or clear the profile guard", async () => {
+  const f = await fixture({ managed: "abort" })
+  await acknowledgeLogin(f, "begin")
+  expect(await f.result()).toMatchObject({ code: 1, guarded: true, observation: { events: ["host.close"] } })
+})
+
+test("actual managed command failure propagates to the outer profile guard after confirmed local Host cleanup", async () => {
+  const f = await fixture({ managementCommand: true })
+  await acknowledgeLogin(f, "begin", "validation")
+  expect(await f.result()).toMatchObject({ code: 1, guarded: true })
+  expect(JSON.parse(await readFile(join(f.root, "managed-closed.json"), "utf8"))).toEqual({ closed: true })
 })

@@ -269,6 +269,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     sessionId: session.metadata.sessionId, origin: new URL(config.loginomUrl).origin,
                     build: state.target.loginom_build, documentId: state.document_id,
                     account: state.loginom_account, directories: config.storageDirectories,
+                    managedLoginBarrier: config.managedLoginBarrier === true,
                   });
                   const geometry = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
                     code: makeBrowserGeometryCode({ session_id: session.metadata.sessionId,

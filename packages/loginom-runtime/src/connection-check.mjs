@@ -25,7 +25,17 @@ export function loginomAddress(value) {
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
-export async function loginPage(page, candidate) {
+export async function loginPage(page, candidate, loginBarrier) {
+  if (loginBarrier !== undefined && typeof loginBarrier !== "function") throw Error("LOGINOM_LOGIN_BARRIER_INVALID")
+  const barrier = async (phase) => {
+    if (!loginBarrier) return
+    try {
+      if ((await loginBarrier(phase)) !== undefined) throw Error()
+    } catch {
+      throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+    }
+  }
+  await barrier("begin")
   await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 })
   const field = (name) => page.locator(`[data-tid="LoginForm;Login;${name}"]`)
   const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
@@ -44,6 +54,7 @@ export async function loginPage(page, candidate) {
     () => globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
   )
   if (identity !== candidate.username) throw Error("LOGINOM_ACCOUNT_MISMATCH")
+  await barrier("authenticated")
   return { authenticated: true }
 }
 
@@ -70,7 +81,14 @@ export async function checkKnowledge(endpoint, apiKey) {
   }
 }
 
-export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false }) {
+export async function loginBrowser({
+  browserPath,
+  profile,
+  candidate,
+  headless = false,
+  keepOpen = false,
+  loginBarrier,
+}) {
   const { chromium } = require("playwright-core")
   const launch = browserLaunch(headless)
   await mkdir(profile, { recursive: true, mode: 0o700 })
@@ -107,7 +125,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     // This authenticated page predates MCP; its capability choice must already
     // match the executor's download/byte-verification path on the first load.
     await context.addInitScript({ content: browserDownloadScript(candidate.url) })
-    const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate)
+    const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate, loginBarrier)
     if (!keepOpen) {
       await context.close()
       return result
@@ -116,7 +134,15 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     return { ...result, context }
   } catch (error) {
     await context.close().catch(() => undefined)
-    if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED"].includes(error?.message)) throw error
+    if (
+      [
+        "LOGINOM_ACCOUNT_MISMATCH",
+        "LOGINOM_LOGIN_REJECTED",
+        "LOGINOM_LOGIN_BARRIER_UNKNOWN",
+        "LOGINOM_LOGIN_BARRIER_INVALID",
+      ].includes(error?.message)
+    )
+      throw error
     throw Error("LOGINOM_LOGIN_UNAVAILABLE")
   }
 }

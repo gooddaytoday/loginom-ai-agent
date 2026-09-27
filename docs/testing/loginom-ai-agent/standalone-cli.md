@@ -573,3 +573,46 @@ Active-import driver также принимает SIGINT. Для этого с�
 
 Обязательная матрица и текущие исходные доказательства: [browser-scale](browser-scale.md).
 Исторические результаты этого runbook не подтверждают исправленный payload.
+
+
+### Managed Loginom v2 (2026-09-27)
+
+Подготовлен исходный контракт управляемого входа через существующие приватные
+IPC и унаследованный Unix socket CLI. Trusted launcher заранее создаёт в
+Loginom-профиле приватный `session-registration.json` с точной формой
+`{"version":2,"attemptId":"<trusted-attempt>","loginBarrier":2}`. Это не публичная
+команда и не параметр модели. Регистрация v1 и обычный standalone сохраняют
+прежнее поведение; v2 без callback/приватного FD отказывает до подключения.
+
+- Callback подключается до запуска Host, включая восстановление readiness,
+  `loginom setup`, `loginom check` и создание runtime чата. Перед каждым таким
+  входом Host сохраняет и синхронизирует `login-barrier-pending.json`, создаёт
+  новый `loginId` UUIDv4 и связывает его с attempt, generation, purpose, chat и
+  account. Одновременно допускается один вход; предел — 32 входа на Host.
+- Фаза `begin` требует коррелированного ACK до навигации Loginom. Фаза
+  `authenticated` отправляется после фактического чтения UserName; её ACK нужен
+  до READY, инструментов и закрытия проверочного browser context. На каждую
+  фазу отведено 60 секунд. Повтор, чужой ACK, EOF или отмена не разрешают повтор
+  эффекта; неизвестный результат сохраняет барьер входа и writer guard профиля.
+- Управляемые `setup/check` используют отдельный режим контроллера `login-only`:
+  допустимы validation/readiness, требуется хотя бы один подтверждённый validation
+  и отсутствие незавершённых фаз. EOF сам по себе не успех: контроллер отдельно
+  проверяет exit 0. Это только регистрация входов, без technical PASS и без
+  доказательства завершения серверных сессий. Для `run` EOF не заменяет прежнюю
+  последовательность `ready → options → finish → receipt`.
+- Внешние frames имеют version 2; вложенный `SessionCompletionReceipt` остаётся
+  строго version 1. Управляемый runtime отказывает при обнаруженном разрыве или
+  смене native session/connection и не нажимает «Восстановить». Это проверка на
+  границах операций, а не непрерывный монитор сети. Обычное восстановление v1
+  не изменено. Product не получает admin credentials и не выдаёт свой loginId
+  за серверный Loginom session ID: точную регистрацию ведёт root provisioning.
+
+Проверено на исходниках поверх `d37736f4000fedfd3e2dd38837d47a7b94df96e2`:
+**131 targeted-тест PASS** (Host barrier/реальный Node relay 17, CLI v1/v2 32,
+Host session completion 19, process/transport 10, runtime input/login 26,
+reconnect/storage 27), Host и Agent package typecheck PASS. Проверка CLI включает
+UNKNOWN после begin ACK: даже при подтверждённом локальном Host cleanup внешний
+writer guard остаётся. В joined Node fixture явно использован synthetic Linux
+credential codec; это не Linux/Keychain qualification. Проверки сборки,
+установленного артефакта и живого Loginom для этой правки не выполнялись;
+исторические PASS выше на новые исходники не переносятся.

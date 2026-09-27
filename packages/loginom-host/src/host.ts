@@ -1,8 +1,8 @@
 import { inputStore, type InputFile } from "./inputs"
-import { readFile, rm } from "node:fs/promises"
+import { readFile, rm, open, lstat, unlink } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { randomUUID } from "node:crypto"
-import { supervise } from "./supervisor"
+import { supervise, type LoginBarrier } from "./supervisor"
 import { connectionService } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
@@ -16,6 +16,7 @@ export async function createLoginomHost(options: {
   environment?: NodeJS.ProcessEnv
   headless?: boolean
   strictRecovery?: boolean
+  loginBarrier?: LoginBarrier
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -23,6 +24,21 @@ export async function createLoginomHost(options: {
   const environment = { ...(options.environment ?? process.env) }
   const inputs = inputStore(join(root, "inputs"))
   const registration = await readSessionRegistration(root)
+  const barrier = options.loginBarrier
+  if ((registration?.version === 2) !== (typeof barrier === "function")) throw Error("LOGINOM_LOGIN_BARRIER_REQUIRED")
+  const pendingLogin = join(root, "login-barrier-pending.json")
+  if (
+    registration?.version === 2 &&
+    (await lstat(pendingLogin).then(
+      () => true,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return false
+        throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+      },
+    ))
+  )
+    throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+  const loginState = { active: false, failed: false, count: 0 }
   const journal = await recoveryStore(join(root, "recovery"), {
     strict: options.strictRecovery === true || !!registration,
   })
@@ -34,11 +50,7 @@ export async function createLoginomHost(options: {
   const lost = new Set<string>()
   const stale = new Set<string>()
   type Runtime = Awaited<ReturnType<typeof supervise>>
-  function retain(
-    generation: { children: Map<string, Promise<Runtime>> },
-    chat: string,
-    child: Promise<Runtime>,
-  ) {
+  function retain(generation: { children: Map<string, Promise<Runtime>> }, chat: string, child: Promise<Runtime>) {
     const tracked = child.then((runtime) => {
       void runtime.exited.then(() => {
         if (generation.children.get(chat) !== tracked) return
@@ -55,22 +67,92 @@ export async function createLoginomHost(options: {
   }
   async function launch(connection: ActiveConnection, chat: string, validation = false) {
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
-    return supervise({
-      node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-      entry: join(resources, "runtime/src/managed-entry.mjs"),
-      resources,
-      stateDir: join(root, validation ? "validation" : "runtime"),
-      generation: connection.generation,
-      chat,
-      connection,
-      validation,
-      headless: validation || chat === "readiness" || options.headless === true,
-      environment,
-      endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
-      actionManifestUri: manifest.actionManifestUri,
-      actionManifestSha256: manifest.actionManifestSha256,
-      trustedAttempt: registration ? { attemptId: registration.attemptId } : undefined,
-    })
+    if (barrier && (loginState.active || loginState.failed || loginState.count >= 32))
+      throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+    const loginBinding =
+      barrier && registration
+        ? Object.freeze({
+            attemptId: registration.attemptId,
+            loginId: randomUUID(),
+            generation: connection.generation,
+            purpose: validation
+              ? ("validation" as const)
+              : chat === "readiness"
+                ? ("readiness" as const)
+                : ("chat" as const),
+            chat,
+            account: connection.username,
+          })
+        : undefined
+    let loginStamp: { dev: number; ino: number } | undefined
+    if (loginBinding) {
+      loginState.active = true
+      loginState.count++
+      try {
+        const file = await open(pendingLogin, "wx", 0o600)
+        try {
+          await file.writeFile(JSON.stringify(loginBinding) + "\n")
+          await file.sync()
+          loginStamp = await file.stat()
+        } finally {
+          await file.close()
+        }
+        const directory = await open(root, "r")
+        try {
+          await directory.sync()
+        } finally {
+          await directory.close()
+        }
+      } catch {
+        loginState.failed = true
+        throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+      }
+    }
+    try {
+      const runtime = await supervise({
+        node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+        entry: join(resources, "runtime/src/managed-entry.mjs"),
+        resources,
+        stateDir: join(root, validation ? "validation" : "runtime"),
+        generation: connection.generation,
+        chat,
+        connection,
+        validation,
+        headless: validation || chat === "readiness" || options.headless === true,
+        environment,
+        endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
+        actionManifestUri: manifest.actionManifestUri,
+        actionManifestSha256: manifest.actionManifestSha256,
+        loginBinding,
+        loginBarrier: barrier,
+        trustedAttempt: registration ? { attemptId: registration.attemptId } : undefined,
+      })
+      if (loginBinding) {
+        try {
+          const current = await lstat(pendingLogin)
+          if (!loginStamp || !current.isFile() || current.dev !== loginStamp.dev || current.ino !== loginStamp.ino)
+            throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+          await unlink(pendingLogin)
+          const directory = await open(root, "r")
+          try {
+            await directory.sync()
+          } finally {
+            await directory.close()
+          }
+        } catch {
+          await runtime.close().catch(() => undefined)
+          throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+        }
+        loginState.active = false
+      }
+      return runtime
+    } catch (error) {
+      if (loginBinding) {
+        loginState.failed = true
+        throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+      }
+      throw error
+    }
   }
   const sessions = await sessionCompletion({
     root,
@@ -145,6 +227,7 @@ export async function createLoginomHost(options: {
   return {
     ...service,
     acquire(run: string) {
+      if (loginState.failed || loginState.active) throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
       if (sessions.blocked() || sessions.completed()) return
       return service.acquire(run)
     },
@@ -191,7 +274,14 @@ export async function createLoginomHost(options: {
         const child = generation.children.get(chat)
         if (!child) continue
         generation.children.delete(chat)
-        closing.push(child.then((runtime) => runtime.close()).then(() => undefined, () => undefined))
+        closing.push(
+          child
+            .then((runtime) => runtime.close())
+            .then(
+              () => undefined,
+              () => undefined,
+            ),
+        )
       }
       await Promise.all(closing)
       restarts.delete(chat)
@@ -213,6 +303,7 @@ export async function createLoginomHost(options: {
       return inputs.admit(`${generation}:${chat}`, userMessage, files, `/${current.connection.username}`)
     },
     async runtime(generation: number, chat: string) {
+      if (loginState.failed) throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       const previous = current.children.get(chat)

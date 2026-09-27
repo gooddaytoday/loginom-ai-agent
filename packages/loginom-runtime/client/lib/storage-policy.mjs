@@ -37,12 +37,14 @@ export function storageTidSuffix(name) {
   return name.replace(/\s/g, '_').replaceAll(',', '');
 }
 
-export function createStorageBinding({ sessionId, origin, build, documentId, account, directories }) {
+export function createStorageBinding({ sessionId, origin, build, documentId, account, directories, managedLoginBarrier = false }) {
+  if (typeof managedLoginBarrier !== 'boolean') throw Error('Managed login barrier policy must be boolean');
   if (!['http:', 'https:'].includes(new URL(origin).protocol)) throw Error('Observed Loginom origin is required');
   if (![sessionId, documentId, account].every(v => typeof v === 'string' && v.trim() && v.length <= 200)
       || build !== '7.4.2' || new URL(origin).origin !== origin) throw Error('Observed Loginom identity is required');
   return Object.freeze({ version: 1, session_id: sessionId, origin, loginom_build: build,
-    document_id: documentId, loginom_account: account, directories: storageDirectories(directories) });
+    document_id: documentId, loginom_account: account, directories: storageDirectories(directories),
+    ...(managedLoginBarrier ? { managed_login_barrier: true } : {}) });
 }
 
 // Every browser operation retains the account/document observed by prepare.

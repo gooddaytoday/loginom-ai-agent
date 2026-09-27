@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto"
+import type { LoginBarrier } from "./supervisor"
 import { EventEmitter } from "node:events"
 import { isAbsolute } from "node:path"
 import { Option, Schema } from "effect"
@@ -30,7 +32,56 @@ const save = Schema.decodeUnknownOption(Loginom.Save)
 const cancel = Schema.decodeUnknownOption(Loginom.Cancel)
 const recover = Schema.decodeUnknownOption(Loginom.AcknowledgeRecovery)
 
+const loginPending = new Map<
+  string,
+  { resolve(): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
+>()
+let loginFailed = false
+function failLogin() {
+  loginFailed = true
+  for (const item of loginPending.values()) {
+    clearTimeout(item.timer)
+    item.reject(Error("LOGINOM_LOGIN_BARRIER_UNKNOWN"))
+  }
+  loginPending.clear()
+}
+const loginBarrier: LoginBarrier = async (event) => {
+  if (loginFailed || state.closed || loginPending.size || !process.connected)
+    throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+  const id = randomUUID()
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(failLogin, 60_000)
+    loginPending.set(id, { resolve, reject, timer })
+    reply({ id, method: "login-barrier", input: event })
+  })
+  if (loginFailed || state.closed) throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+}
 process.on("message", (message: unknown) => {
+  if (
+    message &&
+    typeof message === "object" &&
+    "id" in message &&
+    typeof message.id === "string" &&
+    loginPending.has(message.id)
+  ) {
+    const pending = loginPending.get(message.id)!
+    if (
+      Object.keys(message).sort().join() !== "id,result" ||
+      !("result" in message) ||
+      !message.result ||
+      typeof message.result !== "object" ||
+      Object.keys(message.result).join() !== "accepted" ||
+      !("accepted" in message.result) ||
+      message.result.accepted !== true
+    ) {
+      failLogin()
+      return
+    }
+    clearTimeout(pending.timer)
+    loginPending.delete(message.id)
+    pending.resolve()
+    return
+  }
   const operation = dispatch(message)
   operations.add(operation)
   void operation
@@ -82,10 +133,12 @@ async function dispatch(message: unknown) {
         !isAbsolute(input.resources) ||
         !("headless" in input) ||
         typeof input.headless !== "boolean" ||
-        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean")
+        ("strictRecovery" in input && typeof input.strictRecovery !== "boolean") ||
+        ("loginBarrier" in input && input.loginBarrier !== 2)
       )
         throw new Error("LOGINOM_HANDSHAKE_INVALID")
       const options = {
+        loginBarrier: "loginBarrier" in input ? loginBarrier : undefined,
         root: input.root,
         resources: input.resources,
         headless: input.headless,
@@ -166,6 +219,7 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
 function stop() {
   if (state.stopping) return state.stopping
   state.closed = true
+  failLogin()
   events.emit("close")
   state.stopping = (async () => {
     await state.starting

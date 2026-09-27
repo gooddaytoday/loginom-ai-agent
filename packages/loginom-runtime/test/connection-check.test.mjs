@@ -90,3 +90,79 @@ for (const [initial, password, expected] of [
     },
   )
 }
+
+function barrierPage(events, identity = "own-user") {
+  const locator = {
+    or() {
+      return this
+    },
+    first() {
+      return this
+    },
+    async waitFor() {},
+    async isVisible() {
+      return true
+    },
+  }
+  return {
+    async goto() {
+      events.push("navigate")
+    },
+    locator() {
+      return locator
+    },
+    async evaluate() {
+      events.push("identity")
+      return identity
+    },
+  }
+}
+test("managed login awaits begin before navigation and authenticated ACK after actual identity", async () => {
+  const events = [],
+    begin = Promise.withResolvers(),
+    authenticated = Promise.withResolvers(),
+    reached = Promise.withResolvers()
+  const candidate = { url: "http://fixture.test/app/", username: "own-user", password: "" }
+  const result = loginPage(barrierPage(events), candidate, async (phase) => {
+    events.push(phase)
+    if (phase === "begin") await begin.promise
+    else {
+      reached.resolve()
+      await authenticated.promise
+    }
+  })
+  assert.deepEqual(events, ["begin"])
+  begin.resolve()
+  await reached.promise
+  assert.deepEqual(events, ["begin", "navigate", "identity", "authenticated"])
+  let done = false
+  void result.then(() => {
+    done = true
+  })
+  await Promise.resolve()
+  assert.equal(done, false)
+  authenticated.resolve()
+  assert.deepEqual(await result, { authenticated: true })
+})
+test("managed refusal never navigates; identity mismatch never emits authenticated; non-ACK rejected", async () => {
+  const candidate = { url: "http://fixture.test/app/", username: "own-user", password: "" }
+  const events = []
+  await assert.rejects(
+    loginPage(barrierPage(events), candidate, async () => {
+      throw Error("private-value")
+    }),
+    /LOGINOM_LOGIN_BARRIER_UNKNOWN/,
+  )
+  assert.deepEqual(events, [])
+  await assert.rejects(
+    loginPage(barrierPage(events, "foreign"), candidate, async (phase) => {
+      events.push(phase)
+    }),
+    /LOGINOM_ACCOUNT_MISMATCH/,
+  )
+  assert.deepEqual(events, ["begin", "navigate", "identity"])
+  await assert.rejects(
+    loginPage(barrierPage([]), candidate, async () => true),
+    /LOGINOM_LOGIN_BARRIER_UNKNOWN/,
+  )
+})

@@ -24,6 +24,9 @@ const state = {
   browserProfile: undefined,
   browserServer: undefined,
   inputs: new Map(),
+  loginAck: undefined,
+  loginFailed: false,
+  loginPhase: "begin",
 }
 const requests = new Set()
 const send = (message, disconnect = false) => {
@@ -32,13 +35,41 @@ const send = (message, disconnect = false) => {
       if (disconnect && process.connected) process.disconnect()
     })
 }
+function failLogin() {
+  state.loginFailed = true
+  state.loginAck?.reject(Error("LOGINOM_LOGIN_BARRIER_UNKNOWN"))
+}
+async function loginBarrier(phase) {
+  if (state.closing || state.loginFailed || state.loginAck || phase !== state.loginPhase)
+    throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+  const id = randomUUID()
+  try {
+    await new Promise((resolve, reject) => {
+      state.loginAck = { id, resolve, reject }
+      send({ id, operation: "login-barrier", input: { phase } })
+      state.loginAck.timer = setTimeout(failLogin, 60_000)
+    })
+    if (state.loginFailed || state.closing) throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+    state.loginPhase = phase === "begin" ? "authenticated" : "done"
+  } catch {
+    failLogin()
+    throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+  } finally {
+    clearTimeout(state.loginAck?.timer)
+    state.loginAck = undefined
+  }
+}
 function close() {
   if (state.closing) return state.closing
+  failLogin()
   state.controller?.abort()
   state.closing = (async () => {
     await Promise.allSettled([...requests])
-    await closeManagedHandles({ ...state,
-      removeProfile: state.browserProfile ? () => rm(state.browserProfile, { recursive: true, force: true }) : undefined,
+    await closeManagedHandles({
+      ...state,
+      removeProfile: state.browserProfile
+        ? () => rm(state.browserProfile, { recursive: true, force: true })
+        : undefined,
     })
   })()
   return state.closing
@@ -52,6 +83,17 @@ const stop = () => {
 process.on("disconnect", stop)
 process.on("SIGTERM", stop)
 process.on("message", (message) => {
+  if (message && typeof message === "object" && message.id === state.loginAck?.id) {
+    if (
+      Object.keys(message).sort().join() === "id,result" &&
+      message.result &&
+      Object.keys(message.result).join() === "accepted" &&
+      message.result.accepted === true
+    )
+      state.loginAck.resolve()
+    else failLogin()
+    return
+  }
   const request = handle(message)
   requests.add(request)
   void request
@@ -68,7 +110,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage } = validateStartInput(input)
+      const { acceptanceCleanupPackage, loginBinding } = validateStartInput(input)
       const resources = await verifyResources(input.resources)
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(
@@ -92,6 +134,7 @@ async function handle(message) {
         profile: browserProfile,
         candidate: input.connection,
         headless: input.headless === true,
+        loginBarrier: loginBinding ? loginBarrier : undefined,
       }
       if (input.validation === true) {
         await checkConnection({ ...login, endpoint: input.endpoint })
@@ -101,6 +144,7 @@ async function handle(message) {
       const authenticated = await loginBrowser({ ...login, keepOpen: true })
       state.browser = authenticated.context
       const config = {
+        managedLoginBarrier: !!loginBinding,
         endpoint: input.endpoint,
         apiKey: input.connection.apiKey,
         // Preparation must bind to the same canonical path used by private login.
@@ -211,9 +255,14 @@ async function handle(message) {
         signal: controller.signal,
         timeout: 105_000,
       })
-      send({ id: message.id, result: {
-        result, recoveryPending: state.bridge.hasUnsettledWork(), activeWork: state.bridge.hasActiveWork(),
-      } })
+      send({
+        id: message.id,
+        result: {
+          result,
+          recoveryPending: state.bridge.hasUnsettledWork(),
+          activeWork: state.bridge.hasActiveWork(),
+        },
+      })
     } finally {
       state.controller = undefined
     }

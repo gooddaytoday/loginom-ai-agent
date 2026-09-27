@@ -3,6 +3,8 @@ import { createHash, randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "@loginom-ai-agent/schema/loginom"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
+import { readSessionRegistration } from "@loginom-ai-agent/loginom-host/session-completion"
+import { validateLoginBinding, type LoginBarrier } from "@loginom-ai-agent/loginom-host/supervisor"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { Product } from "@loginom-ai-agent/product"
@@ -11,7 +13,7 @@ import { standaloneBundle } from "./standalone-bundle"
 
 export async function standaloneRun(args: string[], paths: ReturnType<typeof cliProfile>, mode: "run" | "tui" = "run") {
   const signal = mode === "run" ? standaloneCancellation() : undefined
-  const control = await standaloneSessionCompletion(signal)
+  const control = await standaloneSessionCompletion(signal, paths.loginom)
   try {
     if (control && mode !== "run") throw Error("CLI_CONTROL_INVALID")
     const boundary = args.indexOf("--") < 0 ? args.length : args.indexOf("--")
@@ -71,6 +73,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     }
     const host = await launchNodeHost({
       ...bundle,
+      loginBarrier: control?.loginBarrier,
       root: paths.loginom,
       headless,
       environment: process.env,
@@ -210,10 +213,15 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
  * descendants; ordinary child spawn uses only its explicit stdio descriptors.
  * This is a private capability, not an OS sandbox against same-UID inspection.
  */
-export async function standaloneSessionCompletion(signal?: AbortSignal) {
+export async function standaloneSessionCompletion(signal?: AbortSignal, root?: string) {
   const selected = process.env.LOGINOM_AI_AGENT_CLI_CONTROL_FD
   delete process.env.LOGINOM_AI_AGENT_CLI_CONTROL_FD
-  if (selected === undefined) return
+  const registration = root ? await readSessionRegistration(root) : undefined
+  const version = registration?.version === 2 ? 2 : 1
+  if (selected === undefined) {
+    if (version === 2) throw Error("LOGINOM_LOGIN_BARRIER_REQUIRED")
+    return
+  }
   if (process.platform === "win32" || !/^(?:[3-9]|[1-5][0-9]|6[0-3])$/.test(selected))
     throw Error("CLI_CONTROL_INVALID")
   const fd = Number(selected)
@@ -227,7 +235,13 @@ export async function standaloneSessionCompletion(signal?: AbortSignal) {
     draining: undefined as { resolve(): void; reject(error: Error): void } | undefined,
     waiting: undefined as { resolve(value: string): void; reject(error: Error): void } | undefined,
     queued: [] as string[],
-    allowed: "none" as "none" | "options" | "finish",
+    allowed: "",
+    completing: false,
+    loginBusy: false,
+    logins: new Map<
+      string,
+      { binding: string; phase: "authenticated" | "done"; purpose: "validation" | "readiness" | "chat" }
+    >(),
   }
   const fail = () => {
     if (state.failed) return
@@ -253,13 +267,8 @@ export async function standaloneSessionCompletion(signal?: AbortSignal) {
           const value = state.buffer.slice(0, end)
           state.buffer = state.buffer.slice(end + 1)
           // Exact compact frames also reject duplicate JSON keys and caller IDs.
-          if (
-            ++state.requests > 2 ||
-            state.allowed === "none" ||
-            value !== JSON.stringify({ version: 1, method: state.allowed })
-          )
-            return fail()
-          state.allowed = "none"
+          if (++state.requests > (version === 2 ? 66 : 2) || !state.allowed || value !== state.allowed) return fail()
+          state.allowed = ""
           if (state.waiting) {
             state.waiting.resolve(value)
             state.waiting = undefined
@@ -282,7 +291,7 @@ export async function standaloneSessionCompletion(signal?: AbortSignal) {
   function check() {
     if (state.failed || signal?.aborted || socket.readyState !== 1) throw Error("CLI_CONTROL_UNCONFIRMED")
   }
-  async function next(expected: "options" | "finish") {
+  async function next(expected: string) {
     check()
     const frame =
       state.queued.shift() ??
@@ -290,7 +299,7 @@ export async function standaloneSessionCompletion(signal?: AbortSignal) {
         state.waiting = { resolve, reject }
       }))
     check()
-    if (frame !== JSON.stringify({ version: 1, method: expected })) throw Error("CLI_CONTROL_INVALID")
+    if (frame !== expected) throw Error("CLI_CONTROL_INVALID")
   }
   async function write(value: object) {
     check()
@@ -310,7 +319,63 @@ export async function standaloneSessionCompletion(signal?: AbortSignal) {
 
     check()
   }
+  const loginBarrier: LoginBarrier | undefined =
+    version === 2
+      ? async (event) => {
+          check()
+          try {
+            if (
+              state.completing ||
+              state.loginBusy ||
+              !event ||
+              Object.keys(event).sort().join() !== "binding,phase" ||
+              !["begin", "authenticated"].includes(event.phase)
+            )
+              throw Error("CLI_CONTROL_INVALID")
+            const binding = validateLoginBinding(event.binding)
+            if (binding.attemptId !== registration?.attemptId) throw Error("CLI_CONTROL_INVALID")
+            const previous = state.logins.get(binding.loginId)
+            const serialized = JSON.stringify(binding)
+            if (
+              event.phase === "begin"
+                ? previous ||
+                  state.logins.size >= 32 ||
+                  [...state.logins.values()].some((value) => value.phase !== "done")
+                : !previous || previous.phase !== "authenticated" || previous.binding !== serialized
+            )
+              throw Error("CLI_CONTROL_INVALID")
+            state.loginBusy = true
+            if (event.phase === "begin")
+              state.logins.set(binding.loginId, {
+                binding: serialized,
+                phase: "authenticated",
+                purpose: binding.purpose,
+              })
+            const timer = setTimeout(fail, 60_000)
+            try {
+              const expected = JSON.stringify({
+                version: 2,
+                method: "login-ack",
+                loginId: binding.loginId,
+                phase: event.phase,
+              })
+              state.allowed = expected
+              await write({ version: 2, type: "login", phase: event.phase, binding })
+              await next(expected)
+              if (event.phase === "authenticated") state.logins.get(binding.loginId)!.phase = "done"
+            } finally {
+              clearTimeout(timer)
+              state.loginBusy = false
+            }
+          } catch {
+            fail()
+            throw Error("LOGINOM_LOGIN_BARRIER_UNKNOWN")
+          }
+        }
+      : undefined
   return {
+    version,
+    loginBarrier,
     session(sessionID: string) {
       check()
       if (state.session || !/^[a-zA-Z0-9_-]{1,160}$/.test(sessionID)) throw Error("CLI_CONTROL_INVALID")
@@ -319,13 +384,19 @@ export async function standaloneSessionCompletion(signal?: AbortSignal) {
     async complete(host: Pick<Awaited<ReturnType<typeof launchNodeHost>>, "request">, generation: number) {
       check()
       if (!state.session || !Number.isSafeInteger(generation) || generation < 1) throw Error("CLI_CONTROL_INVALID")
+      if (
+        version === 2 &&
+        (!state.logins.size || state.loginBusy || [...state.logins.values()].some((value) => value.phase !== "done"))
+      )
+        throw Error("CLI_CONTROL_UNCONFIRMED")
+      state.completing = true
       // Start a bounded controller window only after the run has settled. No
       // finish is sent because a model answered or the CLI returned exit zero.
       const timer = setTimeout(fail, 60000)
       try {
-        state.allowed = "options"
-        await write({ version: 1, type: "ready" })
-        await next("options")
+        state.allowed = JSON.stringify({ version, method: "options" })
+        await write({ version, type: "ready" })
+        await next(JSON.stringify({ version, method: "options" }))
         const target = { generation, chat: createHash("sha256").update(state.session).digest("hex") }
         const decoded = Schema.decodeUnknownOption(Loginom.SessionCompletionBinding)(
           await host.request("connection.session-completion-options", target, 30000),
@@ -339,9 +410,9 @@ export async function standaloneSessionCompletion(signal?: AbortSignal) {
         )
           throw Error("CLI_CONTROL_UNCONFIRMED")
         const completionId = randomUUID()
-        state.allowed = "finish"
-        await write({ version: 1, type: "options", completionId, binding: decoded.value })
-        await next("finish")
+        state.allowed = JSON.stringify({ version, method: "finish" })
+        await write({ version, type: "options", completionId, binding: decoded.value })
+        await next(JSON.stringify({ version, method: "finish" }))
         check()
         const receipt = Schema.decodeUnknownOption(Loginom.SessionCompletionReceipt)(
           await host.request("connection.finish-own-session", { completionId, binding: decoded.value }, 30000),
@@ -358,7 +429,7 @@ export async function standaloneSessionCompletion(signal?: AbortSignal) {
           )
         )
           throw Error("CLI_CONTROL_UNCONFIRMED")
-        await write({ version: 1, type: "receipt", receipt: receipt.value })
+        await write({ version, type: "receipt", receipt: receipt.value })
         if (
           receipt.value.status !== "SUCCEEDED" ||
           !receipt.value.packageClosed ||
@@ -369,6 +440,18 @@ export async function standaloneSessionCompletion(signal?: AbortSignal) {
       } finally {
         clearTimeout(timer)
       }
+    },
+    managementComplete() {
+      check()
+      if (
+        version !== 2 ||
+        state.completing ||
+        state.loginBusy ||
+        ![...state.logins.values()].some((value) => value.purpose === "validation" && value.phase === "done") ||
+        [...state.logins.values()].some((value) => value.phase !== "done" || value.purpose === "chat")
+      )
+        throw Error("CLI_CONTROL_UNCONFIRMED")
+      state.completing = true
     },
     close() {
       signal?.removeEventListener("abort", fail)

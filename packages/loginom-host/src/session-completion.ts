@@ -31,7 +31,9 @@ async function readPrivate(file: string) {
 
 // Written by the trusted launcher/controller before starting the private Host.
 // No management request or model tool can create or replace this registration.
-export async function readSessionRegistration(root: string): Promise<{ version: 1; attemptId: string } | undefined> {
+export async function readSessionRegistration(
+  root: string,
+): Promise<{ version: 1 | 2; attemptId: string; loginBarrier?: 2 } | undefined> {
   const value = await readPrivate(join(root, "session-registration.json")).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined
     throw Error("LOGINOM_SESSION_STORE_INVALID")
@@ -41,14 +43,23 @@ export async function readSessionRegistration(root: string): Promise<{ version: 
     !value ||
     typeof value !== "object" ||
     !("version" in value) ||
-    value.version !== 1 ||
+    ![1, 2].includes(value.version as number) ||
     !("attemptId" in value) ||
     typeof value.attemptId !== "string" ||
     !identifier.test(value.attemptId) ||
-    Object.keys(value).sort().join() !== "attemptId,version"
+    /[^a-zA-Z0-9_-]/.test(value.attemptId) ||
+    (value.version === 1
+      ? Object.keys(value).sort().join() !== "attemptId,version"
+      : Object.keys(value).sort().join() !== "attemptId,loginBarrier,version" ||
+        !("loginBarrier" in value) ||
+        value.loginBarrier !== 2)
   )
     throw Error("LOGINOM_SESSION_STORE_INVALID")
-  return { version: 1, attemptId: value.attemptId }
+  return {
+    version: value.version as 1 | 2,
+    attemptId: value.attemptId,
+    ...(value.version === 2 ? { loginBarrier: 2 as const } : {}),
+  }
 }
 
 function same(left: Loginom.SessionCompletionBinding, right: Loginom.SessionCompletionBinding) {

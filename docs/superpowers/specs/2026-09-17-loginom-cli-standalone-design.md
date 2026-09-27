@@ -524,6 +524,24 @@ SDK/Client; если HTTP contract не меняется, новый control API
 
 ## 16. Ход реализации
 
+### Управляемый барьер каждого входа — 2026-09-27
+
+- **Реализовано в исходниках:** explicit registration v2 с `loginBarrier: 2`
+  подключает trusted callback до всех входов Host: validation/readiness/chat.
+  Существующие IPC и приватный FD связывают begin/authenticated ACK с новым
+  loginId и attempt; до ACK нет навигации/READY соответственно. v1 сохранён.
+- **Разделены результаты:** setup/check завершают только login-only регистрацию;
+  run требует private completion. Внешний wire v2 сохраняет внутренний receipt v1.
+  Unknown/отмена удерживают барьеры; managed reconnect не выполняет restore click.
+- **Проверено:** 131 targeted-тест PASS, Host/Agent typecheck PASS; в том числе
+  реальный Node relay и сохранение writer guard после managed command failure
+  при успешном локальном закрытии Host. Состав и границы:
+  [managed Loginom v2 в runbook](../../testing/loginom-ai-agent/standalone-cli.md#managed-loginom-v2-2026-09-27).
+- **Не проверено этим этапом:** новый product build/installed payload, живой Loginom,
+  серверные session IDs и account-wide cleanup. Эти проверки не подменяются
+  локальным IPC-успехом или ранее проверенным артефактом.
+
+
 ### Мягкое восстановление — 2026-09-23
 
 По умолчанию неопределённая операция Loginom больше не ставит замок

@@ -16,6 +16,17 @@ export async function guardLoginomConnection(page, binding) {
   let a=store.get(b.session_id);
   const unchanged=()=>a&&a.document===document&&a.connection===c&&a.remote===c.FRemoteSession&&a.session===c.FSession
    &&current&&a.packages.length===current.length&&a.packages.every((p,i)=>p.node===current[i].node&&p.path===current[i].path);
+  // A registered login cannot acquire or restore a session outside its Host barrier.
+  // Keep refusal sticky even when the application reconnects on its own later.
+  if(b.managed_login_barrier===true){
+   if(a?.blocked)return {reason:'managed_login_barrier'};
+   if(!connected||form.FReconnecting!==false||!proof||a?.pending
+    ||a&&(a.document!==document||a.connection!==c||a.remote!==c.FRemoteSession||a.session!==c.FSession)){
+    if(!a&&store.size>=8)return {reason:'capacity'};
+    store.set(b.session_id,{...a,blocked:true});
+    return {reason:'managed_login_barrier'};
+   }
+  }
   if(a?.pending||mode==='verify'||mode==='reserve'){
    if(!unchanged())return {reason:'owner'};
    if(mode==='reserve'){
@@ -35,7 +46,8 @@ export async function guardLoginomConnection(page, binding) {
   if(!unchanged())return {reason:'owner'};
   return {connected:false};
  },{b:binding,mode});
- const fail=reason=>{if(reason==='identity')throw Error('Loginom account or document changed; prepare the workspace again');
+ const fail=reason=>{if(reason==='managed_login_barrier')throw Error('LOGINOM_LOGIN_BARRIER_UNKNOWN');
+  if(reason==='identity')throw Error('Loginom account or document changed; prepare the workspace again');
   throw Error('Loginom connection is disconnected; original session recovery unverified ('+reason+'); inspect the pending operation before continuing');};
  const before=await inspect('observe');
  if(before.reason)fail(before.reason);
