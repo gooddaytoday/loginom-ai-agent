@@ -15,6 +15,15 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze36 проверен, headed batch36 запущен — 2026-09-27
+
+Root:192 tests PASS,23 итоговых SHA проверены, протестированные файлы неизменны.
+После единственного Visualizers click добавлено read-only ожидание native Views
+и исходного port под opening deadline. Roots refusal сохраняет ограниченную
+диагностику. Cleanup проверяет surface и исключает повтор уже отправленного
+Table return. Новое выполнение batch36: freshprofile09, Chromium1246,
+headed DISPLAY=:1/sandbox. Live-результат пока ожидается; G2/G3 не закрыты.
+
 ### Повторная проверка OpenViking — 2026-09-27
 
 После перезапуска Codex фактически выполнены MCP health, actor search и read
