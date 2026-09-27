@@ -16,6 +16,17 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Named finalization: исправлен success flag при ошибке записи
+
+Root code review обнаружил: catch после failed persist сохранял exact_pass:true
+из finalSelected, хотя status/case_complete становились unresolved/false.
+Разработчик исправил catch: exact_pass:false. Root отдельно выполнил pinnedNode
+--test-isolation=none с test-name-pattern «named successful read cannot bypass
+report-fsync»:1PASS/0FAIL, лог private named-fsync-root-targeted.log.
+Это адресная проверка WIP; не общий regression и не допуск frozen source83.
+Developer revision56 остаётся active, браузер закрыт.
+
+
 ### Независимый scalar oracle для named A подготовлен
 
 Создан private `named-access-case-matrix.json`:25 fixed slots из проверенного
