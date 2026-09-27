@@ -36,7 +36,13 @@ generation=false. Отсутствие sentinel в других этапах н�
 совпали с техническим oracle. Последующий `existing-mapping-baseline` отказал:
 NodeProcedureStepError «The node surface changed during observation».
 Поэтому весь case остаётся FAILED: полный выход не заменяет проверку
-повторного открытия кода/соответствий. Причина изменения surface ещё исследуется.
+повторного открытия кода/соответствий. Root отдельно проверил journal line1700: confirm_wizard_close имеет
+ui_gesture_applied; mismatch сохраняет document_id/workflow_id/node_id/surface/tid,
+меняется только locked:true→false. Это локализует отказ проверки на переходе
+разблокировки, но не заменяет новое пассивное подтверждение графа в исправлении.
+Независимый `g2-batch-45-preview-verification.json` дополнительно проверяет
+source SHA, native owner chain, объявленную схему, свежий sentinel,
+единственные dispatch/observed Preview и Close, terminal и закрытие мастера.
 Исходный cleanup package_closed/logged_out/browser_closed=true; отдельный
 recovery не нужен. Lease переведена в closed, profile18 сохранён,
 freshprofile19 назначен и ещё не создан.
