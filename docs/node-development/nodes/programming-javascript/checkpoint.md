@@ -15,6 +15,27 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch38: первый полный code-table case PASS — 2026-09-27
+
+Freshprofile11/freeze38. Native wizard settlement подтвердил1disabled-delete
+mask/0blockers. Первый code-table-execute case завершён gate_passed=true:
+новый Execute, полный output6×2, повторное открытие мастера, code-mode и полный
+source readback, Close и повторный mapping read. Root проверил1600journalSHA,
+три input6×5 reads/90cells,12outputcells, source SHA d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2,
+семантику input/output mappings до/после (исключены лишь volatile record_id).
+
+Второй code-sentinel-preview остановлен link-js-input: palette создала
+unexpected link. Новый второй JS обнаружен; topology guard отказал до
+дальнейшей настройки. Это не полный batch PASS. Source selection/точное ребро
+требуют разбора; возможная привязка к предыдущему JS пока гипотеза.
+Прежней задаче назначен fix39: доказать/подготовить original input selection
+перед palette gesture, не ослаблять graph allowlist и не исправлять unknown
+эффекты удалением. Следующий live после handoff — freshprofile12.
+
+Оригинальный cleanup38 впервые на этом полном пути: package_closed/logged_out/
+browser_closed=true; отдельная recovery не нужна. Browser lease закрыта.
+Public handler, остальные G1–G7/J01–J27 и автономная CLI-приёмка ещё впереди.
+
 ### Freeze38 проверен, headed batch38 запущен — 2026-09-27
 
 Root64 tests PASS;25 SHA итогового handoff проверены, tested source неизменён.
