@@ -16,6 +16,31 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze44: native trigger передан в live — 2026-09-27
+
+Root независимо проверил78 tests PASS: column-editor25,stage-observer14,
+execution-evidence31,batch8;30/30 source SHA совпали до/после. Developer commit
+`fbc7e718fe40abea5a84e56af07fedea04c30429` сохраняет3 изменённых файла:
+column-editor, test, schema-probe. Canonical `;trg_picker` связан с own native
+trigger через orderedTriggers/field/el/triggerWrap; один UI click с hit-test.
+Opening min(5s,original budget), без повторения. Picker↔combo/store/DOM и native
+record/type4|5 проверяются до option click, option/record/data identities pinned.
+Только config имена valueField/displayField могут читаться через bounded data
+prototype lookup; getters и guessed defaults запрещены. Подробные predicate
+checks и bounded snapshots объясняют отказ без ослабления guards.
+
+Exact ComboBoxUtils.js SHA
+`798d21d2d3426c0723ed497b8255d0fcc4fb55d512c65c827e63592b8b553e34`
+получен root со стенда и подтверждает inherited displayField; private manifest
+preview-source-40/fix44-source-manifest.json. E2E helper919–939 также нажимает
+;trg_picker, его retry-loop не перенесён; TestCafe не запускался.
+
+Batch44 запущен: declared-sentinel-preview,declared-table-execute,
+freshprofile17, headed DISPLAY=:1, Chromium1246/sandbox. Private source commit,
+30pins/root-test receipt и lease записаны. Итог RUNNING; public JS-handler,
+G1–G7/J01–J27 и CLI-приёмка по-прежнему не завершены.
+
+
 ### Batch43: field readback доказан; picker требует отдельного trigger — 2026-09-27
 
 Root-аудит962 journalSHA, два input6×5/60cells. После единственного edtName fill
