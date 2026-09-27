@@ -16,6 +16,20 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Integer coercion string-numeric01: independent characterization PASS
+
+Source82/profile68 original session88544 terminal exit0, CHARACTERIZED,
+cleanup3/3. Root live auditor PASS:3 native cells,578 journal refs,1259 pins.
+Native String «42» INPUT/upstream exact UTF-8 hex3432; OUTPUT native signed64
+Integer42,bytes2a00000000000000. Report SHA
+396ab09e70812da53ad804a5e9257950a4bda83127874392265b6232cd6dc562;
+baseline SHAd162c37e17e3395beb845999ba2881180192444e1a9ab0198c72f73398ee293d.
+Evidence native-integer-coercion-string-numeric-probe-01 и verification.json.
+Matrix3 characterized/4 not_run; это одно наблюдение String coercion,
+не общий string parsing oracle. Browser CLOSED/no pinned Chromium; fresh
+profile69 зарезервирован для native String «not-an-integer» INPUT.
+
+
 ### Integer coercion string-numeric01 RUNNING
 
 Source82 unchanged/1259 pins повторно проверены; original exec session88544
