@@ -15,6 +15,33 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Filename fix + bounded Python harness: full PASS; native probe02 — 2026-09-27
+
+Исправление source57 закоммичено в node-javascript:
+`f24b82001fdbe9f50f1ae366dba1af25f4fe371c`. Code-editor deny сохранён; filename
+часть TID исключается только в подтверждённой readonly активной файловой ячейке.
+Добавлены bounded stale-reference reason/checks без произвольного текста ошибок.
+
+Исходный full UI run сохранён отдельно как291PASS/1FAIL после SIGTERM зависшего
+Python child (operator57-full-interrupted.stdout/json), не переписан. Root заменил
+pipe stdin тестового journal_equal на private temporary file (те же полные JSON),
+timeout10s/SIGKILL и finally close/remove. Python oracle unchanged; targeted test
+PASS62ms. Root full workspace: **292/292 PASS**,fail/skip0,149012ms;66pins unchanged.
+Receipt operator57-root-full-result.json и stdout/stderr; отдельные root targeted
+workspace4 +download15 PASS остаются адресными, не прибавляются к full292.
+
+В задаче разработчика произошёл повторный возврат к историческому bootstrap;
+она idle, harnessfix выполнен root. Из-за её сообщения о find transport error
+root запустил Doctor:0failures,auth/storage/ready PASS; MCP health/find вновь
+успешны. Memory/config не менялись, текущей недоступности не установлено.
+
+После pin/idle проверки запущен **native-input-probe-02** на fresh profile35,
+DISPLAY=:1, sandbox enabled, pinned runtimes. Source receipt закрепляет66pins
+фактически проверенной версии, включая root harness. На момент записи RUNNING;
+прохождение старого download refusal, native values и cleanup ещё не доказаны.
+Предыдущий profile34/evidence сохранены. G5 и полный план остаются открытыми.
+
+
 ### Freeze57: filename fix проверен адресно; full-suite subprocess stall — 2026-09-27
 
 Причина native-input-probe-01 воспроизведена на прежнем source: `javascript` в
