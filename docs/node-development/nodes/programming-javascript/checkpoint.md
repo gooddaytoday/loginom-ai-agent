@@ -16,6 +16,25 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Подключение восстановлено; Fix71 возобновлён
+
+После нового запроса пользователя MCP health, actor find по JavaScript native
+roundtrip boolean string (2 результата) и exact read найденной
+`viking://user/kiselev/memories/cases/boolean_string_type_handling.md` прошли.
+Поиск завершился за пределами прежнего15s; это подтверждает текущую возможность
+поиска, но не гарантирует постоянную доступность сервера. Настройки не менялись.
+Существующей задаче разработчика передано продолжение Fix71; App API подтвердил
+active/inProgress turn01a0e2cd-6a91-75f3-865e-d084fe55a78e, cursor2.
+
+Root подготовил приватный независимый scalar oracle audit-native-bool-string.py,
+SHA256 `74c42f9f0fcbea5a4ce62445aa7ad64bb18caeb6e03128a6fd9a7a1fb98fd1cd`.
+Expected сверены с canonical typed-cases.json; synthetic2positive/12negativePASS.
+Проверяются теги NULL/boolean/string, boolean byte, UTF8 length/codepage/bytes,
+empty отдельно от NULL, адреса и frame bounds. Ownership/lifecycle этим oracle
+не доказываются; live bool/string ещё не выполнен. Freeze71 ожидается; профиль50
+не назначен, browser не запущен. Предыдущие blocked записи ниже исторические.
+
+
 ### Уточнение причины таймаута MCP (следующее продолжение)
 
 Повторный штатный find(query=JavaScript,limit1) снова прерван через15s.
