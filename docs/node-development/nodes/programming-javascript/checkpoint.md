@@ -15,6 +15,29 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+
+### Source75 проверен; keep2 live запущен
+
+OpenViking health и actor find повторно успешны. Freeze75 проверен root:
+1146 main +3 public-deny +11 Python CSV PASS, 192 pins до/после тестов,
+syntax изменённых MJS и git diff --check PASS. Shared228 source73 не повторялись:
+общие исходники не изменены. CSV Value/1/2/3 независимо совпал с private oracle,
+SHA `10dd7b1596d2eab4d6145699462eb2cc7c30508f78d4c5b2760c207dbb427dd5`.
+
+Только 16 runtime/test/fixture файлов закоммичены в node-javascript:
+`f4603ad552aa3a85a8bb00b5726511d3c7fdb234`. Старые незавершённые docs worktree
+не переносились. Freeze manifest SHA
+`b2842699c536fcbdafd8a4ab84013b19ca673930fe24febe81ba708103081cdf`.
+Private operator75-root-test-source.json содержит команды и контрольные суммы.
+
+Начат native-cardinality-keep2-probe-01, fresh profile57, DISPLAY=:1,
+headed/sandbox=true, terminal session87717. Browser lease RUNNING; результата
+ещё нет. Продолжать ожиданием этой сессии, не повторять запуск. После terminal
+требуются независимый audit7cells (3/1/3), baseline/ACK/source/execution,
+journal/runtime pins и cleanup. Odd/duplicate ещё не запускались; обязательный
+UI declared-empty/nativezero и весь G5 остаются открыты.
+
+
 ### Cardinality design принят; Fix75 nonempty назначен
 
 Root подготовил private audit-cardinality-roundtrip.py, SHA
