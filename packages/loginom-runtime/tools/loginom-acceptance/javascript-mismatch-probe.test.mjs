@@ -4,7 +4,8 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {javascriptExecutionProbes} from './javascript-execution-probes.mjs';
 import {javascriptMismatchSource,javascriptExecutionIdentity,characterizeJavascriptMapping,verifyJavascriptMismatchTable,
-  javascriptMismatchOutputOracle,javascriptMismatchVerdict,runJavascriptMismatchMaterialization,verifyJavascriptPreviousExecution} from './javascript-mismatch-probe.mjs';
+  javascriptMismatchOutputOracle,javascriptMismatchVerdict,runJavascriptMismatchMaterialization,verifyJavascriptPreviousExecution,
+  javascriptProbeFailure,javascriptMismatchExecutionProgress} from './javascript-mismatch-probe.mjs';
 import {javascriptBatchVerdict} from './javascript-batch-plan.mjs';
 
 function fixture(){
@@ -199,7 +200,7 @@ test('production characterize reader polls incomplete cache without another open
  const source=await readFile(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
  const start=source.indexOf('    async readPortMapping('),end=source.indexOf('    async prepareInput(',start);
  assert.ok(start>0&&end>start);
- for(const scenario of ['render','verified','strict','timeout','owner']){
+ for(const scenario of ['render','verified','strict','timeout','owner','both-errors']){
   const f=fixture(),events=[],limit=Date.now()+5000;
   const incomplete=structuredClone(f.state);incomplete.node_mapping.reason='mapping_store';
   const ready=structuredClone(f.state);
@@ -209,7 +210,7 @@ test('production characterize reader polls incomplete cache without another open
    observe:async options=>{
     events.push('observe');assert.equal(options.readMappings,true);
     assert.equal(options.ready(incomplete),false);
-    if(scenario==='timeout'){assert.equal(options.ready(incomplete),false);throw Error('Original bounded timeout');}
+    if(scenario==='timeout'||scenario==='both-errors'){assert.equal(options.ready(incomplete),false);throw Error('Original bounded timeout');}
     if(scenario==='strict')assert.equal(options.ready(f.state),false);
     assert.equal(options.ready(ready),true);return ready;
    }};
@@ -219,17 +220,56 @@ test('production characterize reader polls incomplete cache without another open
    requireJavascriptTopology:()=>{},requireJavascriptGraphUnchanged:()=>events.push('same-graph'),captureJavascriptNativeTopology:()=>{},
    page:{evaluateHandle:async()=>({dispose:async()=>events.push('dispose')}),evaluate:async()=>{events.push('native-check');return {}; }},
    record:async()=>{},closeJavascriptPortMapping:async args=>{assert.equal(args.reader,reader);assert.ok(args.deadline<=limit);
-    events.push('close');await args.verifyGraph();}
+    events.push('close');if(scenario==='both-errors')throw Object.assign(Error('Close ambiguous'),{name:'NodeProcedureStepError',receipt:{operation_id:'close1',status:'AMBIGUOUS',error:{code:'PREPARED_NODE_CONTEXT_CHANGED'}}});await args.verifyGraph();}
   });
   const run=()=>operator.readPortMapping(f.node,'output',{characterize:scenario!=='strict',operationDeadline:limit});
-  if(scenario==='timeout'||scenario==='owner')await assert.rejects(run(),scenario==='owner'?/owner differs/:/bounded timeout/);
+  if(scenario==='both-errors')await assert.rejects(run(),error=>{
+   const failure=javascriptProbeFailure(error);assert.equal(failure.message,'Original bounded timeout');
+   assert.equal(failure.observation_error.message,'Original bounded timeout');assert.equal(failure.cleanup_error.message,'Close ambiguous');
+   assert.equal(failure.cleanup_error.receipt.error_code,'PREPARED_NODE_CONTEXT_CHANGED');return true;
+  });
+  else if(scenario==='timeout'||scenario==='owner')await assert.rejects(run(),scenario==='owner'?/owner differs/:/bounded timeout/);
   else {
    const result=await run();
    if(scenario==='render'){assert.equal(result.status,'unverified');assert.equal(result.mapping.verified,false);assert.equal(result.mapping.source_identity_verified,false);}
    else assert.equal(scenario==='strict'?result.verified:result.mapping.verified,true);
   }
-  assert.deepEqual(events,['open','observe','close','native-check','same-graph','dispose']);
+  assert.deepEqual(events,['open','observe','close',...(scenario==='both-errors'?[]:['native-check','same-graph']),'dispose']);
  }
+});
+
+test('owned failed execution admits only the observed empty native source characterization, never schema PASS',async()=>{
+ const f=fixture();Object.assign(f.execution,{status:'failed',node:f.node,ownership_source:'native_process_model_identity_and_show_node',
+  error_source:'native_child_error_details',error:{message:'Не удалось найти исходный столбец PhaseMarker для выходного столбца ManualMarker'}});
+ const state=structuredClone(f.state);state.node_mapping={...f.mapping.mapping,node_context:state.prepared_node_context,
+  source_identity_verified:false,source_fields:[],mapping_wizard:'DataSetOutputSocketWizard',state_source:'cached_mapping_stores',
+  target_fields:f.mapping.mapping.target_fields.map(field=>({...field,source:null}))};
+ assert.equal(characterizeJavascriptMapping(state,f.node,{allowPending:true}),null);
+ const mapping=characterizeJavascriptMapping(state,f.node,{failedExecution:f.execution});
+ assert.equal(mapping.classification,'empty_source_after_owned_failure');assert.equal(mapping.mapping.verified,true);
+ assert.equal(mapping.mapping.source_identity_verified,false);assert.equal(mapping.status,'unverified');
+ f.args.readMapping=async execution=>{assert.equal(execution,f.execution);return mapping;};
+ const result=await runJavascriptMismatchMaterialization(f.args);
+ assert.equal(result.gate_passed,false);assert.equal(result.source_schema_materialized,false);
+ assert.equal(result.discovery_outcome,'owned_execution_failed');assert.equal(result.output,null);
+ for(const mutate of [e=>e.owner_verified=false,e=>e.status='completed',e=>e.error_source='group',e=>e.node={...f.node,workflow_id:'foreign'}]){
+  const execution=structuredClone(f.execution);mutate(execution);
+  assert.equal(characterizeJavascriptMapping(state,f.node,{allowPending:true,failedExecution:execution}),null);
+ }
+});
+
+test('terminal receipt is retained before deadline expiry or subsequent observation/cleanup errors',async()=>{
+ for(const failure of ['deadline','mapping','boundary']){
+  const f=fixture(),progress=[];
+  f.args.onProgress=async trial=>progress.push(structuredClone(trial));
+  if(failure==='deadline')f.args.execute=async()=>{f.setClock(100);return f.execution;};
+  if(failure==='mapping')f.args.readMapping=async()=>{throw Error('Mapping unavailable');};
+  if(failure==='boundary'){let count=0;f.args.verifyBoundary=async()=>{if(count++)throw Error('Boundary changed');};}
+  await assert.rejects(runJavascriptMismatchMaterialization(f.args));
+  assert.equal(progress.length,1);assert.equal(progress[0].execution_started,true);
+  assert.deepEqual(progress[0].execution,f.execution);assert.equal(progress[0].gate_passed,false);
+ }
+ const f=fixture();assert.throws(()=>javascriptMismatchExecutionProgress({source_sha256:'wrong'},f.execution));
 });
 
 test('pending mapping only waits without accepting unknown reasons or conflicting owners',()=>{

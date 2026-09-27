@@ -11,11 +11,12 @@ import {javascriptBatchCases,runJavascriptBatch,caseEffect,javascriptBatchInputI
 import {loginBrowser} from '../../src/connection-check.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
 import {javascriptEngineProbes} from './javascript-engine-probes.mjs';
+import {javascriptDiscoveryIds,javascriptDiscoveryProbe,observeJavascriptDiscovery,javascriptDiscoveryWizardDiagnostic} from './javascript-discovery-probes.mjs';
 import {javascriptSourceSample,javascriptSourceBoundary} from './javascript-source-probes.mjs';
 import {makeWorkspacePrepareCode} from '../../client/lib/workspace.mjs';
 import {createJavascriptExecutionRuntime,selectJavascriptForSettings} from './javascript-execution-runtime.mjs';
 import {javascriptExecutionProbes} from './javascript-execution-probes.mjs';
-import {javascriptMismatchSource,runJavascriptMismatchMaterialization} from './javascript-mismatch-probe.mjs';
+import {javascriptMismatchSource,runJavascriptMismatchMaterialization,javascriptMismatchExecutionProgress,javascriptProbeFailure} from './javascript-mismatch-probe.mjs';
 import {readJavascriptSchema,configureJavascriptSchema} from './javascript-schema-probe.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
@@ -28,9 +29,9 @@ const batchDeadline=batch?Date.now()+1800000:Infinity;
 let cleaning=false;
 const phaseDeadline=ms=>Math.min(cleaning?Infinity:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=batchDeadline-Date.now();if(!cleaning&&ms<=0)throw Error('Original batch deadline expired');return cleaning?Infinity:ms;};
-const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--probe-source]] | --execution-case CASE]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch';
+const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
 if (args.includes('--help')) { console.log(usage); return; }
-const allowed = new Set(['--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case']);
+const allowed = new Set(['--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe']);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
@@ -39,7 +40,9 @@ for (let i=0;i<args.length;i++) {
   if (options[key]===undefined) throw Error(usage);
 }
 if(batch&&options['--execution-case'])throw Error('Batch cannot also select a single case');
-let executionCase=batch?.[0]??options['--execution-case'];
+const discoveryProbe=options['--discovery-probe']?javascriptDiscoveryProbe(options['--discovery-probe']):null;
+if(discoveryProbe&&(batch||options['--execution-case']))throw Error('Discovery requires one isolated probe, not a batch or execution case');
+let executionCase=discoveryProbe?'code-table-execute':batch?.[0]??options['--execution-case'];
 if(executionCase){
   if(!/^(declared|code)-(sentinel-(next|done|preview|execute)|table-execute)$/.test(executionCase)&&executionCase!=='code-table-mismatch')throw Error('Unknown execution case');
   if(['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source'].some(k=>options[k]))throw Error('Execution case is a separate mode');
@@ -69,7 +72,7 @@ const directory=resolve(options['--evidence']);
 // Refuse reuse: no old evidence is overwritten and no uncertain run is replayed.
 await mkdir(directory,{mode:0o700});
 const redactor=createRedactor([config.password]);
-if(batch){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Batch requires an empty fresh assigned profile');}
+if(batch||discoveryProbe){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},knownSecrets:[config.password]});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
   node:process.versions.node,headless:false,server_os:{status:'not_observed'},storage:{status:'not_observed'},
@@ -84,6 +87,14 @@ let executionJournalLine=0;
 let readingExisting=false;
 const schemaContext=()=>({root:wizardRoot,native:wizardHandle,binding:wizardBinding,prefix:owner.prefix,account:config.username,build:'7.4.2'});
 const executionRecord=async event=>{
+  if(discoveryProbe&&event.phase==='execution_terminal'){
+    report.execution_probe.execution=event.terminal;report.execution_probe.status='execution_terminal';
+    report.execution_probe.execution_started=true;
+  }
+  if(event.phase==='execution_terminal'&&event.terminal?.trial?.phase==='generated-mismatch'){
+    const readback=report.execution_probe.existing_readback;
+    readback.generated_schema_mismatch_trial=javascriptMismatchExecutionProgress(readback.generated_schema_mismatch_trial,event.terminal);
+  }
   const saved=await executionJournal({...event,...(report.case_id?{case_id:report.case_id,execution_case:executionCase}:{})});
   (report.execution_records??=[]).push(compactJavascriptJournalRecord(saved,++executionJournalLine));
   await save();return saved;
@@ -638,6 +649,11 @@ const runExecutionTrial=async probe=>{
     await executionRecord({phase:'execution_stage_observed',identity,before,after,outcome});
     if(after?.boundary_refusal)throw Error('Execution stage boundary refused: '+after.boundary_refusal);
     if(!terminal)throw Error('Execution stage result remains unconfirmed: '+stage);
+    if(discoveryProbe){
+      const diagnostic=javascriptDiscoveryWizardDiagnostic({probe,identity,stage,before,after});
+      if(diagnostic){report.discovery_result=diagnostic;await executionRecord({phase:'discovery_wizard_diagnostic',diagnostic});
+        await save();return {...outcome,discovery_diagnostic:true};}
+    }
     if(stage==='next'&&after.page_tid!==before.page_tid)report.execution_page_transition={from:before.page_tid,to:after.page_tid};
     return outcome;
   };
@@ -653,7 +669,7 @@ const runExecutionTrial=async probe=>{
     const state=await waitWizardReady({deadline,inputOnly:false});
     if(state.page.tid.endsWith(';DoneWizard'))break;
     const outcome=await dispatch('next',owner.prefix+';WizrdMCF;btnNext',step);
-    if(outcome.sentinel_observed||trigger==='next'){
+    if(outcome.sentinel_observed||outcome.discovery_diagnostic||trigger==='next'){
       report.execution_probe.outcome=outcome;return;
     }
     if(step===7)throw Error('Done page not reached within bounded transitions');
@@ -662,10 +678,24 @@ const runExecutionTrial=async probe=>{
   if(!done.page.tid.endsWith(';DoneWizard'))throw Error('Exact Done page required');
   const outcome=await dispatch('done',owner.prefix+';WizrdMCF;btnDone',0);
   report.execution_probe.done_outcome=outcome;
-  if(outcome.sentinel_observed){report.execution_probe.outcome=outcome;return;}
+  if(outcome.sentinel_observed||outcome.discovery_diagnostic){report.execution_probe.outcome=outcome;return;}
   await exact(owner.prefix+';WizrdMCF').waitFor({state:'hidden',timeout:Math.max(1,deadline-Date.now())});
   openedWizard=false;await waitGraphReady(Math.max(1,deadline-Date.now()));
   if(trigger==='done'){report.execution_probe.outcome=outcome;return;}
+  if(discoveryProbe){
+    const boundary=await executionRuntime.captureExecutionBoundary();
+    try{
+      await verifyBatchInputIdentity();
+      const execution=await executionRuntime.executeNode(executionNode,deadline,{phase:'initial',source_sha256:probe.source_sha256});
+      report.execution_probe.execution=execution;await save();
+      await executionRuntime.verifyExecutionBoundary(boundary);await verifyBatchInputIdentity();
+      const result=await observeJavascriptDiscovery({probe,node:executionNode,execution,deadline,
+        readOutput:()=>executionRuntime.readPassive(executionNode,'discovery',deadline),record:executionRecord,
+        onProgress:async progress=>{report.discovery_result={...progress,oracle_passed:progress.gate_passed,gate_passed:false,boundary_verified:false};await save();}});
+      await executionRuntime.verifyExecutionBoundary(boundary);await verifyBatchInputIdentity();
+      report.discovery_result={...result,boundary_verified:true};await save();return;
+    }finally{await boundary.native.dispose();}
+  }
   const execution=await executionRuntime.executeNode(executionNode,deadline,{phase:'initial',source_sha256:probe.source_sha256});
   report.execution_probe.execution=execution;
   if(sentinel){
@@ -742,7 +772,9 @@ const runExecutionTrial=async probe=>{
           node:executionNode,changed,sourceProof,manual,postDone,baseline:execution,deadline,
           verifyBoundary:async()=>{await executionRuntime.verifyExecutionBoundary(boundary);await verifyBatchInputIdentity();},
           execute:identity=>executionRuntime.executeNode(executionNode,deadline,identity),
-          readMapping:()=>executionRuntime.readPortMapping(executionNode,'output',{characterize:true,operationDeadline:deadline}),
+          onProgress:async trial=>{report.execution_probe.existing_readback.generated_schema_mismatch_trial=trial;await save();},
+          readMapping:execution=>executionRuntime.readPortMapping(executionNode,'output',{characterize:true,operationDeadline:deadline,
+            failedExecution:execution.status==='failed'?execution:undefined}),
           readOutput:()=>executionRuntime.readPassive(executionNode,'mismatch',deadline),record:executionRecord});
       }finally{await boundary.native.dispose();}
     }
@@ -961,7 +993,7 @@ const runPreparedCase=async()=>{
     }
     if(executionCase){
       const mode=executionCase.split('-')[0],sentinel=executionCase.includes('-sentinel-');
-      const probe=javascriptExecutionProbes('RowID').find(p=>p.schema_mode===mode&&p.id.endsWith(sentinel?'execution-sentinel':'table-v1'));
+      const probe=discoveryProbe??javascriptExecutionProbes('RowID').find(p=>p.schema_mode===mode&&p.id.endsWith(sentinel?'execution-sentinel':'table-v1'));
       report.execution_probe={id:probe.id,source_sha256:probe.source_sha256,status:'source_pending'};await save();
       await probeOwnedSource(baselineSource,probe.source);
       report.execution_probe.status='source_verified';await save();
@@ -1039,12 +1071,13 @@ try {
     report.stage='graph-ready';await waitGraphReady(createRemaining());
     await snapshot('graph-ready-baseline');
     if(executionCase){
-      report.scope='G2/G3 operator trial';report.execution_case=executionCase;
+      report.scope=discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
+      if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
         record:executionRecord,effectScope:()=>report.case_id,deadline:batch?batchDeadline:Date.now()+1200000});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
-      if(batch){
+      if(batch||discoveryProbe){
         if(!executionInput.table?.execution_id)throw Error('Batch input execution proof absent');
         inputBinding=await page.evaluateHandle(input=>{
           const tab=globalThis.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),controller=tab.Controller;
@@ -1101,7 +1134,9 @@ try {
   }
   report.status='OBSERVED';
 } catch(error) {
-  report.status='FAILED';report.failure={stage:report.stage,name:error.name,message:redactor.text(String(error.message)).slice(0,1200)};
+  report.status='FAILED';report.failure={stage:report.stage,...redactor.redact(javascriptProbeFailure(error))};
+  if(discoveryProbe)report.discovery_failure_context={source_sha256:discoveryProbe.source_sha256,
+    terminal_receipt_observed:!!report.execution_probe?.execution,syntax_support:'not_determined'};
   if (page) await snapshot('failure').catch(()=>{report.failure.snapshot='unavailable';});
   if (page&&owner) await paletteSnapshot('failure-palette').catch(()=>{report.failure.palette_snapshot='unavailable';});
   if (page) await refusalEvidence('work-refusal').catch(()=>{report.failure.refusal_evidence='unavailable';});

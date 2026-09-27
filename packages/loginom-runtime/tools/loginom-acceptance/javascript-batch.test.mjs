@@ -46,12 +46,14 @@ test('table and mismatch verdicts require typed output, execution and source/map
 
 test('batch allocates independent cases and never continues an unknown mutation or lost owner',async()=>{
   const cases=['code-sentinel-next','declared-sentinel-next','code-sentinel-done'];
-  for(const failure of ['none','dispatch','owner','duplicate','begin']){
+  for(const failure of ['none','dispatch','owner','duplicate','begin','observation-cleanup']){
     const started=[],finished=[];
     const run=runJavascriptBatch({cases,deadline:100,now:()=>1,
       begin:async entry=>{started.push(entry);if(failure==='begin'&&started.length===2)throw Error('input replaced');},
       run:async()=>{
         if(failure==='dispatch'&&started.length===2)throw Error('lost click response');
+        if(failure==='observation-cleanup'&&started.length===2)throw Object.assign(Error('read timeout'),{
+          observationError:Error('read timeout'),cleanupError:Object.assign(Error('close ambiguous'),{receipt:{status:'AMBIGUOUS'}})});
         return {node_id:failure==='duplicate'?'same':'node-'+started.length,probe:observation()};
       },
       settle:async()=>({...settled,owner_verified:!(failure==='owner'&&started.length===2)}),
@@ -60,6 +62,10 @@ test('batch allocates independent cases and never continues an unknown mutation 
     assert.equal(started.length,failure==='none'?3:2);
     assert.equal(new Set(started.map(e=>e.case_id)).size,started.length);
     assert.equal(finished.at(-1).status,failure==='none'?'OBSERVED':'FAILED');
+    if(failure==='observation-cleanup'){
+      assert.equal(finished.at(-1).failure.observation_error.message,'read timeout');
+      assert.equal(finished.at(-1).failure.cleanup_error.receipt.status,'AMBIGUOUS');
+    }
   }
 });
 
