@@ -16,6 +16,19 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### A-isnull-index PASS; A-isnull-exact RUNNING
+
+Profile83/original18856 terminal exit0, cleanup3/3; audit12cells/627refs/1265pins
+PASS. Output exact[1,0,0,0], input/upstream unchanged. Report SHA
+a4106d388bab10fdb560463162388cb54109a7d1139e0c74de837b2a9c089911.
+A7/8 accepted. Последний A case: A-isnull-exact/profile84,
+evidence native-named-isnull-exact-probe-01, **original40609 RUNNING**,
+headed/sandbox/source84. Ждать original process до terminal и audit.
+Attribution design root принят как проект, не implemented/live proof;
+см. [решение](native-error-attribution-design.md),§9. Developer idle после
+revision6, исходники не меняются. Полный G5/handler/CLI/goal открыт.
+
+
 ### A-columns-exact PASS source84; A-isnull-index RUNNING
 
 Profile82/original89067 terminal exit0/CHARACTERIZED,cleanup3/3;
