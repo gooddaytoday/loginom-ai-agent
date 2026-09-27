@@ -1,0 +1,61 @@
+import {javascriptNamedCase,javascriptNamedProbe} from './javascript-native-named-cases.mjs';
+import {verifyNativeInputRead,verifyNativeFixtureCells} from './javascript-native-input-contract.mjs';
+import {verifyNativeRoundtripInput,verifyNativeRoundtripExecution} from './javascript-native-roundtrip-contract.mjs';
+import {adaptRead} from '../../client/lib/variant-native-values.mjs';
+const need=(v,m)=>{if(!v)throw Error('Named native contract: '+m);};
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+export function verifyJavascriptNamedInput(input,caseId){
+ const c=javascriptNamedCase(caseId);
+ need(input?.native_input?.native?.binding?.fixture_id===c.input_fixture_id,'immutable integer-safe input');
+ const before=verifyNativeRoundtripInput(input,c.input_fixture_id);
+ const exact=verifyNativeInputRead(before.raw,{binding:before.binding,lifecycle:before.lifecycle,provenance:before.exact.provenance});
+ need(same(exact,before.exact),'stored pre-JS input differs');
+ need(before.binding.completed_child?.verified===true&&before.binding.completed_child.owner_verified===true
+  &&before.binding.completed_child.cleanup_complete===true&&before.binding.completed_child.status==='completed'
+  &&before.binding.execution.execution_id===before.binding.completed_child.execution_id
+  &&['execution_id','group_id','process_id','process_record_id'].every(k=>before.binding.completed_child[k]===exact.provenance.execution[k]),'original complete input child');
+ return before;
+}
+export function verifyJavascriptNamedRead(raw,{binding,lifecycle,input,role}){
+ const c=javascriptNamedCase(binding.named_case_id),probe=javascriptNamedProbe(c.id);
+ need(raw.named_case_id===c.id&&raw.input_fixture_id===c.input_fixture_id&&raw.source_sha256===probe.source_sha256,'raw named/source identity');
+ need(binding.fixture_id===c.input_fixture_id&&binding.input_fixture_id===c.input_fixture_id,'read input fixture identity');
+ verifyJavascriptNamedInput({node:{node_id:input.binding.node_id},table:{port_guid:input.binding.port_guid},native_input:{native:input}},c.id);
+ need(['output','upstream'].includes(role)&&binding.roundtrip_role===role&&binding.source_sha256===probe.source_sha256,'role/source identity');
+ need(['document_id','workflow_id','package_id'].every(k=>binding[k]===input.binding[k]),'read scope');
+ need(binding.execution?.status==='completed'&&binding.completed_child?.execution_id===binding.execution.execution_id
+  &&['group_id','process_id','process_record_id'].every(k=>binding.execution[k]===undefined||binding.execution[k]===binding.completed_child[k]),'completed child association');
+ if(role==='output'){
+  need(binding.failed_terminal===undefined&&binding.node_id!==input.binding.node_id&&binding.javascript_node_id===binding.node_id,'own completed JS output');
+  verifyNativeRoundtripExecution(binding.completed_child,binding,c.input_fixture_id,c.id);
+ }
+ if(role==='upstream')need(binding.node_id===input.binding.node_id&&binding.port_guid===input.binding.port_guid
+  &&same(binding.source,input.binding.source)&&same(binding.completed_child,input.binding.completed_child),'original upstream identity/child');
+ const exact=adaptRead(raw,{expected:binding,lifecycle,consistency:{kind:'observed_local',changed:false,exclusive_operation:true,stability_basis:'owned_static_completed_fixture'}});
+ need(exact.coverage.table_complete&&exact.row_count===4&&exact.cells.length===4
+  &&same(exact.schema,[{name:'Value',label:'Value',type:'integer',index:0}]),'complete fixed Value/Integer schema/count');
+ if(role==='upstream'||c.oracle==='copy'){
+  verifyNativeFixtureCells(exact,'integer-safe');
+  need(exact.cells.every((cell,i)=>cell.row===i&&cell.column===0&&cell.value===input.exact.cells[i].value
+   &&cell.is_null===input.exact.cells[i].is_null&&same(cell.native,input.exact.cells[i].native)),'exact copy/upstream differs');
+ }
+ if(role==='output'&&c.oracle==='isnull')need(exact.cells.every((cell,i)=>cell.row===i&&cell.column===0&&cell.type==='integer'
+  &&cell.cell_type==='integer'&&cell.is_null===false&&cell.precision==='exact_native'&&cell.representation==='decimal_integer'
+  &&cell.value===(i===0?'1':'0')&&cell.decimal===cell.value
+  &&same(cell.native,{tag:20,encoding:'signed-int64-le',bytes_le:i===0?'0100000000000000':'0000000000000000',bits:64})),'independent IsNull vector differs');
+ return {...exact,contract:'javascript-native-named-read-1',named_case_id:c.id,input_fixture_id:c.input_fixture_id,
+  role,source_sha256:probe.source_sha256,input_read_id:input.raw.read_id,g5_complete:false};
+}
+export function verifyJavascriptNamedOutcome(results,caseId){
+ const c=javascriptNamedCase(caseId),before=verifyJavascriptNamedInput({node:{node_id:results.before.binding.node_id},table:{port_guid:results.before.binding.port_guid},native_input:{native:results.before}},caseId);
+ need(!results.failed,'failed execution cannot use success oracle');
+ for(const role of ['output','upstream']){
+  const proof=results[role];need(proof.binding.named_case_id===caseId,'selected case differs');
+  const exact=verifyJavascriptNamedRead(proof.raw,{...proof,input:before,role});
+  need(same(exact,proof.exact),'stored '+role+' proof differs');
+ }
+ need(results.upstream.binding.javascript_node_id===results.output.binding.node_id,'same JS owner before upstream');
+ return {named_case_id:caseId,input_fixture_id:c.input_fixture_id,status:'named_exact_case_observed',oracle:c.oracle,
+  input_exact:true,upstream_exact:true,output_case_exact:true,output_identity_exact:c.oracle==='copy',exact_pass:true,
+  characterization_only:false,g5_complete:false,public_handler_accepted:false,cli_accepted:false};
+}

@@ -218,6 +218,25 @@ class FixtureAudit(unittest.TestCase):
     def test_declared_empty_shared_input(self):
         verify("cardinality-empty", (HERE / "fixtures" / CATALOG["cardinality-empty"]["file"]).read_bytes())
 
+    def test_named_stage_a_independent_pins(self):
+        named = json.loads((HERE / "javascript-native-named-cases.mjs").read_text().split("const cases=", 1)[1].split(";\nObject.values", 1)[0])
+        spec = [('A-get-index', 501, 'ade8e3b5195f4c6cd81c09ced0836e909d1ad037b99b40ac152805630ffd8782'), ('A-get-exact', 507, '6befc43d503c85db5063fe2ae128cdbfc52db37f26cf449610639e3280079ab5'), ('A-getcolumn-index', 659, 'bb2b3bbd7adf0204483b9a3367ba1506f2fc4fd9b89d45ce9381147ac8868766'), ('A-getcolumn-exact', 665, 'ddda422a0d6a06aa08ad0743fdfb616f18641e232aaa5b9921d8b752aa777ee1'), ('A-columns-index', 657, '5410965b02be2a044a1973b31ca2290d60ee935a817109329728a4fa21021032'), ('A-columns-exact', 663, '752e74be9ab4fb53adece872ec1492ee7fd761f4ec086229187965120eec902e'), ('A-isnull-index', 487, '1ab38e09307a876f96b6e3b83e2a46f3b34da9cb4f90a759413cd4d36dd0dc98'), ('A-isnull-exact', 493, '57ceade9570a31dc76f0e2a94e514c1ad7d4474470467ba69649d3dc2b4fb34c')]
+        self.assertEqual(list(named), [row[0] for row in spec])
+        data = (HERE / "fixtures/javascript-native-input-integer-safe.csv").read_bytes()
+        self.assertEqual(data, b"Value\n__JS_NULL__\n-9007199254740991\n0\n9007199254740991\n")
+        self.assertEqual(hashlib.sha256(data).hexdigest(), "86983c730cec045020a014b5bd365b2cf604c5f214774eb4a31b9344f6d0865d")
+        for case_id, size, digest in spec:
+            with self.subTest(case=case_id):
+                case = named[case_id]
+                self.assertEqual(case["input_fixture_id"], "integer-safe")
+                self.assertEqual(case["oracle"], "isnull" if case_id.startswith("A-isnull-") else "copy")
+                source = case["source"].encode("utf-8")
+                self.assertEqual(len(source), size)
+                self.assertEqual(hashlib.sha256(source).hexdigest(), digest)
+                self.assertEqual(case["source_sha256"], digest)
+                for changed in [source + b" ", source.replace(b"\n", b"\r\n"), source.replace(b"Value", b"value")]:
+                    self.assertNotEqual(hashlib.sha256(changed).hexdigest(), digest)
+
     def test_coercion_enum_and_pins(self):
         self.assertEqual(len(COERCIONS), 7)
         self.assertEqual(list(COERCIONS), [case["id"] for case in COERCION_SPEC])

@@ -91,7 +91,7 @@ for(const [index,id]of ids.entries()){
   const source=readFileSync(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
   const start=source.indexOf('    async readNativeRoundtrip(input,node,execution) {'),end=source.indexOf('    async readNativeCivil(',start);
   const runtime=vm.runInNewContext('({'+source.slice(start,end)+'})',{
-   nativeFixtureId:id,nativeInputFixture:javascriptNativeFixture(id),nativeRoundtripProbe:javascriptNativeRoundtripProbe(id),
+   nativeNamedCaseId:undefined,nativeFixtureId:id,nativeInputFixture:javascriptNativeFixture(id),nativeRoundtripProbe:javascriptNativeRoundtripProbe(id),
    verifyNativeRoundtripInput,verifyNativeRoundtripOutcome,verifyNativeRoundtripExecution:()=>{},validateNativeSource:()=>{},freezeCivilEvidence,
    page:{evaluate:async()=>{}},completeJavascriptNativeRoundtrip:()=>{},prepared:{document_id:'d',workflow_ref:{workflow_id:'w'}},
    deadline:Date.now()+10000,randomUUID:()=>String(events.length),execute:()=>{},nativeReadUncertain:false,sessionId:'test',origin:'http://test',build:'7.4.2',
@@ -124,7 +124,7 @@ for(const id of [...ids,'cardinality-empty'])for(const mode of ['pass','bad-ack'
  const source=readFileSync(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
  const start=source.indexOf('    async armNativeRoundtrip(input) {'),end=source.indexOf('    async checkNativeRoundtripBeforeExecute()',start);
  const runtime=vm.runInNewContext('({'+source.slice(start,end)+'})',{
-  nativeInputOnly:true,nativeReadUncertain:false,nativeFixtureId:id,nativeRoundtripProbe:javascriptNativeRoundtripProbe(id),
+  nativeInputOnly:true,nativeReadUncertain:false,nativeNamedCaseId:undefined,nativeFixtureId:id,nativeRoundtripProbe:javascriptNativeRoundtripProbe(id),
   verifyNativeRoundtripInput,validateNativeSource:()=>{},armJavascriptNativeRoundtrip:()=>{},
   page:{evaluate:async()=>{calls.push('arm');return {armed:true};}},record:async e=>{calls.push(e.phase);return mode==='bad-ack'?{...e,proof:{}}:clone(e);}
  });
