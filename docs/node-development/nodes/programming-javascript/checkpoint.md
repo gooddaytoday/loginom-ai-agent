@@ -16,6 +16,25 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Fix79 regression: основной набор завершён, full client ещё работает
+
+Root непосредственно прочитал developer main log: **1292 PASS**, failed/skipped0.
+Это ещё не независимая приёмка frozen source79: manifest/handoff не переданы.
+Полный client suite подтверждён живым Node process2579529; workspace-ui child
+2583127 также реально работает. Observation timeout не трактуется как остановка,
+root не перезапускает и не прерывает этот handle.
+
+В отдельном developer diagnostic сохранены3 отказа action-catalog/agent-command,
+в том числе `EPERM` при запуске временного executable shim. Их нельзя без
+доказательств считать pre-existing либо чинить ослаблением product/test guards.
+Root назначил сохранить точные логи и повторить suite независимо после freeze.
+Дополнительный root-subprocess-preflight79.json подтвердил, что pinned Node в
+среде root запускает временный executable с пробелами в пути; артефакт удалён.
+Это только environment preflight, не PASS отказавших product tests.
+
+Browser CLOSED/profile63 unused. Developer active Fix79; следующий root test
+запускается после окончательной передачи версии.
+
 ### Сверка оставшейся G5-матрицы и границ engine profile
 
 Root сверил canonical typed-cases, engine-profile и J01–J27: Integer coercion
