@@ -34,6 +34,18 @@ test('download binds the checked file gesture to its page event and exact privat
   assert.ok(!JSON.stringify(result).includes('not-for-output'));
 });
 
+test('download preserves bounded stale-reference reason/checks without replaying the denied gesture',async()=>{
+  const f=fixture('javascript-native-input-real.csv'),snapshot=f.page.uiSnapshot.bind(f.page);
+  f.page.uiSnapshot=()=>{const s=snapshot();s.ui.elements=s.ui.elements.map(e=>e.ref===f.options.file_ref?{...e,allowed_actions:[]}:e);return s;};
+  f.page.waitForEvent=async()=>{f.calls.push('listen');throw Object.assign(Error('private download URL'),{name:'TimeoutError'});};
+  const result=await f.run();assert.equal(result.status,'NOT_APPLIED');assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);
+  assert.equal(result.error.code,'DOWNLOAD_GESTURE_NOT_CONFIRMED');
+  const refused=result.trace.find(e=>e.event==='download_gesture_result');
+  assert.equal(refused.reference_reason,'control_changed_or_action_denied');
+  assert.deepEqual(refused.reference_checks,{present:true,identity_matches:true,signature_matches:true,action_allowed:false});
+  assert.deepEqual(f.calls,['listen']);assert.ok(!JSON.stringify(result).includes('private download URL'));
+});
+
 test('TSV download retains exact-name, destination and event ownership checks',async()=>{
   const f=fixture('sales.tsv'),result=await f.run();
   assert.equal(result.status,'SUCCEEDED');assert.equal(result.cleanup_complete,true);

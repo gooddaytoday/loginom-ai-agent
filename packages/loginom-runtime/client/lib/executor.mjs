@@ -280,9 +280,19 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     browserStep='download.gesture';
     const action=await act(page,before.output);
     gesture=revealed || action.effect_possible===true;
+    const refusal=action.trace?.find(e=>e.event==='ui_reference_precondition_refused')?.checks;
+    const referenceChecks=refusal?Object.fromEntries(['present','identity_matches','signature_matches','action_allowed']
+      .filter(key=>typeof refusal[key]==='boolean').map(key=>[key,refusal[key]])):null;
+    const referenceReasons={
+      'The observed control changed; observe the workspace again':'control_changed_or_action_denied',
+      'Observed control is no longer unique':'not_unique','Observed control is detached':'detached',
+      'Observed control is detached, hidden, disabled, or replaced':'not_live_visible_enabled',
+      'Observed control geometry changed':'geometry_changed'};
     trace.push({event:'download_gesture_result',status:action.status,effect_possible:action.effect_possible===true,
       cleanup_complete:action.cleanup_complete===true,
-      error_code:/^[A-Z][A-Z0-9_]{0,79}$/.test(action.error?.code??'')?action.error.code:null});
+      error_code:/^[A-Z][A-Z0-9_]{0,79}$/.test(action.error?.code??'')?action.error.code:null,
+      ...(action.error?.code==='UI_REFERENCE_STALE'?{reference_reason:referenceReasons[action.error.message]??'unclassified',
+        ...(referenceChecks?{reference_checks:referenceChecks}:{})}:{})});
     browserStep='download.event';download=await event;
     if(action.status!=='SUCCEEDED' || action.output?.gesture_applied!==true) {
       if(download) {gesture=true;await download.cancel();completed=true;}
