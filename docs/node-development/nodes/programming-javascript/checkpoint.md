@@ -16,6 +16,41 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch54: manual mapping сохранён; изменённый код требует отдельного materialization — 2026-09-27
+
+Root аудит1450 journalSHA,60 input cells,1fresh completed baseline execution,
+full6×2/12cells и38/38 source hashes PASS. manual_mapping_prepared впервые получен:
+verified/settings_applied/source_identity_verified=true,autosync=false,
+ObservedID→ObservedID,PhaseMarker→ManualMarker (name=label). Shared autosync и
+owned Done source53 подтверждены live. Grouped reorder был no-op; его движения
+этим прогоном не сертифицированы.
+
+После reopen точная замена PhaseMarker→GeneratedMarker подтверждена snapshot
+source-probe-result exact=true, SHA
+f27e0409c160ed0417a66517773b2b7c19bfa60a3fe3e0fb4c91aeaea1e098bb.
+Done завершился, wizard hidden. Следующее чтение output mapping отказало после
+15s: NodeReadinessTimeout/complete JavaScript output mapping. Last snapshot
+line1437: mapping verified=false/reason=mapping_render_value, тот же prepared
+node/output-port; rendered ObservedID/ManualMarker,auto_sync=false, оба source
+unobserved. Старые имена полей не доказывают корректность изменённой source schema.
+Изменённый код отдельно НЕ выполнялся; найден только исходный baseline execution.
+Generated-schema mismatch gate не закрыт; report trial остаётсяnot_run.
+
+Original terminal exit1 FAILED, package/logout/browser ALL PASS: scoped mapping
+Close выполнен, recovery не требовался. Private boundary receipt отдельно доказал
+manual settings, changed exact source/Done, unverified post-Done sources и cleanup.
+Profile27 сохранён; freshprofile28 назначен, lease closed.
+
+В задаче разработчика назначен fix54/discovery: сохранить post-Done observation
+как отдельный исход; затем одна явно новая execution phase для changed source,
+с собственным effect identity/sourceSHA и fresh baseline. Не сбрасывать once journal,
+не повторять прежний Execute, не ослаблять mapping reader и не включать auto reset.
+Требуется actual GeneratedMarker source schema и manual mapping/полный typed output
+либо строго owned native failure. Это устраняет пробел самой пробы, а не объявляет
+неподтверждённый mapping_render_value ошибкой observer. Public handler и цель открыты.
+
+
+
 ### Freeze53: DataSet controls; полный workspace-ui PASS — 2026-09-27
 
 Source commit `05e40b740bc6a3e39b37e3226144985967975e1a`:shared port-mapping-procedure
