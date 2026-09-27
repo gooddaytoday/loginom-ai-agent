@@ -1,5 +1,13 @@
 # G5 native types: следующий ограниченный шаг
 
+Наблюдение source73: Date INPUT-only прошёл native/civil admission (3+3cells).
+Первый Date roundtrip отказал в verifier до публикации native OUTPUT из-за
+ошибочного требования разных port GUID. Один output0 GUID встречается у разных
+node_id, в том числе в прежних успешных int64/string прогонах. Принадлежность
+проверять составным контекстом узла/порта/исполнения, не глобальной уникальностью
+port GUID. Date roundtrip пока не подтверждён; подробности и Fix74 — в checkpoint.
+
+
 Статус на 2026-09-27: **private real/boolean/string INPUT и JS identity roundtrip подтверждены live**.
 Source71 `0115eccd20`: boolean/profile50 audit9cells/570journal refs PASS,
 string/profile51 audit24cells/556refs PASS;81sourcepins и original cleanup3/3

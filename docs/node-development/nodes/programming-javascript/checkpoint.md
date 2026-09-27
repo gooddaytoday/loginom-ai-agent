@@ -15,6 +15,31 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Date roundtrip01: ошибочная глобальная уникальность port GUID; Fix74 назначен
+
+Source73/profile55 завершён FAILED, session27875 terminal exit1, original
+cleanup3/3=true, recovery не нужен. Ошибка `civil output must belong to JS`
+возникла из-за нового требования разных port_guid у import/JS. Фактически
+output0 GUID `58f7e6c3-511e-39d7-8853-036e0a1a7612` одинаков при разных node_id;
+это также независимо подтверждено прежними успешными safe-int64/string reports.
+Нельзя использовать неравенство GUID как доказательство принадлежности разным
+узлам; проверка должна сохранять полный document/workflow/node/port/source/execution.
+
+Root проверил3native INPUT +3civil INPUT +3civil JS OUTPUT,807journalrefs,
+190pins (188 из Git source73,2 Playwright dependency JSON с диска).
+JS own Execute completed; native OUTPUT lifecycle3/3 completed/released, но
+его значения не опубликованы после отказа verifier, upstream ещё не читался.
+**Date byte identity/full roundtrip не доказан.** ReportSHA
+`339a63966c66ec8d27237d94925187af877e2bca65828251645d785047c3f66e`;
+private native-datetime-roundtrip-probe-01-failure-verification.json сохранён.
+
+Lease CLOSED, profile55 сохранён, следующий ещё не назначен. Прежней задаче
+назначен bounded Fix74: убрать только ошибочную global-GUID inequality,
+сохранить составные ownership/fresh execution/native source guards, добавить
+same-GUID/distinct-node positive и foreign owner/execution negative tests,
+затем Freeze74. Root владеет commit и новым headed прогоном, replay не выполняется.
+
+
 ### Date INPUT-only PASS; отдельный roundtrip запущен
 
 Source73/profile54 native-datetime-input-probe-01 завершён exit0,
