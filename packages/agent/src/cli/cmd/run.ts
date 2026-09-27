@@ -126,7 +126,7 @@ async function toolError(part: ToolPart) {
   }
 }
 
-export const RunCommand = effectCmd({
+export const createRunCommand = (onSession?: (sessionID: string) => void) => effectCmd({
   command: "run [message..]",
   describe: "run opencode with a message",
   // --attach connects to a remote server (no local instance needed); the
@@ -705,6 +705,7 @@ export const RunCommand = effectCmd({
           exitCli(1)
         }
         const sessionID = sess.id
+        onSession?.(sessionID)
 
         function emit(type: string, data: Record<string, unknown>) {
           if (args.format === "json") {
@@ -1056,6 +1057,8 @@ export const RunCommand = effectCmd({
     })
   }),
 })
+
+export const RunCommand = createRunCommand()
 
 type MiniCommandInput = {
   directory?: string

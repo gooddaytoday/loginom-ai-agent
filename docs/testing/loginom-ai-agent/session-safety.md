@@ -141,6 +141,89 @@ Generic acknowledge не стирает даже orphan completion intent, во�
   человеческое принятие PR остаются отдельными gates. В ходе этой разработки
   Loginom, модели и реальные кампании не запускались.
 
+## Приватный контроллер CLI
+
+Trusted launcher может завершить собственную Loginom-сессию после обычного
+неинтерактивного `run`, пока **тот же** Node Host и профиль ещё удерживаются.
+Интерфейс работает только через унаследованный Unix socket FD 3–63, указанный
+в `LOGINOM_AI_AGENT_CLI_CONTROL_FD`; Windows этим изменением не квалифицирован.
+Переменная удаляется до импорта backend. Канал не становится модельным
+инструментом, публичной management-командой или HTTP endpoint. Это capability
+доверенного launcher, а не изоляция от произвольного процесса того же UID.
+
+До запуска launcher создаёт/настраивает отдельный профиль обычным путём и
+записывает существующую trusted registration
+`<profile>/loginom/session-registration.json`: `{"version":1,"attemptId":"..."}`,
+с владельцем CLI UID и режимом 0600. Он включает
+`LOGINOM_AI_AGENT_STRICT_RECOVERY=1`. Полная привязка runtime-сессии **до `run`
+ещё не существует**: её возвращает Host после выполнения. Нельзя подставить
+полную binding через переменные окружения, аргументы или управляющий запрос.
+Launcher обязан исключить приватный профиль и канал из доступа модели.
+
+Пример передачи socketpair через Node `spawn` (окружение уже составлено
+launcher по своему разрешённому списку; секреты здесь не показаны):
+
+```js
+const child = spawn(cliExecutable, ["run", ...runArguments], {
+  env: {
+    ...trustedEnvironment,
+    LOGINOM_AI_AGENT_STRICT_RECOVERY: "1",
+    LOGINOM_AI_AGENT_CLI_CONTROL_FD: "3",
+  },
+  stdio: ["ignore", "pipe", "pipe", "pipe"],
+})
+const control = child.stdio[3]
+```
+
+Канал использует UTF-8 JSON с переводом строки. Запросы имеют **ровно** две
+допустимые компактные формы ниже; extra fields, повторные ключи, преждевременные
+и повторные запросы закрывают канал. Накопленный вход ограничен 256 байтами,
+ответ — 32 KiB. Контроллер выполняет шаги последовательно:
+
+1. После завершения `run` получает `{"version":1,"type":"ready"}`.
+2. Отправляет `{"version":1,"method":"options"}\n`.
+3. Получает `{version:1,type:"options",completionId,binding}`. `binding` —
+   существующий `SessionCompletionBinding`; `chat` вычислен из фактического
+   backend session ID, generation взят из текущего Host. Контроллер сверяет
+   attempt/account/package/save с собственной ожидаемой попыткой. Идентификатор
+   completion генерирует CLI; контроллер не выбирает его.
+4. Только после проверки явно отправляет
+   `{"version":1,"method":"finish"}\n` без идентификаторов. CLI вызывает
+   существующий Host `finish-own-session` с ранее полученной binding.
+5. Получает `{version:1,type:"receipt",receipt}` до `finally` и локального
+   закрытия Host. Receipt использует существующую схему, включая completion ID,
+   binding, status, packageClosed, loggedOut и reason.
+
+От `ready` действует 60-секундное окно, каждый запрос к Host ограничен 30
+секундами. Это отдельное окно завершения, оно не меняет бюджет модели.
+`SUCCEEDED` принимается только при обоих cleanup-флагах и `reason:null`.
+`BLOCKED`/`UNKNOWN`, EOF, отмена, просрочка, смена generation или неверная схема
+завершают CLI с ошибкой и сохраняют `.writer`. Они не разрешают повторный finish
+с новым ID, удаление guard, новый login или продолжение через TTL. Если ответ
+потерян, launcher сохраняет неизвестный результат для отдельного reconciliation.
+
+Даже полученный успешный receipt доказывает только завершение этой Loginom
+runtime-сессии. Launcher отдельно ожидает exit 0 и успешного освобождения
+локального профиля; account provisioning отдельно подтверждает серверный
+inventory всех принадлежащих попытке сессий перед блокировкой аккаунта.
+При ошибке локального cleanup успешный receipt не превращается в общий PASS.
+Никакого автоматического finish по exit 0 или ответу модели нет. Без переменной
+control FD обычный CLI сохраняет прежнее поведение.
+
+Из `packages/agent` локальные проверки: закреплённым Bun 1.3.14 запустить
+`LOGINOM_AI_AGENT_TEST_NODE=/absolute/pinned/node bun test test/cli/standalone-completion.test.ts test/cli/standalone.test.ts test/cli/standalone-status.test.ts test/cli/run-outcome.test.ts`
+и `bun typecheck`. Новые fixtures используют реальный inherited socket и Bun
+child, синтетический локальный provider и синтетический отдельный Node Host;
+живые Loginom, OAuth и модели в этих тестах не используются.
+
+На 2026-09-27: четыре перечисленных CLI test-файла — 35 PASS; после добавления
+проверки реального backend `bash` → Bun child новая suite повторно дала 18 PASS.
+Это повторная проверка части тех же тестов, а не 53 различных теста. В дочернем
+процессе отсутствуют control env key и исходный socket (сравниваются dev/inode,
+а не только номер FD). Package `bun typecheck` — PASS. Проверены Bun 1.3.14 и
+Node 24.19.0; дистрибутивная сборка и техническая приёмка по-прежнему отдельные
+непройденные gates.
+
 ## Локальные проверки
 
 Использовать закреплённые Bun 1.3.14 и Node 24.19.0. Из `packages/loginom-host`:
