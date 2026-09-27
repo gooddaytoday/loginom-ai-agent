@@ -15,6 +15,26 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze62: direct subscription cookie binding; probe08 запущен
+
+Source node-javascript `c535b67b890eb4eb237de1e672120c5691075e31`: recursive cookie
+serialization заменена exact direct DelegateProxy admission. Проверяются own
+shape, constructor/prototype, session identity, numeric remote identity/refcounts;
+объекты и scalar values сохраняются для сравнений до/после каждого request.
+Host проверяет SHA загруженных constructor/$II до native dispatch, без их вызова.
+Это subscription handles, не data-generation counters; observed_local/no_snapshot/
+ABA limitations сохранены. Shared Collapse не изменён.
+
+Root **350/350 PASS**, fail/skip0;66pins unchanged до/после. Независимая extraction
+constructor/interface из закреплённого frontend дала совпадающие source hashes
+(operator62-cookie-source-root-audit.json), но loaded match ещё предстоит live.
+Private operator62-root-test-source.json + stdout/stderr закрепляют tests/pins.
+
+Разработчик idle. Native-input-probe-08 запущен на fresh profile41, headed,
+DISPLAY=:1/sandbox. На момент checkpoint RUNNING; nativevalues/cleanup ещё
+не подтверждены. Profile40 сохранён; cleanup07 ALL PASS. Full plan active.
+
+
 ### Probe07: cookie — direct DelegateProxy, не Out/счётчик
 
 Headed profile40/source61 завершён exit1 FAILED, original cleanup ALL PASS.
