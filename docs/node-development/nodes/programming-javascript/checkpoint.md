@@ -15,6 +15,27 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch37: wizard найден, одна маска блокирует settlement — 2026-09-27
+
+Freshprofile10/freeze37. Root-аудит:1252 journal refs SHA, один свежий launch,
+полный JS output6×2/12cells PASS. Повторный Setting отправлен один раз.
+Settlement timeout90s: surface=wizard, native_owner_verified/root_visible=true,
+breadcrumb7 при workflow5, dialog0, mask_count1. Cleanup повторно наблюдал
+то же состояние и завершился timeout60s без повторного Setting. Original
+cleanup package/logoutfalse, browserclosedtrue, CLEANUP_UNCONFIRMED.
+
+Root просмотрел screenshot: открыта JavaScriptColumnsWizard. В исходном
+javascript-live.mjs уже есть строгое native-различение disabled-delete-header
+mask, а новый wizard-settlement считает все x-mask blockers. Это подтверждённое
+расхождение кода; принадлежность конкретной live37 mask ещё требует диагностики,
+по одному screenshot она не доказана. Назначен fix38: переиспользование точного
+classifier с owner/cache/bounds guards, bounded mask diagnostics и regressions;
+не игнорировать произвольные masks. Public guards сохраняются.
+
+Отдельный headed recovery37 без download/package mutation: packages0,
+logout/browser PASS, проверено root. Следующий live — freshprofile11 после
+handoff38; текущий браузер закрыт. Полный batch/G2/G3 ещё не завершены.
+
 ### Freeze37 проверен, headed batch37 запущен — 2026-09-27
 
 Root повторил60 tests: PASS; проверены24 SHA итогового handoff37,
