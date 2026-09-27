@@ -16,6 +16,24 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Integer coercion fraction-positive01: independent characterization PASS
+
+Source87332cec9804c761465dad766f989fb458c4d997/profile66,
+original session97032 terminal exit0, CHARACTERIZED, cleanup3/3.
+Root audit-coercion-success-live.py прошёл на реальном отчёте:
+**3 native cells,625 journal refs,1259 source pins**; source/execution/owner,
+INPUT-before-JS, Done seal, single Execute, final ACK/coverage и lifecycle проверены.
+Native Real1.75 INPUT/upstream exact; OUTPUT native signed64 Integer1,
+bytes0100000000000000. Это отдельное наблюдение, не общий алгоритм trunc/round,
+не strict exact-value PASS, не full G5/handler/CLI acceptance.
+Report SHA29aa1bd6c1f9c0de7b2436607fa0860264201a8699ab27b86092147faa461c93;
+baseline SHA011d32e5c5bfd1f51b754431eec4d2ee318a5d9b602b81da4e3364dc22f33723.
+Private evidence native-integer-coercion-fraction-positive-probe-01 и
+одноимённый verification.json. Matrix:1 characterized/6 not_run,
+coverage_complete=false. Процесс pinned Chromium отсутствует, browser lease CLOSED.
+Fresh profile67 зарезервирован для independent fraction-negative; не повторять66.
+
+
 ### Source82 принят; первый headed Integer coercion RUNNING
 
 Developer revision51 idle передал freeze82:16 changed+14 new files,1259 pins.

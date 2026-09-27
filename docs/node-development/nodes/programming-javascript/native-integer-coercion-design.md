@@ -236,3 +236,17 @@ completed witness. Ожидаемые значения не менять по р
 Все7 слотов сохраняются, в том числе failed/unresolved/not_run. Полный набор
 проверок из раздела выше обязателен; root принимает frozen source перед каждым
 live запуском. Public handler/CLI и остальные G5 пункты не исключаются из цели.
+
+
+## Наблюдённые исполнения (Ubuntu operator)
+
+Source `87332cec9804c761465dad766f989fb458c4d997`, pinned Loginom frontend7.4.2.
+Первый отдельный headed run fraction-positive01/profile66: native Real1.75
+перед JS и после него upstream точны; native Integer OUTPUT равен1
+(signed64 LE0100000000000000). Root проверил3 native cells,625 journal refs,
+1259 source pins и cleanup3/3. Report SHA
+29aa1bd6c1f9c0de7b2436607fa0860264201a8699ab27b86092147faa461c93.
+Это characterization одного fixed case; никакой общий rounding/truncation
+алгоритм и внутренний механизм ChakraCore не объявляются доказанными.
+Матрица пока1/7 characterized, остальные6 not_run. Подробности и актуальное
+продолжение — [checkpoint](checkpoint.md); full G5/handler/CLI не закрыты.
