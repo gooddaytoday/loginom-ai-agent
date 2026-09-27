@@ -15,6 +15,20 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch39 частично: Alt-drag двух узлов подтверждён — 2026-09-27
+
+Текущий процесс batch39 всё ещё RUNNING. Root проверил две palette delta:
+links0→0 и1→1, каждый раз ровно один новый JS; прежние links совпали полностью.
+Оба drag вернули24steps и подтверждённые mouse/Alt release. Далее выполнялся
+явный connect. Первый code-table-execute снова gate_passed=true; output6×2
+подтверждён. Второй case прошёл прежнее место unexpectedlink и отправил Preview.
+
+Preview sentinel пока ожидает terminal под исходным case deadline10min:
+повторных Preview/Execute нет. readJavascriptStage читает только owned wizard/
+preview messages; фактическое отсутствие распознанного результата не доказывает
+отсутствия выполнения. Cleanup ещё не запускался; lease/browser остаются занятыми.
+Приватная квитанция g2-batch-39-partial-verification.json — частичная, не finalPASS.
+
 ### Freeze39 проверен, headed batch39 запущен — 2026-09-27
 
 Root65 tests PASS;27 итоговых SHA проверены, tested source неизменён.
