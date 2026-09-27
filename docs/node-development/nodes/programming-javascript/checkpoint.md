@@ -16,6 +16,21 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Следующий этап: named/index/case и J24 design
+
+Той же задаче разработчика «JavaScript: общая память и допуск Ubuntu» повторно
+передано точное design-only назначение. Revision54/turn
+01a0e454-c966-7433-9cab-f3d9f92ff31e active; это не повтор исторического bootstrap.
+Deliverable: новый native-named-access-design.md; runtime/fixtures/tests и старые
+dirty docs не менять, браузер не запускать. До появления и проверки файла дизайн
+не считается готовым. Root подтвердил ограничения текущих input/roundtrip
+contracts/read: single column Value/Value. J24 потребует отдельного schema contract,
+ослаблять старые equality нельзя. Root перечитал Help API/input/output и skipped
+E2E NameGens/problematic AddColumn; гипотезы добавлены в план с точным SHA.
+Браузер закрыт; следующего live запуска нет. Source82 seven-case milestone
+закоммичен 8f0ea4e427, полный Goal остаётся active.
+
+
 ### Source82: семь Integer coercion случаев подтверждены
 
 2026-09-27: повторные MCP health/find и Doctor0.8.1 успешны: auth/system/status,

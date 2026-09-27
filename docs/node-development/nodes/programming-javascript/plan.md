@@ -699,6 +699,16 @@ baseline 24/24, указанных в research. Идентификаторы п�
 | J26 import policy | Data import, явные unsupported declarations/calls и похожий текст в comments/strings/templates | Preflight различает синтаксис, неподдержанное отклонено до мутации; не заявлена sandbox-гарантия | Pure parser tests + журнал без editor effects |
 | J27 target persistence | Exact назначенный URL в новом CLI profile и после restart | Origin/path остаются назначенными; legacy migration не уводит приёмку на другой сервер | Host regression + actual CLI status; gate перед приёмкой |
 
+Для J24 внешние `js_data_output.ts:307–400` на E2E SHA
+`7a41b5adbb9c45dca8d756a8220615554301c2e0` содержат гипотезы
+`РусскиеБуквы`→`RusskieBukvy`, `124`→`_124` и генерации имени для пустого
+аргумента. Оба теста помечены `test.skip` (TODO2332), не запускались;
+это не подтверждение поведения текущего стенда. Проверять фактическую native
+schema и различать `Name`/`DisplayName`; результат `AddColumn` не переносить
+на `AssignColumns` без отдельного доказательства. SHA256 прочитанного файла:
+`f1bd7c9c72e4621b756020b3b794cdca9de1b7259bb08039dbf7e0e25645fde0`.
+
+
 ## Следующие расширения узла
 
 Каждое расширение получает отдельное назначение/версию scope, собственный
