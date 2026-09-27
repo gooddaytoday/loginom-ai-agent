@@ -1,0 +1,448 @@
+import {withJavascriptWizardMasks} from './javascript-wizard-masks.mjs';
+import {waitJavascriptWizardSettlement} from './javascript-wizard-settlement.mjs';
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile,mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createHash} from 'node:crypto';
+import vm from 'node:vm';
+import {EventEmitter} from 'node:events';
+import {observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
+import {javascriptInputColumns,javascriptInputRows,verifyJavascriptFixture,verifyJavascriptTable,javascriptSentinelOutcome,createJavascriptEffectJournal,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord} from './javascript-execution-evidence.mjs';
+import {javascriptInputRequest,waitJavascriptCleanupReady,selectJavascriptForSettings,javascriptWizardBinding,openJavascriptWizard,cleanupJavascriptWizardOpening} from './javascript-execution-runtime.mjs';
+import {validateNodeApplyRequest} from '../../client/lib/node-apply.mjs';
+import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
+import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
+
+function privateSelectionFixture(fault) {
+  const node={id:'js-guid',tid:'MF;TF-1;Graph;JavaScript',allowed_actions:[]};
+  const element=tid=>({isConnected:true,allowed_actions:[],getAttribute:k=>k==='data-tid'?tid:null,
+    getBoundingClientRect:()=>({x:100,y:100,width:80,height:100}),closest(selector){return selector==='[data-tid]'?this:null;},contains(other){return other===this;}});
+  const body=element(node.tid),setting=element(node.tid+';Setting');let shape=body,selected=['already','selected_no_setting'].includes(fault),clicks=0,disposed=0;
+  const overlay=element(node.tid+';'+(fault?.startsWith('overlay_')?fault.slice(8):'Execute'));
+  const icon={closest:selector=>selector==='[data-tid]'?body:null};
+  body.contains=e=>e===body||e===overlay||e===icon;setting.contains=e=>e===setting||e===overlay;
+  if(fault==='setting_overlay')selected=true;
+  const native={FGuid:node.id,FIconCls:'js',FCell:{},data:{}};
+  const diagram={FNodes:{FCollection:[native]},FmxGraph:{container:{contains:e=>e===shape||e===setting,
+    querySelectorAll:()=>fault==='selected_no_setting'?[shape]:fault==='duplicate_after'&&selected?[shape,element(node.tid),setting]:selected?[shape,setting]:[shape]},getSelectionCells:()=>selected?[fault==='foreign_selected'?{}:native.FCell]:[],view:{getState:()=>({shape:{node:shape}})}}};
+  const tab={Controller:{Node:{data:{node:{}}},FController:{FDiagram:diagram}}};
+  const binding={tab,workflow:tab.Controller.Node.data.node,nodeData:native.data};
+  const realm=vm.createContext({location:{origin:'http://logi-test-plan.bg.local'},innerWidth:1000,innerHeight:800,
+    document:{querySelectorAll:()=>fault==='covered_after'&&selected?[{isConnected:true,getBoundingClientRect:()=>({width:20,height:20})}]:[],elementFromPoint:()=>fault==='cover'?{}:fault?.startsWith('overlay_')||fault==='setting_overlay'?overlay:selected?setting:fault==='icon'?icon:shape},getComputedStyle:()=>({visibility:'visible'}),
+    bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>tab}}}}}}}});
+  const invoke=(fn,arg)=>vm.runInContext('('+fn.toString()+')',realm)(arg);
+  const page={evaluateHandle:async(fn,arg)=>Object.assign(invoke(fn,arg),{dispose:async()=>{disposed++;}}),evaluate:async(fn,arg)=>invoke(fn,arg),
+    mouse:{click:async()=>{clicks++;if(fault==='lost'||fault==='lost_open'&&clicks===2)throw Error('lost click reply');selected=true;
+      if(fault?.includes('replace')||['foreign_selected','duplicate_after','node_after','cell_after','covered_after'].includes(fault)){
+        body.isConnected=fault==='replace_connected';shape=element(node.tid);
+      }
+      if(fault==='node_after')native.data={};if(fault==='cell_after')native.FCell={};if(fault==='controller_after')tab.Controller={...tab.Controller};
+    }},
+    waitForFunction:async(fn,arg,options)=>{assert.equal(typeof fn,'function');assert.ok(options.timeout>0&&options.timeout<=5000);
+      assert.ok(invoke(fn,arg));if(fault==='replace_twice'){shape.isConnected=false;shape=element(node.tid);}return {dispose:async()=>{}};}};
+  const records=[];
+  const record=async e=>{records.push(e);if(e.phase==='javascript_private_selection_dispatch'){
+    if(fault==='node')native.data={};if(fault==='dom')shape=element(node.tid);if(fault==='journal')throw Error('journal failure');
+  }};
+  return {run:(deadline=Date.now()+5000,options={})=>selectJavascriptForSettings(page,{binding,node,icon:'js',deadline,record,...options}),node,records,page,binding,realm,record,tab,native,
+    get clicks(){return clicks;},get disposed(){return disposed;}};
+}
+test('private JS selection works with observed generic deny and sends only one body gesture',async()=>{
+  const f=privateSelectionFixture();assert.deepEqual(f.node.allowed_actions,[]);assert.equal((await f.run()).verified,true);assert.equal(f.clicks,1);
+  assert.deepEqual(f.node.allowed_actions,[]);assert.equal(f.disposed,1);assert.equal(f.records.at(-1).ready,true);
+  const ready=privateSelectionFixture('already');assert.equal((await ready.run()).selected,false);assert.equal(ready.clicks,0);
+  const icon=privateSelectionFixture('icon');assert.equal((await icon.run()).verified,true);assert.equal(icon.clicks,1);
+});
+test('descendant Execute, Preview, ports or foreign Setting child never authorize body/Setting clicks',async()=>{
+  for(const fault of ['overlay_Execute','overlay_Preview','overlay_Input_Data-0','overlay_Setting','setting_overlay']){
+    const f=privateSelectionFixture(fault);await assert.rejects(f.run(),/covered/);assert.equal(f.clicks,0);assert.equal(f.disposed,1);
+  }
+});
+test('private selection refuses changed node/DOM, cover, journal failure and deadline before click',async()=>{
+  for(const fault of ['node','dom','cover','journal']){const f=privateSelectionFixture(fault);await assert.rejects(f.run());assert.equal(f.clicks,0);assert.equal(f.disposed,1);}
+  const f=privateSelectionFixture();await assert.rejects(f.run(Date.now()-1),/deadline/);assert.equal(f.clicks,0);
+});
+test('private selection keeps a lost click ambiguous without replay',async()=>{
+  const f=privateSelectionFixture('lost');await assert.rejects(f.run(),/lost click/);assert.equal(f.clicks,1);
+  assert.equal(f.records.at(-1).phase,'javascript_private_selection_refused');assert.equal(f.records.at(-1).effect_possible,true);
+});
+
+test('selection admits one detached DOM replacement only after the returned gesture on the same selected cell',async()=>{
+  const f=privateSelectionFixture('replace');const result=await f.run();
+  assert.equal(result.dom_replacements,1);assert.equal(f.clicks,1);assert.equal(f.records.at(-1).node_selected,true);
+  for(const fault of ['replace_connected','replace_twice','foreign_selected','duplicate_after','node_after','cell_after','controller_after','covered_after']){
+    const rejected=privateSelectionFixture(fault);await assert.rejects(rejected.run());assert.equal(rejected.clicks,1);
+    assert.equal(rejected.records.at(-1).effect_possible,true);
+  }
+});
+
+test('private Setting opening has one journaled click after selection and refuses a changed owner before dispatch',async()=>{
+  const f=privateSelectionFixture('replace');const result=await f.run(undefined,{openSettings:true});
+  assert.equal(result.opening_dispatched,true);assert.equal(f.clicks,2);
+  assert.equal(f.records.filter(e=>e.phase==='javascript_private_open_dispatch').length,1);
+  const changed=privateSelectionFixture();await assert.rejects(changed.run(undefined,{openSettings:true,beforeOpen:async()=>{changed.native.data={};}}));
+  assert.equal(changed.clicks,1);assert.equal(changed.records.at(-1).opening_dispatched,false);
+});
+
+test('private execution preparation only selects the native cell and never clicks Setting or Execute',async()=>{
+  const already=privateSelectionFixture('selected_no_setting');const result=await already.run(undefined,{requireSettings:false});
+  assert.equal(result.verified,true);assert.equal(already.clicks,0);
+  const select=privateSelectionFixture('replace');assert.equal((await select.run(undefined,{requireSettings:false})).verified,true);
+  assert.equal(select.clicks,1);assert.equal(select.records.some(e=>e.phase==='javascript_private_open_dispatch'),false);
+  const lost=privateSelectionFixture('lost_open');await assert.rejects(lost.run(undefined,{openSettings:true}),/lost click/);
+  assert.equal(lost.clicks,2);assert.equal(lost.records.at(-1).opening_dispatched,true);assert.equal(lost.records.at(-1).effect_possible,true);
+});
+
+function privateWizardFixture({deactivate=false,foreign=false,wrongNative=false,fault,maskFault}={}) {
+  const f=privateSelectionFixture(fault==='lostSetting'?'lost_open':'replace');
+  const reference={document_id:'doc',workflow_id:'workflow',node_id:f.node.id};
+  const path=[{tid:'nav',label:'Workflow'}];
+  const prepared={document_id:'doc',node:reference,workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'tab',navigation_path:path}};
+  const graph={loginom_build:'7.4.2',prepared_node_context:{...reference,verified:true,surface:'graph',tid:f.node.tid,locked:false},wizard:{status:'absent'},
+    ui:{dialogs:[],masks:[],elements:[{tid:f.node.tid+';Setting',allowed_actions:[],wizard_open:{node:{part:'settings',node_label:'JavaScript'},workflow_path:path}}]}};
+  const pending=structuredClone(graph);
+  pending.wizard_pending_owner={status:'observed',node:{tid:'nav>JavaScript',label:'JavaScript'},path:[...path,{tid:'node',label:'JavaScript'},{tid:'wizard',label:'Настройка'}]};
+  pending.ui.dialogs=[{ref:'dialog',title:'Loginom 7.4.2',text:foreign?'foreign':'Loginom 7.4.2 Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел? Да Да, больше не спрашивать Нет'}];
+  pending.ui.elements=Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).map(([name,label])=>({tid:'msgbox;tlb;'+name,label,ref:name,signature:{dialog_ref:'dialog'},allowed_actions:['click']}));
+  const opened={prepared_node_context:{...reference,verified:true,surface:'wizard'},wizard:{status:'observed',root_ref:'wizard-root',root_tid:'MF;TF-1;WizrdMCF',stage:'input_mapping',owner_context:{status:'observed',node:{},path}},ui:{dialogs:[],masks:[],elements:[{tid:'MF;TF-1;WizrdMCF;btnClose',ref:'close',allowed_actions:['click']}]}};
+  f.binding.document=f.realm.document;
+  const app=f.realm.bg.app;app.WizardTreeNode=class {};app.ModelNodeTreeNode=class {};
+  const tree=new app.ModelNodeTreeNode();Object.assign(tree,{FGuid:wrongNative?'other':f.node.id,ParentNode:f.binding.workflow,FModelNode:f.binding.nodeData});
+  const wizard=new app.WizardTreeNode();wizard.ParentNode=tree;
+  const originalController=f.tab.Controller,originalModel=originalController.FController;
+  Object.assign(f.binding,{native:f.native,cell:f.native.FCell,controller:originalController,model:originalModel,diagram:originalModel.FDiagram,graph:originalModel.FDiagram.FmxGraph});
+  const packageNode={};f.binding.workflow.ParentNode=packageNode;
+  const el=(tid,text='')=>({id:tid,isConnected:true,textContent:text,innerText:text,getAttribute:k=>k==='data-tid'?tid:null,getBoundingClientRect:()=>({width:100,height:100})});
+  const root=Object.assign(el('MF;TF-1;WizrdMCF'),{querySelectorAll:()=>[]}),tabElement={classList:{contains:()=>true}},crumb=el(path[0].tid,path[0].label),nodeCrumb=el('node','JavaScript'),wizardCrumb=el('wizard','Настройка'),dialog=el('msgbox',pending.ui.dialogs[0].text);
+  const pageEl=el('MF;TF-1;WizrdMCF;JavaScriptColumnsWizard'),gridEl=el(pageEl.id+';grdTargetColumns'),header=el(pageEl.id+';colTargetDelete');
+  const mask=el('header-mask','sensitive content never logged'),overlay=el('overlay','sensitive overlay');
+  for(const element of [pageEl,gridEl,header,mask,overlay]){
+    element.classList=new Set(['x-mask','x-border-box']);element.classList.contains=element.classList.has.bind(element.classList);
+    element.className='x-mask x-border-box';element.getBoundingClientRect=()=>({x:10,y:20,width:30,height:40});
+    element.matches=()=>false;element.querySelectorAll=()=>[];
+  }
+  mask.parentElement=header;overlay.parentElement=null;
+  header._extData={maskEl:{dom:mask}};
+  const pageCmp={el:{dom:pageEl}},gridCmp={el:{dom:gridEl},ownerCt:pageCmp},column={el:{dom:header},ownerCt:gridCmp,disabled:true};
+  root.querySelectorAll=()=>maskFault?[pageEl]:[];
+  root.contains=e=>[pageEl,gridEl,header,mask].includes(e);gridEl.contains=e=>e===header||e===mask;pageEl.contains=e=>[gridEl,header,mask].includes(e);
+  if(maskFault==='cache')header._extData.maskEl.dom={};
+  if(maskFault==='enabled')column.disabled=false;
+  if(maskFault==='grid_owner')column.ownerCt=pageCmp;
+  if(maskFault==='page_owner')gridCmp.ownerCt=null;
+  if(maskFault==='geometry')mask.getBoundingClientRect=()=>({x:10,y:20,width:300,height:40});
+  if(maskFault==='class')mask.classList.add('bg-mask-message');
+  if(maskFault==='loading')mask.querySelectorAll=()=>[overlay];
+  class WizardModelComponentForm {constructor(){this.FModelNode=f.binding.nodeData;this.FView={el:{dom:root}};}}
+  f.realm.__loginomDockPreparationV1={document:f.realm.document,id:'doc',receipts:new Map([['r',{phase:'verified',workflowId:'workflow',nodeTargetWorkflowNode:f.binding.workflow,packageNode,tab:tabElement}]])};
+  f.realm.Ext={getCmp:id=>{
+    if(id==='node'||id==='wizard')return {el:{dom:id==='node'?nodeCrumb:wizardCrumb},_node:{data:{node:id==='node'?tree:wizard}}};
+    if(id===pageEl.id)return pageCmp;if(id===gridEl.id)return gridCmp;if(id===header.id)return column;
+    if(id===mask.id&&maskFault==='component')return {el:{dom:mask}};
+  }};
+  let nativeState='graph',confirmed=false,closed=false,progress=fault!=='stalled',closeConfirm=false;const verbs=[];
+  const installWizard=()=>{nativeState='wizard';f.tab.Controller.Node.data.node=wizard;f.tab.Controller.FController=new WizardModelComponentForm();};
+  const installGraph=()=>{nativeState='graph';closed=true;f.tab.Controller.Node.data.node=f.binding.workflow;f.tab.Controller.FController=originalModel;};
+  f.realm.document.querySelectorAll=selector=>{
+    if(selector==='[data-tid="tab"]')return [tabElement];
+    if(selector.startsWith('[data-tid^='))return nativeState==='graph'?(f.clicks>=2&&!closed?[]:[crumb]):[crumb,nodeCrumb,wizardCrumb];
+    if(selector==='[data-tid="MF;TF-1;WizrdMCF"]')return nativeState==='wizard'?[root]:[];
+    if(selector==='[role="dialog"],.x-message-box')return nativeState==='deactivation'?[dialog]:[];
+    if(maskFault&&nativeState==='wizard'){
+      for(const element of [pageEl,gridEl,header])if(selector==='[data-tid='+JSON.stringify(element.id)+']')return element===header&&maskFault==='duplicate'?[header,el(header.id)]:[element];
+      if(selector==='.x-mask,.bg-mask-message,.x-mask-msg')return maskFault==='many'?[mask,...Array(15).fill(overlay)]:maskFault==='real_overlay'?[mask,overlay]:[mask];
+    }
+    return [];
+  };
+  const originalWait=f.page.waitForFunction;
+  f.page.waitForFunction=async(fn,arg,options)=>{
+    if(fn.name!=='inspectJavascriptWizardSettlement')return originalWait(fn,arg,options);
+    assert.ok(options.timeout>0&&options.timeout<=5000);
+    assert.equal(await f.page.evaluate(fn,arg),false,'opening must first be pending');
+    if(progress){if(deactivate&&!confirmed)nativeState='deactivation';else installWizard();}
+    if(fault==='changedOriginal')f.native.data={};
+    if(!await f.page.evaluate(fn,arg))throw Error('Bounded wizard settlement timeout');
+    return {dispose:async()=>{}};
+  };
+  const closeQuestion={...opened,ui:{dialogs:[{ref:'close-dialog',title:'Подтвердить',text:'Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'}],masks:[],elements:['yes','no'].map(name=>({tid:'msgbox;tlb;'+name,ref:'close-'+name,label:name==='yes'?'Да':'Нет',signature:{dialog_ref:'close-dialog'},allowed_actions:['click']}))}};
+  const channel={observe:async options=>{
+    const state=closed?graph:closeConfirm?closeQuestion:nativeState==='deactivation'?pending:nativeState==='wizard'?opened:graph;
+    assert.equal(options.ready(state),true,'Only an exactly bound wizard/deactivation state may be accepted');return state;
+  },perform:async options=>{
+    const state=closeConfirm?closeQuestion:nativeState==='wizard'?opened:pending;
+    assert.equal(options.ready(state),true);const action=options.resolve(state);verbs.push(action.verb);
+    if(action.verb==='confirm_wizard_deactivation'){
+      assert.equal(action.ref,'yes');if(fault!=='lostDeactivationPending')confirmed=true;
+      if(fault?.startsWith('lostDeactivation'))throw Error('Lost deactivation reply');
+      nativeState='graph';return;
+    }
+    if(action.ref==='close'){
+      if(fault==='lostClose')throw Error('Lost close reply');
+      if(fault==='closeConfirmation')closeConfirm=true;else installGraph();return;
+    }
+    assert.equal(action.verb,'confirm_wizard_close');closeConfirm=false;installGraph();
+  }};
+  const lifecycle={},options=()=>({binding:f.binding,node:f.node,icon:'js',reference,prepared,deadline:Date.now()+5000,record:f.record,channel,lifecycle});
+  return {f,graph,reference,verbs,lifecycle,run:()=>openJavascriptWizard(f.page,options()),cleanup:()=>cleanupJavascriptWizardOpening(f.page,options()),settle:deadline=>waitJavascriptWizardSettlement(f.page,{...options(),deadline}),recover:()=>{progress=true;}};
+}
+
+test('private reopen preserves generic deny and uses only the exact optional deactivation confirmation',async()=>{
+  for(const deactivate of [false,true]){
+    const f=privateWizardFixture({deactivate});const result=await f.run();
+    assert.equal(result.verified,true);assert.equal(result.deactivation_required,deactivate);assert.equal(f.f.clicks,2);
+    assert.deepEqual(f.verbs,deactivate?['confirm_wizard_deactivation']:[]);
+    assert.deepEqual(f.graph.ui.elements[0].allowed_actions,[]);
+  }
+});
+
+test('private reopen rejects foreign deactivation and a different native wizard without another opening gesture',async()=>{
+  for(const options of [{deactivate:true,foreign:true},{wrongNative:true}]){
+    const f=privateWizardFixture(options);await assert.rejects(f.run());assert.equal(f.f.clicks,2);assert.deepEqual(f.verbs,[]);
+  }
+  const f=privateWizardFixture();const bad=structuredClone(f.graph);bad.prepared_node_context.node_id='other';
+  assert.throws(()=>javascriptWizardBinding(bad,f.reference),/owner/);
+});
+
+test('lifecycle journal orders closure events before operator intent and caps payload/count',async()=>{
+  const page=new EventEmitter(),context=new EventEmitter(),browser=new EventEmitter(),events=[];
+  page.isClosed=()=>false;context.pages=()=>[page];context.browser=()=>browser;browser.isConnected=()=>true;
+  const observer=observeJavascriptBrowserLifecycle({context,page,record:async e=>events.push(e),stage:()=> 'prepare-typed-input'});
+  page.emit('download',{url:()=> 'private'});page.emit('crash');context.emit('close');browser.emit('disconnected');
+  await observer.beforeClose();
+  for(let i=0;i<140;i++)page.emit('pageerror',new Error('private-message'));
+  const summary=await observer.finish();assert.equal(summary.events,128);assert.ok(summary.dropped>0);assert.equal(summary.write_failed,false);
+  assert.equal(events.find(e=>e.event==='context_close').operator_close_requested,false);
+  assert.equal(events.find(e=>e.event==='operator_context_close_requested').operator_close_requested,true);
+  assert.ok(!JSON.stringify(events).includes('private'));assert.equal(page.listenerCount('close'),0);
+  assert.deepEqual(events.map(e=>e.sequence),Array.from({length:128},(_,i)=>i+1));
+});
+test('lifecycle journal write failure is reported and never throws from a browser event',async()=>{
+  const page=new EventEmitter(),context=new EventEmitter();page.isClosed=()=>true;context.pages=()=>[page];context.browser=()=>null;
+  const observer=observeJavascriptBrowserLifecycle({context,page,record:async()=>{throw Error('disk failure');},stage:()=> 'cleanup'});
+  assert.doesNotThrow(()=>page.emit('close'));await observer.beforeClose();assert.equal((await observer.finish()).write_failed,true);
+});
+
+function cleanupFixture(fault) {
+  const packageNode={PackageFileName:''},workflow={ParentNode:packageNode},tab={};
+  const original={Controller:{Node:{data:{node:workflow}}}};
+  const owner={card:original,controller:original.Controller,workflow,packageNode,tab};
+  const storage={constructor:{name:'StorageDirectoryTreeNode'}};
+  let active={Controller:{Node:{data:{node:storage}}}},blocked=true,disposed=0,waits=0;
+  const blocker={isConnected:true,className:'bg-mask-message',getBoundingClientRect:()=>({x:1,y:2,width:30,height:40}),
+    getAttribute:key=>key==='data-tid'?'owned-mask':key==='bg-mask-text'?'Загрузка':null};
+  const document={querySelectorAll:()=>blocked?[blocker]:[]};
+  const prepared={document_id:'document',workflow_ref:{workflow_id:'workflow'}};
+  const context=vm.createContext({document,location:{origin:'http://logi-test-plan.bg.local'},getComputedStyle:()=>({visibility:'visible'}),
+    __loginomDockPreparationV1:{document,id:'document',receipts:new Map([['r',{phase:'verified',workflowId:'workflow',packageNode,tab}]])},
+    bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>active}},
+      FMapTree:{FServerConnection:{UserName:'jsteach',Connected:true},PackageNodes:{Count:1,Items:()=>packageNode}}}}}}}});
+  const run=(fn,arg)=>vm.runInContext('('+fn.toString()+')',context)(arg);
+  const page={evaluateHandle:async fn=>Object.assign(run(fn),{dispose:async()=>{disposed++;}}),evaluate:async(fn,arg)=>run(fn,arg),
+    waitForFunction:async(fn,arg,options)=>{
+      assert.equal(typeof fn,'function','Playwright string expressions are not invoked with args');
+      waits++;assert.ok(options.timeout>0&&options.timeout<=5000);
+      assert.equal(run(fn,arg),false,'a blocker must keep the first sample pending');
+      if(fault==='owner')active={...active};
+      if(fault!=='blocked')blocked=false;
+      if(!run(fn,arg))throw Error('Settlement timeout');return {dispose:async()=>{}};
+    }};
+  const records=[];
+  return {run:(deadline=Date.now()+5000)=>waitJavascriptCleanupReady(page,{owner,prepared,account:'jsteach',deadline,record:async r=>records.push(r)}),records,
+    get disposed(){return disposed;},get waits(){return waits;}};
+}
+test('cleanup waits read-only for bounded blockers with the original native owners',async()=>{
+  const f=cleanupFixture();await f.run();assert.equal(f.waits,1);assert.equal(f.disposed,1);
+  assert.equal(f.records[0].blockers[0].tid,'owned-mask');assert.equal(f.records[0].blockers[0].mask_text,'Загрузка');
+  assert.equal(f.records.at(-1).ready,true);assert.equal(f.records[0].deadline,f.records.at(-1).deadline);
+});
+test('expired cleanup deadline cannot start a new settlement wait',async()=>{
+  const f=cleanupFixture();await assert.rejects(f.run(Date.now()-1),/deadline/);assert.equal(f.waits,0);assert.equal(f.disposed,1);
+});
+test('cleanup refuses retained blockers or a changed native surface without UI mutation',async()=>{
+  for(const fault of ['blocked','owner']){
+    const f=cleanupFixture(fault);await assert.rejects(f.run(),fault==='blocked'?/timeout/:/surface changed/);
+    assert.equal(f.disposed,1);assert.equal(f.records.at(-1).phase,'cleanup_workflow_settlement_refused');
+    if(fault==='blocked')assert.equal(f.records.at(-1).blocker_count,1);
+    else assert.equal(f.records.at(-1).owner_verified,false);
+  }
+});
+
+test('connected initial-page admission requires the complete same-node input mapping',()=>{
+  const node={document_id:'document',workflow_id:'workflow',node_id:'node'};
+  const sources=javascriptInputColumns.map((field,index)=>({...field,index,required:false,record_id:'record-'+index,field_id:'field-'+index}));
+  const mapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',autosync:true,
+    node_context:{...node,verified:true,surface:'wizard',input_port:{direction:'input',port:0,port_guid:'port'}},
+    source_fields:sources,target_fields:sources.map((source,index)=>({...source,record_id:'target-'+index,field_id:'target-field-'+index,source}))};
+  const proof=verifyJavascriptInputMapping(mapping,node);
+  assert.ok(javascriptInitialPages('MF;TF-1',node,proof).some(page=>page.endsWith(';JavaScriptColumnsWizard')));
+  assert.equal(javascriptInitialPages('MF;TF-1',{...node,node_id:'foreign'},proof).length,1);
+  assert.equal(javascriptInitialPages('MF;TF-1',node,null).length,1);
+  for(const corrupt of [m=>{m.inventory_complete=false;},m=>{m.node_context.node_id='foreign';},m=>m.target_fields.pop(),
+    m=>{m.target_fields[0].source={...m.target_fields[0].source,record_id:'foreign'};},m=>{m.source_fields[1].type='integer';}]){
+    const changed=structuredClone(mapping);corrupt(changed);assert.throws(()=>verifyJavascriptInputMapping(changed,node));
+  }
+});
+
+test('compact report reference addresses the complete durable journal line and preserves acknowledgement',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'javascript-journal-'));
+  try{
+    const journal=createExecutionJournal({directory,metadata:{sessionId:'journal-test',clientRevision:'test'}});
+    const event={phase:'artifact_delivery_upload_receipt',operation_id:'delivery',payload:{text:'x'.repeat(1000000)}};
+    const saved=await journal(event),reference=compactJavascriptJournalRecord(saved,1),bytes=await readFile(join(directory,'execution-events.jsonl'));
+    assert.equal(saved.phase,event.phase);assert.equal(saved.operation_id,event.operation_id);assert.equal(saved.payload.text,event.payload.text);
+    assert.equal(reference.sha256,createHash('sha256').update(bytes).digest('hex'));
+    assert.equal(reference.line,1);assert.equal(reference.journal,'execution-events.jsonl');
+    assert.ok(JSON.stringify(reference).length<512);assert.equal(reference.payload,undefined);
+    assert.equal(bytes.toString(),JSON.stringify(saved)+'\n');
+  } finally {await rm(directory,{recursive:true,force:true});}
+});
+
+test('generated input request passes the installed text-import admission contract',()=>{
+  const prepared={document_id:'js-document',workflow_ref:{workflow_id:'js-workflow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_workflow',label:'Сценарий'}]}};
+  const request=javascriptInputRequest({prepared,storage:'/jsteach/js-g2-11111111-1111-4111-8111-111111111111',
+    artifact:{artifact_id:'fixture',bytes:157,sha256:'4fce338d2edd2901ba35732ed148a1a80eba4a5fbf927f2828f3cdbe6b8fa09e'},uploadOperationId:'fixture:upload',totalMs:600000});
+  const support=createTextImportNodeSupport({targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2'});
+  assert.doesNotThrow(()=>validateNodeApplyRequest(request,support.nodeApplyHandlers));
+});
+
+test('pinned sales bytes and manifest agree; changed bytes and repinned fixture are refused',async()=>{
+  const fixture=new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/model-input/sales.csv',import.meta.url);
+  const bytes=await readFile(fixture),manifest=JSON.parse(await readFile(new URL('../manifest.json',fixture),'utf8'));
+  assert.equal(verifyJavascriptFixture(bytes,manifest).bytes,157);
+  assert.throws(()=>verifyJavascriptFixture(Buffer.concat([bytes,Buffer.from('\n')]),manifest));
+  const changed=structuredClone(manifest);changed.files.find(file=>file.path==='model-input/sales.csv').sha256='0'.repeat(64);
+  assert.throws(()=>verifyJavascriptFixture(bytes,changed));
+});
+
+test('typed oracle rejects whitespace loss, reordered rows, approximate integers and partial reads',()=>{
+  const table={sample_complete:true,row_count:6,sample_rows:6,schema:javascriptInputColumns,
+    sample:javascriptInputRows.map(row=>row.map((value,i)=>({type:javascriptInputColumns[i].type,is_null:false,value,precision:i===1?'display_text':'exact_integer'})))};
+  assert.equal(verifyJavascriptTable(table,'input').verified,true);
+  for(const corrupt of [t=>{t.sample[0][1].value='Alpha';},t=>t.sample.reverse(),t=>{t.sample[0][0].precision='unverified';},t=>{t.sample_complete=false;}]){
+    const changed=structuredClone(table);corrupt(changed);assert.throws(()=>verifyJavascriptTable(changed,'input'));
+  }
+});
+
+test('sentinel requires fresh same effect/node/source messages and a terminal result for gate pass',()=>{
+  const identity={effect_id:'next-1',node_id:'node-1',source_sha256:'a'.repeat(64)};
+  const message={...identity,id:'error-1',text:'JS_G2_EXECUTION_SENTINEL_V1'};
+  const args={stage:'next',messages:[message],baselineIds:[],identity,ownerVerified:true,terminal:true};
+  assert.equal(javascriptSentinelOutcome(args).gate_passed,true);
+  assert.equal(javascriptSentinelOutcome({...args,terminal:false}).gate_passed,false);
+  assert.equal(javascriptSentinelOutcome({...args,baselineIds:['error-1']}).execution,'ambiguous');
+  for(const key of ['effect_id','node_id','source_sha256'])assert.equal(javascriptSentinelOutcome({...args,messages:[{...message,[key]:'foreign'}]}).execution,'ambiguous');
+  assert.equal(javascriptSentinelOutcome({...args,messages:[]}).absence_proves_no_execution,false);
+});
+
+test('durable acknowledgement precedes a gesture; an uncertain gesture cannot be replayed',async()=>{
+  const calls=[];
+  const once=createJavascriptEffectJournal({deadline:100,now:()=>1,record:async event=>calls.push(event.state)});
+  await assert.rejects(once('effect',{},async()=>{calls.push('gesture');throw Error('lost result');}));
+  await assert.rejects(once('effect',{},async()=>calls.push('replayed')));
+  assert.deepEqual(calls,['dispatching','gesture','unconfirmed']);
+});
+
+test('failed journal or expired original deadline cannot dispatch a gesture',async()=>{
+  let gestures=0;
+  const broken=createJavascriptEffectJournal({deadline:100,now:()=>1,record:async()=>{throw Error('disk full');}});
+  await assert.rejects(broken('effect',{},async()=>gestures++));
+  await assert.rejects(broken('effect',{},async()=>gestures++));
+  const expired=createJavascriptEffectJournal({deadline:1,now:()=>1,record:async()=>{}});
+  await assert.rejects(expired('effect',{},async()=>gestures++));
+  assert.equal(gestures,0);
+});
+
+
+test('private Setting waits for wizard native surface before roots; both waits retain opening deadline',async()=>{
+ for(const deactivate of [false,true]){
+  const f=privateWizardFixture({deactivate});await f.run();
+  const samples=f.f.records.filter(e=>e.phase.startsWith('javascript_wizard_settlement_'));
+  assert.equal(samples[0].ready,false);assert.equal(samples[0].navigation_count,0);
+  assert.equal(samples.at(-1).surface,'wizard');assert.equal(samples.at(-1).ready,true);
+  assert.equal(new Set(samples.map(e=>e.deadline)).size,1);assert.equal(f.f.clicks,2);
+ }
+});
+
+test('failed Setting opening can be settled and cleaned up without repeating Setting',async()=>{
+ for(const config of [{fault:'lostSetting'},{fault:'stalled'},{fault:'lostSetting',deactivate:true}]){
+  const f=privateWizardFixture(config);await assert.rejects(f.run());f.recover();
+  const closed=await f.cleanup();assert.equal(closed.verified,true);assert.equal(f.f.clicks,2);
+  const before=f.verbs.length;assert.equal(await f.cleanup(),closed);assert.equal(f.verbs.length,before);
+  assert.deepEqual(f.verbs,config.deactivate?['confirm_wizard_deactivation','click']:['click']);
+ }
+});
+
+test('uncertain deactivation is observed without repeating confirmation; a remaining dialog stays pending',async()=>{
+ for(const fault of ['lostDeactivationApplied','lostDeactivationPending']){
+  const f=privateWizardFixture({fault,deactivate:true});await assert.rejects(f.run(),/Lost deactivation/);
+  if(fault==='lostDeactivationApplied')assert.equal((await f.cleanup()).verified,true);
+  else await assert.rejects(f.cleanup(),/settlement timeout/);
+  assert.equal(f.verbs.filter(v=>v==='confirm_wizard_deactivation').length,1);assert.equal(f.f.clicks,2);
+ }
+});
+
+test('cleanup closes the owned wizard with its exact confirmation and never repeats an uncertain close',async()=>{
+ for(const fault of ['closeConfirmation','lostClose']){
+  const f=privateWizardFixture({fault});await f.run();
+  if(fault==='closeConfirmation'){
+   assert.equal((await f.cleanup()).verified,true);assert.deepEqual(f.verbs,['click','confirm_wizard_close']);
+  }else{
+   await assert.rejects(f.cleanup(),/Lost close/);await assert.rejects(f.cleanup(),/Lost close/);assert.deepEqual(f.verbs,['click']);
+  }
+ }
+});
+
+
+test('wizard settlement rejects changed original native identity and expired deadline without effects',async()=>{
+ const changed=privateWizardFixture({fault:'changedOriginal'});await assert.rejects(changed.run(),/original native owner changed/);
+ assert.deepEqual(changed.verbs,[]);assert.equal(changed.f.clicks,2);
+ const ready=privateWizardFixture();await ready.run();
+ await assert.rejects(ready.settle(Date.now()-1),/original deadline expired/);
+ assert.deepEqual(ready.verbs,[]);assert.equal(ready.f.clicks,2);
+});
+
+
+test('same-owned disabled delete header permits wizard settlement and cleanup through the shared classifier',async()=>{
+ const f=privateWizardFixture({maskFault:'valid'});await f.run();assert.equal((await f.cleanup()).verified,true);
+ const samples=f.f.records.filter(e=>e.phase==='javascript_wizard_settlement_verified');
+ assert.ok(samples.length>=2);
+ for(const s of samples){
+  assert.equal(s.mask_count,1);assert.equal(s.blocker_count,0);assert.equal(s.disabled_delete_mask_count,1);
+  assert.equal(s.mask_diagnostics[0].disabled_delete_mask,true);assert.ok(Object.values(s.mask_diagnostics[0].checks).every(Boolean));
+  assert.equal(JSON.stringify(s).includes('sensitive'),false);
+ }
+ assert.deepEqual(f.verbs,['click']);assert.equal(f.f.clicks,2);
+});
+
+test('wizard settlement keeps real overlays and every failed header identity check blocking',async()=>{
+ for(const maskFault of ['real_overlay','cache','enabled','grid_owner','page_owner','geometry','class','loading','component','duplicate']){
+  const f=privateWizardFixture({maskFault});await assert.rejects(f.run(),/settlement timeout/);
+  await assert.rejects(f.cleanup(),/settlement timeout/);
+  const refused=f.f.records.findLast(e=>e.phase==='javascript_wizard_settlement_refused');
+  assert.equal(refused.native_owner_verified,true);assert.ok(refused.blocker_count>0);assert.equal(refused.ready,false);
+  assert.equal(JSON.stringify(refused).includes('sensitive'),false);assert.deepEqual(f.verbs,[]);assert.equal(f.f.clicks,2);
+ }
+});
+
+test('wizard mask diagnostics are capped without truncating blocker admission or accepting a foreign node',async()=>{
+ const many=privateWizardFixture({maskFault:'many'});await assert.rejects(many.run(),/settlement timeout/);
+ const r=many.f.records.findLast(e=>e.phase==='javascript_wizard_settlement_refused');
+ assert.equal(r.mask_count,16);assert.equal(r.blocker_count,15);assert.equal(r.mask_diagnostics.length,12);assert.equal(r.mask_diagnostics_truncated,true);
+ const foreign=privateWizardFixture({maskFault:'valid',wrongNative:true});await assert.rejects(foreign.run(),/native owner changed/);
+ assert.deepEqual(foreign.verbs,[]);
+});
+
+
+test('the live readiness inspector serializes the same classifier without browser imports or host closures',async()=>{
+ const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
+ const start=source.indexOf('const wizardReadiness=withJavascriptWizardMasks(')+'const wizardReadiness=withJavascriptWizardMasks('.length;
+ const end=source.indexOf(');\nconst waitWizardReady=',start);
+ assert.ok(start>0&&end>start);
+ const inspect=withJavascriptWizardMasks(vm.runInNewContext('('+source.slice(start,end)+')'));
+ const realm=vm.createContext({document:{querySelectorAll:()=>[]},getComputedStyle:()=>({visibility:'visible'})});
+ const result=vm.runInContext('('+inspect.toString()+')',realm)({prefix:'MF;TF-1',inspect:true});
+ assert.equal(result.ready,false);assert.equal(result.fatal,true);assert.equal(result.counts.overlays,0);
+ assert.equal(result.mask_classification.length,0);
+});

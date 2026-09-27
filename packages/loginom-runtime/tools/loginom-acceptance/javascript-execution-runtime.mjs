@@ -1,0 +1,522 @@
+import {waitJavascriptWizardSettlement} from './javascript-wizard-settlement.mjs';
+// All generated runtime code runs against the caller's authenticated page.
+// No browser launch, credentials, server RPC, or second MCP context lives here.
+import {openJavascriptOutputViews,waitJavascriptViewsSettlement} from './javascript-output-opening.mjs';
+import {captureJavascriptNativeTopology,connectJavascriptInput,requireJavascriptTopology,requireJavascriptGraphUnchanged} from './javascript-link-topology.mjs';
+import {caseEffect} from './javascript-batch-plan.mjs';
+import {readFile} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+import {randomUUID} from 'node:crypto';
+import {createArtifactStore} from '../../client/lib/artifacts.mjs';
+import {createActionRuntime,withBrowserReceipt} from '../../client/lib/executor.mjs';
+import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
+import {createNodeTargetBrowserAdapter} from '../../client/lib/node-target-browser.mjs';
+import {createNodeProcedure} from '../../client/lib/node-procedure.mjs';
+import {createNodeExecutionProcedure} from '../../client/lib/node-execution-procedure.mjs';
+import {openNewOutputTable,configureTablePrecision,prepareTableRead,restoreTablePrecision,returnFromOutputTable} from '../../client/lib/node-output-procedure.mjs';
+import {readTableOutputPages} from '../../client/lib/table-output-pages.mjs';
+import {decodeTableOutput} from '../../client/lib/table-output-values.mjs';
+import {boundWizardDeactivationConfirmation} from '../../client/lib/node-wizard-open.mjs';
+import {closePreparedWizard} from '../../client/lib/node-wizard-close.mjs';
+import {configureSeparateOutputPort} from '../../client/lib/port-mapping-procedure.mjs';
+import {activatePreparedWorkflow} from '../../client/lib/node-workflow-activation.mjs';
+import {javascriptInputColumns,javascriptOutputColumns,verifyJavascriptFixture,verifyJavascriptTable,createJavascriptEffectJournal} from './javascript-execution-evidence.mjs';
+
+export function javascriptInputRequest({prepared,storage,artifact,uploadOperationId,totalMs}) {
+  if(!/^\/jsteach\/js-g2-[a-f0-9-]{36}$/.test(storage))throw Error('Owned UUID input directory required');
+  return {operation_id:'js-input-import',contract_revision:'1.0.0',document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,
+    target:{kind:'new',type:'imports.text',label:'JSInput',position:{x:96,y:80}},inputs:[],mode:'delimited',parameters:{
+      settings:{source:{source_path:storage+'/sales.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},
+        format:{delimiter:',',decimal_separator:'.',null_marker:'NULL',text_qualifier:'"'},columns:javascriptInputColumns.map(c=>({...c}))},
+      source:{artifact_id:artifact.artifact_id,upload_operation_id:uploadOperationId,bytes:artifact.bytes,sha256:artifact.sha256}},
+    mappings:[],finish:'execute',read:{ports:[0],sample_rows:10,require_exact_numbers:true},
+    budgets:{configure_ms:240000,execute_ms:60000,total_ms:Math.min(600000,totalMs)}};
+}
+
+// Cleanup waits are read-only and retain both the original workflow and the
+// currently displayed native surface. A foreign owner never becomes ready.
+export async function waitJavascriptCleanupReady(page,{owner,prepared,account,deadline,record}) {
+  const current=await page.evaluateHandle(()=>{
+    const card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
+    return {document,card,controller:card?.Controller,node:card?.Controller?.Node?.data?.node};
+  });
+  const inspect=({owner,prepared,account,current,poll=false})=>{
+    const app=globalThis.bg?.app,f=app?.Application?.FInstance?.FMainForm,map=f?.FMapTree,p=globalThis.__loginomDockPreparationV1;
+    const card=f?.Items?.Workspace?.getActiveTab?.(),records=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===prepared.workflow_ref.workflow_id);
+    const ancestors=new Set();for(let n=owner.workflow;n&&ancestors.size<32&&!ancestors.has(n);n=n.ParentNode)ancestors.add(n);
+    const valid=document===current.document&&p?.document===document&&location.origin==='http://logi-test-plan.bg.local'&&app?.Version==='7.4.2'&&p?.id===prepared.document_id
+      &&map?.FServerConnection?.UserName===account&&map.FServerConnection.Connected===true&&map.PackageNodes?.Count===1
+      &&map.PackageNodes.Items(0)===owner.packageNode&&owner.packageNode.PackageFileName===''
+      &&ancestors.has(owner.packageNode)&&owner.card.Controller===owner.controller&&owner.controller.Node?.data?.node===owner.workflow
+      &&records.length===1&&records[0].packageNode===owner.packageNode&&records[0].tab===owner.tab
+      &&card===current.card&&card?.Controller===current.controller&&card?.Controller?.Node?.data?.node===current.node
+      &&(card===owner.card||current.node?.constructor?.name==='StorageDirectoryTreeNode');
+    if(!valid)throw Error('Cleanup original package/workflow or current surface changed');
+    const visible=e=>e.isConnected&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
+    const blockers=[...document.querySelectorAll('[role="dialog"],.x-mask,.bg-mask-message,.x-mask-msg')].filter(visible);
+    const observed={ready:blockers.length===0,blocker_count:blockers.length,blockers:blockers.slice(0,12).map(e=>{
+      const rect=e.getBoundingClientRect();
+      return {tid:e.getAttribute('data-tid'),role:e.getAttribute('role'),classes:String(e.className??'').slice(0,200),
+        mask_text:String(e.getAttribute('bg-mask-text')??'').slice(0,160),
+        box:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}};
+    })};
+    return poll?(observed.ready?observed:false):observed;
+  };
+  const args={owner,prepared,account,current};
+  try {
+    const before=await page.evaluate(inspect,args);await record({phase:'cleanup_workflow_settlement_before',...before,deadline});
+    if(!before.ready){
+      const remaining=deadline-Date.now();if(remaining<=0)throw Error('Cleanup settlement deadline');
+      const ready=await page.waitForFunction(inspect,{...args,poll:true},{timeout:remaining,polling:250});
+      await ready.dispose();
+    }
+    const after=await page.evaluate(inspect,args);await record({phase:'cleanup_workflow_settlement_after',...after,deadline});
+    if(!after.ready||Date.now()>=deadline)throw Error('Cleanup settlement unconfirmed');
+  }catch(error){
+    const terminal=await page.evaluate(inspect,args).catch(()=>({owner_verified:false}));
+    await record({phase:'cleanup_workflow_settlement_refused',...terminal,error:String(error.message).slice(0,300),deadline});
+    throw error;
+  }finally{await current.dispose();}
+}
+
+// A cleanup return uses the same observed parent-scenario capability as the
+// normal Table return, including a views surface with no Table created yet.
+export async function returnJavascriptViewsForCleanup(channel,node,portGuid,record,{returnAlreadyDispatched=false}={}) {
+  if(returnAlreadyDispatched)throw Error('Original views return already dispatched; no replay');
+  const bound=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='views'
+    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k])
+    &&s.node_outputs?.verified===true&&s.node_outputs.surface==='views'
+    &&s.node_outputs.port_panels?.filter(p=>p.port_guid===portGuid).length===1
+    &&s.workflow_navigation?.status==='observed'
+    &&s.ui.elements.filter(e=>e.ref===s.workflow_navigation.control_ref&&e.tid===s.workflow_navigation.control_tid&&e.allowed_actions.includes('click')).length===1;
+  const before=await channel.observe({condition:'owned views before cleanup return',readOutputs:true,readNavigation:true,ready:bound});
+  const path=before.workflow_navigation.path;
+  await record({phase:'cleanup_views_return_dispatch',node,port_guid:portGuid});
+  await channel.perform({condition:'return owned views to scenario for cleanup',initialObservation:before,
+    ready:s=>bound(s)&&JSON.stringify(s.workflow_navigation.path)===JSON.stringify(path),
+    identity:()=>({node,port_guid:portGuid,path}),resolve:s=>({verb:'click',ref:s.workflow_navigation.control_ref})});
+  const after=await channel.observe({condition:'owned cleanup scenario returned',readOutputs:true,readNavigation:true,
+    ready:s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
+      &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k])
+      &&s.navigation_context?.status==='observed'&&JSON.stringify(s.navigation_context.path)===JSON.stringify(path)
+      &&s.node_outputs?.verified===true&&s.node_outputs.surface==='graph'
+      &&s.node_outputs.ports?.filter(p=>p.port_guid===portGuid).length===1});
+  await record({phase:'cleanup_views_return_verified',node:after.prepared_node_context,port_guid:portGuid});
+}
+
+// Private acceptance gesture. Public generic JS-node actions remain denied.
+export async function selectJavascriptForSettings(page,{binding,node,icon,deadline,record,openSettings=false,requireSettings=true,requireVisualizers=false,beforeSelect=async()=>{},beforeOpen=async()=>{}}) {
+  if(openSettings&&(!requireSettings||requireVisualizers))throw Error('Private opening requires Setting readiness');
+  const retained=await page.evaluateHandle(({binding,node})=>{
+    const tab=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
+    const diagram=tab?.Controller?.FController?.FDiagram,nodes=diagram?.FNodes?.FCollection;
+    const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===node.id):[];
+    if(tab!==binding.tab||found.length!==1)throw Error('Private selection binding unavailable');
+    return {document,controller:tab.Controller,model:tab.Controller.FController,diagram,graph:diagram.FmxGraph,container:diagram.FmxGraph.container,native:found[0],cell:found[0].FCell,shape:diagram.FmxGraph.view.getState(found[0].FCell)?.shape?.node,replacements:0};
+  },{binding,node});
+  const inspect=({binding,node,icon,retained:r,requireSettings,requireVisualizers,poll=false,afterGesture=false})=>{
+    const app=globalThis.bg?.app,tab=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
+    const diagram=tab?.Controller?.FController?.FDiagram,nodes=diagram?.FNodes?.FCollection;
+    const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===node.id):[];
+    if(document!==r.document||location.origin!=='http://logi-test-plan.bg.local'||app?.Version!=='7.4.2'
+      ||tab!==binding.tab||tab?.Controller!==r.controller||tab.Controller.FController!==r.model
+      ||tab?.Controller?.Node?.data?.node!==binding.workflow||diagram!==r.diagram
+      ||diagram.FmxGraph!==r.graph||diagram.FmxGraph.container!==r.container
+      ||found.length!==1||found[0]!==r.native||found[0].data!==binding.nodeData||found[0].FCell!==r.cell||found[0].FIconCls!==icon)
+      throw Error('Private selection native owner changed');
+    const shape=diagram.FmxGraph.view.getState(r.cell)?.shape?.node,graph=diagram.FmxGraph.container;
+    const exact=tid=>[...graph.querySelectorAll('[data-tid]')].filter(e=>e.getAttribute('data-tid')===tid);
+    const selected=diagram.FmxGraph.getSelectionCells();
+    const nodeSelected=Array.isArray(selected)&&selected.length===1&&selected[0]===r.cell;
+    const unique=exact(node.tid);
+    if(!shape?.isConnected||shape.getAttribute('data-tid')!==node.tid||!graph.contains(shape)
+      ||unique.length!==1||unique[0]!==shape)throw Error('Private selection DOM changed');
+    if(shape!==r.shape){
+      if(!afterGesture||r.replacements!==0||r.shape?.isConnected||!nodeSelected)throw Error('Private selection DOM changed');
+      // Only the DOM association can change, once, after our returned gesture.
+      r.shape=shape;r.replacements++;
+    }
+    const visible=e=>e.isConnected&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
+    if([...document.querySelectorAll('[role="dialog"],.x-mask,.bg-mask-message,.x-mask-msg')].some(visible))throw Error('Private selection blocked');
+    const point=element=>{
+      if(!visible(element)||element.closest('.x-item-disabled,.x-grid-row-disabled')||element.getAttribute('aria-disabled')==='true')return null;
+      const box=element.getBoundingClientRect();
+      for(const dy of [.5,.25,.75])for(const dx of [.5,.25,.75]){
+        const x=box.x+box.width*dx,y=box.y+box.height*dy,hit=document.elementFromPoint(x,y);
+        const target=hit?.closest('[data-tid]');
+        const control=hit?.closest('button,a,input,select,textarea,[role="button"],[role="menuitem"]');
+        if(x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&hit&&(hit===element||element.contains(hit))
+          &&target===element&&(!control||control===element))return {x,y};
+      }
+      return null;
+    };
+    const settings=exact(node.tid+';Setting');if(settings.length>1)throw Error('Private selection duplicate Setting');
+    const setting=settings.length===1?point(settings[0]):null;
+    const visualizers=exact(node.tid+';Visualizers');if(requireVisualizers&&visualizers.length>1)throw Error('Private selection duplicate Visualizers');
+    const visualizer=visualizers.length===1?point(visualizers[0]):null;
+    const result={ready:nodeSelected&&(!requireSettings||!!setting)&&(!requireVisualizers||!!visualizer),node_selected:nodeSelected,
+      native_selection_count:Array.isArray(selected)?selected.length:null,dom_replacements:r.replacements,settings_count:settings.length,setting_point:setting,
+      visualizers_count:visualizers.length,visualizers_visible:visualizers.length===1&&visible(visualizers[0]),visualizers_point:visualizer,body_point:point(shape)};
+    return poll?(result.ready?result:false):result;
+  };
+  const args={binding,node,icon,retained,requireSettings,requireVisualizers};let dispatched=false,openingDispatched=false;
+  try {
+    const before=await page.evaluate(inspect,args);await record({phase:'javascript_private_selection_before',node_id:node.id,...before});
+    if(Date.now()>=deadline)throw Error('Private selection deadline');
+    if(!before.ready){
+      if(!before.body_point)throw Error('Private selection body covered');
+      await record({phase:'javascript_private_selection_dispatch',node_id:node.id,point:before.body_point,deadline,require_visualizers:requireVisualizers});
+      await beforeSelect();
+      const checked=await page.evaluate(inspect,args);
+      if(JSON.stringify(checked)!==JSON.stringify(before))throw Error('Private selection changed before click');
+      if(Date.now()>=deadline)throw Error('Private selection deadline');
+      dispatched=true;
+      await page.mouse.click(before.body_point.x,before.body_point.y);
+      await record({phase:'javascript_private_selection_gesture_returned',node_id:node.id});
+      args.afterGesture=true;
+      const remaining=deadline-Date.now();if(remaining<=0)throw Error('Private selection deadline');
+      const ready=await page.waitForFunction(inspect,{...args,poll:true},{timeout:remaining,polling:100});await ready.dispose();
+    }
+    const after=await page.evaluate(inspect,args);
+    await record({phase:'javascript_private_selection_after',node_id:node.id,...after});
+    if(!after.ready||Date.now()>=deadline)throw Error('Private selection requested controls unconfirmed');
+    if(openSettings){
+      await beforeOpen();
+      const opening=await page.evaluate(inspect,args);
+      if(!opening.ready)throw Error('Private Setting no longer ready');
+      await record({phase:'javascript_private_open_dispatch',node_id:node.id,point:opening.setting_point,deadline});
+      const checked=await page.evaluate(inspect,args);
+      if(JSON.stringify(checked)!==JSON.stringify(opening)||Date.now()>=deadline)throw Error('Private Setting changed before click');
+      openingDispatched=true;
+      await page.mouse.click(opening.setting_point.x,opening.setting_point.y);
+      await record({phase:'javascript_private_open_gesture_returned',node_id:node.id});
+    }
+    return {verified:true,selected:dispatched,opening_dispatched:openingDispatched,dom_replacements:after.dom_replacements};
+  }catch(error){
+    const observed=await page.evaluate(inspect,args).catch(()=>({owner_verified:false}));
+    await record({phase:'javascript_private_selection_refused',node_id:node.id,effect_possible:dispatched||openingDispatched,opening_dispatched:openingDispatched,deadline,reason:String(error.message),...observed});throw error;
+  }finally{await retained.dispose();}
+}
+
+// The public observer may describe a Setting while generic JS actions stay denied.
+// Its owner metadata is evidence, never permission to call begin_wizard.
+export function javascriptWizardBinding(state,node) {
+  const n=state.prepared_node_context;
+  const controls=state.ui?.elements?.filter(e=>e.tid===n?.tid+';Setting'&&e.wizard_open?.node?.part==='settings')??[];
+  if(n?.verified!==true||n.surface!=='graph'||state.wizard?.status!=='absent'||controls.length!==1
+    ||!['document_id','workflow_id','node_id'].every(k=>n[k]===node[k]))throw Error('Private wizard opening owner unavailable');
+  const opening=controls[0].wizard_open;
+  if(!Array.isArray(opening.workflow_path)||!opening.workflow_path.length||typeof opening.node.node_label!=='string')throw Error('Private wizard navigation unavailable');
+  return {kind:'deactivation',node:{document_id:n.document_id,workflow_id:n.workflow_id,node_id:n.node_id},graph_tid:n.tid,opening:structuredClone(opening)};
+}
+
+export async function openJavascriptWizard(page,{binding,node,icon,reference,prepared,deadline,record,channel,lifecycle={}}) {
+  await selectJavascriptForSettings(page,{binding,node,icon,deadline,record:async event=>{
+    await record(event);
+    // Reserved conservatively before dispatch: uncertain opening is never replayed.
+    if(event.phase==='javascript_private_open_dispatch')lifecycle.openingDispatched=true;
+  },openSettings:true,beforeOpen:async()=>{
+    const state=await channel.observe({condition:'private JavaScript Setting owner',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
+    lifecycle.confirmation=javascriptWizardBinding(state,reference);
+    if(lifecycle.confirmation.graph_tid!==node.tid)throw Error('Private wizard graph identity changed');
+  }});
+  return finishJavascriptWizardOpening(page,{binding,node,reference,prepared,deadline,record,channel,lifecycle});
+}
+
+export async function finishJavascriptWizardOpening(page,{binding,node,reference,prepared,deadline,record,channel,lifecycle}) {
+  if(!lifecycle.openingDispatched||!lifecycle.confirmation)throw Error('No owned Setting opening to settle');
+  const confirmation=lifecycle.confirmation;
+  await waitJavascriptWizardSettlement(page,{binding,prepared,deadline,record,allowDeactivation:!lifecycle.deactivationDispatched});
+  const state=await channel.observe({condition:'private JavaScript wizard or bound deactivation',wizardConfirmation:confirmation,
+    ready:s=>s.wizard?.status==='observed'&&s.prepared_node_context?.surface==='wizard'
+      ||!lifecycle.deactivationDispatched&&boundWizardDeactivationConfirmation(s,confirmation)});
+  const deactivationRequired=state.wizard.status==='absent';
+  if(deactivationRequired){
+    lifecycle.deactivationDispatched=true;
+    await channel.perform({condition:'confirm only privately opened JavaScript node deactivation',initialObservation:state,
+      ready:s=>boundWizardDeactivationConfirmation(s,confirmation),identity:()=>confirmation,
+      resolve:s=>({verb:'confirm_wizard_deactivation',ref:s.ui.elements.find(e=>e.tid==='msgbox;tlb;yes').ref})});
+    await waitJavascriptWizardSettlement(page,{binding,prepared,deadline,record,allowDeactivation:false});
+  }
+  const after=await channel.observe({condition:'private JavaScript wizard native owner',ready:s=>s.wizard?.status==='observed'
+    &&s.wizard.owner_context?.status==='observed'&&s.prepared_node_context?.surface==='wizard'});
+  const valid=await page.evaluate(({binding,node})=>{
+    const app=globalThis.bg?.app,tab=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
+    const wizard=tab?.Controller?.Node?.data?.node,tree=wizard?.ParentNode,form=tab?.Controller?.FController;
+    return document===binding.document&&location.origin==='http://logi-test-plan.bg.local'&&app?.Version==='7.4.2'&&tab===binding.tab
+      &&app.WizardTreeNode&&wizard instanceof app.WizardTreeNode&&app.ModelNodeTreeNode&&tree instanceof app.ModelNodeTreeNode
+      &&tree.ParentNode===binding.workflow&&tree.FGuid===node.id&&tree.FModelNode===binding.nodeData&&form?.FModelNode===binding.nodeData;
+  },{binding,node});
+  if(!valid||Date.now()>=deadline||after.prepared_node_context?.verified!==true
+    ||!['document_id','workflow_id','node_id'].every(k=>after.prepared_node_context[k]===reference[k]))throw Error('Private reopened wizard owner changed');
+  return {verified:true,deactivation_required:deactivationRequired||lifecycle.deactivationDispatched===true,node_context:after.prepared_node_context,
+    owner:after.wizard.owner_context,settings_applied:false,execution_started:false};
+}
+
+// A failed opening remains owned by the runtime until cleanup or handoff. This
+// memoized cleanup cannot repeat Setting, deactivation, Close or confirmation.
+export function cleanupJavascriptWizardOpening(page,options) {
+  const lifecycle=options.lifecycle;
+  lifecycle.cleanup??=(async()=>{
+    await finishJavascriptWizardOpening(page,options);
+    if(lifecycle.closeDispatched)throw Error('Wizard close already attempted; no replay');
+    lifecycle.closeDispatched=true;
+    const closed=await closePreparedWizard(options.channel);
+    await options.record({phase:'javascript_pending_wizard_cleanup_verified',closed});
+    return closed;
+  })();
+  return lifecycle.cleanup;
+}
+
+export async function createJavascriptExecutionRuntime({page,prepared,directory,record,account,deadline,effectScope=()=>null}) {
+  if(account!=='jsteach'||prepared.status!=='READY'||prepared.package_ref?.persisted!==false)throw Error('Own JavaScript draft required');
+  const origin='http://logi-test-plan.bg.local',build='7.4.2',sessionId='js-g2-'+randomUUID();
+  const journalOnce=createJavascriptEffectJournal({record,deadline});
+  const once=(id,identity,perform)=>journalOnce(caseEffect(effectScope(),id),identity,perform);
+  const execute=async code=>{
+    if(Date.now()>=deadline)throw Error('Original G2/G3 operation deadline expired');
+    // The module supplies these fixed local builders; this function is never
+    // exposed to a model or evaluated in the browser's application realm.
+    return await Function('return ('+code+')')()(page);
+  };
+  const actions=JSON.parse(await readFile(new URL('../../executor/catalog/actions.json',import.meta.url),'utf8')).actions;
+  const selectors=JSON.parse(await readFile(new URL('../../executor/catalog/selectors.json',import.meta.url),'utf8')).selectors;
+  const pinned={actions:new Map(actions.map(action=>[action.action_key,action])),selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
+  const artifactStore=await createArtifactStore({directory:directory+'/input-artifacts',sessionId});
+  const runtime=createActionRuntime({pinned,execute,artifactStore,allowCandidate:true,onRecord:record,targetOrigin:origin,targetBuild:build,
+    ...createTextImportNodeSupport({targetOrigin:origin,targetBuild:build})});
+  const adapter=createNodeTargetBrowserAdapter({execute,origin,build,pinned});
+  const graphRequest={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref};
+  const workflowOwner=await page.evaluateHandle(prepared=>{
+    const p=globalThis.__loginomDockPreparationV1,card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
+    const matches=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===prepared.workflow_ref.workflow_id);
+    if(p?.id!==prepared.document_id||matches.length!==1||!card?.Controller?.Node?.data?.node)throw Error('Original workflow cleanup binding unavailable');
+    return {card,controller:card.Controller,workflow:card.Controller.Node.data.node,packageNode:matches[0].packageNode,tab:matches[0].tab};
+  },prepared);
+  let cleanupRestore,passiveSurface,pendingWizard;
+  const graph=()=>adapter.observe(graphRequest,deadline);
+  const channel=(node,operationDeadline=deadline)=>createNodeProcedure({operation:{id:'js-g2-'+randomUUID(),action:{action_key:'diagnostic.javascript',revision:'1'},deadline:operationDeadline},
+    execute,record,targetOrigin:origin,targetBuild:build,maxSteps:4096,preparedNodeContext:{...graphRequest,node},
+    wrapMutation:(code,receipt)=>withBrowserReceipt('('+code+')(page)',{receipt_namespace:sessionId,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
+  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']').filter({visible:true});
+  const accountGuard=async()=>{
+    const same=await page.evaluate(({account,documentId})=>{
+      const m=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
+      return location.origin==='http://logi-test-plan.bg.local'&&globalThis.bg.app.Version==='7.4.2'
+        &&globalThis.__loginomDockPreparationV1?.id===documentId&&m?.FServerConnection?.UserName===account&&m.FServerConnection.Connected===true&&m.PackageNodes.Count===1;
+    },{account,documentId:prepared.document_id});
+    if(!same)throw Error('JavaScript runtime account/document changed');
+  };
+  const privateGraphBinding=async node=>{
+    await accountGuard();
+    const binding=await page.evaluateHandle(({owner,node})=>{
+      const tab=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
+      const diagram=tab?.Controller?.FController?.FDiagram,nodes=diagram?.FNodes?.FCollection;
+      const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===node.node_id):[];
+      if(tab!==owner.card||tab?.Controller!==owner.controller||tab?.Controller?.Node?.data?.node!==owner.workflow
+        ||found.length!==1||!found[0].data||found[0].FIconCls!=='bg-vendor-icon-javascript')throw Error('Private JS graph binding unavailable');
+      const shape=diagram.FmxGraph.view.getState(found[0].FCell)?.shape?.node,tid=shape?.getAttribute('data-tid');
+      if(!tid||!shape.isConnected||!diagram.FmxGraph.container.contains(shape))throw Error('Private JS graph shape unavailable');
+      return {document,tab,controller:tab.Controller,model:tab.Controller.FController,diagram,graph:diagram.FmxGraph,container:diagram.FmxGraph.container,
+        native:found[0],cell:found[0].FCell,workflow:owner.workflow,nodeData:found[0].data,node:{id:node.node_id,tid},icon:found[0].FIconCls};
+    },{owner:workflowOwner,node});
+    return binding;
+  };
+  return {
+    graph,channel,once,
+    get passiveSurfacePending(){return !!passiveSurface;},
+    get wizardOpeningPending(){return !!pendingWizard;},
+    restoreWorkflowForCleanup() {
+      cleanupRestore??=(async()=>{
+        const cleanupDeadline=Date.now()+60000;
+        if(pendingWizard){
+          await cleanupJavascriptWizardOpening(page,{...pendingWizard,deadline:cleanupDeadline,record,channel:channel(pendingWizard.reference,cleanupDeadline)});
+          await pendingWizard.binding.dispose();pendingWizard=undefined;
+        }
+        if(passiveSurface){
+          const settled=await waitJavascriptViewsSettlement(page,{...passiveSurface,deadline:cleanupDeadline,record,allowGraph:true});
+          if(settled.surface==='views')await returnJavascriptViewsForCleanup(channel(passiveSurface.prepared.node,cleanupDeadline),passiveSurface.prepared.node,passiveSurface.output.port_guid,record,{returnAlreadyDispatched:passiveSurface.returnDispatched});
+        }
+        await waitJavascriptCleanupReady(page,{owner:workflowOwner,prepared,account,deadline:cleanupDeadline,record});
+        await record({phase:'cleanup_workflow_activation_dispatch',document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,deadline:cleanupDeadline});
+        const restored=await activatePreparedWorkflow(page,{request:graphRequest,origin,build,deadline:cleanupDeadline});
+        await record({phase:'cleanup_workflow_activation_observed',restored});
+        if(restored.status!=='SUCCEEDED'||restored.verified!==true)throw Error('Cleanup workflow activation unconfirmed');
+        const same=await page.evaluate(owner=>{
+          const card=globalThis.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+          return card===owner.card&&card.Controller===owner.controller&&card.Controller.Node?.data?.node===owner.workflow;
+        },workflowOwner);
+        if(!same)throw Error('Cleanup native workflow changed after UI activation');
+        await passiveSurface?.held.dispose();await passiveSurface?.binding.dispose();passiveSurface=undefined;
+        return restored;
+      })();
+      return cleanupRestore;
+    },
+    async reopen(node) {
+      if(pendingWizard)throw Error('Previous Setting opening remains unresolved; no replay');
+      const openingDeadline=Math.min(deadline,Date.now()+90000),binding=await privateGraphBinding(node);
+      const identity=await page.evaluate(b=>({node:b.node,icon:b.icon}),binding);
+      pendingWizard={...identity,binding,reference:node,prepared:{...graphRequest,node},lifecycle:{}};
+      try {
+        const opened=await openJavascriptWizard(page,{...pendingWizard,deadline:openingDeadline,record,channel:channel(node,openingDeadline)});
+        pendingWizard.lifecycle.handoffReady=true;return opened;
+      }catch(error){
+        if(!pendingWizard.lifecycle.openingDispatched){await binding.dispose();pendingWizard=undefined;}
+        throw error;
+      }
+    },
+    async handoffReopenedWizard() {
+      if(!pendingWizard?.lifecycle.handoffReady||pendingWizard.lifecycle.cleanup)throw Error('Reopened wizard is not ready for runner ownership');
+      // The caller has already set its openedWizard flag and owns Close now.
+      const binding=pendingWizard.binding;pendingWizard=undefined;await binding.dispose();
+    },
+    async prepareManualMapping(node) {
+      const result=await configureSeparateOutputPort(channel(node),{direction:'output',port:0,autosync:false,
+        fields:[{source:{kind:'configured_field',name:'ObservedID'},name:'ObservedID',label:'ObservedID'},
+          {source:{kind:'configured_field',name:'PhaseMarker'},name:'ManualMarker',label:'ManualMarker'}]},javascriptOutputColumns);
+      await record({phase:'manual_mapping_prepared',node,result});return result;
+    },
+    async readPortMapping(node,direction) {
+      if(!['input','output'].includes(direction))throw Error('Unknown mapping direction');
+      const reader=channel(node);let opened=false;
+      try {
+        await reader.openPort(direction,0);opened=true;
+        const state=await reader.observe({condition:'complete JavaScript '+direction+' mapping',readMappings:true,
+          ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.prepared_node_context?.verified===true});
+        await record({phase:'port_mapping_observed',direction,node,mapping:state.node_mapping});return state.node_mapping;
+      } finally {if(opened)await closePreparedWizard(reader);}
+    },
+    async prepareInput() {
+      const fixture=new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/model-input/sales.csv',import.meta.url);
+      const manifest=JSON.parse(await readFile(new URL('../manifest.json',fixture),'utf8'));
+      const pin=verifyJavascriptFixture(await readFile(fixture),manifest);
+      const folder='js-g2-'+randomUUID(),storage='/jsteach/'+folder;
+      await record({phase:'input_fixture_verified',pin,storage});
+      await accountGuard();
+      await once('storage-open',{account},()=>at('MF;cntMain;tlbMainToolbar;btnFilestorage').click());
+      const table=page.locator('[data-tid$=";FileStorageForm;pnlFileStorage;tbl"]').filter({visible:true});
+      await table.waitFor({timeout:Math.min(30000,deadline-Date.now())});
+      if(await table.count()!==1)throw Error('Unique file storage required');
+      const prefix=(await table.getAttribute('data-tid')).split(';FileStorageForm;')[0];
+      const nav=prefix+';cnrNaviMode;b.s_Сервер>Файлы>jsteach';
+      if(await at(nav).count()===0)await once('storage-user-folder',{account,prefix},()=>at(prefix+';FileStorageForm;colName_jsteach').dblclick());
+      await at(nav).waitFor();await accountGuard();
+      const observedDirectory=async()=>{
+        const roots=await runtime.observe({scope:'roots'});
+        const navigation=roots.output.ui.elements.filter(element=>element.tid===prefix+';NavigationBar;NavigationPanel');
+        if(navigation.length!==1)throw Error('Exact storage navigation unavailable');
+        const observed=await runtime.observe({rootRef:navigation[0].ref,observationId:roots.output.observation_id});
+        await record({phase:'storage_directory_observed',file_storage:observed.output.file_storage});
+        if(observed.output.file_storage?.status!=='observed')throw Error('Native storage directory unconfirmed');
+        return observed.output.file_storage.directory;
+      };
+      if(await observedDirectory()!=='/jsteach')await once('storage-user-breadcrumb',{account,prefix},()=>at(nav).click());
+      if(await observedDirectory()!=='/jsteach')throw Error('Storage parent is not the assigned account directory');
+      if(await at(prefix+';FileStorageForm;colName_'+folder).count())throw Error('Own storage directory already exists');
+      await once('storage-create-prompt',{storage},()=>at(prefix+';FileStorageForm;btnCreateDirectory').click());
+      const prompt=page.locator('[data-tid^="msgbox"][data-tid$="cnt;cnt;txt"] input').filter({visible:true});
+      await prompt.waitFor();if(await prompt.count()!==1)throw Error('Storage directory prompt is ambiguous');
+      await once('storage-name',{storage},()=>prompt.fill(folder));
+      await accountGuard();
+      await once('storage-create',{storage},()=>page.locator('[data-tid^="msgbox"][data-tid$="tlb;ok"]').filter({visible:true}).click());
+      await at(prefix+';FileStorageForm;colName_'+folder).waitFor();
+      await once('storage-enter',{storage},()=>at(prefix+';FileStorageForm;colName_'+folder).dblclick());
+      await at(nav+'>'+folder).waitFor();
+      if(await observedDirectory()!==storage)throw Error('Own storage directory did not open');
+      const artifact=await artifactStore.admit({sourcePath:fileURLToPath(fixture),name:'sales.csv',bytes:pin.bytes,sha256:pin.sha256,upload:{directory:storage,overwrite:'reject'}});
+      const delivered=await once('input-delivery',{storage,artifact_id:artifact.artifact_id,sha256:pin.sha256},()=>runtime.deliverArtifact({operation_id:'js-input-delivery',artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:Math.min(120000,deadline-Date.now())}));
+      if(delivered.outcome?.status!=='SUCCEEDED'||!delivered.upload_operation_id)throw Error('JavaScript source delivery unconfirmed');
+      const request=javascriptInputRequest({prepared,storage,artifact,uploadOperationId:delivered.upload_operation_id,totalMs:deadline-Date.now()});
+      const imported=await once('input-import',{artifact_id:artifact.artifact_id,source_path:request.parameters.settings.source.source_path},()=>runtime.runNodeApply(request));
+      if(imported.status!=='SUCCEEDED')throw Error('JavaScript input import unconfirmed: '+JSON.stringify(imported.error??{}));
+      const result=imported.output?.output?.ports?.find(p=>p.port===0);
+      const proof=verifyJavascriptTable(result,'input');
+      await record({phase:'input_verified',node:imported.output.node,pin,storage,proof,table:result});
+      return {node:imported.output.node,storage,pin,table:result,proof};
+    },
+    async captureDropTopology() {
+      await accountGuard();const before=await graph();requireJavascriptTopology(before);
+      await record({phase:'javascript_palette_topology_before',before});
+      const native=await page.evaluateHandle(captureJavascriptNativeTopology,{});
+      try {
+        const selection=await page.evaluate(held=>{
+          const cells=held.graph.getSelectionCells();
+          if(!Array.isArray(cells)||cells.length>20)throw Error('Palette selection diagnostic bound');
+          return cells.map(cell=>({node_id:held.nodes.find(n=>n.cell===cell)?.guid??null,
+            port_guid:held.nodes.flatMap(n=>n.ports).find(p=>p.cell===cell)?.guid??null,edge:cell.edge===true}));
+        },native);
+        await record({phase:'javascript_palette_selection_before',selection,modifiers:['Alt'],selection_is_not_link_authority:true});
+        requireJavascriptGraphUnchanged(before,await graph());
+        return {before,native};
+      }catch(error){await native.dispose();throw error;}
+    },
+    async checkDropTopology(drop) {
+      await accountGuard();
+      await page.evaluate(captureJavascriptNativeTopology,{previous:drop.native,checkOnly:true});
+      requireJavascriptGraphUnchanged(drop.before,await graph());
+    },
+    async connectInput(source,id,drop) {
+      if(!drop||drop.linkAdmission)throw Error('JavaScript palette link admission already consumed or absent');
+      if(drop.gesture?.automatic_link_suppression_requested!==true||drop.gesture.mouse_released!==true||drop.gesture.alt_released!==true)throw Error('Alt palette gesture/release unconfirmed');
+      drop.linkAdmission=true;
+      await accountGuard();
+      const after=await graph();
+      await record({phase:'javascript_palette_topology_after',before:drop?.before,after,source,id,
+        target_candidates:after.nodes.filter(node=>node.ref.node_id===id),incoming:after.links.filter(edge=>edge.target===id)});
+      let native;
+      try {
+        if(!drop?.native||!drop.before)throw Error('JavaScript retained palette baseline required');
+        native=await page.evaluateHandle(captureJavascriptNativeTopology,{previous:drop.native,addedId:id});
+        return await connectJavascriptInput({source,id,drop:drop.before,graph,record,allowAutoLink:false,
+          checkNative:()=>page.evaluate(captureJavascriptNativeTopology,{previous:native,checkOnly:true}),
+          connect:effect=>once(effect.id,effect.parameters,()=>adapter.mutate(effect,deadline))});
+      }catch(error){
+        await record({phase:'javascript_palette_topology_refused',source,id,reason:String(error.message)});throw error;
+      }finally{await native?.dispose();}
+    },
+    async executeNode(node,operationDeadline=deadline) {
+      const executionDeadline=Math.min(deadline,operationDeadline);
+      const driver=createNodeExecutionProcedure(channel(node,executionDeadline),node);
+      const baseline=await driver.prepare();
+      const binding=await privateGraphBinding(node);
+      try {
+        const identity=await page.evaluate(b=>({node:b.node,icon:b.icon}),binding);
+        await selectJavascriptForSettings(page,{...identity,binding,deadline:Math.min(executionDeadline,Date.now()+90000),record,requireSettings:false});
+      }finally{await binding.dispose();}
+      const launch=await once('execute-'+node.node_id,{node,baseline},()=>driver.launchGraph());
+      const identified=await driver.identify(),terminal=await driver.waitCompleted({});
+      await record({phase:'execution_terminal',node,baseline,launch,identified,terminal});return terminal;
+    },
+    async readPassive(node,kind='output') {
+      if(!['input','output'].includes(kind))throw Error('Unknown passive JavaScript table kind');
+      // No execution driver is called here. openNewOutputTable refuses an
+      // inactive port instead of activating or executing its node.
+      const reader=channel(node),opened=await openNewOutputTable(reader,0,kind==='input'?{}:{openViews:async({output})=>{
+        const openingDeadline=Math.min(deadline,Date.now()+90000),binding=await privateGraphBinding(node);
+        await passiveSurface?.held.dispose();await passiveSurface?.binding.dispose();
+        const held=await page.evaluateHandle(({binding:b,output})=>{
+          const ports=b.native.FPorts.flatMap(list=>list.FCollection).filter(p=>p.FGuid===output.port_guid);
+          if(ports.length!==1)throw Error('Passive cleanup output identity unavailable');
+          return {port:ports[0],portData:ports[0].data,portCell:ports[0].FCell};
+        },{binding,output});
+        passiveSurface={binding,held,prepared:{...graphRequest,node},output};
+        const identity=await page.evaluate(b=>({node:b.node,icon:b.icon}),binding);
+        return await once('passive-views-'+node.node_id,{node,port_guid:output.port_guid,execution_started:false},()=>
+            openJavascriptOutputViews(page,{...identity,binding,reference:node,prepared:{...graphRequest,node},channel:channel(node,openingDeadline),output,deadline:openingDeadline,record,select:selectJavascriptForSettings}));
+      }});
+      const formatProof=await configureTablePrecision(reader,opened.table);
+      let result;
+      try {
+        const readSettings=await prepareTableRead(reader,opened.table),raw=await readTableOutputPages(reader,opened.table,{sampleRows:10});
+        result=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:kind==='input'?javascriptInputColumns:javascriptOutputColumns,requireExactNumbers:true});
+        verifyJavascriptTable(result,kind);
+      } finally {
+        await restoreTablePrecision(reader,formatProof);
+        if(kind==='output'&&passiveSurface)passiveSurface.returnDispatched=true;
+        await returnFromOutputTable(reader,opened.table);
+        if(kind==='output'&&passiveSurface){await passiveSurface.held.dispose();await passiveSurface.binding.dispose();passiveSurface=undefined;}
+      }
+      await record({phase:kind==='input'?'passive_input_verified':'passive_output_verified',execution_started:false,node,result});return result;
+    },
+  };
+}

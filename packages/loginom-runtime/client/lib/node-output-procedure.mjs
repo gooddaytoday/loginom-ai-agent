@@ -48,9 +48,10 @@ async function revealViewerCard(channel,state,select,verb){
   throw Error('Output viewer scroll bound exhausted');
 }
 
-// Fixed UI procedures only: callers provide a port number, never a selector,
-// browser callback or sequence. The enclosing node.apply owns the channel gate.
-export async function openNewOutputTable(channel,port) {
+// Normal callers provide only a port number. The private acceptance operator
+// may supply openViews for its own graph admission; it cannot bypass active
+// output or native Table checks and is never part of a public descriptor.
+export async function openNewOutputTable(channel,port,{openViews}={}) {
   const observe=(condition,ready,confirmIdentity)=>channel.observe({condition,readOutputs:true,ready,confirmIdentity});
   const perform=(s,condition,select,verb='click')=>channel.perform({condition,initialObservation:s,
     ready:s=>s.ui.elements.filter(select).length===1,resolve:s=>({verb,ref:one(s.ui.elements.filter(select),'Unique Table control required').ref}),
@@ -58,14 +59,25 @@ export async function openNewOutputTable(channel,port) {
   let s=await observe('prepared graph output',s=>s.node_outputs?.verified&&s.node_outputs.surface==='graph');
   const output=one(s.node_outputs.ports.filter(p=>p.index===port),'Requested output port missing');
   requireValue(output.active,'Requested output is not active');
+  const sourceNode=s.prepared_node_context;
   const nodeTid=s.prepared_node_context.tid;
   // Selected nodes can have their body covered by their own hover controls.
   // The verified prepared-node observation already attests this selection.
-  if(s.node_outputs.node_selected!==true||!s.ui.elements.some(e=>e.allowed_actions.includes('open_node_views')))
-    await perform(s,'select prepared graph node',e=>e.graph_node?.part==='body'&&e.tid===nodeTid);
-  s=await observe('prepared node visualizers',s=>s.ui.elements.some(e=>e.allowed_actions.includes('open_node_views')));
-  await perform(s,'open prepared node visualizers',e=>e.allowed_actions.includes('open_node_views'),'open_node_views');
+  if(openViews) {
+    // Internal operator admission only; never supplied by a public action.
+    // Active-port admission above and normal native views/table checks below
+    // remain mandatory. No UI capabilities are fabricated or broadened.
+    await openViews({state:s,output});
+  } else {
+    if(s.node_outputs.node_selected!==true||!s.ui.elements.some(e=>e.allowed_actions.includes('open_node_views')))
+      await perform(s,'select prepared graph node',e=>e.graph_node?.part==='body'&&e.tid===nodeTid);
+    s=await observe('prepared node visualizers',s=>s.ui.elements.some(e=>e.allowed_actions.includes('open_node_views')));
+    await perform(s,'open prepared node visualizers',e=>e.allowed_actions.includes('open_node_views'),'open_node_views');
+  }
   s=await observe('prepared port visualizer cards',s=>s.node_outputs?.verified&&s.node_outputs.surface==='views'&&s.ui.elements.some(e=>e.viewer_vendor?.kind==='table'));
+  if(openViews)requireValue(s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='views'
+    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===sourceNode[k])
+    &&s.node_outputs.port_panels?.filter(p=>p.port_guid===output.port_guid).length===1,'Opened views do not own the active output');
   const before=s.node_outputs.tables.map(t=>t.view_guid);
   await perform(s,'select Table vendor',e=>e.viewer_vendor?.kind==='table');
   s=await observe('Table selected for native output port',s=>s.ui.elements.some(e=>e.viewer_vendor?.selected===true)
