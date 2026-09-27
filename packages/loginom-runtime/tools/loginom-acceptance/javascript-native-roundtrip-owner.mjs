@@ -58,20 +58,21 @@ export function bindJavascriptNativeRoundtripGraph({node,inputPortGuid}){
   const matches=nodes.filter(n=>n.FGuid===node.node_id&&n.FIconCls==='bg-vendor-icon-javascript');
   need(matches.length===1&&nodes.length<=3&&nodes.includes(initial.node)&&links.length===1,'single import→JS topology');
   const js=matches[0],edge=links[0],targetPort=edge.FTargetPort;
+  const enumValue=(port,key)=>{
+    const descriptor=Object.getOwnPropertyDescriptor(port??{},key);
+    if(!descriptor)return 'missing';if(!Object.hasOwn(descriptor,'value'))return 'accessor';
+    const value=descriptor.value;return Number.isInteger(value)&&value>=0&&value<=16?String(value):'other';
+  };
   const checks={source:edge.FSourcePort===initial.port,parent:targetPort?.parent===js,
     collection:Array.isArray(js.FPorts?.[0]?.FCollection)&&js.FPorts[0].FCollection.includes(targetPort),
     guid:targetPort?.FGuid===inputPortGuid,type:targetPort?.FType===0,subtype:targetPort?.FSubType===1,
-    param:targetPort?.FParam===0,edge_guid:typeof edge.FGuid==='string'&&edge.FGuid.length>0};
+    // Probe02: optional + multiple is exactly 3; the graph still has one edge.
+    param:targetPort?.FParam===3,edge_guid:typeof edge.FGuid==='string'&&edge.FGuid.length>0};
   if(!Object.values(checks).every(Boolean)){
     // Only bounded enum classes and identity booleans, never GUIDs, labels,
     // source handles or arbitrary property values. Fits the 500-char transport.
-    const enumValue=key=>{
-      const descriptor=Object.getOwnPropertyDescriptor(targetPort??{},key);
-      if(!descriptor)return 'missing';if(!Object.hasOwn(descriptor,'value'))return 'accessor';
-      const value=descriptor.value;return Number.isInteger(value)&&value>=0&&value<=16?String(value):'other';
-    };
     need(false,'RG1 '+JSON.stringify({c:checks,f:Object.keys(checks).filter(k=>!checks[k]),
-      v:['FType','FSubType','FParam'].map(enumValue)}));
+      v:['FType','FSubType','FParam'].map(key=>enumValue(targetPort,key))}));
   }
   need(nodes.filter(n=>n!==js&&n!==initial.node).every(n=>n.FIconCls==='bg-vendor-icon-modelvariables'&&n.FStatus===0&&!n.FRunning),'foreign dynamic nodes');
   const heldNodes=nodes.map(n=>({node:n,data:n.data,cell:n.FCell,guid:n.FGuid,icon:n.FIconCls,ports:n.FPorts,
@@ -101,7 +102,11 @@ export function bindJavascriptNativeRoundtripGraph({node,inputPortGuid}){
 
   };
   Object.assign(s,{node:js,targetPort,edge,check,stage:'graph-bound'});check();
-  return {bound:true,node_id:js.FGuid,input_port_guid:targetPort.FGuid,edge_guid:edgeGuid};
+  // Read-only inventory, not an admission rule for unobserved output metadata.
+  const inventory=group=>({count:group.FCollection.length>8?'>8':String(group.FCollection.length),
+    values:group.FCollection.slice(0,8).map(port=>['FType','FSubType','FParam','FStatus','FPortIndex'].map(key=>enumValue(port,key)))});
+  return {bound:true,node_id:js.FGuid,input_port_guid:targetPort.FGuid,edge_guid:edgeGuid,
+    ports:{input:inventory(js.FPorts[0]),output:inventory(js.FPorts[1])}};
 }
 
 export function bindJavascriptNativeRoundtripSchema({root,native,binding,schema}){
