@@ -17,6 +17,22 @@
 
 ### Fix73: Date/civil design проверен; реализация назначена
 
+Root независимо проверил новый CSV:66bytes/3rows, SHA
+`38f67790aa3c944c1fb465023157a128087e6781c9b8e22eca9e277468cdc708`.
+DMY→canonical civil проверен перестановкой компонентов, без Date/epoch/timezone.
+Private civil-datetime-csv-preflight73.json сохранён; native admission не запускался.
+После повторной проверки terminal outside-safe report/cleanup под registry.lock
+назначен fresh profile54 для INPUT-only; backup/receipt54 сохранены, browser CLOSED.
+
+Дополнительно private audit-civil-receipts.py проверяет raw Table pages,
+применённую ms mask, восстановление исходного формата и return-to-graph,
+полную completed-child связь (compact input.execution отдельно).
+SHA `1e12a777c1442bbfbf60fcff1062fb80b819916a08971e6805fe2c98da15dc5f`;
+synthetic1positive/15negative PASS. Это проверка структуры oracle, не live proof.
+Root передал разработчику интеграционный случай compact input.execution против
+full completed_child для адресного регрессионного теста до Freeze73.
+
+
 Root подготовил независимый private audit-native-datetime.py, SHA
 `113a77f382ec2199a71e09a7386ffa301f0c2352d6edf013d39f962474ed9892`.
 Он проверяет canonical civil values/миллисекунды/NULL и native tag7 significant
@@ -36,7 +52,7 @@ civil OUTPUT в текущем roundtrip. Допуск требует полно
 attestation, отдельные civil OUTPUT/upstream reads и строгий final outcome,
 отрицательные проверки и Freeze73. Root владеет commits/live. Сначала отдельный
 INPUT-only probe, затем при его PASS — roundtrip в другом fresh профиле.
-Browser CLOSED, последний profile53 сохранён, следующий ещё не назначен.
+Browser CLOSED, profile53 сохранён; fresh profile54 назначен для будущего INPUT-only.
 Полный план не сужен и не завершён.
 
 
