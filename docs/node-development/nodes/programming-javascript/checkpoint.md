@@ -15,6 +15,33 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch40 завершён: привязка страницы и разрыв сессии — 2026-09-27
+
+Original result CLEANUP_UNCONFIRMED. Root проверил959journalSHA и два полных
+input6×5/60cells. Один code Preview отправлен; во всех новых observations
+code_owned=false. Ни положительного sentinel, ни terminal Preview не доказано;
+второй declared case не запускался. В момент cleanup Connected=false,
+accountjsteach/build7.4.2 не изменились; DOM содержит диалог восстановления
+сессии. Причина и точное время разрыва не установлены. Frozen40 observer
+проверял native objects, но не connected/dialog, поэтому сохранил owner=true.
+Клик восстановления/повторение Preview не выполнялись, браузер закрыт.
+
+Отдельный recovery40 на profile13, headed/no-download: packages0,
+logout/browser=true, packageMutation=false. Browser lease закрыта. Это не
+переписывает исходный cleanup FAIL. Проверка документов PASS.
+
+Прежней задаче назначен fix41: source-supported WizardItem.FPages→FWizard,
+bounded local arrays, отдельные predicate diagnostics; connection/dialog boundary
+и отказ без reconnect/replay. До Preview необходимо подтвердить code_owned,
+чтобы не запускать эффект с заведомо непроверяемой связью. Наличие lazy
+FPreviewController до первого Preview не требуется. Следующий freshprofile14
+после финального handoff/tests; полный scope плана остаётся незавершённым.
+
+Дополнительное source-наблюдение: JavaScriptCodeWizard.PageExitAsync сохраняет
+Code и вызывает Verify(); ExecutePreviewAsync сохраняет Code, активирует входы
+и вызывает Preview.ShowPreview→ExecuteAsync. Это помогает диаграмме G2,
+но не доказывает серверную семантику Verify и не заменяет живые probes.
+
 ### Batch40 частично: visible page отличается от controller view — 2026-09-27
 
 Batch40 RUNNING, lease занят. Новые changed-state snapshots полезны:
