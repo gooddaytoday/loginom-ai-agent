@@ -282,3 +282,27 @@ GetColumn cases уже отдельно вернули undefined; эти рез�
 и G6/J25 по основному плану, а не выполненной проверкой этого документа.
 Проверка source/data/owner/error completeness/cleanup и фактического диагностического
 формата требуется в каждом назначенном live; синтаксический host oracle её не заменяет.
+
+
+## 9. Допуск реализации K3 после наблюдения K2
+
+Root независимо проверил K2/source89/profile97: exact291bytes/SHA, собственный
+fresh failed execution и полный ErrorDetails88units. Наблюдаются два разных
+кадра: caller `Anonymous function (<main>:4:1)` и module `<main>:1:1`.
+Marker встречается один раз в заранее принятом source; перед throw находятся
+только известные import/input-shape/schema statements. Это пригодный формат для
+одного заранее предложенного K3 (§6), но ещё не доказательство source mapping.
+Потребность — четыре прежних B Get/IsNull failed с неатрибутированным expression.
+
+Разрешена реализация source90 с закрытым K3-shift-v1 из §6, без изменения P,
+K1/K2/B и без иных snippets. Следующий live будет только после frozen handoff и
+независимого source/test допуска. K4 остаётся условным до результата K3; live K5
+не назначен. Использованы3 из общего maximum5 attempts (failed95,K2/97,K1/98),
+так что K3 расходует четвёртую, возможный K4 — пятую. Повторных сдвигов, иных
+API/index и автоматических повторов нет. Непригодный формат K3 завершает ветку.
+
+K1/source89/profile98 дал полный retained wizard exception tree с сообщением
+`SyntaxError: Syntax error at code (:4:19)`; native class — EBGException, server
+stack origin не установлен. Это отдельный wizard domain; он не калибрует caller
+frames Execute. Cleanup3 подтверждён, committed-source restoration/fresh upstream
+после discard не доказаны; G6/J25 остаются открытыми. Исходные reports неизменны.

@@ -15,6 +15,42 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### K1/profile98 terminal; полный wizard diagnostic сохранён
+
+Original17596 terminal exit1, statusUNRESOLVED, result wizard_diagnostic_observed,
+failure отсутствует. На Next получен fresh native FException: message
+`SyntaxError: Syntax error at code (:4:19)`, classEBGException, пустой stack,
+без children.53UTF16units — сумма message/name/stack. Это полнота retained wizard
+exception tree, не доказательство полноты серверного стека или source mapping.
+Explicit Execute не запускался. Cleanup package/logout/browser=true и отсутствие
+закреплённого Chromium проверены независимо.
+
+Root audit PASS_WITH_GAPS: exact274bytes/SHA K1, node/draft/identity,4INPUT native
+cells,1274pins,500 journal references и порядок baseline/diagnostic/finalization.
+Private operator89-root-k1-verification.json/audit-calibration-k1-source89.py.
+Report SHAa18d78cdb4a21ecd0fade200882e72ab846a0beefeb18fd3fa19472ec95bba53;
+journal SHAc8b0d3ef22f45aa3491bc1638a70a5cd4f16b45e7fdd10eb59b5bc4d4181be3f.
+Prior committed source и readback после Close не доказаны, fresh upstream после
+wizard discard не прочитан. Same-node repair/model delivery/G6/J25 остаются открыты.
+
+Использованы3/5 calibration attempts. По пригодному Execute format K2 и потребности
+атрибуции прежних B failed root разрешил реализацию только K3-shift-v1:
+calibration-source-proposal.md§9. Live K3 допускается отдельно после source90
+handoff/tests; K4 условный, K5 live не назначен. Нового browser сейчас нет.
+
+### K1/profile98 запущен на принятом source89
+
+Третья из максимум5 calibration attempts: K1-parse-v1, fresh headed profile98,
+DISPLAY1, original session17596, evidence native-calibration-k1-probe-01.
+Перед запуском проверены1274 source pins, Node/Chromium SHA, terminal K2/session83954,
+cleanup3, отсутствие закреплённого Chromium и свободный acceptance lease.
+OpenViking health PASS. Root HEAD/runtime developer commit не подменялся:
+source89=`ddc625cdd467da0b7665d72ffcf533c610987f4e`.
+
+Последний опрос17596 подтвердил живой процесс; report RUNNING/prepare-typed-input.
+Повторного dispatch нет. Assignment/registry/ledger и launch/source receipts
+содержат profile98/original handle. Калибровка не закрывает G6/J25 сама по себе.
+
 ### K2/profile97 завершён; независимая проверка PASS
 
 Original session83954 terminal exit1, report DIAGNOSTIC_OBSERVED, без failure;
