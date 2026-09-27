@@ -15,6 +15,21 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source87 K1/K2 implementation active; root acceptance criteria prepared
+
+Developer turn01a0e503-41b7-7080-9292-9e61ae5167aa active/inProgress подтверждён
+wait_threads, revision15/cursor2cc6c517-0ccb-49e9-bb9b-9daa2c14c7b8:15.
+Публичный progress соответствует K1/K2 implementation, не старому bootstrap.
+Observation timeout не terminal; повторного назначения нет. Browser не работает.
+
+Root отдельно подготовил private calibration-root-acceptance-requirements.json:
+exact fixed sources, wizard vs Execute stage, native raw completeness, prior
+committed/draft source, input/upstream, no OUTPUT, marker header vs source quote,
+no inferred mapping, ACK/persist/cleanup. Проверено, что прежний discovery wizard
+path сам не доказывает raw completeness. Это список требований для будущего review,
+не выполненная проверка source87. Frozen handoff/tests/live ещё отсутствуют.
+
+
 ### Все8 B наблюдены; K1/K2 назначены к реализации source87
 
 Последний B-isnull-missing/profile94/original54306 terminal exit1/UNRESOLVED.
