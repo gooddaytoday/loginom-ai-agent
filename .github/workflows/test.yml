@@ -148,9 +148,22 @@ jobs:
         working-directory: packages/client
         run: bun run check:generated
 
-      - name: Run HttpApi exerciser gates
+      # Keep the three gates independent so a stalled scenario is visible and
+      # cannot consume the entire unit job without a useful last phase.
+      - name: Run HttpApi coverage gate
         working-directory: packages/agent
-        run: bun run test:httpapi
+        timeout-minutes: 15
+        run: bun run script/httpapi-exercise.ts --mode coverage --fail-on-missing --fail-on-skip --progress
+
+      - name: Run HttpApi auth gate
+        working-directory: packages/agent
+        timeout-minutes: 15
+        run: bun run script/httpapi-exercise.ts --mode auth --fail-on-missing --fail-on-skip --progress --trace
+
+      - name: Run HttpApi effect gate
+        working-directory: packages/agent
+        timeout-minutes: 15
+        run: bun run script/httpapi-exercise.ts --mode effect --fail-on-missing --fail-on-skip --progress --trace
 
   desktop:
     name: desktop
