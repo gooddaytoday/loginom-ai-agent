@@ -27,8 +27,12 @@ absence_proves_no_execution=false. Это не доказательство от
 Отдельный boundary receipt сверил actual stage events, owner/page transitions.
 
 Четвёртый code-sentinel-done остановился до ввода кода на link-js-input:
-«Node label is not bound to its rendered identity» после palette drag. Причина
-ещё не установлена. Не повторяли drag/не ослабляли identity guard.
+«Node label is not bound to its rendered identity» после palette drag. Root затем
+проверил created-node snapshot05:18:19.259Z: два разных GUID имеют один
+MF;TF-1;Graph;JavaScript@0 и два соответствующих Label controls. Общий graph reader
+отказывает именно при такой неоднозначности; причина генерации повторного TID
+в Loginom не установлена. Private tid-collision-verification закрепляет reportSHA,
+case/snapshot и оба GUID. Не повторяли drag/не ослабляли identity guard.
 Original terminal exit1 FAILED; package_closed/logged_out/browser_closed всеtrue.
 Отдельный recovery не требовался. Profile25 сохранён; freshprofile26 назначен.
 
