@@ -41,6 +41,15 @@ Owner/store/context change, чужие маски/dialog, deadline остают�
 Разработчику браузер/commit не разрешён; root принимает исходники и live.
 A5/8 accepted, оставшиеся3 не приняты. Полная цель active.
 
+wait_threads подтвердил активный turn01a0e4a0-9c13-7301-a124-a90379f82a27,
+cursor2cc6c517-0ccb-49e9-bb9b-9daa2c14c7b8:2. Developer сообщил81 targeted PASS,
+полный client suite ещё выполняется с отказами; это не root acceptance.
+Root просмотрел промежуточный diff2files: artifact-discovery.mjs + его тест,
+bounded16 rereads, исходный deadline, no extra gesture. Freeze84/handoff пока
+не получен; source83 live результаты не переносить автоматически на source84.
+Следующий шаг — дождаться этой же задачи, сверить manifest/test logs и выполнить
+root regression на закреплённых исходниках до нового headed кейса.
+
 
 ### Возобновление: OpenViking работает; A5/8 PASS; проверка загрузки требует reconciliation
 
