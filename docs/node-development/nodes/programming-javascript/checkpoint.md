@@ -16,6 +16,24 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Integer coercion: independent scalar audit подготовлен, live ещё нет
+
+Root создал private integer-coercion-case-matrix.json: все7 фиксированных слотов
+not_run, output scalar unknown, expected-error allowlists пусты. Source/CSV/input
+pins взяты из reviewed design; ни один слот не объявлен проверенным на движке.
+
+Private audit-integer-coercion-output.py независимо декодирует signed64 bytes,
+сверяет canonical decimal string/NULL, schema1×1/coverage/tag/address/precision.
+SHA `d052679dfb3261d6caea03df418aaff63f9a1b8173aa78eebfbce6cc550d140a`.
+Selfcheck:7 положительных синтетических случаев (включая NULL и границы int64),
+13 отрицательных; malformed bytes/tag/value/address/coverage отвергнуты.
+Receipt integer-coercion-output-auditor-selfcheck.json. Проверка доказывает только
+scalar encoding; execution/owner/source/upstream/journal/cleanup и actual engine
+coercion остаются отдельными обязательными доказательствами. Current source82
+implementation в прежней задаче active; freeze/приёмка ещё не переданы.
+Browser CLOSED; свежий профиль для coercion пока не выделен.
+
+
 ### Empty04 source81: независимый declared-empty roundtrip PASS
 
 Original session68506 terminal exit0, OBSERVED/native-roundtrip-observed,
