@@ -1,5 +1,5 @@
 import {withJavascriptWizardMasks} from './javascript-wizard-masks.mjs';
-import {waitJavascriptWizardSettlement} from './javascript-wizard-settlement.mjs';
+import {waitJavascriptWizardSettlement,inspectJavascriptWizardAddress,withJavascriptWizardAddress} from './javascript-wizard-settlement.mjs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,mkdtemp,rm} from 'node:fs/promises';
@@ -437,10 +437,10 @@ test('wizard mask diagnostics are capped without truncating blocker admission or
 
 test('the live readiness inspector serializes the same classifier without browser imports or host closures',async()=>{
  const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
- const start=source.indexOf('const wizardReadiness=withJavascriptWizardMasks(')+'const wizardReadiness=withJavascriptWizardMasks('.length;
- const end=source.indexOf(');\nconst waitWizardReady=',start);
+ const start=source.indexOf('const wizardReadiness=')+'const wizardReadiness='.length;
+ const end=source.indexOf(';\nconst waitWizardReady=',start);
  assert.ok(start>0&&end>start);
- const inspect=withJavascriptWizardMasks(vm.runInNewContext('('+source.slice(start,end)+')'));
+ const inspect=vm.runInNewContext(source.slice(start,end),{withJavascriptWizardMasks,withJavascriptWizardAddress});
  const realm=vm.createContext({document:{querySelectorAll:()=>[]},getComputedStyle:()=>({visibility:'visible'})});
  const result=vm.runInContext('('+inspect.toString()+')',realm)({prefix:'MF;TF-1',inspect:true});
  assert.equal(result.ready,false);assert.equal(result.fatal,true);assert.equal(result.counts.overlays,0);
@@ -492,5 +492,75 @@ test('mapping-close refuses another error or changed original native graph',asyn
     const f=mappingCloseFixture(options);await assert.rejects(f.run());assert.deepEqual(f.effects,['click','confirm_wizard_close']);
     assert.equal(f.events.some(e=>e.phase==='port_mapping_close_verified'),false);
     assert.equal(f.verified,options.bad?0:1);
+  }
+});
+
+
+function wizardAddressFixture(label='JavaScript') {
+  const document={},cell={},nodeData={},workflow={},node={FGuid:'js',data:nodeData,FCell:cell};
+  node.FLabel={parent:node,FCell:{parent:cell},FRawValue:label};
+  const tree={FGuid:'js',FModelNode:nodeData,FParentNode:workflow},native={FParentNode:tree},model={FModelNode:nodeData};
+  const element=(id,tid,text)=>({id,tid,textContent:text,getAttribute(key){return key==='data-tid'?this.tid:null;}});
+  const prefix='MF;TF-1',base=prefix+';cnrNaviMode;b.s_Workflow>',suffix=label.replaceAll(' ','_').replaceAll(',','');
+  const crumbs=[element('node',base+suffix,label),element('wizard',base+suffix+'>Настройка','Настройка')];
+  const controls={node:{el:{dom:crumbs[0]},_node:{data:{node:tree}}},wizard:{el:{dom:crumbs[1]},_node:{data:{node:native}}}};
+  const binding={document,native:node,cell,nodeData,workflow};
+  const args={prefix,id:'js',binding,native,model,crumbs,epoch:0};
+  const realm=vm.createContext({document,Ext:{getCmp:id=>controls[id]}});
+  const read=()=>vm.runInContext('('+inspectJavascriptWizardAddress.toString()+')',realm)(args);
+  return {args,realm,binding,node,tree,native,model,crumbs,controls,read,
+    reopen(label){node.FLabel.FRawValue=label;const suffix=label.replaceAll(' ','_').replaceAll(',','');
+      crumbs[0].tid=base+suffix;crumbs[0].textContent=label;crumbs[1].tid=base+suffix+'>Настройка';
+      args.epoch++;}};
+}
+
+test('wizard addressing accepts renamed same native node for reopening and repeated cleanup readiness',()=>{
+  const f=wizardAddressFixture();assert.equal(f.read().ready,true);
+  f.reopen('JS: ObservedID, PhaseMarker');const reopened=f.read();assert.equal(reopened.ready,true);
+  assert.equal(reopened.label,'JS: ObservedID, PhaseMarker');assert.match(reopened.node_tid,/JS:_ObservedID_PhaseMarker$/);
+  const cleanup=f.read();assert.equal(cleanup.ready,true);assert.equal(cleanup.node_tid,reopened.node_tid);
+});
+
+test('wizard addressing rejects foreign node, spoofed breadcrumb and stale label without weakening native identity',()=>{
+  for(const corrupt of [f=>f.tree.FGuid='foreign',f=>f.tree.FModelNode={},f=>f.controls.node._node.data.node={...f.tree},
+    f=>f.controls.wizard._node.data.node={...f.native},f=>f.node.FCell={},f=>f.node.FLabel.parent={},f=>f.crumbs[0].textContent='Other',
+    f=>f.crumbs[1].tid='foreign']){
+    const f=wizardAddressFixture('JS: ObservedID, PhaseMarker');corrupt(f);assert.equal(f.read().ready,false);
+  }
+});
+
+test('wizard address is pinned within an opening and never reads a label getter',()=>{
+  const f=wizardAddressFixture();assert.equal(f.read().ready,true);
+  f.node.FLabel.FRawValue='Other';f.crumbs[0].textContent='Other';
+  assert.equal(f.read().ready,false);assert.equal(f.read().checks.retained_address,false);
+  const g=wizardAddressFixture();let reads=0;
+  Object.defineProperty(g.node.FLabel,'FRawValue',{get(){reads++;throw Error('label getter');}});
+  assert.equal(g.read().ready,false);assert.equal(reads,0);
+});
+
+
+test('wizard address reads proven FParentNode caches without invoking ParentNode prototype getters',()=>{
+  const f=wizardAddressFixture();let reads=0;
+  const prototype={};Object.defineProperty(prototype,'ParentNode',{get(){reads++;throw Error('ParentNode getter');}});
+  Object.setPrototypeOf(f.tree,prototype);Object.setPrototypeOf(f.native,prototype);
+  assert.equal(f.read().ready,true);assert.equal(reads,0);
+  f.tree.FParentNode={};assert.equal(f.read().ready,false);assert.equal(reads,0);
+});
+
+test('wizard address rejects duplicate crumbs, epoch rollback and missing retained data',()=>{
+  const f=wizardAddressFixture();f.crumbs.unshift(f.crumbs[0]);assert.equal(f.read().ready,false);
+  const g=wizardAddressFixture();g.reopen('JS: ObservedID, PhaseMarker');assert.equal(g.read().ready,true);
+  g.args.epoch--;assert.equal(g.read().ready,false);
+  const h=wizardAddressFixture();delete h.binding.nodeData;delete h.node.data;assert.equal(h.read().ready,false);
+});
+
+test('wizard address refuses accessors throughout native label and breadcrumb caches without invoking them',()=>{
+  for(const target of [f=>[f.native,'FParentNode'],f=>[f.tree,'FModelNode'],f=>[f.node,'FLabel'],
+    f=>[f.node.FLabel,'parent'],f=>[f.node.FLabel.FCell,'parent'],f=>[f.controls.node,'_node'],
+    f=>[f.controls.node._node,'data'],f=>[f.controls.node._node.data,'node'],
+    f=>[f.controls.node,'el'],f=>[f.controls.node.el,'dom']]){
+    const f=wizardAddressFixture();const [object,key]=target(f);let reads=0;
+    Object.defineProperty(object,key,{get(){reads++;throw Error('cache accessor');}});
+    assert.equal(f.read().ready,false);assert.equal(reads,0);
   }
 });
