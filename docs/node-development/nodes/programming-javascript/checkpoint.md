@@ -16,6 +16,28 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze69: диагностический headed roundtrip probe06 запущен
+
+Source node-javascript `df3f131ff3a4d7c262e85166c04c51dcd42a0997` сохраняет прежние
+identity predicates. NP1 содержит bounded phase/reservation и10 boolean checks
+(binding/model/diagram/graph/container/node/port/data/cell/shape). Select означает
+проверку перед click, selected — после возврата click. Refusal пишется с exact ACK,
+при transport/lost effect diagnostic=null; повтор и удаление reservation запрещены.
+Причина probe05 пока неизвестна, DOM root replacement не разрешён как норма.
+Child repaint с тем же root уже допустим при fresh hit-test; это не root rebind.
+
+Root независимо main798/798PASS + public-deny3/3PASS;75pins before/after совпали,
+syntax2PASS. Private operator69-root-test-source.json. Source-only проверки не
+доказывают прохождение native roundtrip. Общий UI deny не менялся.
+
+После отдельной recovery05 profile47 сохранён; назначен fresh48. Headed probe06
+запущен на profile48, DISPLAY=:1/sandbox, Node/Chromium SHA проверены. Receipt
+native-roundtrip-probe-06-source.json; process session97252. Разработчик idle,
+cursor152. На момент записи RUNNING, NP1/live outcome/cleanup ещё не получены.
+Полный G5, handler и CLI acceptance остаются незавершёнными.
+
+
+
 ### Roundtrip probe05: private selection identity refusal; отдельное восстановление PASS
 
 Source68/profile47 завершён exit1 CLEANUP_UNCONFIRMED, session31763 terminal.
