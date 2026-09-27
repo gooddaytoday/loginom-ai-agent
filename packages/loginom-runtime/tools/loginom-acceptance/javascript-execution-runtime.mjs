@@ -91,7 +91,11 @@ export function inspectJavascriptExecutionNotifications({binding:b,poll=false}) 
       throw Error('Post-execution ModelForm mask sequence changed');
     busyContext=context;
   }
-  const dialogs=[...document.querySelectorAll('[role="dialog"],.x-message-box,.x-toast')].filter(visible);
+  // Cover the workspace guard's inventory too. Native notification config can
+  // replace Toast's x-toast cls while retaining Window's x-window baseCls.
+  // Discovery alone grants nothing: every visible entry must pass the native
+  // lifecycle proof below, including windows/dialogs unrelated to this node.
+  const dialogs=[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog,.x-message-box,.x-toast')].filter(visible);
   if(dialogs.length>4)throw Error('Post-execution notification count exceeded');
   const toasts=dialogs.map(element=>{
     const control=globalThis.Ext?.getCmp?.(element.id),delay=own(control,'autoCloseDelay');
