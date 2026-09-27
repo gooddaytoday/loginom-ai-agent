@@ -15,6 +15,30 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Все8 B наблюдены; K1/K2 назначены к реализации source87
+
+Последний B-isnull-missing/profile94/original54306 terminal exit1/UNRESOLVED.
+Independent audit8cells/597refs/1265pins/cleanup3 PASS; no pinned Chromium.
+Native error столбец `"Missing"` отсутствует, `<main>:4:1`/module `<main>:1:1`.
+Report SHA5843ca42dfa45a32265abab48a8d93ed31893ff4aae8aece9ccd755b10ac4ecc.
+Receipt native-named-isnull-missing-probe-01-verification.json; registry/matrix updated.
+
+Root aggregate named-stage-b-observations.json:8fixed source86 observations,
+68cells/4850refs. GetColumn/Columns (case+missing)4×undefined complete; Get/IsNull
+(case+missing)4×owned failures unattributed, case_complete=false. Поэтому
+observations_complete=true, stage_b_coverage_complete=false/G5=false.
+Aggregate draft исправлен для формата marker: native exact integer decimal string
+`"10"` сравнивается с canonical str(root integer10); report/oracles не менялись.
+A8/8 prior evidence остаётся; C4/D5 и полный handler/CLI ещё открыты.
+
+В существующей задаче назначена реализация ТОЛЬКО fixed K1/K2 по принятому
+[proposal](calibration-source-proposal.md),§8, в source87. Runtime changes теперь
+разрешены, browser/CLI/commit/newtask — нет. K3/K4 не активировать; K5negative
+fixtures допустимы. Нужны реальная completeness/stage distinction и honest unknown,
+не автоматическое B attribution. Server OS остаётся неизвестной/open gate.
+Root ожидает frozen handoff с exact source/test hashes; live пока не назначен.
+
+
 ### B-isnull-missing/profile94 RUNNING
 
 Fresh profile94 после verified owned failure/cleanup profile93;1265pins/toolchains/

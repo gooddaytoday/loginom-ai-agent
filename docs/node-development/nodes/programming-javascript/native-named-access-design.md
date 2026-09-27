@@ -713,3 +713,14 @@ actual-verifier tests:4/1/4 cardinality, API-specific markers,99/неподде�
 scalar и wrong schema/owner/source/ACK, failed path без OUTPUT. Полные client и
 JS/native suite перед root handoff, без браузера и коммита разработчиком.
 C/D отдельно не допущены; полного handler/CLI acceptance это назначение не заменяет.
+
+## 14. Root: результаты фиксированных B observations
+
+Все8 запусков наблюдены на source86 `f30244f37d90a2f23e61bd07d95028babacda5f7`.
+Independent aggregate `named-stage-b-observations.json`:68native cells/4850journal
+refs; точные case reports/verification hashes закреплены в private receipt.
+Для `value` и `Missing` GetColumn и Columns дали undefined (marker10),4cases complete.
+Get и IsNull дали owned full errors об отсутствующем столбце,4cases остаются
+unattributed до независимой проверки source mapping. Полнота наблюдений не означает
+полноту semantic B coverage/G5. INPUT/upstream unchanged, cleanup всех8 подтверждён.
+Результаты ограничены fixed sources/input/build; C/D и общий handler не проверены.
