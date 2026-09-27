@@ -16,6 +16,23 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source82: независимая проверка fixed-script guards
+
+Private audit-coercion-script-guards.mjs выполнил7 fixed scripts в pinned Node VM
+после удаления только точной import строки. **7 positive /35 negative PASS**:
+один AssignColumns(Integer), Append и Set с исходным candidate; wrong row/column,
+NULL, другой тип/operand останавливаются до любой записи. NaN/+Infinity/-Infinity
+проверены через Object.is/typeof, в receipt записаны отдельными обозначениями,
+не JSON-null. SHA audit script bd2f9843c041cf81072226fcc2b0670c17c6c9a7c826889d73aa2cfceb20d436.
+Receipt integer-coercion-script-guard-verification.json; это проверка source guards
+и Set argument, без имитации преобразования и без ChakraCore execution.
+
+Developer revision48 продолжает failed-terminal tests. Новая ветвь оставляет
+owned failure incomplete/unattributed, пока runtime/source line mapping не доказан;
+synthetic строка9 не считается подтверждением отказа Set. Полная интеграция и
+regression ещё не завершены; source82 не frozen, profile66 unused.
+
+
 ### OpenViking проверен; scalar-контракт source82 прошёл root regression
 
 Текущие MCP health/find/read успешны. Doctor0.8.1 подтвердил credentials,
