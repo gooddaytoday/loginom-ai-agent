@@ -16,6 +16,26 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch42: native Add подтверждён, field/readback и Cancel открыты — 2026-09-27
+
+Один Add дошёл до ready: новая запись исходного store, standalone
+EditColumnDefForm, form↔record, vendor/page/controls/connection/owner — true.
+Затем `Column field readback differs`, до Preview/Execute. Root проверил965
+journalSHA и два input6×5/60cells. Нового подтверждения исполнения здесь нет.
+При cleanup один Cancel закрыл editor и удалил новую запись; screenshots и
+observer показывают baseline0/records0/added0/editor0,quiet=true. Проверка
+cancel_settlement всё же осталась pending и истекла. Возможное расхождение
+getTotalCount с локальным cache требует source-проверки, пока это гипотеза.
+Original cleanup package/logout=false,browser=true; статус CLEANUP_UNCONFIRMED.
+
+Отдельный headed recovery42 (profile15, без downloads): packages0,
+logout/browser PASS, packageMutation=false. Source-файлы во время original
+process не менялись. Прежняя задача получила fix43: установить причину field
+readback и корректный критерий Cancel, добавить точные diagnostics и тесты.
+Freshprofile16 назначен, ещё не создан; lease browser закрыта. G2/G3 и весь
+план остаются незавершёнными.
+
+
 ### Freeze42: ожидание declared editor передано в live — 2026-09-27
 
 Прежняя developer-задача завершила fix42. Root сверил30/30 source hashes
