@@ -16,6 +16,30 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### String roundtrip PASS; следующий bounded slice — int64
+
+Source71/profile51 native-string-roundtrip-probe-01 завершён exit0 OBSERVED,
+work_stage native-roundtrip-observed, session6459 terminal. Original cleanup
+package_closed/logged_out/browser_closed=true. Независимый v2 audit проверил
+**24/24cells на3стадиях**, NULL/empty/literalstrings/Unicode/quote/backslash/newline
+с точными UTF8 bytes и неизменным upstream execution. Проверены556journal refs,
+81sourcepins, fixture/source/execution receipts, lifecycle8/8 каждой стадии,
+final verified event и три Preview-close events. ReportSHA
+`11982c8ddfaae42d318fa5c167d9c502bd2eefa0ca5977958ffeaa28cb338fb7`;
+private native-string-roundtrip-probe-01-verification.json сохранён.
+Lease CLOSED, profile51 сохранён, recovery не требуется. Private real, boolean,
+string identity slices подтверждены; полный G5/public handler/CLI ещё не готовы.
+
+Прежней задаче назначен Fix72: safe int64 fixture с NULL и всеми canonical safe
+значениями, отдельный outside-safe fixture с canonical3decimalstrings. INPUT
+обязан быть точным до JS, без host Number conversion. Safe OUTPUT exact required;
+outside-safe OUTPUT — явная characterization точности, без объявления exactPASS
+при округлении. Upstream reread и все ownership/source/journal/no-replay guards
+сохраняются. Сначала bounded design, затем source/tests/Freeze72. Root live/commit;
+profile52 ещё не назначен, browser не запущен. Date/coercion и прочая матрица плана
+остаются отдельными последующими проверками, полный scope не сужен.
+
+
 ### Boolean roundtrip PASS; отдельный string probe01 запущен
 
 Source71/profile50 native-boolean-roundtrip-probe-01 завершён OBSERVED,

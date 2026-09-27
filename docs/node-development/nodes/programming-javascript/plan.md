@@ -223,7 +223,9 @@ diagnostics и все примеры будущей v1-редакции. Про�
 и строки из наблюдённого входа. Отдельный [дизайн native G5](native-types-design.md) закрепляет независимую
 аттестацию typed input до JS и границу переиспользования native reader;
 его private real/NULL input-only admission и identity JS roundtrip подтверждены
-source70/probe07 (12 native cells); остальные семейства и весь G5 остаются открыты,
+source70/probe07 (12 native cells); source71 отдельно подтвердил boolean (9 cells)
+и string (24 cells), включая NULL/empty/false/Unicode/multiline. Int64, Date,
+кардинальности и весь G5 остаются открыты,
 точные доказательства и ограничения — в checkpoint. В G5 ограниченными случаями установить
 Integer coercion для fraction/string/NaN/±Infinity; exact integer oracle
 от этого не меняется. Неудача сначала локализуется по коду/входу/native output;

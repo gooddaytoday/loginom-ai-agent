@@ -1,6 +1,11 @@
 # G5 native types: следующий ограниченный шаг
 
-Статус на 2026-09-27: **private real/NULL INPUT и JS identity roundtrip подтверждены live**.
+Статус на 2026-09-27: **private real/boolean/string INPUT и JS identity roundtrip подтверждены live**.
+Source71 `0115eccd20`: boolean/profile50 audit9cells/570journal refs PASS,
+string/profile51 audit24cells/556refs PASS;81sourcepins и original cleanup3/3
+каждого прогона подтверждены. NULL/false/empty и точные Unicode/multiline строки
+сохранены. Root886main+3deny+4Python PASS. Следующий bounded Fix72 — safe int64
+и outside-safe characterization; Date/cardinality/полный G5 остаются открыты.
 Source70 `c1ae171e50a2b3368d72831fb27ecca84d4a58a2`, root814 main+3deny PASS.
 Headed native-roundtrip-probe07/profile49 завершён exit0 OBSERVED, original cleanup
 ALL PASS. Независимый Python oracle проверил12/12 ячеек: INPUT до JS, JS OUTPUT и
@@ -12,8 +17,8 @@ server atomic snapshot/отсутствие ABA и весь G5 не доказа
 Private input-only admission ранее подтверждён source63/probe09; source64–70
 добавили отдельные JS/upstream bindings, source/mode Done seal, точный AddPort
 admission и owned-port selection+F3 с проверенным postclick DOM transition.
-Следующий slice — отдельные bool/string fixtures с native INPUT до JS, точным
-NULL/empty/false/UTF8 и независимым roundtrip. Потом safe int64, outside-safe
+Bool/string fixtures с native INPUT до JS, точным NULL/empty/false/UTF8
+и независимым roundtrip подтверждены source71. Далее safe int64, outside-safe
 characterization, Date, cardinality и остальная матрица плана. Нельзя подгонять
 expected под importer или заменять независимый input JS-генератором.
 
