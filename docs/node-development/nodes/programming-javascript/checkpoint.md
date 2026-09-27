@@ -15,6 +15,19 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-columns-missing CHARACTERIZED: undefined
+
+Profile92/original7925 terminal exit0/CHARACTERIZED. Independent audit9cells/
+632journal refs/1265pins/cleanup3 PASS; no pinned Chromium. Marker10 означает
+undefined для точного `InputTable.Columns["Missing"]`. Case_complete=true,
+exact_pass=false/G5=false. Report SHA
+68937593a89f3dc8fe2fceccab3b219bebc347f6ede13c24ce7cbc9c11c2d627.
+Receipt native-named-columns-missing-probe-01-verification.json;
+registry/matrix обновлены. B4complete/2owned-failure-unattributed/2not_run.
+Следующий — B-isnull-case, fresh profile93; source86 frozen.
+K1/K2 proposal reviewed, реализация/calibration ещё не назначены.
+
+
 ### B-columns-missing/profile92 RUNNING
 
 Fresh profile92 после verified profile91 cleanup;1265pins/toolchains и no pinned
