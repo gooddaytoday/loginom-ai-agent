@@ -15,6 +15,20 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-get-missing: второе owned failure observation подтверждено
+
+Profile88/original16350 terminal exit1/UNRESOLVED, source86 unchanged.
+Root independent audit8cells/608journal refs/1265pins/cleanup3 PASS; no pinned
+Chromium. Report SHA db9a850fb20b9a99c3c5fa575293a6c2a9c4543b194f850f7e1811a43763d7c1.
+Native error: столбец `"Missing"` отсутствует во входной таблице №0,
+`<main>:4:1`/module `<main>:1:1`. Fresh owned failed child/source/full error и
+unchanged upstream подтверждены; OUTPUT не читался. Это не screenshot oracle.
+Private native-named-get-missing-probe-01-verification.json; registry/matrix
+обновлены. B:2 owned failures observed/6not_run, case_complete=false для обоих
+до отдельно проверенной attribution. A8/8 сохранена; G5/J25/полный goal открыт.
+Следующий фиксированный case — B-getcolumn-case, fresh profile89 после допуска.
+
+
 ### B-get-missing/profile88 RUNNING; failed auditor проверен негативными данными
 
 Fresh profile88 после verified owned failure/cleanup profile87;1265pins/Node/
