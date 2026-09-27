@@ -15,6 +15,26 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze60: optional input admission исправлен; probe06 запущен
+
+Source node-javascript `6e8efd36c5da4576a0c76685acd6e0399a13833c` допускает ровно
+наблюдённые Connection6/Variables3 inputs с owner=node,type0,param1,status1,
+в наблюдённом порядке. No-links и остальные12 Preview guards сохранены.
+Snapshot дополнен identities input collection/array/обоих port objects;
+замена теми же значениями отклоняется до/после request и между cells.
+
+Root итоговый suite: **165/165 PASS**,fail/skip0,66pins unchanged до/после.
+Промежуточное сообщение разработчика164 не является финальным числом.
+Negatives покрывают missing/extra/duplicate/reorder/foreign/property mutations,
+recreated ports/collections, освобождение response/request и запрет публикации.
+Private operator60-root-test-source.json + stdout/stderr закрепляют результат.
+
+Разработчик idle. Native-input-probe-06 запущен на fresh profile39, headed,
+DISPLAY=:1/sandbox. На момент checkpoint RUNNING; успех native reads/cleanup
+ещё не установлен. Source receipt содержит66pins. Profile38 сохранён, его
+original cleanup ALL PASS; G5/public handler/CLI по-прежнему открыты.
+
+
 ### Probe05: actual Connection/Variables inventory полностью подтверждён
 
 Headed profile38/source59 завершён exit1 FAILED с ожидаемым admission refusal.
