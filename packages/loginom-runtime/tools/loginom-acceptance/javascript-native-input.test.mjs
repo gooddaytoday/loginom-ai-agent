@@ -68,7 +68,7 @@ export async function fake({deferred=false,change,beforeBind,bind=true,afterRele
       WriteParameter(offset,row){assert.equal(offset,0);this.row=row;},WriteParameter$a:(offset,column)=>assert.deepEqual([offset,column],[8,0]),
       get_MessageID:()=>id,Release:()=>{counters.requests++;afterRelease?.(result);}};}},
     DispatchMessageAsync(request,exceptions){assert.equal(exceptions,false);counters.sent++;
-      const value=values[request.row],utf8=typeof value==='string'?new TextEncoder().encode(value):null;
+      const value=(fixture.output_values&&dc.FModelNode!==node.data?fixture.output_values:values)[request.row],utf8=typeof value==='string'?new TextEncoder().encode(value):null;
       const bytes=new Uint8Array(Math.max(60,utf8?.length?28+utf8.length:60)),view=new DataView(bytes.buffer);
       view.setInt16(12,value===null?1:fixture.type==='datetime'?7:fixtureId==='real'?5:fixtureId==='boolean'?11:fixture.type==='integer'?20:8,true);
       if(value!==null){
@@ -107,7 +107,7 @@ export async function fake({deferred=false,change,beforeBind,bind=true,afterRele
     execution:{status:'completed',execution_id:'d:1:2'},completed_child:{group_id:'2',process_id:'2.1',process_record_id:'3'},document_id:'d',workflow_id:'w',tab_tid:'tab',prefix:'TF',node_id:'n',port_guid:'p',origin:'http://test',
     schema:[{name:'Value',label:'Value',type:fixture.native_type}],row_count:fixture.rows,deadline:Date.now()+30000};
   const result={page,execute,env,context,b,node,port,root,group,child,helper,dc,dt,store,model,session,counters,callbacks};
-  if(fixture.type==='datetime')b.completed_child={...sourceEvidence(fixtureId).execution};
+  if(fixture.type==='datetime'||fixture.output_input_rows)b.completed_child={...sourceEvidence(fixtureId).execution};
   beforeBind?.(result);
   if(bind)result.b=await execute(javascriptNativeInputCode(b));
   return result;
@@ -506,7 +506,7 @@ test('owning driver journal acknowledgement precedes scoped Close and proof retu
   assert.deepEqual(f.actions,['click','press','native','close']);assert.deepEqual(f.events.map(e=>e.phase),['javascript_native_input_cells_verified','javascript_native_input_preview_closed']);
   assert.equal(f.states.at(-1).releasedResponses,4);
 });
-for(const fixtureId of ['real','boolean','string','integer-safe','integer-outside-safe'])for(const wrongAck of [false,true])test(fixtureId+' production journal full proof, disk, secrets and exact ACK: '+wrongAck,async t=>{
+for(const fixtureId of ['real','boolean','string','integer-safe','integer-outside-safe','cardinality-keep2','cardinality-odd','cardinality-duplicate'])for(const wrongAck of [false,true])test(fixtureId+' production journal full proof, disk, secrets and exact ACK: '+wrongAck,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'javascript-native-proof-'));
   t.after(()=>rm(directory,{recursive:true,force:true}));
   const journal=createExecutionJournal({directory,metadata:{sessionId:'test',clientRevision:'test'},knownSecrets:['private-secret']});

@@ -582,9 +582,9 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
   const pinned={actions:new Map(actions.map(action=>[action.action_key,action])),selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
   const artifactStore=await createArtifactStore({directory:directory+'/input-artifacts',sessionId});
   const support=nativeInputOnly?createJavascriptNativeInputSupport({targetOrigin:origin,targetBuild:build,fixtureId:nativeFixtureId,
-    onProof:async(proof,owner)=>{nativeInputEvidence=nativeFixtureId==='civil-datetime'?freezeCivilEvidence(structuredClone(proof)):proof;nativeInputOwner=owner;},
+    onProof:async(proof,owner)=>{nativeInputEvidence=nativeFixtureId==='civil-datetime'||nativeInputFixture.output_input_rows?freezeCivilEvidence(structuredClone(proof)):proof;nativeInputOwner=owner;},
     onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0
-      ||state.status!=='completed'||state.releasedRequests!==nativeInputFixture.rows||state.releasedResponses!==nativeInputFixture.rows;
+      ||state.status!=='completed'||state.requests!==nativeInputFixture.rows||state.releasedRequests!==nativeInputFixture.rows||state.releasedResponses!==nativeInputFixture.rows;
       await record({phase:'javascript_native_input_lifecycle',state,uncertain:nativeReadUncertain});}})
     :createTextImportNodeSupport({targetOrigin:origin,targetBuild:build});
   const runtime=createActionRuntime({pinned,execute,artifactStore,allowCandidate:true,onRecord:record,targetOrigin:origin,targetBuild:build,...support});
@@ -776,7 +776,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       const result=imported.output?.output?.ports?.find(p=>p.port===0);
       const proof=nativeInputOnly?verifyNativeInputUi(result,nativeFixtureId):verifyJavascriptTable(result,'input');
       if(nativeInputOnly&&(!nativeInputEvidence?.native.exact.native_bytes_verified||nativeReadUncertain))throw Error('Native input proof/cleanup unavailable');
-      if(nativeFixtureId==='civil-datetime')verifyNativeRoundtripInput({node:imported.output.node,table:result,native_input:nativeInputEvidence},nativeFixtureId);
+      if(nativeFixtureId==='civil-datetime'||nativeInputFixture.output_input_rows)verifyNativeRoundtripInput({node:imported.output.node,table:result,native_input:nativeInputEvidence},nativeFixtureId);
       await record({phase:'input_verified',node:imported.output.node,pin,storage,proof,table:result});
       return {node:imported.output.node,storage,pin,table:result,proof,...(nativeInputOnly?{native_input:nativeInputEvidence}: {})};
     },
@@ -805,17 +805,19 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       for(const role of ['output','upstream']){
         validateNativeSource();
         const owner=role==='output'?node:input.node,completed=role==='output'?execution:before.exact.provenance.execution;
+        const expectedRows=role==='output'?(nativeInputFixture.output_rows??nativeInputFixture.rows):nativeInputFixture.rows;
         const operation={id:'native-roundtrip-'+role+'-'+randomUUID(),action:{action_key:'diagnostic.javascript',revision:'1'},deadline};
         const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node:owner,execution:completed,deadline};
         const civil=nativeFixtureId==='civil-datetime'?await this.readNativeCivil(owner,completed,role):undefined;
         results[role]=await readNativeRoundtrip({options:{operation,execute,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>!nativeReadUncertain,
           receiptOptions:(id,key,signature)=>({receipt_namespace:sessionId,receipt_id:id,receipt_signature:signature,operation_id:id})},ctx,input:before,role,civil,targetOrigin:origin,targetBuild:build,
-          onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0||state.status!=='completed'||state.releasedRequests!==nativeInputFixture.rows||state.releasedResponses!==nativeInputFixture.rows;
+          onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0||state.status!=='completed'||state.requests!==expectedRows||state.releasedRequests!==expectedRows||state.releasedResponses!==expectedRows;
             await record({phase:'native_roundtrip_lifecycle',role,state,uncertain:nativeReadUncertain});}});
       }
       await page.evaluate(()=>globalThis.__loginomJavascriptNativeRoundtripV1.check());
       validateNativeSource();
       results.outcome=verifyNativeRoundtripOutcome(results,nativeFixtureId);
+      if(nativeInputFixture.output_input_rows)freezeCivilEvidence(results);
       const saved=await record({phase:'native_roundtrip_verified',results,g5_complete:false});
       if(JSON.stringify(saved.results)!==JSON.stringify(results))throw Error('Roundtrip final journal ACK differs');
       return results;

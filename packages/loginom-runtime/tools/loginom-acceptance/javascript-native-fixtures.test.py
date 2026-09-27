@@ -24,6 +24,15 @@ def verify(kind, data):
     rows = list(csv.reader(io.StringIO(data.decode("utf-8"), newline=""), delimiter=";", quotechar='"'))
     assert rows[0] == ["Value"] and all(len(row) == 1 for row in rows)
     values = [None if row[0] == "__JS_NULL__" else {"true": True, "false": False}[row[0]] if kind == "boolean" else float(row[0]) if kind == "real" else row[0] for row in rows[1:]]
+    if kind.startswith("cardinality-"):
+        case = next(case for case in CASES if case["id"] == "cardinality")
+        assert values == [str(v) for v in case["input_rows"]] == fixture["values"]
+        index = {"cardinality-keep2": 0, "cardinality-odd": 1, "cardinality-duplicate": 2}[kind]
+        expected = [str(v) for v in case["cases"][index]["expected_ids"]]
+        assert fixture["output_values"] == expected and fixture["output_rows"] == len(expected)
+        assert [values[i] for i in fixture["output_input_rows"]] == expected
+        assert fixture["expected_bytes"] == [int(v).to_bytes(8, "little", signed=True).hex() for v in values]
+        return
     if kind == "civil-datetime":
         import re
         converted = []
@@ -68,6 +77,18 @@ class FixtureAudit(unittest.TestCase):
 
     def test_civil_datetime(self):
         verify("civil-datetime", (HERE / "fixtures" / CATALOG["civil-datetime"]["file"]).read_bytes())
+
+    def test_cardinality_keep2(self):
+        verify("cardinality-keep2", (HERE / "fixtures" / CATALOG["cardinality-keep2"]["file"]).read_bytes())
+
+    def test_cardinality_odd(self):
+        verify("cardinality-odd", (HERE / "fixtures" / CATALOG["cardinality-odd"]["file"]).read_bytes())
+
+    def test_cardinality_duplicate(self):
+        verify("cardinality-duplicate", (HERE / "fixtures" / CATALOG["cardinality-duplicate"]["file"]).read_bytes())
+
+    def test_empty_remains_unavailable(self):
+        assert "cardinality-empty" not in CATALOG
 
     def test_changed_inputs_refused(self):
         for kind in CATALOG:
