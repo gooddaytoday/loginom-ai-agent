@@ -15,6 +15,31 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source87 независимо проверен и закоммичен; K1/K2 live ещё не запускались
+
+Developer completed revision18/turn01a0e519; получен действительный freeze87 handoff.
+Root сверил1269pins:1246 unchanged,19changed+4new,146files/436relative-import edges,
+69preserved docs, все developer logs и root design/evidence hashes. Manifest JSON
+SHA e62506cb3402f803ba811f29d327637006eed2239aa47fd5c6ebb94e7b8b677a.
+Independent main original88365 terminal0:2494PASS/0FAIL/0SKIP,25412.609333ms;
+public deny3PASS/Python15PASS/23syntax/diff-check PASS. Changed-source hashes
+сняты во время main и сверены после и с frozen manifest, не до запуска.
+Client runtime/tests unchanged: отдельный full client повторно не выполнялся.
+
+Child exact23 runtime/test files commit35120b6cb5be886e369a7fc26366391901e74e19;
+старые dirty/untracked docs не включены. Root private copies: freeze87-handoff.md,
+javascript-freeze87-source.json/.sha256,source87-developer-logs,
+operator87-root-main-verification.json,operator87-root-manifest-verification.json.
+K1/K2 closed source / stage separation / no OUTPUT / raw completeness / ACK,
+cleanup и no-replay рассмотрены; source87 пригоден для ограниченной диагностики,
+не принятия handler/G6/J25. Ошибка free variable исправлена и serialized tests PASS.
+
+Следующий шаг: read-only анализ retained JavaScriptCodeWizard.js и WizardVendor
+для wizard native-message completeness и committed-source cache/discard proof.
+Handoff содержит bounded request; до его проверки K1 wizard остаётся UNRESOLVED.
+Новых browser runs нет, K3/K4 не активны; source87 не подменяет прежние B evidence.
+
+
 ### Сообщение пользователя о случайном клике; source87 handoff ещё отсутствует
 
 Пользователь сообщил случайный клик, нарушивший последний прогон. При текущей
