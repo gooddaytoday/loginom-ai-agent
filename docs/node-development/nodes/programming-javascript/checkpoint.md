@@ -18,6 +18,14 @@
 
 ### String roundtrip PASS; следующий bounded slice — int64
 
+Root подготовил private audit-native-int64.py SHA
+932fdd3bb5f93945cd17b7c0c02a5ca5616eb6d95a76a6b90540f5dd3505696f.
+Шесть canonical decimal→signed64LE encodings проверены Python struct без float;
+synthetic7positive/4negativePASS. Safe и весь INPUT/upstream требуют exact value
+и bytes; outside-safe OUTPUT получает CHARACTERIZED с явными differences и
+exact_identity=false при потере точности, не общий exactPASS. Host numeric values
+вместо decimal strings отвергаются. Это подготовка oracle, не live int64 proof.
+
 Source71/profile51 native-string-roundtrip-probe-01 завершён exit0 OBSERVED,
 work_stage native-roundtrip-observed, session6459 terminal. Original cleanup
 package_closed/logged_out/browser_closed=true. Независимый v2 audit проверил
