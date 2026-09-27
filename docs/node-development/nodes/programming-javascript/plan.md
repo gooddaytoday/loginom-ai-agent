@@ -224,7 +224,9 @@ diagnostics и все примеры будущей v1-редакции. Про�
 аттестацию typed input до JS и границу переиспользования native reader;
 его private real/NULL input-only admission и identity JS roundtrip подтверждены
 source70/probe07 (12 native cells); source71 отдельно подтвердил boolean (9 cells)
-и string (24 cells), включая NULL/empty/false/Unicode/multiline. Int64, Date,
+и string (24 cells), включая NULL/empty/false/Unicode/multiline. Source72
+подтвердил safe int64 identity (12 cells, NULL/0/±9007199254740991);
+outside-safe characterization, Date,
 кардинальности и весь G5 остаются открыты,
 точные доказательства и ограничения — в checkpoint. В G5 ограниченными случаями установить
 Integer coercion для fraction/string/NaN/±Infinity; exact integer oracle

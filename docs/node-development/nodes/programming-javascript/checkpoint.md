@@ -15,6 +15,26 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Safe int64 PASS; outside-safe запущен отдельно
+
+Source72/profile52 native-integer-safe-roundtrip-probe-01 завершён exit0,
+session55512 terminal, OBSERVED/native-roundtrip-observed; original cleanup3/3.
+Независимый Python audit подтвердил12/12cells (NULL, обе safe границы и0)
+на3стадиях, exact signed64LE bytes/decimalstrings, неизменный upstream execution.
+Проверены632journal refs,85sourcepins, runtime/frontend/source/execution receipts,
+lifecycle4/4 каждой стадии, final journal ACK и3Preview-close events.
+ReportSHA `827d7aa80db0dc3a6890477353bce1b498166043b4ecf9e7a079986062727bb9`.
+Private native-integer-safe-roundtrip-probe-01-verification.json сохранён;
+это ограниченный exact identity result, не полныйG5/handler/CLI.
+
+После terminal cleanup lease закрыта, profile52 сохранён; под registry.lock
+назначен fresh profile53, assignment backup/reassignment receipt сохранены.
+Начат native-integer-outside-safe-roundtrip-probe-01, session23219, тот же
+source72 и85pins, headed DISPLAY=:1/sandbox. Lease RUNNING. INPUT/upstream
+должны оставаться точными; OUTPUT — characterization, даже если все значения
+совпадут. До terminal cleanup новый браузер не запускать.
+
+
 
 ### Freeze72 проверен; safe int64 live запущен
 
