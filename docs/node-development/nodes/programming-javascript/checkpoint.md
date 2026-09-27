@@ -15,7 +15,26 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source86: восстановлено актуальное назначение после ошибочного bootstrap
+
+Developer revision10 terminal/completed (turn01a0e4d6) фактически выполнил
+историческую проверку памяти, не диагностику/fix. Это подтверждено публичным
+last_agent_message в task_complete; runtime diff отсутствовал. Root отправил
+корректирующее назначение в ту же задачу: актуальный HEAD/source85, обе FAILED
+попытки, несовпадающие dialog inventories, строгие guards и freeze86/tests.
+Source86 пока не существует/не принят. Новых browser runs не запускать до handoff.
+
+
 ### B-get-case повторил отказ: обнаружен toast в проверке готовности
+
+Разработчик active revision9, turn01a0e4d6-16a7-7830-9ba7-c852ae8dd93b
+подтверждён wait_threads. Root сравнил оба журнала: первый toast observation
+через197/172ms после notification_wait_verified (quiet512.5/510.4ms,count0).
+Статически найдено различие inventory: общий workspace-ui classifier включает
+`.x-window,.bg-dialog`, inspector notifications — `.x-toast` и не эти классы.
+Это проверяемая гипотеза blind spot; фактический DOM-класс прошлых toast
+не записан в этих observation. Не объявлять timing race или класс доказанным.
+
 
 Profile86/original93557 terminal exit1: тот же FAILED inspect-pages после
 execution_launched, без execution_terminal. Cleanup3/3, закреплённых Chromium
