@@ -15,6 +15,26 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze58: diagnostic guards проверены, probe04 запущен — 2026-09-27
+
+Source node-javascript `675b5c8d4a`: только native-input-binding и его tests.
+Все исходные admission predicates сохранены. Отказ сообщает 13 фиксированных
+boolean checks, bounded input inventory type/subtype/param/status и output param;
+произвольные данные/GUID не сериализуются. Getter values не читаются в inventory.
+
+Root проверил итоговый Freeze58: **80/80 tests PASS**, fail/skip0 и 66 совпадающих
+pins до/после тестов. Более ранняя draft-проверка не использована как доказательство
+финального source: разработчик успел уточнить тесты, поэтому final проверен заново.
+Private receipt operator58-root-test-source.json, stdout/stderr сохранены.
+
+Разработчик idle, запущен native-input-probe-04 в новом profile37, DISPLAY=:1,
+sandbox enabled. Source receipt закрепляет66pins. На момент checkpoint RUNNING;
+это диагностический прогон, успех native reads не ожидается при сохранённом
+no_input_ports guard. Он должен записать все фактические false conditions и
+параметры Connection/Var до scoped cleanup. Не считать заранее cleanup PASS.
+Profile36 сохранён; previous original cleanup ALL PASS. G5/public/CLI открыты.
+
+
 ### Native Preview: локализация input-port inventory — 2026-09-27
 
 Root повторно сверил probe03: server bytes delivery SUCCEEDED, 33 bytes с
