@@ -32,7 +32,8 @@ export function verifyJavascriptNamedRead(raw,{binding,lifecycle,input,role}){
  if(role==='upstream')need(binding.node_id===input.binding.node_id&&binding.port_guid===input.binding.port_guid
   &&same(binding.source,input.binding.source)&&same(binding.completed_child,input.binding.completed_child),'original upstream identity/child');
  const exact=adaptRead(raw,{expected:binding,lifecycle,consistency:{kind:'observed_local',changed:false,exclusive_operation:true,stability_basis:'owned_static_completed_fixture'}});
- need(exact.coverage.table_complete&&exact.row_count===4&&exact.cells.length===4
+ const rows=role==='output'?(c.output_rows??4):4;
+ need(exact.coverage.table_complete&&exact.row_count===rows&&exact.cells.length===rows
   &&same(exact.schema,[{name:'Value',label:'Value',type:'integer',index:0}]),'complete fixed Value/Integer schema/count');
  if(role==='upstream'||c.oracle==='copy'){
   verifyNativeFixtureCells(exact,'integer-safe');
@@ -43,6 +44,9 @@ export function verifyJavascriptNamedRead(raw,{binding,lifecycle,input,role}){
   &&cell.cell_type==='integer'&&cell.is_null===false&&cell.precision==='exact_native'&&cell.representation==='decimal_integer'
   &&cell.value===(i===0?'1':'0')&&cell.decimal===cell.value
   &&same(cell.native,{tag:20,encoding:'signed-int64-le',bytes_le:i===0?'0100000000000000':'0000000000000000',bits:64})),'independent IsNull vector differs');
+ if(role==='output'&&c.output_rows===1)need(exact.cells.every(cell=>cell.row===0&&cell.column===0&&cell.type==='integer'
+  &&cell.cell_type==='integer'&&cell.is_null===false&&cell.precision==='exact_native'&&cell.representation==='decimal_integer'
+  &&cell.decimal===cell.value&&cell.native?.tag===20&&cell.native.encoding==='signed-int64-le'&&cell.native.bits===64),'non-NULL native Integer marker required');
  return {...exact,contract:'javascript-native-named-read-1',named_case_id:c.id,input_fixture_id:c.input_fixture_id,
   role,source_sha256:probe.source_sha256,input_read_id:input.raw.read_id,g5_complete:false};
 }
@@ -55,6 +59,16 @@ export function verifyJavascriptNamedOutcome(results,caseId){
   need(same(exact,proof.exact),'stored '+role+' proof differs');
  }
  need(results.upstream.binding.javascript_node_id===results.output.binding.node_id,'same JS owner before upstream');
+ if(c.output_rows===1){
+  const marker=results.output.exact.cells[0],allowed={'get-return':['10','11','12'],'column-return':['10','11','13'],'isnull-return':['10','11','14','15']}[c.oracle];
+  need(Array.isArray(allowed),'fixed marker API');
+  const bytes={'10':'0a00000000000000','11':'0b00000000000000','12':'0c00000000000000','13':'0d00000000000000','14':'0e00000000000000','15':'0f00000000000000'};
+  const recognized=allowed.includes(marker.value)&&marker.native.bytes_le===bytes[marker.value];
+  return {named_case_id:caseId,input_fixture_id:c.input_fixture_id,status:recognized?'characterized_return':'unresolved_unsupported_return',oracle:c.oracle,
+   marker:marker.value,return_kind:recognized?{'10':'undefined','11':'null','12':'input_number','13':'matching_column','14':'true','15':'false'}[marker.value]:'unsupported',
+   return_characterized:recognized,input_exact:true,upstream_exact:true,output_case_exact:false,output_identity_exact:false,exact_pass:false,
+   characterization_only:true,rejection_attributed:false,g5_complete:false,public_handler_accepted:false,cli_accepted:false};
+ }
  return {named_case_id:caseId,input_fixture_id:c.input_fixture_id,status:'named_exact_case_observed',oracle:c.oracle,
   input_exact:true,upstream_exact:true,output_case_exact:true,output_identity_exact:c.oracle==='copy',exact_pass:true,
   characterization_only:false,g5_complete:false,public_handler_accepted:false,cli_accepted:false};

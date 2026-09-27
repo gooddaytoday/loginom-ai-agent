@@ -31,11 +31,11 @@ function inputProof(x){
  const before={binding,raw,lifecycle,exact};
  return {before,input:{node:{document_id:'d',workflow_id:'w',node_id:'n'},table:{port_guid:'p'},native_input:{native:before}}};
 }
-async function stages(id){
+async function stages(id,{marker=10n,tag=20}={}){
  const x=await roundtrip({fixtureId:'integer-safe',namedCaseId:id,reply:(f,response,request)=>{
-  if(id.startsWith('A-isnull-')&&f.dc.FModelNode!==f.node.data){
+  if((id.startsWith('A-isnull-')||id.startsWith('B-'))&&f.dc.FModelNode!==f.node.data){
    const bytes=response.$FData,view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
-   view.setInt16(12,20,true);view.setBigInt64(14,request.row===0?1n:0n,true);
+   view.setInt16(12,id.startsWith('B-')?tag:20,true);view.setBigInt64(14,id.startsWith('B-')?marker:request.row===0?1n:0n,true);
   }
  }}),proof=inputProof(x),results={before:proof.before};
  for(const role of ['output','upstream']){
@@ -75,7 +75,7 @@ function runtime(receipt,calls){
   verifyExecutionBoundary:async()=>calls.push('boundary'),executeNode:async()=>{calls.push('execute');return receipt.execution;},
   readNativeRoundtrip:async()=>{calls.push('output');return receipt.results;},readNativeNamedFailure:async()=>{calls.push('failed-upstream');return receipt.results;}};
 }
-for(const id of javascriptNamedIds){
+for(const id of javascriptNamedIds.filter(id=>id.startsWith('A-'))){
  test(id+' real native transport and independent exact oracle',async()=>{
   const r=await stages(id);assert.equal(r.results.outcome.exact_pass,true);assert.equal(r.results.outcome.g5_complete,false);
   assert.deepEqual(clone(r.results.output.exact.cells.map(c=>c.value)),id.startsWith('A-isnull-')?['1','0','0','0']:[null,'-9007199254740991','0','9007199254740991']);
@@ -90,7 +90,7 @@ for(const id of javascriptNamedIds){
   await assert.rejects(()=>r.x.f.execute(javascriptNativeRoundtripCode({...r.results.upstream.binding,binding_id:'bad',roundtrip_role:'output'})));assert.equal(r.x.f.counters.sent,8);
  });
  for(const [name,change]of Object.entries({
-  raw_case:r=>r.output.raw.named_case_id='A-get-exact-other',raw_source:r=>r.output.raw.source_sha256='0'.repeat(64),case:r=>r.output.binding.named_case_id=javascriptNamedIds[(javascriptNamedIds.indexOf(id)+1)%8],future:r=>r.output.binding.named_case_id='B-get-case',
+  raw_case:r=>r.output.raw.named_case_id='A-get-exact-other',raw_source:r=>r.output.raw.source_sha256='0'.repeat(64),case:r=>r.output.binding.named_case_id=javascriptNamedIds[(javascriptNamedIds.indexOf(id)+1)%8],future:r=>r.output.binding.named_case_id='C-set-index',
   input_fixture:r=>r.output.binding.input_fixture_id='real',old_fixture:r=>r.before.binding.fixture_id='real',source:r=>r.output.binding.source_sha256='0'.repeat(64),
   execution_source:r=>r.output.binding.completed_child.trial.source_sha256='0'.repeat(64),execution_id:r=>r.output.binding.completed_child.execution_id='d:foreign',
   failed:r=>r.output.binding.completed_child.status='failed',stale:r=>r.output.binding.completed_child.fresh_baseline.roots.push({process_id:r.output.binding.completed_child.group_id}),
@@ -112,7 +112,7 @@ for(const id of javascriptNamedIds){
   await run();assert.equal(calls.filter(c=>c==='execute').length,1);assert.equal(calls.includes('output'),!failed);
   const status=await trial.finish({cleanup:clean,record,persist:async status=>writeJavascriptNamedReport(directory,{status,native_named:trial.coverage})});
   assert.equal(status,failed?'UNRESOLVED':'CHARACTERIZED');const saved=JSON.parse(await readFile(join(directory,'report.json'),'utf8'));
-  assert.equal(saved.native_named.cases.length,8);assert.equal(saved.native_named.cases.filter(c=>c.status==='not_run').length,7);
+  assert.equal(saved.native_named.cases.length,16);assert.equal(saved.native_named.cases.filter(c=>c.status==='not_run').length,15);
   assert.equal(saved.native_named.cases.find(c=>c.id===id).case_complete,!failed);assert.equal(saved.native_named.coverage_complete,false);await assert.rejects(run,/no replay/);
  });
 }
@@ -139,8 +139,8 @@ for(const [name,change]of Object.entries({owner:s=>s.child.data.ModelNode={},err
  const s=await failedStage(javascriptNamedIds[0],{beforeSeal:change});await assert.rejects(async()=>s.seal());assert.equal(s.x.f.counters.sent,4);
 });
 test('private CLI refuses future stages, duplicate selection, source and input override before browser',async()=>{
- for(const id of ['B-get-case','C-set-index','D-name-cyrillic',javascriptNamedIds.join(','),'__proto__'])assert.throws(()=>javascriptNamedCase(id));
- for(const args of [['--native-named-case','B-get-case'],['--native-named-case',javascriptNamedIds[0],'--native-fixture','integer-safe'],['--native-named-case',javascriptNamedIds[0],'--native-named-case',javascriptNamedIds[1]],['--native-named-case',javascriptNamedIds[0],'--source','custom']])await assert.rejects(()=>runJavascriptOperator(args,{nativeRoundtrip:true}));
+ for(const id of ['B-get-unknown','C-set-index','D-name-cyrillic',javascriptNamedIds.join(','),'__proto__'])assert.throws(()=>javascriptNamedCase(id));
+ for(const args of [['--native-named-case','B-get-unknown'],['--native-named-case',javascriptNamedIds[0],'--native-fixture','integer-safe'],['--native-named-case',javascriptNamedIds[0],'--native-named-case',javascriptNamedIds[1]],['--native-named-case',javascriptNamedIds[0],'--source','custom']])await assert.rejects(()=>runJavascriptOperator(args,{nativeRoundtrip:true}));
  await assert.rejects(()=>runJavascriptOperator(['--native-named-case',javascriptNamedIds[0]]));await assert.rejects(()=>runJavascriptOperator(['--native-named-case',javascriptNamedIds[0]],{nativeInputOnly:true}));
 });
 for(const mode of ['ok','seal-ack','native-ack','final-ack','after-ack-drift','after-ack-pending'])test('named production failed driver holds owner through ACK '+mode,async()=>{
@@ -174,7 +174,7 @@ for(const mode of ['success','failed','package_closed','logged_out','browser_clo
  await publish();assert.equal(report.status,mode==='success'?'CHARACTERIZED':mode==='failed'?'UNRESOLVED':mode==='evidence'?'EVIDENCE_UNCONFIRMED':'CLEANUP_UNCONFIRMED');
  assert.equal(trial.coverage.cases[0].case_complete,mode==='success');assert.equal(trial.coverage.cases[0].exact_pass,mode==='success');
 });
-for(const id of javascriptNamedIds)test(id+' catalogue source immutable and A-only',()=>{
+for(const id of javascriptNamedIds)test(id+' catalogue source immutable and closed A/B',()=>{
  const c=javascriptNamedCase(id),p=javascriptNamedProbe(id);assert.ok(Object.isFrozen(c));assert.ok(Object.isFrozen(p.output_schema[0]));
  assert.equal(createHash('sha256').update(c.source).digest('hex'),p.source_sha256);assert.equal(c.input_fixture_id,'integer-safe');assert.equal(p.named_case_id,id);
  assert.throws(()=>{c.input_fixture_id='real';});assert.throws(()=>{p.output_schema[0].name='Other';});
@@ -212,4 +212,120 @@ for(const mode of ['ok','input-ack','arm-ack','graph-ack'])test('named productio
  });
  const run=async()=>{await runtime.armNativeRoundtrip(r.input);await runtime.bindNativeRoundtripGraph({node_id:'js'},'js-input');};
  if(mode==='ok'){await run();assert.equal(events.length,3);}else await assert.rejects(run,/ACK differs/);
+});
+
+const bIds=javascriptNamedIds.filter(id=>id.startsWith('B-'));
+const bMarkers=id=>id.startsWith('B-get-')?[10,11,12]:id.startsWith('B-isnull-')?[10,11,14,15]:[10,11,13];
+for(const id of bIds){
+ for(const marker of [10,11,12,13,14,15,99])test(id+' native marker '+marker+' is characterized only for its API',async()=>{
+  const r=await stages(id,{marker:BigInt(marker)}),accepted=bMarkers(id).includes(marker);
+  assert.equal(r.results.output.exact.row_count,1);assert.equal(r.results.upstream.exact.row_count,4);
+  assert.deepEqual(r.x.f.counters,{sent:9,requests:9,responses:9});
+  assert.equal(r.results.outcome.return_characterized,accepted);assert.notEqual(r.results.outcome.case_complete,true);assert.equal(r.results.outcome.exact_pass,false);
+  assert.equal(r.results.outcome.marker,String(marker));assert.equal(r.results.outcome.characterization_only,true);
+  const trial=createJavascriptNamedTrial(id),calls=[];
+  await trial.run({runtime:runtime(r,calls),input:r.input,node:{node_id:'js'},sourceProbe:javascriptNamedProbe(id),deadline:Date.now()+30000,record:async e=>e,onExecution:async()=>{}});
+  let persisted;
+  assert.equal(await trial.finish({cleanup:clean,record:async e=>e,persist:async status=>{persisted={status,coverage:trial.coverage};}}),accepted?'CHARACTERIZED':'UNRESOLVED');
+  const selected=persisted.coverage.cases.find(c=>c.id===id);
+  assert.equal(selected.case_complete,accepted);assert.equal(selected.exact_pass,false);assert.equal(selected.marker,String(marker));
+  assert.equal(persisted.coverage.cases.length,16);assert.equal(persisted.coverage.cases.filter(c=>c.status==='not_run').length,15);
+  assert.equal(persisted.coverage.coverage_complete,false);assert.equal(persisted.coverage.g5_complete,false);
+  assert.equal(calls.filter(c=>c==='execute').length,1);await assert.rejects(()=>trial.run({}),/no replay/);
+ });
+ test(id+' owned failed child remains unattributed with only 4+4 cells',async()=>{
+  const r=await readFailed(await failedStage(id));
+  assert.equal(r.results.outcome.case_complete,false);assert.equal(r.results.outcome.exact_pass,false);
+  assert.equal(r.results.outcome.rejection_attributed,false);assert.deepEqual(r.x.f.counters,{sent:8,requests:8,responses:8});
+  assert.equal(r.x.f.env.__loginomJavascriptNativeRoundtripV1.bindings.has('output'),false);
+  await assert.rejects(()=>r.x.f.execute(javascriptNativeRoundtripCode({...r.results.upstream.binding,binding_id:'bad',roundtrip_role:'output'})),/upstream/);
+  const calls=[],trial=createJavascriptNamedTrial(id);
+  await trial.run({runtime:runtime(r,calls),input:r.input,node:r.node,sourceProbe:javascriptNamedProbe(id),deadline:Date.now()+30000,record:async e=>e,onExecution:async()=>{}});
+  assert.equal(await trial.finish({cleanup:clean,record:async e=>e,persist:async()=>{}}),'UNRESOLVED');
+  assert.equal(calls.includes('output'),false);assert.deepEqual(r.x.f.counters,{sent:8,requests:8,responses:8});
+ });
+ for(const tag of [1,3,5])test(id+' rejects NULL/double/non-integer native tag '+tag,async()=>{await assert.rejects(()=>stages(id,{tag}));});
+ for(const [name,change]of Object.entries({
+  source:r=>r.output.raw.source_sha256='0'.repeat(64),case:r=>r.output.binding.named_case_id=bIds[(bIds.indexOf(id)+1)%8],
+  input_fixture:r=>r.output.binding.input_fixture_id='real',source_trial:r=>r.output.binding.completed_child.trial.source_sha256='0'.repeat(64),
+  owner:r=>r.output.raw.owner_rechecked=false,schema:r=>{r.output.raw.schema[0].name=r.output.binding.schema[0].name='Other';},
+  label:r=>{r.output.raw.schema[0].label=r.output.binding.schema[0].label='Other';},type:r=>{r.output.raw.schema[0].type=r.output.binding.schema[0].type=3;},
+  count:r=>{r.output.raw.row_count=r.output.binding.row_count=4;},missing:r=>r.output.raw.cells.pop(),
+  bytes:r=>r.output.raw.cells[0].payload[2]^=1,stored:r=>r.output.exact.cells[0].value='11',
+  release:r=>r.output.lifecycle.releasedResponses=0,pending:r=>r.output.lifecycle.pending=1,
+  upstream:r=>r.upstream.raw.cells[1].payload[2]^=1,upstream_owner:r=>{r.upstream.binding.node_id=r.upstream.raw.node_id='foreign';},
+ }))test(id+' marker proof rejects '+name,async()=>{const r=await stages(id);change(r.results);assert.throws(()=>verifyJavascriptNamedOutcome(r.results,id));});
+}
+for(const fault of ['dispatch-ack','terminal-ack','final-ack','persist','post-ack','cleanup'])test('B characterization cannot bypass '+fault,async()=>{
+ const id=bIds[0],r=await stages(id),trial=createJavascriptNamedTrial(id),rt=runtime(r,[]);
+ if(fault==='post-ack')rt.checkNativeNamedEvidence=async()=>{throw Error('post ACK drift');};
+ const run=()=>trial.run({runtime:rt,input:r.input,node:{node_id:'js'},sourceProbe:javascriptNamedProbe(id),deadline:Date.now()+30000,
+  record:async e=>fault==='dispatch-ack'&&e.phase==='native_named_dispatch_reserved'||fault==='terminal-ack'&&e.phase==='native_named_terminal_verified'?{}:e,onExecution:async()=>{}});
+ if(['dispatch-ack','terminal-ack','post-ack'].includes(fault))await assert.rejects(run);else await run();
+ const finish=()=>trial.finish({cleanup:{...clean,...(fault==='cleanup'?{browser_closed:false}:{})},record:async e=>fault==='final-ack'?{}:e,persist:async()=>{if(fault==='persist')throw Error('fsync');}});
+ if(['final-ack','persist'].includes(fault))await assert.rejects(finish);else assert.notEqual(await finish(),'CHARACTERIZED');
+ const selected=trial.coverage.cases.find(c=>c.id===id);assert.equal(selected.case_complete,false);assert.notEqual(selected.exact_pass,true);
+});
+for(const fault of ['rows','case','source','cache'])test('serialized B read refuses changed '+fault+' before further RPC',async()=>{
+ const x=await roundtrip({fixtureId:'integer-safe',namedCaseId:bIds[0]}),binding=await x.bind('output');
+ if(fault==='rows')binding.rows=binding.row_count=4;if(fault==='case')binding.named_case_id=bIds[1];
+ if(fault==='source')binding.source_sha256='0'.repeat(64);if(fault==='cache')x.outputHelper.$FData={};
+ await assert.rejects(()=>readJavascriptNativeRoundtrip(x.f.page,binding,decodeVariantFrame,{operationId:'output'}));
+ assert.equal(x.f.counters.sent,4);
+});
+for(const mode of ['ok','native-ack','wrong-count'])test('B production OUTPUT driver uses one row and exact journal ACK '+mode,async t=>{
+ const id=bIds[0],x=await roundtrip({fixtureId:'integer-safe',namedCaseId:id,reply:(f,response)=>{
+  if(f.dc.FModelNode!==f.node.data){const bytes=response.$FData,view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);view.setInt16(12,20,true);view.setBigInt64(14,10n,true);}
+ }}),f=x.f;
+ f.b.package_id='d:w';x.before.package_id='d:w';const input=inputProof(x).before;
+ f.dt.FTotalRowCount=mode==='wrong-count'?4:1;f.model.FPreviewManager.FPreviewVisible=true;
+ Object.assign(f.model.FPreviewManager.FPreviewForm,{FCurrentPreviewNode:x.js,FCurrentPreviewPort:x.output});
+ Object.assign(f.model.FPreviewManager.FShowDataLastCall,{Node:x.js,Port:x.output});
+ f.dc.FModelNode=x.js.data;f.dc.FDataSource=x.outputDs;f.dt.FDataSource=x.outputDs;f.store.proxy.dataSource=x.outputDs;
+ const node={document_id:'d',workflow_id:'w',node_id:'js'},ctx={document_id:'d',node,workflow_ref:{workflow_id:'w',tab_tid:'tab',prefix:'TF'},execution:x.execution,deadline:f.b.deadline};
+ const state={prepared_node_context:{...node,verified:true,surface:'graph'},wizard:{status:'absent'},node_outputs:{verified:true,ports:[{index:0,active:true,tid:'output',port_guid:'js-output'}]},
+  ui:{elements:[{tid:'preview;p.h;close',ref:'close',allowed_actions:['click']}]},node_preview_schema:{verified:true,port_guid:'js-output',port:0,root_tid:'preview',fields:[{name:'Value',label:'Value',type:'integer'}]}};
+ const directory=await mkdtemp(join(tmpdir(),'js-b-driver-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+ const journal=createExecutionJournal({directory,metadata:{sessionId:'B',clientRevision:'source85'}}),states=[];
+ const run=()=>readNativeRoundtrip({options:{operation:{id:'B-output'},execute:f.execute,now:Date.now,exclusiveNodeOperation:()=>true,receiptOptions:()=>({}),onRecord:async e=>{
+  const saved=await journal(e);if(mode==='native-ack'&&saved.proof)saved.proof.lifecycle.releasedResponses=0;return saved;
+ }},ctx,input,role:'output',namedCaseId:id,targetOrigin:'http://test',targetBuild:'7.4.2',onState:async s=>states.push(s)},
+ {openPreview:async()=>{},verifyFrontends:async()=>[],verifyCountLoaders:()=>({}),createProcedure:()=>({observe:async({ready})=>{assert.equal(ready(state),true);return state;},perform:async({resolve})=>{assert.equal(resolve(state).ref,'close');f.model.FPreviewManager.FPreviewVisible=false;}})});
+ if(mode==='ok'){
+  const proof=await run();assert.equal(proof.binding.rows,1);assert.equal(proof.binding.fixture_id,'integer-safe');assert.equal(proof.exact.cells[0].value,'10');
+  assert.equal(proof.lifecycle.requests,1);assert.equal(proof.lifecycle.releasedRequests,1);assert.equal(proof.lifecycle.releasedResponses,1);
+  assert.ok(states.some(s=>s.status==='completed'&&s.requests===1));
+ }else await assert.rejects(run,mode==='native-ack'?/acknowledgement/:/row count/);
+ assert.equal(f.counters.sent,mode==='wrong-count'?4:5);
+});
+for(const marker of [10n,99n])test('B real journal/fsync report retains marker '+marker+' and no exact_pass',async t=>{
+ const id=bIds[0],r=await stages(id,{marker}),trial=createJavascriptNamedTrial(id);
+ const directory=await mkdtemp(join(tmpdir(),'js-b-report-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+ const record=createExecutionJournal({directory,metadata:{sessionId:'B',clientRevision:'source85'}});
+ await trial.run({runtime:runtime(r,[]),input:r.input,node:{node_id:'js'},sourceProbe:javascriptNamedProbe(id),deadline:Date.now()+30000,record,onExecution:async()=>{}});
+ await trial.finish({cleanup:clean,record,persist:async status=>writeJavascriptNamedReport(directory,{status,native_named:trial.coverage,native_roundtrip:r.results})});
+ const saved=JSON.parse(await readFile(join(directory,'report.json'),'utf8')),slot=saved.native_named.cases.find(c=>c.id===id);
+ assert.equal(saved.status,marker===10n?'CHARACTERIZED':'UNRESOLVED');assert.equal(slot.marker,String(marker));assert.equal(slot.exact_pass,false);
+ assert.equal(saved.native_roundtrip.output.exact.cells[0].native.bytes_le,marker===10n?'0a00000000000000':'6300000000000000');
+});
+for(const mode of ['ok','lifecycle','ack','upstream'])test('B actual runtime method keeps OUTPUT1/upstream4 and final ACK '+mode,async()=>{
+ const {verifyNativeRoundtripExecution}=await import('./javascript-native-roundtrip-contract.mjs');
+ const {freezeCivilEvidence}=await import('./javascript-native-datetime-civil.mjs');
+ const id=bIds[0],r=await stages(id),events=[],steps=[];
+ if(mode==='upstream')r.results.upstream.raw.cells[1].payload[2]^=1;
+ const source=readFileSync(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
+ const start=source.indexOf('    async readNativeRoundtrip(input,node,execution) {'),end=source.indexOf('    async readNativeCivil(',start);
+ const context={nativeNamedCaseId:id,javascriptNamedCase,nativeFixtureId:'integer-safe',nativeInputFixture:{rows:4},nativeRoundtripProbe:javascriptNamedProbe(id),
+  verifyJavascriptNamedInput,verifyJavascriptNamedOutcome,verifyNativeRoundtripExecution,freezeCivilEvidence,validateNativeSource:()=>{},
+  page:{evaluate:async()=>{}},completeJavascriptNativeRoundtrip,prepared:{document_id:'d',workflow_ref:{workflow_id:'w'}},
+  deadline:Date.now()+10000,randomUUID:()=>String(steps.length),execute:()=>{},nativeReadUncertain:false,sessionId:'B',origin:'http://test',build:'7.4.2',Date,
+  readNativeRoundtrip:async({role,onState,options,namedCaseId})=>{assert.equal(namedCaseId,id);assert.equal(options.exclusiveNodeOperation(),true);steps.push(role);
+   await onState(mode==='lifecycle'&&role==='output'?{...r.results[role].lifecycle,requests:4}:r.results[role].lifecycle);return r.results[role];},
+  record:async e=>{events.push(clone(e));const saved=clone(e);if(mode==='ack'&&saved.results)saved.results.outcome.exact_pass=true;return saved;}};
+ const runtime=vm.runInNewContext('({'+source.slice(start,end)+'})',context);
+ runtime.checkNativeNamedEvidence=async()=>{assert.equal(context.nativeReadUncertain,false);};
+ const run=()=>runtime.readNativeRoundtrip(r.input,{document_id:'d',workflow_id:'w',node_id:'js'},r.execution);
+ if(mode==='ok'){const result=await run();assert.equal(result.outcome.status,'characterized_return');assert.equal(result.outcome.exact_pass,false);assert.deepEqual(steps,['output','upstream']);}
+ else await assert.rejects(run);
+ if(mode==='lifecycle')assert.deepEqual(steps,['output']);
 });

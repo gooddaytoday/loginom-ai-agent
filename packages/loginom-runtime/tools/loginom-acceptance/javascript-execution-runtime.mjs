@@ -1,3 +1,4 @@
+import {javascriptNamedCase} from './javascript-native-named-cases.mjs';
 import {verifyJavascriptNamedInput,verifyJavascriptNamedOutcome} from './javascript-native-named-contract.mjs';
 import {readNativeNamedFailure} from './javascript-native-named-failure-driver.mjs';
 import {verifyNativeCivil,freezeCivilEvidence} from './javascript-native-datetime-civil.mjs';
@@ -896,7 +897,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
         onState:async(state,uncertain)=>{nativeReadUncertain=uncertain;}});
     },
     async readNativeNamedFailure(input,node,execution) {
-      if(nativeNamedCaseId===undefined||nativeReadUncertain)throw Error('Fixed stage A failed route required');
+      if(nativeNamedCaseId===undefined||nativeReadUncertain)throw Error('Fixed named failed route required');
       return readNativeNamedFailure({page,input,node,execution,caseId:nativeNamedCaseId,workflow:prepared.workflow_ref,deadline,
         targetOrigin:origin,targetBuild:build,validateSource:validateNativeSource,
         options:{execute,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>!nativeReadUncertain,
@@ -924,7 +925,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       for(const role of ['output','upstream']){
         validateNativeSource();
         const owner=role==='output'?node:input.node,completed=role==='output'?execution:before.exact.provenance.execution;
-        const expectedRows=role==='output'?(nativeInputFixture.output_rows??nativeInputFixture.rows):nativeInputFixture.rows;
+        const expectedRows=role==='output'?(nativeNamedCaseId!==undefined?(javascriptNamedCase(nativeNamedCaseId).output_rows??4):(nativeInputFixture.output_rows??nativeInputFixture.rows)):nativeInputFixture.rows;
         const operation={id:'native-roundtrip-'+role+'-'+randomUUID(),action:{action_key:'diagnostic.javascript',revision:'1'},deadline};
         const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node:owner,execution:completed,deadline};
         const civil=nativeFixtureId==='civil-datetime'?await this.readNativeCivil(owner,completed,role):undefined;

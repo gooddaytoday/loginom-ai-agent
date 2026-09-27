@@ -6,7 +6,7 @@ import {freezeCivilEvidence} from './javascript-native-datetime-civil.mjs';
 const need=(v,m)=>{if(!v)throw Error('Named run: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 
-// One selected case, never a runtime batch. The seven untouched slots are retained
+// One selected case, never a runtime batch. All untouched slots are retained
 // in every checkpoint; only a separate coordinator can aggregate separate runs.
 export function createJavascriptNamedTrial(caseId){
  const fixture=javascriptNamedCase(caseId),probe=javascriptNamedProbe(caseId);
@@ -54,9 +54,11 @@ export function createJavascriptNamedTrial(caseId){
   async finish({cleanup,failure,record,persist}){
    need(!finished,'one finalization; no replay');finished=true;
    const clean=['package_closed','logged_out','browser_closed'].every(k=>cleanup?.[k]===true)&&!cleanup.failure;
-   const success=!!result&&!result.failed&&clean&&!failure;
+   const success=!!result&&!result.failed&&clean&&!failure
+    &&(result.outcome.exact_pass===true||result.outcome.status==='characterized_return'&&result.outcome.return_characterized===true);
    const finalSelected={...selected,status:success?'characterized':'unresolved',case_complete:success,
-    exact_pass:success,reason:!clean?'cleanup_unconfirmed':failure?'work_failed':success?'independent_named_oracle_and_exact_upstream':result?'owned_execution_failure_unattributed':'selected_case_not_completed'};
+    exact_pass:success&&result.outcome.exact_pass===true,...(result?.outcome.marker!==undefined?{marker:result.outcome.marker,return_kind:result.outcome.return_kind}:{}),
+    reason:!clean?'cleanup_unconfirmed':failure?'work_failed':success?(result.outcome.exact_pass?'independent_named_oracle_and_exact_upstream':'characterized_return_and_exact_upstream'):result?.failed?'owned_execution_failure_unattributed':result?'unsupported_return':'selected_case_not_completed'};
    const status=!clean?'CLEANUP_UNCONFIRMED':failure?'FAILED':success?'CHARACTERIZED':'UNRESOLVED';
    try{
     await acknowledge(record,{phase:'native_named_finalized',status,coverage:coverage(finalSelected),cleanup:structuredClone(cleanup)});
