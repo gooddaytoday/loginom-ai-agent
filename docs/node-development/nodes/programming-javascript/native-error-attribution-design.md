@@ -374,3 +374,20 @@ HTTP через environment proxy вернул503 для app и scripts, но п
 напрямую, без browser/application RPC и без изменения глобальной proxy config.
 Это не текущая недоступность Loginom. Browser запусков и calibration attempts
 в ходе анализа не было; общий лимит5 не расходовался.
+
+
+Дополнительная независимая root-проверка callback: retained
+`fix47-bg_app_TabForm.js:886–923` содержит DoConfigureNode. Он начинает
+BeginOperationEx, создаёт backup delegate и передаёт в Close callback
+`cancel = CloseResult !== Ok`. Это доказывает предусмотренный запрос отмены для
+Close/Cancel. `fix61-bg_ts_BG_Interfaces.js:228–247` обнуляет local cookie **до**
+вызова remote EndOperationExNotify и возвращает его result; следовательно,
+cookie=null не доказывает завершённый rollback. Нужны наблюдённое завершение
+операции и проверка exact source при повторном открытии того же узла. Эти строки
+не являются доказательством уже выполненного Close/rollback на стенде.
+
+Получены referenced Uses.js скрипты mscorlib/SysUtils/rtl.imp; отдельные manifests
+в private calibration-wizard-source87. ss.Exception использует _message,
+_innerException и _error, тогда как BG AggregateException — FInnerExceptions.
+Тождество ss.Exception и global Exception этим не установлено; поддержка одной
+структуры не должна выдаваться за полноту произвольного native exception.

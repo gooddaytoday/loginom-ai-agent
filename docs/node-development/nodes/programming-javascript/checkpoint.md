@@ -15,6 +15,17 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source88 active; configure cancellation source path independently checked
+
+Root подтвердил по TabForm.DoConfigureNode callback: Close/Cancel передают cancel
+в EndOperationExNotify; helper очищает local cookie до remote completion. Поэтому
+rollback/source restoration по hidden wizard или cookie=null не принимаются.
+Подробности и pinned sources — native-error-attribution-design.md §10.
+Source88 turn01a0e520-51f2-7303-b1a9-80c40873a6f2 active revision19 подтверждён
+wait_threads; frozen handoff ещё не получен. Root передал новые static source paths
+в эту же задачу. Нет browser runs, live K1/K2 пока отсутствуют.
+
+
 ### Wizard source analysis: Next записывает engine, tooltip преобразует exception
 
 Root source-only findings сохранены в native-error-attribution-design.md §10.
