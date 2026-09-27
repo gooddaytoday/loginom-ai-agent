@@ -16,6 +16,19 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Duplicate source75 запущен независимо от odd
+
+После terminal failure odd и подтверждённого cleanup3/3 назначен fresh profile59.
+Начат native-cardinality-duplicate-probe-01, source75
+`f4603ad552aa3a85a8bb00b5726511d3c7fdb234`, 192pins и Node/Chrome SHA повторно
+совпали, headed DISPLAY=:1/sandbox=true. Terminal session29452, browser RUNNING.
+Ожидается exact OUTPUT[1,1,2,2,3,3], native counts3/6/3, всего12cells.
+Это самостоятельный обязательный case, не replay odd. Developer выполняет только
+read-only исследование selection blocker; runtime во время live остаётся frozen.
+Продолжать эту сессию до terminal и независимо проверить report/cleanup.
+
+
+
 ### Odd остановлен до JS source; выбор узла требует диагностики
 
 Source75/profile58 native-cardinality-odd-probe-01 terminal exit1 (session66016),
