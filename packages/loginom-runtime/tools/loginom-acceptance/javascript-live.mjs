@@ -1,3 +1,4 @@
+import {withJavascriptWizardAddress} from './javascript-wizard-settlement.mjs';
 import {cleanupJavascriptColumnEditor} from './javascript-column-editor.mjs';
 import {dragJavascriptPalette} from './javascript-palette-drag.mjs';
 import {withJavascriptWizardMasks} from './javascript-wizard-masks.mjs';
@@ -74,7 +75,7 @@ const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOSt
   snapshots:[],effects:[],cleanup:{package_closed:false,logged_out:false,browser_closed:false},
   probes:javascriptEngineProbes.map(p=>({id:p.id,sha256:p.source_sha256,status:'not_run'}))};
 let report=rootReport;
-let session,page,owner,packageHandle,wizardBinding,wizardHandle,wizardRoot,openedWizard=false,closeDispatched=false,closeConfirmed=false,closeDeadline=0,wizardDeadline=0,createDeadline=0;
+let session,page,owner,packageHandle,wizardBinding,wizardHandle,wizardRoot,openedWizard=false,closeDispatched=false,closeConfirmed=false,closeDeadline=0,wizardDeadline=0,createDeadline=0,wizardAddressEpoch=0;
 let executionRuntime,executionInput,executionNode,executionPrepared,executionInputProof,executionDrop,paletteAdmission;
 let browserLifecycle,inputBinding,previewCloseState={dispatched:false};
 const columnState={pending:null};
@@ -238,7 +239,7 @@ const waitGraphReady=async(timeout=60000)=>{
 };
 // Serialized by Playwright for both polling and diagnostics. Read only cached
 // native identities: never dereference FModelNode/server proxy properties.
-const wizardReadiness=withJavascriptWizardMasks(function wizardReadiness({prefix,owned,account,label,id,binding,expectedWizard,expectedRoot,inspect=false,inputOnly=true,initialPages=[],afterIndex=null,afterPageTid=null}) {
+const wizardReadiness=withJavascriptWizardAddress(withJavascriptWizardMasks(function wizardReadiness({prefix,owned,account,id,binding,addressEpoch,expectedWizard,expectedRoot,inspect=false,inputOnly=true,initialPages=[],afterIndex=null,afterPageTid=null}) {
   const app=globalThis.bg?.app,f=app?.Application?.FInstance?.FMainForm,m=f?.FMapTree;
   const tab=f?.Items?.Workspace?.getActiveTab?.(),native=tab?.Controller?.Node?.data?.node,model=tab?.Controller?.FController;
   const visible=e=>!!e?.isConnected&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
@@ -295,6 +296,7 @@ const wizardReadiness=withJavascriptWizardMasks(function wizardReadiness({prefix
   const lineage=[],seen=new Set();
   for(let n=native;n&&lineage.length<32&&!seen.has(n);n=n.ParentNode){seen.add(n);lineage.push(n);}
   const nodeTree=native?.ParentNode;
+  const address=inspectJavascriptWizardAddress({prefix,id,binding,native,model,crumbs,epoch:addressEpoch});
   const checks={
     account:m?.FServerConnection?.UserName===account,
     package_count:m?.PackageNodes?.Count===1,
@@ -313,8 +315,8 @@ const wizardReadiness=withJavascriptWizardMasks(function wizardReadiness({prefix
       &&pages.length===1&&pages[0].getAttribute('data-tid')!==afterPageTid,
     close_unique:close.length===1,
     close_enabled:close.length===1&&!close[0].closest('.x-item-disabled,.x-btn-disabled'),
-    node_breadcrumb:crumbs.at(-2)?.textContent.trim()===label,
-    wizard_breadcrumb:crumbs.at(-1)?.textContent.trim()==='Настройка',
+    node_breadcrumb:address.ready,
+    wizard_breadcrumb:address.checks.wizard_binding&&address.checks.wizard_text,
     native_wizard_instance:!!app?.WizardTreeNode&&native instanceof app.WizardTreeNode,
     native_node_instance:!!app?.ModelNodeTreeNode&&nodeTree instanceof app.ModelNodeTreeNode,
     node_guid:nodeTree?.FGuid===id,
@@ -342,7 +344,7 @@ const wizardReadiness=withJavascriptWizardMasks(function wizardReadiness({prefix
     display:getComputedStyle(e).display,visibility:getComputedStyle(e).visibility,opacity:getComputedStyle(e).opacity,
     within_root:!!root&&root.contains(e),contains_root:!!root&&e.contains(root),
     rect:{x:e.getBoundingClientRect().x,y:e.getBoundingClientRect().y,width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height}});
-  return {ready:failed.length===0,fatal,checks,failed,
+  return {ready:failed.length===0,fatal,checks,failed,address,
     transition:afterIndex===null?null:{from_index:afterIndex,to_index:pageIndex,from_tid:afterPageTid,
       skipped_indices:Number.isInteger(pageIndex)&&pageIndex>afterIndex?Array.from({length:pageIndex-afterIndex-1},(_,i)=>afterIndex+i+1):[]},
     native_class:native?.constructor?.name??null,model_class:model?.constructor?.name??null,
@@ -372,11 +374,11 @@ const wizardReadiness=withJavascriptWizardMasks(function wizardReadiness({prefix
       cached_mask_id:header?._extData?.maskEl?.dom?.id??null,
       native_owners:columnOwners.map(c=>({class:c.$className??null,id:c.el?.dom?.id??null})),
       owner_bound_reached:columnOwners.length===16}};
-});
+}));
 const waitWizardReady=async({deadline=wizardDeadline,inputOnly=true,afterIndex=null,afterPageTid=null}={})=>{
   deadline=Math.min(deadline,cleaning?Infinity:batchDeadline);
-  const args={prefix:owner.prefix,owned:packageHandle,account:config.username,label:report.owned_node.label,
-    id:report.owned_node.id,binding:wizardBinding,expectedWizard:wizardHandle??null,expectedRoot:wizardRoot??null,inputOnly,
+  const args={prefix:owner.prefix,owned:packageHandle,account:config.username,
+    id:report.owned_node.id,binding:wizardBinding,addressEpoch:wizardAddressEpoch,expectedWizard:wizardHandle??null,expectedRoot:wizardRoot??null,inputOnly,
     initialPages:javascriptInitialPages(owner.prefix,executionNode,executionInputProof),afterIndex,afterPageTid};
   const record=async(label,state)=>{
     report.snapshots.push({at:new Date().toISOString(),label,remaining_ms:Math.max(0,deadline-Date.now()),...state});await save();
@@ -403,6 +405,7 @@ const waitWizardReady=async({deadline=wizardDeadline,inputOnly=true,afterIndex=n
   if(!wizardHandle)wizardHandle=await page.evaluateHandle(()=>globalThis.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node);
   if(!wizardRoot)wizardRoot=await exact(owner.prefix+';WizrdMCF').elementHandle();
   if(!wizardRoot)throw Error('Ready wizard root disappeared');
+  report.wizard_address=readyState.address;await save();
   return readyState;
 };
 const inspectWizardPages=async({remainingPages=false}={})=>{
@@ -667,7 +670,7 @@ const runExecutionTrial=async probe=>{
     report.stage='existing-mapping-baseline';
     const before={input:await executionRuntime.readPortMapping(executionNode,'input'),output:await executionRuntime.readPortMapping(executionNode,'output')};
     report.stage='existing-source-readback';
-    const reopened=await executionRuntime.reopen(executionNode);
+    const reopened=await executionRuntime.reopen(executionNode);wizardAddressEpoch++;
     wizardHandle=null;wizardRoot=null;openedWizard=true;closeDispatched=false;closeConfirmed=false;closeDeadline=0;wizardDeadline=phaseDeadline(90000);
     await executionRuntime.handoffReopenedWizard();
     await executionRecord({phase:'existing_wizard_opened',reopened});
@@ -698,7 +701,7 @@ const runExecutionTrial=async probe=>{
     if(trigger==='mismatch'){
       report.stage='generated-schema-mismatch';
       const manual=await executionRuntime.prepareManualMapping(executionNode);
-      await executionRuntime.reopen(executionNode);
+      await executionRuntime.reopen(executionNode);wizardAddressEpoch++;
       wizardHandle=null;wizardRoot=null;openedWizard=true;closeDispatched=false;closeConfirmed=false;closeDeadline=0;wizardDeadline=phaseDeadline(90000);
       await executionRuntime.handoffReopenedWizard();
       await waitWizardReady();await inspectWizardPages();
@@ -861,7 +864,7 @@ const runPreparedCase=async()=>{
       if(!app?.WorkFlowTreeNode||!(workflow instanceof app.WorkFlowTreeNode)||!ancestors.has(owned)
         ||matches.length!==1||!matches[0].data||matches[0].FIconCls!==icon
         ||diagram.FmxGraph.view.getState(matches[0].FCell)?.shape?.node?.getAttribute('data-tid')!==tid)throw Error('Wizard source binding unavailable');
-      return {tab,workflow,nodeData:matches[0].data};
+      return {document,tab,workflow,nodeData:matches[0].data,native:matches[0],cell:matches[0].FCell};
     },{id:node.id,tid:node.tid,icon:expectedIcon,owned:packageHandle});
     wizardDeadline=phaseDeadline(90000);report.wizard_open_deadline=new Date(wizardDeadline).toISOString();await save();
     if(executionCase)await selectJavascriptForSettings(page,{binding:wizardBinding,node,icon:expectedIcon,deadline:wizardDeadline,record:executionRecord});

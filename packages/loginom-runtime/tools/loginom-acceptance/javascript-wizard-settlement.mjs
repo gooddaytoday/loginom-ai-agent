@@ -94,3 +94,47 @@ export async function waitJavascriptWizardSettlement(page,{binding,prepared,dead
     await record({phase:'javascript_wizard_settlement_refused',...terminal,deadline,reason:String(error.message).slice(0,300)});throw error;
   }
 }
+
+
+// Resolve current addressing only from the retained native node and reciprocal
+// breadcrumb controls. A rename never substitutes the node's identity.
+// Source-backed caches: Trees.FParentNode, Unit.parent/FCell, Label.FRawValue,
+// NavigationPanel._node and Ext Model.data/Component.el/Element.dom.
+export function inspectJavascriptWizardAddress({prefix,id,binding,native,model,crumbs,epoch}) {
+  const value=(object,key)=>object&&Object.getOwnPropertyDescriptor(object,key)?.value;
+  const dom=control=>value(value(control,'el'),'dom');
+  const node=value(binding,'native'),cell=value(binding,'cell'),nodeData=value(binding,'nodeData');
+  const tree=value(native,'FParentNode'),labelObject=value(node,'FLabel'),label=value(labelObject,'FRawValue');
+  const nodeCrumb=crumbs?.at(-2),wizardCrumb=crumbs?.at(-1);
+  const nodeControl=nodeCrumb&&globalThis.Ext?.getCmp?.(nodeCrumb.id),wizardControl=wizardCrumb&&globalThis.Ext?.getCmp?.(wizardCrumb.id);
+  const controlNode=control=>value(value(value(control,'_node'),'data'),'node');
+  const nodeTid=nodeCrumb?.getAttribute('data-tid'),wizardTid=wizardCrumb?.getAttribute('data-tid');
+  const checks={epoch:Number.isSafeInteger(epoch)&&epoch>=0,document:!!binding&&document===value(binding,'document'),
+    native_node:!!node&&!!nodeData&&!!cell&&value(node,'FGuid')===id&&value(node,'data')===nodeData&&value(node,'FCell')===cell,
+    tree:!!tree&&value(tree,'FGuid')===id&&value(tree,'FModelNode')===nodeData&&value(tree,'FParentNode')===value(binding,'workflow'),
+    model:!!model&&value(model,'FModelNode')===nodeData,
+    label_cache:!!labelObject&&value(labelObject,'parent')===node&&value(value(labelObject,'FCell'),'parent')===cell
+      &&typeof label==='string'&&label.length>0&&label.length<=256,
+    count:Array.isArray(crumbs)&&crumbs.length>=2&&crumbs.length<=32,
+    unique:Array.isArray(crumbs)&&crumbs.filter(e=>e.getAttribute('data-tid')===nodeTid).length===1
+      &&crumbs.filter(e=>e.getAttribute('data-tid')===wizardTid).length===1,
+    node_binding:!!nodeCrumb&&dom(nodeControl)===nodeCrumb&&controlNode(nodeControl)===tree,
+    wizard_binding:!!wizardCrumb&&dom(wizardControl)===wizardCrumb&&controlNode(wizardControl)===native,
+    node_text:typeof label==='string'&&nodeCrumb?.textContent?.trim()===label,
+    wizard_text:wizardCrumb?.textContent?.trim()==='Настройка',
+    tids:typeof nodeTid==='string'&&nodeTid.length<=1024&&nodeTid.startsWith(prefix+';cnrNaviMode;b.s_')
+      &&wizardTid===nodeTid+'>Настройка'};
+  const ready=Object.values(checks).every(Boolean);
+  const previous=value(binding,'wizardAddress');
+  checks.retained_address=!previous||epoch>previous.epoch||epoch===previous.epoch&&previous.wizard===native&&previous.node===node&&previous.tree===tree
+    &&previous.label===label&&previous.node_tid===nodeTid&&previous.wizard_tid===wizardTid;
+  if(ready&&checks.retained_address&&(!previous||epoch>previous.epoch))binding.wizardAddress={
+    epoch,wizard:native,node,tree,label,node_tid:nodeTid,wizard_tid:wizardTid};
+  return {ready:ready&&checks.retained_address,checks,epoch,
+    label:checks.label_cache?label:null,node_tid:checks.tids?nodeTid:null,wizard_tid:checks.tids?wizardTid:null,
+    node_id:checks.native_node?id:null};
+}
+
+export function withJavascriptWizardAddress(inspector) {
+  return new Function('return function '+inspector.name+'(args){const inspectJavascriptWizardAddress='+inspectJavascriptWizardAddress.toString()+';return ('+inspector.toString()+')(args);}')();
+}
