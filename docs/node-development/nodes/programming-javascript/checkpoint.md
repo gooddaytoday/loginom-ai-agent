@@ -16,6 +16,32 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch51: source admission пройден; field editor отказ — 2026-09-27
+
+Root проверил1330 journal refs,60 input cells,1fresh completed execution,
+полный6×2/12cells output, exact reopened source/mode/semantic mappings и34 hashes.
+used:true устранил прежний source schema отказ. После открытия standalone output
+wizard shared procedure один раз double_click PhaseMarker; receipt SUCCEEDED.
+Затем наблюдение bound output field name editor отказало: «Node procedure is
+blocked by a mask or dialog». Snapshot показывает EditColumnDefForm с Name/Label
+PhaseMarker, Apply/Cancel, masks=[], verified prepared output-port context.
+Причина отсутствия bound editor proof ещё исследуется; одного TID недостаточно.
+Изменение JS и generated-schema trial NOT_RUN,4Next/Done NOT_RUN.
+
+Fix51 сохранил неопределённость после editor dispatch: mapping_effect_possible=true,
+никакого generic Close/replay. Original exit1 CLEANUP_UNCONFIRMED, package/logout
+false,browser true. Отдельный recovery51(profile24,headed,no downloads) подтвердил
+Home/accountjsteach/packages0,logout/browsertrue,packageMutationfalse.
+Он не подменяет original cleanup result. Private verification/boundary receipts сохранены.
+
+Batch52 запущен на неизменном Freeze51/commit7274cca5e5, freshprofile25,headed:
+declared-sentinel-next,declared-sentinel-done,code-sentinel-next,code-sentinel-done.
+Это независимые cases без manual mapping; результат пока RUNNING. Разработчик
+в прежней задаче исследует fix52 только read-only до окончания live. Все34 hashes
+повторно совпали перед запуском. Полная цель остаётся активной.
+
+
+
 ### Freeze51: manual mapping admission и безопасный отказ — 2026-09-27
 
 После перезапуска MCP health, actor search и чтение точного найденного URI
