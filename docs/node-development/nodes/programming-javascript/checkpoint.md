@@ -16,6 +16,17 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### A-getcolumn-index PASS; A-getcolumn-exact RUNNING
+
+Fresh profile76/original80206 terminal exit0/CHARACTERIZED, cleanup3/3;
+root independent audit12cells/624refs/1265pins PASS, report SHA
+70d4e965bf110e355ac46709db1c4dfd8dbc60b18b23ee6a368eaccf68631d71.
+После подтверждения отсутствия pinned Chromium выделен profile77.
+A-getcolumn-exact evidence native-named-getcolumn-exact-probe-01,
+**original95451 RUNNING**; headed DISPLAY=:1/sandbox, исходный deadline.
+A3/8 accepted; source83 unchanged, G5/full goal open. Ждать original session.
+
+
 ### A-getcolumn-index: setup failure, новый прогон profile76
 
 Original42738 terminal exit1: prepare-typed-input / NODE_APPLY_STOPPED,

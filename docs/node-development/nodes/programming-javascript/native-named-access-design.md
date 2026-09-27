@@ -636,7 +636,7 @@ c67e5a8abb884352ef16076178e23e9b3a7d44f95be1428c302cf47ada4d58ba;
 integer-safe input contract не выдаёт coercion/cardinality native_baseline_sha256.
 Root сравнил полный before proof с предшествующей JS записью журнала, отдельно
 вычислил digest; не заявляет сравнение с отсутствующим runtime полем.
-Два случая из8 A приняты, весь G5/J24/handler/CLI остаётся открытым.
+Три случая из8 A приняты, весь G5/J24/handler/CLI остаётся открытым.
 
 
 A-get-exact/profile74, original session15883 terminal exit0/CHARACTERIZED,
@@ -645,3 +645,12 @@ cleanup3/3. Independent audit12cells,616refs,1265pins; exact INPUT/OUTPUT/upstre
 637fb623e9f2fc27eaf7a1489fee450f39eeeddac4d661361fd5658d89a9a6df;
 root-computed baseline180350575ad57a31c8ee1a17a1a29586afd420994565b6503fd7f6c225117173.
 Подтверждён точный вызов Get(row,"Value"); регистр/отсутствующее имя не проверены.
+
+
+A-getcolumn-index/profile76, original80206 terminal exit0/CHARACTERIZED,cleanup3/3.
+Independent audit12cells,624refs,1265pins; INPUT/OUTPUT/upstream exact.
+Report SHA70d4e965bf110e355ac46709db1c4dfd8dbc60b18b23ee6a368eaccf68631d71.
+Предыдущий profile75/original42738 failed в подготовке импорта до JS;
+пользователь сообщил случайный клик. FAILED evidence сохранён, новый run
+после проверенной очистки на неизменном source83 прошёл. Это наблюдение точного
+GetColumn(0), не доказательство всех вариантов имён/индексов.
