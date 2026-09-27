@@ -16,6 +16,31 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source85 принят; первый B live RUNNING
+
+Developer revision8 завершён/idle. Root проверил1265pins/13changedfiles,
+12MJSsyntax, gitdiff, source/handoff/log hashes и каталог16A/B.
+Manifest JSON SHA8d6f2163b0a5fd2b56d4bee886f5692b72814fc2d4e0e784a8fc3d563fe441b3.
+Root main original89341 terminal exit0:2441PASS/0FAIL/0SKIP,50204.706151ms.
+Root client original73594 terminal exit0:2484PASS/0FAIL/10SKIP,178831.227907ms;
+Python15PASS/publicdeny3PASS. После проверок1265pins unchanged.
+Developer fullclient202filePASS/9FAIL отдельно сохранён; no blanket EPERM claim.
+
+Только13runtime/test files committed в child node-javascript:
+0538118bc508674ba65393a9ef0dd9979bbc6b38. Старые dirty docs untouched.
+Первый B: fresh profile85, B-get-case, evidence native-named-get-case-probe-01,
+**original exec63969 RUNNING**, headed DISPLAY=:1/sandbox/original600000ms.
+Toolchains/pins/no other Chromium/предыдущий cleanup сверены. Не replay:
+ждать эту session до terminal, затем соответствующий independent audit.
+
+Private completed B auditor подготовлен (ещё без B live proof):
+audit-named-b-completed-live.py. Failed вариант audit-named-b-failed-live.py
+также только draft: проверяет8cells/full error/source/owner/journal/cleanup,
+не приписывает semantic rejection. Проверять фактический report/schema; любой
+разбор поля auditor не является разрешением менять runtime/report/ожидаемый исход.
+A8/8 accepted; B1running/7not_run, C/D not_run, общий G5/goal open.
+
+
 ### A8/8 завершена; следующий шаг — реализация B
 
 
