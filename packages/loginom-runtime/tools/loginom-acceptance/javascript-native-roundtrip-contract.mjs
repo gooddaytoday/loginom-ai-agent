@@ -1,3 +1,4 @@
+import {verifyCalibrationUpstream} from './javascript-calibration-contract.mjs';
 import {javascriptNamedProbe} from './javascript-native-named-cases.mjs';
 import {verifyJavascriptNamedRead} from './javascript-native-named-contract.mjs';
 import {verifyJavascriptDeclaredEmpty,verifyJavascriptZeroAdmission} from './javascript-native-zero.mjs';
@@ -56,6 +57,7 @@ export function verifyNativeRoundtripMapping(mapping,node,fixtureId='real'){
   return {verified:true,node:{...node},port:0,port_guid:port.port_guid,columns:1,input_technical_name:'Value'};
 }
 export function verifyNativeRoundtripRead(raw,{binding,lifecycle,input,role,civil}){
+  if(binding.calibration_id!==undefined)return verifyCalibrationUpstream(raw,{binding,lifecycle,input,role});
   if(binding.named_case_id!==undefined)return verifyJavascriptNamedRead(raw,{binding,lifecycle,input,role});
   const fixture=javascriptNativeFixture(binding.fixture_id),nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixture.id);
   need((input.binding.fixture_id??'real')===fixture.id,'input fixture differs');

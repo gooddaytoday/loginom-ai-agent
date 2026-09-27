@@ -16,11 +16,12 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
   const slice={"integer-coercion-fraction-positive":[1,3,1,4],"integer-coercion-fraction-negative":[1,3,1,4],"integer-coercion-string-numeric":[1,5,1,4],"integer-coercion-string-invalid":[1,5,1,4],"integer-coercion-nan":[1,3,1,4],"integer-coercion-positive-infinity":[1,3,1,4],"integer-coercion-negative-infinity":[1,3,1,4],real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6],'cardinality-empty':[3,4,0]}[b.fixture_id??'real'];
   const typeCode=b.roundtrip_role==='output'?(slice?.[3]??slice?.[1]):slice?.[1];
   const namedMarker=["B-get-case","B-get-missing","B-getcolumn-case","B-getcolumn-missing","B-columns-case","B-columns-missing","B-isnull-case","B-isnull-missing"].includes(b.named_case_id);
+  if(b.calibration_id!==undefined)need(b.named_case_id===undefined&&['K1-parse-v1','K2-sync-v1'].includes(b.calibration_id)&&b.roundtrip_role==='upstream'&&b.fixture_id==='integer-safe'&&b.input_fixture_id==='integer-safe','calibration upstream only');
   const rowCount=b.roundtrip_role==='output'?(namedMarker?1:(slice?.[2]??slice?.[0])):slice?.[0];
   need(Array.isArray(slice)&&b.rows===rowCount&&b.row_count===rowCount&&b.columns.length===1&&b.columns[0]===0
     &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:typeCode}]),'fixed native slice');
   const owner=globalThis.__loginomJavascriptNativeRoundtripV1;
-  need(b.named_case_id===owner.named_case_id&&b.input_fixture_id===owner.input_fixture_id,'named read identity');
+  need(b.calibration_id===globalThis.__loginomJavascriptNativeRoundtripV1.calibration_id&&b.named_case_id===owner.named_case_id&&b.input_fixture_id===owner.input_fixture_id,'named read identity');
   const snapshot=()=>captured.capture(b);
   const bound=()=>{const s=snapshot();need(Object.keys(captured.initial).every(k=>captured.initial[k]===s[k]),'native input changed since binding');return s;};
   need(Object.keys(options).every(k=>['operationId','timeoutMs','requireAtomicSnapshot','maxBytes'].includes(k)),'diagnostic option allowlist');
@@ -92,7 +93,7 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
    } finally {releaseResponse(response);if(!callbackOwns)releaseRequest();}
   }
   live();const final=snapshot();need(equal(final),'final stale binding');
-  const result={...(b.named_case_id!==undefined?{named_case_id:b.named_case_id,input_fixture_id:b.input_fixture_id,source_sha256:b.source_sha256}:{}),...(zeroBefore?{zero_admission:{before:zeroBefore,final:zeroReceipt(final,'final')}}:{}),empty_count_attested:!!zeroBefore,read_id:op.id,workflow_id:b.workflow_id,package_id:b.package_id,method:321,interface:116,document_id:b.document_id,execution:b.execution,node_id:b.node_id,port_guid:b.port_guid,port:0,source:{owner:initial.owner,object:initial.object},row_count:initial.count,schema:b.schema,cells:output,owner_rechecked:true,cache_identity_rechecked:true,consistency:'observed_local_only',atomic_snapshot_verified:false,native_cancellation_supported:false};
+  const result={...(b.calibration_id!==undefined?{calibration_id:b.calibration_id,input_fixture_id:b.input_fixture_id,source_sha256:b.source_sha256}:{}),...(b.named_case_id!==undefined?{named_case_id:b.named_case_id,input_fixture_id:b.input_fixture_id,source_sha256:b.source_sha256}:{}),...(zeroBefore?{zero_admission:{before:zeroBefore,final:zeroReceipt(final,'final')}}:{}),empty_count_attested:!!zeroBefore,read_id:op.id,workflow_id:b.workflow_id,package_id:b.package_id,method:321,interface:116,document_id:b.document_id,execution:b.execution,node_id:b.node_id,port_guid:b.port_guid,port:0,source:{owner:initial.owner,object:initial.object},row_count:initial.count,schema:b.schema,cells:output,owner_rechecked:true,cache_identity_rechecked:true,consistency:'observed_local_only',atomic_snapshot_verified:false,native_cancellation_supported:false};
   need(new TextEncoder().encode(JSON.stringify(result)).length<=maxBytes,'final serialization byte budget');op.status='completed';op.published=true;return result;
   }catch(e){if(op.status==='running')op.status='failed';if(op.requests>0)state.poisoned=true;throw e;}finally{clearTimeout(timer);delete op.stop;state.last=op;state.active=null;}
  },{b,decoder:decode.toString(),options});

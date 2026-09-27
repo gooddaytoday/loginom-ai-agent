@@ -181,7 +181,7 @@ for(const mode of ['exact','changed','bad-ack','changed-upstream'])test('product
  const start=source.indexOf('    async readNativeRoundtrip(input,node,execution) {'),end=source.indexOf('    async captureDropTopology()',start);
  const events=[],steps=[];
  const runtime=vm.runInNewContext('({'+source.slice(start,end)+'})',{
-  nativeNamedCaseId:undefined,nativeFixtureId:'integer-outside-safe',nativeInputFixture:javascriptNativeFixture('integer-outside-safe'),nativeRoundtripProbe:javascriptNativeRoundtripProbe('integer-outside-safe'),
+  nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:'integer-outside-safe',nativeInputFixture:javascriptNativeFixture('integer-outside-safe'),nativeRoundtripProbe:javascriptNativeRoundtripProbe('integer-outside-safe'),
   verifyNativeRoundtripInput,verifyNativeRoundtripOutcome,verifyNativeRoundtripExecution:()=>{},validateNativeSource:()=>{},
   page:{evaluate:async()=>{}},completeJavascriptNativeRoundtrip:()=>{},prepared:{document_id:'d',workflow_ref:{workflow_id:'w'}},
   deadline:Date.now()+10000,randomUUID:()=>String(steps.length),execute:()=>{},nativeReadUncertain:false,sessionId:'test',origin:'http://test',build:'7.4.2',

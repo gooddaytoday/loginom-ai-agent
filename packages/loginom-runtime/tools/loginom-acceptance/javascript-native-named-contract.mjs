@@ -5,9 +5,12 @@ import {adaptRead} from '../../client/lib/variant-native-values.mjs';
 const need=(v,m)=>{if(!v)throw Error('Named native contract: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export function verifyJavascriptNamedInput(input,caseId){
- const c=javascriptNamedCase(caseId);
- need(input?.native_input?.native?.binding?.fixture_id===c.input_fixture_id,'immutable integer-safe input');
- const before=verifyNativeRoundtripInput(input,c.input_fixture_id);
+ javascriptNamedCase(caseId);
+ return verifyJavascriptIntegerInput(input);
+}
+export function verifyJavascriptIntegerInput(input){
+ need(input?.native_input?.native?.binding?.fixture_id==='integer-safe','immutable integer-safe input');
+ const before=verifyNativeRoundtripInput(input,'integer-safe');
  const exact=verifyNativeInputRead(before.raw,{binding:before.binding,lifecycle:before.lifecycle,provenance:before.exact.provenance});
  need(same(exact,before.exact),'stored pre-JS input differs');
  need(before.binding.completed_child?.verified===true&&before.binding.completed_child.owner_verified===true

@@ -1,3 +1,5 @@
+import {javascriptCalibrationIds,captureCalibrationWizard} from './javascript-calibration-cases.mjs';
+import {createJavascriptCalibrationTrial} from './javascript-calibration-run.mjs';
 import {javascriptNamedIds,javascriptNamedCase} from './javascript-native-named-cases.mjs';
 import {createJavascriptNamedTrial,writeJavascriptNamedReport} from './javascript-native-named-run.mjs';
 import {createJavascriptCoercionTrial,writeJavascriptCoercionReport} from './javascript-native-coercion-run.mjs';
@@ -40,8 +42,8 @@ let cleaning=false;
 const phaseDeadline=ms=>Math.min(cleaning?Infinity:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=batchDeadline-Date.now();if(!cleaning&&ms<=0)throw Error('Original batch deadline expired');return cleaning?Infinity:ms;};
 const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
-if (args.includes('--help')) { if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set(['--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case']:[])]);
+if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
+const allowed = new Set(['--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
@@ -51,12 +53,14 @@ for (let i=0;i<args.length;i++) {
 }
 if(batch&&options['--execution-case'])throw Error('Batch cannot also select a single case');
 if(nativeInputOnly||nativeRoundtrip){
-  if(batch||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence','--native-fixture',...(nativeRoundtrip?['--native-named-case']:[])].includes(k)))throw Error('Native input-only requires its separate private entrypoint and no JS modes');
+  if(batch||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence','--native-fixture',...(nativeRoundtrip?['--native-named-case','--error-calibration']:[])].includes(k)))throw Error('Native input-only requires its separate private entrypoint and no JS modes');
   options['--create-node']=true;
 }
-const nativeNamedCaseId=options['--native-named-case'];
+const nativeNamedCaseId=options['--native-named-case'],nativeCalibrationId=options['--error-calibration'];
+if(nativeCalibrationId!==undefined&&(nativeNamedCaseId!==undefined||options['--native-fixture']!==undefined))throw Error('Calibration owns its separate fixed identity/input');
+const calibrationTrial=nativeCalibrationId!==undefined?createJavascriptCalibrationTrial(nativeCalibrationId):null;
 if(nativeNamedCaseId!==undefined&&options['--native-fixture']!==undefined)throw Error('Named case owns its immutable input fixture');
-const nativeFixtureId=nativeNamedCaseId!==undefined?javascriptNamedCase(nativeNamedCaseId).input_fixture_id:options['--native-fixture']??'real',nativeFixture=javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=javascriptNativeRoundtripProbe(nativeFixtureId,nativeNamedCaseId);
+const nativeFixtureId=calibrationTrial?'integer-safe':nativeNamedCaseId!==undefined?javascriptNamedCase(nativeNamedCaseId).input_fixture_id:options['--native-fixture']??'real',nativeFixture=javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=calibrationTrial?calibrationTrial.probe:javascriptNativeRoundtripProbe(nativeFixtureId,nativeNamedCaseId);
 const namedTrial=nativeNamedCaseId!==undefined?createJavascriptNamedTrial(nativeNamedCaseId):null;
 const coercionTrial=nativeRoundtrip&&nativeFixture.coercion?createJavascriptCoercionTrial(nativeFixtureId):null;
 const discoveryProbe=options['--discovery-probe']?javascriptDiscoveryProbe(options['--discovery-probe']):null;
@@ -116,6 +120,7 @@ const executionRecord=async event=>{
     readback.generated_schema_mismatch_trial=javascriptMismatchExecutionProgress(readback.generated_schema_mismatch_trial,event.terminal);
   }
   const saved=await executionJournal({...event,...(report.case_id?{case_id:report.case_id,execution_case:executionCase}:{})});
+  if(calibrationTrial&&!Object.keys(event).every(k=>JSON.stringify(saved?.[k])===JSON.stringify(event[k])))throw Error('Calibration journal ACK differs');
   if(nativeRoundtrip&&report.stage==='prepare-typed-input'&&saved.phase==='node_observation_completed'
     &&saved.outcome?.output?.prepared_node_context?.verified===true
     &&saved.outcome.output.prepared_node_context.surface==='graph') {
@@ -128,6 +133,14 @@ const executionRecord=async event=>{
 };
 const createRemaining=()=>{const remaining=createDeadline-Date.now();if(remaining<=0)throw Error('Original package preparation deadline expired');return remaining;};
 const save=async()=>{
+  if(calibrationTrial){
+    rootReport.calibration=calibrationTrial.coverage;
+    const cleaned=redactor.redact(rootReport);
+    cleaned.calibration_delivery={redacted:JSON.stringify(cleaned.calibration_result)!==JSON.stringify(rootReport.calibration_result),
+      native_text_complete:rootReport.calibration_result?.failed?.native_error_complete===true,
+      truncation_status:rootReport.calibration_result?.failed?(rootReport.calibration_result.failed.native_error_complete?'not_truncated':'truncated'):'not_established'};
+    return writeJavascriptNamedReport(directory,cleaned);
+  }
   if(namedTrial){rootReport.native_named=namedTrial.coverage;return writeJavascriptNamedReport(directory,redactor.redact(rootReport));}
   if(coercionTrial){rootReport.native_coercion=coercionTrial.coverage;return writeJavascriptCoercionReport(directory,redactor.redact(rootReport));}
   return writeFile(directory+'/report.json',JSON.stringify(redactor.redact(rootReport),null,2)+'\n',{mode:0o600});
@@ -479,7 +492,7 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
         if(nativeFixtureId==='cardinality-empty')verifyJavascriptDeclaredEmpty(report.execution_schema.declaration,report.execution_schema.declaration_sha256);
         const event={phase:'native_roundtrip_schema_bound',...await page.evaluate(bindJavascriptNativeRoundtripSchema,{...schemaContext(),schema:report.execution_schema})};
         const saved=await executionRecord(event);
-        if((nativeFixtureId==='cardinality-empty'||nativeFixture.coercion||namedTrial)&&JSON.stringify(Object.fromEntries(Object.keys(event).map(k=>[k,saved?.[k]])))!==JSON.stringify(event))throw Error('Declared schema binding journal ACK differs');
+        if((nativeFixtureId==='cardinality-empty'||nativeFixture.coercion||namedTrial||calibrationTrial)&&JSON.stringify(Object.fromEntries(Object.keys(event).map(k=>[k,saved?.[k]])))!==JSON.stringify(event))throw Error('Declared schema binding journal ACK differs');
       }
     }
     if(current.visible_editors===1&&!remainingPages)return current;
@@ -692,6 +705,11 @@ const runExecutionTrial=async probe=>{
       messages:(after?.messages??[]).map(message=>({...message,...identity})),ownerVerified:after?.owner_verified===true,terminal});
     await executionRecord({phase:'execution_stage_observed',identity,before,after,outcome});
     if(after?.boundary_refusal)throw Error('Execution stage boundary refused: '+after.boundary_refusal);
+    if(calibrationTrial&&after?.messages?.some(m=>!before.messages.some(old=>old.id===m.id))){
+      const witness=await page.evaluate(captureCalibrationWizard,{id:nativeCalibrationId,stage,identity,before,after});
+      report.calibration_result=await calibrationTrial.wizard({witness,record:executionRecord});await save();
+      return {...outcome,calibration_diagnostic:true};
+    }
     if(nativeRoundtrip&&after?.messages?.some(m=>!before.messages.some(old=>old.id===m.id)))throw Error('Native roundtrip wizard diagnostic; no replay');
     if(!terminal)throw Error('Execution stage result remains unconfirmed: '+stage);
     if(discoveryProbe){
@@ -715,7 +733,7 @@ const runExecutionTrial=async probe=>{
     const state=await waitWizardReady({deadline,inputOnly:false});
     if(state.page.tid.endsWith(';DoneWizard'))break;
     const outcome=await dispatch('next',owner.prefix+';WizrdMCF;btnNext',step);
-    if(outcome.sentinel_observed||outcome.discovery_diagnostic||trigger==='next'){
+    if(outcome.sentinel_observed||outcome.discovery_diagnostic||outcome.calibration_diagnostic||trigger==='next'){
       report.execution_probe.outcome=outcome;return;
     }
     if(step===7)throw Error('Done page not reached within bounded transitions');
@@ -724,7 +742,7 @@ const runExecutionTrial=async probe=>{
   if(!done.page.tid.endsWith(';DoneWizard'))throw Error('Exact Done page required');
   const outcome=await dispatch('done',owner.prefix+';WizrdMCF;btnDone',0);
   report.execution_probe.done_outcome=outcome;
-  if(outcome.sentinel_observed||outcome.discovery_diagnostic){report.execution_probe.outcome=outcome;return;}
+  if(outcome.sentinel_observed||outcome.discovery_diagnostic||outcome.calibration_diagnostic){report.execution_probe.outcome=outcome;return;}
   await exact(owner.prefix+';WizrdMCF').waitFor({state:'hidden',timeout:Math.max(1,deadline-Date.now())});
   openedWizard=false;await waitGraphReady(Math.max(1,deadline-Date.now()));
   if(trigger==='done'){report.execution_probe.outcome=outcome;return;}
@@ -732,6 +750,11 @@ const runExecutionTrial=async probe=>{
     const attestation=await page.evaluate(sealJavascriptNativeRoundtripDone,roundtripDone);
     const saved=await executionRecord({phase:'native_roundtrip_done_sealed',attestation});
     if(JSON.stringify(saved.attestation)!==JSON.stringify(attestation))throw Error('Done seal journal ACK differs');
+    if(calibrationTrial){
+      report.calibration_result=await calibrationTrial.run({runtime:executionRuntime,input:executionInput,node:executionNode,sourceProbe:probe,deadline,
+        record:executionRecord,onExecution:async execution=>{report.execution_probe.execution=execution;await save();}});
+      report.stage='calibration-awaiting-finalization';await save();return;
+    }
     if(coercionTrial){
       report.native_roundtrip=await coercionTrial.run({runtime:executionRuntime,input:executionInput,node:executionNode,sourceProbe:probe,deadline,
         record:executionRecord,onExecution:async execution=>{report.execution_probe.execution=execution;await save();}});
@@ -1073,12 +1096,13 @@ const runPreparedCase=async()=>{
       const mode=executionCase.split('-')[0],sentinel=executionCase.includes('-sentinel-');
       const probe=(nativeRoundtrip?nativeRoundtripProbe:discoveryProbe)??javascriptExecutionProbes('RowID').find(p=>p.schema_mode===mode&&p.id.endsWith(sentinel?'execution-sentinel':'table-v1'));
       report.execution_probe={id:probe.id,source_sha256:probe.source_sha256,status:'source_pending'};await save();
+      if(calibrationTrial)await calibrationTrial.capturePrior({source:baselineSource,input:executionInput,node:executionNode,record:executionRecord});
       await probeOwnedSource(baselineSource,probe.source);
       report.execution_probe.status='source_verified';await save();
       if(nativeRoundtrip){
         const event={phase:'native_roundtrip_source_bound',...await page.evaluate(bindJavascriptNativeRoundtripSource,{...schemaContext(),schema:report.execution_schema})};
         const saved=await executionRecord(event);
-        if((nativeFixtureId==='cardinality-empty'||nativeFixture.coercion||namedTrial)&&JSON.stringify(Object.fromEntries(Object.keys(event).map(k=>[k,saved?.[k]])))!==JSON.stringify(event))throw Error('Declared source binding journal ACK differs');
+        if((nativeFixtureId==='cardinality-empty'||nativeFixture.coercion||namedTrial||calibrationTrial)&&JSON.stringify(Object.fromEntries(Object.keys(event).map(k=>[k,saved?.[k]])))!==JSON.stringify(event))throw Error('Declared source binding journal ACK differs');
       }
       // Execution dispatch is kept separate from source replacement; each
       // trigger receives its own fresh error baseline and once-only receipt.
@@ -1156,11 +1180,11 @@ try {
     report.stage='graph-ready';await waitGraphReady(createRemaining());
     await snapshot('graph-ready-baseline');
     if(executionCase||nativeInputOnly){
-      report.scope=namedTrial?'private stage A/B named access: '+nativeNamedCaseId:coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
+      report.scope=calibrationTrial?'private fixed error calibration: '+nativeCalibrationId:namedTrial?'private stage A/B named access: '+nativeNamedCaseId:coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
       if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=1;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
-        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId});
+        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
       if(nativeRoundtrip)await executionRuntime.armNativeRoundtrip(executionInput);
@@ -1224,7 +1248,7 @@ try {
       }
     }
   }
-  report.status=coercionTrial||namedTrial?'PENDING_EVIDENCE':'OBSERVED';
+  report.status=coercionTrial||namedTrial||calibrationTrial?'PENDING_EVIDENCE':'OBSERVED';
 } catch(error) {
   report.status='FAILED';report.failure={stage:report.stage,...redactor.redact(javascriptProbeFailure(error))};
   const diagnostic=await captureJavascriptNativeClassifierDiagnostic({nativeRoundtrip,stage:report.stage,page,binding:nativeClassifierBinding});
@@ -1360,7 +1384,10 @@ try {
   if(browserLifecycle)Object.assign(report.browser_lifecycle,await browserLifecycle.finish());
   if (!report.cleanup.package_closed||!report.cleanup.logged_out||!report.cleanup.browser_closed) report.status='CLEANUP_UNCONFIRMED';
   report.finished_at=new Date().toISOString();
-  if(coercionTrial){
+  if(calibrationTrial){
+    try{await calibrationTrial.finish({cleanup:report.cleanup,failure:report.failure,record:executionRecord,persist:async status=>{report.status=status;await save();}});}
+    catch(error){report.status='EVIDENCE_UNCONFIRMED';report.evidence_failure=redactor.text(String(error.message)).slice(0,1200);await save().catch(()=>{});}
+  }else if(coercionTrial){
     try{await coercionTrial.finish({cleanup:report.cleanup,failure:report.failure,record:executionRecord,persist:async status=>{report.status=status;await save();}});}
     catch(error){report.status='EVIDENCE_UNCONFIRMED';report.evidence_failure=redactor.text(String(error.message)).slice(0,1200);await save().catch(()=>{});}
   }else if(namedTrial){

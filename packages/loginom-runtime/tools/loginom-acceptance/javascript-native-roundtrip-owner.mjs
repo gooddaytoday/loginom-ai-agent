@@ -1,11 +1,18 @@
 // Page-local capabilities. Nothing here invokes model methods or remote RPCs.
-export function armJavascriptNativeRoundtrip({binding,source,source_sha256,schema_mode,named_case_id,input_fixture_id}){
+export function armJavascriptNativeRoundtrip({binding,source,source_sha256,schema_mode,named_case_id,input_fixture_id,calibration_id}){
   const need=(v,m)=>{if(!v)throw Error('Roundtrip owner: '+m);};
   need(!globalThis.__loginomJavascriptNativeRoundtripV1,'already armed');
   const namedPins={"A-get-index":"ade8e3b5195f4c6cd81c09ced0836e909d1ad037b99b40ac152805630ffd8782","A-get-exact":"6befc43d503c85db5063fe2ae128cdbfc52db37f26cf449610639e3280079ab5","A-getcolumn-index":"bb2b3bbd7adf0204483b9a3367ba1506f2fc4fd9b89d45ce9381147ac8868766","A-getcolumn-exact":"ddda422a0d6a06aa08ad0743fdfb616f18641e232aaa5b9921d8b752aa777ee1","A-columns-index":"5410965b02be2a044a1973b31ca2290d60ee935a817109329728a4fa21021032","A-columns-exact":"752e74be9ab4fb53adece872ec1492ee7fd761f4ec086229187965120eec902e","A-isnull-index":"1ab38e09307a876f96b6e3b83e2a46f3b34da9cb4f90a759413cd4d36dd0dc98","A-isnull-exact":"57ceade9570a31dc76f0e2a94e514c1ad7d4474470467ba69649d3dc2b4fb34c","B-get-case":"ca569c1320bf7c160803b9031524feaadf4adecf87f1bd00ee4eff043599c505","B-get-missing":"8e2ed7bf78ccb567121f257dc43058dddc284ef7384df4a45eeabdbfa0e7329c","B-getcolumn-case":"08054f2f62477f665c8b92bd0414755dc0e66e3ba8008439aa05d28500c3eb30","B-getcolumn-missing":"4832a8582d5af517d8f60c2a2c8499ce8b4c131a3ba78b952bcd3f9dfd3f038d","B-columns-case":"d60e2aa72f3585e87c09073c0c002cc465846b39a146f719c494276f8271cc19","B-columns-missing":"13c5ccc3c6aec7723b5401b1853ee4d2f343444a566e0d37a7f520e4173e766f","B-isnull-case":"dc8be58b76ab183e2b3be3921886a2bac1fc37eb0ea30470d763c37522cf4c1b","B-isnull-missing":"7133ef6538cd9f2d09e652df0eafcdba8fe89d8619b8a8be22fa898368b577c4"};
   if(named_case_id!==undefined)need(Object.hasOwn(namedPins,named_case_id)&&namedPins[named_case_id]===source_sha256
     &&input_fixture_id==='integer-safe'&&binding.fixture_id==='integer-safe'&&schema_mode==='code','fixed stage A/B source/input');
-  if(named_case_id===undefined)need(input_fixture_id===undefined,'named input requires named case');
+  if(calibration_id!==undefined){
+    const prefix='import {InputTable,OutputTable,DataType} from "builtIn/Data";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error("JS_NAMED_INPUT_SHAPE");\nOutputTable.AssignColumns([{Name:"Value",DisplayName:"Value",DataType:DataType.Integer}]);\n';
+    const fixed={'K1-parse-v1':['const result=(1 + );\n','721161cd4f4c0de387cefeef03b2425fd20f5645c05bff724103e330acd1620f'],
+      'K2-sync-v1':['throw new Error("JS_CAL_K2_SYNC_V1");\n','3f7350f5f9e7cb30107fb314643ae844477a7b87610132036e995f556fe983c2']};
+    need(named_case_id===undefined&&Object.hasOwn(fixed,calibration_id)&&source===prefix+fixed[calibration_id][0]
+      &&source_sha256===fixed[calibration_id][1]&&input_fixture_id==='integer-safe'&&binding.fixture_id==='integer-safe'&&schema_mode==='code','fixed calibration source/input');
+  }
+  if(named_case_id===undefined&&calibration_id===undefined)need(input_fixture_id===undefined,'named input requires named case');
   const mode=binding.fixture_id==='cardinality-empty'?'declared':'code';
   need(schema_mode===mode,'fixed case mode');
   if(mode==='declared')need(source==="import {InputTable,OutputTable} from \"builtIn/Data\";\n// UI-declared Value Integer; deliberately emit no rows.\n"&&source_sha256==='0d6cddd9ca40a285c549076429f47f0a1cbf0086f208592ccfefdee98f267d30','fixed declared-empty source');
@@ -56,7 +63,7 @@ export function armJavascriptNativeRoundtrip({binding,source,source_sha256,schem
   const card=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
   need(card===input.card&&card.Controller.FController===input.model&&input.manager.FPreviewVisible===false,'owned graph after Preview Close');
   globalThis.__loginomJavascriptNativeRoundtripV1={document,input,binding,source,source_sha256,upstream,bindings:new Map(),stage:'armed'};
-  Object.defineProperties(globalThis.__loginomJavascriptNativeRoundtripV1,{named_case_id:{value:named_case_id,enumerable:true},input_fixture_id:{value:input_fixture_id,enumerable:true},schema_mode:{value:mode,enumerable:true},fixture_id:{value:binding.fixture_id??'real',enumerable:true}});
+  Object.defineProperties(globalThis.__loginomJavascriptNativeRoundtripV1,{calibration_id:{value:calibration_id,enumerable:true},named_case_id:{value:named_case_id,enumerable:true},input_fixture_id:{value:input_fixture_id,enumerable:true},schema_mode:{value:mode,enumerable:true},fixture_id:{value:binding.fixture_id??'real',enumerable:true}});
   return {armed:true,input_read_id:binding.read_id,source_sha256};
 }
 
@@ -249,7 +256,7 @@ export function sealJavascriptNativeRoundtripDone({identity,confirmation}){
 
 export function completeJavascriptNativeRoundtrip({execution,source_sha256}){
   const s=globalThis.__loginomJavascriptNativeRoundtripV1;
-  if(s?.stage!=='done-sealed'||source_sha256!==s.source_sha256||execution?.verified!==true||execution.owner_verified!==true
+  if(s?.calibration_id!==undefined||s?.stage!=='done-sealed'||source_sha256!==s.source_sha256||execution?.verified!==true||execution.owner_verified!==true
     ||execution.status!=='completed'||!execution.process_id||!execution.process_record_id||!execution.group_id
     ||execution.trial?.source_sha256!==s.source_sha256)throw Error('Roundtrip completed JS child required');
   s.stage='execution-reserved';s.check();
