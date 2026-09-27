@@ -15,6 +15,29 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source86 live: B-get-case owned failure подтверждён, attribution открыт
+
+Profile87/original54042 terminal exit1/UNRESOLVED (не harness FAILED).
+Прошли execution_terminal/native_named_terminal_verified; прежнего timeout нет.
+Root independent audit:8native cells/591journal refs/1265pins/cleanup3 PASS;
+закреплённых Chromium процессов нет. Report SHA
+660eff769c3024ba49a61f83fea166dcd12654a7ec94e325b77958f73ebb0e9c.
+Native full error: столбец `"value"` отсутствует во входной таблице №0,
+`<main>:4:1`, module `<main>:1:1`. Точный source и fresh owned failed child
+подтверждены, OUTPUT не читался, исходные4cells unchanged после выполнения.
+Case_complete=false/rejection_attributed=false: отдельная проверка source-position
+mapping ещё нужна, полный B/G5/J25 не закрыт. A8/8 сохраняется.
+
+Private audit-named-b-failed-live86.py впервые проверен на реальном failed proof.
+Исправлена ошибка draft auditor: raw INPUT хранит компактный execution(status/id),
+а completed_child и upstream — полный receipt. Теперь exact full child equality
+и compact exact(status/id) проверяются отдельно, как ранее в A auditor.
+Draft1 сохранён; runtime/report/ожидаемая семантика не менялись ради аудита.
+Receipt native-named-get-case-probe-03-verification.json, registry/matrix обновлены.
+Следующий шаг — оставшиеся фиксированные B observations и затем необходимая
+отдельная attribution calibration по принятому design; новых browser пока нет.
+
+
 ### Source86 принят; B-get-case/profile87 RUNNING
 
 Developer revision12 completed/idle, turn01a0e4d9. Изменены только два acceptance
