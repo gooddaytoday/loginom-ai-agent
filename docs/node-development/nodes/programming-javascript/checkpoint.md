@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Engine-probe-05 input-text PASS; переход к native INPUT — 2026-09-27
+
+После перезапуска OpenViking MCP health и actor find успешны; Doctor: 0 failures,
+авторизация и /ready подтверждены. Одно предупреждение относится к старым
+transcript_unreadable/aborted запросам; новых ошибок в этой проверке нет.
+
+Source55/profile33 engine-input-text завершён exit0 OBSERVED. Root независимо
+проверил 842 journal SHA, все 30 входных и 6 выходных ячеек, один fresh owned
+completed JS Execute, exact source и 42/42 неизменённых runtime/test hashes.
+Полная таблица Result:string совпала с независимым Python CSV/Unicode oracle
+для trim/lower/upper. Original cleanup: package closed, logout, browser closed.
+Report SHA: `6d19df26fbd86e2801497685dd7d8300f824686ca9bcb0efd5570ecc6467800e`.
+Приватные receipts: engine-probe-05-verification.json и
+engine-probe-05-oracle-verification.json. Engine profile: 5 observed_pass,
+25 not_checked; native bytes и G5 остаются открытыми.
+
+Первый следующий шаг — input-only реализация по [native design](native-types-design.md):
+Value:real, четыре значения NULL/0/−1.25/10.125, независимое native чтение до JS.
+Браузер закрыт, profile33 сохранён; новая реализация требует отдельной проверки
+и source freeze перед следующим headed запуском. Полный план остаётся active.
+
+
 
 ### Engine-probe-04 Cyrillic upper PASS; input-text запущен — 2026-09-27
 
