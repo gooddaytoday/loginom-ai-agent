@@ -4,7 +4,7 @@ import {createNodeProcedure} from '../../client/lib/node-procedure.mjs';
 import {withBrowserReceipt} from '../../client/lib/executor.mjs';
 import {nativeFrontendPins} from '../../client/lib/collapse-native-output.mjs';
 import {decodeVariantFrame} from '../../client/lib/variant-native-decode.mjs';
-import {javascriptNativeInputCode,javascriptNativeRuntimeCode} from './javascript-native-input-binding.mjs';
+import {javascriptNativeInputCode,javascriptNativeRuntimeCode,verifyNativeInputCookieRuntime} from './javascript-native-input-binding.mjs';
 import {verifyLoadedNativeRuntime} from '../../client/lib/collapse-native-runtime.mjs';
 import {readJavascriptNativeInput,cancelJavascriptNativeInput,javascriptNativeInputStatus} from './javascript-native-input-read.mjs';
 import {nativeInputProvenance,verifyNativeInputUi,verifyNativeInputRead,nativeInputFixture} from './javascript-native-input-contract.mjs';
@@ -39,7 +39,7 @@ export async function verifyNativeInputFrontends(execute,origin,deadline,signal)
 
 export async function readNativeInputDuringImport({options,ctx,provenance,targetOrigin,targetBuild,onState},
   {createProcedure=createNodeProcedure,verifyFrontends=verifyNativeInputFrontends,verifyRuntime=verifyLoadedNativeRuntime,
-    verifyCountLoaders=verifyNativeInputCountLoaders}={}){
+    verifyCountLoaders=verifyNativeInputCountLoaders,verifyCookieRuntime=verifyNativeInputCookieRuntime}={}){
   const {execute,operation,onRecord,now}=options;
   const deadline=ctx.deadline;
   const check=()=>{ctx.signal?.throwIfAborted();need(now()<deadline,'original deadline expired');
@@ -78,6 +78,7 @@ export async function readNativeInputDuringImport({options,ctx,provenance,target
     const runtime=verifyRuntime(await execute(javascriptNativeRuntimeCode(args),{timeout:Math.min(10000,deadline-now())}),args);
     check();
     const binding=await execute(javascriptNativeInputCode(args),{timeout:Math.min(10000,deadline-now())});
+    const cookiePins=verifyCookieRuntime(binding.cookie_sources);delete binding.cookie_sources;
     const pins=verifyCountLoaders(binding.count_loader_sources);
     delete binding.count_loader_sources;check();
     let cancellation;
@@ -94,7 +95,7 @@ export async function readNativeInputDuringImport({options,ctx,provenance,target
         throw Object.assign(new AggregateError([readError,statusError],readError.message),{observationError:readError,cleanupError:statusError});}}
     check();const expected={...binding,read_id:readId};
     const exact=verifyNativeInputRead(raw,{binding:expected,lifecycle,provenance});
-    const proof={exact,raw,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,count_loader_sha256:pins,lifecycle};
+    const proof={exact,raw,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,cookie_runtime_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
     const event={phase:'javascript_native_input_cells_verified',operation_id:operation.id,proof};
     const saved=await onRecord(event);need(saved?.phase===event.phase&&JSON.stringify(saved.proof)===JSON.stringify(proof),'native journal acknowledgement differs');
     return proof;
