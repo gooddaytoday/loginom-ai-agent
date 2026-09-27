@@ -15,6 +15,27 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Probe04: единственный guard failure установлен; diagnostic delivery обрезана
+
+Headed profile37/source58 завершён exit1 FAILED. Все13 Preview checks доставлены:
+только no_input_ports=false; owner/node/port GUID/output identity/type/subtype/
+param/status/last-call checks true. Input count2; первая запись подтверждает
+parent_matches=true,type0,subtype6,param1. Остальные inventory values не доказаны:
+конечный error.message обрезан на500 chars после начала status. Нельзя выводить
+состояния портов из synthetic tests или значения первого переносить на второй.
+
+Original cleanup ALL PASS (package/logout/browser), recovery не требуется.
+Root проверил439 journal references и66source pins. Report SHA256:
+`5c2a6b118bda0e9aac66f6a8a1582d7dd1edd4c51c7e1b6fd23d519930c78df5`.
+Private receipt native-input-probe-04-verification.json. Native cells не читались.
+
+Существующей задаче поручена компактная fixed diagnostic с полным inventory
+внутри действующего лимита, без расширения generic error bounds, и regression
+через actual production error delivery. Проверка только fake driver не покрыла
+этот truncation. Guard пока сохранён; после нового freeze требуется fresh headed
+probe. Lease browser closed, profile37 сохранён; полный план остаётся active.
+
+
 ### Freeze58: diagnostic guards проверены, probe04 запущен — 2026-09-27
 
 Source node-javascript `675b5c8d4a`: только native-input-binding и его tests.
