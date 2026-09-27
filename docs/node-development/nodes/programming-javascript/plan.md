@@ -226,7 +226,8 @@ diagnostics и все примеры будущей v1-редакции. Про�
 source70/probe07 (12 native cells); source71 отдельно подтвердил boolean (9 cells)
 и string (24 cells), включая NULL/empty/false/Unicode/multiline. Source72
 подтвердил safe int64 identity (12 cells, NULL/0/±9007199254740991);
-outside-safe characterization, Date,
+outside-safe probe отдельно показал 9007199254740993 →9007199254740992
+при точных INPUT/upstream (9 cells), без общей гарантии int64. Date,
 кардинальности и весь G5 остаются открыты,
 точные доказательства и ограничения — в checkpoint. В G5 ограниченными случаями установить
 Integer coercion для fraction/string/NaN/±Infinity; exact integer oracle

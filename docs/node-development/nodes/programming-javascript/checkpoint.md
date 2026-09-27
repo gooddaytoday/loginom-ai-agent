@@ -15,6 +15,31 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Outside-safe int64: изменение точности подтверждено
+
+Source72/profile53 native-integer-outside-safe-roundtrip-probe-01 завершён
+exit0, session23219 terminal, OBSERVED/native-roundtrip-characterized.
+INPUT и повторный upstream точны; OUTPUT строки2 изменился:
+`9007199254740993` → `9007199254740992`, signed64LE
+`0100000000002000` → `0000000000002000`, delta `-1`.
+Остальные два значения ±9007199254740992 сохранились. Это наблюдение прямого
+Data Get/Set identity на данном стенде, не доказательство конкретной внутренней
+причины и не общая гарантия арифметики int64. ExactPASS=false,
+characterization_only=true, general_integer_precision_guarantee=false.
+
+Независимо проверены9cells/619journalrefs/85sourcepins, source/execution,
+исходный upstream execution, runtime/frontend receipts, lifecycle3/3 каждой
+стадии, final journal ACK и3Preview-close events. Original cleanup3/3=true.
+ReportSHA `81ba816209289cc8cbb497ccdf9b07bdfd4d8d33e94b016d37f6addca8184115`;
+private native-integer-outside-safe-roundtrip-probe-01-verification.json сохранён.
+Lease CLOSED, profile53 сохранён; recovery не нужен. Следующий профиль не назначен.
+
+Прежняя задача разработчика готовит только bounded Date/civil design по коду;
+runtime/fixtures/tests до отдельного следующего задания не меняются. Проверить
+civil read миллисекунд и native tag7 без выдуманного epoch/timezone. Все остальные
+требования исходного плана, полный G5/public handler/CLI остаются открыты.
+
+
 ### Safe int64 PASS; outside-safe запущен отдельно
 
 Source72/profile52 native-integer-safe-roundtrip-probe-01 завершён exit0,

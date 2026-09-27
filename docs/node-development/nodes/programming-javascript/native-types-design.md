@@ -4,8 +4,11 @@
 Source71 `0115eccd20`: boolean/profile50 audit9cells/570journal refs PASS,
 string/profile51 audit24cells/556refs PASS;81sourcepins и original cleanup3/3
 каждого прогона подтверждены. NULL/false/empty и точные Unicode/multiline строки
-сохранены. Root886main+3deny+4Python PASS. Следующий bounded Fix72 — safe int64
-и outside-safe characterization; Date/cardinality/полный G5 остаются открыты.
+сохранены. Root886main+3deny+4Python PASS. Source72 `7982cc3542`: safe int64/profile52 exact12cells/632refs PASS;
+outside-safe/profile53 characterization9cells/619refs —
+9007199254740993 →9007199254740992, INPUT/upstream неизменны.
+85pins и cleanup3/3 обоих прогонов подтверждены; root959main+3deny+6Python PASS.
+Date/cardinality/полный G5 остаются открыты.
 Source70 `c1ae171e50a2b3368d72831fb27ecca84d4a58a2`, root814 main+3deny PASS.
 Headed native-roundtrip-probe07/profile49 завершён exit0 OBSERVED, original cleanup
 ALL PASS. Независимый Python oracle проверил12/12 ячеек: INPUT до JS, JS OUTPUT и
@@ -18,8 +21,8 @@ Private input-only admission ранее подтверждён source63/probe09;
 добавили отдельные JS/upstream bindings, source/mode Done seal, точный AddPort
 admission и owned-port selection+F3 с проверенным postclick DOM transition.
 Bool/string fixtures с native INPUT до JS, точным NULL/empty/false/UTF8
-и независимым roundtrip подтверждены source71. Далее safe int64, outside-safe
-characterization, Date, cardinality и остальная матрица плана. Нельзя подгонять
+и независимым roundtrip подтверждены source71. Safe int64 и outside-safe characterization подтверждены source72 в указанном
+объёме. Далее Date, cardinality и остальная матрица плана. Нельзя подгонять
 expected под importer или заменять независимый input JS-генератором.
 
 Далее сохранён дизайн и анализ **исходного source55**, поэтому указания
