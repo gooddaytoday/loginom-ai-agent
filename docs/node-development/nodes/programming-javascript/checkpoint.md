@@ -16,6 +16,25 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source81 independently PASS; empty04 headed RUNNING
+
+Developer full client завершился202 file PASS/9 file FAIL; исходные failures и
+EPERM diagnostics сохранены в freeze81, причины не обобщаются. Root повторил
+тот же1245-pin snapshot: **2480 client PASS/10 SKIP/0 FAIL**,1325 main+3 deny+
+11 Python PASS; syntax/diff-check и hashes до/после PASS. Skips:2 Windows-only,
+8 opt-in Chromium; их live выполнение не заявляется.
+
+Exact5 source/test files committed child:
+`14a9df5fcee360fd551c36e6410bd0bd6fa429b2`. Manifest SHA
+`037bacce0f6a3f981818eb0d0e4a08162f404ecead1de26ab8c7dc38346beebf`.
+Private root receipt operator81-root-test-source.json и matching freeze81 сохранены.
+
+Запущен native-cardinality-empty-probe-04/profile65, original session68506,
+DISPLAY=:1/headed/sandbox. Node/browser/source pins и отсутствие другого
+закреплённого браузера проверены. Browser lease RUNNING, developer idle.
+Terminal ещё не получен; live FItems/empty/native zero пока не приняты.
+
+
 ### Empty03: причина Items подтверждена live; source81 назначен
 
 Original session82166 terminal exit1: prepare-typed-input, cleanup3/3.
