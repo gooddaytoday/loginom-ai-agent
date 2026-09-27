@@ -16,6 +16,25 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Engine-probe-01 smoke PASS; Unicode trim запущен — 2026-09-27
+
+Source55 engine-data-smoke/profile29 завершён exit0 OBSERVED, original package/
+logout/browser ALL PASS. Root независимо проверил862 journalSHA,30 input cells,
+один свежий completed JS execution и exact source SHA
+fdf568072d6bf7924b9d8c901ee3be94e6a0c7278563637ee508325b8d9db3c7.
+Отдельный oracle подтвердил полную1×1 Result:string='Data ready',nonnull,
+filterfalse,untruncated, unchanged graph/input boundary. Все42 sourceSHA сохранены.
+ReportSHA33fde39645f04cccdb8b720819f7bf1bc6f13e582d230c81eda2ac5eaa3e97b2;
+private receipts engine-probe-01-verification.json и -oracle-verification.json.
+Это только engine/API/UI smoke: native_bytes_verifiedfalse,gates_closed[].
+
+Freshprofile30 назначен с backup/receipt,profile29 сохранён. На тех же исходниках
+запущен engine-probe-02 --discovery-probe engine-literal-trim,headed DISPLAY=:1,
+sandbox enabled. Ожидание задано заранее:1×1 Result:string='Ёж 😀' после trim
+пробелов,tab иLF литерала. Source receipt engine-probe-02-source.json.
+На момент записи RUNNING; повторное выполнение не отправлялось.
+
+
 ### Freeze55: isolated discovery; engine-probe-01 запущен — 2026-09-27
 
 Source commit `520ce1f78ce39859d3ce30a65db93e80c9081747`,8 private source/test files.
