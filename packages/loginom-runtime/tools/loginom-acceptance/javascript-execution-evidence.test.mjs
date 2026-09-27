@@ -18,6 +18,7 @@ import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {resolveConfiguredOutputMapping} from '../../client/lib/port-mapping-procedure.mjs';
 import {NodeProcedureStepError} from '../../client/lib/node-procedure.mjs';
+import {Element} from '../../client/test/support/workspace-ui-fixture.mjs';
 
 function privateSelectionFixture(fault) {
   const node={id:'js-guid',tid:'MF;TF-1;Graph;JavaScript',allowed_actions:[]};
@@ -961,12 +962,14 @@ test('wizard address refuses accessors throughout native label and breadcrumb ca
 });
 
 function executionNotificationFixture() {
-  const element={id:'toast-1',isConnected:true,getAttribute:k=>k==='data-tid'?'toast':null,getBoundingClientRect:()=>({width:300,height:150})};
+  const element=Object.assign(new Element('div',{'data-tid':'toast',class:'x-window bg-notify-msg-color-error'},'',{width:300,height:150}),
+    {id:'toast-1',root:true});
   class Toast {}
   Object.assign(Toast.prototype,{$className:'Ext.window.Toast',closeOnMouseOut:false,hideDuration:500});
   const toast=new Toast();Object.assign(toast,{el:{dom:element},autoClose:true,autoCloseDelay:23000});
   const node={FGuid:'js',data:{},FCell:{}},workflow={},container={},graph={container};
-  const form={...element,id:'model-form',classList:{contains:c=>c==='bg-mask-message'},contains:e=>e===container,
+  const form={id:'model-form',isConnected:true,getBoundingClientRect:()=>({width:1000,height:800}),
+    classList:{contains:c=>c==='bg-mask-message'},contains:e=>e===container,
     getAttribute:k=>k==='data-tid'?'MF;TF-1;ModelForm':k==='bg-mask-text'?'Загрузка':null};
   const view={el:{dom:form}},diagram={FNodes:{FCollection:[node]},FmxGraph:graph},model={FDiagram:diagram,FView:view};
   class MaskContext {}
@@ -975,7 +978,8 @@ function executionNotificationFixture() {
   view[MaskContext.ElementSymb]=mask;
   const controller={FController:model,Node:{data:{node:workflow}}},tab={Controller:controller};
   const state={dialogs:[element],masks:[],now:0};
-  const document={querySelectorAll:s=>s.startsWith('.x-mask')?state.masks:s.startsWith('[data-tid=')?[form]:state.dialogs};
+  const document={querySelectorAll:s=>s.startsWith('.x-mask')?state.masks:s.startsWith('[data-tid=')?[form]:
+    state.dialogs.filter(e=>Element.prototype.matches.call(e,s))};
   const binding={document,tab,controller,model,view,form,diagram,graph,container,native:node,nodeData:node.data,cell:node.FCell,workflow,node:{id:'js',tid:'MF;TF-1;Graph;JavaScript'}};
   const realm=vm.createContext({document,performance:{now:()=>state.now},location:{origin:'http://logi-test-plan.bg.local'},getComputedStyle:()=>({display:'block',visibility:'visible'}),
     Ext:{window:{Toast},getCmp:id=>id===form.id?view:toast},bg:{ext:{AfterElementTextMaskContext:MaskContext},
@@ -989,6 +993,42 @@ test('post-execution notification waits for natural disappearance without claimi
   assert.equal(before.execution_dispatched,true);assert.equal(before.execution_completed,false);
   assert.equal(before.notification_owner_verified,false);assert.equal(before.auto_close_delays[0],23000);
   f.state.dialogs=[];assert.equal(f.read().ready,false);f.state.now+=500;assert.equal(f.read().ready,true);
+});
+
+test('post-execution inventory sees native window without toast class or ARIA role throughout auto-close',()=>{
+  const f=executionNotificationFixture();
+  assert.equal(f.element.matches('[role="dialog"],.x-message-box,.x-toast'),false);
+  assert.equal(f.element.matches('[role="dialog"],.x-window,.bg-dialog'),true);
+  assert.equal(f.read().notification_count,1);
+  f.state.now=23000;const retained=f.read();
+  assert.equal(retained.ready,false);assert.equal(retained.quiet_for_ms,null);
+  assert.equal(retained.execution_completed,false);assert.equal(retained.notification_owner_verified,false);
+  f.element.remove();f.element.root=false;
+  assert.equal(f.read().ready,false);f.state.now+=499;assert.equal(f.read().ready,false);
+  f.state.now++;assert.equal(f.read().ready,true);
+});
+
+test('post-execution inventory retains old selectors and counts a multiply matched native toast once',()=>{
+  for(const attrs of [{class:'x-toast'},{class:'x-message-box'},{role:'dialog'},
+    {class:'x-window bg-dialog x-message-box x-toast',role:'dialog'}]){
+    const f=executionNotificationFixture();f.element.attrs={'data-tid':'toast',...attrs};
+    assert.equal(f.read().notification_count,1);assert.equal(f.read().ready,false);
+  }
+});
+
+test('post-execution inventory rejects generic-only foreign windows even after prior quiet',()=>{
+  for(const cls of ['x-window','bg-dialog']){
+    const f=executionNotificationFixture();f.state.dialogs=[];
+    assert.equal(f.read().ready,false);f.state.now=500;assert.equal(f.read().ready,true);
+    const foreign=Object.assign(new Element('div',{'data-tid':'foreign',class:cls}),{id:'foreign',root:true});
+    assert.equal(foreign.matches('[role="dialog"],.x-message-box,.x-toast'),false);
+    f.state.dialogs=[foreign];
+    assert.throws(()=>f.read(),/foreign dialog or unsupported notification lifecycle/);
+    // A valid Toast next to a foreign dialog does not authorize either waiting
+    // on or dismissing the foreign dialog.
+    f.state.dialogs=[f.element,foreign];
+    assert.throws(()=>f.read(),/foreign dialog or unsupported notification lifecycle/);
+  }
 });
 
 test('post-execution owned ModelForm busy may publish its first toast before stable quiet',()=>{
@@ -1008,7 +1048,7 @@ test('post-execution native busy proof rejects foreign target, inactive/replaced
     f=>f.mask.FIsActive=false,f=>f.mask.FSequence=[],f=>f.mask.FCurrent=1,f=>f.mask.FSequence=['Foreign'],
     f=>delete f.view[f.MaskContext.ElementSymb],f=>f.view[f.MaskContext.ElementSymb]={...f.mask},
     f=>f.binding.model.FView={},f=>f.form.contains=()=>false,f=>f.state.masks.push(f.element),
-    f=>f.state.dialogs=[{...f.element,getAttribute:()=> 'msgbox'}]]){
+    f=>{f.element.attrs['data-tid']='msgbox';f.state.dialogs=[f.element];}]){
     const f=executionNotificationFixture();f.state.dialogs=[];f.state.masks=[f.form];change(f);assert.throws(()=>f.read());
   }
 });
