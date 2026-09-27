@@ -248,7 +248,7 @@ Source `87332cec9804c761465dad766f989fb458c4d997`, pinned Loginom frontend7.4.2.
 29aa1bd6c1f9c0de7b2436607fa0860264201a8699ab27b86092147faa461c93.
 Это characterization одного fixed case; никакой общий rounding/truncation
 алгоритм и внутренний механизм ChakraCore не объявляются доказанными.
-Матрица5/7 characterized, остальные2 not_run. Подробности и актуальное
+Матрица6/7 characterized, последний случай not_run. Подробности и актуальное
 продолжение — [checkpoint](checkpoint.md); full G5/handler/CLI не закрыты.
 
 Отдельный fraction-negative01/profile67 на том же source: native Real−1.75
@@ -273,3 +273,10 @@ e56fe58eb78f1fdcdbf6f05ee40a5dc78741ddace477dce5f3fbb59686918d9a.
 616 refs,1259 pins,cleanup3/3; report SHA
 d082d1dcda98860569efac8772b0dd66a37677e839d242ce4cf68ea282594e75.
 Проверка не устанавливает native nonfinite INPUT или общий floating-point bridge.
+
+Отдельный positive-infinity01/profile71: native Real1 INPUT/upstream exact;
+fixed source candidate +Infinity=input/0, Integer OUTPUT−9223372036854775808
+(signed64 LE0000000000000080), не NULL. Root audit3 cells,646 refs,1259 pins,
+cleanup3/3; report SHA
+f981135e99df70b88af12637ee4ad5309ef2a1bd4ca7a1d921ddc74f5be7fa6f.
+Внутренний механизм и общий overflow/clamping algorithm этим не доказываются.
