@@ -16,6 +16,17 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Integer coercion negative-infinity01 RUNNING
+
+Source82 unchanged/1259 pins повторно проверены; original exec session52877
+RUNNING, fresh profile72, DISPLAY=:1/headed/sandbox. Evidence
+native-integer-coercion-negative-infinity-probe-01. INPUT native Real−1;
+candidate −Infinity=fixed input/0, не native nonfinite INPUT. OUTPUT неизвестен,
+результат +Infinity не подставляется oracle. Исходный deadline600000ms,no replay.
+Matrix6 characterized,−Infinity unresolved/running. Проверять original
+session52877 до terminal, затем cleanup и independent audit.
+
+
 ### Integer coercion positive-infinity01: independent characterization PASS
 
 Source82/profile71 original session59840 terminal exit0, CHARACTERIZED,
