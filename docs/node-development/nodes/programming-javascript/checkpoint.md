@@ -15,6 +15,23 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze74 root PASS; Date roundtrip02 запущен
+
+Root подтвердил1042main+3public-deny+7Python PASS,190pins до/после, syntax3.
+Shared228 tests source73 не повторялись: их код не изменён. Проверен bounded diff:
+удалена только global port-GUID inequality, составная принадлежность и native
+owner/source/fresh execution проверки сохранены. Добавлены13 regression cases.
+Три runtime/test файла закоммичены в node-javascript:
+`cb3e608baac8ca9f0270540ac4c65e7930d08d21`.
+
+После terminal cleanup прежнего прогона назначен fresh profile56; profile55
+сохранён, backup/receipt56 приватны. Запущен native-datetime-roundtrip-probe-02,
+session74185, source74/190pins, headed DISPLAY=:1/sandbox; Node/Chromium hashes
+повторно проверены. Lease RUNNING, разработчик idle Freeze74. Ожидания дат и
+байтов не изменены; INPUT аттестуется заново. До terminal cleanup другой браузер
+не запускать. Полный Date roundtrip/остальнойG5/public handler/CLI ещё открыты.
+
+
 ### Date roundtrip01: ошибочная глобальная уникальность port GUID; Fix74 назначен
 
 Source73/profile55 завершён FAILED, session27875 terminal exit1, original
