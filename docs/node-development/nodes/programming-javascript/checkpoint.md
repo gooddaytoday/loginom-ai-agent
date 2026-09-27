@@ -16,6 +16,32 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Upload79 reconciled; source84 readiness fix назначен
+
+Original FAILED/profile79 остаётся FAILED. Отдельная read-only проверка
+profile81/original49543 terminal exit0: точный каталог исходного receipt,
+CSV скачан через UI, 55bytes и SHA
+86983c730cec045020a014b5bd365b2cf604c5f214774eb4a31b9344f6d0865d
+совпали с fixture. Повторной загрузки/импорта/JS не было; account jsteach,
+packages0, logout/browser close подтверждены, pinned Chromium отсутствует.
+Private evidence upload79-reconciliation-02.json + upload79-server-copy.csv.
+Первый recovery profile80/original15091 failed до файлового списка, cleanup
+logout не подтвердился из-за mask. Он сохранён; profile81 дожидался HomePage
+и подтвердил корректное состояние аккаунта и финальный выход.
+
+Root get_usage_limits теперь1% used; прежний лимит больше не подтверждается.
+В ту же задачу разработчика назначено source84 исправление readiness race.
+Attribution design отложен. Узкий дизайн: при ready→busy SAME owner на финальном
+reread ждать тот же native binding до исходного deadline, заново проверить
+все guards; bounded rechecks, без новых upload/refresh/download/gesture.
+Owner/store/context change, чужие маски/dialog, deadline остаются отказом.
+Аналогичное окно после Refresh проверить отдельно. Не ослаблять guard и не
+переписывать старый FAILED. Нужны адресные regression tests actual predicates,
+полный client suite, новый freeze manifest со всеми1265 прежними paths.
+Разработчику браузер/commit не разрешён; root принимает исходники и live.
+A5/8 accepted, оставшиеся3 не приняты. Полная цель active.
+
+
 ### Возобновление: OpenViking работает; A5/8 PASS; проверка загрузки требует reconciliation
 
 MCP health/find/read успешны. Случайный клик пользователя относился к
