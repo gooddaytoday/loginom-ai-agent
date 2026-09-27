@@ -15,6 +15,19 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-columns-case CHARACTERIZED: undefined
+
+Profile91/original41062 terminal exit0/CHARACTERIZED. Independent audit9cells/
+603journal refs/1265pins/cleanup3 PASS; no pinned Chromium. Marker10 означает
+undefined для точного `InputTable.Columns["value"]`. Case_complete=true,
+exact_pass=false и G5=false. Report SHA
+1dd1566e9f24694c908102a3689f5bac41e71b270ce00cc6500d8b9c1ea80f64.
+Receipt native-named-columns-case-probe-01-verification.json;
+registry/matrix обновлены. B3complete/2owned-failure-unattributed/3not_run.
+Следующий — B-columns-missing, fresh profile92; source86 остаётся frozen.
+K1/K2 proposal reviewed, реализация/calibration ещё не назначены.
+
+
 ### B-columns-case/profile91 RUNNING; calibration sources проверены
 
 Fresh profile91/source86 после verified profile90 cleanup;1265pins/toolchains/
