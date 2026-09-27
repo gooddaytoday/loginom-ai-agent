@@ -16,6 +16,20 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Fix78 interim review: не переносить UI Required в native metadata без основания
+
+Root прочитал новую captureJavascriptNativeZero и обнаружил дополнительное
+требование native Preview field.Required boolean/equal UI.Required. В существующих
+node-preview-schema.mjs и variant-native-read.mjs native metadata проверяется по
+Name/DisplayName/DataType; наличие Required в другом UI mapping store этого
+не доказывает. Разработчику передано проверить source evidence. Если native поле
+не подтверждено, Required сохраняется в UI held witness/drift checks, а native
+association использует доказанные name/label/type/index. Это открытый review point,
+не установленный live-дефект и не разрешение ослабить schema/count/owner checks.
+Developer active Fix78; code не frozen, tests/live ещё не приняты. Browser CLOSED.
+
+
+
 ### Подготовлены независимые zero oracles; profile62 зарезервирован
 
 Root подготовил private auditors, без live claim:
