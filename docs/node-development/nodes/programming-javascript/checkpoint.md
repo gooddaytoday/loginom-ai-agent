@@ -15,6 +15,18 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source89 incomplete handoff corrected after terminal revision22
+
+Task turn01a0e532 terminal revision22, но final относится к историческому memory
+bootstrap и не соответствует изменённым runtime/helper/tests. Freeze89 отсутствует;
+targeted1131PASS/1FAIL (actual calibration trial with production journal).
+Root не принял версию и направил продолжение в ту же задачу: закончить реальный
+source89/failing integration/full suites/manifest, не повторять bootstrap.
+Ранний root helper check: canonical origin принят,10подмен отвергнуты; private
+operator89-root-intermediate-ACK-check.json. Он не заменяет полный integration.
+Новых browser runs нет, recovery profile96 завершён ранее.
+
+
 ### Root reproduced concrete K2 ACK mismatch: origin normalization
 
 Actual failed journal line7 stores outcome.output.origin with trailing slash.
