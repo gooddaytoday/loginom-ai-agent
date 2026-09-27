@@ -4,6 +4,7 @@ import {waitJavascriptWizardSettlement} from './javascript-wizard-settlement.mjs
 import {openJavascriptOutputViews,waitJavascriptViewsSettlement} from './javascript-output-opening.mjs';
 import {captureJavascriptNativeTopology,connectJavascriptInput,requireJavascriptTopology,requireJavascriptGraphUnchanged} from './javascript-link-topology.mjs';
 import {caseEffect} from './javascript-batch-plan.mjs';
+import {characterizeJavascriptMapping,javascriptExecutionIdentity,verifyJavascriptMismatchTable,verifyJavascriptPreviousExecution} from './javascript-mismatch-probe.mjs';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
@@ -573,6 +574,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     return {card,controller:card.Controller,workflow:card.Controller.Node.data.node,packageNode:matches[0].packageNode,tab:matches[0].tab};
   },prepared);
   let cleanupRestore,passiveSurface,pendingWizard,pendingMapping;
+  const executionPhases=new Map();
   const graph=()=>adapter.observe(graphRequest,deadline);
   const channel=(node,operationDeadline=deadline,cleanup=false)=>createNodeProcedure({operation:{id:'js-g2-'+randomUUID(),action:{action_key:'diagnostic.javascript',revision:'1'},deadline:operationDeadline},
     execute:cleanup?code=>executeUntil(code,operationDeadline):execute,
@@ -636,9 +638,9 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       })();
       return cleanupRestore;
     },
-    async reopen(node) {
+    async reopen(node,operationDeadline=deadline) {
       if(pendingWizard)throw Error('Previous Setting opening remains unresolved; no replay');
-      const openingDeadline=Math.min(deadline,Date.now()+90000),binding=await privateGraphBinding(node);
+      const openingDeadline=Math.min(deadline,operationDeadline,Date.now()+90000),binding=await privateGraphBinding(node);
       const identity=await page.evaluate(b=>({node:b.node,icon:b.icon}),binding);
       pendingWizard={...identity,binding,reference:node,prepared:{...graphRequest,node},lifecycle:{}};
       try {
@@ -673,19 +675,23 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
         if(lifecycle.closed){pendingMapping=undefined;await native.dispose();}
       }
     },
-    async readPortMapping(node,direction) {
+    async readPortMapping(node,direction,{characterize=false,operationDeadline=deadline}={}) {
       if(!['input','output'].includes(direction))throw Error('Unknown mapping direction');
-      const reader=channel(node),reference={document_id:prepared.document_id,workflow_id:prepared.workflow_ref.workflow_id,node_id:node.node_id};
+      if(characterize&&direction!=='output')throw Error('Only output mapping characterization is supported');
+      const readDeadline=Math.min(deadline,operationDeadline);
+      const reader=channel(node,readDeadline),reference={document_id:prepared.document_id,workflow_id:prepared.workflow_ref.workflow_id,node_id:node.node_id};
       const before=await graph();requireJavascriptTopology(before);
       const native=await page.evaluateHandle(captureJavascriptNativeTopology,{});let opened=false;
       try {
         try {
           await reader.openPort(direction,0);opened=true;
           const state=await reader.observe({condition:'complete JavaScript '+direction+' mapping',readMappings:true,
-            ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.prepared_node_context?.verified===true});
-          await record({phase:'port_mapping_observed',direction,node,mapping:state.node_mapping});return state.node_mapping;
+            ready:s=>characterize?!!characterizeJavascriptMapping(s,reference,{allowPending:true}):
+              s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.prepared_node_context?.verified===true});
+          const mapping=characterize?characterizeJavascriptMapping(state,reference):state.node_mapping;
+          await record({phase:characterize?'port_mapping_characterized':'port_mapping_observed',direction,node,mapping});return mapping;
         } finally {
-          if(opened)await closeJavascriptPortMapping({reader,direction,reference,record,deadline:Math.min(deadline,Date.now()+15000),verifyGraph:async()=>{
+          if(opened)await closeJavascriptPortMapping({reader,direction,reference,record,deadline:Math.min(readDeadline,Date.now()+15000),verifyGraph:async()=>{
             const checked=await page.evaluate(captureJavascriptNativeTopology,{previous:native,checkOnly:true});
             const after=await graph();requireJavascriptGraphUnchanged(before,after);
             await record({phase:'port_mapping_original_graph_verified',direction,checked,before,after});
@@ -782,27 +788,49 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
         await record({phase:'javascript_palette_topology_refused',source,id,reason:String(error.message)});throw error;
       }finally{await native?.dispose();}
     },
-    async executeNode(node,operationDeadline=deadline) {
+    async captureExecutionBoundary() {
+      await accountGuard();const before=await graph();requireJavascriptTopology(before);
+      return {before,native:await page.evaluateHandle(captureJavascriptNativeTopology,{})};
+    },
+    async verifyExecutionBoundary(boundary) {
+      await accountGuard();
+      await page.evaluate(captureJavascriptNativeTopology,{previous:boundary.native,checkOnly:true});
+      requireJavascriptGraphUnchanged(boundary.before,await graph());
+      await record({phase:'execution_boundary_verified',before:boundary.before});
+    },
+    async executeNode(node,operationDeadline=deadline,trial) {
+      const phaseIdentity=javascriptExecutionIdentity(node,trial);
+      if(executionPhases.has(phaseIdentity.effect_id))throw Error('JavaScript execution phase already reserved; no replay');
+      if(trial.phase==='generated-mismatch'){
+        const initial=executionPhases.get('execute-initial-'+node.node_id)?.terminal;
+        if(initial?.verified!==true||initial.owner_verified!==true||initial.status!=='completed'
+          ||initial.trial.source_sha256===trial.source_sha256)throw Error('Changed execution requires a completed distinct initial source');
+      }
+      const slot={identity:phaseIdentity};executionPhases.set(phaseIdentity.effect_id,slot);
       const executionDeadline=Math.min(deadline,operationDeadline);
       const driver=createNodeExecutionProcedure(channel(node,executionDeadline),node,{verifyFailedChild:true});
       const baseline=await driver.prepare();
+      if(trial.phase==='generated-mismatch')verifyJavascriptPreviousExecution(baseline,executionPhases.get('execute-initial-'+node.node_id).terminal);
       const binding=await privateGraphBinding(node);
       try {
         const identity=await page.evaluate(b=>({node:b.node,icon:b.icon}),binding);
         await selectJavascriptForSettings(page,{...identity,binding,deadline:Math.min(executionDeadline,Date.now()+90000),record,requireSettings:false});
-        const launch=await once('execute-'+node.node_id,{node,baseline},()=>driver.launchGraph());
-        await record({phase:'execution_launched',node,baseline,launch,execution_dispatched:true,execution_completed:false});
+        const launch=await once(phaseIdentity.effect_id,{...phaseIdentity,node,baseline},()=>driver.launchGraph());
+        await record({phase:'execution_launched',identity:phaseIdentity,node,baseline,launch,execution_dispatched:true,execution_completed:false});
         await waitJavascriptExecutionNotifications(page,{binding,deadline:executionDeadline,record});
         const identified=await driver.identify(),terminal=await driver.waitCompleted({});
-        await record({phase:'execution_terminal',node,baseline,launch,identified,terminal});return terminal;
+        const result={...terminal,trial:phaseIdentity,fresh_baseline:baseline,launch_identity:identified};
+        slot.terminal=result;
+        await record({phase:'execution_terminal',identity:phaseIdentity,node,baseline,launch,identified,terminal:result});return result;
       }finally{await binding.dispose();}
     },
-    async readPassive(node,kind='output') {
-      if(!['input','output'].includes(kind))throw Error('Unknown passive JavaScript table kind');
+    async readPassive(node,kind='output',operationDeadline=deadline) {
+      if(!['input','output','mismatch'].includes(kind))throw Error('Unknown passive JavaScript table kind');
       // No execution driver is called here. openNewOutputTable refuses an
       // inactive port instead of activating or executing its node.
-      const reader=channel(node),opened=await openNewOutputTable(reader,0,kind==='input'?{}:{openViews:async({output})=>{
-        const openingDeadline=Math.min(deadline,Date.now()+90000),binding=await privateGraphBinding(node);
+      const readDeadline=Math.min(deadline,operationDeadline);
+      const reader=channel(node,readDeadline),opened=await openNewOutputTable(reader,0,kind==='input'?{}:{openViews:async({output})=>{
+        const openingDeadline=Math.min(readDeadline,Date.now()+90000),binding=await privateGraphBinding(node);
         await passiveSurface?.held.dispose();await passiveSurface?.binding.dispose();
         const held=await page.evaluateHandle(({binding:b,output})=>{
           const ports=b.native.FPorts.flatMap(list=>list.FCollection).filter(p=>p.FGuid===output.port_guid);
@@ -811,22 +839,25 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
         },{binding,output});
         passiveSurface={binding,held,prepared:{...graphRequest,node},output};
         const identity=await page.evaluate(b=>({node:b.node,icon:b.icon}),binding);
-        return await once('passive-views-'+node.node_id,{node,port_guid:output.port_guid,execution_started:false},()=>
+        return await once('passive-views-'+(kind==='mismatch'?'generated-mismatch-':'')+node.node_id,{node,port_guid:output.port_guid,execution_started:false},()=>
             openJavascriptOutputViews(page,{...identity,binding,reference:node,prepared:{...graphRequest,node},channel:channel(node,openingDeadline),output,deadline:openingDeadline,record,select:selectJavascriptForSettings}));
       }});
       const formatProof=await configureTablePrecision(reader,opened.table);
       let result;
       try {
         const readSettings=await prepareTableRead(reader,opened.table),raw=await readTableOutputPages(reader,opened.table,{sampleRows:10});
-        result=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:kind==='input'?javascriptInputColumns:javascriptOutputColumns,requireExactNumbers:true});
-        verifyJavascriptTable(result,kind);
+        // Characterization decodes the independently observed Table schema;
+        // a separate fixed mismatch oracle classifies it, never the old oracle.
+        result=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:kind==='mismatch'?raw.columns:
+          kind==='input'?javascriptInputColumns:javascriptOutputColumns,requireExactNumbers:true});
+        if(kind==='mismatch')verifyJavascriptMismatchTable(result);else verifyJavascriptTable(result,kind);
       } finally {
         await restoreTablePrecision(reader,formatProof);
-        if(kind==='output'&&passiveSurface)passiveSurface.returnDispatched=true;
+        if(kind!=='input'&&passiveSurface)passiveSurface.returnDispatched=true;
         await returnFromOutputTable(reader,opened.table);
-        if(kind==='output'&&passiveSurface){await passiveSurface.held.dispose();await passiveSurface.binding.dispose();passiveSurface=undefined;}
+        if(kind!=='input'&&passiveSurface){await passiveSurface.held.dispose();await passiveSurface.binding.dispose();passiveSurface=undefined;}
       }
-      await record({phase:kind==='input'?'passive_input_verified':'passive_output_verified',execution_started:false,node,result});return result;
+      await record({phase:kind==='mismatch'?'passive_mismatch_output_characterized':kind==='input'?'passive_input_verified':'passive_output_verified',execution_started:false,node,result});return result;
     },
   };
 }
