@@ -1,4 +1,4 @@
-import {openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,fillJavascriptColumnField,recordJavascriptColumnHelperSource} from './javascript-column-editor.mjs';
+import {openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,fillJavascriptColumnField,recordJavascriptColumnHelperSource,openJavascriptColumnTypePicker} from './javascript-column-editor.mjs';
 // Private native-cache observer for the two JavaScript wizard pages. A missing
 // cache contract is a refusal with inventory, never permission to read a proxy.
 export function readJavascriptSchema({root,native,binding,prefix}) {
@@ -121,16 +121,16 @@ export async function configureJavascriptSchema({page,context,mode,once,record,d
           fill:text=>field.fill(text,{timeout:Math.max(1,deadline-Date.now())})});
       };
       await fill('edtName',name);await fill('edtDisplayName',name);
-      const combo=at(base+';cbxDataType');
-      await effect('schema-type-open-'+index,{base,name},'cbxDataType','click',()=>combo.click({timeout:Math.max(1,deadline-Date.now())}));
+      const expectedType=[4,5][index],expectedLabel=['Целый','Строковый'][index];
+      await openJavascriptColumnTypePicker({page,state:columnState,record,once,deadline,id:'schema-type-open-'+index,expectedType,expectedLabel,
+        click:(tid,timeout)=>at(tid).click({timeout})});
       const option=page.locator('.x-boundlist-item').filter({visible:true}).filter({hasText:index===0?/^Целый$/:/^Строковый$/});
-      await option.waitFor({state:'visible',timeout:Math.max(1,deadline-Date.now())});
       if(await option.count()!==1)throw Error('Unique native column type option unavailable');
       const optionHandle=await option.elementHandle();
       try {
         await once('schema-type-select-'+index,{base,name},async()=>{
-          await verifyJavascriptColumnEditor({page,state:columnState,record,deadline,target:'cbxDataType',kind:'option',option:optionHandle});
-          await option.click({timeout:Math.max(1,deadline-Date.now())});
+          await verifyJavascriptColumnEditor({page,state:columnState,record,deadline,target:'cbxDataType',kind:'option',option:optionHandle,expectedType,expectedLabel});
+          await option.click({timeout:Math.max(1,Math.min(5000,deadline-Date.now()))});
         });
       } finally {await optionHandle?.dispose();}
       await effect('schema-apply-'+index,{base,name},'btnApply','click',async()=>{columnState.pending.applyDispatched=true;await at(base+';btnApply').click({timeout:Math.max(1,deadline-Date.now())});});

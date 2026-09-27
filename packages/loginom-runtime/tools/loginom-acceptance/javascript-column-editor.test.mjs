@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {observeJavascriptColumnEditor,openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,cleanupJavascriptColumnEditor,waitJavascriptColumnEditor,fillJavascriptColumnField,javascriptColumnFieldMatches,recordJavascriptColumnHelperSource} from './javascript-column-editor.mjs';
+import {observeJavascriptColumnEditor,openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,cleanupJavascriptColumnEditor,waitJavascriptColumnEditor,fillJavascriptColumnField,javascriptColumnFieldMatches,recordJavascriptColumnHelperSource,openJavascriptColumnTypePicker} from './javascript-column-editor.mjs';
 
 function fixture({count=0,globalForm=true}={}) {
   const prefix='MF;TF-1',pageTid=prefix+';WizrdMCF;JavaScriptColumnsWizard',nodes=[],controls={};
@@ -51,6 +51,24 @@ function fixture({count=0,globalForm=true}={}) {
   const observe=phase=>page.evaluate(observeJavascriptColumnEditor,{held:state.pending.held,phase});
   return {realm,page,context,state,once,record,open,observe,model,vendor,view,store,records,form,editor,controls,connection,events,effects,masks,dialogs,element,show,hide,addRecord,
     setHit:fn=>{hit=fn;},setWait:fn=>{onWait=fn;},get waits(){return waits;},get disposed(){return disposed;}};
+}
+
+function typeFixture(f,{expanded=true,type=4,label='Целый'}={}) {
+  const combo=f.form.FItems.cbxDataType,base=combo.el.dom.tid;
+  const wrap=f.element('triggerWrap','',combo.el.dom),triggerDom=f.element('typeTrigger',base+';trg_picker',wrap);
+  const trigger={id:'picker',field:combo,el:{dom:triggerDom},rendered:true};
+  combo.orderedTriggers=[trigger];combo.triggerWrap={dom:wrap};combo.isExpanded=expanded;
+  combo.valueField='Value';combo.displayField='DisplayText';
+  const pickerDom=f.element('typePicker',base+';boundlist'),option=f.element('typeOption',base+';boundlist;'+label,pickerDom);
+  pickerDom.shown=expanded;option.shown=expanded;option.textContent=label;option.classList.add('x-boundlist-item');
+  option.closest=selector=>selector==='.x-boundlist'?pickerDom:null;
+  option.getAttribute=key=>key==='data-recordId'?'type4':key==='data-boundView'?pickerDom.id:key==='data-tid'?option.tid:null;
+  const records=[{isModel:true,internalId:'type4',data:{Value:type,DisplayText:label}}];
+  const store={getData:()=>({items:records}),isLoading:()=>false};combo.store=store;
+  const picker={el:{dom:pickerDom},pickerField:combo,store,dataSource:store};combo.picker=picker;f.controls.typePicker=picker;
+  pickerDom.querySelectorAll=selector=>selector==='.x-boundlist-item'?[option]:[];
+  return {combo,wrap,triggerDom,trigger,pickerDom,picker,option,records,store,
+    expand(){combo.isExpanded=true;pickerDom.shown=true;option.shown=true;}};
 }
 
 test('one Add waits for asynchronous record then global form, with a same-native portal binding',async()=>{
@@ -147,16 +165,14 @@ test('foreign overlay blocks fill despite visible enabled native input and no di
   await assert.rejects(verifyJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000,target:'edtName',kind:'fill'}));
 });
 
-test('owned picker option is admitted while it covers other controls; foreign picker is refused',async()=>{
-  const f=fixture();await f.open();
-  const picker=f.element('picker',''),option=f.element('option','',picker);
-  option.classList.add('x-boundlist-item');option.closest=selector=>selector==='.x-boundlist'?picker:null;
-  f.form.FItems.cbxDataType.picker={el:{dom:picker}};f.setHit(()=>option);
-  const verify=()=>verifyJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000,target:'cbxDataType',kind:'option',option});
+test('owned typed picker option is admitted while it covers other controls; foreign picker is refused',async()=>{
+  const f=fixture();await f.open();const t=typeFixture(f);f.setHit(()=>t.option);
+  const verify=()=>verifyJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000,
+    target:'cbxDataType',kind:'option',option:t.option,expectedType:4,expectedLabel:'Целый'});
   await verify();
   await assert.rejects(verifyJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000,target:'edtName',kind:'fill'}));
-  f.form.FItems.cbxDataType.picker={el:{dom:f.element('foreign-picker','')}};
-  await assert.rejects(verify());assert.equal(f.events.at(-1).snapshot.checks.option_owner,false);
+  t.combo.picker={...t.picker,pickerField:{}};
+  await assert.rejects(verify());assert.equal(f.events.at(-1).snapshot.reason,'type_picker_owner_changed');
 });
 
 test('dense store inventories refuse holes, accessor slots and filtered source caches before Add',async()=>{
@@ -244,4 +260,74 @@ test('helper source diagnostic never invokes helper, bounds UTF-8 bytes and excl
   Object.defineProperty(f.realm.bg.ext,'AssociateDisplaynameWithName',{get(){calls++;throw Error('helper getter');}});
   assert.equal((await diagnostic()).status,'unavailable');assert.equal(calls,0);
   f.form.Records=[{}];assert.equal((await diagnostic()).status,'owner_unconfirmed');assert.equal(calls,0);
+});
+
+
+test('type opening clicks the exact native trigger once and waits for its late owned typed option',async()=>{
+  const f=fixture();await f.open();const t=typeFixture(f,{expanded:false});f.setHit(()=>t.triggerDom);
+  let clicks=0,methodCalls=0;t.combo.getPicker=t.combo.expand=t.combo.onTriggerClick=()=>{methodCalls++;throw Error('mutating method');};
+  await openJavascriptColumnTypePicker({page:f.page,state:f.state,record:f.record,once:f.once,deadline:Date.now()+1000,
+    id:'type-open',expectedType:4,expectedLabel:'Целый',click:async(tid,timeout)=>{
+      clicks++;assert.equal(tid,t.triggerDom.tid);assert.ok(timeout<=1000);f.setWait(()=>t.expand());
+    }});
+  assert.equal(clicks,1);assert.equal(methodCalls,0);assert.equal(f.effects.filter(e=>e==='type-open').length,1);
+  assert.equal(f.events.at(-1).snapshot.picker.typed_option_count,1);
+});
+
+test('type trigger refuses a body hit, foreign native trigger, readOnly or repeated-click trigger before dispatch',async()=>{
+  for(const corrupt of [(f,t)=>f.setHit(()=>t.combo.el.dom),(f,t)=>t.trigger.field={},(f,t)=>t.combo.readOnly=true,(f,t)=>t.trigger.repeatClick=true]){
+    const f=fixture();await f.open();const t=typeFixture(f,{expanded:false});f.setHit(()=>t.triggerDom);corrupt(f,t);let clicks=0;
+    await assert.rejects(openJavascriptColumnTypePicker({page:f.page,state:f.state,record:f.record,once:f.once,deadline:Date.now()+1000,
+      id:'type-open',expectedType:4,expectedLabel:'Целый',click:async()=>{clicks++;}}));
+    assert.equal(clicks,0);assert.equal(f.effects.includes('type-open'),false);
+  }
+});
+
+test('closed type picker and lost trigger click are bounded and never authorize replay',async()=>{
+  for(const lost of [false,true]){
+    const f=fixture();await f.open();const t=typeFixture(f,{expanded:false});f.setHit(()=>t.triggerDom);let clicks=0;
+    const open=()=>openJavascriptColumnTypePicker({page:f.page,state:f.state,record:f.record,once:f.once,deadline:Date.now()+(lost?1800000:15),
+      id:'type-open',expectedType:4,expectedLabel:'Целый',click:async(tid,timeout)=>{assert.ok(timeout<=5000);clicks++;if(lost)throw Error('lost click');}});
+    await assert.rejects(open());await assert.rejects(open(),/do not replay/);assert.equal(clicks,1);
+    if(!lost){assert.equal(f.events.at(-1).phase,'column_type_opening_refused');assert.equal(f.events.at(-1).snapshot.picker.expanded,false);}
+  }
+});
+
+test('typed option rejects matching text with wrong type, bound view or changed native record',async()=>{
+  for(const corrupt of [t=>t.records[0].data.Value=5,t=>t.option.getAttribute=()=>null,t=>t.records[0]={...t.records[0]}]){
+    const f=fixture();await f.open();const t=typeFixture(f);f.setHit(()=>t.option);
+    const verify=()=>verifyJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000,
+      target:'cbxDataType',kind:'option',option:t.option,expectedType:4,expectedLabel:'Целый'});
+    await verify();corrupt(t);await assert.rejects(verify());
+  }
+});
+
+
+test('type config reads bounded inherited data descriptors but refuses accessors without invoking them',async()=>{
+  for(const accessor of [false,true]){
+    const f=fixture();await f.open();const t=typeFixture(f);f.setHit(()=>t.option);let calls=0;
+    delete t.combo.valueField;delete t.combo.displayField;
+    const prototype={valueField:'Value',displayField:'DisplayText'};
+    if(accessor)Object.defineProperty(prototype,'displayField',{get(){calls++;throw Error('config getter');}});
+    Object.setPrototypeOf(t.combo,prototype);
+    const verify=()=>verifyJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000,
+      target:'cbxDataType',kind:'option',option:t.option,expectedType:4,expectedLabel:'Целый'});
+    if(accessor){await assert.rejects(verify());assert.equal(f.events.at(-1).snapshot.picker.display_config.status,'accessor');}
+    else {const ready=await verify();assert.equal(ready.picker.display_config.depth,1);assert.equal(ready.picker.value_config.depth,1);}
+    assert.equal(calls,0);
+  }
+});
+
+
+test('type opening tolerates a lazy or not-yet-rendered owned picker without calling getPicker',async()=>{
+  for(const lazy of [false,true]){
+    const f=fixture();await f.open();const t=typeFixture(f,{expanded:false});f.setHit(()=>t.triggerDom);
+    if(lazy)delete t.combo.picker;else delete t.picker.el;
+    let clicks=0;
+    await openJavascriptColumnTypePicker({page:f.page,state:f.state,record:f.record,once:f.once,deadline:Date.now()+1000,
+      id:'type-open',expectedType:4,expectedLabel:'Целый',click:async()=>{
+        clicks++;f.setWait(()=>{t.combo.picker=t.picker;t.picker.el={dom:t.pickerDom};t.expand();});
+      }});
+    assert.equal(clicks,1);assert.equal(f.events.at(-1).snapshot.picker.picker_owned,true);
+  }
 });
