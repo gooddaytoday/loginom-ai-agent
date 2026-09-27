@@ -16,6 +16,35 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Empty01: UI schema и исполнение подтверждены, Preview отказал до чтения
+
+native-cardinality-empty-probe-01/source78/profile62 terminal exit1 (session20932),
+FAILED/inspect-pages: `Private native Preview: exact denied output control`.
+Root независимо проверил **3 INPUT cells / 586 journal refs / 195 source pins**,
+UI declaration Value/Value/type4/index0/Required=false, generation=false,
+declaration digest и own fresh completed JS execution с fixed Data-only source.
+Report SHA `6d0ec9bd84712b3149aff2d46395cf0f1dd31ab3479758e8596bdf0dfb97a100`.
+Raw OUTPUT0 и повторный upstream ещё не опубликованы; zero-cache неизвестен.
+Original cleanup3/3 подтверждён, browser CLOSED; recovery не нужен, profile62
+сохранён. Запуск не повторяется автоматически.
+
+Отказ точно локализован в precondition opening wrapper **до** первого
+native_roundtrip_preview_intent, клика и F3. Последний owned graph observation
+(journal lines585/586) содержит node `MF;TF-1;Graph;JS:_Value` и его активный
+Output_Data-0: enabled/visible=true, kind=port, scope=graph, но allowed_actions
+равны `[click,double_click,right_click,press,drag]`, а wrapper требует пустой
+массив. Screenshot после отказа действительно показывает label `JS: Value`.
+
+В workspace-ui.mjs dangerous predicate использует текстовый regex
+script/javascript/python/codeeditor по control identity. Existing deny test
+проверяет только имя `JavaScript`; rename `JS: Value` в него не входит.
+Root назначил прежней задаче bounded source/evidence investigation и proposal:
+обосновать классификацию по actual owner/type независимо от label, сохранить
+ownership/public deny и не обходить отказ удалением guard либо переименованием
+узла. Runtime пока frozen source78, browser/commits разработчику не разрешены.
+Private failure-verification.json фиксирует пределы проверки; source-only и
+успешное Execute не выдаются за принятие пустого OUTPUT/J08/G5.
+
 ### Source78 проверен и закоммичен; начат declared-empty live
 
 Developer завершил Fix78 и подтвердил idle. Root независимо повторил **1289 main
