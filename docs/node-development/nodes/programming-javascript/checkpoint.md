@@ -15,6 +15,24 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Независимый oracle для будущего JS roundtrip
+
+Root подготовил private audit-native-real-roundtrip.py, SHA256
+`02a09371c589becd44ba756db584c776ed1901625146e009b8058176a29a37c8`.
+Он принимает INPUT-before / JS-OUTPUT / INPUT-after и независимо проверяет все12
+scalar cells через существующий Python struct oracle. Дополнительно сверяет
+raw↔binding association, общий document/workflow/package, три новых read IDs,
+неизменный upstream node/port/execution и отдельный JS node/execution.
+
+Synthetic self-check:1positive/10negative PASS; отдельно coherent duplicate read
+IDs отклоняются по fresh-reads guard. Проверяются wrong zero sign, lost NULL,
+partial cells, row mismatch, foreign document, changed upstream и отсутствие
+нового JS execution. Private roundtrip-oracle-selfcheck.json явно помечен synthetic.
+Это не доказательство выполнения JS, ownership или live roundtrip. Проверку
+source/edge/process/runtime/cleanup должен дать будущий pinned оператор.
+Прежняя задача разработчика подтверждённо active; браузеров сейчас нет.
+
+
 ### Probe09: input-only native admission и durable ACK подтверждены
 
 Source63 `ab76a768b2d5c3190b79f11dbebec2ff7c0b246d`, headed fresh profile42:
