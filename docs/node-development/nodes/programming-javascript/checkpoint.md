@@ -16,6 +16,17 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Integer coercion NaN01 RUNNING
+
+Source82 unchanged/1259 pins повторно проверены; original exec session44055
+RUNNING, fresh profile70, DISPLAY=:1/headed/sandbox. Evidence
+native-integer-coercion-nan-probe-01. INPUT native Real+0; candidate NaN
+вычисляется fixed script через input/input; это не native nonfinite INPUT.
+OUTPUT заранее неизвестен. Исходный deadline600000ms,no replay.
+Matrix4 characterized,NaN unresolved/running,2 not_run. Проверять original
+session44055 до terminal, затем cleanup и independent audit.
+
+
 ### Integer coercion string-invalid01: independent characterization PASS
 
 Source82/profile69 original session53900 terminal exit0, CHARACTERIZED,
