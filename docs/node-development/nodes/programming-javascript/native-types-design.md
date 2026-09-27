@@ -1,7 +1,7 @@
 # G5 native types: следующий ограниченный шаг
 
 Статус на 2026-09-27: **private real/NULL input-only admission подтверждён;
-JS identity roundtrip ещё не реализован**. Source63:
+private JS identity roundtrip реализован, live результат ещё не получен**. Source63:
 `ab76a768b2d5c3190b79f11dbebec2ff7c0b246d`, root352/352теста PASS.
 Headed probe09/profile42 завершён exit0 OBSERVED/native-input-observed, durable
 journal ACK и original cleanup ALL PASS. Root Python scalar oracle независимо
@@ -12,7 +12,9 @@ Probe08 сохраняет FAILED из-за прежнего redaction имен�
 fixture и observed_local; она не закрывает JS OUTPUT, ABA или весь G5.
 
 Реализован отдельный `javascript-native-input-live.mjs` и import-only binding;
-JS-output binding, identity roundtrip и остальные семейства ниже ещё предстоят.
+Source64 добавляет отдельные JS-output/upstream bindings и private identity
+roundtrip (649 root tests PASS); первый headed-прогон начат, результат ещё не
+получен. Остальные семейства и G5 целиком ещё предстоят.
 Далее сохранён дизайн и анализ **исходного source55**, поэтому указания
 «текущий» внутри анализа относятся к этой базе, а не к source63.
 Основание source55: `520ce1f78ce39859d3ce30a65db93e80c9081747`.

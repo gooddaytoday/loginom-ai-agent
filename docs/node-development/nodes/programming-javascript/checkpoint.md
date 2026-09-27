@@ -15,6 +15,31 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze64: private roundtrip реализован; первый headed run запущен
+
+Source node-javascript `7e583ca0ec7cefc97326bb28949672faea50b9dd`:12 runtime/test
+файлов, отдельный native-roundtrip-live entrypoint. После подтверждённого INPUT
+создаётся один JS node с exact Value→Value mapping, Data-only identity script
+(DataType.Float), source/mode/edge и fresh completed execution. Отдельные OUTPUT
+и upstream bindings/read IDs сохраняют исходный import-only отказ на новую topology,
+проверки provenance/upload history/cache/subscriptions и порядок output→upstream.
+Каждый proof и итог требуют exact production journal ACK; no replay и ограничения
+observed_local/no_snapshot/ABA сохранены. Общий initial deadline600000ms.
+
+Root независимо **649/649 PASS**, fail/skip0: все JavaScript operator tests плюс
+native Collapse/runtime/source/journal/variant/public-deny. Input suite исполняется
+однократно через import roundtrip suite.73pins до/после совпадают; syntax12files PASS.
+Private operator64-root-test-source.json содержит точные test paths; новый source
+receipt native-roundtrip-probe-01-source.json. Runtime source закоммичен root;
+незавершённые docs разработчика не перенесены.
+
+Native-roundtrip-probe-01 запущен на fresh profile43, headed DISPLAY=:1/sandbox.
+Node/Chromium binary SHA повторно сверены; разработчик idle_freeze64, profile42
+сохранён после полного cleanup. На момент checkpoint RUNNING; применимость JS
+Preview, сохранность upstream и live roundtrip ещё не подтверждены. G5/full plan
+остаются active/incomplete; это не formal final implementation review или CLI.
+
+
 ### Независимый oracle для будущего JS roundtrip
 
 Root подготовил private audit-native-real-roundtrip.py, SHA256
