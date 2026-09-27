@@ -216,3 +216,34 @@ for(const fault of ['reply','ack'])test('lost postclick rebind '+fault+' cannot 
   assert.equal(f.capability.previewOpening.status,'selected');assert.equal(f.operation.transportUncertain,true);
   await assert.rejects(f.run);assert.deepEqual(f.gestures,['click']);
 });
+
+for(const fault of ['none','public-actions','owner-drift'])test('production workspace classifier feeds renamed private native Preview: '+fault,async()=>{
+  const {scriptGraphFixture,origin}=await import('../../client/test/support/workspace-ui-fixture.mjs');
+  const f=scriptGraphFixture('JS:_Value');f.page.app.Version='7.4.2';
+  const graph=f.model.FDiagram.FmxGraph,diagram=f.model.FDiagram,workflow={},card={Controller:{FController:f.model,Node:{data:{node:workflow}}}};
+  f.page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>card;
+  Object.assign(f.node,{FStatus:1,FRunning:false});Object.assign(f.port,{FStatus:1,FParam:2,FPortIndex:0});
+  f.model.FPreviewManager={FPreviewVisible:false};let selection=[];diagram.selectedPorts=[];
+  graph.getSelectionCells=()=>selection;graph.view.getDrawPane=()=>graph.container;
+  f.page.context.innerWidth=1000;f.page.context.innerHeight=800;
+  f.page.evaluate=async(fn,arg)=>{f.page.context.argument=arg;return vm.runInContext('('+fn.toString()+')(argument)',f.page.context);};
+  const node={document_id:'d',workflow_id:'w',node_id:f.node.FGuid},deadline=Date.now()+10000;
+  const execution={status:'completed',execution_id:'d:1:3',trial:{source_sha256:'a'.repeat(64)}};
+  f.page.context.__loginomJavascriptNativeRoundtripV1={document:f.page.document,stage:'completed',binding:node,node:f.node,
+    source_sha256:execution.trial.source_sha256,execution,input:{model:f.model,workflow,card},check:()=>assert.equal(f.node.FIconCls,'bg-vendor-icon-javascript')};
+  const observed=await f.page.execute({mode:'observe',expected_build:'7.4.2'});assert.equal(observed.status,'SUCCEEDED');
+  const control=observed.output.ui.elements.find(e=>e.tid===f.tid+';Output_Data-0');
+  assert.equal(control.signature.native_graph.status,'script');assert.deepEqual(control.allowed_actions,[]);
+  const port={index:0,native_index:0,active:true,port_guid:f.port.FGuid,tid:control.tid};
+  const state={...observed.output,prepared_node_context:{...node,tid:f.tid,surface:'graph',verified:true},node_outputs:{verified:true,ports:[port]}};
+  const events=[],gestures=[];
+  f.page.mouse.click=async()=>{gestures.push('click');selection=[f.port.FCell];diagram.selectedPorts=[f.port];};
+  f.page.keyboard.press=async key=>gestures.push(key);
+  if(fault==='public-actions')control.allowed_actions=['click'];
+  if(fault==='owner-drift')f.node.FIconCls='bg-vendor-icon-importtext';
+  const run=()=>openJavascriptNativeRoundtripPreview({options:{operation:{id:'integration'},now:Date.now,exclusiveNodeOperation:()=>true,
+    execute:code=>vm.runInNewContext('('+code+')')(f.page),onRecord:async e=>{events.push(e);return structuredClone(e);}},
+    ctx:{document_id:'d',node,workflow_ref:{workflow_id:'w'},execution,deadline},input:{binding:{deadline}},port,state,deadline,targetOrigin:origin,targetBuild:'7.4.2',onState:async()=>{}});
+  if(fault==='none'){await run();assert.deepEqual(gestures,['click','F3']);assert.equal(events.length,6);}
+  else {await assert.rejects(run);assert.deepEqual(gestures,[]);if(fault==='public-actions')assert.deepEqual(events,[]);}
+});
