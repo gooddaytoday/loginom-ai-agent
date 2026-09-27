@@ -16,6 +16,27 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Текущий Fix79 учёл оба замечания; усилен независимый live audit
+
+Root перечитал незавершённый source: label `|` больше не исключает native
+node/port, links выделяются по native collection/cell/renderer; invalid port
+collection больше не заменяется на `[]`. Это текущая source-проверка, ещё не
+frozen приёмка. Тестовая DOM fixture вынесена в support для переиспользования;
+root не выдаёт перемещение fixture за удаление проверок. Developer active,
+полные suites/freeze79 ещё ожидаются.
+
+Для будущего live root требует **положительную** native JS classification
+в signature.native_graph, а не только actions[] при unconfirmed owner:
+- audit-js-output-denial-v2.py SHA
+  `b9807e561b140caa32bcc82a1870d12a3b5607f4e5089657ed47fb5f7f727d2b`;
+  synthetic1positive/8negative PASS поверх прежних1positive/9negative.
+- audit-cardinality-empty-live79-v2.py SHA
+  `166bc00901d51458edbef48bfd502e6ff9abde5f187cf067e7ebbdf440bb2fbb`;
+  syntax PASS, live NOT_RUN. Требует script + bg-vendor-icon-javascript и bounded
+  opaque identity у текущего own renamed output перед первым Preview intent.
+
+Browser CLOSED, fresh profile63 reserved/unused. Новых запусков нет.
+
 ### Промежуточный review Fix79: label separator и неполные port collections
 
 Root прочитал текущий незавершённый classifier и передал два адресных замечания:
