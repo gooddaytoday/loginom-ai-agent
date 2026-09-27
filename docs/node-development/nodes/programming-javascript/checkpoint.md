@@ -17,6 +17,18 @@
 
 ### Cardinality design принят; Fix75 nonempty назначен
 
+Root подготовил private audit-cardinality-roundtrip.py, SHA
+`c531c1c232e8138b37d9059671b25d26787bf76555eff9b5a35dc60c46e355de`:
+3positive/12negative synthetic association/lifecycle checks PASS. Он сохраняет
+исходное upstream execution, допускает одинаковый port GUID разных узлов и
+проверяет release counts3/1|2|6/3. Native scalar/order oracle проверяется отдельно;
+source/runtime/journal ownership ещё требует будущего live audit.
+
+После перепроверки Date roundtrip02 reportSHA/cleanup назначен fresh profile57
+для keep2 после Freeze75; backup/receipt57 сохранены. Browser CLOSED, profile56
+сохранён. До root tests/freeze новый live не запускать.
+
+
 Root проверил и сохранил [cardinality дизайн](native-cardinality-design.md).
 Canonical empty обязателен в UI declared mode, generation=false, ровно Value
 integer и source без AssignColumns/Append/Set. Code-empty его не заменяет.
@@ -30,7 +42,7 @@ Empty/declared остаётся обязательным следующим эт
 Root private audit-native-cardinality-nonempty.py прошёл synthetic9positive/
 13negative, SHA `68bcd1756b9be14808ba8f07c4da8dd6953b961e053231b627936227e111e60f`.
 Это подготовка oracle, не live proof. Browser CLOSED, profile56 сохранён,
-следующий профиль ещё не назначен. Полный план остаётся активным.
+profile57 назначен для будущего keep2. Полный план остаётся активным.
 
 
 ### Date roundtrip02 PASS; следующий срез — cardinality
