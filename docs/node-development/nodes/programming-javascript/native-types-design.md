@@ -17,14 +17,19 @@ real/NULL, boolean, string, safe int64 и двух canonical Date значени
   1025refs/190pins. Civil values и significant bytes совпали с pre-JS INPUT
   на OUTPUT/upstream. Epoch/timezone не выводились. Root1042main+3deny+7Python
   PASS; неизменённые shared import/output ранее228PASS на source73.
+- Source75 `f4603ad552`: keep2/profile57,7cells/618refs и duplicate/profile59,
+  12cells/620refs;192pins. OUTPUT соответственно[2] и[1,1,2,2,3,3], INPUT/upstream
+  [1,2,3] неизменны. Root1146main+3deny+11Python PASS. Odd/profile58 остановлен
+  до JS source по visible blocker выбора узла, его OUTPUT не проверен.
 
-Original cleanup3/3 подтверждён у каждого перечисленного прогона.
+Original cleanup3/3 подтверждён у каждого перечисленного прогона, включая
+остановленный odd. Его отказ не является проверкой JavaScript результата.
 Source73 Date roundtrip01 ранее отказал из-за ошибочной global port-GUID
 inequality. Source74 исправил её: один output0 GUID встречается у разных узлов,
 принадлежность проверяется полным контекстом node/port/source/execution.
 Runtime/source seals, native ownership и single-use guards сохранены.
 
-Следующие проверки: cardinality с порядком строк и пустой declared-схемой,
+Следующие проверки: оставшийся odd cardinality и пустой OUTPUT с UI declared-схемой,
 Integer coercion и оставшаяся матрица плана. INPUT нельзя заменять JS-генератором
 или менять expected под поведение импорта. Atomic server snapshot и отсутствие
 unobserved ABA не доказаны. [Date/civil дизайн](native-datetime-design.md)
