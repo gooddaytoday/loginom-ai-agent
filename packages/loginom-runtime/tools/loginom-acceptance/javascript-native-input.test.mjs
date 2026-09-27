@@ -42,11 +42,11 @@ function sourceEvidence(){
 function ui(){return {row_count:4,sample_rows:4,sample_complete:true,filter_enabled:false,precision:{numbers_verified:true,limitations:[]},limitations:[],
   schema:[{name:'Value',label:'Value',type:'real'}],sample:values.map((value,i)=>[{type:'real',value,is_null:i===0,precision:i===0?'exact_null':'17_significant_digits'}])};}
 
-async function fake({deferred=false,change,beforeBind,bind=true}={}){
+async function fake({deferred=false,change,beforeBind,bind=true,afterRelease}={}){
   class Workflow{} class Package{}
   const pack=new Package(),workflow=new Workflow();workflow.ParentNode=pack;
   const node={FGuid:'n',FIconCls:'bg-vendor-icon-importtextfile',FStatus:1,FRunning:false,data:{}},port={parent:node,FGuid:'p',FType:1,FSubType:1,FParam:0,FStatus:1};
-  node.FPorts=[{FCollection:[]},{FCollection:[port]}];
+  node.FPorts=[{FCollection:[6,3].map(FSubType=>({parent:node,FType:0,FSubType,FParam:1,FStatus:1}))},{FCollection:[port]}];
   const child={internalId:3,data:{id:'2.1',Status:3,ErrorDetails:'',ModelNode:node.data},childNodes:[]};
   const group={internalId:2,data:{id:'2',Status:3,ErrorDetails:'',loaded:true},childNodes:[child]};
   const root={internalId:1,data:{loaded:true},childNodes:[group]},processStore={isLoading:()=>false,getRoot:()=>root};
@@ -56,7 +56,7 @@ async function fake({deferred=false,change,beforeBind,bind=true}={}){
   const session={$M:{GetDynamicData:()=>{
     const id=++nextId;return {set_StaticDataSize:()=>{},InitializeMethodCallMessage:(...a)=>assert.deepEqual(a,[0,9,321,0]),
       WriteParameter(offset,row){assert.equal(offset,0);this.row=row;},WriteParameter$a:(offset,column)=>assert.deepEqual([offset,column],[8,0]),
-      get_MessageID:()=>id,Release:()=>counters.requests++};}},
+      get_MessageID:()=>id,Release:()=>{counters.requests++;afterRelease?.(result);}};}},
     DispatchMessageAsync(request,exceptions){assert.equal(exceptions,false);counters.sent++;
       const bytes=new Uint8Array(60),view=new DataView(bytes.buffer);view.setInt16(12,request.row===0?1:5,true);
       if(request.row)view.setFloat64(14,values[request.row],true);
@@ -90,6 +90,62 @@ async function fake({deferred=false,change,beforeBind,bind=true}={}){
   if(bind)result.b=await execute(javascriptNativeInputCode(b));
   return result;
 }
+
+const optionalInputMutations={
+  missingConnection:f=>f.node.FPorts[0].FCollection.shift(),
+  missingVariables:f=>f.node.FPorts[0].FCollection.pop(),
+  missingAll:f=>f.node.FPorts[0].FCollection=[],
+  extra:f=>f.node.FPorts[0].FCollection.push({...f.node.FPorts[0].FCollection[0]}),
+  duplicate:f=>f.node.FPorts[0].FCollection[1]=f.node.FPorts[0].FCollection[0],
+  dataInput:f=>f.node.FPorts[0].FCollection[0].FSubType=1,
+  reordered:f=>f.node.FPorts[0].FCollection.reverse(),
+  foreignGroup:f=>f.node.FPorts.push({FCollection:[]}),
+  notArray:f=>f.node.FPorts[0].FCollection={length:2},
+  sparse:f=>delete f.node.FPorts[0].FCollection[1],
+  ...Object.fromEntries([0,1].flatMap(i=>[
+    ['foreign'+i,f=>f.node.FPorts[0].FCollection[i].parent={}],
+    ...Object.entries({FType:1,FSubType:0,FParam:0,FStatus:0}).map(([key,value])=>[key+i,f=>f.node.FPorts[0].FCollection[i][key]=value]),
+    ['missingStatus'+i,f=>delete f.node.FPorts[0].FCollection[i].FStatus]
+  ]))
+};
+const optionalInputReplacements={
+  connection:f=>f.node.FPorts[0].FCollection[0]={...f.node.FPorts[0].FCollection[0]},
+  variables:f=>f.node.FPorts[0].FCollection[1]={...f.node.FPorts[0].FCollection[1]},
+  inventory:f=>f.node.FPorts[0].FCollection=[...f.node.FPorts[0].FCollection],
+  collection:f=>f.node.FPorts[0]={...f.node.FPorts[0]},
+  groups:f=>f.node.FPorts=[...f.node.FPorts]
+};
+for(const [name,change]of Object.entries(optionalInputMutations))test('initial admission refuses optional input '+name,async()=>{
+  let fixture;
+  await assert.rejects(()=>fake({beforeBind:f=>{fixture=f;change(f);}}),error=>{
+    assert.deepEqual(JSON.parse(error.message.split('NI1 ')[1]).f,['inputs']);return true;
+  });
+  assert.equal(fixture.counters.sent,0);assert.equal(fixture.env.__loginomJavascriptNativeInputBindingV1,undefined);
+});
+for(const [name,change]of Object.entries({...optionalInputMutations,...optionalInputReplacements})){
+  test('before native dispatch refuses optional input '+name,async()=>{
+    const f=await fake();change(f);await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame));
+    assert.deepEqual(f.counters,{sent:0,requests:0,responses:0});
+  });
+  test('after native response refuses optional input '+name+' and releases buffers',async()=>{
+    const f=await fake({change});await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame));
+    assert.deepEqual(f.counters,{sent:1,requests:1,responses:1});
+    const status=await javascriptNativeInputStatus(f.page);
+    assert.equal(status.retired,true);assert.equal(status.pending,0);assert.equal(status.published,false);
+    await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame),/retired/);
+    assert.equal(f.counters.sent,1);
+  });
+}
+for(const [name,afterRelease]of Object.entries(optionalInputReplacements))test('same-value optional input replacement between cells refuses '+name,async()=>{
+  const f=await fake({afterRelease});await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame),/stale owner\/schema\/cache before read/);
+  assert.deepEqual(f.counters,{sent:1,requests:1,responses:1});
+  const status=await javascriptNativeInputStatus(f.page);assert.equal(status.retired,true);assert.equal(status.published,false);
+});
+test('observed optional port statuses do not permit any graph link at initial admission',async()=>{
+  let fixture;
+  await assert.rejects(()=>fake({beforeBind:f=>{fixture=f;f.model.FDiagram.FLinks.FCollection.push({});}}),/input-only topology/);
+  assert.equal(fixture.counters.sent,0);assert.equal(fixture.env.__loginomJavascriptNativeInputBindingV1,undefined);
+});
 
 for(const [check,change]of Object.entries({
   visible:f=>f.model.FPreviewManager.FPreviewVisible=false,
@@ -132,13 +188,13 @@ test('refused inventory diagnostic is bounded, contains no data or getter evalua
   assert.equal(getterCalls,0);
 });
 
-for(const mode of ['two-inputs','all-checks','oversized-control'])test('production node error transport and journal preserve compact inventory: '+mode,async t=>{
+for(const mode of ['inactive-inputs','all-checks','oversized-control'])test('production node error transport and journal preserve compact inventory: '+mode,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'javascript-native-error-'));
   t.after(()=>rm(directory,{recursive:true,force:true}));
   const journal=createExecutionJournal({directory,metadata:{sessionId:'test',clientRevision:'test'},knownSecrets:['private-secret']});
   const f=await fake({bind:false,beforeBind:f=>{
-    // Subtypes are source-backed. Status/param test values are not live evidence.
-    f.node.FPorts[0].FCollection=[6,3].map(FSubType=>({parent:f.node,FType:0,FSubType,FParam:1,FStatus:0}));
+    // Default statuses are the observed 1; zero here is deliberately invalid.
+    if(mode==='inactive-inputs')f.node.FPorts[0].FCollection.forEach(p=>p.FStatus=0);
     if(mode==='all-checks'){
       const manager=f.model.FPreviewManager;
       manager.FPreviewVisible=false;manager.FPreviewForm.FCurrentPreviewNode={};manager.FShowDataLastCall={};
@@ -189,7 +245,7 @@ for(const mode of ['two-inputs','all-checks','oversized-control'])test('producti
   const message=result.error.message.split('\n')[0];assert.ok(message.startsWith('page.evaluate: Error: Native input binding: NI1 '));
   assert.ok(message.length<400);assert.ok(!result.error.message.includes('private-secret'));
   const diagnostic=JSON.parse(message.split('NI1 ')[1]);
-  if(mode==='two-inputs')assert.deepEqual(diagnostic,{n:'2',i:[[true,'0','6','1','0'],[true,'0','3','1','0']],o:'0',f:['inputs']});
+  if(mode==='inactive-inputs')assert.deepEqual(diagnostic,{n:'2',i:[[true,'0','6','1','0'],[true,'0','3','1','0']],o:'0',f:['inputs']});
   if(mode==='all-checks'){
     assert.deepEqual(diagnostic,{n:'>4',i:Array.from({length:4},()=>[false,'missing','missing','missing','missing']),o:'other',
       f:['visible','node','parent','guid','outputs','output','inputs','type','subtype','param','status','last_node','last_port']});
