@@ -16,6 +16,21 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Независимая проверка zero receipt и продолжение Fix78
+
+Подготовлен private audit-declared-zero-receipts.py SHA256
+`cbb68f3300f6ed68226aaf4ba22012566c27c3538401c272c18f8033a1f060b1`.
+Он независимо проверяет declared witness/digest, фиксированный JS, Done seal,
+связь before/final с read/source/owner/execution, loader pins и наблюдённое zero
+state. Synthetic **1 positive / 23 negative PASS**; это не live-приёмка и не
+замена проверок input/upstream, журналов, runtime pins и cleanup.
+
+Первый ход Fix78 завершился без freeze, ошибочно вернувшись к историческому
+bootstrap памяти. Root явно восстановил актуальное поручение в той же задаче;
+новый ход активен и продолжает runtime/tests. Это сбой следования текущему
+заданию, не установленная ошибка MCP. Live/commits runtime до frozen handoff
+не выполняются; root canonical docs сохраняются отдельно.
+
 ### Повторный допуск памяти и текущая проверка Fix78 — 2026-09-27
 
 MCP OpenViking health и actor find успешно выполнены в основной задаче:
