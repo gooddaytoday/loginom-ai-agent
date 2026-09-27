@@ -16,6 +16,24 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Отдельный таймаут зарегистрированной задачи исправлен в конфигурации
+
+Root plugin health/find/read PASS не означал допуск разработчика: его первая
+проверка дала transport/DNS, повторная health PASS10018ms и find −32003/15023ms.
+Код source/adapter.mjs loadCredentials читает OPENVIKING_TIMEOUT_MS либо15000,
+не plugin.codex.timeoutMs. В task config env отсутствовал.
+
+На подтверждённой App API idle/completed границе root под enrollment lock
+добавил только MCP env OPENVIKING_TIMEOUT_MS=60000 и обновил prepared.configSha256.
+Backup/receipt: private memory-task-timeout60-backup,
+memory-task-timeout60-receipt.json. Old configSHA54994d52ba430d7acb76517fa71cd52cda20a3658dda1a2fb2e9cd5aab8617d9,
+new7327d6d3b3c4e4400705a90f97b6f7669ada0b9a515032333f0399ef0ce15eec.
+Capture state, routing activation и receipt побайтно неизменны; registration,
+thread, Peer, permissions и runtime не менялись. Новая настройка ещё требует
+подтверждения фактическим MCP этой задачи; разработчику назначена проверка и
+продолжение Fix71 только после PASS. Если процесс сохраняет15s, требуется его
+перезагрузка, а не повторный enrollment. Browser/live не запускался.
+
 ### Подключение восстановлено; Fix71 возобновлён
 
 После нового запроса пользователя MCP health, actor find по JavaScript native
