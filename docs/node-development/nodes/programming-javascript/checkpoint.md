@@ -16,6 +16,28 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Подготовлены независимые zero oracles; profile62 зарезервирован
+
+Root подготовил private auditors, без live claim:
+- audit-native-empty-shape.py SHA
+  `665d290c23204bc6ce82e8eb09cdb1fd8cfa231e12c8341b667f5f882c7b8470`:
+  schema Value integer сохраняется при rows/cells/coverage0; lifecycle completed,
+  published, no requests/releases/received bytes. Synthetic1positive/20negative PASS.
+- audit-observed-zero-state.py SHA
+  `05412ce08fa26a1b5c159a78f0f1aca1d937cf5c86d83fc0ba2142e402a6ae71`:
+  independent normalized expectations для actual dc/dt/proxy/store/helper0,
+  schema/field map/getter, cachefalse/null и idle/pending0. Synthetic1positive/
+  25negative PASS; mapping из будущих actual receipts запрещает missing defaults.
+
+Это только oracle shape/state; UI declaration, before/final associations,
+source/loader/owner/execution/journal proof проверяются отдельно. Shared source
+variant-native-read zero precedent перечитан, но не объявлен JS live evidence.
+После подтверждённого odd03 cleanup назначен fresh profile62 для canonical empty
+после Freeze78/root checks. Backup/receipt62 сохранены, browser CLOSED, запусков
+пустого case ещё нет. Developer active Fix78, прежний полный план не сужается.
+
+
+
 ### Odd03 PASS; обязательный declared-empty назначен
 
 Source77/profile61 native-cardinality-odd-probe-03 terminal exit0 (session42834),
