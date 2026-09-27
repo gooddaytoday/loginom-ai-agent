@@ -7,20 +7,53 @@ import type { Config } from "../../../src/config/config"
 
 import type { MessageV2 } from "../../../src/session/message-v2"
 import { MessageID, PartID } from "../../../src/session/schema"
-import { call, callAuthProbe, disposeApps } from "./backend"
+import { assertDisposalReady, call, callAuthProbe, disposeApps } from "./backend"
 import { original } from "./environment"
 import { runtime } from "./runtime"
 import type { ActiveScenario, Options, ProjectOptions, Result, Scenario, ScenarioContext, SeededContext } from "./types"
 import { ProviderV2 } from "@loginom-ai-agent/core/provider"
 import { ModelV2 } from "@loginom-ai-agent/core/model"
 
+const cleanupTimeoutMs = 15_000
+let cleanupUnknown = false
+
+export function assertCleanupReady() {
+  if (cleanupUnknown) throw new Error("HttpApi scenario cleanup is unconfirmed")
+  assertDisposalReady()
+}
+
+export async function cleanupWithin(label: string, operation: () => Promise<unknown>, timeoutMs = cleanupTimeoutMs) {
+  assertCleanupReady()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      Promise.resolve().then(operation),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs)
+      }),
+    ])
+  } catch (error) {
+    // A timed-out operation can still be mutating shared test state. Abort the
+    // remainder of the exerciser rather than running on an uncertain fixture.
+    cleanupUnknown = true
+    throw error
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 export function runScenario(options: Options) {
   return (scenario: Scenario) => {
+    assertCleanupReady()
     if (scenario.kind === "todo") return Effect.succeed({ status: "skip", scenario } as Result)
     return runActive(options, scenario).pipe(
       Effect.timeoutOrElse({
         duration: options.scenarioTimeout,
-        orElse: () => Effect.die(new Error(`scenario timed out after ${Duration.format(options.scenarioTimeout)}`)),
+        orElse: () => Effect.sync(() => {
+          // An interrupted request or fixture operation may still be active.
+          cleanupUnknown = true
+          throw new Error(`scenario timed out after ${Duration.format(options.scenarioTimeout)}`)
+        }),
       }),
       Effect.as({ status: "pass", scenario } as Result),
       Effect.catchCause((cause) => Effect.succeed({ status: "fail" as const, scenario, message: Cause.pretty(cause) })),
@@ -79,9 +112,9 @@ function withContext<A, E>(
     (ctx) =>
       Effect.gen(function* () {
         yield* trace(options, scenario, `${label} tmpdir cleanup start`)
-        yield* Effect.promise(async () => {
+        yield* Effect.promise(() => cleanupWithin("HttpApi temporary directory cleanup", async () => {
           await ctx.dir?.[Symbol.asyncDispose]()
-        }).pipe(Effect.ignore)
+        }))
         yield* trace(options, scenario, `${label} tmpdir cleanup done`)
       }),
   ).pipe(
@@ -257,11 +290,12 @@ function fakeLlmConfig(url: string): Partial<ConfigV1.Info> {
 }
 
 const resetState = Effect.promise(async () => {
+  assertCleanupReady()
   const modules = await runtime()
   Flag.LOGINOM_AI_AGENT_SERVER_PASSWORD = original.LOGINOM_AI_AGENT_SERVER_PASSWORD
   Flag.LOGINOM_AI_AGENT_SERVER_USERNAME = original.LOGINOM_AI_AGENT_SERVER_USERNAME
   await disposeApps()
-  await modules.disposeAllInstances()
-  await modules.resetDatabase()
-  await Bun.sleep(25)
+  await cleanupWithin("HttpApi instance cleanup", () => modules.disposeAllInstances())
+  await cleanupWithin("HttpApi database reset", () => modules.resetDatabase())
+  await cleanupWithin("HttpApi reset pause", () => Bun.sleep(25))
 })

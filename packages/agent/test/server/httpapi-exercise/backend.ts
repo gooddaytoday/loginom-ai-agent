@@ -44,14 +44,39 @@ export function callAuthProbe(scenario: ActiveScenario, credentials: "missing" |
 type CachedApp = BackendApp & { readonly dispose: () => Promise<void> }
 
 const appCache: Partial<Record<string, CachedApp>> = {}
+const disposeTimeoutMs = 10_000
+let disposalUnknown = false
+
+export function assertDisposalReady() {
+  if (disposalUnknown) throw new Error("HttpApi app disposal is unconfirmed")
+}
 
 export async function disposeApps() {
+  assertDisposalReady()
   const apps = Object.values(appCache)
-  for (const key of Object.keys(appCache)) delete appCache[key]
-  await Promise.all(apps.flatMap((app) => (app === undefined ? [] : [app.dispose()])))
+  if (apps.length === 0) return
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const pending = Promise.all(apps.flatMap((app) => (app === undefined ? [] : [app.dispose()])))
+    await Promise.race([
+      pending,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error("HttpApi app disposal timed out")), disposeTimeoutMs)
+      }),
+    ])
+    for (const key of Object.keys(appCache)) delete appCache[key]
+  } catch (error) {
+    // A pending dispose may still be running. Never start another scenario or
+    // retry disposal against resources whose ownership is now unknown.
+    disposalUnknown = true
+    throw error
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 function app(modules: Runtime, options: CallOptions) {
+  assertDisposalReady()
   const username = options.auth?.username
   const password = options.auth?.password
   const cacheKey = `${username ?? ""}:${password ?? ""}`
