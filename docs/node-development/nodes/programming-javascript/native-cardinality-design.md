@@ -1,6 +1,6 @@
 # JavaScript native cardinality — bounded proposal
 
-Статус: **source75 реализовал непустые случаи; keep2 независимо проверен live, odd выполняется; duplicate и declared-empty не проверены live**.
+Статус: **source75 реализовал непустые случаи; keep2 независимо проверен live; odd остановлен до JS source на блокировке выбора узла; duplicate и declared-empty не проверены live**.
 Актуальные evidence и границы — в [checkpoint](checkpoint.md). Описание исходных ограничений ниже относится к source74 перед реализацией.
 Source74 HEAD `cb3e608baac8ca9f0270540ac4c65e7930d08d21`.
 Координатор сообщил terminal OBSERVED для Date roundtrip02/source74/profile56:

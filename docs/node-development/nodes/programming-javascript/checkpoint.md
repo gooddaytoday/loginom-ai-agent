@@ -16,6 +16,30 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Odd остановлен до JS source; выбор узла требует диагностики
+
+Source75/profile58 native-cardinality-odd-probe-01 terminal exit1 (session66016),
+FAILED/open-wizard: `Private selection blocked`. Original cleanup3/3; lease CLOSED,
+profile58 сохранён, recovery не нужен. Native INPUT[1,2,3] независимо проверен:
+3cells/481journalrefs/192pins. OUTPUT/upstream roundtrip не выполнялся; odd не PASS.
+Report SHA `ea3e134d6aa21ae4547d3fa018a35fcd5c595ee8ec29f81831d931682d0fd952`.
+Private failure-verification receipt сохранён.
+
+После verified input mapping initial selection inspection прошёл, ready=false,
+native_selection_count=2. Следующая inspection перед click отказала по visible
+`[role=dialog],.x-mask,.bg-mask-message,.x-mask-msg` predicate (runtime:249).
+Журнал отказа: effect_possible=false, opening_dispatched=false. Source/schema JS
+ещё не bound. Поздний work-refusal.png показывает обычный граф; он не устанавливает,
+какая именно маска/диалог существовала в момент отказа. Причина не объявлена доказанной.
+
+Прежней задаче разработчика назначено read-only source/evidence investigation и
+selection-blocker-design.md: определить минимальное исправление либо недостающую
+диагностику. Runtime пока не менять; foreign blockers/owner guard и exactly-once
+сохранить. Не replay и не слепой повтор. После этого продолжить odd/duplicate,
+затем mandatory UI declared-empty/nativezero. Keep2 остаётся подтверждённым PASS.
+
+
+
 ### Cardinality keep2 PASS; odd выполняется
 
 Source75/profile57 keep2 завершён terminal exit0 (session87717),
