@@ -16,6 +16,21 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Подготовка Fix72: CSV и профиль52
+
+Root независимо разобрал CSV без float/JS Number: safe55bytes/4rows (NULL и
+canonical3safe decimalstrings), SHA86983c730cec045020a014b5bd365b2cf604c5f214774eb4a31b9344f6d0865d;
+outside58bytes/3rows, SHA606534ae7c03a4cc31c963a14b3029576e2f7867411d27347ab9548ccf8aa1f6.
+Private int64-csv-preflight-72.json фиксирует строки и signed64LE bytes.
+Это проверка файлов-кандидатов; native admission ещё не выполнялся.
+
+После повторной проверки string reportSHA/cleanup назначен fresh profile52
+под registry.lock. assignment-before-profile52.json/profile-reassignment-52.json
+сохранены приватно; profile51 сохранён. Lease CLOSED, acceptance lease свободна.
+Разработчик active Fix72, Freeze72 отсутствует; до фиксации и root tests live
+не запускать. Общая цель и оставшиеся gates сохраняются.
+
+
 ### String roundtrip PASS; следующий bounded slice — int64
 
 Дополнительно подготовлен private audit-native-int64-roundtrip.py, SHA
