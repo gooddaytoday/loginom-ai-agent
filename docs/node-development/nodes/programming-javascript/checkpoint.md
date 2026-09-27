@@ -16,6 +16,19 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Named design принят для реализации стадии A
+
+Developer revision55 terminal completed; proposal действительно создан,
+SHA8a1b6c035a06380cccf9af41fe612d401c6f334b882e8b7ff3f956da28319bb5.
+Root восстановил25 источников, сверил hashes/length/syntax pinned Node,55-byte
+integer-safe CSV и signed64 bytes. Private named-design-preflight.json PASS.
+Каноническая копия: [native-named-access-design](native-named-access-design.md),
+§11 задаёт условия допуска A: восемь independent positive input cases, exact
+copy/IsNull oracles, отдельные case/source identities, прежние guards сохраняются.
+B/C/D остаются planned, live не назначен. Следующий шаг — implementation A,
+регрессия и frozen source83 для root review. Full goal остаётся active.
+
+
 ### Следующий этап: named/index/case и J24 design
 
 Root проверил границы реализации source82: `javascript-native-roundtrip-read.mjs`

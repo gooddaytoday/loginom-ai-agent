@@ -242,7 +242,7 @@ Source82 подтвердил все [семь фиксированных Intege
 String «not-an-integer» и вычисленный NaN →native NULL,
 вычисленные ±Infinity →−9223372036854775808. INPUT/upstream проверены отдельно;
 21 native cells суммарно. Это bounded observations, не общий алгоритм conversion.
-Весь G5 остаётся открытым, включая named/index/case и J24;
+Весь G5 остаётся открытым, включая [named/index/case и J24](native-named-access-design.md);
 точные доказательства и ограничения — в checkpoint. Exact integer oracle
 от этого не меняется. Неудача сначала локализуется по коду/входу/native output;
 ожидания не подгоняются и причина не объявляется «отсутствие ICU» без доказательства.
