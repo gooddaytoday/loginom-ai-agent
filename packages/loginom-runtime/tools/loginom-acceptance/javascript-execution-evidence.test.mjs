@@ -10,7 +10,7 @@ import vm from 'node:vm';
 import {EventEmitter} from 'node:events';
 import {observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {javascriptInputColumns,javascriptInputRows,verifyJavascriptFixture,verifyJavascriptTable,javascriptSentinelOutcome,createJavascriptEffectJournal,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord} from './javascript-execution-evidence.mjs';
-import {javascriptInputRequest,waitJavascriptCleanupReady,selectJavascriptForSettings,javascriptWizardBinding,openJavascriptWizard,cleanupJavascriptWizardOpening} from './javascript-execution-runtime.mjs';
+import {javascriptInputRequest,waitJavascriptCleanupReady,selectJavascriptForSettings,javascriptWizardBinding,openJavascriptWizard,cleanupJavascriptWizardOpening,javascriptMappingUnlockReceipt,closeJavascriptPortMapping} from './javascript-execution-runtime.mjs';
 import {validateNodeApplyRequest} from '../../client/lib/node-apply.mjs';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
@@ -445,4 +445,52 @@ test('the live readiness inspector serializes the same classifier without browse
  const result=vm.runInContext('('+inspect.toString()+')',realm)({prefix:'MF;TF-1',inspect:true});
  assert.equal(result.ready,false);assert.equal(result.fatal,true);assert.equal(result.counts.overlays,0);
  assert.equal(result.mask_classification.length,0);
+});
+
+
+function mappingCloseFixture({bad=false,foreignGraph=false}={}) {
+  const reference={document_id:'doc',workflow_id:'workflow',node_id:'node'};
+  const graph={verified:true,...reference,surface:'graph',tid:'MF;TF-1;Graph;JS',locked:false};
+  const receipt={status:'AMBIGUOUS',action_key:'ui.act',operation_id:'close:n7',effect_possible:true,
+    error:{code:'PREPARED_NODE_CONTEXT_CHANGED'},output:{prepared_node_context:graph},
+    trace:[{event:'ui_preconditions_verified',verb:'confirm_wizard_close'},{event:'ui_gesture_applied',verb:'confirm_wizard_close'},
+      {event:'prepared_node_surface_mismatch',before:{...graph,locked:true},after:graph}]};
+  if(bad)receipt.error.code='TRANSPORT_LOST';
+  const node={...reference,verified:true,surface:'wizard',input_port:{direction:'input',port:0,native_index:0,port_guid:'port',opening_operation_id:'open:n2'}};
+  const wizard={status:'observed',stage:'input_mapping',root_ref:'wizard',root_tid:'MF;TF-1;WizrdMCF'};
+  const close={tid:wizard.root_tid+';btnClose',ref:'close',allowed_actions:['click']};
+  const controls=['yes','no'].map(name=>({tid:'msgbox;tlb;'+name,ref:name,label:name==='yes'?'Да':'Нет',allowed_actions:['click'],signature:{dialog_ref:'dialog'}}));
+  const stages=[{prepared_node_context:node,wizard,ui:{elements:[close],dialogs:[],masks:[]}},
+    {prepared_node_context:node,wizard,ui:{elements:controls,dialogs:[{ref:'dialog',title:'Подтвердить',text:'Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'}],masks:[]}},
+    {prepared_node_context:graph,wizard:{status:'absent'},ui:{dialogs:[],masks:[]}}];
+  let index=0,current,verified=0;const effects=[],events=[];
+  const reader={observe:async options=>{current=stages[index++];assert.ok(options.ready(current));return current;},
+    perform:async options=>{assert.ok(options.ready(current));const action=options.resolve(current);effects.push(action.verb);
+      if(action.verb==='confirm_wizard_close'){const error=Error('surface changed');error.name='NodeProcedureStepError';error.receipt=receipt;throw error;}}};
+  const run=()=>closeJavascriptPortMapping({reader,direction:'input',reference,record:async e=>events.push(e),deadline:Date.now()+1000,
+    verifyGraph:async()=>{verified++;if(foreignGraph)throw Error('native graph changed');}});
+  return {reference,receipt,effects,events,run,get verified(){return verified;}};
+}
+
+test('mapping-close reconciliation accepts only exact applied confirmation graph unlock receipt',()=>{
+  const f=mappingCloseFixture();assert.equal(javascriptMappingUnlockReceipt(f.receipt,f.reference),true);
+  for(const corrupt of [r=>r.effect_possible=false,r=>r.trace[1].verb='click',r=>r.trace[2].after={...r.trace[2].after,node_id:'foreign'},
+    r=>r.trace[2].before.locked=false,r=>r.trace[2].before.surface='wizard',r=>r.trace[2].before.extra=true,
+    r=>r.output.prepared_node_context={...r.output.prepared_node_context,tid:'foreign'},r=>r.trace.reverse()]){
+    const receipt=structuredClone(f.receipt);corrupt(receipt);assert.equal(javascriptMappingUnlockReceipt(receipt,f.reference),false);
+  }
+});
+
+test('mapping-close uses only readonly proof after ambiguous unlock and never replays confirmation',async()=>{
+  const f=mappingCloseFixture();const closed=await f.run();assert.equal(closed.verified,true);assert.equal(closed.original_status,'AMBIGUOUS');
+  assert.deepEqual(f.effects,['click','confirm_wizard_close']);assert.equal(f.verified,1);
+  assert.equal(f.events.at(-1).phase,'port_mapping_close_verified');
+});
+
+test('mapping-close refuses another error or changed original native graph',async()=>{
+  for(const options of [{bad:true},{foreignGraph:true}]){
+    const f=mappingCloseFixture(options);await assert.rejects(f.run());assert.deepEqual(f.effects,['click','confirm_wizard_close']);
+    assert.equal(f.events.some(e=>e.phase==='port_mapping_close_verified'),false);
+    assert.equal(f.verified,options.bad?0:1);
+  }
 });

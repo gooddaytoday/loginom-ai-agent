@@ -416,3 +416,51 @@ test('acknowledged opening with an already collapsed picker needs no close gestu
   assert.equal(f.effects.filter(e=>e==='cancel').length,1);
   assert.equal(f.events.some(e=>e.phase==='column_type_close_dispatch'),false);
 });
+
+
+test('Apply waits for own sync and clean cached records even after editor closes and ModalResultOk',async()=>{
+  for(const pendingFlag of ['isSyncing','needsSync','dirty','phantom','dropped','removed']){
+    const f=fixture();await f.open();f.state.pending.applyDispatched=true;f.form.ModalResultOk=true;f.hide();
+    const object=['isSyncing','needsSync','removed'].includes(pendingFlag)?f.store:f.records[0];
+    if(pendingFlag==='removed')object.removed.push({});else object[pendingFlag]=true;
+    const pending=await f.observe('applied');assert.equal(pending.status,'pending');assert.equal(pending.checks.writes_clean,false);
+    f.setWait(()=>{if(pendingFlag==='removed')object.removed.length=0;else object[pendingFlag]=false;});
+    await settleJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000,phase:'applied'});
+    assert.equal(f.state.pending,null);assert.equal(f.effects.includes('cancel'),false);
+  }
+});
+
+test('failed Apply write keeps pending binding and cannot authorize Cancel or replay',async()=>{
+  const f=fixture();await f.open();f.state.pending.applyDispatched=true;f.form.ModalResultOk=true;f.hide();
+  f.store.isSyncing=false;f.records[0].dirty=true;
+  const cleanup=()=>cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+15});
+  await assert.rejects(cleanup());await assert.rejects(cleanup());
+  assert.ok(f.state.pending);assert.equal(f.disposed,0);assert.equal(f.effects.includes('cancel'),false);
+  assert.equal(f.events.at(-1).snapshot.write_state.dirty_count,1);
+});
+
+test('capture, pre-Add recheck and Cancel share clean-write boundaries without invoking accessors',async()=>{
+  for(const fault of ['sync','dirty','removed','getter']){
+    const f=fixture({count:1});let calls=0;
+    if(fault==='sync')f.store.isSyncing=true;
+    if(fault==='dirty')f.records[0].dirty=true;
+    if(fault==='removed')f.store.removed.push({});
+    if(fault==='getter')Object.defineProperty(f.store,'isSyncing',{get(){calls++;throw Error('sync getter');}});
+    await assert.rejects(f.open());assert.equal(calls,0);assert.deepEqual(f.effects,[]);
+  }
+  const f=fixture();let added=0;
+  await assert.rejects(openJavascriptColumnEditor({page:f.page,context:f.context,index:0,state:f.state,once:f.once,
+    record:async e=>{await f.record(e);if(e.phase==='column_editor_prepared')f.store.isSyncing=true;},deadline:Date.now()+1000,add:async()=>{added++;}}));
+  assert.equal(added,0);
+  const c=fixture();await c.open();c.hide();c.records.pop();c.store.isSyncing=true;
+  assert.equal((await c.observe('cancelled')).status,'pending');c.store.isSyncing=false;assert.equal((await c.observe('cancelled')).status,'settled');
+});
+
+test('Apply refuses unknown record flags and replacement data cache without calling getters',async()=>{
+  for(const fault of ['getter','cache']){
+    const f=fixture();await f.open();f.form.ModalResultOk=true;f.hide();let calls=0;
+    if(fault==='getter')Object.defineProperty(f.records[0],'dirty',{get(){calls++;throw Error('dirty getter');}});
+    else f.records[0].data={...f.records[0].data};
+    assert.notEqual((await f.observe('applied')).status,'settled');assert.equal(calls,0);
+  }
+});
