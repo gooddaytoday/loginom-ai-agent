@@ -16,6 +16,34 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source77 проверен; odd03 выполняется
+
+Freeze77 root independently: **1207main+3public-deny+11Python PASS**,193pins
+до/после, syntax5MJS и diffcheck PASS. Финальная версия добавила explicit false
+для ещё не совершённых initial-opening действий; поэтому ранние1206 не финальный
+счёт. Только5runtime/test файлов закоммичены в node-javascript:
+`f297b74d034e1c6becfb2eeece9af9fc8ed272c3`.
+Manifest SHA `aea5d7afadbb6fe0b11dc588b150edcc70f2ac889996e8287f11fce2e4fd6e7d`;
+JSON SHA `11b9ded314aa20f0fc42ac2e278c6b9bc50f2c4b6ad8e812b551fab4aa4bc3df`.
+
+Initial executionCase использует единый retained selection+Setting path с
+exact dispatch ACK и original deadline; nonexecution discovery не изменён.
+Point/blocker snapshots разделены с terminal observation. Неопределённый actual
+Setting dispatch без observed wizard останавливает cleanup до restore/Close,
+не объявляется успехом и не replay. Root перепроверил эти границы в source/tests.
+
+Начат native-cardinality-odd-probe-03, fresh profile61, headed DISPLAY=:1,
+sandbox=true; Node/Chrome SHA и193pins совпали. Terminal session42834, browser
+RUNNING, developer idle. Продолжать ту же сессию до terminal. Private
+operator77-root-test-source.json и source receipt сохранены. Подготовлен
+независимый audit-cardinality-live77.py (SHA
+`ff79242bbb5584d6a65c1e83ff4ae9b8b3fdca2934e3c858166a89edf4ca20f6`), который
+дополнительно проверяет initial lifecycle и журнал до schema binding. Пока это
+подготовка auditor, не live PASS. На успехе нужны8cells/3-2-3 и cleanup. Старые
+odd01/02 причины не объявлять установленными только из успеха нового run.
+
+
+
 ### Odd02: selection PASS, отдельный Setting hit-test отказал; Fix77 назначен
 
 Source76/profile60 native-cardinality-odd-probe-02 terminal exit1 (session64986),
