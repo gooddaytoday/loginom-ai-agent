@@ -15,6 +15,27 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Автосвязь: найден штатный Alt-drag — 2026-09-27
+
+Root просмотрел screenshot38: второй JS визуально связан с первым JS.
+Причина не должна объясняться только selection: historical helper
+`tests/toreview/helpers/al/autobinding_helpers.ts` выбирает ближайший порт
+по геометрии (dx191/dy63), а не selection. Эти числа не сертифицируются для7.4.2.
+
+[Официальная справка портов](https://help.loginom.ru/userguide/workflow/ports/index.html)
+прямо описывает отключение автоматической связи при удержании Alt в процессе
+перетаскивания. Локальный e2e checkout чистый на
+`7a41b5adbb9c45dca8d756a8220615554301c2e0`: tests/helpers/workflow/node.ts:140–157
+сравнивает Alt=false/link exists и Alt=true/no link; bg/helpers/workflow/node.ts
+передаёт modifiers.alt в drag. E2E здесь только прочитаны, не запускались.
+SHA256 tests/helper:4a632266cc9b525a26d6df9ff6632987a219fdef7278199ad25554102a1d076f;
+bg/helper:c50802326ad3b32bcceb35e892606bae5726eaaafab0fd5d833f26dfb6ebea64.
+
+Разработчику переданы источники для fix39: явный Alt-drag с гарантированным
+release и сохранением uncertain-effect semantics, затем штатное соединение
+original input. Strict topology guards остаются. Live Ubuntu Alt ещё NOT_RUN;
+selection-only гипотеза не считается достаточным исправлением.
+
 ### Batch38: первый полный code-table case PASS — 2026-09-27
 
 Freshprofile11/freeze38. Native wizard settlement подтвердил1disabled-delete
