@@ -1094,7 +1094,7 @@ try {
       if(packageHandle&&!owner){report.cleanup.stage='settle-created-package';await settlePackageMetadata();}
       if(executionRuntime&&owner&&!openedWizard){
         const surface=await observe();
-        if(surface.prefix!==owner.prefix||executionRuntime.passiveSurfacePending||executionRuntime.wizardOpeningPending){
+        if(surface.prefix!==owner.prefix||executionRuntime.passiveSurfacePending||executionRuntime.wizardOpeningPending||executionRuntime.manualMappingPending){
           report.cleanup.stage='restore-owned-workflow';
           await executionRuntime.restoreWorkflowForCleanup();
         }

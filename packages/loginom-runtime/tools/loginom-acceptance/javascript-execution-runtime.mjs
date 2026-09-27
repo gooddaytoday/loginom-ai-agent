@@ -11,13 +11,13 @@ import {createArtifactStore} from '../../client/lib/artifacts.mjs';
 import {createActionRuntime,withBrowserReceipt} from '../../client/lib/executor.mjs';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
 import {createNodeTargetBrowserAdapter} from '../../client/lib/node-target-browser.mjs';
-import {createNodeProcedure} from '../../client/lib/node-procedure.mjs';
+import {createNodeProcedure,NodeProcedureStepError} from '../../client/lib/node-procedure.mjs';
 import {createNodeExecutionProcedure} from '../../client/lib/node-execution-procedure.mjs';
 import {openNewOutputTable,configureTablePrecision,prepareTableRead,restoreTablePrecision,returnFromOutputTable} from '../../client/lib/node-output-procedure.mjs';
 import {readTableOutputPages} from '../../client/lib/table-output-pages.mjs';
 import {decodeTableOutput} from '../../client/lib/table-output-values.mjs';
 import {boundWizardDeactivationConfirmation} from '../../client/lib/node-wizard-open.mjs';
-import {closePreparedWizard} from '../../client/lib/node-wizard-close.mjs';
+import {closePreparedWizard,wizardCloseBinding} from '../../client/lib/node-wizard-close.mjs';
 import {configureSeparateOutputPort} from '../../client/lib/port-mapping-procedure.mjs';
 import {activatePreparedWorkflow} from '../../client/lib/node-workflow-activation.mjs';
 import {javascriptInputColumns,javascriptOutputColumns,verifyJavascriptFixture,verifyJavascriptTable,createJavascriptEffectJournal} from './javascript-execution-evidence.mjs';
@@ -410,17 +410,95 @@ export async function closeJavascriptPortMapping({reader,direction,reference,rec
   await record({phase:'port_mapping_close_verified',direction,closed,native_graph_unchanged:true});return closed;
 }
 
+export function javascriptManualMappingRequest() {
+  return {mapping:{direction:'output',port:0,autosync:false,
+    fields:[{source:{kind:'configured_field',name:'ObservedID'},name:'ObservedID',label:'ObservedID'},
+      {source:{kind:'configured_field',name:'PhaseMarker'},name:'ManualMarker',label:'ManualMarker'}]},
+    configured:javascriptOutputColumns.map(column=>({...column,used:true}))};
+}
+
+// A separate port wizard is not the node wizard retained by the outer runner.
+// Cleanup is allowed only for its proven opening and no possible mapping edits.
+export async function configureJavascriptManualMapping({reader,cleanupReader,reference,record,verifyGraph,lifecycle}) {
+  if(lifecycle.started)throw Error('Manual mapping already attempted; no replay');
+  lifecycle.started=true;lifecycle.attempts=0;
+  const bind=state=>{
+    const binding=wizardCloseBinding(state),opening=lifecycle.opening?.output;
+    if(lifecycle.opening?.status!=='SUCCEEDED'||!opening?.verified||opening.direction!=='output'||opening.port!==0
+      ||binding.stage!=='output_mapping'||!binding.owner.output_port
+      ||!['document_id','workflow_id','node_id'].every(k=>binding.node[k]===reference[k]&&opening[k]===reference[k])
+      ||binding.owner.output_port.port!==0||binding.owner.output_port.port_guid!==opening.port_guid
+      ||binding.owner.output_port.native_index!==opening.native_index
+      ||binding.owner.output_port.opening_operation_id!==opening.opening_operation_id
+      ||opening.opening_operation_id!==lifecycle.opening.operation_id)
+      throw Error('Manual mapping original port opening changed');
+    if(lifecycle.binding&&JSON.stringify(binding)!==JSON.stringify(lifecycle.binding))throw Error('Manual mapping wizard binding changed');
+    return binding;
+  };
+  const tracked={...reader,
+    async openOutputPort(port){
+      if(lifecycle.openingAttempted)throw Error('Manual port opening already attempted');
+      lifecycle.openingAttempted=true;lifecycle.opening=await reader.openOutputPort(port);
+      return lifecycle.opening;
+    },
+    async observe(options){
+      const state=await reader.observe(options);
+      if(!lifecycle.binding)lifecycle.binding=bind(state);
+      return state;
+    },
+    async perform(options){
+      lifecycle.attempts++;
+      try{return await reader.perform(options);}
+      catch(error){
+        if(error instanceof NodeProcedureStepError&&error.receipt?.status==='REFUSED'
+          &&error.receipt.effect_possible===false&&error.receipt.cleanup_complete===true)lifecycle.attempts--;
+        throw error;
+      }
+    }};
+  try{
+    const {mapping,configured}=javascriptManualMappingRequest();
+    const result=await configureSeparateOutputPort(tracked,mapping,configured);
+    lifecycle.closed=true;return result;
+  }catch(error){
+    await record({phase:'manual_mapping_refused',node:reference,opening_verified:!!lifecycle.binding,
+      mapping_effect_possible:lifecycle.attempts>0,reason:String(error.message).slice(0,300)});
+    if(!lifecycle.binding||lifecycle.attempts>0)throw error;
+    const deadline=lifecycle.cleanupDeadline=Date.now()+60000,cleanup=cleanupReader(deadline);
+    // Pin the original root/port/opening receipt before every observation and
+    // gesture; readPreparedNodeContext supplies its retained native identities.
+    const owned=state=>{
+      if(state.wizard?.status==='observed')bind(state);
+      else if(state.wizard?.status!=='absent'||state.prepared_node_context?.verified!==true
+        ||state.prepared_node_context.surface!=='graph'
+        ||!['document_id','workflow_id','node_id'].every(k=>state.prepared_node_context[k]===reference[k]))
+        throw Error('Manual mapping cleanup owner changed');
+    };
+    const bound={...cleanup,
+      observe:options=>cleanup.observe({...options,ready:state=>{owned(state);return options.ready(state);}}),
+      perform:options=>cleanup.perform({...options,ready:state=>{owned(state);return options.ready(state);}})};
+    lifecycle.cleanupAttempted=true;
+    const closed=await closePreparedWizard(bound);
+    if(Date.now()>=deadline)throw Error('Manual port cleanup deadline expired');
+    await verifyGraph(deadline);
+    if(Date.now()>=deadline)throw Error('Manual port cleanup graph proof exceeded deadline');
+    lifecycle.closed=true;
+    await record({phase:'manual_mapping_refusal_cleanup_verified',node:reference,deadline,closed,native_graph_unchanged:true});
+    throw error;
+  }
+}
+
 export async function createJavascriptExecutionRuntime({page,prepared,directory,record,account,deadline,effectScope=()=>null}) {
   if(account!=='jsteach'||prepared.status!=='READY'||prepared.package_ref?.persisted!==false)throw Error('Own JavaScript draft required');
   const origin='http://logi-test-plan.bg.local',build='7.4.2',sessionId='js-g2-'+randomUUID();
   const journalOnce=createJavascriptEffectJournal({record,deadline});
   const once=(id,identity,perform)=>journalOnce(caseEffect(effectScope(),id),identity,perform);
-  const execute=async code=>{
-    if(Date.now()>=deadline)throw Error('Original G2/G3 operation deadline expired');
+  const executeUntil=async(code,until)=>{
+    if(Date.now()>=until)throw Error('Original JavaScript operation deadline expired');
     // The module supplies these fixed local builders; this function is never
     // exposed to a model or evaluated in the browser's application realm.
     return await Function('return ('+code+')')()(page);
   };
+  const execute=code=>executeUntil(code,deadline);
   const actions=JSON.parse(await readFile(new URL('../../executor/catalog/actions.json',import.meta.url),'utf8')).actions;
   const selectors=JSON.parse(await readFile(new URL('../../executor/catalog/selectors.json',import.meta.url),'utf8')).selectors;
   const pinned={actions:new Map(actions.map(action=>[action.action_key,action])),selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
@@ -435,10 +513,11 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     if(p?.id!==prepared.document_id||matches.length!==1||!card?.Controller?.Node?.data?.node)throw Error('Original workflow cleanup binding unavailable');
     return {card,controller:card.Controller,workflow:card.Controller.Node.data.node,packageNode:matches[0].packageNode,tab:matches[0].tab};
   },prepared);
-  let cleanupRestore,passiveSurface,pendingWizard;
+  let cleanupRestore,passiveSurface,pendingWizard,pendingMapping;
   const graph=()=>adapter.observe(graphRequest,deadline);
-  const channel=(node,operationDeadline=deadline)=>createNodeProcedure({operation:{id:'js-g2-'+randomUUID(),action:{action_key:'diagnostic.javascript',revision:'1'},deadline:operationDeadline},
-    execute,record,targetOrigin:origin,targetBuild:build,maxSteps:4096,preparedNodeContext:{...graphRequest,node},
+  const channel=(node,operationDeadline=deadline,cleanup=false)=>createNodeProcedure({operation:{id:'js-g2-'+randomUUID(),action:{action_key:'diagnostic.javascript',revision:'1'},deadline:operationDeadline},
+    execute:cleanup?code=>executeUntil(code,operationDeadline):execute,
+    record,targetOrigin:origin,targetBuild:build,maxSteps:4096,preparedNodeContext:{...graphRequest,node},
     wrapMutation:(code,receipt)=>withBrowserReceipt('('+code+')(page)',{receipt_namespace:sessionId,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
   const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']').filter({visible:true});
   const accountGuard=async()=>{
@@ -470,9 +549,11 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     graph,channel,once,
     get passiveSurfacePending(){return !!passiveSurface;},
     get wizardOpeningPending(){return !!pendingWizard;},
+    get manualMappingPending(){return !!pendingMapping;},
     restoreWorkflowForCleanup() {
       cleanupRestore??=(async()=>{
         const cleanupDeadline=Date.now()+60000;
+        if(pendingMapping)throw Error('Standalone manual mapping remains unresolved; no generic Close or replay');
         if(pendingWizard){
           await cleanupJavascriptWizardOpening(page,{...pendingWizard,deadline:cleanupDeadline,record,channel:channel(pendingWizard.reference,cleanupDeadline)});
           await pendingWizard.binding.dispose();pendingWizard=undefined;
@@ -515,10 +596,23 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       const binding=pendingWizard.binding;pendingWizard=undefined;await binding.dispose();
     },
     async prepareManualMapping(node) {
-      const result=await configureSeparateOutputPort(channel(node),{direction:'output',port:0,autosync:false,
-        fields:[{source:{kind:'configured_field',name:'ObservedID'},name:'ObservedID',label:'ObservedID'},
-          {source:{kind:'configured_field',name:'PhaseMarker'},name:'ManualMarker',label:'ManualMarker'}]},javascriptOutputColumns);
-      await record({phase:'manual_mapping_prepared',node,result});return result;
+      if(pendingMapping)throw Error('Previous manual mapping remains unresolved');
+      const before=await graph();requireJavascriptTopology(before);
+      const native=await page.evaluateHandle(captureJavascriptNativeTopology,{}),lifecycle={};
+      pendingMapping={native,lifecycle};
+      try{
+        const result=await configureJavascriptManualMapping({reader:channel(node),cleanupReader:until=>channel(node,until,true),
+          reference:{document_id:prepared.document_id,workflow_id:prepared.workflow_ref.workflow_id,node_id:node.node_id},
+          record,lifecycle,verifyGraph:async until=>{
+            const checked=await page.evaluate(captureJavascriptNativeTopology,{previous:native,checkOnly:true});
+            const cleanupAdapter=createNodeTargetBrowserAdapter({execute:code=>executeUntil(code,until),origin,build,pinned});
+            const after=await cleanupAdapter.observe(graphRequest,until);requireJavascriptGraphUnchanged(before,after);
+            await record({phase:'manual_mapping_refusal_graph_verified',checked,before,after});
+          }});
+        await record({phase:'manual_mapping_prepared',node,result});return result;
+      }finally{
+        if(lifecycle.closed){pendingMapping=undefined;await native.dispose();}
+      }
     },
     async readPortMapping(node,direction) {
       if(!['input','output'].includes(direction))throw Error('Unknown mapping direction');

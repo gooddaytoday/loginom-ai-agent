@@ -9,11 +9,13 @@ import {createHash} from 'node:crypto';
 import vm from 'node:vm';
 import {EventEmitter} from 'node:events';
 import {observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
-import {javascriptInputColumns,javascriptInputRows,verifyJavascriptFixture,verifyJavascriptTable,javascriptSentinelOutcome,createJavascriptEffectJournal,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord} from './javascript-execution-evidence.mjs';
-import {javascriptInputRequest,waitJavascriptCleanupReady,selectJavascriptForSettings,javascriptWizardBinding,openJavascriptWizard,cleanupJavascriptWizardOpening,javascriptMappingUnlockReceipt,closeJavascriptPortMapping,inspectJavascriptExecutionNotifications,waitJavascriptExecutionNotifications} from './javascript-execution-runtime.mjs';
+import {javascriptInputColumns,javascriptOutputColumns,javascriptInputRows,verifyJavascriptFixture,verifyJavascriptTable,javascriptSentinelOutcome,createJavascriptEffectJournal,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord} from './javascript-execution-evidence.mjs';
+import {javascriptInputRequest,waitJavascriptCleanupReady,selectJavascriptForSettings,javascriptWizardBinding,openJavascriptWizard,cleanupJavascriptWizardOpening,javascriptMappingUnlockReceipt,closeJavascriptPortMapping,inspectJavascriptExecutionNotifications,waitJavascriptExecutionNotifications,javascriptManualMappingRequest,configureJavascriptManualMapping} from './javascript-execution-runtime.mjs';
 import {validateNodeApplyRequest} from '../../client/lib/node-apply.mjs';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
+import {resolveConfiguredOutputMapping} from '../../client/lib/port-mapping-procedure.mjs';
+import {NodeProcedureStepError} from '../../client/lib/node-procedure.mjs';
 
 function privateSelectionFixture(fault) {
   const node={id:'js-guid',tid:'MF;TF-1;Graph;JavaScript',allowed_actions:[]};
@@ -713,4 +715,118 @@ test('production executeNode waits after one launch before identify and never re
     assert.deepEqual(steps,['prepare','select','once','launch','execution_launched','settlement',
       ...(!fail?['identify','terminal','execution_terminal']:[]),'dispose']);
   }
+});
+
+function manualMappingFixture({foreignSource=true,foreignCleanup=false,lostClose=false,mutationError,afterFirst=false,graphError}={}){
+ const reference={document_id:'doc',workflow_id:'flow',node_id:'js'},lifecycle={},events=[],actions=[];
+ const port={direction:'output',port:0,native_index:0,port_guid:'port',opening_operation_id:'opening'};
+ const sources=javascriptOutputColumns.map((c,i)=>({...c,record_id:'s'+i,field_id:'f'+i,required:false}));
+ if(foreignSource)sources[0].label='foreign';
+ const mapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',
+  autosync:true,source_fields:sources,target_fields:sources.map((s,i)=>({...s,record_id:'t'+i,source:s,index:i,excluded:false,inherited:false}))};
+ let phase=0,cleanup=false,opened=0,graphChecks=0,editorDispatched=false;
+ const state=()=>({prepared_node_context:{...reference,verified:true,surface:phase===2?'graph':'wizard',locked:false,
+   ...(phase!==2?{output_port:{...port,...(cleanup&&foreignCleanup?{opening_operation_id:'foreign'}:{})}}:{})},
+  wizard:phase===2?{status:'absent'}:{status:'observed',stage:'output_mapping',root_tid:'W',root_ref:'root',
+   port_context:{status:'observed',kind:'output_data',node:{ref:'node'},port:{ref:'port'}},
+   output_columns:{page:{status:'complete_definition_page',schema_id:'schema',offset:0,limit:8,total_columns:2,returned:2,next_offset:null},
+    fields:mapping.target_fields.map((f,i)=>({...f,status:'observed',name_ref:'name'+i}))}},node_mapping:mapping,
+  ui:{masks:phase===1?[{kind:'modal_background',ref:'root'}]:[],dialogs:phase===1?[{ref:'dialog',title:'Подтвердить',text:'Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'}]:[],
+   elements:[...sources.map((_,i)=>({ref:'name'+i,allowed_actions:['double_click']})),{tid:'W;btnClose',ref:'close',allowed_actions:['click']},...['yes','no'].map(name=>({tid:'msgbox;tlb;'+name,ref:name,label:name==='yes'?'Да':'Нет',signature:{dialog_ref:'dialog'},allowed_actions:['click']}))]}});
+ const channel={openOutputPort:async()=>{opened++;return {status:'SUCCEEDED',operation_id:'opening',output:{verified:true,...reference,...port}};},
+  observe:async options=>{
+   if(editorDispatched&&!cleanup)throw mutationError;
+   const s=state();assert.ok(options.ready(s),options.condition);
+   return structuredClone(s);
+  },perform:async options=>{
+   if(!cleanup){
+    if(afterFirst){editorDispatched=true;return {status:'SUCCEEDED'};}
+    throw mutationError??Error('Unexpected edit');
+   }
+   const s=state();assert.ok(options.ready(s));options.identity(s);const action=options.resolve(s);actions.push(action);
+   if(action.ref==='close'){phase=1;if(lostClose)throw Error('Lost Close acknowledgement');}
+   else if(action.ref==='yes')phase=2;
+   else throw Error('Unexpected cleanup action');
+   return {status:'SUCCEEDED'};
+  }};
+ return {reference,lifecycle,events,actions,mapping,channel,get opened(){return opened;},get graphChecks(){return graphChecks;},
+  run:()=>configureJavascriptManualMapping({reader:channel,reference,lifecycle,record:async r=>events.push(r),
+   cleanupReader:deadline=>{assert.ok(deadline-Date.now()>55000&&deadline-Date.now()<=60000);cleanup=true;return channel;},
+   verifyGraph:async()=>{graphChecks++;assert.equal(phase,2);if(graphError)throw graphError;}})};
+}
+
+test('private manual mapping adapts used flags and passes the actual shared source resolver',()=>{
+ const {mapping,configured}=javascriptManualMappingRequest(),f=manualMappingFixture({foreignSource:false});
+ assert.ok(configured.every(c=>c.used===true));assert.ok(javascriptOutputColumns.every(c=>c.used===undefined));
+ const result=resolveConfiguredOutputMapping(mapping,configured,f.mapping);
+ assert.deepEqual(result.fields.map(f=>[f.name,f.label]),[['ObservedID','ObservedID'],['ManualMarker','ManualMarker']]);
+ assert.equal(result.autosync,false);
+ assert.throws(()=>resolveConfiguredOutputMapping(mapping,javascriptOutputColumns,f.mapping),/Configured source/);
+ for(const key of ['name','label','type']){
+  const wrong=structuredClone(f.mapping);wrong.source_fields[0][key]='foreign';
+  assert.throws(()=>resolveConfiguredOutputMapping(mapping,configured,wrong),/Configured source/);
+ }
+});
+
+test('real shared pre-edit refusal closes only its original standalone wizard with native confirmation',async()=>{
+ const f=manualMappingFixture();await assert.rejects(f.run(),/Configured source/);
+ assert.equal(f.opened,1);assert.equal(f.lifecycle.attempts,0);assert.equal(f.lifecycle.closed,true);assert.equal(f.graphChecks,1);
+ assert.deepEqual(f.actions.map(a=>a.ref),['close','yes']);
+ assert.equal(f.events.at(-1).phase,'manual_mapping_refusal_cleanup_verified');
+ await assert.rejects(f.run(),/no replay/);assert.equal(f.actions.length,2);assert.equal(f.opened,1);
+});
+
+for(const option of ['foreignCleanup','lostClose'])test('manual mapping refusal never closes foreign ownership or replays unknown Close: '+option,async()=>{
+ const f=manualMappingFixture({[option]:true});await assert.rejects(f.run(),option==='foreignCleanup'?/opening changed/:/Lost Close/);
+ assert.notEqual(f.lifecycle.closed,true);assert.equal(f.graphChecks,0);
+ assert.equal(f.actions.length,option==='foreignCleanup'?0:1);
+ await assert.rejects(f.run(),/no replay/);assert.equal(f.opened,1);
+});
+
+for(const kind of ['safe_refusal','ambiguous','unsafe_refusal','lost_reply'])test('manual mapping first editor dispatch preserves effect uncertainty: '+kind,async()=>{
+ const mutationError=kind==='lost_reply'?Error('Lost editor acknowledgement'):new NodeProcedureStepError({
+  status:kind==='ambiguous'?'AMBIGUOUS':'REFUSED',effect_possible:kind!=='safe_refusal',cleanup_complete:kind==='safe_refusal'});
+ const f=manualMappingFixture({foreignSource:false,mutationError});
+ await assert.rejects(f.run(),e=>e===mutationError);
+ assert.equal(f.lifecycle.attempts,kind==='safe_refusal'?0:1);
+ assert.equal(f.lifecycle.closed===true,kind==='safe_refusal');
+ assert.equal(f.actions.length,kind==='safe_refusal'?2:0);
+ assert.equal(f.graphChecks,kind==='safe_refusal'?1:0);
+ await assert.rejects(f.run(),/no replay/);assert.equal(f.opened,1);
+});
+
+test('manual mapping prior successful editor dispatch forbids cleanup after a later safe refusal',async()=>{
+ const mutationError=new NodeProcedureStepError({status:'REFUSED',effect_possible:false,cleanup_complete:true});
+ const f=manualMappingFixture({foreignSource:false,mutationError,afterFirst:true});
+ await assert.rejects(f.run(),e=>e===mutationError);
+ assert.equal(f.lifecycle.attempts,1);assert.equal(f.actions.length,0);assert.equal(f.graphChecks,0);
+ assert.notEqual(f.lifecycle.closed,true);await assert.rejects(f.run(),/no replay/);
+});
+
+test('manual mapping cleanup requires unchanged native graph after confirmed Close',async()=>{
+ const graphError=Error('Native graph changed'),f=manualMappingFixture({graphError});
+ await assert.rejects(f.run(),e=>e===graphError);
+ assert.deepEqual(f.actions.map(a=>a.ref),['close','yes']);assert.equal(f.graphChecks,1);
+ assert.notEqual(f.lifecycle.closed,true);await assert.rejects(f.run(),/no replay/);
+ assert.equal(f.actions.length,2);
+});
+
+test('production manual mapping binds full prepared identity and retains unresolved cleanup ownership',async()=>{
+ const source=await readFile(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
+ const start=source.indexOf('    async prepareManualMapping('),end=source.indexOf('    async readPortMapping(',start);
+ assert.ok(start>0&&end>start);
+ for(const closed of [false,true]){
+  const steps=[],node={node_id:'js'},native={dispose:async()=>steps.push('dispose')},error=Error('mapping refusal');
+  const realm={pendingMapping:undefined,graph:async()=>({}),requireJavascriptTopology:()=>{},
+   page:{evaluateHandle:async()=>native},captureJavascriptNativeTopology:()=>{},channel:()=>({}),
+   prepared:{document_id:'doc',workflow_ref:{workflow_id:'flow'}},record:async()=>{},
+   configureJavascriptManualMapping:async args=>{
+    assert.deepEqual(JSON.parse(JSON.stringify(args.reference)),{document_id:'doc',workflow_id:'flow',node_id:'js'});
+    args.lifecycle.closed=closed;throw error;
+   }};
+  const operator=vm.runInNewContext('({'+source.slice(start,end)+'})',realm);
+  await assert.rejects(operator.prepareManualMapping(node),e=>e===error);
+  assert.equal(!!realm.pendingMapping,!closed);assert.deepEqual(steps,closed?['dispose']:[]);
+  if(!closed)await assert.rejects(operator.prepareManualMapping(node),/Previous manual mapping/);
+ }
 });
