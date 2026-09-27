@@ -58,9 +58,21 @@ export function bindJavascriptNativeRoundtripGraph({node,inputPortGuid}){
   const matches=nodes.filter(n=>n.FGuid===node.node_id&&n.FIconCls==='bg-vendor-icon-javascript');
   need(matches.length===1&&nodes.length<=3&&nodes.includes(initial.node)&&links.length===1,'single import→JS topology');
   const js=matches[0],edge=links[0],targetPort=edge.FTargetPort;
-  need(edge.FSourcePort===initial.port&&targetPort?.parent===js&&js.FPorts[0].FCollection.includes(targetPort)
-    &&targetPort.FGuid===inputPortGuid&&targetPort.FType===0&&targetPort.FSubType===1&&targetPort.FParam===0
-    &&typeof edge.FGuid==='string'&&edge.FGuid,'exact edge/port');
+  const checks={source:edge.FSourcePort===initial.port,parent:targetPort?.parent===js,
+    collection:Array.isArray(js.FPorts?.[0]?.FCollection)&&js.FPorts[0].FCollection.includes(targetPort),
+    guid:targetPort?.FGuid===inputPortGuid,type:targetPort?.FType===0,subtype:targetPort?.FSubType===1,
+    param:targetPort?.FParam===0,edge_guid:typeof edge.FGuid==='string'&&edge.FGuid.length>0};
+  if(!Object.values(checks).every(Boolean)){
+    // Only bounded enum classes and identity booleans, never GUIDs, labels,
+    // source handles or arbitrary property values. Fits the 500-char transport.
+    const enumValue=key=>{
+      const descriptor=Object.getOwnPropertyDescriptor(targetPort??{},key);
+      if(!descriptor)return 'missing';if(!Object.hasOwn(descriptor,'value'))return 'accessor';
+      const value=descriptor.value;return Number.isInteger(value)&&value>=0&&value<=16?String(value):'other';
+    };
+    need(false,'RG1 '+JSON.stringify({c:checks,f:Object.keys(checks).filter(k=>!checks[k]),
+      v:['FType','FSubType','FParam'].map(enumValue)}));
+  }
   need(nodes.filter(n=>n!==js&&n!==initial.node).every(n=>n.FIconCls==='bg-vendor-icon-modelvariables'&&n.FStatus===0&&!n.FRunning),'foreign dynamic nodes');
   const heldNodes=nodes.map(n=>({node:n,data:n.data,cell:n.FCell,guid:n.FGuid,icon:n.FIconCls,ports:n.FPorts,
     groups:n.FPorts.map(group=>({group,collection:group.FCollection,ports:group.FCollection.map(p=>({port:p,data:p.data,cell:p.FCell,guid:p.FGuid,type:p.FType,subtype:p.FSubType,param:p.FParam,parent:p.parent}))}))}));

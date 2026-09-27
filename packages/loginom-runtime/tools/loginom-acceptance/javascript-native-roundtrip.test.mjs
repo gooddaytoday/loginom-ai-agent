@@ -1,3 +1,5 @@
+import {javascriptProbeFailure} from './javascript-mismatch-probe.mjs';
+import {createRedactor} from '../../client/lib/redact.mjs';
 import {nativeInputProvenance} from './javascript-native-input-contract.mjs';
 import {adaptRead} from '../../client/lib/variant-native-values.mjs';
 import {nativeRuntimePins} from '../../client/lib/collapse-native-runtime-pins.mjs';
@@ -18,7 +20,7 @@ import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,bindJava
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {readJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus,cancelJavascriptNativeRoundtrip} from './javascript-native-roundtrip-read.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
-async function roundtrip({change,deferred=false}={}){
+async function roundtrip({change,deferred=false,beforeGraph}={}){
   let mutate,defer=false;
   const f=await fake({change:()=>mutate?.(),deferred:()=>defer});
   const before=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'before'});
@@ -29,6 +31,7 @@ async function roundtrip({change,deferred=false}={}){
   const output={parent:js,FGuid:'js-output',FType:1,FSubType:1,FParam:0,FStatus:1};
   js.FPorts=[{FCollection:[target]},{FCollection:[output]}];f.model.FDiagram.FNodes.FCollection.push(js);
   const edge={FGuid:'edge',FSourcePort:f.port,FTargetPort:target};f.model.FDiagram.FLinks.FCollection.push(edge);
+  beforeGraph?.({f,js,edge,target,output});
   await f.page.evaluate(bindJavascriptNativeRoundtripGraph,{node:{node_id:'js'},inputPortGuid:'js-input'});
   const lines=nativeRoundtripProbe.source.split('\n'),doc={firstLine:()=>0,lineCount:()=>lines.length,getLine:i=>lines[i]};
   const generation={id:'generation'},generationControl={el:{dom:generation},checked:true};
@@ -198,4 +201,49 @@ test('completed import provenance refuses pending/failed/new execution, changed 
 test('upstream role cannot be admitted before a completed output read',async()=>{
   const x=await roundtrip();await assert.rejects(()=>x.bind('upstream'),/Completed output read required/);
   assert.equal(x.f.counters.sent,4);
+});
+
+const graphRefusals={
+  source:x=>x.edge.FSourcePort={...x.f.port},parent:x=>x.target.parent={},
+  collection:x=>x.js.FPorts[0].FCollection=[],guid:x=>x.target.FGuid='private-guid',
+  type:x=>x.target.FType=1,subtype:x=>x.target.FSubType=3,param:x=>x.target.FParam=1,
+  edge_guid:x=>x.edge.FGuid='',
+};
+for(const [predicate,change]of Object.entries(graphRefusals))test('serialized graph admission identifies only '+predicate+' and does not dispatch JS/native output',async()=>{
+  let fixture;
+  await assert.rejects(()=>roundtrip({beforeGraph:x=>{fixture=x;change(x);}}),error=>{
+    const diagnostic=JSON.parse(error.message.split('RG1 ')[1]);
+    assert.deepEqual(diagnostic.f,[predicate]);assert.equal(diagnostic.c[predicate],false);
+    assert.equal(Object.values(diagnostic.c).filter(Boolean).length,7);
+    assert.ok(error.message.length<400);assert.ok(!error.message.includes('private-guid'));
+    if(predicate==='param')assert.deepEqual(diagnostic.v,['0','1','1']);
+    return true;
+  });
+  assert.equal(fixture.f.counters.sent,4);assert.equal(fixture.f.env.__loginomJavascriptNativeRoundtripV1.stage,'graph-reserved');
+  assert.throws(()=>fixture.f.page.evaluate(bindJavascriptNativeRoundtripGraph,{node:{node_id:'js'},inputPortGuid:'js-input'}),/one graph admission/);
+});
+for(const value of [undefined,null,-1,17,NaN,Infinity,'private-value',{secret:'private-value'}])test('graph param diagnostic uses bounded classes for '+String(value),async()=>{
+  await assert.rejects(()=>roundtrip({beforeGraph:x=>{x.target.FParam=value;}}),error=>{
+    const d=JSON.parse(error.message.split('RG1 ')[1]);assert.deepEqual(d.f,['param']);assert.equal(d.v[2],'other');
+    assert.ok(!error.message.includes('private-value'));return true;
+  });
+});
+test('all graph predicates survive real operator error serialization and production journal redaction',async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'js-roundtrip-graph-diagnostic-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+  const journal=createExecutionJournal({directory,metadata:{sessionId:'test',clientRevision:'test'},knownSecrets:['private-value']});
+  const error=await roundtrip({beforeGraph:x=>{
+    for(const change of Object.values(graphRefusals))change(x);
+    x.target.FType='private-value';x.target.FSubType={secret:'private-value'};delete x.target.FParam;
+  }}).then(()=>assert.fail('Graph must refuse'),error=>error);
+  // Playwright adds its prefix/stack; use the same report failure serializer and
+  // redactor as the operator, followed by the real durable journal and disk read.
+  const transported=Error('page.evaluate: Error: '+error.message+'\n    at bindJavascriptNativeRoundtripGraph'.repeat(50));
+  const failure=createRedactor(['private-value']).redact(javascriptProbeFailure(transported));
+  const saved=await journal({phase:'roundtrip_graph_refused',failure});
+  const first=saved.failure.message.split('\n')[0];assert.ok(first.length<500);
+  const diagnostic=JSON.parse(first.split('RG1 ')[1]);assert.deepEqual(diagnostic.f,Object.keys(graphRefusals));
+  assert.deepEqual(diagnostic.v,['other','other','missing']);assert.ok(Object.values(diagnostic.c).every(v=>v===false));
+  assert.equal(saved.failure.message.length,1200);
+  const disk=await readFile(join(directory,'execution-events.jsonl'),'utf8');assert.ok(!disk.includes('private-value'));
+  assert.deepEqual(JSON.parse(disk).failure,clone(failure));
 });
