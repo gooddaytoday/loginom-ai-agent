@@ -16,6 +16,31 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source82 failed-terminal route: root bounded regression PASS
+
+Developer revision49 передал отдельные javascript-native-coercion-failure.mjs,
+failure-driver.mjs и failure.test.mjs. Completed owner/verifier не расширялись:
+новый capability держит fresh own failed group/child, полный ErrorDetails<=1000,
+source seal, исходную topology и историю; OUTPUT запрещён. Только исходный
+completed import читается заново, с lifecycle/ACK/idle revalidation. INPUT и
+coercion proofs теперь frozen. Ошибка без наблюдённого runtime/source mapping
+остаётся owned_execution_failure_unattributed/case_complete=false.
+
+Root reviewed changes и pinned Node regression:
+coercion-failure/coercion/integer/cardinality/typed/datetime/empty —
+**1343 PASS,0 FAIL,0 SKIP**, original session75784 terminal exit0, stderr0.
+30 native source/test pins до/после совпали. Private receipts:
+operator82-failed-root-test-pins.json и operator82-failed-root-verification.json.
+Среди проверок: отсутствие OUTPUT, original upstream, source/owner/state drift,
+release both buffers, ACK tampering, повторный seal/read, pending после final ACK.
+Это bounded host/native harness; engine/error mapping на реальном Loginom не проверены.
+
+Та же задача продолжает live dispatch обоих terminal путей, fixed enum7 outcome
+report, runtime/orchestration tests и full regression; затем freeze82/handoff.
+Root не меняет source/code вместо разработчика. Browser CLOSED/profile66 unused;
+все7 live cases по-прежнему not_run. Публичный handler/CLI/full G5 не завершены.
+
+
 ### Source82: независимая проверка fixed-script guards
 
 Private audit-coercion-script-guards.mjs выполнил7 fixed scripts в pinned Node VM
