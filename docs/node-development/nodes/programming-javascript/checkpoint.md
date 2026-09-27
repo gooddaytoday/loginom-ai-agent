@@ -16,6 +16,22 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Engine-probe-02 Unicode trim PASS; lower запущен — 2026-09-27
+
+Source55/profile30 engine-literal-trim:exit0 OBSERVED,original cleanup ALL PASS.
+Root проверил864 journalSHA,30 input cells,один fresh completed JS execution,
+exact source89354899d30075f74cff3cfde7e81db6986339d4c4677eb69adc4a22c1e59698,
+полную1×1 Result:string='Ёж 😀',nonnull/filterfalse и42/42 unchanged source hashes.
+ReportSHAc4ee8032c782be6620e3bf5ac952f7ce262c8a42b6f794fd42980b3c68f287f8.
+Отдельные journal/oracle receipts сохранены; engine-profile.json обновлён:
+2observed UI passes,28not_checked,native bytes/G5 не закрыты.
+
+После подтверждённой очистки freshprofile31 назначен с backup/receipt;
+profile30 сохранён. Engine-probe-03 --discovery-probe engine-literal-lower
+запущен на source55,headed DISPLAY=:1,sandbox enabled. Ожидание до запуска:
+Result:string='абвёж' для литералаАБВЁЖ. На момент записи RUNNING.
+
+
 ### Engine-probe-01 smoke PASS; Unicode trim запущен — 2026-09-27
 
 Source55 engine-data-smoke/profile29 завершён exit0 OBSERVED, original package/

@@ -53,9 +53,31 @@
       "source_sha256": "89354899d30075f74cff3cfde7e81db6986339d4c4677eb69adc4a22c1e59698",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_pass",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "explicit_js_execute_count": 1,
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "string"
+        }
+      ],
+      "output_rows": 1,
+      "all_cells_verified": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-probe-02/report.json",
+        "report_sha256": "c4ee8032c782be6620e3bf5ac952f7ce262c8a42b6f794fd42980b3c68f287f8",
+        "source_receipt": "engine-probe-02-source.json",
+        "journal_verifier": "engine-probe-02-verification.json",
+        "oracle_verifier": "engine-probe-02-oracle-verification.json"
+      }
     },
     {
       "id": "engine-literal-lower",
