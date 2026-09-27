@@ -34,6 +34,11 @@ ReportSHA `81ba816209289cc8cbb497ccdf9b07bdfd4d8d33e94b016d37f6addca8184115`;
 private native-integer-outside-safe-roundtrip-probe-01-verification.json сохранён.
 Lease CLOSED, profile53 сохранён; recovery не нужен. Следующий профиль не назначен.
 
+Root подготовил private civil-datetime-preflight.json, SHA
+`d05294a63731610ea3c37d7d7b401cc7050c7e0f127c6b16c8230002641e089c`:
+canonical civil components для двух дат с123/999ms иNULL проверены Python
+без timezone/epoch. Это expected-data preparation, не native/live admission.
+
 Прежняя задача разработчика готовит только bounded Date/civil design по коду;
 runtime/fixtures/tests до отдельного следующего задания не меняются. Проверить
 civil read миллисекунд и native tag7 без выдуманного epoch/timezone. Все остальные
