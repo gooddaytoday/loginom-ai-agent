@@ -33,7 +33,7 @@ let cleaning=false;
 const phaseDeadline=ms=>Math.min(cleaning?Infinity:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=batchDeadline-Date.now();if(!cleaning&&ms<=0)throw Error('Original batch deadline expired');return cleaning?Infinity:ms;};
 const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
-if (args.includes('--help')) { console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string] Private typed/NULL input admission then one Data-only identity JS Execute, native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
+if (args.includes('--help')) { console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe] Private typed/NULL input admission then one Data-only identity JS Execute, native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
 const allowed = new Set(['--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
@@ -712,7 +712,7 @@ const runExecutionTrial=async probe=>{
       await executionRuntime.verifyExecutionBoundary(boundary);
       report.native_roundtrip=await executionRuntime.readNativeRoundtrip(executionInput,executionNode,execution);
       await executionRuntime.verifyExecutionBoundary(boundary);
-      report.stage='native-roundtrip-observed';report.gates_closed=[];await save();return;
+      report.stage=report.native_roundtrip.outcome?.characterization_only?'native-roundtrip-characterized':'native-roundtrip-observed';report.gates_closed=[];await save();return;
     }finally{await boundary.native.dispose();}
   }
   if(discoveryProbe){
@@ -1040,7 +1040,7 @@ const runPreparedCase=async()=>{
     report.stage='discard-wizard';
     if(openedWizard)await closeWizardOnce();
     await snapshot('wizard-discarded');
-    if(nativeRoundtrip&&report.native_roundtrip)report.stage='native-roundtrip-observed';
+    if(nativeRoundtrip&&report.native_roundtrip)report.stage=report.native_roundtrip.outcome?.characterization_only?'native-roundtrip-characterized':'native-roundtrip-observed';
     }
     }
 };

@@ -77,6 +77,52 @@ const fixtures={
       "d09fd180d0b8d0b2d0b5d1822c20d081d0b620f09f9880",
       "71756f7465225c736c6173680a6c696e65"
     ]
+  },
+  "integer-safe": {
+    "id": "integer-safe",
+    "file": "javascript-native-input-integer-safe.csv",
+    "rows": 4,
+    "columns": 1,
+    "bytes": 55,
+    "sha256": "86983c730cec045020a014b5bd365b2cf604c5f214774eb4a31b9344f6d0865d",
+    "type": "integer",
+    "native_type": 4,
+    "js_type": "Integer",
+    "data_kind": "Дискретный",
+    "values": [
+      null,
+      "-9007199254740991",
+      "0",
+      "9007199254740991"
+    ],
+    "expected_bytes": [
+      null,
+      "010000000000e0ff",
+      "0000000000000000",
+      "ffffffffffff1f00"
+    ]
+  },
+  "integer-outside-safe": {
+    "id": "integer-outside-safe",
+    "file": "javascript-native-input-integer-outside-safe.csv",
+    "rows": 3,
+    "columns": 1,
+    "bytes": 58,
+    "sha256": "606534ae7c03a4cc31c963a14b3029576e2f7867411d27347ab9548ccf8aa1f6",
+    "type": "integer",
+    "native_type": 4,
+    "js_type": "Integer",
+    "data_kind": "Дискретный",
+    "values": [
+      "-9007199254740992",
+      "9007199254740992",
+      "9007199254740993"
+    ],
+    "expected_bytes": [
+      "000000000000e0ff",
+      "0000000000002000",
+      "0100000000002000"
+    ]
   }
 };
 for(const f of Object.values(fixtures)){Object.freeze(f.values);Object.freeze(f.expected_bytes);Object.freeze(f);}

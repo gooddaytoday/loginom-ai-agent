@@ -145,13 +145,13 @@ for(const id of ['boolean','string']){
   await assert.rejects(()=>support.nodeApplyDriverFactory(x).readOutput({},x.ctx));assert.equal(native,0);assert.equal(proof,0);
  });
 }
-test('private fixture selector rejects Date/int64/generic schemas and public CLI option',async()=>{
+test('private fixture selector rejects Date/generic schemas and public CLI option',async()=>{
  for(const id of ['datetime','integer','variant','__proto__','constructor','unknown'])assert.throws(()=>javascriptNativeFixture(id));
  const {runJavascriptOperator}=await import('./javascript-live.mjs');
  await assert.rejects(()=>runJavascriptOperator(['--native-fixture','boolean']),/Unknown/);
  for(const entry of [{nativeRoundtrip:true},{nativeInputOnly:true}]){
   await assert.rejects(()=>runJavascriptOperator(['--native-fixture','datetime'],entry),/Unknown private native fixture/);
-  for(const id of ['real','boolean','string'])await assert.rejects(()=>runJavascriptOperator(['--native-fixture',id],entry),/Absolute --config required/);
+  for(const id of ['real','boolean','string','integer-safe','integer-outside-safe'])await assert.rejects(()=>runJavascriptOperator(['--native-fixture',id],entry),/Absolute --config required/);
   await assert.rejects(()=>runJavascriptOperator(['--native-fixture','boolean','--native-fixture','string'],entry),/Unknown or duplicate/);
  }
 });

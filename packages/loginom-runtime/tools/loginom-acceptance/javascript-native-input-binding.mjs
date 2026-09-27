@@ -50,7 +50,7 @@ export function javascriptNativeInputSnapshot(b){
     // Subscription metadata, not a data-generation/version counter. Never walk $S.
     return {identity,identityPrototype:Object.getPrototypeOf(identity),value:JSON.stringify([owner,object,type,remoteRefs,refs])};
   };
-  const fixtureId=b.fixture_id??'real',slice={real:[4,3],boolean:[3,1],string:[8,5]}[fixtureId];
+  const fixtureId=b.fixture_id??'real',slice={real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4]}[fixtureId];
   need(Array.isArray(slice)&&b.rows===slice[0]&&b.row_count===slice[0]
     &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:slice[1]}]),'fixed native fixture schema/count');
   const prep=globalThis.__loginomDockPreparationV1;

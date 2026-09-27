@@ -2,7 +2,7 @@ import {verifyTextImportSource} from '../../client/lib/text-import-node.mjs';
 import {textImportConfigurationReadback} from '../../client/lib/text-import-readback.mjs';
 import {createHash} from 'node:crypto';
 import {adaptRead} from '../../client/lib/variant-native-values.mjs';
-import {verifyNativeFixtureCells} from './javascript-native-input-contract.mjs';
+import {verifyNativeFixtureCells,verifyNativeInputRead} from './javascript-native-input-contract.mjs';
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 
 const need=(v,m)=>{if(!v)throw Error('Native roundtrip: '+m);};
@@ -48,12 +48,48 @@ export function verifyNativeRoundtripRead(raw,{binding,lifecycle,input,role}){
   need(binding.source_sha256===nativeRoundtripProbe.source_sha256,'identity script digest');
   const exact=adaptRead(raw,{expected:binding,lifecycle,consistency:{kind:'observed_local',changed:false,
     exclusive_operation:true,stability_basis:'owned_static_completed_fixture'}});
-  verifyNativeFixtureCells(input.exact,fixture.id);verifyNativeFixtureCells(exact,fixture.id);
-  need(exact.cells.every((cell,i)=>{const before=input.exact.cells[i];return cell.row===i&&cell.column===0
-    &&cell.is_null===before.is_null&&JSON.stringify(cell.native)===JSON.stringify(before.native)
-    &&cell.value===before.value;}), 'roundtrip significant bytes differ');
+  verifyNativeFixtureCells(input.exact,fixture.id);
+  const characterization=fixture.id==='integer-outside-safe'&&role==='output'?characterizeOutsideSafeIntegers(exact,input.exact):null;
+  if(!characterization){
+    verifyNativeFixtureCells(exact,fixture.id);
+    need(exact.cells.every((cell,i)=>{const before=input.exact.cells[i];return cell.row===i&&cell.column===0
+      &&cell.is_null===before.is_null&&JSON.stringify(cell.native)===JSON.stringify(before.native)
+      &&cell.value===before.value;}), 'roundtrip significant bytes differ');
+  }
   return {...exact,contract:'javascript-native-'+fixture.id+'-roundtrip-read-1',fixture_id:fixture.id,role,source_sha256:nativeRoundtripProbe.source_sha256,
-    input_read_id:input.raw.read_id,g5_complete:false};
+    input_read_id:input.raw.read_id,g5_complete:false,...(characterization?{integer_characterization:characterization}:{})};
+}
+
+function characterizeOutsideSafeIntegers(exact,input){
+  need(exact.coverage.table_complete&&exact.row_count===3&&exact.cells.length===3&&exact.schema.length===1
+    &&exact.schema[0].name==='Value'&&exact.schema[0].label==='Value'&&exact.schema[0].type==='integer','full outside-safe integer output required');
+  const cells=exact.cells.map((cell,i)=>{
+    need(cell.row===i&&cell.column===0&&cell.type==='integer'&&cell.cell_type==='integer'&&cell.is_null===false
+      &&typeof cell.value==='string'&&/^(?:0|-?[1-9][0-9]*)$/.test(cell.value)&&cell.decimal===cell.value
+      &&cell.native.tag===20&&cell.native.bits===64&&cell.native.encoding==='signed-int64-le'
+      &&typeof cell.native.bytes_le==='string'&&/^[a-f0-9]{16}$/.test(cell.native.bytes_le)
+      &&Buffer.from(cell.native.bytes_le,'hex').readBigInt64LE().toString()===cell.value,'outside-safe output is not a complete native int64 observation');
+    const before=input.cells[i];
+    return {row:i,input_decimal:before.value,output_decimal:cell.value,input_bytes_le:before.native.bytes_le,output_bytes_le:cell.native.bytes_le,
+      unchanged:cell.value===before.value&&cell.native.bytes_le===before.native.bytes_le,delta_decimal:(BigInt(cell.value)-BigInt(before.value)).toString()};
+  });
+  const identityExact=cells.every(c=>c.unchanged);
+  return {status:identityExact?'outside_safe_exact_observed':'outside_safe_value_change_observed',characterization_only:true,
+    output_identity_exact:identityExact,exact_pass:false,general_integer_precision_guarantee:false,cells};
+}
+
+// Revalidate recorded bytes/lifecycles after the fresh upstream read. A changed
+// outside-safe OUTPUT is never promoted to exact PASS by a successful cleanup.
+export function verifyNativeRoundtripOutcome(results,fixtureId='real'){
+  const fixture=javascriptNativeFixture(fixtureId),before=results.before;
+  need((before.binding.fixture_id??'real')===fixture.id,'final fixture differs');
+  const input={...before,exact:verifyNativeInputRead(before.raw,{binding:before.binding,lifecycle:before.lifecycle,provenance:before.exact.provenance})};
+  const output=verifyNativeRoundtripRead(results.output.raw,{binding:results.output.binding,lifecycle:results.output.lifecycle,input,role:'output'});
+  verifyNativeRoundtripRead(results.upstream.raw,{binding:results.upstream.binding,lifecycle:results.upstream.lifecycle,input,role:'upstream'});
+  const observation=output.integer_characterization;
+  return {fixture_id:fixture.id,status:observation?.status??'exact_fixture_identity_observed',input_exact:true,upstream_exact:true,
+    output_identity_exact:observation?.output_identity_exact??true,exact_pass:!observation,characterization_only:!!observation,
+    general_integer_precision_guarantee:false,g5_complete:false,...(observation?{cells:observation.cells}:{})};
 }
 
 export function verifyNativeRoundtripExecution(execution,node,fixtureId='real'){

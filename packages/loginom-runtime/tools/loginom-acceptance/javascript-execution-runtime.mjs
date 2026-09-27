@@ -1,6 +1,6 @@
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,completeJavascriptNativeRoundtrip} from './javascript-native-roundtrip-owner.mjs';
-import {javascriptNativeRoundtripProbe,verifyNativeRoundtripInput,verifyNativeRoundtripExecution,verifyNativeRoundtripProvenance} from './javascript-native-roundtrip-contract.mjs';
+import {javascriptNativeRoundtripProbe,verifyNativeRoundtripInput,verifyNativeRoundtripExecution,verifyNativeRoundtripProvenance,verifyNativeRoundtripOutcome} from './javascript-native-roundtrip-contract.mjs';
 import {readNativeRoundtrip} from './javascript-native-roundtrip-driver.mjs';
 import {waitJavascriptWizardSettlement} from './javascript-wizard-settlement.mjs';
 // All generated runtime code runs against the caller's authenticated page.
@@ -811,6 +811,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       }
       await page.evaluate(()=>globalThis.__loginomJavascriptNativeRoundtripV1.check());
       validateNativeSource();
+      results.outcome=verifyNativeRoundtripOutcome(results,nativeFixtureId);
       const saved=await record({phase:'native_roundtrip_verified',results,g5_complete:false});
       if(JSON.stringify(saved.results)!==JSON.stringify(results))throw Error('Roundtrip final journal ACK differs');
       return results;
