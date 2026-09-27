@@ -1,45 +1,34 @@
-# G5 native types: следующий ограниченный шаг
+# G5 native types: текущие доказательства и следующие проверки
 
-Актуальный Date результат source74/profile56: **exact civil/native identity PASS**,
-9native cells+9civil observations,1025journalrefs/190pins, original cleanup3/3.
-NULL и две canonical даты с123/999ms сохранились на всех трёх стадиях;
-epoch/timezone не устанавливались. Ошибка port-GUID из source73 ниже исправлена
-с сохранением составного owner контекста. Следующие cardinality/coercion и полный
-G5 остаются открыты; точные receipts/SHA — в [checkpoint](checkpoint.md).
+Статус на 2026-09-27: private INPUT и identity JS roundtrip подтверждены для
+real/NULL, boolean, string, safe int64 и двух canonical Date значений сNULL.
+Это ограниченные observed_local проверки; полныйG5, публичный handler и CLI
+ещё не подтверждены. Точные receipts/hashes находятся в [checkpoint](checkpoint.md).
 
+- Source70 `c1ae171e50`: real/profile49,12native cells/627journalrefs/75pins.
+- Source71 `0115eccd20`: boolean/profile50,9cells/570refs; string/profile51,
+  24cells/556refs;81pins. Сохранены NULL/false/empty/Unicode/multiline.
+- Source72 `7982cc3542`: safe int64/profile52,12cells/632refs; outside-safe/profile53,
+  9cells/619refs/85pins. Наблюдено9007199254740993→9007199254740992 при точных
+  INPUT/upstream. Это characterization, exactPASS=false, не гарантия int64.
+- Source73 `c642e6bab3`: отдельный Date INPUT-only/profile54,3native+3civil cells,
+  465refs/190pins; NULL и123/999ms проверены до JS.
+- Source74 `cb3e608baa`: Date roundtrip02/profile56,9native+9civil observations,
+  1025refs/190pins. Civil values и significant bytes совпали с pre-JS INPUT
+  на OUTPUT/upstream. Epoch/timezone не выводились. Root1042main+3deny+7Python
+  PASS; неизменённые shared import/output ранее228PASS на source73.
 
-Наблюдение source73: Date INPUT-only прошёл native/civil admission (3+3cells).
-Первый Date roundtrip отказал в verifier до публикации native OUTPUT из-за
-ошибочного требования разных port GUID. Один output0 GUID встречается у разных
-node_id, в том числе в прежних успешных int64/string прогонах. Принадлежность
-проверять составным контекстом узла/порта/исполнения, не глобальной уникальностью
-port GUID. Date roundtrip пока не подтверждён; подробности и Fix74 — в checkpoint.
+Original cleanup3/3 подтверждён у каждого перечисленного прогона.
+Source73 Date roundtrip01 ранее отказал из-за ошибочной global port-GUID
+inequality. Source74 исправил её: один output0 GUID встречается у разных узлов,
+принадлежность проверяется полным контекстом node/port/source/execution.
+Runtime/source seals, native ownership и single-use guards сохранены.
 
-
-Статус на 2026-09-27: **private real/boolean/string INPUT и JS identity roundtrip подтверждены live**.
-Source71 `0115eccd20`: boolean/profile50 audit9cells/570journal refs PASS,
-string/profile51 audit24cells/556refs PASS;81sourcepins и original cleanup3/3
-каждого прогона подтверждены. NULL/false/empty и точные Unicode/multiline строки
-сохранены. Root886main+3deny+4Python PASS. Source72 `7982cc3542`: safe int64/profile52 exact12cells/632refs PASS;
-outside-safe/profile53 characterization9cells/619refs —
-9007199254740993 →9007199254740992, INPUT/upstream неизменны.
-85pins и cleanup3/3 обоих прогонов подтверждены; root959main+3deny+6Python PASS.
-Date/cardinality/полный G5 остаются открыты.
-Source70 `c1ae171e50a2b3368d72831fb27ecca84d4a58a2`, root814 main+3deny PASS.
-Headed native-roundtrip-probe07/profile49 завершён exit0 OBSERVED, original cleanup
-ALL PASS. Независимый Python oracle проверил12/12 ячеек: INPUT до JS, JS OUTPUT и
-INPUT после JS; NULL/+0/−1.25/10.125, exact significant binary64 bytes, distinct
-read IDs и неизменное upstream execution.627journal refs/75pins проверены.
-Private receipt и SHA — в [checkpoint](checkpoint.md). Это observed_local;
-server atomic snapshot/отсутствие ABA и весь G5 не доказаны.
-
-Private input-only admission ранее подтверждён source63/probe09; source64–70
-добавили отдельные JS/upstream bindings, source/mode Done seal, точный AddPort
-admission и owned-port selection+F3 с проверенным postclick DOM transition.
-Bool/string fixtures с native INPUT до JS, точным NULL/empty/false/UTF8
-и независимым roundtrip подтверждены source71. Safe int64 и outside-safe characterization подтверждены source72 в указанном
-объёме. Далее Date, cardinality и остальная матрица плана. Нельзя подгонять
-expected под importer или заменять независимый input JS-генератором.
+Следующие проверки: cardinality с порядком строк и пустой declared-схемой,
+Integer coercion и оставшаяся матрица плана. INPUT нельзя заменять JS-генератором
+или менять expected под поведение импорта. Atomic server snapshot и отсутствие
+unobserved ABA не доказаны. [Date/civil дизайн](native-datetime-design.md)
+описывает соответствующий ограниченный контракт.
 
 Далее сохранён дизайн и анализ **исходного source55**, поэтому указания
 «текущий» внутри анализа относятся к этой базе, а не к source63.
