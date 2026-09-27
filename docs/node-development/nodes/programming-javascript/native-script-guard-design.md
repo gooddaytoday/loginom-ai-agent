@@ -208,3 +208,28 @@ Root выполняет независимые проверки/commit и сле
 зарезервированном fresh profile63. Developer не запускает браузер, не меняет
 private campaign/config и не коммитит. Эти промежуточные source reviews не
 подменяют предусмотренный планом один итоговый этап ревью готового handler.
+
+
+## Диагностика отказа source79 на empty02
+
+Live empty02 не достиг JS: обычный NativeInput body классифицирован unconfirmed,
+действия запрещены. Source-only сверка локализовала отказ в ready(click), но не
+установила конкретное звено own-descriptor цепочки. Изменять guard без этой
+проверки оснований нет.
+
+Следующий шаг — private диагностический отчёт на failure prepare-typed-input.
+Он привязан к последнему durable node_observation_completed с verified graph
+context; выполняется до существующей очистки, не заменяет исходный отказ.
+Вместо повтора действия или ослабления классификации выбран один read-only
+проход по фиксированным свойствам: descriptor kind/depth/type, model/container,
+плотность nodes, GUID/cell/icon predicates, renderer/DOM uniqueness. Значения
+произвольных полей, функции, секреты и handles не публикуются. Геттеры не
+вызываются, обход прототипов и коллекций ограничен. Недоступность диагностики
+отделяется от доказанного отказа classifier; её дополнительные ограничения
+не выдаются за продуктовую причину. Никаких новых жестов, RPC, retry или ожиданий.
+
+Проверки: actual serialized diagnostic function, отсутствующие/inherited/data/
+accessor descriptors без вызова getter, holey collection, неверные container и
+renderer, gated failure integration с сохранением исходного error/cleanup.
+Root выделил profile64; browser CLOSED. Live только после source freeze и
+независимых тестов, DISPLAY=:1/headed/sandbox. Полный empty roundtrip/G5 не принят.
