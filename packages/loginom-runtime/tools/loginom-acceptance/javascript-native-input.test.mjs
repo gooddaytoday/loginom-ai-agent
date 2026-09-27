@@ -188,7 +188,47 @@ test('refused inventory diagnostic is bounded, contains no data or getter evalua
   assert.equal(getterCalls,0);
 });
 
-for(const mode of ['inactive-inputs','all-checks','oversized-control'])test('production node error transport and journal preserve compact inventory: '+mode,async t=>{
+// Source-backed possible shape, deliberately NOT an observation of helper cookies.
+// rtl.imp.js Out.$ -> rpc.js proxy {$S,$FRefCount,$}; no getters/native calls.
+function cookieStructureFixture(f,kind){
+  function Out(){}
+  function $bg_rpc_TIBGDelegateConnectionCookie_Proxy(){}
+  for(let i=0;i<20;i++)f.session['private-field-'+i]='private-cookie-value';
+  const wrapper=new Out(),proxy=new $bg_rpc_TIBGDelegateConnectionCookie_Proxy();
+  Object.assign(proxy,{$S:f.session,$FRefCount:1,$:{$OW:0,$O:10,$I:206,$RRC:1}});
+  wrapper.$=proxy;f.helper[kind==='d'?'$FDataChangeCookie':'$FStateChangeCookie']=wrapper;
+}
+for(const kind of ['d','s']){
+  for(const reason of ['bound','number','shape','accessor','bytes','unknown-class'])test('cookie diagnostic preserves '+kind+' rejection '+reason+' without values/getters',async()=>{
+    let getters=0,fixture;
+    await assert.rejects(()=>fake({beforeBind:f=>{
+      fixture=f;
+      const value=reason==='bound'?{}:reason==='number'?{value:Infinity}:reason==='shape'?{value:undefined}
+        :reason==='bytes'?{value:'private-cookie-value'.repeat(400)}:{};
+      if(reason==='accessor')Object.defineProperty(value,'value',{get(){getters++;return 'private-cookie-value';}});
+      if(reason==='unknown-class'){
+        const constructor=function(){};Object.defineProperty(constructor,'name',{value:'private_cookie_value'});
+        Object.setPrototypeOf(value,{constructor});
+      }
+      f.helper[kind==='d'?'$FDataChangeCookie':'$FStateChangeCookie']=value;
+    }}),error=>{
+      const diagnostic=JSON.parse(error.message.split('NC1 ')[1]);
+      assert.equal(diagnostic.k,kind);assert.equal(diagnostic.r,reason==='unknown-class'?'bound':reason);
+      if(reason==='accessor')assert.equal(diagnostic[kind][0][1],'a-------');
+      if(reason==='unknown-class')assert.equal(diagnostic[kind][0][0],'other');
+      assert.ok(error.message.length<400);assert.ok(!error.message.includes('private-cookie-value'));
+      assert.ok(!error.message.includes('private_cookie_value'));return true;
+    });
+    assert.equal(getters,0);assert.equal(fixture.counters.sent,0);
+  });
+  test('cookie structural failure after response still releases and retires '+kind,async()=>{
+    const f=await fake({change:f=>cookieStructureFixture(f,kind)});
+    await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame),/NC1 /);
+    assert.deepEqual(f.counters,{sent:1,requests:1,responses:1});
+    const status=await javascriptNativeInputStatus(f.page);assert.equal(status.retired,true);assert.equal(status.published,false);
+  });
+}
+for(const mode of ['inactive-inputs','all-checks','oversized-control','cookie-data','cookie-state','cookie-both'])test('production node error transport and journal preserve compact inventory: '+mode,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'javascript-native-error-'));
   t.after(()=>rm(directory,{recursive:true,force:true}));
   const journal=createExecutionJournal({directory,metadata:{sessionId:'test',clientRevision:'test'},knownSecrets:['private-secret']});
@@ -202,6 +242,8 @@ for(const mode of ['inactive-inputs','all-checks','oversized-control'])test('pro
       f.node.FPorts[1].FCollection=[];
       f.node.FPorts[0].FCollection=Array.from({length:5},()=>({parent:{}}));
     }
+    if(mode==='cookie-data'||mode==='cookie-both')cookieStructureFixture(f,'d');
+    if(mode==='cookie-state'||mode==='cookie-both')cookieStructureFixture(f,'s');
   }});
   const evaluate=f.page.evaluate;
   f.page.evaluate=async(...args)=>{
@@ -242,9 +284,19 @@ for(const mode of ['inactive-inputs','all-checks','oversized-control'])test('pro
   const final=recorded.findLast(e=>e.phase==='completed');assert.equal(final.outcome.error.message,result.error.message);
   assert.equal(final.outcome.output.error.message,result.error.message);
   if(mode==='oversized-control'){assert.equal(result.error.message,'X'.repeat(500));return;}
-  const message=result.error.message.split('\n')[0];assert.ok(message.startsWith('page.evaluate: Error: Native input binding: NI1 '));
+  const marker=mode.startsWith('cookie-')?'NC1 ':'NI1 ';
+  const message=result.error.message.split('\n')[0];assert.ok(message.startsWith('page.evaluate: Error: Native input binding: '+marker));
   assert.ok(message.length<400);assert.ok(!result.error.message.includes('private-secret'));
-  const diagnostic=JSON.parse(message.split('NI1 ')[1]);
+  const diagnostic=JSON.parse(message.split(marker)[1]);
+  if(mode.startsWith('cookie-')){
+    const kind=mode==='cookie-state'?'s':'d';
+    assert.equal(diagnostic.k,kind);assert.equal(diagnostic.r,'bound');assert.equal(diagnostic.z,2);assert.equal(diagnostic.n,'>16');
+    const expected=[['Out','-o------','1'],['DelegateProxy','-oon----','3'],['Object','----nnnn','4']];
+    assert.deepEqual(diagnostic[kind],expected);
+    if(mode==='cookie-both')assert.deepEqual(diagnostic.s,expected);
+    assert.equal(diagnostic.h,'Object');
+    assert.ok(!result.error.message.includes('private-cookie-value'));assert.ok(!result.error.message.includes('private-field'));
+  }
   if(mode==='inactive-inputs')assert.deepEqual(diagnostic,{n:'2',i:[[true,'0','6','1','0'],[true,'0','3','1','0']],o:'0',f:['inputs']});
   if(mode==='all-checks'){
     assert.deepEqual(diagnostic,{n:'>4',i:Array.from({length:4},()=>[false,'missing','missing','missing','missing']),o:'other',

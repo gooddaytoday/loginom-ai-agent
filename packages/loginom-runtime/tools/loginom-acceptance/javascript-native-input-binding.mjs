@@ -4,14 +4,40 @@ import {collectNativeRuntime} from '../../client/lib/collapse-native-runtime.mjs
 export function javascriptNativeInputSnapshot(b){
   const v=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
   const need=(x,m)=>{if(!x)throw Error('Native input binding: '+m);};
-  const cookie=value=>{
-    const encode=(x,depth)=>{
-      if(x===null||['string','boolean','number'].includes(typeof x)){need(typeof x!=='number'||Number.isFinite(x),'cookie number');return x;}
-      need(x&&typeof x==='object'&&depth<3,'cookie shape');
-      const ds=Object.getOwnPropertyDescriptors(x),keys=Object.keys(ds).sort();need(keys.length>0&&keys.length<=16,'cookie bound');
-      return keys.map(k=>{need('value' in ds[k],'cookie accessor');return [k,encode(ds[k].value,depth+1)];});
+  const cookie=(value,kind)=>{
+    const check=(ok,reason,depth,count)=>{
+      if(ok)return;
+      // Diagnostic only: no cookie/session values or unrestricted property names.
+      // Three '$' levels distinguish Out -> proxy -> remote identity without
+      // following $S into session internals. Keep the production 500-char cap.
+      const className=o=>{
+        if(!o||typeof o!=='object')return o===null?'null':typeof o;
+        const name=v(v(Object.getPrototypeOf(o),'constructor'),'name');
+        const names={Object:'Object',Out:'Out',DelegateCookie:'DelegateCookie',
+          $bg_rpc_TIBGDelegateConnectionCookie_Proxy:'DelegateProxy',$rpc_TBGObjectProxy:'ObjectProxy'};
+        return Object.hasOwn(names,name)?names[name]:'other';
+      };
+      const shape=o=>{
+        const fields=['value','$','$S','$FRefCount','$OW','$O','$I','$RRC'];
+        const mask=fields.map(k=>{
+          const d=Object.getOwnPropertyDescriptor(o??{},k);
+          if(!d)return '-';if(!('value' in d))return 'a';
+          return d.value===null?'0':({undefined:'u',object:'o',number:'n',string:'s',boolean:'b',function:'f',bigint:'i',symbol:'y'}[typeof d.value]??'?');
+        }).join('');
+        const count=o&&typeof o==='object'?Reflect.ownKeys(o).length:0;
+        return [className(o),mask,count>16?'>16':String(count)];
+      };
+      const chain=o=>[shape(o),shape(v(o,'$')),shape(v(v(o,'$'),'$'))];
+      need(false,'NC1 '+JSON.stringify({k:kind,r:reason,z:depth,n:count===undefined?'-':count>16?'>16':String(count),h:className(helper),
+        d:chain(v(helper,'$FDataChangeCookie')),s:chain(v(helper,'$FStateChangeCookie'))}));
     };
-    const result=JSON.stringify(encode(value,0));need(result.length<=4096,'cookie bytes');return result;
+    const encode=(x,depth)=>{
+      if(x===null||['string','boolean','number'].includes(typeof x)){check(typeof x!=='number'||Number.isFinite(x),'number',depth);return x;}
+      check(x&&typeof x==='object'&&depth<3,'shape',depth);
+      const ds=Object.getOwnPropertyDescriptors(x),keys=Object.keys(ds).sort();check(keys.length>0&&keys.length<=16,'bound',depth,keys.length);
+      return keys.map(k=>{check('value' in ds[k],'accessor',depth);return [k,encode(ds[k].value,depth+1)];});
+    };
+    const result=JSON.stringify(encode(value,0));check(result.length<=4096,'bytes',0);return result;
   };
   const prep=globalThis.__loginomDockPreparationV1;
   need(prep?.document===document&&prep.id===b.document_id&&location.origin===b.origin&&bg.app.Version==='7.4.2','document/build');
@@ -101,7 +127,7 @@ export function javascriptNativeInputSnapshot(b){
     processFingerprint:JSON.stringify(records.map(r=>[r.internalId,r.data.id,parents.get(r)?.internalId,r.data.Status,r.data.ErrorDetails,r.data.ModelNode===node.data])),
     root,dc,dt,ds,store,helper,identity,count:4,cache:v(helper,'$FData'),owner:v(identity,'$OW'),object:v(identity,'$O'),
     dataCookie:v(helper,'$FDataChangeCookie'),stateCookie:v(helper,'$FStateChangeCookie'),
-    dataCookieValue:cookie(v(helper,'$FDataChangeCookie')),stateCookieValue:cookie(v(helper,'$FStateChangeCookie'))};
+    dataCookieValue:cookie(v(helper,'$FDataChangeCookie'),'d'),stateCookieValue:cookie(v(helper,'$FStateChangeCookie'),'s')};
 }
 
 export async function bindJavascriptNativeRuntime(page,args,collect){
