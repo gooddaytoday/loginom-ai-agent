@@ -8,7 +8,7 @@ import {join} from 'node:path';
 import {createActionRuntime,parseCapabilityResult} from '../../client/lib/executor.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {runJavascriptOperator} from './javascript-live.mjs';
-import {javascriptNativeInputCode,javascriptNativeRuntimeCode} from './javascript-native-input-binding.mjs';
+import {javascriptNativeInputCode,javascriptNativeRuntimeCode,verifyNativeInputCookieRuntime} from './javascript-native-input-binding.mjs';
 import {readJavascriptNativeInput,cancelJavascriptNativeInput,javascriptNativeInputStatus} from './javascript-native-input-read.mjs';
 import {nativeInputFixture,verifyNativeInputFixture,nativeInputRequest,verifyNativeInputUi,nativeInputProvenance,verifyNativeInputRead} from './javascript-native-input-contract.mjs';
 import {createJavascriptNativeInputSupport,readNativeInputDuringImport,verifyNativeInputCountLoaders} from './javascript-native-input-driver.mjs';
@@ -17,6 +17,9 @@ import {decodeVariantFrame} from '../../client/lib/variant-native-decode.mjs';
 import {nativeRuntimePins} from '../../client/lib/collapse-native-runtime-pins.mjs';
 import {verifyLoadedNativeRuntime} from '../../client/lib/collapse-native-runtime.mjs';
 
+// Exact function text from pinned bg.rtl.rpc.js, lines9810/47244.
+const cookieSources={constructor:'function(objectOwnerID, objectID) {\n\t\trpc.TBGObjectProxy.call(this, objectOwnerID, objectID);\n\t}',
+  interface:'function() {\n\t\t\treturn 206;\n\t\t}'};
 const values=[null,0,-1.25,10.125];
 const clone=x=>JSON.parse(JSON.stringify(x));
 function sourceEvidence(){
@@ -52,7 +55,10 @@ async function fake({deferred=false,change,beforeBind,bind=true,afterRelease}={}
   const root={internalId:1,data:{loaded:true},childNodes:[group]},processStore={isLoading:()=>false,getRoot:()=>root};
   const counters={sent:0,requests:0,responses:0},callbacks=[];
   let nextId=100;
-  const helper={$FCacheInitialized:true,$FData:{},$FDataChangeCookie:{value:1},$FStateChangeCookie:{value:2},$FRowCount:4};
+  const cookieClass=vm.runInNewContext('('+cookieSources.constructor+')');
+  Object.defineProperty(cookieClass,'name',{value:'$bg_rpc_TIBGDelegateConnectionCookie_Proxy'});
+  cookieClass.prototype.$II=vm.runInNewContext('('+cookieSources.interface+')');
+  const helper={$FCacheInitialized:true,$FData:{},$FRowCount:4};
   const session={$M:{GetDynamicData:()=>{
     const id=++nextId;return {set_StaticDataSize:()=>{},InitializeMethodCallMessage:(...a)=>assert.deepEqual(a,[0,9,321,0]),
       WriteParameter(offset,row){assert.equal(offset,0);this.row=row;},WriteParameter$a:(offset,column)=>assert.deepEqual([offset,column],[8,0]),
@@ -67,6 +73,8 @@ async function fake({deferred=false,change,beforeBind,bind=true,afterRelease}={}
       }};
     }};
   node.data.$S=session;
+  helper.$FDataChangeCookie=Object.assign(Object.create(cookieClass.prototype),{$S:session,$FRefCount:1,$:{$OW:0,$O:10,$I:206,$RRC:1}});
+  helper.$FStateChangeCookie=Object.assign(Object.create(cookieClass.prototype),{$S:session,$FRefCount:1,$:{$OW:0,$O:11,$I:206,$RRC:1}});
   const ds={$S:session,$:{'$I':116,'$OW':0,'$O':9},$FHelper:helper};helper.FBaseProxy=ds;
   const store={loading:false,proxy:{dataSource:ds,read(){}}},dt={FDataSource:ds,FDataSourceStore:store,FTotalRowCount:4};
   const dc={FModelNode:node.data,FDataSource:ds,FDataTable:dt,FColumnInfosStore:{data:{items:[{data:{Name:'Value',DisplayName:'Value',DataType:3}}]}},PrepareColumnInfoAndRowCount(){},InitOutput(){}};
@@ -75,7 +83,7 @@ async function fake({deferred=false,change,beforeBind,bind=true,afterRelease}={}
   const manager={FPreviewVisible:true,FPreviewForm:{FCurrentPreviewNode:node,FCurrentPreviewPort:port},FShowDataLastCall:{Node:node,Port:port}};
   const model={FPreviewManager:manager,FCreateDraggedNodeStarted:false,FDraggingOverGraph:false,FDiagram:{FNodes:{FCollection:[node]},FLinks:{FCollection:[]}}};
   const card={Controller:{Node:{data:{node:workflow}},FController:model}};
-  const env={document,location:{origin:'http://test'},bg:{app:{Version:'7.4.2',WorkFlowTreeNode:Workflow,PackageTreeNode:Package,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>card}}}}}}},
+  const env={Object,document,location:{origin:'http://test'},bg:{rpc:{TIBGDelegateConnectionCookie_Proxy:cookieClass},app:{Version:'7.4.2',WorkFlowTreeNode:Workflow,PackageTreeNode:Package,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>card}}}}}}},
     Ext:{getCmp:id=>id==='preview'?{Controller:dc}:{getStore:()=>processStore}},Uint8Array,DataView,TextDecoder,TextEncoder,setTimeout,clearTimeout};
   env.__loginomDockPreparationV1={document,id:'d',receipts:new Map([['r',{phase:'verified',workflowId:'w',tab,nodeTargetWorkflowNode:workflow,packageNode:pack}]])};
   env.__loginomJavascriptNativeRuntimeV1={document,binding_id:'binding',check:s=>assert.equal(s,session)};
@@ -198,36 +206,73 @@ function cookieStructureFixture(f,kind){
   Object.assign(proxy,{$S:f.session,$FRefCount:1,$:{$OW:0,$O:10,$I:206,$RRC:1}});
   wrapper.$=proxy;f.helper[kind==='d'?'$FDataChangeCookie':'$FStateChangeCookie']=wrapper;
 }
-for(const kind of ['d','s']){
-  for(const reason of ['bound','number','shape','accessor','bytes','unknown-class'])test('cookie diagnostic preserves '+kind+' rejection '+reason+' without values/getters',async()=>{
-    let getters=0,fixture;
-    await assert.rejects(()=>fake({beforeBind:f=>{
-      fixture=f;
-      const value=reason==='bound'?{}:reason==='number'?{value:Infinity}:reason==='shape'?{value:undefined}
-        :reason==='bytes'?{value:'private-cookie-value'.repeat(400)}:{};
-      if(reason==='accessor')Object.defineProperty(value,'value',{get(){getters++;return 'private-cookie-value';}});
-      if(reason==='unknown-class'){
-        const constructor=function(){};Object.defineProperty(constructor,'name',{value:'private_cookie_value'});
-        Object.setPrototypeOf(value,{constructor});
-      }
-      f.helper[kind==='d'?'$FDataChangeCookie':'$FStateChangeCookie']=value;
-    }}),error=>{
-      const diagnostic=JSON.parse(error.message.split('NC1 ')[1]);
-      assert.equal(diagnostic.k,kind);assert.equal(diagnostic.r,reason==='unknown-class'?'bound':reason);
-      if(reason==='accessor')assert.equal(diagnostic[kind][0][1],'a-------');
-      if(reason==='unknown-class')assert.equal(diagnostic[kind][0][0],'other');
-      assert.ok(error.message.length<400);assert.ok(!error.message.includes('private-cookie-value'));
-      assert.ok(!error.message.includes('private_cookie_value'));return true;
+const cookieChanges={
+  foreignSession:c=>c.$S={},missingSession:c=>delete c.$S,
+  extraField:c=>c.extra='private-cookie-value',missingField:c=>delete c.$FRefCount,
+  extraIdentity:c=>c.$.extra=0,missingIdentity:c=>delete c.$.$O,
+  unknownClass:c=>Object.setPrototypeOf(c,{}),identityPrototype:c=>Object.setPrototypeOf(c.$,null),
+  sessionAccessor:c=>Object.defineProperty(c,'$S',{get(){throw Error('getter invoked');}}),
+  identityAccessor:c=>Object.defineProperty(c,'$',{get(){throw Error('getter invoked');}}),
+  scalarAccessor:c=>Object.defineProperty(c.$,'$O',{get(){throw Error('getter invoked');}}),
+  symbolField:c=>c[Symbol('private-cookie-value')]=1,
+  symbolIdentity:c=>c.$[Symbol('private-cookie-value')]=1,
+  unknownInterface:c=>c.$.$I=207,negativeOwner:c=>c.$.$OW=-1,
+  overflowObject:c=>c.$.$O=2147483648,negativeRemoteRefs:c=>c.$.$RRC=-1,
+  invalidLocalRefs:c=>c.$FRefCount=NaN,stringValue:c=>c.$.$O='10',fractionalValue:c=>c.$.$O=1.5,
+  negativeZeroOwner:c=>c.$.$OW=-0,negativeZeroObject:c=>c.$.$O=-0,
+  negativeZeroRemoteRefs:c=>c.$.$RRC=-0,negativeZeroLocalRefs:c=>c.$FRefCount=-0,
+  ownerValue:c=>c.$.$OW++,objectValue:c=>c.$.$O++,remoteRefValue:c=>c.$.$RRC++,localRefValue:c=>c.$FRefCount++
+};
+const cookieReplacements={
+  proxy:(c,f,key)=>f.helper[key]=Object.assign(Object.create(Object.getPrototypeOf(c)),c),
+  identity:c=>c.$={...c.$},
+  class:(c,f)=>f.env.bg.rpc.TIBGDelegateConnectionCookie_Proxy=function(){},
+  interfaceFunction:(c,f)=>f.env.bg.rpc.TIBGDelegateConnectionCookie_Proxy.prototype.$II=function(){return 206;}
+};
+for(const key of ['$FDataChangeCookie','$FStateChangeCookie']){
+  for(const [name,mutate]of Object.entries({...cookieChanges,...cookieReplacements})){
+    const change=f=>mutate(f.helper[key],f,key);
+    test('direct cookie before dispatch rejects '+key+'/'+name,async()=>{
+      const f=await fake();change(f);
+      await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame),error=>{
+        assert.ok(!error.message.includes('getter invoked'));return true;
+      });
+      assert.deepEqual(f.counters,{sent:0,requests:0,responses:0});
     });
-    assert.equal(getters,0);assert.equal(fixture.counters.sent,0);
-  });
-  test('cookie structural failure after response still releases and retires '+kind,async()=>{
-    const f=await fake({change:f=>cookieStructureFixture(f,kind)});
-    await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame),/NC1 /);
-    assert.deepEqual(f.counters,{sent:1,requests:1,responses:1});
-    const status=await javascriptNativeInputStatus(f.page);assert.equal(status.retired,true);assert.equal(status.published,false);
+    test('direct cookie after response rejects '+key+'/'+name+' and releases',async()=>{
+      const f=await fake({change});
+      await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame),error=>{
+        assert.ok(!error.message.includes('getter invoked'));return true;
+      });
+      assert.deepEqual(f.counters,{sent:1,requests:1,responses:1});
+      const state=await javascriptNativeInputStatus(f.page);assert.equal(state.retired,true);assert.equal(state.pending,0);assert.equal(state.published,false);
+    });
+    if(name.endsWith('Value')||Object.hasOwn(cookieReplacements,name))continue;
+    test('direct cookie initial admission rejects '+key+'/'+name,async()=>{
+      await assert.rejects(()=>fake({beforeBind:change}),error=>{
+        assert.match(error.message,/NC1 /);assert.ok(!error.message.includes('getter invoked'));return true;
+      });
+    });
+  }
+  for(const [name,mutate]of Object.entries(cookieReplacements))test('direct cookie same-value replacement between cells rejects '+key+'/'+name,async()=>{
+    const f=await fake({afterRelease:f=>mutate(f.helper[key],f,key)});
+    await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame));
+    assert.deepEqual(f.counters,{sent:1,requests:1,responses:1});assert.equal((await javascriptNativeInputStatus(f.page)).published,false);
   });
 }
+test('direct cookie binds loaded constructor/interface text without invoking either or walking session',async()=>{
+  const f=await fake({beforeBind:f=>{
+    Object.defineProperty(f.session,'unrelatedGetter',{get(){throw Error('session walked');}});
+    f.session.cycle=f.session;
+  }});
+  assert.deepEqual(clone(f.b.cookie_sources),cookieSources);
+  assert.equal(Object.keys(verifyNativeInputCookieRuntime(f.b.cookie_sources)).length,2);
+  const result=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame);
+  assert.equal(result.cells.length,4);assert.equal(result.consistency,'observed_local_only');assert.equal(result.atomic_snapshot_verified,false);
+  assert.deepEqual(f.counters,{sent:4,requests:4,responses:4});
+  for(const bad of [undefined,{}, {...cookieSources,extra:'x'}, {...cookieSources,interface:cookieSources.interface.replace('206','207')},
+    {...cookieSources,constructor:cookieSources.constructor+' '}])assert.throws(()=>verifyNativeInputCookieRuntime(bad),/runtime changed/);
+});
 for(const mode of ['inactive-inputs','all-checks','oversized-control','cookie-data','cookie-state','cookie-both'])test('production node error transport and journal preserve compact inventory: '+mode,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'javascript-native-error-'));
   t.after(()=>rm(directory,{recursive:true,force:true}));
@@ -290,7 +335,7 @@ for(const mode of ['inactive-inputs','all-checks','oversized-control','cookie-da
   const diagnostic=JSON.parse(message.split(marker)[1]);
   if(mode.startsWith('cookie-')){
     const kind=mode==='cookie-state'?'s':'d';
-    assert.equal(diagnostic.k,kind);assert.equal(diagnostic.r,'bound');assert.equal(diagnostic.z,2);assert.equal(diagnostic.n,'>16');
+    assert.equal(diagnostic.k,kind);assert.equal(diagnostic.r,'class');assert.equal(diagnostic.z,0);assert.equal(diagnostic.n,'-');
     const expected=[['Out','-o------','1'],['DelegateProxy','-oon----','3'],['Object','----nnnn','4']];
     assert.deepEqual(diagnostic[kind],expected);
     if(mode==='cookie-both')assert.deepEqual(diagnostic.s,expected);
@@ -350,7 +395,7 @@ test('serialized runtime builder invokes supplied collector in isolated executor
 for(const [name,change]of Object.entries({extraJS:f=>f.model.FDiagram.FNodes.FCollection.push({FIconCls:'bg-vendor-icon-javascript'}),edge:f=>f.model.FDiagram.FLinks.FCollection.push({}),
   recreatedNode:f=>f.model.FDiagram.FNodes.FCollection[0]={...f.node},port:f=>f.port.FGuid='other',rows:f=>f.dt.FTotalRowCount=3,
   schema:f=>f.dc.FColumnInfosStore.data.items[0].data.DataType=4,session:f=>f.node.data.$S={},cache:f=>f.helper.$FData={},
-  dataCookie:f=>f.helper.$FDataChangeCookie.value++,stateCookie:f=>f.helper.$FStateChangeCookie.value++,
+  dataCookie:f=>f.helper.$FDataChangeCookie.$.$O++,stateCookie:f=>f.helper.$FStateChangeCookie.$.$O++,
   processHierarchy:f=>{f.group.childNodes=[];f.root.childNodes.push(f.child);},
   processRoot:f=>f.root.internalId=4,processRecord:f=>f.child.internalId=4,newExecution:f=>f.root.childNodes.push({internalId:7,data:{id:'3.1',ModelNode:f.node.data},childNodes:[]})})){
   test('before dispatch refuses '+name,async()=>{const f=await fake();change(f);await assert.rejects(()=>readJavascriptNativeInput(f.page,f.b,decodeVariantFrame));assert.equal(f.counters.sent,0);});
@@ -409,7 +454,8 @@ async function driverFixture(mode){
   const id='js-native-input-'+createHash('sha256').update(x.operation.id+':'+x.ctx.execution.execution_id).digest('hex').slice(0,40);
   const raw=clone(await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:id}));
   const lifecycle=clone(await javascriptNativeInputStatus(f.page));raw.package_id='d:w';
-  const binding={...clone(f.b),binding_id:id,runtime_binding_id:id,package_id:'d:w',count_loader_sources:{}};
+  const binding={...clone(f.b),binding_id:id,runtime_binding_id:id,package_id:'d:w',count_loader_sources:{},cookie_sources:cookieSources};
+  if(mode==='cookie-runtime')binding.cookie_sources={...cookieSources,interface:cookieSources.interface.replace('206','207')};
   Object.assign(x.ctx,{deadline:Date.now()+30000,signal:new AbortController().signal});
   Object.assign(x.ctx.workflow_ref,{tab_tid:'tab',prefix:'TF'});
   const graph={prepared_node_context:{...x.ctx.node,verified:true,surface:'graph'},wizard:{status:'absent'},node_outputs:{verified:true,ports:[{index:0,active:true,tid:'port',port_guid:'p'}]},
@@ -453,6 +499,10 @@ test('actual serialized binder diagnostic survives driver refusal and owned Clos
 });
 test('lost journal acknowledgement refuses proof but still closes only owned Preview',async()=>{
   const f=await driverFixture('journal');await assert.rejects(f.run,/acknowledgement/);assert.equal(f.actions.at(-1),'close');
+});
+test('changed loaded cookie class source stops owning driver before cells and closes only owned Preview',async()=>{
+  const f=await driverFixture('cookie-runtime');await assert.rejects(f.run,/cookie runtime changed/);
+  assert.deepEqual(f.actions,['click','press','close']);assert.deepEqual(f.events.map(e=>e.phase),['javascript_native_input_preview_closed']);
 });
 test('lost Close refuses proof and marks cleanup uncertain',async()=>{
   const f=await driverFixture('close');await assert.rejects(f.run,/close lost/);assert.equal(f.x.operation.transportUncertain,true);assert.equal(f.states.at(-1).uncertain,true);
