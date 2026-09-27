@@ -248,7 +248,7 @@ Source `87332cec9804c761465dad766f989fb458c4d997`, pinned Loginom frontend7.4.2.
 29aa1bd6c1f9c0de7b2436607fa0860264201a8699ab27b86092147faa461c93.
 Это characterization одного fixed case; никакой общий rounding/truncation
 алгоритм и внутренний механизм ChakraCore не объявляются доказанными.
-Матрица4/7 characterized, остальные3 not_run. Подробности и актуальное
+Матрица5/7 characterized, остальные2 not_run. Подробности и актуальное
 продолжение — [checkpoint](checkpoint.md); full G5/handler/CLI не закрыты.
 
 Отдельный fraction-negative01/profile67 на том же source: native Real−1.75
@@ -267,3 +267,9 @@ exact; successful JS terminal и Integer1×1 OUTPUT с native NULL/tag1, не н
 Root audit3 cells,559 refs,1259 pins,cleanup3/3; report SHA
 e56fe58eb78f1fdcdbf6f05ee40a5dc78741ddace477dce5f3fbb59686918d9a.
 Это конкретное наблюдение, не универсальное правило для всех неверных строк.
+
+Отдельный NaN01/profile70: native Real+0 INPUT/upstream exact, fixed source
+вычисляет NaN=input/input; Integer1×1 OUTPUT native NULL/tag1. Root audit3 cells,
+616 refs,1259 pins,cleanup3/3; report SHA
+d082d1dcda98860569efac8772b0dd66a37677e839d242ce4cf68ea282594e75.
+Проверка не устанавливает native nonfinite INPUT или общий floating-point bridge.

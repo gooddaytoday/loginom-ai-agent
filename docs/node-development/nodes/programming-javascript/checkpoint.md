@@ -16,6 +16,25 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Integer coercion NaN01: independent characterization PASS
+
+Source82/profile70 original session44055 terminal exit0, CHARACTERIZED,
+cleanup3/3. Root live auditor PASS:3 native cells,616 journal refs,1259 pins.
+Native Real+0 INPUT/upstream exact bytes0000000000000000; fixed script
+candidate NaN=input/input, OUTPUT schema Integer1×1 с native NULL/tag1.
+Report SHAd082d1dcda98860569efac8772b0dd66a37677e839d242ce4cf68ea282594e75;
+baseline SHAf4f5c2959b40bb1831e11b4f4d9769aab94e4948a6e9a94b9a63bf92565cf651.
+Evidence native-integer-coercion-nan-probe-01 и verification.json.
+Matrix5 characterized/2 not_run; native nonfinite INPUT не утверждается.
+Browser CLOSED/no pinned Chromium; fresh profile71 для +Infinity из Real1/0.
+
+Прежняя developer задача назначена только на новый untracked
+native-named-access-design.md: G5 named/index/case и J24 technical names,
+сверка docs/Help и fixed-case design. Runtime/tests/fixtures/pinned files,
+старые docs/checkpoint и браузер менять запрещено пока root заканчивает
+coercion. Это подготовка следующего полного этапа, не его реализация.
+
+
 ### Integer coercion NaN01 RUNNING
 
 Source82 unchanged/1259 pins повторно проверены; original exec session44055
