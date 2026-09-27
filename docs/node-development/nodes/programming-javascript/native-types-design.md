@@ -61,8 +61,14 @@ Source hash и upstream input attestation — части read capability, не U
 Оба binding проверять до каждого request, после response и перед публикацией:
 workflow receipt, node/port/execution, session, Preview controller↔model↔datasource,
 remote source owner/object/interface, schema/count/cache identities и loading.
-Явно закрепить data/state cookie values, а не только наличие cookies: текущий
-snapshot проверяет их наличие и cache reference, не гарантирует deep immutability.
+Уточнение live probe07 и клиентского source: data/state cookies здесь — direct
+`TIBGDelegateConnectionCookie_Proxy`, handles подписок с `Unadvise`, interface206.
+Они **не являются доказанными счётчиками поколений данных**. Проверять точный
+класс/own shape, session identity, объекты proxy/remote identity и скалярные поля
+между запросами; не сериализовать рекурсивно `$S`. Это проверка стабильности
+подписок/владельца, не deep immutability данных. Отдельные проверки cache/schema,
+execution и границы `observed_local`/ABA по-прежнему обязательны. Реализация этой
+адаптации после probe07 ещё готовится; её успешный live результат не заявлен.
 Повторный input read после JS — новый read ID при доказанном неизменном upstream;
 он выявляет наблюдаемое изменение, но не устраняет ABA/отсутствие server snapshot.
 
