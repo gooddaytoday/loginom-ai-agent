@@ -15,6 +15,36 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Roundtrip probe03: graph прошёл; witness переживает закрытие мастера неверно
+
+Source66/profile45 завершён exit1 FAILED inspect-pages, cleanup ALL PASS.
+Param3 admission прошёл; native_roundtrip_graph_bound записан. Schema code-mode
+и exact source прошли проверки, Next/Done дали terminal observed. После закрытия
+мастера checkNativeRoundtripBeforeExecute вызывает sourceWitness.read, который
+читает control.el.dom при control.el=null. Это жизненный цикл уничтоженного
+DOM-контрола, а не отказ байтов native output. Explicit Execute не достигнут;
+эффекты Next/Done остаются ambiguous, отсутствие исполнения ими не доказано.
+
+Root независимо: input4/4scalar PASS,514journal refs,73source pins. Browser закрыт,
+profile45 сохранён. Report SHA256:
+`c668dad17360acafa5642004466f621ecea60eb737e9aaa117b3d4827c42ce85`.
+Private native-roundtrip-probe-03-verification.json содержит failure/port inventory.
+
+Наблюдён [type,subtype,param,status,index] в graph до выполнения:
+input=[[0,1,3,0,0],[0,3,1,0,1],[0,10,other,0,other]],
+output=[[1,1,2,2,0],[1,10,other,0,other]]. Значит основной output имеет param2,
+а коллекция содержит также служебный subtype10. Root получил AddPort.js SHA256
+`c0e61fef494a97e4e0b45cd890024c3389bbcefc09fc78bd2bcf23aefd0a29bb`:
+constructor передаёт Port(parent,graph,type,0,10), без param/index. Это объясняет
+other для undefined; не превращает placeholder в ещё один data output.
+
+Разработчику назначены validated transition source/mode witness после подтверждённого
+закрытия собственного мастера и точный JS-output data0+AddPort admission. Нельзя
+допускать произвольное исчезновение контрола, новые data outputs, замену объектов
+или переносить pre-execution status2 в read admission. Нужны адресные negatives,
+затем freeze67 и новый headed run. G5/full plan active/incomplete.
+
+
 ### Freeze66: JS input param3; roundtrip probe03 запущен
 
 Source node-javascript `d54080e092df20c03570c4167642295ed37abccc` требует observed
