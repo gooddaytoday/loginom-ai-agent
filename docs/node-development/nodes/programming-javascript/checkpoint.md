@@ -15,6 +15,20 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze37 проверен, headed batch37 запущен — 2026-09-27
+
+Root повторил60 tests: PASS; проверены24 SHA итогового handoff37,
+протестированные файлы неизменны. Runtime сохраняет pending Setting opening
+до подтверждённой передачи владения runner; read-only wizard/deactivation
+settlement предшествует shared roots read. Cleanup учитывает незавершённое
+открытие и не повторяет отправленные Setting/confirmation/Close.
+
+Freshprofile10, прежний Chromium1246/sandbox, DISPLAY=:1/headed, новый UUID
+и evidence g2-batch-37. Browser process запущен; результат ожидается.
+Для root-аудита подготовлен приватный verify-batch-evidence.py: на batch36
+подтверждены1276journalSHA, свежий same-node launch и12cells6×2.
+Это проверка конкретной пробы, не завершение общего плана/CLI-приёмки.
+
 ### Batch36: JS output6×2 впервые прочитан полностью — 2026-09-27
 
 Shared диагностика `node-procedure.mjs` и её regression test закреплены отдельно
