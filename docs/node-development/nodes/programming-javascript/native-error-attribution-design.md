@@ -335,3 +335,42 @@ unattributed outcomes. Нельзя признавать failed semantic rejecti
 плана; отсутствие mapping не является поводом выдумывать позицию или бесконечно
 расширять calibration. Реализация и запуск каждой следующей версии назначаются
 после source freeze, тестов и отдельного решения координатора.
+
+
+## 10. Root: источники wizard diagnostic после source87
+
+Это анализ клиентских исходников, не live-наблюдение K1/K2. Private evidence:
+`calibration-wizard-source87/source-review-pins.json` и `manifest.json`.
+
+- `JavaScriptCodeWizard.js:125–141`: SetComponentAsync загружает engine.Code,
+  затем сохраняет FEngine и FCodeText. FCodeText — исходный снимок этой страницы;
+  по одному этому полю нельзя доказать durable/committed конфигурацию узла.
+- `JavaScriptCodeWizard.js:250–258`: PageExitAsync сначала присваивает
+  FEngine.Code из CodeMirror, задаёт InsecureNetworking=false, затем вызывает
+  FEngine.Verify через VerifyAsync. Следовательно, ещё до Done существует эффект
+  записи в engine; «Next только читает» неверно. Это не доказательство отдельного
+  Execute или отсутствия implicit execution внутри серверного Verify.
+- `BaseWizard.js:133–157`: VerifyAsync ловит exception и передаёт HandleException.
+  `WizardForm.js:385–413` сохраняет FException (для AbortException — innerException)
+  и строит tooltip через GetExceptionMsg. Отсутствие нового DOM message не следует
+  приравнивать отсутствию нового native exception без отдельного baseline.
+- `Message.js:505–508` вызывает GetExceptionDetailsText(e,5). В полученном
+  `BG_Exceptions.js:141–234,266–283` число5 — битовая маска, не лимит длины/глубины.
+  Она включает сообщения и inner exceptions, но не отдельные поля класса/stack.
+  Aggregate wrapper message может быть пропущен. Текст tooltip является
+  представлением exception tree, а не автоматически полным raw diagnostic.
+- Raw candidate — принадлежащий текущему wizard объект FException с message/name,
+  stack и inner/aggregate exceptions. Перед признанием полноты нужны конкретные
+  own-data descriptors, bounded tree/cycle checks, отсутствие getters/remote reads,
+  fresh identity относительно baseline, повторная проверка owner/source и явные
+  поля truncation/normalization. Host JS stack нельзя объявлять Chakra source span.
+- `WizardForm.js:467–478` делегирует CloseWizard в FCallbackClose. CloseResult.Close,
+  Cancel и Ok различны; этот файл сам не доказывает rollback/commit. Для безопасной
+  проверки committed source требуется найти creator callback и ConfigureCookie
+  semantics; наименование Close не является доказательством discard.
+
+HTTP через environment proxy вернул503 для app и scripts, но прямая intranet
+проверка DNS10.200.11.224 и `/app/` дала200. Два новых статических скрипта получены
+напрямую, без browser/application RPC и без изменения глобальной proxy config.
+Это не текущая недоступность Loginom. Browser запусков и calibration attempts
+в ходе анализа не было; общий лимит5 не расходовался.

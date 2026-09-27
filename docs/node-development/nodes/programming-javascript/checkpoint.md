@@ -15,6 +15,18 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Wizard source analysis: Next записывает engine, tooltip преобразует exception
+
+Root source-only findings сохранены в native-error-attribution-design.md §10.
+Найдены FException native candidate, mask5 exception rendering и делегирование
+Close в callback; committed-source/rollback остаются недоказанными. Private pins
+и новые Exceptions.js/BG_Exceptions.js сохранены в calibration-wizard-source87.
+Proxy HTTP503 локализован: direct intranet200, стенд доступен. Глобальные настройки
+не менялись; новый browser/calibration run отсутствует. Следующая работа —
+ограниченно дополнить wizard capture по проверенным источникам, сохраняя unknown
+для неустановленных commit/implicit-execution свойств.
+
+
 ### Source87 независимо проверен и закоммичен; K1/K2 live ещё не запускались
 
 Developer completed revision18/turn01a0e519; получен действительный freeze87 handoff.
