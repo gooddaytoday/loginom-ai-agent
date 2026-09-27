@@ -15,6 +15,24 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-getcolumn-case CHARACTERIZED: undefined
+
+Profile89/original64389 terminal exit0/CHARACTERIZED. Root independent completed
+B audit9cells/607journal refs/1265pins/cleanup3 PASS; no pinned Chromium.
+Source86 unchanged. Marker10 доказывает `undefined` в точном `GetColumn("value")`
+case; результаты Get сюда не переносились. Case_complete=true, exact_pass=false
+(характеризация B, не заранее ожидаемый A oracle), полный G5=false.
+Report SHA e75045d421c3e00a3cd9a3ed10472a9eb6550ef44601496d03f22bc8b3a0b5ba.
+Private native-named-getcolumn-case-probe-01-verification.json сохранён;
+registry/matrix обновлены. B1complete/2owned-failure-unattributed/5not_run.
+Следующий — B-getcolumn-missing, fresh profile90.
+
+В прежней задаче разработчика назначено только doc-only предложение точных
+K1 parse/K2 sync calibration sources по принятому error-attribution design.
+Runtime/tests/source86 pins заморожены; browser/CLI/commit запрещены для этого
+назначения. Новый calibration-source-proposal.md требует root review до реализации.
+
+
 ### B-getcolumn-case/profile89 RUNNING
 
 После verified B-get-missing/cleanup и no pinned Chromium закреплён fresh
