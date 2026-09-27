@@ -17,6 +17,13 @@
 
 ### Source86: восстановлено актуальное назначение после ошибочного bootstrap
 
+Корректирующий turn01a0e4d9-551a-7321-896d-78cbcb083e18 подтверждён active,
+revision11/cursor2cc6c517-0ccb-49e9-bb9b-9daa2c14c7b8:11. Публичный progress
+разработчика соответствует текущему заданию: проверяет selector blind spot
+и selector-insensitive fixture, готовит регрессию. Timeout wait не terminal;
+не повторять назначение и не перезапускать. Root ждёт frozen handoff.
+
+
 Developer revision10 terminal/completed (turn01a0e4d6) фактически выполнил
 историческую проверку памяти, не диагностику/fix. Это подтверждено публичным
 last_agent_message в task_complete; runtime diff отсутствовал. Root отправил
