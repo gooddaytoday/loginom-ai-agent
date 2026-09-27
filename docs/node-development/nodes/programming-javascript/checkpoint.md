@@ -15,6 +15,21 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-columns-case/profile91 RUNNING; calibration sources проверены
+
+Fresh profile91/source86 после verified profile90 cleanup;1265pins/toolchains/
+no Chromium проверены. Evidence native-named-columns-case-probe-01,
+**original exec41062 RUNNING**, headed DISPLAY=:1/sandbox/original deadline.
+Ждать terminal и независимый audit, не повторять Execute.
+
+Root проверил [calibration source proposal](calibration-source-proposal.md),§8:
+P/K1–K4 bytes/hash/LF/ASCII/prefix/document refs/error lengths PASS; host syntax
+K1 отвергнут/K2–K4 приняты. Это не Loginom execution. K1/K2 source proposal принят,
+реализация пока НЕ назначена, runtime source86 frozen для оставшихся B.
+K3/K4 условны, K5fixtures, общий лимит5. Server OS остаётся неизвестной и отдельным
+открытым engine-profile/G6/J25 предусловием. Full goal не закрыт.
+
+
 ### B-getcolumn-missing CHARACTERIZED: undefined
 
 Profile90/original72243 terminal exit0/CHARACTERIZED. Independent audit9cells/
