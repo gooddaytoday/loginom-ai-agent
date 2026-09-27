@@ -1,3 +1,4 @@
+import {javascriptNamedCase} from './javascript-native-named-cases.mjs';
 import {createHash} from 'node:crypto';
 import {javascriptNativeFixture,javascriptNativeReadFixture} from './javascript-native-fixtures.mjs';
 import vm from 'node:vm';
@@ -79,12 +80,12 @@ export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,
     launch_identity:{execution_id:execution.execution_id,group_id:execution.group_id,root_id:'root',group_record_id:'4',node:{document_id:'d',workflow_id:'w',node_id:'js'}}});
   await f.page.evaluate(completeJavascriptNativeRoundtrip,{execution,source_sha256:nativeRoundtripProbe.source_sha256});
   output.FStatus=1;
-  const source=f.dc.FDataSource,outputHelper={...f.helper,$FData:{},$FRowCount:javascriptNativeReadFixture(fixtureId,'output').rows},outputDs={...source,$:{...source.$},$FHelper:outputHelper};outputHelper.FBaseProxy=outputDs;
+  const source=f.dc.FDataSource,outputHelper={...f.helper,$FData:{},$FRowCount:namedCaseId!==undefined?(javascriptNamedCase(namedCaseId).output_rows??4):javascriptNativeReadFixture(fixtureId,'output').rows},outputDs={...source,$:{...source.$},$FHelper:outputHelper};outputHelper.FBaseProxy=outputDs;
   if(fixtureId==='cardinality-empty')Object.assign(outputHelper,{$FCacheInitialized:false,$FData:null,$FDataChangeCookie:null,$FStateChangeCookie:null});
   const inputFields=f.dc.FColumnInfosStore.data.items;
   const outputFields=javascriptNativeFixture(fixtureId).coercion?[{data:{Name:'Value',DisplayName:'Value',DataType:4}}]:inputFields;
   const bind=async role=>{
-    const slice=javascriptNativeReadFixture(fixtureId,role);
+    const slice={...javascriptNativeReadFixture(fixtureId,role),...(namedCaseId!==undefined&&role==='output'?{rows:javascriptNamedCase(namedCaseId).output_rows??4}:{})};
     f.dt.FTotalRowCount=slice.rows;f.dc.FColumnInfosStore.data.items=role==='output'?outputFields:inputFields;
     if(fixtureId==='cardinality-empty'){
       f.dc.FTotalRowCount=slice.rows;f.store.totalCount=slice.rows;f.store.pageRequests={};

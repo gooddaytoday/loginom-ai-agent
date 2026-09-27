@@ -1,4 +1,4 @@
-// Root-reviewed stage A only. Input fixture identity is deliberately separate.
+// Root-reviewed stages A/B only. Input fixture identity is deliberately separate.
 import {createHash} from 'node:crypto';
 const cases={
   "A-get-index": {
@@ -56,12 +56,76 @@ const cases={
     "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nfor (let row=0;row<4;row++) {\n  const missing=InputTable.IsNull(row,\"Value\");\n  if (typeof missing !== \"boolean\") throw Error(\"JS_NAMED_NULL_KIND\");\n  const value=missing ? 1 : 0;\n  OutputTable.Append();\n  OutputTable.Set(\"Value\",value);\n}\n",
     "source_sha256": "57ceade9570a31dc76f0e2a94e514c1ad7d4474470467ba69649d3dc2b4fb34c",
     "oracle": "isnull"
+  },
+  "B-get-case": {
+    "id": "B-get-case",
+    "input_fixture_id": "integer-safe",
+    "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nconst result=InputTable.Get(1,\"value\");\nconst code=result === undefined ? 10 : result === null ? 11 : result === -9007199254740991 ? 12 : 99;\nOutputTable.Append();\nOutputTable.Set(\"Value\",code);\n",
+    "source_sha256": "ca569c1320bf7c160803b9031524feaadf4adecf87f1bd00ee4eff043599c505",
+    "oracle": "get-return",
+    "output_rows": 1
+  },
+  "B-get-missing": {
+    "id": "B-get-missing",
+    "input_fixture_id": "integer-safe",
+    "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nconst result=InputTable.Get(1,\"Missing\");\nconst code=result === undefined ? 10 : result === null ? 11 : result === -9007199254740991 ? 12 : 99;\nOutputTable.Append();\nOutputTable.Set(\"Value\",code);\n",
+    "source_sha256": "8e2ed7bf78ccb567121f257dc43058dddc284ef7384df4a45eeabdbfa0e7329c",
+    "oracle": "get-return",
+    "output_rows": 1
+  },
+  "B-getcolumn-case": {
+    "id": "B-getcolumn-case",
+    "input_fixture_id": "integer-safe",
+    "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nconst result=InputTable.GetColumn(\"value\");\nconst code=result === undefined ? 10 : result === null ? 11 : (typeof result === \"object\" && result.Index === 0 && result.Name === \"Value\" && result.DisplayName === \"Value\" && result.Get(1) === -9007199254740991) ? 13 : 99;\nOutputTable.Append();\nOutputTable.Set(\"Value\",code);\n",
+    "source_sha256": "08054f2f62477f665c8b92bd0414755dc0e66e3ba8008439aa05d28500c3eb30",
+    "oracle": "column-return",
+    "output_rows": 1
+  },
+  "B-getcolumn-missing": {
+    "id": "B-getcolumn-missing",
+    "input_fixture_id": "integer-safe",
+    "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nconst result=InputTable.GetColumn(\"Missing\");\nconst code=result === undefined ? 10 : result === null ? 11 : (typeof result === \"object\" && result.Index === 0 && result.Name === \"Value\" && result.DisplayName === \"Value\" && result.Get(1) === -9007199254740991) ? 13 : 99;\nOutputTable.Append();\nOutputTable.Set(\"Value\",code);\n",
+    "source_sha256": "4832a8582d5af517d8f60c2a2c8499ce8b4c131a3ba78b952bcd3f9dfd3f038d",
+    "oracle": "column-return",
+    "output_rows": 1
+  },
+  "B-columns-case": {
+    "id": "B-columns-case",
+    "input_fixture_id": "integer-safe",
+    "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nconst result=InputTable.Columns[\"value\"];\nconst code=result === undefined ? 10 : result === null ? 11 : (typeof result === \"object\" && result.Index === 0 && result.Name === \"Value\" && result.DisplayName === \"Value\" && result.Get(1) === -9007199254740991) ? 13 : 99;\nOutputTable.Append();\nOutputTable.Set(\"Value\",code);\n",
+    "source_sha256": "d60e2aa72f3585e87c09073c0c002cc465846b39a146f719c494276f8271cc19",
+    "oracle": "column-return",
+    "output_rows": 1
+  },
+  "B-columns-missing": {
+    "id": "B-columns-missing",
+    "input_fixture_id": "integer-safe",
+    "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nconst result=InputTable.Columns[\"Missing\"];\nconst code=result === undefined ? 10 : result === null ? 11 : (typeof result === \"object\" && result.Index === 0 && result.Name === \"Value\" && result.DisplayName === \"Value\" && result.Get(1) === -9007199254740991) ? 13 : 99;\nOutputTable.Append();\nOutputTable.Set(\"Value\",code);\n",
+    "source_sha256": "13c5ccc3c6aec7723b5401b1853ee4d2f343444a566e0d37a7f520e4173e766f",
+    "oracle": "column-return",
+    "output_rows": 1
+  },
+  "B-isnull-case": {
+    "id": "B-isnull-case",
+    "input_fixture_id": "integer-safe",
+    "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nconst result=InputTable.IsNull(0,\"value\");\nconst code=result === true ? 14 : result === false ? 15 : result === undefined ? 10 : result === null ? 11 : 99;\nOutputTable.Append();\nOutputTable.Set(\"Value\",code);\n",
+    "source_sha256": "dc8be58b76ab183e2b3be3921886a2bac1fc37eb0ea30470d763c37522cf4c1b",
+    "oracle": "isnull-return",
+    "output_rows": 1
+  },
+  "B-isnull-missing": {
+    "id": "B-isnull-missing",
+    "input_fixture_id": "integer-safe",
+    "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nconst result=InputTable.IsNull(0,\"Missing\");\nconst code=result === true ? 14 : result === false ? 15 : result === undefined ? 10 : result === null ? 11 : 99;\nOutputTable.Append();\nOutputTable.Set(\"Value\",code);\n",
+    "source_sha256": "7133ef6538cd9f2d09e652df0eafcdba8fe89d8619b8a8be22fa898368b577c4",
+    "oracle": "isnull-return",
+    "output_rows": 1
   }
 };
 Object.values(cases).forEach(Object.freeze);Object.freeze(cases);
 export const javascriptNamedIds=Object.freeze(Object.keys(cases));
 export function javascriptNamedCase(id){
- if(!Object.hasOwn(cases,id))throw Error('Unknown fixed stage A named case');
+ if(!Object.hasOwn(cases,id))throw Error('Unknown fixed stage A/B named case');
  return cases[id];
 }
 export function javascriptNamedProbe(id){

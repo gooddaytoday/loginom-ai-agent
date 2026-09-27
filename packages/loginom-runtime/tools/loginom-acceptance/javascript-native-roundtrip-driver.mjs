@@ -1,3 +1,4 @@
+import {javascriptNamedCase} from './javascript-native-named-cases.mjs';
 import {freezeCivilEvidence} from './javascript-native-datetime-civil.mjs';
 import {javascriptNativeFixture,javascriptNativeReadFixture} from './javascript-native-fixtures.mjs';
 import {openJavascriptNativeRoundtripPreview} from './javascript-native-roundtrip-opening.mjs';
@@ -17,7 +18,7 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,namedCas
   {createProcedure=createNodeProcedure,verifyFrontends=verifyNativeInputFrontends,
     verifyCountLoaders=verifyNativeInputCountLoaders,verifyCookieRuntime=verifyNativeInputCookieRuntime,openPreview=openJavascriptNativeRoundtripPreview}={}){
   const fixture=javascriptNativeFixture(input.binding.fixture_id),nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixture.id,namedCaseId);
-  const readFixture=javascriptNativeReadFixture(fixture.id,role);
+  const readFixture={...javascriptNativeReadFixture(fixture.id,role),...(namedCaseId!==undefined&&role==='output'?{rows:javascriptNamedCase(namedCaseId).output_rows??4}:{})};
   const {execute,operation,onRecord,now}=options;
   const deadline=Math.min(ctx.deadline,input.binding.deadline);
   const check=()=>{ctx.signal?.throwIfAborted();need(now()<deadline,'original deadline expired');
