@@ -15,6 +15,24 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-getcolumn-missing CHARACTERIZED: undefined
+
+Profile90/original72243 terminal exit0/CHARACTERIZED. Independent audit9cells/
+615journal refs/1265pins/cleanup3 PASS; no pinned Chromium. Marker10 означает
+undefined для точного GetColumn("Missing") source. Case_complete=true, exact_pass
+и G5=false. Report SHA0ccefdbfd05dbd45ff6777b59aa591356954a7fbbaa6ac256bff8f7ca3db4880.
+Receipt native-named-getcolumn-missing-probe-01-verification.json;
+registry/matrix обновлены. B2complete/2owned-failure-unattributed/4not_run.
+Следующий фиксированный case — B-columns-case, fresh profile91.
+
+Developer doc-only turn01a0e4ec-32fb-7bc2-8a08-9d62857b0767 completed/idle,
+revision14, cursor2cc6c517-0ccb-49e9-bb9b-9daa2c14c7b8:14.
+Получен child calibration-source-proposal.md: K1 parse/K2 unique throw на P,
+условныеK3shift/K4nativecaller/K5negative fixtures. Root прочитал, но ещё НЕ
+завершил независимую проверку/допуск. Runtime source86 unchanged по live audit.
+K1–K5 не реализованы/не запущены; полный G6/J25 остаётся открытым.
+
+
 ### B-getcolumn-missing/profile90 RUNNING
 
 Fresh profile90 после CHARACTERIZED/cleanup profile89;1265pins/toolchains
