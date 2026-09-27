@@ -16,6 +16,31 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Odd02: selection PASS, отдельный Setting hit-test отказал; Fix77 назначен
+
+Source76/profile60 native-cardinality-odd-probe-02 terminal exit1 (session64986),
+FAILED/open-wizard: `Bound Setting covered`. Original cleanup3/3, lease CLOSED,
+profile60 сохранён, recovery не нужен. INPUT3 independently exact; **469refs/192pins**.
+Report SHA `11746c88add1b2cbe7a193e4e0cb9e3a67ec290d9a1f92cf0d9343ef344f6e2a`.
+Private failure-verification receipt сохранён. JS source/schema ещё не bound,
+OUTPUT не проверен. Source76 blocker branch этим run не исполнялась.
+
+Body selection прошёл: gesture_returned и selection_after ready=true/count1,
+dom_replacements1, Setting point(646,218). Затем standalone initial-open hit-test
+в javascript-live.mjs отверг все9points до Setting mouse.click. Report dispatch
+intent не равен фактическому клику. Точные hit targets не записаны; поздний
+screenshot показывает граф/Setting, но не устанавливает причину прежнего refusal.
+
+Fix77 назначен прежней задаче: объединить initial executionCase opening с имеющимся
+selectJavascriptForSettings(openSettings=true), сохранив исходные owner/DOM/deadline,
+exactly-once и cleanup. Добавить bounded same-inspect hit-test diagnostics, а не
+sleeps/retries/ослабление covered/foreign controls. Не использовать reopen-specific
+confirmation для initial fresh node без основания. При source-препятствии — явно
+описать его. Далее полный freeze/root tests/fresh odd; UI declared-empty обязателен.
+Runtime теперь может меняться; новый браузер не запускать до frozen handoff.
+
+
+
 ### Source76 проверен; fresh odd02 запущен
 
 Freeze76 независимо проверен root: **1175main+3public-deny+11Python PASS**,
