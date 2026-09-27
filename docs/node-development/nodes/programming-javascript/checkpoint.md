@@ -15,6 +15,29 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Probe05: actual Connection/Variables inventory полностью подтверждён
+
+Headed profile38/source59 завершён exit1 FAILED с ожидаемым admission refusal.
+Полный NI1 доставлен через production error outcome и journal:
+`n=2; i=[[true,0,6,1,1],[true,0,3,1,1]]; o=0; f=[inputs]`.
+Tuple: parentMatches,type,subtype,param,status. Это два собственных входа:
+Connection6 и Variables3, direction0, optional param1, status1; прочие12
+Preview predicates true. Эти observed statuses заменяют прежнее отсутствие
+доказательств; synthetic test status0 не переносится в live contract.
+
+Original cleanup ALL PASS, recovery не нужен. Root проверил451 journal refs,
+66source pins и точный NI1. Report SHA256:
+`2e12a75ad8b5cb892feb16c7b11233d6b68f0daa98d4bff7ea061fdb8711ca37`.
+Private receipt native-input-probe-05-verification.json. Native cell dispatch
+по-прежнему не допущен; UI/port evidence не означает native values PASS.
+
+Существующей задаче поручено narrow optional-port admission с exact inventory,
+owner/type/subtype/param/status и no-links, а также сохранением object identities
+между native requests. Требуются negatives missing/extra/foreign/recreated и
+изменения каждого свойства до dispatch/после response. Следующий freeze60
+проверит root до fresh headed run. Profile38 сохранён, browser closed.
+
+
 ### Freeze59: actual error delivery проверена; probe05 запущен
 
 Source node-javascript `29dd62c4428f7272405f7a0297b731ad4a7eab8f` меняет только
