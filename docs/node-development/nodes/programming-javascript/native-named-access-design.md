@@ -636,7 +636,7 @@ c67e5a8abb884352ef16076178e23e9b3a7d44f95be1428c302cf47ada4d58ba;
 integer-safe input contract не выдаёт coercion/cardinality native_baseline_sha256.
 Root сравнил полный before proof с предшествующей JS записью журнала, отдельно
 вычислил digest; не заявляет сравнение с отсутствующим runtime полем.
-Шесть случаев из8 A приняты, весь G5/J24/handler/CLI остаётся открытым.
+Все8 случаев A приняты, весь G5/J24/handler/CLI остаётся открытым.
 
 
 A-get-exact/profile74, original session15883 terminal exit0/CHARACTERIZED,
@@ -678,3 +678,38 @@ b407c261866b5cb5930eb59bb614c3a19be0fff330541573137b499c66ea321c.
 Original profile79 failure сохранён; серверные55bytes отдельно сверены read-only
 перед новым запуском. Успешный source84 run не доказывает, что гонка обязательно
 воспроизвелась в этом run; её обе точки и guards проверены адресными VM tests.
+
+
+A-isnull-index/profile83 original18856 terminal exit0,cleanup3/3;
+12cells/627refs/1265pins PASS; report SHA
+a4106d388bab10fdb560463162388cb54109a7d1139e0c74de837b2a9c089911.
+A-isnull-exact/profile84 original40609 terminal exit0,cleanup3/3;
+12cells/623refs/1265pins PASS; report SHA
+cb84b73973f388935761574a6601b979f55c64bea74ddef9ade1376697d099fc.
+Оба source84: OUTPUT Integer[1,0,0,0], INPUT/original upstream unchanged.
+
+Все8 A приняты:96native cells и4977journal refs в независимых receipts.
+Первые5 source83, последние3 source84; manifests/version каждого run сохранены.
+Это bounded stage-A coverage, не полное G5/J24 или API names/case semantics.
+Матрица25 cases в целом остаётся incomplete; B/C/D ещё не выполнены.
+
+## 13. Допуск реализации B после A
+
+Координатор разрешает реализовать только8фиксированных B из §5 на source84.
+INPUT/upstream integer-safe4rows; completed OUTPUT строго1Integer Value/Value.
+Допустимые marker sets привязаны к API,99 incomplete. Characterized return не
+является положительным exact_pass или правилом чувствительности имён к регистру.
+Failed path сохраняет полный owner/source/native-error witness и4+4cells,
+OUTPUT не читается, semantic rejection не заявляется: case_complete=false.
+
+[План атрибуции](native-error-attribution-design.md) принят отдельно. Отсутствие
+mapping не блокирует completed B observations; оно не разрешает автоматически
+принять failed. K1/K2 остаются обязательными G6/J25; K3–K5 условны. В этом
+назначении calibration/parser/semantic rejection не реализуются молча.
+
+A hashes/oracles/lifecycle и все прежние native guards сохранить. Новый manifest
+содержит все1265 прежних путей, обновлённые hashes и реальные imports. Адресные
+actual-verifier tests:4/1/4 cardinality, API-specific markers,99/неподдержанный
+scalar и wrong schema/owner/source/ACK, failed path без OUTPUT. Полные client и
+JS/native suite перед root handoff, без браузера и коммита разработчиком.
+C/D отдельно не допущены; полного handler/CLI acceptance это назначение не заменяет.

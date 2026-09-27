@@ -16,6 +16,21 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### A8/8 завершена; следующий шаг — реализация B
+
+A-isnull-exact/profile84 original40609 terminal exit0/CHARACTERIZED,
+cleanup3/3. Root audit12cells/623refs/1265pins PASS, report SHA
+cb84b73973f388935761574a6601b979f55c64bea74ddef9ade1376697d099fc.
+Stage A8/8 accepted:96native cells/4977journal refs; receipt named-stage-a-acceptance.json.
+Первые5 source83, последние3 source84. Все браузеры закрыты, никаких live processes.
+Общая25case coverage=false, G5/full goal open. Старые FAILED сохранены.
+
+В [named design](native-named-access-design.md),§13 назначена реализация8B cases:
+completed1Integer marker с API-specific допустимыми значениями, failed4+4cells
+без OUTPUT/unattributed. A/guards не ослаблять, source85 freeze+tests перед live.
+Attribution/K1–K5 не включаются в этот патч автоматически; основной G6/J25 остаётся.
+
+
 ### A-isnull-index PASS; A-isnull-exact RUNNING
 
 Profile83/original18856 terminal exit0, cleanup3/3; audit12cells/627refs/1265pins
