@@ -18,6 +18,8 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
   const rowCount=b.roundtrip_role==='output'?(slice?.[2]??slice?.[0]):slice?.[0];
   need(Array.isArray(slice)&&b.rows===rowCount&&b.row_count===rowCount&&b.columns.length===1&&b.columns[0]===0
     &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:typeCode}]),'fixed native slice');
+  const owner=globalThis.__loginomJavascriptNativeRoundtripV1;
+  need(b.named_case_id===owner.named_case_id&&b.input_fixture_id===owner.input_fixture_id,'named read identity');
   const snapshot=()=>captured.capture(b);
   const bound=()=>{const s=snapshot();need(Object.keys(captured.initial).every(k=>captured.initial[k]===s[k]),'native input changed since binding');return s;};
   need(Object.keys(options).every(k=>['operationId','timeoutMs','requireAtomicSnapshot','maxBytes'].includes(k)),'diagnostic option allowlist');
@@ -89,7 +91,7 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
    } finally {releaseResponse(response);if(!callbackOwns)releaseRequest();}
   }
   live();const final=snapshot();need(equal(final),'final stale binding');
-  const result={...(zeroBefore?{zero_admission:{before:zeroBefore,final:zeroReceipt(final,'final')}}:{}),empty_count_attested:!!zeroBefore,read_id:op.id,workflow_id:b.workflow_id,package_id:b.package_id,method:321,interface:116,document_id:b.document_id,execution:b.execution,node_id:b.node_id,port_guid:b.port_guid,port:0,source:{owner:initial.owner,object:initial.object},row_count:initial.count,schema:b.schema,cells:output,owner_rechecked:true,cache_identity_rechecked:true,consistency:'observed_local_only',atomic_snapshot_verified:false,native_cancellation_supported:false};
+  const result={...(b.named_case_id!==undefined?{named_case_id:b.named_case_id,input_fixture_id:b.input_fixture_id,source_sha256:b.source_sha256}:{}),...(zeroBefore?{zero_admission:{before:zeroBefore,final:zeroReceipt(final,'final')}}:{}),empty_count_attested:!!zeroBefore,read_id:op.id,workflow_id:b.workflow_id,package_id:b.package_id,method:321,interface:116,document_id:b.document_id,execution:b.execution,node_id:b.node_id,port_guid:b.port_guid,port:0,source:{owner:initial.owner,object:initial.object},row_count:initial.count,schema:b.schema,cells:output,owner_rechecked:true,cache_identity_rechecked:true,consistency:'observed_local_only',atomic_snapshot_verified:false,native_cancellation_supported:false};
   need(new TextEncoder().encode(JSON.stringify(result)).length<=maxBytes,'final serialization byte budget');op.status='completed';op.published=true;return result;
   }catch(e){if(op.status==='running')op.status='failed';if(op.requests>0)state.poisoned=true;throw e;}finally{clearTimeout(timer);delete op.stop;state.last=op;state.active=null;}
  },{b,decoder:decode.toString(),options});

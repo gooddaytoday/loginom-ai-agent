@@ -1,3 +1,5 @@
+import {javascriptNamedProbe} from './javascript-native-named-cases.mjs';
+import {verifyJavascriptNamedRead} from './javascript-native-named-contract.mjs';
 import {verifyJavascriptDeclaredEmpty,verifyJavascriptZeroAdmission} from './javascript-native-zero.mjs';
 import {verifyNativeCivil,nativeCivilExpectation} from './javascript-native-datetime-civil.mjs';
 import {verifyTextImportSource} from '../../client/lib/text-import-node.mjs';
@@ -8,7 +10,8 @@ import {verifyNativeFixtureCells,verifyNativeInputRead} from './javascript-nativ
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 
 const need=(v,m)=>{if(!v)throw Error('Native roundtrip: '+m);};
-export function javascriptNativeRoundtripProbe(fixtureId='real'){
+export function javascriptNativeRoundtripProbe(fixtureId='real',namedCaseId){
+ if(namedCaseId!==undefined){need(fixtureId==='integer-safe','named input fixture');return javascriptNamedProbe(namedCaseId);}
  const f=javascriptNativeFixture(fixtureId);
  const body={
   'cardinality-keep2':'for (let row=0;row<InputTable.RowCount;row++) {\n  const value=InputTable.Get(row,"Value");\n  if (value === 2) { OutputTable.Append(); OutputTable.Set("Value",value); }\n}\n',
@@ -53,6 +56,7 @@ export function verifyNativeRoundtripMapping(mapping,node,fixtureId='real'){
   return {verified:true,node:{...node},port:0,port_guid:port.port_guid,columns:1,input_technical_name:'Value'};
 }
 export function verifyNativeRoundtripRead(raw,{binding,lifecycle,input,role,civil}){
+  if(binding.named_case_id!==undefined)return verifyJavascriptNamedRead(raw,{binding,lifecycle,input,role});
   const fixture=javascriptNativeFixture(binding.fixture_id),nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixture.id);
   need((input.binding.fixture_id??'real')===fixture.id,'input fixture differs');
   need(['output','upstream'].includes(role)&&binding.roundtrip_role===role,'private read role');
@@ -160,8 +164,8 @@ export function verifyNativeRoundtripOutcome(results,fixtureId='real'){
     general_integer_precision_guarantee:false,g5_complete:false,...(observation?{cells:observation.cells}:{}),...(fixture.coercion?{output_encoding_verified:observation.output_encoding_verified}:{})};
 }
 
-export function verifyNativeRoundtripExecution(execution,node,fixtureId='real'){
-  const nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixtureId);
+export function verifyNativeRoundtripExecution(execution,node,fixtureId='real',namedCaseId){
+  const nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixtureId,namedCaseId);
   need(execution?.verified===true&&execution.owner_verified===true&&execution.cleanup_complete===true
     &&execution.status==='completed'&&execution.trial?.phase==='initial'
     &&execution.trial.source_sha256===nativeRoundtripProbe.source_sha256&&execution.trial.node_id===node.node_id

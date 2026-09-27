@@ -67,7 +67,9 @@ export function javascriptNativeRoundtripSnapshot(b,zeroCapture){
   const diagram=model.FDiagram,nodes=diagram.FNodes.FCollection,links=diagram.FLinks.FCollection;
   const roundtrip=globalThis.__loginomJavascriptNativeRoundtripV1;
   need(roundtrip?.document===document&&roundtrip.input.fixtureId===fixtureId&&roundtrip.source_sha256===b.source_sha256,'roundtrip capability');
-  const failed=globalThis.__loginomJavascriptCoercionFailureV1;
+  need(b.named_case_id===roundtrip.named_case_id&&b.input_fixture_id===roundtrip.input_fixture_id,'named capability identity');
+  if(b.named_case_id!==undefined)need(fixtureId==='integer-safe'&&b.input_fixture_id==='integer-safe','immutable named input');
+  const failed=roundtrip.named_case_id!==undefined?globalThis.__loginomJavascriptNamedFailureV1:globalThis.__loginomJavascriptCoercionFailureV1;
   if(failed){
     need(b.roundtrip_role==='upstream'&&failed.document===document&&failed.roundtrip===roundtrip
       &&JSON.stringify(b.failed_terminal)===JSON.stringify(failed.proof),'failed branch is upstream-only');
@@ -184,7 +186,8 @@ export async function bindJavascriptNativeRoundtrip(page,args,snapshot,zeroSnaps
     const state=globalThis.__loginomJavascriptNativeRoundtripV1;
     if(!state||state.bindings.has(args.roundtrip_role))throw Error('Roundtrip role already reserved; no replay');
     if(!['output','upstream'].includes(args.roundtrip_role))throw Error('Unknown roundtrip role');
-    const failed=globalThis.__loginomJavascriptCoercionFailureV1;
+    if(args.named_case_id!==state.named_case_id||args.input_fixture_id!==state.input_fixture_id)throw Error('Named capability identity differs');
+    const failed=state.named_case_id!==undefined?globalThis.__loginomJavascriptNamedFailureV1:globalThis.__loginomJavascriptCoercionFailureV1;
     if(failed){
       if(args.roundtrip_role!=='upstream'||failed.document!==document||failed.roundtrip!==state
         ||JSON.stringify(args.failed_terminal)!==JSON.stringify(failed.proof))throw Error('Failed branch permits only original upstream');

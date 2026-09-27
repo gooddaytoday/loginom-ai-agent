@@ -1,7 +1,11 @@
 // Page-local capabilities. Nothing here invokes model methods or remote RPCs.
-export function armJavascriptNativeRoundtrip({binding,source,source_sha256,schema_mode}){
+export function armJavascriptNativeRoundtrip({binding,source,source_sha256,schema_mode,named_case_id,input_fixture_id}){
   const need=(v,m)=>{if(!v)throw Error('Roundtrip owner: '+m);};
   need(!globalThis.__loginomJavascriptNativeRoundtripV1,'already armed');
+  const namedPins={"A-get-index":"ade8e3b5195f4c6cd81c09ced0836e909d1ad037b99b40ac152805630ffd8782","A-get-exact":"6befc43d503c85db5063fe2ae128cdbfc52db37f26cf449610639e3280079ab5","A-getcolumn-index":"bb2b3bbd7adf0204483b9a3367ba1506f2fc4fd9b89d45ce9381147ac8868766","A-getcolumn-exact":"ddda422a0d6a06aa08ad0743fdfb616f18641e232aaa5b9921d8b752aa777ee1","A-columns-index":"5410965b02be2a044a1973b31ca2290d60ee935a817109329728a4fa21021032","A-columns-exact":"752e74be9ab4fb53adece872ec1492ee7fd761f4ec086229187965120eec902e","A-isnull-index":"1ab38e09307a876f96b6e3b83e2a46f3b34da9cb4f90a759413cd4d36dd0dc98","A-isnull-exact":"57ceade9570a31dc76f0e2a94e514c1ad7d4474470467ba69649d3dc2b4fb34c"};
+  if(named_case_id!==undefined)need(Object.hasOwn(namedPins,named_case_id)&&namedPins[named_case_id]===source_sha256
+    &&input_fixture_id==='integer-safe'&&binding.fixture_id==='integer-safe'&&schema_mode==='code','fixed stage A source/input');
+  if(named_case_id===undefined)need(input_fixture_id===undefined,'named input requires named case');
   const mode=binding.fixture_id==='cardinality-empty'?'declared':'code';
   need(schema_mode===mode,'fixed case mode');
   if(mode==='declared')need(source==="import {InputTable,OutputTable} from \"builtIn/Data\";\n// UI-declared Value Integer; deliberately emit no rows.\n"&&source_sha256==='0d6cddd9ca40a285c549076429f47f0a1cbf0086f208592ccfefdee98f267d30','fixed declared-empty source');
@@ -52,7 +56,7 @@ export function armJavascriptNativeRoundtrip({binding,source,source_sha256,schem
   const card=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
   need(card===input.card&&card.Controller.FController===input.model&&input.manager.FPreviewVisible===false,'owned graph after Preview Close');
   globalThis.__loginomJavascriptNativeRoundtripV1={document,input,binding,source,source_sha256,upstream,bindings:new Map(),stage:'armed'};
-  Object.defineProperties(globalThis.__loginomJavascriptNativeRoundtripV1,{schema_mode:{value:mode,enumerable:true},fixture_id:{value:binding.fixture_id??'real',enumerable:true}});
+  Object.defineProperties(globalThis.__loginomJavascriptNativeRoundtripV1,{named_case_id:{value:named_case_id,enumerable:true},input_fixture_id:{value:input_fixture_id,enumerable:true},schema_mode:{value:mode,enumerable:true},fixture_id:{value:binding.fixture_id??'real',enumerable:true}});
   return {armed:true,input_read_id:binding.read_id,source_sha256};
 }
 
