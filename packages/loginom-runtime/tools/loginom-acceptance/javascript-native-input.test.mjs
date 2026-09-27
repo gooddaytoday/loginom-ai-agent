@@ -23,7 +23,7 @@ const cookieSources={constructor:'function(objectOwnerID, objectID) {\n\t\trpc.T
   interface:'function() {\n\t\t\treturn 206;\n\t\t}'};
 const values=[null,0,-1.25,10.125];
 const clone=x=>JSON.parse(JSON.stringify(x));
-function sourceEvidence(){
+export function sourceEvidence(){
   const prepared={document_id:'d',workflow_ref:{workflow_id:'w'}},artifact={artifact_id:'a',...nativeInputFixture};
   const request=nativeInputRequest({prepared,artifact,storage:'/jsteach/js-g2-00000000-0000-0000-0000-000000000000',uploadOperationId:'u',totalMs:600000});
   const destination=request.parameters.settings.source.source_path;
@@ -46,7 +46,7 @@ function sourceEvidence(){
 function ui(){return {row_count:4,sample_rows:4,sample_complete:true,filter_enabled:false,precision:{numbers_verified:true,limitations:[]},limitations:[],
   schema:[{name:'Value',label:'Value',type:'real'}],sample:values.map((value,i)=>[{type:'real',value,is_null:i===0,precision:i===0?'exact_null':'17_significant_digits'}])};}
 
-async function fake({deferred=false,change,beforeBind,bind=true,afterRelease}={}){
+export async function fake({deferred=false,change,beforeBind,bind=true,afterRelease}={}){
   class Workflow{} class Package{}
   const pack=new Package(),workflow=new Workflow();workflow.ParentNode=pack;
   const node={FGuid:'n',FIconCls:'bg-vendor-icon-importtextfile',FStatus:1,FRunning:false,data:{}},port={parent:node,FGuid:'p',FType:1,FSubType:1,FParam:0,FStatus:1};
@@ -70,7 +70,7 @@ async function fake({deferred=false,change,beforeBind,bind=true,afterRelease}={}
       const response={$FData:bytes,$FDataSize:60,get_MessageType:()=>1,get_MessageID:()=>request.get_MessageID(),set_StaticDataSize:()=>{},Release:()=>counters.responses++};
       return {continueWith:callback=>{
         const complete=error=>{change?.(result,response);callback({getAwaitedResult:()=>{if(error)throw Error('transport lost');return response;}});};
-        if(deferred)callbacks.push(complete);else complete();
+        if(typeof deferred==='function'?deferred():deferred)callbacks.push(complete);else complete();
       }};
     }};
   node.data.$S=session;

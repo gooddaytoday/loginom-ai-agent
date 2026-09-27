@@ -1,3 +1,5 @@
+import {nativeRoundtripProbe,verifyNativeRoundtripMapping} from './javascript-native-roundtrip-contract.mjs';
+import {bindJavascriptNativeRoundtripSource,bindJavascriptNativeRoundtripSchema} from './javascript-native-roundtrip-owner.mjs';
 import {withJavascriptWizardAddress} from './javascript-wizard-settlement.mjs';
 import {cleanupJavascriptColumnEditor} from './javascript-column-editor.mjs';
 import {dragJavascriptPalette} from './javascript-palette-drag.mjs';
@@ -22,15 +24,15 @@ import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false}={}) {
 process.umask(0o077);
 const batch=batchCases===null?null:javascriptBatchCases(batchCases);
-const batchDeadline=batch?Date.now()+1800000:Infinity;
+const batchDeadline=nativeRoundtrip?Date.now()+600000:batch?Date.now()+1800000:Infinity;
 let cleaning=false;
 const phaseDeadline=ms=>Math.min(cleaning?Infinity:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=batchDeadline-Date.now();if(!cleaning&&ms<=0)throw Error('Original batch deadline expired');return cleaning?Infinity:ms;};
 const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
-if (args.includes('--help')) { console.log(nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nPrivate input-only Value:real [null,0,-1.25,10.125]; one import Execute, typed UI + native4-cell read; no JS creation.':usage); return; }
+if (args.includes('--help')) { console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nPrivate real/NULL input admission then one Data-only identity JS Execute, native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nPrivate input-only Value:real [null,0,-1.25,10.125]; one import Execute, typed UI + native4-cell read; no JS creation.':usage); return; }
 const allowed = new Set(['--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe']);
 const options = {};
 for (let i=0;i<args.length;i++) {
@@ -40,16 +42,16 @@ for (let i=0;i<args.length;i++) {
   if (options[key]===undefined) throw Error(usage);
 }
 if(batch&&options['--execution-case'])throw Error('Batch cannot also select a single case');
-if(nativeInputOnly){
+if(nativeInputOnly||nativeRoundtrip){
   if(batch||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence'].includes(k)))throw Error('Native input-only requires its separate private entrypoint and no JS modes');
   options['--create-node']=true;
 }
 const discoveryProbe=options['--discovery-probe']?javascriptDiscoveryProbe(options['--discovery-probe']):null;
 if(discoveryProbe&&(batch||options['--execution-case']))throw Error('Discovery requires one isolated probe, not a batch or execution case');
-let executionCase=discoveryProbe?'code-table-execute':batch?.[0]??options['--execution-case'];
+let executionCase=nativeRoundtrip?'code-table-execute':discoveryProbe?'code-table-execute':batch?.[0]??options['--execution-case'];
 if(executionCase){
   if(!/^(declared|code)-(sentinel-(next|done|preview|execute)|table-execute)$/.test(executionCase)&&executionCase!=='code-table-mismatch')throw Error('Unknown execution case');
-  if(['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source'].some(k=>options[k]))throw Error('Execution case is a separate mode');
+  if(!nativeRoundtrip&&['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source'].some(k=>options[k]))throw Error('Execution case is a separate mode');
   options['--create-node']=true;options['--inspect-pages']=true;
 }
 if (['--create-node','--palette-only','--palette-hit-test'].filter(k=>options[k]).length>1) throw Error('Choose one discovery mode');
@@ -76,7 +78,7 @@ const directory=resolve(options['--evidence']);
 // Refuse reuse: no old evidence is overwritten and no uncertain run is replayed.
 await mkdir(directory,{mode:0o700});
 const redactor=createRedactor([config.password]);
-if(batch||discoveryProbe||nativeInputOnly){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
+if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},knownSecrets:[config.password]});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
   node:process.versions.node,headless:false,server_os:{status:'not_observed'},storage:{status:'not_observed'},
@@ -395,7 +397,7 @@ const waitWizardReady=async({deadline=wizardDeadline,inputOnly=true,afterIndex=n
   deadline=Math.min(deadline,cleaning?Infinity:batchDeadline);
   const args={prefix:owner.prefix,owned:packageHandle,account:config.username,
     id:report.owned_node.id,binding:wizardBinding,addressEpoch:wizardAddressEpoch,expectedWizard:wizardHandle??null,expectedRoot:wizardRoot??null,inputOnly,
-    initialPages:javascriptInitialPages(owner.prefix,executionNode,executionInputProof),afterIndex,afterPageTid};
+    initialPages:nativeRoundtrip&&executionInputProof?.verified?[owner.prefix+';WizrdMCF;TuneDataSourceInputPortWizard',owner.prefix+';WizrdMCF;JavaScriptColumnsWizard']:javascriptInitialPages(owner.prefix,executionNode,executionInputProof),afterIndex,afterPageTid};
   const record=async(label,state)=>{
     report.snapshots.push({at:new Date().toISOString(),label,remaining_ms:Math.max(0,deadline-Date.now()),...state});await save();
   };
@@ -438,7 +440,7 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
       const schema=await page.evaluate(readJavascriptSchema,schemaContext());await executionRecord({phase:'input_mapping_inventory',schema});
       if(!schema.verified)throw Error('Native JavaScript input schema contract unconfirmed');
       const fields=schema.grids.find(grid=>grid.tid===schema.page_tid+';grdTargetColumns;tbl')?.fields;
-      if(fields?.length!==5||!fields.some(field=>field.Name==='RowID'&&field.DataType===4))throw Error('Verified RowID input binding unavailable');
+      if(nativeRoundtrip?fields?.length!==1||fields[0].Name!=='Value'||fields[0].DataType!==3:fields?.length!==5||!fields.some(field=>field.Name==='RowID'&&field.DataType===4))throw Error('Verified fixed input mapping unavailable');
     }
     if(executionCase&&!remainingPages&&current.tid.endsWith(';JavaScriptColumnsWizard')){
       if(readingExisting){
@@ -448,6 +450,7 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
         report.execution_existing_schema=schema;
       }else report.execution_schema=await configureJavascriptSchema({page,context:schemaContext(),mode:executionCase.split('-')[0],
         once:(id,identity,perform)=>executionRuntime.once(caseEffect(report.case_id,id),identity,perform),record:executionRecord,deadline,columnState});
+      if(nativeRoundtrip)await executionRecord({phase:'native_roundtrip_schema_bound',...await page.evaluate(bindJavascriptNativeRoundtripSchema,{...schemaContext(),schema:report.execution_schema})});
     }
     if(current.visible_editors===1&&!remainingPages)return current;
     if(remainingPages&&Number.isInteger(current.index)&&current.index===current.indicator_count-1)return current;
@@ -652,6 +655,7 @@ const runExecutionTrial=async probe=>{
       messages:(after?.messages??[]).map(message=>({...message,...identity})),ownerVerified:after?.owner_verified===true,terminal});
     await executionRecord({phase:'execution_stage_observed',identity,before,after,outcome});
     if(after?.boundary_refusal)throw Error('Execution stage boundary refused: '+after.boundary_refusal);
+    if(nativeRoundtrip&&after?.messages?.some(m=>!before.messages.some(old=>old.id===m.id)))throw Error('Native roundtrip wizard diagnostic; no replay');
     if(!terminal)throw Error('Execution stage result remains unconfirmed: '+stage);
     if(discoveryProbe){
       const diagnostic=javascriptDiscoveryWizardDiagnostic({probe,identity,stage,before,after});
@@ -686,6 +690,18 @@ const runExecutionTrial=async probe=>{
   await exact(owner.prefix+';WizrdMCF').waitFor({state:'hidden',timeout:Math.max(1,deadline-Date.now())});
   openedWizard=false;await waitGraphReady(Math.max(1,deadline-Date.now()));
   if(trigger==='done'){report.execution_probe.outcome=outcome;return;}
+  if(nativeRoundtrip){
+    await executionRuntime.checkNativeRoundtripBeforeExecute();
+    const boundary=await executionRuntime.captureExecutionBoundary();
+    try{
+      const execution=await executionRuntime.executeNode(executionNode,deadline,{phase:'initial',source_sha256:probe.source_sha256});
+      report.execution_probe.execution=execution;await save();
+      await executionRuntime.verifyExecutionBoundary(boundary);
+      report.native_roundtrip=await executionRuntime.readNativeRoundtrip(executionInput,executionNode,execution);
+      await executionRuntime.verifyExecutionBoundary(boundary);
+      report.stage='native-roundtrip-observed';report.gates_closed=[];await save();return;
+    }finally{await boundary.native.dispose();}
+  }
   if(discoveryProbe){
     const boundary=await executionRuntime.captureExecutionBoundary();
     try{
@@ -911,7 +927,8 @@ const runPreparedCase=async()=>{
       report.stage='link-js-input';executionNode=await executionRuntime.connectInput(executionInput.node,node.id,executionDrop);
       report.stage='verify-js-input-port';
       const mapping=await executionRuntime.readPortMapping(executionNode,'input');
-      executionInputProof=verifyJavascriptInputMapping(mapping,executionNode);
+      executionInputProof=(nativeRoundtrip?verifyNativeRoundtripMapping:verifyJavascriptInputMapping)(mapping,executionNode);
+      if(nativeRoundtrip)await executionRuntime.bindNativeRoundtripGraph(executionNode,executionInputProof.port_guid);
       await executionRecord({phase:'javascript_input_port_verified',proof:executionInputProof,mapping});
       report.execution_input_port=executionInputProof;
       await waitGraphReady();await guard();
@@ -997,10 +1014,11 @@ const runPreparedCase=async()=>{
     }
     if(executionCase){
       const mode=executionCase.split('-')[0],sentinel=executionCase.includes('-sentinel-');
-      const probe=discoveryProbe??javascriptExecutionProbes('RowID').find(p=>p.schema_mode===mode&&p.id.endsWith(sentinel?'execution-sentinel':'table-v1'));
+      const probe=(nativeRoundtrip?nativeRoundtripProbe:discoveryProbe)??javascriptExecutionProbes('RowID').find(p=>p.schema_mode===mode&&p.id.endsWith(sentinel?'execution-sentinel':'table-v1'));
       report.execution_probe={id:probe.id,source_sha256:probe.source_sha256,status:'source_pending'};await save();
       await probeOwnedSource(baselineSource,probe.source);
       report.execution_probe.status='source_verified';await save();
+      if(nativeRoundtrip)await executionRecord({phase:'native_roundtrip_source_bound',...await page.evaluate(bindJavascriptNativeRoundtripSource,{...schemaContext(),schema:report.execution_schema})});
       // Execution dispatch is kept separate from source replacement; each
       // trigger receives its own fresh error baseline and once-only receipt.
       await runExecutionTrial(probe);
@@ -1009,6 +1027,7 @@ const runPreparedCase=async()=>{
     report.stage='discard-wizard';
     if(openedWizard)await closeWizardOnce();
     await snapshot('wizard-discarded');
+    if(nativeRoundtrip&&report.native_roundtrip)report.stage='native-roundtrip-observed';
     }
     }
 };
@@ -1075,12 +1094,14 @@ try {
     report.stage='graph-ready';await waitGraphReady(createRemaining());
     await snapshot('graph-ready-baseline');
     if(executionCase||nativeInputOnly){
-      report.scope=nativeInputOnly?'private native real input-only admission':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
+      report.scope=nativeRoundtrip?'private native real/NULL identity roundtrip':nativeInputOnly?'private native real input-only admission':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
       if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=1;report.gates_closed=[];}
+      if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
-        record:executionRecord,effectScope:()=>report.case_id,deadline:batch?batchDeadline:Date.now()+1200000,nativeInputOnly});
+        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
+      if(nativeRoundtrip)await executionRuntime.armNativeRoundtrip(executionInput);
       if(batch||discoveryProbe){
         if(!executionInput.table?.execution_id)throw Error('Batch input execution proof absent');
         inputBinding=await page.evaluateHandle(input=>{

@@ -1,3 +1,6 @@
+import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,completeJavascriptNativeRoundtrip} from './javascript-native-roundtrip-owner.mjs';
+import {nativeRoundtripProbe,verifyNativeRoundtripInput,verifyNativeRoundtripExecution,verifyNativeRoundtripProvenance} from './javascript-native-roundtrip-contract.mjs';
+import {readNativeRoundtrip} from './javascript-native-roundtrip-driver.mjs';
 import {waitJavascriptWizardSettlement} from './javascript-wizard-settlement.mjs';
 // All generated runtime code runs against the caller's authenticated page.
 // No browser launch, credentials, server RPC, or second MCP context lives here.
@@ -554,7 +557,8 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
   const origin='http://logi-test-plan.bg.local',build='7.4.2',sessionId='js-g2-'+randomUUID();
   const journalOnce=createJavascriptEffectJournal({record,deadline});
   const once=(id,identity,perform)=>journalOnce(caseEffect(effectScope(),id),identity,perform);
-  let nativeInputEvidence,nativeReadUncertain=false;
+  let nativeInputEvidence,nativeInputOwner,nativeReadUncertain=false;
+  const validateNativeSource=()=>verifyNativeRoundtripProvenance(nativeInputOwner);
   const executeUntil=async(code,until)=>{
     if(Date.now()>=until)throw Error('Original JavaScript operation deadline expired');
     // The module supplies these fixed local builders; this function is never
@@ -575,7 +579,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
   const pinned={actions:new Map(actions.map(action=>[action.action_key,action])),selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
   const artifactStore=await createArtifactStore({directory:directory+'/input-artifacts',sessionId});
   const support=nativeInputOnly?createJavascriptNativeInputSupport({targetOrigin:origin,targetBuild:build,
-    onProof:async proof=>{nativeInputEvidence=proof;},
+    onProof:async(proof,owner)=>{nativeInputEvidence=proof;nativeInputOwner=owner;},
     onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0
       ||state.status!=='completed'||state.releasedRequests!==4||state.releasedResponses!==4;
       await record({phase:'javascript_native_input_lifecycle',state,uncertain:nativeReadUncertain});}})
@@ -771,6 +775,43 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       if(nativeInputOnly&&(!nativeInputEvidence?.native.exact.native_bytes_verified||nativeReadUncertain))throw Error('Native input proof/cleanup unavailable');
       await record({phase:'input_verified',node:imported.output.node,pin,storage,proof,table:result});
       return {node:imported.output.node,storage,pin,table:result,proof,...(nativeInputOnly?{native_input:nativeInputEvidence}: {})};
+    },
+    async armNativeRoundtrip(input) {
+      if(!nativeInputOnly||nativeReadUncertain)throw Error('Private native input required');
+      const proof=verifyNativeRoundtripInput(input);validateNativeSource();
+      await record({phase:'native_roundtrip_input_before_js',proof});
+      const armed=await page.evaluate(armJavascriptNativeRoundtrip,{binding:{...proof.binding,read_id:proof.raw.read_id},...nativeRoundtripProbe});
+      await record({phase:'native_roundtrip_armed',...armed});return armed;
+    },
+    async checkNativeRoundtripBeforeExecute() {
+      validateNativeSource();
+      await page.evaluate(()=>{const s=globalThis.__loginomJavascriptNativeRoundtripV1;if(s?.stage!=='source-bound')throw Error('Source not bound');s.check();});
+    },
+    async bindNativeRoundtripGraph(node,inputPortGuid) {
+      validateNativeSource();
+      const result=await page.evaluate(bindJavascriptNativeRoundtripGraph,{node,inputPortGuid});
+      await record({phase:'native_roundtrip_graph_bound',...result});
+    },
+    async readNativeRoundtrip(input,node,execution) {
+      const before=verifyNativeRoundtripInput(input);validateNativeSource();
+      verifyNativeRoundtripExecution(execution,node);
+      await page.evaluate(completeJavascriptNativeRoundtrip,{execution,source_sha256:nativeRoundtripProbe.source_sha256});
+      const results={before};
+      for(const role of ['output','upstream']){
+        validateNativeSource();
+        const owner=role==='output'?node:input.node,completed=role==='output'?execution:before.exact.provenance.execution;
+        const operation={id:'native-roundtrip-'+role+'-'+randomUUID(),action:{action_key:'diagnostic.javascript',revision:'1'},deadline};
+        const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node:owner,execution:completed,deadline};
+        results[role]=await readNativeRoundtrip({options:{operation,execute,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>!nativeReadUncertain,
+          receiptOptions:(id,key,signature)=>({receipt_namespace:sessionId,receipt_id:id,receipt_signature:signature,operation_id:id})},ctx,input:before,role,targetOrigin:origin,targetBuild:build,
+          onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0||state.status!=='completed'||state.releasedRequests!==4||state.releasedResponses!==4;
+            await record({phase:'native_roundtrip_lifecycle',role,state,uncertain:nativeReadUncertain});}});
+      }
+      await page.evaluate(()=>globalThis.__loginomJavascriptNativeRoundtripV1.check());
+      validateNativeSource();
+      const saved=await record({phase:'native_roundtrip_verified',results,g5_complete:false});
+      if(JSON.stringify(saved.results)!==JSON.stringify(results))throw Error('Roundtrip final journal ACK differs');
+      return results;
     },
     async captureDropTopology() {
       await accountGuard();const before=await graph();requireJavascriptTopology(before);

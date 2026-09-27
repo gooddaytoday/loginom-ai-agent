@@ -138,7 +138,7 @@ export function createJavascriptNativeInputSupport({targetOrigin,targetBuild,onP
         const ui=await base.readOutput(read,ctx);verifyNativeInputUi(ui.ports?.[0]);
         const provenance=nativeInputProvenance({...options,ctx,execution});
         const proof=await readNative({options,ctx,provenance,targetOrigin,targetBuild,onState});
-        await onProof({ui,native:proof});return ui;
+        await onProof({ui,native:proof},{options,ctx,provenance});return ui;
       }};
   }};
 }
