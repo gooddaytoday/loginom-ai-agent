@@ -16,6 +16,26 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze45: exact option и picker cleanup переданы в live — 2026-09-27
+
+Root85 tests PASS: column-editor32,stage-observer14,execution-evidence31,batch8;
+30/30 SHA совпали до/после. Developer commit
+`a84e099289746028c87527bd25dc5f9486eeb8c4` —3 изменённых source/test файла.
+Option ElementHandle берётся из доказанного holder, без global text locator;
+перед единственным click повторяются native item/record/cache/picker/store/DOM
+и hit-test. Lost reply не разрешает повтор. Cleanup различает reserved opening,
+observed click response и ready picker; закрывает лишь доказанно свой expanded
+picker отдельным exact trigger click, затем пассивно ждёт collapsed/hidden/quiet.
+После этого свежая проверка Cancel; после ApplyDispatched разрешено только
+наблюдение Apply. Исходники Ext подтверждают UI toggle при expanded; native методы
+не вызываются. Закрытие/выбор bounded5s в пределах исходного budget.
+
+Batch45 RUNNING: declared-sentinel-preview,declared-table-execute;
+freshprofile18, headed DISPLAY=:1, Chromium1246/sandbox. Source commit/30pins,
+root test receipt и lease сохранены приватно. Source45 не означает закрытия
+G2/G3 или всей матрицы; public handler и CLI-приёмка остаются впереди.
+
+
 ### Batch44: trigger/picker/type-record подтверждены, выбор и cleanup требуют fix45 — 2026-09-27
 
 Root проверил948 journalSHA, два input6×5/60cells. Native type opening ready:
