@@ -16,6 +16,44 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch45: declared Preview и полный выход подтверждены; reopening требует fix46 — 2026-09-27
+
+После перезапуска Codex повторно проверены OpenViking MCP health, actor search и
+read; Doctor0.8.1: credentials/system/status/MCP15 tools/ready PASS,0 failures.
+Предупреждение относится к прежним transcript_unreadable/aborted запросам;
+текущие вызовы успешны, настройки не менялись.
+
+Root-аудит сохранён в приватном `g2-batch-45-verification.json`:1700 journalSHA,
+3 input reads/90 typed cells,1 fresh completed execution,полный output6×2/12cells.
+`declared-sentinel-preview` завершён OBSERVED: source SHA
+`e0ea9794bb7e640ed0918f8bbdb48d4b0ae5b097959d248528a48ba7aa8f8749`,
+owner/terminal/sentinel/gate подтверждены; safe_to_continue=true,
+wizard закрыт. Объявленная схема ObservedID(integer4) и PhaseMarker(string5),
+generation=false. Отсутствие sentinel в других этапах не доказывает отсутствие
+исполнения.
+
+`declared-table-execute`: свежий процесс completed, все6 строк и2 столбца
+совпали с техническим oracle. Последующий `existing-mapping-baseline` отказал:
+NodeProcedureStepError «The node surface changed during observation».
+Поэтому весь case остаётся FAILED: полный выход не заменяет проверку
+повторного открытия кода/соответствий. Причина изменения surface ещё исследуется.
+Исходный cleanup package_closed/logged_out/browser_closed=true; отдельный
+recovery не нужен. Lease переведена в closed, profile18 сохранён,
+freshprofile19 назначен и ещё не создан.
+
+В ту же developer-задачу передан fix46: исправить доказательство reopening,
+сохранив ownership и запрет повторов неизвестных effects. Отдельно проверить
+Apply settlement: исходный ColumnDefsMappingWizard.CreateColumnDefFormClose
+ожидает TargetStore.syncAsync; Ext.sync выставляет isSyncing=true,
+onBatchComplete снимает его после onProxyWrite. Закрытый editor и totalCount
+сами по себе не доказывают завершение записи. Требуются пассивные проверки
+sync/dirty/phantom/removed и адресные тесты; это source-confirmed gap,
+но не установленная причина live-отказа45. Успешные guards43–45 сохраняются.
+
+Public JS-handler, полная G1–G7/J01–J27 матрица, итоговое ревью и автономная
+CLI-приёмка остаются открытыми. Цель активна; слияние/публикация не выполнялись.
+
+
 ### Freeze45: exact option и picker cleanup переданы в live — 2026-09-27
 
 Root85 tests PASS: column-editor32,stage-observer14,execution-evidence31,batch8;
