@@ -1,3 +1,4 @@
+import {openJavascriptNativeRoundtripPreview} from './javascript-native-roundtrip-opening.mjs';
 import {createHash} from 'node:crypto';
 import {createNodeProcedure} from '../../client/lib/node-procedure.mjs';
 import {withBrowserReceipt} from '../../client/lib/executor.mjs';
@@ -12,7 +13,7 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 
 export async function readNativeRoundtrip({options,ctx,input,role,targetOrigin,targetBuild,onState},
   {createProcedure=createNodeProcedure,verifyFrontends=verifyNativeInputFrontends,
-    verifyCountLoaders=verifyNativeInputCountLoaders,verifyCookieRuntime=verifyNativeInputCookieRuntime}={}){
+    verifyCountLoaders=verifyNativeInputCountLoaders,verifyCookieRuntime=verifyNativeInputCookieRuntime,openPreview=openJavascriptNativeRoundtripPreview}={}){
   const {execute,operation,onRecord,now}=options;
   const deadline=Math.min(ctx.deadline,input.binding.deadline);
   const check=()=>{ctx.signal?.throwIfAborted();need(now()<deadline,'original deadline expired');
@@ -27,13 +28,18 @@ export async function readNativeRoundtrip({options,ctx,input,role,targetOrigin,t
   let state=await channel.observe({condition:'native roundtrip owned graph/output',readOutputs:true,ready:s=>same(s)&&s.node_outputs?.verified===true});
   const ports=state.node_outputs.ports.filter(p=>p.index===0);need(ports.length===1&&ports[0].active===true,'one active owned output');const port=ports[0];
   const control=(s,verb)=>{const es=s.ui.elements.filter(e=>e.tid===port.tid&&e.allowed_actions.includes(verb));need(es.length===1,'unique output control');return es[0];};
-  check();await channel.perform({condition:'select owned roundtrip output Preview',initialObservation:state,ready:same,
-    identity:()=>ctx.node,resolve:s=>({verb:'click',ref:control(s,'click').ref})});
-  state=await channel.observe({condition:'owned roundtrip output Preview command',ready:s=>same(s)&&s.ui.elements.some(e=>e.tid===port.tid&&e.allowed_actions.includes('press'))});
-  check();await channel.perform({condition:'open owned roundtrip native Preview',initialObservation:state,ready:same,
-    identity:()=>ctx.node,resolve:s=>({verb:'press',ref:control(s,'press').ref,key:'F3'})});
-  let lifecycle,observationError,preview,readDispatched=false;
+  let lifecycle,observationError,preview,readDispatched=false,openingReturned=false;
   try{
+    if(role==='output'){
+      await openPreview({options,ctx,input,port,state,deadline,targetOrigin,targetBuild,onState});
+    }else{
+      check();await channel.perform({condition:'select owned roundtrip output Preview',initialObservation:state,ready:same,
+        identity:()=>ctx.node,resolve:s=>({verb:'click',ref:control(s,'click').ref})});
+      state=await channel.observe({condition:'owned roundtrip output Preview command',ready:s=>same(s)&&s.ui.elements.some(e=>e.tid===port.tid&&e.allowed_actions.includes('press'))});
+      check();await channel.perform({condition:'open owned roundtrip native Preview',initialObservation:state,ready:same,
+        identity:()=>ctx.node,resolve:s=>({verb:'press',ref:control(s,'press').ref,key:'F3'})});
+    }
+    openingReturned=true;
     preview=await channel.observe({condition:'native roundtrip Preview schema',readPreview:true,ready:s=>s.node_preview_schema?.verified===true
       &&s.node_preview_schema.port_guid===port.port_guid&&s.node_preview_schema.port===0});
     need(preview.node_preview_schema.fields.length===1&&preview.node_preview_schema.fields[0].name==='Value'
@@ -72,6 +78,7 @@ export async function readNativeRoundtrip({options,ctx,input,role,targetOrigin,t
     return proof;
   }catch(error){observationError=error;throw error;
   }finally{
+    if(openingReturned&&!preview){operation.transportUncertain=true;await onState({uncertain:true});}
     if(readDispatched&&(!lifecycle||lifecycle.retired||lifecycle.pending||lifecycle.status!=='completed'
       ||lifecycle.releasedRequests!==4||lifecycle.releasedResponses!==4)){
       operation.transportUncertain=true;await onState({...lifecycle,uncertain:true});

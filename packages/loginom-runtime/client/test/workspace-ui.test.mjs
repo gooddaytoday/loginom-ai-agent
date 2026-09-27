@@ -5185,3 +5185,15 @@ test('fractional Reform rows retain complete definitions and native record bindi
   for(const field of s.wizard.reform_columns.fields)assert.ok(s.ui.elements.find(e=>e.ref===field.name_ref)?.allowed_actions.includes('double_click'));
  }
 });
+
+test('JavaScript output port remains publicly denied for click and F3',async()=>{
+  const page=new Page(),port=page.add('g','MF;TF-1;Graph;JavaScript;Output_Data-0');
+  const snapshot=await page.observe(),target=snapshot.ui.elements.find(e=>e.tid===port.getAttribute('data-tid'));
+  assert.equal(target.visible,true);assert.equal(target.enabled,true);assert.deepEqual(target.allowed_actions,[]);
+  for(const action of [{verb:'click',ref:target.ref},{verb:'press',ref:target.ref,key:'F3'}]){
+    const result=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+      {mode:'act',expected_build:build,expected_origin:origin,operation_id:'denied-js-output-'+action.verb,snapshot,action}));
+    assert.equal(result.error.code,'UI_REFERENCE_STALE');assert.equal(result.effect_possible,false);
+  }
+  assert.equal(page.events.length,0);
+});
