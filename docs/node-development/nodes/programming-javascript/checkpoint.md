@@ -16,6 +16,25 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Empty03: причина Items подтверждена live; source81 назначен
+
+Original session82166 terminal exit1: prepare-typed-input, cleanup3/3.
+Report SHA `9787f6d0bfe200ce62e1eaf2b6af1a2160ea74c1eb8b28e9cfccf3b27e750e4f`.
+Root повторно сверил1245pins;100 journal events. Browser lease CLOSED.
+Diagnostic first_failed=Items, failure_scope=classifier: свойство унаследовано
+на depth4, kind=accessor. Все предшествующие поля до FMainForm — own data.
+Это объясняет unconfirmed body обычного импорта на source79/80.
+
+Сохранённый vendor ViewController.js из preview-source-40 подтверждает:
+Items getter возвращает this.FItems; PrepareItemsController создаёт own FItems.
+SHA `69a209465619fa56670ab767b040c91b00b5cec950c3b56a9151f4dfcd00dbb8`
+совпал с исходным manifest. Это ранее сохранённый frontend, не новая загрузка.
+Разработчику назначен узкий Fix81: own FItems вместо own Items, без исполнения
+произвольных getters, с fixtures реальной формы и full client regression.
+Текущий FItems path предстоит подтвердить следующим headed live. JS/output0
+и полный G5 всё ещё не проверены в этих двух диагностических прогонах.
+
+
 ### Source80 independently PASS; headed diagnostic empty03 RUNNING
 
 Developer передал source80 и завершил turn (revision39). Root проверил
