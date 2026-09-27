@@ -69,6 +69,23 @@ export async function waitArtifactDiscoveryReady(page,task,deadline,trace,minimu
   if(busyOnly&&!observed.ready&&!busySameOwner)throw Error('DISCOVERY_REFRESH_BLOCKED');
   return poll?(observed.ready?observed:false):observed;
  };
+ const revalidateReady=async()=>{
+  // A completed poll does not reserve readiness. Keep the original binding and
+  // deadline across final-read races, and bound repeated transitions as well.
+  for(let attempt=0;attempt<16;attempt++){
+   if(Date.now()>=deadline)throw Error('DISCOVERY_READY_DEADLINE');
+   const observed=await page.evaluate(inspect,{binding,task,minimumLoadCount});
+   if(Date.now()>=deadline)throw Error('DISCOVERY_READY_DEADLINE');
+   if(observed.ready)return observed;
+   if(!observed.busy_same_owner)throw Error('DISCOVERY_READY_CHANGED');
+   trace.push({event:'artifact_discovery_ready_recheck',attempt,...observed});
+   if(attempt===15)throw Error('DISCOVERY_READY_RECHECK_LIMIT');
+   const remaining=deadline-Date.now();if(remaining<=0)throw Error('DISCOVERY_READY_DEADLINE');
+   const ready=await page.waitForFunction(inspect,
+    {binding,task,minimumLoadCount,poll:true,busyOnly:true},{timeout:remaining,polling:250});
+   await ready.dispose();
+  }
+ };
  try {
   const before=await page.evaluate(inspect,{binding,task,minimumLoadCount});trace.push({event:'artifact_discovery_readiness',...before});
   if(!before.ready){
@@ -77,8 +94,7 @@ export async function waitArtifactDiscoveryReady(page,task,deadline,trace,minimu
     {binding,task,minimumLoadCount,poll:true},{timeout:remaining,polling:250});
    await ready.dispose();
   }
-  const after=await page.evaluate(inspect,{binding,task,minimumLoadCount});
-  if(!after.ready)throw Error('DISCOVERY_READY_CHANGED');
+  const after=await revalidateReady();
   trace.push({event:'artifact_discovery_ready',...after});
   if(refresh){
    if(!Number.isSafeInteger(after.load_count)||Date.now()>=deadline)throw Error('DISCOVERY_REFRESH_GENERATION_UNAVAILABLE');
@@ -108,8 +124,7 @@ export async function waitArtifactDiscoveryReady(page,task,deadline,trace,minimu
    const loaded=await page.waitForFunction(inspect,
     {binding,task,minimumLoadCount,poll:true},{timeout:remaining,polling:250});
    await loaded.dispose();
-   const settled=await page.evaluate(inspect,{binding,task,minimumLoadCount});
-   if(!settled.ready)throw Error('DISCOVERY_READY_CHANGED');
+   const settled=await revalidateReady();
    trace.push({event:'artifact_discovery_refresh_settled',...settled});
    return settled;
   }

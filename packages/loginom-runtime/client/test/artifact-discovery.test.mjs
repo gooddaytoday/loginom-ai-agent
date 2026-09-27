@@ -153,10 +153,10 @@ function nativeFixture({empty=false,parent=false,blocked=false,loading=false,mas
  const records=parent?[{internalId:'parent-record'}]:empty?[]:[{internalId:'file-record'}];
  const store={$className:'Ext.data.Store',loadCount:1,isLoading:()=>loading,getData:()=>({items:records}),getCount:()=>records.length,
   getTotalCount:()=>records.length+(incomplete?1:0)};
- let currentStore=store;
+ let currentStore=store,dialog=false;
  const view={el:{dom:grid},getStore:()=>currentStore};
  const card={Controller:{Node:{data:{node:{}}}}};let active=card,hit=blocked?element('foreign'):empty||parent?placeholder:grid;
- const doc={querySelectorAll:selector=>selector.includes('x-mask')?mask?[mask==='foreign'?element('foreign-mask'):root]:[]:selector.includes('role=')?[]:
+ const doc={querySelectorAll:selector=>selector.includes('x-mask')?mask?[mask==='foreign'?element('foreign-mask'):root]:[]:selector.includes('role=')?dialog?[element('dialog')]:[]:
   selector==='[data-tid='+JSON.stringify(gridTid)+']'?[grid]:selector==='[data-tid="tab"]'?[tab]:selector==='[data-tid='+JSON.stringify(rootTid)+']'?[root]:[],
   elementFromPoint:()=>hit};
  const realm=vm.createContext({document:doc,location:{origin:'https://test'},getComputedStyle:()=>({visibility:'visible'}),
@@ -164,17 +164,20 @@ function nativeFixture({empty=false,parent=false,blocked=false,loading=false,mas
  realm[Symbol.for('loginom-dock.workspace-ui.identity.v1')]={epoch:'doc'};
  const invoke=(fn,args)=>vm.runInContext('('+fn.toString()+')',realm)(args);
  let disposed=0,waits=0,onWait=()=>{loading=false;mask=false;root.className='test';if(!blocked)hit=empty||parent?placeholder:grid;store.loadCount++;};
- const timeouts=[];
+ const timeouts=[],waitDisposals=[];let evaluations=0,onEvaluate=()=>{},elapsed=0;
+ const started=Date.now();realm.Date=class extends Date {static now(){return started+elapsed;}};
  const page={evaluateHandle:async(fn,arg)=>{const value=invoke(fn,arg);value.dispose=async()=>{disposed++;};return value;},
-  evaluate:async(fn,arg)=>invoke(fn,arg),waitForFunction:async(fn,arg,options)=>{
+  evaluate:async(fn,arg)=>{onEvaluate(++evaluations);return invoke(fn,arg);},waitForFunction:async(fn,arg,options)=>{
    assert.equal(typeof fn,'function','Playwright string expressions are not invoked with args');
    waits++;timeouts.push(options.timeout);assert.ok(options.timeout>0&&options.timeout<=5000);
    assert.equal(invoke(fn,arg),false,'first unsettled sample must keep polling');onWait();
-   if(!invoke(fn,arg))throw Error('Readiness deadline');return {dispose:async()=>{}};
+   if(!invoke(fn,arg))throw Error('Readiness deadline');const index=waitDisposals.push(0)-1;return {dispose:async()=>{waitDisposals[index]++;}};
   }};
  const task={snapshot:{workflow_ref:{prefix,tab_tid:'tab'},dom_epoch:{document:'doc'}},expected_origin:'https://test',expected_build:'7.4.2',artifact:{name:'source.csv'}};
  const trace=[];
- return {run:(minimum=null,refresh=null,deadline=Date.now()+5000)=>waitArtifactDiscoveryReady(page,task,deadline,trace,minimum,refresh),trace,task,
+ return {run:(minimum=null,refresh=null,deadline=started+5000)=>vm.runInContext('('+waitArtifactDiscoveryReady.toString()+')',realm)(page,task,deadline,trace,minimum,refresh),trace,task,
+  onEvaluate:fn=>{onEvaluate=fn;},elapse:ms=>{elapsed+=ms;},waitDisposals,
+  showDialog:()=>{dialog=true;},changeContext:()=>{realm.location.origin='https://foreign';},
   replaceStore:()=>{currentStore={...store};},
   startBusy:(foreign=false)=>{loading=true;mask=foreign?'foreign':true;root.className='bg-mask-message';hit=root;},
   failWait:()=>{onWait=()=>{throw Error('Original readiness deadline');};},
@@ -183,6 +186,52 @@ function nativeFixture({empty=false,parent=false,blocked=false,loading=false,mas
   advanceLoad:()=>{store.loadCount++;},
   changeOwner:()=>{onWait=()=>{active={...card};};},get waits(){return waits;},get disposed(){return disposed;}};
 }
+test('serialized final readiness reread settles same-owner races before and after the only Refresh',async()=>{
+ for(const postRefresh of [false,true]){
+  const f=nativeFixture({empty:true});let refreshes=0;
+  f.onEvaluate(n=>{if(n===(postRefresh?3:2))f.startBusy();});
+  const result=await f.run(null,postRefresh?async()=>{refreshes++;}:null);
+  assert.equal(result.ready,true);assert.equal(refreshes,postRefresh?1:0);
+  assert.equal(f.waits,postRefresh?2:1);assert.equal(f.disposed,1);
+  assert.ok(f.waitDisposals.every(n=>n===1));
+  assert.equal(f.trace.filter(e=>e.event==='artifact_discovery_ready_recheck').length,1);
+ }
+});
+test('serialized repeated final-read transitions stop at the recheck limit without Refresh',async()=>{
+ const f=nativeFixture({empty:true});let refreshes=0;
+ f.onEvaluate(n=>{if(n>=2)f.startBusy();});
+ await assert.rejects(f.run(null,async()=>{refreshes++;}),/RECHECK_LIMIT/);
+ assert.equal(refreshes,0);assert.equal(f.waits,15);assert.equal(f.disposed,1);
+ assert.equal(f.trace.filter(e=>e.event==='artifact_discovery_ready_recheck').length,16);
+ assert.ok(f.waitDisposals.every(n=>n===1));
+});
+test('serialized final-read settlement retains deadline through repeated races and refuses late readiness',async()=>{
+ const f=nativeFixture({empty:true});
+ f.onEvaluate(n=>{if(n>=2){f.elapse(1000);f.startBusy();}});
+ await assert.rejects(f.run(),/DEADLINE/);
+ assert.deepEqual(f.timeouts,[4000,3000,2000,1000]);
+ assert.equal(f.disposed,1);assert.ok(f.waitDisposals.every(n=>n===1));
+ const late=nativeFixture();late.onEvaluate(n=>{if(n===2)late.elapse(5000);});
+ await assert.rejects(late.run(),/DEADLINE/);assert.equal(late.waits,0);assert.equal(late.disposed,1);
+});
+test('serialized final-read races reject owner/store/context changes and foreign masks/dialogs',async()=>{
+ for(const postRefresh of [false,true])for(const fault of ['store','owner','context','foreign','dialog','foreign_late']){
+  const f=nativeFixture({empty:true});let refreshes=0;
+  f.onEvaluate(n=>{
+   if(n!==(postRefresh?3:2))return;
+   f.startBusy(fault==='foreign');
+   if(fault==='store')f.replaceStore();
+   if(fault==='owner')f.changeOwner();
+   if(fault==='context')f.changeContext();
+   if(fault==='dialog')f.showDialog();
+   if(fault==='foreign_late')f.foreignDuringWait();
+  });
+  await assert.rejects(f.run(null,async()=>{refreshes++;}),
+   ['store','owner','context'].includes(fault)?/OWNER_CHANGED/:fault==='foreign_late'?/BLOCKED/:/READY_CHANGED/);
+  assert.equal(refreshes,postRefresh?1:0);assert.equal(f.disposed,1);
+  assert.ok(f.waitDisposals.every(n=>n===1));
+ }
+});
 test('native readiness waits for store load and mask settlement under the supplied deadline',async()=>{
  const f=nativeFixture({loading:true,mask:true}),r=await f.run(2);
  assert.equal(r.ready,true);assert.equal(r.load_count,2);assert.equal(f.waits,1);assert.equal(f.disposed,1);
