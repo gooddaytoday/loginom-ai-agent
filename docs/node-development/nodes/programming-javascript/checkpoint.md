@@ -16,6 +16,33 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze51: manual mapping admission и безопасный отказ — 2026-09-27
+
+После перезапуска MCP health, actor search и чтение точного найденного URI
+успешны. Doctor:0 failures; предупреждение только о старых aborted/transcript
+ошибках. Конфигурация не менялась.
+
+Root независимо воспроизвёл admission на actual batch50 snapshot (journal line2229):
+исходные javascriptOutputColumns без used отвергаются; адаптация used:true
+принимает те же native sources и требуемое ObservedID/ManualMarker mapping.
+Required flags не являются причиной. Общий resolver не изменён.
+
+Source51 `7274cca5e541fd8951096a1dadef2308f36ee3d9`:3 private source/test файла.
+Root339 tests PASS,34/34 hashes до/после. Новый cleanup разрешён только при
+доказанном исходном standalone output wizard и отсутствии возможных mapping
+изменений. Проверяет opening receipt, document/workflow/node/port/root и после
+Close неизменность native/semantic graph. Unknown edit/Close не повторяется;
+неподтверждённый wizard остаётся pending. Cleanup имеет отдельный60s deadline,
+основной operation budget не продлевается.
+
+Batch51 запущен root в headed DISPLAY=:1, sandbox enabled, freshprofile24:
+code-table-mismatch,declared-sentinel-next,declared-sentinel-done,
+code-sentinel-next,code-sentinel-done. Private source/test receipts сохранены
+отдельно от live report. На момент записи результат ещё не получен.
+Разработчик idle; исходники во время live не изменяются. Полная цель открыта.
+
+
+
 ### Batch50: оба sentinel Execute FULL PASS; manual mapping admission bug — 2026-09-27
 
 Root-аудит2229 journalSHA,4 full input reads/120cells,2fresh failed JS children
