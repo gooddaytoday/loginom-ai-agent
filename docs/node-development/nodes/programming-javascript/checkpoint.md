@@ -16,6 +16,22 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze72 проверен; safe int64 live запущен
+
+OpenViking health повторно PASS. Разработчик idle, Freeze72 завершён. Root
+подтвердил 959 основных тестов, 3 public-deny и 6 Python-тестов без failures;
+85 pins совпали до/после проверок. Только 16 runtime-файлов закоммичены в
+node-javascript: `7982cc35425efbac15d5c225893bd7a1544b5491`.
+
+Начат private native-integer-safe-roundtrip-probe-01 на fresh profile52,
+headed DISPLAY=:1, sandbox enabled, закреплённые Node/Chromium hashes проверены.
+Session55512; lease RUNNING. До terminal result и проверки cleanup другой
+браузер не запускать. Safe fixture: NULL, -9007199254740991, 0, 9007199254740991.
+Outside-safe остаётся отдельным будущим прогоном; его изменение точности не
+считается exact PASS. Полные G5, публичный handler и CLI-приёмка ещё открыты.
+
+
+
 ### Подготовка Fix72: CSV и профиль52
 
 Root уточнил independent audit-native-int64.py: outside-safe OUTPUT обязан
