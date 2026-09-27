@@ -16,6 +16,47 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Пауза по команде пользователя — 2026-09-27, после roundtrip probe04
+
+**Работа приостановлена пользователем. Не возобновлять без новой команды.**
+Активного browser/process нет: unified session36485 завершён exit1, исходный
+report подтверждает package_closed/logged_out/browser_closed=true. Разработчик
+`01a0de3e-6a07-7661-aa88-ed4807aef6ec` idle (cursor142 затем повторный handoff144).
+Host lease сохраняет профиль46 и CLOSED; предыдущие профили не удалены.
+
+Source67 `5e80c795ed694a981a04594fdef05f0b57ee101c` прошёл live Done sealing и
+явное Execute: completed, owner_verified=true, process3.1/group3, JS node
+`ef142165-43bc-4063-bd1d-43b5538f5510`. Source digest неизменён:
+`5519fcf8c9232b3d7b157745ab0852033825cdac02ae2ab489ec4801243942f5`.
+Next/Done всё ещё ambiguous относительно исполнения; это не доказательство
+отсутствия побочных выполнений.
+
+Новый отказ до открытия output Preview: `Native roundtrip driver: unique output control`.
+Последнее наблюдение имеет node_outputs.verified=true, один active data output0,
+GUID `58f7e6c3-511e-39d7-8853-036e0a1a7612`. При этом видимый enabled UI-контрол
+`MF;TF-1;Graph;JavaScript;Output_Data-0` имеет allowed_actions=[]. Аналогично
+Output_Add. Driver ищет разрешённый click и отказывает. Это подтверждённое
+расхождение private roundtrip orchestration с UI admission, не результат native
+чтения. Причину правил допуска ещё надо исследовать; общий запрет generic code
+не ослаблять. Existing javascript-output-opening.mjs — предмет для сравнения.
+Output/upstream bytes не прочитаны, G5 не закрыт.
+
+Root независимо проверил input4/4scalar,583journal refs,73source pins и ALL PASS
+cleanup. Report SHA256:
+`0687af0ae61ae45f6ae558cd29d5f740f5292d1d2e6cc22dbc2964d2832ab036`.
+Приватные evidence: native-roundtrip-probe-04/report.json,
+native-roundtrip-probe-04-verification.json и operator67-root-test-source.json
+в campaign javascript-20260926-ubuntu. Source-only regression738/738PASS.
+
+После разрешения продолжить: исследовать точный отказ allowed_actions для
+принадлежащего JS output и существующий private opener; исправить с адресными
+тестами, затем новый freeze и независимая проверка. Следующий browser требует
+нового профиля (46 уже использован) и нового evidence directory. Никакого replay
+этого завершённого прогона. Полный план остаётся незавершённым; публичный handler,
+остальные G1–G7/J01–J27, итоговое ревью и compiled CLI acceptance ещё впереди.
+
+
+
 ### Freeze67: Done lifecycle и JS output; roundtrip probe04 запущен
 
 Source node-javascript `5e80c795ed694a981a04594fdef05f0b57ee101c` (7 файлов):
