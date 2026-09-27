@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze56 проверен; native-input-probe-01 запущен — 2026-09-27
+
+Source commit в node-javascript: `63aafcbf59d1f834de3fbe173a7308167f47d94f`.
+Добавлен private input-only runner: verified artifact/upload/import + UI4×1,
+затем отдельные owned native binding/read/lifecycle, без создания JS. Shared
+client/ не изменён; два прежних private оператора расширены отдельным режимом.
+Root независимо выполнил **333/333 tests PASS**, fail/skip0: native65,
+Collapse81, прежние JavaScript187. Все66 pins совпали до/после тестов.
+Root receipt: operator56-root-test-source.json; stdout/stderr сохранены отдельно.
+Два прежних serialization ReferenceError и count устраняются новой версией;
+добавлены checks journal acknowledgement, Close/lifecycle failures и deadlines.
+
+После idle задачи разработчика назначен fresh profile34, прежний profile33
+сохранён с reassignment receipt. Запущен **native-input-probe-01**, Ubuntu headed
+DISPLAY=:1, sandbox enabled, pinned Node24.19/Chromium1246. Source receipt содержит
+66 pins и полный commit. На момент записи процесс RUNNING, живые native values
+и cleanup ещё не подтверждены. Root владеет единственным браузером, разработчик
+idle/source frozen. Следующий шаг: наблюдать тот же процесс, проверить actual
+native payload независимым Python oracle, journal/source/lifecycle и cleanup.
+G5, JS roundtrip, public handler и полный план остаются открытыми.
+
+
 ### Native INPUT draft: integration findings и возобновление — 2026-09-27
 
 Root проверил новые private binding/contract/read/driver и независимо подтвердил
