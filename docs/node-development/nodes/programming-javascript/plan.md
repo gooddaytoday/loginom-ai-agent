@@ -196,6 +196,11 @@ observations. Источники: Help JS/API/output-tables/ports; e2e `js_helpe
 | G6 diagnostics/lifecycle | Parse error vs sync throw, ownership ошибки, Stop/Close/cancel, потерянные ответы | Классифицированный terminal/ambiguous outcome; сохранён прежний исходник и соседний граф |
 | G7 persistence | Полный исходник/options/schema после save/new open, свежий execution | Независимое чтение без перенастройки expected; доказано сохранение последней редакции |
 
+Накопленные доказательства G2/G3 сведены в [переходы и эффекты](execution-effects.md).
+Документ отдельно отмечает подтверждённое исполнение Preview/Execute,
+неустановленные эффекты Next/Done и native failure несовместимого manual mapping.
+Он не закрывает gates и не заменяет последующую проверку реализации.
+
 Наблюдение Ubuntu operator17: у JS с подключённым input0 мастер начинается
 с JavaScriptColumnsWizard (index0, четыре индикатора); отдельной первой страницы
 TuneDataSourceInputPortWizard, наблюдённой у несоединённого узла, нет. Admission
