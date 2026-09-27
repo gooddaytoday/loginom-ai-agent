@@ -16,6 +16,19 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Integer coercion fraction-negative01: independent characterization PASS
+
+Source82/profile67 original session93764 terminal exit0, CHARACTERIZED,
+cleanup3/3. Root live auditor PASS:3 native cells,628 journal refs,1259 pins.
+Native Real−1.75 INPUT/upstream exact; OUTPUT native signed64 Integer−1,
+bytesffffffffffffffff. Report SHA5b43823fd0bd64e936de486e834cb0073251c912daac006b69da22eb2b6ef1e0;
+baseline SHA08233edd52c8d65e593cdc205afd121d96325948561e7310d13d30036fdfc6f5.
+Evidence native-integer-coercion-fraction-negative-probe-01 и verification.json.
+Matrix2 characterized/5 not_run; два отдельных observed значения не доказывают
+общий conversion algorithm. Browser CLOSED/no pinned Chromium; fresh profile68
+зарезервирован для string-numeric с native String «42» INPUT.
+
+
 ### Integer coercion fraction-negative01 RUNNING
 
 Source82 unchanged/1259 pins повторно проверены; original exec session93764
