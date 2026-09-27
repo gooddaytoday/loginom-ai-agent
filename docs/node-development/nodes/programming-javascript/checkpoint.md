@@ -16,6 +16,22 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Независимый scalar oracle для named A подготовлен
+
+Private `audit-named-scalar.py` SHA
+5f9c3ed602c602ff1b699033d53bd03b28eaa3389e1ddb6a0e16deee488dec84
+проверяет8 fixed case IDs × INPUT/OUTPUT/upstream:4×1 Value/Value Integer,
+полную coverage, координаты, native tags/bytes и canonical decimal strings.
+Copy cases ожидают [NULL,−9007199254740991,0,9007199254740991]; IsNull OUTPUT
+строго[1,0,0,0], INPUT/upstream прежние. Oracle не импортирует candidate runtime.
+Selfcheck:24 допустимых scalar shapes,336 намеренных подмен отклонены.
+Receipt `named-scalar-selfcheck.json`; база — прежний integer-safe report и
+синтетическое IsNull OUTPUT. Это не named live, не source/owner/execution/
+lifecycle/journal proof. Такие проверки будут добавлены после source83 handoff.
+Последний wait подтвердил developer revision56 active; source83 ещё не принят,
+браузер закрыт. Следующий шаг — проверка фактического implementation handoff.
+
+
 ### Named design принят для реализации стадии A
 
 Developer revision55 terminal completed; proposal действительно создан,
