@@ -1,17 +1,20 @@
 # G5 native types: следующий ограниченный шаг
 
-Статус на 2026-09-27: **private input-only runtime реализован и проверен unit
-тестами; native live admission ещё не подтверждён**. Source57:
-`f24b82001fdbe9f50f1ae366dba1af25f4fe371c`; 66 актуальных pins находятся в private
-`operator57-root-full-result.json`. Input-only source56 прошёл 333 адресных и
-регрессионных теста; shared UI source57 — 292/292. Это разные наборы проверок,
-не доказательство live native значений. Первые два запуска остановились до
-импорта; причины и recovery отражены в [checkpoint](checkpoint.md).
+Статус на 2026-09-27: **private input-only runtime реализован; четыре native
+значения независимо проверены, полный live admission ещё не принят**. Source62:
+`c535b67b890eb4eb237de1e672120c5691075e31`, 350 адресных тестов PASS; shared UI
+source57 ранее прошёл 292/292. Probe08 прочитал NULL/+0/−1.25/10.125; Python
+scalar oracle подтвердил tags и bytes всех четырёх ячеек. Однако proof не прошёл
+exact durable acknowledgement: production redactor заменил поле с хешами
+subscription proxy из-за слова cookie в имени. Оператор завершился FAILED с
+полной очисткой. 450 journal refs и 66 source pins проверены; квитанция, SHA и
+исправление Freeze63 описаны в [checkpoint](checkpoint.md). Scalar PASS не
+заменяет успешный journal ACK или полную G5-приёмку.
 
 Реализован отдельный `javascript-native-input-live.mjs` и import-only binding;
 JS-output binding, identity roundtrip и остальные семейства ниже ещё предстоят.
 Далее сохранён дизайн и анализ **исходного source55**, поэтому указания
-«текущий» внутри анализа относятся к этой базе, а не к source57.
+«текущий» внутри анализа относятся к этой базе, а не к source62.
 Основание source55: `520ce1f78ce39859d3ce30a65db93e80c9081747`.
 Текущие42 pins сохраняются для root engine probes. Их UI/string PASS не закрывает G5.
 
@@ -67,8 +70,8 @@ remote source owner/object/interface, schema/count/cache identities и loading.
 класс/own shape, session identity, объекты proxy/remote identity и скалярные поля
 между запросами; не сериализовать рекурсивно `$S`. Это проверка стабильности
 подписок/владельца, не deep immutability данных. Отдельные проверки cache/schema,
-execution и границы `observed_local`/ABA по-прежнему обязательны. Реализация этой
-адаптации после probe07 ещё готовится; её успешный live результат не заявлен.
+execution и границы `observed_local`/ABA по-прежнему обязательны. Source62 прошёл этот допуск и выполнил native read в probe08; весь прогон
+остался FAILED на последующей проверке durable journal acknowledgement.
 Повторный input read после JS — новый read ID при доказанном неизменном upstream;
 он выявляет наблюдаемое изменение, но не устраняет ABA/отсутствие server snapshot.
 
@@ -178,7 +181,9 @@ root. После подтверждённого read — scoped own Preview Clos
   partial sample не PASS; failed JS без refreshed output; outside-safe не получает
   false precision guarantee; original cleanup и server-cancel status раздельны.
 
-Неизвестны применимость loaded pins/interface116/method321 к JS и import-only
-Preview на текущем сервере, native tags нового fixture, parser empty/date/int64,
+Probe08 подтвердил получение native frames через interface116/method321 для
+import-only Preview и tags1/5 четырёх real/NULL ячеек. Полный журналируемый
+input-only admission ещё не принят. Неизвестны применимость этого пути к JS-output,
+parser empty/date/int64,
 стабильность datasource после JS, Date civil↔serial связь и full native cleanup.
 ОС сервера также не установлена. Ни G5, ни persistence/полный discovery не закрыты.
