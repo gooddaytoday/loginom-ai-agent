@@ -16,6 +16,29 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### OpenViking проверен; scalar-контракт source82 прошёл root regression
+
+Текущие MCP health/find/read успешны. Doctor0.8.1 подтвердил credentials,
+HTTP200 system/status,15 MCP tools и все подсистемы ready. Текущих connection
+failures нет; предупреждение относится к прошлым ENOENT rollout и aborted recall.
+Конфигурация памяти не изменялась; запись отдельного нового знания этим тестом
+не проверялась. Private report: openviking-resume-doctor.json.
+
+Developer bounded scalar turn завершён revision47. Root просмотрел изменения
+контракта и независимо запустил pinned Node24.19.0 из packages/loginom-runtime:
+coercion/integer/cardinality/typed/datetime/empty — **1225 PASS,0 FAIL,0 SKIP**,
+original session35348 exit0; stderr пуст. Receipt operator82-scalar-root-verification.json
+содержит hashes трёх просмотренных файлов на завершении проверки. Проверены
+полные native int64/NULL наблюдения без scalar oracle, exact INPUT/upstream,
+отказы при подмене schema/tag/bytes/source/owner/execution/lifecycle и stored proofs.
+Это bounded host-contract regression, не полный suite, не ChakraCore/live приёмка.
+
+Та же developer задача продолжает отдельный failed-terminal witness и upstream-only
+маршрут: без JS OUTPUT и без превращения failed witness в completed. Полная
+интеграция обоих исходов и full regression обязательны перед freeze82.
+Browser CLOSED/profile66 unused; все7 coercion live слотов пока not_run.
+
+
 ### Source82 частично сохранён; преждевременный bootstrap-ответ не принят
 
 Developer turn завершился idle revision45 с историческим bootstrap-ответом
