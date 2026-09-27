@@ -16,6 +16,40 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch53: code-Done и editor Apply наблюдены; autosync helper gap — 2026-09-27
+
+Root аудит1710 journalSHA,90 input cells,1fresh completed execution,full6×2/12cells,
+exact reopened source/mode/semantic mappings и36/36 hashes PASS.
+Первый code-sentinel-done OBSERVED/safe_to_continue=true. Как и предыдущие три
+Next/Done probes, sentinel отсутствует: gate_passed=false,execution=ambiguous,
+absence_proves_no_execution=false. Все четыре перехода теперь наблюдены;
+это не утверждение no execution. Boundary receipt сверил owned before и hidden wizard after.
+
+Второй code-table-mismatch прошёл source52 editor: одно set_wizard_field,
+one apply_output_column SUCCEEDED, последующее чтение показывает
+ObservedID/ObservedID и ManualMarker/ManualMarker. Исправление scoped observer
+получило live подтверждение; refusal cleanup Cancel-ветка в этом прогоне не выполнялась.
+Далее configureOutputAutosync отказал «Unique output mapping control unavailable».
+Фактическая кнопка DataSetOutputSocketWizard;btnAutoSyncThroughColumns
+observed/enabled/clickable, auto_sync.value=true, ref совпадает с observed option.
+Root подтвердил причину кодом: mappingControl в port-mapping-procedure перечисляет
+четыре других wizard типа и не включает DataSetOutputSocketWizard.
+manual_mapping_prepared и изменённый JS source ещё не получены;
+generated_schema_mismatch_trial=not_run.
+
+Original terminal exit1 CLEANUP_UNCONFIRMED: после возможных field/Apply effects
+pendingMapping запретил generic Close/replay; package/logoutfalse,browsertrue.
+Отдельный headed recovery53 на profile26 без downloads подтвердил Home/jsteach/
+packages0/logout/browser,packageMutationfalse. Он не меняет original result.
+Profile26 сохранён, freshprofile27 назначен с backup/receipt; lease closed.
+
+Разработчик выполняет fix53 в прежней задаче: точный wizard type для autosync
+с сохранением boundref/uniqueness/schema checks, тесты и аудит соседних списков
+на текущем mapping→Done пути. Следующий live только code-table-mismatch.
+Полная цель, public handler, остальные discovery gates и CLI-приёмка открыты.
+
+
+
 ### Freeze52: editor ownership проверен; batch53 запущен — 2026-09-27
 
 Source commit `9b49c28b3a23124609fa892e7093dd6cece819e6`:4 source/test файла.
