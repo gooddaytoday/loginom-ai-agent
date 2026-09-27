@@ -15,6 +15,20 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### B-isnull-case: owned failure подтверждён, attribution открыт
+
+Profile93/original4394 terminal exit1/UNRESOLVED, без harness failure.
+Independent audit8cells/597journal refs/1265pins/cleanup3 PASS; no pinned Chromium.
+Native full error: столбец `"value"` отсутствует во входной таблице №0,
+`<main>:4:1`/module `<main>:1:1`. Exact source/fresh owned failed child/input и
+unchanged upstream подтверждены; OUTPUT не читался. Case_complete=false,
+rejection_attributed=false до отдельно проверенного mapping; G5=false.
+Report SHA8c15ec28e5a980dfe2976f696207b05bd343f2399e97070cf9540052407eb37d.
+Receipt native-named-isnull-case-probe-01-verification.json;
+registry/matrix обновлены. B4complete/3owned-failure-unattributed/1not_run.
+Следующий — B-isnull-missing, fresh profile94; source86 frozen.
+
+
 ### B-isnull-case/profile93 RUNNING
 
 Fresh profile93 после verified profile92 cleanup;1265pins/toolchains/no pinned
