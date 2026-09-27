@@ -16,6 +16,30 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch48: Execute dispatch подтверждён, busy mask требует settlement — 2026-09-27
+
+Batch48 terminal exit1 FAILED, original package/logout/browser cleanup ALLPASS.
+Recovery не потребовался. Root проверил977 journalSHA,2 full input reads/60cells;
+fresh terminal/output отсутствуют. Первый code-sentinel-execute дошёл до actual
+Execute04:06:37.211Z и verified launch04:06:37.491Z, затем новый notification
+inspector отказал04:06:37.521Z: «Post-execution busy or modal mask remains».
+В launch receipt видна ровно одна busy mask target_tid MF;TF-1;ModelForm,
+dialog_ref=null, text=Загрузка; dialogs[]. Same graph/node context verified,
+node d45ac23d-f4b2-4ad8-be9c-087251e49848, unlocked. Отказ случился до проверки
+toast, поэтому live settlement48 не засчитан. Последующий screenshot не показывает
+mask, но не заменяет terminal proof. Остальные6cases NOT_RUN.
+
+Приватные verification/boundary receipts сохраняют исходный FAILED и cleanup.
+Lease closed; profile21 сохранён, freshprofile22 назначен с backup/receipt.
+Разработчик в прежней задаче выполняет fix49: пассивное ожидание доказанной
+ModelForm busy mask и перехода mask→toast→quiet, в исходном deadline и без
+повторного Execute. Foreign masks/dialogs/owner replacement остаются отказами;
+нельзя фиксировать пустой toast set до завершения загрузки как запрет появления
+штатного уведомления. Требуются exact-source justification и regression tests,
+после чего root повторно проверит freeze перед live. Public handler/полный план,
+итоговое ревью и CLI-приёмка всё ещё открыты; цель активна.
+
+
 ### Freeze48: пассивное ожидание execution toast, live запущен — 2026-09-27
 
 Повторная проверка OpenViking после перезапуска: MCP health, actor search и read
