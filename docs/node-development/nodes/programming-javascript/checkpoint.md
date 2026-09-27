@@ -20,7 +20,9 @@
 
 Один Add дошёл до ready: новая запись исходного store, standalone
 EditColumnDefForm, form↔record, vendor/page/controls/connection/owner — true.
-Затем `Column field readback differs`, до Preview/Execute. Root проверил965
+Техническое edtName=ObservedID записалось/прочиталось успешно; затем
+`Column field readback differs` на edtDisplayName, до Preview/Execute.
+Фактическое несовпавшее значение прежний журнал не сохранил. Root проверил965
 journalSHA и два input6×5/60cells. Нового подтверждения исполнения здесь нет.
 При cleanup один Cancel закрыл editor и удалил новую запись; screenshots и
 observer показывают baseline0/records0/added0/editor0,quiet=true. Проверка
