@@ -16,6 +16,17 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Сверка оставшейся G5-матрицы и границ engine profile
+
+Root сверил canonical typed-cases, engine-profile и J01–J27: Integer coercion
+(fraction/string/NaN/±Infinity), named access/case и остальные engine cases
+остаются обязательными после текущего empty case. Результаты новых native
+проб имеют другие source hashes и не дают автоматически повысить старые
+`g5-*` snippets в engine-profile.json. Уточнена только устаревшая limitation
+об отсутствии любых typed/date evidence: теперь она явно разделяет этот
+индекс и отдельные подтверждённые native probes. Ни один status/hash/snippet
+не повышен; профиль остаётся partial_discovery_not_acceptance.
+
 ### Текущий Fix79 учёл оба замечания; усилен независимый live audit
 
 Root перечитал незавершённый source: label `|` больше не исключает native

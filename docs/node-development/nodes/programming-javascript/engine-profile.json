@@ -428,7 +428,7 @@
   ],
   "limitations": [
     "Next/Done execution effects remain unestablished; explicit Execute count does not prove exact body invocation count.",
-    "Native typed input/output byte roundtrip and civil Date semantics remain unverified.",
+    "The indexed g5-* snippets remain not_checked. Separate source70-78 native probes provide scoped typed/cardinality evidence recorded in native-types-design.md and checkpoint.md; their different source hashes do not promote these indexed snippets or close G5.",
     "Case source hashes identify probes, not support on another server or build.",
     "All not_checked cases require individual evidence before promotion."
   ]
