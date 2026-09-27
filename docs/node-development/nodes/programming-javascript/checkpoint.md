@@ -16,6 +16,28 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source84 принят; A-columns-exact profile82 RUNNING
+
+Root targeted original76839 exit0:81PASS/0FAIL. Full client original44414
+terminal exit0:2484PASS/10SKIP/0FAIL,177265.783062ms. Все1265pins до/после
+совпали; изменены ровно artifact-discovery.mjs и его тест. Source84 manifest JSON
+SHA fdf47ea1bc425250194310c58c1daf9cbb355438b27822b7aec29ae0ced96e3d;
+logs/handoff hashes проверены. Developer202filePASS/9FAIL и diagnostic32PASS/
+17FAIL/1SKIP сохранены отдельно; единую причину всех отказов не утверждаем.
+
+Только2runtime/test files закоммичены в child node-javascript:
+84dd84a6be5bee86633b5d1e2492d82805997b80. Старые dirty docs untouched.
+Root явным решением выделил fresh profile82 после reconciliation upload79,
+проверки закрытия/отсутствия Chromium и toolchainSHA. Новая проверка
+A-columns-exact: evidence native-named-columns-exact-probe-02,
+**original exec89067 RUNNING**, headed DISPLAY=:1/sandbox/original600000ms.
+Ждать этот процесс до terminal, затем независимый audit/cleanup. Не replay
+старого неизвестного эффекта: исходные55bytes уже сверены read-only, old FAILED
+не меняется; здесь новый фиксированный кейс на исправленном source84.
+Developer выполняет только новый attribution design; runtime frozen.
+A5/8 accepted, G5/handler/CLI/full goal open.
+
+
 ### Upload79 reconciled; source84 readiness fix назначен
 
 Original FAILED/profile79 остаётся FAILED. Отдельная read-only проверка
