@@ -16,6 +16,34 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source83: frozen source и root regression
+
+Developer revision57 terminal/idle передал source83:14 modified+6new runtime/test
+files; все1259 source82 paths сохранены,1265 pins. Root независимо сверил каждый
+hash и manifest, полный relative-import closure136files,19MJS syntax и diff check.
+JSON SHA cde9705060e8641b15f03fc1b3ddcfdcecb9ce93f5787ce4910f13ef43b08bd6;
+SHA manifest4626b15bd654f5463b9eb2331b275a8dc44d8441737bfc6d3953d83d2f0957f6.
+Копии source/manifest/handoff и14 hash-verified developer logs сохранены private.
+
+Root main original session3527 terminal exit0:2198PASS/0FAIL/0SKIP,41444.9ms.
+Public deny3PASS, Python14PASS, обе команды exit0.1265pins после main unchanged.
+**Root full client original session68476 RUNNING**, concurrency2, pinnedNode,
+без CI/LOGINOM_DOCK_TEST_BROWSER. Не перезапускать по observation timeout.
+Private state operator83-root-tests-state.json; stdout/stderr operator83-root-*.
+До terminal client source83 не принят, commit runtime/live не разрешены.
+
+Developer full client session41228 terminal exit1:202 filePASS/9fileFAIL;
+раздельные diagnostics сохранены. Это не PASS и не доказанная общая причина всех9.
+Root собственный прогон должен оценить frozen candidate независимо.
+Браузер закрыт; developer idle, acceptance lease null.
+
+Дополнительный root audit-named-association.py SHA
+707e153304de83d963bd6ce5cef4e8b76da41a9241306a3126414a90cc325eb2
+проверяет recorded INPUT/OUTPUT/upstream associations, source/case IDs и12scalar
+cells через независимый scalar oracle. Selfcheck8positive/80negative PASS на
+синтетических overlays прежнего integer-safe report; **не named live evidence**.
+
+
 ### Named A: независимый intermediate suite PASS
 
 Root original session19742 terminal exit0: pinnedNode24.19.0 --test
