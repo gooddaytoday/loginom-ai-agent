@@ -1,13 +1,13 @@
 {
   "kind": "javascript_plan_fixtures",
-  "version": 2,
+  "version": 3,
   "status": "authored_not_live_validated",
   "operator_only_must_not_be_delivered_to_model": true,
   "files": [
     {
       "path": "README.md",
-      "bytes": 6201,
-      "sha256": "6ba72faa5189f80e60acbc080c15e42656d82b787694bb3041006eb3336e06b7"
+      "bytes": 6651,
+      "sha256": "e41f0a5d906e75307ed9a8a49b712cda900eb48be7235312c3590e26c6dadb0b"
     },
     {
       "path": "model-input/sales.csv",
@@ -48,6 +48,11 @@
       "path": "operator-only/typed-cases.json",
       "bytes": 1706,
       "sha256": "35dd2d1e145ff186b83582b8981af3e8510cfbc53cd078ae660d2bbfb4fd1046"
+    },
+    {
+      "path": "operator-only/typed-native-oracle.json",
+      "bytes": 2241,
+      "sha256": "382097f8c5491c1c30208c5c799d06c096a12496fb85298c43cc5b97b899e1ff"
     }
   ],
   "model_workspace_files_by_mode": {

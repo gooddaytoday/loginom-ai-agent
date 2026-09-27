@@ -27,6 +27,10 @@
 - `operator-only/typed-cases.json`: спецификация нативных fixtures для
   NULL/empty/Unicode, boolean, real, безопасных и небезопасных int64,
   civil datetime и изменения количества строк. **Это не готовый файл импорта.**
+- `operator-only/typed-native-oracle.json`: независимые математические encoding
+  ожидания для signed int64 и binary64 из typed-cases. Для outside-safe это
+  проверка подготовки нативного входа, без обещания точного JS roundtrip.
+  Даты требуют наблюдённых native input bytes; эпоха и timezone не подставляются.
 - `manifest.json`: SHA-256 файлов, проверяется до каждой попытки.
 
 ## Изоляция модельного задания
