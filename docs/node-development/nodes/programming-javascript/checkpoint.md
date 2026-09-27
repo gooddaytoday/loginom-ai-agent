@@ -16,6 +16,28 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source76 проверен; fresh odd02 запущен
+
+Freeze76 независимо проверен root: **1175main+3public-deny+11Python PASS**,
+192pins до/после, syntax обоих MJS и diffcheck PASS. Root source review подтвердил
+сохранение первого blocker snapshot и отдельного terminal observation, fail-closed
+при diagnostic/journal/transport failure, отсутствие нового wait/allowance/replay.
+Только runtime/test файлы закоммичены в node-javascript:
+`7aa5d3711a42942a9cdc7829e1884aec6dfddc51`. Manifest SHA
+`6f80a942328831a595ae7e2f024c75959c8dda0b88a87cdd08b3695e956a7e6e`;
+JSON SHA `a4d86abd6eaaa742ffdcfe158ad996a0faf3802822ed9c612acf96a81ba75cd6`.
+Private operator76-root-test-source.json и stdout/stderr сохранены.
+
+Начат native-cardinality-odd-probe-02, fresh profile60, headed DISPLAY=:1,
+sandbox=true. Node/Chrome SHA и192pins перед запуском совпали. Terminal session64986,
+browser lease RUNNING, developer idle. Продолжать эту сессию до terminal, не
+повторять запуск. На успехе независимый audit8cells/3-2-3 и cleanup; на отказе —
+точный javascript_private_selection_blocked snapshot, а не поздний screenshot.
+Даже успешный odd02 не докажет причину прежнего odd01 отказа. Mandatory declared-empty
+и полный план остаются открыты.
+
+
+
 ### Fix76 назначен: диагностика selection blocker без изменения допуска
 
 Проверен и сохранён [source-backed дизайн](selection-blocker-design.md).
