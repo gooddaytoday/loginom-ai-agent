@@ -48,7 +48,7 @@ function privateSelectionFixture(fault) {
   const records=[];
   const record=async e=>{records.push(e);if(e.phase==='javascript_private_selection_dispatch'){
     if(fault==='node')native.data={};if(fault==='dom')shape=element(node.tid);if(fault==='journal')throw Error('journal failure');
-  }};
+  }return e;};
   return {run:(deadline=Date.now()+5000,options={})=>selectJavascriptForSettings(page,{binding,node,icon:'js',deadline,record,...options}),node,records,page,binding,realm,record,tab,native,
     get clicks(){return clicks;},get disposed(){return disposed;}};
 }
@@ -96,6 +96,184 @@ test('private execution preparation only selects the native cell and never click
   assert.equal(select.clicks,1);assert.equal(select.records.some(e=>e.phase==='javascript_private_open_dispatch'),false);
   const lost=privateSelectionFixture('lost_open');await assert.rejects(lost.run(undefined,{openSettings:true}),/lost click/);
   assert.equal(lost.clicks,2);assert.equal(lost.records.at(-1).opening_dispatched,true);assert.equal(lost.records.at(-1).effect_possible,true);
+});
+
+// Run the production closure in a separate realm and serialize evaluate results.
+function selectionBlockerFixture({phase='pre_select_click',selector='.x-mask',count=1,clear=true,fault,diagnostic,ack}={}) {
+  const f=privateSelectionFixture(fault),reads=[],waits=[];
+  const graph=f.tab.Controller.FController.FDiagram.FmxGraph.container;
+  const blockers=Array.from({length:count},(_,index)=>({isConnected:true,id:'foreign-'+index,parentElement:{getAttribute:()=> 'foreign-parent'},
+    getAttribute:key=>({role:selector==='[role="dialog"]'?'dialog':null,'data-tid':'foreign-'+index,class:selector.slice(1)})[key]??null,
+    matches:query=>query===selector,contains:()=>false,getBoundingClientRect:()=>({x:10,y:20,width:30,height:40}),
+    get innerText(){throw Error('secret text must not be read');},get innerHTML(){throw Error('secret HTML must not be read');}}));
+  if(diagnostic==='geometry')blockers[0].getBoundingClientRect=()=>({x:Infinity,y:NaN,width:30,height:40});
+  if(diagnostic==='descriptor')blockers[0].getAttribute=()=>{throw Error('secret diagnostic error');};
+  if(diagnostic==='visibility')blockers[0].getBoundingClientRect=()=>{throw Error('secret visibility error');};
+  if(diagnostic==='long'){
+    blockers[0].id='i'.repeat(400);blockers[0].getAttribute=()=> 'v'.repeat(400);
+    blockers[0].parentElement.getAttribute=()=> 'p'.repeat(400);
+  }
+  if(diagnostic==='contained')graph.contains=()=>true;
+  const query=f.realm.document.querySelectorAll,evaluate=f.page.evaluate,wait=f.page.waitForFunction;
+  const enter=arg=>{
+    if(arg?.inspectPhase)reads.push(arg.inspectPhase);
+    if(arg?.inspectPhase===phase)f.realm.document.querySelectorAll=()=>blockers;
+  };
+  const leave=arg=>{if(arg?.inspectPhase===phase&&clear)f.realm.document.querySelectorAll=query;};
+  f.page.evaluate=async(fn,arg)=>{enter(arg);try{return structuredClone(await evaluate(fn,arg));}finally{leave(arg);}};
+  f.page.waitForFunction=async(fn,arg,options)=>{waits.push(options);enter(arg);try{return await wait(fn,arg,options);}finally{leave(arg);}};
+  const record=async event=>{
+    await f.record(event);
+    if(event.phase==='javascript_private_selection_blocked'){
+      assert.ok(Object.isFrozen(event));assert.ok(Object.isFrozen(event.snapshot));assert.ok(Object.isFrozen(event.snapshot.blockers));
+      if(event.snapshot.blockers.length){assert.ok(Object.isFrozen(event.snapshot.blockers[0]));assert.ok(Object.isFrozen(event.snapshot.blockers[0].box));}
+      if(ack==='throw')throw Error('journal unavailable');
+      if(ack==='missing')return undefined;
+      if(ack==='wrong')return {...event,snapshot:{...event.snapshot,blocker_count:0}};
+      if(ack==='phase')return {...event,phase:'wrong'};
+      if(ack==='mutate')event.snapshot.blocker_count=0;
+      if(ack==='owner')f.native.data={};
+    }
+    return structuredClone({...event,recorded_at:'test journal metadata'});
+  };
+  return {f,reads,waits,blockers,record,run:(options={})=>selectJavascriptForSettings(f.page,{binding:f.binding,node:f.node,icon:'js',deadline:Date.now()+5000,record,...options})};
+}
+
+for(const selector of ['[role="dialog"]','.x-mask','.bg-mask-message','.x-mask-msg'])test('selection captures the actual pre-click blocker: '+selector,async()=>{
+  const h=selectionBlockerFixture({selector});await assert.rejects(h.run(),/Private selection blocked/);
+  assert.equal(h.f.clicks,0);assert.equal(h.f.disposed,1);assert.equal(h.waits.length,0);
+  const receipt=h.f.records.find(e=>e.phase==='javascript_private_selection_blocked'),snapshot=receipt.snapshot;
+  assert.equal(snapshot.inspect_phase,'pre_select_click');assert.equal(snapshot.blocker_count,1);
+  assert.equal(snapshot.native_owner_verified,true);assert.equal(snapshot.held_dom_verified,true);assert.equal(snapshot.diagnostic_failed,false);
+  assert.deepEqual(snapshot.blockers[0].selectors,[selector]);assert.equal(snapshot.blockers[0].tid,'foreign-0');
+  assert.equal(snapshot.blockers[0].graph_contains_blocker,false);assert.equal(snapshot.blockers[0].blocker_contains_graph,false);
+  assert.equal(receipt.effect_possible,false);assert.equal(receipt.opening_dispatched,false);
+  const refused=h.f.records.at(-1);assert.equal(refused.blocker_snapshot,snapshot);
+  assert.equal(refused.terminal_observation.blocked,undefined);assert.equal(refused.terminal_observation.native_selection_count,0);
+  assert.equal(Object.hasOwn(refused,'owner_verified'),false);assert.equal(JSON.stringify(receipt).includes('secret'),false);
+});
+
+for(const phase of ['initial','pre_select_click','post_select_poll','final','pre_open','pre_open_click'])test('selection blocker refuses without replay in inspect phase '+phase,async()=>{
+  const h=selectionBlockerFixture({phase});await assert.rejects(h.run({openSettings:true}),/Private selection blocked/);
+  const clicked=['initial','pre_select_click'].includes(phase)?0:1;
+  assert.equal(h.f.clicks,clicked);assert.equal(h.f.disposed,1);
+  const event=h.f.records.find(e=>e.phase==='javascript_private_selection_blocked');
+  assert.equal(event.snapshot.inspect_phase,phase);assert.equal(event.effect_possible,clicked===1);assert.equal(event.opening_dispatched,false);
+  assert.equal(h.f.records.some(e=>e.phase==='javascript_private_open_gesture_returned'),false);
+  assert.equal(h.reads.filter(p=>p===phase).length,1);
+  if(phase==='post_select_poll')assert.equal(h.waits.length,1,'original wait throws without retry or truthy readiness');
+});
+
+test('terminal blocker remains separate from the original failure',async()=>{
+  const h=selectionBlockerFixture({phase:'terminal',fault:'journal'});await assert.rejects(h.run(),/journal failure/);
+  assert.equal(h.f.clicks,0);assert.equal(h.f.records.some(e=>e.phase==='javascript_private_selection_blocked'),false);
+  const refused=h.f.records.at(-1);assert.equal(refused.blocker_snapshot,null);
+  assert.equal(refused.terminal_observation.blocked,true);assert.equal(refused.terminal_observation.inspect_phase,'terminal');
+});
+
+test('terminal observation failure cannot erase the snapshot or claim owner mismatch',async()=>{
+  const h=selectionBlockerFixture({ack:'owner'});await assert.rejects(h.run(),/Private selection blocked/);
+  const refused=h.f.records.at(-1);assert.equal(refused.blocker_snapshot.inspect_phase,'pre_select_click');
+  assert.deepEqual(refused.terminal_observation,{observation_status:'unavailable'});assert.equal(Object.hasOwn(refused,'owner_verified'),false);
+});
+
+test('bounded blocker descriptors never allow unknown or contained overlays',async()=>{
+  for(const options of [{count:17},{diagnostic:'long'},{diagnostic:'contained'}]){
+    const h=selectionBlockerFixture(options);await assert.rejects(h.run(),/Private selection blocked/);assert.equal(h.f.clicks,0);
+    const s=h.f.records.find(e=>e.phase==='javascript_private_selection_blocked').snapshot;
+    assert.equal(s.blocker_count,options.count??1);assert.equal(s.blockers.length,Math.min(options.count??1,12));
+    assert.equal(s.descriptors_truncated,options.count>12);assert.equal(s.ready,false);
+    if(options.diagnostic==='long')for(const k of ['id','tid','role','classes','parent_tid'])assert.equal(s.blockers[0][k].length,200);
+    if(options.diagnostic==='contained')assert.equal(s.blockers[0].graph_contains_blocker,true);
+  }
+});
+
+for(const diagnostic of ['geometry','descriptor','visibility'])test('selection diagnostic failure remains fail-closed: '+diagnostic,async()=>{
+  const h=selectionBlockerFixture({diagnostic});await assert.rejects(h.run(),/Private selection blocked/);assert.equal(h.f.clicks,0);
+  const s=h.f.records.find(e=>e.phase==='javascript_private_selection_blocked').snapshot;
+  assert.equal(s.diagnostic_failed,true);assert.equal(s.blockers.length,0);assert.equal(s.ready,false);
+  assert.equal(s.blocker_count,diagnostic==='visibility'?null:1);assert.equal(JSON.stringify(s).includes('secret'),false);
+});
+
+for(const ack of ['throw','missing','wrong','phase','mutate'])test('selection blocker requires immutable exact journal ACK: '+ack,async()=>{
+  const h=selectionBlockerFixture({ack});await assert.rejects(h.run(),ack==='throw'?/journal unavailable/:ack==='mutate'?/read only/:/journal ACK differs/);
+  assert.equal(h.f.clicks,0);assert.equal(h.f.disposed,1);assert.equal(h.waits.length,0);
+  assert.equal(h.f.records.filter(e=>e.phase==='javascript_private_selection_blocked').length,1);
+  assert.equal(h.f.records.find(e=>e.phase==='javascript_private_selection_blocked').snapshot.blocker_count,1);
+});
+
+test('selection preserves expired original deadline without a new wait or click',async()=>{
+  const h=selectionBlockerFixture({phase:'initial'}),deadline=Date.now()-1;await assert.rejects(h.run({deadline}),/Private selection blocked/);
+  assert.equal(h.f.records.find(e=>e.phase==='javascript_private_selection_blocked').snapshot.deadline,deadline);
+  assert.equal(h.waits.length,0);assert.equal(h.f.clicks,0);
+});
+
+
+test('unchanged visibility predicate ignores only disconnected, zero-sized or hidden blockers',async()=>{
+  for(const kind of ['disconnected','zero','hidden']){
+    const h=selectionBlockerFixture({phase:'initial'});
+    if(kind==='disconnected')h.blockers[0].isConnected=false;
+    if(kind==='zero')h.blockers[0].getBoundingClientRect=()=>({x:0,y:0,width:0,height:40});
+    if(kind==='hidden')h.f.realm.getComputedStyle=e=>({visibility:e===h.blockers[0]?'hidden':'visible'});
+    assert.equal((await h.run()).verified,true);assert.equal(h.f.clicks,1);
+    assert.equal(h.f.records.some(e=>e.phase==='javascript_private_selection_blocked'),false);
+  }
+});
+
+test('a persistent terminal blocker cannot replace the original inspect phase',async()=>{
+  const h=selectionBlockerFixture({clear:false});await assert.rejects(h.run(),/Private selection blocked/);
+  const refused=h.f.records.at(-1);
+  assert.equal(refused.blocker_snapshot.inspect_phase,'pre_select_click');assert.equal(refused.terminal_observation.inspect_phase,'terminal');
+  assert.equal(refused.blocker_snapshot.blocker_count,1);assert.equal(h.f.clicks,0);
+});
+
+test('private wizard wrapper forwards the actual blocker journal ACK',async()=>{
+  for(const ack of [undefined,'wrong']){
+    const h=selectionBlockerFixture({phase:'initial',ack}),lifecycle={};
+    await assert.rejects(openJavascriptWizard(h.f.page,{binding:h.f.binding,node:h.f.node,icon:'js',deadline:Date.now()+5000,
+      record:h.record,lifecycle}),ack?/journal ACK differs/:/Private selection blocked/);
+    assert.equal(h.f.clicks,0);assert.equal(lifecycle.openingDispatched,undefined);
+    assert.equal(h.f.records.filter(e=>e.phase==='javascript_private_selection_blocked').length,1);
+  }
+});
+
+
+test('already returned blocker snapshot survives a later transport failure',async()=>{
+  const h=selectionBlockerFixture(),evaluate=h.f.page.evaluate;
+  h.f.page.evaluate=async(fn,arg)=>{
+    if(h.reads.includes('pre_select_click'))throw Error('later transport failure');
+    return evaluate(fn,arg);
+  };
+  await assert.rejects(h.run(),/Private selection blocked/);assert.equal(h.f.clicks,0);
+  const refused=h.f.records.at(-1);assert.equal(refused.blocker_snapshot.blocker_count,1);
+  assert.equal(refused.snapshot_observation_available,true);assert.equal(refused.terminal_observation.observation_status,'unavailable');
+});
+
+test('lost gesture and unavailable diagnostic transport preserve uncertainty without replay',async()=>{
+  const h=selectionBlockerFixture({phase:'unused',fault:'lost'}),evaluate=h.f.page.evaluate;
+  h.f.page.evaluate=async(fn,arg)=>{if(h.f.clicks)throw Error('transport unavailable');return evaluate(fn,arg);};
+  await assert.rejects(h.run(),/lost click/);assert.equal(h.f.clicks,1);
+  const refused=h.f.records.at(-1);assert.equal(refused.effect_possible,true);assert.equal(refused.blocker_snapshot,null);
+  assert.equal(refused.snapshot_observation_available,false);assert.equal(refused.terminal_observation.observation_status,'unavailable');
+});
+
+test('post-gesture blocked snapshot with invalid journal ACK cannot replay or open Setting',async()=>{
+  const h=selectionBlockerFixture({phase:'post_select_poll',ack:'wrong'});
+  await assert.rejects(h.run({openSettings:true}),/journal ACK differs/);assert.equal(h.f.clicks,1);
+  const receipt=h.f.records.at(-1);assert.equal(receipt.phase,'javascript_private_selection_blocked');
+  assert.equal(receipt.effect_possible,true);assert.equal(receipt.opening_dispatched,false);assert.equal(h.waits.length,1);
+});
+
+test('blocker snapshot passes the production fsync journal and exact ACK validation',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'js-selection-journal-'));
+  try {
+    const h=selectionBlockerFixture(),record=createExecutionJournal({directory,metadata:{sessionId:'test',clientRevision:'source76'}});
+    await assert.rejects(h.run({record}),/Private selection blocked/);assert.equal(h.f.clicks,0);
+    const events=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(line=>JSON.parse(line));
+    const blocked=events.find(e=>e.phase==='javascript_private_selection_blocked'),refused=events.at(-1);
+    assert.equal(blocked.snapshot.inspect_phase,'pre_select_click');assert.equal(blocked.snapshot.blockers[0].tid,'foreign-0');
+    assert.deepEqual(refused.blocker_snapshot,blocked.snapshot);assert.equal(refused.terminal_observation.blocked,undefined);
+  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
 function privateWizardFixture({deactivate=false,foreign=false,wrongNative=false,fault,maskFault}={}) {
