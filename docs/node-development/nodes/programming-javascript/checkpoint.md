@@ -18,6 +18,10 @@
 
 ### A8/8 завершена; следующий шаг — реализация B
 
+Назначение source85B отправлено; wait_threads подтвердил active revision7,
+turn01a0e4b7-23be-7d61-beac-4c41781283d9, cursor2cc6c517-0ccb-49e9-bb9b-9daa2c14c7b8:7.
+Не создавать новую задачу и не перезапускать по timeout. Root ожидает frozen handoff.
+
 A-isnull-exact/profile84 original40609 terminal exit0/CHARACTERIZED,
 cleanup3/3. Root audit12cells/623refs/1265pins PASS, report SHA
 cb84b73973f388935761574a6601b979f55c64bea74ddef9ade1376697d099fc.
