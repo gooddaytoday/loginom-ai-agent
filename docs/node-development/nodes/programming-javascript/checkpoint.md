@@ -15,6 +15,32 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Date roundtrip02 PASS; следующий срез — cardinality
+
+Source74/profile56 native-datetime-roundtrip-probe-02 завершён exit0,
+session74185 terminal, OBSERVED/native-roundtrip-observed, original cleanup3/3.
+Независимый Python audit проверил **9native cells +9civil observations**:
+NULL и2024-02-29T23:59:59.123/2026-03-29T01:59:59.999 наINPUT/JS OUTPUT/upstream.
+Все significant native bytes совпали с local pre-JS INPUT baseline;
+исходное upstream execution сохранено, JS execution отдельное и завершённое.
+Проверены1025journalrefs/190pins, civil ms-format/restoration/graph receipts,
+native lifecycle3/3 каждой стадии, pre-JS иfinal journal ACK,3Preview-close events.
+Baseline digest дополнительно пересчитан Node crypto: совпал.
+ReportSHA `82b3201a689a026513631366ea3c638cc9e947b285be6032c79f33c9d2b66527`;
+JS sourceSHA `55722d57ce9d7b181469743eef6f2b0a8cdfbe768354821da9e08dfdccee3352`.
+Private verification иbaseline receipts сохранены. Epoch/timezone/atomic
+server snapshot/отсутствие ABA этим ограниченным observed_local run не доказаны.
+Lease CLOSED, profile56 сохранён, recovery не нужен, следующий ещё не назначен.
+
+Прежняя задача готовит только native-cardinality-design.md по исходному плану:
+input[1,2,3], keep2->[2], odd->[1,3], duplicate->[1,1,2,2,3,3], empty declared->[].
+Runtime во время Date live не менялся. Root зафиксировал независимые counts,
+порядок и signed64LE expectations в private cardinality-preflight.json,
+SHA `afad47f2c7c60fd0f94433b5acc5ba5514bbb790efa8c59e60a801d82fc67d8e`.
+Это подготовка, не live cardinality proof. ПолныйG5/public handler/CLI и остальные
+обязательства плана остаются открытыми.
+
+
 ### Freeze74 root PASS; Date roundtrip02 запущен
 
 Root подтвердил1042main+3public-deny+7Python PASS,190pins до/после, syntax3.

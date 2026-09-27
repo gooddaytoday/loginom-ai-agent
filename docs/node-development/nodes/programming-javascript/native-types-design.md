@@ -1,5 +1,13 @@
 # G5 native types: следующий ограниченный шаг
 
+Актуальный Date результат source74/profile56: **exact civil/native identity PASS**,
+9native cells+9civil observations,1025journalrefs/190pins, original cleanup3/3.
+NULL и две canonical даты с123/999ms сохранились на всех трёх стадиях;
+epoch/timezone не устанавливались. Ошибка port-GUID из source73 ниже исправлена
+с сохранением составного owner контекста. Следующие cardinality/coercion и полный
+G5 остаются открыты; точные receipts/SHA — в [checkpoint](checkpoint.md).
+
+
 Наблюдение source73: Date INPUT-only прошёл native/civil admission (3+3cells).
 Первый Date roundtrip отказал в verifier до публикации native OUTPUT из-за
 ошибочного требования разных port GUID. Один output0 GUID встречается у разных
