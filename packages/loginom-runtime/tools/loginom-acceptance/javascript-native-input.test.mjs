@@ -48,7 +48,7 @@ export function sourceEvidence(fixtureId='real'){
 function ui(){return {row_count:4,sample_rows:4,sample_complete:true,filter_enabled:false,precision:{numbers_verified:true,limitations:[]},limitations:[],
   schema:[{name:'Value',label:'Value',type:'real'}],sample:values.map((value,i)=>[{type:'real',value,is_null:i===0,precision:i===0?'exact_null':'17_significant_digits'}])};}
 
-export async function fake({deferred=false,change,beforeBind,bind=true,afterRelease,fixtureId='real'}={}){
+export async function fake({deferred=false,change,beforeBind,bind=true,afterRelease,fixtureId='real',coercionOutput='0'}={}){
   const fixture=javascriptNativeFixture(fixtureId),values=fixture.values;
   class Workflow{} class Package{}
   const pack=new Package(),workflow=new Workflow();workflow.ParentNode=pack;
@@ -68,16 +68,17 @@ export async function fake({deferred=false,change,beforeBind,bind=true,afterRele
       WriteParameter(offset,row){assert.equal(offset,0);this.row=row;},WriteParameter$a:(offset,column)=>assert.deepEqual([offset,column],[8,0]),
       get_MessageID:()=>id,Release:()=>{counters.requests++;afterRelease?.(result);}};}},
     DispatchMessageAsync(request,exceptions){assert.equal(exceptions,false);counters.sent++;
-      const value=(fixture.output_values&&dc.FModelNode!==node.data?fixture.output_values:values)[request.row],utf8=typeof value==='string'?new TextEncoder().encode(value):null;
+      const coercionOutputRole=fixture.coercion&&dc.FModelNode!==node.data,type=coercionOutputRole?'integer':fixture.type;
+      const value=coercionOutputRole?coercionOutput:(fixture.output_values&&dc.FModelNode!==node.data?fixture.output_values:values)[request.row],utf8=typeof value==='string'?new TextEncoder().encode(value):null;
       const bytes=new Uint8Array(Math.max(60,utf8?.length?28+utf8.length:60)),view=new DataView(bytes.buffer);
-      view.setInt16(12,value===null?1:fixture.type==='datetime'?7:fixtureId==='real'?5:fixtureId==='boolean'?11:fixture.type==='integer'?20:8,true);
+      view.setInt16(12,value===null?1:type==='datetime'?7:type==='real'?5:type==='boolean'?11:type==='integer'?20:8,true);
       if(value!==null){
         // Synthetic arbitrary serials exercise byte identity, never a civil/epoch conversion.
-        if(fixture.type==='datetime')view.setFloat64(14,request.row+0.125,true);
-        if(fixtureId==='real')view.setFloat64(14,value,true);
+        if(type==='datetime')view.setFloat64(14,request.row+0.125,true);
+        if(type==='real')view.setFloat64(14,value,true);
         if(fixtureId==='boolean')bytes[14]=value?1:0;
-        if(fixture.type==='integer')view.setBigInt64(14,BigInt(value),true);
-        if(fixtureId==='string'){view.setInt32(22,utf8.length,true);if(utf8.length){view.setUint16(26,65001,true);bytes.set(utf8,28);}}
+        if(type==='integer')view.setBigInt64(14,BigInt(value),true);
+        if(type==='string'){view.setInt32(22,utf8.length,true);if(utf8.length){view.setUint16(26,65001,true);bytes.set(utf8,28);}}
       }
       const response={$FData:bytes,$FDataSize:bytes.length,get_MessageType:()=>1,get_MessageID:()=>request.get_MessageID(),set_StaticDataSize:()=>{},Release:()=>counters.responses++};
       return {continueWith:callback=>{
@@ -107,7 +108,7 @@ export async function fake({deferred=false,change,beforeBind,bind=true,afterRele
     execution:{status:'completed',execution_id:'d:1:2'},completed_child:{group_id:'2',process_id:'2.1',process_record_id:'3'},document_id:'d',workflow_id:'w',tab_tid:'tab',prefix:'TF',node_id:'n',port_guid:'p',origin:'http://test',
     schema:[{name:'Value',label:'Value',type:fixture.native_type}],row_count:fixture.rows,deadline:Date.now()+30000};
   const result={page,execute,env,context,b,node,port,root,group,child,helper,dc,dt,store,model,session,counters,callbacks};
-  if(fixture.type==='datetime'||fixture.output_input_rows)b.completed_child={...sourceEvidence(fixtureId).execution};
+  if(fixture.type==='datetime'||fixture.output_input_rows||fixture.coercion)b.completed_child={...sourceEvidence(fixtureId).execution};
   beforeBind?.(result);
   if(bind)result.b=await execute(javascriptNativeInputCode(b));
   return result;

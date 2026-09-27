@@ -1,5 +1,7 @@
+import {javascriptCoercionCases} from './javascript-native-coercion-cases.mjs';
 // Fixed private slices only. CSV pins and oracles are not native evidence.
 const fixtures={
+  ...javascriptCoercionCases,
   "real": {
     "id": "real",
     "file": "javascript-native-input-real.csv",
@@ -278,6 +280,7 @@ export function javascriptNativeFixture(id='real'){
 export function javascriptNativeReadFixture(id='real',role='input'){
   if(!['input','output','upstream'].includes(role))throw Error('Unknown native read role');
   const f=javascriptNativeFixture(id);
+  if(f.coercion&&role==='output')return Object.freeze({...f,type:'integer',native_type:4,js_type:'Integer',values:undefined,expected_bytes:undefined});
   if(role!=='output'||!f.output_input_rows)return f;
   return Object.freeze({...f,rows:f.output_rows,values:f.output_values,
     expected_bytes:Object.freeze(f.output_input_rows.map(row=>f.expected_bytes[row]))});

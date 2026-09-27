@@ -23,10 +23,10 @@ import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,bindJava
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {readJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus,cancelJavascriptNativeRoundtrip} from './javascript-native-roundtrip-read.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
-export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real',reply,sharedPortGuid,beforeSchema,beforeSource}={}){
+export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real',reply,sharedPortGuid,beforeSchema,beforeSource,coercionOutput}={}){
   const nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixtureId);
   let mutate,mutateAfter,defer=false;
-  const f=await fake({fixtureId,beforeBind:sharedPortGuid?f=>{f.port.FGuid=sharedPortGuid;f.b.port_guid=sharedPortGuid;}:undefined,change:(fixture,response,request)=>{mutate?.();reply?.(fixture,response,request);},deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
+  const f=await fake({fixtureId,coercionOutput,beforeBind:sharedPortGuid?f=>{f.port.FGuid=sharedPortGuid;f.b.port_guid=sharedPortGuid;}:undefined,change:(fixture,response,request)=>{mutate?.();reply?.(fixture,response,request);},deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
   const initialRead=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'before'});
   f.model.FPreviewManager.FPreviewVisible=false;
   await f.page.evaluate(armJavascriptNativeRoundtrip,{binding:{...f.b,read_id:'before'},...nativeRoundtripProbe});
@@ -69,21 +69,23 @@ export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,
   const dispose=(destroy=true)=>{card.Controller.Node.data.node=previousNode;card.Controller.FController=f.model;root.isConnected=false;if(destroy)generationControl.el=null;};
   const confirmation={effect_settled:true,terminal:true,after:{wizard_visible:false,pending:false},no_new_messages:true};
   const seal=(overrides={})=>f.page.evaluate(sealJavascriptNativeRoundtripDone,{identity,confirmation,...overrides});
-  if(wizardOnly)return {f,js,target,output,service,lines,generationControl,declaredRecord,declaredStore,declaredData,declaredView,schema,context,identity,before,prepare,dispose,seal,confirmation,root};
+  if(wizardOnly)return {f,inputRaw:initialRead,js,target,output,service,lines,generationControl,declaredRecord,declaredStore,declaredData,declaredView,schema,context,identity,before,prepare,dispose,seal,confirmation,root};
   await prepare();dispose();await seal();
   const child={internalId:5,data:{id:'4.1',Status:3,ErrorDetails:'',ModelNode:js.data},childNodes:[]};
   f.root.childNodes.push({internalId:4,data:{id:'4',Status:3,ErrorDetails:'',loaded:true},childNodes:[child]});
   const execution={verified:true,owner_verified:true,status:'completed',execution_id:'d:1:4',group_id:'4',process_id:'4.1',process_record_id:'5',trial:{source_sha256:nativeRoundtripProbe.source_sha256}};
-  if(fixtureId==='civil-datetime'||javascriptNativeFixture(fixtureId).output_input_rows)Object.assign(execution,{cleanup_complete:true,
+  if(fixtureId==='civil-datetime'||javascriptNativeFixture(fixtureId).output_input_rows||javascriptNativeFixture(fixtureId).coercion)Object.assign(execution,{cleanup_complete:true,
     trial:{...execution.trial,phase:'initial',node_id:'js'},fresh_baseline:{node:{document_id:'d',workflow_id:'w',node_id:'js'},roots:[],root_id:'root'},
     launch_identity:{execution_id:execution.execution_id,group_id:execution.group_id,root_id:'root',group_record_id:'4',node:{document_id:'d',workflow_id:'w',node_id:'js'}}});
   await f.page.evaluate(completeJavascriptNativeRoundtrip,{execution,source_sha256:nativeRoundtripProbe.source_sha256});
   output.FStatus=1;
   const source=f.dc.FDataSource,outputHelper={...f.helper,$FData:{},$FRowCount:javascriptNativeReadFixture(fixtureId,'output').rows},outputDs={...source,$:{...source.$},$FHelper:outputHelper};outputHelper.FBaseProxy=outputDs;
   if(fixtureId==='cardinality-empty')Object.assign(outputHelper,{$FCacheInitialized:false,$FData:null,$FDataChangeCookie:null,$FStateChangeCookie:null});
+  const inputFields=f.dc.FColumnInfosStore.data.items;
+  const outputFields=javascriptNativeFixture(fixtureId).coercion?[{data:{Name:'Value',DisplayName:'Value',DataType:4}}]:inputFields;
   const bind=async role=>{
     const slice=javascriptNativeReadFixture(fixtureId,role);
-    f.dt.FTotalRowCount=slice.rows;
+    f.dt.FTotalRowCount=slice.rows;f.dc.FColumnInfosStore.data.items=role==='output'?outputFields:inputFields;
     if(fixtureId==='cardinality-empty'){
       f.dc.FTotalRowCount=slice.rows;f.store.totalCount=slice.rows;f.store.pageRequests={};
       Object.assign(f.store.proxy,{FTotalRowCount:slice.rows,FDataFieldNames:['Value'],FValueGetters:[()=>{}],pendingOperations:{}});
@@ -94,7 +96,7 @@ export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,
     Object.assign(f.model.FPreviewManager.FShowDataLastCall,{Node:node,Port:port});
     f.dc.FModelNode=node.data;f.dc.FDataSource=ds;f.dt.FDataSource=ds;f.store.proxy.dataSource=ds;
     return f.execute(javascriptNativeRoundtripCode({...f.b,binding_id:role,roundtrip_role:role,source_sha256:nativeRoundtripProbe.source_sha256,
-      node_id:role==='output'?'js':'n',port_guid:port.FGuid,rows:slice.rows,row_count:slice.rows,
+      node_id:role==='output'?'js':'n',port_guid:port.FGuid,rows:slice.rows,row_count:slice.rows,schema:[{name:'Value',label:'Value',type:slice.native_type}],
       execution:role==='output'?execution:f.b.execution,completed_child:role==='output'?execution:f.b.completed_child}));
   };
   const result={f,before:initialRead,js,edge,target,output,service,outputDs,outputHelper,source,child,execution,lines,generationControl,declaredRecord,declaredStore,declaredData,declaredView,schema,graphProof,bind,closeOutput:()=>{f.model.FPreviewManager.FPreviewVisible=false;const entry=f.env.__loginomJavascriptNativeRoundtripV1.bindings.get('output'),facts=entry.zeroCheck();entry.zeroAcknowledge({phase:'javascript_native_zero_graph_verified',read_id:entry.readId,declaration_sha256:entry.initial.declaration_sha256,facts});return facts;}};
@@ -219,7 +221,7 @@ test('production roundtrip trial revalidates before one Execute and never retrie
   for(const failure of ['none','characterized','admission','read','done-lost','done-unconfirmed','preflight-ack','seal-ack']){
     const steps=[],report={execution_probe:{}},deadline=Date.now()+10000;
     const runner=vm.runInNewContext(source.slice(start,end)+'\nrunExecutionTrial',{
-      nativeRoundtrip:true,discoveryProbe:null,phaseDeadline:()=>deadline,executionCase:'code-table-execute',report,owner:{prefix:'p'},executionNode:{node_id:'js'},executionInput:{},
+      nativeRoundtrip:true,coercionTrial:null,discoveryProbe:null,phaseDeadline:()=>deadline,executionCase:'code-table-execute',report,owner:{prefix:'p'},executionNode:{node_id:'js'},executionInput:{},
       executionRuntime:{checkNativeRoundtripBeforeExecute:async()=>{steps.push('admission');if(failure==='admission')throw Error('changed input');},
         captureExecutionBoundary:async()=>({native:{dispose:async()=>steps.push('dispose')}}),verifyExecutionBoundary:async()=>steps.push('boundary'),
         executeNode:async(node,limit,trial)=>{assert.equal(limit,deadline);assert.equal(trial.source_sha256,nativeRoundtripProbe.source_sha256);steps.push('execute');return {};},

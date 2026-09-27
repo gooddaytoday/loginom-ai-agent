@@ -47,10 +47,11 @@ export function javascriptNativeRoundtripSnapshot(b,zeroCapture){
     // Subscription metadata, not a data-generation/version counter. Never walk $S.
     return {identity,identityPrototype:Object.getPrototypeOf(identity),value:JSON.stringify([owner,object,type,remoteRefs,refs])};
   };
-  const fixtureId=b.fixture_id??'real',slice={real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6],'cardinality-empty':[3,4,0]}[fixtureId];
+  const fixtureId=b.fixture_id??'real',slice={"integer-coercion-fraction-positive":[1,3,1,4],"integer-coercion-fraction-negative":[1,3,1,4],"integer-coercion-string-numeric":[1,5,1,4],"integer-coercion-string-invalid":[1,5,1,4],"integer-coercion-nan":[1,3,1,4],"integer-coercion-positive-infinity":[1,3,1,4],"integer-coercion-negative-infinity":[1,3,1,4],real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6],'cardinality-empty':[3,4,0]}[fixtureId];
+  const typeCode=b.roundtrip_role==='output'?(slice?.[3]??slice?.[1]):slice?.[1];
   const rowCount=b.roundtrip_role==='output'?(slice?.[2]??slice?.[0]):slice?.[0];
   need(Array.isArray(slice)&&b.rows===rowCount&&b.row_count===rowCount
-    &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:slice[1]}]),'fixed native fixture schema/count');
+    &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:typeCode}]),'fixed native fixture schema/count');
   const prep=globalThis.__loginomDockPreparationV1;
   need(prep?.document===document&&prep.id===b.document_id&&location.origin===b.origin&&bg.app.Version==='7.4.2','document/build');
   const receipts=[...prep.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_id&&r.nodeTargetWorkflowNode);
@@ -65,7 +66,14 @@ export function javascriptNativeRoundtripSnapshot(b,zeroCapture){
   need(workflow===receipt.nodeTargetWorkflowNode&&pack===receipt.packageNode,'workflow/package owner');
   const diagram=model.FDiagram,nodes=diagram.FNodes.FCollection,links=diagram.FLinks.FCollection;
   const roundtrip=globalThis.__loginomJavascriptNativeRoundtripV1;
-  need(roundtrip?.document===document&&roundtrip.input.fixtureId===fixtureId&&roundtrip.stage==='completed'&&roundtrip.source_sha256===b.source_sha256,'roundtrip capability');
+  need(roundtrip?.document===document&&roundtrip.input.fixtureId===fixtureId&&roundtrip.source_sha256===b.source_sha256,'roundtrip capability');
+  const failed=globalThis.__loginomJavascriptCoercionFailureV1;
+  if(failed){
+    need(b.roundtrip_role==='upstream'&&failed.document===document&&failed.roundtrip===roundtrip
+      &&JSON.stringify(b.failed_terminal)===JSON.stringify(failed.proof),'failed branch is upstream-only');
+    failed.check();
+  }
+  if(!failed)need(roundtrip.stage==='completed'&&b.failed_terminal===undefined,'completed roundtrip capability');
   roundtrip.check();
   const completed=b.roundtrip_role==='output'?roundtrip.execution:roundtrip.binding.completed_child;
   need(b.execution.execution_id===(b.roundtrip_role==='output'?roundtrip.execution.execution_id:roundtrip.binding.execution.execution_id)
@@ -145,7 +153,7 @@ export function javascriptNativeRoundtripSnapshot(b,zeroCapture){
   if(!zero)need(!store.loading&&v(helper,'$FCacheInitialized')===true&&v(helper,'$FData'),'loaded cache');
   const fields=v(v(v(dc,'FColumnInfosStore'),'data'),'items');
   need(Array.isArray(fields)&&fields.length===1,'one field');const field=v(fields[0],'data');
-  need(v(field,'Name')==='Value'&&v(field,'DisplayName')==='Value'&&v(field,'DataType')===slice[1],'fixed native schema');
+  need(v(field,'Name')==='Value'&&v(field,'DisplayName')==='Value'&&v(field,'DataType')===typeCode,'fixed native schema');
   need(v(dt,'FTotalRowCount')===rowCount&&v(helper,'$FRowCount')===rowCount,'fixed native row count');
   const runtime=globalThis.__loginomJavascriptNativeRuntimeV1;
   need(runtime?.document===document&&runtime.binding_id===b.runtime_binding_id,'loaded runtime binding');runtime.check(v(ds,'$S'));
@@ -160,12 +168,12 @@ export function javascriptNativeRoundtripSnapshot(b,zeroCapture){
   const declaration=roundtrip.schemaWitness.declaration,declaration_sha256=roundtrip.schemaWitness.declaration_sha256;
   const zeroState=zero?zeroCapture({dc,dt,ds,store,helper,fields,field,declaration,declaration_sha256}):{};
   if(b.roundtrip_role==='upstream')need(ds===roundtrip.input.ds&&helper===roundtrip.input.helper&&v(helper,'$FData')===roundtrip.input.cache&&fields===roundtrip.input.fields&&field===roundtrip.input.field,'upstream datasource/cache replaced');
-  return {...zeroState,declaration,declaration_sha256,addPortClass,addPortPrototype,addService,roundtrip,prep,receipt,card,model,diagram,nodes,links,node,nodeData:node.data,port,portData:port.data,manager,form,workflow,pack,fields,field,
+  return {...zeroState,failedTerminal:failed?.proof,declaration,declaration_sha256,addPortClass,addPortPrototype,addService,roundtrip,prep,receipt,card,model,diagram,nodes,links,node,nodeData:node.data,port,portData:port.data,manager,form,workflow,pack,fields,field,
     cookieClass,cookiePrototype,cookieInterface,
     nodePorts,inputCollection,inputPorts,connectionInput:inputPorts[0],variablesInput:inputPorts[1],
     processStore,processRoot,group:groups[0],child:child[0],
     processFingerprint:JSON.stringify(records.map(r=>[r.internalId,r.data.id,parents.get(r)?.internalId,r.data.Status,r.data.ErrorDetails,r.data.ModelNode===node.data])),
-    root,dc,dt,ds,store,helper,identity,fixtureId,typeCode:slice[1],count:rowCount,cache:v(helper,'$FData'),owner:v(identity,'$OW'),object:v(identity,'$O'),
+    root,dc,dt,ds,store,helper,identity,fixtureId,typeCode,count:rowCount,cache:v(helper,'$FData'),owner:v(identity,'$OW'),object:v(identity,'$O'),
     dataCookie,stateCookie,dataCookieIdentity:dataCookieState.identity,stateCookieIdentity:stateCookieState.identity,
     dataCookieIdentityPrototype:dataCookieState.identityPrototype,stateCookieIdentityPrototype:stateCookieState.identityPrototype,
     dataCookieValue:dataCookieState.value,stateCookieValue:stateCookieState.value};
@@ -176,7 +184,15 @@ export async function bindJavascriptNativeRoundtrip(page,args,snapshot,zeroSnaps
     const state=globalThis.__loginomJavascriptNativeRoundtripV1;
     if(!state||state.bindings.has(args.roundtrip_role))throw Error('Roundtrip role already reserved; no replay');
     if(!['output','upstream'].includes(args.roundtrip_role))throw Error('Unknown roundtrip role');
-    if(args.roundtrip_role==='upstream'){
+    const failed=globalThis.__loginomJavascriptCoercionFailureV1;
+    if(failed){
+      if(args.roundtrip_role!=='upstream'||failed.document!==document||failed.roundtrip!==state
+        ||JSON.stringify(args.failed_terminal)!==JSON.stringify(failed.proof))throw Error('Failed branch permits only original upstream');
+      failed.check();
+      const read=globalThis.__loginomJavascriptNativeRoundtripReadV1;
+      if(state.bindings.size!==0||read&&(read.document!==document||read.poisoned||read.active||read.last))throw Error('Failed branch requires unused native roundtrip reader');
+    }
+    if(args.roundtrip_role==='upstream'&&!failed){
       const output=state.bindings.get('output'),read=globalThis.__loginomJavascriptNativeRoundtripReadV1;
       if(!output||output.initial.zeroFacts&&!output.zeroGraphVerified||read?.document!==document||read.poisoned||read.active||read.last?.id!==output.readId
         ||read.last.status!=='completed'||!read.last.published||read.last.pending!==0

@@ -99,7 +99,7 @@ export async function readNativeInputDuringImport({options,ctx,provenance,target
     check();const expected={...binding,read_id:readId};
     const exact=verifyNativeInputRead(raw,{binding:expected,lifecycle,provenance});
     const proof={exact,raw,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,subscription_proxy_source_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
-    if(fixtureId==='civil-datetime'||nativeInputFixture.output_input_rows)freezeCivilEvidence(proof);
+    if(fixtureId==='civil-datetime'||nativeInputFixture.output_input_rows||nativeInputFixture.coercion)freezeCivilEvidence(proof);
     const event={phase:'javascript_native_input_cells_verified',operation_id:operation.id,proof};
     const saved=await onRecord(event);need(saved?.phase===event.phase&&JSON.stringify(saved.proof)===JSON.stringify(proof),'native journal acknowledgement differs');
     return proof;
