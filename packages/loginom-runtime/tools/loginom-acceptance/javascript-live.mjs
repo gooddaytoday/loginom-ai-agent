@@ -1,5 +1,5 @@
 import {nativeRoundtripProbe,verifyNativeRoundtripMapping} from './javascript-native-roundtrip-contract.mjs';
-import {bindJavascriptNativeRoundtripSource,bindJavascriptNativeRoundtripSchema} from './javascript-native-roundtrip-owner.mjs';
+import {bindJavascriptNativeRoundtripSource,bindJavascriptNativeRoundtripSchema,prepareJavascriptNativeRoundtripWizard,sealJavascriptNativeRoundtripDone} from './javascript-native-roundtrip-owner.mjs';
 import {withJavascriptWizardAddress} from './javascript-wizard-settlement.mjs';
 import {cleanupJavascriptColumnEditor} from './javascript-column-editor.mjs';
 import {dragJavascriptPalette} from './javascript-palette-drag.mjs';
@@ -631,7 +631,7 @@ const readOwnedExecutionSource=()=>page.evaluate(({root,native,binding})=>{
     },schemaContext());
 const runExecutionTrial=async probe=>{
   const deadline=phaseDeadline(600000),trigger=executionCase.split('-').at(-1),sentinel=executionCase.includes('-sentinel-');
-  let trialPhase='initial',sourceSha=probe.source_sha256;
+  let trialPhase='initial',sourceSha=probe.source_sha256,roundtripDone;
   const read=async()=>{
     const snapshot=await page.evaluate(readJavascriptStage,schemaContext());
     return {...snapshot,messages:snapshot.messages.map(message=>({...message,id:digest(message.key+'\n'+message.text)}))};
@@ -646,7 +646,14 @@ const runExecutionTrial=async probe=>{
         ||!(hit===element||element.contains(hit)))throw Error('Execution control native binding or hit-test refused');
       return {x,y};
     });
-    await executionRuntime.once(identity.effect_id,{...identity,before},()=>page.mouse.click(point.x,point.y));
+    await executionRuntime.once(identity.effect_id,{...identity,before},async()=>{
+      if(nativeRoundtrip){
+        const attestation=await page.evaluate(prepareJavascriptNativeRoundtripWizard,{context:schemaContext(),before,identity,stage,deadline});
+        const saved=await executionRecord({phase:'native_roundtrip_wizard_preflight',attestation});
+        if(JSON.stringify(saved.attestation)!==JSON.stringify(attestation))throw Error('Wizard preflight journal ACK differs');
+      }
+      await page.mouse.click(point.x,point.y);
+    });
     // Wait only on the result of the original dispatch. Neither a timeout nor
     // lack of a sentinel authorizes another click.
     const after=await waitJavascriptStageObservation({read,wait:ms=>page.waitForTimeout(ms),deadline,stage,before,identity,record:executionRecord});
@@ -662,6 +669,7 @@ const runExecutionTrial=async probe=>{
       if(diagnostic){report.discovery_result=diagnostic;await executionRecord({phase:'discovery_wizard_diagnostic',diagnostic});
         await save();return {...outcome,discovery_diagnostic:true};}
     }
+    if(nativeRoundtrip&&stage==='done')roundtripDone={identity,confirmation:{effect_settled:true,terminal,after,no_new_messages:!after.messages.some(m=>!before.messages.some(old=>old.id===m.id))}};
     if(stage==='next'&&after.page_tid!==before.page_tid)report.execution_page_transition={from:before.page_tid,to:after.page_tid};
     return outcome;
   };
@@ -691,6 +699,9 @@ const runExecutionTrial=async probe=>{
   openedWizard=false;await waitGraphReady(Math.max(1,deadline-Date.now()));
   if(trigger==='done'){report.execution_probe.outcome=outcome;return;}
   if(nativeRoundtrip){
+    const attestation=await page.evaluate(sealJavascriptNativeRoundtripDone,roundtripDone);
+    const saved=await executionRecord({phase:'native_roundtrip_done_sealed',attestation});
+    if(JSON.stringify(saved.attestation)!==JSON.stringify(attestation))throw Error('Done seal journal ACK differs');
     await executionRuntime.checkNativeRoundtripBeforeExecute();
     const boundary=await executionRuntime.captureExecutionBoundary();
     try{

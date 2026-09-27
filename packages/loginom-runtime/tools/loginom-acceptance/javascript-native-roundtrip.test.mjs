@@ -1,3 +1,4 @@
+import vm from 'node:vm';
 import {javascriptProbeFailure} from './javascript-mismatch-probe.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
 import {nativeInputProvenance} from './javascript-native-input-contract.mjs';
@@ -9,43 +10,58 @@ import {mkdtemp,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {readNativeRoundtrip} from './javascript-native-roundtrip-driver.mjs';
-import {verifyNativeRoundtripRead,verifyNativeRoundtripExecution,verifyNativeRoundtripProvenance} from './javascript-native-roundtrip-contract.mjs';
+import {verifyNativeRoundtripRead,verifyNativeRoundtripExecution,verifyNativeRoundtripProvenance,verifyNativeRoundtripAddPortRuntime} from './javascript-native-roundtrip-contract.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fake,sourceEvidence} from './javascript-native-input.test.mjs';
 import {readJavascriptNativeInput} from './javascript-native-input-read.mjs';
 import {decodeVariantFrame} from '../../client/lib/variant-native-decode.mjs';
 import {nativeRoundtripProbe} from './javascript-native-roundtrip-contract.mjs';
-import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,bindJavascriptNativeRoundtripSource,bindJavascriptNativeRoundtripSchema,completeJavascriptNativeRoundtrip} from './javascript-native-roundtrip-owner.mjs';
+import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,bindJavascriptNativeRoundtripSource,bindJavascriptNativeRoundtripSchema,completeJavascriptNativeRoundtrip,prepareJavascriptNativeRoundtripWizard,sealJavascriptNativeRoundtripDone} from './javascript-native-roundtrip-owner.mjs';
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {readJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus,cancelJavascriptNativeRoundtrip} from './javascript-native-roundtrip-read.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
-async function roundtrip({change,deferred=false,beforeGraph,afterRelease}={}){
+async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false}={}){
   let mutate,mutateAfter,defer=false;
   const f=await fake({change:()=>mutate?.(),deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
-  const before=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'before'});
+  const initialRead=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'before'});
   f.model.FPreviewManager.FPreviewVisible=false;
   await f.page.evaluate(armJavascriptNativeRoundtrip,{binding:{...f.b,read_id:'before'},...nativeRoundtripProbe});
   const js={FGuid:'js',FIconCls:'bg-vendor-icon-javascript',FStatus:1,FRunning:false,data:{$S:f.session}};
   const target={parent:js,FGuid:'js-input',FType:0,FSubType:1,FParam:3,FStatus:1};
-  const output={parent:js,FGuid:'js-output',FType:1,FSubType:1,FParam:0,FStatus:1};
-  js.FPorts=[{FCollection:[target]},{FCollection:[output]}];f.model.FDiagram.FNodes.FCollection.push(js);
+  const output={parent:js,FGuid:'js-output',FType:1,FSubType:1,FParam:2,FStatus:2,FPortIndex:0};
+  // Exact constructor text from pinned fix66 AddPort.js; never invoked here.
+  const addPortSource='function AddPort(parent, graph, type) {\n            var _this = _super.call(this, parent, graph, type, 0, 10) || this;\n            _this.FReachedMaxOccurs = [];\n            _this.FVerifiedPortsForConnection = {};\n            _this.FHasHoverState = true;\n            return _this;\n        }';
+  const addPortClass=vm.runInNewContext('('+addPortSource+')');f.env.mx={AddPort:addPortClass};
+  const service=Object.assign(Object.create(addPortClass.prototype),{parent:js,FType:1,FSubType:10,FParam:undefined,FStatus:0,FPortIndex:undefined});
+  js.FPorts=[{FCollection:[target]},{FCollection:[output,service]}];f.model.FDiagram.FNodes.FCollection.push(js);
   const edge={FGuid:'edge',FSourcePort:f.port,FTargetPort:target};f.model.FDiagram.FLinks.FCollection.push(edge);
-  beforeGraph?.({f,js,edge,target,output});
+  beforeGraph?.({f,js,edge,target,output,service,addPortClass});
   const graphProof=await f.page.evaluate(bindJavascriptNativeRoundtripGraph,{node:{node_id:'js'},inputPortGuid:'js-input'});
   const lines=nativeRoundtripProbe.source.split('\n'),doc={firstLine:()=>0,lineCount:()=>lines.length,getLine:i=>lines[i]};
   const generation={id:'generation'},generationControl={el:{dom:generation},checked:true};
   const oldGet=f.env.Ext.getCmp;f.env.Ext.getCmp=id=>id==='generation'?generationControl:oldGet(id);
-  const root={querySelectorAll:q=>q==='.CodeMirror'?[{getBoundingClientRect:()=>({width:1,height:1}),CodeMirror:{getDoc:()=>doc}}]:[generation]};
+  const currentPage={isConnected:true,getBoundingClientRect:()=>({width:1,height:1})};
+  const root={isConnected:true,getBoundingClientRect:()=>({width:1,height:1}),querySelectorAll:q=>q==='.CodeMirror'
+    ?[{getBoundingClientRect:()=>({width:1,height:1}),CodeMirror:{getDoc:()=>doc}}]:q.includes('DoneWizard')?[currentPage]:[generation]};
   const card=f.env.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),native={};
   const previousNode=card.Controller.Node.data.node;card.Controller.Node.data.node=native;card.Controller.FController={FView:{el:{dom:root}}};
   await f.page.evaluate(bindJavascriptNativeRoundtripSchema,{root,native,binding:{native:js,nodeData:js.data},schema:{verified:true,generation:{checked:true,tid:'generation;DisplayEl'}}});
   await f.page.evaluate(bindJavascriptNativeRoundtripSource,{root,native,binding:{native:js,nodeData:js.data},schema:{verified:true,generation:{checked:true,tid:'generation;DisplayEl'}}});
-  card.Controller.Node.data.node=previousNode;card.Controller.FController=f.model;
+  const context={root,native,binding:{native:js,nodeData:js.data},prefix:'p'};
+  const identity={effect_id:'own-done',node_id:'js',source_sha256:nativeRoundtripProbe.source_sha256};
+  const before={owner_verified:true,wizard_visible:true,pending:false,page_tid:'p;WizrdMCF;DoneWizard'};
+  const prepare=(overrides={})=>f.page.evaluate(prepareJavascriptNativeRoundtripWizard,{context,before,identity,stage:'done',deadline:f.b.deadline,...overrides});
+  const dispose=(destroy=true)=>{card.Controller.Node.data.node=previousNode;card.Controller.FController=f.model;root.isConnected=false;if(destroy)generationControl.el=null;};
+  const confirmation={effect_settled:true,terminal:true,after:{wizard_visible:false,pending:false},no_new_messages:true};
+  const seal=(overrides={})=>f.page.evaluate(sealJavascriptNativeRoundtripDone,{identity,confirmation,...overrides});
+  if(wizardOnly)return {f,js,target,output,service,lines,generationControl,context,identity,before,prepare,dispose,seal,confirmation,root};
+  await prepare();dispose();await seal();
   const child={internalId:5,data:{id:'4.1',Status:3,ErrorDetails:'',ModelNode:js.data},childNodes:[]};
   f.root.childNodes.push({internalId:4,data:{id:'4',Status:3,ErrorDetails:'',loaded:true},childNodes:[child]});
   const execution={verified:true,owner_verified:true,status:'completed',execution_id:'d:1:4',group_id:'4',process_id:'4.1',process_record_id:'5',trial:{source_sha256:nativeRoundtripProbe.source_sha256}};
   await f.page.evaluate(completeJavascriptNativeRoundtrip,{execution,source_sha256:nativeRoundtripProbe.source_sha256});
+  output.FStatus=1;
   const source=f.dc.FDataSource,outputHelper={...f.helper,$FData:{}},outputDs={...source,$:{...source.$},$FHelper:outputHelper};outputHelper.FBaseProxy=outputDs;
   const bind=async role=>{
     f.model.FPreviewManager.FPreviewVisible=true;
@@ -57,7 +73,7 @@ async function roundtrip({change,deferred=false,beforeGraph,afterRelease}={}){
       node_id:role==='output'?'js':'n',port_guid:role==='output'?'js-output':'p',
       execution:role==='output'?execution:f.b.execution,completed_child:role==='output'?execution:f.b.completed_child}));
   };
-  const result={f,before,js,edge,target,output,outputDs,outputHelper,source,child,execution,lines,generationControl,graphProof,bind};
+  const result={f,before:initialRead,js,edge,target,output,service,outputDs,outputHelper,source,child,execution,lines,generationControl,graphProof,bind};
   mutate=change?()=>change(result):null;mutateAfter=afterRelease?()=>afterRelease(result):null;defer=deferred;return result;
 }
 test('separate native output and upstream bindings read twelve real/NULL cells without replay',async()=>{
@@ -72,9 +88,9 @@ test('separate native output and upstream bindings read twelve real/NULL cells w
   assert.deepEqual(x.f.counters,{sent:12,requests:12,responses:12});
 });
 const mutations={sameSubscriptionIdentity:x=>x.f.helper.$FDataChangeCookie.$={...x.f.helper.$FDataChangeCookie.$},
-  sameOptionalInput:x=>x.f.node.FPorts[0].FCollection[0]={...x.f.node.FPorts[0].FCollection[0]},generation:x=>x.generationControl.checked=false,edge:x=>x.edge.FTargetPort={...x.target},edgeGuid:x=>x.edge.FGuid='other',node:x=>x.js.data={...x.js.data},
+  sameOptionalInput:x=>x.f.node.FPorts[0].FCollection[0]={...x.f.node.FPorts[0].FCollection[0]},sealedMode:x=>{const s=x.f.env.__loginomJavascriptNativeRoundtripV1;s.done={...s.done,schema_mode:'declared'};},edge:x=>x.edge.FTargetPort={...x.target},edgeGuid:x=>x.edge.FGuid='other',node:x=>x.js.data={...x.js.data},
   sameGuidNode:x=>x.f.model.FDiagram.FNodes.FCollection[1]={...x.js},inputCache:x=>x.f.helper.$FData={},inputSource:x=>x.source.$.$O++,
-  inputSubscription:x=>x.f.helper.$FDataChangeCookie.$.$RRC++,source:x=>x.lines[0]+=' ',outputCache:x=>x.outputHelper.$FData={},
+  inputSubscription:x=>x.f.helper.$FDataChangeCookie.$.$RRC++,source:x=>x.f.env.__loginomJavascriptNativeRoundtripV1.source+=' ',outputCache:x=>x.outputHelper.$FData={},
   outputSchema:x=>x.f.dc.FColumnInfosStore.data.items[0].data.DataType=4,outputProcess:x=>x.child.data.Status=2,
   upstreamExecution:x=>x.f.root.childNodes.push({internalId:9,data:{id:'9.1',ModelNode:x.f.node.data,Status:3,ErrorDetails:''},childNodes:[]}),outputPort:x=>x.output.data={}};
 for(const [name,change]of Object.entries(mutations))test('roundtrip refuses '+name+' mutation after response and releases buffers',async()=>{
@@ -164,7 +180,7 @@ test('production roundtrip trial revalidates before one Execute and never retrie
   const {default:vm}=await import('node:vm');
   const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
   const start=source.indexOf('const runExecutionTrial=async probe=>'),end=source.indexOf('const verifyBatchInputIdentity=',start);
-  for(const failure of ['none','admission','read']){
+  for(const failure of ['none','admission','read','done-lost','done-unconfirmed','preflight-ack','seal-ack']){
     const steps=[],report={execution_probe:{}},deadline=Date.now()+10000;
     const runner=vm.runInNewContext(source.slice(start,end)+'\nrunExecutionTrial',{
       nativeRoundtrip:true,discoveryProbe:null,phaseDeadline:()=>deadline,executionCase:'code-table-execute',report,owner:{prefix:'p'},executionNode:{node_id:'js'},executionInput:{},
@@ -172,15 +188,16 @@ test('production roundtrip trial revalidates before one Execute and never retrie
         captureExecutionBoundary:async()=>({native:{dispose:async()=>steps.push('dispose')}}),verifyExecutionBoundary:async()=>steps.push('boundary'),
         executeNode:async(node,limit,trial)=>{assert.equal(limit,deadline);assert.equal(trial.source_sha256,nativeRoundtripProbe.source_sha256);steps.push('execute');return {};},
         readNativeRoundtrip:async()=>{steps.push('native');if(failure==='read')throw Error('lost read');return {before:{},output:{},upstream:{}};},once:async(id,args,perform)=>perform()},
-      page:{evaluate:async()=>({owner_verified:true,messages:[]}),mouse:{click:async()=>steps.push('done')}},schemaContext:()=>({}),readJavascriptStage:()=>{},
+      page:{evaluate:async fn=>fn===prepareJavascriptNativeRoundtripWizard||fn===sealJavascriptNativeRoundtripDone?{verified:true}:{owner_verified:true,messages:[]},mouse:{click:async()=>{steps.push('done');if(failure==='done-lost')throw Error('lost Done');}}},
+      prepareJavascriptNativeRoundtripWizard,sealJavascriptNativeRoundtripDone,schemaContext:()=>({}),readJavascriptStage:()=>{},
       guard:async()=>{},digest:s=>s,caseEffect:(id,effect)=>effect,requireJavascriptStageAdmission:async()=>{},
-      exact:()=>({filter:()=>({evaluate:async()=>({x:1,y:1})}),waitFor:async()=>{}}),executionRecord:async()=>{},
-      waitJavascriptStageObservation:async()=>({messages:[]}),javascriptStageTerminal:()=>true,javascriptSentinelOutcome:()=>({sentinel_observed:false}),
+      exact:()=>({filter:()=>({evaluate:async()=>({x:1,y:1})}),waitFor:async()=>{}}),executionRecord:async event=>failure==='preflight-ack'&&event.phase==='native_roundtrip_wizard_preflight'||failure==='seal-ack'&&event.phase==='native_roundtrip_done_sealed'?{}:event,
+      waitJavascriptStageObservation:async()=>({messages:[],wizard_visible:false,pending:false}),javascriptStageTerminal:()=>failure!=='done-unconfirmed',javascriptSentinelOutcome:()=>({sentinel_observed:false}),
       waitWizardReady:async()=>({page:{tid:'p;DoneWizard'}}),waitGraphReady:async()=>{},openedWizard:true,save:async()=>{},Date
     });
     if(failure==='none'){await runner(nativeRoundtripProbe);assert.equal(report.stage,'native-roundtrip-observed');}
-    if(failure!=='none')await assert.rejects(()=>runner(nativeRoundtripProbe),failure==='admission'?/changed input/:/lost read/);
-    assert.deepEqual(steps,failure==='admission'?['done','admission']:failure==='read'?['done','admission','execute','boundary','native','dispose']:['done','admission','execute','boundary','native','boundary','dispose']);
+    if(failure!=='none')await assert.rejects(()=>runner(nativeRoundtripProbe),{admission:/changed input/,read:/lost read/,'done-lost':/lost Done/,'done-unconfirmed':/unconfirmed/,'preflight-ack':/preflight journal ACK/,'seal-ack':/Done seal journal ACK/}[failure]);
+    assert.deepEqual(steps,failure==='preflight-ack'?[]:['done-lost','done-unconfirmed','seal-ack'].includes(failure)?['done']:failure==='admission'?['done','admission']:failure==='read'?['done','admission','execute','boundary','native','dispose']:['done','admission','execute','boundary','native','boundary','dispose']);
   }
 });
 
@@ -274,7 +291,7 @@ test('graph-bound port inventory is bounded, descriptor-only and does not admit 
     Object.defineProperty(x.target,'FPortIndex',{get:()=>{getters++;return 'private-index';}});
     x.output.FPortIndex=999;x.output.FStatus='private-status';
   }});
-  assert.deepEqual(clone(x.graphProof.ports),{input:{count:'1',values:[['0','1','3','1','accessor']]},output:{count:'1',values:[['1','1','0','other','other']]}});
+  assert.deepEqual(clone(x.graphProof.ports),{input:{count:'1',values:[['0','1','3','1','accessor']]},output:{count:'2',values:[['1','1','2','other','other'],['1','10','other','0','other']]}});
   assert.equal(getters,0);assert.ok(!JSON.stringify(x.graphProof).includes('private-'));
   x.output.FStatus=1;x.output.FParam=3;
   await assert.rejects(()=>x.bind('output'),/port identity/);
@@ -285,6 +302,70 @@ test('graph-bound observation caps per-port enum inventory at eight without admi
   }});
   assert.equal(x.graphProof.ports.output.count,'>8');assert.equal(x.graphProof.ports.output.values.length,8);
   assert.ok(!JSON.stringify(x.graphProof.ports).includes('private-output'));
-  await assert.rejects(()=>x.bind('output'),/NI1/);
+  await assert.rejects(()=>x.bind('output'),/AddPort service layout/);
   assert.equal(x.f.counters.sent,4);
+});
+
+test('matched own Done seals live source/mode before legitimate widget disposal and permits graph checks',async()=>{
+  const x=await roundtrip({wizardOnly:true});x.prepare();x.dispose();
+  assert.equal(x.generationControl.el,null);const proof=x.seal();assert.equal(proof.verified,true);assert.equal(proof.execution_from_wizard,'ambiguous');
+  const s=x.f.env.__loginomJavascriptNativeRoundtripV1;assert.equal(s.stage,'done-sealed');assert.equal(s.sourceWitness.verify(),nativeRoundtripProbe.source);
+  s.sourceWitness.doc.getLine=()=>{throw Error('disposed editor');};s.check();
+  assert.throws(()=>x.seal(),/one pending Done/);assert.equal(x.f.counters.sent,4);
+});
+for(const mode of ['disposed-control','disposed-wizard','source','mode','wizard-root','wizard-native'])test('wizard preflight refuses '+mode+' before Done reservation',async()=>{
+  const x=await roundtrip({wizardOnly:true});
+  if(mode==='disposed-control')x.generationControl.el=null;
+  if(mode==='disposed-wizard')x.dispose();
+  if(mode==='source')x.lines[0]+=' ';
+  if(mode==='mode')x.generationControl.checked=false;
+  const context={...x.context,...(mode==='wizard-root'?{root:{}}:{}),...(mode==='wizard-native'?{native:{}}:{})};
+  assert.throws(()=>x.prepare({context}));assert.equal(x.f.env.__loginomJavascriptNativeRoundtripV1.stage,'source-bound');assert.equal(x.f.counters.sent,4);
+});
+for(const mode of ['lost-done','nonterminal','pending','visible','foreign-dialog','new-message','wrong-effect','wrong-digest','wrong-node'])
+  test('disposed widget cannot seal '+mode+' Done or permit Execute',async()=>{
+    const x=await roundtrip({wizardOnly:true});x.prepare();x.dispose();
+    const confirmation=clone(x.confirmation),identity={...x.identity};
+    if(mode==='lost-done')confirmation.effect_settled=false;if(mode==='nonterminal')confirmation.terminal=false;
+    if(mode==='pending')confirmation.after.pending=true;if(mode==='visible')confirmation.after.wizard_visible=true;
+    if(mode==='foreign-dialog')confirmation.after.boundary_refusal='foreign_dialog';if(mode==='new-message')confirmation.no_new_messages=false;
+    if(mode==='wrong-effect')identity.effect_id='foreign';if(mode==='wrong-digest')identity.source_sha256='foreign';if(mode==='wrong-node')identity.node_id='foreign';
+    assert.throws(()=>x.seal({confirmation,identity}));
+    assert.throws(()=>x.f.page.evaluate(completeJavascriptNativeRoundtrip,{execution:{},source_sha256:nativeRoundtripProbe.source_sha256}));
+    assert.equal(x.f.env.__loginomJavascriptNativeRoundtripV1.stage,'done-prepared');assert.equal(x.f.counters.sent,4);
+  });
+for(const mode of ['unprepared','wrong-graph','surviving-source','surviving-mode','still-visible'])test('Done seal refuses '+mode,async()=>{
+  const x=await roundtrip({wizardOnly:true});if(mode!=='unprepared')x.prepare();x.dispose(!mode.startsWith('surviving-'));
+  if(mode==='wrong-graph')x.f.model.FDiagram={};if(mode==='surviving-source')x.lines[0]+=' ';if(mode==='surviving-mode')x.generationControl.checked=false;
+  if(mode==='still-visible')x.root.isConnected=true;
+  assert.throws(()=>x.seal());assert.notEqual(x.f.env.__loginomJavascriptNativeRoundtripV1.stage,'done-sealed');assert.equal(x.f.counters.sent,4);
+});
+const outputRefusals={param0:x=>x.output.FParam=0,param1:x=>x.output.FParam=1,param3:x=>x.output.FParam=3,
+  wrongIndex:x=>x.output.FPortIndex=1,extraActual:x=>x.js.FPorts[1].FCollection.push({...x.output}),
+  missingService:x=>x.js.FPorts[1].FCollection.pop(),foreignService:x=>Object.setPrototypeOf(x.service,{}),
+  wrongServiceParent:x=>x.service.parent={},wrongServiceType:x=>x.service.FType=0,wrongServiceSubtype:x=>x.service.FSubType=1,
+  serviceParam:x=>x.service.FParam=0,missingServiceParam:x=>delete x.service.FParam,serviceIndex:x=>x.service.FPortIndex=1,
+  serviceStatus:x=>x.service.FStatus=1};
+for(const [name,change]of Object.entries(outputRefusals))test('JS native output requires exact data0 param2 plus AddPort: '+name,async()=>{
+  const x=await roundtrip({beforeGraph:change});await assert.rejects(()=>x.bind('output'));assert.equal(x.f.counters.sent,4);
+});
+for(const status of [0,2,3])test('pre-execution graph status '+status+' is not active native output',async()=>{
+  const x=await roundtrip();x.output.FStatus=status;await assert.rejects(()=>x.bind('output'),/NI1/);assert.equal(x.f.counters.sent,4);
+});
+for(const [name,change]of Object.entries({service:x=>x.js.FPorts[1].FCollection[1]=Object.assign(Object.create(Object.getPrototypeOf(x.service)),x.service),
+  serviceStatus:x=>x.service.FStatus=1,dataParam:x=>x.output.FParam=0,extraActual:x=>x.js.FPorts[1].FCollection.push({...x.output})}))
+  test('native output rejects '+name+' change after response with buffer release',async()=>{
+    const x=await roundtrip({change}),b=await x.bind('output');await assert.rejects(()=>readJavascriptNativeRoundtrip(x.f.page,b,decodeVariantFrame,{operationId:'service-change'}));
+    assert.deepEqual(x.f.counters,{sent:5,requests:5,responses:5});assert.equal((await javascriptNativeRoundtripStatus(x.f.page)).published,false);
+  });
+test('loaded AddPort constructor source must match pinned frontend constructor exactly',async()=>{
+  const x=await roundtrip(),b=await x.bind('output');assert.equal(verifyNativeRoundtripAddPortRuntime(b.add_port_sources).constructor,'38bbd3e2f5143859e0c963aeb9c1389304c140d32484a88af1b2ec8f6ba0a72c');
+  for(const sources of [undefined,{}, {...b.add_port_sources,extra:'x'},{constructor:b.add_port_sources.constructor+' '}])assert.throws(()=>verifyNativeRoundtripAddPortRuntime(sources));
+});
+
+for(const field of ['node','port'])test('upstream reread refuses '+field+' deactivation after native JS output',async()=>{
+  const x=await roundtrip(),b=await x.bind('output');
+  await readJavascriptNativeRoundtrip(x.f.page,b,decodeVariantFrame,{operationId:'output'});
+  if(field==='node')x.js.FStatus=0;if(field==='port')x.output.FStatus=2;
+  await assert.rejects(()=>x.bind('upstream'),/completed JS output inactive/);assert.equal(x.f.counters.sent,8);
 });

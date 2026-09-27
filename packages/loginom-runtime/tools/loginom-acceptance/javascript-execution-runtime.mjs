@@ -785,7 +785,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     },
     async checkNativeRoundtripBeforeExecute() {
       validateNativeSource();
-      await page.evaluate(()=>{const s=globalThis.__loginomJavascriptNativeRoundtripV1;if(s?.stage!=='source-bound')throw Error('Source not bound');s.check();});
+      await page.evaluate(()=>{const s=globalThis.__loginomJavascriptNativeRoundtripV1;if(s?.stage!=='done-sealed')throw Error('Confirmed Done source not sealed');s.check();});
     },
     async bindNativeRoundtripGraph(node,inputPortGuid) {
       validateNativeSource();

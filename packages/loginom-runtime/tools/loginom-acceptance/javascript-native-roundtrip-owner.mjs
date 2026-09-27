@@ -76,11 +76,11 @@ export function bindJavascriptNativeRoundtripGraph({node,inputPortGuid}){
   }
   need(nodes.filter(n=>n!==js&&n!==initial.node).every(n=>n.FIconCls==='bg-vendor-icon-modelvariables'&&n.FStatus===0&&!n.FRunning),'foreign dynamic nodes');
   const heldNodes=nodes.map(n=>({node:n,data:n.data,cell:n.FCell,guid:n.FGuid,icon:n.FIconCls,ports:n.FPorts,
-    groups:n.FPorts.map(group=>({group,collection:group.FCollection,ports:group.FCollection.map(p=>({port:p,data:p.data,cell:p.FCell,guid:p.FGuid,type:p.FType,subtype:p.FSubType,param:p.FParam,parent:p.parent}))}))}));
+    groups:n.FPorts.map(group=>({group,collection:group.FCollection,ports:group.FCollection.map(p=>({port:p,data:p.data,cell:p.FCell,guid:p.FGuid,type:p.FType,subtype:p.FSubType,param:p.FParam,parent:p.parent,prototype:Object.getPrototypeOf(p),constructor:Object.getPrototypeOf(p)?.constructor}))}))}));
   const edgeGuid=edge.FGuid,upstreamCheck=s.upstream;
-  const check=()=>{
+  const checkGraph=()=>{
     const records=s.upstream();
-    need(s.check===check&&s.upstream===upstreamCheck,'owner checker replaced');
+    need(s.check===check&&s.checkGraph===checkGraph&&s.upstream===upstreamCheck,'owner checker replaced');
     need(globalThis.__loginomJavascriptNativeRoundtripV1===s&&s.document===document,'capability replaced');
     const card=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
     need(card===initial.card&&card.Controller.FController===initial.model&&initial.model.FDiagram===diagram
@@ -91,9 +91,10 @@ export function bindJavascriptNativeRoundtripGraph({node,inputPortGuid}){
       &&n.node.FIconCls===n.icon&&n.node.FPorts===n.ports&&n.ports.length===n.groups.length,'node identity');
       for(const [i,g]of n.groups.entries()){need(n.ports[i]===g.group&&g.group.FCollection===g.collection&&g.collection.length===g.ports.length,'port collection');
         for(const [j,p]of g.ports.entries())need(g.collection[j]===p.port&&p.port.data===p.data&&p.port.FCell===p.cell&&p.port.FGuid===p.guid
-          &&p.port.FType===p.type&&p.port.FSubType===p.subtype&&p.port.FParam===p.param&&p.port.parent===p.parent,'port identity');}}
-    if(s.sourceWitness)need(s.sourceWitness.read()===s.source,'source changed');
+          &&p.port.FType===p.type&&p.port.FSubType===p.subtype&&p.port.FParam===p.param&&p.port.parent===p.parent
+          &&Object.getPrototypeOf(p.port)===p.prototype&&Object.getPrototypeOf(p.port)?.constructor===p.constructor,'port identity');}}
     if(s.executionWitness){const w=s.executionWitness;
+      need(!s.bindings.get('output')||js.FStatus===1&&js.FRunning===false&&js.FPorts[1].FCollection[0].FStatus===1,'completed JS output inactive');
       need(records.has(w.child)&&records.has(w.group)&&w.child.data.ModelNode===js.data&&w.child.data.Status===3&&w.child.data.ErrorDetails===''
         &&String(w.child.data.id)===s.execution.process_id&&String(w.child.internalId)===s.execution.process_record_id
         &&w.group.data.Status===3&&w.group.data.ErrorDetails===''&&w.group.data.loaded===true
@@ -101,7 +102,8 @@ export function bindJavascriptNativeRoundtripGraph({node,inputPortGuid}){
       need(JSON.stringify([...records].map(r=>[r.internalId,r.data.id,r.data.Status,r.data.ErrorDetails,r.data.ModelNode===js.data]))===w.fingerprint,'process history changed');}
 
   };
-  Object.assign(s,{node:js,targetPort,edge,check,stage:'graph-bound'});check();
+  const check=()=>{checkGraph();if(s.sourceWitness)need(s.sourceWitness.verify()===s.source,'source changed');};
+  Object.assign(s,{node:js,targetPort,edge,check,checkGraph,stage:'graph-bound'});check();
   // Read-only inventory, not an admission rule for unobserved output metadata.
   const inventory=group=>({count:group.FCollection.length>8?'>8':String(group.FCollection.length),
     values:group.FCollection.slice(0,8).map(port=>['FType','FSubType','FParam','FStatus','FPortIndex'].map(key=>enumValue(port,key)))});
@@ -130,18 +132,72 @@ export function bindJavascriptNativeRoundtripSource({root,native,binding,schema}
     &&schema.verified===true&&schema.generation?.checked===true,'owned code schema');
   const witness=s.schemaWitness,control=witness.control;
   need(root===witness.root&&native===witness.native&&tab.Controller.FController===witness.model
-    &&control.checked===true&&control.el.dom===witness.element,'same applied code mode');
+    &&control.checked===true&&control.el?.dom===witness.element,'same applied code mode');
   const editors=[...root.querySelectorAll('.CodeMirror')].filter(e=>e.getBoundingClientRect().width&&e.getBoundingClientRect().height);
   need(editors.length===1,'one source editor');const cm=editors[0].CodeMirror,doc=cm.getDoc();
-  const read=()=>{need(control.checked===true&&control.el.dom===witness.element,'code-generation changed');need(cm.getDoc()===doc&&doc.firstLine()===0&&doc.lineCount()>=1&&doc.lineCount()<=32,'source identity');
+  const admittedSource=s.source,admittedDigest=s.source_sha256;
+  const read=()=>{need(s.source===admittedSource&&s.source_sha256===admittedDigest,'admitted source changed');need(control.checked===true&&control.el?.dom===witness.element,'code-generation changed');need(cm.getDoc()===doc&&doc.firstLine()===0&&doc.lineCount()>=1&&doc.lineCount()<=32,'source identity');
     return Array.from({length:doc.lineCount()},(_,i)=>doc.getLine(i)).join('\n');};
-  need(read()===s.source,'exact source readback');s.sourceWitness={doc,read};s.stage='source-bound';
+  need(read()===s.source,'exact source readback');
+  let applied;
+  const verify=()=>{
+    if(!applied)return read();
+    need(s.done===applied&&applied.source===admittedSource&&applied.source===s.source&&applied.source_sha256===admittedDigest&&applied.source_sha256===s.source_sha256
+      &&applied.schema_mode==='code'&&['done-sealed','execution-reserved','completed'].includes(s.stage),'sealed source/mode changed');
+    return applied.source;
+  };
+  const seal=receipt=>{
+    need(!applied&&s.pendingDone===receipt&&s.stage==='done-prepared','one prepared Done');
+    applied=Object.freeze({...receipt,status:'sealed'});s.done=applied;s.stage='done-sealed';
+  };
+  s.sourceWitness={doc,read,verify,seal};s.stage='source-bound';
   return {verified:true,source_sha256:s.source_sha256,schema_mode:'code'};
+}
+
+// A live wizard attestation is reserved immediately before the one gesture.
+// Disposal by itself is never a success signal and cannot authorize Execute.
+export function prepareJavascriptNativeRoundtripWizard({context,before,identity,stage,deadline}){
+  const s=globalThis.__loginomJavascriptNativeRoundtripV1,need=(v,m)=>{if(!v)throw Error('Roundtrip wizard: '+m);};
+  need(s?.document===document&&s.stage==='source-bound'&&['next','done'].includes(stage)&&Date.now()<deadline,'live source stage/deadline');
+  const w=s.schemaWitness,tab=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+  need(context.root===w.root&&context.native===w.native&&context.binding.native===s.node&&context.binding.nodeData===s.node.data
+    &&w.root.isConnected===true&&tab===s.input.card&&tab.Controller.Node.data.node===w.native
+    &&tab.Controller.FController===w.model&&w.model.FView?.el?.dom===w.root,'same live wizard');
+  need(before?.owner_verified===true&&before.wizard_visible===true&&!before.pending&&!before.boundary_refusal
+    &&identity.node_id===s.node.FGuid&&identity.source_sha256===s.source_sha256&&typeof identity.effect_id==='string'&&identity.effect_id,'owned gesture identity');
+  need(typeof before.page_tid==='string'&&before.page_tid.startsWith(context.prefix+';WizrdMCF;')
+    &&(stage!=='done'||before.page_tid===context.prefix+';WizrdMCF;DoneWizard'),'exact Done page');
+  const pages=[...w.root.querySelectorAll('[data-tid='+JSON.stringify(before.page_tid)+']')].filter(e=>e.isConnected&&e.getBoundingClientRect().width&&e.getBoundingClientRect().height);
+  need(pages.length===1,'same visible page');s.upstream();need(s.sourceWitness.read()===s.source,'source changed before gesture');
+  if(stage==='done'){
+    s.pendingDone=Object.freeze({effect_id:identity.effect_id,node_id:identity.node_id,source_sha256:s.source_sha256,
+      source:s.source,schema_mode:'code',deadline});s.stage='done-prepared';
+  }
+  return {verified:true,stage,effect_id:identity.effect_id,node_id:identity.node_id,source_sha256:s.source_sha256,schema_mode:'code'};
+}
+
+export function sealJavascriptNativeRoundtripDone({identity,confirmation}){
+  const s=globalThis.__loginomJavascriptNativeRoundtripV1,need=(v,m)=>{if(!v)throw Error('Roundtrip Done: '+m);};
+  const receipt=s?.pendingDone,w=s?.schemaWitness;
+  need(s?.document===document&&s.stage==='done-prepared'&&receipt&&Date.now()<receipt.deadline,'one pending Done within deadline');
+  need(['effect_id','node_id','source_sha256'].every(k=>identity?.[k]===receipt[k])
+    &&receipt.source===s.source&&receipt.source_sha256===s.source_sha256&&receipt.schema_mode==='code','prepared source/mode/identity');
+  need(confirmation?.effect_settled===true&&confirmation.terminal===true&&confirmation.after?.wizard_visible===false
+    &&confirmation.after.pending===false&&!confirmation.after.boundary_refusal&&confirmation.no_new_messages===true,'confirmed original Done required');
+  const tab=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+  need(tab===s.input.card&&tab.Controller.Node.data.node===s.input.workflow&&tab.Controller.FController===s.input.model
+    &&(!w.root.isConnected||!w.root.getBoundingClientRect().width||!w.root.getBoundingClientRect().height),'same graph and hidden original wizard');
+  // If the original control survives, it must still agree. A disposed control
+  // is accepted only at this matched, settled Done -> original-graph boundary.
+  if(w.control.el?.dom)need(s.sourceWitness.read()===receipt.source,'surviving source/mode changed');
+  s.checkGraph();s.sourceWitness.seal(receipt);s.check();
+  return {verified:true,effect_id:receipt.effect_id,node_id:receipt.node_id,source_sha256:receipt.source_sha256,
+    schema_mode:'code',basis:'live_pre_done_attestation_and_confirmed_own_done_graph',execution_from_wizard:'ambiguous'};
 }
 
 export function completeJavascriptNativeRoundtrip({execution,source_sha256}){
   const s=globalThis.__loginomJavascriptNativeRoundtripV1;
-  if(s?.stage!=='source-bound'||source_sha256!==s.source_sha256||execution?.verified!==true||execution.owner_verified!==true
+  if(s?.stage!=='done-sealed'||source_sha256!==s.source_sha256||execution?.verified!==true||execution.owner_verified!==true
     ||execution.status!=='completed'||!execution.process_id||!execution.process_record_id||!execution.group_id
     ||execution.trial?.source_sha256!==s.source_sha256)throw Error('Roundtrip completed JS child required');
   s.stage='execution-reserved';s.check();
