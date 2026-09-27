@@ -16,6 +16,48 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch55: изменённая schema несовместима с прежней manual link — 2026-09-27
+
+Terminal exit1 FAILED, original package/logout/browser ALL PASS; recovery не нужен.
+Root проверил1574 journalSHA,60 input cells,2fresh terminal groups, baseline completed
+с full6×2/12cells, changed owned failed child с реальным ShowNode и40/40 sourceSHA.
+Case c322086e-ee3b-4536-8c0e-c5aa1802e71b, JS node
+ dbb4aedf-ad0d-4084-85ee-c5cfd0f67772. Изменённый source f27e0409… повторно прочитан
+после Done; режим code и полный owner подтверждены. Native root/record первого
+исполнения сохранился в fresh baseline второго. Это ровно две разные фазы,
+а не повтор initial Execute. Native graph boundary после failed execution PASS.
+
+Ошибка нового исполнения принадлежит JS-child:
+«Не удалось найти исходный столбец PhaseMarker для выходного столбца ManualMarker».
+В этом случае прежний manual mapping не был автоматически успешно перепривязан
+к GeneratedMarker. Это подтверждённая несовместимость, а не доказательство
+неподдерживаемого изменения схемы вообще. Автосброс/повторное исполнение не отправлялись.
+
+Последующее чтение mapping 15s не прошло private characterization. Last sample
+line1565: тот же полный owner/output GUID; native mapping verified/inventory_complete
+true, но source_identity_verified=false, source_fields=[], targets ObservedID и
+ManualMarker с прежними names/labels/types,source:null,autosync=false.
+Это наблюдённое пустое source inventory после failed execution; оно не подтверждает
+GeneratedMarker schema или сохранённые связи. Scoped Close завершился затем
+AMBIGUOUS/PREPARED_NODE_CONTEXT_CHANGED; outer cleanup ALL PASS сохранён отдельно.
+
+Дефект private отчёта: trial остаётсяpending_materialization/execution_started=false,
+хотя журнал содержит changed terminal. Final failure показывает cleanup
+NodeProcedureStepError вместо первоначального mapping timeout. Root отдельным
+boundary verifier подтвердил changed SHA/owner/freshness/native failure и пустое
+source inventory; verifier полного trial корректно оставил gate=false.
+Private receipts: g2-batch-55-verification.json, -boundary-verification.json,
+-transition-verification.json. Существующий report не переписывался.
+
+В прежней задаче разработчика назначены сохранение terminal receipt до последующих
+чтений, корректная negative characterization и сохранение обоих ошибок без
+ослабления public reader. Требуется оценить достаточность данного negative исхода
+для discovery и перейти к bounded engine/G5/diagnostic probes вместо попыток
+добиться успешной manual link вопреки наблюдению. G2/G3 ещё не закрыты целиком.
+Profile28 сохранён, freshprofile29 назначен с receipt; browser closed.
+Публичный handler и полная CLI-приёмка остаются открытыми.
+
+
 ### Freeze54: changed-source execution; batch55 запущен — 2026-09-27
 
 Source commit `67628e1c82bc0ab58241acbd96e43db979f0634a`, семь private source/test
