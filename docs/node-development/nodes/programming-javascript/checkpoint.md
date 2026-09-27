@@ -16,6 +16,17 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Integer coercion positive-infinity01 RUNNING
+
+Source82 unchanged/1259 pins повторно проверены; original exec session59840
+RUNNING, fresh profile71, DISPLAY=:1/headed/sandbox. Evidence
+native-integer-coercion-positive-infinity-probe-01. INPUT native Real1;
+candidate +Infinity=fixed input/0, не native nonfinite INPUT. OUTPUT неизвестен.
+Исходный deadline600000ms,no replay. Matrix5 characterized,+Infinity
+unresolved/running,1 not_run. Проверять original session59840 до terminal,
+затем cleanup и independent audit. Runtime изменения до завершения запрещены.
+
+
 ### Integer coercion NaN01: independent characterization PASS
 
 Source82/profile70 original session44055 terminal exit0, CHARACTERIZED,
