@@ -17,6 +17,12 @@
 
 ### Batch36: JS output6×2 впервые прочитан полностью — 2026-09-27
 
+Shared диагностика `node-procedure.mjs` и её regression test закреплены отдельно
+в developer branch: `86cd64e2ef` (`fix(runtime): retain bounded node observation refusal`).
+Root сверил оба файла с freeze36,101tests PASS; live36 подтвердил полезность
+нового error code/binding reason. Остальные operator/docs changes в этом коммите
+не включены; перенос в основной продукт и выпуск не выполнялись.
+
 Freshprofile09/freeze36. После нового Execute read-only settlement подтвердил
 переход graph→Views с исходным native output. Root независимо проверил все12
 ячеек: ObservedID integer1..6 exact, PhaseMarker string JS_G2_TABLE_V1,
