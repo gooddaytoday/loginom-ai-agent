@@ -16,6 +16,33 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Roundtrip probe06: доказана замена DOM shape после click; recovery06 PASS
+
+Source69/profile48 завершён exit1 CLEANUP_UNCONFIRMED, session97252 terminal.
+NP1 p=selected,h=selection-dispatched: binding/model/diagram/graph/container/node/
+port/data/cell=true, shape=false. Следовательно mouse.click вернулся, затем current
+DOM root shape порта изменился при сохранённых native refs. F3 и output read не
+достигнуты. Это уточняет причину текущего прогона; не переписывает probe05.
+Done sealing и explicit completed own JS Execute прошли.
+
+Root независимо: input4/4scalarPASS,579journal refs,75source pins. Report SHA256
+`59688f30dc3b5fe3935c23c242c41068471b4599271b0b868b520248583bf5d6`.
+Private native-roundtrip-probe-06-verification.json содержит exact NP1. Исходный
+report сохраняет package_closed=false/logged_out=false/browser_closed=true.
+Отдельная headed recovery06 на profile48 завершилась exit0 (session93820):
+account jsteach, packages0, logout=true,browserClosed=true,packageMutation=false.
+Private native-roundtrip-recovery-06.mjs/.json; lease CLOSED. Никакого повторения
+исходного click/F3/Execute не было. Profile48 сохраняется.
+
+Назначен Fix70: одноразовый postclick DOM transition только на selected при
+selection-dispatched и неизменных native identity/execution/source. Нужны exact
+selected port, unique current shape/TID/parent и fresh hit-test/focus перед
+обновлением held shape; проверки остальных фаз не ослаблять. Positive rerender
+и negatives подмен/потерянных ответов обязательны. Разработчик работает, Freeze70
+ещё нет. Следующий live требует fresh49; полный G5/handler/CLI не закрыты.
+
+
+
 ### Freeze69: диагностический headed roundtrip probe06 запущен
 
 Source node-javascript `df3f131ff3a4d7c262e85166c04c51dcd42a0997` сохраняет прежние
