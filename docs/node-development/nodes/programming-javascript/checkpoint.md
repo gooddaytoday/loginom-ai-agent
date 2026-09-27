@@ -15,6 +15,25 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Native Preview: локализация input-port inventory — 2026-09-27
+
+Root повторно сверил probe03: server bytes delivery SUCCEEDED, 33 bytes с
+ожидаемым SHA; Preview schema verified `Value:real`, output0 и owned node GUID.
+Реальный graph содержит `Input_Connection-0` и `Input_Var-1` в other_ports при
+пустом списке табличных inputs. Source ModelForm.SubTypeBySocketInfo различает
+connection=6, variables=3, dataset=1; NodeAbstract хранит все подтипы одной
+направленности в FPorts[0/1]. Таким образом, условие полного отсутствия входных
+портов не соответствует наблюдаемой топологии импорта. Тестовый fake исходной
+версии ошибочно задавал пустую FPorts[0].FCollection.
+
+Другие условия составного Preview guard по прошлому сообщению ошибки не
+различимы. Разработчик active; готовит bounded booleans для отказа, сохраняющие
+все текущие admission predicates, и регрессионные проверки. Следующий live
+должен установить точные false conditions до изменения допуска. Private receipt
+native-input-probe-03-port-diagnosis.json закрепляет journal/source hashes и
+подтверждённые delivery/schema. Нового браузерного запуска пока нет.
+
+
 ### Native probe03: import/Preview достигнут, native binder отказал — 2026-09-27
 
 Новый headed profile36/source57 завершён exit1 FAILED на prepare-typed-input.
