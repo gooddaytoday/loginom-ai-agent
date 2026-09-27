@@ -296,7 +296,7 @@ export async function settleJavascriptColumnEditor({page,state,record,deadline,p
   const pending=state.pending;
   const snapshot=await waitJavascriptColumnEditor({page,pending,phase,deadline:Math.min(deadline,Date.now()+15000),record});
   await record({phase:'column_editor_closed',stage:phase,snapshot});
-  await pending.held.dispose();state.pending=null;
+  await pending.held.dispose();state.pending=null;return snapshot;
 }
 
 export async function cleanupJavascriptColumnEditor({page,state,record,deadline}) {

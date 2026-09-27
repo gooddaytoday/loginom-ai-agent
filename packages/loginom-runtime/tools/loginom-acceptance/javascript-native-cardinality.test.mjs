@@ -111,14 +111,14 @@ test('duplicate rejects grouped-by-copy rows with correct six-row count',async()
  const cells=s.results.output.raw.cells;[1,2,3,1,2,3].forEach((v,i)=>{cells[i].payload[2]=v;});
  assert.throws(()=>verifyNativeRoundtripOutcome(s.results,'cardinality-duplicate'));
 });
-test('cardinality canonical empty and arbitrary selectors/count roles remain unavailable',()=>{
- for(const id of ['cardinality-empty','cardinality-code-empty','cardinality-all','cardinality-keep3']){
+test('cardinality code-empty and arbitrary selectors/count roles remain unavailable',()=>{
+ for(const id of ['cardinality-code-empty','cardinality-all','cardinality-keep3']){
   assert.throws(()=>javascriptNativeFixture(id));assert.throws(()=>javascriptNativeRoundtripProbe(id));
  }
  assert.throws(()=>javascriptNativeReadFixture(ids[0],'arbitrary'));
 });
 
-for(const id of ids)for(const mode of ['pass','bad-ack','changed-baseline'])test(id+' production pre-JS arm requires frozen raw baseline and exact ACK '+mode,async()=>{
+for(const id of [...ids,'cardinality-empty'])for(const mode of ['pass','bad-ack','changed-baseline'])test(id+' production pre-JS arm requires frozen raw baseline and exact ACK '+mode,async()=>{
  const s=await stages(id),calls=[];
  if(mode==='changed-baseline')s.results.before.raw.cells[0].payload[2]=9;
  const source=readFileSync(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');

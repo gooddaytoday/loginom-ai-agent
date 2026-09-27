@@ -1,6 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {configureJavascriptSchema} from './javascript-schema-probe.mjs';
+import {verifyJavascriptDeclaredEmpty} from './javascript-native-zero.mjs';
 import {observeJavascriptColumnEditor,openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,cleanupJavascriptColumnEditor,waitJavascriptColumnEditor,fillJavascriptColumnField,javascriptColumnFieldMatches,recordJavascriptColumnHelperSource,openJavascriptColumnTypePicker,selectJavascriptColumnTypeOption,closeJavascriptColumnTypePicker} from './javascript-column-editor.mjs';
 
 function fixture({count=0,globalForm=true}={}) {
@@ -50,7 +52,7 @@ function fixture({count=0,globalForm=true}={}) {
   const open=()=>openJavascriptColumnEditor({page,context,index:count,state,once,record,deadline:Date.now()+1000,
     add:async()=>{effects.push('add-click');onWait=n=>{if(n===1)addRecord();if(n===2)show();};}});
   const observe=phase=>page.evaluate(observeJavascriptColumnEditor,{held:state.pending.held,phase});
-  return {realm,page,context,state,once,record,open,observe,model,vendor,view,store,records,form,editor,controls,connection,events,effects,masks,dialogs,element,show,hide,addRecord,
+  return {realm,page,context,state,once,record,open,observe,model,vendor,view,store,records,form,editor,controls,connection,events,effects,masks,dialogs,element,show,hide,addRecord,nodes,
     setHit:fn=>{hit=fn;},setWait:fn=>{onWait=fn;},get waits(){return waits;},get disposed(){return disposed;}};
 }
 
@@ -463,4 +465,49 @@ test('Apply refuses unknown record flags and replacement data cache without call
     else f.records[0].data={...f.records[0].data};
     assert.notEqual((await f.observe('applied')).status,'settled');assert.equal(calls,0);
   }
+});
+
+
+// Run the production configurator and serialized observers against the same
+// native/DOM editor fixture; UI gestures update its native cached records.
+for(const mode of ['empty','sales','code','wrong-ack','wrong-phase','wrong-type','wrong-label','apply-lost'])test('production schema configuration preserves '+mode,async()=>{
+  const f=fixture(),root=f.context.root,page=f.controls.page.el.dom,base=page.tid;
+  const generation=f.element('generation',base+';BooleanPropEdit;ValueControl',page),input=f.element('generationInput',generation.tid+';InputEl',generation),display=f.element('generationDisplay',generation.tid+';DisplayEl',generation);
+  generation.classList.add('x-form-cb-checked');
+  const control=f.controls.generation={el:{dom:generation},inputEl:{dom:input},checked:true};
+  const add=f.element('add',base+';btnAddMappingColumn',page);f.controls.add={el:{dom:add}};
+  root.querySelectorAll=selector=>f.nodes.filter(e=>root.contains(e)&&e!==root&&(selector==='[data-tid]'||selector.includes(';tbl')&&e.tid.endsWith(';tbl')));
+  page.querySelectorAll=()=>[f.controls.grid.el.dom];
+  let picker;
+  const evaluate=f.page.evaluate;
+  f.page.evaluate=async(fn,arg)=>{
+    if(arg?.target){const target=arg.target==='cbxDataType'?(arg.kind==='option'?picker.option:picker.triggerDom):f.form.FItems[arg.target]?.inputEl?.dom??f.form.FItems[arg.target]?.el?.dom;f.setHit(()=>target);}
+    return evaluate(fn,arg);
+  };
+  f.page.locator=selector=>{
+    const tid=JSON.parse(selector.slice(10,-1)),element=f.nodes.find(e=>e.tid===tid);
+    return {filter(){return this;},locator(){return this;},async fill(value){
+      const key=tid.split(';').at(-1),field=f.form.FItems[key];field.value=value;field.rawValue=value;field.inputEl.dom.value=value;
+      f.records.at(-1).data[key==='edtName'?'Name':'DisplayName']=value;
+    },async click(){
+      if(element===display){control.checked=false;generation.classList.delete('x-form-cb-checked');return;}
+      if(element===add){
+        f.addRecord();f.records.at(-1).internalId='declared-'+f.records.length;f.form.ModalResultOk=false;f.show();
+        for(const key of ['edtName','edtDisplayName']){const field=f.form.FItems[key];field.value=field.rawValue=field.inputEl.dom.value='COL1';}
+        if(picker)for(let i=f.nodes.length-1;i>=0;i--)if(picker.wrap.contains(f.nodes[i])||picker.pickerDom.contains(f.nodes[i]))f.nodes.splice(i,1);
+        picker=typeFixture(f,{expanded:false,type:f.records.length===1?4:5,label:f.records.length===1?'Целый':'Строковый'});
+        picker.option.onClick=async()=>{f.records.at(-1).data.DataType=mode==='wrong-type'?3:picker.records[0].data.Value;picker.combo.isExpanded=false;picker.pickerDom.shown=false;picker.option.shown=false;};return;
+      }
+      if(element===picker.triggerDom){picker.expand();return;}
+      if(element===f.form.FItems.btnApply.el.dom){f.form.ModalResultOk=true;f.hide();if(mode==='wrong-label')f.records.at(-1).data.DisplayName='Other';if(mode==='apply-lost')throw Error('lost Apply');return;}
+      assert.fail('unexpected gesture '+tid);
+    }};
+  };
+  const run=()=>configureJavascriptSchema({page:f.page,context:f.context,mode:mode==='code'?'code':'declared',fixedCase:mode==='sales'||mode==='code'?undefined:'cardinality-empty',columnState:f.state,once:f.once,deadline:Date.now()+1000,
+    record:async event=>{f.events.push(event);return event.phase==='javascript_declared_empty_verified'?(mode==='wrong-ack'?{}:mode==='wrong-phase'?{...event,phase:'wrong'}:event):event;}});
+  if(['wrong-ack','wrong-phase','wrong-type','wrong-label','apply-lost'].includes(mode)){await assert.rejects(run);assert.equal(f.events.some(e=>e.phase==='javascript_declared_empty_verified'),['wrong-ack','wrong-phase'].includes(mode));return;}
+  const result=await run();assert.equal(result.verified,true);
+  if(mode==='empty'){verifyJavascriptDeclaredEmpty(result.declaration,result.declaration_sha256);assert.deepEqual(f.records.map(r=>[r.data.Name,r.data.DisplayName,r.data.DataType]),[['Value','Value',4]]);assert.equal(f.state.pending,null);assert.equal(f.effects.filter(e=>e==='schema-apply-0').length,1);}
+  if(mode==='sales')assert.deepEqual(f.records.map(r=>[r.data.Name,r.data.DataType]),[['ObservedID',4],['PhaseMarker',5]]);
+  if(mode==='code'){assert.equal(result.generation.checked,true);assert.equal(f.records.length,0);assert.equal(f.effects.length,0);}
 });

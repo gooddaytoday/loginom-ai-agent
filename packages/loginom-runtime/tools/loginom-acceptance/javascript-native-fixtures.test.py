@@ -27,7 +27,7 @@ def verify(kind, data):
     if kind.startswith("cardinality-"):
         case = next(case for case in CASES if case["id"] == "cardinality")
         assert values == [str(v) for v in case["input_rows"]] == fixture["values"]
-        index = {"cardinality-keep2": 0, "cardinality-odd": 1, "cardinality-duplicate": 2}[kind]
+        index = {"cardinality-keep2": 0, "cardinality-odd": 1, "cardinality-duplicate": 2, "cardinality-empty": 3}[kind]
         expected = [str(v) for v in case["cases"][index]["expected_ids"]]
         assert fixture["output_values"] == expected and fixture["output_rows"] == len(expected)
         assert [values[i] for i in fixture["output_input_rows"]] == expected
@@ -87,8 +87,8 @@ class FixtureAudit(unittest.TestCase):
     def test_cardinality_duplicate(self):
         verify("cardinality-duplicate", (HERE / "fixtures" / CATALOG["cardinality-duplicate"]["file"]).read_bytes())
 
-    def test_empty_remains_unavailable(self):
-        assert "cardinality-empty" not in CATALOG
+    def test_declared_empty_shared_input(self):
+        verify("cardinality-empty", (HERE / "fixtures" / CATALOG["cardinality-empty"]["file"]).read_bytes())
 
     def test_changed_inputs_refused(self):
         for kind in CATALOG:

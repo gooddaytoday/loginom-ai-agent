@@ -32,7 +32,7 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,targetOr
   let state=await channel.observe({condition:'native roundtrip owned graph/output',readOutputs:true,ready:s=>same(s)&&s.node_outputs?.verified===true});
   const ports=state.node_outputs.ports.filter(p=>p.index===0);need(ports.length===1&&ports[0].active===true,'one active owned output');const port=ports[0];
   const control=(s,verb)=>{const es=s.ui.elements.filter(e=>e.tid===port.tid&&e.allowed_actions.includes(verb));need(es.length===1,'unique output control');return es[0];};
-  let lifecycle,observationError,preview,readDispatched=false,openingReturned=false;
+  let lifecycle,observationError,preview,readDispatched=false,openingReturned=false,zeroFinal;
   try{
     if(role==='output'){
       await openPreview({options,ctx,input,port,state,deadline,targetOrigin,targetBuild,onState});
@@ -61,7 +61,9 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,targetOr
     const addPortPins=verifyNativeRoundtripAddPortRuntime(binding.add_port_sources);delete binding.add_port_sources;
     const cookiePins=verifyCookieRuntime(binding.cookie_sources);delete binding.cookie_sources;
     const pins=verifyCountLoaders(binding.count_loader_sources);
-    delete binding.count_loader_sources;check();
+    delete binding.count_loader_sources;
+    if(fixture.id==='cardinality-empty'&&role==='output')binding.count_loader_sha256=pins;
+    check();
     let cancellation;
     const abort=()=>{operation.transportUncertain=true;cancellation=execute(`async page=>(${cancelJavascriptNativeRoundtrip.toString()})(page,${JSON.stringify(readId)})`,{timeout:5000}).catch(()=>null);};
     ctx.signal?.addEventListener('abort',abort,{once:true});
@@ -74,7 +76,7 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,targetOr
       try{lifecycle=await execute(`async page=>(${javascriptNativeRoundtripStatus.toString()})(page)`,{timeout:5000});await onState(lifecycle);}
       catch(statusError){if(!readError)throw statusError;
         throw Object.assign(new AggregateError([readError,statusError],readError.message),{observationError:readError,cleanupError:statusError});}}
-    check();const expected={...binding,read_id:readId};
+    check();zeroFinal=raw.zero_admission?.final;const expected={...binding,read_id:readId};
     const exact=verifyNativeRoundtripRead(raw,{binding:expected,lifecycle,input,role,civil});
     const proof={exact,raw,...(civil?{civil}:{}),add_port_source_sha256:addPortPins,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,subscription_proxy_source_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
     if(fixture.id==='civil-datetime'||fixture.output_input_rows)freezeCivilEvidence(proof);
@@ -97,6 +99,13 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,targetOr
           identity:()=>({node:ctx.node,port_guid:port.port_guid,root}),resolve:s=>{
             const es=s.ui.elements.filter(e=>e.tid===root+';p.h;close'&&e.allowed_actions.includes('click'));need(es.length===1,'owned Preview Close');return {verb:'click',ref:es[0].ref};}});
         await channel.observe({condition:'same roundtrip graph after Preview',ready:same});check();
+        if(zeroFinal){
+          const facts=await execute(`async page=>page.evaluate(()=>globalThis.__loginomJavascriptNativeRoundtripV1.bindings.get('output').zeroCheck())`,{timeout:Math.min(10000,deadline-now())});
+          need(JSON.stringify(facts)===JSON.stringify(zeroFinal.facts),'zero cache/schema changed after graph return');
+          const event={phase:'javascript_native_zero_graph_verified',operation_id:operation.id,read_id:zeroFinal.read_id,declaration_sha256:zeroFinal.declaration_sha256,facts};
+          const saved=await onRecord(event);need(Object.keys(event).every(k=>JSON.stringify(saved?.[k])===JSON.stringify(event[k])),'zero graph journal ACK differs');
+          if(!observationError)await execute(`async page=>page.evaluate(receipt=>globalThis.__loginomJavascriptNativeRoundtripV1.bindings.get('output').zeroAcknowledge(receipt),${JSON.stringify(event)})`,{timeout:Math.min(10000,deadline-now())});
+        }
         await onRecord({phase:'javascript_native_roundtrip_'+role+'_preview_closed',operation_id:operation.id,node:ctx.node});
       }catch(cleanupError){operation.transportUncertain=true;await onState({...lifecycle,uncertain:true});if(!observationError)throw cleanupError;
         throw Object.assign(new AggregateError([observationError,cleanupError],observationError.message),{observationError,cleanupError});}
