@@ -19,6 +19,16 @@
 ### A8/8 завершена; следующий шаг — реализация B
 
 
+B implementation: developer сообщил final JS/native2441PASS,Python15PASS,
+publicdeny3PASS; fullclient ещё активен, freeze85 пока не передан. Это developer
+результаты, не root acceptance. Root уточнил association auditor под окончательное
+поле return_characterized (case_complete только после final cleanup/persist):
+SHA87bf398a285e8ed067393364fcec7b175cc5b250c68b1d259d9a991f125f2753,
+16positive/192negative PASS. Старый draft сохранён отдельно. Подготовлен
+private audit-named-b-completed-live.py; на B live ещё НЕ запускался. Для него
+обязательны frozen source85 manifest, полный journal/owner/cleanup proof.
+
+
 Дополнительно root B recorded-association auditor SHA
 bc598da36f80e0a4c1bd523ccfbf0083a7f9397f737b439ca1431cee73f03209:
 16syntheticpositive/192negative PASS, связывает9cells/source/owner/child/lifecycle;
