@@ -16,6 +16,29 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze46: mapping unlock и Apply sync — live запущен — 2026-09-27
+
+Root независимо проверил100 tests PASS (column-editor36,stage-observer14,
+execution-evidence34,batch8,link-topology8),30/30 hashes до/после тестов.
+Developer commit `1c6c6df209c1f58c96564b6c33dddc597c80b871`:4 source/test файла.
+Shared guard не ослаблен: private reconciliation принимает только exact receipt
+применённого confirm_wizard_close с единственным locked:true→false; затем требует
+два свежих unlocked-context samples, отсутствие wizard/dialog/mask, прежние
+native node/port identities и полный semantic graph. Исходный AMBIGUOUS сохранён,
+повторного Close нет. Apply/Cancel/capture учитывают own sync/needsSync,
+removed queue, dirty/phantom/dropped; неизвестные accessor flags не считаются clean.
+После Apply timeout не разрешает Cancel либо повтор записи.
+
+Batch46 RUNNING, freshprofile19, DISPLAY=:1/headed/Chromium1246/sandbox.
+Cases: declared-table-execute,code-sentinel-execute,declared-sentinel-execute,
+code-table-mismatch,declared-sentinel-next,declared-sentinel-done,
+code-sentinel-next,code-sentinel-done. Уже подтверждённый Preview отдельно
+не повторяется; новый clean-Apply boundary проверяется declared-table case.
+Private source receipt/root-test receipt и host lease сохранены.
+Developer завершил ход и заморозил source; runtime процесс принадлежит root.
+Это ещё не результат live46 и не закрытие G2/G3/полной цели.
+
+
 ### Batch45: declared Preview и полный выход подтверждены; reopening требует fix46 — 2026-09-27
 
 После перезапуска Codex повторно проверены OpenViking MCP health, actor search и
