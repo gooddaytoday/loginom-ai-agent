@@ -15,6 +15,25 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze59: actual error delivery проверена; probe05 запущен
+
+Source node-javascript `29dd62c4428f7272405f7a0297b731ad4a7eab8f` меняет только
+private binder diagnostic и tests. Формат NI1: n=count, i=до4 tuples
+[parentMatches,type,subtype,param,status], o=outputParam, f=failed checks.
+Inventory находится в начале; все13 прежних admission predicates сохранены.
+
+Root **83/83 PASS**,66pins unchanged до/после. Новые тесты проходят actual
+executor executeNodeScript → parseCapabilityResult → runNodeApply → execution
+journal; prefix+полный diagnostic JSON <400chars даже для all-checks failure.
+Контрольная произвольная ошибка по-прежнему обрезается на500chars. Synthetic
+port statuses/params не считаются live evidence. Receipt operator59-root-test-source.json.
+
+Разработчик idle. Запущен native-input-probe-05 на fresh profile38 в headed
+Chromium, DISPLAY=:1/sandbox; прежний profile37 сохранён, cleanup04 ALL PASS.
+Новый результат/cleanup ещё не подтверждены. После terminal разобрать NI1,
+не принимать отсутствующие states по тестовой модели. G5 и весь план открыты.
+
+
 ### Probe04: единственный guard failure установлен; diagnostic delivery обрезана
 
 Headed profile37/source58 завершён exit1 FAILED. Все13 Preview checks доставлены:
