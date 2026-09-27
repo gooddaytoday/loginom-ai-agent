@@ -16,6 +16,40 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Batch47: declared table/reopen FULL PASS; error toast блокирует console — 2026-09-27
+
+Root-аудит1773 journalSHA,3 input reads/90cells,1 fresh completed execution,
+полный typed6×2/12cells. Первый declared-table-execute завершён OBSERVED,
+gate_passed/safe_to_continue=true. Независимый boundary receipt проверил полный
+reopened source digest, mode, semantic input/output mappings before==after и
+native breadcrumb epoch1 с текущей меткой JS: ObservedID, PhaseMarker.
+Это первое полное declared table/source/reopen/mapping подтверждение.
+
+Второй code-sentinel-execute FAILED: NodeReadinessTimeout «prepared node available
+for process console; no mutation was authorized». Эта последняя фраза относится
+к очередному шагу: журнал уже содержит execute_graph_node dispatch03:52:16.165Z.
+Затем prepared node context остаётся same verified graph/unlocked, masks0,
+но ui.dialogs содержит anchor_tid=toast. Root просмотрел screenshot: ожидаемая
+JS_G2_EXECUTION_SENTINEL_V1 ошибка в уведомлении и красный JS-узел. Одного текста
+недостаточно для terminal/process ownership, поэтому case не объявлен PASS.
+Console ещё unobserved; первопричина timeout — notification в dialog guard.
+
+Original cleanup package/logout/browser ALL PASS, terminal exit1 FAILED.
+Recovery не нужен; leaseclosed, freshprofile21 назначен, profile20 сохранён.
+Остальные6cases NOT_RUN. Private receipts g2-batch-47-verification.json и
+boundary-verification.json. Same developer task выполняет fix48: доказанный
+путь passive settlement error notification и свежего process console read,
+без повторного Execute, без широкого ignore dialogs и без присвоения ownership
+по тексту. Exact Message.js получен: SHA
+87d2051a19fc5afe30a8cfd41d54f12f522713e6398208808a7052ec1e5cc2be;
+он задаёт auto-close toast до60s, тогда как текущий console wait15s.
+Это объясняет возможное расхождение budget, но подход ещё требует проверки
+native lifecycle и адресных тестов. Source bodies остаются приватными.
+
+Public JS-handler, остальная матрица, итоговое ревью и автономная CLI-приёмка
+по-прежнему не завершены. Полная цель активна.
+
+
 ### Freeze47: актуальный native breadcrumb передан в live — 2026-09-27
 
 Root106 tests PASS: column-editor36,stage-observer14,execution-evidence40,batch8,
