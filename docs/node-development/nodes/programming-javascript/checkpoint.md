@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Native-input-probe-01: stale download gesture до импорта — 2026-09-27
+
+Source56/profile34 завершён exit1 FAILED на prepare-typed-input. Upload дошёл до
+обнаружения файла (33 bytes), но download verification: NOT_APPLIED,
+effect_possible=false, DOWNLOAD_GESTURE_NOT_CONFIRMED. Точный gesture отказ:
+UI_REFERENCE_STALE; ожидание download event закончилось timeout. Итоговая delivery
+AMBIGUOUS — server bytes не подтверждены, import/JS/native read не запускались.
+Original cleanup ALL PASS: пакет закрыт, logout и browser close подтверждены.
+Повторов не выполнялось, recovery не требуется; profile34 сохранён.
+
+Root проверил59 journalSHA и66/66 неизменённых source pins. Report SHA:
+`b34336d85c5677a3e667184d7f86711136510491113e6f4544adbb3693b3cde0`.
+Private receipt native-input-probe-01-verification.json. Старый G2 auditor после
+проверки journal отказал на отсутствии execution_input: вход ещё не создан;
+его all-cell часть к этому pre-import отказу неприменима и PASS ей не приписан.
+
+Существующей задаче поручены diagnosis/fix по фактической stale reference и
+regression без ослабления ownership, повторов unknown effect или обхода download
+verification. Длина нового имени файла пока лишь гипотеза. Браузер закрыт,
+source freeze снят для исправления; G5 и полный план остаются active/incomplete.
+
+
 ### Freeze56 проверен; native-input-probe-01 запущен — 2026-09-27
 
 Source commit в node-javascript: `63aafcbf59d1f834de3fbe173a7308167f47d94f`.
