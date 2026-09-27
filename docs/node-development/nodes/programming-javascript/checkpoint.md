@@ -16,6 +16,32 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze55: isolated discovery; engine-probe-01 запущен — 2026-09-27
+
+Source commit `520ce1f78ce39859d3ce30a65db93e80c9081747`,8 private source/test files.
+Root сверил42/42 финальных SHA до/после111 адресных tests PASS: discovery14,
+mismatch17,execution-evidence72,batch8. Shared client files не менялись;
+полный workspace-ui288 PASS остаётся применимым. Разработчик сообщил490 PASS
+(487direct+3targeted); root не прибавляет их к своим111. Задача подтверждённо idle.
+
+Fix55 сохраняет changed terminal до последующих чтений, раздельно observation/
+cleanup errors; bounded empty-source classification допускается лишь после
+подтверждённой owned failure и остаётсяunverified/gatefalse. Новый одиночный
+--discovery-probe path использует fresh package/profile и один JS-узел, не более
+одного явного JS Execute, отдельный fixed oracle и graph/input boundary.
+Wizard diagnostic до Execute отделён от native process error после Execute;
+оба сохраняют наблюдённые доказательства, не выдумывают syntax support.
+
+Engine-probe-01 запущен root: только engine-data-smoke, freshprofile29,
+headed DISPLAY=:1, sandbox enabled. Source receipt закрепляет42SHA/commit/tests.
+Ожидается ровно1×1 Result:string='Data ready', полная cleanup. Это smoke API/UI,
+не native byte proof и не закрытие G5. На момент записи RUNNING.
+Private verify-engine-smoke.py подготовлен для независимой проверки результата
+вместе с journal/native execution auditor; live acceptance ещё не получен.
+Повтор batch55 ради успешного mapping не назначен: отрицательная совместимость
+уже подтверждена. Дальше отдельные строковые probes и оставшийся полный план.
+
+
 ### Batch55: изменённая schema несовместима с прежней manual link — 2026-09-27
 
 Дополнение root06:32UTC: промежуточный fix55 проверен17 адресными tests PASS.
