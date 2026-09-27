@@ -16,6 +16,26 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Fix49: точная цепочка ModelForm loading mask — 2026-09-27
+
+Root получил со стенда по подтверждённым Uses.js путям HTTP200:
+Mask.js SHA60ecabc17c86df4a034bbace02e8d1f80ad7bbcf88f4a3a4721ebd656e858051,
+Controller.js SHA960886f953daefa7b06b06173b4f6a0b8a15daea07e44b5e3e81bd531e5e2949,
+Lock.js SHAe321d140d5da0ef14ab24435e9a6562c1042f2e5f789424de6d1c3dfa2af23bd.
+Private manifests fix49-source-manifest.json/fix49-lock-source-manifest.json;
+тела исходников остаются вне Git.
+
+ModelForm301–303 создаёт lock decorators; Lock219–220 выбирает LS_Loading и
+ext.MaskAfterElementText,274 вызывает маску для Views[i]. Mask341–342 задаёт
+AfterElementTextMaskContext.ClsName=bg-mask-message и ElementSymb;367 сохраняет
+native context на переданном объекте. FElement/FController/FIsActive и sequence
+описывают владельца/состояние. Это отличается от legacy Ext Element.mask с
+_extData.maskEl: наличие такого старого helper не доказывает его использование
+ModelForm. Разработчику переданы exact sources для обоснования пассивного
+ожидания и tests busy→toast→quiet. Instance ownership ещё требует live проверки.
+Source49 пока не передан; нового браузера нет, lease closed/profile22 reserved.
+
+
 ### Batch48: Execute dispatch подтверждён, busy mask требует settlement — 2026-09-27
 
 Batch48 terminal exit1 FAILED, original package/logout/browser cleanup ALLPASS.
