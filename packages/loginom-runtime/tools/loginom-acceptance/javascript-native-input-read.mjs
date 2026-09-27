@@ -13,7 +13,7 @@ export async function readJavascriptNativeInput(page,b,decode,options={}) {
   need(receipt&&receipt.tab===document.querySelector('[data-tid='+JSON.stringify(b.tab_tid)+']')&&receipt.tab.classList.contains('x-tab-active'),'workflow receipt');
   const captured=globalThis.__loginomJavascriptNativeInputBindingV1;
   need(captured?.document===document&&captured.id===b.runtime_binding_id,'private native input binding required');
-  const slice={real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6],'cardinality-empty':[3,4,0]}[b.fixture_id??'real'];
+  const slice={"integer-coercion-fraction-positive":[1,3,1,4],"integer-coercion-fraction-negative":[1,3,1,4],"integer-coercion-string-numeric":[1,5,1,4],"integer-coercion-string-invalid":[1,5,1,4],"integer-coercion-nan":[1,3,1,4],"integer-coercion-positive-infinity":[1,3,1,4],"integer-coercion-negative-infinity":[1,3,1,4],real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6],'cardinality-empty':[3,4,0]}[b.fixture_id??'real'];
   need(Array.isArray(slice)&&b.rows===slice[0]&&b.row_count===slice[0]&&b.columns.length===1&&b.columns[0]===0
     &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:slice[1]}]),'fixed native slice');
   const snapshot=()=>captured.capture(b);

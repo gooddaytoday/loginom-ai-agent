@@ -13,10 +13,11 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
   need(receipt&&receipt.tab===document.querySelector('[data-tid='+JSON.stringify(b.tab_tid)+']')&&receipt.tab.classList.contains('x-tab-active'),'workflow receipt');
   const captured=globalThis.__loginomJavascriptNativeRoundtripV1?.bindings.get(b.roundtrip_role);
   need(captured?.document===document&&captured.id===b.runtime_binding_id,'private native input binding required');
-  const slice={real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6],'cardinality-empty':[3,4,0]}[b.fixture_id??'real'];
+  const slice={"integer-coercion-fraction-positive":[1,3,1,4],"integer-coercion-fraction-negative":[1,3,1,4],"integer-coercion-string-numeric":[1,5,1,4],"integer-coercion-string-invalid":[1,5,1,4],"integer-coercion-nan":[1,3,1,4],"integer-coercion-positive-infinity":[1,3,1,4],"integer-coercion-negative-infinity":[1,3,1,4],real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6],'cardinality-empty':[3,4,0]}[b.fixture_id??'real'];
+  const typeCode=b.roundtrip_role==='output'?(slice?.[3]??slice?.[1]):slice?.[1];
   const rowCount=b.roundtrip_role==='output'?(slice?.[2]??slice?.[0]):slice?.[0];
   need(Array.isArray(slice)&&b.rows===rowCount&&b.row_count===rowCount&&b.columns.length===1&&b.columns[0]===0
-    &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:slice[1]}]),'fixed native slice');
+    &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:typeCode}]),'fixed native slice');
   const snapshot=()=>captured.capture(b);
   const bound=()=>{const s=snapshot();need(Object.keys(captured.initial).every(k=>captured.initial[k]===s[k]),'native input changed since binding');return s;};
   need(Object.keys(options).every(k=>['operationId','timeoutMs','requireAtomicSnapshot','maxBytes'].includes(k)),'diagnostic option allowlist');

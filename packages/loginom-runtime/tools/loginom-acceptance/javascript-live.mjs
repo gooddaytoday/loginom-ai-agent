@@ -1,3 +1,5 @@
+import {createJavascriptCoercionTrial,writeJavascriptCoercionReport} from './javascript-native-coercion-run.mjs';
+import {javascriptCoercionIds} from './javascript-native-coercion-cases.mjs';
 import {captureJavascriptNativeClassifierDiagnostic} from './javascript-native-classifier-diagnostic.mjs';
 import {verifyJavascriptDeclaredEmpty} from './javascript-native-zero.mjs';
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
@@ -36,7 +38,7 @@ let cleaning=false;
 const phaseDeadline=ms=>Math.min(cleaning?Infinity:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=batchDeadline-Date.now();if(!cleaning&&ms<=0)throw Error('Original batch deadline expired');return cleaning?Infinity:ms;};
 const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
-if (args.includes('--help')) { console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
+if (args.includes('--help')) { if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
 const allowed = new Set(['--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
@@ -51,6 +53,7 @@ if(nativeInputOnly||nativeRoundtrip){
   options['--create-node']=true;
 }
 const nativeFixtureId=options['--native-fixture']??'real',nativeFixture=javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=javascriptNativeRoundtripProbe(nativeFixtureId);
+const coercionTrial=nativeRoundtrip&&nativeFixture.coercion?createJavascriptCoercionTrial(nativeFixtureId):null;
 const discoveryProbe=options['--discovery-probe']?javascriptDiscoveryProbe(options['--discovery-probe']):null;
 if(discoveryProbe&&(batch||options['--execution-case']))throw Error('Discovery requires one isolated probe, not a batch or execution case');
 let executionCase=nativeRoundtrip?nativeRoundtripProbe.schema_mode+'-table-execute':discoveryProbe?'code-table-execute':batch?.[0]??options['--execution-case'];
@@ -119,7 +122,10 @@ const executionRecord=async event=>{
   await save();return saved;
 };
 const createRemaining=()=>{const remaining=createDeadline-Date.now();if(remaining<=0)throw Error('Original package preparation deadline expired');return remaining;};
-const save=async()=>writeFile(directory+'/report.json',JSON.stringify(redactor.redact(rootReport),null,2)+'\n',{mode:0o600});
+const save=async()=>{
+  if(coercionTrial){rootReport.native_coercion=coercionTrial.coverage;return writeJavascriptCoercionReport(directory,redactor.redact(rootReport));}
+  return writeFile(directory+'/report.json',JSON.stringify(redactor.redact(rootReport),null,2)+'\n',{mode:0o600});
+};
 const exact=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
 const visibleOne=async locator=>{
   const visible=locator.filter({visible:true});
@@ -467,7 +473,7 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
         if(nativeFixtureId==='cardinality-empty')verifyJavascriptDeclaredEmpty(report.execution_schema.declaration,report.execution_schema.declaration_sha256);
         const event={phase:'native_roundtrip_schema_bound',...await page.evaluate(bindJavascriptNativeRoundtripSchema,{...schemaContext(),schema:report.execution_schema})};
         const saved=await executionRecord(event);
-        if(nativeFixtureId==='cardinality-empty'&&JSON.stringify(Object.fromEntries(Object.keys(event).map(k=>[k,saved?.[k]])))!==JSON.stringify(event))throw Error('Declared schema binding journal ACK differs');
+        if((nativeFixtureId==='cardinality-empty'||nativeFixture.coercion)&&JSON.stringify(Object.fromEntries(Object.keys(event).map(k=>[k,saved?.[k]])))!==JSON.stringify(event))throw Error('Declared schema binding journal ACK differs');
       }
     }
     if(current.visible_editors===1&&!remainingPages)return current;
@@ -720,6 +726,11 @@ const runExecutionTrial=async probe=>{
     const attestation=await page.evaluate(sealJavascriptNativeRoundtripDone,roundtripDone);
     const saved=await executionRecord({phase:'native_roundtrip_done_sealed',attestation});
     if(JSON.stringify(saved.attestation)!==JSON.stringify(attestation))throw Error('Done seal journal ACK differs');
+    if(coercionTrial){
+      report.native_roundtrip=await coercionTrial.run({runtime:executionRuntime,input:executionInput,node:executionNode,sourceProbe:probe,deadline,
+        record:executionRecord,onExecution:async execution=>{report.execution_probe.execution=execution;await save();}});
+      report.stage='native-coercion-awaiting-finalization';report.gates_closed=[];await save();return;
+    }
     await executionRuntime.checkNativeRoundtripBeforeExecute();
     const boundary=await executionRuntime.captureExecutionBoundary();
     try{
@@ -1056,7 +1067,7 @@ const runPreparedCase=async()=>{
       if(nativeRoundtrip){
         const event={phase:'native_roundtrip_source_bound',...await page.evaluate(bindJavascriptNativeRoundtripSource,{...schemaContext(),schema:report.execution_schema})};
         const saved=await executionRecord(event);
-        if(nativeFixtureId==='cardinality-empty'&&JSON.stringify(Object.fromEntries(Object.keys(event).map(k=>[k,saved?.[k]])))!==JSON.stringify(event))throw Error('Declared source binding journal ACK differs');
+        if((nativeFixtureId==='cardinality-empty'||nativeFixture.coercion)&&JSON.stringify(Object.fromEntries(Object.keys(event).map(k=>[k,saved?.[k]])))!==JSON.stringify(event))throw Error('Declared source binding journal ACK differs');
       }
       // Execution dispatch is kept separate from source replacement; each
       // trigger receives its own fresh error baseline and once-only receipt.
@@ -1066,7 +1077,8 @@ const runPreparedCase=async()=>{
     report.stage='discard-wizard';
     if(openedWizard)await closeWizardOnce();
     await snapshot('wizard-discarded');
-    if(nativeRoundtrip&&report.native_roundtrip)report.stage=report.native_roundtrip.outcome?.characterization_only?'native-roundtrip-characterized':'native-roundtrip-observed';
+    if(coercionTrial&&report.native_roundtrip)report.stage='native-coercion-awaiting-finalization';
+    if(nativeRoundtrip&&report.native_roundtrip&&!coercionTrial)report.stage=report.native_roundtrip.outcome?.characterization_only?'native-roundtrip-characterized':'native-roundtrip-observed';
     }
     }
 };
@@ -1133,7 +1145,7 @@ try {
     report.stage='graph-ready';await waitGraphReady(createRemaining());
     await snapshot('graph-ready-baseline');
     if(executionCase||nativeInputOnly){
-      report.scope=nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
+      report.scope=coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
       if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=1;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
@@ -1201,7 +1213,7 @@ try {
       }
     }
   }
-  report.status='OBSERVED';
+  report.status=coercionTrial?'PENDING_EVIDENCE':'OBSERVED';
 } catch(error) {
   report.status='FAILED';report.failure={stage:report.stage,...redactor.redact(javascriptProbeFailure(error))};
   const diagnostic=await captureJavascriptNativeClassifierDiagnostic({nativeRoundtrip,stage:report.stage,page,binding:nativeClassifierBinding});
@@ -1336,9 +1348,13 @@ try {
   }
   if(browserLifecycle)Object.assign(report.browser_lifecycle,await browserLifecycle.finish());
   if (!report.cleanup.package_closed||!report.cleanup.logged_out||!report.cleanup.browser_closed) report.status='CLEANUP_UNCONFIRMED';
-  report.finished_at=new Date().toISOString();await save();
+  report.finished_at=new Date().toISOString();
+  if(coercionTrial){
+    try{await coercionTrial.finish({cleanup:report.cleanup,failure:report.failure,record:executionRecord,persist:async status=>{report.status=status;await save();}});}
+    catch(error){report.status='EVIDENCE_UNCONFIRMED';report.evidence_failure=redactor.text(String(error.message)).slice(0,1200);await save().catch(()=>{});}
+  }else await save();
   console.log(JSON.stringify({status:report.status,work_stage:report.work_stage,report:directory+'/report.json',cleanup:report.cleanup}));
-  if (report.status!=='OBSERVED') process.exitCode=1;
+  if (!['OBSERVED','CHARACTERIZED'].includes(report.status)) process.exitCode=1;
 }
 
 }

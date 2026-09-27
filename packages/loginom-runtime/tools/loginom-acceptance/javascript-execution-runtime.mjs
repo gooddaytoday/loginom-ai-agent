@@ -3,6 +3,7 @@ import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,completeJavascriptNativeRoundtrip} from './javascript-native-roundtrip-owner.mjs';
 import {javascriptNativeRoundtripProbe,verifyNativeRoundtripInput,verifyNativeRoundtripExecution,verifyNativeRoundtripProvenance,verifyNativeRoundtripOutcome} from './javascript-native-roundtrip-contract.mjs';
 import {readNativeRoundtrip} from './javascript-native-roundtrip-driver.mjs';
+import {readNativeCoercionFailure} from './javascript-native-coercion-failure-driver.mjs';
 import {waitJavascriptWizardSettlement} from './javascript-wizard-settlement.mjs';
 // All generated runtime code runs against the caller's authenticated page.
 // No browser launch, credentials, server RPC, or second MCP context lives here.
@@ -666,7 +667,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
   const pinned={actions:new Map(actions.map(action=>[action.action_key,action])),selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
   const artifactStore=await createArtifactStore({directory:directory+'/input-artifacts',sessionId});
   const support=nativeInputOnly?createJavascriptNativeInputSupport({targetOrigin:origin,targetBuild:build,fixtureId:nativeFixtureId,
-    onProof:async(proof,owner)=>{nativeInputEvidence=nativeFixtureId==='civil-datetime'||nativeInputFixture.output_input_rows?freezeCivilEvidence(structuredClone(proof)):proof;nativeInputOwner=owner;},
+    onProof:async(proof,owner)=>{nativeInputEvidence=nativeFixtureId==='civil-datetime'||nativeInputFixture.output_input_rows||nativeInputFixture.coercion?freezeCivilEvidence(structuredClone(proof)):proof;nativeInputOwner=owner;},
     onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0
       ||state.status!=='completed'||state.requests!==nativeInputFixture.rows||state.releasedRequests!==nativeInputFixture.rows||state.releasedResponses!==nativeInputFixture.rows;
       await record({phase:'javascript_native_input_lifecycle',state,uncertain:nativeReadUncertain});}})
@@ -814,7 +815,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     },
 
     async prepareInput() {
-      const fixture=nativeInputOnly?new URL('./fixtures/'+nativeInputFixture.file,import.meta.url)
+      const fixture=nativeInputOnly?new URL((nativeInputFixture.coercion?'../../../../docs/node-development/nodes/programming-javascript/fixtures/operator-only/':'./fixtures/')+nativeInputFixture.file,import.meta.url)
         :new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/model-input/sales.csv',import.meta.url);
       const pin=nativeInputOnly?verifyNativeInputFixture(await readFile(fixture),nativeFixtureId)
         :verifyJavascriptFixture(await readFile(fixture),JSON.parse(await readFile(new URL('../manifest.json',fixture),'utf8')));
@@ -868,18 +869,26 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       if(!nativeInputOnly||nativeReadUncertain)throw Error('Private native input required');
       const proof=verifyNativeRoundtripInput(input,nativeFixtureId);validateNativeSource();
       const saved=await record({phase:'native_roundtrip_input_before_js',proof});
-      if(JSON.stringify(saved.proof)!==JSON.stringify(proof))throw Error('Pre-JS baseline ACK differs');
+      if(JSON.stringify(saved.proof)!==JSON.stringify(proof)||nativeFixtureId.startsWith('integer-coercion-')&&saved.phase!=='native_roundtrip_input_before_js')throw Error('Pre-JS baseline ACK differs');
       const armed=await page.evaluate(armJavascriptNativeRoundtrip,{binding:{...proof.binding,read_id:proof.raw.read_id},...nativeRoundtripProbe});
       await record({phase:'native_roundtrip_armed',...armed});return armed;
     },
     async checkNativeRoundtripBeforeExecute() {
       validateNativeSource();
-      await page.evaluate(()=>{const s=globalThis.__loginomJavascriptNativeRoundtripV1;if(s?.stage!=='done-sealed')throw Error('Confirmed Done source not sealed');s.check();});
+      await page.evaluate(()=>{const s=globalThis.__loginomJavascriptNativeRoundtripV1;if(s?.stage!=='done-sealed'||globalThis.__loginomJavascriptCoercionFailureV1)throw Error('Confirmed Done source not sealed or failed terminal already reserved');s.check();});
     },
     async bindNativeRoundtripGraph(node,inputPortGuid) {
       validateNativeSource();
       const result=await page.evaluate(bindJavascriptNativeRoundtripGraph,{node,inputPortGuid});
       await record({phase:'native_roundtrip_graph_bound',...result});
+    },
+    async readNativeCoercionFailure(input,node,execution) {
+      if(!nativeInputFixture.coercion||nativeReadUncertain)throw Error('Fixed coercion failed route required');
+      return readNativeCoercionFailure({page,input,node,execution,fixtureId:nativeFixtureId,workflow:prepared.workflow_ref,deadline,
+        targetOrigin:origin,targetBuild:build,validateSource:validateNativeSource,
+        options:{execute,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>!nativeReadUncertain,
+          receiptOptions:(id,key,signature)=>({receipt_namespace:sessionId,receipt_id:id,receipt_signature:signature,operation_id:id})},
+        onState:async(state,uncertain)=>{nativeReadUncertain=uncertain;}});
     },
     async readNativeRoundtrip(input,node,execution) {
       const before=verifyNativeRoundtripInput(input,nativeFixtureId);validateNativeSource();
@@ -901,9 +910,9 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       await page.evaluate(()=>globalThis.__loginomJavascriptNativeRoundtripV1.check());
       validateNativeSource();
       results.outcome=verifyNativeRoundtripOutcome(results,nativeFixtureId);
-      if(nativeInputFixture.output_input_rows)freezeCivilEvidence(results);
+      if(nativeInputFixture.output_input_rows||nativeInputFixture.coercion)freezeCivilEvidence(results);
       const saved=await record({phase:'native_roundtrip_verified',results,g5_complete:false});
-      if(JSON.stringify(saved.results)!==JSON.stringify(results))throw Error('Roundtrip final journal ACK differs');
+      if(JSON.stringify(saved.results)!==JSON.stringify(results)||nativeInputFixture.coercion&&saved.phase!=='native_roundtrip_verified')throw Error('Roundtrip final journal ACK differs');
       return results;
     },
     async readNativeCivil(node,execution,role) {

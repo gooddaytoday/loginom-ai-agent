@@ -22,7 +22,8 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,targetOr
   const deadline=Math.min(ctx.deadline,input.binding.deadline);
   const check=()=>{ctx.signal?.throwIfAborted();need(now()<deadline,'original deadline expired');
     need(options.exclusiveNodeOperation()===true,'owning read lock lost');
-    need(['output','upstream'].includes(role),'private roundtrip role');};
+    need(['output','upstream'].includes(role),'private roundtrip role');
+    if(ctx.failed_terminal)need(fixture.coercion&&role==='upstream','failed branch is upstream-only');};
   check();const frontends=await verifyFrontends(execute,targetOrigin,deadline,ctx.signal);check();
   const channel=createProcedure({operation,execute,record:onRecord,now,signal:ctx.signal,maxSteps:128,targetOrigin,targetBuild,
     preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
@@ -47,13 +48,13 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,targetOr
     preview=await channel.observe({condition:'native roundtrip Preview schema',readPreview:true,ready:s=>s.node_preview_schema?.verified===true
       &&s.node_preview_schema.port_guid===port.port_guid&&s.node_preview_schema.port===0});
     need(preview.node_preview_schema.fields.length===1&&preview.node_preview_schema.fields[0].name==='Value'
-      &&preview.node_preview_schema.fields[0].label==='Value'&&preview.node_preview_schema.fields[0].type===fixture.type,'Preview fixed schema');
+      &&preview.node_preview_schema.fields[0].label==='Value'&&preview.node_preview_schema.fields[0].type===readFixture.type,'Preview fixed schema');
     const readId='js-native-roundtrip-'+hash(operation.id+':'+role+':'+ctx.execution.execution_id).slice(0,40);
     const args={fixture_id:fixture.id,binding_id:readId,runtime_binding_id:input.binding.runtime_binding_id,roundtrip_role:role,source_sha256:nativeRoundtripProbe.source_sha256,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,
       package_id:ctx.document_id+':'+ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id,port_guid:port.port_guid,
       origin:targetOrigin,tab_tid:ctx.workflow_ref.tab_tid,prefix:ctx.workflow_ref.prefix,execution:ctx.execution,
-      completed_child:ctx.execution,deadline,method:321,interface:116,port:0,offset:0,rows:readFixture.rows,row_count:readFixture.rows,columns:[0],
-      schema:[{name:'Value',label:'Value',type:fixture.native_type}]};
+      completed_child:ctx.execution,...(ctx.failed_terminal?{failed_terminal:ctx.failed_terminal}:{}),deadline,method:321,interface:116,port:0,offset:0,rows:readFixture.rows,row_count:readFixture.rows,columns:[0],
+      schema:[{name:'Value',label:'Value',type:readFixture.native_type}]};
     check();
     // Retain the original attested runtime; page-local checks reject rebinding.
     const runtime=input.runtime;
@@ -79,7 +80,7 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,targetOr
     check();zeroFinal=raw.zero_admission?.final;const expected={...binding,read_id:readId};
     const exact=verifyNativeRoundtripRead(raw,{binding:expected,lifecycle,input,role,civil});
     const proof={exact,raw,...(civil?{civil}:{}),add_port_source_sha256:addPortPins,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,subscription_proxy_source_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
-    if(fixture.id==='civil-datetime'||fixture.output_input_rows)freezeCivilEvidence(proof);
+    if(fixture.id==='civil-datetime'||fixture.output_input_rows||fixture.coercion)freezeCivilEvidence(proof);
     const event={phase:'javascript_native_roundtrip_'+role+'_cells_verified',operation_id:operation.id,proof};
     const saved=await onRecord(event);need(saved?.phase===event.phase&&JSON.stringify(saved.proof)===JSON.stringify(proof),'native journal acknowledgement differs');
     return proof;
