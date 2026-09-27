@@ -15,6 +15,24 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze63: exact journal ACK исправлен; probe09 запущен
+
+Source node-javascript `ab76a768b2d5c3190b79f11dbebec2ff7c0b246d` переименовывает
+поле proof в subscription_proxy_source_sha256. Redactor, native ownership и
+exact ACK comparison не изменены. Два новых теста проводят полный proof через
+настоящий createExecutionJournal/fsync/read-back; проверяют sensitive redaction
+и отказ при изменённом lifecycle ACK. Root независимо: **352/352 PASS**, fail/skip0;
+66pins до/после совпадают. Дополнительный offline replay реального probe08 proof
+с этим именем также сохранил exact proof и redaction тестового authorization.
+
+Private operator63-root-test-source.json и native-input-probe-09-source.json
+закрепляют исходники. Разработчик idle. Повторно сверены Node24.19.0/Chromium1246
+binary SHA. Profile41 сохранён после полного cleanup; fresh profile42 назначен
+атомарно с backup/receipt. Native-input-probe-09 запущен headed, DISPLAY=:1,
+sandbox; на момент checkpoint RUNNING. Его native/ACK/cleanup ещё не подтверждены.
+G5, JS-output и весь план остаются незавершёнными.
+
+
 ### Probe08: байты прочитаны; durable ACK отклонён после redaction
 
 Headed profile41/source62 завершён FAILED. Original cleanup подтверждает
