@@ -16,6 +16,31 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze53: DataSet controls; полный workspace-ui PASS — 2026-09-27
+
+Source commit `05e40b740bc6a3e39b37e3226144985967975e1a`:shared port-mapping-procedure
+и его tests. DataSetOutputSocketWizard включён в точный mappingControl список
+и существующую grouped reorder ветвь. Unique clickable/current root/ref/value,
+source/schema preservation, group membership и owned Done checks сохранены.
+Остальные36 прежних pins неизменны; freeze теперь38 файлов.
+Root проверил diff,38/38 hashes до/после и104 адресных tests PASS
+(port-mapping32+private execution72). Ранее проверенные неизменные suites не повторялись.
+Разработчик отдельно сообщил456direct+3targeted PASS; root не смешивает эти счётчики.
+
+Независимый полный workspace-ui завершился exit0: **288 tests PASS**,0fail/skip,
+151690ms. Запуск pinned Node24.19.0 --test --test-reporter=spec, nice15,
+workspace-ui/test SHA остались33c126ed…/51aef30d…(Freeze52/53).
+Private stdout/stderr и workspace-ui-full-root52.json сохраняют команду,время,
+полные hashes и source_unchanged=true. Прежний остановленный запуск остаётся
+историческим exit130; его результат не переписывается и причина долгого выполнения
+в задаче разработчика не установлена. Текущий полный PASS снимает пробел проверки.
+
+Batch54 запущен: только code-table-mismatch, freshprofile27,headed DISPLAY=:1,
+sandbox enabled; source38 hashes закреплены. Разработчик idle, live владеет root.
+На момент записи RUNNING. Public handler и полная цель ещё не завершены.
+
+
+
 ### Batch53: code-Done и editor Apply наблюдены; autosync helper gap — 2026-09-27
 
 Root аудит1710 journalSHA,90 input cells,1fresh completed execution,full6×2/12cells,
