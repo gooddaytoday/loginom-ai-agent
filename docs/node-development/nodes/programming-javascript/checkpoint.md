@@ -16,6 +16,27 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Fix47: новые bindings проверяются по exact client sources до live — 2026-09-27
+
+При source-review промежуточного fix47 root обнаружил неверную own-data
+проверку ParentNode. Прямо полученный `bg/lib/Trees.js`:97–98 определяет
+ParentNode как prototype getter к FParentNode; own descriptor ParentNode
+отсутствует. Это гарантировало бы новый ложный readiness refusal. Разработчику
+передано исправление на подтверждённое сохранённое поле FParentNode и требование
+тестов с реальной формой getter-backed tree; live47 ещё не запускался.
+
+Root получил exact public client sources через прямой GET со стенда:
+MapTree.js содержит ModelNodeTreeNode/WizardTreeNode, Trees.js — базовое дерево;
+ModelForm→mxgraph/Common→NodeAbstract/Unit/Label/Vertex — владение меткой;
+TabForm view→navigation/NavigationToolbar→NavigationPanel — breadcrumbs.
+NavigationPanel.js236/321 создаёт `_node` в config соответствующего контрола;
+NodeAbstract.js84 создаёт FLabel с самим node, Unit.js16 сохраняет parent.
+Hashes/байты/полные тела и исходные404 отдельных guessed class paths сохранены
+в private preview-source-40/fix47-*-source-manifest.json;404 не объявлены PASS.
+Тела клиентских исходников в Git не добавлены. Доказательства определений
+не заменяют последующую live-проверку конкретных native objects.
+
+
 ### Batch46: clean Apply и full output PASS, stale breadcrumb требует fix47 — 2026-09-27
 
 Первый declared-table-execute достиг полного правильного6×2 output. Root проверил
