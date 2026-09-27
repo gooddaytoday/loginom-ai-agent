@@ -16,6 +16,28 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Возобновлено по команде пользователя — 2026-09-27
+
+Пауза ниже историческая: пользователь дал команду продолжить. Source67 и terminal
+probe04 проверены по сохранённой точке, root worktree чист. OpenViking health,
+повторный find и exact read прошли после transient timeout; устойчивость поиска
+не гарантирована. Doctor подтвердил credentials/MCP, но /ready timeout повторялся.
+Ранее вывод о hot reload 60s был слишком сильным: новая ошибка инструмента снова
+пришла примерно за15s; успешный короткий запрос не доказывает применение timeout.
+В приватном config явно установлен captureTimeoutMs=30000 (с backup0600), чтобы
+общий timeoutMs60000 не увеличивал default capture выше Stop-hook30s.
+
+Отказ probe04 связан с тем, что workspace-ui dangerous regex включает JavaScript
+в control identity (TID); наблюдённый output имеет allowed_actions=[]. Общий deny
+сохраняется. Разработчику в прежней задаче назначен Fix68: private output opening
+с проверками ownership/execution/hit-test/deadline/no replay, по аналогии с уже
+существующим private opener, без отождествления Visualizers и native Preview.
+До Freeze68 новый browser не запускается. После передачи нужны независимые тесты,
+commit и fresh profile47 для native-roundtrip-probe05. Profile47 назначен
+атомарно после проверки cleanup probe04; он ещё не создан/не использован.
+
+
+
 ### Пауза по команде пользователя — 2026-09-27, после roundtrip probe04
 
 **Работа приостановлена пользователем. Не возобновлять без новой команды.**
