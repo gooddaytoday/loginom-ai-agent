@@ -636,7 +636,7 @@ c67e5a8abb884352ef16076178e23e9b3a7d44f95be1428c302cf47ada4d58ba;
 integer-safe input contract не выдаёт coercion/cardinality native_baseline_sha256.
 Root сравнил полный before proof с предшествующей JS записью журнала, отдельно
 вычислил digest; не заявляет сравнение с отсутствующим runtime полем.
-Пять случаев из8 A приняты, весь G5/J24/handler/CLI остаётся открытым.
+Шесть случаев из8 A приняты, весь G5/J24/handler/CLI остаётся открытым.
 
 
 A-get-exact/profile74, original session15883 terminal exit0/CHARACTERIZED,
@@ -668,3 +668,13 @@ A-columns-exact/profile79 original10136 failed до импорта/JS: посл�
 серверная копия не проверена из-за DISCOVERY_READY_CHANGED. Cleanup подтверждён,
 JS семантика не наблюдалась. Не принят; original receipt требует read-only
 reconciliation, upload не повторять. Полные сведения в актуальном checkpoint.
+
+
+Source84 commit84dd84a6be5bee86633b5d1e2492d82805997b80 меняет только
+artifact readiness и regression tests. Full root client2484PASS/10SKIP/0FAIL,
+targeted81PASS. A-columns-exact/profile82 original89067 terminal exit0,
+cleanup3/3; audit12cells/625refs/1265pins PASS, report SHA
+b407c261866b5cb5930eb59bb614c3a19be0fff330541573137b499c66ea321c.
+Original profile79 failure сохранён; серверные55bytes отдельно сверены read-only
+перед новым запуском. Успешный source84 run не доказывает, что гонка обязательно
+воспроизвелась в этом run; её обе точки и guards проверены адресными VM tests.

@@ -16,6 +16,20 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### A-columns-exact PASS source84; A-isnull-index RUNNING
+
+Profile82/original89067 terminal exit0/CHARACTERIZED,cleanup3/3;
+root independent audit12cells/625refs/1265pins PASS. Report SHA
+b407c261866b5cb5930eb59bb614c3a19be0fff330541573137b499c66ea321c.
+A6/8 accepted. После source/toolchain/cleanup проверки выделен profile83:
+A-isnull-index evidence native-named-isnull-index-probe-01,
+**original18856 RUNNING**. Headed/sandbox/source84 commit84dd84a6be5b,
+original deadline; ждать именно этот процесс, затем full audit.
+Новый attribution design получен; root проверил4report hashes и текущие
+error witness/slicing. Требуется только уточнение K3 как conditional mapping
+probe; source84 runtime остаётся frozen. Полная цель active.
+
+
 ### Source84 принят; A-columns-exact profile82 RUNNING
 
 Root targeted original76839 exit0:81PASS/0FAIL. Full client original44414
