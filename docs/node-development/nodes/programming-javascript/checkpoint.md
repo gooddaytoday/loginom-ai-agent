@@ -18,6 +18,18 @@
 
 ### Batch55: изменённая schema несовместима с прежней manual link — 2026-09-27
 
+Дополнение root06:32UTC: промежуточный fix55 проверен17 адресными tests PASS.
+Offline replay фактических batch55 sample line1565 и changed terminal через новые
+characterize/progress functions подтвердил empty_source_after_owned_failure,
+statusunverified/source_schema_verifiedfalse, default reader refusal без failed
+receipt и сохранение terminal/execution_startedtrue/gatefalse. Это не live rerun
+и не финальный freeze. Private operator55-batch55-offline-replay.json закрепляет
+journalSHA5148c4fcbf988b32cf447eb24e24c61447044ca4daff9b4d41786c4f94f40377.
+Исходный report не изменён. Native G5 route требует отдельного design: обычный
+Table decoder не доказывает native bytes, а существующий collapse native reader
+ограничен собственной static provenance. Строковые engine probes не закрывают G5.
+
+
 Terminal exit1 FAILED, original package/logout/browser ALL PASS; recovery не нужен.
 Root проверил1574 journalSHA,60 input cells,2fresh terminal groups, baseline completed
 с full6×2/12cells, changed owned failed child с реальным ShowNode и40/40 sourceSHA.
