@@ -16,6 +16,29 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Freeze43: исходники закоммичены, адресный live запущен — 2026-09-27
+
+Root получил окончательный handoff и независимо выполнил72 tests PASS:
+column-editor19, stage-observer14, execution-evidence31,batch8. Все30 source
+SHA совпали до/после проверки. Field readback полностью пассивный: DOM плюс
+own value/rawValue, без getValue/getRawValue. Единственный fill либо пропуск
+уже совпавшего поля, readonly ожидание не более5s, точная bounded диагностика;
+placeholder не считается фактическим значением. Cancel требует исходный baseline,
+пустой removed и clean records; устаревший proxy total — только диагностика.
+Один bounded function-source snapshot собственного association helper пишется
+в private evidence без вызова helper и не влияет на admission.
+
+Проверенные source/test файлы сохранены в developer branch node-javascript:
+`166d01077c1b96d048367d5da90d780d36a3ce0d` —24 files, private discovery operator
+и ранее проверенная internal output-opening интеграция. Непроверенные/старые
+developer docs/checkpoint этим коммитом не включены. Слияния в root/product нет.
+
+Запущен batch43: declared-sentinel-preview,declared-table-execute;
+freshprofile16, Chromium1246, sandbox=true, headed DISPLAY=:1. Source commit,
+30pins, root test receipt и lease закреплены приватно. Итог пока RUNNING;
+этот commit не добавляет публичный JS-handler и не закрывает G1–G7/CLI acceptance.
+
+
 ### Batch42: native Add подтверждён, field/readback и Cancel открыты — 2026-09-27
 
 
