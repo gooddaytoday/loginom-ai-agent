@@ -1,3 +1,4 @@
+import {openJavascriptInitialWizard,requireJavascriptInitialOpeningCleanup} from './javascript-initial-opening.mjs';
 import {javascriptExecutionIdentity} from './javascript-mismatch-probe.mjs';
 import {withJavascriptWizardMasks} from './javascript-wizard-masks.mjs';
 import {waitJavascriptWizardSettlement,inspectJavascriptWizardAddress,withJavascriptWizardAddress} from './javascript-wizard-settlement.mjs';
@@ -274,6 +275,219 @@ test('blocker snapshot passes the production fsync journal and exact ACK validat
     assert.equal(blocked.snapshot.inspect_phase,'pre_select_click');assert.equal(blocked.snapshot.blockers[0].tid,'foreign-0');
     assert.deepEqual(refused.blocker_snapshot,blocked.snapshot);assert.equal(refused.terminal_observation.blocked,undefined);
   }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+
+function initialOpeningFixture({phase='pre_open_click',cover,ack,saveFailure,visibleFailure,fault='replace'}={}) {
+  const f=privateSelectionFixture(fault),lifecycle={},report={effects:[]},steps=[],waits=[];
+  const graph=f.tab.Controller.FController.FDiagram.FmxGraph.container;
+  const originalPoint=f.realm.document.elementFromPoint,originalQuery=graph.querySelectorAll,evaluate=f.page.evaluate;
+  const foreign={isConnected:true,tagName:'BUTTON',getAttribute:key=>({'data-tid':'foreign','class':'foreign-class',role:'button'})[key]??null,
+    closest:()=>foreign,contains:()=>false};
+  f.page.evaluate=async(fn,arg)=>{
+    if(arg?.inspectPhase===phase&&cover){
+      const setting=originalQuery().find(e=>e.getAttribute('data-tid')===f.node.tid+';Setting');
+      if(cover==='absent')graph.querySelectorAll=()=>originalQuery().filter(e=>e!==setting);
+      if(cover==='disabled'){
+        const attr=setting.getAttribute;setting.getAttribute=key=>key==='aria-disabled'?'true':attr(key);
+      }
+      if(cover==='geometry')setting.getBoundingClientRect=()=>({x:NaN,y:0,width:80,height:100});
+      if(cover==='overflow')setting.getBoundingClientRect=()=>({x:Number.MAX_VALUE,y:0,width:Number.MAX_VALUE,height:100});
+      if(cover==='child'){
+        foreign.closest=selector=>selector==='[data-tid]'?setting:foreign;
+        setting.contains=e=>e===setting||e===foreign;
+      }
+      if(cover==='diagnostic')foreign.getAttribute=()=>{throw Error('sensitive hit diagnostic');};
+      if(cover==='long')foreign.getAttribute=()=> 'a'.repeat(450);
+      if(cover==='null')f.realm.document.elementFromPoint=()=>null;
+      if(['foreign','child','diagnostic','long'].includes(cover))f.realm.document.elementFromPoint=()=>foreign;
+      if(cover==='owner')f.native.data={};
+      if(cover==='dom')f.tab.Controller.FController.FDiagram.FmxGraph.view.getState=()=>({shape:{node:{}}});
+    }
+    const result=await evaluate(fn,arg);
+    if(arg?.inspectPhase===phase){f.realm.document.elementFromPoint=originalPoint;graph.querySelectorAll=originalQuery;}
+    return structuredClone(result);
+  };
+  const wait=f.page.waitForFunction;
+  f.page.waitForFunction=async(fn,arg,options)=>{
+    if(arg?.inspectPhase===phase&&cover){
+      assert.ok(options.timeout>0&&options.timeout<=5000);
+      if(!await f.page.evaluate(fn,arg))throw Error('Bounded selection readiness pending');
+      return {dispose:async()=>{}};
+    }
+    return wait(fn,arg,options);
+  };
+  const record=async event=>{
+    await f.record(event);steps.push(event.phase);
+    if(event.phase==='javascript_private_selection_point_unavailable'){
+      assert.ok(Object.isFrozen(event.snapshot));assert.ok(Object.isFrozen(event.snapshot.samples));
+      if(ack==='point-throw')throw Error('point journal failed');
+      if(ack==='point-wrong')return {...event,snapshot:{...event.snapshot,control_count:99}};
+    }
+    if(event.phase==='javascript_private_open_dispatch'){
+      if(ack==='open-throw')throw Error('open journal failed');
+      if(ack==='open-wrong')return {...event,point:{x:0,y:0}};
+    }
+    if(event.phase==='javascript_private_selection_dispatch'&&ack==='body-wrong')return {};
+    return structuredClone(event);
+  };
+  const guard=async()=>steps.push('guard'),save=async()=>{steps.push('save');if(saveFailure&&lifecycle.openingIntent)throw Error('report save failed');};
+  const waitVisible=async deadline=>{waits.push(deadline);steps.push('visible');if(visibleFailure)throw Error('visible timeout');};
+  const options=()=>({page:f.page,binding:f.binding,node:f.node,icon:'js',deadline:Date.now()+5000,record,guard,report,save,waitVisible,lifecycle});
+  return {f,lifecycle,report,steps,waits,record,options,run:()=>openJavascriptInitialWizard(options())};
+}
+
+test('production initial opening uses one body and one Setting gesture with distinct lifecycle and ACK',async()=>{
+  const h=initialOpeningFixture();await h.run();assert.equal(h.f.clicks,2);
+  assert.equal(h.lifecycle.openingIntent,true);assert.equal(h.lifecycle.settingDispatched,true);
+  assert.equal(h.lifecycle.settingGestureReturned,true);assert.equal(h.lifecycle.wizardVisible,true);
+  assert.equal(h.report.effects.filter(e=>e.action==='open-wizard').length,1);
+  assert.equal(h.report.initial_opening,h.lifecycle);assert.equal(h.report.wizard_hit.setting_tid,h.f.node.tid+';Setting');
+  assert.ok(h.steps.indexOf('guard')<h.steps.indexOf('javascript_private_open_dispatch'));
+  assert.ok(h.steps.indexOf('javascript_private_open_dispatch')<h.steps.indexOf('javascript_private_open_gesture_returned'));
+  assert.equal(h.waits[0],h.lifecycle.deadline);requireJavascriptInitialOpeningCleanup(h.lifecycle);
+  await assert.rejects(h.run(),/no replay/);assert.equal(h.f.clicks,2);
+});
+
+for(const mode of ['lost','visible'])test('initial Setting uncertainty refuses cleanup and replay: '+mode,async()=>{
+  const h=initialOpeningFixture(mode==='lost'?{fault:'lost_open'}:{visibleFailure:true});
+  await assert.rejects(h.run(),mode==='lost'?/lost click/:/visible timeout/);assert.equal(h.f.clicks,2);
+  assert.equal(h.lifecycle.settingDispatched,true);assert.equal(h.lifecycle.wizardVisible,false);
+  assert.equal(h.lifecycle.settingGestureReturned,mode==='lost'?false:true);
+  assert.throws(()=>requireJavascriptInitialOpeningCleanup(h.lifecycle),/cleanup unconfirmed/);
+  await assert.rejects(h.run(),/no replay/);assert.equal(h.f.clicks,2);
+});
+
+for(const ack of ['body-wrong','open-wrong','open-throw'])test('initial journal ACK failure cannot dispatch Setting: '+ack,async()=>{
+  const h=initialOpeningFixture({ack});await assert.rejects(h.run(),/journal/);
+  assert.equal(h.f.clicks,ack==='body-wrong'?0:1);assert.equal(h.lifecycle.settingDispatched,false);
+  requireJavascriptInitialOpeningCleanup(h.lifecycle);assert.equal(h.waits.length,0);
+});
+
+test('initial report save failure after intent remains no Setting effect',async()=>{
+  const h=initialOpeningFixture({saveFailure:true});await assert.rejects(h.run(),/report save failed/);
+  assert.equal(h.lifecycle.openingIntent,true);assert.equal(h.lifecycle.settingDispatched,false);assert.equal(h.f.clicks,1);
+  requireJavascriptInitialOpeningCleanup(h.lifecycle);
+});
+
+for(const cover of ['foreign','child','null','disabled','absent','geometry','overflow','diagnostic','long'])test('same-inspect Setting hit evidence refuses '+cover,async()=>{
+  const h=initialOpeningFixture({cover});await assert.rejects(h.run());assert.equal(h.f.clicks,1);assert.equal(h.waits.length,0);
+  assert.equal(h.lifecycle.settingDispatched,false);requireJavascriptInitialOpeningCleanup(h.lifecycle);
+  const e=h.f.records.find(e=>e.phase==='javascript_private_selection_point_unavailable'),s=e.snapshot;
+  assert.equal(s.inspect_phase,'pre_open_click');assert.equal(s.control,'Setting');assert.equal(s.native_owner_verified,true);
+  assert.equal(s.diagnostic_failed,['geometry','overflow','diagnostic'].includes(cover));
+  if(['foreign','child','null','disabled','long'].includes(cover))assert.equal(s.samples.length,9);
+  if(cover==='absent'){assert.equal(s.control_count,0);assert.equal(s.samples.length,0);assert.equal(s.box,null);}
+  if(cover==='foreign')assert.equal(s.samples[0].hit.tid,'foreign');
+  if(cover==='child'){assert.equal(s.samples[0].hit_owned,true);assert.equal(s.samples[0].target_exact,true);assert.equal(s.samples[0].control_allowed,false);}
+  if(cover==='null')assert.equal(s.samples[0].hit,null);
+  if(cover==='long')assert.equal(s.samples[0].hit.tid.length,200);
+  assert.equal(JSON.stringify(s).includes('sensitive'),false);
+  assert.equal(h.f.records.at(-1).point_snapshot,s);
+});
+
+for(const ack of ['point-wrong','point-throw'])test('failed point journal ACK cannot open or retry: '+ack,async()=>{
+  const h=initialOpeningFixture({cover:'foreign',ack});await assert.rejects(h.run(),/point journal/);
+  assert.equal(h.f.clicks,1);assert.equal(h.f.records.filter(e=>e.phase==='javascript_private_selection_point_unavailable').length,1);
+  assert.equal(h.lifecycle.settingDispatched,false);
+});
+
+for(const cover of ['owner','dom'])test('initial pre-Setting '+cover+' drift remains refused',async()=>{
+  const h=initialOpeningFixture({cover});await assert.rejects(h.run(),/owner changed|DOM changed/);
+  assert.equal(h.f.clicks,1);assert.equal(h.lifecycle.settingDispatched,false);
+});
+
+test('initial wrapper preserves source76 blocker rejection between phases',async()=>{
+  const h=selectionBlockerFixture({phase:'pre_open_click'}),lifecycle={};
+  await assert.rejects(openJavascriptInitialWizard({page:h.f.page,binding:h.f.binding,node:h.f.node,icon:'js',deadline:Date.now()+5000,
+    record:h.record,guard:async()=>{},report:{effects:[]},save:async()=>{},waitVisible:async()=>assert.fail('no visible wait'),lifecycle}),/Private selection blocked/);
+  assert.equal(h.f.clicks,1);assert.equal(lifecycle.openingIntent,true);assert.equal(lifecycle.settingDispatched,false);
+  requireJavascriptInitialOpeningCleanup(lifecycle);
+});
+
+
+for(const phase of ['initial','pre_select_click','post_select_poll','final','pre_open','pre_open_click'])test('first hit failure is retained in phase '+phase,async()=>{
+  const h=initialOpeningFixture({phase,cover:'foreign'});await assert.rejects(h.run());
+  assert.equal(h.f.clicks,['initial','pre_select_click'].includes(phase)?0:1);
+  const receipt=h.f.records.find(e=>e.phase==='javascript_private_selection_point_unavailable');
+  assert.equal(receipt.snapshot.inspect_phase,phase);assert.equal(receipt.snapshot.samples.length,9);
+  assert.equal(h.lifecycle.settingDispatched,false);
+});
+
+test('existing post-body poll preserves first unavailable sample even after a later ready sample',async()=>{
+  const h=initialOpeningFixture(),doc=h.f.realm.document,hit=doc.elementFromPoint;
+  let polls=0,pointAcknowledged=false;
+  const record=h.record,click=h.f.page.mouse.click;
+  h.f.page.waitForFunction=async(fn,arg,options)=>{
+    assert.ok(options.timeout>0&&options.timeout<=5000);polls++;
+    doc.elementFromPoint=()=>null;
+    const invoke=()=>vm.runInContext('('+fn.toString()+')',h.f.realm)(arg);
+    assert.equal(invoke(),false);
+    doc.elementFromPoint=hit;assert.equal(invoke().ready,true);
+    return {dispose:async()=>{}};
+  };
+  h.f.page.mouse.click=async(...args)=>{if(h.f.clicks===1)assert.equal(pointAcknowledged,true);return click(...args);};
+  await openJavascriptInitialWizard({...h.options(),record:async event=>{
+    const saved=await record(event);if(event.phase==='javascript_private_selection_point_unavailable')pointAcknowledged=true;return saved;
+  }});
+  assert.equal(polls,1);assert.equal(h.f.clicks,2);
+  const snapshot=h.f.records.find(e=>e.phase==='javascript_private_selection_point_unavailable').snapshot;
+  assert.equal(snapshot.inspect_phase,'post_select_poll');assert.equal(snapshot.samples.length,9);assert.equal(snapshot.samples[0].hit,null);
+  assert.equal(h.lifecycle.wizardVisible,true);
+});
+
+test('live initial branch uses the production wrapper only for executionCase and retains discovery path',async()=>{
+  const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
+  const start=source.indexOf('    if(executionCase){\n      await openJavascriptInitialWizard');
+  const end=source.indexOf("    report.stage='wizard-ready';",start);assert.ok(start>0&&end>start);
+  const run=vm.runInNewContext('(async function(ctx){with(ctx){'+source.slice(start,end)+';return openedWizard;}})');
+  for(const executionCase of [true,false]){
+    const h=initialOpeningFixture({fault:executionCase?'replace':'already'}),o=h.options();
+    const opened=await run({executionCase,openJavascriptInitialWizard,page:o.page,wizardBinding:o.binding,node:o.node,expectedIcon:o.icon,
+      wizardDeadline:o.deadline,executionRecord:o.record,guard:o.guard,report:o.report,save:o.save,initialOpening:o.lifecycle,
+      owner:{prefix:'MF;TF-1'},openedWizard:false,exact:()=>({waitFor:async options=>{assert.equal(options.state,'visible');assert.ok(options.timeout>0);}})});
+    assert.equal(opened,true);assert.equal(h.f.clicks,executionCase?2:1);
+    assert.equal(h.lifecycle.attempted,executionCase?true:undefined);assert.equal(h.report.effects.length,1);
+  }
+});
+
+test('live cleanup guard rejects uncertain initial dispatch before restoration or Close',async()=>{
+  const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
+  const start=source.indexOf('      requireJavascriptInitialOpeningCleanup(initialOpening);');
+  const end=source.indexOf('      if (openedWizard) {',start);assert.ok(start>0&&end>start);
+  const cleanup=vm.runInNewContext('(async function(ctx){with(ctx){'+source.slice(start,end)+';if(openedWizard)await closeWizardOnce();}})');
+  const h=initialOpeningFixture({fault:'lost_open'});await assert.rejects(h.run(),/lost click/);
+  const actions=[];
+  await assert.rejects(cleanup({requireJavascriptInitialOpeningCleanup,initialOpening:h.lifecycle,openedWizard:false,owner:{prefix:'own'},
+    executionRuntime:{restoreWorkflowForCleanup:async()=>actions.push('restore')},observe:async()=>{actions.push('observe');return {prefix:'foreign'};},
+    report:{cleanup:{}},guard:async()=>actions.push('guard'),closeWizardOnce:async()=>actions.push('close')}),/cleanup unconfirmed/);
+  assert.deepEqual(actions,[]);assert.equal(h.f.clicks,2);
+});
+
+test('point snapshot passes the actual fsync journal ACK without text/HTML data',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'js-point-journal-'));
+  try{
+    const h=initialOpeningFixture({cover:'foreign'}),record=createExecutionJournal({directory,metadata:{sessionId:'test',clientRevision:'source77'}});
+    await assert.rejects(openJavascriptInitialWizard({...h.options(),record}));assert.equal(h.f.clicks,1);
+    const events=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(line=>JSON.parse(line));
+    const point=events.find(e=>e.phase==='javascript_private_selection_point_unavailable');assert.equal(point.snapshot.samples.length,9);
+    assert.deepEqual(events.at(-1).point_snapshot,point.snapshot);assert.equal(events.at(-1).terminal_observation.ready,true);
+  }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+
+test('an optional point diagnostic failure cannot silently allow an otherwise ready Setting',async()=>{
+  const h=initialOpeningFixture(),evaluate=h.f.page.evaluate;
+  h.f.page.evaluate=async(fn,arg)=>{
+    if(arg?.inspectPhase==='pre_open_click'){
+      const point=h.f.realm.document.elementFromPoint;let calls=0;
+      h.f.realm.document.elementFromPoint=(...args)=>++calls===1?point(...args):{};
+    }
+    return evaluate(fn,arg);
+  };
+  await assert.rejects(h.run(),/point diagnostic failed/);assert.equal(h.f.clicks,1);
+  const s=h.f.records.find(e=>e.phase==='javascript_private_selection_point_unavailable').snapshot;
+  assert.equal(s.control,'body');assert.equal(s.diagnostic_failed,true);assert.equal(h.lifecycle.settingDispatched,false);
 });
 
 function privateWizardFixture({deactivate=false,foreign=false,wrongNative=false,fault,maskFault}={}) {

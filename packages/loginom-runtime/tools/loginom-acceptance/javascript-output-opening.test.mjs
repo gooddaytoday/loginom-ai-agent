@@ -85,6 +85,7 @@ function fixture(fault='none') {
       if(fault==='inactive_late')active=false;
       if(fault==='journal')throw Error('Journal unavailable');
     }
+    return event;
   };
   const run=()=>openNewOutputTable(channel,0,{openViews:({output})=>openJavascriptOutputViews(page,
     {binding,node,icon:'bg-vendor-icon-javascript',reference:ref,prepared,channel,output,deadline:Date.now()+5000,record,select:selectJavascriptForSettings})});

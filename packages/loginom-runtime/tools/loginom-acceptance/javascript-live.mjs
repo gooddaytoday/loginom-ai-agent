@@ -17,7 +17,8 @@ import {javascriptEngineProbes} from './javascript-engine-probes.mjs';
 import {javascriptDiscoveryIds,javascriptDiscoveryProbe,observeJavascriptDiscovery,javascriptDiscoveryWizardDiagnostic} from './javascript-discovery-probes.mjs';
 import {javascriptSourceSample,javascriptSourceBoundary} from './javascript-source-probes.mjs';
 import {makeWorkspacePrepareCode} from '../../client/lib/workspace.mjs';
-import {createJavascriptExecutionRuntime,selectJavascriptForSettings} from './javascript-execution-runtime.mjs';
+import {createJavascriptExecutionRuntime} from './javascript-execution-runtime.mjs';
+import {openJavascriptInitialWizard,requireJavascriptInitialOpeningCleanup} from './javascript-initial-opening.mjs';
 import {javascriptExecutionProbes} from './javascript-execution-probes.mjs';
 import {javascriptMismatchSource,runJavascriptMismatchMaterialization,javascriptMismatchExecutionProgress,javascriptProbeFailure} from './javascript-mismatch-probe.mjs';
 import {readJavascriptSchema,configureJavascriptSchema} from './javascript-schema-probe.mjs';
@@ -92,7 +93,7 @@ let executionRuntime,executionInput,executionNode,executionPrepared,executionInp
 let browserLifecycle,inputBinding,previewCloseState={dispatched:false};
 const columnState={pending:null};
 let executionJournalLine=0;
-let readingExisting=false;
+let readingExisting=false,initialOpening={};
 const schemaContext=()=>({root:wizardRoot,native:wizardHandle,binding:wizardBinding,prefix:owner.prefix,account:config.username,build:'7.4.2'});
 const executionRecord=async event=>{
   if(discoveryProbe&&event.phase==='execution_terminal'){
@@ -960,26 +961,32 @@ const runPreparedCase=async()=>{
       return {document,tab,workflow,nodeData:matches[0].data,native:matches[0],cell:matches[0].FCell};
     },{id:node.id,tid:node.tid,icon:expectedIcon,owned:packageHandle});
     wizardDeadline=phaseDeadline(90000);report.wizard_open_deadline=new Date(wizardDeadline).toISOString();await save();
-    if(executionCase)await selectJavascriptForSettings(page,{binding:wizardBinding,node,icon:expectedIcon,deadline:wizardDeadline,record:executionRecord});
-    report.effects.push({at:new Date().toISOString(),action:'open-wizard',node_id:node.id,state:'dispatching'});await save();
-    const point=await page.evaluate(({id,tid,icon})=>{
-      const d=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController?.FDiagram;
-      const matches=d?.FNodes?.FCollection?.filter(n=>n.FGuid===id);
-      if(matches?.length!==1||matches[0].FIconCls!==icon||d.FmxGraph.view.getState(matches[0].FCell)?.shape?.node?.getAttribute('data-tid')!==tid)throw Error('Wizard target identity changed');
-      const settings=[...d.FmxGraph.container.querySelectorAll('[data-tid]')].filter(e=>e.getAttribute('data-tid')===tid+';Setting');
-      if(settings.length!==1)throw Error('Unique bound Setting control required');
-      const setting=settings[0],b=setting.getBoundingClientRect();
-      if(setting.closest('.x-item-disabled,.x-grid-row-disabled')||setting.getAttribute('aria-disabled')==='true')throw Error('Setting disabled');
-      for(const dy of [.5,.25,.75])for(const dx of [.5,.25,.75]){const x=b.x+b.width*dx,y=b.y+b.height*dy,hit=document.elementFromPoint(x,y);
-        const control=hit?.closest('button,a,input,select,textarea,[role="button"],[role="menuitem"]');
-        if(x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&hit&&(hit===setting||setting.contains(hit))
-          &&hit.closest('[data-tid]')===setting&&(!control||control===setting))return{x,y,setting_tid:tid+';Setting',hit_tid:tid+';Setting'};}
-      throw Error('Bound Setting covered');
-    },{id:node.id,tid:node.tid,icon:expectedIcon});
-    report.wizard_hit=point;await save();await guard();
-    if(Date.now()>=wizardDeadline)throw Error('Original wizard opening deadline expired');
-    await page.mouse.click(point.x,point.y);
-    await exact(owner.prefix+';WizrdMCF').waitFor({state:'visible',timeout:Math.max(1,wizardDeadline-Date.now())});openedWizard=true;
+    if(executionCase){
+      await openJavascriptInitialWizard({page,binding:wizardBinding,node,icon:expectedIcon,deadline:wizardDeadline,
+        record:executionRecord,guard,report,save,lifecycle:initialOpening,
+        waitVisible:async deadline=>{await exact(owner.prefix+';WizrdMCF').waitFor({state:'visible',timeout:Math.max(1,deadline-Date.now())});openedWizard=true;}});
+    }else{
+      report.effects.push({at:new Date().toISOString(),action:'open-wizard',node_id:node.id,state:'dispatching'});await save();
+      const point=await page.evaluate(({id,tid,icon})=>{
+        const d=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController?.FDiagram;
+        const matches=d?.FNodes?.FCollection?.filter(n=>n.FGuid===id);
+        if(matches?.length!==1||matches[0].FIconCls!==icon||d.FmxGraph.view.getState(matches[0].FCell)?.shape?.node?.getAttribute('data-tid')!==tid)throw Error('Wizard target identity changed');
+        const settings=[...d.FmxGraph.container.querySelectorAll('[data-tid]')].filter(e=>e.getAttribute('data-tid')===tid+';Setting');
+        if(settings.length!==1)throw Error('Unique bound Setting control required');
+        const setting=settings[0],b=setting.getBoundingClientRect();
+        if(setting.closest('.x-item-disabled,.x-grid-row-disabled')||setting.getAttribute('aria-disabled')==='true')throw Error('Setting disabled');
+        for(const dy of [.5,.25,.75])for(const dx of [.5,.25,.75]){const x=b.x+b.width*dx,y=b.y+b.height*dy,hit=document.elementFromPoint(x,y);
+          const control=hit?.closest('button,a,input,select,textarea,[role="button"],[role="menuitem"]');
+          if(x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&hit&&(hit===setting||setting.contains(hit))
+            &&hit.closest('[data-tid]')===setting&&(!control||control===setting))return{x,y,setting_tid:tid+';Setting',hit_tid:tid+';Setting'};}
+        throw Error('Bound Setting covered');
+      },{id:node.id,tid:node.tid,icon:expectedIcon});
+      report.wizard_hit=point;await save();await guard();
+      if(Date.now()>=wizardDeadline)throw Error('Original wizard opening deadline expired');
+      await page.mouse.click(point.x,point.y);
+      await exact(owner.prefix+';WizrdMCF').waitFor({state:'visible',timeout:Math.max(1,wizardDeadline-Date.now())});
+    }
+    openedWizard=true;
     report.stage='wizard-ready';
     let editorPage=(await waitWizardReady()).page;
     await snapshot('wizard-first-page');await guard();
@@ -1144,7 +1151,7 @@ try {
             for(const handle of [wizardRoot,wizardHandle,wizardBinding,executionDrop?.native])await handle?.dispose();
             executionDrop=null;
             wizardRoot=null;wizardHandle=null;wizardBinding=null;executionNode=null;executionInputProof=null;
-            openedWizard=false;closeDispatched=false;closeConfirmed=false;previewCloseState={dispatched:false};closeDeadline=0;wizardDeadline=0;readingExisting=false;
+            openedWizard=false;closeDispatched=false;closeConfirmed=false;previewCloseState={dispatched:false};closeDeadline=0;wizardDeadline=0;readingExisting=false;initialOpening={};
             await verifyBatchInputIdentity();
             report.input_reuse={node:executionInput.node,original_execution_id:executionInput.table.execution_id,
               original_schema:executionInput.table.schema,original_proof:executionInput.proof,
@@ -1198,6 +1205,7 @@ try {
         }
       }
       if(packageHandle&&!owner){report.cleanup.stage='settle-created-package';await settlePackageMetadata();}
+      requireJavascriptInitialOpeningCleanup(initialOpening);
       if(executionRuntime&&owner&&!openedWizard){
         const surface=await observe();
         if(surface.prefix!==owner.prefix||executionRuntime.passiveSurfacePending||executionRuntime.wizardOpeningPending||executionRuntime.manualMappingPending){
