@@ -675,27 +675,32 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
         if(lifecycle.closed){pendingMapping=undefined;await native.dispose();}
       }
     },
-    async readPortMapping(node,direction,{characterize=false,operationDeadline=deadline}={}) {
+    async readPortMapping(node,direction,{characterize=false,operationDeadline=deadline,failedExecution}={}) {
       if(!['input','output'].includes(direction))throw Error('Unknown mapping direction');
       if(characterize&&direction!=='output')throw Error('Only output mapping characterization is supported');
       const readDeadline=Math.min(deadline,operationDeadline);
       const reader=channel(node,readDeadline),reference={document_id:prepared.document_id,workflow_id:prepared.workflow_ref.workflow_id,node_id:node.node_id};
       const before=await graph();requireJavascriptTopology(before);
-      const native=await page.evaluateHandle(captureJavascriptNativeTopology,{});let opened=false;
+      const native=await page.evaluateHandle(captureJavascriptNativeTopology,{});let opened=false,observationError;
       try {
         try {
           await reader.openPort(direction,0);opened=true;
           const state=await reader.observe({condition:'complete JavaScript '+direction+' mapping',readMappings:true,
-            ready:s=>characterize?!!characterizeJavascriptMapping(s,reference,{allowPending:true}):
+            ready:s=>characterize?!!characterizeJavascriptMapping(s,reference,{allowPending:true,failedExecution}):
               s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.prepared_node_context?.verified===true});
-          const mapping=characterize?characterizeJavascriptMapping(state,reference):state.node_mapping;
+          const mapping=characterize?characterizeJavascriptMapping(state,reference,{failedExecution}):state.node_mapping;
           await record({phase:characterize?'port_mapping_characterized':'port_mapping_observed',direction,node,mapping});return mapping;
+        } catch(error){observationError=error;throw error;
         } finally {
-          if(opened)await closeJavascriptPortMapping({reader,direction,reference,record,deadline:Math.min(readDeadline,Date.now()+15000),verifyGraph:async()=>{
+          try{if(opened)await closeJavascriptPortMapping({reader,direction,reference,record,deadline:Math.min(readDeadline,Date.now()+15000),verifyGraph:async()=>{
             const checked=await page.evaluate(captureJavascriptNativeTopology,{previous:native,checkOnly:true});
             const after=await graph();requireJavascriptGraphUnchanged(before,after);
             await record({phase:'port_mapping_original_graph_verified',direction,checked,before,after});
-          }});
+          }});}catch(cleanupError){
+            if(!observationError)throw cleanupError;
+            const combined=new AggregateError([observationError,cleanupError],observationError.message,{cause:observationError});
+            combined.observationError=observationError;combined.cleanupError=cleanupError;throw combined;
+          }
         }
       } finally {await native.dispose();}
     },
@@ -825,7 +830,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       }finally{await binding.dispose();}
     },
     async readPassive(node,kind='output',operationDeadline=deadline) {
-      if(!['input','output','mismatch'].includes(kind))throw Error('Unknown passive JavaScript table kind');
+      if(!['input','output','mismatch','discovery'].includes(kind))throw Error('Unknown passive JavaScript table kind');
       // No execution driver is called here. openNewOutputTable refuses an
       // inactive port instead of activating or executing its node.
       const readDeadline=Math.min(deadline,operationDeadline);
@@ -848,16 +853,16 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
         const readSettings=await prepareTableRead(reader,opened.table),raw=await readTableOutputPages(reader,opened.table,{sampleRows:10});
         // Characterization decodes the independently observed Table schema;
         // a separate fixed mismatch oracle classifies it, never the old oracle.
-        result=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:kind==='mismatch'?raw.columns:
+        result=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:['mismatch','discovery'].includes(kind)?raw.columns:
           kind==='input'?javascriptInputColumns:javascriptOutputColumns,requireExactNumbers:true});
-        if(kind==='mismatch')verifyJavascriptMismatchTable(result);else verifyJavascriptTable(result,kind);
+        if(['mismatch','discovery'].includes(kind))verifyJavascriptMismatchTable(result);else verifyJavascriptTable(result,kind);
       } finally {
         await restoreTablePrecision(reader,formatProof);
         if(kind!=='input'&&passiveSurface)passiveSurface.returnDispatched=true;
         await returnFromOutputTable(reader,opened.table);
         if(kind!=='input'&&passiveSurface){await passiveSurface.held.dispose();await passiveSurface.binding.dispose();passiveSurface=undefined;}
       }
-      await record({phase:kind==='mismatch'?'passive_mismatch_output_characterized':kind==='input'?'passive_input_verified':'passive_output_verified',execution_started:false,node,result});return result;
+      await record({phase:kind==='discovery'?'passive_discovery_output_characterized':kind==='mismatch'?'passive_mismatch_output_characterized':kind==='input'?'passive_input_verified':'passive_output_verified',execution_started:false,node,result});return result;
     },
   };
 }

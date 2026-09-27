@@ -1,0 +1,111 @@
+// Private discovery only. Sources and fixed expected values are separate data;
+// importing this module never evaluates a Loginom source or derives its oracle.
+import {createHash} from 'node:crypto';
+import {javascriptEngineProbes,inputTextProbe} from './javascript-engine-probes.mjs';
+import {verifyJavascriptMismatchTable} from './javascript-mismatch-probe.mjs';
+
+const need=(v,m)=>{if(!v)throw Error(m);};
+const hash=s=>createHash('sha256').update(s,'utf8').digest('hex');
+const column=type=>[{name:'Result',label:'Result',type}];
+const source=(type,expression)=>'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+  +'OutputTable.AssignColumns([{Name:"Result",DataType:DataType.'+type+'}]);\n'+expression+'\n';
+const rows=expressions=>expressions.map(e=>'OutputTable.Append(); OutputTable.Set("Result", '+e+');').join('\n');
+const typed=(id,type,expressions,values,note)=>({id,scope:'G5',source:source(type,rows(expressions)),
+  schema:column({String:'string',Boolean:'boolean',Integer:'integer',Float:'real',DateTime:'datetime'}[type]),
+  expected:values===null?null:values.map(value=>[value]),note,expectation:values===null?'characterization':'fixed'});
+
+const probes=[
+  ...javascriptEngineProbes.map(p=>({...p,id:'engine-'+p.id,schema:column('string'),
+    expected:p.expected?.map(v=>[v])??null,expectation:p.expectedError?'diagnostic':'fixed'})),
+  {...inputTextProbe('Customer'),id:'engine-input-text',schema:column('string'),expectation:'fixed',
+    // Independent literals from pinned sales.csv, including preserved padding.
+    expected:[['["Alpha","  alpha  ","  ALPHA  "]'],['["BETA","beta","BETA"]'],
+      ['["Alpha","alpha","ALPHA"]'],['["Гамма","гамма","ГАММА"]'],['["Ёж","ёж","ЁЖ"]'],['["delta","delta","DELTA"]']]},
+  typed('g5-null-empty','String',['null','""','"null"','"0"','"false"'],[null,'','null','0','false']),
+  typed('g5-undefined','String',['undefined'],null,'Unknown bridge semantics; record typed output or owned failure without choosing an expected value after observation.'),
+  typed('g5-boolean','Boolean',['null','false','true'],[null,false,true]),
+  typed('g5-real','Float',['null','0','-1.25','10.125'],[null,0,-1.25,10.125]),
+  typed('g5-safe-integer','Integer',['-9007199254740991','0','9007199254740991'],['-9007199254740991','0','9007199254740991']),
+  typed('g5-outside-safe','Integer',['Number("9007199254740993")'],null,'Characterization only; does not test native input int64 transport or promise exact arithmetic.'),
+  ...[['fraction','1.75'],['string','"42"'],['nan','NaN'],['positive-infinity','Infinity'],['negative-infinity','-Infinity']]
+    .map(([id,value])=>typed('g5-integer-'+id,'Integer',[value],null,'Integer coercion is unknown; independent isolated case, never alter the safe-integer oracle.')),
+  typed('g5-date-civil','DateTime',['null','new Date(2024, 1, 29, 23, 59, 59, 123)'],[null,'2024-02-29T23:59:59.123'],
+    'Constructed civil JS Date to native output only; not native input roundtrip or native serial-byte proof.'),
+  {id:'g5-named-access',scope:'G5',source:source('Integer','for(let i=0;i<InputTable.RowCount;i++){OutputTable.Append();OutputTable.Set("Result",InputTable.Get(i,"RowID"));}'),
+    schema:column('integer'),expected:[['1'],['2'],['3'],['4'],['5'],['6']],expectation:'fixed'},
+  {id:'g5-name-case',scope:'G5',source:source('Integer','OutputTable.Append();OutputTable.Set("Result",InputTable.Get(0,"rowid"));'),
+    schema:column('integer'),expected:null,expectation:'characterization',note:'Named-access case sensitivity is unknown.'},
+  {id:'g5-empty-output',scope:'G5',source:source('Integer','// Deliberately append no rows.'),
+    schema:column('integer'),expected:[],expectation:'fixed'},
+].map(p=>({...p,schema_mode:'code',build:'7.4.2',source_sha256:hash(p.source),status:'not_run'}));
+
+export const javascriptDiscoveryIds=Object.freeze(probes.map(p=>p.id));
+
+export function javascriptDiscoveryProbe(id){
+  const matches=probes.filter(p=>p.id===id);
+  need(matches.length===1,'Unknown isolated discovery probe');
+  return structuredClone(matches[0]);
+}
+
+export function javascriptDiscoveryOracle(probe,table){
+  const pinned=javascriptDiscoveryProbe(probe?.id);
+  need(probe.source===pinned.source&&probe.source_sha256===pinned.source_sha256,'Discovery source pin changed');
+  verifyJavascriptMismatchTable(table);
+  const schema=JSON.stringify(table.schema.map(c=>({name:c.name,label:c.label,type:c.type})))===JSON.stringify(pinned.schema);
+  const values=pinned.expected!==null&&table.row_count===pinned.expected.length
+    &&table.sample.every((row,i)=>row.length===pinned.expected[i].length
+      &&row.every((cell,j)=>cell.is_null===(pinned.expected[i][j]===null)&&Object.is(cell.value,pinned.expected[i][j])));
+  return {schema_verified:schema,values_verified:values,gate_passed:pinned.expectation==='fixed'&&schema&&values,
+    expectation:pinned.expectation,scope:pinned.scope,proof_level:'typed_ui_only',native_bytes_verified:false,gates_closed:[]};
+}
+
+export function javascriptDiscoveryWizardDiagnostic({probe,identity,stage,before,after}){
+  const pinned=javascriptDiscoveryProbe(probe?.id);
+  need(probe.source===pinned.source&&identity?.source_sha256===pinned.source_sha256&&identity.node_id,
+    'Wizard diagnostic source/identity differs');
+  if(!['next','done'].includes(stage)||before?.owner_verified!==true||after?.owner_verified!==true
+    ||after.native_owner_verified!==true||after.wizard_visible!==true||after.pending||after.boundary_refusal)return null;
+  const messages=after.messages?.filter(message=>!before.messages?.some(old=>old.id===message.id));
+  if(!messages?.length)return null;
+  need(messages.length<=64&&messages.every(m=>typeof m.id==='string'&&m.id&&typeof m.text==='string'
+    &&m.text.length>0&&m.text.length<=4096),'Bounded fresh wizard diagnostic required');
+  return {id:pinned.id,status:'owned_wizard_diagnostic',stage,source_sha256:pinned.source_sha256,node_id:identity.node_id,
+    messages:structuredClone(messages),explicit_execute_dispatched:false,execution:'ambiguous',absence_proves_no_execution:false,
+    syntax_support:'not_determined',class_observed:null,position_observed:null,gate_passed:false,native_bytes_verified:false,gates_closed:[]};
+}
+
+export async function observeJavascriptDiscovery({probe,node,execution,readOutput,record,onProgress=async()=>{},deadline,now=Date.now}){
+  const pinned=javascriptDiscoveryProbe(probe?.id);
+  need(probe.source===pinned.source&&hash(probe.source)===pinned.source_sha256
+    &&execution?.verified===true&&execution.owner_verified===true&&execution.cleanup_complete===true
+    &&['completed','failed'].includes(execution.status)&&execution.trial?.phase==='initial'
+    &&execution.trial.source_sha256===pinned.source_sha256&&execution.trial.node_id===node?.node_id
+    &&['document_id','workflow_id','node_id'].every(k=>node?.[k]&&execution.fresh_baseline?.node?.[k]===node[k])
+    &&execution.execution_id&&execution.group_id&&Array.isArray(execution.fresh_baseline.roots)
+    &&execution.launch_identity?.execution_id===execution.execution_id&&execution.launch_identity.group_id===execution.group_id
+    &&execution.launch_identity.root_id===execution.fresh_baseline.root_id
+    &&typeof execution.launch_identity.group_record_id==='string'&&execution.launch_identity.group_record_id
+    &&['document_id','workflow_id','node_id'].every(k=>execution.launch_identity.node?.[k]===node[k])
+    &&!execution.fresh_baseline.roots.some(p=>p.process_id===execution.group_id),'Discovery execution owner/source/freshness incomplete');
+  const result={id:pinned.id,source_sha256:pinned.source_sha256,status:'execution_terminal',execution,
+    execution_started:true,gate_passed:false,output:null,scope:pinned.scope,expectation:pinned.expectation,
+    proof_level:'typed_ui_only',native_bytes_verified:false,gates_closed:[]};
+  await onProgress(result);await record({phase:'discovery_execution_terminal',...result});
+  need(now()<deadline,'Original discovery deadline expired');
+  if(execution.status==='failed'){
+    need(execution.ownership_source==='native_process_model_identity_and_show_node'
+      &&execution.error_source==='native_child_error_details'&&execution.output_refreshed===false
+      &&['document_id','workflow_id','node_id'].every(k=>execution.node?.[k]===node[k])
+      &&typeof execution.error?.message==='string'&&execution.error.message,'Owned native diagnostic required');
+    result.status='owned_native_failure';result.diagnostic={...execution.error,
+      class_observed:execution.error.class??null,position_observed:execution.error.position??null,
+      expected_family:pinned.expectation==='diagnostic'?pinned.id:null,
+      sync_marker_observed:pinned.id==='engine-sync-throw'&&execution.error.message.includes('JS_DISCOVERY_SYNC_THROW')};
+  }else{
+    result.output=await readOutput();
+    need(now()<deadline,'Original discovery deadline expired');
+    result.oracle=javascriptDiscoveryOracle(pinned,result.output);result.gate_passed=result.oracle.gate_passed;
+    result.status=result.gate_passed?'typed_oracle_verified':'typed_characterization';
+  }
+  await onProgress(result);await record({phase:'discovery_probe_observed',...result});return result;
+}

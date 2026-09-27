@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {verifyJavascriptTable} from './javascript-execution-evidence.mjs';
-import {javascriptMismatchVerdict} from './javascript-mismatch-probe.mjs';
+import {javascriptMismatchVerdict,javascriptProbeFailure} from './javascript-mismatch-probe.mjs';
 
 export const javascriptBatchOrder=Object.freeze([
   'code-table-execute','code-sentinel-preview','declared-sentinel-preview',
@@ -63,7 +63,7 @@ export async function runJavascriptBatch({cases,deadline,begin,run,settle,record
       const verdict=javascriptBatchVerdict(execution_case,result.probe,settled);
       await record({status:'OBSERVED',node_id:result.node_id,settlement:settled,verdict,finished_at:new Date(now()).toISOString()});
     } catch(error) {
-      await record({status:'FAILED',failure:{name:error.name,message:String(error.message)},finished_at:new Date(now()).toISOString()});
+      await record({status:'FAILED',failure:javascriptProbeFailure(error),finished_at:new Date(now()).toISOString()});
       throw error;
     }
   }

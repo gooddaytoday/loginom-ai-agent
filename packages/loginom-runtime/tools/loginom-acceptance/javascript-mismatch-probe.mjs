@@ -20,7 +20,7 @@ export function javascriptExecutionIdentity(node,trial){
 
 // Unverified native state stays unverified. This bounded characterization is
 // separate from readPortMapping's default strict source/schema contract.
-export function characterizeJavascriptMapping(state,reference,{allowPending=false}={}){
+export function characterizeJavascriptMapping(state,reference,{allowPending=false,failedExecution}={}){
   const owner=state?.prepared_node_context,mapping=state?.node_mapping,w=state?.wizard;
   // Missing/cache-loading evidence can settle without another gesture. Positive
   // evidence of another owner must never be hidden by the readiness poll.
@@ -42,7 +42,16 @@ export function characterizeJavascriptMapping(state,reference,{allowPending=fals
   if(allowPending&&!owned)return null;
   need(owned,'Characterization output owner differs');
   const verified=mapping?.verified===true&&mapping.inventory_complete===true&&mapping.source_identity_verified===true;
-  const supported=verified||mapping?.verified===false&&mapping.source_identity_verified===false&&mapping.reason==='mapping_render_value';
+  const emptyAfterFailure=failedExecution?.status==='failed'&&failedExecution.verified===true&&failedExecution.owner_verified===true
+    &&failedExecution.cleanup_complete===true&&failedExecution.ownership_source==='native_process_model_identity_and_show_node'
+    &&failedExecution.error_source==='native_child_error_details'&&typeof failedExecution.error?.message==='string'
+    &&failedExecution.error.message&&['document_id','workflow_id','node_id'].every(k=>failedExecution.node?.[k]===reference[k])
+    &&mapping.verified===true&&mapping.inventory_complete===true&&mapping.source_identity_verified===false
+    &&mapping.mapping_wizard==='DataSetOutputSocketWizard'&&mapping.state_source==='cached_mapping_stores'
+    &&mapping.autosync===false&&same(mapping.source_fields,[])
+    &&same(mapping.target_fields?.map(f=>[f.name,f.label,f.type,f.source,f.excluded]),
+      [['ObservedID','ObservedID','integer',null,false],['ManualMarker','ManualMarker','string',null,false]]);
+  const supported=verified||emptyAfterFailure||mapping?.verified===false&&mapping.source_identity_verified===false&&mapping.reason==='mapping_render_value';
   if(allowPending&&!supported)return null;
   need(supported,'Unsupported native mapping characterization');
   const rendered=w.output_columns;
@@ -52,7 +61,22 @@ export function characterizeJavascriptMapping(state,reference,{allowPending=fals
   if(allowPending&&!complete)return null;
   need(complete,'Bounded rendered mapping unavailable');
   return {status:verified?'verified':'unverified',owner_verified:true,node_context:structuredClone(owner),
-    mapping:structuredClone(mapping),rendered:structuredClone(rendered),rendered_is_native_schema:false};
+    mapping:structuredClone(mapping),rendered:structuredClone(rendered),rendered_is_native_schema:false,
+    ...(emptyAfterFailure?{classification:'empty_source_after_owned_failure',source_schema_verified:false}: {})};
+}
+
+export function javascriptProbeFailure(error){
+  const describe=e=>({name:e?.name??'Error',message:String(e?.message??e).slice(0,1200),
+    ...(e?.receipt?{receipt:{operation_id:e.receipt.operation_id,status:e.receipt.status,
+      error_code:e.receipt.error?.code}}:{})});
+  return {...describe(error),...(error?.observationError?{observation_error:describe(error.observationError)}:{}),
+    ...(error?.cleanupError?{cleanup_error:describe(error.cleanupError)}:{})};
+}
+
+export function javascriptMismatchExecutionProgress(trial,execution){
+  need(trial&&execution?.trial?.phase==='generated-mismatch'&&execution.trial.source_sha256===trial.source_sha256,
+    'Mismatch progress identity changed');
+  return {...trial,status:'execution_terminal',execution_started:true,execution:structuredClone(execution),gate_passed:false};
 }
 
 export function verifyJavascriptPreviousExecution(fresh,initial){
@@ -148,11 +172,12 @@ export function javascriptMismatchVerdict(trial,baseline){
       &&outputOracle.layout==='manual'&&outputOracle.changed_output_verified,
     output_oracle:outputOracle,
     source_schema_materialized:materialized,manual_mapping_preserved:preserved,target_source_bindings_verified:sourcesBound,
-    execution:'confirmed',absence_proves_no_execution:false};
+    execution:'confirmed',absence_proves_no_execution:false,
+    discovery_outcome:execution.status==='failed'?'owned_execution_failed':'materialization_observed'};
 }
 
 export async function runJavascriptMismatchMaterialization({node,changed,sourceProof,manual,postDone,baseline,deadline,
-  verifyBoundary,execute,readMapping,readOutput,record,now=Date.now}){
+  verifyBoundary,execute,readMapping,readOutput,record,onProgress=async()=>{},now=Date.now}){
   const identity=javascriptExecutionIdentity(node,changed);
   need(changed.phase==='generated-mismatch'&&sha(changed.source)===changed.source_sha256
     &&changed.baseline_source_sha256===baseline?.trial?.source_sha256&&changed.source_sha256!==changed.baseline_source_sha256
@@ -170,8 +195,11 @@ export async function runJavascriptMismatchMaterialization({node,changed,sourceP
   const budget=()=>need(now()<deadline,'Original mismatch deadline expired');
   budget();await verifyBoundary();budget();
   await record({phase:'mismatch_materialization_admitted',identity,source_proof:sourceProof,post_done:postDone,baseline,reset_dispatched:false});
-  budget();const execution=await execute(identity);budget();
+  budget();const execution=await execute(identity);
+  await onProgress(javascriptMismatchExecutionProgress({phase:changed.phase,source_sha256:changed.source_sha256,
+    post_done:postDone,source_proof:sourceProof,baseline_manual_mapping:manual.definition},execution));
   await record({phase:'mismatch_materialization_terminal',identity,execution});
+  budget();
   need(execution?.verified===true&&execution.owner_verified===true&&execution.cleanup_complete===true
     &&execution.execution_id!==baseline.execution_id&&same(execution.trial,identity)
     &&['completed','failed'].includes(execution.status)
@@ -179,7 +207,7 @@ export async function runJavascriptMismatchMaterialization({node,changed,sourceP
     'Mismatch execution ownership or freshness unconfirmed');
   verifyJavascriptPreviousExecution(execution.fresh_baseline,baseline);
   await verifyBoundary();budget();
-  const mapping=await readMapping();budget();
+  const mapping=await readMapping(execution);budget();
   need(mapping?.owner_verified===true&&['document_id','workflow_id','node_id'].every(k=>mapping.node_context?.[k]===node[k])
     &&mapping.node_context.output_port?.port_guid===postDone.node_context.output_port.port_guid,'Materialized mapping owner changed');
   const output=execution.status==='completed'?await readOutput():null;budget();
