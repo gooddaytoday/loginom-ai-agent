@@ -20,19 +20,19 @@ import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,bindJava
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {readJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus,cancelJavascriptNativeRoundtrip} from './javascript-native-roundtrip-read.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
-async function roundtrip({change,deferred=false,beforeGraph}={}){
-  let mutate,defer=false;
-  const f=await fake({change:()=>mutate?.(),deferred:()=>defer});
+async function roundtrip({change,deferred=false,beforeGraph,afterRelease}={}){
+  let mutate,mutateAfter,defer=false;
+  const f=await fake({change:()=>mutate?.(),deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
   const before=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'before'});
   f.model.FPreviewManager.FPreviewVisible=false;
   await f.page.evaluate(armJavascriptNativeRoundtrip,{binding:{...f.b,read_id:'before'},...nativeRoundtripProbe});
   const js={FGuid:'js',FIconCls:'bg-vendor-icon-javascript',FStatus:1,FRunning:false,data:{$S:f.session}};
-  const target={parent:js,FGuid:'js-input',FType:0,FSubType:1,FParam:0,FStatus:1};
+  const target={parent:js,FGuid:'js-input',FType:0,FSubType:1,FParam:3,FStatus:1};
   const output={parent:js,FGuid:'js-output',FType:1,FSubType:1,FParam:0,FStatus:1};
   js.FPorts=[{FCollection:[target]},{FCollection:[output]}];f.model.FDiagram.FNodes.FCollection.push(js);
   const edge={FGuid:'edge',FSourcePort:f.port,FTargetPort:target};f.model.FDiagram.FLinks.FCollection.push(edge);
   beforeGraph?.({f,js,edge,target,output});
-  await f.page.evaluate(bindJavascriptNativeRoundtripGraph,{node:{node_id:'js'},inputPortGuid:'js-input'});
+  const graphProof=await f.page.evaluate(bindJavascriptNativeRoundtripGraph,{node:{node_id:'js'},inputPortGuid:'js-input'});
   const lines=nativeRoundtripProbe.source.split('\n'),doc={firstLine:()=>0,lineCount:()=>lines.length,getLine:i=>lines[i]};
   const generation={id:'generation'},generationControl={el:{dom:generation},checked:true};
   const oldGet=f.env.Ext.getCmp;f.env.Ext.getCmp=id=>id==='generation'?generationControl:oldGet(id);
@@ -57,8 +57,8 @@ async function roundtrip({change,deferred=false,beforeGraph}={}){
       node_id:role==='output'?'js':'n',port_guid:role==='output'?'js-output':'p',
       execution:role==='output'?execution:f.b.execution,completed_child:role==='output'?execution:f.b.completed_child}));
   };
-  const result={f,before,js,edge,target,output,outputDs,outputHelper,source,child,execution,lines,generationControl,bind};
-  mutate=change?()=>change(result):null;defer=deferred;return result;
+  const result={f,before,js,edge,target,output,outputDs,outputHelper,source,child,execution,lines,generationControl,graphProof,bind};
+  mutate=change?()=>change(result):null;mutateAfter=afterRelease?()=>afterRelease(result):null;defer=deferred;return result;
 }
 test('separate native output and upstream bindings read twelve real/NULL cells without replay',async()=>{
   const x=await roundtrip();
@@ -246,4 +246,45 @@ test('all graph predicates survive real operator error serialization and product
   assert.equal(saved.failure.message.length,1200);
   const disk=await readFile(join(directory,'execution-events.jsonl'),'utf8');assert.ok(!disk.includes('private-value'));
   assert.deepEqual(JSON.parse(disk).failure,clone(failure));
+});
+
+for(const param of [0,1,2,4,16])test('observed JS input requires exact param3 and rejects '+param+' before graph binding',async()=>{
+  let f;
+  await assert.rejects(()=>roundtrip({beforeGraph:x=>{f=x.f;x.target.FParam=param;}}),error=>{
+    const d=JSON.parse(error.message.split('RG1 ')[1]);assert.deepEqual(d.f,['param']);assert.deepEqual(d.v,['0','1',String(param)]);return true;
+  });assert.equal(f.counters.sent,4);
+});
+for(const param of [0,1,2,4])for(const stage of ['before-binding','before-read','after-response','between-cells','final-publication'])
+  test('JS input param3 mutation to '+param+' at '+stage+' refuses native publication',async()=>{
+    const change=x=>{x.target.FParam=param;};
+    const x=await roundtrip({change:stage==='after-response'?change:undefined,
+      afterRelease:stage==='between-cells'?change:stage==='final-publication'?x=>{if(x.f.counters.requests===8)change(x);}:undefined});
+    if(stage==='before-binding'){
+      change(x);await assert.rejects(()=>x.bind('output'),/port identity/);assert.equal(x.f.counters.sent,4);return;
+    }
+    const b=await x.bind('output');if(stage==='before-read')change(x);
+    await assert.rejects(()=>readJavascriptNativeRoundtrip(x.f.page,b,decodeVariantFrame,{operationId:'changed-param'}),/port identity/);
+    const count=stage==='before-read'?4:stage==='final-publication'?8:5;
+    assert.deepEqual(x.f.counters,{sent:count,requests:count,responses:count});
+    if(stage!=='before-read'){const state=await javascriptNativeRoundtripStatus(x.f.page);assert.equal(state.published,false);assert.equal(state.retired,true);}
+  });
+test('graph-bound port inventory is bounded, descriptor-only and does not admit output param changes',async()=>{
+  let getters=0;
+  const x=await roundtrip({beforeGraph:x=>{
+    Object.defineProperty(x.target,'FPortIndex',{get:()=>{getters++;return 'private-index';}});
+    x.output.FPortIndex=999;x.output.FStatus='private-status';
+  }});
+  assert.deepEqual(clone(x.graphProof.ports),{input:{count:'1',values:[['0','1','3','1','accessor']]},output:{count:'1',values:[['1','1','0','other','other']]}});
+  assert.equal(getters,0);assert.ok(!JSON.stringify(x.graphProof).includes('private-'));
+  x.output.FStatus=1;x.output.FParam=3;
+  await assert.rejects(()=>x.bind('output'),/port identity/);
+});
+test('graph-bound observation caps per-port enum inventory at eight without admitting a wider output read',async()=>{
+  const x=await roundtrip({beforeGraph:x=>{
+    x.js.FPorts[1].FCollection.push(...Array.from({length:9},(_,i)=>({...x.output,FGuid:'private-output-'+i,FPortIndex:i+1})));
+  }});
+  assert.equal(x.graphProof.ports.output.count,'>8');assert.equal(x.graphProof.ports.output.values.length,8);
+  assert.ok(!JSON.stringify(x.graphProof.ports).includes('private-output'));
+  await assert.rejects(()=>x.bind('output'),/NI1/);
+  assert.equal(x.f.counters.sent,4);
 });
