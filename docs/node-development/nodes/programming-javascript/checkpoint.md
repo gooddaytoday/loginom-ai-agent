@@ -16,6 +16,26 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### B-get-case: последний прогон завершился; пользователь сообщил о нажатии
+
+Profile85/original63969 terminal exit1, FAILED inspect-pages:
+`NodeReadinessTimeout: prepared node available for process console`.
+Execute был отправлен (journal launch verified), но терминальный результат
+с привязкой к владельцу не подтверждён. Снимок work-refusal.png показывает
+ошибку отсутствующего столбца `"value"`, `<main>:4:1`; это наблюдение,
+а не независимая приёмка B-кейса. Пользователь сообщил о случайном нажатии
+в браузере; причинная связь с timeout не доказана.
+
+Cleanup package_closed/logged_out/browser_closed=true; точных процессов
+закреплённого Chromium нет. Исходные report/journal сохранены неизменными.
+Private diagnosis: native-named-get-case-probe-01-diagnosis.json;
+реестр/launch/matrix исправлены с RUNNING на FAILED/unresolved.
+OpenViking health/find/read успешны. A8/8 сохраняется, B ещё не принят.
+Следующий шаг: отдельный свежий кейс только после проверки границы запуска
+и очистки; прежний Execute не повторять в старом пакете. Runtime не менялся.
+
+
+
 ### Source85 принят; первый B live RUNNING
 
 Developer revision8 завершён/idle. Root проверил1265pins/13changedfiles,
