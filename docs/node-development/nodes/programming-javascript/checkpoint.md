@@ -15,6 +15,19 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Freeze39 проверен, headed batch39 запущен — 2026-09-27
+
+Root65 tests PASS;27 итоговых SHA проверены, tested source неизменён.
+Один Alt-drag освобождает mouse→Alt в finally; неподтверждённый release
+останавливает UI cleanup, оставляя browser close. Before/after native graph
+обязан подтвердить ноль новых связей после palette; затем один явный connect
+от original JSInput и полная проверка сохранности старого графа.
+Выбор узла не используется как доказательство подавления автосвязи.
+
+Freshprofile12/Chromium1246, headed DISPLAY=:1/sandbox, новый UUID/evidence
+batch39. Process запущен, live-результат ожидается. Статус полного G2/G3 и
+прочих требований плана не изменён; публичного handler/CLI-приёмки пока нет.
+
 ### Автосвязь: найден штатный Alt-drag — 2026-09-27
 
 Root просмотрел screenshot38: второй JS визуально связан с первым JS.
