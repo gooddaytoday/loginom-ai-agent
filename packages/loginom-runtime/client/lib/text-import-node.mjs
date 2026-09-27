@@ -98,7 +98,7 @@ export function bindConfiguredOutputColumns(configured,actual,native) {
 
 // Host-owned support object. It is deliberately not registered in the public
 // catalog until execution, wide mapping and independent acceptance are complete.
-export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
+export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRead}) {
   const nodeApplyHandlers=new Map([['imports.text',{revision:'text-import-output-v2',modes:['delimited'],
     parameter_schema:textImportParametersSchema,
     configurationReadback:textImportConfigurationReadback,
@@ -248,13 +248,15 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         requireValue(Array.isArray(outputColumns)&&outputColumns.length>0,'Verified output mapping is unavailable');
         const opened=await openNewOutputTable(channel,0);
         const formatProof=read.require_exact_numbers?await configureTablePrecision(channel,opened.table):null;
-        let readSettings,data,formatRestoration;
+        let readSettings,data,formatRestoration,raw;
         try {
           readSettings=await prepareTableRead(channel,opened.table);
-          const raw=await readTableOutputPages(channel,opened.table,{sampleRows:read.sample_rows});
+          raw=await readTableOutputPages(channel,opened.table,{sampleRows:read.sample_rows});
           data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:outputColumns,requireExactNumbers:read.require_exact_numbers});
         } finally { if(formatProof)formatRestoration=await restoreTablePrecision(channel,formatProof); }
         const workflowReturn=await returnFromOutputTable(channel,opened.table);
+        // Private acceptance may retain raw civil evidence; no public response/schema changes.
+        await onTableRead?.({raw,table_creation:opened,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:workflowReturn});
         return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:executionReceipt.execution_id,evidence_ref:ctx.receipt_id,
           ports:[{port:0,port_guid:opened.port_guid,fresh:true,freshness_basis:'new_bound_table_after_verified_node_execution',execution_id:executionReceipt.execution_id,...data}],
           table_creation:opened,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:workflowReturn});

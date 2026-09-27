@@ -1,7 +1,8 @@
+import {verifyNativeCivil,nativeCivilExpectation} from './javascript-native-datetime-civil.mjs';
 import {verifyTextImportSource} from '../../client/lib/text-import-node.mjs';
 import {textImportConfigurationReadback} from '../../client/lib/text-import-readback.mjs';
 import {createHash} from 'node:crypto';
-import {adaptRead} from '../../client/lib/variant-native-values.mjs';
+import {adaptRead,temporalProfile} from '../../client/lib/variant-native-values.mjs';
 import {verifyNativeFixtureCells,verifyNativeInputRead} from './javascript-native-input-contract.mjs';
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 
@@ -26,6 +27,10 @@ export function verifyNativeRoundtripInput(input,fixtureId='real'){
     &&proof.lifecycle.releasedRequests===nativeInputFixture.rows&&proof.lifecycle.releasedResponses===nativeInputFixture.rows,'input release required');
   need((proof.binding.fixture_id??'real')===nativeInputFixture.id&&proof.binding.node_id===input.node.node_id&&proof.binding.port_guid===input.table.port_guid,'input owner differs');
   verifyNativeFixtureCells(proof.exact,nativeInputFixture.id);
+  if(nativeInputFixture.type==='datetime'){
+    const checked=verifyNativeInputRead(proof.raw,{binding:proof.binding,lifecycle:proof.lifecycle,provenance:proof.exact.provenance});
+    need(JSON.stringify(checked)===JSON.stringify(proof.exact),'frozen civil/native baseline differs');
+  }
   return proof;
 }
 export function verifyNativeRoundtripMapping(mapping,node,fixtureId='real'){
@@ -41,12 +46,23 @@ export function verifyNativeRoundtripMapping(mapping,node,fixtureId='real'){
     &&b.source?.record_id===a.record_id&&b.source?.field_id===a.field_id&&b.source?.name==='Value'&&b.source?.type===fixture.type,'Value identity mapping required');
   return {verified:true,node:{...node},port:0,port_guid:port.port_guid,columns:1,input_technical_name:'Value'};
 }
-export function verifyNativeRoundtripRead(raw,{binding,lifecycle,input,role}){
+export function verifyNativeRoundtripRead(raw,{binding,lifecycle,input,role,civil}){
   const fixture=javascriptNativeFixture(binding.fixture_id),nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixture.id);
   need((input.binding.fixture_id??'real')===fixture.id,'input fixture differs');
   need(['output','upstream'].includes(role)&&binding.roundtrip_role===role,'private read role');
   need(binding.source_sha256===nativeRoundtripProbe.source_sha256,'identity script digest');
-  const exact=adaptRead(raw,{expected:binding,lifecycle,consistency:{kind:'observed_local',changed:false,
+  if(fixture.type==='datetime'){
+    verifyNativeCivil(civil,nativeCivilExpectation(binding,role,fixture.sha256));
+    need(['document_id','workflow_id','package_id'].every(k=>binding[k]===input.binding[k]),'civil roundtrip scope differs');
+    if(role==='upstream')need(['node_id','port_guid'].every(k=>binding[k]===input.binding[k])
+      &&JSON.stringify(binding.source)===JSON.stringify(input.binding.source)
+      &&['execution_id','group_id','process_id','process_record_id'].every(k=>binding.completed_child[k]===input.binding.completed_child[k]),'original civil upstream differs');
+    if(role==='output'){
+      need(binding.node_id!==input.binding.node_id&&binding.port_guid!==input.binding.port_guid,'civil output must belong to JS');
+      verifyNativeRoundtripExecution(binding.completed_child,binding,fixture.id);
+    }
+  }
+  const exact=adaptRead(raw,{expected:binding,lifecycle,...(fixture.type==='datetime'?{dateProfile:temporalProfile}:{}),consistency:{kind:'observed_local',changed:false,
     exclusive_operation:true,stability_basis:'owned_static_completed_fixture'}});
   verifyNativeFixtureCells(input.exact,fixture.id);
   const characterization=fixture.id==='integer-outside-safe'&&role==='output'?characterizeOutsideSafeIntegers(exact,input.exact):null;
@@ -84,10 +100,11 @@ export function verifyNativeRoundtripOutcome(results,fixtureId='real'){
   const fixture=javascriptNativeFixture(fixtureId),before=results.before;
   need((before.binding.fixture_id??'real')===fixture.id,'final fixture differs');
   const input={...before,exact:verifyNativeInputRead(before.raw,{binding:before.binding,lifecycle:before.lifecycle,provenance:before.exact.provenance})};
-  const output=verifyNativeRoundtripRead(results.output.raw,{binding:results.output.binding,lifecycle:results.output.lifecycle,input,role:'output'});
-  verifyNativeRoundtripRead(results.upstream.raw,{binding:results.upstream.binding,lifecycle:results.upstream.lifecycle,input,role:'upstream'});
+  const output=verifyNativeRoundtripRead(results.output.raw,{binding:results.output.binding,lifecycle:results.output.lifecycle,input,role:'output',civil:results.output.civil});
+  verifyNativeRoundtripRead(results.upstream.raw,{binding:results.upstream.binding,lifecycle:results.upstream.lifecycle,input,role:'upstream',civil:results.upstream.civil});
+  if(fixture.type==='datetime')need(JSON.stringify(input.exact)===JSON.stringify(before.exact),'final frozen civil/native baseline differs');
   const observation=output.integer_characterization;
-  return {fixture_id:fixture.id,status:observation?.status??'exact_fixture_identity_observed',input_exact:true,upstream_exact:true,
+  return {fixture_id:fixture.id,status:observation?.status??(fixture.type==='datetime'?'civil_and_native_identity_observed':'exact_fixture_identity_observed'),input_exact:true,upstream_exact:true,
     output_identity_exact:observation?.output_identity_exact??true,exact_pass:!observation,characterization_only:!!observation,
     general_integer_precision_guarantee:false,g5_complete:false,...(observation?{cells:observation.cells}:{})};
 }
