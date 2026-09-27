@@ -31,7 +31,11 @@ Receipt integer-coercion-output-auditor-selfcheck.json. Проверка док�
 scalar encoding; execution/owner/source/upstream/journal/cleanup и actual engine
 coercion остаются отдельными обязательными доказательствами. Current source82
 implementation в прежней задаче active; freeze/приёмка ещё не переданы.
-Browser CLOSED; свежий профиль для coercion пока не выделен.
+Browser CLOSED; root зарезервировал fresh profile66 для первого fixed случая
+integer-coercion-fraction-positive после freeze82 и независимых проверок.
+Проверено отсутствие процессов pinned Chromium, profile66 ещё не создан браузером.
+Предварительная сверка WIP catalogue/CSV: все7 source/CSV/input metadata совпадают
+с независимой матрицей; это не frozen source acceptance и не live evidence.
 
 
 ### Empty04 source81: независимый declared-empty roundtrip PASS
