@@ -22,16 +22,16 @@ import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,bindJava
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {readJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus,cancelJavascriptNativeRoundtrip} from './javascript-native-roundtrip-read.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
-export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real',reply}={}){
+export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real',reply,sharedPortGuid}={}){
   const nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixtureId);
   let mutate,mutateAfter,defer=false;
-  const f=await fake({fixtureId,change:(fixture,response,request)=>{mutate?.();reply?.(fixture,response,request);},deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
+  const f=await fake({fixtureId,beforeBind:sharedPortGuid?f=>{f.port.FGuid=sharedPortGuid;f.b.port_guid=sharedPortGuid;}:undefined,change:(fixture,response,request)=>{mutate?.();reply?.(fixture,response,request);},deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
   const initialRead=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'before'});
   f.model.FPreviewManager.FPreviewVisible=false;
   await f.page.evaluate(armJavascriptNativeRoundtrip,{binding:{...f.b,read_id:'before'},...nativeRoundtripProbe});
   const js={FGuid:'js',FIconCls:'bg-vendor-icon-javascript',FStatus:1,FRunning:false,data:{$S:f.session}};
   const target={parent:js,FGuid:'js-input',FType:0,FSubType:1,FParam:3,FStatus:1};
-  const output={parent:js,FGuid:'js-output',FType:1,FSubType:1,FParam:2,FStatus:2,FPortIndex:0};
+  const output={parent:js,FGuid:sharedPortGuid??'js-output',FType:1,FSubType:1,FParam:2,FStatus:2,FPortIndex:0};
   // Exact constructor text from pinned fix66 AddPort.js; never invoked here.
   const addPortSource='function AddPort(parent, graph, type) {\n            var _this = _super.call(this, parent, graph, type, 0, 10) || this;\n            _this.FReachedMaxOccurs = [];\n            _this.FVerifiedPortsForConnection = {};\n            _this.FHasHoverState = true;\n            return _this;\n        }';
   const addPortClass=vm.runInNewContext('('+addPortSource+')');f.env.mx={AddPort:addPortClass};
@@ -75,7 +75,7 @@ export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,
     Object.assign(f.model.FPreviewManager.FShowDataLastCall,{Node:node,Port:port});
     f.dc.FModelNode=node.data;f.dc.FDataSource=ds;f.dt.FDataSource=ds;f.store.proxy.dataSource=ds;
     return f.execute(javascriptNativeRoundtripCode({...f.b,binding_id:role,roundtrip_role:role,source_sha256:nativeRoundtripProbe.source_sha256,
-      node_id:role==='output'?'js':'n',port_guid:role==='output'?'js-output':'p',
+      node_id:role==='output'?'js':'n',port_guid:port.FGuid,
       execution:role==='output'?execution:f.b.execution,completed_child:role==='output'?execution:f.b.completed_child}));
   };
   const result={f,before:initialRead,js,edge,target,output,service,outputDs,outputHelper,source,child,execution,lines,generationControl,graphProof,bind};
