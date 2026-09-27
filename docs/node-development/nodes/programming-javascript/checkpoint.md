@@ -15,6 +15,24 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Batch36: JS output6×2 впервые прочитан полностью — 2026-09-27
+
+Freshprofile09/freeze36. После нового Execute read-only settlement подтвердил
+переход graph→Views с исходным native output. Root независимо проверил все12
+ячеек: ObservedID integer1..6 exact, PhaseMarker string JS_G2_TABLE_V1,
+полная6×2 таблица, filter=false; все1276 уникальных journal refs SHA совпали.
+Это подтверждает конкретный code-table output, но ещё не весь кейс/G2/G3.
+
+Следующий existing-source-readback отказал сразу после private Setting opening:
+PREPARED_NODE_CONTEXT_CHANGED / surface_unavailable. Cleanup snapshot уже
+WizardTreeNode; close-owned-package timeout60s, package/logoutfalse,
+browserclosedtrue. Отдельный headed recovery36 без download/package mutation:
+packages0, logout/browserPASS. Оригинальная попытка остаётся CLEANUP_UNCONFIRMED.
+
+Прежней задаче назначен fix37: bounded native wizard/deactivation settlement
+после единственного Setting click и корректный owned wizard cleanup без replay.
+Публичные guards сохраняются. Следующий live только после handoff на freshprofile10.
+
 ### Freeze36 проверен, headed batch36 запущен — 2026-09-27
 
 Root:192 tests PASS,23 итоговых SHA проверены, протестированные файлы неизменны.
