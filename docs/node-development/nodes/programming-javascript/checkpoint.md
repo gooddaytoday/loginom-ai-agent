@@ -18,6 +18,17 @@
 
 ### Следующий этап: named/index/case и J24 design
 
+Root проверил границы реализации source82: `javascript-native-roundtrip-read.mjs`
+перед каждым native request и после ответа сверяет удержанные identities/schema/cache,
+отказывает при reused read binding, ограничивает bytes/deadline и освобождает
+request/response. В `javascript-native-roundtrip-binding.mjs` fixed schema
+проверяется и по receipt, и по native field Name/DisplayName/DataType.
+Для J24 новая policy должна сохранять обе проверки: observed schema принадлежит
+удержанному native field, а не принимается из caller. Исходный input/upstream
+остаётся exact Value. Эти требования переданы в тот же active turn; runtime не менялся.
+Последний wait_threads подтвердил revision54 active, timeout не считается
+окончанием задачи. Host registry developer status синхронизирован с этим состоянием.
+
 Той же задаче разработчика «JavaScript: общая память и допуск Ubuntu» повторно
 передано точное design-only назначение. Revision54/turn
 01a0e454-c966-7433-9cab-f3d9f92ff31e active; это не повтор исторического bootstrap.
