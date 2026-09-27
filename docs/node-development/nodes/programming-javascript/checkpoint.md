@@ -16,6 +16,22 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Повторный допуск памяти и текущая проверка Fix78 — 2026-09-27
+
+MCP OpenViking health и actor find успешно выполнены в основной задаче:
+сервер initialized/VikingFS, поиск вернул записи текущего проекта. Настройки
+памяти не менялись; отказов подключения в этой проверке нет.
+
+В текущем, ещё не frozen коде Fix78 native zero schema проверяется по
+Name/DisplayName/DataType/index без требования native Required. UI declaration
+сохраняет Required boolean и отдельные проверки удержанного редактора/записи.
+Тем самым замечание ниже учтено в текущем исходнике; итоговая проверка frozen
+версии и live-подтверждение всё ещё нужны. Root также прочитал pre-loop single-use
+reservation, нулевой lifecycle, пять фактических счётчиков, before/final receipts
+и проверку удержанного cache/schema после возврата из Preview. Эти source checks
+не объявляются успешным прогоном пустого JS-выхода. Разработчик продолжает Fix78;
+browser CLOSED, profile62 ещё не использован.
+
 ### Fix78 interim review: не переносить UI Required в native metadata без основания
 
 Root прочитал новую captureJavascriptNativeZero и обнаружил дополнительное
