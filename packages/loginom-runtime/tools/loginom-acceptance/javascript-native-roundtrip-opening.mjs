@@ -31,8 +31,13 @@ export function inspectJavascriptNativePreview({binding:b,phase}){
     s.previewOpening={fingerprint,model,diagram,graph,container,node,port,portData:port.data,cell:port.FCell,shape,status:'prepared'};
   }
   const held=s.previewOpening;
-  need(held?.fingerprint===fingerprint&&held.model===model&&held.diagram===diagram&&held.graph===graph&&held.container===container
-    &&held.node===node&&held.port===port&&held.portData===port.data&&held.cell===port.FCell&&held.shape===shape,'opening identity changed');
+  const checks={binding:held?.fingerprint===fingerprint,model:held?.model===model,diagram:held?.diagram===diagram,
+    graph:held?.graph===graph,container:held?.container===container,node:held?.node===node,port:held?.port===port,
+    data:held?.portData===port.data,cell:held?.cell===port.FCell,shape:held?.shape===shape};
+  // Bounded booleans only; retain the original reservation even on refusal.
+  // selected runs only after mouse.click returned; select runs before the click.
+  need(Object.values(checks).every(Boolean),'NP1 '+JSON.stringify({p:['prepare','select','selected','preview'].includes(phase)?phase:'other',
+    h:['prepared','selection-dispatched','selected','preview-dispatched'].includes(held?.status)?held.status:'other',c:checks}));
   const box=shape.getBoundingClientRect(),point={x:box.x+box.width/2,y:box.y+box.height/2},hit=document.elementFromPoint(point.x,point.y);
   need(point.x>=0&&point.y>=0&&point.x<innerWidth&&point.y<innerHeight&&hit&&(hit===shape||shape.contains(hit))
     &&hit.closest('[data-tid]')===shape&&!hit.closest('button,a,input,select,textarea,[contenteditable="true"],[role="button"],[role="menuitem"]'),'native port hit-test');
@@ -78,10 +83,10 @@ export async function openJavascriptNativeRoundtripPreview({options,ctx,input,po
     origin:new URL(new URL(targetOrigin).origin).href,build:targetBuild,source_sha256:ctx.execution.trial.source_sha256,
     execution:ctx.execution,deadline:Math.min(deadline,input.binding.deadline),effect_id:operation.id+':native-preview'};
   const check=()=>{ctx.signal?.throwIfAborted();need(now()<binding.deadline&&options.exclusiveNodeOperation()===true,'deadline/read lock');};
-  let effectPossible=false;
+  let effectPossible=false,step='prepare';
   try{
     for(const phase of ['prepare','select','preview']){
-      check();
+      step=phase;check();
       const intent={phase:'native_roundtrip_preview_intent',step:phase,binding};
       const saved=await onRecord(intent);need(saved?.phase===intent.phase&&saved.step===phase&&JSON.stringify(saved.binding)===JSON.stringify(binding),'intent journal ACK differs');check();
       if(phase!=='prepare')effectPossible=true;
@@ -95,6 +100,26 @@ export async function openJavascriptNativeRoundtripPreview({options,ctx,input,po
     }
   }catch(error){
     if(effectPossible){operation.transportUncertain=true;await onState({uncertain:true});}
+    const event={phase:'native_roundtrip_preview_refused',step,effect_possible:effectPossible,
+      diagnostic:parseJavascriptNativePreviewDiagnostic(error.message)};
+    try{
+      const saved=await onRecord(event);
+      need(saved?.phase===event.phase&&saved.step===step&&saved.effect_possible===effectPossible
+        &&JSON.stringify(saved.diagnostic)===JSON.stringify(event.diagnostic),'refusal journal ACK differs');
+    }catch(journalError){throw new AggregateError([error,journalError],error.message);}
     throw error;
   }
+}
+
+export function parseJavascriptNativePreviewDiagnostic(message){
+  const match=typeof message==='string'&&message.match(/NP1 (\{[^\n]{1,400}\})/);
+  if(!match)return null;
+  let value;
+  try{value=JSON.parse(match[1]);}catch{return null;}
+  const keys=['binding','model','diagram','graph','container','node','port','data','cell','shape'];
+  if(!value||Object.keys(value).sort().join(',')!=='c,h,p'
+    ||!['prepare','select','selected','preview','other'].includes(value.p)
+    ||!['prepared','selection-dispatched','selected','preview-dispatched','other'].includes(value.h)
+    ||!value.c||Object.keys(value.c).length!==keys.length||!keys.every(k=>typeof value.c[k]==='boolean'))return null;
+  return {p:value.p,h:value.h,c:Object.fromEntries(keys.map(k=>[k,value.c[k]]))};
 }
