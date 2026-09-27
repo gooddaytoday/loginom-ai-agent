@@ -15,6 +15,30 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Preview40: native связь установлена по исходникам стенда — 2026-09-27
+
+Root прочитал клиентские JS самого стенда через read-only HTTP GET:
+Uses→RegistrationWizards→JavaScriptWizardVendor→JavaScriptCodeWizard.
+Браузер или RPC не запускались. Семь исходников и URL/SHA manifest сохранены
+приватно в preview-source-40; исходники Loginom в Git не копировались.
+
+JavaScriptCodeWizard.InitPreviewController создаёт FPreviewController;
+CodePreviewController.Init сохраняет FPreviewForm, а ShowPreview вызывает
+FPreviewForm.View.showModal(scope). Ext ownerCt до wizard поэтому не является
+достаточной моделью принадлежности. BaseWizard.SetWizardForm сохраняет
+FWizardForm; ViewController связывает view.Controller и controller.FView.
+Предлагаемая проверка: owned code page.Controller.FWizardForm===original wizard,
+page.FPreviewController.FPreviewForm.FView.el.dom===exact Preview root плюс
+обратная связь Preview control.Controller===preview form. Это source proof,
+фактические equality на живом стенде ещё NOT_RUN. Разработчик получил источники.
+
+SHA JavaScriptCodeWizard:ab0d3102321e00f38b5bd373c995bba67eb5beab1c10f1c349e8a7109b4362c7;
+CodePreviewController:3a419d3e2735ea4ee113fe8567c3c87d47b604d6ae55181fa1995d9347d3d34a;
+BaseWizard:a4b0238c9a2985cc2d5d7cd09a51aaabd17cb523349fad028eeab92d6cac3325;
+ViewController:69a209465619fa56670ab767b040c91b00b5cec950c3b56a9151f4dfcd00dbb8.
+Следующий адресный прогон начнёт с code/declared Preview; повторение уже двух
+полных table PASS отложено до проверки изменённой логики. Полный scope сохраняется.
+
 ### Batch39: Preview виден, native ownership не подтверждён — 2026-09-27
 
 Прогон завершён CLEANUP_UNCONFIRMED. Первый code-table-execute повторно прошёл
