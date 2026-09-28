@@ -150,6 +150,28 @@ function configuredFixture(){
 test('independent audit accepts native configured-only before execution and complete proofs after it',()=>{
  assert.equal(auditJavascriptPersistence(configuredFixture()).status,'VERIFIED');
 });
+function coldGeneratedEmptyFixture(mode='code'){
+ const f=fixture(mode),output=f.cold.cold.mappings_before.output;
+ output.source_fields=[];output.target_fields=[];output.rendered_indices=[];
+ return f;
+}
+test('code mode accepts observed empty cold output cache only before a verified fresh execution',()=>{
+ assert.equal(auditJavascriptPersistence(coldGeneratedEmptyFixture()).status,'VERIFIED');
+});
+test('declared mode refuses an empty cold output cache',()=>{
+ assert.throws(()=>auditJavascriptPersistence(coldGeneratedEmptyFixture('declared')));
+});
+for(const [name,change] of Object.entries({
+ nonempty_rendered:f=>{f.cold.cold.mappings_before.output.rendered_indices=[0];},
+ wrong_wizard:f=>{f.cold.cold.mappings_before.output.mapping_wizard='OtherWizard';},
+ wrong_port:f=>{f.cold.cold.mappings_before.output.node_context.output_port.port=1;},
+ autosync:f=>{f.cold.cold.mappings_before.output.autosync=false;},
+ partial_source:f=>{f.cold.cold.mappings_before.output.source_fields=[{index:0,name:'ObservedID',type:'integer'}];},
+ empty_after_execute:f=>{f.cold.cold.mappings_after.output.source_fields=[];f.cold.cold.mappings_after.output.target_fields=[];},
+ missing_output:f=>{f.cold.cold.output.sample=[];},
+ }))test('cold generated cache allowance refuses '+name,()=>{
+ const f=coldGeneratedEmptyFixture();change(f);assert.throws(()=>auditJavascriptPersistence(f));
+ });
 for(const [name,change] of Object.entries({
  configured_label:f=>{f.writer.persistence.final.before_execute.mapping_evidence.before.output.target_fields[0].label='Changed';},
  configured_header:f=>{f.cold.cold.mappings_before.output.source_pending.hidden=false;},
