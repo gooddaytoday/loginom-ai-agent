@@ -15,6 +15,21 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source110: main PASS, freeze, writer12 активен
+
+Main original98890 exit0:3610PASS/0FAIL/0SKIP,38606ms. Focused150PASS.
+Shared client source109/full2806PASS/10SKIP неизменён. Freeze110 SHA
+eadee9947b9d1358fd5cc965de8af7b8a474af01e808074f83568df3b354062b:
+1324 pins, closure206 files/637 edges, computed0,2 syntax checks PASS.
+Runtime08eb123df89a8862536f19cd8a5eb805fffde957; runtime diff HEAD пустой.
+
+Writer12 original86368, fresh profile135. Chromium PID369377 проверен /proc:
+headed, sandbox включён, exact assigned profile. Реестр active_exec_session86368.
+Report persistence-code-writer-12/report.json; log source110-code-writer-12.log.
+Запуск активен, не PASS. При продолжении сначала опросить этот handle; не
+повторять процессы из-за timeout наблюдения. Следующий свободный profile136.
+
+
 ### Writer11: link исправлен, save1 подтверждён, private selection остановлен
 
 Original1440 terminal exit1. Новый input link подтверждён, JS выполнен, initial
