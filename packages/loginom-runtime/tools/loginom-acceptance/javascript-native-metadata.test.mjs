@@ -47,14 +47,14 @@ export async function metadataFixture({hook,namedCaseId='C-set-index',unbound=fa
       :{get(){originalReads++;throw Error('unselected property '+name);},configurable:true});
     return object;
   }
-  const socket=make({},961),component=make({},780),engine=make({},781),ports=make({},815),parent=make({},1082);
+  const socket=make({},961),component=make({},780),engine=make({},781),ports=make({},815),parent=make({},1086),modelPorts=make({},1082);
   const n=make({},1069,x.js.data),w=make({},1081,x.output.data);
   const s=make({},102),t=make({},84),p=make({},860),item=make({},814),output=make({},219);
   const source=make({},87),target=make({},69),extension=make({},81),extensions=make({},0);
   const d=x.outputDs;
   make({},116,d);
-  values.set(n,{OutputPorts:parent,Component:component});values.set(w,{Index:0,Parent:parent,Socket:socket});
-  values.set(parent,{ParentNode:n});values.set(component,{Engine:engine});values.set(engine,{OutputPorts:ports});
+  values.set(n,{OutputPorts:modelPorts,Component:component});values.set(w,{Index:0,Parent:parent,Socket:socket});
+  values.set(parent,{ParentNode:n});values.set(modelPorts,{Count:1,Items:[w]});values.set(component,{Engine:engine});values.set(engine,{OutputPorts:ports});
   values.set(ports,{Count:1,Items:[item]});values.set(item,{Index:0,Port:p});
   values.set(p,{SourceColumns:s,TargetColumns:t,Socket:socket});values.set(socket,{Output:output});
   values.set(output,{SyncThroughColumns:true,ColumnDefs:t});values.set(d,{ColumnDefs:t});
@@ -106,7 +106,7 @@ export async function metadataFixture({hook,namedCaseId='C-set-index',unbound=fa
     SelectItemRangePropertyDesc(item,count,start,end,selector){return {GetterMethodIndex:-3,ItemMemberInfo:item,CountMemberInfo:count,RangeStartIndex:start,RangeEndIndex:end,Elements:desc(item,undefined,selector)};},
     async GetPropertyValues$1(object,descs){calls.push({object,descs});await hook?.({call:calls.length,x,values,refs,casts});return query(object,descs);}
   }};
-  const refs={n,w,s,t,p,d,source,target,extension,extensions,socket,component,engine,ports,item,output,parent};
+  const refs={n,w,s,t,p,d,source,target,extension,extensions,socket,component,engine,ports,item,output,parent,modelPorts};
   Object.assign(env,{NamesOf:()=>({QueryInterface:'QueryInterface'}),rpc,rtl:{SelectorMemberInfo:Member},IInterface:function IInterface(){},Debug:{assert:value=>assert.ok(value)},ss:{isNullOrUndefined:x=>x==null,isInterface:t=>t?.__interface,getInterfaces:t=>[],getBaseType:t=>Object},
     __awaiter:(_this,_args,_P,generator)=>new Promise((resolve,reject)=>{const g=generator.apply(_this,_args??[]);const next=(method,arg)=>{let v;try{v=g[method](arg);}catch(e){reject(e);return;}if(v.done)resolve(v.value);else Promise.resolve(v.value).then(v=>next('next',v),e=>next('throw',e));};next('next');})});
   Object.assign(env.bg,types,{CreateDictionary:()=>({}),IsDisposedProxyObject:()=>false});
@@ -127,6 +127,9 @@ test('metadata actual selector scopes: seven bounded calls, native associations,
   assert.equal(dto.metadata_observation_complete,true);assert.equal(dto.api_calls,7);assert.equal(dto.D_case_complete,false);
   assert.equal(dto.G5_complete,false);assert.equal(dto.wire_request_count_verified,false);assert.ok(dto.held_objects<=32);
   assert.equal(dto.mapping.source.object,dto.source.identity.object);assert.equal(dto.target.identity.object,dto.physical.identity.object);
+  assert.notEqual(dto.model_output_membership.parent_collection.object,dto.model_output_membership.output_collection.object);
+  assert.equal(dto.model_output_membership.parent_collection.interface,1086);assert.equal(dto.model_output_membership.output_collection.interface,1082);
+  assert.equal(dto.model_output_membership.port.object,dto.owner.port.object);assert.equal(dto.model_output_membership.count,1);assert.equal(dto.model_output_membership.index,0);
   assert.equal(f.originalReads(),0);assert.equal(f.calls.length,7);assert.equal(f.state().pending,0);
   assert.equal(Object.hasOwn(f.refs.source,'Name'),false);assert.equal(Object.hasOwn(f.refs.ports,'Items'),false);
   assert.equal(Object.hasOwn(f.refs.extensions,'QueryInterface'),false);
@@ -135,6 +138,10 @@ test('metadata actual selector scopes: seven bounded calls, native associations,
 });
 
 for(const [name,call,change]of [
+  ['model output count zero',1,({values,refs})=>values.get(refs.modelPorts).Count=0],
+  ['model output count two',1,({values,refs})=>values.get(refs.modelPorts).Count=2],
+  ['model output membership index',1,({values,refs})=>{values.get(refs.modelPorts).Items=[refs.item];values.get(refs.item).Index=1;}],
+  ['foreign parent node',1,({values,refs})=>{const n={...refs.n,$:{...refs.n.$,$O:991}};values.set(n,values.get(refs.n));values.get(refs.parent).ParentNode=n;}],
   ['socket',2,({values,refs})=>values.get(refs.p).Socket=refs.output],
   ['engine count',1,({values,refs})=>values.get(refs.ports).Count=2],
   ['range count drift',2,({values,refs})=>values.get(refs.ports).Count=2],
@@ -193,11 +200,12 @@ test('production metadata host waits for exact journal ACK and retires on lost A
 
 // Actual runtime orchestration, driver/capability and live catch/finally blocks;
 // browser UI and wire responses remain synthetic fixture boundaries.
-for(const fault of ['socket','timeout','ack','ok'])test('metadata production runtime/driver/live cleanup: '+fault,async t=>{
+for(const fault of ['membership','socket','timeout','ack','ok'])test('metadata production runtime/driver/live cleanup: '+fault,async t=>{
   let finish;
   const fixture=await metadataFixture({unbound:true,reply:(f,response)=>{
     if(f.dc.FModelNode!==f.node.data){const bytes=response.$FData,view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);view.setInt16(12,20,true);view.setBigInt64(14,-9007199254740991n,true);}
   },hook:({call,values,refs})=>{
+    if(fault==='membership'&&call===1)values.get(refs.modelPorts).Items=[refs.item];
     if(fault==='socket'&&call===2)values.get(refs.p).Socket=refs.output;
     if(fault==='timeout'&&call===1)return new Promise(resolve=>{finish=resolve;});
   }}),f=fixture.x.f,x=fixture.x;
@@ -253,7 +261,13 @@ for(const fault of ['socket','timeout','ack','ok'])test('metadata production run
     assert.equal(result.outcome.exact_pass,true);assert.equal(events.filter(e=>e.phase==='native_roundtrip_verified').length,1);
     assert.equal(events.filter(e=>e.phase==='javascript_native_metadata_observed').length,1);return;
   }
-  assert.ok(failure);assert.match(failure.message,fault==='ack'?/ACK differs/:fault==='timeout'?/timeout/:/association/);
+  assert.ok(failure);
+  if(fault==='membership'){
+    const diagnostic=JSON.parse(failure.message.split('native object association ')[1]);
+    assert.deepEqual(diagnostic,{phase:'model-output-membership',api_call:1,left:fixture.refs.item.$,right:fixture.refs.w.$});
+    assert.equal(fixture.calls.length,1);assert.equal(fixture.originalReads(),0);
+  }
+  assert.match(failure.message,fault==='ack'?/ACK differs/:fault==='timeout'?/timeout/:/association/);
   assert.deepEqual(roles,['output']);assert.equal(f.counters.sent,4);assert.equal(ui.includes('PreviewClose'),false);
   assert.equal(lifecycle.retired,true);assert.equal(runtime.nativeReadUncertain,true);assert.equal(runtime.metadataReadUncertain,true);
   const uiBefore=ui.length;
@@ -288,7 +302,7 @@ test('metadata production host accepts real journal envelope without weakening D
   assert.equal(event.dto.metadata_observation_complete,true);assert.equal(lifecycle.uncertain,false);assert.equal(lifecycle.retired,false);
 });
 
-for(const key of ['select','selectAsync','selectRangeAsync','getPropertyValues','getPropertyValuesImpl'])test('metadata loaded function pin refuses before first API: '+key,async()=>{
+for(const key of ['selectRange','select','selectAsync','selectRangeAsync','getPropertyValues','getPropertyValuesImpl'])test('metadata loaded function pin refuses before first API: '+key,async()=>{
   const f=await metadataFixture(),lifecycle=createJavascriptMetadataLifecycle(),events=[];
   const target=key.startsWith('getPropertyValues')?f.x.f.env.rpc.TBGSession:f.x.f.env.bg;
   target[key==='getPropertyValuesImpl'?'GetPropertyValues$1':key==='getPropertyValues'?'GetPropertyValues':key]=function replaced(){throw Error('must not call replaced function');};
