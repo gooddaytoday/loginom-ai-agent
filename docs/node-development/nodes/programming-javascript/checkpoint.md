@@ -15,6 +15,23 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source92 profile projection: промежуточная root сверка
+
+Developer source92 turn01a0e56a остаётся active/revision29; final verifier/manifest
+ещё не передан. Root проверил промежуточный whitelist fixture
+javascript-error-attribution-reviewed.json SHA
+f6e876d9d338087d42a2e16ba44611d1c39d03d6a27f0de1f66ca79467084247:
+35original artifact hashes совпадают,3calibration source/raw diagnostic/length
+совпадают с actual reports; frontend/runtime functions+constants/proxy/loader/schema
+соответствуют всем7reports. Отдельно в каждой original journal найдены origin
+наблюдения нашего стенда, в report snapshots build7.4.2/Enterprise. Эти поля
+не означают server-engine identity/continuity. Receipt:
+operator92-root-intermediate-projection-check.json. Это промежуточная проверка
+происхождения данных,не готовый attribution verifier или принятие B cases.
+
+Historical reports/outcomes не изменены. Runtime code ещё не предъявлен к
+независимому main/negative review; browser не запускался, calibration limit5/5.
+
 ### Source92 active; независимое сравнение recorded domain
 
 Existing developer turn01a0e56a-f892-7970-a3ed-8bb74cc52650 подтверждён
