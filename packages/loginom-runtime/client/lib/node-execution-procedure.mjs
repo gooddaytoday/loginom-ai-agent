@@ -86,7 +86,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     resolve:s=>({verb,ref:one(control(s,tid,verb),'Unique execution control required').ref,...(key?{key}:{})}),identity});
   const consoleVisible=s=>s.ui.elements.some(e=>e.tid===grid);
   async function openConsole() {
-    let s=await observe('prepared node available for process console');
+    let s=await observe('prepared node available for process console',()=>true,{readProcesses:false});
     if(!consoleVisible(s)) {await act(s,button);s=await observe('process console visible',consoleVisible);}
     return s;
   }

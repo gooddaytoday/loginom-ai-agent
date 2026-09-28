@@ -3,21 +3,21 @@ import assert from 'node:assert/strict';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from '../lib/node-execution-procedure.mjs';
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 function fixture({selected=false,fail=false,active=false,allowDeactivate=false,loseDeactivation=false}={}){
- const actions=[];let consoleOpen=false;
+ const actions=[],observations=[];let consoleOpen=false;
  const element=(tid,actions,extra={})=>({tid,ref:tid,allowed_actions:actions,...extra});
  const state=()=>({prepared_node_context:{verified:true,...node,surface:'graph',locked:false,tid:'graph-node'},wizard:{status:'absent'},
  node_outputs:{verified:true,node_selected:selected},node_processes:{verified:true,show_completed:true,inventory_complete:true,root_id:'root',node_context:{verified:true,...node},processes:[]},
  ui:{elements:[element('MF;cntMain;tlbMainToolbar;btnProgress',['click']),element('mnContextMenu;mniShowCompletedProcesses',['click','press']),element('ConsoleForm;btnClose',['click']),
  ...(consoleOpen?[element('ConsoleForm;ProgressForm;trpProgress;grd;tbl',['right_click'])]:[]),element('graph-node',['click'],{graph_node:{part:'body'}}),
  ...(selected?[element('launch',[active?'deactivate_graph_node':'execute_graph_node'],{graph_execution:{node_id:'node',mode:active?'deactivate':'execute',source:'native_selected_graph_node'}})]:[])]}});
- const channel={observe:async({ready})=>{const s=state();assert.equal(ready(s),true);return s;},perform:async p=>{const s=state();assert.equal(p.ready(s),true);const a=p.resolve(s);actions.push(a);
+ const channel={observe:async({ready,condition,readProcesses})=>{observations.push({condition,readProcesses});if(condition==='prepared node available for process console')assert.equal(readProcesses,false,'unopened console cannot provide process grids');const s=state();assert.equal(ready(s),true);return s;},perform:async p=>{const s=state();assert.equal(p.ready(s),true);const a=p.resolve(s);actions.push(a);
  if(a.ref==='MF;cntMain;tlbMainToolbar;btnProgress')consoleOpen=true;
  if(a.ref==='ConsoleForm;btnClose')consoleOpen=false;
  if(a.ref==='graph-node')selected=true;
  if(a.verb==='deactivate_graph_node'){active=false;if(loseDeactivation)throw Error('lost deactivation reply');}
  if(a.verb==='execute_graph_node'&&fail)throw Error('lost launch reply');
  return {status:'SUCCEEDED'};}};
- return {driver:createNodeExecutionProcedure(channel,node,{allowDeactivate}),actions};
+ return {driver:createNodeExecutionProcedure(channel,node,{allowDeactivate}),actions,observations};
 }
 for(const selected of [false,true])test('graph launch selects only when needed and issues one typed launch: '+selected,async()=>{
  const f=fixture({selected});await f.driver.prepare();const r=await f.driver.launchGraph();
@@ -67,4 +67,13 @@ test('lost deactivation response blocks retries and does not execute',async()=>{
  const f=fixture({active:true,allowDeactivate:true,loseDeactivation:true});await f.driver.prepare();await assert.rejects(f.driver.launchGraph(),/lost deactivation/);
  await assert.rejects(f.driver.launchGraph());assert.equal(f.actions.filter(a=>a.verb==='deactivate_graph_node').length,1);
  assert.equal(f.actions.filter(a=>a.verb==='execute_graph_node').length,0);
+});
+
+test('process prepare materializes console before requesting its native history',async()=>{
+ const f=fixture();await f.driver.prepare();
+ assert.equal(f.observations[0].readProcesses,false);
+ assert.equal(f.observations.slice(1).every(x=>x.readProcesses===true),true);
+ assert.equal(f.actions[0].ref,'MF;cntMain;tlbMainToolbar;btnProgress');
+ assert.equal(f.actions.some(x=>x.verb==='execute_graph_node'),false);
+ assert.equal(f.actions.at(-1).ref,'ConsoleForm;btnClose');
 });
