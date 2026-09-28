@@ -15,6 +15,29 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+
+### Повторное сообщение о случайном клике; source92 offline
+
+После нового сообщения пользователя root повторно проверил состояние: pinned
+Chromium PID отсутствуют; registry указывает closed_logout_verified/profile100.
+Последний K4 report по-прежнему имеет SHA
+c239e6939bb53f3fca6dc7314c3da50dd0f3fce7223759f26dea4e91e03ef516,
+status DIAGNOSTIC_OBSERVED, failure=null и cleanup package_closed/logged_out/
+browser_closed=true. Время и затронутая попытка пользовательского клика пока
+не установлены; влияние на K4 не подтверждено. Исходные доказательства сохранены,
+новый browser/replay не запускался. Пользователю задан вопрос для привязки события.
+
+Source92 остаётся offline/inProgress/revision31. Независимая synthetic проверка
+парсера после исправления: четыре сочетания line/column с числом выше safe integer
+и Infinity-overflow отклонены без изменения raw; обычный caller4:1 принят.
+Receipt operator92-root-coordinate-fix-check.json, source SHA
+8532783788314becffc63027cf7bdb23d06d8319e384fc9ab0352fa46cd72deb.
+Это проверка одного исправления, не итоговая приёмка source92. В targeted suite
+обнаружен FAIL rehashed synthetic cleanup; разработчику передано замечание о
+возможном общем объекте cleanup в report/event fixture. Frozen handoff и полный
+независимый прогон ещё ожидаются. OpenViking health/find/read успешны.
+
+
 ### Source92 intermediate review: positive candidate и точность координат
 
 Source92 turn01a0e572 подтверждён active/revision31; появились pure verifier,
