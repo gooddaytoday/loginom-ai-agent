@@ -19,7 +19,7 @@ const same=(a,b)=>assert.equal(JSON.stringify(a),JSON.stringify(b));
 
 // The actual operator helper, production admission/reader and serialized native
 // source/process observers. Navigation transport is synthetic; no browser starts.
-for(const fault of ['ok','configured-before','configured-after','configured-foreign','configured-header','open-lost','close-lost','unlock-lost','execute-lost','source','settings','process','ack','stale','foreign','output-lost'])
+for(const fault of ['ok','configured-before','configured-after','configured-foreign','configured-header','history-lost','open-lost','close-lost','unlock-lost','execute-lost','source','settings','process','ack','stale','foreign','output-lost'])
   test('cold actual operator read/execute flow: '+fault,async()=>{
     const code=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
     const body=code.slice(code.indexOf('const runColdRead=async'),code.indexOf('const runExecutionTrial=async'));
@@ -39,6 +39,7 @@ for(const fault of ['ok','configured-before','configured-after','configured-fore
       closeWizardOnce:async()=>{calls.push('close');if(fault==='close-lost')throw Error('Lost Close');if(fault==='process')f.processRecord.data.Status=1;},
       executionRecord:async event=>{events.push(event);return fault==='ack'&&event.phase==='javascript_source_effect_dispatch'?{}:event;},
       executionRuntime:{
+        prepareSourceProcessHistory:async(n,until)=>{same(n,node);assert.equal(until,deadline);calls.push('history');if(fault==='history-lost')throw Error('History preparation unconfirmed');},
         captureExecutionBoundary:async()=>({before:graph,native:{dispose:async()=>{}}}),verifyExecutionBoundary:async()=>{},settleClosedExecutionBoundary:async()=>{calls.push('unlock');if(fault==='unlock-lost')throw Error('Close unlock unconfirmed');},
         graph:async()=>graph,readPortMapping:async(n,direction,options)=>{same(n,node);assert.equal(options.operationDeadline,deadline);calls.push('mapping-'+direction);const mapping={direction,actual:true,verified:true,source_identity_verified:true,inventory_complete:true,state_source:'cached_mapping_stores',
           autosync:true,settings_applied:false,package_saved:false,node_context:{...node,verified:true,surface:'wizard'},source_fields:[{name:'Actual'}],target_fields:[{name:'Actual'}]};
@@ -69,12 +70,12 @@ for(const fault of ['ok','configured-before','configured-after','configured-fore
     if(['ok','configured-before'].includes(fault)){
       await env.run();assert.equal(report.cold.source.source_text,source);same(report.cold.source.settings,javascriptSourceSettings(schema()));
       assert.equal(report.cold.output,output);assert.equal(report.cold.status,'COLD_OBSERVED');assert.equal(report.cold.persistence_verified,false);
-      assert.equal(opens,3);assert.equal(executes,1);assert.equal(calls.filter(x=>x==='close').length,3);
+      assert.equal(calls[0],'history');assert.equal(opens,3);assert.equal(executes,1);assert.equal(calls.filter(x=>x==='close').length,3);
       assert.equal(calls.indexOf('execute')>calls.lastIndexOf('close'),true);assert.equal(env.sourceCycleUncertain,false);
       if(fault==='configured-before'){assert.equal(report.cold.mappings_before.output.verified,false);assert.equal(report.cold.mappings_after.output.source_identity_verified,true);}
     }else{
       await assert.rejects(env.run());assert.ok(executes<=1);
-      if(['configured-foreign','configured-header'].includes(fault))assert.equal(executes,0);
+      if(['configured-foreign','configured-header','history-lost'].includes(fault))assert.equal(executes,0);
       if(fault==='configured-after')assert.equal(executes,1);assert.notEqual(report.cold?.status,'COLD_OBSERVED');
       if(['open-lost','close-lost','execute-lost','source','settings','process','ack'].includes(fault))assert.equal(env.sourceCycleUncertain,true);
       if(['stale','foreign'].includes(fault))assert.equal(calls.includes('output'),false);

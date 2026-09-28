@@ -782,7 +782,12 @@ const runSourceReadCycle=async(probe,deadline,expectedSettings,{allowConfiguredO
 const runColdRead=async()=>{
   const deadline=batchDeadline;
   const boundary=await executionRuntime.captureExecutionBoundary();
-  const processes=await page.evaluateHandle(observeJavascriptSourceProcesses,{capture:true});
+  let processes;
+  try{
+    await executionRuntime.prepareSourceProcessHistory(executionNode,deadline);
+    await executionRuntime.verifyExecutionBoundary(boundary);
+    processes=await page.evaluateHandle(observeJavascriptSourceProcesses,{capture:true});
+  }catch(error){sourceCycleUncertain=true;await boundary.native.dispose();throw error;}
   const sourceOwner={operation_id:'source99-cold',document_id:executionPrepared.document_id,
     workflow_id:executionPrepared.workflow_ref.workflow_id,node_id:executionNode.node_id,ui_epoch:wizardAddressEpoch};
   const checkReadBoundary=async()=>{
