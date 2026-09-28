@@ -19,9 +19,36 @@ terminal. Добавлен тест на сочетание нового соо�
 набор `javascript*.test.mjs` прошли под закреплённым Node 24.19.0 после
 `npm ci` в child client. Первый широкий запуск под системным Node 20.19.2
 был неприменим из-за отсутствующего `acorn` и не считается регрессией.
-Изменённая revision ещё не проверена живым Loginom; прежние native
-свидетельства относятся к `180f1d5810`. Перед следующим живым прогоном
-обновить private source closure/freeze для `0aea9b8b25`.
+Прежние native свидетельства относятся к `180f1d5810`; отдельная живая
+регрессионная проверка новой revision приведена ниже.
+
+## Headed regression отказа мастера на `0aea9b8b25` — 2026-09-29
+
+Перед запуском private freeze125 закрепил commit
+`0aea9b8b25cb6adf511702df584ed653b378ddbd`: 1326 проверенных source
+pin, import closure 214 файлов / 650 literal edges / 0 computed imports.
+От freeze124 отличаются ровно три намеренно изменённых файла; остальные pin,
+closure и внешние imports совпали. SHA256 freeze125:
+`a0b04f7448fe84ca6b927c8efa50d9828e444d12334e1f502cb63b02f8c8f21a`.
+
+Один свежий headed `engine-optional-chain-regression-34` на Ubuntu,
+profile198/original session34854 завершился exit0/`OBSERVED`. Для закреплённого
+`engine-optional-chain` Loginom 7.4.2 дал `SyntaxError: Syntax error at code
+(:4:48)`. Оператор прочитал подсказку `btnError`, один раз открыл штатный
+диалог, закрыл его `OK`, не отправлял Execute и не выдал gate PASS. Журнал:
+669 событий, один button dispatch, один owned dialog read, ноль
+`execution_terminal`; ожидание не записано как успешный terminal. Package
+close/logout/browser close подтверждены, процессов профиля не осталось.
+Report SHA256 `791ed89ddbffea3899fe506058523fd8c0667676c2947af1da58de395c2daed2`,
+journal SHA256 `2fe8943c6f4923a77a90abca1e3d94086616d0718e4faeb93fbf666bf100c126`,
+private independent verification SHA256
+`12cf56009b4320ecef58dc44a9a89f4697e9799485d4ce8d1d295ba28692ba2b`.
+Lease освобождён после проверки; следующий fresh profile199.
+
+Эта живая проба подтверждает цикл отказа на новой revision. Одновременное
+появление нового общего сообщения с `btnError` здесь не произошло; его
+приоритет проверен адресным тестом, не native observation. Повторение `?.`
+не закрывает G5/J20, D cases, public handler или CLI-приёмку.
 
 ## Indexed engine/G5 matrix: 30/30 наблюдений — 2026-09-29
 
