@@ -294,8 +294,10 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
     }
   };
   const before=await observe();
-  if(JSON.stringify(before)!==JSON.stringify(task.effect.before)){
-    // Failure-only bounded evidence; strict admission and no-gesture exit remain.
+  // The prior readBindings observation already permits node SVG replacement.
+  // Preserve the same complete graph contract here, then bind fresh hover epochs.
+  if(!sameGraph(task.effect.before,before)){
+    // Failure-only bounded evidence; structural admission and no-gesture exit remain.
     const differences=[],pending=[{path:'$',expected:task.effect.before,observed:before}];
     let inspected=0;
     while(pending.length&&differences.length<32&&inspected++<512){
