@@ -31,8 +31,25 @@ Main3563PASS/0FAIL/0SKIP (original86503 exit0); focused mapping/procedure72PASS,
 Freeze105:1322 pins, closure203 files/629 edges; manifest
 javascript-freeze105-root-final-source.json SHA
 b347f606e60f90c91d8bb09493b1f9c2330da17440d20b663c14f38d9dfcfc94.
-Writer08/profile129 headed/sandbox запущен, original5590 ещё ожидает terminal.
-Не запускать другой browser до завершения. OpenViking health успешен.
+Writer08/profile129 original5590 terminal exit1. Save1 подтверждён, второго
+Execute/save нет. После S2 Done output source count0/targets2; exact owned
+header SourceDisplayName/itemId colSourceDisplayName имеет hidden:true,
+visible:false и DOM inside owner. ColName/DisplayName/DataKind видимы. Cached
+targets ObservedID/integer/continuous и PhaseMarker/string/discrete сохранены,
+required:false, connected:false; source_label diagnostic null. Отсутствие source
+cell теперь объяснено native hidden column, но допуск mapping ещё не изменён.
+Recovery08/profile130 original75619 exit0: jsteach,0 packages, logout/browser
+close true; Chrome отсутствует. Private result source105-code-writer-result-08.json
+содержит hashes, полную bounded diagnostic и путь сохранённого S1.
+
+Следующий шаг — реализовать [уточнённый порядок](pending-output-mapping-design.md)
+в reader, writer/source-cycle и независимом auditor: configured-only native proof
+до Execute, полное source mapping после Execute до save2 и после cold Execute.
+Не исправлять одну только hidden-cell проверку: прежнее сравнение всех mapping
+полей до Execute всё равно смешивает два разных состояния. Полный source read,
+module policy, exact targets/settings и проверки native owner сохраняются.
+Уточнение документировано, но ещё не реализовано/не принято на стенде.
+OpenViking health успешен; прежние полные G7/public/CLI gates остаются открыты.
 
 
 ### Source104: bounded диагностика несовпавшей mapping ячейки

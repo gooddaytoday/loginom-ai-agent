@@ -540,6 +540,12 @@ Loginom, source digest и owner/execution. Применять redactor и явн
 
 ## Фаза 4. Независимый oracle и сохранение
 
+Наблюдённое source105 состояние после Done уточняет порядок G7:
+[настроенные выходные поля до materialization](pending-output-mapping-design.md)
+проверяются отдельно от полного source mapping. Полная проверка связей обязательна
+после нового Execute до save2 и после cold Execute; отсутствие source cache не
+выдаётся за проверенное сопоставление. Уточнение пока требует реализации.
+
 Уже подготовлены [fixtures](fixtures/README.md) и ожидаемые бизнес-значения.
 Будущие `javascript_configuration_evidence.py`, `javascript_output_evidence.py`,
 `javascript_node_acceptance.py` — **TO_IMPLEMENT**, не существующие команды.
