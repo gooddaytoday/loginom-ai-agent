@@ -1,5 +1,25 @@
 # JavaScript: checkpoint исполнения
 
+## G5 undefined: typed characterization как null — 2026-09-28
+
+Отдельный headed `g5-undefined-20`/profile184 на child revision `180f1d5810`
+доставил source SHA256
+`b91ad838ba2f6effa4d411e3a568411eeaf4465cb6caa098750ac0afcb0c45c9`.
+Свежий принадлежащий JS process завершился успешно. Typed UI reader получил
+одну строковую колонку `Result` и одну строку с настоящим `null`
+(`is_null=true`, exact null), а не текстом `"undefined"` или `"null"`.
+Статус `typed_characterization`, поскольку у пробного case намеренно не
+было фиксированного ожидаемого значения; `gate_passed=false` не означает
+провал исполнения. Proof level `typed_ui_only`, native bytes не проверялись;
+G5 в целом остаётся открытым.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`412c6225afa15ae0ea1259297d0630db83bd01f33514cbdc062402b9e76071df`,
+journal SHA256
+`bf9c53e1e44f4fb71fb54afeb8a52aa7297c3cb9b9ff0af2d440c6f9b151014b`.
+Реестр закрыт, следующий fresh profile185.
+
 ## G5 null/empty: пять значений различены — 2026-09-28
 
 Отдельный headed `g5-null-empty-19`/profile183 на child revision `180f1d5810`
