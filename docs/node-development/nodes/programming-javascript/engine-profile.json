@@ -818,9 +818,34 @@
       "source_sha256": "61706bb2fd82a3a7f56934056bb00b1b538f21be9e39d5ba74853367517f4c66",
       "schema_mode": "code",
       "expectation": "characterization",
-      "status": "not_checked",
+      "status": "observed_characterization",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_expression": "-Infinity",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        ["-9223372036854775808"]
+      ],
+      "number_precision": "exact_integer_decimal_output_only",
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-integer-negative-infinity-29/report.json",
+        "report_sha256": "eeff0eb667ef89ddf76f2b5a665af0ba4c124bdc7d2bf62d1988f303db5c997c",
+        "journal_sha256": "9717ec3bf689dce636c7ae4dcc4d4deb0e6d4ce87e34e190d300664a73da1209",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "g5-date-civil",
