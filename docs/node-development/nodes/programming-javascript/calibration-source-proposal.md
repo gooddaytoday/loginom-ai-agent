@@ -331,3 +331,39 @@ live calibration attempt. Четыре уже использованы (95,97,98
 не меняются; runtime outcome остаётся observation-only. K4 не закрывает сам по себе
 атрибуцию B: нужна отдельная проверка области применимости и negative verifier
 fixtures. G6/J25, repair/rollback/model delivery и server OS остаются открытыми.
+
+
+## 11. Итог K4 и завершение live-калибровок
+
+K4/source91/profile100, original83246 terminalexit1: DIAGNOSTIC_OBSERVED;
+полный native ErrorDetails: `Error: Номер строки 4 вне диапазона [0, 3]`,
+`Anonymous function (<main>:6:1)`, `module (<main>:1:1)`. Source oracle line6
+зафиксирован до live. Root проверил exact295bytes/SHA,1276pins,8native cells,
+596journal references,owner/source/process и cleanup3; browser process отсутствует.
+Report SHAc239e6939bb53f3fca6dc7314c3da50dd0f3fce7223759f26dea4e91e03ef516;
+journal SHA55084fd4459fe7cf89de5ceee12eaaf01b499f21d9bfe2f75bafcc5c2e7d1c7b.
+
+Наблюдения K2caller4/K3caller5/K4caller6 пригодны для отдельной реализации и review
+закрытого line-only attribution verifier по native-error-attribution-design.md§7.
+Это не изменение historical runtime outcome: mapping_status там unverified;
+общая семантика Data API/чувствительность регистра/column mapping не доказаны.
+K4 относится к выражению InputTable.Get(4,"Value"),не к любым методам/билдам/схемам.
+
+Разрешён следующий source92: отдельный private pure verifier и offline sidecar
+аудит сохранённых B failures. До признания результата он обязан связать exact
+source/catalog/expression,full owned failed witness,исходный INPUT/fresh upstream,
+cleanup,journal references и независимые K2/K3/K4 source/diagnostic proofs.
+Профиль ограничить реально подтверждённым runtime/frontend/build/schema/source
+форматом; отсутствующие сведения не заполнять предположениями. Установить явно,
+достаточен ли observed caller domain для каждого Get/IsNull expression; при
+неподтверждённой применимости оставить unresolved с конкретным reason.
+
+Новое sidecar evidence отдельно от неизменных old reports; generic completed,
+coercion и historical unattributed outcomes не переписывать. Negative fixtures:
+setup/module/competing/preview frames,foreign source/environment/owner,отсутствующий
+calibration proof,сдвиг/обрезка/очистка,stale ACK и поздний getter. Текст фразы сам
+по себе не oracle. Root review final verifier/sidecars требуется до B completion.
+
+Лимит5/5исчерпан. K5live,шестая проба,retry и alternative API/index/shift не назначены.
+Следующая работа offline, без запуска Loginom. G6/J25,repair/rollback/model delivery,
+C/D,engine profile и публичная CLI-приёмка остаются самостоятельными требованиями.

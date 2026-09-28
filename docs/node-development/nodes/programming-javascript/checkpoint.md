@@ -15,6 +15,23 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### K4/profile100 terminal и независимый audit PASS; лимит5/5 исчерпан
+
+Original83246 terminalexit1, DIAGNOSTIC_OBSERVED/owned_failure_observed,
+failure отсутствует. Native message: «Номер строки 4 вне диапазона [0, 3]»;
+caller `<main>:6:1`,module1:1. Root independently1276pins,295sourcebytes/SHA,
+8INPUT/upstream cells,596journal refs,owner/execution/source и cleanup3/no browser.
+Private operator91-root-k4-verification.json/audit-calibration-k4-failed-source91.py.
+Report SHAc239e6939bb53f3fca6dc7314c3da50dd0f3fce7223759f26dea4e91e03ef516;
+journal SHA55084fd4459fe7cf89de5ceee12eaaf01b499f21d9bfe2f75bafcc5c2e7d1c7b.
+
+До live source oracle6 совпал с native caller6; K2/K3 ранее дали4/5. Это основание
+для отдельной offline проверки применимости line-only attribution к B,не автоматическая
+семантика/готовность. Historical reports/outcomes неизменны. Source92 pure verifier
+и новые sidecars допущены §11 calibration-source-proposal,без браузера/новыхпроб.
+Лимит5liveattempts исчерпан; no K5live/sixth/retry/alternative index. Active browser нет.
+Public handler, C/D,engine profile,repair/rollback/model delivery/CLI ещё открыты.
+
 ### Source91 принят; последняя K4/profile100 запущена
 
 Developer turn01a0e55d terminal revision28. Exact12runtime/test files committed
