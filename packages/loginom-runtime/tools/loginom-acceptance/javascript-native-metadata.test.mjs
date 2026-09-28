@@ -220,7 +220,7 @@ for(const fault of ['membership','socket','timeout','ack','ok'])test('metadata p
   const source=readFileSync(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
   const start=source.indexOf('    async checkNativeNamedEvidence() {'),end=source.indexOf('    async readNativeCivil(',start);
   assert.ok(start>=0&&end>start);
-  const context={nativeCalibrationId:undefined,nativeNamedCaseId:'C-set-index',javascriptNamedCase,nativeFixtureId:'integer-safe',nativeInputFixture:{rows:4},nativeRoundtripProbe:javascriptNamedProbe('C-set-index'),
+  const context={nativeTelemetryCaseId:undefined,nativeCalibrationId:undefined,nativeNamedCaseId:'C-set-index',javascriptNamedCase,nativeFixtureId:'integer-safe',nativeInputFixture:{rows:4},nativeRoundtripProbe:javascriptNamedProbe('C-set-index'),
     verifyJavascriptNamedInput,verifyJavascriptNamedOutcome,verifyNativeRoundtripExecution,freezeCivilEvidence,validateNativeSource:()=>{},page:f.page,completeJavascriptNativeRoundtrip,
     prepared:{document_id:'d',workflow_ref:{workflow_id:'w',tab_tid:'tab',prefix:'TF'}},deadline:Date.now()+30000,randomUUID:()=>String(roles.length),
     execute:async(code,options)=>{
@@ -286,7 +286,7 @@ for(const fault of ['membership','socket','timeout','ack','ok'])test('metadata p
     nativeRoundtrip:true,nativeClassifierBinding:undefined,captureJavascriptNativeClassifierDiagnostic:forbidden('classifier'),
     javascriptProbeFailure:e=>({message:e.message}),redactor:{text:v=>v,redact:v=>v},discoveryProbe:null,
     snapshot:forbidden('snapshot'),paletteSnapshot:forbidden('palette'),refusalEvidence:forbidden('refusal'),guard:forbidden('guard'),observe:forbidden('observe'),
-    click:forbidden('click'),calibrationTrial:null,coercionTrial:null,namedTrial:null,save:async()=>{calls.push('save');},Date,cleaning:false
+    click:forbidden('click'),calibrationTrial:null,coercionTrial:null,namedTrial:null,telemetryTrial:null,save:async()=>{calls.push('save');},Date,cleaning:false
   });
   await cleanup();assert.deepEqual(calls,['own-context-close','save']);
   assert.equal(report.status,'CLEANUP_UNCONFIRMED');assert.match(report.cleanup.failure,/UI cleanup refused/);

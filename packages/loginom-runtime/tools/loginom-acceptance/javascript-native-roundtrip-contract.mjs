@@ -1,3 +1,5 @@
+import {javascriptTelemetryProbe} from './javascript-schema-telemetry-cases.mjs';
+import {verifyJavascriptTelemetryRead} from './javascript-schema-telemetry-contract.mjs';
 import {verifyCalibrationUpstream} from './javascript-calibration-contract.mjs';
 import {javascriptNamedProbe} from './javascript-native-named-cases.mjs';
 import {verifyJavascriptNamedRead} from './javascript-native-named-contract.mjs';
@@ -11,7 +13,8 @@ import {verifyNativeFixtureCells,verifyNativeInputRead} from './javascript-nativ
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 
 const need=(v,m)=>{if(!v)throw Error('Native roundtrip: '+m);};
-export function javascriptNativeRoundtripProbe(fixtureId='real',namedCaseId){
+export function javascriptNativeRoundtripProbe(fixtureId='real',namedCaseId,telemetryCaseId){
+ if(telemetryCaseId!==undefined){need(fixtureId==='integer-safe'&&namedCaseId===undefined,'telemetry input identity');return javascriptTelemetryProbe(telemetryCaseId);}
  if(namedCaseId!==undefined){need(fixtureId==='integer-safe','named input fixture');return javascriptNamedProbe(namedCaseId);}
  const f=javascriptNativeFixture(fixtureId);
  const body={
@@ -57,6 +60,7 @@ export function verifyNativeRoundtripMapping(mapping,node,fixtureId='real'){
   return {verified:true,node:{...node},port:0,port_guid:port.port_guid,columns:1,input_technical_name:'Value'};
 }
 export function verifyNativeRoundtripRead(raw,{binding,lifecycle,input,role,civil}){
+  if(binding.telemetry_case_id!==undefined)return verifyJavascriptTelemetryRead(raw,{binding,lifecycle,input,role});
   if(binding.calibration_id!==undefined)return verifyCalibrationUpstream(raw,{binding,lifecycle,input,role});
   if(binding.named_case_id!==undefined)return verifyJavascriptNamedRead(raw,{binding,lifecycle,input,role});
   const fixture=javascriptNativeFixture(binding.fixture_id),nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixture.id);
@@ -166,8 +170,8 @@ export function verifyNativeRoundtripOutcome(results,fixtureId='real'){
     general_integer_precision_guarantee:false,g5_complete:false,...(observation?{cells:observation.cells}:{}),...(fixture.coercion?{output_encoding_verified:observation.output_encoding_verified}:{})};
 }
 
-export function verifyNativeRoundtripExecution(execution,node,fixtureId='real',namedCaseId){
-  const nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixtureId,namedCaseId);
+export function verifyNativeRoundtripExecution(execution,node,fixtureId='real',namedCaseId,telemetryCaseId){
+  const nativeRoundtripProbe=javascriptNativeRoundtripProbe(fixtureId,namedCaseId,telemetryCaseId);
   need(execution?.verified===true&&execution.owner_verified===true&&execution.cleanup_complete===true
     &&execution.status==='completed'&&execution.trial?.phase==='initial'
     &&execution.trial.source_sha256===nativeRoundtripProbe.source_sha256&&execution.trial.node_id===node.node_id
