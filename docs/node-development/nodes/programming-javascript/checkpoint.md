@@ -15,6 +15,23 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source107: freeze и новый writer09 запущен
+
+Commit e2f8036b2a7a077f99b10f9ec58aad7529aef77f. Freeze107 SHA
+c111251eedecf128a4a6c308f1b689dbb38a7634671c6cf1d6ed58d5b9865eee:
+1324 pins; Acorn literal closure205 files/635 edges, computed imports0;
+11 changed/new files syntax PASS. Main3609PASS/0FAIL/0SKIP, cold focused112PASS.
+Shared client reader не менялся относительно source106/full client2797PASS/10SKIP.
+Все pins/toolchain повторно проверены перед запуском. Public handler ещё выключен.
+
+Writer09 original exec24906, новый profile131, Chromium PID334078 проверен по
+/proc: headed, без --no-sandbox, точный новый assigned profile. Начальный статус
+RUNNING/prepare-typed-input. Private report persistence-code-writer-09/report.json,
+log source107-code-writer-09.log. Реестр содержит active_exec_session24906.
+Это незавершённый запуск, не PASS; при продолжении сначала опросить тот же handle
+и actual process/report, не запускать дубль из-за timeout наблюдения.
+
+
 ### Сообщение о клике: текущий прогон отсутствует; source107 проверяется локально
 
 После нового сообщения пользователя о случайном клике проверены реестр ресурсов
