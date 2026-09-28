@@ -15,6 +15,25 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source94: независимые локальные проверки после handoff
+
+Developer revision48 завершён; получены freeze94/handoff. ROOT сверил1285pins,
+109 прежних документов и70 evidence hashes;11changed/4new совпадают с manifest.
+Независимый main original60878 terminalexit0:2986PASS/0FAIL/0SKIP;
+deny3PASS и Python15PASS. Все1285files неизменны до/после проверок.
+Receipt: private `operator94-root-final-test-results.json`, полные логи рядом.
+Это offline validation; окончательное source review/import closure, runtime commit
+и новый headed metadata run ещё не выполнены.
+
+После сообщения пользователя о случайном клике ROOT повторно проверил `/proc`:
+закреплённый Chromium и native-roundtrip runner не запущены. Lease хранит последнее
+завершение profile104. Время и эффект клика не установлены; сообщение не доказывает
+причину прежней ошибки, а сохранность отчёта не исключает вмешательства во время прогона.
+Старые evidence сохранены; новый live и replay не запускались. Следующий отдельный
+run должен использовать свежий profile105 после source94 review и проверки lease.
+OpenViking health успешен. Полная цель обучения остаётся незавершённой.
+
+
 ### Source94 review: реальный journal ACK и новые runtime fingerprints
 
 ROOT независимо проверил metadata host с настоящим createExecutionJournal и
