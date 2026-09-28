@@ -185,6 +185,18 @@ test('fresh quiet wizard error ends original Next wait after mask settles withou
   assert.ok(records.some(event=>event.diagnostic?.wizard_error?.visible===true));
 });
 
+test('fresh wizard error takes precedence over a new generic message',async()=>{
+  const f=fixture(),before=f.read();f.error.rect.width=30;
+  let polls=0;
+  const after=await waitJavascriptStageObservation({read:async()=>{
+    polls++;return {...f.read(),messages:[{id:'fresh',key:'error',text:'generic failure'}]};
+  },wait:async()=>{},deadline:Date.now()+5000,stage:'next',before,
+  identity:{effect_id:'once'},record:async()=>{}});
+  assert.equal(polls,2);
+  assert.equal(after.wizard_error_refusal,true);
+  assert.equal(after.wizard_error.tooltip,'SyntaxError: Syntax error at code (:4:33)');
+});
+
 test('stale error button before a corrected transition does not end Next wait',async()=>{
   const f=fixture();f.error.rect.width=30;
   const before=f.read();let polls=0;

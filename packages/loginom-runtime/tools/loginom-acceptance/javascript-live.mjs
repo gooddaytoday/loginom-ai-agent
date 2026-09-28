@@ -892,7 +892,7 @@ const runExecutionTrial=async probe=>{
     // Wait only on the result of the original dispatch. Neither a timeout nor
     // lack of a sentinel authorizes another click.
     const after=await waitJavascriptStageObservation({read,wait:ms=>page.waitForTimeout(ms),deadline,stage,before,identity,record:executionRecord});
-    const terminal=javascriptStageTerminal({stage,before,after});
+    const terminal=!after?.wizard_error_refusal&&javascriptStageTerminal({stage,before,after});
     const outcome=javascriptSentinelOutcome({stage,identity,baselineIds:before.messages.map(message=>message.id),
       messages:(after?.messages??[]).map(message=>({...message,...identity})),ownerVerified:after?.owner_verified===true,terminal});
     await executionRecord({phase:'execution_stage_observed',identity,before,after,outcome});

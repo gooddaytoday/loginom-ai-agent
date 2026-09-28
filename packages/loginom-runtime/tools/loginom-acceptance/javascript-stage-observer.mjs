@@ -173,7 +173,6 @@ export async function waitJavascriptStageObservation({read,wait,deadline,stage,b
   while(Date.now()<deadline){
     after=await read();
     await recordJavascriptStageChange({state:changes,identity,snapshot:after,record});
-    if(javascriptStageTerminal({stage,before,after}))break;
     pendingSeen ||= after.pending===true;
     const currentError=after.native_owner_verified===true&&after.wizard_visible===true
       &&after.page_tid===before.page_tid&&!!after.page_tid&&after.pending===false&&after.wizard_error?.visible===true
@@ -184,6 +183,7 @@ export async function waitJavascriptStageObservation({read,wait,deadline,stage,b
         ||pendingSeen);
     refusalPolls=currentError?refusalPolls+1:0;
     if(currentError&&(refusalPolls>=2||after.boundary_refusal==='foreign_dialog')){after.wizard_error_refusal=true;break;}
+    if(javascriptStageTerminal({stage,before,after})&&!currentError)break;
     if(after.boundary_refusal)break;
     await wait(Math.min(200,Math.max(1,deadline-Date.now())));
   }
