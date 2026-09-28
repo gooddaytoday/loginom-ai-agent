@@ -20,6 +20,19 @@ function rejectedTunnelError(socket, error) {
   throw error;
 }
 
+function windowsBackgroundTelemetryConnect(url, platform = process.platform) {
+  return platform === 'win32' && url === 'incoming.telemetry.mozilla.org:443';
+}
+
+test('proxy trap excludes only the observed Windows Mozilla telemetry CONNECT', () => {
+  assert.equal(windowsBackgroundTelemetryConnect('incoming.telemetry.mozilla.org:443', 'win32'), true);
+  for (const url of ['app.loginom.ai:443', 'incoming.telemetry.mozilla.org:444',
+    'other.telemetry.mozilla.org:443', 'http://incoming.telemetry.mozilla.org:443']) {
+    assert.equal(windowsBackgroundTelemetryConnect(url, 'win32'), false);
+  }
+  assert.equal(windowsBackgroundTelemetryConnect('incoming.telemetry.mozilla.org:443', 'linux'), false);
+});
+
 test('rejected proxy tunnels tolerate only resets after the response ends', () => {
   const socket = new PassThrough();
   const reset = Object.assign(new Error('read ECONNRESET'), {code:'ECONNRESET'});
@@ -60,6 +73,7 @@ test('Loginom Chromium connects directly with a configured proxy', {
   const directory = await mkdtemp(join(tmpdir(), 'direct-browser-'));
   const requests = [];
   const connectivityProbes = [];
+  const backgroundTelemetry = [];
   const pacReads = [];
   const sockets = new Set();
   const origin = createServer((request, response) => {
@@ -98,7 +112,10 @@ test('Loginom Chromium connects directly with a configured proxy', {
     }
   });
   proxy.on('connect', (request, socket) => {
-    requests.push(request.url);
+    // Windows can send Firefox telemetry through the machine PAC while this
+    // test runs. Keep that exact unrelated CONNECT separate from product URLs.
+    if (windowsBackgroundTelemetryConnect(request.url)) backgroundTelemetry.push(request.url);
+    else requests.push(request.url);
     socket.on('error', error => rejectedTunnelError(socket, error));
     socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n');
   });
@@ -158,4 +175,5 @@ test('Loginom Chromium connects directly with a configured proxy', {
     }
   }
   if (connectivityProbes.length) t.diagnostic(`Separate Windows NCSI probes: ${connectivityProbes.length}`);
+  if (backgroundTelemetry.length) t.diagnostic(`Separate Windows Mozilla telemetry CONNECTs: ${backgroundTelemetry.length}`);
 });
