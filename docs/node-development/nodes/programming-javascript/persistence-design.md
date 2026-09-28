@@ -7,7 +7,11 @@
 `javascript_package_byte_audit.py` связывает ZIP/XML с принятым writer/cold audit,
 не передавая expected в cold reader и не запуская новый Execute. Подтверждённые
 SHA и границы доказательства перечислены в [checkpoint](checkpoint.md).
-Dirty-state и публичная реализация G7 по-прежнему требуют отдельной проверки.
+Child source `945f75baf0` теперь читает `IsPackageModified` сразу после
+каждого Save с проверкой прежнего владельца и журналом; аудитор проверяет два
+согласованных ответа. Это пока source-only: старые пакеты не получают
+`dirty_state_verified` задним числом, нужны новые headed writer/cold пары.
+Публичная реализация G7 также остаётся открытой.
 
 Source99, 2026-09-28. Части G7/J20 согласованного plan.md; base runtime
 beaf849091830e3adb77a53cb88ca2f0c9e4a98c. Полный план/public/CLI остаются в силе.

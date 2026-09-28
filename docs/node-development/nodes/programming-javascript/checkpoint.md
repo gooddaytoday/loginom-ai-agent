@@ -1,5 +1,27 @@
 # JavaScript: checkpoint исполнения
 
+## G7: post-save dirty-state read, source-only — 2026-09-29
+
+Child `node-javascript` commit `945f75baf0` добавил read-only запрос
+`Session.IsPackageModified` после каждого из двух подтверждённых
+`package.save_checkpoint`. Запрос привязан к прежнему native owner, точному
+сохранённому пути, документу, workflow, аккаунту и версии Loginom; владелец
+проверяется до и после RPC. Истёкший исходный deadline или потерянный ответ
+оставляют writer в uncertain-состоянии без повторения Save и штатного UI cleanup.
+Отдельный журнал связывает наблюдение с operation ID сохранения. Независимый
+аудитор принимает `dirty_state_verified=true` только при двух чистых,
+упорядоченных и согласованных native-ответах. Старые отчёты без этих ответов
+по-прежнему дают `dirty_state_verified=false`.
+
+На закреплённом Node 24.19.0 весь `javascript*.test.mjs` набор прошёл
+18 042/18 042, fail/skip 0; после последней правки порядка аудита адресные
+83/83 прошли. Полный лог находится только в private campaign dir, SHA256
+`76844e5dd5447def4bc325e610a4a1a1918497b84bc47e1094f73d19fe8df73a`.
+Это source-only подготовка. Нового headed writer/cold прогона не было;
+dirty-state двух прежних сохранённых пакетов не подтверждён. Перед новым live
+нужны fresh profile, source freeze и lease по общему регламенту. Публичный
+handler, CLI-приёмка и остальные G/J gates остаются открытыми.
+
 ## G7: воспроизводимый независимый аудит `.lgp` — 2026-09-29
 
 Child source `619c977bad` добавил
