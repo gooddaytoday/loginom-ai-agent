@@ -16,6 +16,32 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### C-set-case: owned failure наблюдён, semantic attribution открыта
+
+Original19457 terminalexit1, fresh headed profile103, source93/commit9132b60cda.
+ReportUNRESOLVED, failure=null: наблюдён owned failed JS child с полным native
+ErrorDetails `Столбец "value" отсутствует в выходной таблице`, frames main8:1/module1:1.
+Independent root audit:473byte source SHA
+f7ddd2dec629713271d2158b23e9f923ab152c538601b38c9b114a1797599557,
+INPUT4/upstream4 unchanged,OUTPUTnot_read_failed_execution,1281pins/600journalrefs,
+cleanup3/no pinned browser. ReportSHA
+ea851547392d0c099df0b7385cb86baf511258a053fab7a7bcfa2c2af798246b;
+receipt native-named-set-case-probe-01-verification.json. Case_complete=false,
+rejection_attributed=false; наблюдённый кадр8 не выдаётся за принятую Set mapping.
+Profile103 закрыт, matrix/registry сохранены. Следующий отдельный run — C-set-missing
+на fresh104 после preflight; это не retry. Private prepare-c-source93.py ограничен
+двумя конкретными оставшимися C cases и не запускает браузер самостоятельно.
+
+D audit revision37 завершился историческим bootstrap final без документа; root
+вернул конкретное незавершённое назначение в ту же задачу. Turn01a0e59b-2cd3-7282-acda-
+f20ac73ef0cf/revision38 подтверждён active. Новый native-output-schema-witness-design.md
+теперь появился в child: различает configured OutputColumnDefs,code preview,physical
+metadata и mapping; complete source→physical association пока не доказана. Root
+прочёл промежуточный текст, но exact source references/final handoff ещё не проверены.
+D runtime/live не принят; source93 runtime оставался frozen во время C-set-case.
+
+
+
 ### C-set-exact live PASS_EXACT_CASE; D witness source audit активен
 
 Original99473 terminalexit0, fresh headed profile102, source93/commit9132b60cda.

@@ -776,3 +776,11 @@ C-set-exact также независимо пройден:source93/profile102/o
 Report SHA40c27640d05fc524de5e8022defe1b3aa9ea4497d6d30036fa643c9cb9799da2.
 Остались C-set-case/C-set-missing; их результаты нельзя выводить из двух controls.
 Для D начат отдельный read-only source audit metadata witness,без runtime допуска.
+
+
+C-set-case наблюдён отдельно:profile103/original19457exit1,owned failed JS child,
+полный native ErrorDetails «Столбец "value" отсутствует в выходной таблице»,
+main8:1/module1:1. INPUT/upstream8cells unchanged,OUTPUT не читался,1281pins/600refs,
+cleanup3/no browser. ReportSHAea851547392d0c099df0b7385cb86baf511258a053fab7a7bcfa2c2af798246b.
+Semantic attribution Set не принята,case_complete=false. Это сохраняет конкретный
+наблюдённый отказ без общего правила о регистре. C-set-missing ещё NOT_RUN.
