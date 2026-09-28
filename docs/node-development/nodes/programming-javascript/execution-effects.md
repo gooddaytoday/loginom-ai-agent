@@ -40,6 +40,38 @@ flowchart TD
 не исследовано. Preview вызывает ActivateInputPorts и ShowPreview. Клиентский код
 дополняет наблюдения, но не доказывает поведение невидимого серверного исполнения.
 
+## Калибровка диагностики: K1 и K2
+
+Source89 `ddc625cdd467da0b7665d72ffcf533c610987f4e`, тот же стенд7.4.2,
+headed Chromium/Ubuntu. Отчёты и независимые проверки находятся в приватной
+кампании `javascript-20260926-ubuntu`; исходные отчёты не переписывались.
+
+| Проба | Наблюдённая граница | Диагностика и предел |
+| --- | --- | --- |
+| K1-parse-v1 / profile98 | Next остаётся в мастере и создаёт свежий native exception; отдельного Execute нет | Полный retained tree: `SyntaxError: Syntax error at code (:4:19)`, native class `EBGException`, stack пуст. Координаты сохранены внутри сообщения; server stack/source span не атрибутированы |
+| K2-sync-v1 / profile97 | Done seal, одна reservation Execute, новый process/group и собственный failed child | Полный ErrorDetails: `Error: JS_CAL_K2_SYNC_V1`, caller `<main>:4:1`, module `<main>:1:1`; native INPUT4/upstream4 совпадают, OUTPUT не читается |
+
+K1: exact274bytes/SHA721161cd4f4c0de387cefeef03b2425fd20f5645c05bff724103e330acd1620f,
+500 проверенных journal references,4native INPUT cells. Result wizard_diagnostic_observed,
+report UNRESOLVED: отмена не сопровождается независимым чтением prior committed
+source и свежего upstream. Пакет закрыт/logout/browser closed подтверждены, но это
+не подменяет доказательство rollback. Нельзя выводить отсутствие implicit execution
+внутри Verify только из отсутствия отдельного Execute.
+
+K2: exact291bytes/SHA3f7350f5f9e7cb30107fb314643ae844477a7b87610132036e995f556fe983c2,
+604 проверенных journal references,8native cells. Report DIAGNOSTIC_OBSERVED;
+исходный terminal exit1 отражает диагностический исход, не успешное вычисление.
+Связь source/node/process и cleanup3 проверена; две позиции не устанавливают общую
+карту Chakra/native-call offsets. Предшествующий K2/profile95 отказал до JS Execute
+на origin ACK; его отдельный recovery не превращает тот отчёт в успешный.
+
+Root audit receipts: `operator89-root-k1-verification.json` (PASS_WITH_GAPS) и
+`operator89-root-k2-verification.json` (PASS в указанной узкой области).
+Report SHA K1:a18d78cdb4a21ecd0fade200882e72ab846a0beefeb18fd3fa19472ec95bba53;
+K2:9f64074a37207a12e3b56e60e29c55c2e099d6f6cf4422ed10846e39bf0bdc7c.
+G6/J25 остаются открытыми: нужны repair того же узла, отмена/восстановление,
+Stop/lost-reply и доставка модели. См. [допуск K3](calibration-source-proposal.md#9-допуск-реализации-k3-после-наблюдения-k2).
+
 ## Изменение schema при ручном сопоставлении
 
 В batch54 впервые подтверждено сохранение ручных настроек: autosync=false,
