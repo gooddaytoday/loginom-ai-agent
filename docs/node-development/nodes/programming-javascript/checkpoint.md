@@ -16,6 +16,34 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Cold06: console исправлен, позднее открытие output port; source116
+
+Cold06 source115/profile149 original66449 exit1. /proc PID465874 подтвердил headed,
+sandbox и exact profile. Process history подготовлена, source/input mapping прочтены;
+output Configure отправлен и вернулся. Trace source113 наконец получен: open_issued,
+open_returned, pending4samples/wizard_count0/controllerModelForm/node_lockedfalse
+до15s deadline. Поздний screenshot cold06-output-timeout-screen.png показывает уже
+открытый output wizard и locked-node question при package cleanup. Это доказательство
+асинхронного открытия после лимита, не необходимость повторить Configure.
+Report CLEANUP_UNCONFIRMED,close-confirmation timeout,ownbrowserclosedtrue.
+
+ROOT admin recovery07/profile150 original82656 exit0: exact writer13 path найден в
+jsteach:2973, после выбора пакета Stop disabled; подтверждён exact-name Close package,
+исчезновение дочерней строки, затем exact-session Close2973 и отсутствие сеанса.
+Admin logout/browser close подтверждены, Chromium отсутствует. Private
+source115-admin-recovery-07.jsonl. Новый пакетный прогон до recovery не запускался.
+
+Source116 a06baf65c5 использует исходный operation.deadline вместо15s/20s для port
+open/transport. Нового срока или replay нет. readPortMapping отмечает
+nativeReadUncertain при неподтверждённом открытии или отказе Close/graph proof;
+внешний cleanup тогда не закрывает пакет поверх переходящего мастера.182targeted
+PASS,source116-focused-02.log. -01 был до добавления новых tests, не финальный.
+Main original75390/source116-main.log и full client original29089/
+source116-full-client.log выполняются; продолжать эти handles. Source116 final
+freeze/live ещё не выполнены. Next fresh profile151/cold07. Полный scope открыт.
+
+
+
 ### Source115 проверен и закреплён; новый live ещё не запускался
 
 Main original93434 exit0:3615PASS/0FAIL/0SKIP. Full client original35299 exit0:
