@@ -54,22 +54,23 @@ for (const [name, codec] of [
   ["CLI", cliCredentials("linux")],
 ] as const) {
   for (const url of [original.url, original.url.slice(0, -1)]) {
-    test(`${name}: migrates ${url}, preserves secrets/history and does not repeat after restart`, async () => {
+    test(`${name}: preserves explicitly saved ${url}, credentials and history after restart`, async () => {
       const f = await fixture(codec)
       try {
         await f.store.stage({ ...original, url })
         await f.store.activate(1)
         const history = await f.history()
         const first = await f.start()
-        expect(await f.store.read()).toEqual({ ...original, url: Product.connection.url, generation: 2, revision: 2 })
+        expect(await f.store.read()).toEqual({ ...original, url })
         expect(await f.history()).toBe(history)
         expect(await f.store.pending()).toBeUndefined()
-        expect(first.acquire("run")?.generation).toBe(2)
-        expect(f.prepared).toEqual([Product.connection.url])
+        expect(first.acquire("run")?.generation).toBe(1)
+        expect(f.prepared).toEqual([url])
         await first.close()
         await f.start()
-        expect((await f.store.read())?.generation).toBe(2)
-        expect(await f.store.latestGeneration()).toBe(2)
+        expect((await f.store.read())?.generation).toBe(1)
+        expect(await f.store.latestGeneration()).toBe(1)
+        expect(f.prepared).toEqual([url, url])
       } finally {
         await f.close()
       }
@@ -79,6 +80,7 @@ for (const [name, codec] of [
   test(`${name}: keeps custom URLs, including old-origin custom paths and queries`, async () => {
     for (const url of [
       "https://private.example/app/",
+      Product.connection.url,
       `${original.url}?custom=1`,
       "http://logi-test-plan.bg.local/other/",
     ]) {
@@ -93,6 +95,36 @@ for (const [name, codec] of [
       }
     }
   })
+
+  for (const query of ["?testable=true", "?custom=1&testable=true"]) {
+    test(`${name}: setup then restart retains the selected LAN endpoint (${query})`, async () => {
+      const f = await fixture(codec)
+      try {
+        const service = await f.start()
+        const validation = await service.api.check({
+          revision: 0,
+          url: original.url + query,
+          username: original.username,
+          apiKey: { operation: "replace", value: original.apiKey },
+          password: { operation: "replace", value: original.password },
+        })
+        await service.api.save({ revision: 0, validationId: validation.validationId })
+        await service.settled()
+        const saved = await f.store.read()
+        const url = original.url + (query.includes("custom") ? "?custom=1" : "")
+        expect(saved).toMatchObject({ url, username: original.username, apiKey: original.apiKey, password: original.password })
+        const history = await f.history()
+        await service.close()
+        await f.start()
+        expect(f.prepared).toEqual([url, url])
+        expect(await f.store.read()).toEqual(saved)
+        expect(await f.store.pending()).toBeUndefined()
+        expect(await f.history()).toBe(history)
+      } finally {
+        await f.close()
+      }
+    })
+  }
 
   for (const url of [original.url, "https://pending.example/app/"]) {
     test(`${name}: pending settings take precedence (${url})`, async () => {
@@ -110,10 +142,8 @@ for (const [name, codec] of [
         }
         await f.store.savePending(pending)
         await f.start()
-        expect(await f.store.read()).toEqual(
-          url === original.url ? { ...pending, url: Product.connection.url, generation: 3, revision: 3 } : pending,
-        )
-        expect(f.prepared).toEqual([url === original.url ? Product.connection.url : url])
+        expect(await f.store.read()).toEqual(pending)
+        expect(f.prepared).toEqual([url])
       } finally {
         await f.close()
       }
@@ -132,15 +162,44 @@ for (const [name, codec] of [
       const failed = await f.start()
       expect(await failed.api.status()).toMatchObject({
         state: "recoverable-error",
-        failure: "LOGINOM_RUNTIME_START_FAILED",
       })
       expect(failed.acquire("run")).toBeUndefined()
       expect(await f.store.read()).toEqual(original)
-      expect(await f.store.pending()).toEqual({ ...original, url: Product.connection.url, generation: 2, revision: 2 })
+      expect(await f.store.pending()).toBeUndefined()
       await failed.close()
       f.runtime.prepare = prepare
       await f.start()
-      expect(await f.store.read()).toEqual({ ...original, url: Product.connection.url, generation: 2, revision: 2 })
+      expect(await f.store.read()).toEqual(original)
+      expect(f.prepared).toEqual([original.url])
+    } finally {
+      await f.close()
+    }
+  })
+
+  test(`${name}: failed pending connection stays pending without contacting the previous endpoint`, async () => {
+    const f = await fixture(codec)
+    try {
+      const active = { ...original, url: "https://previous.example/app/" }
+      const pending = { ...original, generation: 2, revision: 2 }
+      await f.store.stage(active)
+      await f.store.activate(1)
+      await f.store.savePending(pending)
+      const prepare = f.runtime.prepare
+      f.runtime.prepare = async (record) => {
+        f.prepared.push(record.url)
+        throw new Error("unavailable")
+      }
+      const failed = await f.start()
+      expect(await failed.api.status()).toMatchObject({ state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
+      expect(await f.store.read()).toEqual(active)
+      expect(await f.store.pending()).toEqual(pending)
+      expect(f.prepared).toEqual([pending.url])
+      await failed.close()
+      f.runtime.prepare = prepare
+      await f.start()
+      expect(await f.store.read()).toEqual(pending)
+      expect(await f.store.pending()).toBeUndefined()
+      expect(f.prepared).toEqual([pending.url, pending.url])
     } finally {
       await f.close()
     }
