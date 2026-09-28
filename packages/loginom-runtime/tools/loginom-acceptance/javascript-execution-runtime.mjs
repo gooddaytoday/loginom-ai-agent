@@ -672,7 +672,7 @@ export async function createJavascriptSavedExecutionRuntime(options) {
   const runtime=await createJavascriptBoundRuntime({...options,coldPackagePath:options.savedPath});
   // No channel, import, source edit, create/connect, save or configure surface.
   return Object.freeze({graph:runtime.graph,reopen:runtime.reopen,handoffReopenedWizard:runtime.handoffReopenedWizard,
-    readPortMapping:runtime.readPortMapping,captureExecutionBoundary:runtime.captureExecutionBoundary,
+    readPortMapping:runtime.readPortMapping,prepareSourceProcessHistory:runtime.prepareSourceProcessHistory,captureExecutionBoundary:runtime.captureExecutionBoundary,
     verifyExecutionBoundary:runtime.verifyExecutionBoundary,settleClosedExecutionBoundary:runtime.settleClosedExecutionBoundary,restoreWorkflowForCleanup:runtime.restoreWorkflowForCleanup,
     get nativeReadUncertain(){return runtime.nativeReadUncertain;},
     get passiveSurfacePending(){return runtime.passiveSurfacePending;},
@@ -1153,6 +1153,18 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
           await page.evaluate(captureJavascriptNativeTopology,{previous:boundary.native,checkOnly:true});
           return graph();
         }});
+    },
+    async prepareSourceProcessHistory(node,operationDeadline=deadline) {
+      if(!coldPackagePath)throw Error('Source process history preparation requires cold runtime');
+      await accountGuard();
+      const until=Math.min(deadline,operationDeadline);
+      return once('cold-source-process-history',{node},async()=>{
+        const driver=createNodeExecutionProcedure(channel(node,until),node);
+        const baseline=await driver.prepare();
+        await accountGuard();
+        await record({phase:'cold_source_process_history_prepared',node,baseline,execution_dispatched:false});
+        return baseline;
+      });
     },
     async captureExecutionBoundary() {
       await accountGuard();const before=await graph();requireJavascriptTopology(before);
