@@ -1,8 +1,9 @@
 import { $ } from "bun"
 import { buildPhase } from "./build-phase"
 import { createHash } from "node:crypto"
-import { createReadStream } from "node:fs"
-import { link, lstat, mkdir, mkdtemp, readFile, readlink, rename, rm } from "node:fs/promises"
+import { execFileSync } from "node:child_process"
+import { createReadStream, lstatSync, readFileSync, readlinkSync } from "node:fs"
+import { link, lstat, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises"
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import { stageResources } from "./stage-resources"
 import { buildNodeHost } from "./build-node-host"
@@ -16,6 +17,17 @@ import webkitSource from "../licenses/bun/webkit-source.json"
 import chromiumNotice from "../licenses/chromium/source.json"
 
 const repo = resolve(import.meta.dir, "../../..")
+if (process.argv[2] === "--source-snapshot-worker") {
+  try {
+    process.stdout.write(JSON.stringify(snapshotInWorker(repo)))
+    process.exit(0)
+  } catch {
+    // This child never emits file paths, source contents or environment values.
+    process.stderr.write("LOGINOM_SOURCE_SNAPSHOT_FAILED\n")
+    process.exit(1)
+  }
+}
+const snapshotWorkerSha256 = createHash("sha256").update(readFileSync(import.meta.path)).digest("hex")
 const destination = process.argv[2]
 if (!destination || !isAbsolute(destination)) throw new Error("Provide a new absolute artifact directory")
 if (await Bun.file(join(destination, "cli-manifest.json")).exists()) throw new Error("Artifact already exists")
@@ -207,17 +219,59 @@ try {
 }
 
 async function snapshot() {
+  // The second snapshot follows a large Bun export. Run both snapshots in a
+  // fresh process so a stalled async filesystem worker cannot hold the build
+  // indefinitely or leave a live read after a Promise timeout.
+  if (createHash("sha256").update(readFileSync(import.meta.path)).digest("hex") !== snapshotWorkerSha256)
+    throw new Error("LOGINOM_SOURCE_CHANGED_DURING_BUILD")
+  const child = Bun.spawn([process.execPath, import.meta.path, "--source-snapshot-worker"], {
+    cwd: repo,
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  let deadline: ReturnType<typeof setTimeout> | undefined
+  try {
+    const result = await Promise.race([
+      Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]),
+      new Promise<never>((_resolve, reject) => {
+        deadline = setTimeout(() => reject(new Error("LOGINOM_SOURCE_SNAPSHOT_TIMEOUT")), 180_000)
+      }),
+    ])
+    if (result[0] !== 0) throw new Error("LOGINOM_SOURCE_SNAPSHOT_FAILED")
+    const value: unknown = JSON.parse(result[1])
+    if (
+      !value ||
+      typeof value !== "object" ||
+      typeof (value as Record<string, unknown>).sourceCommit !== "string" ||
+      typeof (value as Record<string, unknown>).sourceTreeSha256 !== "string" ||
+      typeof (value as Record<string, unknown>).sourceDirty !== "boolean"
+    ) throw new Error("LOGINOM_SOURCE_SNAPSHOT_INVALID")
+    return value as { sourceCommit: string; sourceTreeSha256: string; sourceDirty: boolean }
+  } finally {
+    if (deadline) clearTimeout(deadline)
+    if (child.exitCode === null) {
+      child.kill(9)
+      await Promise.race([child.exited, Bun.sleep(5_000)])
+    }
+  }
+}
+
+function snapshotInWorker(root: string) {
+  const git = (args: string[]) =>
+    execFileSync("git", args, { cwd: root, timeout: 60_000, killSignal: "SIGKILL", maxBuffer: 16 * 1024 * 1024 }).toString()
   const paths = [
     ...new Set(
-      (await $`git ls-files --cached --others --exclude-standard -z`.cwd(repo).text()).split("\0").filter(Boolean),
+      git(["ls-files", "--cached", "--others", "--exclude-standard", "-z"]).split("\0").filter(Boolean),
     ),
   ].sort()
   const hash = createHash("sha256")
   for (const path of paths) {
-    const stat = await lstat(join(repo, path)).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === "ENOENT") return undefined
-      throw error
-    })
+    let stat: ReturnType<typeof lstatSync> | undefined
+    try {
+      stat = lstatSync(join(root, path))
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+    }
     hash.update(path).update("\0")
     if (!stat) {
       hash.update("deleted\0")
@@ -225,13 +279,13 @@ async function snapshot() {
     }
     hash.update(String(stat.mode)).update("\0")
     hash
-      .update(stat.isSymbolicLink() ? await readlink(join(repo, path)) : await readFile(join(repo, path)))
+      .update(stat.isSymbolicLink() ? readlinkSync(join(root, path)) : readFileSync(join(root, path)))
       .update("\0")
   }
   return {
-    sourceCommit: (await $`git rev-parse HEAD`.cwd(repo).text()).trim(),
+    sourceCommit: git(["rev-parse", "HEAD"]).trim(),
     sourceTreeSha256: hash.digest("hex"),
-    sourceDirty: !!(await $`git status --porcelain`.cwd(repo).text()).trim(),
+    sourceDirty: !!git(["status", "--porcelain"]).trim(),
   }
 }
 
