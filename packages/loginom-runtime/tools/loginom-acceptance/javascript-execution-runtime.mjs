@@ -1121,6 +1121,27 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
         await record({phase:'javascript_palette_topology_refused',source,id,reason:String(error.message)});throw error;
       }finally{await native?.dispose();}
     },
+    async settleAppliedNode(node,operationDeadline) {
+      // Called only after our confirmed Done returns to its graph, before any
+      // mapping/source baseline. A still-held wizard lock is not that baseline.
+      await accountGuard();
+      const before=await graph();requireJavascriptTopology(before);
+      const target=before.nodes.find(n=>n.ref.node_id===node.node_id);
+      if(!target||typeof target.locked!=='boolean'
+        ||!['document_id','workflow_id','node_id'].every(k=>target.ref[k]===node[k]))
+        throw Error('Applied node unlock owner differs');
+      const native=await page.evaluateHandle(captureJavascriptNativeTopology,{});
+      try{
+        await record({phase:'javascript_done_unlock_baseline',before:structuredClone(before),node:structuredClone(node)});
+        await settleJavascriptCloseBoundary({before:{...before,nodes:before.nodes.map(n=>n===target?{...n,locked:false}:n)},
+          node,deadline:Math.min(deadline,operationDeadline),record,observe:async()=>{
+            await accountGuard();
+            await page.evaluate(captureJavascriptNativeTopology,{previous:native,checkOnly:true});
+            return graph();
+          }});
+        await record({phase:'javascript_done_unlock_verified',node:structuredClone(node)});
+      }finally{await native.dispose();}
+    },
     async settleClosedExecutionBoundary(boundary,node,operationDeadline) {
       return settleJavascriptCloseBoundary({before:boundary.before,node,deadline:Math.min(deadline,operationDeadline),record,
         observe:async()=>{

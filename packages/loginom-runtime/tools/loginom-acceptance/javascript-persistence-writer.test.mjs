@@ -50,6 +50,7 @@ async function writerFixture(mode, fault) {
       return {rounds: [{settings: structuredClone(settings)}], mappings: {after: fault === 'mapping' && cycles === 2 ? {} : mappings}};
     },
     executionRuntime: {
+      settleAppliedNode:async(node,until)=>{calls.push('done-unlock');assert.equal(node,executionNode);assert.equal(until,deadline);if(fault==='done-unlock')throw Error('Done still locked');},
       savePersistenceCheckpoint: async revision => {
         calls.push('save-' + revision);
         if (fault === 'save-' + revision) throw Error('Lost save response');
@@ -77,20 +78,20 @@ async function writerFixture(mode, fault) {
 
 for (const mode of ['code','declared']) test('actual fixed writer performs two ordered saves: ' + mode, async () => {
   const f = await writerFixture(mode);await f.run();
-  assert.deepEqual(f.calls, ['cycle-1','save-1','reopen','replace','done','done-hidden','cycle-2',
+  assert.deepEqual(f.calls, ['cycle-1','save-1','reopen','replace','done','done-hidden','done-unlock','cycle-2',
     'execute-final','read-output','dispose-boundary','save-2','cycle-2']);
   assert.equal(f.report.persistence.status, 'WRITER_OBSERVED');
   assert.equal(f.report.persistence.cold_persistence_verified, false);
   assert.equal(f.report.persistence.package_bytes_verified, false);
 });
 
-for (const fault of ['save-1','settings','old-source','done-sentinel','source-before','mapping','stale-execution',
+for (const fault of ['save-1','settings','old-source','done-sentinel','done-unlock','source-before','mapping','stale-execution',
   'missing-execution','foreign-execution','graph','stale-output','save-2','source-final'])
   test('actual writer stops on ' + fault + ' without replay', async () => {
     const f = await writerFixture('code', fault);await assert.rejects(f.run());
     assert.notEqual(f.report.persistence.status, 'WRITER_OBSERVED');
     for (const action of ['save-1','replace','execute-final','save-2']) assert.ok(f.calls.filter(x => x === action).length <= 1);
-    if (['save-1','settings','old-source','done-sentinel','source-before','mapping'].includes(fault))
+    if (['save-1','settings','old-source','done-sentinel','done-unlock','source-before','mapping'].includes(fault))
       assert.equal(f.calls.includes('execute-final'), false);
   });
 

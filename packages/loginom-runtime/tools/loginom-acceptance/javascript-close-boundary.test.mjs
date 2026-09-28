@@ -56,3 +56,33 @@ test('runtime Close settlement checks retained native identity on every observat
   await method({before,native:held},node,Date.now()+2000);
   assert.deepEqual(calls,['account','native','graph','account','native','graph']);
 });
+
+for(const fault of ['unlocked','locked','foreign','position','native'])test('Done waits before admitting a new graph baseline: '+fault,async()=>{
+  const source=await readFile(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
+  const start=source.indexOf('    async settleAppliedNode('),end=source.indexOf('    async settleClosedExecutionBoundary(',start);
+  assert.ok(start>0&&end>start);
+  const before=make(),events=[],held={dispose:async()=>events.push('disposed')};let reads=0;
+  if(fault!=='unlocked')before.nodes[0].locked=true;
+  const method=vm.runInNewContext('({'+source.slice(start,end)+'}).settleAppliedNode',{
+    Math,structuredClone,deadline:Date.now()+2000,settleJavascriptCloseBoundary,captureJavascriptNativeTopology,
+    requireJavascriptTopology:()=>{},accountGuard:async()=>{},record:async e=>events.push(e.phase),
+    graph:async()=>{
+      if(reads++===0)return before;
+      const after=make();if(fault==='locked'&&reads===2)after.nodes[0].locked=true;
+      if(fault==='position')after.nodes[0].position.x++;
+      return after;
+    },
+    page:{evaluateHandle:async()=>held,evaluate:async(fn,args)=>{
+      assert.equal(fn,captureJavascriptNativeTopology);assert.equal(args.previous,held);assert.equal(args.checkOnly,true);
+      if(fault==='native')throw Error('Native changed');
+    }},
+  });
+  if(['unlocked','locked'].includes(fault)){
+    await method(node,Date.now()+2000);assert.equal(events.includes('javascript_done_unlock_verified'),true);
+    assert.equal(before.nodes[0].locked,fault==='locked');assert.equal(events.at(-1),'disposed');
+  }else{
+    await assert.rejects(method(fault==='foreign'?{...node,workflow_id:'other'}:node,Date.now()+2000));
+    assert.equal(events.includes('javascript_done_unlock_verified'),false);
+    if(fault!=='foreign')assert.equal(events.at(-1),'disposed');
+  }
+});
