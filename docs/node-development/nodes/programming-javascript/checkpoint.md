@@ -17,6 +17,31 @@
 
 ### Source98: начата реализация AST policy и effective-source admission
 
+ROOT full source checks завершены: main/original94991 exit0,3294PASS/0FAIL;
+client/original60962 exit1,2755PASS/1FAIL/10SKIP; deny3PASS,Python15PASS.
+Все1300source pins до/после неизменны. Commands используют явный test-only
+Acorn loader к ROOT isolated production install; file isolation/concurrency2
+для client, без LOGINOM_DOCK_TEST_BROWSER/CI. Receipts
+`operator98-root-test-progress.json`, `operator98-root-full-check-inputs.json`,
+`operator98-root-{main,client,deny,python}.log`.
+
+Единственный ROOT client FAIL — mcp-runtime-contract.test.mjs:32: текущий
+product runtimeLockSha256313161… не совпадает с новым lock349887… . Это
+подтверждённый packaging mismatch, версия пока НЕ принята. Developer log
+2678PASS/18FAIL/10SKIP сохранён отдельно; ROOT не объявляет все18 причин
+одинаковыми, но в основном окружении остался ровно этот checksum failure.
+
+ROOT явно назначил обновление только candidate product/loginom-release.json
+runtimeLockSha256 на349887bff383c30e3450e0978658a0d75fb854b9cd47c1f644d0e2b03c646c3c,
+с включением в manifest pins и сохранением исторических evidence. Это плановая
+смена dependency, не разрешение ослабить test или изменить Node/Chromium/catalog.
+После изменения: ROOT реальный stageResources flavorcli/Linux в новом private
+каталоге, inventory/hash verification и normal resolver Acorn; затем адресный
+MCP test/окончательный candidate checks. Полная platform/CLI acceptance впереди.
+На момент этой записи product pin ещё старый; задача разработчика активна.
+Оба ROOT original test processes terminal, активных ROOT browser/test jobs нет.
+
+
 ROOT focused tests:211PASS/0FAIL/0SKIP, pinned Node24.19.0, original command
 terminalexit0. Запущены реальные client module-policy/source-admission tests
 (включая source-read fixtures/tests) из отдельного9file snapshot с Acorn из
