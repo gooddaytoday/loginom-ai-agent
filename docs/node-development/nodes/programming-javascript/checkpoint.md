@@ -15,6 +15,16 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source111 writer13: активный headed запуск
+
+Перед стартом повторно проверены HEAD b47ead6d824c57f49c4905c98ff863cae4e9cae3,
+все1324 pins freeze111 и Node/Chromium binary hashes. Writer13 original92458,
+fresh profile136. /proc подтвердил Chromium PID383345, headed, sandbox включён,
+exact assigned profile. Реестр active_exec_session92458. Private report
+persistence-code-writer-13/report.json, log source111-code-writer-13.log.
+Результат ещё не объявлен; продолжать опрос того же handle. Следующий профиль137.
+
+
 ### Source111: проверки завершены, fixture исправлен, freeze готов
 
 Main original31572 exit0:3610PASS/0FAIL/0SKIP. Full client original64535 exit1:
