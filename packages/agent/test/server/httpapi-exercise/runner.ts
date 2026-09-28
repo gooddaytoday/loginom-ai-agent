@@ -83,6 +83,7 @@ function runAuth(scenario: ActiveScenario) {
     if (scenario.auth === "protected") {
       if (result.status !== 401) throw new Error(`auth expected 401, got ${result.status}`)
       const authed = yield* callAuthProbe(scenario, "valid")
+      if (authed.timedOut || authed.status === 0) throw new Error("auth valid probe timed out")
       if (authed.status === 401) throw new Error("auth rejected valid credentials")
       return
     }

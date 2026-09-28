@@ -21,29 +21,74 @@ export function call(scenario: ActiveScenario, ctx: SeededContext<unknown>, opti
 export function callAuthProbe(scenario: ActiveScenario, credentials: "missing" | "valid" = "missing") {
   return Effect.promise(async () => {
     const controller = new AbortController()
-    return Promise.race([
-      Promise.resolve(
-        app(await runtime(), { auth: { password: "secret", username: Product.slug } }).request(
-          toAuthProbeRequest(scenario, credentials, controller.signal),
-        ),
-      ).then((response) => capture(response, scenario.capture)),
-      Bun.sleep(1_000).then(() => {
-        controller.abort("auth probe timed out")
-        return {
-          status: 0,
-          contentType: "",
-          text: "auth probe timed out",
-          body: undefined,
-          timedOut: true,
+    const request = Promise.resolve().then(async () => {
+      const response = await app(await runtime(), { auth: { password: "secret", username: Product.slug } }).request(
+        toAuthProbeRequest(scenario, credentials, controller.signal),
+      )
+      if (scenario.capture !== "stream") return capture(response, scenario.capture)
+      // Authentication only needs the response status. Reading the first SSE
+      // event can race the outer deadline and leave a live subscription behind.
+      try {
+        await response.body?.cancel("auth probe complete")
+      } catch {
+        disposalUnknown = true
+        throw new Error("auth probe stream closure unconfirmed")
+      }
+      return {
+        status: response.status,
+        contentType: response.headers.get("content-type") ?? "",
+        text: "",
+        body: undefined,
+        timedOut: false,
+      } satisfies CallResult
+    })
+    // Observe both outcomes so the losing request can never reject unhandled.
+    const settled = request.then(
+      (value) => ({ kind: "result" as const, value }),
+      (error: unknown) => ({ kind: "error" as const, error }),
+    )
+    let deadline: ReturnType<typeof setTimeout> | undefined
+    try {
+      const first = await Promise.race([
+        settled,
+        new Promise<{ kind: "timeout" }>((resolve) => {
+          deadline = setTimeout(() => {
+            controller.abort("auth probe timed out")
+            resolve({ kind: "timeout" })
+          }, authProbeTimeoutMs)
+        }),
+      ])
+      if (first.kind === "result") return first.value
+      if (first.kind === "error") throw first.error
+      // Aborting is a request, not proof of closure. Keep the app unavailable
+      // if the handler/stream does not actually settle within this bound.
+      let settlementDeadline: ReturnType<typeof setTimeout> | undefined
+      try {
+        const afterAbort = await Promise.race([
+          settled,
+          new Promise<{ kind: "unconfirmed" }>((resolve) => {
+            settlementDeadline = setTimeout(() => resolve({ kind: "unconfirmed" }), authProbeTimeoutMs)
+          }),
+        ])
+        if (afterAbort.kind === "unconfirmed") {
+          disposalUnknown = true
+          throw new Error("auth probe cancellation unconfirmed")
         }
-      }),
-    ])
+      } finally {
+        if (settlementDeadline) clearTimeout(settlementDeadline)
+      }
+      return { status: 0, contentType: "", text: "auth probe timed out", body: undefined, timedOut: true }
+    } finally {
+      if (deadline) clearTimeout(deadline)
+      controller.abort("auth probe complete")
+    }
   })
 }
 
 type CachedApp = BackendApp & { readonly dispose: () => Promise<void> }
 
 const appCache: Partial<Record<string, CachedApp>> = {}
+const authProbeTimeoutMs = 5_000
 const disposeTimeoutMs = 10_000
 let disposalUnknown = false
 
