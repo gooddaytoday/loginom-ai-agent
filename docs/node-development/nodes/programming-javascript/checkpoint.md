@@ -30,9 +30,22 @@ Done wrapper и writer, включая late/foreign/native/position и отка�
 Freeze103:1322 pins, closure202 files/628 edges,4 syntax checks;
 manifest javascript-freeze103-root-final-source.json SHA
 2821374b2e48bc95abaebb590bfc3f2ccf29442923aa7f7ae2268da376325089.
-Writer06/profile125 headed/sandbox запущен, original71139 ждёт terminal.
-Нельзя запускать следующий browser до его завершения. Все прежние G7/public/CLI
-ограничения сохраняются; новая local проверка не заменяет live/cold pair.
+Writer06/profile125 headed/sandbox, original71139 terminal exit1. Done unlock
+подтверждён, input mapping и strict graph проверки прошли. Save1 подтверждён,
+второго Execute/save не было. Новый отказ: bounded read выходного mapping после
+S2 Done возвращает node_mapping.verified:false/reason:mapping_render_value.
+Native node/port/wizard identity verified, UI показывает ObservedID(integer) и
+PhaseMarker(string), autosync:true; source identity не подтверждена. Close output
+mapping и strict before/after graph прошли. Это не прежняя lock гонка.
+Причина несовпадения конкретной ячейки ещё неизвестна: node-mapping-context.mjs
+сравнивает colName/colDisplayName/colSourceDisplayName с cached records, но отказ
+не содержит key/count/expected/actual. Следующий шаг — bounded readonly
+диагностика точной ячейки, без ослабления equality/ownership/complete guards.
+Не переносить Execute вперёд и не угадывать пустое mapping по текущему reason.
+Recovery06/profile126 original94937 exit0: jsteach,0 packages, logout/browser close
+true; Chrome отсутствует. Private result source103-code-writer-result-06.json
+сохраняет report/journal hashes и путь S1; сохранённые пакеты не удалены.
+Все прежние G7/public/CLI ограничения сохраняются; live writer/cold pair не принят.
 
 
 ### Source102: точная диагностика графа после port mapping Close
