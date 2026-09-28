@@ -217,6 +217,12 @@ lookbehind, BigInt, globalThis изолированными snippets: один p
 не пытаться заявить полную ECMAScript conformance. Async probes характеризуют
 среду, но не расширяют accepted scope v1.
 
+Первое native наблюдение на назначенном стенде 7.4.2: `null ?? "fallback"`
+отклонено при разборе с `SyntaxError: Syntax error at code (:4:33)` после
+клика по кнопке ошибки мастера; точный source SHA и cleanup зафиксированы в
+[checkpoint](checkpoint.md). Остальные перечисленные конструкции пока не
+характеризованы этим результатом; J20 остаётся открытым.
+
 Обязательный профиль движка охватывает предпосылки задания и runtime-справки:
 `trim`, кириллические `toLowerCase`/`toUpperCase` (включая Ё/ё), strict-mode
 diagnostics и все примеры будущей v1-редакции. Проверить отдельно литералы
