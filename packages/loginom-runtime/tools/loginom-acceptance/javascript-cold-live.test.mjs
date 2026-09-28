@@ -18,7 +18,7 @@ const same=(a,b)=>assert.equal(JSON.stringify(a),JSON.stringify(b));
 
 // The actual operator helper, production admission/reader and serialized native
 // source/process observers. Navigation transport is synthetic; no browser starts.
-for(const fault of ['ok','open-lost','close-lost','execute-lost','source','settings','process','ack','stale','foreign','output-lost'])
+for(const fault of ['ok','open-lost','close-lost','unlock-lost','execute-lost','source','settings','process','ack','stale','foreign','output-lost'])
   test('cold actual operator read/execute flow: '+fault,async()=>{
     const code=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
     const body=code.slice(code.indexOf('const runColdRead=async'),code.indexOf('const runExecutionTrial=async'));
@@ -38,7 +38,7 @@ for(const fault of ['ok','open-lost','close-lost','execute-lost','source','setti
       closeWizardOnce:async()=>{calls.push('close');if(fault==='close-lost')throw Error('Lost Close');if(fault==='process')f.processRecord.data.Status=1;},
       executionRecord:async event=>{events.push(event);return fault==='ack'&&event.phase==='javascript_source_effect_dispatch'?{}:event;},
       executionRuntime:{
-        captureExecutionBoundary:async()=>({before:graph,native:{dispose:async()=>{}}}),verifyExecutionBoundary:async()=>{},
+        captureExecutionBoundary:async()=>({before:graph,native:{dispose:async()=>{}}}),verifyExecutionBoundary:async()=>{},settleClosedExecutionBoundary:async()=>{calls.push('unlock');if(fault==='unlock-lost')throw Error('Close unlock unconfirmed');},
         graph:async()=>graph,readPortMapping:async(n,direction,options)=>{same(n,node);assert.equal(options.operationDeadline,deadline);calls.push('mapping-'+direction);return {direction,actual:true};},
         handoffReopenedWizard:async()=>{},reopen:async(n,until)=>{same(n,node);assert.equal(until,deadline);calls.push('open');opens++;f.binding.wizardAddress.epoch=opens;
           if(fault==='open-lost')throw Error('Lost Open');if(fault==='source'&&opens===2)f.setSource(source+' ');},

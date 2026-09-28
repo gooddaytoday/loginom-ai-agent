@@ -14,7 +14,7 @@ test('saved runtime binds the real constructor without input artifacts or mutati
     assert.ok(Object.isFrozen(runtime));
     assert.deepEqual(Object.keys(runtime).sort(),['captureExecutionBoundary','executeNode','graph','handoffReopenedWizard',
       'manualMappingPending','nativeReadUncertain','passiveSurfacePending','readOutput','readPortMapping','reopen',
-      'restoreWorkflowForCleanup','verifyExecutionBoundary','wizardOpeningPending'].sort());
+      'restoreWorkflowForCleanup','settleClosedExecutionBoundary','verifyExecutionBoundary','wizardOpeningPending'].sort());
     for(const method of ['prepareInput','channel','once','savePersistenceCheckpoint','prepareManualMapping','connectInput'])
       assert.equal(method in runtime,false);
     assert.deepEqual(await readdir(directory),[]);

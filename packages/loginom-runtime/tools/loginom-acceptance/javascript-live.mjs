@@ -762,6 +762,7 @@ const runSourceReadCycle=async(probe,deadline,expectedSettings)=>{
           closeDeadline=deadline;
           await closeWizardOnce();
           await handle.held.dispose();
+          await executionRuntime.settleClosedExecutionBoundary(boundary,executionNode,deadline);
           await checkBoundary();
           return {closed:true,owner:readerOwner};
         }
@@ -807,6 +808,7 @@ const runColdRead=async()=>{
       },
       async discard(handle){
         remainingBatch();closeDeadline=deadline;await closeWizardOnce();await handle.held.dispose();
+        await executionRuntime.settleClosedExecutionBoundary(boundary,executionNode,deadline);
         await checkReadBoundary();return {closed:true,owner:readerOwner};
       }
     })});
