@@ -113,6 +113,30 @@ export function readMappingBrowser(prefix) {
     }
     sourceSelection={verified:true,record_ids:selected.map(r=>String(r.internalId))};
   }
+  // An empty source cache can hide the source column after reconfiguration.
+  // This proves configured targets only, never a complete source mapping.
+  let pendingSource=null;
+  if(form==='DataSetOutputSocketWizard'&&!links&&sources.length===0&&targets.length>0
+    &&targets.every(t=>t.data.GroupField===''&&t.data.ConnectedRecord==null
+      &&t.data.SourceDisplayName==null&&t.data.SourceDataType==null)){
+    const header=views[1].headerCt??views[1].ownerGrid?.headerCt;
+    const headerTid=base+'grdTargetColumns;headercontainer',headers=exact(headerTid);
+    if(headers.length===1&&header?.el?.dom===headers[0]&&root.contains(headers[0])){
+      const columns=header.getGridColumns?.();
+      if(Array.isArray(columns)&&columns.length>0&&columns.length<=32){
+        const candidates=columns.filter(c=>c.dataIndex==='SourceDisplayName');
+        const sourceHeader=exact(base+'colSourceDisplayName');
+        if(candidates.length===1&&sourceHeader.length===1){
+          const column=candidates[0];
+          if(column.itemId==='colSourceDisplayName'&&column.hidden===true&&column.el?.dom===sourceHeader[0]
+            &&headers[0].contains(sourceHeader[0])&&!sourceHeader[0].checkVisibility({checkVisibilityCSS:true}))
+            pendingSource={kind:'hidden_source_column',header_tid:headerTid,column_tid:base+'colSourceDisplayName',
+              data_index:'SourceDisplayName',item_id:'colSourceDisplayName',hidden:true,visible:false,
+              source_count:0,target_count:targets.length,native_header_verified:true};
+        }
+      }
+    }
+  }
   const rows=[...elements[1].querySelectorAll('table.x-grid-item')],rendered=new Set();
   if(!rows.length||rows.length>200)return fail('mapping_render_bound');
   for(const row of rows) {
@@ -123,6 +147,10 @@ export function readMappingBrowser(prefix) {
     for(const [key,value] of (links?[['colDisplayName_',target.data.DisplayName]]:[['colName_',target.data.Name],['colDisplayName_',target.data.DisplayName],
       ['colSourceDisplayName_',target.data.ConnectedRecord?.data.DisplayName??'']])) {
       const cells=exact(base+key+target.data.Name).filter(c=>row.contains(c));
+      if(pendingSource&&key==='colSourceDisplayName_'){
+        if(cells.length!==0)return fail('mapping_hidden_source_cell');
+        continue;
+      }
       if(cells.length!==1||cells[0].textContent.trim()!==value){
         // Failure-only local UI diagnostics. Hidden/missing columns remain a
         // refusal; neither these headers nor the cached targets admit a mapping.
@@ -161,7 +189,8 @@ export function readMappingBrowser(prefix) {
   const produce=exact(base+'btnProduceType');
   const produceNative=produce.length===1&&globalThis.Ext?.getCmp?.(produce[0].id);
   const produceMode=produceNative?.el?.dom===produce[0]?{'bg-TBGDerivedProxyProduceType-dptSupplement':'supplement','bg-TBGDerivedProxyProduceType-dptReplace':'replace','bg-TBGDerivedProxyProduceType-dptDefault':'default'}[produceNative.iconCls]:null;
-  return {...(produceMode?{produce_mode:produceMode}:{}),verified:true,source_identity_verified:sources.length>0||targets.length===0,inventory_complete:true,
+  return {...(produceMode?{produce_mode:produceMode}:{}),verified:pendingSource===null,source_identity_verified:sources.length>0||targets.length===0,inventory_complete:true,
+    ...(pendingSource?{reason:'mapping_source_pending',configured_inventory_verified:true,source_pending:pendingSource}:{}),
     ...(grouped||input?{mapping_wizard:form}:{}),
     ...(links?{source_selection:sourceSelection}:{}),
     state_source:'cached_mapping_stores',autosync:native.pressed,

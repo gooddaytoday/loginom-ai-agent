@@ -237,3 +237,39 @@ test('successful mapping does not inspect optional diagnostic headers',()=>{
  const f=fixture();Object.defineProperty(f.views[f.grids[1].id],'headerCt',{get(){throw Error('Diagnostic must not run');}});
  assert.equal(f.read().verified,true);
 });
+
+function pendingFixture() {
+ const f=fixture({socket:true});f.source.splice(0);
+ for(const t of f.target)Object.assign(t.data,{ConnectedRecord:null,SourceDisplayName:null,SourceDataType:null});
+ for(const cell of [...f.all])if(cell.tid?.startsWith(f.base+'colSourceDisplayName_'))f.all.splice(f.all.indexOf(cell),1);
+ const header=f.el(f.base+'grdTargetColumns;headercontainer','',f.root);
+ const element=f.el(f.base+'colSourceDisplayName','',header);element.checkVisibility=()=>false;
+ const column={dataIndex:'SourceDisplayName',itemId:'colSourceDisplayName',hidden:true,el:{dom:element}};
+ const columns=[column];f.views[f.grids[1].id].headerCt={el:{dom:header},getGridColumns:()=>columns};
+ return {...f,header,element,column,columns};
+}
+test('owned hidden source column proves configured inventory without proving mapping',()=>{
+ const f=pendingFixture(),r=f.read();
+ assert.equal(r.verified,false);assert.equal(r.reason,'mapping_source_pending');assert.equal(r.source_identity_verified,false);
+ assert.equal(r.configured_inventory_verified,true);assert.equal(r.inventory_complete,true);
+ assert.equal(r.source_fields.length,0);assert.equal(r.target_fields.length,2);
+ assert.equal(r.target_fields[0].name,'Out0');assert.equal(r.target_fields[0].source,null);
+ assert.equal(r.source_pending.native_header_verified,true);assert.equal(r.source_pending.target_count,2);
+ assert.equal(r.settings_applied,false);assert.equal(r.package_saved,false);
+});
+for(const [name,change] of Object.entries({
+ visible:f=>{f.element.checkVisibility=()=>true;},not_hidden:f=>{f.column.hidden=false;},
+ foreign_header:f=>{f.header.parent=null;},missing_header:f=>{f.all.splice(f.all.indexOf(f.header),1);},
+ duplicate_header:f=>{f.el(f.header.tid,'',f.root);},foreign_column:f=>{f.column.el.dom=f.header;},
+ duplicate_column:f=>{f.columns.push({...f.column});},duplicate_dom:f=>{f.el(f.element.tid,'',f.header);},
+ wrong_data_index:f=>{f.column.dataIndex='Other';},wrong_item_id:f=>{f.column.itemId='Other';},
+ connected:f=>{f.target[0].data.ConnectedRecord={data:{}};},nonempty_source:f=>{f.source.push({});},
+ source_label:f=>{f.target[0].data.SourceDisplayName='Unknown';},source_type:f=>{f.target[0].data.SourceDataType=5;},
+ source_cell:f=>{f.el(f.base+'colSourceDisplayName_Out0','wrong',f.rows[0]);},
+ empty_source_cell:f=>{f.el(f.base+'colSourceDisplayName_Out0','',f.rows[0]);},
+ changed_name_cell:f=>{f.all.find(e=>e.tid===f.base+'colName_Out0').textContent='Other';},
+ incomplete_store:f=>{f.stores[1].getCount=()=>1;},autosync:f=>{f.views[f.button.id].pressed=true;},
+ wrong_form:f=>{for(const e of f.all)if(e.tid)e.tid=e.tid.replace('DataSetOutputSocketWizard','DerivedDataSourceOutputSocketWizard');}
+}))test('configured-only mapping rejects '+name,()=>{
+ const f=pendingFixture();change(f);const r=f.read();assert.equal(r.verified,false);assert.notEqual(r.configured_inventory_verified,true);
+});
