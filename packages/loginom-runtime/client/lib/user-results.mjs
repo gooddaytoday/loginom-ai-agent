@@ -158,6 +158,8 @@ CSV по умолчанию: UTF-8, запятая, header=names, bom=false, LF,
 Загрузи input_artifacts через dock_artifact_deliver, сохрани подтверждённую identity
 источника для импорта. Каждый node.apply сам проверяет настройки и выполнение.
 Для dock_node_resume передавай только исходный operation_id; запрос хранится в Dock.
+После dock_prepare вызови dock_graph_inventory, если нужны проверенные ID, типы и связи уже сохранённых узлов.
+Его граф не доказывает настройки, выполнение или значения на выходе.
 Для повторного чтения выхода без изменения вычислений используй dock_node_read
 с новым operation_id, source_operation_id успешной локальной операции и read
 (например, sample_rows:100, require_exact_numbers:true). Dock выполняет существующий

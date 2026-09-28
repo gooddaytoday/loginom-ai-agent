@@ -143,3 +143,11 @@ test('bridge keeps application feedback recoverable over the MCP protocol', asyn
   assert.match(result.stdout, /pass 1/);
   assert.match(result.stdout, /fail 0/);
 });
+
+test('compact bridge exposes only verified read-only graph inventory',async()=>{
+  const environment={...process.env,...desktopEnvironment};delete environment.NODE_TEST_CONTEXT;
+  const result=await promisify(execFile)(process.execPath,['--experimental-test-module-mocks','--test',
+    fileURLToPath(new URL('./support/graph-inventory-bridge.mjs',import.meta.url))],{timeout:30000,env:environment});
+  assert.match(result.stdout,/pass 1/);
+  assert.match(result.stdout,/fail 0/);
+});

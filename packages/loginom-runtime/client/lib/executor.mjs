@@ -6,7 +6,7 @@ import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference} from './ar
 import {createArtifactDelivery} from './artifact-delivery.mjs';
 import { prepareNodeTarget, inspectNodeTarget } from './node-target.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
-import { validateNodeTargetRequest } from './node-contracts.mjs';
+import { NODE_TYPES, validateNodeTargetRequest } from './node-contracts.mjs';
 import { describeNodeTypes } from './node-contracts.mjs';
 import { randomUUID, createHash } from 'node:crypto';
 import { requireCapability } from './capability-registry.mjs';
@@ -49,6 +49,10 @@ const artifactVerifyTool={name:'dock_artifact_verify',
     properties:{operation_id:identifier,verification_id:identifier,observation_id:identifier,file_ref:identifier}},
   annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}};
 export const executorTools = [actionDescribeTool, actionRunTool, operationInspectTool, operationRecoverTool, uiActionTool];
+const graphInventoryTool = {name:'dock_graph_inventory',
+  description:'Read the complete native node IDs, component types, saved labels and directed tabular links of the currently prepared Loginom workflow. Rejects incomplete, changed or ambiguous graphs. Read-only; does not execute or save nodes.',
+  inputSchema:{type:'object',properties:{},additionalProperties:false},
+  annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}};
 
 async function browserArtifactUpload(page,task,observe,resolveConflict) {
   let phase='preconditions',effect=false,input;
@@ -1763,10 +1767,54 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     waitNodeApply:(id,options)=>nodeJobs.wait(id,options),
     cancelNodeApply:id=>nodeJobs.cancel(id),
     stopNodeApply:id=>nodeJobs.stop(id),
-    tools: [...executorTools,...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
+    tools: [...executorTools,...(allowCandidate && nodeApplyDriverFactory ? [graphInventoryTool] : []),
+      ...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
       ...(allowCandidate&&nodeApplyHandlers.has('imports.text')&&nodeApplyDriverFactory?nodeApiTools:[])],
     assertPreparationAllowed() {
       if (running || pending) throw new Error('Dock preparation cannot run while an action is running or its effect remains uncertain');
+    },
+    async graphInventory(request,{signal}={}) {
+      signal?.throwIfAborted();
+      if(!allowCandidate||!nodeApplyDriverFactory||running||pending||nodeJobs.active)
+        throw new Error('Graph inventory requires an idle candidate runtime');
+      if(typeof request?.document_id!=='string'||!request.document_id||!request.workflow_ref?.workflow_id)
+        throw new Error('Graph inventory requires the prepared workflow');
+      const transport=async(code,options)=>{
+        const wrapped='async page => {const base={action_key:"graph.inventory.transport",action_revision:"1",operation_id:'+JSON.stringify(randomUUID())+',phase:"observed",effect_possible:false,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+code+')(page)}};}catch{return {...base,status:"FAILED",output:{},error:{code:"GRAPH_INVENTORY_UNAVAILABLE",message:"Prepared graph cannot be verified"}};}}';
+        const response=await execute(wrapped,options);
+        if(response.status!=='SUCCEEDED')throw new Error('Prepared graph inventory unavailable');
+        return response.output.value;
+      };
+      const graph=await nodeTargetAdapterFactory({execute:transport,origin:targetOrigin,build:targetBuild,pinned})
+        .observe(request,now()+15000,signal);
+      signal?.throwIfAborted();
+      if(graph?.complete!==true||graph.interaction_ready!==true||graph.document_id!==request.document_id||
+        JSON.stringify(graph.workflow_ref)!==JSON.stringify(request.workflow_ref)||
+        !Array.isArray(graph.nodes)||graph.nodes.length>200||!Array.isArray(graph.links)||graph.links.length>400||
+        !Array.isArray(graph.foreign_links)||graph.foreign_links.length!==0)
+        throw new Error('Complete prepared graph inventory required');
+      const ids=new Set();
+      for(const node of graph.nodes){
+        if(!node?.ref||node.ref.document_id!==request.document_id||node.ref.workflow_id!==request.workflow_ref.workflow_id||
+          typeof node.ref.node_id!=='string'||!node.ref.node_id||ids.has(node.ref.node_id)||
+          !Object.hasOwn(NODE_TYPES,node.type)||typeof node.label!=='string'||!node.label||
+          !Array.isArray(node.inputs)||!Array.isArray(node.outputs))
+          throw new Error('Graph node identity is absent or ambiguous');
+        ids.add(node.ref.node_id);
+      }
+      const edges=new Set();
+      for(const edge of graph.links){
+        const source=graph.nodes.find(node=>node.ref.node_id===edge?.source),target=graph.nodes.find(node=>node.ref.node_id===edge?.target);
+        const key=JSON.stringify([edge?.source,edge?.output,edge?.target,edge?.input]);
+        if(!source||!target||!source.outputs.includes(edge.output)||!target.inputs.includes(edge.input)||edges.has(key))
+          throw new Error('Graph link identity is absent or ambiguous');
+        edges.add(key);
+      }
+      return {schema:'loginom-dock-graph-inventory/v1',complete:true,document_id:graph.document_id,
+        workflow_ref:{workflow_id:graph.workflow_ref.workflow_id,tab_tid:graph.workflow_ref.tab_tid},
+        nodes:graph.nodes.map(node=>({id:node.ref.node_id,type:node.type,label:node.label,
+          inputs:node.inputs,outputs:node.outputs})),
+        links:graph.links.map(edge=>({source:edge.source,output:edge.output,target:edge.target,input:edge.input}))};
     },
     describe(actionKey) {
       if (actionKey && typeof actionKey === 'object') {
