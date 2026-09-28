@@ -15,6 +15,26 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source92 intermediate review: positive candidate и точность координат
+
+Source92 turn01a0e572 подтверждён active/revision31; появились pure verifier,
+artifact audit и tests, но frozen handoff ещё отсутствует. Root прочёл текущие
+модули и направил два замечания в ту же активную задачу:
+
+- Не приравнивать любые matched records к constantUNRESOLVED только по новым
+  предположениям об обязательности той же native error-path/engine continuity.
+  Отделить observed frames и strong whole-R candidate для root review от negative
+  или неполных evidence. Candidate не означает rejection/case/G5 acceptance;
+  IsNull applicability и unknown engine остаются явно ограниченными.
+- Конкретный synthetic repro: raw caller column9007199254740993 парсер выдаёт как
+  parsed=true,column9007199254740992. Source SHA2973c97a4bd14b594c32dc51293c4bbb78aa9d04dd0758e47f15899bcbf861ac;
+  private operator92-root-coordinate-overflow-reproduction.json. Требуются safe
+  integer checks для line/column и regression для overflow; raw text сохранён,
+  но неверное parsed numeric field недопустимо. Это не Loginom observation.
+
+Source92 пока не принят; новые main suite/root artifact replay после исправлений
+ещё не выполнялись. Browser не запускался, original evidence/outcomes неизменны.
+
 ### Source92 incomplete handoff: terminal revision30 исправлен
 
 Turn01a0e56a завершён authoritative revision30,но последний final снова относился
