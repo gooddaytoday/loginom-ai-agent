@@ -302,3 +302,24 @@ test('mapping read admits only its native disabled output delete-column mask',()
   if(variant!=='valid')assert.equal(result.reason,'mapping_mask',variant);
  }
 });
+
+
+test('empty output socket mapping reports actual empty inventories without inventing rows',()=>{
+ const variants=['valid','loading','nonzero-total','filtered','nonempty-source','nonempty-target','input','other-form','stale-row'];
+ for(const variant of variants){
+  const f=fixture(variant==='input'?{input:true}:variant==='other-form'?{}:{socket:true});
+  const source=f.source[0],target=f.target[0];f.source.splice(0);f.target.splice(0);
+  if(variant!=='stale-row')for(let i=f.all.length-1;i>=0;i--)if(f.rows.some(row=>row.contains(f.all[i])))f.all.splice(i,1);
+  if(variant==='loading')f.stores[0].isLoading=()=>true;
+  if(variant==='nonzero-total')f.stores[0].getTotalCount=()=>1;
+  if(variant==='filtered')f.stores[0].getData=()=>({items:[],getSource:()=>({items:[source]})});
+  if(variant==='nonempty-source'){source.data.ConnectedRecord=null;f.source.push(source);}
+  if(variant==='nonempty-target'){Object.assign(target.data,{ConnectedRecord:null,SourceDisplayName:null,SourceDataType:null});f.target.push(target);}
+  const r=f.read();assert.equal(r.verified,variant==='valid',variant+': '+r.reason);
+  if(variant==='valid'){
+   assert.equal(r.inventory_complete,true);assert.equal(r.state_source,'cached_mapping_stores');
+   assert.equal(r.source_fields.length,0);assert.equal(r.target_fields.length,0);assert.equal(r.rendered_indices.length,0);
+   assert.equal(r.settings_applied,false);assert.equal(r.package_saved,false);
+  }
+ }
+});

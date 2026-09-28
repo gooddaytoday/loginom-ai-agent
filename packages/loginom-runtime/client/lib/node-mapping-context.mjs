@@ -151,7 +151,9 @@ export function readMappingBrowser(prefix) {
     }
   }
   const rows=[...elements[1].querySelectorAll('table.x-grid-item')],rendered=new Set();
-  if(!rows.length||rows.length>200)return fail('mapping_render_bound');
+  // A cold code-generated output can have two fully empty cached stores.
+  // Nonempty inventories still require rendered rows as an independent witness.
+  if(!rows.length&&!(form==='DataSetOutputSocketWizard'&&sources.length===0&&targets.length===0)||rows.length>200)return fail('mapping_render_bound');
   for(const row of rows) {
     const index=Number(row.getAttribute('data-recordindex')),target=targets[index];
     if(!Number.isSafeInteger(index)||index<0||!target||rendered.has(index)
