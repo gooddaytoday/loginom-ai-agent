@@ -15,6 +15,27 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source96: независимые проверки завершены; runtime закоммичен
+
+Developer revision56 завершён. ROOT принял frozen candidate и самостоятельно
+выполнил main **3065 PASS**, deny **3 PASS**, Python fixtures **15 PASS**.
+Original main session77616 завершился exit0;1289pins до/после совпали.
+Проверены115прежних документов,120external evidence hashes, canonical design,
+20syntax checks и literal import closure166files/541edges. JSON property order
+не меняет сравнения metadata; соответствующий тест входит в main.
+
+Runtime commit в `node-javascript`: `9d9a2af27a` —20точно выбранных runtime files;
+старые незавершённые документы developer не включены. Manifest96 SHA256
+`a7b36e416aec29ec926229fdcbeecb65dbf9484bef22eaeffdf6dfe2cd3a612d`.
+ROOT receipts: private `operator96-root-source-review.json`,
+`operator96-root-test-results.json`; freeze/handoff скопированы в campaign.
+
+Это offline admission, не результат Loginom/ChakraCore. Следующий шаг — один
+T-schema-control на fresh headed profile109, затем независимая проверка native
+bytes, source/owner/journal/cleanup и наблюдённых before/after/physical metadata.
+Остальные4T cases до результата control не запускать. Profile108 остаётся закрыт;
+в этом ходе браузер не запускался. Public handler, полный G/J и CLI ещё не приняты.
+
 ### Проверка состояния после сообщения о случайном клике (source96)
 
 Повторная проверка `/proc` не обнаружила pinned Chromium. Реестр сохраняет
