@@ -15,6 +15,32 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source99: original deadline и интеграция saver с настоящим capability
+
+Runtime commit `295aa76b997fab978da111b232bbb8fd50505512` (пять адресных файлов; старые dirty docs не включены).
+createActionRuntime.run получил host-only deadlineAt: preflight/apply используют
+один min(original parent deadline, action timeout). Journal ACK не продлевает срок;
+перед mutation повторная проверка; browser получает тот же deadline_at. Transport
+budget ограничен remaining+5000ms на получение результата/settlement; эти5s не
+разрешают новую mutation. Existing callers без deadlineAt сохраняют поведение.
+Повторный operation ID с другим parent deadline отклоняется. Private JS saver
+передаёт исходный writer deadline в оба сохранения.
+
+Полный client:2763PASS/0FAIL/10SKIP, original session81470 terminalexit0,
+176562ms. Финальные адресные executor/deadline tests:49PASS; persistence tests:
+41PASS. Один integration test добавлен после старта полного suite и проверен
+в адресных49, без изменения runtime во время suite. Проверяются реальные
+createActionRuntime/makeCapabilityCode на synthetic Page: два save одного пути,
+fail→replace, обновление navigation, сохранение изменённого графа. Это ещё не
+проверка actual Loginom/ChakraCore или cold persistence. Подтверждения и SHA:
+private source99-deadline-verification.json и три указанных там лога.
+
+Следующий шаг: explicit owned saved-package binding и UI cleanup, подключение
+saver к writer и графу, затем cold reader/independent auditor. Старый draft-only
+guard не снят. Новых live browser/profile не было. Source99 остаётся частичной
+реализацией без final freeze; весь public/knowledge/lifecycle/CLI plan открыт.
+
+
 ### Source99: частичная реализация последовательного сохранения
 
 Добавлены private javascript-persistence-save.mjs и тесты: первый Save As
