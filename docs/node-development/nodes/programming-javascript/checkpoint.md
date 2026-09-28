@@ -16,6 +16,26 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Сообщение о случайном клике: причинная связь пока не установлена
+
+Пользователь сообщил, что случайный клик нарушил последний прогон. При текущей
+проверке процессов активного pinned Chromium и live runner нет; registry содержит
+profile104 `closed_logout_verified`. SHA последнего report C-set-missing остаётся
+`183fa26ef63332391d23fbacc9e5a3e24885cba2baa3c9e30b8ca1d368a9a4d6` и совпадает
+с ранее сохранённой независимой проверкой. Это доказывает сохранность файла,
+но **не исключает вмешательства во время выполнения**. Время/экран клика уточняются;
+до сопоставления сообщение не приписывается конкретному шагу и не служит основанием
+для повторного запуска. Исходные evidence не переписаны; case_complete остаётся false.
+Private receipt: `operator94-user-browser-interference-check.json`.
+
+OpenViking health успешен. Developer revision42 завершил D metadata proposal:
+selected-property lifetime и unresolved transport cleanup отражены; нового RPC нет.
+Root прочёл предложение. В той же задаче продолжен только source-only поиск связи
+owned output port → P и происхождения P.SourceColumns; source93 runtime не меняется.
+Это продолжение исследования, а не допуск D или приёмка всего узла.
+
+
+
 ### D metadata: root подтвердил временный lifetime selected-property cache
 
 
