@@ -14,7 +14,7 @@ for(const fault of ['none','position','label','links','foreign_document','root_e
  const page={locator:()=>({locator:()=>source}),mouse:{move:async()=>{moves++;}},evaluate:async()=>{}};
  const read=async()=>reads++<2?(fault==='prior_change'?after:before):after;
  const task={request:{workflow_ref:{prefix:'wf'}},effect:{before},source_tid:'port'};
- if(fault==='none'){const result=await prepareLinkHover(page,task,read,samePlacementGraph);assert.equal(result.nodes[0].dom_epoch,3);assert.equal(moves,1);}
+ if(['none','prior_change'].includes(fault)){const result=await prepareLinkHover(page,task,read,samePlacementGraph);assert.equal(result.nodes[0].dom_epoch,3);assert.equal(moves,1);}
  else {await assert.rejects(prepareLinkHover(page,task,read,samePlacementGraph));assert.equal(moves,['prior_change','missing_source'].includes(fault)?0:1);}
 });
 for(const permanent of [false,true])test('link hover waits boundedly for covered source: '+permanent,async()=>{
@@ -35,9 +35,9 @@ for(const mode of ['transient','persistent','foreign'])test('link hover graph wa
  else{await assert.rejects(prepareLinkHover(page,task,read,samePlacementGraph));assert.equal(moves,0);assert.equal(waits,mode==='persistent'?2:0);}
 });
 
-for(const fault of ['epoch','label','many'])test('link hover strict refusal carries bounded evidence: '+fault,async()=>{
+for(const fault of ['root_epoch','label','many'])test('link hover strict refusal carries bounded evidence: '+fault,async()=>{
  const before={nodes:[{dom_epoch:1,label:'A'}]},after=structuredClone(before);
- if(fault==='epoch')after.nodes[0].dom_epoch=2;
+ if(fault==='root_epoch'){before.dom_epoch=1;after.dom_epoch=2;}
  if(fault==='label')after.nodes[0].label='X'.repeat(1000);
  if(fault==='many')for(let i=0;i<100;i++)after['field'+i]=i;
  let effects=0;
@@ -45,10 +45,24 @@ for(const fault of ['epoch','label','many'])test('link hover strict refusal carr
  await assert.rejects(prepareLinkHover(page,{effect:{before}},async()=>after,samePlacementGraph),error=>{
   const evidence=JSON.parse(error.message.slice('Graph changed before link hover: '.length));
   assert.ok(evidence.differences.length<=32);
-  if(fault==='epoch')assert.deepEqual(evidence.differences,[{path:'$.nodes.0.dom_epoch',expected:1,observed:2}]);
+  if(fault==='root_epoch')assert.deepEqual(evidence.differences,[{path:'$.dom_epoch',expected:1,observed:2}]);
   if(fault==='label')assert.equal(evidence.differences[0].observed.length,128);
   if(fault==='many')assert.equal(evidence.truncated,true);
   return true;
  });
+ assert.equal(effects,0);
+});
+
+for(const fault of ['position','locked','ports','node_id','document','links'])test('pre-hover replacement never permits structural drift: '+fault,async()=>{
+ const before={document_id:'doc',dom_epoch:1,nodes:[{ref:{node_id:'n'},dom_epoch:11,locked:false,position:{x:1,y:2},inputs:[0]}],links:[]};
+ const after=structuredClone(before);after.nodes[0].dom_epoch=12;
+ if(fault==='position')after.nodes[0].position.x++;
+ if(fault==='locked')after.nodes[0].locked=true;
+ if(fault==='ports')after.nodes[0].inputs.push(1);
+ if(fault==='node_id')after.nodes[0].ref.node_id='other';
+ if(fault==='document')after.document_id='other';
+ if(fault==='links')after.links.push({source:'a',target:'n'});
+ let effects=0;
+ await assert.rejects(prepareLinkHover({locator:()=>{effects++;}}, {effect:{before}},async()=>after,samePlacementGraph),/Graph changed before link hover/);
  assert.equal(effects,0);
 });
