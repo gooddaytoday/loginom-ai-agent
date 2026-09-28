@@ -48,7 +48,7 @@ import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
 import {captureJavascriptWizardError} from './javascript-wizard-error.mjs';
-import {openJavascriptPackageDirectory,readJavascriptPackageFile} from './javascript-package-file.mjs';
+import {openJavascriptPackageFileTab,readJavascriptPackageFile} from './javascript-package-file.mjs';
 
 export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false}={}) {
 process.umask(0o077);
@@ -1423,10 +1423,11 @@ try {
     owner=observed;coldOpenPending=false;await guard();await waitGraphReady();
     try {
       report.stage='package-file-directory';
-      report.package_file_observation=await openJavascriptPackageDirectory(page,options['--package']);await save();
+      report.package_file_observation=await openJavascriptPackageFileTab(page,{account:config.username,
+        path:options['--package'],packageHandle});await save();
       report.stage='package-file-read';packageFileReadUncertain=true;
       report.package_file=await readJavascriptPackageFile({page,documentId:executionPrepared.document_id,
-        path:options['--package'],directory:directory+'/package-bytes'});
+        path:options['--package'],packageHandle,directory:directory+'/package-bytes'});
       packageFileReadUncertain=false;
       await executionRecord({phase:'package_file_bytes_verified',receipt:report.package_file});await save();
     } finally {

@@ -1,21 +1,81 @@
 import {createHash} from 'node:crypto';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {nativeRead, nativeFilePins} from './collapse/native-gates/readonly-download.mjs';
+import {nativeFilePins} from './collapse/native-gates/readonly-download.mjs';
 import {requireJavascriptSavedPackagePath} from './javascript-package-binding.mjs';
 
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 
-// Private read-only audit of one already saved package. The native reader pins
-// Loginom's own FileDownloader methods and checks the active FileStorageForm.
-export async function readJavascriptPackageFile({page,documentId,path,directory}) {
+// Read the exact path already proved by the saved-package binding. FileStorage's
+// listing omitted this saved folder in two headed runs, so it cannot prove ownership.
+export async function nativeReadOwnedPackage(a) {
+  const preparation=globalThis.__loginomDockPreparationV1;
+  const form=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
+  const map=form?.FMapTree,workspace=form?.Items?.Workspace;
+  const card=workspace?.getActiveTab?.(),controller=card?.Controller?.FController;
+  const owned=a.packageNode;
+  const normalized=()=>{
+    const raw=owned?.PackageFileName;
+    return typeof raw==='string'&&raw?'/'+raw.replaceAll('\\','/').replace(/^\/+/, ''):null;
+  };
+  const owner=()=>{
+    if(preparation?.id!==a.documentId||preparation.document!==document
+      ||globalThis.__loginomDockPreparationV1!==preparation
+      ||map?.FServerConnection?.UserName!=='jsteach'||map.FServerConnection.Connected!==true
+      ||map.PackageNodes?.Count!==1||map.PackageNodes.Items(0)!==owned||normalized()!==a.path
+      ||workspace.getActiveTab()!==card||controller?.constructor?.name!=='FileStorageForm'
+      ||!controller.FFileStorage)throw Error('Saved package file owner changed');
+  };
+  owner();
+  const check=(key,method)=>{if(typeof method!=='function'||method.toString()!==a.functions[key])throw Error('Unpinned native '+key);};
+  check('constructor',bg.filestorage.FileDownloader);
+  check('OpenFile',controller.FFileStorage.OpenFile);
+  check('GetFileInfo',controller.FFileStorage.GetFileInfo);
+  if(bg.TBGFileOpenMode.fomRead!==0)throw Error('Unpinned readonly mode');
+  const name=a.path.split('/').at(-1),directory=a.path.slice(0,-name.length);
+  const downloader=new bg.filestorage.FileDownloader(name,directory,controller.FFileStorage);
+  const result={kind:'javascript_owned_package_download_v1',document_id:a.documentId,path:a.path,mode:0,calls:[]};
+  try {
+    for(const key of ['Dispose','CreateStream','GetFileSize','IsStreamReleased','ReleaseStreamObj','GetFileStream','GetNextBufferSize'])check(key,downloader[key]);
+    for(const key of ['IsDisposed','FileName']){
+      let object=downloader,descriptor;
+      for(let depth=0;object&&depth<8&&!descriptor;depth++,object=Object.getPrototypeOf(object))descriptor=Object.getOwnPropertyDescriptor(object,key);
+      check(key,descriptor?.get);
+    }
+    if(downloader.FullFilename!==a.path)throw Error('Native full filename differs');
+    owner();result.calls.push('GetFileSize');
+    const size=await downloader.GetFileSize();
+    if(!Number.isSafeInteger(size)||size<0||size>262144)throw Error('Saved package file size outside bound');
+    owner();result.bytes=size;result.calls.push('GetFileStream');
+    const stream=await downloader.GetFileStream();
+    if(downloader.FShareDenyNone)throw Error('Native shared-write fallback rejected');
+    check('ReadBuffer',stream.ReadBuffer);
+    const chunks=[];
+    for(let offset=0;offset<size;){
+      owner();const chunk=new Uint8Array(Math.min(16384,size-offset));
+      await stream.ReadBuffer(chunk);result.calls.push({ReadBuffer:chunk.length});
+      chunks.push(...chunk);offset+=chunk.length;
+    }
+    owner();result.base64=btoa(chunks.map(byte=>String.fromCharCode(byte)).join(''));
+    result.function_sha256=a.sha256;
+  } finally {
+    await downloader.Dispose();result.calls.push('Dispose');
+    result.stream_released=downloader.IsStreamReleased();result.disposed=downloader.IsDisposed;
+  }
+  if(!result.stream_released||!result.disposed)throw Error('Native stream cleanup unconfirmed');
+  return result;
+}
+
+export async function readJavascriptPackageFile({page,documentId,path,packageHandle,directory}) {
   requireJavascriptSavedPackagePath(path);
   need(page&&typeof page.evaluate==='function','Owned browser page required');
   need(typeof documentId==='string'&&documentId.length>0&&documentId.length<=128,'Prepared document required');
+  need(packageHandle,'Bound saved package handle required');
   need(typeof directory==='string'&&directory.startsWith('/'),'Private evidence directory required');
-  const raw=await page.evaluate(nativeRead,{documentId,path,functions:nativeFilePins.functions,sha256:nativeFilePins.sha256});
+  const raw=await page.evaluate(nativeReadOwnedPackage,{documentId,path,packageNode:packageHandle,
+    functions:nativeFilePins.functions,sha256:nativeFilePins.sha256});
   const bytes=Buffer.from(raw?.base64??'','base64');
-  need(raw?.kind==='collapse_native_download_v1'&&raw.document_id===documentId&&raw.path===path
+  need(raw?.kind==='javascript_owned_package_download_v1'&&raw.document_id===documentId&&raw.path===path
     &&raw.mode===0&&raw.stream_released===true&&raw.disposed===true
     &&Number.isSafeInteger(raw.bytes)&&raw.bytes>=0&&raw.bytes<=262144
     &&bytes.length===raw.bytes&&bytes.toString('base64')===raw.base64,'Owned package bytes unconfirmed');
@@ -27,51 +87,18 @@ export async function readJavascriptPackageFile({page,documentId,path,directory}
     native_function_sha256:raw.function_sha256,stream_released:true,disposed:true};
 }
 
-export async function openJavascriptPackageDirectory(page,path) {
+export async function openJavascriptPackageFileTab(page,{account,path,packageHandle}) {
   requireJavascriptSavedPackagePath(path);
-  const expected=path.slice(0,path.lastIndexOf('/'));
+  need(account==='jsteach'&&packageHandle,'Bound account/package required');
   await page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnFilestorage"]').click();
-  const state=()=>page.evaluate(()=>{
+  await page.waitForFunction(({account,path,owned})=>{
     const form=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
-    const controller=form?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
-    if(form?.FMapTree?.FServerConnection?.UserName!=='jsteach'||controller?.constructor?.name!=='FileStorageForm'
-      ||controller.FFileStore?.loading||!controller.FFileStore?.complete)return null;
-    const rows=controller.FFileStore.data.items;
-    if(!Array.isArray(rows)||rows.length>512)return null;
-    return {directory:controller.FCurrentDirPath.replace(/\/$/,''),
-      entries:rows.map(r=>({name:r.data.FileName,path:r.data.FilePath,type:r.data.Type,size:r.data.Size})),
-      tids:[...document.querySelectorAll('[data-tid*=";FileStorageForm;colName_"]')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}))
-        .map(e=>e.getAttribute('data-tid')).slice(0,512)};
-  });
-  await page.waitForFunction(()=>{
-    const f=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
-    const c=f?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
-    return f?.FMapTree?.FServerConnection?.UserName==='jsteach'&&c?.constructor?.name==='FileStorageForm'
-      &&c.FFileStore?.loading===false&&c.FFileStore?.complete===true;
-  },undefined,{timeout:30000});
-  let current=await state();
-  for(let step=0;step<3&&current?.directory!==expected;step++){
-    need(current&&expected.startsWith(current.directory+'/'),'Own package directory outside native storage');
-    const folder=expected.slice(current.directory.length+1).split('/')[0];
-    const matching=current.entries.filter(row=>row.name===folder);
-    need(matching.filter(row=>row.type===1).length===1,
-      'Own folder not observed '+JSON.stringify({directory:current.directory,folder,rows:current.entries.length,
-        matching:matching.map(row=>({type:row.type,path:row.path})),visible_tids:current.tids.length}));
-    const tids=current.tids.filter(tid=>tid.endsWith(';FileStorageForm;colName_'+folder));
-    need(tids.length===1,'Own folder control not unique');
-    await page.locator('[data-tid="'+tids[0]+'"]').dblclick();
-    const next=current.directory+'/'+folder;
-    await page.waitForFunction(directory=>{
-      const f=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
-      const c=f?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
-      return f?.FMapTree?.FServerConnection?.UserName==='jsteach'&&c?.constructor?.name==='FileStorageForm'
-        &&c.FFileStore?.loading===false&&c.FFileStore?.complete===true&&c.FCurrentDirPath.replace(/\/$/,'')===directory;
-    },next,{timeout:30000});
-    current=await state();
-  }
-  need(current?.directory===expected,'Own package directory not reached');
-  const files=current.entries.filter(row=>row.path===path&&row.type===0);
-  need(files.length===1&&Number.isSafeInteger(files[0].size)&&files[0].size>=0&&files[0].size<=262144,
-    'Own package file not uniquely observed within native bound');
-  return {directory:expected,path,size:files[0].size};
+    const map=form?.FMapTree,controller=form?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+    const raw=owned?.PackageFileName;
+    const normalized=typeof raw==='string'&&raw?'/'+raw.replaceAll('\\','/').replace(/^\/+/, ''):null;
+    return map?.FServerConnection?.UserName===account&&map.FServerConnection.Connected===true
+      &&map.PackageNodes?.Count===1&&map.PackageNodes.Items(0)===owned&&normalized===path
+      &&controller?.constructor?.name==='FileStorageForm'&&!!controller.FFileStorage;
+  },{account,path,owned:packageHandle},{timeout:30000});
+  return {path,owner_verified:true,file_tab_open:true};
 }

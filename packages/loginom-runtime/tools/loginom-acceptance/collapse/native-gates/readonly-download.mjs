@@ -64,7 +64,7 @@ async function nativeRead(a) {
 }
 
 // Private JS persistence audit reuses the same pinned Loginom read path.
-export {nativeRead, pins as nativeFilePins};
+export {pins as nativeFilePins};
 
 export async function downloadReadonly({execute, documentId, path, directory, expectedSha256}) {
   if (!/^\/test-1\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.(csv|lgp)$/.test(path) || path.includes('..')) throw Error('Explicit owned file required');
