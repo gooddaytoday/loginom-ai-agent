@@ -49,6 +49,8 @@ test('two ordered writes bind one destination and consume verified continuation'
   assert.deepEqual(calls.map(call => call.parameters.conflict_policy), ['fail', 'replace']);
   assert.notEqual(calls[0].options.operationId, calls[1].options.operationId);
   assert.ok(calls[0].options.signal instanceof AbortSignal);
+  assert.ok(Number.isSafeInteger(calls[0].options.deadlineAt));
+  assert.equal(calls[0].options.deadlineAt, calls[1].options.deadlineAt);
   await assert.rejects(saver.save(2));
   await assert.rejects(saver.save(3));
   assert.equal(calls.length, 2);

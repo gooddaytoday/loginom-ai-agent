@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateActionParameters } from '../lib/action-catalog.mjs';
-import { actions, build, Page, nodeParameters, linkPage, linkParameters, run, runtime } from './support/executor-fixture.mjs';
+import { actions, selectors, build, Page, nodeParameters, linkPage, linkParameters, run, runtime } from './support/executor-fixture.mjs';
+import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from '../../tools/loginom-acceptance/javascript-persistence-save.mjs';
 
 test('node capability creates, types the rename and verifies actual snapped geometry with a workflow-bound ref', async () => {
   const page = new Page();
@@ -435,6 +436,30 @@ test('saved continuation returns current navigation with the same native workflo
  assert.equal(continuation.workflow_ref.workflow_id,'workflow');assert.equal(continuation.previous_workflow_ref.workflow_id,'workflow');
  assert.equal(continuation.previous_workflow_ref.navigation_path[2].label,'Draft');assert.equal(continuation.workflow_ref.navigation_path[2].label,'Saved');
  assert.equal(continuation.workflow_ref.tab_tid,continuation.previous_workflow_ref.tab_tid);
+});
+
+test('JavaScript saver drives real save capability twice through verified navigation changes', async () => {
+ const {page}=await continuationPage();page.clock=Date.now();
+ const storage='/jsteach/js-g2-9150c962-ad60-4cd4-a13e-bcba89b982d8';
+ const pinnedActions=new Map(actions);
+ pinnedActions.set('package.save_checkpoint',javascriptPersistenceSaveAction(actions.get('package.save_checkpoint'),storage));
+ const engine=runtime(page,{pinned:{actions:pinnedActions,selectors,pins:{},compatibility:{loginom_build:build}}});
+ const prepared={status:'READY',document_id:'doc',package_ref:{persisted:false},workflow_ref:{
+   workflow_id:'workflow',prefix:page.prefix,tab_tid:page.tabTid,
+   navigation_path:page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind)).map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent})),
+ }};
+ const evidence=[];
+ const saver=createJavascriptPersistenceSaver({runtime:engine,storage,prepared,deadline:Date.now()+60000,record:async row=>{evidence.push(row);}});
+ const first=await saver.save(1);
+ assert.equal(first.workflow_ref.navigation_path[2].label,'Saved');
+ page.nodes[0].label='Changed';
+ const last=await saver.save(2);
+ assert.equal(last.path,first.path);
+ assert.equal(page.storage.size,1);
+ assert.equal(page.storage.get(last.path).nodes[0].label,'Changed');
+ assert.equal(last.receipt.output.persisted_content_verified,false);
+ assert.deepEqual(evidence.filter(row=>row.phase==='persistence_save_reserved').map(row=>row.parameters.conflict_policy),['fail','replace']);
+ assert.equal(page.events.includes('package_closed'),false);
 });
 
 test('saved continuation refuses a different native package even at the same path',async()=>{

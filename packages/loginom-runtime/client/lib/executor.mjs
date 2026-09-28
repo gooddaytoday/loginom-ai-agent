@@ -1448,8 +1448,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const outcome = await execute(makeCapabilityCode(operation.action, pinned.selectors, operation.parameters, {
       operation_id: operation.id, mode, checkpoint: operation.checkpoint, expected_build: targetBuild,
       ...(operation.action.effect?.destination_policy==='session_storage'?{storage_binding:getStorageBinding()}:{}),
-      ...receipt, ...(mutation ? { deadline_at: mode === 'apply' ? operation.deadline : now() + operation.action.timeout_ms } : {}),
-    }), { timeout: operation.action.timeout_ms + 5000, ...options });
+      ...receipt, ...(mutation ? { deadline_at: mode === 'apply' ? operation.deadline : now() + operation.action.timeout_ms }
+        : operation.parentDeadline !== undefined ? { deadline_at: operation.deadline } : {}),
+    }), { timeout: operation.parentDeadline !== undefined && ['prepare', 'apply'].includes(mode)
+      ? Math.max(1, Math.min(operation.action.timeout_ms, operation.deadline - now())) + 5000
+      : operation.action.timeout_ms + 5000, ...options });
     assertActionOutcome(outcome);
     if (outcome.action_key !== operation.action.action_key || outcome.action_revision !== operation.action.revision) {
       throw new Error('Dock capability outcome identity does not match the pinned action');
@@ -2366,8 +2369,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return structuredClone(operation.outcome);
       }finally{running=false;}
     },
-    async run(actionKey, parameters, { signal, operationId } = {}) {
+    async run(actionKey, parameters, { signal, operationId, deadlineAt } = {}) {
       signal?.throwIfAborted();
+      // Host-only ceiling: preflight and evidence writes consume the caller's
+      // original budget. No new full action allowance at mutation admission.
+      if (deadlineAt !== undefined && (!Number.isSafeInteger(deadlineAt) || deadlineAt <= now()))
+        throw new Error('Action parent deadline must be a future safe integer');
       const action = find(actionKey);
       validateActionParameters(action.input_schema, parameters);
       if (operationId !== undefined && (typeof operationId !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(operationId))) {
@@ -2379,6 +2386,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (operationId && operations.has(operationId) && operations.get(operationId).signature !== signature) {
         throw new Error('operation_id was already used with different parameters');
       }
+      if (operationId && operations.has(operationId) && operations.get(operationId).parentDeadline !== deadlineAt)
+        throw new Error('operation_id was already used with a different parent deadline');
       // inspectApply сам захватывает шлюз только на время своих фазовых чтений;
       // под чужим захватом он принял бы этот вызов за активную операцию.
       if (pending?.action.capability === 'node.apply') {
@@ -2397,16 +2406,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           if (previous.signature !== signature) throw new Error('operation_id was already used with different parameters');
           return structuredClone(previous.outcome);
         }
-        const operation = { id: operationId ?? randomUUID(), action, signature, parameters: structuredClone(parameters) };
+        const operation = { id: operationId ?? randomUUID(), action, signature, parameters: structuredClone(parameters),
+          ...(deadlineAt !== undefined ? {parentDeadline: deadlineAt, deadline: Math.min(deadlineAt, now() + action.timeout_ms)} : {}) };
+        if (deadlineAt !== undefined && now() >= operation.deadline) throw new Error('Action parent deadline expired');
         let prepared;
         try { prepared = await invoke(operation, 'prepare', { signal }); }
         catch (error) { return failed(operation, 'PREFLIGHT_FAILED', String(error?.message ?? error).slice(0, 1000), 'FAILED'); }
         if (prepared.status !== 'NOT_APPLIED' || prepared.phase !== 'prepared' || !prepared.checkpoint?.workflow_ref) return prepared;
         operation.checkpoint = prepared.checkpoint;
         signal?.throwIfAborted();
-        operation.deadline = now() + action.timeout_ms;
+        operation.deadline ??= now() + action.timeout_ms;
         await remember(operation, 'prepared');
         signal?.throwIfAborted();
+        if (deadlineAt !== undefined && now() >= operation.deadline) throw new Error('Action parent deadline expired before mutation');
         operations.set(operation.id, operation);
         pending = operation;
         observations.clear();
