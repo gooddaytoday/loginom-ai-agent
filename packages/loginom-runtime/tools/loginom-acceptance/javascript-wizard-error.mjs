@@ -8,12 +8,11 @@ export function readJavascriptWizardErrorDialog() {
   if(dialogs.length!==1)throw Error('Unique visible native error dialog required');
   const dialog=dialogs[0],tid=dialog.getAttribute('data-tid');
   if(!/^msgbox(?:-\d+)?$/.test(tid??''))throw Error('Native error dialog identity unavailable');
-  // Ext portals may render message body and footer outside the root element.
-  // Their exact tid still binds both controls to this unique native msgbox.
-  const exact=suffix=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid+suffix)+']')].filter(visible);
-  const body=exact(';cnt;cnt;cmp'),ok=exact(';tlb;ok');
-  if(body.length!==1||ok.length!==1||ok[0].innerText.trim()!=='OK')throw Error('Native error dialog controls unavailable');
-  const text=body[0].innerText;
+  const ok=[...new Set([...dialog.querySelectorAll('button,[role="button"],.x-btn'),
+    ...document.querySelectorAll('[data-tid='+JSON.stringify(tid+';tlb;ok')+']')])]
+    .filter(element=>visible(element)&&element.getAttribute('data-tid')===tid+';tlb;ok');
+  if(ok.length!==1||ok[0].innerText.trim()!=='OK')throw Error('Native error dialog OK unavailable');
+  const text=dialog.innerText;
   if(typeof text!=='string'||!text)throw Error('Native error dialog text unavailable');
   return {present:true,tid,text:text.slice(0,4096),text_truncated:text.length>4096,ok_tid:tid+';tlb;ok'};
 }
