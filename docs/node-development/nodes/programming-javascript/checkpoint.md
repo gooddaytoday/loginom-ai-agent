@@ -1,5 +1,26 @@
 # JavaScript: checkpoint исполнения
 
+## G5 outside safe integer: характеристика Number rounding — 2026-09-28
+
+Отдельный headed `g5-outside-safe-24`/profile188 на child revision
+`180f1d5810` доставил source SHA256
+`9de9debd30abdab9be899cc8cdfb4691ed58ac8892441a7a6813f6ce5b57dbf1`.
+Выражение `Number("9007199254740993")` создало выходной integer со
+значением `"9007199254740992"`; typed UI reader сохранил точную десятичную
+строку с precision `exact_integer`. Это согласуется с округлением при
+создании JavaScript Number, но не проверяет передачу исходного int64 через
+native input bridge и не обещает точную арифметику за безопасной границей.
+Статус `typed_characterization`, фиксированного ожидаемого значения не было;
+`gate_passed=false` не означает провал исполнения. Proof level
+`typed_ui_only`, native bytes не проверены; G5 остаётся открытым.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`817a251f198ad8b04fd4b081cefc42495638077e2e40816f1c40dc1044eaa2cc`,
+journal SHA256
+`fbb01478716148e2ea0873b530fa8f751f4d6c812c8dd84dc5bba458d21829b9`.
+Реестр закрыт, следующий fresh profile189.
+
 ## G5 safe integer: точные границы — 2026-09-28
 
 Отдельный headed `g5-safe-integer-23`/profile187 на child revision

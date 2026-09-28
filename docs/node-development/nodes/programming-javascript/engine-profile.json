@@ -643,9 +643,34 @@
       "source_sha256": "9de9debd30abdab9be899cc8cdfb4691ed58ac8892441a7a6813f6ce5b57dbf1",
       "schema_mode": "code",
       "expectation": "characterization",
-      "status": "not_checked",
+      "status": "observed_characterization",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_expression": "Number(\"9007199254740993\")",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        ["9007199254740992"]
+      ],
+      "number_precision": "exact_integer_decimal_output_only",
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-outside-safe-24/report.json",
+        "report_sha256": "817a251f198ad8b04fd4b081cefc42495638077e2e40816f1c40dc1044eaa2cc",
+        "journal_sha256": "fbb01478716148e2ea0873b530fa8f751f4d6c812c8dd84dc5bba458d21829b9",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "g5-integer-fraction",
