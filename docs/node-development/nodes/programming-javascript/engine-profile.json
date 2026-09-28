@@ -261,9 +261,32 @@
       "source_sha256": "865317e82f65e2480ab9f64290d3a1015bbb797be2a1af8f617a795d0c08640c",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_pass",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "string"
+        }
+      ],
+      "output_rows": 1,
+      "all_cells_verified": true,
+      "observed_values": [
+        ["object"]
+      ],
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-global-this-13/report.json",
+        "report_sha256": "443cbc622754d42c2375ded6ff31b5256686516e2e6207fcf6b55042112a95b2",
+        "journal_sha256": "7a1393d71c8d02908b7efa218ede06c1a3d9e99188b58f3ea95bc001d4249d18",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "engine-async-declaration",

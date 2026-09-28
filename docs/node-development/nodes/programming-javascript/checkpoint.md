@@ -1,5 +1,24 @@
 # JavaScript: checkpoint исполнения
 
+## Engine globalThis: typed UI PASS — 2026-09-28
+
+Отдельный headed `engine-global-this-13`/profile177 на child revision
+`180f1d5810` доставил source SHA256
+`865317e82f65e2480ab9f64290d3a1015bbb797be2a1af8f617a795d0c08640c`
+(`typeof globalThis`). Native принадлежащее выполнение завершилось успешно;
+UI reader получил одну строку строковой колонки `Result` со значением `object`.
+Независимый typed oracle подтвердил schema и все клетки (`typed_oracle_verified`,
+gate_passed=true для этой локальной пробы). Proof level `typed_ui_only`:
+native bytes не проверялись, другие возможности движка отсюда не выводятся,
+общие gates не закрываются.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`443cbc622754d42c2375ded6ff31b5256686516e2e6207fcf6b55042112a95b2`,
+journal SHA256
+`7a1393d71c8d02908b7efa218ede06c1a3d9e99188b58f3ea95bc001d4249d18`.
+Реестр закрыт, следующий fresh profile178; J20 остаётся открытым.
+
 ## Engine BigInt: native refusal и полный cleanup — 2026-09-28
 
 Отдельный headed `engine-bigint-12`/profile176 на child revision `180f1d5810`

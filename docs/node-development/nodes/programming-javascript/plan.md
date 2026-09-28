@@ -223,9 +223,10 @@ lookbehind, BigInt, globalThis изолированными snippets: один p
 (`SyntaxError: Unexpected quantifier at code (:4:36)`) и BigInt literal
 (`SyntaxError: Unexpected identifier after numeric literal at code (:4:34)`).
 Для `??` потребовался ручной клик и admin recovery; `?.`, lookbehind и BigInt
-прочитаны собственным оператором со штатным cleanup. Точные source SHA и
-различия доказательств —
-в [engine profile](engine-profile.json) и [checkpoint](checkpoint.md).
+прочитаны собственным оператором со штатным cleanup. Отдельный
+`typeof globalThis` дал строку `object` с проверенным typed UI oracle.
+Точные source SHA и различия доказательств — в
+[engine profile](engine-profile.json) и [checkpoint](checkpoint.md).
 Остальные конструкции требуют отдельных запусков; J20 остаётся открытым.
 
 **Операторский барьер перед следующими syntax probes:** применить общий порядок
