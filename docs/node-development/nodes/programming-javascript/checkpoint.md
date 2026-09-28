@@ -15,6 +15,35 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Cold03 выявил console readiness cycle; source114 исправлен
+
+Source113 main original39888 exit0:3615PASS; focused19PASS. Freeze113 SHA
+da2441b80e5f716e73206d389369e2db8cd2c83f007fd0b7ed34afa028bff669,
+1324 pins/closure209 files642 edges, computed0,2 syntax checks PASS.
+Cold03 original67225/profile140 terminal exit1. Headed/sandbox/profile доказаны
+/proc PID407179. Failure cold-open-package: NodeReadinessTimeout, prepared node
+available for process console; no mutation authorized. Последнее observation:
+prepared_node_context verified graph/unlocked, wizard absent, но node_processes
+verified:false/reason:console_grids. Это actual journal evidence, не предположение.
+Close UI не повторялся при source uncertain; own browser закрыт.
+Recovery03/profile141 original1604 exit0: jsteach,0 packages, logout/browser close
+true; Chrome отсутствует. Реестр closed_recovery_verified/active_exec_session=null.
+Private source113-code-cold-result-03.json содержит report hash/failure.
+
+Code: createNodeExecutionProcedure.openConsole initial observe запрашивал
+readProcesses:true, и channel отказывал до открытия отсутствующих grids.
+Source114 a66165a347 меняет только initial observation на readProcesses:false;
+подготовленный owner/UI по-прежнему проверяются каналом, все последующие
+observations prepare читают process history. Не добавлены launch/retry/пустой
+process baseline.46 targeted tests PASS, source114-console-focused-02.log.
+Первый focused отказал из-за слишком широкого assert нового fixture на launch
+observations; assert ограничен начальным prepare, отдельный test проверяет все
+последующие history reads именно в prepare. Failed log сохранён.
+Main original90231/source114-main.log и full client original69008/
+source114-full-client.log запущены; сначала опросить эти handles, не дублировать.
+Next profile142/cold04 на writer13 package; source114 freeze/live ещё не выполнены.
+
+
 ### Cold02 output opening timeout; source113 diagnostic
 
 Cold02 original24302 terminal exit1. Process history preparation прошла; source
