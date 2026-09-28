@@ -15,6 +15,43 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source99: собран fixed code/declared persistence writer
+
+Runtime commit `e26c13ac4304554c38ce156d4f91d386fb675e81`. Два отдельных entrypoints:
+javascript-persistence-code-live.mjs / javascript-persistence-declared-live.mjs,
+только config/profile/browser/evidence; mixed modes запрещены. Общий срок30мин
+от process timeOrigin, cleanup отдельные180s. Fresh profile/headed/sandbox прежние.
+Source98 module policy проверяет обе fixed программы до live действий.
+
+После первого Execute/output writer читает полный S1 через source97 reader,
+сохраняет новый .lgp, открывает свой JS и заменяет только ожидаемый S1 на S2.
+Дополнительная проверка old source непосредственно перед заменой. Done, полный
+read/Close S2 с прежними settings/mappings, новый persistence-final Execute и
+независимый typed6x2 oracle; второй save того же файла и итоговый полный source
+cycle. Повторное исполнение связано с сохранённой initial process identity;
+старая execution_id, неподтверждённый cleanup/owner/SHA/узел отклоняются.
+
+Saved-aware guard/waitGraphReady/Close используют имя и exact path из проверенной
+квитанции runtime, сохраняя native package handle. При persistenceUncertain UI
+cleanup запрещён, остаётся закрытие собственного браузера. Итог WRITER_OBSERVED
+не означает cold persistence; package_bytes_verified/cold_persistence_verified=false.
+
+Финальный main3397PASS/0FAIL/0SKIP, session15166 terminalexit0,34399ms.
+30новых тестов исполняют настоящий writer block/guard в VM (UI/transport synthetic):
+два mode, порядок действий, stale/foreign execution, lost save, source/settings/
+mappings drift, stale table, guard draft/saved path/name/account/native identity.
+Первый main session10762 завершился exit1: VM harnesses не передавали новые
+лексические binding persistence/structuredClone. Окружения обновлены, проверки
+поведения сохранены; исходный failed log не перезаписан. Промежуточный suite3367
+также PASS, но финальный3397 — актуальная проверка. Оба entrypoint --help exit0.
+SHA/логи: private source99-writer-verification.json.
+
+Браузер не запускался. Следующий шаг — отдельный cold reader600000ms только с
+owned package path и назначением, без source/configuration fixture authority,
+затем independent whole-cycle auditor, freeze и headed writer/reader по mode.
+Writer на реальном Loginom ещё не проверен; все прежние открытые gates остаются.
+
+
 ### Source99: owned package binding и runtime save transition
 
 Runtime commit `eb7b9812e9ad6f207bcf3e830ab019dac799b3bf`. Новый javascript-package-binding.mjs проверяет
