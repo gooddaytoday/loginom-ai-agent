@@ -106,3 +106,29 @@ Baseline для следующего manifest — private javascript-freeze98-ro
 (SHA4bf45dc25ab84999f411996b16622472d216fbaab37918ed89dfbefb17e9aed2),
 а не старый developer draft freeze98 с прежней product pin. Исходники source98
 закоммичены; ROOT final source/check/staging receipts — авторитетный prior state.
+
+
+## Source115: открытие консоли без преждевременного чтения истории
+
+Cold05 после внешнего закрытия сеансов прошёл initial prepared observation без
+readonly toast, но perform отказал до жеста: в graph-scoped snapshot отсутствовал
+btnProgress. Source114 readProcesses:false убрал не только native process inventory,
+но и выбор toolbar/console observation root. Повтор Execute здесь не нужен.
+
+Выбран отдельный внутренний readProcessControls: та же область toolbar/console,
+тот же prepared-node owner, все dialog/epoch guards, но без запроса native history.
+Initial openConsole ждёт существующую консоль либо единственную доступную кнопку.
+Флаг сохраняется при разрешённом pre-gesture refresh. После открытия обязательный
+readProcesses:true возвращает полную проверку истории; отсутствие grids не выдаётся
+за пустую историю. Альтернативы — ослабить native history guard или расширить весь
+workspace scan — не нужны. Публичные model tools и контракты не меняются.
+
+Проверить actual createNodeProcedure: controls-only root, отсутствие native history
+вызова, retained marker, отказ без prepared owner; driver test проверяет initial
+controls-only и последующие history reads. Затем общий runtime regression до live.
+
+Cleanup: закрытие браузера и пустой новый сеанс не подтверждают закрытие пакета в
+старом сеансе. При CLEANUP_UNCONFIRMED новый пакетный прогон запрещён до наблюдаемого
+закрытия прежнего пакета/сеанса либо явно сообщённого пользователем admin cleanup.
+Для cold05 ROOT через headed Диспетчер подтвердил exact path в jsteach:2970, закрыл
+пакет и сеанс, подтвердил отсутствие строки2970, затем admin logout/browser close.
