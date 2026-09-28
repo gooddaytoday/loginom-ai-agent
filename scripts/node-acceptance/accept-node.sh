@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Приёмка одного узла в слоте a|b через headed CLI в квалифицированном bwrap.
+# Приёмка одного узла в слоте (одна латинская буква a-z) через headed CLI в квалифицированном bwrap.
 set -euo pipefail
 
 usage() {
-  echo "Usage: accept-node.sh --node <slug> --slot <a|b> --cli <absolute loginom-ai-agent-cli> --out <absolute directory>" >&2
+  echo "Usage: accept-node.sh --node <slug> --slot <a-z> --cli <absolute loginom-ai-agent-cli> --out <absolute directory>" >&2
   exit 1
 }
 
@@ -23,7 +23,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$NODE" && -n "$SLOT" && -n "$CLI" && -n "$OUT" ]] || usage
-[[ "$SLOT" == "a" || "$SLOT" == "b" ]] || { echo "slot must be a or b" >&2; exit 1; }
+[[ "$SLOT" =~ ^[a-z]$ ]] || { echo "slot must be a single letter a-z" >&2; exit 1; }
 [[ "$CLI" == /* && "$OUT" == /* ]] || { echo "--cli and --out must be absolute" >&2; exit 1; }
 [[ -x "$CLI" ]] || { echo "CLI is not executable: $CLI" >&2; exit 1; }
 [[ ! -e "$OUT" ]] || { echo "out already exists: $OUT" >&2; exit 1; }
@@ -48,8 +48,9 @@ HARNESS_ROOT="/opt/loginom-worker/cli-v017-20260926"
 BWRAP="/usr/local/libexec/loginom-swarm/bwrap"
 HEADED_ENTRY="$HARNESS_ROOT/headed-entry.py"
 MODEL="openai/gpt-6-sol"
-DISPLAY_NUM=11
-[[ "$SLOT" == "b" ]] && DISPLAY_NUM=12
+# Дисплей слота: a=11, b=12, c=13 и так далее.
+SLOT_ORD="$(printf '%d' "'$SLOT")"
+DISPLAY_NUM=$((11 + SLOT_ORD - 97))
 
 STALE_LOCK_CLEARED=false
 LOCK_OWNED=false
