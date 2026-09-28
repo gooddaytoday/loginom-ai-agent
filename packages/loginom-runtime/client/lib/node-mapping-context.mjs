@@ -24,7 +24,20 @@ export function readMappingBrowser(prefix) {
   if(candidates.length!==1)return fail('mapping_root');
   const {form,root}=candidates[0],input=form==='TuneDataSourceMappingWizard',grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard'].includes(form);
   const base=prefix+';WizrdMCF;'+form+';';
-  if([...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].some(e=>e.checkVisibility({checkVisibilityCSS:true})))return fail('mapping_mask');
+  const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
+  if(masks.some(e=>{
+    // The empty output grid disables delete-all with an Ext control mask.
+    // Other masks still block reading the cached mapping stores.
+    const parent=e.parentElement,columnTid=base+'colTargetDelete',wizard=exact(prefix+';WizrdMCF');
+    const model=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+    const column=parent&&globalThis.Ext?.getCmp?.(parent.id);
+    return !(form==='DataSetOutputSocketWizard'&&e.classList?.contains('x-mask')
+      &&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
+      &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()
+      &&parent?.getAttribute('data-tid')===columnTid&&exact(columnTid).length===1&&root.contains(parent)
+      &&wizard.length===1&&model?.FView?.el?.dom===wizard[0]&&wizard[0].contains(root)
+      &&column?.el?.dom===parent&&column.disabled===true&&masks.filter(mask=>mask.parentElement===parent).length===1);
+  }))return fail('mapping_mask');
   const grids=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(s=>exact(base+s));
   if(grids.some(es=>es.length!==1||!root.contains(es[0])))return fail('mapping_grids');
   const elements=grids.map(es=>es[0]),views=elements.map(e=>globalThis.Ext?.getCmp?.(e.id));
