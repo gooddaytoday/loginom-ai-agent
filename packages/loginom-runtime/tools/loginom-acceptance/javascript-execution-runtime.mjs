@@ -1,3 +1,4 @@
+import {javascriptMappingState} from './javascript-mapping-state.mjs';
 import {settleJavascriptCloseBoundary} from './javascript-close-boundary.mjs';
 import {javascriptCalibrationCase} from './javascript-calibration-cases.mjs';
 import {bindJavascriptPackage, javascriptPackageBindingRequest, observeJavascriptPackageBinding} from './javascript-package-binding.mjs';
@@ -860,9 +861,10 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
         if(lifecycle.closed){pendingMapping=undefined;await native.dispose();}
       }
     },
-    async readPortMapping(node,direction,{characterize=false,operationDeadline=deadline,failedExecution}={}) {
+    async readPortMapping(node,direction,{characterize=false,allowConfiguredOnly=false,operationDeadline=deadline,failedExecution}={}) {
       if(!['input','output'].includes(direction))throw Error('Unknown mapping direction');
       if(characterize&&direction!=='output')throw Error('Only output mapping characterization is supported');
+      if(typeof allowConfiguredOnly!=='boolean'||allowConfiguredOnly&&(direction!=='output'||characterize))throw Error('Configured-only admission requires separate output read');
       const readDeadline=Math.min(deadline,operationDeadline);
       const reader=channel(node,readDeadline),reference={document_id:prepared.document_id,workflow_id:prepared.workflow_ref.workflow_id,node_id:node.node_id};
       const before=await graph();requireJavascriptTopology(before);
@@ -872,8 +874,10 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
           await reader.openPort(direction,0);opened=true;
           const state=await reader.observe({condition:'complete JavaScript '+direction+' mapping',readMappings:true,
             ready:s=>characterize?!!characterizeJavascriptMapping(s,reference,{allowPending:true,failedExecution}):
-              s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.prepared_node_context?.verified===true});
+              (s.node_mapping?.verified===true||allowConfiguredOnly&&s.node_mapping?.configured_inventory_verified===true
+                &&s.node_mapping.reason==='mapping_source_pending')&&s.node_mapping.inventory_complete===true&&s.prepared_node_context?.verified===true});
           const mapping=characterize?characterizeJavascriptMapping(state,reference,{failedExecution}):state.node_mapping;
+          if(allowConfiguredOnly)javascriptMappingState(mapping,reference,{direction,allowConfiguredOnly:true});
           await record({phase:characterize?'port_mapping_characterized':'port_mapping_observed',direction,node,mapping});return mapping;
         } catch(error){observationError=error;throw error;
         } finally {
