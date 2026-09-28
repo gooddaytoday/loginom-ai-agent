@@ -1,6 +1,6 @@
 # JavaScript: code-side metadata и физический выход
 
-Дата: 2026-09-28. Проект следующего этапа; runtime admission и live ещё не выполнены.
+Дата: 2026-09-28. Выбранный дизайн source96; runtime admission и live ещё не выполнены.
 Полный [план](plan.md) и обязательные G/J сохраняются. Этот документ не объявляет
 готовым публичный handler и не закрывает прежние одноколоночные D cases задним числом.
 
@@ -15,8 +15,17 @@
 Для проверки generated names требуется наблюдать API внутри JS и фактический
 выход. Предлагается перейти к подготовленной двухколоночной telemetry вместо
 очередного изменения equality guards ради успешного engine metadata diagnostic.
-Текущие source94/95 guards и старые evidence не меняются. Перед реализацией ROOT
-сверяет конечный socket audit и закрепляет решение в checkpoint.
+Текущие source94/95 guards и старые evidence не меняются. ROOT сверил конечный
+socket audit и выбрал этот путь для реализации в прежней developer задаче.
+
+В штатном `TabForm.js` (retained fix47, строки1676–1748) FindEnginePort подтверждает
+кандидата через асинхронный `bg.IsEqualObjects(P.Socket,W.Socket)`. Эквивалентность
+этого вызова сравнению `$OW/$O` не доказана: реализации в конечном проверенном
+наборе нет. Поэтому несовпадение raw IDs не доказывает несвязанность объектов,
+а прохождение Number/Name/Index не заменяет штатную проверку. Исследование этой
+внутренней связи отложено; текущий telemetry путь её не вызывает и не утверждает.
+ROOT проверил6audit sources по SHA; private receipt
+`operator96-root-socket-audit-verification.json` закрепляет пути и hashes.
 
 ## Фиксированные пробы
 
@@ -44,7 +53,9 @@ Private proposal `schema-telemetry-proposal-01/manifest.json` подготовл
 открытой таблицы. Для telemetry output требуется ровно два наблюдённых поля в
 порядке0/1 с типами Integer4/String5, одна строка. Полные фактические Name/DisplayName
 берутся из этого поля metadata cache и фиксируются в binding; не подставляются
-из запроса или из telemetry JSON. Для before/upstream прежний одноимённый
+из запроса или из telemetry JSON. Provenance — наблюдаемый Preview cache,
+`bridge_verified=false`; это не доказательство native D.ColumnDefs, derived
+datasource либо P↔D identity. Для before/upstream прежний одноимённый
 одноколоночный Value guard сохраняется.
 
 Удерживать обе field-object references и точные scalar metadata snapshots;

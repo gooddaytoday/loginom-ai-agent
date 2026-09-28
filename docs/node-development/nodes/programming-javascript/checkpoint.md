@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source96: выбран прямой T-schema путь после конечного socket audit
+
+Developer завершил read-only audit (revision51/52). ROOT проверил6source hashes
+и самостоятельно прочёл TabForm.FindComponentEnginePort/FindEnginePort1676–1748:
+UI использует async bg.IsEqualObjects, а не raw $OW/$O comparison. Реализация этой
+семантики не установлена; связь наблюдавшихся sockets остаётся недоказанной,
+их различие не объясняется автоматически разными слоями/alias.
+
+Выбран [schema telemetry design](schema-telemetry-design.md): точные5подготовленных
+источников T-schema, реальный GetColumn before/after JSON и независимо bound
+physical Preview field cache/две native321 cells. Bridge_verified=false; P/engine
+обход не требуется. Source94/95 guards и исходные failures неизменны. Нового
+socket live ради дальнейших предположений не назначать. Это развитие G3/J24,
+а не замена всей цели diagnostic успехом. Public handler/остальные G/J/CLI открыты.
+
+Реализация source96 разрешена в прежней developer задаче;115старых документов
+закреплены private `operator96-root-review-baseline.json`. Первый следующий live
+после review/tests — только T-schema-control, fresh profile109. До этого новые
+браузеры не запущены; recovery108 подтверждён. ROOT audit receipt:
+`operator96-root-socket-audit-verification.json`.
+
+
 ### Source95 live: membership пройден; socket bridge не подтверждён
 
 `native-metadata-control-probe-02`, profile107/original92282 terminalexit1.
