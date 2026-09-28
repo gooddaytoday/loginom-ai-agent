@@ -570,9 +570,36 @@
       "source_sha256": "86e2b53e66428553709ba3656c6b18a3ded9c366fbb69a69cc9911c2d80f9800",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_pass",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "real"
+        }
+      ],
+      "output_rows": 4,
+      "all_cells_verified": true,
+      "observed_values": [
+        [null],
+        [0],
+        [-1.25],
+        [10.125]
+      ],
+      "number_precision": "17_significant_digits",
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-real-22/report.json",
+        "report_sha256": "e21652b38f9c6f0dc76ca95de4cfe8ff678c7ea52f8c26494527fe25a0379fff",
+        "journal_sha256": "c6717fb1af2e426d05c9f7effaacce583150b30e9cde8cd97bc778bb10346b9c",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "g5-safe-integer",

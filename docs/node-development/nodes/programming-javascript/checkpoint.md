@@ -1,5 +1,24 @@
 # JavaScript: checkpoint исполнения
 
+## G5 real: четыре typed значения — 2026-09-28
+
+Отдельный headed `g5-real-22`/profile186 на child revision `180f1d5810`
+доставил source SHA256
+`86e2b53e66428553709ba3656c6b18a3ded9c366fbb69a69cc9911c2d80f9800`.
+Свежий принадлежащий JS process завершился успешно; typed UI reader получил
+real колонку `Result` и четыре строки: настоящий `null`, `0`, `-1.25`,
+`10.125`. Числа считаны binary64 reader с 17 значащими цифрами, не из
+округлённого preview. Независимый oracle подтвердил schema и все клетки
+(`typed_oracle_verified`). Proof level `typed_ui_only`, native bytes не
+проверены, весь G5 этим case не закрыт.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`e21652b38f9c6f0dc76ca95de4cfe8ff678c7ea52f8c26494527fe25a0379fff`,
+journal SHA256
+`c6717fb1af2e426d05c9f7effaacce583150b30e9cde8cd97bc778bb10346b9c`.
+Реестр закрыт, следующий fresh profile187.
+
 ## G5 boolean: null/false/true typed PASS — 2026-09-28
 
 Отдельный headed `g5-boolean-21`/profile185 на child revision `180f1d5810`
