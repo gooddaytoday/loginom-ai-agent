@@ -16,6 +16,50 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Cold05 и подтверждённое admin cleanup; source115
+
+Пользователь сообщил о закрытии пакетов jsteach через Диспетчер и предоставил
+доступ администратора для восстановления. Credentials остаются вне Git. Старые
+проверки пустого нового сеанса не подтверждали закрытие пакетов старых сеансов;
+это ошибка recovery workflow, а не доказательство очистки. Новый пакетный прогон
+после CLEANUP_UNCONFIRMED запрещён до установленного закрытия старого пакета/сеанса.
+Правило и изменение observer описаны в [persistence design](persistence-design.md).
+
+OpenViking transient connect timeout перепроверен Doctor; затем обе HTTP routes
+и зарегистрированный MCP health снова успешны без изменения настроек. Profile145
+session-menu diagnostic original41776 exit0: jsteach0packages/logout/browser close.
+Его результат относится только к этому сеансу; доступ admin через меню не наблюдался.
+
+После user-reported admin cleanup cold05/source114/profile146 original54372 exit1.
+Initial observation ready=true, dialogs=[], navigation без readonly annotation;
+затем Initial bound observation is no longer current or ready. Журнал доказывает:
+btnProgress отсутствует в graph-scoped observation. Source114 отключил readProcesses
+и тем самым исключил toolbar root. Execute/Save не отправлялись. UI cleanup снова
+не подтверждён; own browser закрыт. /proc headed snapshot не успел получить процесс,
+поэтому не приписывать этой попытке отдельное /proc доказательство.
+
+ROOT выполнил headed admin recovery06/profile148, original15309 exit0. Диспетчер
+показал exact writer13 path внутри jsteach:2970. Через штатный UI закрыт только этот
+пакет, подтверждён диалог с его точным именем, затем закрыт сеанс2970 с отдельным
+диалогом и проверено исчезновение строки. Admin logout и browser close подтверждены,
+Chromium отсутствует. Private source114-admin-recovery-06.jsonl и два screenshots
+содержат evidence. Остальные пустые jsteach и чужие admin сеансы не закрывались.
+Recovery05/profile147 original66455 exit1 ждал HomePage, отсутствующую у admin;
+browser закрыт, logout не подтверждён, пакет в нём не открывался. Не засчитывать
+его как successful recovery. Registry closed_admin_recovery_verified.
+
+Source115 f0ea862736ebc295d2f639929c27d81db47a36b9 вводит внутренний
+readProcessControls для выбора toolbar/console root без native history. Prepared
+owner обязателен, marker сохраняется при допустимом pre-gesture refresh. Initial
+ready требует консоль либо уникальную кнопку; subsequent reads требуют историю.
+112 targeted tests PASS,2 syntax checks PASS. Closure1324pins/211files/647edges,
+computed0; private operator115-root-source-inputs.json. Main original93434 и full
+client original35299 пока выполняются; опрашивать эти handles без дублей.
+Source115 final freeze/live ещё не выполнены. Next fresh profile149.
+Общий scope G7/declared/public/knowledge/review/CLI остаётся открытым.
+
+
+
 ### Readonly diagnostic01: уведомление прочитано, связь с кликом не доказана
 
 После сообщения пользователя о случайном нажатии выполнена отдельная диагностика
