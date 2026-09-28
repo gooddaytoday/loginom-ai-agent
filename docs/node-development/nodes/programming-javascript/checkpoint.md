@@ -1,5 +1,58 @@
 # JavaScript: checkpoint исполнения
 
+## Rebase `loginom` и чтение отказа мастера — 2026-09-28
+
+По команде пользователя `javascript` rebased на `loginom` commit
+`3f35c5f232` с общим правилом
+[«Отказ мастера и кнопка ошибки»](../../workflow/lifecycle.md#отказ-мастера-и-кнопка-ошибки).
+Rebase 437 коммитов прошёл без конфликтов; прежний tip сохранён как локальная
+ветка `javascript-backup`. Cursor-сессия
+`79e41aa8-71f2-4345-861f-d6510fe0344b` прямо поручила перенести правило
+в подплан и до следующих syntax probes изменить частный оператор
+`javascript-live.mjs` / `javascript-stage-observer.mjs`; `engine-probe-06`
+не повторять. Общий runtime для уже принятых узлов здесь не менялся.
+
+В child `node-javascript` коммиты `f66373e43a`, `244ce2ebb2`, `180f1d5810`
+добавили раннее распознавание текущей ошибки мастера после одного жеста,
+чтение ограниченной подсказки, однократное открытие штатного диалога,
+запись полного текста Loginom, закрытие его `OK` с проверкой прежней страницы
+и отдельный discovery status `owned_wizard_refusal`. Старую кнопку до
+завершения нового жеста не принимать за новый отказ. Другие диалоги остаются
+чужими; при незакрытом диалоге cleanup не переигрывается. Адресные 36 PASS;
+профильная suite после первого коммита 18 027 PASS/0 FAIL. Финальный
+портальный reader после последних двух коммитов проверен адресными тестами и
+ниже живым стендом; полная suite повторно не запускалась.
+
+Первые две headed попытки `engine-optional-chain-08`/profile170 и
+`engine-optional-chain-09`/profile172 сохранили native
+`SyntaxError: Syntax error at code (:4:48)`, но reader потребовал несуществующее
+внутри контейнера диалога поле. Оба report получили `CLEANUP_UNCONFIRMED`;
+пакеты `Package1` и точные сеансы `jsteach:3034`, `jsteach:3037` последовательно
+закрыты через headed admin Dispatcher с отдельными подтверждениями, затем
+admin logout/browser close. Private evidence:
+`source121-admin-recovery-09.jsonl`, `source122-admin-recovery-10.jsonl`.
+Эти попытки не являются принятыми operator runs.
+
+Третья изолированная попытка `engine-optional-chain-10`/profile174,
+revision `180f1d5810`, original41397 exit0: `OBSERVED`;
+`discovery_result.status=owned_wizard_refusal`, source SHA256
+`aaa5a1fe1e639a12fbd9d8c08932ec39ac1631654c693f187fa01a54664bee99`.
+Подсказка дала точное `SyntaxError: Syntax error at code (:4:48)`; полный
+native диалог содержал то же сообщение, «Технические подробности» и `OK`.
+Класс `SyntaxError` и позиция 4:48 извлечены только из native текста.
+`dialog_closed=true`, отдельный Execute не отправлялся, gate_passed=false.
+Штатный cleanup подтвердил package_closed/logged_out/browser_closed=true,
+процессов pinned Chromium не осталось. Private report SHA256
+`392d590029baeef0932e840b7f0a1558023d86afa674989125eeb9a182c5250c`,
+journal SHA256
+`8cbdea4c2534b4d06a22a72c3082c8fdda79e1d94ef3a63a2b4343b565706c97`.
+Реестр закрыт, active session снят; следующий свежий profile175.
+
+Это подтверждает native parse refusal для `?.` на стенде 7.4.2 и работу
+операторского error-button цикла. Остальные engine probes, полный J20,
+public JS-handler, интеграция child-кода в `javascript` и CLI-приёмка остаются
+открытыми. Private credentials и raw evidence не переносить в Git.
+
 ## Native error button / engine-nullish — 2026-09-28
 
 В headed диагностике source120/profile168 (`engine-error-button-07`, original
