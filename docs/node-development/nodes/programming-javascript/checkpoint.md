@@ -1,5 +1,25 @@
 # JavaScript: checkpoint исполнения
 
+## Engine top-level await: native refusal и полный cleanup — 2026-09-28
+
+Отдельный headed `engine-top-level-await-15`/profile179 на child revision
+`180f1d5810` доставил source SHA256
+`870883e4b8849c8b63b45da30be606f66fb5cacd1c8451502d04137a35cf9404`.
+После Next штатный диалог мастера сообщил native
+`SyntaxError: 'await' expression not allowed in this context at code (:4:27)`.
+Подсказка `btnError` содержала HTML entity `&#39;` вместо апострофов; профиль
+сохраняет декодированный текст полного native диалога. Оператор закрыл диалог
+`OK`, не отправлял отдельный Execute, получил `owned_wizard_refusal` и
+gate_passed=false. Отказ относится к top-level `await` в данном контексте
+Loginom 7.4.2; он не отрицает отдельно наблюдённое async declaration.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`6366d7836b0af113d131ca2ceaf03edd00daa0479aa1d4f4e3bca867d1540798`,
+journal SHA256
+`454c7e1d57d669ff8443d0ae6b921929ffc3ae1ac6fd77eb81b522c979795226`.
+Реестр закрыт, следующий fresh profile180; J20 остаётся открытым.
+
 ## Engine async declaration: typed UI PASS — 2026-09-28
 
 Отдельный headed `engine-async-declaration-14`/profile178 на child revision

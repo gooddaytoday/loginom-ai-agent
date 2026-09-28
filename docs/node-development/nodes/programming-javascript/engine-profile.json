@@ -327,9 +327,27 @@
       "source_sha256": "870883e4b8849c8b63b45da30be606f66fb5cacd1c8451502d04137a35cf9404",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_native_refusal",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "owned_operator_error_button",
+      "native_class": "SyntaxError",
+      "native_message": "SyntaxError: 'await' expression not allowed in this context at code (:4:27)",
+      "native_position": {
+        "line": 4,
+        "column": 27
+      },
+      "explicit_js_execute_count": 0,
+      "gate_passed": false,
+      "dialog_closed": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-top-level-await-15/report.json",
+        "report_sha256": "6366d7836b0af113d131ca2ceaf03edd00daa0479aa1d4f4e3bca867d1540798",
+        "journal_sha256": "454c7e1d57d669ff8443d0ae6b921929ffc3ae1ac6fd77eb81b522c979795226",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "engine-strict-error",

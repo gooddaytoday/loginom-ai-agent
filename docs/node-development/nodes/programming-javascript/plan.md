@@ -226,10 +226,12 @@ lookbehind, BigInt, globalThis изолированными snippets: один p
 прочитаны собственным оператором со штатным cleanup. Отдельный
 `typeof globalThis` дал строку `object` с проверенным typed UI oracle.
 Объявление `async function` отдельно дало `typeof probe === "function"`;
-сама функция не вызывалась.
+сама функция не вызывалась. Top-level `await` в отдельной пробе отвергнут
+native `SyntaxError: 'await' expression not allowed in this context at code
+(:4:27)`.
 Точные source SHA и различия доказательств — в
 [engine profile](engine-profile.json) и [checkpoint](checkpoint.md).
-Остальные конструкции требуют отдельных запусков; J20 остаётся открытым.
+Эти наблюдения не характеризуют остальной ES subset; J20 остаётся открытым.
 
 **Операторский барьер перед следующими syntax probes:** применить общий порядок
 [чтения кнопки ошибки мастера](../../workflow/lifecycle.md#отказ-мастера-и-кнопка-ошибки)
