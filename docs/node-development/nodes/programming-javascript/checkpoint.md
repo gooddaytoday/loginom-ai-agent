@@ -16,6 +16,31 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Cold07/source116 активен: ждать original70654, не запускать дубль
+
+После MCP health PASS и проверки всех freeze116 pins запущен cold07 на writer13
+package, freshprofile151, original70654. /proc PID484152 подтвердил headed/sandbox/
+exact profile. Registry active_exec_session70654/browser_status=cold_running.
+Report persistence-code-cold-07/report.json; journal execution-events.jsonl;
+log source116-code-cold-07.log. Последний подтверждённый poll original70654 вернул
+RUNNING, stage cold-read-source. Source/input mapping/Close пройдены, текущий output
+port open ещё не вернул terminal receipt. Original total deadline600000ms не продлён.
+
+Снимок cold07-front-screen.png показывает «Настройка выходных столбцов», empty grid,
+Done и Close. Это наблюдаемый UI, но не доказательство ожидаемого native wizard owner.
+Screenshot не заменяет незавершённую receipt и не доказывает проблему только времени.
+Первый screenshot cold07-pending-screen.png показал перекрывшее браузер окно Codex;
+через _NET_ACTIVE_WINDOW поднято строго окно PID484152. Повтор Configure/Execute не
+отправлялся. Влияние background throttling пока не установлено.
+
+Следующий шаг: опросить original70654; не менять/перезапускать текущий runtime до
+terminal. После terminal прочитать pending diagnostics (wizard/controller identity),
+проверить cleanup и при необходимости закрыть только этот свой пакет/сеанс через
+headed admin Dispatcher. До confirmed cleanup следующий пакетный прогон запрещён.
+Profile152 ещё не использован. Никаких новых PASS/G7/готовности не объявлено.
+
+
+
 ### Source116 закреплён после всех проверок
 
 Main original75390 exit0:3618PASS/0FAIL/0SKIP. Full client original29089 exit0:
