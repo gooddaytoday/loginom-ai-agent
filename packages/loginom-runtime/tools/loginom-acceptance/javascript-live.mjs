@@ -1,5 +1,4 @@
 import {createJavascriptSourceReader} from '../../client/lib/javascript-source-read.mjs';
-import {javascriptPersistenceCase} from './javascript-persistence-cases.mjs';
 import {inspectJavascriptModulePolicy} from '../../client/lib/javascript-module-policy.mjs';
 import {verifyJavascriptPersistenceOutput} from './javascript-persistence-oracle.mjs';
 import {observeJavascriptSource,observeJavascriptSourceProcesses} from '../../client/lib/javascript-source-browser.mjs';
@@ -36,7 +35,10 @@ import {javascriptEngineProbes} from './javascript-engine-probes.mjs';
 import {javascriptDiscoveryIds,javascriptDiscoveryProbe,observeJavascriptDiscovery,javascriptDiscoveryWizardDiagnostic} from './javascript-discovery-probes.mjs';
 import {javascriptSourceSample,javascriptSourceBoundary} from './javascript-source-probes.mjs';
 import {makeWorkspacePrepareCode} from '../../client/lib/workspace.mjs';
-import {createJavascriptExecutionRuntime} from './javascript-execution-runtime.mjs';
+import {createJavascriptExecutionRuntime,createJavascriptSavedExecutionRuntime} from './javascript-execution-runtime.mjs';
+import {createJavascriptColdSource} from './javascript-cold-source.mjs';
+import {requireJavascriptSavedPackagePath,bindJavascriptPackage} from './javascript-package-binding.mjs';
+import {javascriptColdNodes,observeJavascriptWizardBinding} from './javascript-cold-binding.mjs';
 import {openJavascriptInitialWizard,requireJavascriptInitialOpeningCleanup} from './javascript-initial-opening.mjs';
 import {javascriptExecutionProbes} from './javascript-execution-probes.mjs';
 import {javascriptMismatchSource,runJavascriptMismatchMaterialization,javascriptMismatchExecutionProgress,javascriptProbeFailure} from './javascript-mismatch-probe.mjs';
@@ -45,24 +47,31 @@ import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false}={}) {
 process.umask(0o077);
+if(coldReader&&(batchCases!==null||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null))throw Error('Cold reader requires its separate private entrypoint');
+const {javascriptPersistenceCase}=persistenceMode===null?{}:await import('./javascript-persistence-cases.mjs');
 const batch=batchCases===null?null:javascriptBatchCases(batchCases);
 const persistence=persistenceMode===null?null:javascriptPersistenceCase(persistenceMode);
-const batchDeadline=persistence?Math.floor(performance.timeOrigin)+persistence.writer_budget_ms:nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch?Date.now()+1800000:Infinity;
+const batchDeadline=coldReader?Math.floor(performance.timeOrigin)+600000:persistence?Math.floor(performance.timeOrigin)+persistence.writer_budget_ms:nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch?Date.now()+1800000:Infinity;
 let cleaning=false,cleanupDeadline=Infinity;
 const phaseDeadline=ms=>Math.min(cleaning?cleanupDeadline:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=(cleaning?cleanupDeadline:batchDeadline)-Date.now();if(ms<=0)throw Error(cleaning?'Original cleanup deadline expired':'Original batch deadline expired');return ms;};
 const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
+if(args.includes('--help')&&coldReader){console.log('node javascript-persistence-read-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nCold reader: observe actual source/settings/mappings, one fresh Execute and full output; 10 minutes from process start; headed only. No source or configuration input.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set(['--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader?['--package']:[]),'--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
   options[key]=['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
+}
+if(coldReader){
+  if(batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence','--package'].includes(k)))throw Error('Cold reader requires its separate private entrypoint');
+  requireJavascriptSavedPackagePath(options['--package']);
 }
 if(persistence){
   if(batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence'].includes(k)))throw Error('Persistence requires its separate fixed writer entrypoint');
@@ -86,7 +95,7 @@ const metadataDiagnostic=requireJavascriptMetadataMode(options['--metadata-diagn
 if(nativeCalibrationId!==undefined&&(nativeNamedCaseId!==undefined||options['--native-fixture']!==undefined))throw Error('Calibration owns its separate fixed identity/input');
 const calibrationTrial=nativeCalibrationId!==undefined?createJavascriptCalibrationTrial(nativeCalibrationId):null;
 if(nativeNamedCaseId!==undefined&&options['--native-fixture']!==undefined)throw Error('Named case owns its immutable input fixture');
-const nativeFixtureId=telemetryTrial?javascriptTelemetryCase(nativeTelemetryCaseId).input_fixture_id:calibrationTrial?'integer-safe':nativeNamedCaseId!==undefined?javascriptNamedCase(nativeNamedCaseId).input_fixture_id:options['--native-fixture']??'real',nativeFixture=javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=calibrationTrial?calibrationTrial.probe:javascriptNativeRoundtripProbe(nativeFixtureId,nativeNamedCaseId,nativeTelemetryCaseId);
+const nativeFixtureId=telemetryTrial?javascriptTelemetryCase(nativeTelemetryCaseId).input_fixture_id:calibrationTrial?'integer-safe':nativeNamedCaseId!==undefined?javascriptNamedCase(nativeNamedCaseId).input_fixture_id:options['--native-fixture']??'real',nativeFixture=coldReader?null:javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=coldReader?null:calibrationTrial?calibrationTrial.probe:javascriptNativeRoundtripProbe(nativeFixtureId,nativeNamedCaseId,nativeTelemetryCaseId);
 const namedTrial=nativeNamedCaseId!==undefined?createJavascriptNamedTrial(nativeNamedCaseId):null;
 const coercionTrial=nativeRoundtrip&&nativeFixture.coercion?createJavascriptCoercionTrial(nativeFixtureId):null;
 const discoveryProbe=options['--discovery-probe']?javascriptDiscoveryProbe(options['--discovery-probe']):null;
@@ -121,23 +130,25 @@ const directory=resolve(options['--evidence']);
 // Refuse reuse: no old evidence is overwritten and no uncertain run is replayed.
 await mkdir(directory,{mode:0o700});
 const redactor=createRedactor([config.password]);
-if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
+if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},knownSecrets:[config.password]});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
+  ...(coldReader||persistence?{host_process:{pid:process.pid,started_at:new Date(performance.timeOrigin).toISOString(),profile:resolve(options['--profile'])}}:{}),
+  ...(coldReader?{scope:'private G7 cold saved-package observation',original_deadline:batchDeadline,explicit_execution_limit:1,gates_closed:[]}:{}),
   ...(persistence?{persistence_mode:persistence.schema_mode,original_deadline:batchDeadline,explicit_execution_limit:2}:{}),
   node:process.versions.node,headless:false,server_os:{status:'not_observed'},storage:{status:'not_observed'},
   snapshots:[],effects:[],cleanup:{package_closed:false,logged_out:false,browser_closed:false},
-  probes:javascriptEngineProbes.map(p=>({id:p.id,sha256:p.source_sha256,status:'not_run'}))};
+  probes:coldReader?[]:javascriptEngineProbes.map(p=>({id:p.id,sha256:p.source_sha256,status:'not_run'}))};
 let report=rootReport;
 let session,page,owner,packageHandle,wizardBinding,wizardHandle,wizardRoot,openedWizard=false,closeDispatched=false,closeConfirmed=false,closeDeadline=0,wizardDeadline=0,createDeadline=0,wizardAddressEpoch=0;
 let executionRuntime,executionInput,executionNode,executionPrepared,executionInputProof,executionDrop,paletteAdmission;
-const ownedPackageName=()=>executionRuntime?.persistencePackage?.prepared.package_ref.name??owner?.package_name;
-const ownedPackagePath=()=>executionRuntime?.persistencePackage?.path??null;
+const ownedPackageName=()=>executionRuntime?.persistencePackage?.prepared.package_ref.name??(coldReader?executionPrepared?.package_ref?.name:owner?.package_name);
+const ownedPackagePath=()=>executionRuntime?.persistencePackage?.path??(coldReader?executionPrepared?.package_ref?.path??null:null);
 let browserLifecycle,inputBinding,previewCloseState={dispatched:false};
 const columnState={pending:null};
 let executionJournalLine=0;
 let nativeClassifierBinding;
-let sourceCycleUncertain=false;
+let sourceCycleUncertain=false,coldOpenPending=false;
 const sourceReaders=[];
 let readingExisting=false,initialOpening={};
 const schemaContext=()=>({root:wizardRoot,native:wizardHandle,binding:wizardBinding,prefix:owner.prefix,account:config.username,build:'7.4.2'});
@@ -515,6 +526,11 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
       const fields=schema.grids.find(grid=>grid.tid===schema.page_tid+';grdTargetColumns;tbl')?.fields;
       if(nativeRoundtrip?fields?.length!==1||fields[0].Name!=='Value'||fields[0].DataType!==nativeFixture.native_type:fields?.length!==5||!fields.some(field=>field.Name==='RowID'&&field.DataType===4))throw Error('Verified fixed input mapping unavailable');
     }
+    if(coldReader&&!remainingPages&&current.tid.endsWith(';JavaScriptColumnsWizard')){
+      const schema=await page.evaluate(readJavascriptSchema,schemaContext());
+      if(!schema.verified||typeof schema.generation?.checked!=='boolean')throw Error('Cold observed JavaScript settings incomplete');
+      report.execution_existing_schema=schema;await executionRecord({phase:'cold_schema_observed',schema});
+    }
     if(executionCase&&!remainingPages&&current.tid.endsWith(';JavaScriptColumnsWizard')){
       if(readingExisting){
         const schema=await page.evaluate(readJavascriptSchema,schemaContext());
@@ -760,6 +776,71 @@ const runSourceReadCycle=async(probe,deadline,expectedSettings)=>{
     await save();return structuredClone(report.source_read_cycle);
   }catch(error){sourceCycleUncertain=true;throw error;}
   finally{await processes.dispose();await boundary.native.dispose();}
+};
+const runColdRead=async()=>{
+  const deadline=batchDeadline;
+  const boundary=await executionRuntime.captureExecutionBoundary();
+  const processes=await page.evaluateHandle(observeJavascriptSourceProcesses,{capture:true});
+  const sourceOwner={operation_id:'source99-cold',document_id:executionPrepared.document_id,
+    workflow_id:executionPrepared.workflow_ref.workflow_id,node_id:executionNode.node_id,ui_epoch:wizardAddressEpoch};
+  const checkReadBoundary=async()=>{
+    remainingBatch();await executionRuntime.verifyExecutionBoundary(boundary);
+    return page.evaluate(observeJavascriptSourceProcesses,{held:processes});
+  };
+  const gate=createJavascriptColdSource({owner:sourceOwner,deadline,redactor,record:executionRecord,
+    sourceAdapter:async readerOwner=>({
+      async open(){
+        await checkReadBoundary();
+        await executionRuntime.reopen(executionNode,deadline);wizardAddressEpoch++;
+        wizardHandle=null;wizardRoot=null;openedWizard=true;closeDispatched=false;closeConfirmed=false;closeDeadline=0;
+        wizardDeadline=phaseDeadline(90000);report.execution_existing_schema=null;
+        await executionRuntime.handoffReopenedWizard();
+        await waitWizardReady({deadline:wizardDeadline,inputOnly:false});
+        await inspectWizardPages({deadline});
+        const context=schemaContext(),epoch=wizardAddressEpoch;
+        const held=await page.evaluateHandle(observeJavascriptSource,{context,owner:readerOwner,epoch,capture:true});
+        return {held,context,epoch,settings:javascriptSourceSettings(report.execution_existing_schema)};
+      },
+      async read(handle){
+        await waitWizardReady({deadline,inputOnly:false});
+        return {...await page.evaluate(observeJavascriptSource,{...handle,owner:readerOwner}),settings:handle.settings};
+      },
+      async discard(handle){
+        remainingBatch();closeDeadline=deadline;await closeWizardOnce();await handle.held.dispose();
+        await checkReadBoundary();return {closed:true,owner:readerOwner};
+      }
+    })});
+  const mappings=async()=>({input:await executionRuntime.readPortMapping(executionNode,'input',{operationDeadline:deadline}),
+    output:await executionRuntime.readPortMapping(executionNode,'output',{operationDeadline:deadline})});
+  try{
+    report.stage='cold-read-source';
+    const source=await gate.read();
+    report.cold={status:'SOURCE_OBSERVED',path:ownedPackagePath(),prepared:structuredClone(executionPrepared),
+      node:structuredClone(executionNode),source,graph_before:boundary.before,mappings_before:await mappings()};
+    await checkReadBoundary();await save();
+    report.stage='cold-execute';
+    const execution=await gate.execute(async checked=>{
+      await checkReadBoundary();
+      return executionRuntime.executeNode(executionNode,deadline,checked.policy.source_sha256);
+    });
+    if(execution?.verified!==true||execution.owner_verified!==true||execution.cleanup_complete!==true||execution.status!=='completed'
+      ||!execution.execution_id||execution.trial?.node_id!==executionNode.node_id||execution.trial.source_sha256!==source.source_sha256
+      ||JSON.stringify(execution.fresh_baseline?.node)!==JSON.stringify(executionNode)
+      ||JSON.stringify(execution.launch_identity?.node)!==JSON.stringify(executionNode)
+      ||execution.launch_identity.execution_id!==execution.execution_id||execution.launch_identity.group_id!==execution.group_id
+      ||!Array.isArray(execution.fresh_baseline.roots)||execution.fresh_baseline.roots.some(row=>row.process_id===execution.group_id))
+      throw Error('Cold new owned execution unconfirmed');
+    report.cold.execution=execution;await save();report.stage='cold-read-output';
+    report.cold.output=await executionRuntime.readOutput(executionNode,deadline);
+    report.cold.mappings_after=await mappings();
+    await executionRuntime.verifyExecutionBoundary(boundary);
+    report.cold.graph_after=await executionRuntime.graph();
+    remainingBatch();report.cold.status='COLD_OBSERVED';report.cold.persistence_verified=false;
+    report.cold.package_bytes_verified=false;await save();
+  }catch(error){
+    if(gate.state==='retired'||gate.state==='effect_dispatched')sourceCycleUncertain=true;
+    throw error;
+  }finally{await processes.dispose();await boundary.native.dispose();}
 };
 const runExecutionTrial=async probe=>{
   const deadline=persistence?batchDeadline:phaseDeadline(600000),trigger=executionCase.split('-').at(-1),sentinel=executionCase.includes('-sentinel-');
@@ -1169,18 +1250,7 @@ const runPreparedCase=async()=>{
       await waitGraphReady();await guard();
     }
     report.stage='open-wizard';
-    wizardBinding=await page.evaluateHandle(({id,tid,icon,owned})=>{
-      const app=globalThis.bg?.app,f=app?.Application?.FInstance?.FMainForm;
-      const tab=f?.Items?.Workspace?.getActiveTab?.(),workflow=tab?.Controller?.Node?.data?.node;
-      const diagram=tab?.Controller?.FController?.FDiagram,nodes=diagram?.FNodes?.FCollection;
-      const matches=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===id):[];
-      const ancestors=new Set();
-      for(let n=workflow;n&&ancestors.size<32&&!ancestors.has(n);n=n.ParentNode)ancestors.add(n);
-      if(!app?.WorkFlowTreeNode||!(workflow instanceof app.WorkFlowTreeNode)||!ancestors.has(owned)
-        ||matches.length!==1||!matches[0].data||matches[0].FIconCls!==icon
-        ||diagram.FmxGraph.view.getState(matches[0].FCell)?.shape?.node?.getAttribute('data-tid')!==tid)throw Error('Wizard source binding unavailable');
-      return {document,tab,workflow,nodeData:matches[0].data,native:matches[0],cell:matches[0].FCell};
-    },{id:node.id,tid:node.tid,icon:expectedIcon,owned:packageHandle});
+    wizardBinding=await page.evaluateHandle(observeJavascriptWizardBinding,{id:node.id,tid:node.tid,icon:expectedIcon,owned:packageHandle});
     wizardDeadline=phaseDeadline(90000);report.wizard_open_deadline=new Date(wizardDeadline).toISOString();await save();
     if(executionCase){
       await openJavascriptInitialWizard({page,binding:wizardBinding,node,icon:expectedIcon,deadline:wizardDeadline,
@@ -1295,6 +1365,27 @@ try {
   if (report.geometry.viewport!==null) throw Error('Expected headed null viewport');
   report.server_os={status:'not_established',candidates:home.fields.filter(f=>/ServerOS|OperatingSystem|OSName|ServerPlatform/i.test(f.path))};
   report.storage={status:'not_established',candidates:home.fields.filter(f=>/Storage|Directory/i.test(f.path)),expected_account_folder:'/jsteach',permissions:'not_checked'};
+  if(coldReader){
+    report.stage='cold-open-package';await guard();coldOpenPending=true;
+    const code=makeWorkspacePrepareCode({loginomUrl:config.url,compatibility:{profile_id:'javascript-ubuntu',loginom_build:'7.4.2',platform:'linux',browser:'chromium'},
+      sessionId:'javascript-cold',operationId:'javascript-cold-open',intent:'open_package',packagePath:options['--package'],timeoutMs:Math.min(120000,remainingBatch())});
+    executionPrepared=await Function('return ('+code+')')()(page);
+    await executionRecord({phase:'cold_workspace_prepared',prepared:executionPrepared});
+    if(executionPrepared.status!=='READY'||executionPrepared.target_verified!==true)throw Error('Cold package preparation unconfirmed');
+    const binding=await bindJavascriptPackage({page,prepared:executionPrepared,account:config.username,savedPath:options['--package']});
+    try{packageHandle=await page.evaluateHandle(bound=>bound.packageNode,binding);}finally{await binding.dispose();}
+    const observed=await observe();
+    if(typeof observed.package_name!=='string'||!observed.package_name||observed.package_name!==executionPrepared.package_ref.name
+      ||observed.prefix!==executionPrepared.workflow_ref.prefix)throw Error('Cold observed package metadata differs');
+    owner=observed;await guard();await waitGraphReady();
+    executionRuntime=await createJavascriptSavedExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
+      record:executionRecord,deadline:batchDeadline,savedPath:options['--package']});
+    coldOpenPending=false;
+    const graph=await executionRuntime.graph(),nodes=javascriptColdNodes(graph,await observe(),executionPrepared);
+    executionNode=nodes.node;report.owned_node=nodes.rendered;report.cold_discovery={graph,...nodes};
+    wizardBinding=await page.evaluateHandle(observeJavascriptWizardBinding,{id:nodes.rendered.id,tid:nodes.rendered.tid,icon:nodes.rendered.icon_class,owned:packageHandle});
+    await save();await runColdRead();
+  }
   if (options['--create-node']||options['--palette-only']||options['--palette-hit-test']) {
     report.stage='create-draft';await guard();
     createDeadline=phaseDeadline(120000);
@@ -1410,20 +1501,22 @@ try {
       }
     }
   }
+  if(coldReader||persistence)report.work_finished_at=new Date().toISOString();
   report.status=coercionTrial||namedTrial||telemetryTrial||calibrationTrial?'PENDING_EVIDENCE':'OBSERVED';
 } catch(error) {
   report.status='FAILED';report.failure={stage:report.stage,...redactor.redact(javascriptProbeFailure(error))};
-  const diagnostic=(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))?null:await captureJavascriptNativeClassifierDiagnostic({nativeRoundtrip,stage:report.stage,page,binding:nativeClassifierBinding});
+  const diagnostic=(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))?null:await captureJavascriptNativeClassifierDiagnostic({nativeRoundtrip,stage:report.stage,page,binding:nativeClassifierBinding});
   if(diagnostic)report.native_classifier_diagnostic=diagnostic;
   if(discoveryProbe)report.discovery_failure_context={source_sha256:discoveryProbe.source_sha256,
     terminal_receipt_observed:!!report.execution_probe?.execution,syntax_support:'not_determined'};
-  if (page&&!(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await snapshot('failure').catch(()=>{report.failure.snapshot='unavailable';});
-  if (page&&owner&&!(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await paletteSnapshot('failure-palette').catch(()=>{report.failure.palette_snapshot='unavailable';});
-  if (page&&!(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await refusalEvidence('work-refusal').catch(()=>{report.failure.refusal_evidence='unavailable';});
+  if (page&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await snapshot('failure').catch(()=>{report.failure.snapshot='unavailable';});
+  if (page&&owner&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await paletteSnapshot('failure-palette').catch(()=>{report.failure.palette_snapshot='unavailable';});
+  if (page&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await refusalEvidence('work-refusal').catch(()=>{report.failure.refusal_evidence='unavailable';});
 } finally {
-  cleaning=true;if(persistence)cleanupDeadline=Date.now()+180000;report.work_stage=report.stage;report.stage='cleanup';
+  cleaning=true;if(persistence||coldReader)cleanupDeadline=Date.now()+180000;report.work_stage=report.stage;report.stage='cleanup';
   try {
     if (page) {
+      if(coldOpenPending)throw Error('Cold package opening/binding uncertain; close own browser only');
       if(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain))throw Error('Source cycle uncertain; no UI cleanup replay, close own browser');
       if(executionRuntime?.persistenceUncertain)throw Error('Persistence save/binding uncertain; no UI cleanup replay, close own browser');
       if(executionRuntime?.nativeReadUncertain)throw Error('Native input pending/retired or buffer cleanup unconfirmed; UI cleanup refused, close own browser');
@@ -1541,7 +1634,7 @@ try {
       report.cleanup.logged_out=true;
     }
   } catch(error) {report.cleanup.failure=redactor.text(String(error.message)).slice(0,1200);
-    if(page&&!(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) {await snapshot('cleanup-failure').catch(()=>{});await refusalEvidence('cleanup-refusal').catch(()=>{report.cleanup.refusal_evidence='unavailable';});}}
+    if(page&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) {await snapshot('cleanup-failure').catch(()=>{});await refusalEvidence('cleanup-refusal').catch(()=>{report.cleanup.refusal_evidence='unavailable';});}}
   if (session) {
     if(browserLifecycle)await browserLifecycle.beforeClose();
     await session.context.close().then(()=>{report.cleanup.browser_closed=true;},()=>{report.cleanup.browser_closed=false;});
