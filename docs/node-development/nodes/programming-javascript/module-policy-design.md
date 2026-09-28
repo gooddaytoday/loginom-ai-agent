@@ -68,6 +68,26 @@ finishGraph сразу prepare/finishConfiguredGraph с fresh execute. След�
 wizard-запрета для остальных типов. Source-read остаётся отдельным kind и ничего
 не исполняет. Это source-review findings, не реализованные публичные гарантии.
 
+## Уточнение после проверки реализации
+
+Admission фиксирует параметры до первого await: изменение объекта вызывающей
+стороной не меняет согласованный effective source/expected digest.
+Для разрешённой смены настроек внутренний driver передаёт settingsTransition
+с kind:replace и полным expected_after до начала admission. Этот объект
+канонизируется/копируется/замораживается; его digest входит в receipt. Он
+формируется доверенным driver из валидированного запроса и observed settings,
+не выдаётся модели как обход проверки. Отсутствие transition сохраняет прежние
+settings для existing; заданный transition требует observed post-state,
+совпадающего с плановым. Произвольное изменение после mutation — отказ.
+Generated schema нельзя заранее выдумывать в expected_after: сравниваются
+доказанные настройки; фактическая generated schema читается после materialization.
+
+После awaited mutation/effect-dispatch ACK повторно проверить actual source
+и settings перед callback. ACK подтверждает запись журнала, не свежесть кода.
+Final browser driver всё равно обязан проверить native owner/epoch и фактические
+предусловия при dispatch; два отдельных UI вызова не дают атомарной защиты от
+клика пользователя между ними. Не объявлять более сильную гарантию host helper.
+
 ## Проверки и packaging
 
 Проверить positive/negative AST corpus, decoded strings, templates с imports
