@@ -16,6 +16,37 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source93 принят; следующий шаг — первый headed C-set-index
+
+Developer revision35 terminal; child commit `9132b60cdaf14481ca76f59248ef59159889fee6` содержит
+11changed+1new runtime/test files. Старые dirty/untracked документы не staged.
+Final manifest SHA a75bebffbee8a49b789c6976408c8b48a32bf784ad12a4a6a9ea9bb4ae3819d9;
+1281pins, все1280baseline paths retained,1269unchanged;158files/487literal import
+edges,105old docs/62evidence hashes verified. Root syntax/diff PASS; client unchanged.
+
+Root initial main original2195terminal1:2949PASS/2FAIL, диагностические ожидания
+K3/K4 не учитывали A/B/C wording. Исправлены только два regex; исходный failed log
+и snapshot сохранены. Повтор original11631terminal0:2951PASS/0FAIL/0SKIP,
+30859.046917ms; main log SHA
+7f6ae84a00f3847ce715ed16e6dd71e301a796020b8d5dde13843aca57c36e14.
+Root deny3PASS/Python15PASS; snapshots before/after равны final manifest.
+Receipt operator93-root-manifest-verification.json, additional-checks.json и
+main-final-verification.json. Source/handoff скопированы в приватную кампанию.
+Root повторный full-artifact B audit на source93 дал четыре побайтно прежних
+sidecars в source93-root-attribution-replay-01. B gaps и original outcomes неизменны.
+
+Реализация четырёх C/Set допущена к отдельным операторским наблюдениям по §6/8/15.
+Следующий запуск — только C-set-index, fresh profile101 после preflight toolchain,
+cleanup/no-active-browser и registry reservation. Это ещё не выполненный запуск:
+profile100 остаётся closed_logout_verified, calibration5/5 неизменна. Strict source
+467bytes/SHA83cac05c… и independent output −9007199254740991/LE010000000000e0ff.
+Не запускать D до независимого успешного C-set-index; не переносить Get attribution
+на Set. Browser headed DISPLAY1/sandboxtrue, один selectedcase/один Execute,
+без replay. После completed проверить INPUT4/OUTPUT1/upstream4 и journal/cleanup;
+после failed только INPUT4/upstream4,без OUTPUT. Full goal остаётся активной.
+
+
+
 ### Source93 active: независимые C oracles готовы
 
 
