@@ -97,6 +97,33 @@ class SavedPackageAuditTests(unittest.TestCase):
                 "package_ref": {"path": self.path, "persisted": True}}}) + "\n")
             journal.write(json.dumps({"phase": "package_file_bytes_verified", "receipt": receipt}) + "\n")
 
+    def add_clean_dirty_evidence(self):
+        writer_path = self.writer / "report.json"
+        writer = json.loads(writer_path.read_text())
+        events = []
+        for revision in (1, 2):
+            operation = "save-" + str(revision)
+            state = {"version": 1, "document_id": "writer-doc", "workflow_id": "writer-flow",
+                     "package_path": self.path, "modified": False, "read_only": True,
+                     "observation": "after_confirmed_save"}
+            writer["persistence"]["saves"][revision - 1:revision] = [{
+                "revision": revision, "path": self.path, "document_id": "writer-doc",
+                "workflow_ref": {"workflow_id": "writer-flow"}, "dirty_state": state,
+                "receipt": {"operation_id": operation, "status": "SUCCEEDED",
+                            "output": {"save_completed": True}}}]
+            events.extend([{"phase": "persistence_save_confirmed", "revision": revision,
+                            "receipt": writer["persistence"]["saves"][revision - 1]["receipt"]},
+                           {"phase": "persistence_dirty_state_observed", "revision": revision,
+                            "path": self.path, "save_operation_id": operation, "dirty_state": state}])
+        self.write_json(writer_path, writer)
+        (self.writer / "execution-events.jsonl").write_text(
+            "\n".join(json.dumps(event) for event in events) + "\n", encoding="utf-8")
+        base = json.loads(self.audit_path.read_text())
+        base["dirty_state_verified"] = True
+        base["files"] = [{"path": entry["path"], "sha256": sha(Path(entry["path"]).read_bytes())}
+                         for entry in base["files"]]
+        self.write_json(self.audit_path, base)
+
     def test_code_and_declared_modes_and_once_only_cli(self):
         for mode in ("code", "declared"):
             with self.subTest(mode=mode):
@@ -153,6 +180,19 @@ class SavedPackageAuditTests(unittest.TestCase):
         self.package.write_bytes(self.package.read_bytes()[:-20])
         self.refresh_read_receipt()
         with self.assertRaises((ValueError, zipfile.BadZipFile)):
+            audit(self.audit_path, self.read)
+
+    def test_clean_dirty_state_is_carried_only_with_matching_native_receipts(self):
+        self.add_clean_dirty_evidence()
+        self.assertTrue(audit(self.audit_path, self.read)["dirty_state_verified"])
+        writer_path = self.writer / "report.json"
+        writer = json.loads(writer_path.read_text())
+        writer["persistence"]["saves"][1]["dirty_state"]["modified"] = True
+        self.write_json(writer_path, writer)
+        base = json.loads(self.audit_path.read_text())
+        base["files"][0]["sha256"] = sha(writer_path.read_bytes())
+        self.write_json(self.audit_path, base)
+        with self.assertRaisesRegex(ValueError, "post-save dirty-state receipt differs"):
             audit(self.audit_path, self.read)
 
 
