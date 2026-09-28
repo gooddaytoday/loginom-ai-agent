@@ -48,6 +48,7 @@ import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
 import {captureJavascriptWizardError} from './javascript-wizard-error.mjs';
+import {readJavascriptG1Type} from './javascript-g1-type.mjs';
 import {openJavascriptPackageFileTab,readJavascriptPackageFile} from './javascript-package-file.mjs';
 
 export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false}={}) {
@@ -1360,6 +1361,9 @@ const runPreparedCase=async()=>{
     if(JSON.stringify(afterRead.page)!==JSON.stringify(editorPage))throw Error('Editor page changed during read');
     report.snapshots.push({at:new Date().toISOString(),label:options['--inspect-pages']?'wizard-editor-read':'wizard-editor-first-page',page:editorPage,...editor});await save();
     if(options['--inspect-pages']&&editor.status!=='observed')throw Error('Full bounded editor read unavailable');
+    if(options['--inspect-pages']&&!executionCase){
+      report.g1_native_type=await page.evaluate(readJavascriptG1Type,schemaContext());await save();
+    }
     if(options['--probe-source']){
       report.stage='source-probes';
       await probeOwnedSource(baselineSource);
