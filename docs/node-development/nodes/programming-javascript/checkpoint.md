@@ -1,5 +1,25 @@
 # JavaScript: checkpoint исполнения
 
+## Indexed engine/G5 matrix: 30/30 наблюдений — 2026-09-29
+
+После `g5-empty-output-33` все 30 заранее закреплённых cases в
+`engine-profile.json` имеют наблюдённый статус: 14 `observed_pass`, 7
+`observed_characterization`, 6 `observed_native_refusal`, 3
+`observed_owned_native_failure`. Сверка с текущими
+`javascriptDiscoveryIds`/`javascriptDiscoveryProbe` child revision
+`180f1d5810`: 30/30 ID, missing/extra/source SHA mismatch = 0. Private
+проверка прочитала все 30 report, проверила их SHA256, pinned source SHA,
+имеющиеся journal SHA и admin recovery SHA: mismatch = 0. Из этих report
+29 имеют `OBSERVED`; `engine-nullish` остаётся отдельным manual native
+свидетельством с `CLEANUP_UNCONFIRMED` в operator report и подтверждённым
+последующим admin recovery. Его не повышать до принятого operator cleanup.
+
+Это завершает **наблюдение индексированной discovery-матрицы**, а не G5/J20
+или 0B целиком. Дальше нужны native input/output доказательства, выводы
+G1–G7, примеры будущей v1 knowledge, сведения об ОС сервера, публичный
+handler и последующая CLI-приёмка. В активном browser lease нет процесса;
+следующий свежий profile198.
+
 ## G5 empty output: schema есть, строк нет — 2026-09-29
 
 Отдельный headed `g5-empty-output-33`/profile197 на child revision

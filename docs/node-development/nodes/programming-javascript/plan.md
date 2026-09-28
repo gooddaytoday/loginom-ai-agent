@@ -233,6 +233,15 @@ native `SyntaxError: 'await' expression not allowed in this context at code
 [engine profile](engine-profile.json) и [checkpoint](checkpoint.md).
 Эти наблюдения не характеризуют остальной ES subset; J20 остаётся открытым.
 
+Индексированная discovery-матрица `engine-profile.json` теперь имеет
+наблюдения для всех 30/30 закреплённых snippets с точными source hashes:
+14 успешных typed UI, 7 характеристик, 6 native отказов мастера и 3
+принадлежащие native child failures. Один отказ (`??`) опирается на ручное
+чтение и последующий admin recovery, а не на штатный operator cleanup.
+Это не замена native G5 roundtrip, примеров будущей v1 knowledge, сведений об
+ОС сервера или CLI J20-приёмки; подробная сверка — в
+[checkpoint](checkpoint.md).
+
 **Операторский барьер перед следующими syntax probes:** применить общий порядок
 [чтения кнопки ошибки мастера](../../workflow/lifecycle.md#отказ-мастера-и-кнопка-ошибки)
 в `javascript-live.mjs` и `javascript-stage-observer.mjs`. После единственного
