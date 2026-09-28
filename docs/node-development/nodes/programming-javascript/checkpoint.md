@@ -15,6 +15,16 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### D source audit завершён; выбран metadata diagnostic source94
+
+Developer revision44 terminal. Root проверил32source hashes и actual diagram/model
+port bridge; audit перенесён в каноническую документацию. SourceColumns2351 остаётся
+серверным getter без code provenance. Следующий шаг зафиксирован в
+[metadata-diagnostic-design.md](metadata-diagnostic-design.md): implementation-only
+штатное чтение metadata на C-set-index, один раунд7API calls, затем отдельная telemetry.
+Это не запуск браузера и не принятие D/G5; source93 evidence сохраняются.
+
+
 
 ### Сообщение о случайном клике: причинная связь пока не установлена
 
