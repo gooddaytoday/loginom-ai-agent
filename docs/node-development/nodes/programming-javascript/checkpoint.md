@@ -15,6 +15,73 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source99: cold UI entrypoint и независимый аудитор готовы к freeze
+
+Runtime commits `161a3222e32e79c3224ad84fed78b3d46989caa5` и
+`f88dd9c9e4877e4d23449d464bd885b0d76a8e9e`, child branch node-javascript.
+ROOT продолжает реализацию в прежнем worktree. Все127 preexisting документов
+сверены с operator99-root-review-baseline.json и сохранены без изменений.
+
+javascript-persistence-read-live.mjs принимает только config/profile/browser/
+evidence и exact owned --package. Cold mode исключает writer/discovery/config
+arguments до запуска браузера; fixed source factory не вызывается, импорт
+persistence-cases сделан lazy только для writer. Открытие через настоящий
+makeWorkspacePrepareCode(open_package), Linux compatibility, новый профиль,
+headed/sandbox.600000ms от process timeOrigin; cleanup отдельные180000ms.
+Отчёты writer/cold теперь содержат host PID/start/profile и work_finished_at.
+
+После READY/target_verified выполняется strict saved native binding. Неполное
+открытие/binding удерживает coldOpenPending: нельзя усыновить пакет как draft,
+закрывать его или logout через неопределённый UI; закрывается свой browser.
+Узлы обнаруживаются по текущим cached native GUID/icon/rendered identities и
+наблюдённому графу. Важная сверка с source97 live journal: штатно имеются также
+узел переменных сценария и служебные ports (import Input_Connection/Input_Var,
+JS Input_Add/Input_Var/Output_Add). Discovery допускает один такой variables node,
+требует unique import/JS и одну точную tabular связь; неизвестные узлы/foreign
+links не допускает. Writer и cold используют одну extracted serialized функцию
+observeJavascriptWizardBinding, сохранив прежние ancestor/GUID/icon/DOM guards.
+
+Cold wizard идёт только до Code; settings читаются без configureJavascriptSchema
+и без expected mode. Production createJavascriptColdSource обеспечивает три
+полных read/Close, policy, повторные проверки перед Execute. Наблюдаются оба
+mappings, один новый verified owned process group, затем actual full output;
+ожидаемые source/значения не передаются в cold UI. Retired admission запрещает
+UI cleanup replay. COLD_OBSERVED не объявляется доказательством persistence.
+
+Новый javascript-persistence-audit.mjs работает отдельно после обоих процессов,
+без браузера. Сравнивает full S2/source SHA/UTF8/LF с закреплёнными code/declared
+hashes, writer source chunk receipts, settings с заменой только session prefix,
+semantic mappings, persistent graph/node/port identities, exact typed6x2 и fresh
+execution baseline/launch/terminal. Проверяет save fail→replace, same path,
+workflow continuations, последовательность source/Execute/save events, cold
+admission/read/Close/dispatch journaling и три полных чтения до Execute. Проверяет
+новые process/profile/document/workflow, исходные бюджеты, полный cleanup.
+CLI пишет новый audit file с SHA четырёх report/journal inputs; overwrite запрещён.
+Oracle marker теперь независимый литерал, не импорт значения из writer fixture.
+Аудитор не доказывает сам OS process exit/frozen source: ROOT отдельно обязан
+проверить original handles и manifest. package bytes/dirty state/public handler
+остаются явно false; audit не заменяет полный G7/CLI acceptance.
+
+Проверки: cold UI main3467PASS/0FAIL/0SKIP, original session17156 terminalexit0,
+32418ms; reader --help exit0. После аудитора final main3524PASS/0FAIL/0SKIP,
+original session22480 terminalexit0,35384ms.57 auditor tests включают code/declared,
+инъекции source/mode/mappings/type/value/order/count/execution/cleanup/save/Close/
+журналов и настоящий CLI read/write/no-overwrite. Cold tests используют реальные
+admission/reader и serialized source/process observers с synthetic UI transport;
+это не живое подтверждение нового cold flow. Private SHA receipts:
+source99-cold-ui-verification.json и source99-auditor-verification.json.
+
+Следующий шаг: ROOT review/final freeze относительно
+javascript-freeze98-root-final-source.json, dependency closure/Acorn и source pins,
+затем по одному headed writer/cold reader для code и declared. До freeze не
+запускать browser. Source99 live ещё не запускался; profile115 свободен.
+Предыдущее сообщение о случайном клике перепроверено: Chrome процесса нет,
+source97 report SHA539a1b9f13968f5de7ff76ff842054a41afb7aad4549d7f495d98ca126b2e464
+не изменился, cleanup all true; причинный эффект клика неизвестен. OpenViking
+health/actor search работают. Public JS lifecycle/knowledge/review/compiled CLI
+и все ранее перечисленные незакрытые пункты полного плана остаются обязательными.
+
+
 ### Source99: observed-source cold gate и saved runtime facade
 
 Runtime commit `8239ea7e1b6b79f835ba05af7df00bb2d0223be3`. createJavascriptColdSource использует production
