@@ -294,7 +294,23 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
     }
   };
   const before=await observe();
-  if(JSON.stringify(before)!==JSON.stringify(task.effect.before))throw Error('Graph changed before link hover');
+  if(JSON.stringify(before)!==JSON.stringify(task.effect.before)){
+    // Failure-only bounded evidence; strict admission and no-gesture exit remain.
+    const differences=[],pending=[{path:'$',expected:task.effect.before,observed:before}];
+    let inspected=0;
+    while(pending.length&&differences.length<32&&inspected++<512){
+      const item=pending.pop();
+      if(JSON.stringify(item.expected)===JSON.stringify(item.observed))continue;
+      if(item.expected&&item.observed&&typeof item.expected==='object'&&typeof item.observed==='object'){
+        const keys=[...new Set([...Object.keys(item.expected),...Object.keys(item.observed)])].slice(0,128);
+        for(const key of keys.reverse())pending.push({path:(item.path+'.'+key).slice(0,240),expected:item.expected[key],observed:item.observed[key]});
+      }else{
+        const bounded=value=>value===undefined?'[undefined]':typeof value==='string'?value.slice(0,128):value===null||typeof value==='boolean'||typeof value==='number'?value:'[object]';
+        differences.push({path:item.path,expected:bounded(item.expected),observed:bounded(item.observed)});
+      }
+    }
+    throw Error('Graph changed before link hover: '+JSON.stringify({differences,truncated:pending.length>0}));
+  }
   const root=page.locator('[data-tid='+JSON.stringify(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram')+']');
   const source=root.locator('[data-tid='+JSON.stringify(task.source_tid)+']');
   if(await source.count()!==1)throw Error('Link hover source is not unique');
