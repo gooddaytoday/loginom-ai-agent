@@ -135,7 +135,7 @@ test('missing ACK or rejected persistence cannot admit calibration evidence',asy
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
-for(const fault of ['none','diagnostic','native-cell','terminal-source','terminal-owner','final','secret-diagnostic'])test('actual calibration and failed/upstream drivers through production journal: '+fault,async()=>{
+for(const id of ['K2-sync-v1','K3-shift-v1'])for(const fault of ['none','diagnostic','native-cell','terminal-source','terminal-owner','final','secret-diagnostic'])test(id+' actual calibration and failed/upstream drivers through production journal: '+fault,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'js-calibration-native-journal-'));
  try{
   const x=await integration(directory,{mutate:(saved,event)=>{
@@ -145,7 +145,7 @@ for(const fault of ['none','diagnostic','native-cell','terminal-source','termina
    if(fault==='terminal-owner'&&event.phase==='calibration_terminal_captured')saved.result.failed.node_id='foreign';
    if(fault==='final'&&event.phase==='calibration_finalized')saved.status='ACCEPTED';
    return saved;
-  }}),r=await failedStage('K2-sync-v1',{message:fault==='secret-diagnostic'?'Error: Bearer abcdefghijklmnopqrstuvwxyz':'Error: JS_CAL_K2_SYNC_V1'}),f=r.x.f;
+  }}),r=await failedStage(id,{message:fault==='secret-diagnostic'?'Error: Bearer abcdefghijklmnopqrstuvwxyz':id==='K2-sync-v1'?'Error: JS_CAL_K2_SYNC_V1':'Error: JS_CAL_K3_SYNC_SHIFT_V1'}),f=r.x.f;
   // Match production input identity before sealing; do not preconsume an upstream binding.
   f.b.package_id='d:w';r.before.binding.package_id='d:w';r.before.raw.package_id='d:w';
   r.before.exact=verifyNativeInputRead(r.before.raw,{binding:r.before.binding,lifecycle:r.before.lifecycle,provenance:r.before.exact.provenance});
@@ -159,7 +159,7 @@ for(const fault of ['none','diagnostic','native-cell','terminal-source','termina
     observe:async({ready})=>{assert.equal(ready(state),true);return state;},
     perform:async({resolve})=>{const action=resolve(state);if(action.key==='F3')f.model.FPreviewManager.FPreviewVisible=true;if(action.ref==='close')f.model.FPreviewManager.FPreviewVisible=false;}
    })});
-  const trial=createJavascriptCalibrationTrial('K2-sync-v1');let executions=0;
+  const trial=createJavascriptCalibrationTrial(id);let executions=0;
   await trial.capturePrior({source:'prior editor',input:r.input,node:r.node,record:x.record});
   const runtime={checkNativeRoundtripBeforeExecute:async()=>{},captureExecutionBoundary:async()=>({native:{dispose:async()=>{}}}),
    executeNode:async()=>{executions++;return r.execution;},verifyExecutionBoundary:async()=>{},checkNativeNamedEvidence:async()=>{},

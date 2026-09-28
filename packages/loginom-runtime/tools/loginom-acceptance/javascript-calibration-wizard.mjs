@@ -3,7 +3,7 @@
 export function beginCalibrationWizard({id,stage,identity,deadline}){
  const s=globalThis.__loginomJavascriptNativeRoundtripV1;
  const need=(v,m)=>{if(!v)throw Error('Calibration wizard: '+m);};
- need(['K1-parse-v1','K2-sync-v1'].includes(id)&&s?.document===document&&s.calibration_id===id&&!s.named_case_id
+ need(['K1-parse-v1','K2-sync-v1','K3-shift-v1'].includes(id)&&s?.document===document&&s.calibration_id===id&&!s.named_case_id
   &&['source-bound','done-prepared'].includes(s.stage)&&['next','done'].includes(stage)&&Date.now()<deadline,'closed draft stage/deadline');
  need(!s.calibrationWizard||s.calibrationWizard.settled===true&&!s.calibrationWizard.diagnosticCaptured,'one pending wizard observation');
  const w=s.schemaWitness,source=s.source,digest=s.source_sha256,node=s.node,effect=identity.effect_id;
