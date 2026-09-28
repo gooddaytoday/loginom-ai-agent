@@ -71,7 +71,21 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    return {deactivation:true,phase:r.phase,port_guid:r.portGuid,node_id:r.node_id};
   }
   if(mode==='lookup')return r?{phase:r.phase,port_guid:r.port.FGuid}:null;
-  const blocked=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].some(e=>e.checkVisibility({checkVisibilityCSS:true}));
+  const blockers=[...document.querySelectorAll('[role="dialog"],.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
+  const blocked=blockers.some(e=>{
+   // Ext masks a disabled delete-all column even when the output wizard is ready.
+   // This one native control mask is not a wizard loading overlay.
+   const parent=e.parentElement,roots=exact(b.workflow_ref.prefix+';WizrdMCF');
+   const columnTid=b.workflow_ref.prefix+';WizrdMCF;DataSetOutputSocketWizard;colTargetDelete';
+   const column=parent&&globalThis.Ext?.getCmp?.(parent.id);
+   return !(mode==='finish'&&!input&&e.classList?.contains('x-mask')
+    &&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
+    &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()
+    &&parent?.getAttribute('data-tid')===columnTid&&exact(columnTid).length===1
+    &&roots.length===1&&model?.FView?.el?.dom===roots[0]&&roots[0].contains(parent)
+    &&column?.el?.dom===parent&&column.disabled===true
+    &&blockers.filter(mask=>mask.parentElement===parent).length===1);
+  });
   if(blocked){if(mode==='finish')return {pending:true,reason:'port_wizard_loading'};fail('Port opening blocked');}
   if(mode==='begin') {
    if(r)fail('Port opening already reserved');
