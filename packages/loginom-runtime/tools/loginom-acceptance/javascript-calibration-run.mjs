@@ -58,6 +58,7 @@ export function createJavascriptCalibrationTrial(id){
     }else{
      need(execution.status==='completed','unknown terminal');
      captured=freezeCivilEvidence({status:'unexpected_completed',prior,execution,case_complete:false,
+      attribution:'none',controlled_throw_verified:false,mapping_status:'unverified',source_span:null,rejection_attributed:false,g6_complete:false,j25_complete:false,
       output:{status:'not_read_calibration'},upstream:{status:'not_read',reason:'unexpected_completed_calibration'}});
     }
     await ack(record,{phase:'calibration_terminal_captured',calibration_id:id,result:captured});

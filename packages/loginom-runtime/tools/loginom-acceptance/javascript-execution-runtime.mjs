@@ -915,7 +915,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       validateNativeSource();
       await page.evaluate(id=>{
         const s=globalThis.__loginomJavascriptNativeRoundtripV1,failed=globalThis.__loginomJavascriptNamedFailureV1;
-        if((['K1-parse-v1','K2-sync-v1','K3-shift-v1'].includes(id)?s?.calibration_id!==id||s.named_case_id!==undefined:s?.named_case_id!==id||s.calibration_id!==undefined)||s.input_fixture_id!=='integer-safe')throw Error('Named owner differs');
+        if((['K1-parse-v1','K2-sync-v1','K3-shift-v1','K4-native-caller-v1'].includes(id)?s?.calibration_id!==id||s.named_case_id!==undefined:s?.named_case_id!==id||s.calibration_id!==undefined)||s.input_fixture_id!=='integer-safe')throw Error('Named owner differs');
         s.check();if(failed)failed.checkIdle();
         const read=globalThis.__loginomJavascriptNativeRoundtripReadV1,upstream=s.bindings.get('upstream');
         if(!upstream||read?.document!==document||read.poisoned||read.active||read.last?.id!==upstream.readId

@@ -10,6 +10,9 @@ import {createRedactor} from '../../client/lib/redact.mjs';
 import {acknowledgeJavascriptCalibrationRecord} from './javascript-calibration-journal.mjs';
 import {compactJavascriptJournalRecord} from './javascript-execution-evidence.mjs';
 import {createJavascriptCalibrationTrial} from './javascript-calibration-run.mjs';
+import {javascriptExecutionIdentity} from './javascript-mismatch-probe.mjs';
+import {roundtrip} from './javascript-native-roundtrip.test.mjs';
+import {inputProof} from './javascript-native-named.test.mjs';
 import {failedStage} from './javascript-native-named.test.mjs';
 import {readNativeNamedFailure} from './javascript-native-named-failure-driver.mjs';
 import {readNativeRoundtrip} from './javascript-native-roundtrip-driver.mjs';
@@ -135,7 +138,7 @@ test('missing ACK or rejected persistence cannot admit calibration evidence',asy
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
-for(const id of ['K2-sync-v1','K3-shift-v1'])for(const fault of ['none','diagnostic','native-cell','terminal-source','terminal-owner','final','secret-diagnostic'])test(id+' actual calibration and failed/upstream drivers through production journal: '+fault,async()=>{
+for(const id of ['K2-sync-v1','K3-shift-v1','K4-native-caller-v1'])for(const fault of ['none','diagnostic','native-cell','terminal-source','terminal-owner','final','secret-diagnostic'])test(id+' actual calibration and failed/upstream drivers through production journal: '+fault,async()=>{
  const directory=await mkdtemp(join(tmpdir(),'js-calibration-native-journal-'));
  try{
   const x=await integration(directory,{mutate:(saved,event)=>{
@@ -145,7 +148,7 @@ for(const id of ['K2-sync-v1','K3-shift-v1'])for(const fault of ['none','diagnos
    if(fault==='terminal-owner'&&event.phase==='calibration_terminal_captured')saved.result.failed.node_id='foreign';
    if(fault==='final'&&event.phase==='calibration_finalized')saved.status='ACCEPTED';
    return saved;
-  }}),r=await failedStage(id,{message:fault==='secret-diagnostic'?'Error: Bearer abcdefghijklmnopqrstuvwxyz':id==='K2-sync-v1'?'Error: JS_CAL_K2_SYNC_V1':'Error: JS_CAL_K3_SYNC_SHIFT_V1'}),f=r.x.f;
+  }}),r=await failedStage(id,{message:fault==='secret-diagnostic'?'Error: Bearer abcdefghijklmnopqrstuvwxyz':id==='K2-sync-v1'?'Error: JS_CAL_K2_SYNC_V1':id==='K3-shift-v1'?'Error: JS_CAL_K3_SYNC_SHIFT_V1':'Error: synthetic native call diagnostic'}),f=r.x.f;
   // Match production input identity before sealing; do not preconsume an upstream binding.
   f.b.package_id='d:w';r.before.binding.package_id='d:w';r.before.raw.package_id='d:w';
   r.before.exact=verifyNativeInputRead(r.before.raw,{binding:r.before.binding,lifecycle:r.before.lifecycle,provenance:r.before.exact.provenance});
@@ -190,5 +193,61 @@ for(const id of ['K2-sync-v1','K3-shift-v1'])for(const fault of ['none','diagnos
    assert.equal(Object.keys(persisted.proof.subscription_proxy_source_sha256).length,2);
   }
   if(fault==='secret-diagnostic')assert.ok(!lines.join('\n').includes('abcdefghijklmnopqrstuvwxyz'));
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+for(const fault of ['none','terminal-ack','final-ack','persist','cleanup','unknown','source','owner'])test('K4 completed production execute/trial/report with real journal: '+fault,async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'js-k4-completed-'));
+ try{
+  const x=await integration(directory,{mutate:saved=>{
+   if(fault==='terminal-ack'&&saved.phase==='calibration_terminal_captured')saved.result.execution.node.node_id='foreign';
+   if(fault==='final-ack'&&saved.phase==='calibration_finalized')saved.mapping_status='verified';return saved;
+  }}),r=await roundtrip({fixtureId:'integer-safe',calibrationId:'K4-native-caller-v1',wizardOnly:true}),input=inputProof(r).input;
+  await r.prepare();r.dispose();await r.seal();
+  const node={document_id:'d',workflow_id:'w',node_id:'js'},trial=createJavascriptCalibrationTrial('K4-native-caller-v1'),steps=[];
+  await trial.capturePrior({source:'prior editor',input,node,record:x.record});
+  const deadline=r.f.b.deadline,baseline={node,root_id:'1',roots:[]},identified={node,root_id:'1',group_id:'4',group_record_id:'4',execution_id:'d:1:4'};
+  // Driver result is synthetic completed, with no return-value inspection or fabricated native error.
+  const terminal={verified:true,status:fault==='unknown'?'ambiguous':'completed',owner_verified:true,cleanup_complete:true,node,execution_id:'d:1:4',process_id:'4.1',process_record_id:'5',group_id:'4'};
+  const runtimeSource=await readFile(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
+  const start=runtimeSource.indexOf('    async executeNode('),end=runtimeSource.indexOf('    async readPassive(',start);
+  const runtime=vm.runInNewContext('({'+runtimeSource.slice(start,end)+'})',{
+   deadline,executionPhases:new Map(),javascriptExecutionIdentity,channel:()=>({}),
+   createNodeExecutionProcedure:(channel,owner,options)=>{
+    assert.equal(options.verifyFailedChild,true);assert.deepEqual(owner,node);
+    return {prepare:async()=>baseline,launchGraph:async()=>{steps.push('launch');return {verified:true};},identify:async()=>identified,waitCompleted:async()=>terminal};
+   },privateGraphBinding:async()=>({dispose:async()=>steps.push('graph-dispose')}),page:{evaluate:async()=>({node,icon:'js'})},
+   selectJavascriptForSettings:async()=>{},once:async(id,identity,action)=>action(),record:x.record,waitJavascriptExecutionNotifications:async()=>steps.push('settlement')
+  });
+  Object.assign(runtime,{checkNativeRoundtripBeforeExecute:async()=>r.f.env.__loginomJavascriptNativeRoundtripV1.check(),
+   captureExecutionBoundary:async()=>({native:{dispose:async()=>steps.push('boundary-dispose')}}),verifyExecutionBoundary:async()=>{},
+   readNativeNamedFailure:async()=>assert.fail('Completed is not native failed'),readNativeRoundtrip:async()=>assert.fail('No OUTPUT'),
+   checkNativeNamedEvidence:async()=>assert.fail('No invented failed/upstream proof')});
+  const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8'),runStart=source.lastIndexOf('    if(calibrationTrial){'),runEnd=source.indexOf('    if(coercionTrial){',runStart);
+  const report={execution_probe:{},cleanup:{package_closed:true,logged_out:true,browser_closed:fault!=='cleanup'}};
+  const context={calibrationTrial:trial,report,executionRuntime:runtime,executionInput:input,executionNode:fault==='owner'?{...node,node_id:'foreign'}:node,
+   probe:fault==='source'?{...trial.probe,source:trial.probe.source+' '}:trial.probe,deadline,executionRecord:x.record,Date,redactor:{text:v=>v},
+   save:async()=>{if(fault==='persist'&&trial.coverage.finalized)throw Error('persist failed');}};
+  const run=()=>vm.runInNewContext('(async()=>{'+source.slice(runStart,runEnd)+'})',context)();
+  if(['terminal-ack','unknown','source','owner'].includes(fault)){
+   await assert.rejects(run);assert.equal(report.calibration_result,undefined);
+  }else{
+   await run();assert.equal(report.calibration_result.status,'unexpected_completed');
+   assert.equal(report.execution_probe.execution.status,'completed');assert.equal(report.calibration_result.failed,undefined);
+   assert.equal(report.calibration_result.execution.error,undefined);assert.equal(report.calibration_result.output.status,'not_read_calibration');
+   assert.equal(report.calibration_result.upstream.status,'not_read');assert.equal(report.calibration_result.attribution,'none');
+   assert.equal(report.calibration_result.mapping_status,'unverified');assert.equal(report.calibration_result.controlled_throw_verified,false);
+   const finalStart=source.lastIndexOf('  if (!report.cleanup.package_closed'),finalEnd=source.indexOf('  console.log(JSON.stringify({status:report.status',finalStart);
+   await vm.runInNewContext('(async()=>{'+source.slice(finalStart,finalEnd)+'})',context)();
+   assert.equal(report.status,['final-ack','persist'].includes(fault)?'EVIDENCE_UNCONFIRMED':fault==='cleanup'?'CLEANUP_UNCONFIRMED':'UNRESOLVED');
+   assert.equal(report.failure,undefined);assert.equal(trial.coverage.finalized,!['final-ack','persist'].includes(fault));
+  }
+  await assert.rejects(run,/no replay/);
+  if(!['source','owner'].includes(fault))await assert.rejects(()=>runtime.executeNode(node,deadline,{phase:'initial',source_sha256:trial.probe.source_sha256}),/no replay/);
+  assert.equal(steps.filter(s=>s==='launch').length,['source','owner'].includes(fault)?0:1);
+  assert.deepEqual(r.f.counters,{sent:4,requests:4,responses:4});assert.equal(r.f.env.__loginomJavascriptNativeRoundtripV1.bindings.size,0);
+  assert.equal(trial.coverage.case_complete,false);assert.equal(trial.coverage.g6_complete,false);assert.equal(trial.coverage.j25_complete,false);
+  const lines=await x.lines();for(const ref of x.report.execution_records)assert.equal(ref.sha256,createHash('sha256').update(lines[ref.line-1]+'\n').digest('hex'));
+  assert.ok(lines.every(line=>!JSON.parse(line).failed));
  }finally{await rm(directory,{recursive:true,force:true});}
 });
