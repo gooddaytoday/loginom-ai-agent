@@ -15,6 +15,21 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source90: независимые тесты завершены, handoff ожидается
+
+Existing developer turn01a0e54f-361d-7a32-9da0-873921fddcbb подтверждён active/revision25.
+Root independently main2670 PASS/0FAIL/0SKIP, original49328 terminal exit0,
+29930.939268ms; deny3PASS/Python15PASS. Все1275 source hashes совпали до и после.
+Private operator90-root-before-tests.json и operator90-root-main-verification.json;
+main log SHA4941702679988ed5f13f791fa172fedc5182e8c121d44769f1f03625ceca5e06.
+Final manifest association ещё не выполнена; browser/live K3 не запускался.
+
+До live подготовлен независимый root-k3-independent-source-oracle.json:
+K3 exact300bytes/5LF, line5/column3 source throw, byte256, единственный marker;
+native column заранее не назначен. SHA oracle7b530b07b2e1b075ec83a66f311c05f2902c151b6282b8a7348fd3aafdf1c85a.
+Это ожидаемое расположение в тексте, не engine evidence. K1/K2 отдельно внесены
+в execution-effects.md; documentation validator PASS77active/292allMD.
+
 ### K1/profile98 terminal; полный wizard diagnostic сохранён
 
 Original17596 terminal exit1, statusUNRESOLVED, result wizard_diagnostic_observed,
