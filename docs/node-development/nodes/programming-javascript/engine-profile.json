@@ -678,9 +678,34 @@
       "source_sha256": "8d3a0cf2afcbfc56deaa8eaa87255f5cc4344371d0f2938d16f92ada206d656c",
       "schema_mode": "code",
       "expectation": "characterization",
-      "status": "not_checked",
+      "status": "observed_characterization",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_expression": "1.75",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        ["1"]
+      ],
+      "number_precision": "exact_integer_decimal_output_only",
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-integer-fraction-25/report.json",
+        "report_sha256": "384009cde105c15e87e2093f9827c047a753c289374cc344efe9e6ab21960b9c",
+        "journal_sha256": "e5737488151c2209b4c72ee63692fa0a93c487d6afc3a20b20b0cb242ec1e9dc",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "g5-integer-string",

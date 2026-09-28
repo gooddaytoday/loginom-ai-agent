@@ -1,5 +1,25 @@
 # JavaScript: checkpoint исполнения
 
+## G5 integer fraction: `1.75` → `1` — 2026-09-28
+
+Отдельный headed `g5-integer-fraction-25`/profile189 на child revision
+`180f1d5810` доставил source SHA256
+`8d3a0cf2afcbfc56deaa8eaa87255f5cc4344371d0f2938d16f92ada206d656c`.
+Свежий принадлежащий JS process завершился успешно; typed UI reader получил
+integer колонку `Result` и точную десятичную строку `"1"` для выражения
+`1.75`. Это характеризует только одно положительное дробное значение, не
+общее правило округления и не отрицательные дроби. Статус
+`typed_characterization`, фиксированного oracle не было; `gate_passed=false`
+не означает провал исполнения. Proof level `typed_ui_only`, native bytes не
+проверены; G5 остаётся открытым.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`384009cde105c15e87e2093f9827c047a753c289374cc344efe9e6ab21960b9c`,
+journal SHA256
+`e5737488151c2209b4c72ee63692fa0a93c487d6afc3a20b20b0cb242ec1e9dc`.
+Реестр закрыт, следующий fresh profile190.
+
 ## G5 outside safe integer: характеристика Number rounding — 2026-09-28
 
 Отдельный headed `g5-outside-safe-24`/profile188 на child revision
