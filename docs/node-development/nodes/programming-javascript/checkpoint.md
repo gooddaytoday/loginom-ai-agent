@@ -1,5 +1,26 @@
 # JavaScript: checkpoint исполнения
 
+## G5 integer +Infinity: наблюдён int64 minimum — 2026-09-28
+
+Отдельный headed `g5-integer-positive-infinity-28`/profile192 на child
+revision `180f1d5810` доставил source SHA256
+`22d97b9959f45229b31af0f754f3cb45fab6a5c39c216fdcaf8ac5a679fee017`.
+Свежий принадлежащий JS process завершился успешно; typed UI reader получил
+integer колонку `Result` и точную десятичную строку
+`"-9223372036854775808"` для `Infinity`. Native failure не было. Это
+неожиданное значение остаётся характеристикой данного выражения, а не
+разрешённым бизнес-преобразованием или выводом о `-Infinity`. Статус
+`typed_characterization`, фиксированного oracle не было; `gate_passed=false`
+не означает провал исполнения. Proof level `typed_ui_only`, native bytes не
+проверены; G5 остаётся открытым.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`0e5e55be45ccdb285bbed45c5b0bc83eca39ff1b3960fba6fe3c35baeb9cc3f1`,
+journal SHA256
+`257cc8415fc918d092b0e3dbbb5cf26883ac7ef8e0f7fcc88ae20279c1f7254d`.
+Реестр закрыт, следующий fresh profile193.
+
 ## G5 integer NaN: typed null — 2026-09-28
 
 Отдельный headed `g5-integer-nan-27`/profile191 на child revision

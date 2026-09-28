@@ -783,9 +783,34 @@
       "source_sha256": "22d97b9959f45229b31af0f754f3cb45fab6a5c39c216fdcaf8ac5a679fee017",
       "schema_mode": "code",
       "expectation": "characterization",
-      "status": "not_checked",
+      "status": "observed_characterization",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_expression": "Infinity",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        ["-9223372036854775808"]
+      ],
+      "number_precision": "exact_integer_decimal_output_only",
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-integer-positive-infinity-28/report.json",
+        "report_sha256": "0e5e55be45ccdb285bbed45c5b0bc83eca39ff1b3960fba6fe3c35baeb9cc3f1",
+        "journal_sha256": "257cc8415fc918d092b0e3dbbb5cf26883ac7ef8e0f7fcc88ae20279c1f7254d",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "g5-integer-negative-infinity",
