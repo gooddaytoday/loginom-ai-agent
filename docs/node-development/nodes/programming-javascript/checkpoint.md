@@ -16,6 +16,36 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### D metadata: root подтвердил временный lifetime selected-property cache
+
+Уточнённый D audit после нового wizard source завершён revision40; root прочёл
+актуальный текст и проверил22refs. Единственный current hash mismatch — явно
+исторический S13: SHAacac8dfe4b0521ae735bd287ff09a39ebeedbf199789c0e1f9f8e33a93a1ab06
+независимо найден в root git99b80bac69df5a469a01bd8bb951a75242cfe7c4. Остальные
+referenced bytes совпадают. Receipt operator94-root-schema-audit-reference-check.json.
+Это не принятие полного D witness.
+
+Root сохранил известную Uses.js зависимость PropertySelector.js через staticGET
+HTTP200:output-schema-source-94/PropertySelector.js,55817bytes,
+SHAf630266cafcbb6559e6a7f521ff9e6c807b88be13e18e0d546e939c8f14c7b55,
+property-selector-manifest.json. Прочитаны actual ProcessPropValues118–138,
+GetSelectPropValuesHandlerAsync158–163,selectAsync482–504,Wrap/UnWrap951–985,
+DeletePropValues987–1000. GetPropertyValues получает metadata, selected свойства
+временно устанавливаются и снимаются вfinally; при счётчике0 ownproperty удаляется.
+Поэтому удержание FSourceColumns/FOutputPort references не доказывает доступности
+cached metadata после callback. Nested/refcount/copies требуют отдельного учёта;
+не сделан ложный вывод,что абсолютно все caches отсутствуют.
+
+Developer продолжает source-only D audit/proposal в turn01a0e5a6-df7d-7ae3-ac3e-
+245cdbd28017,authoritative revision41 active. Нужно обосновать либо реальный durable
+cache,либо отдельно предложить bounded metadata-only protocol read с полным
+owner/completed/field association,без Sync/Activate/Set/Verify/Execute/reopen.
+Это разрешение проектирования,не выполнения новых RPC или изменения runtime.
+1281source93pins остаются базой; profile104 закрыт,живого браузера нет.
+Следующий шаг — review конкретного witness proposal; C observations не повторять.
+
+
+
 ### C-set-missing наблюдён; все4 C runs сохранены
 
 Original78988 terminalexit1, fresh headed profile104, source93/commit9132b60cda.
