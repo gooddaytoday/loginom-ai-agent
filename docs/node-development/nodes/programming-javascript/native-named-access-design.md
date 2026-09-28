@@ -755,3 +755,17 @@ main JS/native, deny3, Python15, syntax/diff. Full client только при и
 client. Новые private artifacts вне Git; runtime commit делает root после проверки.
 D пока не реализовывать: его отдельный schema witness и prerequisite C-set-index
 остаются обязательными. Браузер остаётся у координатора, только headed.
+
+
+## 16. Root: первое C наблюдение
+
+C-set-index выполнен на source93 commit9132b60cdaf14481ca76f59248ef59159889fee6,
+Loginom7.4.2,headed Ubuntu/profile101. Original50693exit0, independently verified
+PASS_EXACT_CASE:INPUT4/OUTPUT1/upstream4,output−9007199254740991,
+signed64LE010000000000e0ff,source467bytes/SHA83cac05c…,
+1281pins/631journal refs,cleanup3/no browser. Private report SHA
+2200ad8430b7169098307832beb6bc2481005bd9b51a6720052429f3449731ca.
+
+Это выполняет только prerequisite положительного index Set перед D. Остальные
+три C cases и D ещё не наблюдены; общее правило имён и full G5 не установлены.
+Следующий C-set-exact имеет отдельный source/hash и требует нового профиля/run.

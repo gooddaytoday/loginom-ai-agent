@@ -16,6 +16,28 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### C-set-index live PASS_EXACT_CASE на source93
+
+Original50693 terminalexit0, fresh headed profile101, source commit
+9132b60cdaf14481ca76f59248ef59159889fee6. Прогон native-named-set-index-probe-01
+получил CHARACTERIZED; independent root audit подтвердил467byte source
+SHA83cac05c5b23db232bd5a89d522e15a6665997cb9083b451c855e914f3186b2e,
+INPUT4/OUTPUT1/upstream4,exact Integer−9007199254740991,
+LE010000000000e0ff,1281sourcepins и631journal refs. ReportSHA
+2200ad8430b7169098307832beb6bc2481005bd9b51a6720052429f3449731ca;
+receipt native-named-set-index-probe-01-verification.json. Независимые scalar,
+owner/source/execution associations,phase/journal/Done/opening,cleanup3PASS;
+pinned browser PID отсутствуют. Registry/profile101 закрыт, matrix C-set-index
+complete/exact. Original evidence сохранены; никаких retries/calibration runs.
+
+Это один fixed positive Set control, не общий G5/CLI/public handler acceptance.
+Предусловие C-set-index для будущего D schema observation выполнено; реализация
+D ещё не назначена/не принята. Следующий bounded run — C-set-exact на fresh102,
+после preflight; затем отдельные case/missing observations без заранее заданного
+исхода. Непринятая атрибуция B/IsNull и все оставшиеся gates сохраняются.
+
+
+
 ### Source93 принят; следующий шаг — первый headed C-set-index
 
 Developer revision35 terminal; child commit `9132b60cdaf14481ca76f59248ef59159889fee6` содержит
