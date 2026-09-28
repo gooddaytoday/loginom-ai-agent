@@ -1,5 +1,24 @@
 # JavaScript: checkpoint исполнения
 
+## G5 boolean: null/false/true typed PASS — 2026-09-28
+
+Отдельный headed `g5-boolean-21`/profile185 на child revision `180f1d5810`
+доставил source SHA256
+`7bf18292a75218bc490b33937bfc974dd53bdbef3d45b9ac8ca14195e9aaef34`.
+Свежий принадлежащий JS process завершился успешно; typed UI reader получил
+булеву колонку `Result` и три строки: настоящий `null`, `false`, `true`.
+Native UI labels для последних двух — «Ложь» и «Истина»; reader выдал точные
+boolean values, не сравнивал строки. Независимый oracle подтвердил schema и
+все клетки (`typed_oracle_verified`). Proof level `typed_ui_only`, native bytes
+не проверены, весь G5 этим case не закрыт.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`8bcfed6c421e6d4fccf8b3537478ccbd98754a94c9e43fb1dc8e48024ad6e11b`,
+journal SHA256
+`59c4f9c03c003f9e6157c47b19165153f401468da42afc3bcc2cc33666d3c80f`.
+Реестр закрыт, следующий fresh profile186.
+
 ## G5 undefined: typed characterization как null — 2026-09-28
 
 Отдельный headed `g5-undefined-20`/profile184 на child revision `180f1d5810`
