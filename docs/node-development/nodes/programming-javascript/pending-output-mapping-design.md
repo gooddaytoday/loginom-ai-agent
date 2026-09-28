@@ -2,7 +2,8 @@
 
 2026-09-28. Уточнение private G7 persistence flow по live source105 writer08.
 Reader и explicit private admission реализованы в source106; интеграция
-source-cycle/writer/cold/auditor ещё не выполнена. Это не закрытие G3/G7.
+source-cycle/writer/cold/auditor — source107 (e2f8036b2a). Локальный JS suite:
+3609PASS/0FAIL/0SKIP. Новая live-проверка ещё требуется; это не закрытие G3/G7.
 
 ## Подтверждённое состояние
 
@@ -17,8 +18,8 @@ DOM принадлежит мастеру, visible=false. Ячеек colSourceDi
 Name/DisplayName/DataKind/DefaultUsageType видимы. Это установлено по native/UI
 состоянию, не по тексту ошибки и не по отсутствию результатов поиска.
 
-Сейчас reader требует ячейку SourceDisplayName даже при таком скрытом заголовке.
-Отдельно writer/auditor требуют полное равенство initial и pre-execution mapping,
+В source105 reader требовал ячейку SourceDisplayName даже при таком скрытом заголовке.
+Отдельно writer/auditor требовали полное равенство initial и pre-execution mapping,
 включая исходные поля/связи. Исправить только DOM-предикат недостаточно: состояние
 без исходных полей нельзя выдавать за полное проверенное сопоставление.
 

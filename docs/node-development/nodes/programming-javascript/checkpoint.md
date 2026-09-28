@@ -15,6 +15,29 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Сообщение о клике: текущий прогон отсутствует; source107 проверяется локально
+
+После нового сообщения пользователя о случайном клике проверены реестр ресурсов
+и `/proc`: закреплённый Chromium и Node-процессы кампании отсутствовали.
+Последний browser attempt — writer08/source105, recovery08/profile130 уже закрыт
+и подтверждён. Время клика не установлено; writer08 нельзя использовать как
+чистое доказательство причинного дефекта. Его native observations и сохранённый
+S1 остаются историческими данными, но требуют нового независимого live повтора.
+Никакие действия Execute/save этого запуска автоматически не переигрывались.
+MCP OpenViking health успешен.
+
+В child worktree продолжается source107: raw mapping evidence, configured-only
+до Execute, strict full mapping после Execute до save2 и независимый auditor.
+Сохранённый focused log показывает231PASS/0FAIL/0SKIP; исходный terminal exit
+этого запуска после compaction не восстановлен. Новые cold fault tests проверяют
+configured-only до исполнения, чужого владельца/невалидный header до Execute и
+запрет configured-only после исполнения. Полная локальная проверка завершена:3609PASS/0FAIL/0SKIP, original59937
+exit0; cold focused112PASS/0FAIL/0SKIP exit0. Runtime commit e2f8036b2a
+в child worktree. Нового браузера на этом шаге нет. Изменения runtime ещё не
+приняты live. Следующий шаг: freeze относительно105 с source106+107, затем
+fresh headed writer09/profile131; прежние сохранённые пакеты не переиспользовать.
+
+
 ### Source106: configured-only reader и явный private opt-in
 
 Runtime commit `81c7c9b53c` (полный SHA в private verification receipt).
