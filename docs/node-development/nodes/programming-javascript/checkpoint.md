@@ -1,5 +1,32 @@
 # JavaScript: checkpoint исполнения
 
+## G1: полный проход собственного мастера без Done — 2026-09-29
+
+В новом Ubuntu headed Chromium, profile209, child source `70b384418f`,
+оператор один раз прошёл собственный wizard: index0
+`TuneDataSourceInputPortWizard` → index1 `JavaScriptColumnsWizard` → index2
+`JavaScriptCodeWizard`. После точного восстановления baseline исходника один
+`Next` перевёл code2 сразу в `DoneWizard` index4; native indicator3 был скрыт,
+а не посещён. Пять индикаторов принадлежали одному `Ext.form.RadioGroup`, текущая
+страница/DOM и `WizardTreeNode`/`WizardModelComponentForm` имели прежнего owner.
+CodeMirror 4.11.1 прочитан полностью (130 байт/2 строки, прежний SHA256
+`6eb6e2f9e8395c9b00185f1fa9f77cae18c041784f2b2033da946e74aebecc64`).
+G4 private source probe снова дал `insertText` exact, boundary exact и
+`baseline_restored=true`. Done, Preview и Execute не нажимались.
+
+Исходный процесс exit0/`OBSERVED`, `headless=false`, package close/logout/browser
+close 3/3. Независимая проверка сверила страницы, переход2→4/skip3,
+исходник, отсутствие Done/Execute и все1332 source pin freeze132; процессов
+профиля209 после выхода нет. Report SHA256
+`e41bc361ca55fb9c64d2192c2ad7e2c2895850bcbb5051d62c5c541e6daae73f`,
+journal SHA256
+`1c264873cbfdae874759711f0b147a3328463d571fcf2ee09db56b25f3801db2`,
+private verification SHA256
+`bcbea50a5043f988fa9e4040930ffdb95386d4c20787b17ca17f60d1514319e3`.
+Browser lease освобождён, следующий пустой профиль210. Это карта конкретного
+несоединённого узла; runtime `FullType`, другие условные маршруты, наличие
+помощника/переключателя движка и полный G1 ещё не доказаны.
+
 ## G1: сериализованный engine сохранённых узлов 7.4.2 — 2026-09-29
 
 Без нового браузерного действия повторно прочитаны уже принятые `.lgp` из
