@@ -879,7 +879,10 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
         } finally {
           try{if(opened)await closeJavascriptPortMapping({reader,direction,reference,record,deadline:Math.min(readDeadline,Date.now()+15000),verifyGraph:async()=>{
             const checked=await page.evaluate(captureJavascriptNativeTopology,{previous:native,checkOnly:true});
-            const after=await graph();requireJavascriptGraphUnchanged(before,after);
+            const after=await graph();
+            await record({phase:'port_mapping_original_graph_observed',direction,checked,
+              before:structuredClone(before),after:structuredClone(after)});
+            requireJavascriptGraphUnchanged(before,after);
             await record({phase:'port_mapping_original_graph_verified',direction,checked,before,after});
           }});}catch(cleanupError){
             if(!observationError)throw cleanupError;
