@@ -1,5 +1,44 @@
 # JavaScript: checkpoint исполнения
 
+## G7: сохранённые байты двух режимов — 2026-09-29
+
+После подтверждённых writer/cold пар независимый read-only оператор на Ubuntu
+открыл каждый сохранённый `.lgp` в свежем видимом Chromium. Исходник,
+определение полей и принадлежность узла не передавались reader заново.
+Сначала два declared-прогона `persistence-declared-package-bytes-01/02`
+отказались от чтения: `FileStorageForm` показывала только 7 строк каталога
+`/jsteach` без папки открытого пакета. Это не доказательство отсутствия
+файла. В обоих прогонах байты не запрашивались, пакет был закрыт, затем
+подтверждены logout/browser close. Такой список не принят за authority;
+оператор `f2d3f06a5d` читает exact path, уже связанный с собственным открытым
+пакетом, через pinned native `FileDownloader`/`GetFileInfo`/`OpenFile` с mode
+read, лимитом 256 KiB, проверкой владельца до и после каждого chunk и
+подтверждением release/dispose. Новый источник закреплён private freeze129:
+1329 pins, 218 файлов closure, 656 literal edges, 0 computed; SHA256 manifest
+`b85cf2a156fd5a8295f581b33681abbe8dd5233344e4b56e764c214d2631f210`.
+Все 18 031 адресных `javascript*.test.mjs` прошли под закреплённым Node 24.19.0.
+
+`declared` read `persistence-declared-package-bytes-03`/profile201,
+`code` read `persistence-code-package-bytes-01`/profile202 завершились exit0,
+`OBSERVED` и cleanup3/3. Из ZIP независимо проверены CRC всех 14 членов,
+единственный `TBGJavaScriptEngine`, точный UTF-8 decoded `Code` против
+writer-final и cold-source, package name и GUID узла. У `declared` XML содержит
+две колонки `ObservedID: dtInteger`, `PhaseMarker: dtString`; у `code`
+`CodeConfigurableColumns=true` и пустой `ColumnDefs`. Полученные private
+audit `VERIFIED`:
+
+| Режим | `.lgp` bytes / SHA256 | Source SHA256 | Private audit SHA256 |
+| --- | --- | --- | --- |
+| `declared` | 8753 / `83ce8a5582a2ee2c216a969685625a109ef8508a2883c477b603dc9c645f889e` | `ceae03ba038a6fb0f9889a3c98cbc6a93efea8c1448cd2e4693ee34a01d51c1a` | `f82dbc9c38f554cdc0ecd608646948d18641da84738f5acd0b812580b15933f1` |
+| `code` | 8802 / `13979103859d06a1c65ce2a975594aeaf22766b937a050424efae3f17cbf6189` | `82b59a9d136dd1de484fe005db3b50c7ed8b314c1a2e3f2a832ce90903f94cdf` | `2d2a6e8eb6aaef79999bf3c0c070faadeacec39884774cbafe579e39ed4bfb8d` |
+
+Исходные отчёты, journals, `.lgp` и audit JSON лежат только в private
+`~/.local/state/loginom-ai-agent/node-development/campaigns/javascript-20260926-ubuntu/`.
+Никакого нового Execute не отправлено. `package_bytes_verified=true` относится
+к этим двум private парам; dirty-state, публичный handler, полная G1–G7/J01–J27
+и автономная CLI-приёмка остаются открытыми. Lease браузера свободен, следующий
+fresh profile203.
+
 ## Сверка с общим правилом отказа мастера — 2026-09-29
 
 `javascript` уже содержит `loginom` commit `3f35c5f232`; повторный

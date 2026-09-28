@@ -586,8 +586,9 @@ Loginom, source digest и owner/execution. Применять redactor и явн
 [настроенные выходные поля до materialization](pending-output-mapping-design.md)
 проверяются отдельно от полного source mapping. Полная проверка связей обязательна
 после нового Execute до save2 и после cold Execute; отсутствие source cache не
-выдаётся за проверенное сопоставление. Private реализация source106/107 и
-локальные проверки выполнены; живые writer/cold подтверждения ещё требуются.
+выдаётся за проверенное сопоставление. Private writer/cold пары обоих режимов и
+отдельное чтение точных байтов `.lgp` подтверждены; их пределы приведены в
+[checkpoint](checkpoint.md). Проверка dirty-state и публичного handler остаётся.
 
 Уже подготовлены [fixtures](fixtures/README.md) и ожидаемые бизнес-значения.
 Будущие `javascript_configuration_evidence.py`, `javascript_output_evidence.py`,
