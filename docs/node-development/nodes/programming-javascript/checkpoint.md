@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source101: ожидание освобождения узла после нашего Close
+
+Runtime commit `75f013982c14d0d32d19e9757c0f6ef426817a82`, child node-javascript.
+[Обоснование и границы](close-settlement-design.md): после Close ограниченное
+readonly ожидание только target locked:true→false с проверкой retained native
+identities и всех остальных graph fields. Финальное сравнение остаётся строгим.
+Нет повторного Close, setters или нового Execute. Writer и cold проходят это
+ожидание до source delivery; при отказе сохраняется uncertain cleanup.
+
+Main3551PASS/0FAIL/0SKIP, original14992 exit0; предыдущий main97442 exit1
+имел только устаревший whitelist cold facade, исправленный включением нового
+readonly метода. Проверки actual source/cold adapters включают unlock refusal.
+127 preexisting child документов не изменены. Freeze101:1322 pins,
+closure201 files/625 literal relative imports, computed imports absent,
+7 incremental syntax checks. Manifest javascript-freeze101-root-final-source.json
+SHA3285c5572e1bf0b34dfc6acc81876f17a66c7a6a442f71459155fe4395574c9a.
+
+Запущен headed/sandbox writer04/profile121, original39706. До его terminal
+результата не запускать другой browser. Live settlement ещё не подтверждён.
+Source101 — private persistence candidate, не public/CLI acceptance.
+
+
 ### Source99/100: freezes, два отказа до save и сообщение о случайном клике
 
 ROOT закрепил source99 commit `0eb6d5d9d5bd49a5476fa693e5e1010da9fb29ae`:
