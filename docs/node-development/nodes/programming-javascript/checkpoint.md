@@ -16,6 +16,24 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source118 design: то же правило для cached mapping read
+
+Применить узкое исключение disabled colTargetDelete к readMappingBrowser только
+для DataSetOutputSocketWizard. Перед исключением проверить единственный wizard
+root, active native FView, вложенность mapping root/колонки, exact unique column,
+Ext column el.dom и disabled=true; duplicate/text/dialog/loading masks запрещены.
+Чтение stores/records/identity и before/after prepared-node bracket не меняются.
+Не удалять глобальную проверку масок и не выдавать схему по ожиданиям oracle.
+
+Сериализуемые browser functions исполняются через toString, в том числе напрямую
+в probes/tests. В данном исправлении оставить локальный predicate в каждом
+browser builder: общий импорт потребовал бы нового протокола передачи функции
+для обоих независимых builders. Это расширение не нужно для устранения дефекта;
+эквивалентность критичных отказов закрепить отдельными production-code tests.
+После focused/main/full client и freeze — headed production readPortMapping,
+затем настоящий cold, если наблюдение схемы проходит. Пакет закрывать в том же
+сеансе; неизвестное состояние не считать очищенным после browser close.
+
 ### Source117 проверен локально и на стенде; следующий отказ mapping_mask
 
 Child commit8ce147ae332cc278bc5d5864be3af48a2047ab49 изменяет только
