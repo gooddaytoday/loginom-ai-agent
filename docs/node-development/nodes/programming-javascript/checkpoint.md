@@ -15,6 +15,36 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source99: частичная реализация последовательного сохранения
+
+Добавлены private javascript-persistence-save.mjs и тесты: первый Save As
+использует conflict_policy=fail, второй replace разрешён только после полного
+подтверждения первого. Один UUID path в каталоге попытки; уникальные operation IDs;
+точное сравнение document/previous workflow, проверка единственного continuation,
+сохранение workflow_id/tab_tid/prefix и принятие обновлённой navigation_path.
+Unknown response, чужая/неполная квитанция, concurrent call, сбой записи evidence
+не разрешают повтор или следующий save. Catalog action клонируется с private
+allowed_roots; глобальный каталог не изменён. Источники и результаты callback
+копируются, чтобы внешние изменения объектов не меняли принятую идентичность.
+
+41PASS/0FAIL/0SKIP (fixtures/output oracle + save coordinator), Node24.19.0;
+original process exit0. Private source99-persistence-save-partial.json содержит
+SHA пяти файлов и лога source99-persistence-save-focused.log. Тесты saver используют
+synthetic runtime boundary и настоящий catalog action; это не проверка UI сохранения.
+
+Helper пока не подключён к live operator. Следующая обязательная работа:
+ограничить preflight/apply package action исходным deadline всего writer (сейчас
+createActionRuntime.run отсчитывает action.timeout_ms отдельно; один AbortSignal
+не доказывает остановку браузерного действия); добавить explicit owned saved-package
+cleanup/binding без удаления draft guard; связать continuation с повторным graph
+наблюдением; cold reader и полный auditor. Браузер не запускался, G7 не закрыт.
+
+OpenViking Doctor:0failures/1warning (старые hook timeouts), context actor search
+и exact Experience read успешны. List search с target_uri отклонён сервером из-за
+peer_scope, даже без явно переданного peer_scope; context search работает.
+Настройки памяти не менялись, текущего connection blocker нет.
+
+
 ### Повторное сообщение о случайном клике: проверка сохранённого результата
 
 Пользователь сообщил, что случайный клик нарушил последний прогон. После сообщения
