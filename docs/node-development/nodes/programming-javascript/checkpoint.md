@@ -19,6 +19,19 @@
 ### D metadata: root подтвердил временный lifetime selected-property cache
 
 
+Root дополнительно проверил failure lifecycle штатного property reader:
+fix61-bg_js_rpc.js:2543–2589 GetPropertyValues$1 освобождает input после успешного
+await и output после decode; общий finally Release отсутствует,catch только
+setException. Это статическая finding,не наблюдённая утечка реального RPC.
+Receipt operator94-root-property-values-lifecycle-review.json. В proposal нельзя
+приравнять применение штатного selectAsync к доказанному cleanup при ошибке/timeout:
+нужны bounded tracking,late-response/Release и fail-closed без replay,либо явный gap.
+PropertySelector140–146 также различает sync function callback и отдельный async
+callback object; DTO следует копировать синхронно до снятия selected descriptors.
+Замечания переданы текущему active revision41; runtime/стенд не менялись.
+
+
+
 Дополнительная root проверка интерфейсов: retained bg.rtl.js содержит
 ColumnDefMappingExtension.Source/SourceIndex (4834),ProxyColumnInfo.Target/
 TargetColumnIndex (4994),ColumnInfo.Collection (4825),DataSource.ColumnDefs/Columns
