@@ -51,6 +51,23 @@ owner и оригинальный deadline. Drift — отказ, не авто�
 adapter fixtures. Публичная маршрутизация остаётся выключенной до завершения
 G1–G7. Эти тесты не закрывают общий shell/output-read integration и J26 целиком.
 
+## Уточнённые точки включения по текущему коду
+
+`executor.mjs` prepareTarget wrapper уже имеет `nodeApplyDrivers.beforeTarget`:
+после verifyWorkflow и полного graph observe, до prepareNodeTarget. Это подходящая
+точка для owned existing-source admission; новая generic phase не обязательна.
+При её подключении сохранить учёт подтверждённых UI effects в refusal/cleanup.
+Текущий wrapper возвращает effect_possible из targetPhase и имеет специальные
+ветки для прежних preflight; нельзя потерять факт открытого/закрытого JS wizard.
+
+`createNodeReadDrivers` создаёт отдельный набор drivers, а не оборачивает JS driver:
+verifySource проверяет completed local receipt, wizard methods запрещены,
+finishGraph сразу prepare/finishConfiguredGraph с fresh execute. Следовательно,
+добавление beforeTarget только в JS apply driver не защитит output-read.
+Для JS нужен отдельный обязательный admission/recheck в этом пути, без снятия
+wizard-запрета для остальных типов. Source-read остаётся отдельным kind и ничего
+не исполняет. Это source-review findings, не реализованные публичные гарантии.
+
 ## Проверки и packaging
 
 Проверить positive/negative AST corpus, decoded strings, templates с imports

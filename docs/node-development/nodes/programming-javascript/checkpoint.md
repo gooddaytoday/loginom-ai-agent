@@ -15,6 +15,29 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source98: начата реализация AST policy и effective-source admission
+
+ROOT зафиксировал [дизайн](module-policy-design.md), base runtime
+`3d922b5f4a8e731191dcbbb2e5fdce92270c392b`, и122preexisting developer docs.
+Существующая задача `01a0de3e-6a07-7661-aa88-ed4807aef6ec` получила source98;
+wait_threads подтвердил active/inProgress turn
+`01a0e691-4e79-7101-8be2-bcea7b287198`, cursor
+`ef4fdbda-223c-4344-9756-08ee1a070ea1:2`. Это запущенная разработка, не готовый
+candidate; после паузы проверять именно эту задачу, не повторять назначение.
+
+Acorn8.15.0 станет прямой production dependency client с точным npm lock;
+parser policy и host admission проверяются до публичного включения. ROOT
+отдельно подготовил49fixed cases (`operator98-root-parser-corpus.json`, SHA256
+`9f5355490cfda5faa624166e3a9a0438bb1ef8fcac4a2ed8b474ee4b5ae8c8d0`);
+результат на новой реализации ещё не получен. Проверка packaging обязательна:
+старый runtimeLockSha256 после изменения lock не считается актуальным.
+
+Source review нашёл beforeTarget seam до prepareNodeTarget и отдельный
+незащищённый пока output-read driver; детали в дизайне. Public JS routes
+по-прежнему выключены. Нового live-прогона нет, profile114 закрыт; следующий115.
+OpenViking health/find/read успешны. Следующий шаг: дождаться source98 freeze,
+проверить candidate, независимый corpus и production dependency installation.
+
 ### Сообщение о случайном клике: состояние перепроверено
 
 После сообщения пользователя о случайном клике 2026-09-28 повторно прочитаны
