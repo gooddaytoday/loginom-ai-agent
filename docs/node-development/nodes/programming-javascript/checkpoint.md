@@ -1,5 +1,24 @@
 # JavaScript: checkpoint исполнения
 
+## Engine async declaration: typed UI PASS — 2026-09-28
+
+Отдельный headed `engine-async-declaration-14`/profile178 на child revision
+`180f1d5810` доставил source SHA256
+`9470d16e52d726b6232331641415d0bde8aeb1acfeb3e2bbea770b5490fabb2e`.
+Snippet объявляет `async function probe()` и записывает `typeof probe`, не
+вызывая функцию. Native принадлежащее выполнение завершилось успешно; UI
+reader получил одну строку `Result="function"`. Независимый typed oracle
+подтвердил schema и значение (`typed_oracle_verified`). Proof level
+`typed_ui_only`: принятие объявления не доказывает Promise/await, native bytes
+не проверялись, общие gates не закрываются.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`e6f042b06e75c9093792d1ca784bd69c46676a1b21326da849060f2b17993927`,
+journal SHA256
+`1ecd9c1f8fd1c5a28f23c92a973998bb90262d0d7a8ae80eab937965cb27ca95`.
+Реестр закрыт, следующий fresh profile179; J20 остаётся открытым.
+
 ## Engine globalThis: typed UI PASS — 2026-09-28
 
 Отдельный headed `engine-global-this-13`/profile177 на child revision

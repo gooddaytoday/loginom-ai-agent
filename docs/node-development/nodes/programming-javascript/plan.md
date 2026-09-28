@@ -225,6 +225,8 @@ lookbehind, BigInt, globalThis изолированными snippets: один p
 Для `??` потребовался ручной клик и admin recovery; `?.`, lookbehind и BigInt
 прочитаны собственным оператором со штатным cleanup. Отдельный
 `typeof globalThis` дал строку `object` с проверенным typed UI oracle.
+Объявление `async function` отдельно дало `typeof probe === "function"`;
+сама функция не вызывалась.
 Точные source SHA и различия доказательств — в
 [engine profile](engine-profile.json) и [checkpoint](checkpoint.md).
 Остальные конструкции требуют отдельных запусков; J20 остаётся открытым.
