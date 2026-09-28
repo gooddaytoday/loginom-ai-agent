@@ -34,7 +34,7 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
         if (m.operation !== 'call') return;
         const action = m.input.arguments.action;
         appendFileSync(${JSON.stringify(join(directory, "calls.jsonl"))}, JSON.stringify({ action }) + '\\n');
-        if (action === 'disconnect') { process.disconnect(); return; }
+        if (action === 'disconnect') { setInterval(() => {}, 1000); process.disconnect(); return; }
         if (action === 'kill') { process.kill(process.pid, 'SIGKILL'); return; }
         process.send({id:m.id,result:{result:{action},recoveryPending:action!=='finish',activeWork:action!=='uncertain'&&action!=='finish'}});
       });

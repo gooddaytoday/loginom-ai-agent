@@ -18,6 +18,7 @@ export function buildCommand(input: {
     })
     let expired = false
     let kill: ReturnType<typeof setTimeout> | undefined
+    let members: number[] = []
     const timer = setTimeout(() => {
       expired = true
       console.error(`BUILD_COMMAND_TIMEOUT: pid=${child.pid} timeout=${input.timeout}ms`)
@@ -30,6 +31,7 @@ export function buildCommand(input: {
         })
           .stdout?.split("\n")
           .filter((line) => Number(line.trim().split(/\s+/)[2]) === child.pid) ?? []
+      members = processes.map((line) => Number(line.trim().split(/\s+/)[0])).filter((pid) => pid > 0)
       console.error(processes.join("\n"))
       if (process.platform === "darwin") {
         for (const line of processes.slice(0, 4)) {
@@ -44,8 +46,8 @@ export function buildCommand(input: {
           )
         }
       }
-      signal(child.pid, "SIGTERM")
-      kill = setTimeout(() => signal(child.pid!, "SIGKILL"), 5_000)
+      signal(child.pid, "SIGTERM", members)
+      kill = setTimeout(() => signal(child.pid!, "SIGKILL", members), 5_000)
     }, input.timeout)
     child.once("error", (error) => {
       clearTimeout(timer)
@@ -56,7 +58,7 @@ export function buildCommand(input: {
       clearTimeout(timer)
       clearTimeout(kill)
       // The leader can exit before its hung child; finish the owned group.
-      if (expired && child.pid) signal(child.pid, "SIGKILL")
+      if (expired && child.pid) signal(child.pid, "SIGKILL", members)
       if (expired) return reject(Error("BUILD_COMMAND_TIMEOUT"))
       if (code !== 0) return reject(Error(`BUILD_COMMAND_FAILED: ${termination ?? code}`))
       resolve()
@@ -64,10 +66,22 @@ export function buildCommand(input: {
   })
 }
 
-function signal(group: number, value: NodeJS.Signals) {
+function signal(group: number, value: NodeJS.Signals, members: number[]) {
   try {
     process.kill(-group, value)
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") return
+    if ((error as NodeJS.ErrnoException).code !== "EPERM" || process.platform !== "darwin") throw error
+    // macOS can deny signalling a detached group after its leader exits.
+    // Fall back only to PIDs observed in that group at the timeout.
+    for (const pid of members) {
+      const current = spawnSync("/bin/ps", ["-p", String(pid), "-o", "pgid="], { encoding: "utf8", timeout: 5_000 })
+      if (Number(current.stdout?.trim()) !== group) continue
+      try {
+        process.kill(pid, value)
+      } catch (memberError) {
+        if ((memberError as NodeJS.ErrnoException).code !== "ESRCH") throw memberError
+      }
+    }
   }
 }
