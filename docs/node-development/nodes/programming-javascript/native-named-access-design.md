@@ -769,3 +769,10 @@ signed64LE010000000000e0ff,source467bytes/SHA83cac05c…,
 Это выполняет только prerequisite положительного index Set перед D. Остальные
 три C cases и D ещё не наблюдены; общее правило имён и full G5 не установлены.
 Следующий C-set-exact имеет отдельный source/hash и требует нового профиля/run.
+
+
+C-set-exact также независимо пройден:source93/profile102/original99473exit0,
+473bytes/SHA3e840949…;9nativecells/610refs,то же exactvalue/bytes,cleanup3/no browser.
+Report SHA40c27640d05fc524de5e8022defe1b3aa9ea4497d6d30036fa643c9cb9799da2.
+Остались C-set-case/C-set-missing; их результаты нельзя выводить из двух controls.
+Для D начат отдельный read-only source audit metadata witness,без runtime допуска.

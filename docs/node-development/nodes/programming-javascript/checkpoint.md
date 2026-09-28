@@ -16,6 +16,32 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### C-set-exact live PASS_EXACT_CASE; D witness source audit активен
+
+Original99473 terminalexit0, fresh headed profile102, source93/commit9132b60cda.
+Independent root audit подтвердил473byte source
+SHA3e840949275b92e7a275458ee0abb27d02fd16fc8483b7877a1d927338ccd05d,
+INPUT4/OUTPUT1/upstream4,exact Integer−9007199254740991,
+LE010000000000e0ff,1281sourcepins/610journal refs. ReportSHA
+40c27640d05fc524de5e8022defe1b3aa9ea4497d6d30036fa643c9cb9799da2;
+receipt native-named-set-exact-probe-01-verification.json. Cleanup3PASS,
+pinned browser PID отсутствуют. Profile102 закрыт, matrix C-set-exact complete/exact.
+Оба положительных C controls пройдены; case/missing ещё NOT_RUN. Следующий
+bounded run C-set-case, fresh103, с неизвестным заранее исходом. Source93 frozen.
+Подготовлен private audit-named-c-failed-live93.py (syntax-only пока нет C failure);
+он сохраняет8cells/noOUTPUT/unattributed,не переносит Get mapping на Set.
+
+Параллельно в той же developer задаче запущен только source audit D schema witness:
+turn01a0e596-1c1b-7b33-89af-97ce28bfadb1,authoritative revision36 active.
+Проверяются actual retained frontend paths code-source→mapping→physical output,
+held identities/cookies и passive read после completed. Разрешён единственный
+новый документ native-output-schema-witness-design.md,не runtime/tests/old docs.
+Никаких browser/RPC/CLI/newtasks/subagents; live capture требует отдельного root
+review. Это не source94 implementation и не подтверждённый D witness.
+Full G5/G6/G7/publichandler/CLI и остальные пункты полного плана остаются открыты.
+
+
+
 ### C-set-index live PASS_EXACT_CASE на source93
 
 Original50693 terminalexit0, fresh headed profile101, source commit
