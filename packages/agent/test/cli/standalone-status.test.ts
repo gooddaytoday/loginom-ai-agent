@@ -7,6 +7,47 @@ import { buildKeychain } from "../../../loginom-host/script/build-keychain"
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
 
+type CliChild = { exited: Promise<number>; kill(signal?: number | NodeJS.Signals): void }
+
+async function exitWithin(child: CliChild, timeoutMs: number) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      child.exited,
+      new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), timeoutMs) }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+async function waitChild(child: CliChild, stage: string, timeoutMs = 15_000) {
+  console.log(`CLI stage: ${stage}`)
+  const code = await exitWithin(child, timeoutMs)
+  if (code !== null) return code
+  child.kill("SIGINT")
+  if (await exitWithin(child, 3_000) === null) {
+    child.kill("SIGKILL")
+    if (await exitWithin(child, 3_000) === null)
+      throw new Error(`CLI ${stage} timed out; child exit unconfirmed after SIGKILL`)
+  }
+  throw new Error(`CLI ${stage} timed out after ${timeoutMs} ms; child terminated`)
+}
+
+async function waitWithin<T>(promise: Promise<T>, stage: string, timeoutMs = 15_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`CLI ${stage} timed out after ${timeoutMs} ms`)), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 const host = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-test-host-")))
 beforeAll(async () => {
   await buildNodeHost(host)
@@ -55,21 +96,13 @@ test("standalone exits after failed host cleanup despite retained process handle
     })
     const output = new Response(child.stdout).text()
     const errors = new Response(child.stderr).text()
-    const deadline = { fired: false }
-    const timer = setTimeout(() => {
-      deadline.fired = true
-      child.kill("SIGKILL")
-    }, 8_000)
     try {
-      expect(await child.exited).toBe(1)
-      expect(deadline.fired).toBe(false)
-      expect(await errors).toContain("LOGINOM_HOST_CLEANUP_FAILED")
-      expect(await output).toContain("LOGINOM_HOST_CLOSED")
+      expect(await waitChild(child, "failed host cleanup", 8_000)).toBe(1)
+      expect(await waitWithin(errors, "failed host cleanup stderr", 5_000)).toContain("LOGINOM_HOST_CLEANUP_FAILED")
+      expect(await waitWithin(output, "failed host cleanup stdout", 5_000)).toContain("LOGINOM_HOST_CLOSED")
       expect(await readdir(join(directory, "profile"))).toContain(".writer")
     } finally {
-      clearTimeout(timer)
       child.kill()
-      await child.exited
     }
   } finally {
     await rm(directory, { recursive: true, force: true })
@@ -101,9 +134,9 @@ test("actual standalone status launches bundled Node and releases the isolated p
     })
     const out = new Response(child.stdout).text()
     const errors = new Response(child.stderr).text()
-    expect(await child.exited).toBe(0)
-    expect(await errors).toBe("")
-    expect(JSON.parse(await out)).toMatchObject({ state: "unconfigured", hasApiKey: false, generation: 0 })
+    expect(await waitChild(child, "status", 12_000)).toBe(0)
+    expect(await waitWithin(errors, "status stderr", 5_000)).toBe("")
+    expect(JSON.parse(await waitWithin(out, "status stdout", 5_000))).toMatchObject({ state: "unconfigured", hasApiKey: false, generation: 0 })
     expect((await readdir(directory)).sort()).toEqual(["bundle", "profile"])
     expect(await readdir(join(directory, "profile"))).not.toContain(".writer")
     expect(await readdir(join(directory, "profile", "loginom"))).not.toContain("runtime")
@@ -133,9 +166,9 @@ test("actual standalone status launches bundled Node and releases the isolated p
     )
     const output = new Response(run.stdout).text()
     const runErrors = new Response(run.stderr).text()
-    expect(await run.exited).toBe(2)
-    expect(JSON.parse(await output)).toMatchObject({ type: "error", error: { name: "LOGINOM_CONFIG_REQUIRED" } })
-    expect(await runErrors).toBe("LOGINOM_CONFIG_REQUIRED\n")
+    expect(await waitChild(run, "unconfigured run", 12_000)).toBe(2)
+    expect(JSON.parse(await waitWithin(output, "unconfigured run stdout", 5_000))).toMatchObject({ type: "error", error: { name: "LOGINOM_CONFIG_REQUIRED" } })
+    expect(await waitWithin(runErrors, "unconfigured run stderr", 5_000)).toBe("LOGINOM_CONFIG_REQUIRED\n")
     expect(await readdir(join(directory, "profile"))).not.toContain(".writer")
     expect(await readdir(join(directory, "profile", "data"))).toEqual([])
   } finally {
@@ -198,9 +231,9 @@ test("management commands share durable setup and recovery semantics through the
       )
       const stdout = new Response(child.stdout).text()
       const stderr = new Response(child.stderr).text()
-      const code = await child.exited
-      const text = await stdout
-      const errors = await stderr
+      const code = await waitChild(child, `management ${args[0]}`)
+      const text = await waitWithin(stdout, `management ${args[0]} stdout`, 5_000)
+      const errors = await waitWithin(stderr, `management ${args[0]} stderr`, 5_000)
       expect(text + errors).not.toContain("private-setup-key")
       expect(await readdir(profile)).not.toContain(".writer")
       return { code, result: JSON.parse(text), errors }
@@ -307,9 +340,9 @@ test("management commands share durable setup and recovery semantics through the
     )
     const output = new Response(run.stdout).text()
     const errors = new Response(run.stderr).text()
-    expect(await run.exited).toBe(1)
-    const text = await output
-    expect(text + (await errors)).not.toContain("private-setup-key")
+    expect(await waitChild(run, "missing model")).toBe(1)
+    const text = await waitWithin(output, "missing model stdout", 5_000)
+    expect(text + (await waitWithin(errors, "missing model stderr", 5_000))).not.toContain("private-setup-key")
     expect(
       text
         .trim()
@@ -375,9 +408,9 @@ test("management commands share durable setup and recovery semantics through the
       const success = invoke(true, attachment)
       const stdout = new Response(success.stdout).text()
       const stderr = new Response(success.stderr).text()
-      expect(await success.exited).toBe(0)
-      expect(await stderr).not.toContain("private-setup-key")
-      const events = (await stdout)
+      expect(await waitChild(success, "model success", 20_000)).toBe(0)
+      expect(await waitWithin(stderr, "model success stderr", 5_000)).not.toContain("private-setup-key")
+      const events = (await waitWithin(stdout, "model success stdout", 5_000))
         .trim()
         .split("\n")
         .map((line) => JSON.parse(line))
@@ -397,10 +430,10 @@ test("management commands share durable setup and recovery semantics through the
       const denied = invoke(false)
       const deniedOutput = new Response(denied.stdout).text()
       const deniedErrors = new Response(denied.stderr).text()
-      expect(await denied.exited).toBe(1)
-      expect(await deniedErrors).not.toContain("private-setup-key")
+      expect(await waitChild(denied, "model permission denied", 20_000)).toBe(1)
+      expect(await waitWithin(deniedErrors, "model permission denied stderr", 5_000)).not.toContain("private-setup-key")
       expect(
-        (await deniedOutput)
+        (await waitWithin(deniedOutput, "model permission denied stdout", 5_000))
           .trim()
           .split("\n")
           .map((line) => JSON.parse(line)),
@@ -421,8 +454,8 @@ test("management commands share durable setup and recovery semantics through the
       const policyDenied = invoke(true)
       const policyDeniedOutput = new Response(policyDenied.stdout).text()
       const policyDeniedErrors = new Response(policyDenied.stderr).text()
-      expect(await policyDenied.exited).toBe(1)
-      const policyDeniedEvents = (await policyDeniedOutput)
+      expect(await waitChild(policyDenied, "model policy denied", 20_000)).toBe(1)
+      const policyDeniedEvents = (await waitWithin(policyDeniedOutput, "model policy denied stdout", 5_000))
         .trim()
         .split("\n")
         .map((line) => JSON.parse(line))
@@ -436,7 +469,7 @@ test("management commands share durable setup and recovery semantics through the
         status: "error",
         metadata: { permissionDenied: true },
       })
-      expect(await policyDeniedErrors).not.toContain("private-setup-key")
+      expect(await waitWithin(policyDeniedErrors, "model policy denied stderr", 5_000)).not.toContain("private-setup-key")
       expect(await readdir(profile)).not.toContain(".writer")
       await provider.runPromise(llm.reset)
       await provider.runPromise(llm.tool("loginom_probe", { fail: true }))
@@ -444,8 +477,8 @@ test("management commands share durable setup and recovery semantics through the
       const toolFailure = invoke(true)
       const failureOutput = new Response(toolFailure.stdout).text()
       const failureErrors = new Response(toolFailure.stderr).text()
-      expect(await toolFailure.exited).toBe(0)
-      const failureEvents = (await failureOutput)
+      expect(await waitChild(toolFailure, "model tool failure", 20_000)).toBe(0)
+      const failureEvents = (await waitWithin(failureOutput, "model tool failure stdout", 5_000))
         .trim()
         .split("\n")
         .map((line) => JSON.parse(line))
@@ -457,7 +490,7 @@ test("management commands share durable setup and recovery semantics through the
       expect(failureEvents.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(
         false,
       )
-      expect(await failureErrors).not.toContain("private-setup-key")
+      expect(await waitWithin(failureErrors, "model tool failure stderr", 5_000)).not.toContain("private-setup-key")
       expect(await readdir(profile)).not.toContain(".writer")
       await provider.runPromise(llm.reset)
       await provider.runPromise(llm.tool("loginom_probe", { operation_id: "corrected-probe", fail: true }))
@@ -466,15 +499,15 @@ test("management commands share durable setup and recovery semantics through the
       const corrected = invoke(true)
       const correctedOutput = new Response(corrected.stdout).text()
       const correctedErrors = new Response(corrected.stderr).text()
-      expect(await corrected.exited).toBe(0)
-      const correctedEvents = (await correctedOutput)
+      expect(await waitChild(corrected, "model corrected tool", 20_000)).toBe(0)
+      const correctedEvents = (await waitWithin(correctedOutput, "model corrected tool stdout", 5_000))
         .trim()
         .split("\n")
         .map((line) => JSON.parse(line))
       expect(
         correctedEvents.filter((event) => event.type === "tool_use").map((event) => event.part.state.status),
       ).toEqual(["error", "completed"])
-      expect(await correctedErrors).not.toContain("private-setup-key")
+      expect(await waitWithin(correctedErrors, "model corrected tool stderr", 5_000)).not.toContain("private-setup-key")
       expect(await readdir(profile)).not.toContain(".writer")
       for (const reply of ["action", "node"]) {
         for (const repair of [false, true]) {
@@ -486,8 +519,8 @@ test("management commands share durable setup and recovery semantics through the
           const child = invoke(true)
           const output = new Response(child.stdout).text()
           const errors = new Response(child.stderr).text()
-          expect(await child.exited).toBe(0)
-          const events = (await output)
+          expect(await waitChild(child, `model business ${reply}/${repair}`, 20_000)).toBe(0)
+          const events = (await waitWithin(output, `model business ${reply}/${repair} stdout`, 5_000))
             .trim()
             .split("\n")
             .map((line) => JSON.parse(line))
@@ -495,16 +528,16 @@ test("management commands share durable setup and recovery semantics through the
             repair ? ["error", "completed"] : ["error"],
           )
           expect(events.some((event) => event.type === "error" && event.error.name === "CLI_TOOL_FAILED")).toBe(false)
-          expect(await errors).not.toContain("private-setup-key")
+          expect(await waitWithin(errors, `model business ${reply}/${repair} stderr`, 5_000)).not.toContain("private-setup-key")
           expect(await readdir(profile)).not.toContain(".writer")
         }
       }
       const invalid = invoke(true, undefined, ["--fork"])
       const invalidOutput = new Response(invalid.stdout).text()
       const invalidErrors = new Response(invalid.stderr).text()
-      expect(await invalid.exited).toBe(2)
-      expect(await invalidOutput).toContain("CLI_ARGUMENT_INVALID")
-      expect(await invalidErrors).toContain("CLI_ARGUMENT_INVALID")
+      expect(await waitChild(invalid, "invalid fork")).toBe(2)
+      expect(await waitWithin(invalidOutput, "invalid fork stdout", 5_000)).toContain("CLI_ARGUMENT_INVALID")
+      expect(await waitWithin(invalidErrors, "invalid fork stderr", 5_000)).toContain("CLI_ARGUMENT_INVALID")
       expect(await readdir(profile)).not.toContain(".writer")
       for (const unavailable of [false, true]) {
         await provider.runPromise(llm.reset)
@@ -525,8 +558,8 @@ test("management commands share durable setup and recovery semantics through the
         const unresolved = invoke(true)
         const unresolvedOutput = new Response(unresolved.stdout).text()
         const unresolvedErrors = new Response(unresolved.stderr).text()
-        expect(await unresolved.exited).toBe(unavailable ? 1 : 0)
-        const unresolvedEvents = (await unresolvedOutput)
+        expect(await waitChild(unresolved, `model unresolved/${unavailable}`, 20_000)).toBe(unavailable ? 1 : 0)
+        const unresolvedEvents = (await waitWithin(unresolvedOutput, `model unresolved/${unavailable} stdout`, 5_000))
           .trim()
           .split("\n")
           .map((line) => JSON.parse(line))
@@ -534,7 +567,7 @@ test("management commands share durable setup and recovery semantics through the
           unavailable,
         )
         if (unavailable) expect(unresolvedEvents.find((event) => event.type === "tool_use").part.tool).toBe("invalid")
-        expect(await unresolvedErrors).not.toContain("private-setup-key")
+        expect(await waitWithin(unresolvedErrors, `model unresolved/${unavailable} stderr`, 5_000)).not.toContain("private-setup-key")
         expect(await readdir(profile)).not.toContain(".writer")
       }
       await provider.runPromise(llm.reset)
@@ -543,11 +576,21 @@ test("management commands share durable setup and recovery semantics through the
       const cancelled = invoke(true)
       const cancelledOutput = new Response(cancelled.stdout).text()
       const cancelledErrors = new Response(cancelled.stderr).text()
-      await provider.runPromise(llm.wait(calls + 1))
+      try {
+        await waitWithin(provider.runPromise(llm.wait(calls + 1)), "fake LLM request")
+      } catch (error) {
+        cancelled.kill("SIGINT")
+        try {
+          await waitChild(cancelled, "cancelled run after LLM wait failure", 5_000)
+        } catch (cleanupError) {
+          throw new AggregateError([error, cleanupError], "fake LLM wait failed; CLI cleanup unconfirmed")
+        }
+        throw error
+      }
       cancelled.kill("SIGINT")
-      expect(await cancelled.exited).toBe(130)
-      expect(await cancelledErrors).not.toContain("private-setup-key")
-      expect(await cancelledOutput).toContain('"name":"CLI_CANCELLED"')
+      expect(await waitChild(cancelled, "cancelled run", 10_000)).toBe(130)
+      expect(await waitWithin(cancelledErrors, "cancelled run stderr", 5_000)).not.toContain("private-setup-key")
+      expect(await waitWithin(cancelledOutput, "cancelled run stdout", 5_000)).toContain('"name":"CLI_CANCELLED"')
       expect(await readdir(profile)).not.toContain(".writer")
     } finally {
       await provider.dispose()
@@ -568,18 +611,19 @@ test("management commands share durable setup and recovery semantics through the
           ],
           { stdout: "ignore", stderr: "ignore" },
         )
-        expect([0, 44]).toContain(await cleanup.exited)
+        expect([0, 44]).toContain(await waitChild(cleanup, "test keychain cleanup", 15_000))
       }
     }
     await rm(directory, { recursive: true, force: true })
   }
-}, 90_000)
+}, 120_000)
 
 // Bun.build inside the test runner intermittently fails with EISDIR on bundled dependencies
 // (seen with fast-check under effect), so the host is built by the script in its own process.
 async function buildNodeHost(output: string) {
   const script = resolve(import.meta.dir, "../../../loginom-host/script/build-node-host.ts")
   const child = Bun.spawn([process.execPath, "run", script, output], { stdout: "inherit", stderr: "pipe" })
-  const stderr = await new Response(child.stderr).text()
-  if ((await child.exited) !== 0) throw new Error(`LOGINOM_HOST_BUILD_FAILED\n${stderr}`)
+  const stderr = new Response(child.stderr).text()
+  const code = await waitChild(child, "host build", 45_000)
+  if (code !== 0) throw new Error(`LOGINOM_HOST_BUILD_FAILED\n${await waitWithin(stderr, "host build stderr", 5_000)}`)
 }
