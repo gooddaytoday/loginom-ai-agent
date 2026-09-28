@@ -12,6 +12,7 @@ export function requireJavascriptMetadataMode(enabled,{nativeRoundtrip,namedCase
 // Exact Function#toString bytes from retained PropertySelector.js and S17 dispatcher.
 // This proves these public bodies, not their lexical closures or all transitive RPC helpers.
 const metadataFunctionPins=Object.freeze({
+  selectRange:'0f97ce77cb11178f5b488934248214ecca8b37cbb1072b7155b216273262bd68',
   select:'9a9566133a0d4e2b8bb402e26ec97a6efcfa862de2bda70851c0942f33be3522',
   selectAsync:'4018b7a2824aeab761e3d58f9f0603e0a369a7a80db9c18622131c4acda66eac',
   selectRangeAsync:'afc880ace4d8371bd137317a80f481fe954ca63697708a91167430b6ce0b0a37',
@@ -22,7 +23,7 @@ export function collectJavascriptMetadataSources(b){
   const owner=globalThis.__loginomJavascriptNativeRoundtripV1,binding=owner?.bindings?.get('output');
   if(owner?.document!==document||owner.stage!=='completed'||binding?.document!==document||binding.readId!==b.binding_id
     ||binding.readStarted||owner.metadata||owner.metadataAttestation)throw Error('Metadata reflection owner/replay differs');
-  const functions={select:bg.select,selectAsync:bg.selectAsync,selectRangeAsync:bg.selectRangeAsync,getPropertyValues:rpc.TBGSession.GetPropertyValues,getPropertyValuesImpl:rpc.TBGSession.GetPropertyValues$1};
+  const functions={selectRange:bg.selectRange,select:bg.select,selectAsync:bg.selectAsync,selectRangeAsync:bg.selectRangeAsync,getPropertyValues:rpc.TBGSession.GetPropertyValues,getPropertyValuesImpl:rpc.TBGSession.GetPropertyValues$1};
   const sources=Object.fromEntries(Object.entries(functions).map(([key,value])=>{
     if(typeof value!=='function')throw Error('Metadata public function missing: '+key);
     const source=Function.prototype.toString.call(value);
@@ -33,7 +34,7 @@ export function collectJavascriptMetadataSources(b){
   return sources;
 }
 export function verifyJavascriptMetadataSources(sources){
-  if(!sources||Object.keys(sources).length!==5)throw Error('Metadata function attestation shape differs');
+  if(!sources||Object.keys(sources).length!==6)throw Error('Metadata function attestation shape differs');
   for(const [key,pin]of Object.entries(metadataFunctionPins)){
     if(typeof sources[key]!=='string'||sources[key].length>16384||createHash('sha256').update(sources[key]).digest('hex')!==pin)
       throw Error('Metadata public function pin differs: '+key);
@@ -71,13 +72,13 @@ export async function captureJavascriptNativeMetadata(b){
   const state={status:'running',retired:false,pending:0,api_calls:0,late_completions:0,published:false};
   owner.metadata=state;
   const deadline=Math.min(b.deadline,Date.now()+60000);
-  const held=new Set(),identities=new Map(),functions={select:bg.select,selectAsync:bg.selectAsync,selectRangeAsync:bg.selectRangeAsync,getPropertyValues:rpc.TBGSession.GetPropertyValues,getPropertyValuesImpl:rpc.TBGSession.GetPropertyValues$1};
+  const held=new Set(),identities=new Map(),functions={selectRange:bg.selectRange,select:bg.select,selectAsync:bg.selectAsync,selectRangeAsync:bg.selectRangeAsync,getPropertyValues:rpc.TBGSession.GetPropertyValues,getPropertyValuesImpl:rpc.TBGSession.GetPropertyValues$1};
   const initial=captured.initial,session=own(initial.ds,'$S');
   const retire=reason=>{state.retired=true;state.status='retired';state.published=false;state.reason=reason;delete state.dto;};
   const live=()=>{
     need(!state.retired&&Date.now()<deadline,'retired/deadline');
     need(owner===globalThis.__loginomJavascriptNativeRoundtripV1&&owner.metadata===state&&owner.bindings.get('output')===captured,'capability replaced');
-    need(['select','selectAsync','selectRangeAsync'].every(k=>bg[k]===functions[k])&&rpc.TBGSession.GetPropertyValues===functions.getPropertyValues&&rpc.TBGSession.GetPropertyValues$1===functions.getPropertyValuesImpl,'selector replaced');
+    need(['selectRange','select','selectAsync','selectRangeAsync'].every(k=>bg[k]===functions[k])&&rpc.TBGSession.GetPropertyValues===functions.getPropertyValues&&rpc.TBGSession.GetPropertyValues$1===functions.getPropertyValuesImpl,'selector replaced');
     const current=captured.capture(b);
     need(Object.keys(initial).every(k=>current[k]===initial[k]),'owner/process/source/cache changed');
     for(const [object,value] of identities)need(own(object,'$S')===session&&own(object,'$')===value.identity
@@ -91,9 +92,13 @@ export async function captureJavascriptNativeMetadata(b){
     if(!identities.has(object))identities.set(object,{identity,key:JSON.stringify(tuple)});
     return object;
   };
-  const same=(a,z)=>{
+  const same=(a,z,phase)=>{
     hold(a);hold(z);
-    need(own(own(a,'$'),'$OW')===own(own(z,'$'),'$OW')&&own(own(a,'$'),'$O')===own(own(z,'$'),'$O'),'native object association');
+    if(own(own(a,'$'),'$OW')!==own(own(z,'$'),'$OW')||own(own(a,'$'),'$O')!==own(own(z,'$'),'$O')){
+      // Only held/session-checked scalar identities; safe across page.evaluate errors.
+      const scalar=o=>Object.fromEntries(['$OW','$O','$I'].map(k=>[k,own(own(o,'$'),k)]));
+      throw Error('Native metadata: native object association '+JSON.stringify({phase,api_call:state.api_calls,left:scalar(a),right:scalar(z)}));
+    }
   };
   // Read only the cast installed by this selected descriptor. Never QueryInterface fallback.
   const selectedCast=(object,type)=>{
@@ -137,46 +142,50 @@ export async function captureJavascriptNativeMetadata(b){
     live();hold(initial.nodeData);hold(initial.portData);hold(initial.ds);
     await step(()=>bg.selectAsync(initial.portData,w=>[w,w.Index,bg.select(w.Socket,x=>[x]),
       bg.select(w.Parent,ports=>[ports,bg.select(ports.ParentNode,n=>[n,
-        bg.select(n.OutputPorts,x=>[x]),bg.select(n.Component,c=>[c,bg.select(c.Engine,e=>[e,bg.select(e.OutputPorts,x=>[x,x.Count])])])])])]),w=>{
-      same(w,initial.portData);need(w.Index===0,'native output index');
-      const n=w.Parent.ParentNode;same(n,initial.nodeData);same(w.Parent,n.OutputPorts);
+        bg.select(n.OutputPorts,c=>[c,bg.selectRange(c,0,1,p=>[p,p.Index])]),bg.select(n.Component,c=>[c,bg.select(c.Engine,e=>[e,bg.select(e.OutputPorts,x=>[x,x.Count])])])])])]),w=>{
+      same(w,initial.portData,'selected-model-port');need(w.Index===0,'native output index');
+      const n=w.Parent.ParentNode;same(n,initial.nodeData,'model-port-parent-node');
+      hold(w.Parent);const modelPorts=hold(n.OutputPorts),modelPort=one(modelPorts);
+      need(modelPort.Index===0,'model-output-membership index');
+      same(modelPort,initial.portData,'model-output-membership');
+      dto.model_output_membership={parent_collection:identity(w.Parent),output_collection:identity(modelPorts),port:identity(modelPort),count:1,index:0};
       refs.socket=hold(w.Socket);refs.component=hold(n.Component);refs.engine=hold(n.Component.Engine);
       refs.ports=hold(refs.engine.OutputPorts);need(refs.ports.Count===1,'one engine output port');
       dto.owner={node:identity(n),port:identity(w),socket:identity(refs.socket),component:identity(refs.component),engine:identity(refs.engine),engine_ports:identity(refs.ports)};
     });
     await step(()=>bg.selectRangeAsync(refs.ports,0,1,item=>[item,item.Index,
       bg.select(item.Port,bg.IBGColumnsMappingEngineOutputPort,p=>[p,bg.select(p.Socket,x=>[x])])]),ports=>{
-      same(ports,refs.ports);const item=one(ports);need(item.Index===0,'engine item index');
-      refs.p=selectedCast(item.Port,bg.IBGColumnsMappingEngineOutputPort);same(refs.p.Socket,refs.socket);
+      same(ports,refs.ports,'engine-output-collection');const item=one(ports);need(item.Index===0,'engine item index');
+      refs.p=selectedCast(item.Port,bg.IBGColumnsMappingEngineOutputPort);same(refs.p.Socket,refs.socket,'model-engine-socket');
       dto.owner.engine_port=identity(refs.p);
     });
     await step(()=>bg.selectAsync(refs.p,p=>[p,
       bg.select(p.SourceColumns,x=>[x,x.Count]),bg.select(p.TargetColumns,x=>[x,x.Count]),
       bg.select(p.Socket,s=>[s,bg.select(s.Output,bg.IBGCustomDerivedDataSource,d=>[d,d.SyncThroughColumns,bg.select(d.ColumnDefs,x=>[x,x.Count])])])]),p=>{
-      same(p,refs.p);same(p.Socket,refs.socket);refs.s=hold(p.SourceColumns);refs.t=hold(p.TargetColumns);
+      same(p,refs.p,'mapping-port');same(p.Socket,refs.socket,'mapping-socket');refs.s=hold(p.SourceColumns);refs.t=hold(p.TargetColumns);
       refs.output=selectedCast(p.Socket.Output,bg.IBGCustomDerivedDataSource);
       need(refs.output.SyncThroughColumns===true,'observed autosync');
       need(refs.s.Count===1&&refs.t.Count===1&&refs.output.ColumnDefs.Count===1,'one schema column');
-      same(refs.t,refs.output.ColumnDefs);
+      same(refs.t,refs.output.ColumnDefs,'target-derived-columns');
       dto.autosync=true;dto.collections={source:identity(refs.s),target:identity(refs.t),socket_output:identity(refs.output)};
     });
     await step(()=>bg.selectAsync(initial.ds,d=>[d,bg.select(d.ColumnDefs,x=>[x,x.Count])]),d=>{
-      same(d,initial.ds);need(d.ColumnDefs.Count===1,'physical column count');
-      refs.physical=hold(d.ColumnDefs);same(refs.physical,refs.t);dto.collections.physical=identity(refs.physical);dto.datasource=identity(d);
+      same(d,initial.ds,'physical-datasource');need(d.ColumnDefs.Count===1,'physical column count');
+      refs.physical=hold(d.ColumnDefs);same(refs.physical,refs.t,'physical-target-columns');dto.collections.physical=identity(refs.physical);dto.datasource=identity(d);
     });
     await step(()=>bg.selectRangeAsync(refs.s,0,1,fields),s=>{
-      same(s,refs.s);refs.source=one(s);same(refs.source.Collection,refs.s);dto.source=field(refs.source);
+      same(s,refs.s,'source-collection');refs.source=one(s);same(refs.source.Collection,refs.s,'source-field-collection');dto.source=field(refs.source);
     });
     await step(()=>bg.selectRangeAsync(refs.t,0,1,t=>[...fields(t),
       bg.select(t.Extensions,bg.IBGColumnDefMappingExtension,e=>[e,e.SourceIndex,bg.select(e.Source,fields)])]),t=>{
-      same(t,refs.t);refs.target=one(t);same(refs.target.Collection,refs.t);
+      same(t,refs.t,'target-collection');refs.target=one(t);same(refs.target.Collection,refs.t,'target-field-collection');
       const extension=selectedCast(refs.target.Extensions,bg.IBGColumnDefMappingExtension);
-      need(extension.SourceIndex===0,'mapping source index');same(extension.Source,refs.source);same(extension.Source.Collection,refs.s);
+      need(extension.SourceIndex===0,'mapping source index');same(extension.Source,refs.source,'mapping-source-field');same(extension.Source.Collection,refs.s,'mapping-source-collection');
       need(JSON.stringify(field(extension.Source))===JSON.stringify(dto.source),'source metadata changed');
       dto.target=field(refs.target);dto.mapping={extension:identity(extension),source:identity(extension.Source),source_index:extension.SourceIndex};
     });
     await step(()=>bg.selectRangeAsync(refs.physical,0,1,fields),c=>{
-      same(c,refs.physical);const physical=one(c);same(physical,refs.target);same(physical.Collection,refs.physical);
+      same(c,refs.physical,'physical-collection');const physical=one(c);same(physical,refs.target,'physical-target-field');same(physical.Collection,refs.physical,'physical-field-collection');
       dto.physical=field(physical);need(JSON.stringify(dto.physical)===JSON.stringify(dto.target),'target metadata changed');
       need(dto.physical.name===own(initial.field,'Name')&&dto.physical.display_name===own(initial.field,'DisplayName')
         &&dto.physical.data_type===own(initial.field,'DataType'),'physical preview corroboration');
