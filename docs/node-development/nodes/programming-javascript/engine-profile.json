@@ -430,6 +430,85 @@
     "Next/Done execution effects remain unestablished; explicit Execute count does not prove exact body invocation count.",
     "The indexed g5-* snippets remain not_checked. Separate source70-78 native probes provide scoped typed/cardinality evidence recorded in native-types-design.md and checkpoint.md; their different source hashes do not promote these indexed snippets or close G5.",
     "Case source hashes identify probes, not support on another server or build.",
-    "All not_checked cases require individual evidence before promotion."
+    "All not_checked cases require individual evidence before promotion.",
+    "K1/K2/K3 calibration observations use separately fixed sources. They do not promote engine-native-parse-error or engine-sync-throw legacy snippets, establish general source mapping, or close G6/J25."
+  ],
+  "calibration_observations": [
+    {
+      "id": "K1-parse-v1",
+      "source_commit": "ddc625cdd467da0b7665d72ffcf533c610987f4e",
+      "source_sha256": "721161cd4f4c0de387cefeef03b2425fd20f5645c05bff724103e330acd1620f",
+      "schema_mode": "code",
+      "scope": "diagnostic observation, not indexed legacy probe promotion",
+      "report_status": "UNRESOLVED",
+      "result_status": "wizard_diagnostic_observed",
+      "report_sha256": "a18d78cdb4a21ecd0fade200882e72ab846a0beefeb18fd3fa19472ec95bba53",
+      "evidence": {
+        "private_campaign": "javascript-20260926-ubuntu",
+        "report": "native-calibration-k1-probe-01/report.json",
+        "independent_audit": "operator89-root-k1-verification.json"
+      },
+      "cleanup_verified": true,
+      "native_cells_verified": 4,
+      "journal_references_verified": 500,
+      "gates_closed": [],
+      "diagnostic_origin": "wizard_native_exception",
+      "native_class": "EBGException",
+      "raw_message": "SyntaxError: Syntax error at code (:4:19)",
+      "text_completeness_scope": "retained_wizard_exception_text_tree",
+      "explicit_execute_observed": false,
+      "prior_committed_source_restored": "not_established",
+      "source_span": null
+    },
+    {
+      "id": "K2-sync-v1",
+      "source_commit": "ddc625cdd467da0b7665d72ffcf533c610987f4e",
+      "source_sha256": "3f7350f5f9e7cb30107fb314643ae844477a7b87610132036e995f556fe983c2",
+      "schema_mode": "code",
+      "scope": "diagnostic observation, not indexed legacy probe promotion",
+      "report_status": "DIAGNOSTIC_OBSERVED",
+      "result_status": "owned_failure_observed",
+      "report_sha256": "9f64074a37207a12e3b56e60e29c55c2e099d6f6cf4422ed10846e39bf0bdc7c",
+      "evidence": {
+        "private_campaign": "javascript-20260926-ubuntu",
+        "report": "native-calibration-k2-probe-02/report.json",
+        "independent_audit": "operator89-root-k2-verification.json"
+      },
+      "cleanup_verified": true,
+      "native_cells_verified": 8,
+      "journal_references_verified": 604,
+      "gates_closed": [],
+      "diagnostic_origin": "native_child",
+      "raw_error": "Error: JS_CAL_K2_SYNC_V1\n   at Anonymous function (<main>:4:1)\n   at module (<main>:1:1)",
+      "native_text_complete": true,
+      "explicit_execute_observed": true,
+      "mapping_status": "unverified",
+      "source_span": null
+    },
+    {
+      "id": "K3-shift-v1",
+      "source_commit": "990e6bf92462b5e1a3dce60a06ff1dbe22fccbbd",
+      "source_sha256": "02b7e36c08e2d1f18fe83e60ed145d00bef83746fbe14b1328b1b6ba91ab76b3",
+      "schema_mode": "code",
+      "scope": "diagnostic observation, not indexed legacy probe promotion",
+      "report_status": "DIAGNOSTIC_OBSERVED",
+      "result_status": "owned_failure_observed",
+      "report_sha256": "2a1ae7bc73c3e7b8d58818d3e88dd20dc9144418e366a082b1dfbe303ad37b0e",
+      "evidence": {
+        "private_campaign": "javascript-20260926-ubuntu",
+        "report": "native-calibration-k3-probe-01/report.json",
+        "independent_audit": "operator90-root-k3-verification.json"
+      },
+      "cleanup_verified": true,
+      "native_cells_verified": 8,
+      "journal_references_verified": 598,
+      "gates_closed": [],
+      "diagnostic_origin": "native_child",
+      "raw_error": "Error: JS_CAL_K3_SYNC_SHIFT_V1\n   at Anonymous function (<main>:5:3)\n   at module (<main>:1:1)",
+      "native_text_complete": true,
+      "explicit_execute_observed": true,
+      "mapping_status": "unverified",
+      "source_span": null
+    }
   ]
 }
