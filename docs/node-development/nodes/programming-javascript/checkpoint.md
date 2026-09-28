@@ -1,5 +1,25 @@
 # JavaScript: checkpoint исполнения
 
+## Engine sync throw: native marker подтверждён — 2026-09-28
+
+Отдельный headed `engine-sync-throw-17`/profile181 на child revision
+`180f1d5810` доставил source SHA256
+`4511b462cff1cad043d42e38d7ed6c4de31539f0528dfd96cc1db81d1f7502c7`.
+После запуска свежий native child process JS-узла завершился `failed`;
+ownership проверен Model/Show Node, output не обновлялся. Собственные child
+error details содержат точный маркер `Error: JS_DISCOVERY_SYNC_THROW` и кадры
+`<main>:4:42`, `<main>:4:1`, `<main>:1:1`; `sync_marker_observed=true`.
+Reader оставил `class_observed=null`, `position_observed=null`: не
+приписывать пока этим кадрам калиброванную source mapping. Это наблюдение
+подтверждает доставку синхронного throw, но G6/J25 остаются открытыми.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`d2a9a8e1794d98e84fe2d875626a699a38486186a174bc1c5159ddba8cadf92f`,
+journal SHA256
+`4405869d01d0f68e2d4e11af253d04c5b6d447d1295a8f28514c139ca73a4d3e`.
+Реестр закрыт, следующий fresh profile182.
+
 ## Engine strict-mode: принадлежащий native failure — 2026-09-28
 
 Отдельный headed `engine-strict-error-16`/profile180 на child revision

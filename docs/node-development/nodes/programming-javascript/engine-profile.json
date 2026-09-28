@@ -379,9 +379,24 @@
       "source_sha256": "4511b462cff1cad043d42e38d7ed6c4de31539f0528dfd96cc1db81d1f7502c7",
       "schema_mode": "code",
       "expectation": "diagnostic",
-      "status": "not_checked",
+      "status": "observed_owned_native_failure",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "owned_native_child_error",
+      "native_error_code": "NODE_EXECUTION_FAILED",
+      "native_error_message": "Error: JS_DISCOVERY_SYNC_THROW\n   at Anonymous function (<main>:4:42)\n   at Anonymous function (<main>:4:1)\n   at module (<main>:1:1)",
+      "sync_marker_observed": true,
+      "class_observed": null,
+      "position_observed": null,
+      "output_refreshed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-sync-throw-17/report.json",
+        "report_sha256": "d2a9a8e1794d98e84fe2d875626a699a38486186a174bc1c5159ddba8cadf92f",
+        "journal_sha256": "4405869d01d0f68e2d4e11af253d04c5b6d447d1295a8f28514c139ca73a4d3e",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "engine-native-parse-error",
