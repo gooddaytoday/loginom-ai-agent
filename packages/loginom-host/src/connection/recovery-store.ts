@@ -3,7 +3,13 @@ import { lstat, mkdir, open, readdir, rename, rm } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
-type Entry = { id: string; chat: string; generation: number; purpose?: "session-completion" }
+type Entry = {
+  id: string
+  chat: string
+  generation: number
+  purpose?: "session-completion"
+  recoveryMode?: "advisory" | "strict"
+}
 
 // Written before dispatch. An absent reply never becomes permission to replay a mutation.
 // Strict mode keeps an uncertain dispatch until acknowledgement. Advisory mode drops it
@@ -38,7 +44,9 @@ export async function recoveryStore(directory: string, options?: { strict?: bool
         !/^[a-f0-9]{64}$/.test(entry.chat) ||
         !Number.isSafeInteger(entry.generation) ||
         entry.generation < 1 ||
-        (entry.purpose !== undefined && entry.purpose !== "session-completion")
+        (entry.purpose !== undefined && entry.purpose !== "session-completion") ||
+        (entry.recoveryMode !== undefined && entry.recoveryMode !== "advisory" && entry.recoveryMode !== "strict") ||
+        (entry.purpose === "session-completion" && entry.recoveryMode === "advisory")
       )
         throw Error("LOGINOM_RECOVERY_STORE_INVALID")
       entries.set(entry.id, entry)
@@ -56,6 +64,22 @@ export async function recoveryStore(directory: string, options?: { strict?: bool
       await handle.close()
     }
   }
+  async function persist(entry: Entry) {
+    const temporary = join(directory, `${entry.id}.${randomUUID()}.tmp`)
+    const handle = await open(
+      temporary,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+      0o600,
+    )
+    try {
+      await handle.writeFile(JSON.stringify(entry))
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
+    await rename(temporary, join(directory, `${entry.id}.json`))
+    await sync()
+  }
   async function remove(entry: Entry) {
     await rm(join(directory, `${entry.id}.json`), { force: true })
     await sync()
@@ -63,7 +87,7 @@ export async function recoveryStore(directory: string, options?: { strict?: bool
     recovered.delete(entry.id)
   }
   // Strict profiles never silently downgrade on a flagless restart. Existing
-  // dispatches also protect profiles written before the policy marker existed.
+  // strict or legacy dispatches also protect profiles without the policy marker.
   const policy = join(directory, ".strict-policy")
   const policyHandle = await open(policy, constants.O_RDONLY | constants.O_NOFOLLOW).catch(
     (error: NodeJS.ErrnoException) => {
@@ -86,7 +110,8 @@ export async function recoveryStore(directory: string, options?: { strict?: bool
       await policyHandle.close()
     }
   }
-  const strict = options?.strict === true || !!policyHandle || entries.size > 0
+  const strict =
+    options?.strict === true || !!policyHandle || [...entries.values()].some((entry) => entry.recoveryMode !== "advisory")
   if (strict && !policyHandle) {
     const handle = await open(
       policy,
@@ -101,6 +126,20 @@ export async function recoveryStore(directory: string, options?: { strict?: bool
     }
     await sync()
   }
+  // The marker is durable before upgrades start. Atomic replacement keeps the
+  // original intent intact across interruption; successful startup also makes
+  // every retained advisory intent survive a later loss of the marker.
+  if (strict) {
+    for (const entry of entries.values()) {
+      if (entry.recoveryMode !== "advisory") continue
+      const upgraded: Entry = { ...entry, recoveryMode: "strict" }
+      await persist(upgraded)
+      entries.set(entry.id, upgraded)
+    }
+  }
+  // Only explicitly advisory records may be discarded after a crash, and only
+  // when no stronger profile policy applies. Missing provenance remains strict.
+  if (!strict) for (const entry of entries.values()) await remove(entry)
   return {
     mode: strict ? ("strict" as const) : ("advisory" as const),
     pending: () => [...recovered],
@@ -121,21 +160,15 @@ export async function recoveryStore(directory: string, options?: { strict?: bool
     async begin(chat: string, generation: number, purpose?: "session-completion") {
       if (!/^[a-f0-9]{64}$/.test(chat) || !Number.isSafeInteger(generation) || generation < 1)
         throw Error("LOGINOM_RECOVERY_IDENTITY_INVALID")
-      const entry = { id: randomUUID(), chat, generation, ...(purpose ? { purpose } : {}) }
-      const temporary = join(directory, `${entry.id}.tmp`)
-      const handle = await open(
-        temporary,
-        constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
-        0o600,
-      )
-      try {
-        await handle.writeFile(JSON.stringify(entry))
-        await handle.sync()
-      } finally {
-        await handle.close()
+      if (purpose && !strict) throw Error("LOGINOM_RECOVERY_IDENTITY_INVALID")
+      const entry: Entry = {
+        id: randomUUID(),
+        chat,
+        generation,
+        recoveryMode: strict ? "strict" : "advisory",
+        ...(purpose ? { purpose } : {}),
       }
-      await rename(temporary, join(directory, `${entry.id}.json`))
-      await sync()
+      await persist(entry)
       entries.set(entry.id, entry)
       active.add(entry.id)
       return entry.id

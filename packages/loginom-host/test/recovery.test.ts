@@ -74,3 +74,44 @@ test.each([false, true])("recovery resets only idle runtimes; shutdown race = %s
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test("an ordinary profile can acquire a new run after restarting with an unfinished dispatch", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-advisory-restart-"))
+  const store = connectionStore(join(directory, "connection"), credentials("linux"))
+  try {
+    await store.stage({
+      generation: 1,
+      revision: 1,
+      url: "http://example.test",
+      username: "user",
+      apiKey: "test",
+      password: "",
+    })
+    await store.activate(1)
+    const original = await recoveryStore(join(directory, "recovery"))
+    await original.begin("a".repeat(64), 1)
+    const journal = await recoveryStore(join(directory, "recovery"))
+    const service = await connectionService(
+      store,
+      {
+        async check() {},
+        async prepare() {
+          return { async reset() {}, async close() {} }
+        },
+      },
+      journal,
+    )
+    try {
+      await service.settled()
+      expect(journal.mode).toBe("advisory")
+      expect((await service.api.status()).recoveries).toBeUndefined()
+      const next = service.acquire("after-crash")
+      expect(next).toBeDefined()
+      next?.release()
+    } finally {
+      await service.close()
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
