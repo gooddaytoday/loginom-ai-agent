@@ -1,3 +1,4 @@
+import {createJavascriptMetadataLifecycle} from './javascript-native-metadata.mjs';
 import vm from 'node:vm';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -158,7 +159,7 @@ for(const mode of ['pass','bad-civil-ack','cache-changed','restoration-fails'])t
  const start=source.indexOf('    async readNativeCivil('),end=source.indexOf('    async captureDropTopology()',start);
  let checks=0;
  const runtime=vm.runInNewContext('({'+source.slice(start,end)+'})',{
-  nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:id,nativeReadUncertain:false,nativeInputFixture:f,validateNativeSource:()=>steps.push('source'),
+  nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:id,nativeReadUncertain:false,metadataDiagnostic:false,metadataLifecycle:createJavascriptMetadataLifecycle(),nativeInputFixture:f,validateNativeSource:()=>steps.push('source'),
   page:{evaluate:async()=>{steps.push('guard');if(++checks===2&&mode==='cache-changed')throw Error('cache changed');}},
   once:async(name,identity,fn)=>fn(),channel:()=>({}),
   openNewOutputTable:async()=>{steps.push('open');return r.table_creation;},
@@ -196,7 +197,7 @@ for(const mode of ['pass','bad-ack','civil-drift'])test('production Date final o
   nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:id,nativeInputFixture:f,nativeRoundtripProbe:javascriptNativeRoundtripProbe(id),
   verifyNativeRoundtripInput,verifyNativeRoundtripOutcome,verifyNativeRoundtripExecution:()=>{},validateNativeSource:()=>{},
   page:{evaluate:async()=>{}},completeJavascriptNativeRoundtrip:()=>{},prepared:{document_id:'d',workflow_ref:{workflow_id:'w'}},
-  deadline:Date.now()+10000,randomUUID:()=>String(steps.length),execute:()=>{},nativeReadUncertain:false,sessionId:'test',origin:'http://test',build:'7.4.2',
+  deadline:Date.now()+10000,randomUUID:()=>String(steps.length),execute:()=>{},nativeReadUncertain:false,metadataDiagnostic:false,metadataLifecycle:createJavascriptMetadataLifecycle(),sessionId:'test',origin:'http://test',build:'7.4.2',
   readNativeRoundtrip:async({role,civil,onState})=>{steps.push('native-'+role);assert.equal(civil,results[role].civil);await onState(results[role].lifecycle);return results[role];},
   record:async event=>{if(!event.results)return event;steps.push('final');return mode==='bad-ack'?{...event,results:{}}:clone(event);},Date
  });

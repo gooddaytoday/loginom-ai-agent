@@ -1,3 +1,4 @@
+import {createJavascriptMetadataLifecycle} from './javascript-native-metadata.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -184,7 +185,7 @@ for(const mode of ['exact','changed','bad-ack','changed-upstream'])test('product
   nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:'integer-outside-safe',nativeInputFixture:javascriptNativeFixture('integer-outside-safe'),nativeRoundtripProbe:javascriptNativeRoundtripProbe('integer-outside-safe'),
   verifyNativeRoundtripInput,verifyNativeRoundtripOutcome,verifyNativeRoundtripExecution:()=>{},validateNativeSource:()=>{},
   page:{evaluate:async()=>{}},completeJavascriptNativeRoundtrip:()=>{},prepared:{document_id:'d',workflow_ref:{workflow_id:'w'}},
-  deadline:Date.now()+10000,randomUUID:()=>String(steps.length),execute:()=>{},nativeReadUncertain:false,sessionId:'test',origin:'http://test',build:'7.4.2',
+  deadline:Date.now()+10000,randomUUID:()=>String(steps.length),execute:()=>{},nativeReadUncertain:false,metadataDiagnostic:false,metadataLifecycle:createJavascriptMetadataLifecycle(),sessionId:'test',origin:'http://test',build:'7.4.2',
   readNativeRoundtrip:async({role,onState})=>{steps.push(role);await onState(s.results[role].lifecycle);return s.results[role];},
   record:async event=>{events.push(clone(event));const saved=clone(event);if(mode==='bad-ack'&&saved.results)saved.results.outcome.exact_pass=true;return saved;},Date
  });

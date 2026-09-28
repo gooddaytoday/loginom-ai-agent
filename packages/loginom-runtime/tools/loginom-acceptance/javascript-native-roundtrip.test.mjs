@@ -25,7 +25,7 @@ import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,bindJava
 import {javascriptNativeRoundtripCode} from './javascript-native-roundtrip-binding.mjs';
 import {readJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus,cancelJavascriptNativeRoundtrip} from './javascript-native-roundtrip-read.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
-export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real',namedCaseId,calibrationId,reply,sharedPortGuid,beforeSchema,beforeSource,coercionOutput}={}){
+export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,wizardOnly=false,fixtureId='real',namedCaseId,calibrationId,reply,sharedPortGuid,beforeSchema,beforeSource,coercionOutput,deferCompletion=false}={}){
   const nativeRoundtripProbe=calibrationId!==undefined?javascriptCalibrationCase(calibrationId):javascriptNativeRoundtripProbe(fixtureId,namedCaseId);
   let mutate,mutateAfter,defer=false;
   const f=await fake({fixtureId,coercionOutput,beforeBind:f=>{if(namedCaseId!==undefined||calibrationId!==undefined)f.b.completed_child={...sourceEvidence('integer-safe').execution};if(sharedPortGuid){f.port.FGuid=sharedPortGuid;f.b.port_guid=sharedPortGuid;}},change:(fixture,response,request)=>{mutate?.();reply?.(fixture,response,request);},deferred:()=>defer,afterRelease:()=>mutateAfter?.()});
@@ -79,7 +79,7 @@ export async function roundtrip({change,deferred=false,beforeGraph,afterRelease,
   if(namedCaseId!==undefined||fixtureId==='civil-datetime'||javascriptNativeFixture(fixtureId).output_input_rows||javascriptNativeFixture(fixtureId).coercion)Object.assign(execution,{cleanup_complete:true,
     trial:{...execution.trial,phase:'initial',node_id:'js'},fresh_baseline:{node:{document_id:'d',workflow_id:'w',node_id:'js'},roots:[],root_id:'root'},
     launch_identity:{execution_id:execution.execution_id,group_id:execution.group_id,root_id:'root',group_record_id:'4',node:{document_id:'d',workflow_id:'w',node_id:'js'}}});
-  await f.page.evaluate(completeJavascriptNativeRoundtrip,{execution,source_sha256:nativeRoundtripProbe.source_sha256});
+  if(!deferCompletion)await f.page.evaluate(completeJavascriptNativeRoundtrip,{execution,source_sha256:nativeRoundtripProbe.source_sha256});
   output.FStatus=1;
   const source=f.dc.FDataSource,outputHelper={...f.helper,$FData:{},$FRowCount:namedCaseId!==undefined?(javascriptNamedCase(namedCaseId).output_rows??4):javascriptNativeReadFixture(fixtureId,'output').rows},outputDs={...source,$:{...source.$},$FHelper:outputHelper};outputHelper.FBaseProxy=outputDs;
   if(fixtureId==='cardinality-empty')Object.assign(outputHelper,{$FCacheInitialized:false,$FData:null,$FDataChangeCookie:null,$FStateChangeCookie:null});

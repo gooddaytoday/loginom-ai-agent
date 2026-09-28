@@ -1,3 +1,4 @@
+import {createJavascriptMetadataLifecycle} from './javascript-native-metadata.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -164,7 +165,7 @@ for(const mode of ['pass','bad-ack','bad-lifecycle'])test('empty production orch
     nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:fixtureId,nativeInputFixture:javascriptNativeFixture(fixtureId),nativeRoundtripProbe:javascriptNativeRoundtripProbe(fixtureId),
     verifyNativeRoundtripInput,verifyNativeRoundtripOutcome,verifyNativeRoundtripExecution:()=>{},validateNativeSource:()=>{},freezeCivilEvidence,
     page:{evaluate:async()=>{}},completeJavascriptNativeRoundtrip:()=>{},prepared:{document_id:'d',workflow_ref:{workflow_id:'w'}},
-    deadline:Date.now()+10000,randomUUID:()=>String(events.length),execute:()=>{},nativeReadUncertain:false,sessionId:'test',origin:'http://test',build:'7.4.2',
+    deadline:Date.now()+10000,randomUUID:()=>String(events.length),execute:()=>{},nativeReadUncertain:false,metadataDiagnostic:false,metadataLifecycle:createJavascriptMetadataLifecycle(),sessionId:'test',origin:'http://test',build:'7.4.2',
     readNativeRoundtrip:async({role,onState})=>{if(mode==='bad-lifecycle'&&role==='output')s.results[role].lifecycle.releasedResponses=3;await onState(s.results[role].lifecycle);return s.results[role];},
     record:async event=>{events.push(clone(event));return mode==='bad-ack'&&event.results?{...event,results:{}}:clone(event);},Date
   });

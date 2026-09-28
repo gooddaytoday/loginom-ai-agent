@@ -1,3 +1,4 @@
+import {createJavascriptMetadataLifecycle} from './javascript-native-metadata.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -94,7 +95,7 @@ for(const [index,id]of ids.entries()){
    nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:id,nativeInputFixture:javascriptNativeFixture(id),nativeRoundtripProbe:javascriptNativeRoundtripProbe(id),
    verifyNativeRoundtripInput,verifyNativeRoundtripOutcome,verifyNativeRoundtripExecution:()=>{},validateNativeSource:()=>{},freezeCivilEvidence,
    page:{evaluate:async()=>{}},completeJavascriptNativeRoundtrip:()=>{},prepared:{document_id:'d',workflow_ref:{workflow_id:'w'}},
-   deadline:Date.now()+10000,randomUUID:()=>String(events.length),execute:()=>{},nativeReadUncertain:false,sessionId:'test',origin:'http://test',build:'7.4.2',
+   deadline:Date.now()+10000,randomUUID:()=>String(events.length),execute:()=>{},nativeReadUncertain:false,metadataDiagnostic:false,metadataLifecycle:createJavascriptMetadataLifecycle(),sessionId:'test',origin:'http://test',build:'7.4.2',
    readNativeRoundtrip:async({role,onState})=>{if(mode==='bad-lifecycle'&&role==='output')s.results[role].lifecycle.releasedResponses=3;await onState(s.results[role].lifecycle);return s.results[role];},
    record:async event=>{events.push(clone(event));return mode==='bad-ack'&&event.results?{...event,results:{}}:clone(event);},Date
   });
@@ -124,7 +125,7 @@ for(const id of [...ids,'cardinality-empty'])for(const mode of ['pass','bad-ack'
  const source=readFileSync(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
  const start=source.indexOf('    async armNativeRoundtrip(input) {'),end=source.indexOf('    async checkNativeRoundtripBeforeExecute()',start);
  const runtime=vm.runInNewContext('({'+source.slice(start,end)+'})',{
-  nativeInputOnly:true,nativeReadUncertain:false,nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:id,nativeRoundtripProbe:javascriptNativeRoundtripProbe(id),
+  nativeInputOnly:true,nativeReadUncertain:false,metadataDiagnostic:false,metadataLifecycle:createJavascriptMetadataLifecycle(),nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:id,nativeRoundtripProbe:javascriptNativeRoundtripProbe(id),
   verifyNativeRoundtripInput,validateNativeSource:()=>{},armJavascriptNativeRoundtrip:()=>{},
   page:{evaluate:async()=>{calls.push('arm');return {armed:true};}},record:async e=>{calls.push(e.phase);return mode==='bad-ack'?{...e,proof:{}}:clone(e);}
  });
