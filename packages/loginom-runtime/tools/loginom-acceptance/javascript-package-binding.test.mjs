@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {bindJavascriptPackage, javascriptPackageBindingRequest, observeJavascriptPackageBinding} from './javascript-package-binding.mjs';
 
 const path = '/jsteach/js-g2-9150c962-ad60-4cd4-a13e-bcba89b982d8/JavaScript-9150c962-ad60-4cd4-a13e-bcba89b982d8.lgp';
-function fixture(saved = true) {
+export function fixture(saved = true) {
   const document = {};
   const prepared = {status: 'READY', document_id: 'doc', workflow_ref: {workflow_id: 'workflow', prefix: 'MF;TF-1', tab_tid: 'tab'},
     package_ref: {persisted: saved, path: saved ? path : null}};

@@ -657,7 +657,30 @@ export async function configureJavascriptManualMapping({reader,cleanupReader,ref
   }
 }
 
-export async function createJavascriptExecutionRuntime({page,prepared:inputPrepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real',nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic=false,persistence=false}) {
+export async function createJavascriptExecutionRuntime(options) {
+  if(options?.coldPackagePath!==undefined)throw Error('Draft runtime cannot admit saved packages');
+  return createJavascriptBoundRuntime(options);
+}
+
+export async function createJavascriptSavedExecutionRuntime(options) {
+  if(!options||Object.keys(options).some(key=>!['page','prepared','directory','record','account','deadline','savedPath'].includes(key))
+    ||!Number.isSafeInteger(options.deadline)||options.deadline<=Date.now())throw Error('Cold runtime technical assignment required');
+  javascriptPackageBindingRequest(options);
+  if(typeof options.savedPath!=='string')throw Error('Cold runtime requires saved package path');
+  const runtime=await createJavascriptBoundRuntime({...options,coldPackagePath:options.savedPath});
+  // No channel, import, source edit, create/connect, save or configure surface.
+  return Object.freeze({graph:runtime.graph,reopen:runtime.reopen,handoffReopenedWizard:runtime.handoffReopenedWizard,
+    readPortMapping:runtime.readPortMapping,captureExecutionBoundary:runtime.captureExecutionBoundary,
+    verifyExecutionBoundary:runtime.verifyExecutionBoundary,restoreWorkflowForCleanup:runtime.restoreWorkflowForCleanup,
+    get nativeReadUncertain(){return runtime.nativeReadUncertain;},
+    get passiveSurfacePending(){return runtime.passiveSurfacePending;},
+    get wizardOpeningPending(){return runtime.wizardOpeningPending;},
+    get manualMappingPending(){return runtime.manualMappingPending;},
+    executeNode:(node,deadline,sourceSha)=>runtime.executeNode(node,deadline,{phase:'initial',source_sha256:sourceSha}),
+    readOutput:(node,deadline)=>runtime.readPassive(node,'cold-observed',deadline)});
+}
+
+async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real',nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic=false,persistence=false,coldPackagePath}) {
   const prepared=structuredClone(inputPrepared);
   if(typeof persistence!=='boolean'||persistence&&(nativeInputOnly||metadataDiagnostic||nativeNamedCaseId!==undefined
     ||nativeCalibrationId!==undefined||nativeTelemetryCaseId!==undefined||!Number.isSafeInteger(deadline)||deadline<=Date.now()))
@@ -666,12 +689,13 @@ export async function createJavascriptExecutionRuntime({page,prepared:inputPrepa
   requireJavascriptMetadataMode(metadataDiagnostic,{nativeRoundtrip:nativeInputOnly,namedCaseId:nativeNamedCaseId,calibrationId:nativeCalibrationId});
   const metadataLifecycle=createJavascriptMetadataLifecycle();
   if(nativeCalibrationId!==undefined&&(nativeNamedCaseId!==undefined||nativeFixtureId!=='integer-safe'))throw Error('Calibration identity conflict');
-  const nativeInputFixture=javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=nativeCalibrationId!==undefined?javascriptCalibrationCase(nativeCalibrationId):javascriptNativeRoundtripProbe(nativeFixtureId,nativeNamedCaseId,nativeTelemetryCaseId);
-  if(account!=='jsteach'||prepared.status!=='READY'||prepared.package_ref?.persisted!==false)throw Error('Own JavaScript draft required');
+  const nativeInputFixture=coldPackagePath?null:javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=coldPackagePath?null:nativeCalibrationId!==undefined?javascriptCalibrationCase(nativeCalibrationId):javascriptNativeRoundtripProbe(nativeFixtureId,nativeNamedCaseId,nativeTelemetryCaseId);
+  if(coldPackagePath)javascriptPackageBindingRequest({prepared,account,savedPath:coldPackagePath});
+  if(!coldPackagePath&&(account!=='jsteach'||prepared.status!=='READY'||prepared.package_ref?.persisted!==false))throw Error('Own JavaScript draft required');
   const origin='http://logi-test-plan.bg.local',build='7.4.2',sessionId='js-g2-'+randomUUID();
   const journalOnce=createJavascriptEffectJournal({record,deadline});
   const once=(id,identity,perform)=>journalOnce(caseEffect(effectScope(),id),identity,perform);
-  let nativeInputEvidence,nativeInputOwner,nativeReadUncertain=false,persistenceSaver,savedPath,persistenceUncertain=false;
+  let nativeInputEvidence,nativeInputOwner,nativeReadUncertain=false,persistenceSaver,savedPath=coldPackagePath,persistenceUncertain=false;
   const validateNativeSource=()=>verifyNativeRoundtripProvenance(nativeInputOwner);
   const executeUntil=async(code,until)=>{
     if(Date.now()>=until)throw Error('Original JavaScript operation deadline expired');
@@ -692,17 +716,17 @@ export async function createJavascriptExecutionRuntime({page,prepared:inputPrepa
   const actions=JSON.parse(await readFile(new URL('../../executor/catalog/actions.json',import.meta.url),'utf8')).actions;
   const selectors=JSON.parse(await readFile(new URL('../../executor/catalog/selectors.json',import.meta.url),'utf8')).selectors;
   const pinned={actions:new Map(actions.map(action=>[action.action_key,action])),selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
-  const artifactStore=await createArtifactStore({directory:directory+'/input-artifacts',sessionId});
-  const support=nativeInputOnly?createJavascriptNativeInputSupport({targetOrigin:origin,targetBuild:build,fixtureId:nativeFixtureId,
+  const artifactStore=coldPackagePath?undefined:await createArtifactStore({directory:directory+'/input-artifacts',sessionId});
+  const support=coldPackagePath?{}:nativeInputOnly?createJavascriptNativeInputSupport({targetOrigin:origin,targetBuild:build,fixtureId:nativeFixtureId,
     onProof:async(proof,owner)=>{nativeInputEvidence=nativeFixtureId==='civil-datetime'||nativeInputFixture.output_input_rows||nativeInputFixture.coercion||nativeTelemetryCaseId!==undefined||nativeNamedCaseId!==undefined||nativeCalibrationId!==undefined?freezeCivilEvidence(structuredClone(proof)):proof;nativeInputOwner=owner;},
     onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0
       ||state.status!=='completed'||state.requests!==nativeInputFixture.rows||state.releasedRequests!==nativeInputFixture.rows||state.releasedResponses!==nativeInputFixture.rows;
       await record({phase:'javascript_native_input_lifecycle',state,uncertain:nativeReadUncertain});}})
     :createTextImportNodeSupport({targetOrigin:origin,targetBuild:build});
-  const runtime=createActionRuntime({pinned,execute,artifactStore,allowCandidate:true,onRecord:record,targetOrigin:origin,targetBuild:build,...support});
+  const runtime=coldPackagePath?null:createActionRuntime({pinned,execute,artifactStore,allowCandidate:true,onRecord:record,targetOrigin:origin,targetBuild:build,...support});
   const adapter=createNodeTargetBrowserAdapter({execute,origin,build,pinned});
   const graphRequest={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref};
-  const workflowOwner=await bindJavascriptPackage({page,prepared,account});
+  const workflowOwner=await bindJavascriptPackage({page,prepared,account,savedPath:coldPackagePath});
   let cleanupRestore,passiveSurface,pendingWizard,pendingMapping;
   const executionPhases=new Map();
   const graph=()=>adapter.observe(graphRequest,deadline);
@@ -1131,7 +1155,8 @@ export async function createJavascriptExecutionRuntime({page,prepared:inputPrepa
       }finally{await binding.dispose();}
     },
     async readPassive(node,kind='output',operationDeadline=deadline) {
-      if(!['input','output','mismatch','discovery','persistence-final'].includes(kind)||kind==='persistence-final'&&!persistence)throw Error('Unknown passive JavaScript table kind');
+      if(!['input','output','mismatch','discovery','persistence-final','cold-observed'].includes(kind)
+        ||kind==='persistence-final'&&!persistence||kind==='cold-observed'&&!coldPackagePath)throw Error('Unknown passive JavaScript table kind');
       // No execution driver is called here. openNewOutputTable refuses an
       // inactive port instead of activating or executing its node.
       const readDeadline=Math.min(deadline,operationDeadline);
@@ -1154,9 +1179,11 @@ export async function createJavascriptExecutionRuntime({page,prepared:inputPrepa
         const readSettings=await prepareTableRead(reader,opened.table),raw=await readTableOutputPages(reader,opened.table,{sampleRows:10});
         // Characterization decodes the independently observed Table schema;
         // a separate fixed mismatch oracle classifies it, never the old oracle.
-        result=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:['mismatch','discovery'].includes(kind)?raw.columns:
+        result=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:['mismatch','discovery','cold-observed'].includes(kind)?raw.columns:
           kind==='input'?javascriptInputColumns:javascriptOutputColumns,requireExactNumbers:true});
-        if(kind==='persistence-final')verifyJavascriptPersistenceOutput(result,2);
+        if(kind==='cold-observed'){
+          if(result.sample_complete!==true||result.sample_rows!==result.row_count)throw Error('Cold output incomplete');
+        }else if(kind==='persistence-final')verifyJavascriptPersistenceOutput(result,2);
         else if(['mismatch','discovery'].includes(kind))verifyJavascriptMismatchTable(result);else verifyJavascriptTable(result,kind);
       } finally {
         await restoreTablePrecision(reader,formatProof);
@@ -1164,7 +1191,7 @@ export async function createJavascriptExecutionRuntime({page,prepared:inputPrepa
         await returnFromOutputTable(reader,opened.table);
         if(kind!=='input'&&passiveSurface){await passiveSurface.held.dispose();await passiveSurface.binding.dispose();passiveSurface=undefined;}
       }
-      await record({phase:kind==='discovery'?'passive_discovery_output_characterized':kind==='mismatch'?'passive_mismatch_output_characterized':kind==='input'?'passive_input_verified':'passive_output_verified',execution_started:false,node,result});return result;
+      await record({phase:kind==='cold-observed'?'cold_output_observed':kind==='discovery'?'passive_discovery_output_characterized':kind==='mismatch'?'passive_mismatch_output_characterized':kind==='input'?'passive_input_verified':'passive_output_verified',execution_started:false,node,result});return result;
     },
   };
 }
