@@ -72,6 +72,36 @@ attestation; обход проверок в live mode недопустим.
 
 ## Отказ и ресурсы
 
+### Уточнение source95 после первого live
+
+Source94 прошёл локальные проверки, но отдельный headed metadata control остановился
+в первом callback на `same(w.Parent,n.OutputPorts)`. Предшествующая проверка
+`same(w.Parent.ParentNode,initial.nodeData)` прошла. Это опровергает допуск равенства
+коллекций для наблюдавшегося состояния; причину различия native объектов не устанавливает.
+В retained model metadata Parent имеет интерфейс1086, OutputPorts —1082; наследование
+интерфейсов само по себе не гарантирует одинаковый native object ID.
+
+Для source95 вместо равенства коллекций проверить непосредственную принадлежность:
+`W.Parent.ParentNode` совпадает с N; у `N.OutputPorts` Count1; единственный элемент
+диапазона `[0,1)` имеет Index0 и ту же native port identity, что W. Все значения
+получить штатным вложенным range descriptor в первом selector callback, без lazy
+Items fallback. Сохранить node/port/socket/session/process guards и максимум7 API
+operations. Новый `bg.selectRange` включить в reflection/hash/reference attestation;
+ROOT независимо получил SHA256
+`0f97ce77cb11178f5b488934248214ecca8b37cbb1072b7155b216273262bd68` (1292bytes)
+из сохранённого PropertySelector. Это шестой публичный function pin, а не проверка
+всех его lexical dependencies.
+
+Нужны тесты distinct collections/same port, чужой порт, неправильные count/index,
+смена шестой функции, а также прежние timeout/ACK/cleanup tests. Для отказа сохранять
+фиксированную метку проверяемой связи и ограниченные native identity scalars из
+уже удержанных proxies, без дополнительных запросов. Это позволит отличить следующий
+сбой связи без повторения неинформативного диагностического запуска.
+
+Исходные report/source94 не менять. Recovery profile106 подтвердил0пакетов/logout
+без package mutation; это не переписывает исходный CLEANUP_UNCONFIRMED как успех.
+Source95 остаётся кандидатом до независимых tests/review и отдельного headed run.
+
 Не менять глобальные функции Loginom, allocator или buffer Release. Использовать
 штатный selector; на успешном пути скопировать DTO до удаления временных descriptors.
 Timeout/decode error/смена владельца/неподтверждённый pending переводят capability
