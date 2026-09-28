@@ -15,6 +15,23 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source108 проверен и закреплён; writer10 работает
+
+Main3609PASS/0FAIL/0SKIP, original24363 exit0; full client2800PASS/0FAIL/10SKIP,
+original51346 exit0,179643ms. Длительный workspace-ui.test.mjs завершился штатно,
+без перезапуска. Freeze108 SHA
+9b70d1dcdf86673095b1290d7c564f653b49264de8168289cbb090706885a014:
+1324 pins, closure206 files/637 edges, computed imports0;2 syntax checks PASS.
+Runtime commit6c7f5940287779cb71cb335fac86efc8a043e16a; runtime diff HEAD пустой.
+
+Writer10 original13153 запущен с новым profile132. Chromium PID347292 проверен
+по /proc: headed, sandbox включён, exact assigned profile. Process пока активен,
+результат не объявлен. Report persistence-code-writer-10/report.json,
+log source108-code-writer-10.log; реестр active_exec_session13153.
+При продолжении опросить этот же handle и report, не запускать дубль.
+Предыдущий writer09 завершён с полностью подтверждённым cleanup, не переигрывался.
+
+
 ### Writer09 завершён; source108 сохраняет причину pre-hover отказа
 
 Original24906 terminal exit1. Report FAILED/link-js-input: `Graph changed before
