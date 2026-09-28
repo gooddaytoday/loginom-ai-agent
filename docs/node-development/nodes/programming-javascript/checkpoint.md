@@ -17,6 +17,16 @@
 
 ### Source98: начата реализация AST policy и effective-source admission
 
+ROOT focused tests:211PASS/0FAIL/0SKIP, pinned Node24.19.0, original command
+terminalexit0. Запущены реальные client module-policy/source-admission tests
+(включая source-read fixtures/tests) из отдельного9file snapshot с Acorn из
+проверенного production install. Admission SHA256
+`b7cf2efd0d33cd5244565254d4ef650b704b49345958b1a0c9151addb03df928`.
+Все9pins до/после совпали. Evidence `operator98-root-focused-snapshot/inputs.json`,
+`tests.log`, `verification.json`. Это адресная проверка промежуточного исходника,
+не полный main/client и не финальный freeze. Worktree node_modules ROOT не менял.
+
+
 ROOT повторил fault injection на исправленном admission SHA256
 `32351b2281fb90d85de340a5a08bc24d4e9362f627bb2692ae073617c74329ae`:
 явный settingsTransition/expected_after разрешил согласованный code→declared;
