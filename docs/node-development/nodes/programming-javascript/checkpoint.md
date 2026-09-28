@@ -17,6 +17,26 @@
 
 ### Source98: начата реализация AST policy и effective-source admission
 
+ROOT review раннего admission SHA256
+`3dd55c3c31d205ff2c5726efb7fc67593603125e73a7699281e49b8fe6405b75`:
+реальный source reader с synthetic adapters подтвердил snapshot входного
+запроса при deferred read (исходный requested digest сохраняется). Выявлены
+два незакрытых пункта, переданы текущему разработчику:
+
+- Existing settings code→declared после разрешённого callback даёт
+  configured_drift/retired. Нужен явный verified planned-settings transition,
+  иначе helper не поддерживает полный контракт existing configuration.
+- Изменение исходника на unsupported import во время awaited effect-dispatch
+  journal ACK не замечено ранней версией: callback запущен, state=finished.
+  Нужна проверка после ACK и проверка фактической границы в browser driver;
+  host helper не доказывает атомарное исключение человеческого вмешательства.
+
+Доказательства `operator98-root-admission-review.json` и
+`operator98-root-dispatch-review.json` с отдельными исполняемыми scripts.
+Это synthetic fault injection без live effects; ранняя версия не принята.
+Перед freeze требуется проверить исправления и отсутствие повторов unknown effects.
+
+
 Ранняя независимая ROOT проверка parser:49/49cases PASS на копии реализации
 `javascript-module-policy.mjs` SHA256
 `2b4a0f723dfae1fcaa8949c2e092b54c2519f9c86d76d4200739ce3177b61d9b`
