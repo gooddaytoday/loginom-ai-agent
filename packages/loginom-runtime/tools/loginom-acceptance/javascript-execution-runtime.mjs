@@ -1,6 +1,7 @@
 import {javascriptCalibrationCase} from './javascript-calibration-cases.mjs';
 import {bindJavascriptPackage, javascriptPackageBindingRequest, observeJavascriptPackageBinding} from './javascript-package-binding.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from './javascript-persistence-save.mjs';
+import {verifyJavascriptPersistenceOutput} from './javascript-persistence-oracle.mjs';
 import {javascriptNamedCase} from './javascript-native-named-cases.mjs';
 import {verifyJavascriptIntegerInput,verifyJavascriptNamedInput,verifyJavascriptNamedOutcome} from './javascript-native-named-contract.mjs';
 import {requireJavascriptTelemetryMode} from './javascript-schema-telemetry-cases.mjs';
@@ -744,9 +745,9 @@ export async function createJavascriptExecutionRuntime({page,prepared:inputPrepa
     get passiveSurfacePending(){return !!passiveSurface;},
     get wizardOpeningPending(){return !!pendingWizard;},
     get manualMappingPending(){return !!pendingMapping;},
-    restoreWorkflowForCleanup() {
+    restoreWorkflowForCleanup(operationDeadline=Date.now()+60000) {
       cleanupRestore??=(async()=>{
-        const cleanupDeadline=Date.now()+60000;
+        const cleanupDeadline=Math.min(operationDeadline,Date.now()+60000);
         if(pendingMapping)throw Error('Standalone manual mapping remains unresolved; no generic Close or replay');
         if(pendingWizard){
           await cleanupJavascriptWizardOpening(page,{...pendingWizard,deadline:cleanupDeadline,record,channel:channel(pendingWizard.reference,cleanupDeadline)});
@@ -806,6 +807,8 @@ export async function createJavascriptExecutionRuntime({page,prepared:inputPrepa
       graphRequest.workflow_ref=prepared.workflow_ref;
       const request=javascriptPackageBindingRequest({prepared,account,savedPath});
       const binding=await page.evaluate(observeJavascriptPackageBinding,{...request,previous:workflowOwner,checkOnly:true});
+      if(typeof binding.package_name!=='string'||!binding.package_name)throw Error('Saved package name unconfirmed');
+      prepared.package_ref.name=binding.package_name;
       const after=await graph();
       requireJavascriptGraphUnchanged({...before,workflow_ref:prepared.workflow_ref},after);
       await record({phase:'persistence_saved_binding_verified',revision,path:savedPath,binding,before,after});
@@ -1103,7 +1106,8 @@ export async function createJavascriptExecutionRuntime({page,prepared:inputPrepa
     async executeNode(node,operationDeadline=deadline,trial) {
       const phaseIdentity=javascriptExecutionIdentity(node,trial);
       if(executionPhases.has(phaseIdentity.effect_id))throw Error('JavaScript execution phase already reserved; no replay');
-      if(trial.phase==='generated-mismatch'){
+      if(trial.phase==='persistence-final'&&!persistence)throw Error('Persistence execution requires private writer mode');
+      if(['generated-mismatch','persistence-final'].includes(trial.phase)){
         const initial=executionPhases.get('execute-initial-'+node.node_id)?.terminal;
         if(initial?.verified!==true||initial.owner_verified!==true||initial.status!=='completed'
           ||initial.trial.source_sha256===trial.source_sha256)throw Error('Changed execution requires a completed distinct initial source');
@@ -1112,7 +1116,7 @@ export async function createJavascriptExecutionRuntime({page,prepared:inputPrepa
       const executionDeadline=Math.min(deadline,operationDeadline);
       const driver=createNodeExecutionProcedure(channel(node,executionDeadline),node,{verifyFailedChild:true});
       const baseline=await driver.prepare();
-      if(trial.phase==='generated-mismatch')verifyJavascriptPreviousExecution(baseline,executionPhases.get('execute-initial-'+node.node_id).terminal);
+      if(['generated-mismatch','persistence-final'].includes(trial.phase))verifyJavascriptPreviousExecution(baseline,executionPhases.get('execute-initial-'+node.node_id).terminal);
       const binding=await privateGraphBinding(node);
       try {
         const identity=await page.evaluate(b=>({node:b.node,icon:b.icon}),binding);
@@ -1127,7 +1131,7 @@ export async function createJavascriptExecutionRuntime({page,prepared:inputPrepa
       }finally{await binding.dispose();}
     },
     async readPassive(node,kind='output',operationDeadline=deadline) {
-      if(!['input','output','mismatch','discovery'].includes(kind))throw Error('Unknown passive JavaScript table kind');
+      if(!['input','output','mismatch','discovery','persistence-final'].includes(kind)||kind==='persistence-final'&&!persistence)throw Error('Unknown passive JavaScript table kind');
       // No execution driver is called here. openNewOutputTable refuses an
       // inactive port instead of activating or executing its node.
       const readDeadline=Math.min(deadline,operationDeadline);
@@ -1141,7 +1145,7 @@ export async function createJavascriptExecutionRuntime({page,prepared:inputPrepa
         },{binding,output});
         passiveSurface={binding,held,prepared:{...graphRequest,node},output};
         const identity=await page.evaluate(b=>({node:b.node,icon:b.icon}),binding);
-        return await once('passive-views-'+(kind==='mismatch'?'generated-mismatch-':'')+node.node_id,{node,port_guid:output.port_guid,execution_started:false},()=>
+        return await once('passive-views-'+(kind==='mismatch'?'generated-mismatch-':kind==='persistence-final'?'persistence-final-':'')+node.node_id,{node,port_guid:output.port_guid,execution_started:false},()=>
             openJavascriptOutputViews(page,{...identity,binding,reference:node,prepared:{...graphRequest,node},channel:channel(node,openingDeadline),output,deadline:openingDeadline,record,select:selectJavascriptForSettings}));
       }});
       const formatProof=await configureTablePrecision(reader,opened.table);
@@ -1152,7 +1156,8 @@ export async function createJavascriptExecutionRuntime({page,prepared:inputPrepa
         // a separate fixed mismatch oracle classifies it, never the old oracle.
         result=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:['mismatch','discovery'].includes(kind)?raw.columns:
           kind==='input'?javascriptInputColumns:javascriptOutputColumns,requireExactNumbers:true});
-        if(['mismatch','discovery'].includes(kind))verifyJavascriptMismatchTable(result);else verifyJavascriptTable(result,kind);
+        if(kind==='persistence-final')verifyJavascriptPersistenceOutput(result,2);
+        else if(['mismatch','discovery'].includes(kind))verifyJavascriptMismatchTable(result);else verifyJavascriptTable(result,kind);
       } finally {
         await restoreTablePrecision(reader,formatProof);
         if(kind!=='input'&&passiveSurface)passiveSurface.returnDispatched=true;

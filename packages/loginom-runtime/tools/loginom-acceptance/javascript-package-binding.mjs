@@ -52,6 +52,6 @@ export function observeJavascriptPackageBinding({prepared, account, path, previo
   if (previous && Object.keys(result).some(key => result[key] !== previous[key]))
     throw Error('JavaScript package native owner replaced');
   if (checkOnly) return {verified: true, document_id: prepared.document_id,
-    workflow_id: prepared.workflow_ref.workflow_id, package_path: actualPath};
+    workflow_id: prepared.workflow_ref.workflow_id, package_path: actualPath, package_name: packageNode.PackageName ?? null};
   return result;
 }
