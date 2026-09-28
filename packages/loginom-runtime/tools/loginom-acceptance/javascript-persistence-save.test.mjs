@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from './javascript-persistence-save.mjs';
 
 const storage = '/jsteach/js-g2-9150c962-ad60-4cd4-a13e-bcba89b982d8';
-const workflow = {workflow_id: 'workflow', prefix: 'MF;TF-1', tab_tid: 'tab', navigation_path: [{tid: 'draft', label: 'Draft'}]};
+const workflow = {workflow_id: 'workflow', prefix: 'MF;TF-1', tab_tid: 'tab', navigation_path: [{tid: 'server', label: ''}, {tid: 'draft', label: 'Draft'}]};
 function fixture({alter, record = async () => {}, run} = {}) {
   const prepared = {status: 'READY', document_id: 'doc', package_ref: {persisted: false}, workflow_ref: structuredClone(workflow)};
   const calls = [];
@@ -12,7 +12,7 @@ function fixture({alter, record = async () => {}, run} = {}) {
   const runtime = {async run(action, parameters, options) {
     calls.push({action, parameters: structuredClone(parameters), options});
     if (run) return run();
-    const continued = {...previous, navigation_path: [{tid: 'saved', label: 'Saved'}]};
+    const continued = {...previous, navigation_path: [{tid: 'server', label: ''}, {tid: 'saved', label: 'Saved'}]};
     const receipt = {status: 'SUCCEEDED', action_key: 'package.save_checkpoint', phase: 'verified', operation_id: options.operationId, output: {
       save_completed: true, reopened: false, workflow_preserved: true,
       package_ref: {path: parameters.path, active_identity: parameters.path},
@@ -114,4 +114,13 @@ test('expired or saved package is not a new writer', () => {
   assert.throws(() => createJavascriptPersistenceSaver({...base, deadline: Infinity}));
   assert.throws(() => createJavascriptPersistenceSaver({...base, deadline: Date.now() + 60000,
     prepared: {...base.prepared, package_ref: {persisted: true}}}));
+});
+
+test('observed blank server caption is preserved; missing captions and empty tids are refused', async () => {
+  const {saver} = fixture();const saved = await saver.save(1);
+  assert.deepEqual(saved.workflow_ref.navigation_path[0], {tid:'server',label:''});
+  for (const field of [{tid:'',label:''},{tid:'server'},{tid:'server',label:null}]) {
+    const prepared={status:'READY',document_id:'doc',package_ref:{persisted:false},workflow_ref:{...workflow,navigation_path:[field]}};
+    assert.throws(()=>createJavascriptPersistenceSaver({runtime:{},storage,prepared,deadline:Date.now()+60000,record:async()=>{}}));
+  }
 });

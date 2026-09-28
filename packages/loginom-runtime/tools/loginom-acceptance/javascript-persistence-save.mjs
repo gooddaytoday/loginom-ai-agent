@@ -71,6 +71,6 @@ function requireStorage(storage) {
 function requireWorkflow(workflow) {
   if (!workflow || ['workflow_id', 'tab_tid', 'prefix'].some(key => typeof workflow[key] !== 'string' || !workflow[key])
     || !Array.isArray(workflow.navigation_path) || !workflow.navigation_path.length
-    || workflow.navigation_path.some(part => !part || ['tid', 'label'].some(key => typeof part[key] !== 'string' || !part[key])))
+    || workflow.navigation_path.some(part => !part || typeof part.tid !== 'string' || !part.tid || typeof part.label !== 'string'))
     throw Error('Persistence workflow reference incomplete');
 }
