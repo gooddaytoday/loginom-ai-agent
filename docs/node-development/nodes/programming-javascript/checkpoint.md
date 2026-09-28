@@ -15,6 +15,21 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source94: кандидат принят для отдельной metadata-пробы
+
+ROOT independently сверил conservative literal import closure162files/509edges,
+syntax14files и уже завершённые main2986/deny3/Python15;1285pins не изменились.
+Точный runtime-only commit в developer worktree:
+`77c7e5a1f17a6c272246d235ee760b543f226838` (15files; старые dirty docs исключены).
+Review receipt: private `operator94-root-final-source-review.json`.
+Новый отдельный `native-metadata-control-probe-01`, C-set-index с opt-in metadata,
+запущен в headed DISPLAY=:1/profile105, original exec28748. Это не повтор прежнего
+сомнительного результата и не D acceptance. Последний наблюдавшийся этап:
+prepare-typed-input; процесс ещё активен. До terminal/independent audit live не принят.
+Итоговые доказательства следует читать из private launch/report, а не считать
+этот промежуточный checkpoint актуальным статусом процесса.
+
+
 ### Source94: независимые локальные проверки после handoff
 
 Developer revision48 завершён; получены freeze94/handoff. ROOT сверил1285pins,
