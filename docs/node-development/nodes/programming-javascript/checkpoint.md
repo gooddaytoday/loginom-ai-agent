@@ -15,6 +15,22 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source90 принят; K3/profile99 запущен
+
+Developer turn01a0e54f terminal revision26. Exact10runtime/test files committed
+`990e6bf92462b5e1a3dce60a06ff1dbe22fccbbd`. Root final association PASS:
+1275pins совпадают с before/after независимого main2670;9changed/1new,
+96old docs unchanged,152literal closure files/455edges,syntax10/diff-checkPASS.
+Manifest SHAd163348319008615f9cee62dad4f178427c4b6b6ba6f71168b19d323953c10b5;
+handoff SHA550f62c19030bae95f80dce690b297c1a720be203077b764b74f3229485abd49.
+Private operator90-root-manifest-verification.json и source90-developer-logs сохранены.
+
+Четвёртая из maximum5 attempts: K3-shift-v1, fresh headed profile99/DISPLAY1,
+original session61076, evidence native-calibration-k3-probe-01. Перед запуском
+сверены1275pins,Node/Chromium SHA,terminal K1/17596,cleanup3/no browser/registry.
+Assignment/launch/source/ledger сохранены. Это live observation, не автоматическое
+закрытие mapping/B/G6/J25; K4 пока не допущен к реализации или запуску.
+
 ### Source90: независимые тесты завершены, handoff ожидается
 
 Existing developer turn01a0e54f-361d-7a32-9da0-873921fddcbb подтверждён active/revision25.
