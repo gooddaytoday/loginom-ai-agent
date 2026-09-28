@@ -211,3 +211,29 @@ test('unverified render diagnostics cannot bypass the bracketing native owner ch
   async()=>({verified:true,surface:'wizard',node_id:String(++reads)}));
  assert.deepEqual(result,{verified:false,reason:'mapping_node_changed'});
 });
+
+for(const mode of ['hidden','visible','unbound','throw','overflow'])test('failure-only header diagnostic '+mode,()=>{
+ const f=fixture(),cell=f.all.find(e=>e.tid===f.base+'colSourceDisplayName_Out0');
+ f.all.splice(f.all.indexOf(cell),1);
+ const header=f.el(f.base+'targetHeader','',mode==='unbound'?null:f.root);
+ const column=f.el(f.base+'sourceColumnHeader','',header);column.checkVisibility=()=>mode!=='hidden';
+ let calls=0;
+ f.views[f.grids[1].id].headerCt={el:{dom:header},getGridColumns:()=>{
+  calls++;if(mode==='throw')throw Error('UI unavailable');
+  return Array.from({length:mode==='overflow'?33:1},()=>({dataIndex:'SourceDisplayName',itemId:'source',hidden:mode==='hidden',el:{dom:column}}));
+ }};
+ const result=f.read();assert.equal(result.verified,false);assert.equal(result.reason,'mapping_render_value');
+ const d=result.render_mismatch;assert.equal(d.cell_count,0);assert.equal(d.cached_targets.length,2);
+ assert.equal(d.cached_targets_truncated,false);assert.equal(d.cached_targets[0].connected,true);
+ assert.equal(d.cached_targets[0].name,'Out0');assert.equal(d.cached_targets[0].type,'string');
+ assert.equal(d.headers.status,mode==='unbound'||mode==='overflow'?'unavailable':mode==='throw'?'diagnostic_failed':'observed');
+ assert.equal(calls,mode==='unbound'?0:1);
+ if(['hidden','visible'].includes(mode)){
+  assert.equal(d.headers.columns[0].data_index,'SourceDisplayName');assert.equal(d.headers.columns[0].dom_in_owner,true);
+  assert.equal(d.headers.columns[0].hidden,mode==='hidden');assert.equal(d.headers.columns[0].visible,mode!=='hidden');
+ }
+});
+test('successful mapping does not inspect optional diagnostic headers',()=>{
+ const f=fixture();Object.defineProperty(f.views[f.grids[1].id],'headerCt',{get(){throw Error('Diagnostic must not run');}});
+ assert.equal(f.read().verified,true);
+});

@@ -123,11 +123,34 @@ export function readMappingBrowser(prefix) {
     for(const [key,value] of (links?[['colDisplayName_',target.data.DisplayName]]:[['colName_',target.data.Name],['colDisplayName_',target.data.DisplayName],
       ['colSourceDisplayName_',target.data.ConnectedRecord?.data.DisplayName??'']])) {
       const cells=exact(base+key+target.data.Name).filter(c=>row.contains(c));
-      if(cells.length!==1||cells[0].textContent.trim()!==value)return {...fail('mapping_render_value'),
-        render_mismatch:{form,row_index:index,column:key,field_name:target.data.Name,expected:value,
-          cell_count:cells.length,cells:cells.slice(0,2).map(cell=>({text:cell.textContent.slice(0,240),
-            truncated:cell.textContent.length>240})),source_connected:target.data.ConnectedRecord!=null,
-          source_count:sources.length,target_count:targets.length}};
+      if(cells.length!==1||cells[0].textContent.trim()!==value){
+        // Failure-only local UI diagnostics. Hidden/missing columns remain a
+        // refusal; neither these headers nor the cached targets admit a mapping.
+        let headerDiagnostic={status:'unavailable'};
+        try{
+          const header=views[1].headerCt??views[1].ownerGrid?.headerCt;
+          if(header?.el?.dom&&root.contains(header.el.dom)){
+            const columns=header.getGridColumns?.();
+            if(Array.isArray(columns)&&columns.length<=32)headerDiagnostic={status:'observed',
+              header_tid:header.el.dom.getAttribute('data-tid'),columns:columns.map(column=>({
+                data_index:typeof column.dataIndex==='string'?column.dataIndex.slice(0,128):null,
+                item_id:typeof column.itemId==='string'?column.itemId.slice(0,128):null,
+                hidden:typeof column.hidden==='boolean'?column.hidden:null,
+                dom_present:!!column.el?.dom,dom_in_owner:!!column.el?.dom&&root.contains(column.el.dom),
+                dom_tid:column.el?.dom&&root.contains(column.el.dom)?column.el.dom.getAttribute('data-tid')?.slice(0,256)??null:null,
+                visible:column.el?.dom&&root.contains(column.el.dom)?column.el.dom.checkVisibility({checkVisibilityCSS:true}):null}))};
+          }
+        }catch{headerDiagnostic={status:'diagnostic_failed'};}
+        return {...fail('mapping_render_value'),
+          render_mismatch:{form,row_index:index,column:key,field_name:target.data.Name,expected:value,
+            cell_count:cells.length,cells:cells.slice(0,2).map(cell=>({text:cell.textContent.slice(0,240),
+              truncated:cell.textContent.length>240})),source_connected:target.data.ConnectedRecord!=null,
+            source_count:sources.length,target_count:targets.length,headers:headerDiagnostic,
+            cached_targets:targets.slice(0,32).map(t=>({...describe(t),data_kind:t.data.DataKind,
+              connected:t.data.ConnectedRecord!=null,source_label:typeof t.data.SourceDisplayName==='string'?t.data.SourceDisplayName.slice(0,240):null})),
+            cached_targets_truncated:targets.length>32,
+            row_cell_tids:[...row.querySelectorAll('[data-tid]')].slice(0,32).map(cell=>cell.getAttribute('data-tid')?.slice(0,256)??null)}};
+      }
     }
     rendered.add(index);
   }
