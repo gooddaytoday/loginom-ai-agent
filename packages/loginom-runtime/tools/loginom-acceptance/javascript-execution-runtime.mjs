@@ -260,9 +260,9 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
     const nodeSelected=Array.isArray(selected)&&selected.length===1&&selected[0]===r.cell;
     const unique=exact(node.tid);
     if(!shape?.isConnected||shape.getAttribute('data-tid')!==node.tid||!graph.contains(shape)
-      ||unique.length!==1||unique[0]!==shape)throw Error('Private selection DOM changed');
+      ||unique.length!==1||unique[0]!==shape)throw Error('Private selection DOM changed: '+JSON.stringify({kind:'current_shape',phase:inspectPhase,connected:shape?.isConnected===true,tid_matches:typeof shape?.getAttribute==='function'&&shape.getAttribute('data-tid')===node.tid,inside_graph:!!shape&&graph.contains(shape),unique_count:unique.length,unique_matches:unique[0]===shape,after_gesture:afterGesture,node_selected:nodeSelected}));
     if(shape!==r.shape){
-      if(!afterGesture||r.replacements!==0||r.shape?.isConnected||!nodeSelected)throw Error('Private selection DOM changed');
+      if(!afterGesture||r.replacements!==0||r.shape?.isConnected||!nodeSelected)throw Error('Private selection DOM changed: '+JSON.stringify({kind:'replacement',phase:inspectPhase,after_gesture:afterGesture,replacements:r.replacements,previous_connected:r.shape?.isConnected===true,node_selected:nodeSelected}));
       // Only the DOM association can change, once, after our returned gesture.
       r.shape=shape;r.replacements++;
     }

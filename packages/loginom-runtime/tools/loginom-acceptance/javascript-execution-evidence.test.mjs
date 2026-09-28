@@ -1356,3 +1356,14 @@ for(const fault of ['after_field','lost_apply','after_apply'])test('manual edito
  assert.deepEqual(f.gestures,fault==='after_field'?['double_click','set_wizard_field']:['double_click','set_wizard_field','set_wizard_field','apply_output_column']);
  await assert.rejects(f.run(),/no replay/);
 });
+
+test('private selection DOM refusal explains replacement without replay',async()=>{
+ const f=privateSelectionFixture('dom');
+ await assert.rejects(f.run(),error=>{
+  const proof=JSON.parse(error.message.split('Private selection DOM changed: ')[1]);
+  assert.equal(proof.kind,'replacement');assert.equal(proof.after_gesture,false);
+  assert.equal(proof.previous_connected,true);assert.equal(proof.replacements,0);
+  return true;
+ });
+ assert.equal(f.clicks,0);assert.equal(f.disposed,1);
+});
