@@ -16,6 +16,20 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source116 закреплён после всех проверок
+
+Main original75390 exit0:3618PASS/0FAIL/0SKIP. Full client original29089 exit0:
+2809PASS/0FAIL/10SKIP. Focused182PASS. Freeze116 SHA
+b53c3b3227a59dbf1631cc0e6e935dd6d43d2f241284c71e17ab7d4d22af3228,
+1324pins/closure211files647edges/computed0,2syntaxchecksPASS; source
+a06baf65c5be90736e9302a9622aa6e5763defd1.
+Private javascript-freeze116-root-final-source.json. Нет активных тестов/браузеров.
+Admin recovery2973 подтверждён. Следующий шаг — cold07/source116 на writer13 package,
+freshprofile151 после проверки freeze; source116 live ещё не запускался.
+Полный G7/declared/public/knowledge/review/CLI scope остаётся открытым.
+
+
+
 ### Cold06: console исправлен, позднее открытие output port; source116
 
 Cold06 source115/profile149 original66449 exit1. /proc PID465874 подтвердил headed,
