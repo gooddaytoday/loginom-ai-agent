@@ -17,6 +17,17 @@
 
 ### Source98: начата реализация AST policy и effective-source admission
 
+ROOT повторил fault injection на исправленном admission SHA256
+`32351b2281fb90d85de340a5a08bc24d4e9362f627bb2692ae073617c74329ae`:
+явный settingsTransition/expected_after разрешил согласованный code→declared;
+изменение source на builtIn/FS во время dispatch ACK теперь даёт policy refusal,
+callback не вызван, state=retired. Snapshot исходного запроса также сохранён.
+Receipts `operator98-root-admission-review2.json` и
+`operator98-root-dispatch-review2.json`; прежние версии/неуспехи не заменены.
+Эти ранние review findings исправлены в проверенной области. Полный freeze,
+тесты candidate и публичная browser boundary ещё не приняты.
+
+
 ROOT review раннего admission SHA256
 `3dd55c3c31d205ff2c5726efb7fc67593603125e73a7699281e49b8fe6405b75`:
 реальный source reader с synthetic adapters подтвердил snapshot входного
