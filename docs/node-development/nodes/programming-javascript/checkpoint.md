@@ -15,6 +15,22 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source109: full client PASS, freeze, writer11 активен
+
+Full client original34897 завершён exit0:2806PASS/0FAIL/10SKIP,179700ms.
+Main original60205 exit0:3609PASS/0FAIL/0SKIP; focused25PASS. Freeze109 SHA
+5d8dd9628ee1969b5d13d6d16efe6d09dcd18aa61e0e2fc76941834389fa79d4:
+1324 pins, closure206 files/637 edges, computed0,2 syntax checks PASS.
+Runtime f96f2e81fc306b6d6f806af78d403c246ecee99d, diff HEAD runtime пустой.
+Pins и binaries перепроверены перед live.
+
+Writer11 original1440, новый profile133. Chromium PID359959 подтверждён /proc:
+headed, sandbox включён, exact assigned profile. Реестр active_exec_session1440.
+Private report persistence-code-writer-11/report.json; log source109-code-writer-11.log.
+Процесс активен, результат пока не объявлен. Продолжать опрос этого handle,
+не перезапускать из-за timeout наблюдения. Следующий свободный profile134.
+
+
 ### Writer10 установил node DOM epoch delta; source109 исправляет pre-hover rebinding
 
 Original13153 terminal exit1. Failure link-js-input: единственная разница
