@@ -15,6 +15,27 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Writer09 завершён; source108 сохраняет причину pre-hover отказа
+
+Original24906 terminal exit1. Report FAILED/link-js-input: `Graph changed before
+link hover`. Начальные данные подготовлены, JS создан, но линк не подтверждён;
+до первого JS Execute и обоих save дело не дошло. Cleanup package_closed,
+logged_out, browser_closed=true; закреплённый Chromium отсутствует в /proc.
+Private source107-code-writer-result-09.json закрепляет report hash и terminal.
+Реестр освобождён от active_exec_session. Recovery login не требуется при таком
+подтверждённом cleanup. Причина изменения графа пока не установлена: exact after
+в старой ошибке не сохранялся. Не приписывать её случайному клику или DOM epoch.
+
+Выбранное уточнение: failure-only bounded diff в prepareLinkHover перед первым
+hover; до32 отличий,512 посещений,128 ключей на уровень, строки до128 символов.
+Строгое JSON равенство, no-gesture отказ и отсутствие replay сохранены. Смягчение
+сравнения либо новый retry без actual delta отвергнуты как недоказанные.
+Runtime commit6c7f594028 (source108),19 адресных tests PASS, git diff --check PASS.
+Полный client suite запущен: original51346, log source108-full-client.log. Сначала
+опросить именно этот handle; не повторять из-за buffered output. Freeze108 и
+новый live пока не выполнены. Следующий свободный профиль132, writer10.
+
+
 ### Source107: freeze и новый writer09 запущен
 
 Commit e2f8036b2a7a077f99b10f9ec58aad7529aef77f. Freeze107 SHA
