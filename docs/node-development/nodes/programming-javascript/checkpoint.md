@@ -15,6 +15,25 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source95 принят offline; новый headed metadata control запущен
+
+Developer revision50 terminal. ROOT независимо сверил1285pins,112старых docs,
+98evidence hashes, closure162files/509edges, syntax2MJS/diff check.
+Main original79533 terminalexit0:2992PASS/0FAIL/0SKIP, deny3PASS, Python15PASS;
+все1285files неизменны до/после. Private receipts `operator95-root-test-results.json`
+и `operator95-root-source-review.json`. Exact3runtime files закоммичены в developer
+worktree как `740c442e3087841d749187086da16fc80e1d895a`; прежние dirtydocs исключены.
+
+Новый `native-metadata-control-probe-02`, C-set-index+metadata, profile107,
+headed DISPLAY=:1, original exec92282. Source/launch receipts сохранены;
+браузер/Node pins и отсутствие прежнего Chrome проверены. Вход после recovery106
+с verified0packages/logout. Это отдельная проба исправленной membership association,
+не продолжение старого uncertain Execute. До terminal и независимого audit live
+результат не принят. Читать актуальный статус из launch/report/original handle;
+этот пункт фиксирует момент запуска. Следующий этап — code-side schema telemetry,
+затем остальные G/J и публичный handler/CLI по неизменному полному плану.
+
+
 ### Source94 live: collection identity refusal; recovery подтверждён
 
 `native-metadata-control-probe-01`, profile105, original28748 terminalexit1.
