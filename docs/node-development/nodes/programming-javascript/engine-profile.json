@@ -953,9 +953,30 @@
       "source_sha256": "435312fcd4d5c3cba1032cb684db6990ffb05da08f9890783d6d1d2088876562",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_pass",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 0,
+      "all_cells_verified": true,
+      "observed_values": [],
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-empty-output-33/report.json",
+        "report_sha256": "a4248fbee8f314fb910c23b2d3545df6effddf47dd0d7be6861d928148149ea6",
+        "journal_sha256": "36166a3f13918638e4d5ff87fe0b0620e19672d494576ae95c2580718e3a42f6",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     }
   ],
   "limitations": [

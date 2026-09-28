@@ -1,5 +1,24 @@
 # JavaScript: checkpoint исполнения
 
+## G5 empty output: schema есть, строк нет — 2026-09-29
+
+Отдельный headed `g5-empty-output-33`/profile197 на child revision
+`180f1d5810` доставил source SHA256
+`435312fcd4d5c3cba1032cb684db6990ffb05da08f9890783d6d1d2088876562`.
+Свежий принадлежащий JS process завершился успешно. Typed UI reader открыл
+выходной просмотр с integer колонкой `Result`, `row_count=0` и пустой полной
+выборкой. Независимый oracle подтвердил schema и ноль строк
+(`typed_oracle_verified`). Proof level `typed_ui_only`, native bytes не
+проверены; пустой output проверен как отдельный case, но G5 в целом остаётся
+открытым.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`a4248fbee8f314fb910c23b2d3545df6effddf47dd0d7be6861d928148149ea6`,
+journal SHA256
+`36166a3f13918638e4d5ff87fe0b0620e19672d494576ae95c2580718e3a42f6`.
+Реестр закрыт, следующий fresh profile198.
+
 ## G5 name case: `rowid` отказ при существующем `RowID` — 2026-09-29
 
 Отдельный headed `g5-name-case-32`/profile196 на child revision
