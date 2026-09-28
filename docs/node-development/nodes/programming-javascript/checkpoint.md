@@ -15,6 +15,26 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source103: освобождение после Done до фиксации baseline
+
+Runtime commit `5254c6a6735edd764a171a276ae66b76e78c9df4`. Только после своего
+Done S2 и восстановления графа writer вызывает settleAppliedNode до source cycle.
+Наблюдаются original graph и retained native identities, ожидается unlocked
+тот же node с точными refs. Только его переход lock допускается при ожидании;
+все другие поля строго равны, deadline исходный с cap15s. Setters/RPC/replay нет.
+До этого шага невозможно начинать чтения mapping или final Execute. Cold facade
+не получает новый метод. Shared unlock helper и прежний strict graph неизменны.
+
+Main3563PASS/0FAIL/0SKIP, original21545 exit0. Новые проверки исполняют actual
+Done wrapper и writer, включая late/foreign/native/position и отказ unlock.
+Freeze103:1322 pins, closure202 files/628 edges,4 syntax checks;
+manifest javascript-freeze103-root-final-source.json SHA
+2821374b2e48bc95abaebb590bfc3f2ccf29442923aa7f7ae2268da376325089.
+Writer06/profile125 headed/sandbox запущен, original71139 ждёт terminal.
+Нельзя запускать следующий browser до его завершения. Все прежние G7/public/CLI
+ограничения сохраняются; новая local проверка не заменяет live/cold pair.
+
+
 ### Source102: точная диагностика графа после port mapping Close
 
 Runtime commit `177110033a14166f85aa0288488fc2fb1a5e2fe7`. Перед прежним строгим
@@ -34,8 +54,13 @@ main для source102.127 preexisting docs сохранены,3 syntax checks п
 Freeze102:1322 pins, closure202 files/628 edges, computed imports absent.
 Manifest javascript-freeze102-root-final-source.json SHA
 952fd8670184eb00f53f6f35fe307b37bc7c03f9b53f4df171c34a1101d9dbd0.
-Writer05/profile123 запущен headed/sandbox, original68559 ещё ожидает terminal.
-До завершения не запускать другой browser. OpenViking health успешен.
+Writer05/profile123 original68559 завершился exit1. Save1 подтверждён,
+save2 не отправлялся. Точная последняя пара mapping graph доказала единственную
+semantic разницу JS locked:true→false (node DOM epochs штатно исключаются).
+Значит baseline после Done снят до освобождения узла. Recovery05/profile124,
+original6679 exit0: jsteach,0 packages, logout/browser close true, Chrome отсутствует.
+Private result source102-code-writer-result-05.json содержит hashes/путь S1.
+OpenViking health успешен.
 
 
 ### Source101: ожидание освобождения узла после нашего Close

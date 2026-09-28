@@ -34,3 +34,19 @@ position/link/epoch drift, native owner, expired observation/journal, невер
 baseline/ref. Actual source/cold adapter tests проверяют отказ settlement;
 cold facade разрешает только новый метод чтения. Полный набор и новый freeze
 обязательны до headed live-проверки; local PASS не закрывает G7.
+
+
+## Дополнение: baseline после Done (source103)
+
+Source102 writer05 подтвердил другую сторону той же readiness-границы:
+после Done S2 перед input mapping baseline содержал locked:true, после Close
+mapping locked:false. Все остальные semantic graph fields строго совпали.
+Нельзя менять сравнение mapping или считать старую блокировку эталоном.
+
+Writer после своего Done возвращается в граф и отдельно наблюдает освобождение
+того же узла до начала source/mapping cycle. Retained native topology проверяется
+каждый раз. Ожидаемый граф отличается от непосредственно наблюдённого post-Done
+только locked:false целевого узла; прочие поля нормализовать запрещено. Ожидание
+повторно использует bounded readonly helper, max15s внутри original deadline.
+Это не принудительное снятие блокировки и не новый Done/Execute. Cold reader
+такого метода не получает. Неуспешное ожидание не допускает final Execute/save2.
