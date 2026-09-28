@@ -1,5 +1,14 @@
 # JavaScript: сохранение последней редакции и холодное открытие
 
+## Состояние после независимого byte audit — 2026-09-29
+
+Для обоих режимов завершены отдельные private writer/cold пары и read-only
+получение точных байтов сохранённого `.lgp`. Воспроизводимый независимый аудитор
+`javascript_package_byte_audit.py` связывает ZIP/XML с принятым writer/cold audit,
+не передавая expected в cold reader и не запуская новый Execute. Подтверждённые
+SHA и границы доказательства перечислены в [checkpoint](checkpoint.md).
+Dirty-state и публичная реализация G7 по-прежнему требуют отдельной проверки.
+
 Source99, 2026-09-28. Части G7/J20 согласованного plan.md; base runtime
 beaf849091830e3adb77a53cb88ca2f0c9e4a98c. Полный план/public/CLI остаются в силе.
 

@@ -1,5 +1,31 @@
 # JavaScript: checkpoint исполнения
 
+## G7: воспроизводимый независимый аудит `.lgp` — 2026-09-29
+
+Child source `619c977bad` добавил
+`packages/loginom-runtime/tools/loginom-acceptance/javascript_package_byte_audit.py`
+и три portable unittest. Аудитор принимает только абсолютные пути к принятому
+writer/cold audit и каталогу отдельного read-only прогона, повторно сверяет
+четыре закреплённых persistence-файла, собственный журнал чтения, exact
+saved-package path, байты и native function pins. ZIP проверяется на CRC,
+дубликаты, выход за пределы архива и лимиты распаковки; decoded `Engine.Code`,
+schema mode, GUID и package name сравниваются с writer/cold, а не с введённым
+в read-прогон expected. Выход создаётся один раз без перезаписи и содержит
+только SHA/метаданные, без текста программы. Три portable теста прошли;
+изменённые source/mode/GUID, stream, pin, ZIP и исходный audit отвергаются.
+
+Повтор на двух сохранённых private парах дал `VERIFIED`:
+`persistence-code-package-bytes-audit-formal-03.json` SHA256
+`55bcbffc454beeaf7ef1c77f361599a534f192463b3371f151b433f8f9aca1a3`,
+`persistence-declared-package-bytes-audit-formal-05.json` SHA256
+`ed1cd9fd60295c3a2224ff39535b0bd2ff4e52d95753dd9895501bf613366575`.
+Private freeze130 закрепил 1331 pins, closure220 файлов / 656 literal edges /
+0 computed imports; SHA256
+`678f4bd250517a73e9f3e632eba9beaeb5d7fbe52dfe6028c578a263b8020cb0`.
+Это source-only/post-run аудит; нового Loginom/browser действия не было.
+`package_bytes_verified=true` только для этих двух private пакетов;
+dirty-state, публичный handler и автономная CLI-приёмка остаются открытыми.
+
 ## G7: сохранённые байты двух режимов — 2026-09-29
 
 После подтверждённых writer/cold пар независимый read-only оператор на Ubuntu
