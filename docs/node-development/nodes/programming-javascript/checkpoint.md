@@ -15,6 +15,40 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source98: policy/admission приняты ROOT и закоммичены
+
+Runtime commit `beaf849091830e3adb77a53cb88ca2f0c9e4a98c` включает8точных
+файлов:3changed/5new. AST policy, source admission, тесты и production Acorn
+с согласованной candidate runtimeLockSha256; старые developer docs не включены.
+ROOT main3294PASS, finalclient2756PASS/0FAIL/10SKIP,deny3PASS,Python15PASS;
+real Linux CLI resources4390hashes и normal ESM/parser/admission проверены.
+1300pins,122прежних docs,177files/565literal import edges проверены независимо.
+
+Канонический итог этого этапа — private
+`javascript-freeze98-root-final-source.json` SHA256
+`4bf45dc25ab84999f411996b16622472d216fbaab37918ed89dfbefb17e9aed2`.
+Он заменяет для следующего baseline старый developer draft freeze98, оставшийся
+с прежней product pin. Draft manifest/sha256/handoff/design/candidate inputs
+сохранены отдельными `source98-developer-draft-*`; не переписаны как успешные.
+ROOT final закрепляет209проверенных external evidence. Изменившийся
+/tmp/build-freeze98.py сохранён как historical_not_reverified с обеими hashes,
+не засчитан проверенным. Старые77missing /tmp refs остаются историей прежних
+этапов; отсутствие этих логов не заменено утверждением об их повторной проверке.
+
+Разработчик terminal/idle, последний completed turn01a0e6af-4131-7ad2-a835-6957ab52e981,
+cursor ef4fdbda-223c-4344-9756-08ee1a070ea1:4. Последние ответы снова сослались
+на исторический bootstrap-only prompt; ROOT завершил только проверку/metadata
+и exact commit уже реализованного кода. Новый этап ещё не назначен. При следующем
+назначении явно заменить историческое bootstrap-only ограничение текущей задачей.
+
+Public JS/source-read/output-read integration, G1–G7 в полном объёме, knowledge,
+formal review и compiled standalone CLI acceptance остаются открытыми. Source98
+не проверял браузер; последняя live evidence source97/profile114, закрыт/logout.
+Следующий свободный профиль115. Следующий предметный этап: сохранение/холодное
+открытие последней редакции исходника и настроек (G7) с reuse owned source reader;
+сначала прочесть действующие package save/open helpers и закрепить bounded design.
+
+
 ### Source98: начата реализация AST policy и effective-source admission
 
 ROOT исправление candidate lock pin подтверждено. Product release SHA256 теперь
