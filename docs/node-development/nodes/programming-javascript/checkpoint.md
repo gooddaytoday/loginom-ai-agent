@@ -15,6 +15,32 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source95 live: membership пройден; socket bridge не подтверждён
+
+`native-metadata-control-probe-02`, profile107/original92282 terminalexit1.
+Первая selection и direct model-output-membership прошли. Во второй API operation
+отказ `model-engine-socket`: P.Socket и W.Socket имеют interface961/owner0,
+но object IDs1451229540 и1543504268. Шестой pin/selectRange не заблокировал вход.
+Это факт несовпадения; причина и путь связи socket пока не установлены.
+Metadata DTO и scalar OUTPUT отсутствуют; report CLEANUP_UNCONFIRMED,
+browser_closed=true/package_closed=false/logged_out=false. Report/source/evidence
+сохранены,1285source pins неизменны, Chrome после terminal отсутствует.
+Ни D/G5, ни полный metadata round этим запуском не закрыты.
+
+Отдельная recovery108/original96916 terminalexit0: jsteach/PackageNodes.Count0,
+packageMutation=false, logout/browserclose/noChrome подтверждены. Receipt
+`native-metadata-recovery-02-verification.json`; report SHA256
+`7cd23804e5bba84549973aace5533164bc490ccc0e404066e16576a983b436ec`.
+Исходный cleanup не переоценён. Lease closed_logout_verified; следующий профиль109.
+
+Developer revision51 активна с READ-ONLY socket-bridge audit. Требуется конечный
+разбор реального пути model port→component/engine→physical datasource, а не
+последовательное удаление несработавших equality guards. Component.OutputSockets,
+SocketCouplers/Couplers, EngineToSocketCoupler и W.Output — только найденные в
+retained metadata кандидаты, не доказательства текущей связи. До review решения
+source96 не реализуется и новый live не назначен. Полный план остаётся активным.
+
+
 ### Source95 принят offline; новый headed metadata control запущен
 
 Developer revision50 terminal. ROOT независимо сверил1285pins,112старых docs,
