@@ -437,12 +437,12 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         // clears before dispatching the single admitted link gesture.
         let graph=await observeGraph(request,deadline);
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
-        if(JSON.stringify(graph)!==JSON.stringify(effect.before))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+        if(!samePlacementGraph(effect.before,graph))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,reason:'connect_graph_changed'};
         // Reuse the complete native graph reader, including its strictly verified
         // rendered-port cache fallback; a second SVG-only resolver loses that identity.
         const bindingGraph=await observeGraph(request,deadline,{readBindings:true});
         const {native_bindings:bindings,...observed}=bindingGraph;
-        if(!samePlacementGraph(graph,observed))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+        if(!samePlacementGraph(graph,observed))return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,reason:'connect_binding_graph_changed'};
         const resolve=(id,direction,index)=>{
           const matches=bindings.filter(b=>b.node_id===id);
           if(matches.length!==1||!Number.isInteger(matches[0][direction][index]))throw Error('Exact tabular port disappeared');
