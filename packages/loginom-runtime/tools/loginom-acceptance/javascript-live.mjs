@@ -48,22 +48,25 @@ import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
 import {captureJavascriptWizardError} from './javascript-wizard-error.mjs';
+import {openJavascriptPackageDirectory,readJavascriptPackageFile} from './javascript-package-file.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false}={}) {
 process.umask(0o077);
 if(coldReader&&(batchCases!==null||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null))throw Error('Cold reader requires its separate private entrypoint');
+if(packageFile&&(coldReader||batchCases!==null||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null))throw Error('Package-file audit requires its separate private entrypoint');
 const {javascriptPersistenceCase}=persistenceMode===null?{}:await import('./javascript-persistence-cases.mjs');
 const batch=batchCases===null?null:javascriptBatchCases(batchCases);
 const persistence=persistenceMode===null?null:javascriptPersistenceCase(persistenceMode);
-const batchDeadline=coldReader?Math.floor(performance.timeOrigin)+600000:persistence?Math.floor(performance.timeOrigin)+persistence.writer_budget_ms:nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch?Date.now()+1800000:Infinity;
+const batchDeadline=coldReader||packageFile?Math.floor(performance.timeOrigin)+600000:persistence?Math.floor(performance.timeOrigin)+persistence.writer_budget_ms:nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch?Date.now()+1800000:Infinity;
 let cleaning=false,cleanupDeadline=Infinity;
 const phaseDeadline=ms=>Math.min(cleaning?cleanupDeadline:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=(cleaning?cleanupDeadline:batchDeadline)-Date.now();if(ms<=0)throw Error(cleaning?'Original cleanup deadline expired':'Original batch deadline expired');return ms;};
 const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
 if(args.includes('--help')&&coldReader){console.log('node javascript-persistence-read-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nCold reader: observe actual source/settings/mappings, one fresh Execute and full output; 10 minutes from process start; headed only. No source or configuration input.');return;}
+if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader?['--package']:[]),'--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
@@ -73,6 +76,10 @@ for (let i=0;i<args.length;i++) {
 }
 if(coldReader){
   if(batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence','--package'].includes(k)))throw Error('Cold reader requires its separate private entrypoint');
+  requireJavascriptSavedPackagePath(options['--package']);
+}
+if(packageFile){
+  if(Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence','--package'].includes(k)))throw Error('Package-file audit accepts only exact saved package');
   requireJavascriptSavedPackagePath(options['--package']);
 }
 if(persistence){
@@ -132,11 +139,12 @@ const directory=resolve(options['--evidence']);
 // Refuse reuse: no old evidence is overwritten and no uncertain run is replayed.
 await mkdir(directory,{mode:0o700});
 const redactor=createRedactor([config.password]);
-if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
+if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},knownSecrets:[config.password]});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
-  ...(coldReader||persistence?{host_process:{pid:process.pid,started_at:new Date(performance.timeOrigin).toISOString(),profile:resolve(options['--profile'])}}:{}),
+  ...(coldReader||persistence||packageFile?{host_process:{pid:process.pid,started_at:new Date(performance.timeOrigin).toISOString(),profile:resolve(options['--profile'])}}:{}),
   ...(coldReader?{scope:'private G7 cold saved-package observation',original_deadline:batchDeadline,explicit_execution_limit:1,gates_closed:[]}:{}),
+  ...(packageFile?{scope:'private G7 saved-package byte audit',original_deadline:batchDeadline,explicit_execution_limit:0,gates_closed:[]}:{}),
   ...(persistence?{persistence_mode:persistence.schema_mode,original_deadline:batchDeadline,explicit_execution_limit:2}:{}),
   node:process.versions.node,headless:false,server_os:{status:'not_observed'},storage:{status:'not_observed'},
   snapshots:[],effects:[],cleanup:{package_closed:false,logged_out:false,browser_closed:false},
@@ -144,13 +152,13 @@ const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOSt
 let report=rootReport;
 let session,page,owner,packageHandle,wizardBinding,wizardHandle,wizardRoot,openedWizard=false,closeDispatched=false,closeConfirmed=false,closeDeadline=0,wizardDeadline=0,createDeadline=0,wizardAddressEpoch=0;
 let executionRuntime,executionInput,executionNode,executionPrepared,executionInputProof,executionDrop,paletteAdmission;
-const ownedPackageName=()=>executionRuntime?.persistencePackage?.prepared.package_ref.name??(coldReader?executionPrepared?.package_ref?.name:owner?.package_name);
-const ownedPackagePath=()=>executionRuntime?.persistencePackage?.path??(coldReader?executionPrepared?.package_ref?.path??null:null);
+const ownedPackageName=()=>executionRuntime?.persistencePackage?.prepared.package_ref.name??(coldReader||packageFile?executionPrepared?.package_ref?.name:owner?.package_name);
+const ownedPackagePath=()=>executionRuntime?.persistencePackage?.path??(coldReader||packageFile?executionPrepared?.package_ref?.path??null:null);
 let browserLifecycle,inputBinding,previewCloseState={dispatched:false};
 const columnState={pending:null};
 let executionJournalLine=0;
 let nativeClassifierBinding;
-let sourceCycleUncertain=false,coldOpenPending=false;
+let sourceCycleUncertain=false,coldOpenPending=false,packageFileReadUncertain=false;
 const sourceReaders=[];
 let readingExisting=false,initialOpening={};
 const schemaContext=()=>({root:wizardRoot,native:wizardHandle,binding:wizardBinding,prefix:owner.prefix,account:config.username,build:'7.4.2'});
@@ -1400,6 +1408,41 @@ try {
   if (report.geometry.viewport!==null) throw Error('Expected headed null viewport');
   report.server_os={status:'not_established',candidates:home.fields.filter(f=>/ServerOS|OperatingSystem|OSName|ServerPlatform/i.test(f.path))};
   report.storage={status:'not_established',candidates:home.fields.filter(f=>/Storage|Directory/i.test(f.path)),expected_account_folder:'/jsteach',permissions:'not_checked'};
+  if(packageFile){
+    report.stage='package-file-open';coldOpenPending=true;
+    const code=makeWorkspacePrepareCode({loginomUrl:config.url,compatibility:{profile_id:'javascript-ubuntu',loginom_build:'7.4.2',platform:'linux',browser:'chromium'},
+      sessionId:'javascript-package-file',operationId:'javascript-package-file-open',intent:'open_package',packagePath:options['--package'],timeoutMs:Math.min(120000,remainingBatch())});
+    executionPrepared=await Function('return ('+code+')')()(page);
+    await executionRecord({phase:'package_file_workspace_prepared',prepared:executionPrepared});
+    if(executionPrepared.status!=='READY'||executionPrepared.target_verified!==true)throw Error('Own saved package opening unconfirmed');
+    const binding=await bindJavascriptPackage({page,prepared:executionPrepared,account:config.username,savedPath:options['--package']});
+    try{packageHandle=await page.evaluateHandle(bound=>bound.packageNode,binding);}finally{await binding.dispose();}
+    const observed=await observe();
+    if(observed.package_name!==executionPrepared.package_ref.name||observed.prefix!==executionPrepared.workflow_ref.prefix)
+      throw Error('Own saved package identity differs');
+    owner=observed;coldOpenPending=false;await guard();await waitGraphReady();
+    try {
+      report.stage='package-file-directory';
+      report.package_file_observation=await openJavascriptPackageDirectory(page,options['--package']);await save();
+      report.stage='package-file-read';packageFileReadUncertain=true;
+      report.package_file=await readJavascriptPackageFile({page,documentId:executionPrepared.document_id,
+        path:options['--package'],directory:directory+'/package-bytes'});
+      packageFileReadUncertain=false;
+      await executionRecord({phase:'package_file_bytes_verified',receipt:report.package_file});await save();
+    } finally {
+      if(!packageFileReadUncertain){
+        report.stage='package-file-return-workflow';
+        const returnable=await page.evaluate(({account,owned,tabTid})=>{
+          const form=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
+          const card=form?.Items?.Workspace?.getActiveTab?.(),controller=card?.Controller?.FController;
+          const tabs=[...document.querySelectorAll('[data-tid]')].filter(e=>e.getAttribute('data-tid')===tabTid&&e.isConnected);
+          return form?.FMapTree?.FServerConnection?.UserName===account&&form.FMapTree.PackageNodes?.Count===1
+            &&form.FMapTree.PackageNodes.Items(0)===owned&&controller?.constructor?.name==='FileStorageForm'&&tabs.length===1;
+        },{account:config.username,owned:packageHandle,tabTid:executionPrepared.workflow_ref.tab_tid});
+        if(returnable){await page.locator('[data-tid="'+executionPrepared.workflow_ref.tab_tid+'"]').click();await waitGraphReady();await guard();}
+      }
+    }
+  }
   if(coldReader){
     report.stage='cold-open-package';await guard();coldOpenPending=true;
     const code=makeWorkspacePrepareCode({loginomUrl:config.url,compatibility:{profile_id:'javascript-ubuntu',loginom_build:'7.4.2',platform:'linux',browser:'chromium'},
@@ -1536,7 +1579,7 @@ try {
       }
     }
   }
-  if(coldReader||persistence)report.work_finished_at=new Date().toISOString();
+  if(coldReader||persistence||packageFile)report.work_finished_at=new Date().toISOString();
   report.status=coercionTrial||namedTrial||telemetryTrial||calibrationTrial?'PENDING_EVIDENCE':'OBSERVED';
 } catch(error) {
   report.status='FAILED';report.failure={stage:report.stage,...redactor.redact(javascriptProbeFailure(error))};
@@ -1548,10 +1591,11 @@ try {
   if (page&&owner&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await paletteSnapshot('failure-palette').catch(()=>{report.failure.palette_snapshot='unavailable';});
   if (page&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await refusalEvidence('work-refusal').catch(()=>{report.failure.refusal_evidence='unavailable';});
 } finally {
-  cleaning=true;if(persistence||coldReader)cleanupDeadline=Date.now()+180000;report.work_stage=report.stage;report.stage='cleanup';
+  cleaning=true;if(persistence||coldReader||packageFile)cleanupDeadline=Date.now()+180000;report.work_stage=report.stage;report.stage='cleanup';
   try {
     if (page) {
       if(coldOpenPending)throw Error('Cold package opening/binding uncertain; close own browser only');
+      if(packageFileReadUncertain)throw Error('Native package read uncertain; no UI cleanup replay, close own browser');
       if(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain))throw Error('Source cycle uncertain; no UI cleanup replay, close own browser');
       if(executionRuntime?.persistenceUncertain)throw Error('Persistence save/binding uncertain; no UI cleanup replay, close own browser');
       if(executionRuntime?.nativeReadUncertain)throw Error('Native input pending/retired or buffer cleanup unconfirmed; UI cleanup refused, close own browser');
