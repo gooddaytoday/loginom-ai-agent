@@ -1,5 +1,25 @@
 # JavaScript: checkpoint исполнения
 
+## G5 safe integer: точные границы — 2026-09-28
+
+Отдельный headed `g5-safe-integer-23`/profile187 на child revision
+`180f1d5810` доставил source SHA256
+`4191ec395e70045ec7f7e626123e849401e59eb83873be2d094560c7aa492283`.
+Свежий принадлежащий JS process завершился успешно; typed UI reader получил
+integer колонку `Result` и точные десятичные строки
+`-9007199254740991`, `0`, `9007199254740991` с precision `exact_integer`.
+Независимый oracle подтвердил schema и все клетки (`typed_oracle_verified`).
+Это не характеризует значение за границей безопасного целого; отдельный
+`g5-outside-safe` остаётся not_checked. Proof level `typed_ui_only`, native
+bytes не проверены, весь G5 этим case не закрыт.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`8deca09170bac452e5627c00a8b473f77112168522ecb924b187e854f4584b22`,
+journal SHA256
+`54bb4edf6753a552c27239d88f803e7f35d4c551d861af3cd8a19ba6e72f80ee`.
+Реестр закрыт, следующий fresh profile188.
+
 ## G5 real: четыре typed значения — 2026-09-28
 
 Отдельный headed `g5-real-22`/profile186 на child revision `180f1d5810`

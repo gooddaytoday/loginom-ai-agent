@@ -607,9 +607,35 @@
       "source_sha256": "4191ec395e70045ec7f7e626123e849401e59eb83873be2d094560c7aa492283",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_pass",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 3,
+      "all_cells_verified": true,
+      "observed_values": [
+        ["-9007199254740991"],
+        ["0"],
+        ["9007199254740991"]
+      ],
+      "number_precision": "exact_integer_decimal",
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-safe-integer-23/report.json",
+        "report_sha256": "8deca09170bac452e5627c00a8b473f77112168522ecb924b187e854f4584b22",
+        "journal_sha256": "54bb4edf6753a552c27239d88f803e7f35d4c551d861af3cd8a19ba6e72f80ee",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "g5-outside-safe",
