@@ -404,9 +404,27 @@
       "source_sha256": "bd308750f70dd6d0a1783613338360b556a0a13bcd41e0ab4e245b648a27f337",
       "schema_mode": "code",
       "expectation": "diagnostic",
-      "status": "not_checked",
+      "status": "observed_native_refusal",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "owned_operator_error_button",
+      "native_class": "SyntaxError",
+      "native_message": "SyntaxError: Syntax error at code (:4:32)",
+      "native_position": {
+        "line": 4,
+        "column": 32
+      },
+      "explicit_js_execute_count": 0,
+      "gate_passed": false,
+      "dialog_closed": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-native-parse-error-18/report.json",
+        "report_sha256": "b9f065dd22a372940f9a7501e69725a3ea07d91ae4afd147a38c20a3ef242874",
+        "journal_sha256": "5694f011b2b4cfd94b83d8275b0100cbd03cb8b9c681f510365860f8d13426f5",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "engine-input-text",

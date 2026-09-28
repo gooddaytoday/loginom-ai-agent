@@ -1,5 +1,23 @@
 # JavaScript: checkpoint исполнения
 
+## Engine native parse error: отказ мастера без Execute — 2026-09-28
+
+Отдельный headed `engine-native-parse-error-18`/profile182 на child revision
+`180f1d5810` доставил source SHA256
+`bd308750f70dd6d0a1783613338360b556a0a13bcd41e0ab4e245b648a27f337`
+с заведомо некорректным `(1 + )`. После Next `btnError` и полный штатный
+диалог показали `SyntaxError: Syntax error at code (:4:32)`.
+Оператор закрыл диалог `OK`, отдельный Execute не отправлял; результат
+`owned_wizard_refusal`, gate_passed=false. Это native parse refusal в мастере,
+а не failed child process и не калибровка общей source mapping G6/J25.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`b9f065dd22a372940f9a7501e69725a3ea07d91ae4afd147a38c20a3ef242874`,
+journal SHA256
+`5694f011b2b4cfd94b83d8275b0100cbd03cb8b9c681f510365860f8d13426f5`.
+Реестр закрыт, следующий fresh profile183.
+
 ## Engine sync throw: native marker подтверждён — 2026-09-28
 
 Отдельный headed `engine-sync-throw-17`/profile181 на child revision
