@@ -15,6 +15,23 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Следующий этап подготовлен отдельно: code-side schema telemetry
+
+Пока source94 проходит реализацию, root подготовил private
+`schema-telemetry-proposal-01/`: пять новых fixed sources T-schema-control/cyrillic/
+space/leading-digit/unicode-label с отдельными SHA256 в manifest.json. Каждый20строк,
+один output port, Integer index0 и String metadata index1. JS читает реальные
+GetColumn metadata до Append и после Integer Set; различия между snapshots сохраняет,
+не заменяет requested literals. Это proposed fixtures, не runtime admission и не live.
+Исходные D1-column cases и source94 C-set-index не изменены.
+
+Node --check прошёл для5sources; это только синтаксис, не ChakraCore/API verification.
+Root независимо проверил Integer little-endian010000000000e0ff и JSON bound8192bytes
+для худших128-unit escaped control strings. Root receipt лежит рядом с manifest.
+Следующий шаг после source94 live — рассмотреть admission и reader для этих2-column
+fixtures; результаты старых D cases ими задним числом не закрывать.
+
+
 ### Source94 в реализации: preliminary code review, не приёмка
 
 Существующая developer задача активна, revision45,
