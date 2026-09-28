@@ -82,9 +82,18 @@ function runAuth(scenario: ActiveScenario) {
     const result = yield* callAuthProbe(scenario, "missing")
     if (scenario.auth === "protected") {
       if (result.status !== 401) throw new Error(`auth expected 401, got ${result.status}`)
+      if (scenario.name === "tui.control.next") {
+        // This endpoint long-polls an in-memory queue. Its effect scenario seeds
+        // a request through withContext, but auth probes deliberately bypass
+        // that fixture. Give the authorized probe exactly one item to receive.
+        const modules = yield* Effect.promise(() => runtime())
+        modules.Tui.submitTuiRequest({ path: "/tui/auth-probe", body: { source: "auth" } })
+      }
       const authed = yield* callAuthProbe(scenario, "valid")
       if (authed.timedOut || authed.status === 0) throw new Error("auth valid probe timed out")
       if (authed.status === 401) throw new Error("auth rejected valid credentials")
+      if (scenario.name === "tui.control.next" && authed.status !== 200)
+        throw new Error(`auth valid TUI probe expected 200, got ${authed.status}`)
       return
     }
 
