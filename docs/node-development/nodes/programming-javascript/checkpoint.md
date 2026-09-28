@@ -15,6 +15,23 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source94: первый независимый запуск тестов выявил18сбоев
+
+Developer revision46 terminal, но актуальный freeze94/handoff отсутствовал;
+исторический bootstrap final не принят. Root выполнил development checks на
+неизменном snapshot1284files: metadata24PASS, deny3PASS, Python15PASS.
+Full main original67331 terminalexit1:2957PASS/18FAIL/0SKIP,37767ms.
+Основная причина: extracted production VM contexts прежних named/cardinality/
+datetime/empty/integer/set tests не получили новую metadataDiagnostic variable.
+Логи `operator94-root-initial-*-tests.txt`, receipt
+`operator94-root-initial-test-results.json`; исходники во время checks не менялись.
+
+В той же задаче назначено исправить harness, добавить actual driver/live cleanup
+integration для metadata refusal/timeout, повторить required suite и завершить
+freeze94/handoff. Это не допуск к live и не runtime commit. Проверки24capability
+не заменяют проверку полного pipeline. Старые live reports не переписывались.
+
+
 ### Следующий этап подготовлен отдельно: code-side schema telemetry
 
 Пока source94 проходит реализацию, root подготовил private
