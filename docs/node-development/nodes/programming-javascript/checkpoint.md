@@ -15,6 +15,32 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Writer13 PASS; cold01 остановлен на process boundary
+
+Writer13 original92458 terminal exit0. Report OBSERVED, persistence WRITER_OBSERVED:
+initial S1 Execute/source cycle/save1, replacement S2/readback/configured mapping,
+final Execute/full mappings до save2, save2 и final saved source cycle выполнены.
+Package closed/logged out/browser closed=true; Chrome отсутствует. Receipt
+source111-code-writer-result-13.json содержит report/journal hashes и exact saved
+path. Это первый полный code writer; независимая cold-пара и declared ещё не PASS.
+
+После его terminal cleanup запущен cold01 original76364 в fresh profile137,
+только exact saved path и technical args (source111-cold-launch-01.json), без
+expected source/settings. Terminal exit1: FAILED/cold-open-package,
+`Source process boundary: tree ambiguous`. Ошибка observeJavascriptSourceProcesses
+при evaluateHandle; выполнение узла не подтверждено. Cleanup package_closed/
+logged_out/browser_closed=true; Chrome отсутствует. Process завершился прежде
+попытки /proc receipt, поэтому такой receipt не создан; report geometry/исходники
+показывают headed/null viewport, но /proc proof cold01 не заявлять.
+
+Private source111-code-cold-result-01.json закрепляет failure и cleanup. Реестр
+closed_recovery_verified, active_exec_session=null. Следующий шаг — исследовать
+инициализацию process tree в новом saved runtime, не объявлять отсутствие дерева
+доказательством отсутствия процессов. Сохранённый writer13 package не менять.
+Next profile138/cold02; новый writer пока не нужен, если cold-only исправление
+не меняет writer и его закреплённые доказательства остаются допустимы для аудитора.
+
+
 ### Source111 writer13: активный headed запуск
 
 Перед стартом повторно проверены HEAD b47ead6d824c57f49c4905c98ff863cae4e9cae3,
