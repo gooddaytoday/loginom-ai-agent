@@ -34,3 +34,21 @@ for(const mode of ['transient','persistent','foreign'])test('link hover graph wa
  if(mode==='transient'){await prepareLinkHover(page,task,read,samePlacementGraph);assert.equal(moves,1);assert.equal(waits,1);}
  else{await assert.rejects(prepareLinkHover(page,task,read,samePlacementGraph));assert.equal(moves,0);assert.equal(waits,mode==='persistent'?2:0);}
 });
+
+for(const fault of ['epoch','label','many'])test('link hover strict refusal carries bounded evidence: '+fault,async()=>{
+ const before={nodes:[{dom_epoch:1,label:'A'}]},after=structuredClone(before);
+ if(fault==='epoch')after.nodes[0].dom_epoch=2;
+ if(fault==='label')after.nodes[0].label='X'.repeat(1000);
+ if(fault==='many')for(let i=0;i<100;i++)after['field'+i]=i;
+ let effects=0;
+ const page={locator:()=>{effects++;throw Error('Must not resolve gesture');},mouse:{move:async()=>{effects++;}}};
+ await assert.rejects(prepareLinkHover(page,{effect:{before}},async()=>after,samePlacementGraph),error=>{
+  const evidence=JSON.parse(error.message.slice('Graph changed before link hover: '.length));
+  assert.ok(evidence.differences.length<=32);
+  if(fault==='epoch')assert.deepEqual(evidence.differences,[{path:'$.nodes.0.dom_epoch',expected:1,observed:2}]);
+  if(fault==='label')assert.equal(evidence.differences[0].observed.length,128);
+  if(fault==='many')assert.equal(evidence.truncated,true);
+  return true;
+ });
+ assert.equal(effects,0);
+});
