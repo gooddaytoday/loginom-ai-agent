@@ -67,16 +67,14 @@ export function auditJavascriptPersistence({writer,cold,writerEvents,coldEvents}
   for(const cycle of cycles)for(const round of cycle.rounds)same(settingsMeaning(round.settings,saved.workflow_ref.prefix),settings,'writer settings preserved');
   same(settingsMeaning(read.source.settings,read.prepared.workflow_ref.prefix),settings,'cold settings preserved');
   const mappings=first.source_cycle.mappings.after;
-  for(const cycle of cycles){same(cycle.mappings.before,mappings,'writer mappings before');same(cycle.mappings.after,mappings,'writer mappings after');}
-  for(const observed of [read.mappings_before,read.mappings_after]){
-    for(const direction of ['input','output']){
-      const mapping=observed?.[direction],context=mapping?.node_context;
-      need(mapping?.verified===true&&mapping.inventory_complete===true&&mapping.source_identity_verified===true
-        &&mapping.settings_applied===false&&mapping.package_saved===false&&context?.verified===true,'cold mapping read proof');
-      same({document_id:context.document_id,workflow_id:context.workflow_id,node_id:context.node_id},node,'mapping owner');
-    }
-    same(javascriptSourceMappings(observed),mappings,'cold semantic mappings');
+  for(const [index,cycle] of cycles.entries())for(const side of ['before','after']){
+    const actual=cycle.mapping_evidence?.[side];
+    auditMappings(actual,mappings,writerNode,index===1);
+    same(javascriptSourceMappings(actual),cycle.mappings[side],'raw cycle mapping evidence');
   }
+  auditMappings(last.mappings_after_execute,mappings,writerNode,false);
+  auditMappings(read.mappings_before,mappings,node,true);
+  auditMappings(read.mappings_after,mappings,node,false);
   for(const save of saves){
     need(save.graph?.document_id===saved.document_id&&save.prepared?.document_id===saved.document_id
       &&save.prepared.package_ref?.persisted===true&&save.prepared.package_ref.path===path,'saved graph/preparation owner');
@@ -112,6 +110,12 @@ export function auditJavascriptPersistence({writer,cold,writerEvents,coldEvents}
     same(saveEvents[index].receipt,receipt,'save journal receipt');
     need(saveEvents[index].revision===index+1&&saveEvents[index].path===path,'save journal identity');
   }
+  const mappingEvents=writerEvents.filter(event=>event.phase==='persistence_post_execution_mappings_verified');
+  need(mappingEvents.length===1,'one post-execution mapping proof');
+  same(mappingEvents[0].mappings,last.mappings_after_execute,'post-execution mapping journal');
+  const finalTerminal=writerEvents.find(event=>event.phase==='execution_terminal'&&event.terminal?.execution_id===last.execution.execution_id);
+  need(finalTerminal&&writerEvents.indexOf(finalTerminal)<writerEvents.indexOf(mappingEvents[0])
+    &&writerEvents.indexOf(mappingEvents[0])<writerEvents.indexOf(reservations[1]),'full mapping proof before second save');
   const terminals=events=>events.filter(event=>event.phase==='execution_terminal'&&event.terminal?.trial?.node_id===node.node_id);
   same(terminals(writerEvents).map(event=>event.terminal),[first.execution,last.execution],'writer execution journal');
   same(terminals(coldEvents).map(event=>event.terminal),[read.execution],'cold execution journal');
@@ -185,6 +189,41 @@ function executionProof(execution,node,sourceSha){
     &&typeof execution.group_id==='string'&&execution.group_id&&launch.root_id===baseline.root_id&&launch.group_id===execution.group_id
     &&launch.execution_id===execution.execution_id&&execution.execution_id===node.document_id+':'+baseline.root_id+':'+execution.group_id
     &&!baseline.roots.some(row=>row.process_id===execution.group_id),'fresh process group');
+}
+// Independent audit of observed proofs; do not call the runtime admission helper.
+function auditMappings(actual,expected,node,pendingAllowed){
+  need(actual&&expected,'mapping evidence required');
+  const kinds={};
+  for(const direction of ['input','output']){
+    const m=actual[direction],c=m?.node_context;
+    need(m?.inventory_complete===true&&m.state_source==='cached_mapping_stores'
+      &&typeof m.autosync==='boolean'&&m.settings_applied===false&&m.package_saved===false
+      &&c?.verified===true&&c.surface==='wizard'&&Array.isArray(m.source_fields)&&m.source_fields.length<=1000
+      &&Array.isArray(m.target_fields)&&m.target_fields.length<=1000,'native mapping evidence');
+    same({document_id:c.document_id,workflow_id:c.workflow_id,node_id:c.node_id},node,'mapping owner');
+    const complete=m.verified===true&&m.source_identity_verified===true&&m.configured_inventory_verified!==true
+      &&m.source_pending===undefined&&(m.source_fields.length>0||m.target_fields.length===0);
+    kinds[direction]=complete;
+    if(complete)continue;
+    need(pendingAllowed&&direction==='output'&&m.verified===false&&m.source_identity_verified===false
+      &&m.configured_inventory_verified===true&&m.reason==='mapping_source_pending'
+      &&m.mapping_wizard==='DataSetOutputSocketWizard','configured-only phase');
+    const p=m.source_pending;
+    need(typeof c.tid==='string'&&c.tid.endsWith(';WizrdMCF')&&c.output_port?.direction==='output'
+      &&c.output_port.port===0&&typeof c.output_port.port_guid==='string'&&c.output_port.port_guid.length>0,'configured output owner');
+    same(p,{kind:'hidden_source_column',header_tid:c.tid+';DataSetOutputSocketWizard;grdTargetColumns;headercontainer',
+      column_tid:c.tid+';DataSetOutputSocketWizard;colSourceDisplayName',data_index:'SourceDisplayName',item_id:'colSourceDisplayName',
+      hidden:true,visible:false,source_count:0,target_count:m.target_fields.length,native_header_verified:true},'configured hidden column proof');
+    need(m.source_fields.length===0&&m.target_fields.length>0&&m.target_fields.length<=200
+      &&m.target_fields.every(t=>t.source===null&&t.exclusion_source===null&&t.excluded===false),'configured target state');
+    same(m.rendered_indices,m.target_fields.map((_,i)=>i),'configured rendered inventory');
+  }
+  const observed=javascriptSourceMappings(actual);
+  same(observed.input,expected.input,'input mapping preserved');
+  if(kinds.output){same(observed.output,expected.output,'complete output mapping preserved');return;}
+  same(observed.output.autosync,expected.output.autosync,'configured autosync');
+  const properties=fields=>fields.map(field=>Object.fromEntries(Object.entries(field).filter(([key])=>key!=='source')));
+  same(properties(observed.output.target_fields),properties(expected.output.target_fields),'configured target properties');
 }
 function sourceCycle(cycle,source,node){
   need(cycle?.source_unchanged===true&&cycle.settings_unchanged===true&&cycle.mappings_unchanged===true
