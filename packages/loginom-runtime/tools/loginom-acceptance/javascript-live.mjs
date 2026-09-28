@@ -1,3 +1,4 @@
+import {javascriptMappingState,javascriptPreservedMappings} from './javascript-mapping-state.mjs';
 import {createJavascriptSourceReader} from '../../client/lib/javascript-source-read.mjs';
 import {inspectJavascriptModulePolicy} from '../../client/lib/javascript-module-policy.mjs';
 import {verifyJavascriptPersistenceOutput} from './javascript-persistence-oracle.mjs';
@@ -724,7 +725,7 @@ const readOwnedExecutionSource=()=>page.evaluate(({root,native,binding})=>{
       for(let i=0;i<count;i++){const line=doc.getLine(i);if(typeof line!=='string'||/[\r\n\0]/.test(line))throw Error('Existing source line differs');bytes+=new TextEncoder().encode(line).length+(i?1:0);if(bytes>32768)throw Error('Existing source outside byte bound');lines.push(line);}
       return lines.join('\n');
     },schemaContext());
-const runSourceReadCycle=async(probe,deadline,expectedSettings)=>{
+const runSourceReadCycle=async(probe,deadline,expectedSettings,{allowConfiguredOnly=false}={})=>{
   // Baseline was explicitly committed/executed by setup. No execution method is
   // reachable from this adapter; Next stops on the code page, Close discards.
   const boundary=await executionRuntime.captureExecutionBoundary();
@@ -772,7 +773,7 @@ const runSourceReadCycle=async(probe,deadline,expectedSettings)=>{
   try{
     report.source_read_cycle=await verifyJavascriptSourceCycle({createReader,owner:sourceOwner,
       readMappings:async()=>({input:await executionRuntime.readPortMapping(executionNode,'input',{operationDeadline:deadline}),
-        output:await executionRuntime.readPortMapping(executionNode,'output',{operationDeadline:deadline})}),
+        output:await executionRuntime.readPortMapping(executionNode,'output',{operationDeadline:deadline,allowConfiguredOnly})}),
       checkBoundary,record:executionRecord,expectedSource:probe.source,expectedSettings,expectedGeneration});
     await save();return structuredClone(report.source_read_cycle);
   }catch(error){sourceCycleUncertain=true;throw error;}
@@ -812,13 +813,15 @@ const runColdRead=async()=>{
         await checkReadBoundary();return {closed:true,owner:readerOwner};
       }
     })});
-  const mappings=async()=>({input:await executionRuntime.readPortMapping(executionNode,'input',{operationDeadline:deadline}),
-    output:await executionRuntime.readPortMapping(executionNode,'output',{operationDeadline:deadline})});
+  const mappings=async(allowConfiguredOnly=false)=>({input:await executionRuntime.readPortMapping(executionNode,'input',{operationDeadline:deadline}),
+    output:await executionRuntime.readPortMapping(executionNode,'output',{operationDeadline:deadline,allowConfiguredOnly})});
   try{
     report.stage='cold-read-source';
     const source=await gate.read();
     report.cold={status:'SOURCE_OBSERVED',path:ownedPackagePath(),prepared:structuredClone(executionPrepared),
-      node:structuredClone(executionNode),source,graph_before:boundary.before,mappings_before:await mappings()};
+      node:structuredClone(executionNode),source,graph_before:boundary.before,mappings_before:await mappings(true)};
+    javascriptMappingState(report.cold.mappings_before.input,executionNode,{direction:'input'});
+    javascriptMappingState(report.cold.mappings_before.output,executionNode,{direction:'output',allowConfiguredOnly:true});
     await checkReadBoundary();await save();
     report.stage='cold-execute';
     const execution=await gate.execute(async checked=>{
@@ -835,6 +838,8 @@ const runColdRead=async()=>{
     report.cold.execution=execution;await save();report.stage='cold-read-output';
     report.cold.output=await executionRuntime.readOutput(executionNode,deadline);
     report.cold.mappings_after=await mappings();
+    javascriptMappingState(report.cold.mappings_after.input,executionNode,{direction:'input'});
+    javascriptMappingState(report.cold.mappings_after.output,executionNode,{direction:'output'});
     await executionRuntime.verifyExecutionBoundary(boundary);
     report.cold.graph_after=await executionRuntime.graph();
     remainingBatch();report.cold.status='COLD_OBSERVED';report.cold.persistence_verified=false;
@@ -1000,6 +1005,8 @@ const runExecutionTrial=async probe=>{
         initial:{source:first,execution,output:report.execution_probe.output},saves:[]};
       const initialCycle=await runSourceReadCycle(first,deadline);
       report.persistence.initial.source_cycle=initialCycle;
+      for(const proof of Object.values(initialCycle.mapping_evidence))
+        javascriptPreservedMappings(initialCycle.mappings.after,proof,executionNode);
       const initialSettings=initialCycle.rounds[0].settings;
       report.stage='persistence-save-initial';
       const initialSave=await executionRuntime.savePersistenceCheckpoint(1);
@@ -1020,8 +1027,9 @@ const runExecutionTrial=async probe=>{
       await exact(owner.prefix+';WizrdMCF').waitFor({state:'hidden',timeout:Math.max(1,deadline-Date.now())});openedWizard=false;
       await waitGraphReady(Math.max(1,deadline-Date.now()));
       await executionRuntime.settleAppliedNode(executionNode,deadline);
-      const beforeFinal=await runSourceReadCycle(last,deadline,initialSettings);
-      if(JSON.stringify(beforeFinal.mappings.after)!==JSON.stringify(initialCycle.mappings.after))throw Error('Persistence replacement changed mappings');
+      const beforeFinal=await runSourceReadCycle(last,deadline,initialSettings,{allowConfiguredOnly:true});
+      for(const proof of Object.values(beforeFinal.mapping_evidence))
+        javascriptPreservedMappings(initialCycle.mappings.after,proof,executionNode,{allowConfiguredOnly:true});
       const boundary=await executionRuntime.captureExecutionBoundary();
       try{
         report.stage='persistence-execute-final';
@@ -1036,12 +1044,20 @@ const runExecutionTrial=async probe=>{
         verifyJavascriptPersistenceOutput(output,2);
         await executionRuntime.verifyExecutionBoundary(boundary);
         report.persistence.final={source:last,before_execute:beforeFinal,execution:finalExecution,output};await save();
+        const mappingsAfterExecute={input:await executionRuntime.readPortMapping(executionNode,'input',{operationDeadline:deadline}),
+        output:await executionRuntime.readPortMapping(executionNode,'output',{operationDeadline:deadline})};
+      javascriptPreservedMappings(initialCycle.mappings.after,mappingsAfterExecute,executionNode);
+      report.persistence.final.mappings_after_execute=mappingsAfterExecute;
+      await executionRuntime.verifyExecutionBoundary(boundary);
+      await executionRecord({phase:'persistence_post_execution_mappings_verified',mappings:structuredClone(mappingsAfterExecute)});
+      await save();
       }finally{await boundary.native.dispose();}
       report.stage='persistence-save-final';
       const finalSave=await executionRuntime.savePersistenceCheckpoint(2);
       executionPrepared=finalSave.prepared;report.persistence.saves.push(finalSave);await save();await guard();
       const finalCycle=await runSourceReadCycle(last,deadline,initialSettings);
-      if(JSON.stringify(finalCycle.mappings.after)!==JSON.stringify(initialCycle.mappings.after))throw Error('Final saved mappings changed');
+      for(const proof of Object.values(finalCycle.mapping_evidence))
+        javascriptPreservedMappings(initialCycle.mappings.after,proof,executionNode);
       report.persistence.final.source_cycle=finalCycle;
       report.persistence.status='WRITER_OBSERVED';report.persistence.cold_persistence_verified=false;
       report.persistence.package_bytes_verified=false;

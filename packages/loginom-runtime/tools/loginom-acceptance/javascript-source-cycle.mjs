@@ -21,7 +21,8 @@ export async function verifyJavascriptSourceCycle({createReader, owner, readMapp
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const metadata = javascriptSourceIdentity(expectedSource);
   await checkBoundary();
-  const before = javascriptSourceMappings(await readMappings());
+  const evidenceBefore = structuredClone(await readMappings());
+  const before = javascriptSourceMappings(evidenceBefore);
   const rounds = [];
   let retainedSettings = expectedSettings;
   for (let round = 0; round < 2; round++) {
@@ -49,10 +50,11 @@ export async function verifyJavascriptSourceCycle({createReader, owner, readMapp
       || !same(settings, retainedSettings) || expectedGeneration !== undefined && settings.generation !== expectedGeneration) throw Error('Source/settings independent readback changed');
     rounds.push({round, ...metadata, chunks, receipts, settings, settings_sha256: createHash('sha256').update(JSON.stringify(settings)).digest('hex')});
   }
-  const after = javascriptSourceMappings(await readMappings());
+  const evidenceAfter = structuredClone(await readMappings());
+  const after = javascriptSourceMappings(evidenceAfter);
   if (!same(before, after)) throw Error('Source cycle mappings changed');
   const process = await checkBoundary();
-  const result = {rounds, mappings: {before, after}, mappings_unchanged: true, source_unchanged: true, settings_unchanged: true,
+  const result = {rounds, mapping_evidence: {before: evidenceBefore, after: evidenceAfter}, mappings: {before, after}, mappings_unchanged: true, source_unchanged: true, settings_unchanged: true,
     process, no_execute_or_done_dispatched_in_cycle: true, no_server_commit_verified: false, public_source_read_enabled: false};
   const saved = await record({phase: 'source_cycle_verified', result});
   if (!same(saved?.result, result)) throw Error('Source cycle final ACK differs');

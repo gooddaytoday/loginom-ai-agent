@@ -1,3 +1,4 @@
+import {javascriptSourceMappings} from './javascript-source-cycle.mjs';
 // Host-side admission of an observed mapping. Configured-only is explicitly
 // opt-in and never becomes a full source-identity proof.
 export function javascriptMappingState(mapping,node,{direction,allowConfiguredOnly=false}={}) {
@@ -30,4 +31,20 @@ export function javascriptMappingState(mapping,node,{direction,allowConfiguredOn
     ||JSON.stringify(mapping.rendered_indices)!==JSON.stringify(mapping.target_fields.map((_,index)=>index)))
     throw Error('Full source mapping or explicit configured-only proof required');
   return 'configured_only';
+}
+
+
+export function javascriptPreservedMappings(initial,current,node,{allowConfiguredOnly=false}={}) {
+  javascriptMappingState(current?.input,node,{direction:'input'});
+  const state=javascriptMappingState(current?.output,node,{direction:'output',allowConfiguredOnly});
+  const observed=javascriptSourceMappings(current);
+  if(JSON.stringify(observed.input)!==JSON.stringify(initial?.input))throw Error('Input mapping changed');
+  if(state==='complete'){
+    if(JSON.stringify(observed.output)!==JSON.stringify(initial?.output))throw Error('Complete output mapping changed');
+  }else{
+    const configured=mapping=>({autosync:mapping.autosync,target_fields:mapping.target_fields.map(({source,...field})=>field)});
+    if(JSON.stringify(configured(observed.output))!==JSON.stringify(configured(initial.output)))
+      throw Error('Configured output targets changed');
+  }
+  return {input:'complete',output:state};
 }
