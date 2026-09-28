@@ -166,7 +166,7 @@ test('telemetry operator uncertain transport permits own browser close only',asy
  const forbidden=name=>()=>{calls.push(name);throw Error('unexpected '+name);};
  const cleanup=vm.runInNewContext('(async()=>{try{throw Error("timeout");'+live.slice(start,end)+'}})',{
   report,executionRuntime:{nativeReadUncertain:true,metadataReadUncertain:false},page:{},owner:{},session:{context:{close:async()=>calls.push('close')}},browserLifecycle:null,
-  nativeRoundtrip:true,nativeClassifierBinding:undefined,captureJavascriptNativeClassifierDiagnostic:forbidden('classifier'),javascriptProbeFailure:e=>({message:e.message}),redactor:{text:x=>x,redact:x=>x},discoveryProbe:null,
+  sourceCycleUncertain:false,sourceReaders:[],nativeRoundtrip:true,nativeClassifierBinding:undefined,captureJavascriptNativeClassifierDiagnostic:forbidden('classifier'),javascriptProbeFailure:e=>({message:e.message}),redactor:{text:x=>x,redact:x=>x},discoveryProbe:null,
   snapshot:forbidden('snapshot'),paletteSnapshot:forbidden('palette'),refusalEvidence:forbidden('refusal'),guard:forbidden('guard'),observe:forbidden('observe'),click:forbidden('click'),
   calibrationTrial:null,coercionTrial:null,namedTrial:null,telemetryTrial:{finish:async()=>calls.push('finish')},executionRecord:async e=>e,save:async()=>{},Date,cleaning:false
  });
