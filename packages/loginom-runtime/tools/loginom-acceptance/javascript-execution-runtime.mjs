@@ -879,7 +879,7 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
           const mapping=characterize?characterizeJavascriptMapping(state,reference,{failedExecution}):state.node_mapping;
           if(allowConfiguredOnly)javascriptMappingState(mapping,reference,{direction,allowConfiguredOnly:true});
           await record({phase:characterize?'port_mapping_characterized':'port_mapping_observed',direction,node,mapping});return mapping;
-        } catch(error){observationError=error;throw error;
+        } catch(error){if(!opened)nativeReadUncertain=true;observationError=error;throw error;
         } finally {
           try{if(opened)await closeJavascriptPortMapping({reader,direction,reference,record,deadline:Math.min(readDeadline,Date.now()+15000),verifyGraph:async()=>{
             const checked=await page.evaluate(captureJavascriptNativeTopology,{previous:native,checkOnly:true});
@@ -889,6 +889,7 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
             requireJavascriptGraphUnchanged(before,after);
             await record({phase:'port_mapping_original_graph_verified',direction,checked,before,after});
           }});}catch(cleanupError){
+            nativeReadUncertain=true;
             if(!observationError)throw cleanupError;
             const combined=new AggregateError([observationError,cleanupError],observationError.message,{cause:observationError});
             combined.observationError=observationError;combined.cleanupError=cleanupError;throw combined;

@@ -66,3 +66,21 @@ for(const fault of ['ok','lock','position','native','journal','journal-mutates']
       assert.deepEqual(diagnostic.before,before);assert.deepEqual(diagnostic.after,after);
     }
   });
+
+
+for(const fault of ['opening-ambiguous','opening-transport','close'])test('actual mapping refusal retains cleanup uncertainty: '+fault,async()=>{
+ const calls=[],before=make();
+ const scope={Date,Math,Error,AggregateError,structuredClone,deadline:Date.now()+10000,nativeReadUncertain:false,
+  prepared:{document_id:'doc',workflow_ref:{workflow_id:'workflow'}},
+  requireJavascriptTopology:graph=>requireJavascriptGraphUnchanged(graph,graph),requireJavascriptGraphUnchanged,captureJavascriptNativeTopology,
+  graph:async()=>before,
+  channel:()=>({openPort:async()=>{calls.push('open');if(fault!=='close')throw Error(fault);},observe:async()=>({node_mapping:{verified:true}})}),
+  page:{evaluateHandle:async()=>({dispose:async()=>calls.push('dispose')})},
+  closeJavascriptPortMapping:async()=>{calls.push('close');throw Error('close');},record:async()=>{},
+ };
+ const context=vm.createContext(scope);
+ const method=vm.runInContext('({'+source.slice(mappingStart,mappingEnd)+'}).readPortMapping',context);
+ await assert.rejects(method({node_id:'js'},'input'),new RegExp(fault==='close'?'close':fault));
+ assert.equal(scope.nativeReadUncertain,true);
+ assert.deepEqual(calls,fault==='close'?['open','close','dispose']:['open','dispose']);
+});
