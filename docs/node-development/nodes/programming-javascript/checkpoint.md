@@ -15,6 +15,19 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source96 возобновлён после неактуального final
+
+Authoritative wait подтвердил завершение developer revision54/turn
+01a0e5f4-f9f0-7072-9c58-13ca65f3e425. Runtime не изменён; вместо source96handoff
+получен исторический bootstrap memory report. Он не принят как выполнение задания.
+ROOT возобновил ту же задачу с актуальным HEAD740c442e3087841d749187086da16fc80e1d895a,
+canonical telemetry design, точными inputs/tests/freeze96 deliverables и явным
+напоминанием, что исходный bootstrap запрет разработки давно отменён назначением.
+Revision55/turn01a0e5fa-03e3-7032-a05a-786a06ae1b19 подтверждён active.
+Новых задач/браузеров нет. Следующая проверка — actual source96 diff/tests/handoff,
+а не повторная регистрация памяти. Goal остаётся active, blocker не объявлен.
+
+
 ### Source96: независимый scalar oracle подготовлен
 
 Пока developer revision53 реализует T-family, ROOT подготовил private
