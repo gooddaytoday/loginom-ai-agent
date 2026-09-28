@@ -15,6 +15,21 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Проверка состояния после сообщения о случайном клике (source96)
+
+Повторная проверка `/proc` не обнаружила pinned Chromium. Реестр сохраняет
+profile108 `closed_logout_verified`; recovery02 подтверждает packages=0,
+loggedOut=true и browserClosed=true. SHA256 recovery02 остаётся
+`7cd23804e5bba84549973aace5533164bc490ccc0e404066e16576a983b436ec`.
+Последний live source95 не засчитан успешным; его report сохранён без изменений
+(SHA256 `eb778fb1f8ab109f7b025e56a7de74a64522df8acc9bced1efd845574841efdb`).
+Сообщение пользователя — свидетельство возможного внешнего вмешательства,
+но время и затронутый запуск не установлены; причинная связь с socket mismatch
+не доказана. OpenViking health успешен. Developer revision55 ещё inProgress;
+новых live-запусков и повторного Execute в рамках этой проверки не было.
+Следующий live остаётся разрешён только после source96 freeze/review/tests,
+в новом headed profile109.
+
 ### Source96: первые runtime edits и предварительное ROOT review
 
 В active revision55 появились telemetry catalog, изменения owner/binding/read/
