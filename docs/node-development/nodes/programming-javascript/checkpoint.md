@@ -37,7 +37,8 @@ Runtime commit f96f2e81fc.25 focused tests PASS/0FAIL; отрицательны�
 сочетают SVG replacement с изменением position/locked/ports/node_id/document/links
 и требуют отказа до любых locator/gesture действий. Full client original34897
 (source109-full-client.log) и main original60205 (source109-main.log) запущены.
-Оба пока требуют terminal polling; не запускать дубль. Source109 live/freeze
+Main original60205 завершён exit0:3609PASS/0FAIL/0SKIP. Full client34897
+ещё требует terminal polling; не запускать дубль. Source109 live/freeze
 ещё не выполнены. Следующий fresh profile133/writer11.
 
 
