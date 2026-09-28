@@ -66,7 +66,7 @@ test('source uncertain actual operator catch/finally only closes its browser',as
   report,sourceCycleUncertain:true,sourceReaders:[],executionRuntime:{nativeReadUncertain:false,metadataReadUncertain:false},page:{},owner:{},session:{context:{close:async()=>calls.push('browser-close')}},browserLifecycle:null,
   nativeRoundtrip:false,nativeClassifierBinding:undefined,captureJavascriptNativeClassifierDiagnostic:forbidden('classifier'),javascriptProbeFailure:e=>({message:e.message}),redactor:createRedactor(),discoveryProbe:null,
   snapshot:forbidden('snapshot'),paletteSnapshot:forbidden('palette'),refusalEvidence:forbidden('refusal'),guard:forbidden('guard'),observe:forbidden('observe'),click:forbidden('click'),
-  calibrationTrial:null,coercionTrial:null,namedTrial:null,telemetryTrial:null,executionRecord:async e=>e,save:async()=>{},Date,cleaning:false,persistence:null,coldReader:false,coldOpenPending:false,cleanupDeadline:Infinity
+  calibrationTrial:null,coercionTrial:null,namedTrial:null,telemetryTrial:null,executionRecord:async e=>e,save:async()=>{},Date,cleaning:false,persistence:null,coldReader:false,packageFile:false,packageFileReadUncertain:false,coldOpenPending:false,cleanupDeadline:Infinity
  });
  await cleanup();assert.deepEqual(calls,['browser-close']);assert.equal(report.cleanup.browser_closed,true);assert.equal(report.cleanup.package_closed,false);assert.equal(report.status,'CLEANUP_UNCONFIRMED');
 });

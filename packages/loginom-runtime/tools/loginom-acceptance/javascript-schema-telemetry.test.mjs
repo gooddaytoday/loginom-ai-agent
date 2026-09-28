@@ -168,7 +168,7 @@ test('telemetry operator uncertain transport permits own browser close only',asy
   report,executionRuntime:{nativeReadUncertain:true,metadataReadUncertain:false},page:{},owner:{},session:{context:{close:async()=>calls.push('close')}},browserLifecycle:null,
   sourceCycleUncertain:false,sourceReaders:[],nativeRoundtrip:true,nativeClassifierBinding:undefined,captureJavascriptNativeClassifierDiagnostic:forbidden('classifier'),javascriptProbeFailure:e=>({message:e.message}),redactor:{text:x=>x,redact:x=>x},discoveryProbe:null,
   snapshot:forbidden('snapshot'),paletteSnapshot:forbidden('palette'),refusalEvidence:forbidden('refusal'),guard:forbidden('guard'),observe:forbidden('observe'),click:forbidden('click'),
-  calibrationTrial:null,coercionTrial:null,namedTrial:null,telemetryTrial:{finish:async()=>calls.push('finish')},executionRecord:async e=>e,save:async()=>{},Date,cleaning:false,persistence:null,coldReader:false,coldOpenPending:false,cleanupDeadline:Infinity
+  calibrationTrial:null,coercionTrial:null,namedTrial:null,telemetryTrial:{finish:async()=>calls.push('finish')},executionRecord:async e=>e,save:async()=>{},Date,cleaning:false,persistence:null,coldReader:false,packageFile:false,packageFileReadUncertain:false,coldOpenPending:false,cleanupDeadline:Infinity
  });
  await cleanup();assert.deepEqual(calls,['close','finish']);assert.equal(report.cleanup.browser_closed,true);assert.equal(report.cleanup.package_closed,false);assert.equal(report.status,'CLEANUP_UNCONFIRMED');
 });

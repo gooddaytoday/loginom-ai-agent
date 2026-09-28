@@ -97,7 +97,7 @@ for(const transportFails of [false,true])test('actual live catch/finally retains
   const outcome=await vm.runInContext(`(async()=>{
     const report={stage:'prepare-typed-input',cleanup:{package_closed:false,logged_out:false,browser_closed:false}},redactor={redact:x=>x,text:x=>x},javascriptProbeFailure=e=>({message:e.message});
     const calibrationTrial=null,coercionTrial=null,namedTrial=null,telemetryTrial=null,nativeRoundtrip=true,nativeClassifierBinding={context:{node_id:'n'}},discoveryProbe=false;
-    const persistence=null,coldReader=false,coldOpenPending=false,sourceCycleUncertain=false,sourceReaders=[];
+    const persistence=null,coldReader=false,packageFile=false,packageFileReadUncertain=false,coldOpenPending=false,sourceCycleUncertain=false,sourceReaders=[];
     let cleaning=false;
     const executionRuntime=null,paletteAdmission=null,createDeadline=0,packageHandle=null,owner=null,initialOpening={},openedWizard=false,browserLifecycle=null;
     const noop=async()=>{}, locator={filter(){return this},locator(){return this},waitFor:noop,innerText:async()=> 'account'};

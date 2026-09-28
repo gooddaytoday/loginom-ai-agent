@@ -287,7 +287,7 @@ for(const fault of ['membership','socket','timeout','ack','ok'])test('metadata p
     sourceCycleUncertain:false,sourceReaders:[],nativeRoundtrip:true,nativeClassifierBinding:undefined,captureJavascriptNativeClassifierDiagnostic:forbidden('classifier'),
     javascriptProbeFailure:e=>({message:e.message}),redactor:{text:v=>v,redact:v=>v},discoveryProbe:null,
     snapshot:forbidden('snapshot'),paletteSnapshot:forbidden('palette'),refusalEvidence:forbidden('refusal'),guard:forbidden('guard'),observe:forbidden('observe'),
-    click:forbidden('click'),calibrationTrial:null,coercionTrial:null,namedTrial:null,telemetryTrial:null,save:async()=>{calls.push('save');},Date,cleaning:false,persistence:null,coldReader:false,coldOpenPending:false,cleanupDeadline:Infinity
+    click:forbidden('click'),calibrationTrial:null,coercionTrial:null,namedTrial:null,telemetryTrial:null,save:async()=>{calls.push('save');},Date,cleaning:false,persistence:null,coldReader:false,packageFile:false,packageFileReadUncertain:false,coldOpenPending:false,cleanupDeadline:Infinity
   });
   await cleanup();assert.deepEqual(calls,['own-context-close','save']);
   assert.equal(report.status,'CLEANUP_UNCONFIRMED');assert.match(report.cleanup.failure,/UI cleanup refused/);
