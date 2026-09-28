@@ -13,11 +13,19 @@ export function javascriptPackageBindingRequest({prepared, account, savedPath}) 
   if (savedPath === undefined) {
     if (prepared.package_ref?.persisted !== false || prepared.package_ref.path != null)
       throw Error('Own JavaScript draft required');
-  } else if (typeof savedPath !== 'string'
-    || !/^\/jsteach\/js-g2-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/JavaScript-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.lgp$/.test(savedPath)
-    || prepared.package_ref?.persisted !== true || prepared.package_ref.path !== savedPath)
-    throw Error('Exact owned saved JavaScript package required');
+  } else {
+    requireJavascriptSavedPackagePath(savedPath);
+    if (prepared.package_ref?.persisted !== true || prepared.package_ref.path !== savedPath)
+      throw Error('Exact owned saved JavaScript package required');
+  }
   return {prepared: structuredClone(prepared), account, path: savedPath ?? null};
+}
+
+export function requireJavascriptSavedPackagePath(path) {
+  if (typeof path !== 'string'
+    || !/^\/jsteach\/js-g2-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/JavaScript-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.lgp$/.test(path))
+    throw Error('Exact owned saved JavaScript package required');
+  return path;
 }
 
 // Serialized read-only native observation; no server calls or setters. The

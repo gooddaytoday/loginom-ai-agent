@@ -171,7 +171,7 @@ for(const id of ['K1-parse-v1','K3-shift-v1','K4-native-caller-v1'])for(const st
  const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8'),start=source.indexOf('const runExecutionTrial=async probe=>'),end=source.indexOf('const verifyBatchInputIdentity=',start);
  const before={...x.before,messages:[]},after={...before,native_owner_verified:true,messages:[]},calls=[],report={execution_probe:{}};
  const stageReader=()=>{};
- const runner=vm.runInNewContext(source.slice(start,end)+'\nrunExecutionTrial',{persistence:null,
+ const runner=vm.runInNewContext(source.slice(start,end)+'\nrunExecutionTrial',{persistence:null,coldReader:false,coldOpenPending:false,
   nativeRoundtrip:true,nativeCalibrationId:id,calibrationTrial:trial,coercionTrial:null,namedTrial:null,discoveryProbe:null,
   phaseDeadline:()=>Date.now()+30000,executionCase:'code-table-execute',report,owner:{prefix:'p'},executionNode:{node_id:'js'},executionInput:input,
   executionRuntime:{once:async(id,b,action)=>action(),executeNode:async()=>assert.fail('no Execute')},

@@ -1,11 +1,9 @@
-import {javascriptPersistenceMarker} from './javascript-persistence-cases.mjs';
-
 // Independent of Loginom configuration/execute drivers. Do not construct the
 // expected table by evaluating the source or copying a prior preview result.
 export function verifyJavascriptPersistenceOutput(table, revision) {
   if (revision !== 1 && revision !== 2) throw Error('Persistence revision refused');
   const ids = ['1', '2', '3', '4', '5', '6'];
-  const marker = revision === 1 ? 'JS_G2_TABLE_V1' : javascriptPersistenceMarker;
+  const marker = revision === 1 ? 'JS_G2_TABLE_V1' : 'JS_G7_FINAL_V2 — Сумма & <tag> "quotes" \'single\' \\ backslash 😀';
   const columns = [{name: 'ObservedID', type: 'integer'}, {name: 'PhaseMarker', type: 'string'}];
   if (table?.sample_complete !== true || table.row_count !== 6 || table.sample_rows !== 6
     || table.truncated === true || table.sample?.length !== 6 || table.schema?.length !== 2

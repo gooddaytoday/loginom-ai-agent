@@ -112,7 +112,7 @@ for (const saved of [false,true]) for (const fault of ['ok','account','path','na
     if (fault === 'prefix') surface.prefix = 'MF;TF-2';
     const native = vm.createContext({bg:{app:{Application:{FInstance:{FMainForm:{FMapTree:{PackageNodes:{Count:1,
       Items:()=>fault==='native'?{}:packageHandle}}}}}}}});
-    const guard = vm.runInNewContext(helpers + body + '\nguard', {owner:{package_name:'Draft',prefix:'MF;TF-1'},packageHandle,
+    const guard = vm.runInNewContext(helpers + body + '\nguard', {coldReader:false,owner:{package_name:'Draft',prefix:'MF;TF-1'},packageHandle,
       executionRuntime:{persistencePackage:saved?{path,prepared:{package_ref:{name}}}:null},
       config:{username:'jsteach'},remainingBatch:()=>1000,observe:async()=>surface,
       page:{evaluate:async(fn,arg)=>vm.runInContext('('+fn.toString()+')',native)(arg)}});

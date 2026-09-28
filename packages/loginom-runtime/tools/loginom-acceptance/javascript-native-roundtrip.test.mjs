@@ -222,7 +222,7 @@ test('production roundtrip trial revalidates before one Execute and never retrie
   const start=source.indexOf('const runExecutionTrial=async probe=>'),end=source.indexOf('const verifyBatchInputIdentity=',start);
   for(const failure of ['none','characterized','admission','read','done-lost','done-unconfirmed','preflight-ack','seal-ack']){
     const steps=[],report={execution_probe:{}},deadline=Date.now()+10000;
-    const runner=vm.runInNewContext(source.slice(start,end)+'\nrunExecutionTrial',{persistence:null,
+    const runner=vm.runInNewContext(source.slice(start,end)+'\nrunExecutionTrial',{persistence:null,coldReader:false,coldOpenPending:false,
       nativeRoundtrip:true,calibrationTrial:null,telemetryTrial:null,coercionTrial:null,namedTrial:null,discoveryProbe:null,phaseDeadline:()=>deadline,executionCase:'code-table-execute',report,owner:{prefix:'p'},executionNode:{node_id:'js'},executionInput:{},
       executionRuntime:{checkNativeRoundtripBeforeExecute:async()=>{steps.push('admission');if(failure==='admission')throw Error('changed input');},
         captureExecutionBoundary:async()=>({native:{dispose:async()=>steps.push('dispose')}}),verifyExecutionBoundary:async()=>steps.push('boundary'),

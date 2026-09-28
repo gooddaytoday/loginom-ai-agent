@@ -43,7 +43,7 @@ for(const fault of ['ok','open-lost','close-lost','process','settings','source',
  const body=code.slice(code.indexOf('const runSourceReadCycle=async'),code.indexOf('const runExecutionTrial=async'));
  const f=sourceFixture(source),events=[],calls=[],report={execution_schema:schema()};let opens=0;
  const page={evaluateHandle:async(fn,args)=>{const held=fn===observeJavascriptSourceProcesses?f.processes(args):f.observe(args);held.dispose=async()=>{};return held;},evaluate:async(fn,args)=>fn===observeJavascriptSourceProcesses?f.processes(args):f.observe(args)};
- const env={persistence:null,structuredClone,createJavascriptSourceReader,observeJavascriptSource,observeJavascriptSourceProcesses,verifyJavascriptSourceCycle,javascriptSourceSettings,Date,Error,Math,report,page,
+ const env={persistence:null,coldReader:false,coldOpenPending:false,structuredClone,createJavascriptSourceReader,observeJavascriptSource,observeJavascriptSourceProcesses,verifyJavascriptSourceCycle,javascriptSourceSettings,Date,Error,Math,report,page,
   executionPrepared:{document_id:'document',workflow_ref:{workflow_id:'workflow'}},executionNode:{node_id:'node'},redactor:createRedactor(),phaseDeadline:ms=>Date.now()+ms,
   schemaContext:()=>f.context,wizardAddressEpoch:0,wizardHandle:null,wizardRoot:null,openedWizard:false,closeDispatched:false,closeConfirmed:false,closeDeadline:0,wizardDeadline:0,readingExisting:false,
   sourceReaders:[],sourceCycleUncertain:false,save:async()=>calls.push('save'),waitWizardReady:async()=>{},
@@ -66,7 +66,7 @@ test('source uncertain actual operator catch/finally only closes its browser',as
   report,sourceCycleUncertain:true,sourceReaders:[],executionRuntime:{nativeReadUncertain:false,metadataReadUncertain:false},page:{},owner:{},session:{context:{close:async()=>calls.push('browser-close')}},browserLifecycle:null,
   nativeRoundtrip:false,nativeClassifierBinding:undefined,captureJavascriptNativeClassifierDiagnostic:forbidden('classifier'),javascriptProbeFailure:e=>({message:e.message}),redactor:createRedactor(),discoveryProbe:null,
   snapshot:forbidden('snapshot'),paletteSnapshot:forbidden('palette'),refusalEvidence:forbidden('refusal'),guard:forbidden('guard'),observe:forbidden('observe'),click:forbidden('click'),
-  calibrationTrial:null,coercionTrial:null,namedTrial:null,telemetryTrial:null,executionRecord:async e=>e,save:async()=>{},Date,cleaning:false,persistence:null,cleanupDeadline:Infinity
+  calibrationTrial:null,coercionTrial:null,namedTrial:null,telemetryTrial:null,executionRecord:async e=>e,save:async()=>{},Date,cleaning:false,persistence:null,coldReader:false,coldOpenPending:false,cleanupDeadline:Infinity
  });
  await cleanup();assert.deepEqual(calls,['browser-close']);assert.equal(report.cleanup.browser_closed,true);assert.equal(report.cleanup.package_closed,false);assert.equal(report.status,'CLEANUP_UNCONFIRMED');
 });
