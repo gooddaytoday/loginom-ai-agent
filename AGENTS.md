@@ -1,10 +1,15 @@
-## Node development — актуально 2026-09-24
+## Разработка узлов Loginom Lab
 
-Для разработки обработчиков узлов сначала прочитать [канонический регламент](docs/node-development/README.md).
-Он определяет orchestration/single/plan-authoring, принятые модели, изоляцию и CLI-приёмку.
-Для новых обработчиков продуктовая база — явно закреплённый SHA ветки `loginom`
-в loginom-ai-agent. Прежние Hermes/Dock node workflows — исторические источники.
-Документация сама не запускает очередь; слияние и выпуск требуют отдельной команды.
+Разработка продукта остаётся в `loginom-ai-agent` на явно закреплённом SHA
+ветки `loginom`. Комплект `docs/node-development` — **reference/historical**:
+его планы, команды, readiness и правила кампаний не выдают новое назначение.
+
+Владелец нового регламента — `kartamyshev-dev/loginom-swarm`,
+`doc/node-development`. Статус подготовки и закреплённая ссылка указаны
+в [историческом комплекте](docs/node-development/README.md).
+Подготовка `NOT_READY` не разрешает обработку узлов или Eval.
+Текущие назначения и владение работой определяет Paperclip, компания Loginom Lab.
+Слияние и выпуск требуют отдельной команды.
 
 - To regenerate the legacy JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit `src/generated` or `src/generated-effect` directly.
