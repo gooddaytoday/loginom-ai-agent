@@ -273,3 +273,32 @@ for(const [name,change] of Object.entries({
 }))test('configured-only mapping rejects '+name,()=>{
  const f=pendingFixture();change(f);const r=f.read();assert.equal(r.verified,false);assert.notEqual(r.configured_inventory_verified,true);
 });
+
+
+test('mapping read admits only its native disabled output delete-column mask',()=>{
+ const variants=['valid','enabled','foreign-native','foreign-root','foreign-view','foreign-tid','duplicate-column','duplicate-mask','loading','message','dialog','text','input'];
+ for(const variant of variants){
+  const f=fixture(variant==='input'?{input:true}:{socket:true});
+  const wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
+  const model={FView:{el:{dom:wizard}}};
+  const workspace={getActiveTab:()=>({Controller:{FController:model}})};
+  f.context.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:workspace}}}}}};
+  const column=f.el(f.base+'colTargetDelete','',f.root);f.views[column.id]={el:{dom:column},disabled:true};
+  const mask=f.el(null,'',column);mask.parentElement=column;mask.mask=true;
+  const classes=new Set(['x-mask','x-border-box']);mask.classList.contains=name=>classes.has(name);
+  if(variant==='enabled')f.views[column.id].disabled=false;
+  if(variant==='foreign-native')f.views[column.id].el.dom={};
+  if(variant==='foreign-root')column.parent={};
+  if(variant==='foreign-view')model.FView.el.dom={};
+  if(variant==='foreign-tid')column.tid='other-column';
+  if(variant==='duplicate-column')f.el(column.tid);
+  if(variant==='duplicate-mask'){const second=f.el(null,'',column);second.mask=true;second.parentElement=column;}
+  if(variant==='loading')classes.add('x-mask-msg');
+  if(variant==='message')classes.add('bg-mask-message');
+  if(variant==='dialog')mask.attrs.role='dialog';
+  if(variant==='text')mask.textContent='Loading';
+  const result=f.read();
+  assert.equal(result.verified,variant==='valid',variant+': '+result.reason);
+  if(variant!=='valid')assert.equal(result.reason,'mapping_mask',variant);
+ }
+});
