@@ -15,6 +15,26 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source105: owned header/cached target диагностика
+
+Runtime commit `bc34daf8fa02d8ed131a4b5e90f449dde1b73ffd`. Только при прежнем
+mapping_render_value дополнительно читаются local Ext headerCt.getGridColumns
+(до32 колонок, только header DOM внутри своего root), dataIndex/itemId/hidden/
+DOM binding/visibility, до32 уже validated cached target definitions и tids
+ячеек текущей строки. Недоступный/чужой/ошибочный header не допускает mapping;
+успешный путь optional headers не читает. verified:false и equality неизменны.
+
+Main3563PASS/0FAIL/0SKIP (original86503 exit0); focused mapping/procedure72PASS,
+0FAIL/0SKIP. Full client2770PASS/10SKIP относится к source104; после узкого
+расширения диагностики повторены actual changed-reader/procedure и JS suite,
+а не полный client suite.127 preexisting docs сохранены;2 syntax checks PASS.
+Freeze105:1322 pins, closure203 files/629 edges; manifest
+javascript-freeze105-root-final-source.json SHA
+b347f606e60f90c91d8bb09493b1f9c2330da17440d20b663c14f38d9dfcfc94.
+Writer08/profile129 headed/sandbox запущен, original5590 ещё ожидает terminal.
+Не запускать другой browser до завершения. OpenViking health успешен.
+
+
 ### Source104: bounded диагностика несовпавшей mapping ячейки
 
 Runtime commit `0b9b7e2c1cbdd7a4ac4fc1a175ac950e7b10d042`. Общий cached mapping
