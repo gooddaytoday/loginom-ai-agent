@@ -15,6 +15,32 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Writer10 установил node DOM epoch delta; source109 исправляет pre-hover rebinding
+
+Original13153 terminal exit1. Failure link-js-input: единственная разница
+`$.nodes.0.dom_epoch`, expected11/observed12; bounded diagnostic truncated:false.
+Save и первый JS Execute не достигнуты. Cleanup package_closed/logged_out/
+browser_closed=true; Chrome отсутствует. Receipt source108-code-writer-result-10.json,
+реестр active_exec_session=null. Причину source109 обосновывает этот новый exact
+native graph read; вмешательство пользователя не предполагается.
+
+В adapter уже используется samePlacementGraph на readBindings, непосредственно
+перед hover gesture и после hover. Первый read prepareLinkHover ошибочно сохранял
+полное JSON equality вместе с per-node DOM epochs. Source109 применяет там тот
+же complete graph comparator, исключающий только per-node dom_epoch; document,
+root epoch, ref, position, locked, ports, links и прочие свойства сравниваются.
+После проверки exact source locator/hit и свежий graph после hover передаются
+прежнему pinned link primitive с новыми epochs. Retry/повтор drag не добавлен.
+Альтернатива игнорировать весь graph либо переиграть ambiguous link отклонена.
+
+Runtime commit f96f2e81fc.25 focused tests PASS/0FAIL; отрицательные проверки
+сочетают SVG replacement с изменением position/locked/ports/node_id/document/links
+и требуют отказа до любых locator/gesture действий. Full client original34897
+(source109-full-client.log) и main original60205 (source109-main.log) запущены.
+Оба пока требуют terminal polling; не запускать дубль. Source109 live/freeze
+ещё не выполнены. Следующий fresh profile133/writer11.
+
+
 ### Source108 проверен и закреплён; writer10 работает
 
 Main3609PASS/0FAIL/0SKIP, original24363 exit0; full client2800PASS/0FAIL/10SKIP,
