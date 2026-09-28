@@ -38,7 +38,7 @@ for(const args of [['--execution-case','code-table-execute'],['--probe-source'],
 // Execute the actual private operator adapter around the production reader.
 // Browser navigation/transport and schema UI are synthetic; reader/process
 // browser functions execute unchanged in a separate realm, no browser launch.
-for(const fault of ['ok','open-lost','close-lost','process','settings','source','ack'])test('source actual operator helper '+fault,async()=>{
+for(const fault of ['ok','open-lost','close-lost','unlock-lost','process','settings','source','ack'])test('source actual operator helper '+fault,async()=>{
  const code=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
  const body=code.slice(code.indexOf('const runSourceReadCycle=async'),code.indexOf('const runExecutionTrial=async'));
  const f=sourceFixture(source),events=[],calls=[],report={execution_schema:schema()};let opens=0;
@@ -50,7 +50,7 @@ for(const fault of ['ok','open-lost','close-lost','process','settings','source',
   inspectWizardPages:async()=>{report.execution_existing_schema=schema();if(fault==='settings'&&opens===2)report.execution_existing_schema.grids[0].fields[0].DisplayName='changed';},
   closeWizardOnce:async()=>{calls.push('close');if(fault==='close-lost')throw Error('lost Close');if(fault==='process')f.processRecord.data.Status=1;},
   executionRecord:async event=>{events.push(event);return fault==='ack'&&event.phase==='source_delivery_verified'?{}:event;},
-  executionRuntime:{captureExecutionBoundary:async()=>({native:{dispose:async()=>{}}}),verifyExecutionBoundary:async()=>{},
+  executionRuntime:{captureExecutionBoundary:async()=>({native:{dispose:async()=>{}}}),verifyExecutionBoundary:async()=>{},settleClosedExecutionBoundary:async()=>{calls.push('unlock');if(fault==='unlock-lost')throw Error('Close unlock unconfirmed');},
    readPortMapping:async()=>mapping(),handoffReopenedWizard:async()=>{},reopen:async()=>{calls.push('open');opens++;f.binding.wizardAddress.epoch=opens;if(fault==='open-lost')throw Error('lost open');if(fault==='source'&&opens===2)f.setSource(source+' ');}}
  };
  const realm=vm.createContext(env);vm.runInContext(body+'\nglobalThis.run=runSourceReadCycle;',realm);

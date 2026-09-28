@@ -1,3 +1,4 @@
+import {settleJavascriptCloseBoundary} from './javascript-close-boundary.mjs';
 import {javascriptCalibrationCase} from './javascript-calibration-cases.mjs';
 import {bindJavascriptPackage, javascriptPackageBindingRequest, observeJavascriptPackageBinding} from './javascript-package-binding.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from './javascript-persistence-save.mjs';
@@ -671,7 +672,7 @@ export async function createJavascriptSavedExecutionRuntime(options) {
   // No channel, import, source edit, create/connect, save or configure surface.
   return Object.freeze({graph:runtime.graph,reopen:runtime.reopen,handoffReopenedWizard:runtime.handoffReopenedWizard,
     readPortMapping:runtime.readPortMapping,captureExecutionBoundary:runtime.captureExecutionBoundary,
-    verifyExecutionBoundary:runtime.verifyExecutionBoundary,restoreWorkflowForCleanup:runtime.restoreWorkflowForCleanup,
+    verifyExecutionBoundary:runtime.verifyExecutionBoundary,settleClosedExecutionBoundary:runtime.settleClosedExecutionBoundary,restoreWorkflowForCleanup:runtime.restoreWorkflowForCleanup,
     get nativeReadUncertain(){return runtime.nativeReadUncertain;},
     get passiveSurfacePending(){return runtime.passiveSurfacePending;},
     get wizardOpeningPending(){return runtime.wizardOpeningPending;},
@@ -1116,6 +1117,14 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
       }catch(error){
         await record({phase:'javascript_palette_topology_refused',source,id,reason:String(error.message)});throw error;
       }finally{await native?.dispose();}
+    },
+    async settleClosedExecutionBoundary(boundary,node,operationDeadline) {
+      return settleJavascriptCloseBoundary({before:boundary.before,node,deadline:Math.min(deadline,operationDeadline),record,
+        observe:async()=>{
+          await accountGuard();
+          await page.evaluate(captureJavascriptNativeTopology,{previous:boundary.native,checkOnly:true});
+          return graph();
+        }});
     },
     async captureExecutionBoundary() {
       await accountGuard();const before=await graph();requireJavascriptTopology(before);
