@@ -16,6 +16,30 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source118 live: mask исправлен, cached source/target пусты
+
+Child0268af373e9463dbb9bd51944e7b518bd613281a: main44452 exit0/3618PASS,
+client95532 exit0/2811PASS/10SKIP,focused82PASS,syntaxPASS. Freeze118 SHA
+b1d23343368813bdb70784478bf021e4dbbf9893b85efe5517669c7e357bcf87,
+1324pins/211files647edges/computed0. Pins перепроверены перед live.
+source118-port-diagnostic-06/profile159/original34552 exit0. /proc PID551647
+headed+sandbox+exactprofile. Port opening SUCCEEDED, mapping_mask больше нет.
+Новый refusal mapping_render_bound. Дополнительное read-only наблюдение native
+Ext stores: source и target count=total=cached_count=0, loading=false,
+rendered_rows=0, fields=[]. Это UI-cache evidence, не данные server dataset.
+Driver finally закрыл мастер и подтвердил прежний graph, nativeReadUncertain=false.
+Operator затем закрыл package, inspect packages=0, logout/browser close confirmed.
+
+Source119 design: допустить отсутствие rendered rows только для
+DataSetOutputSocketWizard, если обе проверенные cached inventories пусты.
+Все store/loading/filter/total/owner/autosync проверки сохраняются; непустые
+stores без строк, чужие формы и stale rows остаются отказами. Возвращать именно
+пустые arrays, не ожидаемые writer колонки. Regression включает пустое состояние,
+loading/nonzero-total/filtered source, nonempty targets без rows, foreign form.
+Это не изменение persistence oracle: сравнение writer/cold ещё может обнаружить
+отличие. После tests/freeze читать реальное состояние и продолжать cold; не
+выдавать пустую cached схему за сохранение двух writer fields.
+
 ### Source118 design: то же правило для cached mapping read
 
 Применить узкое исключение disabled colTargetDelete к readMappingBrowser только
@@ -56,7 +80,7 @@ inspect packages=0, logout и browser close подтверждены. Execute/Sa
 там та же глобальная проверка всех x-mask до чтения cached stores. Сначала применить
 эквивалентную узкую native-bound классификацию disabled colTargetDelete, проверить
 отрицательные случаи; затем читать фактические empty source/target inventories.
-Не подменять пустую схему ожидаемыми6колонками и не ослаблять preservation oracle.
+Не подменять пустую схему ожидаемыми колонками и не ослаблять preservation oracle.
 Возможность общей сериализуемой функции классификации оценить по существующим
 browser builders: они сериализуют функции через toString и требуют явных зависимостей.
 Повтор полного cold до устранения наблюдаемого mapping_mask не нужен. Public,
