@@ -1,5 +1,24 @@
 # JavaScript: checkpoint исполнения
 
+## G5 integer string: `"42"` → `42` — 2026-09-28
+
+Отдельный headed `g5-integer-string-26`/profile190 на child revision
+`180f1d5810` доставил source SHA256
+`f32ca0fa9bfc9cb336129aa15c99db8a0d0289a5cdc9ed79c48516c5a8b7403a`.
+Свежий принадлежащий JS process завершился успешно; typed UI reader получил
+integer колонку `Result` и точную десятичную строку `"42"` для входного
+выражения `"42"`. Это характеризует одно строковое значение, не общее правило
+преобразования строк. Статус `typed_characterization`, фиксированного oracle
+не было; `gate_passed=false` не означает провал исполнения. Proof level
+`typed_ui_only`, native bytes не проверены; G5 остаётся открытым.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`53feb81ece8ef215fe38971230d234df87244ea273cc36b13e62d3d874bb5b02`,
+journal SHA256
+`45fe1ee1e8798028307f7c261b9b8dbf0ee5b14712b72b473488898584810f72`.
+Реестр закрыт, следующий fresh profile191.
+
 ## G5 integer fraction: `1.75` → `1` — 2026-09-28
 
 Отдельный headed `g5-integer-fraction-25`/profile189 на child revision

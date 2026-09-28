@@ -713,9 +713,34 @@
       "source_sha256": "f32ca0fa9bfc9cb336129aa15c99db8a0d0289a5cdc9ed79c48516c5a8b7403a",
       "schema_mode": "code",
       "expectation": "characterization",
-      "status": "not_checked",
+      "status": "observed_characterization",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_expression": "\"42\"",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        ["42"]
+      ],
+      "number_precision": "exact_integer_decimal_output_only",
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-integer-string-26/report.json",
+        "report_sha256": "53feb81ece8ef215fe38971230d234df87244ea273cc36b13e62d3d874bb5b02",
+        "journal_sha256": "45fe1ee1e8798028307f7c261b9b8dbf0ee5b14712b72b473488898584810f72",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "g5-integer-nan",
