@@ -73,7 +73,7 @@ export function auditJavascriptPersistence({writer,cold,writerEvents,coldEvents}
     same(javascriptSourceMappings(actual),cycle.mappings[side],'raw cycle mapping evidence');
   }
   auditMappings(last.mappings_after_execute,mappings,writerNode,false);
-  auditMappings(read.mappings_before,mappings,node,true);
+  auditMappings(read.mappings_before,mappings,node,true,mode==='code');
   auditMappings(read.mappings_after,mappings,node,false);
   for(const save of saves){
     need(save.graph?.document_id===saved.document_id&&save.prepared?.document_id===saved.document_id
@@ -191,7 +191,7 @@ function executionProof(execution,node,sourceSha){
     &&!baseline.roots.some(row=>row.process_id===execution.group_id),'fresh process group');
 }
 // Independent audit of observed proofs; do not call the runtime admission helper.
-function auditMappings(actual,expected,node,pendingAllowed){
+function auditMappings(actual,expected,node,pendingAllowed,emptyGeneratedAllowed=false){
   need(actual&&expected,'mapping evidence required');
   const kinds={};
   for(const direction of ['input','output']){
@@ -220,7 +220,21 @@ function auditMappings(actual,expected,node,pendingAllowed){
   }
   const observed=javascriptSourceMappings(actual);
   same(observed.input,expected.input,'input mapping preserved');
-  if(kinds.output){same(observed.output,expected.output,'complete output mapping preserved');return;}
+  if(kinds.output){
+    if(emptyGeneratedAllowed&&actual.output.source_fields.length===0&&actual.output.target_fields.length===0
+      &&expected.output.target_fields.length>0){
+      // Code-generated output has no cached columns in a newly opened package
+      // until its first execution. The full mapping and output are audited after it.
+      need(actual.output.mapping_wizard==='DataSetOutputSocketWizard'
+        &&actual.output.node_context.output_port?.direction==='output'
+        &&actual.output.node_context.output_port.port===0
+        &&Array.isArray(actual.output.rendered_indices)&&actual.output.rendered_indices.length===0
+        &&actual.output.reason===undefined,'cold generated output inventory');
+      same(observed.output.autosync,expected.output.autosync,'cold generated output autosync');
+      return;
+    }
+    same(observed.output,expected.output,'complete output mapping preserved');return;
+  }
   same(observed.output.autosync,expected.output.autosync,'configured autosync');
   const properties=fields=>fields.map(field=>Object.fromEntries(Object.entries(field).filter(([key])=>key!=='source')));
   same(properties(observed.output.target_fields),properties(expected.output.target_fields),'configured target properties');
