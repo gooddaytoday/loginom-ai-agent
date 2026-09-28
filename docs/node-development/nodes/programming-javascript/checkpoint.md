@@ -16,6 +16,34 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source117 проверен локально и на стенде; следующий отказ mapping_mask
+
+Child commit8ce147ae332cc278bc5d5864be3af48a2047ab49 изменяет только
+client/lib/node-port-open.mjs и его тест. Main original36873 exit0:3618PASS;
+full client original62631 exit0:2810PASS/0FAIL/10SKIP; focused20PASS с13вариантами
+новой регрессии. Этот же новый тест на source116 падает на valid mask, подтверждая
+чувствительность. Syntax PASS. Freeze117 SHA
+49c14cb3eb34f8a025ab9ee467f66580fb00281f7177e62aec16f4faed1ed05b,
+1324pins/closure211files647edges/computed0. Перед live все source pins перепроверены.
+
+source117-port-diagnostic-05/profile158/original73088 exit0: production
+readPortMapping открыл output port, получена SUCCEEDED receipt с полным native
+wizard/tree/port owner, GUID58f7e6c3-511e-39d7-8853-036e0a1a7612. Следующее чтение
+получило mapping_mask и NodeReadinessTimeout. Его finally штатно закрыл мастер,
+проверил прежний graph; nativeReadUncertain=false. Затем operator UI ClosePackage,
+inspect packages=0, logout и browser close подтверждены. Execute/Save не было.
+Активных тестов и Chromium нет. Сохранённый writer13 package не изменён.
+
+Следующее изменение нужно в readMappingBrowser (client/lib/node-mapping-context.mjs):
+там та же глобальная проверка всех x-mask до чтения cached stores. Сначала применить
+эквивалентную узкую native-bound классификацию disabled colTargetDelete, проверить
+отрицательные случаи; затем читать фактические empty source/target inventories.
+Не подменять пустую схему ожидаемыми6колонками и не ослаблять preservation oracle.
+Возможность общей сериализуемой функции классификации оценить по существующим
+browser builders: они сериализуют функции через toString и требуют явных зависимостей.
+Повтор полного cold до устранения наблюдаемого mapping_mask не нужен. Public,
+knowledge, G7 pairs, review и CLI остаются открытыми; source117 не final acceptance.
+
 ### Source117 design: disabled output-column mask, 2026-09-28
 
 Пробы source116-port-diagnostic-03/profile156/original96133 и -04/profile157/
