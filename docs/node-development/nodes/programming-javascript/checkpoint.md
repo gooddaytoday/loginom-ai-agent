@@ -1,8 +1,71 @@
 # JavaScript: checkpoint исполнения
 
-## Пауза по просьбе пользователя — 2026-09-28
+## Возобновление и G7 code cold — 2026-09-28
 
-**Работа остановлена. Не запускать новые тесты/браузеры до команды продолжить.**
+Пользователь возобновил цель; прежняя пауза ниже больше не действует.
+Root `javascript`, child `.worktrees/node-javascript` / `node-javascript`.
+Lease `javascript-20260926-ubuntu-preparation` снова `reserved_active`.
+OpenViking MCP health PASS. Исполняемый подплан остаётся незавершённым:
+публичный JS-handler, declared-пара G7, остальные gates, review и CLI-приёмка
+ещё не приняты. Слияние и выпуск не назначены.
+
+- Source119 child commit `cc883ef03a7752c1881d8da4ff6bd75555413845`:
+  main 3618 PASS (original 84826), полный client 2812 PASS / 10 SKIP
+  (original 89263), focused 83 PASS. Private freeze119 SHA256
+  `bd6b18658d9eae1f42108e4113455dd97a66ad178a9cede6f3f17cfd603efc86`,
+  1324 проверенных pins, 211 файлов closure, 647 edges, computed 0.
+- Ubuntu 24.04/AppArmor запретил user namespace у pinned Chrome for Testing
+  при попытке profile160 до входа в Loginom. Изолированная диагностика
+  profile161 воспроизвела `No usable sandbox`. Для Chrome for Testing выбран
+  штатный setuid helper установленного Google Chrome:
+  `CHROME_DEVEL_SANDBOX=/opt/google/chrome/chrome-sandbox` при сохранённых
+  `headless:false` и `chromiumSandbox:true`. В profile162 чистый headed запуск
+  прошёл. Глобальные kernel/AppArmor настройки и браузерный sandbox не менялись.
+  Запускать следующие headed попытки с этой переменной и свежим профилем.
+- `source119-port-diagnostic-08`, profile163, original59654 exit0: штатный
+  `readPortMapping(output)` дал `verified:true`, native cached source/target
+  обе `[]`, без Execute/Save. Пакет закрыт в том же сеансе (`packages=0`),
+  затем logout/browser close, Chrome отсутствует. Private JSONL SHA256
+  `db0244a020c3e7000ef542b21f400b8b6e17f299557059a6c5ae65`.
+- G7 code writer13 сохранён ранее; независимый cold08 с profile164,
+  original25538 exit0, `COLD_OBSERVED`: точный source/settings/link/input,
+  один свежий Execute, полный результат 6 строк × 2 поля. До Execute выходной
+  native cached inventory пуст; после Execute `ObservedID` integer и
+  `PhaseMarker` string, все шесть final-marker строк. Пакет закрыт, logout и
+  browser close подтверждены; Chrome отсутствует. Report SHA256
+  `938d9a9de0620e0a546dfcb5a3e429de934d9bf5293c65aa1b0657b972cdf6bc`.
+- Первоначальный независимый audit правильно отказал на сравнении empty cold
+  pre-Execute output с writer cached output. В child исправлен **только audit**:
+  для code mode допускается проверенный native empty cache до первого Execute,
+  при точном владельце/порте/мастере/autosync и пустом rendered inventory.
+  Проверка полной схемы/строк после Execute и остальные доказательства сохранены.
+  Адресный audit test 80 PASS; реальный audit code G7 `VERIFIED`, private
+  `persistence-code-audit-08.json` SHA256
+  `68f528c534e665367bf555da0ace95c1a475bcb1cdf9723246e01592d843867e`.
+  `package_bytes_verified`, `dirty_state_verified`, `public_handler_verified`
+  остаются false и не должны называться принятыми.
+- Source120 child commit `b1d63ade2df6603f2e3e6b6926edca31b69ea235`
+  изменил только `javascript-persistence-audit.mjs` и его test. Профильный
+  `javascript-*.test.mjs`: 18019 PASS / 0 FAIL (original76916); full client:
+  2812 PASS / 10 SKIP (original2698); focused audit 80 PASS; оба изменённых
+  файла проходят `node --check`. Private freeze120 SHA256
+  `68a47d25f0d4702b58f7119a6e26055514a868961f5a7d7eb86a75a078c46b59`,
+  1324 проверенных pins, 211 closure files / 647 edges / computed 0.
+  Расширенный `test/*.test.mjs` вместе со всеми
+  `tools/loginom-acceptance/*.test.mjs` дал 18113 PASS / 5 FAIL, все пять в
+  старом `fault-wrappers.test.mjs`, вне изменённого пути. Это отдельный
+  незелёный прогон, не скрывать его. Следующий свободный browser profile165;
+  assignment и host registry перед следующим live должны получить этот точный
+  профиль. Evidence/creds хранятся только в private campaign dir.
+
+**Дальше:** выполнить отдельную G7 declared writer/cold пару с независимым oracle.
+По каждому browser запуску закрывать именно пакет, проверять logout и browser
+close. Продолжать остальные пункты [plan.md](plan.md), не считать G7 code
+доказательством готовности public handler/всего узла.
+
+## Историческая пауза по просьбе пользователя — 2026-09-28 (завершена)
+
+На этом этапе работа была остановлена до команды пользователя продолжить.
 План остаётся незавершённым; пауза не означает blocked или achieved.
 Авторитетная точка продолжения — этот раздел, а не старые записи памяти.
 
