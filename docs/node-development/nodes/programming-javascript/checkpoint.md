@@ -15,6 +15,38 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source91 принят; последняя K4/profile100 запущена
+
+Developer turn01a0e55d terminal revision28. Exact12runtime/test files committed
+`e5a80f5851d6ca249713e763c0f5dc493d56f2b3`. Root final association PASS:
+1276pins совпадают с before/after независимого main2765;11changed/1new,
+99old docs unchanged,153literal closure files/464edges,syntax12/diff-checkPASS.
+Manifest SHA70422296d4895bd52fabdfd2d930cf43caa23da9b4baef3422edc173237ba9f3;
+handoff SHA454e21c8227b5acb713617ee20ce80d0237150967516c5f9be032d46e9853b9a.
+Private operator91-root-manifest-verification.json/source91-developer-logs сохранены.
+
+Пятая и последняя calibration attempt: K4-native-caller-v1, fresh headed
+profile100/DISPLAY1, original83246, evidence native-calibration-k4-probe-01.
+Перед запуском сверены1276pins,Node/Chromium SHA,terminalK3/61076,cleanup3/no browser.
+Assignment/launch/source/ledger сохранены. Completed/непригодная ошибка заканчивает
+mapping ветку; другой API/index/shift,K5live,шестая попытка и retries не разрешены.
+
+### Source91: независимые проверки K4 PASS, handoff ожидается
+
+Existing developer turn01a0e55d-068b-7283-ace6-a5d30dad230e active/revision27.
+Root main2765 PASS/0FAIL/0SKIP, original91836 terminal exit0,26686.78993ms;
+deny3PASS/Python15PASS. Все1276pins совпали до/после, final manifest association pending.
+Private operator91-root-before-tests.json/operator91-root-main-verification.json;
+main SHA fbbff145c5d84ad2e2dbf510602c1dd7adbab1839829851cdbf3147068dd5117.
+Нового live пока нет. Root K4 oracle подготовлен ДО прогона:295bytes/6LF,
+source line6/byte255,INPUT4/Get row4,expected_throw=null/native column=null.
+SHA root-k4-independent-source-oracle.json:
+7f1da8e34b9844f5899e01c0626459abfbd5f9795996e5b56a05b181c16ee042.
+
+В engine-profile.json добавлены отдельные source-bound observations K1/K2/K3,
+без изменения статусов старых snippets с другими hashes; commit72ea565a6e.
+Document validator PASS. Public handler/G6/J25/CLI readiness не заявлена.
+
 ### K3/profile99 terminal и независимый audit PASS; K4 implementation допущен
 
 Original61076 terminal exit1, DIAGNOSTIC_OBSERVED/owned_failure_observed,
