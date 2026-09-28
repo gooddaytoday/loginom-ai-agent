@@ -724,3 +724,34 @@ Get и IsNull дали owned full errors об отсутствующем сто�
 unattributed до независимой проверки source mapping. Полнота наблюдений не означает
 полноту semantic B coverage/G5. INPUT/upstream unchanged, cleanup всех8 подтверждён.
 Результаты ограничены fixed sources/input/build; C/D и общий handler не проверены.
+
+
+## 15. Root: source93, допуск реализации C/Set
+
+После принятия private offline auditor source92 (child2cf8f2c34a) допускается
+реализация четырёх exact C sources из §6. База1280pins; прежние source92 и A/B
+outcomes не менять. B semantic gaps сохраняются отдельными незакрытыми пунктами,
+они не запрещают независимую проверку положительных C index/exact controls.
+
+Реализация должна отдельно поддержать строгие C-set-index/C-set-exact и bounded
+one-cell characterization C-set-case/C-set-missing. Unknown completed допускает
+native NULL либо любой валидный signed int64; decimal/bytes сохраняются, sentinel0,
+candidate−9007199254740991 и other_value различаются. Не переиспользовать B marker
+oracle и не выводить lookup semantics из одного execution success. INPUT/upstream
+прежние4cells, OUTPUT ровно1cell/Integer/Value/Value. Failed C использует owned
+failed-node witness и свежий upstream без OUTPUT; source92 Get candidate не даёт
+атрибуции Set, rejection/case_complete остаются false.
+
+Closed case/source identities должны пройти весь host/serialized capability/
+source verification/Done/dispatch/terminal/reader/journal/final status путь.
+Обязательны отрицательные тесты case/source substitution, count/type/schema,
+owner/input/upstream/process, ACK mutations, failed OUTPUT запрет; native NULL и
+int64 extremes проверять actual decoder, не Number rounding. Дедлайны, отсутствие
+replay и cleanup3 сохраняются. Не добавлять arbitrary JS execution, RPC/UI обход,
+новые calibration cases либо исправлять dirty historical документы.
+
+До root live допуска: frozen handoff/source93, baseline paths и import closure,
+main JS/native, deny3, Python15, syntax/diff. Full client только при изменении
+client. Новые private artifacts вне Git; runtime commit делает root после проверки.
+D пока не реализовывать: его отдельный schema witness и prerequisite C-set-index
+остаются обязательными. Браузер остаётся у координатора, только headed.
