@@ -16,6 +16,19 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source115 проверен и закреплён; новый live ещё не запускался
+
+Main original93434 exit0:3615PASS/0FAIL/0SKIP. Full client original35299 exit0:
+2809PASS/0FAIL/10SKIP. Focused112PASS. Freeze115 SHA
+9241893ec4595b5e81c06cdd7bbbcb2b4005f8bc0dd7c44c68ac52c48e51805f,
+1324pins/closure211files647edges/computed0,2syntaxchecksPASS; sourcef0ea862736.
+Private javascript-freeze115-root-final-source.json. Нет активных тестов/браузеров.
+Следующий шаг — cold06 на writer13 package с freshprofile149 после проверки
+этого freeze. Admin cleanup2970 завершён и проверен; неизвестные предыдущие эффекты
+не переигрывать. Source115 на живом стенде ещё не проверен, G7 не закрыт.
+
+
+
 ### Cold05 и подтверждённое admin cleanup; source115
 
 Пользователь сообщил о закрытии пакетов jsteach через Диспетчер и предоставил
