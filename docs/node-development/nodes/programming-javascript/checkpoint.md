@@ -32,8 +32,21 @@ closure201 files/625 literal relative imports, computed imports absent,
 7 incremental syntax checks. Manifest javascript-freeze101-root-final-source.json
 SHA3285c5572e1bf0b34dfc6acc81876f17a66c7a6a442f71459155fe4395574c9a.
 
-Запущен headed/sandbox writer04/profile121, original39706. До его terminal
-результата не запускать другой browser. Live settlement ещё не подтверждён.
+Headed/sandbox writer04/profile121, original39706 terminal exit1. Новый
+settlement подтвердился: два полных source read/Close завершились, ожидания
+снятия lock потребовали8 и1 наблюдений. Initial Execute и typed6×2 подтверждены.
+Впервые подтверждён save1/S1 (conflict fail) и новая saved native binding:
+`/jsteach/js-g2-fd7bf966-3e5e-4148-9dbe-5d805fc492a4/JavaScript-93c53d37-7812-4184-99d1-c67980113d44.lgp`.
+После source replacement/Done S2 оператор остановился при сравнении graph
+после Close входного mapping. Последний prepared_node_context verified и
+locked:false; полный before/after здесь ещё не записывался. Нельзя объявлять
+причиной lock или менять проверку до получения точной разницы. Следующий шаг:
+добавить readonly evidence перед этим сравнением, проверить наблюдение baseline
+сразу после Done; новый writer не повторяет старые неопределённые эффекты.
+Save2 не отправлялся, cold pair не принят; пакет S1 сохранён как evidence.
+Recovery04/profile122 original98348 exit0: jsteach,0 packages, logout/browser
+close true; Chrome отсутствует. Private result source101-code-writer-result-04.json
+содержит report/journal hashes и точный saved path. OpenViking health успешен.
 Source101 — private persistence candidate, не public/CLI acceptance.
 
 
