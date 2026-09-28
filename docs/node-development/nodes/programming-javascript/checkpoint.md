@@ -36,6 +36,31 @@ owned output port → P и происхождения P.SourceColumns; source93 
 
 
 
+### Уточнение D transport: локальный пул и границы числа запросов
+
+Root прочёл S17 глубже: `Acquire`1638–1646 и `Release`3779–3787 работают
+с локальным JS-пулом буферов (CacheSize16, MaxCachedDataSize1048576).
+Отсутствие Release в catch не доказывает серверную утечку. Ручное повторное
+освобождение поверх штатного API недопустимо без доказанной принадлежности:
+Release не содержит защиты от повторного помещения объекта в пул.
+Split2658–2708 создаёт локальные фрагменты, ReadPropertyValues2709+ освобождает
+их по мере декодирования. Соответственно «точный Release каждого буфера» нельзя
+объявлять доказанным или исправлять внешним finally без учёта этого владения.
+
+Комментарий ReadPropertyValues2738–2740 предупреждает о возможных сообщениях
+при создании custom proxy. Но проверенные GetObjectProxy6656–6711,
+CreateProxy1920–1931, AddRemoteReference4957 и SupportsCustomInterface5371–5387
+не доказывают дополнительный RPC для каждого proxy: повторное использование
+и проверка поддержки интерфейса используют локальные данные. В proposal нужно
+различать число вызовов select и общее число transport requests, проверяя
+конкретные constructors либо наблюдая transport. Это static source review,
+не наблюдение побочного эффекта на стенде.
+
+Receipt `operator94-root-metadata-buffer-pool-review.json`; все1281 source93 pins
+независимо перепроверены без расхождений. Уточнения переданы существующей
+developer задаче, revision43 active. Runtime и первоначальные live evidence
+не изменялись; новые браузеры/RPC не запускались.
+
 ### D metadata: root подтвердил временный lifetime selected-property cache
 
 
