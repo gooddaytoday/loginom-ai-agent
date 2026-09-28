@@ -15,6 +15,21 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source97 возобновлён после неактуального final59
+
+Authoritative wait подтвердил terminal revision59 для turn
+01a0e622-99ec-7f73-9b0f-56c90bdc65f5. Вместо реализации получен исторический
+bootstrap-memory report; runtime на HEAD9d9a2af27a не изменён. Final не принят
+как выполнение source97. Та же задача возобновлена с явной отменой прежнего
+bootstrap-only ограничения и полным текущим заданием. Revision60/turn
+01a0e627-4bd9-7a12-8322-7635146aa196 подтверждён inProgress.
+Новых задач/браузеров нет; profile113 остаётся closed_logout_verified.
+
+ROOT дополнительно сверил execution-effects и существующий reader: выход с
+кодовой страницы через Next вызывает VerifyAsync, эффекты которого не установлены.
+Безопасность будущего source reader нельзя обосновывать отсутствием sentinel
+после Next/Done; проверять именно open/read/Close и независимый readback.
+
 ### Source97 выполняется; проверена дополнительная граница точности source delivery
 
 Authoritative developer revision58/turn01a0e622-99ec-7f73-9b0f-56c90bdc65f5
