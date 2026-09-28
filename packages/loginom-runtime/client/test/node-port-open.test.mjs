@@ -42,7 +42,7 @@ function fixture(direction='output') {
   const tid=JSON.parse(selector.replace(/:visible$/, '').slice(10,-1));return {waitFor:async()=>{},click:async options=>{
    if(options?.trial){if(tid===confirmation.yes.tid)flags.beforeConfirm?.();return;}gestures.push(tid);
    if(tid===portDom.tid){menu.visible=true;graph.FCurrentPortMenu=flags.foreignMenu?{}:port;}
-   else if(tid===button.tid){if(flags.deactivation){menu.visible=false;dialog.visible=true;}else showWizard();}
+   else if(tid===button.tid){if(flags.holdOpen){menu.visible=false;}else if(flags.deactivation){menu.visible=false;dialog.visible=true;}else showWizard();}
    else if(tid===confirmation.yes.tid){showWizard();if(flags.lostConfirmation)throw Error('Confirmation reply lost');}
    else throw Error('Unexpected gesture');
   }};
@@ -101,7 +101,7 @@ test('active port opening confirms its bound question once and replay performs n
  const f=fixture();f.flags.deactivation=true;
  const result=await f.run();assert.equal(result.status,'SUCCEEDED',result.error);
  assert.deepEqual(f.gestures.slice(-1),['msgbox;tlb;yes']);assert.equal(f.gestures.length,3);
- assert.deepEqual(result.trace.map(t=>t.event),['output_port_reserved','output_port_menu_verified','output_port_deactivation_question_verified','output_port_deactivation_issued','output_port_wizard_verified']);
+ assert.deepEqual(result.trace.map(t=>t.event),['output_port_reserved','output_port_menu_verified','output_port_open_issued','output_port_open_returned','output_port_deactivation_question_verified','output_port_deactivation_issued','output_port_wizard_verified']);
  assert.equal((await f.run()).status,'SUCCEEDED');assert.equal(f.gestures.length,3);
 });
 
@@ -178,4 +178,13 @@ test('control input identity comes from the exact cached cell ordinal, never a S
 test('control input opening refuses a misleading native ordinal without a gesture',async()=>{
  const f=fixture('input');f.task.kind='control';f.portDom.tid='MF;TF;Graph;Node;Input_ControlVar';f.portDom.getAttribute=()=>f.portDom.tid;
  f.port.FPortIndex=7;const r=await f.run();assert.equal(r.status,'NOT_APPLIED');assert.equal(f.gestures.length,0);
+});
+
+test('pending port opening reports bounded observed state without another gesture',async()=>{
+ const f=fixture();f.flags.holdOpen=true;f.page.waitForTimeout=async()=>{f.task.deadline=Date.now()-1;};
+ const r=await f.run();assert.equal(r.status,'AMBIGUOUS');assert.equal(f.gestures.length,2);
+ assert.deepEqual(r.trace.map(x=>x.event),['output_port_reserved','output_port_menu_verified','output_port_open_issued','output_port_open_returned','output_port_open_pending']);
+ const pending=r.trace.at(-1);assert.equal(pending.samples,1);assert.equal(pending.last.wizard_count,1);
+ assert.deepEqual(Array.from(pending.last.wizard_visible),[false]);assert.equal(pending.last.controller_type,'ModelForm');
+ assert.equal(pending.last.port_menu_same,true);assert.equal(pending.last.node_locked,false);
 });
