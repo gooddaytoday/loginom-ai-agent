@@ -215,6 +215,7 @@ test('production characterize reader polls incomplete cache without another open
     assert.equal(options.ready(ready),true);return ready;
    }};
   const operator=vm.runInNewContext('({'+source.slice(start,end)+'})',{
+   structuredClone,
    deadline:limit+1000,prepared:{document_id:'doc',workflow_ref:{workflow_id:'flow'}},characterizeJavascriptMapping,
    channel:(node,deadline)=>{assert.equal(deadline,limit);return reader;},graph:async()=>({same:true}),
    requireJavascriptTopology:()=>{},requireJavascriptGraphUnchanged:()=>events.push('same-graph'),captureJavascriptNativeTopology:()=>{},

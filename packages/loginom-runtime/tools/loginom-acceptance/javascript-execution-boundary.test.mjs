@@ -33,3 +33,36 @@ for(const fault of ['ok','node-epoch','position','label','locked','graph-epoch',
       assert.deepEqual(events[0].before,before);assert.deepEqual(events[0].after,after);
     }
   });
+
+// Execute the actual mapping method; only its UI transport/Close procedure is
+// synthetic. Evidence must survive a strict graph refusal, without another read.
+const mappingStart=source.indexOf('    async readPortMapping('),mappingEnd=source.indexOf('    async prepareInput()',mappingStart);
+assert.ok(mappingStart>0&&mappingEnd>mappingStart);
+for(const fault of ['ok','lock','position','native','journal','journal-mutates'])
+  test('actual mapping cleanup graph evidence: '+fault,async()=>{
+    const before=make(),after=make(),events=[],calls=[];let reads=0;
+    if(fault==='lock')before.nodes[0].locked=true;
+    if(['position','journal-mutates'].includes(fault))after.nodes[0].position.x++;
+    const method=vm.runInNewContext('({'+source.slice(mappingStart,mappingEnd)+'}).readPortMapping',{
+      Date,Math,Error,AggregateError,structuredClone,deadline:Date.now()+10000,
+      prepared:{document_id:'doc',workflow_ref:{workflow_id:'workflow'}},
+      requireJavascriptTopology:graph=>requireJavascriptGraphUnchanged(graph,graph),requireJavascriptGraphUnchanged,captureJavascriptNativeTopology,
+      graph:async()=>{reads++;return reads===1?before:after;},
+      channel:()=>({openPort:async()=>calls.push('open'),observe:async()=>({node_mapping:{verified:true}})}),
+      page:{evaluateHandle:async()=>({dispose:async()=>calls.push('dispose')}),evaluate:async(fn,args)=>{
+        assert.equal(fn,captureJavascriptNativeTopology);assert.equal(args.checkOnly,true);if(fault==='native')throw Error('Owner changed');return true;
+      }},
+      closeJavascriptPortMapping:async({verifyGraph})=>{calls.push('close');await verifyGraph();},
+      record:async event=>{events.push(structuredClone(event));if(event.phase==='port_mapping_original_graph_observed'){
+        if(fault==='journal')throw Error('Journal failed');if(fault==='journal-mutates')event.after.nodes[0].position.x=280;
+      }},
+    });
+    if(fault==='ok')await method({node_id:'js'},'input');
+    if(fault!=='ok')await assert.rejects(method({node_id:'js'},'input'));
+    assert.deepEqual(calls,['open','close','dispose']);assert.equal(reads,fault==='native'?1:2);
+    assert.equal(events.some(e=>e.phase==='port_mapping_original_graph_verified'),fault==='ok');
+    if(fault!=='native'){
+      const diagnostic=events.find(e=>e.phase==='port_mapping_original_graph_observed');
+      assert.deepEqual(diagnostic.before,before);assert.deepEqual(diagnostic.after,after);
+    }
+  });
