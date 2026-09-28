@@ -15,6 +15,46 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source99: observed-source cold gate и saved runtime facade
+
+Runtime commit `8239ea7e1b6b79f835ba05af7df00bb2d0223be3`. createJavascriptColdSource использует production
+createJavascriptSourceAdmission(existing). read() не принимает source/settings;
+admit({}) собирает фактический full source через source97 reader, проверяет policy
+и Close, после чего возвращает собственную копию наблюдённого текста/settings.
+execute(host callback) использует withEffect: повторное чтение до/после dispatch
+ACK, прежний deadline, digest/settings drift и no replay после lost response.
+Код и настройки в callback Execute не передаются; параметры содержат owner,
+deadline, policy и settings hash. В журнале нет полного исходника.
+
+createJavascriptSavedExecutionRuntime принимает только техническое назначение и
+exact saved path. Shared internal runtime пропускает native fixture/source factory,
+artifact store и input/configuration action runtime в cold path. Frozen facade
+оставляет graph/reopen/readPortMapping/execution boundary/executeNode/readOutput/
+cleanup restoration; нет channel, prepareInput, source edit, connect, save и manual
+mapping configuration. readOutput использует фактическую schema таблицы и требует
+полной выборки; ожидаемые6x2/значения будут проверяться отдельным аудитором.
+Старый createJavascriptExecutionRuntime по-прежнему не принимает saved пакет и
+отклоняет попытку передать coldPackagePath. Новая общая реализация private.
+
+Main3421PASS/0FAIL/0SKIP, original session25231 terminalexit0,51527ms.
+Component115PASS включает импортированные source-reader/package-binding tests;
+это не115новых тестов. Actual cold constructor проверен на serialized VM native
+binding; каталог читается настоящий, artifact directory остаётся пустой. Gate
+проверен с production reader/admission: Unicode multi-chunk, redaction, imports,
+lost Open/Close/Execute, drift source/settings и после ACK, отсутствие mutation API.
+Metadata VM test теперь выбирает getters внутри shared runtime, не одноимённые
+getters нового facade. Private source99-cold-components-verification.json — SHA.
+
+Следующая интеграция: cold UI entrypoint/open_package в fresh headed процессе
+600000ms. Можно переиспользовать login/wizard-readiness/Next-to-Code/Close/cleanup
+из javascript-live.mjs, но cold ветка не должна вызывать input/source fixture
+factories или configureJavascriptSchema. Подключить createJavascriptColdSource
+к read-only source adapter, наблюдать settings без expected mode и оба mappings,
+выполнить ровно один новый owned Execute, прочитать фактическую таблицу. Gate retired
+должен запрещать UI cleanup replay. Далее whole-cycle auditor/freeze/live обоих modes.
+Браузеры не запускались; profile115 свободен, G7/public/CLI не закрыты.
+
+
 ### Source99: собран fixed code/declared persistence writer
 
 Runtime commit `e26c13ac4304554c38ce156d4f91d386fb675e81`. Два отдельных entrypoints:
