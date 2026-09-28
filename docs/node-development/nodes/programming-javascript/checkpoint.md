@@ -15,6 +15,31 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Writer12 NOT_APPLIED; source111 согласует ранний connect comparator
+
+Original86368 terminal exit1. Report FAILED/link-js-input, link result NOT_APPLIED,
+effect_possible:false, cleanup_complete:true. Никакого JS Execute/save не было.
+Package closed/logged out/browser closed=true; закреплённый Chrome отсутствует.
+Private source110-code-writer-result-12.json закрепляет report hash/terminal;
+реестр closed_recovery_verified, active_exec_session=null. Recovery не требуется.
+Точный graph delta в этом старом NOT_APPLIED отсутствует; не утверждать, что
+именно node epoch был причиной writer12, хотя source108 ранее доказал такой drift.
+
+Code inspection установил ещё один strict JSON comparator в initial connect
+observation до readBindings/prepareLinkHover. Source111 использует существующий
+samePlacementGraph последовательно на всех этих этапах: исключается только
+per-node dom_epoch, перед primitive выполняется свежая привязка. Структурные
+изменения по-прежнему NOT_APPLIED. Добавлены причины connect_graph_changed и
+connect_binding_graph_changed, чтобы следующий отказ различался в journal.
+Source110 private selection диагностика сохранена; до неё writer12 не дошёл.
+
+Runtime f343af1c40, focused26PASS/0FAIL, diff check PASS. Actual adapter test
+проверяет initial node epoch replacement и отказ без link primitive при epoch+
+links/root/node identity/locked/ports. Main original31572/source111-main.log и
+full client original64535/source111-full-client.log запущены; сначала опросить
+эти handles. Freeze/live source111 ещё не выполнены. Next profile136/writer13.
+
+
 ### Source110: main PASS, freeze, writer12 активен
 
 Main original98890 exit0:3610PASS/0FAIL/0SKIP,38606ms. Focused150PASS.
