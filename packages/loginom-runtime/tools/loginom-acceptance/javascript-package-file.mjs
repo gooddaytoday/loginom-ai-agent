@@ -53,7 +53,10 @@ export async function openJavascriptPackageDirectory(page,path) {
   for(let step=0;step<3&&current?.directory!==expected;step++){
     need(current&&expected.startsWith(current.directory+'/'),'Own package directory outside native storage');
     const folder=expected.slice(current.directory.length+1).split('/')[0];
-    need(current.entries.filter(row=>row.name===folder&&row.type===1).length===1,'Own folder not observed');
+    const matching=current.entries.filter(row=>row.name===folder);
+    need(matching.filter(row=>row.type===1).length===1,
+      'Own folder not observed '+JSON.stringify({directory:current.directory,folder,rows:current.entries.length,
+        matching:matching.map(row=>({type:row.type,path:row.path})),visible_tids:current.tids.length}));
     const tids=current.tids.filter(tid=>tid.endsWith(';FileStorageForm;colName_'+folder));
     need(tids.length===1,'Own folder control not unique');
     await page.locator('[data-tid="'+tids[0]+'"]').dblclick();
