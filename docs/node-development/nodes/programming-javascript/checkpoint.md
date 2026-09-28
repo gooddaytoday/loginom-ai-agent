@@ -15,6 +15,30 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Writer11: link исправлен, save1 подтверждён, private selection остановлен
+
+Original1440 terminal exit1. Новый input link подтверждён, JS выполнен, initial
+source cycle и save1 прошли. Затем persistence-replace-source отказал с
+`Private selection DOM changed`. Второго save нет; автоматический повтор не
+выполнялся. Report CLEANUP_UNCONFIRMED, own browser закрыт, Chrome отсутствует.
+Private source109-code-writer-result-11.json закрепляет report hash и saved S1 path.
+
+Recovery11/profile134 original8258 exit0: jsteach,0 packages, loggedOut/browserClosed
+true, Chrome отсутствует. Реестр closed_recovery_verified, active_exec_session=null;
+сохранённый пакет не удалялся. Source109 live доказал прохождение прежнего link
+отказа, но G7 writer/cold целиком ещё не прошёл.
+
+Source110 добавляет только bounded boolean/count диагностику двух отказов private
+selection: current_shape и replacement, inspect phase, связь прежнего/текущего
+DOM и признак afterGesture. Native ownership, one-replacement rule и запрет replay
+не меняются; без exact причины расширять допуск нельзя. Первый focused test выявил
+отсутствующий getAttribute у invalid shape fixture; диагностическое чтение защищено
+проверкой типа. Повтор focused успешен (source110-selection-focused-02.log), failed
+log сохранён. Main original98890/source110-main.log пока выполняется; сначала
+опросить этот handle. Shared client не менялся после source109 full client PASS.
+Следующий profile135/writer12, нового live ещё нет.
+
+
 ### Source109: full client PASS, freeze, writer11 активен
 
 Full client original34897 завершён exit0:2806PASS/0FAIL/10SKIP,179700ms.
