@@ -45,7 +45,7 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
    if(!dialogs.length) {
     if(mode==='deactivation_issued')fail('Port confirmation disappeared before gesture');
     const wizard=exact(b.workflow_ref.prefix+';WizrdMCF');
-    return wizard.length===1&&visible(wizard[0])?{wizard:true}:{pending:true};
+    return wizard.length===1&&visible(wizard[0])?{wizard:true}:{pending:true,wizard_count:wizard.length,wizard_visible:wizard.map(visible).slice(0,4),controller_type:typeof model?.constructor?.name==='string'?model.constructor.name.slice(0,120):null,node_locked:r.node.FLocked===true,port_menu_same:r.graph.FCurrentPortMenu===r.port};
    }
    const dialog=dialogs[0],native=globalThis.Ext?.getCmp?.(dialog.id);
    const normalize=s=>s.replace(/\s+/g,' ').trim();
@@ -179,10 +179,17 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
   await page.mouse.click(issued.point.x,issued.point.y,{button:'right'});
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').waitFor({state:'visible',timeout:remaining()});
   trace.push({event:direction+'_port_menu_verified',...await inspect('menu')});
-  await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({trial:true,timeout:remaining()});await inspect('open_issued');
+  await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({trial:true,timeout:remaining()});
+  trace.push({event:direction+'_port_open_issued',...await inspect('open_issued')});
   await page.locator('[data-tid="mn;mniConfigurePort"]:visible').click({timeout:remaining()});
+  trace.push({event:direction+'_port_open_returned'});
+  let pendingObservation;
   while(remaining()>0) {
    const transition=await inspect('await_open');
+   if(transition.pending){
+    if(!pendingObservation){pendingObservation={event:direction+'_port_open_pending',samples:0,last:transition};trace.push(pendingObservation);}
+    pendingObservation.samples++;pendingObservation.last=transition;
+   }
    if(transition.wizard)break;
    if(transition.deactivation) {
     trace.push({event:direction+'_port_deactivation_question_verified',...transition});
