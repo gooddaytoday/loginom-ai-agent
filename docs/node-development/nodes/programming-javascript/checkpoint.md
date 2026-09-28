@@ -18,6 +18,16 @@
 
 ### Source93 active: независимые C oracles готовы
 
+
+Дополнение root review: промежуточные contract/run изменения проверены вручную:
+strict index/exact и unknown characterization разделены; failed OUTPUT запрет
+сохранён, новый итог ожидает cleanup/persistence. Подготовлен private
+`audit-named-c-association.py` для сверки owner/source/execution/INPUT–OUTPUT–upstream
+с независимо декодированными scalar результатами; проверен только синтаксис,
+реальный C report ещё отсутствует. Повторный wait подтвердил ту же active revision34;
+новая задача/повторный запуск не создавались, frozen93 ещё не предъявлен.
+
+
 Developer turn01a0e582-a008-72e2-899e-6a283fd934f2 подтверждён live/revision34.
 В worktree начаты additive C catalog/serialized owner/binding/read/failure изменения;
 frozen handoff ещё отсутствует. Root отдельно реконструировал4Csource из design§6,
