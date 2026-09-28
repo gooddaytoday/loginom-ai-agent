@@ -15,6 +15,57 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source99/100: freezes, два отказа до save и сообщение о случайном клике
+
+ROOT закрепил source99 commit `0eb6d5d9d5bd49a5476fa693e5e1010da9fb29ae`:
+1319 pins, main3525PASS/0FAIL/0SKIP (original12839 exit0),
+closure198 files/620 relative imports,192 syntax checks. Manifest
+javascript-freeze99-root-final-source.json SHA
+721f2ab13e6ca71e56223be582f3dfb6cfb832413e2821fd2cad354cf65b8ec6.
+Исправлено только допустимое наблюдённое пустое название breadcrumb;
+непустой tid и точное сравнение продолжения сохранены.
+
+Writer01/profile115 (original89247 exit1) выполнил initial JS и проверил6×2,
+но отказался после Close при сравнении полного графа. Save не отправлен.
+Точный after-graph тогда не записывался, причина не установлена.
+Recovery01/profile116 (original42521 exit0): jsteach,0 packages,
+logout/browser close true, без изменения пакетов.
+
+Source100 commit `f67db712bd5ff4f2bad5c52de27ab96db8a1032f` добавляет запись
+уже наблюдённых before/after graph перед строгим сравнением, без повторного
+чтения и без ослабления guard.1320 pins, closure199 files/621 imports;
+main3535PASS/0FAIL/0SKIP (original79770 exit0), focused236PASS.
+Manifest javascript-freeze100-root-final-source.json SHA
+888595a498021ddba08599488f412c10c52248fa6b39a237216bc4ad314c4fb5.
+
+Writer02/profile117 (original22259 exit1) тоже подтвердил initial JS и6×2,
+затем отказался `Private selection DOM changed` до отправки Setting.
+Наблюдённые пары графов равны; save не отправлен. Пользователь сообщил о
+случайном клике в браузере во время последнего прогона. Точные действие и
+время неизвестны: прогон нельзя использовать для вывода об ошибке адаптера
+или для приёмки. Readonly DOM-диагностика пока не добавлялась, guards сохранены.
+Recovery02/profile118 завершил logout/browser close, наблюдал jsteach и0
+packages без мутации. Его original exec handle не сохранился при compaction:
+exit code не заявляется; JSON/log завершены, отсутствие процесса проверено.
+Приватный receipt: source100-user-intervention-02.json.
+
+После повторной сверки1320 pins запущена чистая попытка writer03 на том же
+source100, новый profile119/process/package, headed/sandbox DISPLAY=:1.
+Original handle66147 завершился exit1: после source Close строгий графовый
+boundary обнаружил изменение JS locked:false→true. Node DOM epochs также
+сменились (это сравнение уже допускает), остальные graph fields совпали.
+Save не резервировался. Причина сохранения блокировки после Close пока не
+установлена: это не доказательство пользовательского клика или постоянного
+дефекта; снятие lock вручную и ослабление сравнения не выполнялись.
+Recovery03/profile120, original81320 exit0: jsteach,0 packages, logout/browser
+close true; отсутствие Chromium подтверждено. Результат и hashes сохранены
+в source100-code-writer-result-03.json. Следующий шаг — исследовать штатное
+завершение Close/снятие lock и границу готовности, прежде чем менять runtime.
+Это новый сценарий, не replay неопределённых действий прошлых попыток.
+OpenViking health успешен. Все ограничения полного плана сохраняются;
+ни один writer/cold pair ещё не принят, public handler/CLI не приняты.
+
+
 ### Source99: cold UI entrypoint и независимый аудитор готовы к freeze
 
 Runtime commits `161a3222e32e79c3224ad84fed78b3d46989caa5` и
