@@ -15,6 +15,25 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source111: проверки завершены, fixture исправлен, freeze готов
+
+Main original31572 exit0:3610PASS/0FAIL/0SKIP. Full client original64535 exit1:
+2806PASS/1FAIL/10SKIP,177958ms. Единственный FAIL — node-target.test.mjs fixture
+без nodes; реальный readGraph возвращает nodes. Исправлен только fixture:
+complete graph с nodes/links и root dom_epoch1→2 вместо произвольного marker.
+Runtime f343af1c40 после full suite не менялся. Commit b47ead6d824c57f49c4905c98ff863cae4e9cae3
+содержит fixture correction. Все65 тестов node-target/node-link-hover/
+text-export-connect затем PASS exit0 (source111-link-focused-02.log).
+Полный suite повторно не запускался; не называть исходный full run зелёным.
+
+Freeze111 SHA94568e1baf65a5fca9b1f824e05b32a209ab531b4362de3b6c9ea011187b8b16:
+1324 pins, closure208 files/641 edges, computed0,3 syntax checks PASS.
+Runtime diff HEAD пустой, toolchain hashes проверены. Final closure input:
+operator111-root-source-inputs-final.json; первый closure до fixture сохранён.
+Браузер закрыт. Следующий шаг: fresh headed writer13/profile136 на freeze111,
+перед запуском повторить pins/реестр и закрепить original process handle.
+
+
 ### Writer12 NOT_APPLIED; source111 согласует ранний connect comparator
 
 Original86368 terminal exit1. Report FAILED/link-js-input, link result NOT_APPLIED,
