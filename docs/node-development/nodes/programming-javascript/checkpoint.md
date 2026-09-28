@@ -1,5 +1,54 @@
 # JavaScript: checkpoint исполнения
 
+## Пауза по просьбе пользователя — 2026-09-28
+
+**Работа остановлена. Не запускать новые тесты/браузеры до команды продолжить.**
+План остаётся незавершённым; пауза не означает blocked или achieved.
+Авторитетная точка продолжения — этот раздел, а не старые записи памяти.
+
+- Root branch javascript; child .worktrees/node-javascript, branch node-javascript.
+  Последний runtime commit **cc883ef03a7752c1881d8da4ff6bd75555413845** (source119):
+  читает действительно пустые cached source/target inventories выходного
+  DataSetOutputSocketWizard без выдуманных rendered rows. Другие формы, непустые
+  stores без строк, loading/filtered/nonzero-total/stale rows остаются отказами.
+- Source119: **83 focused tests PASS**, включая9вариантов новой empty-inventory
+  регрессии. До изменения этот тест падал с mapping_render_bound. Полные main/client,
+  final freeze119 и live ещё НЕ выполнены. Не приписывать source119 результаты118.
+- Последняя полностью проверенная версия source118:
+  0268af373e9463dbb9bd51944e7b518bd613281a; main3618PASS,client2811PASS/10SKIP,
+  focused82PASS. Freeze118 SHA
+  b1d23343368813bdb70784478bf021e4dbbf9893b85efe5517669c7e357bcf87.
+- Последняя живая проба source118-port-diagnostic-06/profile159/original34552 exit0:
+  открытие порта прошло, маска больше не мешает; cached source/target count=total=0,
+  loading=false,rendered_rows=0. Runtime отказал только на mapping_render_bound.
+  Его finally закрыл мастер и проверил graph, nativeReadUncertain=false.
+  Затем закрыт пакет в том же сеансе: packages=0, logout и browser close доказаны.
+  При остановке /proc подтвердил отсутствие Chromium и относящихся к пробам/тестам
+  Node процессов. Все original test handles44452/95532 terminal exit0.
+- Приватные данные и доказательства:
+  ~/.local/state/loginom-ai-agent/node-development/campaigns/javascript-20260926-ubuntu/.
+  Настройки доступа loginom-private.json, admin-private.json не копировать в Git/память.
+  Последний использованный freshprofile159; следующий свободный160, перед запуском
+  перепроверить фактическое отсутствие каталога/процессов и lease.
+- Сохранять writer13 package и его evidence. Кодовая persistence-пара ещё не принята:
+  полный cold и независимый audit не пройдены. Пустой pre-Execute cache не доказывает
+  сохранение двух writer output columns. Persistence oracle пока не менялся.
+- OpenViking MCP health в этом этапе PASS; проектный checkpoint является источником
+  истины, проектная память захватывается автоматически. Старые recall с freeze116
+  и прежними коммитами относятся к истории.
+
+**Возобновление:** проверить OpenViking, branch/worktree/lease/processes и этот
+checkpoint; выполнить main/client проверки source119 закреплённым Node24+Acorn
+loader из каталога runtime/client (не из root); закрепить119 import closure/pins.
+После PASS — headed fixed production mapping probe/cold на стенде
+http://logi-test-plan.bg.local/app/ под jsteach. Не передавать ожидаемую схему в
+наблюдатель, не повторять Execute/Save при неизвестном результате. Закрыть каждый
+пакет и выйти из Loginom, подтвердить это до закрытия браузера. Затем продолжать
+весь plan.md: обе G7пары, остальные discovery/lifecycle/knowledge gates, review и
+standalone CLI acceptance. Слияние/публикация не разрешены. Предсуществующие dirty
+документы child worktree не включать в runtime commits.
+
+
 Дата: 2026-09-26. Фаза **0A/0B: OpenViking восстановлен; discovery JavaScript продолжается**.
 Пользователь назначил исполнение [плана](plan.md), Ubuntu и только headed-браузеры.
 Начаты операторские наблюдения 0B. JS-handler, полное discovery, ревью реализации
