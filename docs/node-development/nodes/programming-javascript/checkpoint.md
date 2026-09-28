@@ -1,5 +1,25 @@
 # JavaScript: checkpoint исполнения
 
+## Engine lookbehind: native refusal и полный cleanup — 2026-09-28
+
+В отдельном headed `engine-lookbehind-11`/profile175 оператор child revision
+`180f1d5810` доставил точный source SHA256
+`f94303fb37eb25103ee236c9839ed8f536b5ac36d7162cff05502011e65f71e5`.
+После Next на странице кода кнопка ошибки текущего мастера дала подсказку
+`SyntaxError: Unexpected quantifier at code (:4:36)`; штатный диалог показал
+то же native сообщение. Оператор закрыл диалог `OK`, сохранил прежний owner,
+не отправлял отдельный Execute и получил `owned_wizard_refusal` без gate PASS.
+Отказ характеризует только regex lookbehind snippet на стенде Loginom 7.4.2,
+а не другие возможности движка или выполнение JS.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения процессов pinned Chromium не осталось. Private report SHA256
+`c2afe20b746eaf342d6622e85c0821674379e9a011aff30e26d1268d85d5f395`,
+journal SHA256
+`fb3eeb405fb7abd0e0a676ee0d8025e80a102c36b4cb27a9157ff4ae36117ed5`.
+Реестр закрыт, следующий свежий profile176. `engine-profile.json` отмечает
+`observed_native_refusal`; J20 и другие gates остаются открытыми.
+
 ## Rebase `loginom` и чтение отказа мастера — 2026-09-28
 
 По команде пользователя `javascript` rebased на `loginom` commit

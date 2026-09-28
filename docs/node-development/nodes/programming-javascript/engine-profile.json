@@ -205,9 +205,27 @@
       "source_sha256": "f94303fb37eb25103ee236c9839ed8f536b5ac36d7162cff05502011e65f71e5",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_native_refusal",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "owned_operator_error_button",
+      "native_class": "SyntaxError",
+      "native_message": "SyntaxError: Unexpected quantifier at code (:4:36)",
+      "native_position": {
+        "line": 4,
+        "column": 36
+      },
+      "explicit_js_execute_count": 0,
+      "gate_passed": false,
+      "dialog_closed": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-lookbehind-11/report.json",
+        "report_sha256": "c2afe20b746eaf342d6622e85c0821674379e9a011aff30e26d1268d85d5f395",
+        "journal_sha256": "fb3eeb405fb7abd0e0a676ee0d8025e80a102c36b4cb27a9157ff4ae36117ed5",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "engine-bigint",

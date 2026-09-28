@@ -217,11 +217,14 @@ lookbehind, BigInt, globalThis изолированными snippets: один p
 не пытаться заявить полную ECMAScript conformance. Async probes характеризуют
 среду, но не расширяют accepted scope v1.
 
-Первое native наблюдение на назначенном стенде 7.4.2: `null ?? "fallback"`
-отклонено при разборе с `SyntaxError: Syntax error at code (:4:33)` после
-клика по кнопке ошибки мастера; точный source SHA и cleanup зафиксированы в
-[checkpoint](checkpoint.md). Остальные перечисленные конструкции пока не
-характеризованы этим результатом; J20 остаётся открытым.
+На назначенном стенде 7.4.2 отдельно наблюдены native parse refusals для
+`??` (`SyntaxError: Syntax error at code (:4:33)`), `?.`
+(`SyntaxError: Syntax error at code (:4:48)`) и regex lookbehind
+(`SyntaxError: Unexpected quantifier at code (:4:36)`). Для `??` потребовался
+ручной клик и admin recovery; `?.` и lookbehind прочитаны собственным
+оператором со штатным cleanup. Точные source SHA и различия доказательств —
+в [engine profile](engine-profile.json) и [checkpoint](checkpoint.md).
+Остальные конструкции требуют отдельных запусков; J20 остаётся открытым.
 
 **Операторский барьер перед следующими syntax probes:** применить общий порядок
 [чтения кнопки ошибки мастера](../../workflow/lifecycle.md#отказ-мастера-и-кнопка-ошибки)
@@ -235,8 +238,8 @@ source SHA, класс/позицию только из текста Loginom, о
 Адресные тесты: тихий отказ, самопроизвольный диалог, старая кнопка после
 исправления, незакрытый диалог. `engine-probe-06` не повторять. Барьер реализован
 в дочерней ветке `node-javascript` (до интеграции в `javascript`): оператор
-ревизии `180f1d5810` проверен на отдельной `engine-optional-chain` попытке
-с полным cleanup;
+ревизии `180f1d5810` проверен на отдельных `engine-optional-chain` и
+`engine-lookbehind` попытках с полным cleanup;
 см. [checkpoint](checkpoint.md). Это не закрывает весь J20 или public handler.
 
 Обязательный профиль движка охватывает предпосылки задания и runtime-справки:
