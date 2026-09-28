@@ -15,6 +15,18 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source92 incomplete handoff: terminal revision30 исправлен
+
+Turn01a0e56a завершён authoritative revision30,но последний final снова относился
+к историческому memory bootstrap. В worktree фактически только новый reviewed JSON
+fixture; verifier/tests/offline sidecars/freeze92 отсутствуют. Source92 не принят.
+Root направил конкретное продолжение в ту же задачу. Новый turn
+01a0e572-4495-7660-ac2d-5a1572bb0d57 подтверждён inProgress/revision31.
+Это продолжение после terminal,не повтор по observation timeout; новая задача не
+создавалась. Текущая работа: реализовать и проверить source92 по сохранённому fixture,
+с историческими reports/outcomes unchanged и без новых live calibration5/5.
+Root intermediate projection check не заменяет отсутствующий verifier/handoff.
+
 ### Source92 profile projection: промежуточная root сверка
 
 Developer source92 turn01a0e56a остаётся active/revision29; final verifier/manifest
