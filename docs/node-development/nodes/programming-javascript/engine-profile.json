@@ -233,9 +233,27 @@
       "source_sha256": "54c8ed2f7aad4079cd9c57dbfe679e245675a11b4629bf2ed9df024a25b398d6",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_native_refusal",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "owned_operator_error_button",
+      "native_class": "SyntaxError",
+      "native_message": "SyntaxError: Unexpected identifier after numeric literal at code (:4:34)",
+      "native_position": {
+        "line": 4,
+        "column": 34
+      },
+      "explicit_js_execute_count": 0,
+      "gate_passed": false,
+      "dialog_closed": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-bigint-12/report.json",
+        "report_sha256": "bca74892ac2ec5c4350f20e5f4f6e329a1f26f7a383c322505c0afa241915908",
+        "journal_sha256": "5822d4e1cb04b378adc8a8aed02dfb7588b2477cbad7eccbb372aafdf3404be7",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "engine-global-this",

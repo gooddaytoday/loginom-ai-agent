@@ -1,5 +1,24 @@
 # JavaScript: checkpoint исполнения
 
+## Engine BigInt: native refusal и полный cleanup — 2026-09-28
+
+Отдельный headed `engine-bigint-12`/profile176 на child revision `180f1d5810`
+доставил source SHA256
+`54c8ed2f7aad4079cd9c57dbfe679e245675a11b4629bf2ed9df024a25b398d6`.
+При переходе Next native `btnError`/штатный диалог сообщили
+`SyntaxError: Unexpected identifier after numeric literal at code (:4:34)`.
+Оператор закрыл диалог `OK`, не посылал отдельный Execute и получил
+`owned_wizard_refusal`; gate_passed=false. Это наблюдение относится к
+`String(1n + 2n)` на Loginom 7.4.2, без вывода о других snippets.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`bca74892ac2ec5c4350f20e5f4f6e329a1f26f7a383c322505c0afa241915908`,
+journal SHA256
+`5822d4e1cb04b378adc8a8aed02dfb7588b2477cbad7eccbb372aafdf3404be7`.
+Реестр закрыт, следующий fresh profile177; `engine-profile.json` получил
+`observed_native_refusal`. J20 остаётся открытым.
+
 ## Engine lookbehind: native refusal и полный cleanup — 2026-09-28
 
 В отдельном headed `engine-lookbehind-11`/profile175 оператор child revision
