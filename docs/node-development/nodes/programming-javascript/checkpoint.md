@@ -15,6 +15,31 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source112: cold process history preparation
+
+Code inspection: runColdRead захватывал observeJavascriptSourceProcesses до
+первого открытия консоли в новом браузере. Writer уже материализовал её через
+первый Execute. Отсутствие/неоднозначность tree остаётся отказом, не пустой историей.
+Выбран существующий createNodeExecutionProcedure.prepare(): открывает консоль,
+устанавливает show-completed, проверяет loaded cache и закрывает консоль; launch
+не вызывается. Повторный prepare/Execute после неопределённого результата запрещён.
+
+Saved facade получил prepareSourceProcessHistory; draft вызов отвергается.
+Метод выполняется через once journal, original deadline и account guards,
+фиксирует cold_source_process_history_prepared с execution_dispatched:false.
+Cold reader удерживает graph/native boundary до подготовки, проверяет его после,
+затем захватывает прежний строгий process handle. При ошибке помечает source cycle
+uncertain и освобождает native handle; исходник/настройки/Execute не запускаются.
+Writer path не изменён. Targeted tests проверяют фактический метод, запрет launch,
+ошибки prepare/account/draft и отсутствие чтения/Execute при history failure.
+
+Focused source112-cold-focused-02.log PASS exit0. Main original35833,
+source112-main.log пока выполняется; сначала опросить тот же handle.
+Shared client unchanged: source111 full run имел только исправленный fixture FAIL,
+65 affected tests затем PASS. Live source112 ещё не запускался. Writer13 package
+сохраняется для cold02/profile138; ожидаемые source/settings ему не передавать.
+
+
 ### Writer13 PASS; cold01 остановлен на process boundary
 
 Writer13 original92458 terminal exit0. Report OBSERVED, persistence WRITER_OBSERVED:
