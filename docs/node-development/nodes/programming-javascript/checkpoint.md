@@ -15,6 +15,33 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source94 live: collection identity refusal; recovery подтверждён
+
+`native-metadata-control-probe-01`, profile105, original28748 terminalexit1.
+Loaded function attestation пройдена, первый selector дошёл до синхронного callback.
+Serialized capture line83/column60 указывает на `same(w.Parent,n.OutputPorts)`;
+предыдущая проверка `same(n,initial.nodeData)` пройдена. Native collection association
+не совпала. Это наблюдение не доказывает причину (новый wrapper, иная коллекция и т.п.)
+и не позволяет ослабить port/node/socket ownership. Metadata DTO и scalar OUTPUT
+не опубликованы; D/G5 не закрыты. Report CLEANUP_UNCONFIRMED: browser_closed=true,
+package_closed/logged_out=false; original report сохранён.1285source pins неизменны,
+закреплённого Chrome после terminal нет. Private launch содержит report SHA.
+
+Отдельная headed recovery profile106/original78612 terminalexit0:
+аккаунт jsteach, PackageNodes.Count0, packageMutation=false, logout/browserclose
+и отсутствие Chrome проверены. Receipt `native-metadata-recovery-01-verification.json`,
+report SHA256 `41c855e6f98f0630ef494a3b20cc789844e65e298d30cc9935b737b0ce574b7a`.
+Это подтверждает состояние нового сеанса; старый cleanup не переписан как успешный.
+Lease закрыт с verified logout. Следующий свежий профиль107.
+
+Существующая developer задача revision49 активна: исследовать точное требование
+collection equality; возможная bounded альтернатива — ParentNode identity и
+Count1/index0 membership с identity самого W, если штатный selector это позволяет.
+Предложение ещё не принято как исправление. Запрошены targeted diagnostic/тесты,
+freeze95 и handoff без live/новой задачи/ослабления ownership. Source94 code commit
+сохранён; ROOT отдельно проверяет следующую версию. Полная цель остаётся активной.
+
+
 ### Source94: кандидат принят для отдельной metadata-пробы
 
 ROOT independently сверил conservative literal import closure162files/509edges,
