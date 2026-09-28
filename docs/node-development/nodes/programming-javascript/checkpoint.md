@@ -18,6 +18,18 @@
 
 ### D metadata: root подтвердил временный lifetime selected-property cache
 
+
+Дополнительная root проверка интерфейсов: retained bg.rtl.js содержит
+ColumnDefMappingExtension.Source/SourceIndex (4834),ProxyColumnInfo.Target/
+TargetColumnIndex (4994),ColumnInfo.Collection (4825),DataSource.ColumnDefs/Columns
+(4897);bg.model.js:5282 — DerivedDataSourceMappingEngineOutputPort.DerivedDataSource/
+Socket. Private operator94-root-schema-relations-candidates.json закрепляет hashes
+и строки. Это кандидаты object/index associations,не live graph и не разрешениеRPC;
+направление связи и происхождение code field ещё требуют доказательства.
+Подсказки переданы текущему developer turn; authoritative wait повторно подтвердил
+revision41 active. Runtime git diff пустой; нового browser/source94 запуска нет.
+
+
 Уточнённый D audit после нового wizard source завершён revision40; root прочёл
 актуальный текст и проверил22refs. Единственный current hash mismatch — явно
 исторический S13: SHAacac8dfe4b0521ae735bd287ff09a39ebeedbf199789c0e1f9f8e33a93a1ab06
