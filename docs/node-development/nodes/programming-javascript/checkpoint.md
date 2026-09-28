@@ -15,6 +15,22 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source97: первый reader проверен на границе JSON-бюджета
+
+В revision60 появились design97, production host/browser readers и private
+source-cycle operator. ROOT нашёл воспроизводимый недостаток первых raw4096byte
+chunks: допустимый JS4112bytes/1line с U+0001 внутри строкового литерала не
+помещался в16KiB после JSON escaping. Private receipt
+`operator97-root-chunk-budget-review.json`; замечание передано developer.
+
+Adaptive chunk fix предварительно проверен ROOT на4112bytes и ровно32768bytes:
+полный roundtrip совпал,2/13chunks, maxima16377/16379serializedbytes,
+opens=closes=chunks. Reader SHA256 на этой проверке
+`64a4277fcc328a04ecbdcfb27d3970cc4581c948fca0e36f4d1cd7b5ebe8a890`.
+Receipt `operator97-root-chunk-budget-fix-tests.json`. Это реальный host helper
+с synthetic adapter, не browser/live проверка и не приёмка будущего freeze97.
+Кандидат продолжает изменяться; новые браузеры не запускались.
+
 ### Source97 возобновлён после неактуального final59
 
 Authoritative wait подтвердил terminal revision59 для turn
