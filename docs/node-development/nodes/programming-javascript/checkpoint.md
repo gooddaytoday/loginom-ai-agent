@@ -15,6 +15,21 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source96: независимый scalar oracle подготовлен
+
+Пока developer revision53 реализует T-family, ROOT подготовил private
+`audit-schema-telemetry-scalar.py`: независимое чтение int64 little-endian и
+native String tag8/codepage65001 UTF-8, строгие JSON keys (включая отказ повторным),
+фиксированные indices/types и bounds metadata. Before/after/physical различия
+сохраняются как наблюдения; engine bridge не объявляется подтверждённым.
+`test-schema-telemetry-scalar.py`:2positive/18negative PASS; receipt
+`operator96-root-telemetry-oracle-tests.json`, oracle SHA256
+`d4b645f92a8c1d50f9c48258a3b4a77f3699908c33335fa79b5e466b6108f22d`.
+Это synthetic scalar validation без source/owner/lifecycle/live acceptance;
+целостный live auditor будет связывать эти проверки с evidence новой версии.
+Новый браузер не запускался. Source96 freeze/handoff ещё ожидается.
+
+
 ### Source96: выбран прямой T-schema путь после конечного socket audit
 
 Developer завершил read-only audit (revision51/52). ROOT проверил6source hashes
