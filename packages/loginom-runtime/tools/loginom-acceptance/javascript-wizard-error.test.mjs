@@ -9,8 +9,10 @@ function fixture({auto=false,close=true}={}) {
     getAttribute:key=>key==='data-tid'?id:null});
   const body=element(tid+';cnt;cnt;cmp','SyntaxError: Syntax error at code (:4:33)');
   const ok=element(tid+';tlb;ok','OK');
-  const dialog={...element(tid),querySelectorAll:()=>[body,ok]};
-  const context=vm.createContext({document:{querySelectorAll:()=>state.dialog?[dialog]:[]},getComputedStyle:()=>({visibility:'visible'})});
+  const dialog={...element(tid),querySelectorAll:()=>[]};
+  const context=vm.createContext({document:{querySelectorAll:selector=>!state.dialog?[]:
+    selector.includes('.x-message-box')?[dialog]:selector.includes(';cnt;cnt;cmp')?[body]:selector.includes(';tlb;ok')?[ok]:[]},
+    getComputedStyle:()=>({visibility:'visible'})});
   const page={
     evaluate:async fn=>vm.runInContext('('+fn.toString()+')()',context),
     waitForFunction:async fn=>{if(!vm.runInContext('('+fn.toString()+')()',context))throw Error('Dialog state unconfirmed');},
