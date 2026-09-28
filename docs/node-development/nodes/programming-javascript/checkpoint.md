@@ -15,6 +15,41 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source99: owned package binding и runtime save transition
+
+Runtime commit `eb7b9812e9ad6f207bcf3e830ab019dac799b3bf`. Новый javascript-package-binding.mjs проверяет
+account/origin/build/document, единственный пакет и verified preparation receipt,
+точный owned UUID path, native ancestor chain, активный tab и graph container.
+Повторное наблюдение сравнивает сами native-объекты через retained handle. Код
+наблюдения исполняется в VM тестах как сериализованный browser callback; не
+вызывает серверные методы. Saved admission отдельный и требует persisted=true
+с совпадающим exact path. Default draft admission по-прежнему требует false/null;
+старый guard createJavascriptExecutionRuntime не снят.
+
+Private persistence=true подключает saver после успешного prepareInput, с scoped
+catalog action. savePersistenceCheckpoint проверяет native owner/graph, выполняет
+save и принимает только подтверждённый workflow continuation; повторно читает
+native binding/graph. Prepared context теперь собственная копия runtime. Любая
+незавершённая проверка удерживает persistenceUncertain и запрещает следующую
+запись. Getter persistencePackage отдаёт копию подтверждённого saved context.
+Cleanup settlement поддерживает explicit savedPath, сверенный с подготовкой;
+без него сохраняется прежнее требование PackageFileName=''. Это только
+read-only readiness перед закрытием, не реализация самого Close/logout.
+
+Main tests3367PASS/0FAIL/0SKIP, original session44327 terminalexit0,35625ms.
+Проверены подмена path/account/build/document/receipt/package/workflow/tab/graph,
+повторная native identity, сохранение draft запретов и смена saved path во время
+cleanup wait. Private source99-package-binding-verification.json содержит SHA.
+Тесты runtime компонентов не доказывают новый save transition целиком на стенде.
+
+Следующий шаг — подключить fixed code/declared writer entrypoint к
+runJavascriptOperator:1800000ms, S1 Execute/save, S2 source replacement/Execute/save,
+полный итоговый source/settings/mappings и saved-aware UI guard/Close/logout.
+Затем отдельный cold reader600000ms без source/configuration authority, полный
+auditor и frozen candidate перед live. Source99 ещё не frozen; новые браузеры
+не запускались, profile115 свободен. OpenViking health успешен.
+
+
 ### Source99: original deadline и интеграция saver с настоящим capability
 
 Runtime commit `295aa76b997fab978da111b232bbb8fd50505512` (пять адресных файлов; старые dirty docs не включены).
