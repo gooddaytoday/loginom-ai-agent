@@ -37,7 +37,7 @@ export function createJavascriptPersistenceSaver({runtime, storage, prepared, de
         document_id: documentId, workflow_ref: structuredClone(previous), parameters: {...parameters}, deadline});
       if (Date.now() >= deadline) throw Error('Persistence original deadline expired');
       const receipt = structuredClone(await runtime.run('package.save_checkpoint', parameters,
-        {operationId, signal: AbortSignal.timeout(deadline - Date.now())}));
+        {operationId, deadlineAt: deadline, signal: AbortSignal.timeout(deadline - Date.now())}));
       if (Date.now() >= deadline || receipt.status !== 'SUCCEEDED' || receipt.operation_id !== operationId
         || receipt.action_key !== 'package.save_checkpoint' || receipt.phase !== 'verified' || receipt.error != null
         || receipt.output?.save_completed !== true || receipt.output.reopened !== false
