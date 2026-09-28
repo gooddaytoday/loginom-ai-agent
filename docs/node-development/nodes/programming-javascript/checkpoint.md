@@ -1,5 +1,24 @@
 # JavaScript: checkpoint исполнения
 
+## G5 null/empty: пять значений различены — 2026-09-28
+
+Отдельный headed `g5-null-empty-19`/profile183 на child revision `180f1d5810`
+доставил source SHA256
+`5b312ad7ea5af26aa32759246e2162adff5d235579863fc0159c511f07c78c37`.
+Свежий принадлежащий JS process завершился успешно; typed UI reader получил
+одну строковую колонку `Result`, пять полных строк: настоящий `null` с
+`is_null=true`, затем `""`, `"null"`, `"0"`, `"false"` с `is_null=false`.
+Независимый oracle подтвердил schema и все значения (`typed_oracle_verified`).
+Proof level `typed_ui_only`: native bytes не проверены, строковые значения
+получены из UI cache; один case не закрывает G5 целиком.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`beb49d7d9fff27e85211cfb33cf3437e5f0033b0020a5aaa1be930876d9e043f`,
+journal SHA256
+`01eb830a93a3b6b45120785a3c06145e33e4e6cfe13586905f2bde804643ffeb`.
+Реестр закрыт, следующий fresh profile184.
+
 ## Engine native parse error: отказ мастера без Execute — 2026-09-28
 
 Отдельный headed `engine-native-parse-error-18`/profile182 на child revision
