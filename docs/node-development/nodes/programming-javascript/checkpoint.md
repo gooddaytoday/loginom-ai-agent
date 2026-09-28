@@ -15,6 +15,36 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Cold04: блокирующий toast и readonly package требуют чтения
+
+Source114 main original90231 exit0:3615PASS; full client original69008 exit0:
+2809PASS/0FAIL/10SKIP,177575ms. Freeze114 SHA
+cc0138f01beadfbfc0de2179959bb55f91783e53192e0c42e64b5065dc93a3a2,
+1324 pins/closure210 files644 edges, computed0,2 syntax checks PASS.
+Cold04 original98896/profile142 terminal exit1; /proc PID418898 подтвердил headed/
+sandbox/profile. Failure прежней condition prepared node available for process
+console; no mutation authorized. Browser closed, UI cleanup skipped source uncertain.
+Recovery04/profile143 original63994 exit0: jsteach,0 packages, logout/browser close
+true; Chrome отсутствует. Реестр закрыт/active_exec_session=null.
+
+Важная коррекция причинного вывода source114: cold03 и cold04 в последнем
+observation имеют ui.dialogs=[toast] с text `[outside selected root]`, masks=[];
+общий node-procedure satisfied требует допустимые dialogs. Это блокирует ready
+даже после отключения readProcesses начального observe. Console_grids в cold03
+не было достаточным доказательством единственной причины. Source114 устраняет
+раннее требование process grids, но не устраняет наблюдённый toast.
+
+Также navigation labels cold03/04 содержат `(только чтение)`; cold01/02 таких
+наблюдений не имеют. Это observed UI mode, не доказательство чужого lock/server
+session или повреждения файла. Подготовленный workflow_ref label не содержит
+пометку, но нарушение equality пути не объявлять причиной без tracing predicate.
+Следующий шаг — headed read-only diagnostic exact saved package открытия и текст/
+принадлежность toast/readonly status; не dismiss неизвестное уведомление, не
+игнорировать dialogs, не менять expected/navigation для получения PASS.
+Writer13 package сохраняется. Private result source114-code-cold-result-04.json.
+Next profile144. Полный scope G7/declared/public/knowledge/review/CLI остаётся открыт.
+
+
 ### Cold03 выявил console readiness cycle; source114 исправлен
 
 Source113 main original39888 exit0:3615PASS; focused19PASS. Freeze113 SHA
