@@ -247,7 +247,8 @@ for(const fault of ['membership','socket','timeout','ack','ok'])test('metadata p
       }});}
   };
   const runtime=vm.runInNewContext('({'+source.slice(start,end)+'})',context);
-  const getters=source.slice(source.indexOf('    get nativeReadUncertain()'),source.indexOf('    get nativeReadUncertain()')+300);
+  const getterStart=source.indexOf('    get nativeReadUncertain()',source.indexOf('async function createJavascriptBoundRuntime'));
+  const getters=source.slice(getterStart,getterStart+300);
   const getterEnd=getters.indexOf('\n',getters.indexOf('get metadataReadUncertain'));
   Object.defineProperties(runtime,Object.getOwnPropertyDescriptors(vm.runInNewContext('({'+getters.slice(0,getterEnd)+'})',context)));
   let failure,result;try{result=await runtime.readNativeRoundtrip(input,node,x.execution);}catch(error){failure=error;}
