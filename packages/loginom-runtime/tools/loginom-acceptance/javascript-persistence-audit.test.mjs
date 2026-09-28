@@ -71,6 +71,31 @@ for(const mode of ['code','declared'])test('independent full persistence audit: 
   const result=auditJavascriptPersistence(fixture(mode));assert.equal(result.status,'VERIFIED');assert.equal(result.schema_mode,mode);
   assert.equal(result.cold_execution_verified,true);assert.equal(result.package_bytes_verified,false);assert.equal(result.public_handler_verified,false);
 });
+function withDirtyState(evidence,modified=[false,false]){
+  for(const [index,save] of evidence.writer.persistence.saves.entries()){
+    const dirty_state={version:1,document_id:save.document_id,workflow_id:save.workflow_ref.workflow_id,
+      package_path:path,modified:modified[index],read_only:true,observation:'after_confirmed_save'};
+    save.dirty_state=dirty_state;
+    const at=evidence.writerEvents.findIndex(event=>event.phase==='persistence_save_confirmed'&&event.revision===index+1);
+    evidence.writerEvents.splice(at+1,0,{phase:'persistence_dirty_state_observed',revision:index+1,path,
+      save_operation_id:save.receipt.operation_id,dirty_state:structuredClone(dirty_state)});
+  }
+  return evidence;
+}
+for(const mode of ['code','declared'])test('bounded post-save native dirty-state proof: '+mode,()=>{
+  assert.equal(auditJavascriptPersistence(withDirtyState(fixture(mode))).dirty_state_verified,true);
+  assert.equal(auditJavascriptPersistence(withDirtyState(fixture(mode),[false,true])).dirty_state_verified,false);
+});
+test('dirty-state audit refuses missing, mismatched and early observations',()=>{
+  const missing=withDirtyState(fixture());missing.writerEvents=missing.writerEvents.filter(event=>
+    event.phase!=='persistence_dirty_state_observed'||event.revision!==2);
+  assert.throws(()=>auditJavascriptPersistence(missing),/dirty-state/);
+  const changed=withDirtyState(fixture());changed.writerEvents.find(event=>event.phase==='persistence_dirty_state_observed').dirty_state.modified=true;
+  assert.throws(()=>auditJavascriptPersistence(changed),/dirty-state/);
+  const early=withDirtyState(fixture()),index=early.writerEvents.findIndex(event=>event.phase==='persistence_dirty_state_observed');
+  early.writerEvents.unshift(early.writerEvents.splice(index,1)[0]);
+  assert.throws(()=>auditJavascriptPersistence(early),/dirty-state/);
+});
 const faults={
   source:f=>{f.cold.cold.source.source_text+=' ';},staleSource:f=>{f.cold.cold.source.source_text=f.writer.persistence.initial.source.source;},
   sourceDigest:f=>{f.cold.cold.source.source_sha256='0'.repeat(64);},sourceBytes:f=>{f.cold.cold.source.source_utf8_bytes++;},

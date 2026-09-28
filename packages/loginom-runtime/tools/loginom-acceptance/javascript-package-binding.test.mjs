@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {bindJavascriptPackage, javascriptPackageBindingRequest, observeJavascriptPackageBinding} from './javascript-package-binding.mjs';
+import {readJavascriptSavedDirtyState, verifyJavascriptSavedDirtyState} from './javascript-persistence-dirty-state.mjs';
 
 const path = '/jsteach/js-g2-9150c962-ad60-4cd4-a13e-bcba89b982d8/JavaScript-9150c962-ad60-4cd4-a13e-bcba89b982d8.lgp';
 export function fixture(saved = true) {
@@ -20,7 +21,7 @@ export function fixture(saved = true) {
   const location = {origin: 'http://logi-test-plan.bg.local'};
   const context = vm.createContext({document, location, Map, bg: {app}, __loginomDockPreparationV1: preparation});
   const evaluate = (fn, args) => vm.runInContext('(' + fn.toString() + ')', context)(args);
-  const page = {evaluateHandle: async (fn, args) => evaluate(fn, args)};
+  const page = {evaluateHandle: async (fn, args) => evaluate(fn, args), evaluate: async (fn, args) => evaluate(fn, args)};
   const request = () => javascriptPackageBindingRequest({prepared, account: 'jsteach', ...(saved ? {savedPath: path} : {})});
   return {page, prepared, packageNode, workflow, tab, container, card, receipt, preparation, map, app, location,
     request, observe: extra => evaluate(observeJavascriptPackageBinding, {...request(), ...extra})};
@@ -96,4 +97,44 @@ test('server Windows path separator is normalized without changing case or resol
   assert.equal(f.observe({checkOnly: true}).package_path, path);
   f.packageNode.PackageFileName = path.replace('/JavaScript-', '/./JavaScript-');
   assert.throws(() => f.observe());
+});
+
+for (const modified of [false, true]) test('saved dirty-state read is bound and read-only: ' + modified, async () => {
+  const f = fixture(), packageProxy = {}, calls = [];
+  f.packageNode.Package = packageProxy;
+  f.packageNode.ReadOnly = false;
+  f.packageNode.HasRunningNodes = () => false;
+  f.map.FServerConnection.Session = {IsPackageModified: async proxy => { calls.push(proxy); return modified; }};
+  const owner = f.observe(), request = f.request();
+  const state = verifyJavascriptSavedDirtyState(await f.page.evaluate(readJavascriptSavedDirtyState, {owner, request}), request);
+  assert.deepEqual(calls, [packageProxy]);
+  assert.equal(state.modified, modified);
+  assert.equal(state.read_only, true);
+  assert.equal(state.package_path, path);
+  assert.throws(() => verifyJavascriptSavedDirtyState({...state, package_path: '/other.lgp'}, request));
+});
+
+test('saved dirty-state read rejects owner replacement during native RPC', async () => {
+  const f = fixture();
+  f.packageNode.Package = {};
+  f.packageNode.ReadOnly = false;
+  f.packageNode.HasRunningNodes = () => false;
+  f.map.FServerConnection.Session = {IsPackageModified: async () => {
+    f.card.Controller = {...f.card.Controller};
+    return false;
+  }};
+  const owner = f.observe();
+  await assert.rejects(f.page.evaluate(readJavascriptSavedDirtyState, {owner, request: f.request()}), /owner changed/);
+});
+
+test('saved dirty-state read rejects active execution and non-boolean native result', async () => {
+  const f = fixture();
+  f.packageNode.Package = {};
+  f.packageNode.ReadOnly = false;
+  f.packageNode.HasRunningNodes = () => true;
+  f.map.FServerConnection.Session = {IsPackageModified: async () => 'false'};
+  const owner = f.observe(), request = f.request();
+  await assert.rejects(f.page.evaluate(readJavascriptSavedDirtyState, {owner, request}), /owner changed/);
+  f.packageNode.HasRunningNodes = () => false;
+  await assert.rejects(f.page.evaluate(readJavascriptSavedDirtyState, {owner, request}), /result unconfirmed/);
 });

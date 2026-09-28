@@ -10,6 +10,7 @@ import {inspectJavascriptModulePolicy} from '../../client/lib/javascript-module-
 import {javascriptSourceMappings} from './javascript-source-cycle.mjs';
 import {requireJavascriptTopology} from './javascript-link-topology.mjs';
 import {requireJavascriptSavedPackagePath} from './javascript-package-binding.mjs';
+import {verifyJavascriptSavedDirtyState} from './javascript-persistence-dirty-state.mjs';
 
 const sha=value=>createHash('sha256').update(value).digest('hex');
 const need=(condition,message)=>{if(!condition)throw Error('Persistence audit: '+message);};
@@ -110,6 +111,21 @@ export function auditJavascriptPersistence({writer,cold,writerEvents,coldEvents}
     same(saveEvents[index].receipt,receipt,'save journal receipt');
     need(saveEvents[index].revision===index+1&&saveEvents[index].path===path,'save journal identity');
   }
+  const dirtyEvents=writerEvents.filter(event=>event.phase==='persistence_dirty_state_observed');
+  const dirtyObserved=dirtyEvents.length>0||saves.some(save=>save.dirty_state!==undefined);
+  if(dirtyObserved){
+    need(dirtyEvents.length===2&&saves.every(save=>save.dirty_state),'two saved-package dirty-state observations');
+    for(const [index,save] of saves.entries()){
+      const state=verifyJavascriptSavedDirtyState(save.dirty_state,{prepared:save.prepared,path});
+      const event=dirtyEvents[index];
+      need(event.revision===index+1&&event.path===path&&event.save_operation_id===save.receipt.operation_id,
+        'dirty-state save identity');
+      same(event.dirty_state,state,'dirty-state journal receipt');
+      need(writerEvents.indexOf(saveEvents[index])<writerEvents.indexOf(event)
+        &&(index===1||writerEvents.indexOf(event)<writerEvents.indexOf(reservations[1])),
+        'dirty-state observation order');
+    }
+  }
   const mappingEvents=writerEvents.filter(event=>event.phase==='persistence_post_execution_mappings_verified');
   need(mappingEvents.length===1,'one post-execution mapping proof');
   same(mappingEvents[0].mappings,last.mappings_after_execute,'post-execution mapping journal');
@@ -130,9 +146,11 @@ export function auditJavascriptPersistence({writer,cold,writerEvents,coldEvents}
   }
   const cycleEvents=writerEvents.filter(event=>event.phase==='source_cycle_verified');
   same(cycleEvents.map(event=>event.result),cycles,'complete writer source cycles');
-  const ordered=[terminals(writerEvents)[0],cycleEvents[0],reservations[0],saveEvents[0],cycleEvents[1],
+  const ordered=[terminals(writerEvents)[0],cycleEvents[0],reservations[0],saveEvents[0],
+    ...(dirtyObserved?[dirtyEvents[0]]:[]),cycleEvents[1],
     writerEvents.find(event=>event.phase==='execution_launched'&&event.identity?.phase==='persistence-final'),
-    terminals(writerEvents)[1],reservations[1],saveEvents[1],cycleEvents[2]].map(event=>writerEvents.indexOf(event));
+    terminals(writerEvents)[1],reservations[1],saveEvents[1],
+    ...(dirtyObserved?[dirtyEvents[1]]:[]),cycleEvents[2]].map(event=>writerEvents.indexOf(event));
   need(ordered.every((index,position)=>index>=0&&(position===0||index>ordered[position-1])),'writer cycle/save/execute ordering');
   const admissionEvents=['javascript_source_admitted','javascript_source_effect_dispatch','javascript_source_effect_returned'].map(phase=>{
     const matches=coldEvents.filter(event=>event.phase===phase);need(matches.length===1,'cold '+phase+' count');
@@ -168,7 +186,7 @@ export function auditJavascriptPersistence({writer,cold,writerEvents,coldEvents}
     output:{rows:6,columns:2,numeric_tolerance:0},writer_document_id:saved.document_id,cold_document_id:node.document_id,
     execution_ids:[first.execution.execution_id,last.execution.execution_id,read.execution.execution_id],
     full_source_verified:true,settings_verified:true,mappings_verified:true,graph_verified:true,cold_execution_verified:true,
-    package_bytes_verified:false,dirty_state_verified:false,public_handler_verified:false,
+    package_bytes_verified:false,dirty_state_verified:dirtyObserved&&saves.every(save=>save.dirty_state.modified===false),public_handler_verified:false,
     scope:'Report/journal persistence evidence; requires ROOT source freeze and original process termination checks'};
 }
 
