@@ -588,7 +588,9 @@ Loginom, source digest и owner/execution. Применять redactor и явн
 после нового Execute до save2 и после cold Execute; отсутствие source cache не
 выдаётся за проверенное сопоставление. Private writer/cold пары обоих режимов и
 отдельное чтение точных байтов `.lgp` подтверждены; их пределы приведены в
-[checkpoint](checkpoint.md). Проверка dirty-state и публичного handler остаётся.
+[checkpoint](checkpoint.md). Private dirty-state обоих режимов теперь подтверждён
+отдельными post-save native ответами для этих же сохранённых пакетов; публичный
+handler и автономная CLI-приёмка остаются открытыми.
 
 Уже подготовлены [fixtures](fixtures/README.md) и ожидаемые бизнес-значения.
 Будущие `javascript_configuration_evidence.py`, `javascript_output_evidence.py`,

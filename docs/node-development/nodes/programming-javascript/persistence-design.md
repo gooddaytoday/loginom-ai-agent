@@ -1,5 +1,12 @@
 # JavaScript: сохранение последней редакции и холодное открытие
 
+## Актуальный итог private G7 — 2026-09-29
+
+Новые headed writer/cold/byte-reader тройки для `code` и `declared` дали
+`dirty_state_verified=true` и `package_bytes_verified=true` для одних и тех же
+двух сохранённых пакетов. Независимые SHA и пределы доказательства приведены в
+[checkpoint](checkpoint.md). Публичный обработчик и CLI-приёмка всё ещё открыты.
+
 ## Состояние после независимого byte audit — 2026-09-29
 
 Для обоих режимов завершены отдельные private writer/cold пары и read-only

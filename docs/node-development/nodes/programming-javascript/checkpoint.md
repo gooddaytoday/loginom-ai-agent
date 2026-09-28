@@ -1,5 +1,45 @@
 # JavaScript: checkpoint исполнения
 
+## G7: оба режима — clean Save, cold Execute и точные байты одного пакета — 2026-09-29
+
+На Ubuntu выполнены **шесть отдельных headed-процессов** на fresh profiles
+203–208: writer, cold reader и read-only package-byte reader для каждого
+`code` и `declared`. У каждого writer два Save с разными operation ID и
+`IsPackageModified=false` после каждого. Cold reader открыл тот же `.lgp` в
+новом документе без повторной передачи исходника, прочитал source/settings,
+выполнил один свежий Execute и полностью сверил 6×2 output. Третий процесс
+получил exact `.lgp` через native read-only FileDownloader без Execute;
+поток release/dispose подтверждён. Каждый из шести процессов завершился exit0,
+`OBSERVED`, package close/logout/browser close 3/3; исходные PIDs и процессы
+браузерных профилей отсутствуют. Следующий пустой профиль 209, browser lease
+освобождён. ОС сервера это по-прежнему не устанавливает.
+
+Независимый `javascript-persistence-audit.mjs` дал `VERIFIED` с
+`dirty_state_verified=true` в обоих режимах. Расширенный
+`javascript_package_byte_audit.py` повторно сверил pinned writer/cold files,
+два clean post-save receipts, read-only journal, native function pins и
+ZIP/XML (14 членов, CRC, GUID, decoded source, mode и поля). Итог для этих
+**двух конкретных пакетов**: `package_bytes_verified=true` и
+`dirty_state_verified=true`, `public_handler_verified=false`.
+
+| Режим | Writer report SHA256 | Cold report SHA256 | Persistence audit SHA256 | Package bytes / SHA256 | Combined audit SHA256 |
+| --- | --- | --- | --- | --- | --- |
+| `code` | `67c3445b5803f780a5cd514153e581582a5b82e096669117d8e0dc212df08708` | `a751b90e48aecc12c28ccfa21bc3eb089375599a25c22293434b301f6405868c` | `74dd3b332b7f8ec96bc19523f49a924956de447a00d0f0e4895d2f47a2f44a87` | 8789 / `ec8f7f2d7865f3366a31db8853510e5f4f03408456a33b6c6766a7f7c00f168b` | `ecbf80d8eb1dd36e87aae1dce21de9f42cdcb4b5f228d4e96f764cfd8aecf994` |
+| `declared` | `6b2874b0ea06f7590dd6f495402dce262c65b698228e4dc64dbd5f3122df4d62` | `4485dc056be91700de570263d80273307aeb4e9b2d7027d682583c1d14e7851c` | `fb314ac1a96ae3adb77b8ee564e202003140e287d6ec7cd0ee03207c64c5e1f6` | 8752 / `f221d27bfcc698cfa64161adf18938f397ba6f43bf88ba1976ece6772124444f` | `459dc1157246fde5b2007893e37a74e752dea2a77ab0c4863e35f95cf35792c6` |
+
+Все report/journal/`.lgp`/audit лежат только в private campaign dir.
+Writer/cold/read-only browser source — child commit `945f75baf0`, зафиксирован
+private freeze131 SHA256
+`676eaa67526ed7c94f4bd1f8c54119e8561bff34aa0bfbdff289355a736a8d52`
+(1332 pins, closure221 файлов/659 literal edges, computed0).
+Post-run byte auditor и четыре portable теста — child commit `70b384418f`,
+private freeze132 SHA256
+`f1b08b59e67e965a5c5ba97f991a6677c00ec58a96273b161c54d0dfd39ac9e7`.
+Полная JS suite 18 042 PASS на source131; после audit-правки четыре Python
+unittest PASS. Это закрывает private G7 persistence-доказательство для двух
+фиксированных режимов. Публичный handler, вся G1–G7/J01–J27 интеграция и
+автономная CLI-приёмка остаются открытыми.
+
 ## G7: post-save dirty-state read, source-only — 2026-09-29
 
 Child `node-javascript` commit `945f75baf0` добавил read-only запрос
