@@ -1,0 +1,16 @@
+{
+  "package_path": "/lab-slot-a/node-pipeline-grouping.lgp",
+  "nodes": [
+    { "type": "imports.text" },
+    { "type": "transform.group_data" }
+  ],
+  "output_node_type": "transform.group_data",
+  "columns": [
+    { "name": "Category", "type": "string" },
+    { "name": "Total", "type": "real" }
+  ],
+  "rows": [
+    { "Category": "Alpha", "Total": 15 },
+    { "Category": "Beta", "Total": 27 }
+  ]
+}

@@ -1,10 +1,11 @@
-## Node development — актуально 2026-09-24
+## Node development
 
-Для разработки обработчиков узлов сначала прочитать [канонический регламент](docs/node-development/README.md).
-Он определяет orchestration/single/plan-authoring, принятые модели, изоляцию и CLI-приёмку.
-Для новых обработчиков продуктовая база — явно закреплённый SHA ветки `loginom`
-в loginom-ai-agent. Прежние Hermes/Dock node workflows — исторические источники.
-Документация сама не запускает очередь; слияние и выпуск требуют отдельной команды.
+Для обработки узлов читать [RUNBOOK](docs/node-development/RUNBOOK.md).
+База — закреплённый SHA ветки `loginom`. PR открывать в `loginom`.
+Цель — принятый узел. Новые проверки, барьеры и сервисы добавлять только с согласия владельца.
+Блокер дольше 30 минут — остановиться и написать владельцу в задаче Paperclip.
+Состояние хранить в задаче; checkpoint — не больше 20 строк.
+Ветка `lab-preparation` в `loginom-swarm` заморожена. Слияние и выпуск — отдельная команда владельца.
 
 - To regenerate the legacy JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit `src/generated` or `src/generated-effect` directly.
