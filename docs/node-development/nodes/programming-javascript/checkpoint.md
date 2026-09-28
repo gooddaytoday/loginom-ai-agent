@@ -17,6 +17,17 @@
 
 ### Source98: начата реализация AST policy и effective-source admission
 
+Ранняя независимая ROOT проверка parser:49/49cases PASS на копии реализации
+`javascript-module-policy.mjs` SHA256
+`2b4a0f723dfae1fcaa8949c2e092b54c2519f9c86d76d4200739ce3177b61d9b`
+в изолированном production install. Receipt `operator98-root-parser-corpus-review.json`.
+Это не frozen candidate и не admission lifecycle. Прямой import из worktree
+до установки новой dependency дал ERR_MODULE_NOT_FOUND/acorn; разработчик
+уведомлён, ROOT его node_modules не менял. После freeze сверить source/lock hashes
+и проверить actual worktree installation перед полными тестами. Последнее ожидание
+60s подтвердило ту же active/inProgress задачу; timeout не означает остановку.
+
+
 ROOT отдельно проверил production installation из новых client package/lock в
 `operator98-root-production-install`: pinned Node24.19.0, npm ci с
 --ignore-scripts/--omit=dev/--workspaces=false, exit0. Acorn8.15.0 разрешается
