@@ -15,6 +15,32 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source97: frozen candidate проверен ROOT и закоммичен
+
+Developer revision61 завершён. ROOT проверил1295pins до/после,118прежних docs,
+135external evidence hashes,10syntax checks и literal import closure172files/556edges.
+Независимый main/session56608:3144PASS/0FAIL/0SKIP. Полный client/session43608:
+2545PASS/0FAIL/10SKIP; deny3PASS, Python15PASS. Оба original processes terminalexit0.
+Client запускался из client/ с pinned PATH, file isolation/concurrency2 и без
+LOGINOM_DOCK_TEST_BROWSER/CI; browser integration этим прогоном не заявлена.
+Developer full-client17fail с EPERM сохранён как отдельный исторический результат;
+тесты/права/продуктовые guards для его обхода не менялись.
+
+Runtime commit `3d922b5f4a` содержит10точных файлов source97, старые dirty docs
+developer не включены. Manifest SHA256
+`c37c191de9eae33122d4e643c013cb7cc704bd69a06acd0c30d083d870adf914`.
+Private receipts: `operator97-root-source-review.json`,
+`operator97-root-test-results.json`; freeze97/handoff/design сохранены в campaign.
+ACK теперь связан с source/chunk hashes, размерами, смещением и cursor hash;
+private cycle сохраняет обе фактические квитанции/settings/mappings для аудита.
+
+Следующий шаг: один fresh headed source-read cycle profile114 через
+`javascript-source-read-live.mjs`; baseline setup отдельно Done/Execute, затем
+два owned open/read/Close rounds без нового Execute/Done. Доказать полное чтение,
+неизменность наблюдаемых settings/mappings и process cache; не объявлять отсутствие
+скрытых server transactions/ABA. Public source-read route остаётся выключенной.
+В этом ходе новых браузеров не было; profile113 остаётся закрыт с logout.
+
 ### Source97: первый reader проверен на границе JSON-бюджета
 
 В revision60 появились design97, production host/browser readers и private
