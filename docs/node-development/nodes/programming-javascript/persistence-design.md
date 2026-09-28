@@ -8,7 +8,12 @@ beaf849091830e3adb77a53cb88ca2f0c9e4a98c. Полный план/public/CLI ос�
 Две отдельные операторские сессии на каждый schema mode: writer и cold reader.
 Обе headed, sandbox enabled, Ubuntu DISPLAY=:1, pinned Node/Chromium. Первый
 профиль115 свободен; следующие выдаёт ROOT последовательно после cleanup.
-Один браузер одновременно. Writer полностью завершается с close/logout/browser
+Один браузер одновременно. Для writer общий immutable deadline1800000ms,
+для cold reader600000ms с самого начала процесса; каждый фазовый timeout
+обрезается оставшимся временем. Не использовать defaultInfinity старого
+operator и не продлевать deadline после ожидания. Cleanup имеет отдельный
+bounded budget и подтверждённую authority, не разрешает новое вычисление.
+Writer полностью завершается с close/logout/browser
 close, ROOT проверяет terminal и отсутствие процесса, затем запускает reader
 в новом пустом профиле. Reopen в том же контексте может сохранить caches; только
 ZIP/XML inspection не доказывает исполнение. Поэтому эти варианты не заменяют
