@@ -16,6 +16,30 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source93 active: независимые C oracles готовы
+
+Developer turn01a0e582-a008-72e2-899e-6a283fd934f2 подтверждён live/revision34.
+В worktree начаты additive C catalog/serialized owner/binding/read/failure изменения;
+frozen handoff ещё отсутствует. Root отдельно реконструировал4Csource из design§6,
+сверил published byte lengths/SHA, затем сравнил actual промежуточный каталог с
+независимыми bytes: все4совпали. Receipt operator93-root-intermediate-catalog-check.json;
+source oracle operator93-root-set-source-oracle.json SHA
+60b54931fbf6e7e19410ee923ab979075715a13f65dd2aa6a33fa914718d7241.
+
+Подготовлен private audit-named-c-scalar.py: независимо декодирует signed64 LE и
+NULL, проверяет one-cell schema/coverage, различает strict index/exact и unknown
+case/missing observation. Synthetic self-check20combinations (NULL,0,candidate,
+int64min/max ×4cases) прошёл; неверное округлённое decimal отклонено.
+Receipt operator93-root-set-scalar-selfcheck.json. Это scalar-only oracle, не
+source/owner/journal/lifecycle acceptance и не live наблюдение. Полный исходный
+INPUT/upstream контролируется прежним независимым scalar audit.
+
+Следующий шаг: дождаться готового frozen93 в той же задаче, проверить final diff,
+main suite и manifest; только затем source93 headed admission. Browser не запускался,
+profile100 закрыт; C/D в Loginom ещё не проверены. Full goal остаётся активной.
+
+
+
 ### Source92 принят как private offline auditor; следующий участок C/Set
 
 Developer revision33 terminal; final manifest SHA
