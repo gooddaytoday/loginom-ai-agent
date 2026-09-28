@@ -379,12 +379,13 @@ test('output port opening uses the parent journal and receipt wrapper before any
   const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},
    prepared_node_context:{...binding.node,verified:true,surface:'graph',locked:false,tid:'MF;TF-1;Graph;Import'},scan:{complete:true},wizard:{status:'absent'},
    ui:{elements:[{tid:'MF;TF-1;ModelForm;cmpDiagram',ref:'graph'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
-  const entries=[],order=[],op={id:'parent',deadline:10000,action:{action_key:'node.apply',revision:'1'}};
+  const entries=[],order=[],op={id:'parent',deadline:100000,action:{action_key:'node.apply',revision:'1'}};
   const channel=createNodeProcedure({operation:op,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
    now:()=>1,wait:async()=>{},maxSteps:mode==='budget'?1:5,
    record:async e=>{order.push(e.phase);entries.push(e);if(mode==='journal'&&e.phase==='node_step_prepared')throw Error('disk');if(mode==='completion'&&e.phase==='node_step_completed')return {};return structuredClone(e);},
-   wrapMutation:(code,r)=>{order.push('wrapped');return {code,r};},execute:async code=>{
+   wrapMutation:(code,r)=>{order.push('wrapped');return {code,r};},execute:async(code,options)=>{
     if(typeof code==='string')return {status:'SUCCEEDED',output:structuredClone(state)};
+    assert.ok(code.code.includes('"deadline":100000'));assert.equal(options.timeout,99999);
     order.push('effect');if(mode==='transport')throw Error('transport');
     return {status:'SUCCEEDED',operation_id:mode==='foreign'?'other':code.r.id,action_key:code.r.action_key,effect_possible:true,cleanup_complete:true,
      output:{verified:true,direction:'output',port:0,opening_operation_id:code.r.id,...binding.node,node_id:mode==='owner'?'other':'node'}};

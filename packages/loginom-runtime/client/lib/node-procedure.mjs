@@ -167,10 +167,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       signal?.throwIfAborted();
       if(now()>=operation.deadline)throw Error('Port opening deadline elapsed before mutation');
       const code=(direction==='input'?makePreparedInputPortOpenCode:makePreparedOutputPortOpenCode)(preparedNodeContext,{port,operation_id:id,origin:targetOrigin,build:targetBuild,
-        deadline:Math.min(operation.deadline,now()+15000)});
+        deadline:operation.deadline});
       const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'port_open',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:'OUTPUT_PORT_OPEN_UNCONFIRMED',message:r.error}:null,trace:r.trace}}`;
       let result;
-      try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:20000});}
+      try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(1,operation.deadline-now())});}
       catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
       if(result.operation_id!==id||result.action_key!==actionKey){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw Error('Port opening receipt identity differs');}
       operation.cleanupConfirmed=result.cleanup_complete===true;operation.nodeEffectPossible ||= result.effect_possible===true;
