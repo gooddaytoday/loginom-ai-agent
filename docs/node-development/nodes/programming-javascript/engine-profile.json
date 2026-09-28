@@ -853,9 +853,34 @@
       "source_sha256": "dcc1d1da4d0349de981d1fd7549786cc02ced4aaea28279647a6d45d31670c46",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_pass",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "datetime"
+        }
+      ],
+      "output_rows": 2,
+      "all_cells_verified": true,
+      "observed_values": [
+        [null],
+        ["2024-02-29T23:59:59.123"]
+      ],
+      "datetime_precision": "millisecond_local_timezone_unspecified",
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-date-civil-30/report.json",
+        "report_sha256": "7e7365c8fe4b3799d9faaacd4384521fe78e4f87f15bf871004dffb08b9de72f",
+        "journal_sha256": "df01ed63bbf517c4e8af57035368dcff91f8ae2a869dab7395b8b2889282a06f",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "g5-named-access",

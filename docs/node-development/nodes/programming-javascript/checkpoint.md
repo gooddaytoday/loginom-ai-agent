@@ -1,5 +1,25 @@
 # JavaScript: checkpoint исполнения
 
+## G5 civil DateTime: local millisecond PASS — 2026-09-29
+
+Отдельный headed `g5-date-civil-30`/profile194 на child revision
+`180f1d5810` доставил source SHA256
+`dcc1d1da4d0349de981d1fd7549786cc02ced4aaea28279647a6d45d31670c46`.
+Свежий принадлежащий JS process завершился успешно; typed UI reader получил
+DateTime колонку `Result`, настоящий `null` и local datetime
+`2024-02-29T23:59:59.123` с миллисекундной точностью. Timezone в native
+представлении не установлен. Независимый oracle подтвердил schema и обе
+клетки (`typed_oracle_verified`). Это проверка созданного JS Date на выходе,
+не native input roundtrip и не native serial bytes. Proof level
+`typed_ui_only`; G5 остаётся открытым.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`7e7365c8fe4b3799d9faaacd4384521fe78e4f87f15bf871004dffb08b9de72f`,
+journal SHA256
+`df01ed63bbf517c4e8af57035368dcff91f8ae2a869dab7395b8b2889282a06f`.
+Реестр закрыт, следующий fresh profile195.
+
 ## G5 integer -Infinity: наблюдён int64 minimum — 2026-09-29
 
 Отдельный headed `g5-integer-negative-infinity-29`/profile193 на child
