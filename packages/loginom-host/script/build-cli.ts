@@ -28,6 +28,13 @@ if (process.argv[2] === "--source-snapshot-worker") {
   }
 }
 const snapshotWorkerSha256 = createHash("sha256").update(readFileSync(import.meta.path)).digest("hex")
+if (process.argv[2] === "--verify-source-snapshots") {
+  const first = await snapshot()
+  if (JSON.stringify(first) !== JSON.stringify(await snapshot()))
+    throw new Error("LOGINOM_SOURCE_CHANGED_DURING_BUILD")
+  console.log(JSON.stringify({ status: "pass", ...first }))
+  process.exit(0)
+}
 const destination = process.argv[2]
 if (!destination || !isAbsolute(destination)) throw new Error("Provide a new absolute artifact directory")
 if (await Bun.file(join(destination, "cli-manifest.json")).exists()) throw new Error("Artifact already exists")
@@ -227,12 +234,29 @@ async function snapshot() {
   const child = Bun.spawn([process.execPath, import.meta.path, "--source-snapshot-worker"], {
     cwd: repo,
     stdout: "pipe",
-    stderr: "pipe",
+    stderr: "ignore",
   })
+  let exited = false
+  const exit = child.exited.then((code) => {
+    exited = true
+    return code
+  })
+  const reader = child.stdout.getReader()
+  const output = (async () => {
+    const chunks: Uint8Array[] = []
+    let bytes = 0
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) return Buffer.concat(chunks).toString("utf8")
+      bytes += value.byteLength
+      if (bytes > 4096) throw new Error("LOGINOM_SOURCE_SNAPSHOT_OUTPUT_LIMIT")
+      chunks.push(value)
+    }
+  })()
   let deadline: ReturnType<typeof setTimeout> | undefined
   try {
     const result = await Promise.race([
-      Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]),
+      Promise.all([exit, output]),
       new Promise<never>((_resolve, reject) => {
         deadline = setTimeout(() => reject(new Error("LOGINOM_SOURCE_SNAPSHOT_TIMEOUT")), 180_000)
       }),
@@ -249,10 +273,14 @@ async function snapshot() {
     return value as { sourceCommit: string; sourceTreeSha256: string; sourceDirty: boolean }
   } finally {
     if (deadline) clearTimeout(deadline)
-    if (child.exitCode === null) {
+    if (!exited) {
       child.kill(9)
-      await Promise.race([child.exited, Bun.sleep(5_000)])
+      await Promise.race([
+        exit,
+        Bun.sleep(5_000).then(() => { throw new Error("LOGINOM_SOURCE_SNAPSHOT_CHILD_UNCONFIRMED") }),
+      ])
     }
+    void reader.cancel().catch(() => undefined)
   }
 }
 
