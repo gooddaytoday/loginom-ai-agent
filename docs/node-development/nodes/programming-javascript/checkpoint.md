@@ -16,6 +16,33 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Прямое открытие output port наблюдено, profile155
+
+Приватный source116-port-diagnostic-02.mjs исправляет чтение SVG: innerText
+может отсутствовать, поэтому используется textContent; class читается атрибутом.
+В первой диагностике вызов innerText.slice на SVG был небезопасен; её точный
+исходный stack не сохранён, поэтому причина того завершения остаётся гипотезой.
+Вторая диагностика добавляет запись fatal stack и успешно получила inspect.
+
+Original74398 exit0, headed freshprofile155, тот же writer13 path. Только UI
+right-click Output_Data-0 → Configure, без Execute/Save/Done. Сразу после click
+active controller оставался ModelForm; следующий независимый inspect показал
+WizardModelComponentForm, FView root MF;TF-1;WizrdMCF, DataSetOutputSocketWizard,
+пустую таблицу target columns. Это опровергает постоянное несовпадение названия
+мастера/его корневого tid, но не проверяет весь строгий port-owner predicate.
+
+Close мастера → точный вопрос «Вы действительно хотите закрыть мастер настройки?»
+→ Yes → возвращение ModelForm; затем UI ClosePackage, последующий inspect packages=0,
+logout/login form и browser close. Отдельная admin recovery не потребовалась.
+Evidence source116-port-diagnostic-02.jsonl в приватной кампании; package не сохранён.
+
+Следующий шаг: адресная проба production readPortMapping на saved runtime со
+временем начала/окончания Playwright evaluate/waitForTimeout; сравнить с полным
+cold порядком source/input/output. Cold07 имеет только6 pending samples за~580s,
+но без времени отдельных вызовов нельзя определить блокировавший вызов.
+Не менять native owner predicates и не увеличивать timeout ради PASS.
+Source116 runtime не изменён; это диагностическое свидетельство, не G7 acceptance.
+
 ### Cold07 завершился отказом; пакеты диагностик закрыты
 
 Cold07/source116/profile151, original70654 завершился exit1 по исходному
