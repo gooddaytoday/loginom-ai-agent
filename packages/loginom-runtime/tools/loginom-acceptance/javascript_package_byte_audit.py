@@ -72,6 +72,40 @@ def audit(persistence_audit_path, read_directory):
         pinned.append(data)
     writer, cold = [json.loads(data, object_pairs_hook=unique_pairs) for data in pinned[:2]]
     require(complete(writer) and complete(cold), "writer/cold cleanup not verified")
+    dirty_verified = base.get("dirty_state_verified") is True
+    if dirty_verified:
+        saves = writer.get("persistence", {}).get("saves", [])
+        writer_events = [json.loads(line, object_pairs_hook=unique_pairs)
+                         for line in pinned[2].decode("utf-8").splitlines() if line]
+        dirty_events = [(index, event) for index, event in enumerate(writer_events)
+                        if event.get("phase") == "persistence_dirty_state_observed"]
+        save_events = [(index, event) for index, event in enumerate(writer_events)
+                       if event.get("phase") == "persistence_save_confirmed"]
+        require(len(saves) == len(dirty_events) == len(save_events) == 2,
+                "two post-save dirty-state observations required")
+        for index, save in enumerate(saves):
+            state = save.get("dirty_state", {})
+            receipt = save.get("receipt", {})
+            event_index, event = dirty_events[index]
+            save_index, save_event = save_events[index]
+            require(save.get("revision") == index + 1
+                    and receipt.get("status") == "SUCCEEDED"
+                    and receipt.get("output", {}).get("save_completed") is True
+                    and state == event.get("dirty_state")
+                    and state.get("modified") is False
+                    and state.get("read_only") is True
+                    and state.get("observation") == "after_confirmed_save"
+                    and state.get("document_id") == save.get("document_id")
+                    and state.get("workflow_id") == save.get("workflow_ref", {}).get("workflow_id")
+                    and state.get("package_path") == save.get("path") == base.get("path")
+                    and event.get("revision") == index + 1
+                    and event.get("path") == base.get("path")
+                    and event.get("save_operation_id") == receipt.get("operation_id")
+                    and save_event.get("revision") == index + 1
+                    and save_event.get("receipt") == receipt
+                    and save_index < event_index
+                    and (index == 1 or event_index < save_events[1][0]),
+                    "post-save dirty-state receipt differs")
     final = writer["persistence"]["final"]["source"]
     source = final["source"]
     require(writer["persistence"]["schema_mode"] == mode
@@ -158,7 +192,7 @@ def audit(persistence_audit_path, read_directory):
         "version": 1, "status": "VERIFIED", "schema_mode": mode,
         "package_path": path, "package_bytes": len(package), "package_sha256": digest(package),
         "source_sha256": digest(source.encode("utf-8")), "zip_members": len(names),
-        "package_bytes_verified": True, "dirty_state_verified": False,
+        "package_bytes_verified": True, "dirty_state_verified": dirty_verified,
         "public_handler_verified": False,
         "files": [{"path": str(location), "sha256": digest(data)}
                   for location, data in zip((persistence_audit_path, report_path, journal_path, local),
