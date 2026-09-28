@@ -1,3 +1,6 @@
+> Ветка `loginom-lab`: изолированные продуктовые изменения Loginom Lab.
+> Не является пользовательским релизом; правила и известный дефект — в [AGENTS.md](AGENTS.md).
+
 # Loginom AI Agent
 
 Desktop-приложение для работы с Loginom с помощью AI. Клиент Loginom Dock встроен в приложение вместе с Node.js, Playwright и Chromium. Основано на OpenCode; сведения об исходном проекте и лицензиях сохранены в [архиве документации](docs/upstream/README.md).
