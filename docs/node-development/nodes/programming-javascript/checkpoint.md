@@ -33,8 +33,26 @@ disconnected и смену native owner.127 preexisting child docs сохран�
 Freeze104:1322 pins, closure203 files/629 edges,2 syntax checks;
 manifest javascript-freeze104-root-final-source.json SHA
 80167f7c9c3d21a2c6b680b9092d5084fc88e4f6e890dc6975434e3771e3a360.
-Writer07/profile127 headed/sandbox запущен, original56220 ожидает terminal.
-Не запускать второй browser до его завершения. OpenViking health успешен.
+Writer07/profile127 original56220 terminal exit1. Save1 подтверждён; второго
+Execute/save нет. Точный отказ после S2 Done: DataSetOutputSocketWizard,
+row_index0/field ObservedID/column colSourceDisplayName_, expected empty string,
+cell_count0/cells[], source_connected:false/source_count0/target_count2.
+Это отсутствие ячейки, не несовпадающий текст. Не подтверждена допустимость
+такого представления и source identity; reader оставляет verified:false.
+
+Следующий шаг: исследовать native/rendered column visibility и состояние
+configured target при отсутствии cached source. Existing
+characterizeJavascriptMapping уже допускает characterization этого reason,
+но прямо помечает rendered_is_native_schema:false — это не замена strict mapping
+proof. Не считать отсутствующую ячейку автоматически пустой/скрытой и не двигать
+Execute вперёд без явного пересмотра порядка проверок на основании evidence.
+Штатный local headerCt.getGridColumns подход уже есть в node-table-context.mjs;
+его можно использовать для bounded readonly диагностики, а не server getter.
+
+Recovery07/profile128 original10494 exit0: jsteach,0 packages, logout/browser
+close true; Chrome отсутствует. Private result source104-code-writer-result-07.json
+сохраняет hashes/diagnostic/путь S1. OpenViking health успешен. Public/CLI и полный
+G7 writer/cold pair по-прежнему не приняты.
 
 
 ### Source103: освобождение после Done до фиксации baseline
