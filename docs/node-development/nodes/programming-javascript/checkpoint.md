@@ -16,30 +16,42 @@
 ## Актуальная диагностика после запроса пользователя
 
 
-### Cold07/source116 активен: ждать original70654, не запускать дубль
+### Cold07 завершился отказом; пакеты диагностик закрыты
 
-После MCP health PASS и проверки всех freeze116 pins запущен cold07 на writer13
-package, freshprofile151, original70654. /proc PID484152 подтвердил headed/sandbox/
-exact profile. Registry active_exec_session70654/browser_status=cold_running.
-Report persistence-code-cold-07/report.json; journal execution-events.jsonl;
-log source116-code-cold-07.log. Последний подтверждённый poll original70654 вернул
-RUNNING, stage cold-read-source. Source/input mapping/Close пройдены, текущий output
-port open ещё не вернул terminal receipt. Original total deadline600000ms не продлён.
+Cold07/source116/profile151, original70654 завершился exit1 по исходному
+600000ms deadline. Source/input mapping/Close пройдены, output opening не
+подтверждён: 6 pending observations, wizard_count=0, controller=ModelForm.
+Видимый на screenshot мастер не доказывает ожидаемую native identity.
+Увеличение ожидания не решило проблему; причина пока не установлена.
+Прежнее объяснение отказа cold06 только поздним открытием не доказано.
+Cleanup guard source116 правильно отказался от UI Close при uncertain native
+read; браузер закрыт, пакет потребовал отдельной серверной очистки.
 
-Снимок cold07-front-screen.png показывает «Настройка выходных столбцов», empty grid,
-Done и Close. Это наблюдаемый UI, но не доказательство ожидаемого native wizard owner.
-Screenshot не заменяет незавершённую receipt и не доказывает проблему только времени.
-Первый screenshot cold07-pending-screen.png показал перекрывшее браузер окно Codex;
-через _NET_ACTIVE_WINDOW поднято строго окно PID484152. Повтор Configure/Execute не
-отправлялся. Влияние background throttling пока не установлено.
+Headed admin recovery08/profile152, original50187 exit0: закрыты точный writer13
+пакет и сеанс jsteach:2975, исчезновение строк, logout и browser close проверены.
+Следующая приватная port-diagnostic-01/profile153 открыла этот же пакет (READY),
+но завершилась до получения inspect, записав только browser_closed. Причина
+завершения и исходный terminal handle не восстановлены; package cleanup из этой
+записи не следует. Новый пакетный прогон после этого не запускался.
 
-Следующий шаг: опросить original70654; не менять/перезапускать текущий runtime до
-terminal. После terminal прочитать pending diagnostics (wizard/controller identity),
-проверить cleanup и при необходимости закрыть только этот свой пакет/сеанс через
-headed admin Dispatcher. До confirmed cleanup следующий пакетный прогон запрещён.
-Profile152 ещё не использован. Никаких новых PASS/G7/готовности не объявлено.
+Headed admin recovery09/profile154, original54067 exit0: exact writer13 path
+найден под jsteach:2977; у выбранного пакета Stop disabled. Подтверждены Close
+точного пакета, исчезновение его строки, Close точного сеанса и отсутствие2977,
+затем admin logout и browser close. Evidence source116-admin-recovery-09.jsonl
+в приватной кампании. Посторонние сеансы и общий пул не изменялись.
 
+Правило подтверждено в client/lib/package-cleanup.mjs: проверка принадлежности,
+IsPackageModified, ClosePackage(node,false,true), отсутствие пакетов, затем logout.
+Закрытие browser/context и пустой новый сеанс не заменяют закрытие старого пакета.
+После CLEANUP_UNCONFIRMED новый пакетный прогон запрещён до точной серверной
+очистки. Следующая работа — исправить диагностическое наблюдение native owner
+без Execute/Save; не повторять cold вслепую и не увеличивать deadline.
 
+OpenViking MCP health, actor context search и exact read успешны. List-search
+возвращал ошибку параметра peer_scope даже при его пропуске; context mode работает.
+Doctor под локальным Node20 отдельно получил connection timeout; это не отменяет
+успешные MCP обращения и не является подтверждением исправности hook capture.
+Конфигурация памяти не менялась. G7/declared/public/knowledge/review/CLI не закрыты.
 
 ### Source116 закреплён после всех проверок
 
