@@ -154,7 +154,7 @@ for(const fault of ['ok','lifecycle','ack','upstream'])test('C actual runtime re
  if(fault==='upstream')r.results.upstream.raw.cells[1].payload[2]^=1;
  const source=readFileSync(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
  const start=source.indexOf('    async readNativeRoundtrip(input,node,execution) {'),end=source.indexOf('    async readNativeCivil(',start);
- const context={nativeCalibrationId:undefined,nativeNamedCaseId:id,javascriptNamedCase,nativeFixtureId:'integer-safe',nativeInputFixture:{rows:4},nativeRoundtripProbe:javascriptNamedProbe(id),
+ const context={nativeTelemetryCaseId:undefined,nativeCalibrationId:undefined,nativeNamedCaseId:id,javascriptNamedCase,nativeFixtureId:'integer-safe',nativeInputFixture:{rows:4},nativeRoundtripProbe:javascriptNamedProbe(id),
   verifyJavascriptNamedInput,verifyJavascriptNamedOutcome,verifyNativeRoundtripExecution,freezeCivilEvidence,validateNativeSource:()=>{},
   page:{evaluate:async()=>{}},completeJavascriptNativeRoundtrip,prepared:{document_id:'d',workflow_ref:{workflow_id:'w'}},
   deadline:Date.now()+10000,randomUUID:()=>String(steps.length),execute:()=>{},nativeReadUncertain:false,metadataDiagnostic:false,metadataLifecycle:createJavascriptMetadataLifecycle(),sessionId:'C',origin:'http://test',build:'7.4.2',Date,
@@ -198,7 +198,7 @@ for(const mode of ['success','mismatch','failed','package_closed','logged_out','
  if(Object.hasOwn(report.cleanup,mode))report.cleanup[mode]=false;
  const source=readFileSync(new URL('./javascript-live.mjs',import.meta.url),'utf8');
  const start=source.lastIndexOf('  if (!report.cleanup.package_closed'),end=source.indexOf('  console.log(JSON.stringify({status:report.status',start);
- const publish=vm.runInNewContext('(async()=>{'+source.slice(start,end)+'})',{report,calibrationTrial:null,coercionTrial:null,namedTrial:t.trial,
+ const publish=vm.runInNewContext('(async()=>{'+source.slice(start,end)+'})',{report,calibrationTrial:null,telemetryTrial:null,coercionTrial:null,namedTrial:t.trial,
   executionRecord:async e=>e,Date,save:async()=>{if(mode==='evidence')throw Error('fsync');},redactor:{text:x=>x}});
  await publish();
  assert.equal(report.status,mode==='success'?'CHARACTERIZED':['mismatch','failed'].includes(mode)?'UNRESOLVED':mode==='evidence'?'EVIDENCE_UNCONFIRMED':'CLEANUP_UNCONFIRMED');

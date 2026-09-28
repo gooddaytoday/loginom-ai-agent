@@ -49,10 +49,11 @@ export function javascriptNativeRoundtripSnapshot(b,zeroCapture){
   };
   const fixtureId=b.fixture_id??'real',slice={"integer-coercion-fraction-positive":[1,3,1,4],"integer-coercion-fraction-negative":[1,3,1,4],"integer-coercion-string-numeric":[1,5,1,4],"integer-coercion-string-invalid":[1,5,1,4],"integer-coercion-nan":[1,3,1,4],"integer-coercion-positive-infinity":[1,3,1,4],"integer-coercion-negative-infinity":[1,3,1,4],real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6],'cardinality-empty':[3,4,0]}[fixtureId];
   const typeCode=b.roundtrip_role==='output'?(slice?.[3]??slice?.[1]):slice?.[1];
+  const telemetryOutput=b.telemetry_case_id!==undefined&&b.roundtrip_role==='output';
   const namedOneCell=["B-get-case","B-get-missing","B-getcolumn-case","B-getcolumn-missing","B-columns-case","B-columns-missing","B-isnull-case","B-isnull-missing","C-set-index","C-set-exact","C-set-case","C-set-missing"].includes(b.named_case_id);
-  const rowCount=b.roundtrip_role==='output'?(namedOneCell?1:(slice?.[2]??slice?.[0])):slice?.[0];
+  const rowCount=b.roundtrip_role==='output'?(namedOneCell||telemetryOutput?1:(slice?.[2]??slice?.[0])):slice?.[0];
   need(Array.isArray(slice)&&b.rows===rowCount&&b.row_count===rowCount
-    &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:typeCode}]),'fixed native fixture schema/count');
+    &&(telemetryOutput||JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:typeCode}])),'fixed native fixture schema/count');
   const prep=globalThis.__loginomDockPreparationV1;
   need(prep?.document===document&&prep.id===b.document_id&&location.origin===b.origin&&bg.app.Version==='7.4.2','document/build');
   const receipts=[...prep.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_id&&r.nodeTargetWorkflowNode);
@@ -68,7 +69,7 @@ export function javascriptNativeRoundtripSnapshot(b,zeroCapture){
   const diagram=model.FDiagram,nodes=diagram.FNodes.FCollection,links=diagram.FLinks.FCollection;
   const roundtrip=globalThis.__loginomJavascriptNativeRoundtripV1;
   need(roundtrip?.document===document&&roundtrip.input.fixtureId===fixtureId&&roundtrip.source_sha256===b.source_sha256,'roundtrip capability');
-  need(b.calibration_id===globalThis.__loginomJavascriptNativeRoundtripV1.calibration_id&&b.named_case_id===roundtrip.named_case_id&&b.input_fixture_id===roundtrip.input_fixture_id,'named capability identity');
+  need(b.telemetry_case_id===globalThis.__loginomJavascriptNativeRoundtripV1.telemetry_case_id&&b.calibration_id===globalThis.__loginomJavascriptNativeRoundtripV1.calibration_id&&b.named_case_id===roundtrip.named_case_id&&b.input_fixture_id===roundtrip.input_fixture_id,'named capability identity');
   if(b.named_case_id!==undefined)need(fixtureId==='integer-safe'&&b.input_fixture_id==='integer-safe','immutable named input');
   if(b.calibration_id!==undefined)need(b.named_case_id===undefined&&['K1-parse-v1','K2-sync-v1','K3-shift-v1','K4-native-caller-v1'].includes(b.calibration_id)&&b.roundtrip_role==='upstream'&&fixtureId==='integer-safe'&&b.input_fixture_id==='integer-safe','calibration upstream only');
   const failed=roundtrip.calibration_id!==undefined||roundtrip.named_case_id!==undefined?globalThis.__loginomJavascriptNamedFailureV1:globalThis.__loginomJavascriptCoercionFailureV1;
@@ -156,8 +157,17 @@ export function javascriptNativeRoundtripSnapshot(b,zeroCapture){
   const zero=fixtureId==='cardinality-empty'&&b.roundtrip_role==='output';
   if(!zero)need(!store.loading&&v(helper,'$FCacheInitialized')===true&&v(helper,'$FData'),'loaded cache');
   const fields=v(v(v(dc,'FColumnInfosStore'),'data'),'items');
-  need(Array.isArray(fields)&&fields.length===1,'one field');const field=v(fields[0],'data');
-  need(v(field,'Name')==='Value'&&v(field,'DisplayName')==='Value'&&v(field,'DataType')===typeCode,'fixed native schema');
+  need(Array.isArray(fields)&&fields.length===(telemetryOutput?2:1),'fixed field count');const field=v(fields[0],'data');
+  const fieldRecord0=fields[0],fieldRecord1=telemetryOutput?fields[1]:undefined,field1=telemetryOutput?v(fieldRecord1,'data'):undefined;
+  const telemetrySchema=telemetryOutput?JSON.stringify([field,field1].map((f,i)=>{
+    const name=v(f,'Name'),label=v(f,'DisplayName'),type=v(f,'DataType');
+    need(typeof name==='string'&&typeof label==='string'&&name.length<=128&&label.length<=128
+      &&new TextEncoder().encode(name).length<=512&&new TextEncoder().encode(label).length<=512&&type===(i===0?4:5),'telemetry physical metadata');
+    return {name,label,type};
+  })):undefined;
+  if(telemetryOutput)need(b.fixture_id==='integer-safe'&&b.input_fixture_id==='integer-safe'
+    &&b.named_case_id===undefined&&b.calibration_id===undefined&&(b.schema===undefined||JSON.stringify(b.schema)===telemetrySchema),'observed telemetry schema');
+  if(!telemetryOutput)need(v(field,'Name')==='Value'&&v(field,'DisplayName')==='Value'&&v(field,'DataType')===typeCode,'fixed native schema');
   need(v(dt,'FTotalRowCount')===rowCount&&v(helper,'$FRowCount')===rowCount,'fixed native row count');
   const runtime=globalThis.__loginomJavascriptNativeRuntimeV1;
   need(runtime?.document===document&&runtime.binding_id===b.runtime_binding_id,'loaded runtime binding');runtime.check(v(ds,'$S'));
@@ -172,7 +182,7 @@ export function javascriptNativeRoundtripSnapshot(b,zeroCapture){
   const declaration=roundtrip.schemaWitness.declaration,declaration_sha256=roundtrip.schemaWitness.declaration_sha256;
   const zeroState=zero?zeroCapture({dc,dt,ds,store,helper,fields,field,declaration,declaration_sha256}):{};
   if(b.roundtrip_role==='upstream')need(ds===roundtrip.input.ds&&helper===roundtrip.input.helper&&v(helper,'$FData')===roundtrip.input.cache&&fields===roundtrip.input.fields&&field===roundtrip.input.field,'upstream datasource/cache replaced');
-  return {...zeroState,failedTerminal:failed?.proof,declaration,declaration_sha256,addPortClass,addPortPrototype,addService,roundtrip,prep,receipt,card,model,diagram,nodes,links,node,nodeData:node.data,port,portData:port.data,manager,form,workflow,pack,fields,field,
+  return {...zeroState,telemetrySchema,fieldRecord0,fieldRecord1,field1,cellCount:rowCount*(telemetryOutput?2:1),failedTerminal:failed?.proof,declaration,declaration_sha256,addPortClass,addPortPrototype,addService,roundtrip,prep,receipt,card,model,diagram,nodes,links,node,nodeData:node.data,port,portData:port.data,manager,form,workflow,pack,fields,field,
     cookieClass,cookiePrototype,cookieInterface,
     nodePorts,inputCollection,inputPorts,connectionInput:inputPorts[0],variablesInput:inputPorts[1],
     processStore,processRoot,group:groups[0],child:child[0],
@@ -188,7 +198,7 @@ export async function bindJavascriptNativeRoundtrip(page,args,snapshot,zeroSnaps
     const state=globalThis.__loginomJavascriptNativeRoundtripV1;
     if(!state||state.bindings.has(args.roundtrip_role))throw Error('Roundtrip role already reserved; no replay');
     if(!['output','upstream'].includes(args.roundtrip_role))throw Error('Unknown roundtrip role');
-    if(args.calibration_id!==state.calibration_id||args.named_case_id!==state.named_case_id||args.input_fixture_id!==state.input_fixture_id)throw Error('Named capability identity differs');
+    if(args.telemetry_case_id!==state.telemetry_case_id||args.calibration_id!==state.calibration_id||args.named_case_id!==state.named_case_id||args.input_fixture_id!==state.input_fixture_id)throw Error('Named capability identity differs');
     if(args.calibration_id!==undefined&&(args.named_case_id!==undefined||!['K1-parse-v1','K2-sync-v1','K3-shift-v1','K4-native-caller-v1'].includes(args.calibration_id)||args.roundtrip_role!=='upstream'))throw Error('Calibration upstream only');
     const failed=state.calibration_id!==undefined||state.named_case_id!==undefined?globalThis.__loginomJavascriptNamedFailureV1:globalThis.__loginomJavascriptCoercionFailureV1;
     if(failed){
@@ -202,7 +212,7 @@ export async function bindJavascriptNativeRoundtrip(page,args,snapshot,zeroSnaps
       const output=state.bindings.get('output'),read=globalThis.__loginomJavascriptNativeRoundtripReadV1;
       if(!output||output.initial.zeroFacts&&!output.zeroGraphVerified||read?.document!==document||read.poisoned||read.active||read.last?.id!==output.readId
         ||read.last.status!=='completed'||!read.last.published||read.last.pending!==0
-        ||read.last.requests!==output.initial.count||read.last.releasedRequests!==output.initial.count||read.last.releasedResponses!==output.initial.count)throw Error('Completed output read required before upstream');
+        ||read.last.requests!==output.initial.cellCount||read.last.releasedRequests!==output.initial.cellCount||read.last.releasedResponses!==output.initial.cellCount)throw Error('Completed output read required before upstream');
     }
     state.bindings.set(args.roundtrip_role,null);
     const base=eval('('+code+')'),zero=eval('('+zeroCode+')'),capture=b=>base(b,zero),initial=capture(args);
@@ -231,7 +241,7 @@ export async function bindJavascriptNativeRoundtrip(page,args,snapshot,zeroSnaps
       state.bindings.get('output').zeroGraphVerified=true;
     };
     state.bindings.set(args.roundtrip_role,{document,id:args.runtime_binding_id,readId:args.binding_id,initial,capture,...(initial.zeroFacts?{zeroCheck,zeroAcknowledge}:{})});
-    return {...args,source:{owner:initial.owner,object:initial.object},schema_mode:state.schema_mode,javascript_node_id:state.node.FGuid,
+    return {...args,...(initial.telemetrySchema?{schema:JSON.parse(initial.telemetrySchema),physical_schema_provenance:'Preview cache',bridge_verified:false}:{}),source:{owner:initial.owner,object:initial.object},schema_mode:state.schema_mode,javascript_node_id:state.node.FGuid,
       ...(state.fixture_id==='cardinality-empty'?{declaration:initial.declaration,declaration_sha256:initial.declaration_sha256,done_witness:state.done}:{}),
       ...(initial.zeroFacts?{subscriptions:{data:initial.dataCookieValue,state:initial.stateCookieValue}}:{}),
       add_port_sources:{constructor:Function.prototype.toString.call(initial.addPortClass)},

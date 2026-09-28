@@ -159,7 +159,7 @@ for(const mode of ['pass','bad-civil-ack','cache-changed','restoration-fails'])t
  const start=source.indexOf('    async readNativeCivil('),end=source.indexOf('    async captureDropTopology()',start);
  let checks=0;
  const runtime=vm.runInNewContext('({'+source.slice(start,end)+'})',{
-  nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:id,nativeReadUncertain:false,metadataDiagnostic:false,metadataLifecycle:createJavascriptMetadataLifecycle(),nativeInputFixture:f,validateNativeSource:()=>steps.push('source'),
+  nativeTelemetryCaseId:undefined,nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:id,nativeReadUncertain:false,metadataDiagnostic:false,metadataLifecycle:createJavascriptMetadataLifecycle(),nativeInputFixture:f,validateNativeSource:()=>steps.push('source'),
   page:{evaluate:async()=>{steps.push('guard');if(++checks===2&&mode==='cache-changed')throw Error('cache changed');}},
   once:async(name,identity,fn)=>fn(),channel:()=>({}),
   openNewOutputTable:async()=>{steps.push('open');return r.table_creation;},
@@ -194,7 +194,7 @@ for(const mode of ['pass','bad-ack','civil-drift'])test('production Date final o
  const source=readFileSync(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
  const start=source.indexOf('    async readNativeRoundtrip(input,node,execution) {'),end=source.indexOf('    async readNativeCivil(',start);
  const runtime=vm.runInNewContext('({'+source.slice(start,end)+'})',{
-  nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:id,nativeInputFixture:f,nativeRoundtripProbe:javascriptNativeRoundtripProbe(id),
+  nativeTelemetryCaseId:undefined,nativeCalibrationId:undefined,nativeNamedCaseId:undefined,nativeFixtureId:id,nativeInputFixture:f,nativeRoundtripProbe:javascriptNativeRoundtripProbe(id),
   verifyNativeRoundtripInput,verifyNativeRoundtripOutcome,verifyNativeRoundtripExecution:()=>{},validateNativeSource:()=>{},
   page:{evaluate:async()=>{}},completeJavascriptNativeRoundtrip:()=>{},prepared:{document_id:'d',workflow_ref:{workflow_id:'w'}},
   deadline:Date.now()+10000,randomUUID:()=>String(steps.length),execute:()=>{},nativeReadUncertain:false,metadataDiagnostic:false,metadataLifecycle:createJavascriptMetadataLifecycle(),sessionId:'test',origin:'http://test',build:'7.4.2',

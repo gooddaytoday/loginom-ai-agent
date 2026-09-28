@@ -1,3 +1,4 @@
+import {requireJavascriptTelemetryMode} from './javascript-schema-telemetry-cases.mjs';
 import {javascriptCalibrationCase} from './javascript-calibration-cases.mjs';
 import {javascriptNamedCase} from './javascript-native-named-cases.mjs';
 import {requireJavascriptMetadataMode,runJavascriptNativeMetadata} from './javascript-native-metadata.mjs';
@@ -16,13 +17,15 @@ import {javascriptNativeRoundtripProbe,verifyNativeRoundtripRead,verifyNativeRou
 const need=(v,m)=>{if(!v)throw Error('Native roundtrip driver: '+m);};
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 
-export async function readNativeRoundtrip({options,ctx,input,role,civil,namedCaseId,calibrationId,targetOrigin,targetBuild,onState,metadataDiagnostic=false,onMetadataState},
+export async function readNativeRoundtrip({options,ctx,input,role,civil,namedCaseId,calibrationId,telemetryCaseId,targetOrigin,targetBuild,onState,metadataDiagnostic=false,onMetadataState},
   {createProcedure=createNodeProcedure,verifyFrontends=verifyNativeInputFrontends,
     verifyCountLoaders=verifyNativeInputCountLoaders,verifyCookieRuntime=verifyNativeInputCookieRuntime,openPreview=openJavascriptNativeRoundtripPreview}={}){
+  requireJavascriptTelemetryMode(telemetryCaseId,{namedCaseId,calibrationId,metadataDiagnostic});
+  const telemetryOutput=telemetryCaseId!==undefined&&role==='output';
   requireJavascriptMetadataMode(metadataDiagnostic,{nativeRoundtrip:role==='output',namedCaseId,calibrationId});
   if(metadataDiagnostic)need(typeof onMetadataState==='function','metadata lifecycle required');
-  const fixture=javascriptNativeFixture(input.binding.fixture_id),nativeRoundtripProbe=calibrationId!==undefined?javascriptCalibrationCase(calibrationId):javascriptNativeRoundtripProbe(fixture.id,namedCaseId);
-  const readFixture={...javascriptNativeReadFixture(fixture.id,role),...(namedCaseId!==undefined&&role==='output'?{rows:javascriptNamedCase(namedCaseId).output_rows??4}:{})};
+  const fixture=javascriptNativeFixture(input.binding.fixture_id),nativeRoundtripProbe=calibrationId!==undefined?javascriptCalibrationCase(calibrationId):javascriptNativeRoundtripProbe(fixture.id,namedCaseId,telemetryCaseId);
+  const readFixture={...javascriptNativeReadFixture(fixture.id,role),...(telemetryOutput?{rows:1}:{}),...(namedCaseId!==undefined&&role==='output'?{rows:javascriptNamedCase(namedCaseId).output_rows??4}:{})};
   const {execute,operation,onRecord,now}=options;
   const deadline=Math.min(ctx.deadline,input.binding.deadline);
   const check=()=>{ctx.signal?.throwIfAborted();need(now()<deadline,'original deadline expired');
@@ -53,14 +56,14 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,namedCas
     openingReturned=true;
     preview=await channel.observe({condition:'native roundtrip Preview schema',readPreview:true,ready:s=>s.node_preview_schema?.verified===true
       &&s.node_preview_schema.port_guid===port.port_guid&&s.node_preview_schema.port===0});
-    need(preview.node_preview_schema.fields.length===1&&preview.node_preview_schema.fields[0].name==='Value'
+    need(telemetryOutput?preview.node_preview_schema.fields.length===2&&preview.node_preview_schema.fields.every((f,i)=>f.type===(i===0?'integer':'string')):preview.node_preview_schema.fields.length===1&&preview.node_preview_schema.fields[0].name==='Value'
       &&preview.node_preview_schema.fields[0].label==='Value'&&preview.node_preview_schema.fields[0].type===readFixture.type,'Preview fixed schema');
     const readId='js-native-roundtrip-'+hash(operation.id+':'+role+':'+ctx.execution.execution_id).slice(0,40);
-    const args={...(calibrationId!==undefined?{calibration_id:calibrationId,input_fixture_id:'integer-safe'}:{}),...(namedCaseId!==undefined?{named_case_id:namedCaseId,input_fixture_id:'integer-safe'}:{}),fixture_id:fixture.id,binding_id:readId,runtime_binding_id:input.binding.runtime_binding_id,roundtrip_role:role,source_sha256:nativeRoundtripProbe.source_sha256,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,
+    const args={...(telemetryCaseId!==undefined?{telemetry_case_id:telemetryCaseId,input_fixture_id:'integer-safe'}:{}),...(calibrationId!==undefined?{calibration_id:calibrationId,input_fixture_id:'integer-safe'}:{}),...(namedCaseId!==undefined?{named_case_id:namedCaseId,input_fixture_id:'integer-safe'}:{}),fixture_id:fixture.id,binding_id:readId,runtime_binding_id:input.binding.runtime_binding_id,roundtrip_role:role,source_sha256:nativeRoundtripProbe.source_sha256,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,
       package_id:ctx.document_id+':'+ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id,port_guid:port.port_guid,
       origin:targetOrigin,tab_tid:ctx.workflow_ref.tab_tid,prefix:ctx.workflow_ref.prefix,execution:ctx.execution,
-      completed_child:ctx.execution,...(ctx.failed_terminal?{failed_terminal:ctx.failed_terminal}:{}),deadline,method:321,interface:116,port:0,offset:0,rows:readFixture.rows,row_count:readFixture.rows,columns:[0],
-      schema:[{name:'Value',label:'Value',type:readFixture.native_type}]};
+      completed_child:ctx.execution,...(ctx.failed_terminal?{failed_terminal:ctx.failed_terminal}:{}),deadline,method:321,interface:116,port:0,offset:0,rows:readFixture.rows,row_count:readFixture.rows,columns:telemetryOutput?[0,1]:[0],
+      ...(telemetryOutput?{}:{schema:[{name:'Value',label:'Value',type:readFixture.native_type}]})};
     check();
     // Retain the original attested runtime; page-local checks reject rebinding.
     const runtime=input.runtime;
@@ -91,7 +94,7 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,namedCas
     check();zeroFinal=raw.zero_admission?.final;const expected={...binding,read_id:readId};
     const exact=verifyNativeRoundtripRead(raw,{binding:expected,lifecycle,input,role,civil});
     const proof={exact,raw,...(metadata?{metadata_diagnostic:metadata}:{}),...(civil?{civil}:{}),add_port_source_sha256:addPortPins,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,subscription_proxy_source_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
-    if(fixture.id==='civil-datetime'||fixture.output_input_rows||fixture.coercion||namedCaseId!==undefined||calibrationId!==undefined)freezeCivilEvidence(proof);
+    if(fixture.id==='civil-datetime'||fixture.output_input_rows||fixture.coercion||namedCaseId!==undefined||calibrationId!==undefined||telemetryCaseId!==undefined)freezeCivilEvidence(proof);
     const event={phase:'javascript_native_roundtrip_'+role+'_cells_verified',operation_id:operation.id,proof};
     const saved=await onRecord(event);need(saved?.phase===event.phase&&JSON.stringify(saved.proof)===JSON.stringify(proof),'native journal acknowledgement differs');
     return proof;
@@ -102,7 +105,7 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,namedCas
       operation.transportUncertain=true;await onMetadataState({status:'retired',uncertain:true});
     }
     else if(readDispatched&&(!lifecycle||lifecycle.retired||lifecycle.pending||lifecycle.status!=='completed'
-      ||lifecycle.requests!==readFixture.rows||lifecycle.releasedRequests!==readFixture.rows||lifecycle.releasedResponses!==readFixture.rows)){
+      ||lifecycle.requests!==readFixture.rows*(telemetryOutput?2:1)||lifecycle.releasedRequests!==readFixture.rows*(telemetryOutput?2:1)||lifecycle.releasedResponses!==readFixture.rows*(telemetryOutput?2:1))){
       operation.transportUncertain=true;await onState({...lifecycle,uncertain:true});
     }
     else if(preview){
