@@ -15,6 +15,23 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source112 frozen; cold02 активен
+
+Main original35833 exit0:3615PASS/0FAIL/0SKIP; focused157PASS. Freeze112 SHA
+7d8368246f7a3ab623c9f08d286ded41b38fb73686b4d0cc326c2e1a3508cae3:
+1324 pins, closure208 files/641 edges, computed0,4 syntax checks PASS.
+Commit726e0ba5ad1e2e2d2cd7d42324331b3d29300475. Shared client source111 unchanged.
+
+Cold02 original24302, fresh profile138, exact writer13 saved path из receipt,
+без expected source/settings. /proc Chromium PID398091: headed, sandbox enabled,
+exact assigned profile. Реестр active_exec_session24302; report
+persistence-code-cold-02/report.json, log source112-code-cold-02.log.
+Результат ещё не объявлен; продолжать этот handle, не запускать дубль.
+Writer13 source111 сохранён отдельно; source112 изменяет только cold подготовку.
+Next profile139. После cold terminal PASS нужен независимый persistence auditor,
+а затем ещё declared writer/cold; это пока не закрывает G7 или полную цель.
+
+
 ### Source112: cold process history preparation
 
 Code inspection: runColdRead захватывал observeJavascriptSourceProcesses до
