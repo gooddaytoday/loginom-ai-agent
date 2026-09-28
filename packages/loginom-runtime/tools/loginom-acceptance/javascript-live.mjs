@@ -1019,6 +1019,7 @@ const runExecutionTrial=async probe=>{
       if(changedDone.sentinel_observed)throw Error('Unexpected persistence source diagnostic');
       await exact(owner.prefix+';WizrdMCF').waitFor({state:'hidden',timeout:Math.max(1,deadline-Date.now())});openedWizard=false;
       await waitGraphReady(Math.max(1,deadline-Date.now()));
+      await executionRuntime.settleAppliedNode(executionNode,deadline);
       const beforeFinal=await runSourceReadCycle(last,deadline,initialSettings);
       if(JSON.stringify(beforeFinal.mappings.after)!==JSON.stringify(initialCycle.mappings.after))throw Error('Persistence replacement changed mappings');
       const boundary=await executionRuntime.captureExecutionBoundary();
