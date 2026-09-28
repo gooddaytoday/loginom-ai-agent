@@ -1,5 +1,24 @@
 # JavaScript: checkpoint исполнения
 
+## G5 integer NaN: typed null — 2026-09-28
+
+Отдельный headed `g5-integer-nan-27`/profile191 на child revision
+`180f1d5810` доставил source SHA256
+`9986aca88b5a2935b4229dbc896193892b68be7181a3abedf417b72c270e1478`.
+Свежий принадлежащий JS process завершился успешно; typed UI reader получил
+integer колонку `Result` и одну строку с настоящим `null` (`is_null=true`)
+для выражения `NaN`. Это отдельная характеристика, не native failure и не
+вывод о `Infinity`. Статус `typed_characterization`, фиксированного oracle
+не было; `gate_passed=false` не означает провал исполнения. Proof level
+`typed_ui_only`, native bytes не проверены; G5 остаётся открытым.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`f93add41b4c35c36cbddc6219d216ab9c99cc60ada1d9b6a47b982072a1fca8f`,
+journal SHA256
+`2c855d8a6a7b39fc44f3692aab3bb2c266b7c0f95331285211711a3a5968516b`.
+Реестр закрыт, следующий fresh profile192.
+
 ## G5 integer string: `"42"` → `42` — 2026-09-28
 
 Отдельный headed `g5-integer-string-26`/profile190 на child revision

@@ -748,9 +748,34 @@
       "source_sha256": "9986aca88b5a2935b4229dbc896193892b68be7181a3abedf417b72c270e1478",
       "schema_mode": "code",
       "expectation": "characterization",
-      "status": "not_checked",
+      "status": "observed_characterization",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_expression": "NaN",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 1,
+      "observed_values": [
+        [null]
+      ],
+      "null_verified": true,
+      "gate_passed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-integer-nan-27/report.json",
+        "report_sha256": "f93add41b4c35c36cbddc6219d216ab9c99cc60ada1d9b6a47b982072a1fca8f",
+        "journal_sha256": "2c855d8a6a7b39fc44f3692aab3bb2c266b7c0f95331285211711a3a5968516b",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "g5-integer-positive-infinity",
