@@ -306,3 +306,28 @@ K1/source89/profile98 дал полный retained wizard exception tree с со
 stack origin не установлен. Это отдельный wizard domain; он не калибрует caller
 frames Execute. Cleanup3 подтверждён, committed-source restoration/fresh upstream
 после discard не доказаны; G6/J25 остаются открытыми. Исходные reports неизменны.
+
+
+## 10. Допуск реализации K4 после независимой проверки K3
+
+K3/source90/profile99, original61076 terminal exit1: DIAGNOSTIC_OBSERVED;
+полный owned ErrorDetails содержит `Error: JS_CAL_K3_SYNC_SHIFT_V1`, caller
+`Anonymous function (<main>:5:3)`, module `<main>:1:1`. Root независимо проверил
+exact300bytes/SHA,8native cells,598journal references,source/node/process и cleanup3.
+До live был зафиксирован source oracle line5/byte256; native column заранее не
+назначался. K2 caller4 и K3 caller5 соответствуют source lines4→5. Это пригодный
+line-only результат для этих fixed throw probes, не universal/column/native mapping.
+
+Разрешена реализация source91 только K4-native-caller-v1 из §6: exact P + два LF +
+`const result=InputTable.Get(4,"Value");` + LF,295bytes/6LF,
+SHAdebb9802f3a381e3569b7a7c8857038a3a165fafacfbbcb7a5b18ed3dd17541f.
+Данный вызов находится на source line6; INPUT имеет4строки. Не предполагается,
+что Get обязан бросить. Completed/returned/undefined либо непригодный diagnostic
+означает прекращение mapping ветки, без выбора другого API/index/сдвига.
+
+После frozen handoff/root tests допускается отдельное назначение пятого и последнего
+live calibration attempt. Четыре уже использованы (95,97,98,99). K5 live, шестая
+попытка и автоматические retries не разрешены. K1/K2/K3/B sources и исходные reports
+не меняются; runtime outcome остаётся observation-only. K4 не закрывает сам по себе
+атрибуцию B: нужна отдельная проверка области применимости и negative verifier
+fixtures. G6/J25, repair/rollback/model delivery и server OS остаются открытыми.

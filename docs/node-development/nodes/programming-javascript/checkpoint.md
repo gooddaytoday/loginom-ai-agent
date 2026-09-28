@@ -15,6 +15,27 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### K3/profile99 terminal и независимый audit PASS; K4 implementation допущен
+
+Original61076 terminal exit1, DIAGNOSTIC_OBSERVED/owned_failure_observed,
+failure отсутствует, cleanup3true; no pinned Chromium независимо проверен.
+Exact raw error: Error: JS_CAL_K3_SYNC_SHIFT_V1, caller `<main>:5:3`,module1:1.
+Root проверил1275pins,300bytes/SHA,8native INPUT/upstream cells,598journal refs,
+fresh execution/node/source owner и finalization. Private
+operator90-root-k3-verification.json/audit-calibration-k3-source90.py.
+Report SHA2a1ae7bc73c3e7b8d58818d3e88dd20dc9144418e366a082b1dfbe303ad37b0e;
+journal SHAbee6036704693d166588b88b222b2f6fb6bca89927b27c12d3149d89197f5171.
+
+Предварительный source oracle line5 совпал с native caller5; у K2 caller4.
+Это line4→5 для двух fixed throws; column3 сохранён как observed,не general mapping.
+Runtime reports не переписаны: mapping unverified/case/G6/J25=false.
+По §10 calibration-source-proposal разрешена реализация source91/K4 fixed Get(4,
+Value),line6. Live только после handoff/admission, пятая и последняя попытка.
+Если K4 возвращает значение/undefined/completed или непригодный diagnostic,
+mapping ветка прекращается, без другого API/index и без шестой попытки.
+Открыты public handler, остальная G5 matrix, engine profile, repair/rollback,
+model delivery и CLI acceptance. Active live process отсутствует.
+
 ### Source90 принят; K3/profile99 запущен
 
 Developer turn01a0e54f terminal revision26. Exact10runtime/test files committed
