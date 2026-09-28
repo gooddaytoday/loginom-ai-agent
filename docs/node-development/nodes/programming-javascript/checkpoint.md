@@ -16,6 +16,27 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### Source117 design: disabled output-column mask, 2026-09-28
+
+Пробы source116-port-diagnostic-03/profile156/original96133 и -04/profile157/
+original19059 завершены, package=0/logout/browser close подтверждены в том же
+сеансе. Execute/Save не отправлялись. Instrumented production readPortMapping
+локализовал цикл в finish, а не await_open: evaluate занимает единицы миллисекунд,
+waitForTimeout ~100ms. -04 показала единственную видимую маску x-mask x-border-box,
+пустой текст, parent tid MF;TF-1;WizrdMCF;DataSetOutputSocketWizard;colTargetDelete,
+Ext component disabled=true, el.dom===parent. Finish возвращает port_wizard_loading.
+Это объясняет прежние6samples: они считали только await_open, не finish.
+
+Решение: только для finish выходного порта допустить пустую x-mask отключённой
+колонки colTargetDelete внутри единственного native FView текущего мастера.
+Проверять exact parent tid/unique DOM, Ext component identity и disabled=true;
+не допускать dialog, message/loading classes, foreign root/parent, duplicate
+mask или активный column. Полный native wizard/tree/port owner проверяется далее.
+Не убирать все x-mask: это потеряет реальные блокировки. Не продлевать deadline:
+маска отключённого control постоянна. Регрессии должны исполнять production
+predicate и проверять положительный случай и перечисленные отказы. После tests
+и нового freeze нужен повтор production diagnostic/cold; этот design не PASS.
+
 ### Прямое открытие output port наблюдено, profile155
 
 Приватный source116-port-diagnostic-02.mjs исправляет чтение SVG: innerText
