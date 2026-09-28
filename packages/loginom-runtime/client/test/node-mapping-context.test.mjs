@@ -184,3 +184,30 @@ test('standalone dataset output schema retains effective data kinds and rejects 
  const f=fixture({socket:true});f.target[0].data.DataKind=1;const r=f.read();assert.equal(r.verified,true,r.reason);assert.equal(r.mapping_wizard,'DataSetOutputSocketWizard');assert.deepEqual(Array.from(r.target_fields,f=>f.data_kind),['Непрерывный','Дискретный']);
  f.target[0].data.DataKind=99;assert.equal(f.read().verified,false);
 });
+
+for(const kind of ['value','missing','duplicate','long','disconnected'])test('render mismatch retains bounded evidence without admitting '+kind,()=>{
+ const f=fixture(),cell=f.all.find(e=>e.tid===f.base+'colSourceDisplayName_Out0');
+ if(kind==='value')cell.textContent='Different';
+ if(kind==='missing')f.all.splice(f.all.indexOf(cell),1);
+ if(kind==='duplicate')f.el(cell.tid,'Other',cell.parent);
+ if(kind==='long')cell.textContent='x'.repeat(10000);
+ if(kind==='disconnected'){
+  f.target[0].data.ConnectedRecord=null;f.source[0].data.ConnectedRecord=null;
+  f.target[0].data.SourceDisplayName=null;f.target[0].data.SourceDataType=null;
+ }
+ const result=f.read();assert.equal(result.verified,false);assert.equal(result.reason,'mapping_render_value');
+ assert.equal(result.source_identity_verified,false);
+ const d=result.render_mismatch;
+ assert.equal(d.column,'colSourceDisplayName_');assert.equal(d.field_name,'Out0');assert.equal(d.row_index,0);
+ assert.equal(d.expected,kind==='disconnected'?'':'Same');assert.equal(d.source_connected,kind!=='disconnected');
+ assert.equal(d.cell_count,kind==='missing'?0:kind==='duplicate'?2:1);
+ assert.ok(d.cells.length<=2);for(const entry of d.cells)assert.ok(entry.text.length<=240);
+ if(kind==='long'){assert.equal(d.cells[0].text.length,240);assert.equal(d.cells[0].truncated,true);}
+ assert.equal(d.source_count,2);assert.equal(d.target_count,2);
+});
+test('unverified render diagnostics cannot bypass the bracketing native owner check',async()=>{
+ const f=fixture();f.all.find(e=>e.tid===f.base+'colName_Out0').textContent='Wrong';
+ let reads=0;const result=await readNodeMapping({evaluate:async()=>f.read()},{workflow_ref:{prefix:'MF;TF'}},
+  async()=>({verified:true,surface:'wizard',node_id:String(++reads)}));
+ assert.deepEqual(result,{verified:false,reason:'mapping_node_changed'});
+});

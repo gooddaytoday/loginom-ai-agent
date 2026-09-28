@@ -123,7 +123,11 @@ export function readMappingBrowser(prefix) {
     for(const [key,value] of (links?[['colDisplayName_',target.data.DisplayName]]:[['colName_',target.data.Name],['colDisplayName_',target.data.DisplayName],
       ['colSourceDisplayName_',target.data.ConnectedRecord?.data.DisplayName??'']])) {
       const cells=exact(base+key+target.data.Name).filter(c=>row.contains(c));
-      if(cells.length!==1||cells[0].textContent.trim()!==value)return fail('mapping_render_value');
+      if(cells.length!==1||cells[0].textContent.trim()!==value)return {...fail('mapping_render_value'),
+        render_mismatch:{form,row_index:index,column:key,field_name:target.data.Name,expected:value,
+          cell_count:cells.length,cells:cells.slice(0,2).map(cell=>({text:cell.textContent.slice(0,240),
+            truncated:cell.textContent.length>240})),source_connected:target.data.ConnectedRecord!=null,
+          source_count:sources.length,target_count:targets.length}};
     }
     rendered.add(index);
   }
