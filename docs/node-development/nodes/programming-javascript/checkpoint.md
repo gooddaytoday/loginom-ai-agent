@@ -15,6 +15,41 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source99: ROOT начал persistence implementation в прежнем worktree
+
+[Дизайн холодного открытия](persistence-design.md) зафиксирован; актуальный SHA256
+`fa587cbafc518a6df22cc16794db33b08222547f48eb525fbd32f82b6f05ff38`.
+Writer1800000ms/reader600000ms original deadline; два fresh headed процесса
+на каждый mode, old source→last source и повторное сохранение owned package.
+Baseline127developer docs — private operator99-root-review-baseline.json.
+OpenViking health успешен.
+
+Последняя попытка продолжить задачу разработчика terminal/idle:
+turn01a0e6b8-ee3b-7721-9960-783494f3bdcd,
+cursor ef4fdbda-223c-4344-9756-08ee1a070ea1:6. Она отказалась от source99,
+сославшись на старое фазовое поручение проверки памяти. ROOT не объявляет это
+блокировкой цели: текущее поручение пользователя разрешает весь plan, поэтому
+продолжает сам в том же node-javascript worktree. Конкурирующего writer нет;
+новые задачи/субагенты не созданы. HEAD остаётся beaf849091…; новые изменения
+source99 пока не закоммичены и не являются frozen candidate.
+
+Добавлены tools/loginom-acceptance/javascript-persistence-{cases,oracle}.mjs
+и javascript-persistence.test.mjs. FixedS1 совпадает с прежним table-v1,
+S2 меняет marker и содержит Unicode/LF/XML-special characters. Typed6x2 oracle
+независим от configure/execute;19PASS/0FAIL/0SKIP, terminalexit0 (Node24.19.0,
+явный pinned Acorn loader для source98 policy). Negative tests: stale/value/type/
+label/name/order/count/missing/NULL/precision/truncation. Реальные schema labels
+сверены со source97 saved report, не угаданы. Никакого нового live исполнения.
+
+Private source99-persistence-fixtures.json закрепляет исходники/SHA/tests:
+codeS2 500bytes/9LF-lines SHA82b59a9d136dd1de484fe005db3b50c7ed8b314c1a2e3f2a832ce90903f94cdf;
+declaredS2 378bytes/8LF-lines SHAceae03ba038a6fb0f9889a3c98cbc6a93efea8c1448cd2e4693ee34a01d51c1a.
+Writer/cold reader/whole persistence auditor ещё нужно реализовать; не выдавать
+эти19unit tests за G7. Следующий шаг — saved package binding и UI save/open paths,
+без снятия draft-only guard старого createJavascriptExecutionRuntime. Profile115
+ещё не использован; все browsers закрыты, ROOT original test jobs terminal.
+
+
 ### Source98: policy/admission приняты ROOT и закоммичены
 
 Runtime commit `beaf849091830e3adb77a53cb88ca2f0c9e4a98c` включает8точных
