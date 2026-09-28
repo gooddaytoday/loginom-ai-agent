@@ -15,6 +15,33 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Cold02 output opening timeout; source113 diagnostic
+
+Cold02 original24302 terminal exit1. Process history preparation прошла; source
+read flow и input mapping/Close достигнуты, input original graph verified.
+Затем output open internal operation вернула AMBIGUOUS/OUTPUT_PORT_OPEN_UNCONFIRMED
+`Output port opening deadline`. Trace содержит reserved и menu_verified; прежний
+код не отмечал отправку/возврат ConfigurePort отдельно, поэтому точная фаза
+не установлена. Full cold observation/Execute не подтверждены, save не отправлялся.
+Report CLEANUP_UNCONFIRMED: close-confirmation timeout, browser_closed=true.
+Private source112-code-cold-result-02.json содержит failure/report hash.
+
+Recovery02/profile139 original87879 exit0: jsteach,0 packages, loggedOut/
+browserClosed=true; Chrome отсутствует. Реестр closed_recovery_verified,
+active_exec_session=null. Writer13 сохранённый пакет не менялся этим оператором.
+
+Source113 commit7c9cb2cb1f: диагностика открытия input/output port добавляет
+open_issued/open_returned и один обновляемый pending snapshot (samples, до4
+видимостей wizard, bounded controller type, node_locked/port_menu_same).
+Строгие native/DOM guards, original15s opening deadline и отсутствие replay
+сохранены. Не считать timeout доказательством необходимости большего лимита.
+Focused actual node-port-open19PASS/0FAIL, source113-port-focused-03.log.
+Main original39888/source113-main.log выполняется; сначала опросить handle.
+Первый diagnostic edit не применился из-за cwd; log focused без -02 был до edit,
+не засчитывать его проверкой новых исходников. Final targeted -03 после всех edits.
+Next profile140/cold03; source113 freeze/live ещё не выполнены. Full goal открыта.
+
+
 ### Source112 frozen; cold02 активен
 
 Main original35833 exit0:3615PASS/0FAIL/0SKIP; focused157PASS. Freeze112 SHA
