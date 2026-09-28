@@ -6,7 +6,7 @@
 Root `javascript`, child `.worktrees/node-javascript` / `node-javascript`.
 Lease `javascript-20260926-ubuntu-preparation` снова `reserved_active`.
 OpenViking MCP health PASS. Исполняемый подплан остаётся незавершённым:
-публичный JS-handler, declared-пара G7, остальные gates, review и CLI-приёмка
+публичный JS-handler, остальные gates, review и CLI-приёмка
 ещё не приняты. Слияние и выпуск не назначены.
 
 - Source119 child commit `cc883ef03a7752c1881d8da4ff6bd75555413845`:
@@ -57,11 +57,30 @@ OpenViking MCP health PASS. Исполняемый подплан остаётс
   незелёный прогон, не скрывать его. Следующий свободный browser profile165;
   assignment и host registry перед следующим live должны получить этот точный
   профиль. Evidence/creds хранятся только в private campaign dir.
+- G7 `declared` проверен отдельной writer/cold-парой на source120. Writer14,
+  profile165, original66075 exit0: `WRITER_OBSERVED`, две редакции, два Execute,
+  два Save одного нового пакета
+  `/jsteach/js-g2-c021c16d-6dd7-474b-9a1a-df1fbd28a833/JavaScript-b3b78ce2-d77d-4982-9491-0d20c1ef4857.lgp`.
+  Report SHA256 `44559261e6cc1ab76bf4d78659f81432006815f031bbd91c5de48d36a2464c21`.
+  Cold09, fresh profile166, original95882 exit0: `COLD_OBSERVED`, полное чтение
+  saved source/settings, новый Execute, схема `ObservedID` integer и
+  `PhaseMarker` string, шесть полных строк. До Execute наблюдалось корректное
+  configured-only состояние: source `[]`, два target fields; после Execute
+  обе стороны mapping содержали два поля. Report SHA256
+  `4157e488ff0121b7bda9ae2256870d9534aa57802fdb8536fb227eb745c32ae8`.
+  Независимый audit `VERIFIED`, SHA256
+  `ef773b92b5ff446b02cb90856c07e1920a9ce23cd3204b586e0f5fc34996bfbd`.
+  Каждый пакет закрыт в собственном сеансе, logout/browser close и отсутствие
+  pinned Chromium проверены. Для обеих G7-пар доказан private report/journal
+  цикл, но package bytes, dirty-state и публичный handler остаются отдельными
+  неподтверждёнными пунктами.
 
-**Дальше:** выполнить отдельную G7 declared writer/cold пару с независимым oracle.
-По каждому browser запуску закрывать именно пакет, проверять logout и browser
-close. Продолжать остальные пункты [plan.md](plan.md), не считать G7 code
-доказательством готовности public handler/всего узла.
+**Дальше:** вернуться к незакрытым G1–G6 discovery/contract/knowledge и
+реализации публичного JS-handler, затем live matrix, review и две автономные
+CLI-попытки по [plan.md](plan.md). Для следующего headed запуска нужен новый
+profile167 и обновление assignment/host lease. По каждому browser запуску
+закрывать именно пакет, проверять logout и browser close. Частную приёмку G7
+не считать готовностью public handler/всего узла.
 
 ## Историческая пауза по просьбе пользователя — 2026-09-28 (завершена)
 
