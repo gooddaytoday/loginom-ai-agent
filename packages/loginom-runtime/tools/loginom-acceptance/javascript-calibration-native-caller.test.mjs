@@ -29,7 +29,7 @@ for(const [name,change]of Object.entries({source:p=>p.source=p.source.replace('\
  digest:p=>p.source_sha256=javascriptCalibrationCase('K2-sync-v1').source_sha256,future:p=>p.calibration_id='K5',
  mixed:p=>p.named_case_id='B-get-case',fixture:p=>p.input_fixture_id='real',schema:p=>p.schema_mode='declared'}))test('K4 serialized arm refuses '+name+' before native access',()=>{
  const p={...javascriptCalibrationCase(id),binding:{fixture_id:'integer-safe'}};change(p);
- assert.throws(()=>vm.runInNewContext('('+armJavascriptNativeRoundtrip.toString()+')')(p),/fixed calibration source\/input|fixed stage A\/B source\/input/);
+ assert.throws(()=>vm.runInNewContext('('+armJavascriptNativeRoundtrip.toString()+')')(p),/fixed calibration source\/input|fixed stage A\/B\/C source\/input/);
 });
 
 for(const text of [diagnostic,diagnostic.replace('6:1','2:3'),diagnostic.replace('6:1','3:3'),diagnostic.replace('6:1','4:1'),

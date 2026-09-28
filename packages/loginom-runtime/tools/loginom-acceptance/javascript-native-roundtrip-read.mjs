@@ -15,9 +15,9 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
   need(captured?.document===document&&captured.id===b.runtime_binding_id,'private native input binding required');
   const slice={"integer-coercion-fraction-positive":[1,3,1,4],"integer-coercion-fraction-negative":[1,3,1,4],"integer-coercion-string-numeric":[1,5,1,4],"integer-coercion-string-invalid":[1,5,1,4],"integer-coercion-nan":[1,3,1,4],"integer-coercion-positive-infinity":[1,3,1,4],"integer-coercion-negative-infinity":[1,3,1,4],real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6],'cardinality-empty':[3,4,0]}[b.fixture_id??'real'];
   const typeCode=b.roundtrip_role==='output'?(slice?.[3]??slice?.[1]):slice?.[1];
-  const namedMarker=["B-get-case","B-get-missing","B-getcolumn-case","B-getcolumn-missing","B-columns-case","B-columns-missing","B-isnull-case","B-isnull-missing"].includes(b.named_case_id);
+  const namedOneCell=["B-get-case","B-get-missing","B-getcolumn-case","B-getcolumn-missing","B-columns-case","B-columns-missing","B-isnull-case","B-isnull-missing","C-set-index","C-set-exact","C-set-case","C-set-missing"].includes(b.named_case_id);
   if(b.calibration_id!==undefined)need(b.named_case_id===undefined&&['K1-parse-v1','K2-sync-v1','K3-shift-v1','K4-native-caller-v1'].includes(b.calibration_id)&&b.roundtrip_role==='upstream'&&b.fixture_id==='integer-safe'&&b.input_fixture_id==='integer-safe','calibration upstream only');
-  const rowCount=b.roundtrip_role==='output'?(namedMarker?1:(slice?.[2]??slice?.[0])):slice?.[0];
+  const rowCount=b.roundtrip_role==='output'?(namedOneCell?1:(slice?.[2]??slice?.[0])):slice?.[0];
   need(Array.isArray(slice)&&b.rows===rowCount&&b.row_count===rowCount&&b.columns.length===1&&b.columns[0]===0
     &&JSON.stringify(b.schema)===JSON.stringify([{name:'Value',label:'Value',type:typeCode}]),'fixed native slice');
   const owner=globalThis.__loginomJavascriptNativeRoundtripV1;

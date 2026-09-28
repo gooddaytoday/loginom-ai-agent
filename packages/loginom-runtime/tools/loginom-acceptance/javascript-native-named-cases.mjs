@@ -1,4 +1,4 @@
-// Root-reviewed stages A/B only. Input fixture identity is deliberately separate.
+// Root-reviewed stages A/B/C only. Input fixture identity is deliberately separate.
 import {createHash} from 'node:crypto';
 const cases={
   "A-get-index": {
@@ -120,12 +120,44 @@ const cases={
     "source_sha256": "7133ef6538cd9f2d09e652df0eafcdba8fe89d8619b8a8be22fa898368b577c4",
     "oracle": "isnull-return",
     "output_rows": 1
+  },
+  "C-set-index": {
+    "id": "C-set-index",
+    "input_fixture_id": "integer-safe",
+    "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nconst value=InputTable.Get(1,\"Value\");\nif (typeof value !== \"number\" || value !== -9007199254740991) throw Error(\"JS_NAMED_INPUT_VALUE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nOutputTable.Append();\nOutputTable.Set(\"Value\",0);\nOutputTable.Set(0,value);\n",
+    "source_sha256": "83cac05c5b23db232bd5a89d522e15a6665997cb9083b451c855e914f3186b2e",
+    "oracle": "set-exact",
+    "output_rows": 1
+  },
+  "C-set-exact": {
+    "id": "C-set-exact",
+    "input_fixture_id": "integer-safe",
+    "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nconst value=InputTable.Get(1,\"Value\");\nif (typeof value !== \"number\" || value !== -9007199254740991) throw Error(\"JS_NAMED_INPUT_VALUE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nOutputTable.Append();\nOutputTable.Set(\"Value\",0);\nOutputTable.Set(\"Value\",value);\n",
+    "source_sha256": "3e840949275b92e7a275458ee0abb27d02fd16fc8483b7877a1d927338ccd05d",
+    "oracle": "set-exact",
+    "output_rows": 1
+  },
+  "C-set-case": {
+    "id": "C-set-case",
+    "input_fixture_id": "integer-safe",
+    "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nconst value=InputTable.Get(1,\"Value\");\nif (typeof value !== \"number\" || value !== -9007199254740991) throw Error(\"JS_NAMED_INPUT_VALUE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nOutputTable.Append();\nOutputTable.Set(\"Value\",0);\nOutputTable.Set(\"value\",value);\n",
+    "source_sha256": "f7ddd2dec629713271d2158b23e9f923ab152c538601b38c9b114a1797599557",
+    "oracle": "set-value",
+    "output_rows": 1
+  },
+  "C-set-missing": {
+    "id": "C-set-missing",
+    "input_fixture_id": "integer-safe",
+    "source": "import {InputTable,OutputTable,DataType} from \"builtIn/Data\";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error(\"JS_NAMED_INPUT_SHAPE\");\nconst value=InputTable.Get(1,\"Value\");\nif (typeof value !== \"number\" || value !== -9007199254740991) throw Error(\"JS_NAMED_INPUT_VALUE\");\nOutputTable.AssignColumns([{Name:\"Value\",DisplayName:\"Value\",DataType:DataType.Integer}]);\nOutputTable.Append();\nOutputTable.Set(\"Value\",0);\nOutputTable.Set(\"Missing\",value);\n",
+    "source_sha256": "511b1301e74288974c138b8af0207b332277d0d95af9e7daa5f066375b4d6a26",
+    "oracle": "set-value",
+    "output_rows": 1
   }
 };
 Object.values(cases).forEach(Object.freeze);Object.freeze(cases);
 export const javascriptNamedIds=Object.freeze(Object.keys(cases));
 export function javascriptNamedCase(id){
- if(!Object.hasOwn(cases,id))throw Error('Unknown fixed stage A/B named case');
+ if(!Object.hasOwn(cases,id))throw Error('Unknown fixed stage A/B/C named case');
  return cases[id];
 }
 export function javascriptNamedProbe(id){

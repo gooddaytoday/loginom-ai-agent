@@ -240,7 +240,7 @@ class FixtureAudit(unittest.TestCase):
     def test_named_stage_b_independent_pins(self):
         named = json.loads((HERE / "javascript-native-named-cases.mjs").read_text().split("const cases=", 1)[1].split(";\nObject.values", 1)[0])
         spec = [('B-get-case', 448, 'ca569c1320bf7c160803b9031524feaadf4adecf87f1bd00ee4eff043599c505'), ('B-get-missing', 450, '8e2ed7bf78ccb567121f257dc43058dddc284ef7384df4a45eeabdbfa0e7329c'), ('B-getcolumn-case', 574, '08054f2f62477f665c8b92bd0414755dc0e66e3ba8008439aa05d28500c3eb30'), ('B-getcolumn-missing', 576, '4832a8582d5af517d8f60c2a2c8499ce8b4c131a3ba78b952bcd3f9dfd3f038d'), ('B-columns-case', 572, 'd60e2aa72f3585e87c09073c0c002cc465846b39a146f719c494276f8271cc19'), ('B-columns-missing', 574, '13c5ccc3c6aec7723b5401b1853ee4d2f343444a566e0d37a7f520e4173e766f'), ('B-isnull-case', 462, 'dc8be58b76ab183e2b3be3921886a2bac1fc37eb0ea30470d763c37522cf4c1b'), ('B-isnull-missing', 464, '7133ef6538cd9f2d09e652df0eafcdba8fe89d8619b8a8be22fa898368b577c4')]
-        self.assertEqual(len(named), 16)
+        self.assertEqual(len(named), 20)
         self.assertEqual([key for key in named if key.startswith("B-")], [row[0] for row in spec])
         for case_id, size, digest in spec:
             with self.subTest(case=case_id):
