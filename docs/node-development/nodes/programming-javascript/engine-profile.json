@@ -888,9 +888,39 @@
       "source_sha256": "f18c22929b8dfbd4587497a4ec66520314cb3607ad4bad88cdc43bfebbe42b41",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_pass",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "typed_ui_only",
+      "execution": "fresh_owned_completed",
+      "source_exact": true,
+      "input_name": "RowID",
+      "output_schema": [
+        {
+          "name": "Result",
+          "label": "Result",
+          "type": "integer"
+        }
+      ],
+      "output_rows": 6,
+      "all_cells_verified": true,
+      "observed_values": [
+        ["1"],
+        ["2"],
+        ["3"],
+        ["4"],
+        ["5"],
+        ["6"]
+      ],
+      "number_precision": "exact_integer_decimal",
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-named-access-31/report.json",
+        "report_sha256": "1c4442bc026ac924dfc0001e9f004f05366568a6b8f3ac6ba5f5fab640bb62b7",
+        "journal_sha256": "ad2a9ce78c846d14a457b533af6800ea3e513e6639fa898254b82c33b95e86a9",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "g5-name-case",

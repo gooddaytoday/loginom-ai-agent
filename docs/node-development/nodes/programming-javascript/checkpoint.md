@@ -1,5 +1,25 @@
 # JavaScript: checkpoint исполнения
 
+## G5 named access: `RowID` по шести строкам — 2026-09-29
+
+Отдельный headed `g5-named-access-31`/profile195 на child revision
+`180f1d5810` доставил source SHA256
+`f18c22929b8dfbd4587497a4ec66520314cb3607ad4bad88cdc43bfebbe42b41`.
+Свежий принадлежащий JS process завершился успешно; `InputTable.Get(i,
+"RowID")` записал шесть ordered integer values `1`, `2`, `3`, `4`, `5`, `6`.
+Typed UI reader подтвердил точные десятичные строки, независимый oracle —
+schema и все клетки (`typed_oracle_verified`). Это проверяет техническое имя
+`RowID` на данной fixture, но не case-insensitive lookup: отдельный
+`g5-name-case` ещё нужен. Proof level `typed_ui_only`, native bytes не
+проверены; G5 остаётся открытым.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`1c4442bc026ac924dfc0001e9f004f05366568a6b8f3ac6ba5f5fab640bb62b7`,
+journal SHA256
+`ad2a9ce78c846d14a457b533af6800ea3e513e6639fa898254b82c33b95e86a9`.
+Реестр закрыт, следующий fresh profile196.
+
 ## G5 civil DateTime: local millisecond PASS — 2026-09-29
 
 Отдельный headed `g5-date-civil-30`/profile194 на child revision
