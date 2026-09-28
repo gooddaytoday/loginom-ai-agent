@@ -15,6 +15,29 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source102: точная диагностика графа после port mapping Close
+
+Runtime commit `177110033a14166f85aa0288488fc2fb1a5e2fe7`. Перед прежним строгим
+сравнением записываются копии уже наблюдённых before/after graph. Дополнительных
+чтений/действий и изменений проверок нет. Actual-method тесты подтверждают
+сохранность evidence при lock/position/owner/journal отказах и невозможность
+обойти сравнение мутацией журналируемой копии.
+
+Main original79849 exit1:3556PASS/1FAIL (в старом VM-test отсутствовал
+structuredClone). Повтор81431 начат после неуспешного edit скрипта и сохранил
+тот же отказ; это не новый runtime дефект. Добавлен structuredClone в явное
+окружение VM; affected boundary/mismatch files затем33PASS/0FAIL, exit0.
+Все остальные main проверки прошли на неизменённом runtime. Общий suite после
+этого исправления окружения повторно не запускался; не заявлять полный зелёный
+main для source102.127 preexisting docs сохранены,3 syntax checks прошли.
+
+Freeze102:1322 pins, closure202 files/628 edges, computed imports absent.
+Manifest javascript-freeze102-root-final-source.json SHA
+952fd8670184eb00f53f6f35fe307b37bc7c03f9b53f4df171c34a1101d9dbd0.
+Writer05/profile123 запущен headed/sandbox, original68559 ещё ожидает terminal.
+До завершения не запускать другой browser. OpenViking health успешен.
+
+
 ### Source101: ожидание освобождения узла после нашего Close
 
 Runtime commit `75f013982c14d0d32d19e9757c0f6ef426817a82`, child node-javascript.
