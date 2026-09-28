@@ -1,3 +1,6 @@
+import {createJavascriptSourceReader} from '../../client/lib/javascript-source-read.mjs';
+import {observeJavascriptSource,observeJavascriptSourceProcesses} from '../../client/lib/javascript-source-browser.mjs';
+import {verifyJavascriptSourceCycle,javascriptSourceSettings} from './javascript-source-cycle.mjs';
 import {requireJavascriptMetadataMode} from './javascript-native-metadata.mjs';
 import {beginCalibrationWizard,readCalibrationWizard,finishCalibrationWizardObservation,checkCalibrationWizardBaseline} from './javascript-calibration-wizard.mjs';
 import {acknowledgeJavascriptCalibrationRecord} from './javascript-calibration-journal.mjs';
@@ -39,10 +42,10 @@ import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false}={}) {
 process.umask(0o077);
 const batch=batchCases===null?null:javascriptBatchCases(batchCases);
-const batchDeadline=nativeRoundtrip?Date.now()+600000:batch?Date.now()+1800000:Infinity;
+const batchDeadline=nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch?Date.now()+1800000:Infinity;
 let cleaning=false;
 const phaseDeadline=ms=>Math.min(cleaning?Infinity:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=batchDeadline-Date.now();if(!cleaning&&ms<=0)throw Error('Original batch deadline expired');return cleaning?Infinity:ms;};
@@ -55,6 +58,10 @@ for (let i=0;i<args.length;i++) {
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
   options[key]=['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
+}
+if(sourceReadCycle){
+  if(batch||nativeInputOnly||nativeRoundtrip||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence'].includes(k)))throw Error('Source cycle requires its separate fixed private entrypoint');
+  options['--execution-case']='code-table-execute';
 }
 if(batch&&options['--execution-case'])throw Error('Batch cannot also select a single case');
 if(nativeInputOnly||nativeRoundtrip){
@@ -104,7 +111,7 @@ const directory=resolve(options['--evidence']);
 // Refuse reuse: no old evidence is overwritten and no uncertain run is replayed.
 await mkdir(directory,{mode:0o700});
 const redactor=createRedactor([config.password]);
-if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
+if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},knownSecrets:[config.password]});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
   node:process.versions.node,headless:false,server_os:{status:'not_observed'},storage:{status:'not_observed'},
@@ -117,6 +124,8 @@ let browserLifecycle,inputBinding,previewCloseState={dispatched:false};
 const columnState={pending:null};
 let executionJournalLine=0;
 let nativeClassifierBinding;
+let sourceCycleUncertain=false;
+const sourceReaders=[];
 let readingExisting=false,initialOpening={};
 const schemaContext=()=>({root:wizardRoot,native:wizardHandle,binding:wizardBinding,prefix:owner.prefix,account:config.username,build:'7.4.2'});
 const executionRecord=async event=>{
@@ -683,6 +692,59 @@ const readOwnedExecutionSource=()=>page.evaluate(({root,native,binding})=>{
       for(let i=0;i<count;i++){const line=doc.getLine(i);if(typeof line!=='string'||/[\r\n\0]/.test(line))throw Error('Existing source line differs');bytes+=new TextEncoder().encode(line).length+(i?1:0);if(bytes>32768)throw Error('Existing source outside byte bound');lines.push(line);}
       return lines.join('\n');
     },schemaContext());
+const runSourceReadCycle=async(probe,deadline)=>{
+  // Baseline was explicitly committed/executed by setup. No execution method is
+  // reachable from this adapter; Next stops on the code page, Close discards.
+  const boundary=await executionRuntime.captureExecutionBoundary();
+  const processes=await page.evaluateHandle(observeJavascriptSourceProcesses,{capture:true});
+  const sourceOwner={operation_id:'source97',document_id:executionPrepared.document_id,
+    workflow_id:executionPrepared.workflow_ref.workflow_id,node_id:executionNode.node_id,ui_epoch:wizardAddressEpoch};
+  const expectedGeneration=report.execution_schema.generation.checked;
+  const checkBoundary=async()=>{
+    if(Date.now()>=deadline)throw Error('Source cycle original deadline expired');
+    await executionRuntime.verifyExecutionBoundary(boundary);
+    return page.evaluate(observeJavascriptSourceProcesses,{held:processes});
+  };
+  const createReader=readerOwner=>{
+    const reader=createJavascriptSourceReader({owner:readerOwner,deadline,redactor,record:executionRecord,
+      adapter:{
+        async open(){
+          await checkBoundary();
+          await executionRuntime.reopen(executionNode,deadline);wizardAddressEpoch++;
+          wizardHandle=null;wizardRoot=null;openedWizard=true;closeDispatched=false;closeConfirmed=false;closeDeadline=0;
+          wizardDeadline=Math.min(deadline,phaseDeadline(90000));
+          await executionRuntime.handoffReopenedWizard();
+          await waitWizardReady({deadline:wizardDeadline});readingExisting=true;report.execution_existing_schema=null;
+          await inspectWizardPages({deadline});
+          const context=schemaContext(),epoch=wizardAddressEpoch;
+          const held=await page.evaluateHandle(observeJavascriptSource,{context,owner:readerOwner,epoch,capture:true});
+          return {held,context,epoch,settings:javascriptSourceSettings(report.execution_existing_schema)};
+        },
+        async read(handle){
+          await waitWizardReady({deadline,inputOnly:false});
+          const observed=await page.evaluate(observeJavascriptSource,{...handle,owner:readerOwner});
+          return {...observed,settings:handle.settings};
+        },
+        async discard(handle){
+          if(Date.now()>=deadline)throw Error('Source discard deadline expired');
+          closeDeadline=deadline;
+          await closeWizardOnce();
+          await handle.held.dispose();
+          await checkBoundary();
+          return {closed:true,owner:readerOwner};
+        }
+      }});
+    sourceReaders.push(reader);return reader;
+  };
+  try{
+    report.source_read_cycle=await verifyJavascriptSourceCycle({createReader,owner:sourceOwner,
+      readMappings:async()=>({input:await executionRuntime.readPortMapping(executionNode,'input',{operationDeadline:deadline}),
+        output:await executionRuntime.readPortMapping(executionNode,'output',{operationDeadline:deadline})}),
+      checkBoundary,record:executionRecord,expectedSource:probe.source,expectedGeneration});
+    await save();
+  }catch(error){sourceCycleUncertain=true;throw error;}
+  finally{await processes.dispose();await boundary.native.dispose();}
+};
 const runExecutionTrial=async probe=>{
   const deadline=phaseDeadline(600000),trigger=executionCase.split('-').at(-1),sentinel=executionCase.includes('-sentinel-');
   let trialPhase='initial',sourceSha=probe.source_sha256,roundtripDone,calibrationObserving=false;
@@ -829,6 +891,7 @@ const runExecutionTrial=async probe=>{
     if(execution.status!=='completed'||execution.owner_verified!==true)throw Error('Table trial execution not confirmed');
     report.execution_probe.output=await executionRuntime.readPassive(executionNode);
     report.execution_probe.status='typed_output_verified';
+    if(sourceReadCycle){await runSourceReadCycle(probe,Math.min(deadline,batchDeadline));return;}
     report.stage='existing-mapping-baseline';
     const before={input:await executionRuntime.readPortMapping(executionNode,'input'),output:await executionRuntime.readPortMapping(executionNode,'output')};
     report.stage='existing-source-readback';
@@ -1277,17 +1340,18 @@ try {
   report.status=coercionTrial||namedTrial||telemetryTrial||calibrationTrial?'PENDING_EVIDENCE':'OBSERVED';
 } catch(error) {
   report.status='FAILED';report.failure={stage:report.stage,...redactor.redact(javascriptProbeFailure(error))};
-  const diagnostic=(executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))?null:await captureJavascriptNativeClassifierDiagnostic({nativeRoundtrip,stage:report.stage,page,binding:nativeClassifierBinding});
+  const diagnostic=(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))?null:await captureJavascriptNativeClassifierDiagnostic({nativeRoundtrip,stage:report.stage,page,binding:nativeClassifierBinding});
   if(diagnostic)report.native_classifier_diagnostic=diagnostic;
   if(discoveryProbe)report.discovery_failure_context={source_sha256:discoveryProbe.source_sha256,
     terminal_receipt_observed:!!report.execution_probe?.execution,syntax_support:'not_determined'};
-  if (page&&!(executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await snapshot('failure').catch(()=>{report.failure.snapshot='unavailable';});
-  if (page&&owner&&!(executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await paletteSnapshot('failure-palette').catch(()=>{report.failure.palette_snapshot='unavailable';});
-  if (page&&!(executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await refusalEvidence('work-refusal').catch(()=>{report.failure.refusal_evidence='unavailable';});
+  if (page&&!(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await snapshot('failure').catch(()=>{report.failure.snapshot='unavailable';});
+  if (page&&owner&&!(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await paletteSnapshot('failure-palette').catch(()=>{report.failure.palette_snapshot='unavailable';});
+  if (page&&!(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await refusalEvidence('work-refusal').catch(()=>{report.failure.refusal_evidence='unavailable';});
 } finally {
   cleaning=true;report.work_stage=report.stage;report.stage='cleanup';
   try {
     if (page) {
+      if(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain))throw Error('Source cycle uncertain; no UI cleanup replay, close own browser');
       if(executionRuntime?.nativeReadUncertain)throw Error('Native input pending/retired or buffer cleanup unconfirmed; UI cleanup refused, close own browser');
       if(paletteAdmission?.inputReleaseConfirmed===false)throw Error('Palette mouse/Alt release unconfirmed; UI cleanup refused, browser must close');
       if(createDeadline&&!packageHandle){
@@ -1402,7 +1466,7 @@ try {
       report.cleanup.logged_out=true;
     }
   } catch(error) {report.cleanup.failure=redactor.text(String(error.message)).slice(0,1200);
-    if(page&&!(executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) {await snapshot('cleanup-failure').catch(()=>{});await refusalEvidence('cleanup-refusal').catch(()=>{report.cleanup.refusal_evidence='unavailable';});}}
+    if(page&&!(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) {await snapshot('cleanup-failure').catch(()=>{});await refusalEvidence('cleanup-refusal').catch(()=>{report.cleanup.refusal_evidence='unavailable';});}}
   if (session) {
     if(browserLifecycle)await browserLifecycle.beforeClose();
     await session.context.close().then(()=>{report.cleanup.browser_closed=true;},()=>{report.cleanup.browser_closed=false;});
