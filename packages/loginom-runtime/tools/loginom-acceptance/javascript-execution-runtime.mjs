@@ -3,6 +3,7 @@ import {settleJavascriptCloseBoundary} from './javascript-close-boundary.mjs';
 import {javascriptCalibrationCase} from './javascript-calibration-cases.mjs';
 import {bindJavascriptPackage, javascriptPackageBindingRequest, observeJavascriptPackageBinding} from './javascript-package-binding.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from './javascript-persistence-save.mjs';
+import {readJavascriptSavedDirtyState, verifyJavascriptSavedDirtyState} from './javascript-persistence-dirty-state.mjs';
 import {verifyJavascriptPersistenceOutput} from './javascript-persistence-oracle.mjs';
 import {javascriptNamedCase} from './javascript-native-named-cases.mjs';
 import {verifyJavascriptIntegerInput,verifyJavascriptNamedInput,verifyJavascriptNamedOutcome} from './javascript-native-named-contract.mjs';
@@ -839,8 +840,18 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
       requireJavascriptGraphUnchanged({...before,workflow_ref:prepared.workflow_ref},after);
       await record({phase:'persistence_saved_binding_verified',revision,path:savedPath,binding,before,after});
       if(Date.now()>=deadline)throw Error('Persistence binding deadline expired');
+      const remaining=deadline-Date.now();
+      let timer;
+      const dirty=verifyJavascriptSavedDirtyState(await Promise.race([
+        page.evaluate(readJavascriptSavedDirtyState,{owner:workflowOwner,request}),
+        new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Saved JavaScript dirty-state read timed out')),remaining);}),
+      ]).finally(()=>clearTimeout(timer)),request);
+      await page.evaluate(observeJavascriptPackageBinding,{...request,previous:workflowOwner,checkOnly:true});
+      await record({phase:'persistence_dirty_state_observed',revision,path:savedPath,
+        save_operation_id:saved.receipt.operation_id,dirty_state:dirty});
+      if(Date.now()>=deadline)throw Error('Persistence dirty-state deadline expired');
       persistenceUncertain=false;
-      return {...saved,prepared:structuredClone(prepared),graph:after};
+      return {...saved,prepared:structuredClone(prepared),graph:after,dirty_state:dirty};
     },
     async prepareManualMapping(node) {
       if(pendingMapping)throw Error('Previous manual mapping remains unresolved');
