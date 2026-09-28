@@ -784,3 +784,12 @@ main8:1/module1:1. INPUT/upstream8cells unchanged,OUTPUT не читался,128
 cleanup3/no browser. ReportSHAea851547392d0c099df0b7385cb86baf511258a053fab7a7bcfa2c2af798246b.
 Semantic attribution Set не принята,case_complete=false. Это сохраняет конкретный
 наблюдённый отказ без общего правила о регистре. C-set-missing ещё NOT_RUN.
+
+
+C-set-missing наблюдён отдельно:profile104/original78988exit1,owned failed child,
+полный native ErrorDetails «Столбец "Missing" отсутствует в выходной таблице»,
+main8:1/module1:1. INPUT/upstream8cells unchanged,noOUTPUT,1281pins/593refs,
+cleanup3/no browser. ReportSHA183fa26ef63332391d23fbacc9e5a3e24885cba2baa3c9e30b8ca1d368a9a4d6.
+Root aggregate named-stage-c-observations.json:4observations/34cells/2434refs,
+дваpositivecontrols complete,дваownedfailures attributionpending. Полнота наблюдений
+не означает semantic C coverage/G5. D metadata witness исследуется отдельно.

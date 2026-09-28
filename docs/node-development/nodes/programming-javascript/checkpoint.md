@@ -16,6 +16,46 @@
 ## Актуальная диагностика после запроса пользователя
 
 
+### C-set-missing наблюдён; все4 C runs сохранены
+
+Original78988 terminalexit1, fresh headed profile104, source93/commit9132b60cda.
+ReportUNRESOLVED,failure=null; owned failed JS child с full native ErrorDetails
+`Столбец "Missing" отсутствует в выходной таблице`,main8:1/module1:1.
+Independent root:475byte source SHA
+511b1301e74288974c138b8af0207b332277d0d95af9e7daa5f066375b4d6a26,
+INPUT4/upstream4 unchanged,noOUTPUT,1281pins/593journalrefs,cleanup3/no browser.
+ReportSHA183fa26ef63332391d23fbacc9e5a3e24885cba2baa3c9e30b8ca1d368a9a4d6;
+receipt native-named-set-missing-probe-01-verification.json. Matrix unresolved,
+case_complete/rejection_attributed=false; profile104 closed_logout_verified.
+
+Root aggregate named-stage-c-observations.json SHA
+18787f17d68e52d8482c162708c556eb5a0acaa15e9f8ff4d22ed8974cd47d74:
+4observations/34nativecells/2434journalrefs. Index/exact PASS_EXACT_CASE; case/missing
+owned_failure_observed. Observations_complete=true,stage_c_coverage_complete=false,
+G5false. Никаких retries,output reads после failed или новых calibration runs.
+
+### D audit: недостающий frontend source сохранён root
+
+Developer D audit revision39 terminal; docSHA
+0bdaee96867f244ab671c7b77549d4d18dafe99e5f24570d71dae295a877c5a8.
+Root прочёл документ и проверил19source refs:18hashes совпали; S13rootdesign уже
+изменён C checkpoint,его hash должен обозначать историческую ревизию. Полная
+code→physical association не доказана. Root получил **только статический JS asset**
+HTTP200 без browser/RPC/UI effects:output-schema-source-94/ColumnsMappingEngineOutputPortWizard.js,
+18309bytes,SHA6ad8ed1584136ec0fa3244e89a823f17f70fa561c998660390bd672ec514a79d,
+manifest рядом. Это не проверка loaded runtime. QueryColumns явно выбирает
+SourceColumns/TargetColumns; SyncSourceColumns вызывает ActivatePorts иSyncToOutside.
+Кнопки/открытие мастера не признаны пассивным чтением metadata.
+
+В той же developer задаче назначено уточнить только D audit document по новому
+source,включая extension.Source/IBGProxyColumnInfo,cache/RPC/identity/invalidation.
+Runtime/tests/старые docs остаются frozen; browser/root cleanup завершён.
+Следующий шаг — проверить уточнённый source audit и определить доказуемый metadata
+witness,не угадывая пути и не объявляя physical name полным J24 результатом.
+Полный план,публичный handler,knowledge,remaining lifecycle/persistence/CLI открыты.
+
+
+
 ### C-set-case: owned failure наблюдён, semantic attribution открыта
 
 Original19457 terminalexit1, fresh headed profile103, source93/commit9132b60cda.
