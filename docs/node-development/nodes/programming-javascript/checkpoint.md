@@ -15,6 +15,32 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source94 в реализации: preliminary code review, не приёмка
+
+Существующая developer задача активна, revision45,
+turn01a0e5ba-767f-7483-870b-17df0ed81330; подтверждено authoritative wait.
+Появился `javascript-native-metadata.mjs` и интеграция в execution runtime,
+roundtrip driver/read и live entry. Root прочёл текущий модуль и интеграцию:
+opt-in C-set-index, один metadata round до scalar read, сохранён Value guard,
+отдельный sticky metadata lifecycle включён в nativeReadUncertain.
+Версия ещё изменяется; freeze94/handoff и завершённых тестов пока нет.
+Root не запускает независимую приёмку незакреплённого candidate.
+
+Дополнительный source proof PropertySelector: range response TotalCount временно
+устанавливает Count в том же callback (352–358,775–799); отдельный Count RPC не нужен.
+Для native identity требуется явный self/item descriptor: DoSetPropValues709–746
+иначе может создать SelectStubObject. Вне range Items может обратиться к original
+getter (549–568), поэтому допускается только выбранный index0. Receipt
+`operator94-root-range-selector-review.json`. Root также сохранил независимый
+baseline109 preexisting docs в `operator94-root-review-baseline.json`.
+
+При review source94 обязательно проверить, что metadata retirement не сбрасывается
+поздним completed event старого input/output lifecycle, а failed metadata не допускает
+последующих data/UI действий. Это конкретный integration test, не утверждение о
+проверенном поведении незавершённой версии. Profile104 по-прежнему закрыт; новый
+browser/RPC run не запускался. Полный plan/G1–G7/public handler/CLI остаётся открытым.
+
+
 ### D source audit завершён; выбран metadata diagnostic source94
 
 Developer revision44 terminal. Root проверил32source hashes и actual diagram/model
