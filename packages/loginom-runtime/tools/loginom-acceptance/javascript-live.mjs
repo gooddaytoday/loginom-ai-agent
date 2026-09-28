@@ -1,4 +1,7 @@
 import {createJavascriptSourceReader} from '../../client/lib/javascript-source-read.mjs';
+import {javascriptPersistenceCase} from './javascript-persistence-cases.mjs';
+import {inspectJavascriptModulePolicy} from '../../client/lib/javascript-module-policy.mjs';
+import {verifyJavascriptPersistenceOutput} from './javascript-persistence-oracle.mjs';
 import {observeJavascriptSource,observeJavascriptSourceProcesses} from '../../client/lib/javascript-source-browser.mjs';
 import {verifyJavascriptSourceCycle,javascriptSourceSettings} from './javascript-source-cycle.mjs';
 import {requireJavascriptMetadataMode} from './javascript-native-metadata.mjs';
@@ -42,14 +45,16 @@ import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null}={}) {
 process.umask(0o077);
 const batch=batchCases===null?null:javascriptBatchCases(batchCases);
-const batchDeadline=nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch?Date.now()+1800000:Infinity;
-let cleaning=false;
-const phaseDeadline=ms=>Math.min(cleaning?Infinity:batchDeadline,Date.now()+ms);
-const remainingBatch=()=>{const ms=batchDeadline-Date.now();if(!cleaning&&ms<=0)throw Error('Original batch deadline expired');return cleaning?Infinity:ms;};
+const persistence=persistenceMode===null?null:javascriptPersistenceCase(persistenceMode);
+const batchDeadline=persistence?Math.floor(performance.timeOrigin)+persistence.writer_budget_ms:nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch?Date.now()+1800000:Infinity;
+let cleaning=false,cleanupDeadline=Infinity;
+const phaseDeadline=ms=>Math.min(cleaning?cleanupDeadline:batchDeadline,Date.now()+ms);
+const remainingBatch=()=>{const ms=(cleaning?cleanupDeadline:batchDeadline)-Date.now();if(ms<=0)throw Error(cleaning?'Original cleanup deadline expired':'Original batch deadline expired');return ms;};
 const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
+if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
 const allowed = new Set(['--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
@@ -58,6 +63,11 @@ for (let i=0;i<args.length;i++) {
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
   options[key]=['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
+}
+if(persistence){
+  if(batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence'].includes(k)))throw Error('Persistence requires its separate fixed writer entrypoint');
+  for(const revision of persistence.revisions)if(inspectJavascriptModulePolicy(revision.source).status!=='ADMITTED')throw Error('Fixed persistence source policy refused');
+  options['--execution-case']=persistenceMode+'-table-execute';
 }
 if(sourceReadCycle){
   if(batch||nativeInputOnly||nativeRoundtrip||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence'].includes(k)))throw Error('Source cycle requires its separate fixed private entrypoint');
@@ -111,15 +121,18 @@ const directory=resolve(options['--evidence']);
 // Refuse reuse: no old evidence is overwritten and no uncertain run is replayed.
 await mkdir(directory,{mode:0o700});
 const redactor=createRedactor([config.password]);
-if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
+if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},knownSecrets:[config.password]});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
+  ...(persistence?{persistence_mode:persistence.schema_mode,original_deadline:batchDeadline,explicit_execution_limit:2}:{}),
   node:process.versions.node,headless:false,server_os:{status:'not_observed'},storage:{status:'not_observed'},
   snapshots:[],effects:[],cleanup:{package_closed:false,logged_out:false,browser_closed:false},
   probes:javascriptEngineProbes.map(p=>({id:p.id,sha256:p.source_sha256,status:'not_run'}))};
 let report=rootReport;
 let session,page,owner,packageHandle,wizardBinding,wizardHandle,wizardRoot,openedWizard=false,closeDispatched=false,closeConfirmed=false,closeDeadline=0,wizardDeadline=0,createDeadline=0,wizardAddressEpoch=0;
 let executionRuntime,executionInput,executionNode,executionPrepared,executionInputProof,executionDrop,paletteAdmission;
+const ownedPackageName=()=>executionRuntime?.persistencePackage?.prepared.package_ref.name??owner?.package_name;
+const ownedPackagePath=()=>executionRuntime?.persistencePackage?.path??null;
 let browserLifecycle,inputBinding,previewCloseState={dispatched:false};
 const columnState={pending:null};
 let executionJournalLine=0;
@@ -269,7 +282,8 @@ const guard=async()=>{
   const s=await observe();
   if (!s.connected) throw Error('Connection unavailable');
   if (s.account!==config.username||s.build!=='7.4.2') throw Error('Account/build changed');
-  if (owner&&(s.packages!==1||s.package_name!==owner.package_name||s.package_path||owner.prefix&&s.prefix!==owner.prefix)) throw Error('Owned draft changed');
+  const path=s.package_path?'/'+s.package_path.replaceAll('\\','/').replace(/^\/+/, ''):null;
+  if (owner&&(s.packages!==1||s.package_name!==ownedPackageName()||path!==ownedPackagePath()||owner.prefix&&s.prefix!==owner.prefix)) throw Error('Owned package changed');
   if(packageHandle&&!await page.evaluate(owned=>{
     const m=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
     return m?.PackageNodes?.Count===1&&m.PackageNodes.Items(0)===owned;
@@ -293,9 +307,10 @@ const settlePackageMetadata=async()=>{
 };
 const waitGraphReady=async(timeout=60000)=>{
   timeout=Math.min(timeout,remainingBatch());
-  await page.waitForFunction(({prefix,account,packageName,owned})=>{
+  await page.waitForFunction(({prefix,account,packageName,packagePath,owned})=>{
     const f=globalThis.bg?.app?.Application?.FInstance?.FMainForm,m=f?.FMapTree;
-    if(m?.FServerConnection?.UserName!==account||m.PackageNodes?.Count!==1||m.PackageNodes.Items(0)!==owned||m.PackageNodes.Items(0)?.PackageName!==packageName||m.PackageNodes.Items(0)?.PackageFileName)throw Error('Graph readiness package changed');
+    const rawPath=owned?.PackageFileName,path=rawPath?'/'+rawPath.replaceAll('\\','/').replace(/^\/+/, ''):null;
+    if(m?.FServerConnection?.UserName!==account||m.PackageNodes?.Count!==1||m.PackageNodes.Items(0)!==owned||owned.PackageName!==packageName||path!==packagePath)throw Error('Graph readiness package changed');
     const roots=[...document.querySelectorAll('[data-tid]')].filter(e=>e.getAttribute('data-tid')===prefix+';ModelForm');
     if(roots.length>1)throw Error('Graph form owner ambiguous');
     if(roots.length===0)return false;
@@ -310,7 +325,7 @@ const waitGraphReady=async(timeout=60000)=>{
       &&materialized
       &&model.FCreateDraggedNodeStarted===false&&model.FDraggingOverGraph===false&&!model.FDraggedNode
       &&!roots[0].classList.contains('bg-mask-message')&&!Array.from(document.querySelectorAll('.bg-mask-message,.x-mask-msg,[role="dialog"],.x-message-box')).some(visible);
-  },{prefix:owner.prefix,account:config.username,packageName:owner.package_name,owned:packageHandle},{timeout});
+  },{prefix:owner.prefix,account:config.username,packageName:ownedPackageName(),packagePath:ownedPackagePath(),owned:packageHandle},{timeout});
   await guard();
 };
 // Serialized by Playwright for both polling and diagnostics. Read only cached
@@ -593,6 +608,7 @@ const probeOwnedSource=async (baseline,executionSource=null)=>{
     if(Date.now()>=deadline)throw Error('Original source probe deadline expired');
     await waitWizardReady({deadline,inputOnly:false});
     const before=await read();
+    if(executionSource!==null&&before.source!==baseline)throw Error('Expected old source changed before replacement');
     const point=await page.evaluate(h=>{
       const b=h.wrapper.getBoundingClientRect(),x=b.x+Math.min(35,b.width/2),y=b.y+Math.min(15,b.height/2),hit=document.elementFromPoint(x,y);
       if(x<0||y<0||x>=innerWidth||y>=innerHeight||!h.wrapper.contains(hit))throw Error('Probe editor covered');
@@ -692,12 +708,12 @@ const readOwnedExecutionSource=()=>page.evaluate(({root,native,binding})=>{
       for(let i=0;i<count;i++){const line=doc.getLine(i);if(typeof line!=='string'||/[\r\n\0]/.test(line))throw Error('Existing source line differs');bytes+=new TextEncoder().encode(line).length+(i?1:0);if(bytes>32768)throw Error('Existing source outside byte bound');lines.push(line);}
       return lines.join('\n');
     },schemaContext());
-const runSourceReadCycle=async(probe,deadline)=>{
+const runSourceReadCycle=async(probe,deadline,expectedSettings)=>{
   // Baseline was explicitly committed/executed by setup. No execution method is
   // reachable from this adapter; Next stops on the code page, Close discards.
   const boundary=await executionRuntime.captureExecutionBoundary();
   const processes=await page.evaluateHandle(observeJavascriptSourceProcesses,{capture:true});
-  const sourceOwner={operation_id:'source97',document_id:executionPrepared.document_id,
+  const sourceOwner={operation_id:persistence?'source99-'+probe.source_sha256.slice(0,12):'source97',document_id:executionPrepared.document_id,
     workflow_id:executionPrepared.workflow_ref.workflow_id,node_id:executionNode.node_id,ui_epoch:wizardAddressEpoch};
   const expectedGeneration=report.execution_schema.generation.checked;
   const checkBoundary=async()=>{
@@ -740,13 +756,13 @@ const runSourceReadCycle=async(probe,deadline)=>{
     report.source_read_cycle=await verifyJavascriptSourceCycle({createReader,owner:sourceOwner,
       readMappings:async()=>({input:await executionRuntime.readPortMapping(executionNode,'input',{operationDeadline:deadline}),
         output:await executionRuntime.readPortMapping(executionNode,'output',{operationDeadline:deadline})}),
-      checkBoundary,record:executionRecord,expectedSource:probe.source,expectedGeneration});
-    await save();
+      checkBoundary,record:executionRecord,expectedSource:probe.source,expectedSettings,expectedGeneration});
+    await save();return structuredClone(report.source_read_cycle);
   }catch(error){sourceCycleUncertain=true;throw error;}
   finally{await processes.dispose();await boundary.native.dispose();}
 };
 const runExecutionTrial=async probe=>{
-  const deadline=phaseDeadline(600000),trigger=executionCase.split('-').at(-1),sentinel=executionCase.includes('-sentinel-');
+  const deadline=persistence?batchDeadline:phaseDeadline(600000),trigger=executionCase.split('-').at(-1),sentinel=executionCase.includes('-sentinel-');
   let trialPhase='initial',sourceSha=probe.source_sha256,roundtripDone,calibrationObserving=false;
   const read=async()=>{
     const snapshot=await page.evaluate(readJavascriptStage,schemaContext());
@@ -891,6 +907,62 @@ const runExecutionTrial=async probe=>{
     if(execution.status!=='completed'||execution.owner_verified!==true)throw Error('Table trial execution not confirmed');
     report.execution_probe.output=await executionRuntime.readPassive(executionNode);
     report.execution_probe.status='typed_output_verified';
+    if(persistence){
+      const first=persistence.revisions[0],last=persistence.revisions[1];
+      if(probe.source!==first.source||probe.source_sha256!==first.source_sha256)throw Error('Persistence initial source differs');
+      if(execution.verified!==true||execution.cleanup_complete!==true||execution.trial?.source_sha256!==first.source_sha256
+        ||execution.trial.node_id!==executionNode.node_id||!execution.execution_id)throw Error('Persistence initial execution unconfirmed');
+      verifyJavascriptPersistenceOutput(report.execution_probe.output,1);
+      report.persistence={status:'RUNNING',schema_mode:persistence.schema_mode,deadline,
+        initial:{source:first,execution,output:report.execution_probe.output},saves:[]};
+      const initialCycle=await runSourceReadCycle(first,deadline);
+      report.persistence.initial.source_cycle=initialCycle;
+      const initialSettings=initialCycle.rounds[0].settings;
+      report.stage='persistence-save-initial';
+      const initialSave=await executionRuntime.savePersistenceCheckpoint(1);
+      executionPrepared=initialSave.prepared;report.persistence.saves.push(initialSave);await save();await guard();
+
+      report.stage='persistence-replace-source';
+      await executionRuntime.reopen(executionNode,deadline);wizardAddressEpoch++;
+      wizardHandle=null;wizardRoot=null;openedWizard=true;closeDispatched=false;closeConfirmed=false;closeDeadline=0;
+      wizardDeadline=Math.min(deadline,phaseDeadline(90000));readingExisting=true;report.execution_existing_schema=null;
+      await executionRuntime.handoffReopenedWizard();
+      await waitWizardReady();await inspectWizardPages();
+      if(JSON.stringify(javascriptSourceSettings(report.execution_existing_schema))!==JSON.stringify(initialSettings))throw Error('Saved initial settings changed');
+      await probeOwnedSource(first.source,last.source);
+      trialPhase='persistence-final';sourceSha=last.source_sha256;
+      await inspectWizardPages({remainingPages:true});
+      const changedDone=await dispatch('done',owner.prefix+';WizrdMCF;btnDone',0);
+      if(changedDone.sentinel_observed)throw Error('Unexpected persistence source diagnostic');
+      await exact(owner.prefix+';WizrdMCF').waitFor({state:'hidden',timeout:Math.max(1,deadline-Date.now())});openedWizard=false;
+      await waitGraphReady(Math.max(1,deadline-Date.now()));
+      const beforeFinal=await runSourceReadCycle(last,deadline,initialSettings);
+      if(JSON.stringify(beforeFinal.mappings.after)!==JSON.stringify(initialCycle.mappings.after))throw Error('Persistence replacement changed mappings');
+      const boundary=await executionRuntime.captureExecutionBoundary();
+      try{
+        report.stage='persistence-execute-final';
+        await guard();
+        const finalExecution=await executionRuntime.executeNode(executionNode,deadline,{phase:'persistence-final',source_sha256:last.source_sha256});
+        if(finalExecution.status!=='completed'||finalExecution.verified!==true||finalExecution.owner_verified!==true
+          ||finalExecution.cleanup_complete!==true||!finalExecution.execution_id||finalExecution.execution_id===execution.execution_id
+          ||finalExecution.trial?.source_sha256!==last.source_sha256||finalExecution.trial.node_id!==executionNode.node_id)
+          throw Error('Fresh persistence execution unconfirmed');
+        await executionRuntime.verifyExecutionBoundary(boundary);
+        const output=await executionRuntime.readPassive(executionNode,'persistence-final',deadline);
+        verifyJavascriptPersistenceOutput(output,2);
+        await executionRuntime.verifyExecutionBoundary(boundary);
+        report.persistence.final={source:last,before_execute:beforeFinal,execution:finalExecution,output};await save();
+      }finally{await boundary.native.dispose();}
+      report.stage='persistence-save-final';
+      const finalSave=await executionRuntime.savePersistenceCheckpoint(2);
+      executionPrepared=finalSave.prepared;report.persistence.saves.push(finalSave);await save();await guard();
+      const finalCycle=await runSourceReadCycle(last,deadline,initialSettings);
+      if(JSON.stringify(finalCycle.mappings.after)!==JSON.stringify(initialCycle.mappings.after))throw Error('Final saved mappings changed');
+      report.persistence.final.source_cycle=finalCycle;
+      report.persistence.status='WRITER_OBSERVED';report.persistence.cold_persistence_verified=false;
+      report.persistence.package_bytes_verified=false;
+      await save();return;
+    }
     if(sourceReadCycle){await runSourceReadCycle(probe,Math.min(deadline,batchDeadline));return;}
     report.stage='existing-mapping-baseline';
     const before={input:await executionRuntime.readPortMapping(executionNode,'input'),output:await executionRuntime.readPortMapping(executionNode,'output')};
@@ -1271,9 +1343,10 @@ try {
     if(executionCase||nativeInputOnly){
       report.scope=telemetryTrial?'private fixed schema telemetry: '+nativeTelemetryCaseId:calibrationTrial?'private fixed error calibration: '+nativeCalibrationId:namedTrial?'private stage A/B named access: '+nativeNamedCaseId:coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
       if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=1;report.gates_closed=[];}
+      if(persistence){report.scope='private G7 persistence writer: '+persistence.schema_mode;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
-        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic});
+        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
       if(nativeRoundtrip)await executionRuntime.armNativeRoundtrip(executionInput);
@@ -1348,10 +1421,11 @@ try {
   if (page&&owner&&!(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await paletteSnapshot('failure-palette').catch(()=>{report.failure.palette_snapshot='unavailable';});
   if (page&&!(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await refusalEvidence('work-refusal').catch(()=>{report.failure.refusal_evidence='unavailable';});
 } finally {
-  cleaning=true;report.work_stage=report.stage;report.stage='cleanup';
+  cleaning=true;if(persistence)cleanupDeadline=Date.now()+180000;report.work_stage=report.stage;report.stage='cleanup';
   try {
     if (page) {
       if(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain))throw Error('Source cycle uncertain; no UI cleanup replay, close own browser');
+      if(executionRuntime?.persistenceUncertain)throw Error('Persistence save/binding uncertain; no UI cleanup replay, close own browser');
       if(executionRuntime?.nativeReadUncertain)throw Error('Native input pending/retired or buffer cleanup unconfirmed; UI cleanup refused, close own browser');
       if(paletteAdmission?.inputReleaseConfirmed===false)throw Error('Palette mouse/Alt release unconfirmed; UI cleanup refused, browser must close');
       if(createDeadline&&!packageHandle){
@@ -1368,7 +1442,7 @@ try {
         const surface=await observe();
         if(surface.prefix!==owner.prefix||executionRuntime.passiveSurfacePending||executionRuntime.wizardOpeningPending||executionRuntime.manualMappingPending){
           report.cleanup.stage='restore-owned-workflow';
-          await executionRuntime.restoreWorkflowForCleanup();
+          await executionRuntime.restoreWorkflowForCleanup(phaseDeadline(60000));
         }
       }
       await guard();
@@ -1397,17 +1471,18 @@ try {
         if ((await guard()).running!==false) throw Error('Cannot close: running state not proven false');
         await click('MF;cntMain;tlbMainToolbar;btnPackagesMenu');
         const heading=await (await visibleOne(exact('MF;MainMenuForm;pnlSaveClosePackage;p.h;p.t'))).innerText();
-        if (heading.trim()!==owner.package_name) throw Error('Close menu owner mismatch');
-        const packageCloseDeadline=Date.now()+25000;
+        if (heading.trim()!==ownedPackageName()) throw Error('Close menu owner mismatch');
+        const packageCloseDeadline=phaseDeadline(25000);
         const packageCloseRemaining=()=>{const ms=packageCloseDeadline-Date.now();if(ms<=0)throw Error('Original package close deadline expired; no replay');return ms;};
         report.effects.push({at:new Date().toISOString(),action:'package-close',state:'dispatching',deadline:new Date(packageCloseDeadline).toISOString()});await save();
         await (await visibleOne(exact('MF;MainMenuForm;btnClosePackage'))).click({timeout:packageCloseRemaining()});
         report.cleanup.stage='close-confirmation';
-        const proof=await page.waitForFunction(({owned,account,name})=>{
+        const proof=await page.waitForFunction(({owned,account,name,packagePath})=>{
           const map=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
           if(map?.FServerConnection?.UserName!==account)throw Error('Package close account changed');
           if(map.PackageNodes?.Count===0)return {state:'closed'};
-          if(map.PackageNodes?.Count!==1||map.PackageNodes.Items(0)!==owned||owned.PackageName!==name||owned.PackageFileName)throw Error('Package close owner changed');
+          const rawPath=owned.PackageFileName,path=rawPath?'/'+rawPath.replaceAll('\\','/').replace(/^\/+/, ''):null;
+          if(map.PackageNodes?.Count!==1||map.PackageNodes.Items(0)!==owned||owned.PackageName!==name||path!==packagePath)throw Error('Package close owner changed');
           const visible=e=>e?.isConnected&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
           const dialogs=[...document.querySelectorAll('.x-message-box,[role="dialog"]')].filter(visible);
           if(!dialogs.length)return false;
@@ -1420,7 +1495,7 @@ try {
           if(component?.el?.dom!==dialog||buttons.length!==1||control?.el?.dom!==button||control.disabled===true
             ||button.closest('.x-item-disabled,.x-btn-disabled')||button.textContent.trim()!=='Не сохранять')return false;
           return {state:'confirm',dialog,component,button,control,expected};
-        },{owned:packageHandle,account:config.username,name:owner.package_name},{timeout:packageCloseRemaining(),polling:100});
+        },{owned:packageHandle,account:config.username,name:ownedPackageName(),packagePath:ownedPackagePath()},{timeout:packageCloseRemaining(),polling:100});
         const decision=await proof.getProperty('state');
         if(await decision.jsonValue()==='confirm'){
           await guard();

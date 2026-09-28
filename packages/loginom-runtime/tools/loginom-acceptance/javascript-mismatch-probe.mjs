@@ -12,7 +12,7 @@ export function javascriptMismatchSource(probe){
 }
 
 export function javascriptExecutionIdentity(node,trial){
-  need(node?.node_id&&['initial','generated-mismatch'].includes(trial?.phase)
+  need(node?.node_id&&['initial','generated-mismatch','persistence-final'].includes(trial?.phase)
     &&/^[a-f0-9]{64}$/.test(trial.source_sha256??''),'Explicit JavaScript execution phase and source SHA required');
   return {effect_id:'execute-'+trial.phase+'-'+node.node_id,node_id:node.node_id,
     phase:trial.phase,source_sha256:trial.source_sha256};
