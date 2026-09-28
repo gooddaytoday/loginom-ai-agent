@@ -49,7 +49,10 @@ journal SHA256
 Реестр закрыт, active session снят; следующий свежий profile175.
 
 Это подтверждает native parse refusal для `?.` на стенде 7.4.2 и работу
-операторского error-button цикла. Остальные engine probes, полный J20,
+операторского error-button цикла. В `engine-profile.json` обе отдельно
+наблюдённые syntax-refusal записи (`??`, `?.`) отличаются по силе evidence:
+у `??` был manual button/admin recovery, у `?.` — owned operator и штатный
+cleanup. Ни одна не считается успешным Execute. Остальные engine probes, полный J20,
 public JS-handler, интеграция child-кода в `javascript` и CLI-приёмка остаются
 открытыми. Private credentials и raw evidence не переносить в Git.
 

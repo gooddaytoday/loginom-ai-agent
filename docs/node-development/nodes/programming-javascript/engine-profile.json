@@ -149,9 +149,27 @@
       "source_sha256": "60cbbb1a9f2c7966cd889e7ac1bd3b5bbb3cf551cdc1b380bfb1e22477753207",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_native_refusal",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "manual_error_button_with_admin_recovery",
+      "native_class": "SyntaxError",
+      "native_message": "SyntaxError: Syntax error at code (:4:33)",
+      "native_position": {
+        "line": 4,
+        "column": 33
+      },
+      "explicit_js_execute_count": 0,
+      "gate_passed": false,
+      "operator_cleanup_complete": false,
+      "admin_recovery_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-error-button-07/report.json",
+        "report_sha256": "5c699efaa8444db8bc5a1d3205412e2d13d3b33a1a6b178098bc18e2dd379bd9",
+        "admin_recovery": "engine-error-button-admin-recovery-08.jsonl",
+        "admin_recovery_sha256": "3af60c29709e55fc381e68a2d1b440120875759a5d074bec75544f0290562569"
+      }
     },
     {
       "id": "engine-optional-chain",
@@ -159,9 +177,27 @@
       "source_sha256": "aaa5a1fe1e639a12fbd9d8c08932ec39ac1631654c693f187fa01a54664bee99",
       "schema_mode": "code",
       "expectation": "fixed",
-      "status": "not_checked",
+      "status": "observed_native_refusal",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "owned_operator_error_button",
+      "native_class": "SyntaxError",
+      "native_message": "SyntaxError: Syntax error at code (:4:48)",
+      "native_position": {
+        "line": 4,
+        "column": 48
+      },
+      "explicit_js_execute_count": 0,
+      "gate_passed": false,
+      "dialog_closed": true,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-optional-chain-10/report.json",
+        "report_sha256": "392d590029baeef0932e840b7f0a1558023d86afa674989125eeb9a182c5250c",
+        "journal_sha256": "8cbdea4c2534b4d06a22a72c3082c8fdda79e1d94ef3a63a2b4343b565706c97",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "engine-lookbehind",
@@ -431,7 +467,8 @@
     "The indexed g5-* snippets remain not_checked. Separate source70-78 native probes provide scoped typed/cardinality evidence recorded in native-types-design.md and checkpoint.md; their different source hashes do not promote these indexed snippets or close G5.",
     "Case source hashes identify probes, not support on another server or build.",
     "All not_checked cases require individual evidence before promotion.",
-    "K1/K2/K3/K4 calibration observations use separately fixed sources. They do not promote engine-native-parse-error or engine-sync-throw legacy snippets, establish general source mapping, or close G6/J25."
+    "K1/K2/K3/K4 calibration observations use separately fixed sources. They do not promote engine-native-parse-error or engine-sync-throw legacy snippets, establish general source mapping, or close G6/J25.",
+    "The nullish refusal was read manually and required exact admin recovery; optional-chain was observed by the owned operator with complete cleanup. Neither is a successful JS Execute or closes J20."
   ],
   "calibration_observations": [
     {
