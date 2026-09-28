@@ -15,6 +15,24 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source92 active; независимое сравнение recorded domain
+
+Existing developer turn01a0e56a-f892-7970-a3ed-8bb74cc52650 подтверждён
+active/revision29; задача offline attribution,без browser/новых calibration runs.
+Root независимо сравнил4Bfailed+K2/K3/K4: exact source/SHA и общий253byte P,
+5frontend hashes,53runtime function hashes,subscription proxy/countloader,
+Integer schema и before/upstream равенство. Все перечисленные поля совпадают.
+Это OBSERVED_EQUAL_SUBSET,не доказательство server-engine identity/универсального
+mapping или готовое признание B expression. Original reports/outcomes неизменны.
+Private root-attribution-domain-comparison-01.json
+SHA4bb5618f8d17d59c38bb39da432972da3797e9cfe7497d7da53f85210b2d1fee.
+Материал передан в существующую активную задачу,без перезапуска.
+
+В engine-profile.json добавлено отдельное K4 observation с actual report/hash;
+legacy engine/g5 snippet statuses не повышены. Validator PASS77active/292allMD.
+Применимость к Get и IsNull ещё рассматривается отдельно; итогового source92
+verifier/sidecars/root acceptance пока нет. Calibration budget5/5,active browser нет.
+
 ### K4/profile100 terminal и независимый audit PASS; лимит5/5 исчерпан
 
 Original83246 terminalexit1, DIAGNOSTIC_OBSERVED/owned_failure_observed,

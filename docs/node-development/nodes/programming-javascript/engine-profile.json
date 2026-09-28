@@ -431,7 +431,7 @@
     "The indexed g5-* snippets remain not_checked. Separate source70-78 native probes provide scoped typed/cardinality evidence recorded in native-types-design.md and checkpoint.md; their different source hashes do not promote these indexed snippets or close G5.",
     "Case source hashes identify probes, not support on another server or build.",
     "All not_checked cases require individual evidence before promotion.",
-    "K1/K2/K3 calibration observations use separately fixed sources. They do not promote engine-native-parse-error or engine-sync-throw legacy snippets, establish general source mapping, or close G6/J25."
+    "K1/K2/K3/K4 calibration observations use separately fixed sources. They do not promote engine-native-parse-error or engine-sync-throw legacy snippets, establish general source mapping, or close G6/J25."
   ],
   "calibration_observations": [
     {
@@ -505,6 +505,31 @@
       "gates_closed": [],
       "diagnostic_origin": "native_child",
       "raw_error": "Error: JS_CAL_K3_SYNC_SHIFT_V1\n   at Anonymous function (<main>:5:3)\n   at module (<main>:1:1)",
+      "native_text_complete": true,
+      "explicit_execute_observed": true,
+      "mapping_status": "unverified",
+      "source_span": null
+    },
+    {
+      "id": "K4-native-caller-v1",
+      "source_commit": "e5a80f5851d6ca249713e763c0f5dc493d56f2b3",
+      "source_sha256": "debb9802f3a381e3569b7a7c8857038a3a165fafacfbbcb7a5b18ed3dd17541f",
+      "schema_mode": "code",
+      "scope": "diagnostic observation, not indexed legacy probe promotion",
+      "report_status": "DIAGNOSTIC_OBSERVED",
+      "result_status": "owned_failure_observed",
+      "report_sha256": "c239e6939bb53f3fca6dc7314c3da50dd0f3fce7223759f26dea4e91e03ef516",
+      "evidence": {
+        "private_campaign": "javascript-20260926-ubuntu",
+        "report": "native-calibration-k4-probe-01/report.json",
+        "independent_audit": "operator91-root-k4-verification.json"
+      },
+      "cleanup_verified": true,
+      "native_cells_verified": 8,
+      "journal_references_verified": 596,
+      "gates_closed": [],
+      "diagnostic_origin": "native_child",
+      "raw_error": "Error: Номер строки 4 вне диапазона [0, 3]\n   at Anonymous function (<main>:6:1)\n   at module (<main>:1:1)",
       "native_text_complete": true,
       "explicit_execute_observed": true,
       "mapping_status": "unverified",
