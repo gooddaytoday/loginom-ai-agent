@@ -237,12 +237,17 @@ mkdir -m 700 "$OUT"
 WORK="$OUT/work"
 mkdir -m 700 "$WORK"
 SLOT_USER="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1],encoding="utf-8"))["username"])' "$CONNECTION_JSON")"
-PACKAGE_TEMPLATE="/${SLOT_USER}/node-pipeline-${NODE}.lgp"
+# Каждая попытка пишет свой пакет: модели запрещено перезаписывать файл,
+# поэтому фиксированное имя ломало бы повторную приёмку в том же слоте.
+ATTEMPT_TAG="$(basename "$OUT" | tr -c 'A-Za-z0-9-' '-' | sed 's/--*/-/g; s/^-//; s/-$//')"
+PACKAGE_TEMPLATE="/${SLOT_USER}/node-pipeline-${NODE}-${ATTEMPT_TAG}.lgp"
 python3 - "$TASK_MD" "$WORK/task.md" "$PACKAGE_TEMPLATE" <<'PY'
 import pathlib, sys
 source, dest, package = sys.argv[1:]
 text = pathlib.Path(source).read_text(encoding="utf-8")
-text = text.replace("/lab-slot-a/node-pipeline-grouping.lgp", package)
+if "{{PACKAGE_PATH}}" not in text:
+  raise SystemExit("task.md must contain {{PACKAGE_PATH}}")
+text = text.replace("{{PACKAGE_PATH}}", package)
 pathlib.Path(dest).write_text(text, encoding="utf-8")
 PY
 EXPECTED_JSON_SLOT="$OUT/expected.json"
@@ -497,6 +502,9 @@ chmod 600 "$SAVED_JSON"
 
 # CLI оставляет серверную сессию с открытым пакетом, и холодное открытие видит
 # «только чтение». Перед oracle закрываем только сессии этого слота.
+if [[ -z "${LOGINOM_ACCOUNTS_FILE:-}" && -r /opt/loginom-worker/slots/accounts.json ]]; then
+  LOGINOM_ACCOUNTS_FILE=/opt/loginom-worker/slots/accounts.json
+fi
 if [[ -n "${LOGINOM_ACCOUNTS_FILE:-}" ]]; then
   [[ -f "$LOGINOM_ACCOUNTS_FILE" ]] || { echo "LOGINOM_ACCOUNTS_FILE is missing" >&2; RESULT_STATUS="FAIL"; exit 1; }
   RELEASE_JSON="$OUT/.release-accounts.json"

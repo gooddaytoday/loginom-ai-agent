@@ -1,5 +1,5 @@
 {
-  "package_path": "/lab-slot-a/node-pipeline-grouping.lgp",
+  "package_path": "{{PACKAGE_PATH}}",
   "nodes": [
     { "type": "imports.text" },
     { "type": "transform.group_data" }
