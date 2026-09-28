@@ -127,7 +127,11 @@ export function readMappingBrowser(prefix) {
       // placeholder for a verified absent link, not whitespace in a label.
       const emptySource=key==='colSourceDisplayName_'&&target.data.ConnectedRecord==null
         &&value===''&&cells[0]?.textContent==='\u00a0';
-      if(cells.length!==1||cells[0].textContent!==value&&!emptySource)return fail('mapping_render_value');
+      if(cells.length!==1||cells[0].textContent!==value&&!emptySource)return {...fail('mapping_render_value'),
+        render_mismatch:{form,row_index:index,column:key,field_name:target.data.Name,expected:value,
+          cell_count:cells.length,cells:cells.slice(0,2).map(cell=>({text:cell.textContent.slice(0,240),
+            truncated:cell.textContent.length>240})),source_connected:target.data.ConnectedRecord!=null,
+          source_count:sources.length,target_count:targets.length}};
     }
     rendered.add(index);
   }
