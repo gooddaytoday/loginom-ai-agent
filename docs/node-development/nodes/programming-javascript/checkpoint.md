@@ -1,5 +1,36 @@
 # JavaScript: checkpoint исполнения
 
+## Native error button / engine-nullish — 2026-09-28
+
+В headed диагностике source120/profile168 (`engine-error-button-07`, original
+15199) после доставки точного source SHA256
+`60cbbb1a9f2c7966cd889e7ac1bd3b5bbb3cf551cdc1b380bfb1e22477753207`
+кнопка `MF;TF-1;WizrdMCF;btnError` открыла штатный диалог Loginom 7.4.2:
+`SyntaxError: Syntax error at code (:4:33)`. В строке 4 source
+`OutputTable.Set("Result", null ?? "fallback");` колонка 33 — второй `?`.
+Это native свидетельство отказа парсера на `??` в данном стенде; успешное
+выполнение, terminal receipt и выходная таблица **не** наблюдались. Прежний
+`engine-probe-06` с зависшим `Next` нельзя трактовать как engine PASS.
+
+Клик пришёлся на границу ожидания оператора: тот отказал с
+`foreign_dialog`, report `CLEANUP_UNCONFIRMED`, own browser closed.
+Текст ошибки сохранён в private `engine-error-button-07/report.json`, snapshot
+`cleanup-refusal`; SHA256 report
+`5c699efaa8444db8bc5a1d3205412e2d13d3b33a1a6b178098bc18e2dd379bd9`.
+Отдельный headed admin recovery/profile169 через Диспетчер установил exact
+`jsteach:3025` (создан 14:33 UTC) и вложенный `Package1`, подтвердил диалог
+«Закрыть пакет "Package1" без сохранения изменений?», закрыл пакет, затем
+сам сеанс с отдельным подтверждением. Оба исчезли из списка. Admin logout,
+browser close и отсутствие pinned Chromium проверены. Private recovery JSONL
+SHA256 `3af60c29709e55fc381e68a2d1b440120875759a5d074bec75544f0290562569`.
+Реестр закрыт, active session снят, следующий изолированный профиль 170.
+
+Дальше в G5 engine matrix отмечать `??` как **native syntax refusal на 7.4.2**,
+с точным сообщением и source SHA. Остальные syntax probes не выводить по аналогии:
+каждый требует собственного native наблюдения и закрытия пакета. После
+кнопки ошибки перед cleanup нужно штатно закрывать её диалог; текущий оператор
+правильно отказался закрывать пакет поверх foreign dialog.
+
 ## Возобновление и G7 code cold — 2026-09-28
 
 Пользователь возобновил цель; прежняя пауза ниже больше не действует.
