@@ -143,6 +143,9 @@ GUID JS vendor: `28865f89-eea0-4143-b155-291791324a4b`; engine:
 `TBGCodeModelComponentEngine`. В XML есть DataSource/Variables inputs и DataSet
 output. Проверено чтение 496 LGP ZIP/XML, найдено 134 JS nodes в 45 пакетах,
 ошибок чтения не было. Это поиск исходных примеров, не исполнение 134 узлов.
+В двух отдельно принятых пакетах живого Loginom 7.4.2 сохранён уже
+`TBGJavaScriptEngine` с тем же VendorGuid; исторический engine type не следует
+переносить на текущий стенд. Это сравнение XML не устанавливает runtime `FullType`.
 
 Дополнительные источники: `testdata/common/lgp/Vars.lgp`,
 `testdata/wizards/transform/filterdata/FilterData.lgp`,

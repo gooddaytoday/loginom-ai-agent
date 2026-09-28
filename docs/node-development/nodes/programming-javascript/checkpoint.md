@@ -1,5 +1,21 @@
 # JavaScript: checkpoint исполнения
 
+## G1: сериализованный engine сохранённых узлов 7.4.2 — 2026-09-29
+
+Без нового браузерного действия повторно прочитаны уже принятые `.lgp` из
+G7 code/declared пар: SHA256 `ec8f7f2d7865f3366a31db8853510e5f4f03408456a33b6c6766a7f7c00f168b`
+и `f221d27bfcc698cfa64161adf18938f397ba6f43bf88ba1976ece6772124444f`.
+В каждом `Unit_0/Unit.xml` ровно один `Engine` с `xsi:type=TBGJavaScriptEngine`
+под `Component` собственного `Item`; оба `Item` имеют
+`VendorGuid=28865f89-eea0-4143-b155-291791324a4b`. У code-пакета
+`CodeConfigurableColumns=true`, у declared-пакета этот атрибут отсутствует;
+ранее независимый byte audit связал оба `Item.Guid` с writer/cold узлом.
+
+Исторический e2e-корпус фиксирует тот же JS VendorGuid, но generic
+`TBGCodeModelComponentEngine`; переносить его имя engine на стенд 7.4.2 нельзя.
+XML доказывает сериализованный тип этих двух узлов, а не runtime `FullType`,
+серверную ОС или полную карту страниц мастера. G1 остаётся открытым.
+
 ## G7: оба режима — clean Save, cold Execute и точные байты одного пакета — 2026-09-29
 
 На Ubuntu выполнены **шесть отдельных headed-процессов** на fresh profiles
