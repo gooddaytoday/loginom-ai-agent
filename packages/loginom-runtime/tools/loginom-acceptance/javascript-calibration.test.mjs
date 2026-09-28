@@ -21,38 +21,40 @@ const clone=x=>JSON.parse(JSON.stringify(x)),clean={package_closed:true,logged_o
 const k2='Error: JS_CAL_K2_SYNC_V1\n   at Anonymous function (<main>:4:1)\n   at module (<main>:1:1)';
 // K3 diagnostic is synthetic; its coordinates are not live evidence.
 const k3='Error: JS_CAL_K3_SYNC_SHIFT_V1\n   at Anonymous function (<main>:5:3)\n   at module (<main>:1:1)';
+// Synthetic K4 error: the real native call may complete instead.
+const k4='Error: synthetic native call diagnostic\n   at Anonymous function (<main>:6:1)\n   at module (<main>:1:1)';
 const record=async e=>clone(e);
 
-test('closed K1/K2/K3 bytes match independently pinned proposal; B or arbitrary sources cannot enter',async()=>{
- assert.deepEqual(javascriptCalibrationIds,['K1-parse-v1','K2-sync-v1','K3-shift-v1']);
- const lengths=[274,291,300],hashes=['721161cd4f4c0de387cefeef03b2425fd20f5645c05bff724103e330acd1620f','3f7350f5f9e7cb30107fb314643ae844477a7b87610132036e995f556fe983c2','02b7e36c08e2d1f18fe83e60ed145d00bef83746fbe14b1328b1b6ba91ab76b3'];
+test('closed K1/K2/K3/K4 bytes match independently pinned proposal; B or arbitrary sources cannot enter',async()=>{
+ assert.deepEqual(javascriptCalibrationIds,['K1-parse-v1','K2-sync-v1','K3-shift-v1','K4-native-caller-v1']);
+ const lengths=[274,291,300,295],hashes=['721161cd4f4c0de387cefeef03b2425fd20f5645c05bff724103e330acd1620f','3f7350f5f9e7cb30107fb314643ae844477a7b87610132036e995f556fe983c2','02b7e36c08e2d1f18fe83e60ed145d00bef83746fbe14b1328b1b6ba91ab76b3','debb9802f3a381e3569b7a7c8857038a3a165fafacfbbcb7a5b18ed3dd17541f'];
  for(const [i,id]of javascriptCalibrationIds.entries()){
   const p=javascriptCalibrationCase(id);assert.equal(Buffer.byteLength(p.source),lengths[i]);
   assert.equal(createHash('sha256').update(p.source).digest('hex'),hashes[i]);assert.equal(p.source_sha256,hashes[i]);
-  assert.equal(p.source.split('\n').length,i===2?6:5);assert.equal(p.schema_mode,'code');assert.equal(p.input_fixture_id,'integer-safe');
+  assert.equal(p.source.split('\n').length,i===3?7:i===2?6:5);assert.equal(p.schema_mode,'code');assert.equal(p.input_fixture_id,'integer-safe');
   assert.ok(!/[\r\t\u0080-\uffff]/.test(p.source));assert.equal(p.source.endsWith('\n'),true);assert.ok(Object.isFrozen(p));
  }
- for(const id of ['K3-shift-v2','K4-native-caller-v1','K5','B-get-case','__proto__','K1-parse-v1,K2-sync-v1'])assert.throws(()=>javascriptCalibrationCase(id));
- for(const args of [['--error-calibration','K4-native-caller-v1'],['--error-calibration','K2-sync-v1','--native-named-case','B-get-case'],
+ for(const id of ['K3-shift-v2','K4-native-caller-v2','K5','B-get-case','__proto__','K1-parse-v1,K2-sync-v1'])assert.throws(()=>javascriptCalibrationCase(id));
+ for(const args of [['--error-calibration','K5'],['--error-calibration','K2-sync-v1','--native-named-case','B-get-case'],
   ['--error-calibration','K1-parse-v1','--native-fixture','integer-safe'],['--error-calibration','K2-sync-v1','--source','x'],
   ['--error-calibration','K1-parse-v1','--error-calibration','K2-sync-v1']])await assert.rejects(()=>runJavascriptOperator(args,{nativeRoundtrip:true}));
  await assert.rejects(()=>runJavascriptOperator(['--error-calibration','K1-parse-v1']));
 });
 
 for(const id of javascriptCalibrationIds)test(id+' serialized native failed witness + exact upstream8, no OUTPUT or mapping',async()=>{
- const r=await readFailed(await failedStage(id,{message:id==='K2-sync-v1'?k2:id==='K3-shift-v1'?k3:'SyntaxError: fixture parse diagnostic'}));
+ const r=await readFailed(await failedStage(id,{message:id==='K2-sync-v1'?k2:id==='K3-shift-v1'?k3:id==='K4-native-caller-v1'?k4:'SyntaxError: fixture parse diagnostic'}));
  assert.equal(r.results.failed.calibration_id,id);assert.equal(r.results.failed.named_case_id,undefined);
  assert.equal(r.results.outcome.input_exact,true);assert.equal(r.results.outcome.upstream_exact,true);
  assert.equal(r.results.outcome.case_complete,false);assert.equal(r.results.outcome.controlled_throw_verified,false);
  assert.equal(r.results.outcome.mapping_status,'unverified');assert.deepEqual(r.x.f.counters,{sent:8,requests:8,responses:8});
- assert.equal(r.results.outcome.literal_header_candidate,id!=='K1-parse-v1');
+ assert.equal(r.results.outcome.literal_header_candidate,['K2-sync-v1','K3-shift-v1'].includes(id));
  assert.equal(r.x.f.env.__loginomJavascriptNativeRoundtripV1.bindings.has('output'),false);
  await assert.rejects(()=>r.x.f.execute(javascriptNativeRoundtripCode({...r.results.upstream.binding,binding_id:'forbidden',roundtrip_role:'output'})),/upstream/i);
  const corrupt=clone(r.results);corrupt.upstream.binding.calibration_id=id==='K1-parse-v1'?'K2-sync-v1':'K1-parse-v1';
  assert.throws(()=>verifyNamedFailureOutcome(corrupt,id));
 });
 
-for(const id of ['K2-sync-v1','K3-shift-v1'])for(const length of [999,1000,1001,2000])test(id+' calibration native raw length '+length+' is checked before bounded delivery',async()=>{
+for(const id of ['K2-sync-v1','K3-shift-v1','K4-native-caller-v1'])for(const length of [999,1000,1001,2000])test(id+' calibration native raw length '+length+' is checked before bounded delivery',async()=>{
  const message='Error: '+ 'x'.repeat(length-7),s=await failedStage(id,{message}),failed=await s.seal();
  verifyNamedFailureWitness(failed,s.execution,s.node,s.c.id);
  assert.equal(failed.native_text_length,length);assert.equal(failed.error_details.length,Math.min(length,1000));
@@ -63,10 +65,10 @@ for(const id of ['K2-sync-v1','K3-shift-v1'])for(const length of [999,1000,1001,
  assert.throws(()=>verifyNamedFailureWitness(forged,s.execution,s.node,s.c.id));
 });
 
-for(const id of ['K2-sync-v1','K3-shift-v1'])for(const [fault,change]of Object.entries({owner:s=>s.child.data.ModelNode={},source:s=>s.execution.trial.source_sha256='0'.repeat(64),
+for(const id of ['K2-sync-v1','K3-shift-v1','K4-native-caller-v1'])for(const [fault,change]of Object.entries({owner:s=>s.child.data.ModelNode={},source:s=>s.execution.trial.source_sha256='0'.repeat(64),
  stale:s=>s.execution.fresh_baseline.roots.push({process_id:'4'}),groupOnly:s=>s.group.childNodes=[],pending:s=>s.x.f.env.__loginomJavascriptNativeInputReadV1.last.pending=1,
  wrongId:s=>s.x.f.env.__loginomJavascriptNativeRoundtripV1.source_sha256='0'.repeat(64)}))test(id+' serialized calibration rejects '+fault,async()=>{
- const s=await failedStage(id,{message:id==='K2-sync-v1'?k2:k3,beforeSeal:change});await assert.rejects(async()=>s.seal());assert.equal(s.x.f.counters.sent,4);
+ const s=await failedStage(id,{message:id==='K2-sync-v1'?k2:id==='K3-shift-v1'?k3:k4,beforeSeal:change});await assert.rejects(async()=>s.seal());assert.equal(s.x.f.counters.sent,4);
 });
 
 for(const text of ['source: throw new Error("JS_CAL_K2_SYNC_V1");',k2.replace('4:1','5:1'),k2.replace('<main>','<preview>'),
@@ -99,8 +101,8 @@ for(const id of javascriptCalibrationIds)for(const fault of ['none','foreign','s
 function runtime(r,calls){return {checkNativeRoundtripBeforeExecute:async()=>{},captureExecutionBoundary:async()=>({native:{dispose:async()=>calls.push('dispose')}}),
  executeNode:async()=>{calls.push('execute');return r.execution;},verifyExecutionBoundary:async()=>{},checkNativeNamedEvidence:async()=>{},
  readNativeNamedFailure:async()=>{calls.push('upstream');return r.results;},readNativeRoundtrip:async()=>assert.fail('no OUTPUT')};}
-for(const id of ['K2-sync-v1','K3-shift-v1'])for(const fault of ['none','deadline','source','execute','dispatch-ack','terminal-ack','dispose','final-ack','persist','cleanup'])test(id+' actual calibration trial lifecycle '+fault,async()=>{
- const r=await readFailed(await failedStage(id,{message:id==='K2-sync-v1'?k2:k3})),trial=createJavascriptCalibrationTrial(r.c.id),calls=[],rt=runtime(r,calls);
+for(const id of ['K2-sync-v1','K3-shift-v1','K4-native-caller-v1'])for(const fault of ['none','deadline','source','execute','dispatch-ack','terminal-ack','dispose','final-ack','persist','cleanup'])test(id+' actual calibration trial lifecycle '+fault,async()=>{
+ const r=await readFailed(await failedStage(id,{message:id==='K2-sync-v1'?k2:id==='K3-shift-v1'?k3:k4})),trial=createJavascriptCalibrationTrial(r.c.id),calls=[],rt=runtime(r,calls);
  await trial.capturePrior({source:'old source',input:r.input,node:r.node,record});
  if(fault==='execute')rt.executeNode=async()=>{calls.push('execute');throw Error('transport uncertain');};
  if(fault==='dispose')rt.captureExecutionBoundary=async()=>({native:{dispose:async()=>{throw Error('dispose');}}});
@@ -116,8 +118,8 @@ for(const id of ['K2-sync-v1','K3-shift-v1'])for(const fault of ['none','deadlin
  assert.ok(calls.filter(x=>x==='execute').length<=1);assert.equal(trial.coverage.case_complete,false);assert.equal(trial.coverage.g6_complete,false);
 });
 
-for(const id of ['K2-sync-v1','K3-shift-v1'])test(id+' calibration real failed driver reuses strict original upstream reader',async()=>{
- const s=await failedStage(id,{message:id==='K2-sync-v1'?k2:k3}),f=s.x.f;
+for(const id of ['K2-sync-v1','K3-shift-v1','K4-native-caller-v1'])test(id+' calibration real failed driver reuses strict original upstream reader',async()=>{
+ const s=await failedStage(id,{message:id==='K2-sync-v1'?k2:id==='K3-shift-v1'?k3:k4}),f=s.x.f;
  f.b.package_id='d:w';s.before.binding.package_id='d:w';s.before.raw.package_id='d:w';
  s.before.exact=verifyNativeInputRead(s.before.raw,{binding:s.before.binding,lifecycle:s.before.lifecycle,provenance:s.before.exact.provenance});
  const state={prepared_node_context:{...s.input.node,verified:true,surface:'graph'},wizard:{status:'absent'},node_outputs:{verified:true,ports:[{index:0,active:true,tid:'port',port_guid:'p'}]},
@@ -130,8 +132,8 @@ for(const id of ['K2-sync-v1','K3-shift-v1'])test(id+' calibration real failed d
  assert.equal(result.outcome.upstream_exact,true);assert.deepEqual(f.counters,{sent:8,requests:8,responses:8});
 });
 
-for(const id of ['K2-sync-v1','K3-shift-v1'])test(id+' production calibration dispatch/finalization routes use the selected trial and exact report',async()=>{
- const r=await readFailed(await failedStage(id,{message:id==='K2-sync-v1'?k2:k3})),trial=createJavascriptCalibrationTrial(r.c.id),calls=[];
+for(const id of ['K2-sync-v1','K3-shift-v1','K4-native-caller-v1'])test(id+' production calibration dispatch/finalization routes use the selected trial and exact report',async()=>{
+ const r=await readFailed(await failedStage(id,{message:id==='K2-sync-v1'?k2:id==='K3-shift-v1'?k3:k4})),trial=createJavascriptCalibrationTrial(r.c.id),calls=[];
  await trial.capturePrior({source:'prior',input:r.input,node:r.node,record});
  const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8'),start=source.lastIndexOf('    if(calibrationTrial){'),end=source.indexOf('    if(coercionTrial){',start);
  const report={execution_probe:{},cleanup:clean};
@@ -163,7 +165,7 @@ test('failed prior-source ACK prevents wizard capture and execution admission',a
  await assert.rejects(()=>trial.run({}),/reservation/);await assert.rejects(()=>trial.wizard({}),/wizard diagnostic/);
 });
 
-for(const id of ['K1-parse-v1','K3-shift-v1'])for(const stage of ['next','done'])for(const fault of ['none','baseline-ack','source-after-ack'])test(id+' production '+stage+' wizard diagnostic/no-Execute '+fault,async()=>{
+for(const id of ['K1-parse-v1','K3-shift-v1','K4-native-caller-v1'])for(const stage of ['next','done'])for(const fault of ['none','baseline-ack','source-after-ack'])test(id+' production '+stage+' wizard diagnostic/no-Execute '+fault,async()=>{
  const x=await roundtrip({fixtureId:'integer-safe',calibrationId:id,wizardOnly:true}),input=inputProof(x).input,trial=createJavascriptCalibrationTrial(id);
  await trial.capturePrior({source:'prior',input,node:{node_id:'js'},record});
  const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8'),start=source.indexOf('const runExecutionTrial=async probe=>'),end=source.indexOf('const verifyBatchInputIdentity=',start);

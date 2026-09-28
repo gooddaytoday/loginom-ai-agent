@@ -9,7 +9,8 @@ export function armJavascriptNativeRoundtrip({binding,source,source_sha256,schem
     const prefix='import {InputTable,OutputTable,DataType} from "builtIn/Data";\nif (InputTable.RowCount !== 4 || InputTable.ColumnCount !== 1) throw Error("JS_NAMED_INPUT_SHAPE");\nOutputTable.AssignColumns([{Name:"Value",DisplayName:"Value",DataType:DataType.Integer}]);\n';
     const fixed={'K1-parse-v1':['const result=(1 + );\n','721161cd4f4c0de387cefeef03b2425fd20f5645c05bff724103e330acd1620f'],
       'K2-sync-v1':['throw new Error("JS_CAL_K2_SYNC_V1");\n','3f7350f5f9e7cb30107fb314643ae844477a7b87610132036e995f556fe983c2'],
-      'K3-shift-v1':['\n  throw new Error("JS_CAL_K3_SYNC_SHIFT_V1");\n','02b7e36c08e2d1f18fe83e60ed145d00bef83746fbe14b1328b1b6ba91ab76b3']};
+      'K3-shift-v1':['\n  throw new Error("JS_CAL_K3_SYNC_SHIFT_V1");\n','02b7e36c08e2d1f18fe83e60ed145d00bef83746fbe14b1328b1b6ba91ab76b3'],
+      'K4-native-caller-v1':['\n\nconst result=InputTable.Get(4,"Value");\n','debb9802f3a381e3569b7a7c8857038a3a165fafacfbbcb7a5b18ed3dd17541f']};
     need(named_case_id===undefined&&Object.hasOwn(fixed,calibration_id)&&source===prefix+fixed[calibration_id][0]
       &&source_sha256===fixed[calibration_id][1]&&input_fixture_id==='integer-safe'&&binding.fixture_id==='integer-safe'&&schema_mode==='code','fixed calibration source/input');
   }

@@ -26,7 +26,7 @@ test('K3 independently fixed bytes retain B/K1/K2 prefix and one line5 column3 t
 });
 
 for(const [name,change]of Object.entries({source:p=>p.source=p.source.replace('\n\n','\n'),indent:p=>p.source=p.source.replace('  throw',' throw'),
- digest:p=>p.source_sha256=javascriptCalibrationCase('K2-sync-v1').source_sha256,future:p=>p.calibration_id='K4-native-caller-v1',
+ digest:p=>p.source_sha256=javascriptCalibrationCase('K2-sync-v1').source_sha256,future:p=>p.calibration_id='K5',
  mixed:p=>p.named_case_id='B-get-case',fixture:p=>p.input_fixture_id='real',schema:p=>p.schema_mode='declared'}))test('K3 serialized arm refuses '+name+' before native access',()=>{
  const p={...javascriptCalibrationCase(id),binding:{fixture_id:'integer-safe'}};change(p);
  assert.throws(()=>vm.runInNewContext('('+armJavascriptNativeRoundtrip.toString()+')')(p),/fixed calibration source\/input|fixed stage A\/B source\/input/);
@@ -44,7 +44,7 @@ for(const text of [diagnostic,diagnostic.replace('5:3','2:3'),diagnostic.replace
  if(text===diagnostic){assert.deepEqual(d.frames.map(f=>[f.line,f.column]),[[5,3],[1,1]]);assert.equal(d.frames[0].raw,text.split('\n')[1]);}
 });
 
-for(const route of ['bind','snapshot','read'])for(const [name,change]of Object.entries({future:b=>b.calibration_id='K4-native-caller-v1',
+for(const route of ['bind','snapshot','read'])for(const [name,change]of Object.entries({future:b=>b.calibration_id='K5',
  other:b=>b.calibration_id='K2-sync-v1',mixed:b=>b.named_case_id='B-get-case',output:b=>b.roundtrip_role='output',
  source:b=>b.source_sha256='0'.repeat(64),fixture:b=>b.input_fixture_id='real'}))test('K3 '+route+' refuses '+name+' before upstream transport',async()=>{
  const s=await failedStage(id,{message:diagnostic}),failed=await s.seal(),f=s.x.f;
