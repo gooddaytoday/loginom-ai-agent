@@ -9,7 +9,7 @@ function fixture({auto=false,close=true}={}) {
     getAttribute:key=>key==='data-tid'?id:null});
   const body=element(tid+';cnt;cnt;cmp','SyntaxError: Syntax error at code (:4:33)');
   const ok=element(tid+';tlb;ok','OK');
-  const dialog={...element(tid),querySelectorAll:()=>[]};
+  const dialog={...element(tid,'Loginom 7.4.2\nSyntaxError: Syntax error at code (:4:33)\nТехнические подробности\nOK'),querySelectorAll:()=>[]};
   const context=vm.createContext({document:{querySelectorAll:selector=>!state.dialog?[]:
     selector.includes('.x-message-box')?[dialog]:selector.includes(';cnt;cnt;cmp')?[body]:selector.includes(';tlb;ok')?[ok]:[]},
     getComputedStyle:()=>({visibility:'visible'})});
@@ -36,7 +36,7 @@ test('private operator opens quiet error once, reads exact native text, closes O
   const result=await captureJavascriptWizardError({page:f.page,read:f.read,identity:f.identity,stage:'next',before,
     after:{...before,wizard_error_refusal:true},record:async event=>events.push(event),deadline:Date.now()+5000});
   assert.deepEqual([f.state.buttonClicks,f.state.okClicks,f.state.dialog],[1,1,false]);
-  assert.equal(result.dialog_text,'SyntaxError: Syntax error at code (:4:33)');
+  assert.equal(result.dialog_text,dialogText());
   assert.equal(result.dialog_closed,true);assert.equal(events[0].phase,'wizard_error_button_dispatch');
   assert.equal(events[1].phase,'wizard_error_observed');
 });
@@ -61,6 +61,8 @@ test('serialized browser reader returns bounded text and exact OK identity',()=>
   const f=fixture({auto:true});
   assert.equal(typeof readJavascriptWizardErrorDialog,'function');
   return f.page.evaluate(readJavascriptWizardErrorDialog).then(result=>{
-    assert.equal(result.text,'SyntaxError: Syntax error at code (:4:33)');assert.equal(result.text_truncated,false);
+    assert.equal(result.text,dialogText());assert.equal(result.text_truncated,false);
   });
 });
+
+function dialogText(){return 'Loginom 7.4.2\nSyntaxError: Syntax error at code (:4:33)\nТехнические подробности\nOK';}

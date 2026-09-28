@@ -82,7 +82,7 @@ export function javascriptDiscoveryErrorButtonDiagnostic({probe,identity,error})
     &&error.dialog_closed===true&&error.native_owner_verified===true&&error.page_tid
     &&typeof error.dialog_text==='string'&&error.dialog_text.length>0&&error.dialog_text.length<=4096,
     'Owned native wizard error dialog required');
-  const classObserved=error.dialog_text.match(/^([A-Za-z]+Error):/)?.[1]??null;
+  const classObserved=error.dialog_text.match(/(?:^|\n)([A-Za-z]+Error):/)?.[1]??null;
   const position=error.dialog_text.match(/\(:([0-9]+):([0-9]+)\)/);
   return {id:pinned.id,status:'owned_wizard_refusal',stage:error.stage,source_sha256:pinned.source_sha256,
     node_id:identity.node_id,button_tid:error.button_tid,page_tid:error.page_tid,

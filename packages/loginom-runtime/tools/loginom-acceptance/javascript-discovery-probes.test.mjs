@@ -186,7 +186,7 @@ test('closed native error button preserves exact SyntaxError and refuses unowned
  const identity={effect_id:'once',node_id:'js',source_sha256:probe.source_sha256};
  const error={identity,stage:'next',page_tid:'MF;TF-1;WizrdMCF;JavaScriptCodeWizard',
   button_tid:'MF;TF-1;WizrdMCF;btnError',tooltip:'SyntaxError: Syntax error at code (:4:33)',
-  tooltip_truncated:false,dialog_text:'SyntaxError: Syntax error at code (:4:33)',dialog_text_truncated:false,
+  tooltip_truncated:false,dialog_text:'Loginom 7.4.2\nSyntaxError: Syntax error at code (:4:33)\nТехнические подробности\nOK',dialog_text_truncated:false,
   dialog_closed:true,native_owner_verified:true};
  const result=javascriptDiscoveryErrorButtonDiagnostic({probe,identity,error});
  assert.equal(result.status,'owned_wizard_refusal');assert.equal(result.class_observed,'SyntaxError');
