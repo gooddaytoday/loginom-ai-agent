@@ -7,6 +7,7 @@ import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {armJavascriptNativeRoundtrip,bindJavascriptNativeRoundtripGraph,completeJavascriptNativeRoundtrip} from './javascript-native-roundtrip-owner.mjs';
 import {javascriptNativeRoundtripProbe,verifyNativeRoundtripInput,verifyNativeRoundtripExecution,verifyNativeRoundtripProvenance,verifyNativeRoundtripOutcome} from './javascript-native-roundtrip-contract.mjs';
 import {readNativeRoundtrip} from './javascript-native-roundtrip-driver.mjs';
+import {requireJavascriptMetadataMode,createJavascriptMetadataLifecycle} from './javascript-native-metadata.mjs';
 import {readNativeCoercionFailure} from './javascript-native-coercion-failure-driver.mjs';
 import {waitJavascriptWizardSettlement} from './javascript-wizard-settlement.mjs';
 // All generated runtime code runs against the caller's authenticated page.
@@ -647,7 +648,9 @@ export async function configureJavascriptManualMapping({reader,cleanupReader,ref
   }
 }
 
-export async function createJavascriptExecutionRuntime({page,prepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real',nativeNamedCaseId,nativeCalibrationId}) {
+export async function createJavascriptExecutionRuntime({page,prepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real',nativeNamedCaseId,nativeCalibrationId,metadataDiagnostic=false}) {
+  requireJavascriptMetadataMode(metadataDiagnostic,{nativeRoundtrip:nativeInputOnly,namedCaseId:nativeNamedCaseId,calibrationId:nativeCalibrationId});
+  const metadataLifecycle=createJavascriptMetadataLifecycle();
   if(nativeCalibrationId!==undefined&&(nativeNamedCaseId!==undefined||nativeFixtureId!=='integer-safe'))throw Error('Calibration identity conflict');
   const nativeInputFixture=javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=nativeCalibrationId!==undefined?javascriptCalibrationCase(nativeCalibrationId):javascriptNativeRoundtripProbe(nativeFixtureId,nativeNamedCaseId);
   if(account!=='jsteach'||prepared.status!=='READY'||prepared.package_ref?.persisted!==false)throw Error('Own JavaScript draft required');
@@ -663,6 +666,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     return await Function('return ('+code+')')()(page);
   };
   const execute=async(code,options={})=>{
+    if(metadataLifecycle.retired)throw Error('Metadata retired; no further data/UI execution');
     if(!nativeInputOnly)return executeUntil(code,deadline);
     const until=Math.min(deadline,Date.now()+(options.timeout??deadline-Date.now()));
     if(until<=Date.now())throw Error('Original native input deadline expired');
@@ -724,7 +728,8 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     return binding;
   };
   return {
-    get nativeReadUncertain(){return nativeReadUncertain;},
+    get nativeReadUncertain(){return nativeReadUncertain||metadataLifecycle.uncertain;},
+    get metadataReadUncertain(){return metadataLifecycle.uncertain;},
     graph,channel,once,
     get passiveSurfacePending(){return !!passiveSurface;},
     get wizardOpeningPending(){return !!pendingWizard;},
@@ -936,8 +941,13 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
         const operation={id:'native-roundtrip-'+role+'-'+randomUUID(),action:{action_key:'diagnostic.javascript',revision:'1'},deadline};
         const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node:owner,execution:completed,deadline};
         const civil=nativeFixtureId==='civil-datetime'?await this.readNativeCivil(owner,completed,role):undefined;
-        results[role]=await readNativeRoundtrip({options:{operation,execute,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>!nativeReadUncertain,
+        results[role]=await readNativeRoundtrip({options:{operation,execute,onRecord:record,now:Date.now,exclusiveNodeOperation:()=>!nativeReadUncertain&&!metadataLifecycle.retired,
           receiptOptions:(id,key,signature)=>({receipt_namespace:sessionId,receipt_id:id,receipt_signature:signature,operation_id:id})},ctx,input:before,role,civil,namedCaseId:nativeNamedCaseId,targetOrigin:origin,targetBuild:build,
+          metadataDiagnostic:metadataDiagnostic&&role==='output',onMetadataState:async state=>{
+            metadataLifecycle.update(state);
+            try{await record({phase:'native_metadata_lifecycle',state,uncertain:metadataLifecycle.uncertain});}
+            catch(error){metadataLifecycle.update({status:'retired'});throw error;}
+          },
           onState:async state=>{nativeReadUncertain=!state||state.uncertain===true||state.retired===true||state.pending!==0||state.status!=='completed'||state.requests!==expectedRows||state.releasedRequests!==expectedRows||state.releasedResponses!==expectedRows;
             await record({phase:'native_roundtrip_lifecycle',role,state,uncertain:nativeReadUncertain});}});
       }

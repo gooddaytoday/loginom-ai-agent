@@ -1,3 +1,4 @@
+import {createJavascriptMetadataLifecycle} from './javascript-native-metadata.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -156,7 +157,7 @@ for(const fault of ['ok','lifecycle','ack','upstream'])test('C actual runtime re
  const context={nativeCalibrationId:undefined,nativeNamedCaseId:id,javascriptNamedCase,nativeFixtureId:'integer-safe',nativeInputFixture:{rows:4},nativeRoundtripProbe:javascriptNamedProbe(id),
   verifyJavascriptNamedInput,verifyJavascriptNamedOutcome,verifyNativeRoundtripExecution,freezeCivilEvidence,validateNativeSource:()=>{},
   page:{evaluate:async()=>{}},completeJavascriptNativeRoundtrip,prepared:{document_id:'d',workflow_ref:{workflow_id:'w'}},
-  deadline:Date.now()+10000,randomUUID:()=>String(steps.length),execute:()=>{},nativeReadUncertain:false,sessionId:'C',origin:'http://test',build:'7.4.2',Date,
+  deadline:Date.now()+10000,randomUUID:()=>String(steps.length),execute:()=>{},nativeReadUncertain:false,metadataDiagnostic:false,metadataLifecycle:createJavascriptMetadataLifecycle(),sessionId:'C',origin:'http://test',build:'7.4.2',Date,
   readNativeRoundtrip:async({role,onState,options,namedCaseId})=>{assert.equal(namedCaseId,id);assert.equal(options.exclusiveNodeOperation(),true);steps.push(role);
    await onState(fault==='lifecycle'&&role==='output'?{...r.results[role].lifecycle,requests:4}:r.results[role].lifecycle);return r.results[role];},
   record:async e=>{const saved=clone(e);if(fault==='ack'&&saved.results)saved.results.outcome.observed_cell.value='0';return saved;}};

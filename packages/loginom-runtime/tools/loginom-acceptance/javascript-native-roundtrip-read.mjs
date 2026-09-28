@@ -12,6 +12,8 @@ export async function readJavascriptNativeRoundtrip(page,b,decode,options={}) {
   const receipt=[...prep.receipts.values()].find(r=>r.phase==='verified'&&r.workflowId===b.workflow_id&&r.nodeTargetWorkflowNode);
   need(receipt&&receipt.tab===document.querySelector('[data-tid='+JSON.stringify(b.tab_tid)+']')&&receipt.tab.classList.contains('x-tab-active'),'workflow receipt');
   const captured=globalThis.__loginomJavascriptNativeRoundtripV1?.bindings.get(b.roundtrip_role);
+  const metadata=globalThis.__loginomJavascriptNativeRoundtripV1?.metadata;
+  need(!metadata||metadata.status==='completed'&&!metadata.retired&&metadata.pending===0&&metadata.published===true,'metadata pending/retired; no data read');
   need(captured?.document===document&&captured.id===b.runtime_binding_id,'private native input binding required');
   const slice={"integer-coercion-fraction-positive":[1,3,1,4],"integer-coercion-fraction-negative":[1,3,1,4],"integer-coercion-string-numeric":[1,5,1,4],"integer-coercion-string-invalid":[1,5,1,4],"integer-coercion-nan":[1,3,1,4],"integer-coercion-positive-infinity":[1,3,1,4],"integer-coercion-negative-infinity":[1,3,1,4],real:[4,3],boolean:[3,1],string:[8,5],'integer-safe':[4,4],'integer-outside-safe':[3,4],'civil-datetime':[3,2],'cardinality-keep2':[3,4,1],'cardinality-odd':[3,4,2],'cardinality-duplicate':[3,4,6],'cardinality-empty':[3,4,0]}[b.fixture_id??'real'];
   const typeCode=b.roundtrip_role==='output'?(slice?.[3]??slice?.[1]):slice?.[1];

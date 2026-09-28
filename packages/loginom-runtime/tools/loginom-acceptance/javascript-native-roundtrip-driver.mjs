@@ -1,5 +1,6 @@
 import {javascriptCalibrationCase} from './javascript-calibration-cases.mjs';
 import {javascriptNamedCase} from './javascript-native-named-cases.mjs';
+import {requireJavascriptMetadataMode,runJavascriptNativeMetadata} from './javascript-native-metadata.mjs';
 import {freezeCivilEvidence} from './javascript-native-datetime-civil.mjs';
 import {javascriptNativeFixture,javascriptNativeReadFixture} from './javascript-native-fixtures.mjs';
 import {openJavascriptNativeRoundtripPreview} from './javascript-native-roundtrip-opening.mjs';
@@ -15,9 +16,11 @@ import {javascriptNativeRoundtripProbe,verifyNativeRoundtripRead,verifyNativeRou
 const need=(v,m)=>{if(!v)throw Error('Native roundtrip driver: '+m);};
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 
-export async function readNativeRoundtrip({options,ctx,input,role,civil,namedCaseId,calibrationId,targetOrigin,targetBuild,onState},
+export async function readNativeRoundtrip({options,ctx,input,role,civil,namedCaseId,calibrationId,targetOrigin,targetBuild,onState,metadataDiagnostic=false,onMetadataState},
   {createProcedure=createNodeProcedure,verifyFrontends=verifyNativeInputFrontends,
     verifyCountLoaders=verifyNativeInputCountLoaders,verifyCookieRuntime=verifyNativeInputCookieRuntime,openPreview=openJavascriptNativeRoundtripPreview}={}){
+  requireJavascriptMetadataMode(metadataDiagnostic,{nativeRoundtrip:role==='output',namedCaseId,calibrationId});
+  if(metadataDiagnostic)need(typeof onMetadataState==='function','metadata lifecycle required');
   const fixture=javascriptNativeFixture(input.binding.fixture_id),nativeRoundtripProbe=calibrationId!==undefined?javascriptCalibrationCase(calibrationId):javascriptNativeRoundtripProbe(fixture.id,namedCaseId);
   const readFixture={...javascriptNativeReadFixture(fixture.id,role),...(namedCaseId!==undefined&&role==='output'?{rows:javascriptNamedCase(namedCaseId).output_rows??4}:{})};
   const {execute,operation,onRecord,now}=options;
@@ -36,7 +39,7 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,namedCas
   let state=await channel.observe({condition:'native roundtrip owned graph/output',readOutputs:true,ready:s=>same(s)&&s.node_outputs?.verified===true});
   const ports=state.node_outputs.ports.filter(p=>p.index===0);need(ports.length===1&&ports[0].active===true,'one active owned output');const port=ports[0];
   const control=(s,verb)=>{const es=s.ui.elements.filter(e=>e.tid===port.tid&&e.allowed_actions.includes(verb));need(es.length===1,'unique output control');return es[0];};
-  let lifecycle,observationError,preview,readDispatched=false,openingReturned=false,zeroFinal;
+  let lifecycle,observationError,preview,readDispatched=false,openingReturned=false,zeroFinal,metadata,metadataStarted=false;
   try{
     if(role==='output'){
       await openPreview({options,ctx,input,port,state,deadline,targetOrigin,targetBuild,onState});
@@ -68,6 +71,11 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,namedCas
     delete binding.count_loader_sources;
     if(fixture.id==='cardinality-empty'&&role==='output')binding.count_loader_sha256=pins;
     check();
+    if(metadataDiagnostic){
+      metadataStarted=true;
+      metadata=await runJavascriptNativeMetadata({execute,binding,operation,check,onState:onMetadataState,onRecord,now});
+      check();
+    }
     let cancellation;
     const abort=()=>{operation.transportUncertain=true;cancellation=execute(`async page=>(${cancelJavascriptNativeRoundtrip.toString()})(page,${JSON.stringify(readId)})`,{timeout:5000}).catch(()=>null);};
     ctx.signal?.addEventListener('abort',abort,{once:true});
@@ -82,7 +90,7 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,namedCas
         throw Object.assign(new AggregateError([readError,statusError],readError.message),{observationError:readError,cleanupError:statusError});}}
     check();zeroFinal=raw.zero_admission?.final;const expected={...binding,read_id:readId};
     const exact=verifyNativeRoundtripRead(raw,{binding:expected,lifecycle,input,role,civil});
-    const proof={exact,raw,...(civil?{civil}:{}),add_port_source_sha256:addPortPins,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,subscription_proxy_source_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
+    const proof={exact,raw,...(metadata?{metadata_diagnostic:metadata}:{}),...(civil?{civil}:{}),add_port_source_sha256:addPortPins,binding:{...expected,origin:new URL(expected.origin).href},runtime,frontends,subscription_proxy_source_sha256:cookiePins,count_loader_sha256:pins,lifecycle};
     if(fixture.id==='civil-datetime'||fixture.output_input_rows||fixture.coercion||namedCaseId!==undefined||calibrationId!==undefined)freezeCivilEvidence(proof);
     const event={phase:'javascript_native_roundtrip_'+role+'_cells_verified',operation_id:operation.id,proof};
     const saved=await onRecord(event);need(saved?.phase===event.phase&&JSON.stringify(saved.proof)===JSON.stringify(proof),'native journal acknowledgement differs');
@@ -90,7 +98,10 @@ export async function readNativeRoundtrip({options,ctx,input,role,civil,namedCas
   }catch(error){observationError=error;throw error;
   }finally{
     if(openingReturned&&!preview){operation.transportUncertain=true;await onState({uncertain:true});}
-    if(readDispatched&&(!lifecycle||lifecycle.retired||lifecycle.pending||lifecycle.status!=='completed'
+    if(metadataStarted&&!metadata){
+      operation.transportUncertain=true;await onMetadataState({status:'retired',uncertain:true});
+    }
+    else if(readDispatched&&(!lifecycle||lifecycle.retired||lifecycle.pending||lifecycle.status!=='completed'
       ||lifecycle.requests!==readFixture.rows||lifecycle.releasedRequests!==readFixture.rows||lifecycle.releasedResponses!==readFixture.rows)){
       operation.transportUncertain=true;await onState({...lifecycle,uncertain:true});
     }
