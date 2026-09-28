@@ -708,6 +708,14 @@ schema и различать `Name`/`DisplayName`; результат `AddColumn
 на `AssignColumns` без отдельного доказательства. SHA256 прочитанного файла:
 `f1bd7c9c72e4621b756020b3b794cdca9de1b7259bb08039dbf7e0e25645fde0`.
 
+На текущем стенде source96 отдельно выполнил пять двухколоночных T-проб
+`AssignColumns`; [наблюдения и hashes](schema-telemetry-observations.md)
+подтверждают конкретные преобразования `Сумма → Summa`, `Value Total → Value_Total`,
+`1Value → _1Value` и сохранение Unicode DisplayName `Сумма ё`. API before/after
+и физическая Preview-схема совпали. Для handler требуется фактический readback
+имён; общий алгоритм нормализации не выводится. Старые одноколоночные D cases,
+knowledge delivery и весь G5 не объявляются закрытыми этими пробами.
+
 
 ## Следующие расширения узла
 

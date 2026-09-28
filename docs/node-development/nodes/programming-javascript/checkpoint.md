@@ -15,6 +15,29 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source96: все пять T-проб завершены; следующий этап — existing source reader
+
+После control отдельно выполнены cyrillic/profile110/session15546,
+space/profile111/session76147, leading-digit/profile112/session71930,
+unicode-label/profile113/session60970. Все original processes terminalexit0,
+все native/source/journal/cleanup audits PASS. Наблюдения: `Сумма → Summa`,
+`Value Total → Value_Total`, `1Value → _1Value`; DisplayName `Сумма ё` сохранён.
+До/после записи и Preview согласованы. Всего50cells/3089journal refs,
+1289pins проверены для каждого запуска. [Сводка](schema-telemetry-observations.md).
+Private aggregate `schema-telemetry-observations.json` SHA256
+`7ae655ec4e0e12b5a9c632d470e9ed76e9855f9c42948633b9ebf25eaeb52268`.
+Profile113 закрыт с logout, следующий свободный профиль114. Recovery не требовалась.
+
+Developer read-only review revision57 завершён. ROOT проверил plan1A и порядок
+node-apply.mjs: input_mapping действительно предшествует configure, поэтому policy
+внутри configure недостаточна для preflight effective source existing-узла.
+Следующий source97 — переиспользуемое полное чтение existing source с owned
+open/read/discard, digest/bytes/lines, Unicode-safe chunks и full-source redaction
+до выдачи chunk; отдельная bounded live-проверка committed baseline → read/Close →
+независимый повторный readback source/settings/mappings и отсутствия execution.
+Публичный source-read до доказательства этого пути не включать. Это зависимость
+публичного handler/J26, не новая необязательная metadata-диагностика.
+
 ### Source96: первый реальный T-schema-control подтверждён
 
 `native-schema-telemetry-control-probe-01`, fresh headed profile109,
