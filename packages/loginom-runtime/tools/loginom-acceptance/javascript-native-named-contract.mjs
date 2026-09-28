@@ -47,7 +47,12 @@ export function verifyJavascriptNamedRead(raw,{binding,lifecycle,input,role}){
   &&cell.cell_type==='integer'&&cell.is_null===false&&cell.precision==='exact_native'&&cell.representation==='decimal_integer'
   &&cell.value===(i===0?'1':'0')&&cell.decimal===cell.value
   &&same(cell.native,{tag:20,encoding:'signed-int64-le',bytes_le:i===0?'0100000000000000':'0000000000000000',bits:64})),'independent IsNull vector differs');
- if(role==='output'&&c.output_rows===1)need(exact.cells.every(cell=>cell.row===0&&cell.column===0&&cell.type==='integer'
+ if(role==='output'&&['set-exact','set-value'].includes(c.oracle))need(exact.cells.every(cell=>cell.row===0&&cell.column===0&&cell.type==='integer'
+  &&cell.precision==='exact_native'&&(cell.cell_type==='null'&&cell.is_null===true&&cell.value===null
+   &&cell.representation==='native_null'&&same(cell.native,{tag:1,encoding:'null'})
+   ||cell.cell_type==='integer'&&cell.is_null===false&&cell.representation==='decimal_integer'&&cell.decimal===cell.value
+   &&cell.native?.tag===20&&cell.native.encoding==='signed-int64-le'&&cell.native.bits===64)),'one native int64 or NULL Set observation required');
+ if(role==='output'&&c.output_rows===1&&!['set-exact','set-value'].includes(c.oracle))need(exact.cells.every(cell=>cell.row===0&&cell.column===0&&cell.type==='integer'
   &&cell.cell_type==='integer'&&cell.is_null===false&&cell.precision==='exact_native'&&cell.representation==='decimal_integer'
   &&cell.decimal===cell.value&&cell.native?.tag===20&&cell.native.encoding==='signed-int64-le'&&cell.native.bits===64),'non-NULL native Integer marker required');
  return {...exact,contract:'javascript-native-named-read-1',named_case_id:c.id,input_fixture_id:c.input_fixture_id,
@@ -62,6 +67,19 @@ export function verifyJavascriptNamedOutcome(results,caseId){
   need(same(exact,proof.exact),'stored '+role+' proof differs');
  }
  need(results.upstream.binding.javascript_node_id===results.output.binding.node_id,'same JS owner before upstream');
+ if(['set-exact','set-value'].includes(c.oracle)){
+  const cell=results.output.exact.cells[0],strict=c.oracle==='set-exact';
+  const candidate=cell.is_null===false&&cell.value==='-9007199254740991'&&cell.native.bytes_le==='010000000000e0ff';
+  const sentinel=cell.is_null===false&&cell.value==='0'&&cell.native.bytes_le==='0000000000000000';
+  return {named_case_id:caseId,input_fixture_id:c.input_fixture_id,
+   status:strict?(candidate?'named_exact_case_observed':'observed_mismatch'):'characterized_value',oracle:c.oracle,
+   execution_status:'completed',evidence_status:'native_proofs_verified_pending_cleanup_and_persistence',
+   semantic_status:strict?(candidate?'PASS_EXACT_CASE':'OBSERVED_MISMATCH'):'CHARACTERIZED_VALUE',
+   observed_cell:structuredClone(cell),value_observation:candidate?'candidate_written':sentinel?'sentinel_unchanged':'other_value',
+   value_characterized:!strict,input_exact:true,upstream_exact:true,output_case_exact:strict&&candidate,
+   output_identity_exact:false,exact_pass:strict&&candidate,characterization_only:!strict,rejection_attributed:false,
+   g5_complete:false,public_handler_accepted:false,cli_accepted:false};
+ }
  if(c.output_rows===1){
   const marker=results.output.exact.cells[0],allowed={'get-return':['10','11','12'],'column-return':['10','11','13'],'isnull-return':['10','11','14','15']}[c.oracle];
   need(Array.isArray(allowed),'fixed marker API');

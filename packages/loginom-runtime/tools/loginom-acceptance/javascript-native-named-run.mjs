@@ -55,17 +55,22 @@ export function createJavascriptNamedTrial(caseId){
    need(!finished,'one finalization; no replay');finished=true;
    const clean=['package_closed','logged_out','browser_closed'].every(k=>cleanup?.[k]===true)&&!cleanup.failure;
    const success=!!result&&!result.failed&&clean&&!failure
-    &&(result.outcome.exact_pass===true||result.outcome.status==='characterized_return'&&result.outcome.return_characterized===true);
+    &&(result.outcome.exact_pass===true||result.outcome.status==='characterized_return'&&result.outcome.return_characterized===true
+     ||result.outcome.status==='characterized_value'&&result.outcome.value_characterized===true);
    const finalSelected={...selected,status:success?'characterized':'unresolved',case_complete:success,
     exact_pass:success&&result.outcome.exact_pass===true,...(result?.outcome.marker!==undefined?{marker:result.outcome.marker,return_kind:result.outcome.return_kind}:{}),
-    reason:!clean?'cleanup_unconfirmed':failure?'work_failed':success?(result.outcome.exact_pass?'independent_named_oracle_and_exact_upstream':'characterized_return_and_exact_upstream'):result?.failed?'owned_execution_failure_unattributed':result?'unsupported_return':'selected_case_not_completed'};
+    ...(caseId.startsWith('C-')?{execution_status:result?.failed?'failed':result?'completed':'not_observed',
+     evidence_status:result&&clean&&!failure?'complete':'incomplete',semantic_status:result?.failed?'OWNED_EXECUTION_FAILURE_UNATTRIBUTED':result?.outcome.semantic_status??'NOT_RUN'}:{}),
+    ...(result?.outcome.observed_cell?{observed_cell:structuredClone(result.outcome.observed_cell),value_observation:result.outcome.value_observation,
+    }:{}),
+    reason:!clean?'cleanup_unconfirmed':failure?'work_failed':success?(result.outcome.exact_pass?'independent_named_oracle_and_exact_upstream':result.outcome.status==='characterized_value'?'characterized_value_and_exact_upstream':'characterized_return_and_exact_upstream'):result?.failed?'owned_execution_failure_unattributed':result?.outcome.status==='observed_mismatch'?'strict_set_oracle_mismatch':result?'unsupported_return':'selected_case_not_completed'};
    const status=!clean?'CLEANUP_UNCONFIRMED':failure?'FAILED':success?'CHARACTERIZED':'UNRESOLVED';
    try{
     await acknowledge(record,{phase:'native_named_finalized',status,coverage:coverage(finalSelected),cleanup:structuredClone(cleanup)});
     selected=finalSelected;await persist(status);
     return status;
    }catch(error){
-    selected={...selected,status:'unresolved',case_complete:false,exact_pass:false,reason:'final_evidence_unconfirmed'};throw error;
+    selected={...selected,status:'unresolved',case_complete:false,exact_pass:false,...(caseId.startsWith('C-')?{evidence_status:'incomplete'}:{}),reason:'final_evidence_unconfirmed'};throw error;
    }
   }
  };

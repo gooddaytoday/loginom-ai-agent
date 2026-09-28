@@ -94,7 +94,7 @@ for(const id of javascriptNamedIds.filter(id=>id.startsWith('A-'))){
   await assert.rejects(()=>r.x.f.execute(javascriptNativeRoundtripCode({...r.results.upstream.binding,binding_id:'bad',roundtrip_role:'output'})));assert.equal(r.x.f.counters.sent,8);
  });
  for(const [name,change]of Object.entries({
-  raw_case:r=>r.output.raw.named_case_id='A-get-exact-other',raw_source:r=>r.output.raw.source_sha256='0'.repeat(64),case:r=>r.output.binding.named_case_id=javascriptNamedIds[(javascriptNamedIds.indexOf(id)+1)%8],future:r=>r.output.binding.named_case_id='C-set-index',
+  raw_case:r=>r.output.raw.named_case_id='A-get-exact-other',raw_source:r=>r.output.raw.source_sha256='0'.repeat(64),case:r=>r.output.binding.named_case_id=javascriptNamedIds[(javascriptNamedIds.indexOf(id)+1)%8],future:r=>r.output.binding.named_case_id='C-set-unknown',
   input_fixture:r=>r.output.binding.input_fixture_id='real',old_fixture:r=>r.before.binding.fixture_id='real',source:r=>r.output.binding.source_sha256='0'.repeat(64),
   execution_source:r=>r.output.binding.completed_child.trial.source_sha256='0'.repeat(64),execution_id:r=>r.output.binding.completed_child.execution_id='d:foreign',
   failed:r=>r.output.binding.completed_child.status='failed',stale:r=>r.output.binding.completed_child.fresh_baseline.roots.push({process_id:r.output.binding.completed_child.group_id}),
@@ -116,7 +116,7 @@ for(const id of javascriptNamedIds.filter(id=>id.startsWith('A-'))){
   await run();assert.equal(calls.filter(c=>c==='execute').length,1);assert.equal(calls.includes('output'),!failed);
   const status=await trial.finish({cleanup:clean,record,persist:async status=>writeJavascriptNamedReport(directory,{status,native_named:trial.coverage})});
   assert.equal(status,failed?'UNRESOLVED':'CHARACTERIZED');const saved=JSON.parse(await readFile(join(directory,'report.json'),'utf8'));
-  assert.equal(saved.native_named.cases.length,16);assert.equal(saved.native_named.cases.filter(c=>c.status==='not_run').length,15);
+  assert.equal(saved.native_named.cases.length,20);assert.equal(saved.native_named.cases.filter(c=>c.status==='not_run').length,19);
   assert.equal(saved.native_named.cases.find(c=>c.id===id).case_complete,!failed);assert.equal(saved.native_named.coverage_complete,false);await assert.rejects(run,/no replay/);
  });
 }
@@ -143,12 +143,13 @@ for(const [name,change]of Object.entries({owner:s=>s.child.data.ModelNode={},err
  const s=await failedStage(javascriptNamedIds[0],{beforeSeal:change});await assert.rejects(async()=>s.seal());assert.equal(s.x.f.counters.sent,4);
 });
 test('private CLI refuses future stages, duplicate selection, source and input override before browser',async()=>{
- for(const id of ['B-get-unknown','C-set-index','D-name-cyrillic',javascriptNamedIds.join(','),'__proto__'])assert.throws(()=>javascriptNamedCase(id));
+ for(const id of ['B-get-unknown','C-set-unknown','D-name-cyrillic',javascriptNamedIds.join(','),'__proto__'])assert.throws(()=>javascriptNamedCase(id));
  for(const args of [['--native-named-case','B-get-unknown'],['--native-named-case',javascriptNamedIds[0],'--native-fixture','integer-safe'],['--native-named-case',javascriptNamedIds[0],'--native-named-case',javascriptNamedIds[1]],['--native-named-case',javascriptNamedIds[0],'--source','custom']])await assert.rejects(()=>runJavascriptOperator(args,{nativeRoundtrip:true}));
  await assert.rejects(()=>runJavascriptOperator(['--native-named-case',javascriptNamedIds[0]]));await assert.rejects(()=>runJavascriptOperator(['--native-named-case',javascriptNamedIds[0]],{nativeInputOnly:true}));
 });
-for(const mode of ['ok','seal-ack','native-ack','final-ack','after-ack-drift','after-ack-pending'])test('named production failed driver holds owner through ACK '+mode,async()=>{
- const s=await failedStage(javascriptNamedIds[0]),f=s.x.f,events=[];
+for(const id of [javascriptNamedIds[0],...javascriptNamedIds.filter(id=>id.startsWith('C-'))])
+for(const mode of ['ok','seal-ack','native-ack','final-ack','after-ack-drift','after-ack-pending'])test(id+' production failed driver holds owner through ACK '+mode,async()=>{
+ const s=await failedStage(id),f=s.x.f,events=[];
  f.b.package_id='d:w';s.before.binding.package_id='d:w';s.before.raw.package_id='d:w';
  s.before.exact=verifyNativeInputRead(s.before.raw,{binding:s.before.binding,lifecycle:s.before.lifecycle,provenance:s.before.exact.provenance});
  const state={prepared_node_context:{...s.input.node,verified:true,surface:'graph'},wizard:{status:'absent'},node_outputs:{verified:true,ports:[{index:0,active:true,tid:'input-output',port_guid:'p'}]},
@@ -178,7 +179,7 @@ for(const mode of ['success','failed','package_closed','logged_out','browser_clo
  await publish();assert.equal(report.status,mode==='success'?'CHARACTERIZED':mode==='failed'?'UNRESOLVED':mode==='evidence'?'EVIDENCE_UNCONFIRMED':'CLEANUP_UNCONFIRMED');
  assert.equal(trial.coverage.cases[0].case_complete,mode==='success');assert.equal(trial.coverage.cases[0].exact_pass,mode==='success');
 });
-for(const id of javascriptNamedIds)test(id+' catalogue source immutable and closed A/B',()=>{
+for(const id of javascriptNamedIds)test(id+' catalogue source immutable and closed A/B/C',()=>{
  const c=javascriptNamedCase(id),p=javascriptNamedProbe(id);assert.ok(Object.isFrozen(c));assert.ok(Object.isFrozen(p.output_schema[0]));
  assert.equal(createHash('sha256').update(c.source).digest('hex'),p.source_sha256);assert.equal(c.input_fixture_id,'integer-safe');assert.equal(p.named_case_id,id);
  assert.throws(()=>{c.input_fixture_id='real';});assert.throws(()=>{p.output_schema[0].name='Other';});
@@ -233,7 +234,7 @@ for(const id of bIds){
   assert.equal(await trial.finish({cleanup:clean,record:async e=>e,persist:async status=>{persisted={status,coverage:trial.coverage};}}),accepted?'CHARACTERIZED':'UNRESOLVED');
   const selected=persisted.coverage.cases.find(c=>c.id===id);
   assert.equal(selected.case_complete,accepted);assert.equal(selected.exact_pass,false);assert.equal(selected.marker,String(marker));
-  assert.equal(persisted.coverage.cases.length,16);assert.equal(persisted.coverage.cases.filter(c=>c.status==='not_run').length,15);
+  assert.equal(persisted.coverage.cases.length,20);assert.equal(persisted.coverage.cases.filter(c=>c.status==='not_run').length,19);
   assert.equal(persisted.coverage.coverage_complete,false);assert.equal(persisted.coverage.g5_complete,false);
   assert.equal(calls.filter(c=>c==='execute').length,1);await assert.rejects(()=>trial.run({}),/no replay/);
  });
