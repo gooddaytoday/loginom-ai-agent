@@ -33,7 +33,7 @@ import {javascriptBatchCases,runJavascriptBatch,caseEffect,javascriptBatchInputI
 import {loginBrowser} from '../../src/connection-check.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
 import {javascriptEngineProbes} from './javascript-engine-probes.mjs';
-import {javascriptDiscoveryIds,javascriptDiscoveryProbe,observeJavascriptDiscovery,javascriptDiscoveryWizardDiagnostic} from './javascript-discovery-probes.mjs';
+import {javascriptDiscoveryIds,javascriptDiscoveryProbe,observeJavascriptDiscovery,javascriptDiscoveryWizardDiagnostic,javascriptDiscoveryErrorButtonDiagnostic} from './javascript-discovery-probes.mjs';
 import {javascriptSourceSample,javascriptSourceBoundary} from './javascript-source-probes.mjs';
 import {makeWorkspacePrepareCode} from '../../client/lib/workspace.mjs';
 import {createJavascriptExecutionRuntime,createJavascriptSavedExecutionRuntime} from './javascript-execution-runtime.mjs';
@@ -47,6 +47,7 @@ import {readJavascriptSchema,configureJavascriptSchema} from './javascript-schem
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
+import {captureJavascriptWizardError} from './javascript-wizard-error.mjs';
 
 export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false}={}) {
 process.umask(0o077);
@@ -895,6 +896,16 @@ const runExecutionTrial=async probe=>{
     const outcome=javascriptSentinelOutcome({stage,identity,baselineIds:before.messages.map(message=>message.id),
       messages:(after?.messages??[]).map(message=>({...message,...identity})),ownerVerified:after?.owner_verified===true,terminal});
     await executionRecord({phase:'execution_stage_observed',identity,before,after,outcome});
+    if(after?.wizard_error_refusal){
+      const error=await captureJavascriptWizardError({page,read,identity,stage,before,after,record:executionRecord,deadline});
+      report.execution_probe.wizard_error=error;await save();
+      if(discoveryProbe){
+        report.discovery_result=javascriptDiscoveryErrorButtonDiagnostic({probe,identity,error});
+        await executionRecord({phase:'discovery_wizard_error',diagnostic:report.discovery_result});await save();
+        return {...outcome,discovery_diagnostic:true,wizard_error:true};
+      }
+      throw Error('Native wizard refusal: '+error.dialog_text);
+    }
     if(after?.boundary_refusal)throw Error('Execution stage boundary refused: '+after.boundary_refusal);
     if(calibrationTrial&&after?.calibration_native_exception?.present){
       const witness=await page.evaluate(captureCalibrationWizard,{id:nativeCalibrationId,stage,identity,before,after});

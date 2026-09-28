@@ -9,8 +9,10 @@ function fixture() {
     rect:{x:20,y:20,width:300,height:200},getBoundingClientRect(){return this.rect;},getAttribute(key){return key==='data-tid'?this.tid:null;},
     contains(other){return this===other;},querySelectorAll(){return [];}});
   const root=element('wizard',base),code=element('code',base+';JavaScriptCodeWizard'),preview=element('preview',base+';JavaScriptOutputPreviewForm');
-  root.contains=e=>e===root||e===code;code.parentElement=root;
-  root.querySelectorAll=selector=>selector.includes('bg-error')?[]:[code];
+  const error=element('error',base+';btnError');error.rect.width=0;error.tip='SyntaxError: Syntax error at code (:4:33)';
+  error.getAttribute=key=>key==='data-tid'?error.tid:key==='data-qtip'?error.tip:null;
+  root.contains=e=>e===root||e===code||e===error;code.parentElement=root;error.parentElement=root;
+  root.querySelectorAll=selector=>selector.includes('bg-error')?[]:selector.includes('btnError')?[error]:[code];
   const model={FView:{el:{dom:root}},FModelNode:{}},codeView={el:{dom:code}},previewView={el:{dom:preview},hidden:false};
   const form={FView:previewView,FLoaded:true},controller={FWizardForm:model,FView:{el:{dom:{}}},FPreviewController:{FPreviewForm:form}};
   const item={FWizard:controller,FPages:[codeView]};model.FWizardItems={FItems:[item]};
@@ -22,7 +24,7 @@ function fixture() {
     document:{querySelectorAll:selector=>selector.includes('bg-mask')?masks:selector.includes('role=')?dialogs:previews},Ext:{getCmp:id=>controls[id]},
     bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:connection},Items:{Workspace:{getActiveTab:()=>tab}}}}}}}});
   const read=()=>vm.runInContext('('+readJavascriptStage.toString()+')',context)({root,native,binding,prefix,account:'jsteach',build:'7.4.2'});
-  return {read,context,connection,dialogs,item,root,code,preview,model,codeView,previewView,form,controller,tab,previews,masks,element};
+  return {read,context,connection,dialogs,item,root,code,error,preview,model,codeView,previewView,form,controller,tab,previews,masks,element};
 }
 
 test('serialized observer binds portal Preview through owned code wizard and reciprocal form view',()=>{
@@ -168,4 +170,39 @@ test('wait returns immediate connection refusal even after changed-state diagnos
     deadline:Date.now()+5000,stage:'preview',before,identity:{effect_id:'once'},record:async e=>records.push(e)});
   assert.equal(reads,20);assert.equal(records.length,16);assert.equal(after.boundary_refusal,'connection_unavailable');
   assert.equal(javascriptStageTerminal({stage:'preview',before,after}),false);
+});
+
+test('fresh quiet wizard error ends original Next wait after mask settles without replay',async()=>{
+  const f=fixture(),before=f.read(),records=[];let polls=0;
+  const after=await waitJavascriptStageObservation({read:async()=>{
+    polls++;if(polls===1)f.masks.push(f.element('mask',''));
+    if(polls===2){f.masks.length=0;f.error.rect.width=30;}
+    return f.read();},wait:async()=>{},deadline:Date.now()+5000,stage:'next',before,
+    identity:{effect_id:'once'},record:async event=>records.push(event)});
+  assert.equal(polls,3);assert.equal(after.wizard_error_refusal,true);
+  assert.equal(after.wizard_error.tooltip,'SyntaxError: Syntax error at code (:4:33)');
+  assert.equal(after.page_tid,before.page_tid);assert.equal(after.pending,false);
+  assert.ok(records.some(event=>event.diagnostic?.wizard_error?.visible===true));
+});
+
+test('stale error button before a corrected transition does not end Next wait',async()=>{
+  const f=fixture();f.error.rect.width=30;
+  const before=f.read();let polls=0;
+  const after=await waitJavascriptStageObservation({read:async()=>{
+    polls++;if(polls===2)f.code.tid='MF;TF-1;WizrdMCF;DoneWizard';return f.read();},
+    wait:async()=>{},deadline:Date.now()+5000,stage:'next',before,identity:{effect_id:'once'},record:async()=>{}});
+  assert.equal(polls,2);assert.equal(after.wizard_error_refusal,undefined);
+  assert.equal(javascriptStageTerminal({stage:'next',before,after}),true);
+});
+
+test('self-opened native dialog is attributable only with a fresh owned error button',async()=>{
+  const f=fixture(),before=f.read();f.error.rect.width=30;
+  f.dialogs.push(f.element('dialog','msgbox-1'));
+  const after=await waitJavascriptStageObservation({read:async()=>f.read(),wait:async()=>{},
+    deadline:Date.now()+5000,stage:'next',before,identity:{effect_id:'once'},record:async()=>{}});
+  assert.equal(after.boundary_refusal,'foreign_dialog');assert.equal(after.wizard_error_refusal,true);
+  const other=fixture(),prior=other.read();other.dialogs.push(other.element('dialog','msgbox-1'));
+  const foreign=await waitJavascriptStageObservation({read:async()=>other.read(),wait:async()=>{},
+    deadline:Date.now()+5000,stage:'next',before:prior,identity:{effect_id:'once'},record:async()=>{}});
+  assert.equal(foreign.boundary_refusal,'foreign_dialog');assert.equal(foreign.wizard_error_refusal,undefined);
 });
