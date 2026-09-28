@@ -68,6 +68,9 @@ scripts/node-acceptance/accept-node.sh \
 `accept-node.sh` поднимает Xvfb и Openbox слота, запускает
 `openai/gpt-6-sol` / `low` с лимитом 30 минут, сверяет сохранённый пакет
 с `docs/node-development/nodes/<slug>/acceptance/expected.json` и закрывает сессию.
+Если задан `LOGINOM_ACCOUNTS_FILE` с полями `url`, `admin_user` и `admin_password`,
+перед холодным открытием скрипт закрывает только серверные сессии этого слота:
+иначе пакет, оставленный CLI, открывается как «только чтение».
 Модели не передаются ожидаемые числа, история разработки и oracle.
 
 В задачу приложить `result.json` и короткий отчёт как work product.

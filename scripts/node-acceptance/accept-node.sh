@@ -68,6 +68,7 @@ CLEANUP_PACKAGE_CLOSED=false
 CLEANUP_LOGGED_OUT=false
 PACKAGE_PATH=""
 CONFIG_TMP=""
+RELEASE_JSON=""
 SAVED_JSON=""
 RAW_STDOUT=""
 RAW_STDERR=""
@@ -150,6 +151,9 @@ cleanup() {
   local code=$?
   if [[ -n "${CONFIG_TMP:-}" && -f "$CONFIG_TMP" ]]; then
     rm -f "$CONFIG_TMP"
+  fi
+  if [[ -n "${RELEASE_JSON:-}" && -f "$RELEASE_JSON" ]]; then
+    rm -f "$RELEASE_JSON"
   fi
   if [[ -n "${BWRAP_PID:-}" ]] && kill -0 "$BWRAP_PID" 2>/dev/null; then
     kill -INT -- "-$BWRAP_PID" 2>/dev/null || kill -INT "$BWRAP_PID" 2>/dev/null || true
@@ -490,6 +494,91 @@ PY
 SAVED_JSON="$OUT/saved.json"
 python3 -c 'import json,sys; json.dump({"path": sys.argv[1]}, open(sys.argv[2],"w",encoding="utf-8")); open(sys.argv[2],"a",encoding="utf-8").write("\n")' "$PACKAGE_PATH" "$SAVED_JSON"
 chmod 600 "$SAVED_JSON"
+
+# CLI оставляет серверную сессию с открытым пакетом, и холодное открытие видит
+# «только чтение». Перед oracle закрываем только сессии этого слота.
+if [[ -n "${LOGINOM_ACCOUNTS_FILE:-}" ]]; then
+  [[ -f "$LOGINOM_ACCOUNTS_FILE" ]] || { echo "LOGINOM_ACCOUNTS_FILE is missing" >&2; RESULT_STATUS="FAIL"; exit 1; }
+  RELEASE_JSON="$OUT/.release-accounts.json"
+  python3 - "$LOGINOM_ACCOUNTS_FILE" "$RELEASE_JSON" <<'PY'
+import json, os, sys
+src, dst = sys.argv[1], sys.argv[2]
+data = json.load(open(src, encoding="utf-8"))
+payload = {"url": data["url"], "admin_user": data["admin_user"], "admin_password": data["admin_password"]}
+fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, "w", encoding="utf-8") as fh:
+  json.dump(payload, fh, ensure_ascii=False)
+  fh.write("\n")
+PY
+  RELEASE_DIR="$OUT/release"
+  mkdir -m 700 "$RELEASE_DIR"
+  set +e
+  setsid "$BWRAP" \
+    --die-with-parent \
+    --new-session \
+    --unshare-all \
+    --share-net \
+    --cap-drop ALL \
+    --ro-bind /usr /usr \
+    --symlink usr/bin /bin \
+    --symlink usr/sbin /sbin \
+    --symlink usr/lib /lib \
+    --symlink usr/lib64 /lib64 \
+    --proc /proc \
+    --dev /dev \
+    --tmpfs /tmp \
+    --tmpfs /run \
+    --tmpfs /dev/shm \
+    --ro-bind /etc/ssl /etc/ssl \
+    --ro-bind /etc/ca-certificates /etc/ca-certificates \
+    --ro-bind /etc/resolv.conf /etc/resolv.conf \
+    --ro-bind /etc/hosts /etc/hosts \
+    --ro-bind /etc/nsswitch.conf /etc/nsswitch.conf \
+    --ro-bind /etc/passwd /etc/passwd \
+    --ro-bind /etc/group /etc/group \
+    --ro-bind /etc/fonts /etc/fonts \
+    --ro-bind /etc/alternatives/awk /etc/alternatives/awk \
+    --ro-bind "$PAYLOAD_ROOT" "$PAYLOAD_ROOT" \
+    --ro-bind "$HARNESS_ROOT" "$HARNESS_ROOT" \
+    --ro-bind "$SCRIPT_DIR" "$SCRIPT_DIR" \
+    --bind "$SLOT_ROOT" "$SLOT_ROOT" \
+    --chdir "$RELEASE_DIR" \
+    --setenv HOME "$SLOT_ROOT" \
+    --setenv TMPDIR /tmp \
+    --setenv LOGINOM_AI_AGENT_TEST_HEADLESS 0 \
+    /usr/bin/xvfb-run -n "$DISPLAY_NUM" -s '-screen 0 1920x1200x24 -nolisten tcp' \
+    /usr/bin/python3 "$HEADED_ENTRY" \
+    "$RESOURCES/bin/node" "$SCRIPT_DIR/release-slot-sessions.mjs" \
+    --resources "$RESOURCES" \
+    --accounts "$RELEASE_JSON" \
+    --slot-user "$SLOT_USER" \
+    --output "$RELEASE_DIR" \
+    >"$RELEASE_DIR/stdout.txt" 2>"$RELEASE_DIR/stderr.txt" &
+  BWRAP_PID=$!
+  release_elapsed=0
+  while kill -0 "$BWRAP_PID" 2>/dev/null; do
+    if (( release_elapsed >= 180 )); then
+      kill -INT -- "-$BWRAP_PID" 2>/dev/null || kill -INT "$BWRAP_PID" 2>/dev/null || true
+      sleep 5
+      kill -TERM -- "-$BWRAP_PID" 2>/dev/null || kill -TERM "$BWRAP_PID" 2>/dev/null || true
+      break
+    fi
+    sleep 1
+    release_elapsed=$((release_elapsed + 1))
+  done
+  wait "$BWRAP_PID"
+  RELEASE_EXIT=$?
+  set -e
+  BWRAP_PID=""
+  rm -f "$RELEASE_JSON"
+  RELEASE_JSON=""
+  chmod 600 "$RELEASE_DIR/stdout.txt" "$RELEASE_DIR/stderr.txt" 2>/dev/null || true
+  if [[ "$RELEASE_EXIT" -ne 0 ]]; then
+    echo "slot session release failed" >&2
+    RESULT_STATUS="FAIL"
+    exit 1
+  fi
+fi
 
 ORACLE_DIR="$OUT/oracle"
 mkdir -m 700 "$ORACLE_DIR"
