@@ -17,6 +17,17 @@
 
 ### Source98: начата реализация AST policy и effective-source admission
 
+ROOT отдельно проверил production installation из новых client package/lock в
+`operator98-root-production-install`: pinned Node24.19.0, npm ci с
+--ignore-scripts/--omit=dev/--workspaces=false, exit0. Acorn8.15.0 разрешается
+внутри изолированного client/node_modules, parse реального import/template PASS.
+Receipt `operator98-root-production-install/verification.json` закрепляет inputs
+и parser; lock SHA256
+`349887bff383c30e3450e0978658a0d75fb854b9cd47c1f644d0e2b03c646c3c`.
+Это dependency availability, не compiled CLI или полный staging. Положительные
+21случай ROOT corpus отдельно синтаксически корректны; policy ещё не проверена.
+
+
 ROOT зафиксировал [дизайн](module-policy-design.md), base runtime
 `3d922b5f4a8e731191dcbbb2e5fdce92270c392b`, и122preexisting developer docs.
 Существующая задача `01a0de3e-6a07-7661-aa88-ed4807aef6ec` получила source98;
