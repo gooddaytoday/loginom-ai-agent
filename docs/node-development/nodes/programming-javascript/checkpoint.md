@@ -1,5 +1,26 @@
 # JavaScript: checkpoint исполнения
 
+## G5 name case: `rowid` отказ при существующем `RowID` — 2026-09-29
+
+Отдельный headed `g5-name-case-32`/profile196 на child revision
+`180f1d5810` доставил source SHA256
+`6ecde061ce177ae5c973d142249e1e1c22ddb12963e10ff74490cb7e8e53ac1d`.
+После `InputTable.Get(0, "rowid")` свежий native child process JS-узла
+завершился `failed` с собственной ошибкой `NODE_EXECUTION_FAILED`:
+`Столбец "rowid" отсутствует во входной таблице №0`; output не обновлялся.
+В отдельном `g5-named-access` техническое имя `RowID` успешно дало 1–6.
+Это подтверждает чувствительность данного lookup к регистру на fixture,
+не универсальный контракт для всех имён. Reader вернул
+`class_observed=null`, `position_observed=null`; raw кадр `<main>:3:22` не
+считать калиброванной source mapping. G5 остаётся открытым.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`5a93163d290104cdfdaab6e7e37717858eb07c57d5c264a4b90bea2b6e74708e`,
+journal SHA256
+`ee40a5ad8bff8a4f142f70d35e48105109bce59a01c879468267ffd16e97ac4e`.
+Реестр закрыт, следующий fresh profile197.
+
 ## G5 named access: `RowID` по шести строкам — 2026-09-29
 
 Отдельный headed `g5-named-access-31`/profile195 на child revision

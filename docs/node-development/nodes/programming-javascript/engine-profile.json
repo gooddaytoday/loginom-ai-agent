@@ -928,9 +928,24 @@
       "source_sha256": "6ecde061ce177ae5c973d142249e1e1c22ddb12963e10ff74490cb7e8e53ac1d",
       "schema_mode": "code",
       "expectation": "characterization",
-      "status": "not_checked",
+      "status": "observed_owned_native_failure",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "owned_native_child_error",
+      "input_name": "rowid",
+      "native_error_code": "NODE_EXECUTION_FAILED",
+      "native_error_message": "Error: Столбец \"rowid\" отсутствует во входной таблице №0\n   at Anonymous function (<main>:3:22)\n   at module (<main>:1:1)",
+      "class_observed": null,
+      "position_observed": null,
+      "output_refreshed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "g5-name-case-32/report.json",
+        "report_sha256": "5a93163d290104cdfdaab6e7e37717858eb07c57d5c264a4b90bea2b6e74708e",
+        "journal_sha256": "ee40a5ad8bff8a4f142f70d35e48105109bce59a01c879468267ffd16e97ac4e",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "g5-empty-output",
