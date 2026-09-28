@@ -15,6 +15,36 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+
+### Readonly diagnostic01: уведомление прочитано, связь с кликом не доказана
+
+После сообщения пользователя о случайном нажатии выполнена отдельная диагностика
+source114/profile144, original18825 terminal exit1. MCP OpenViking health и actor
+Experience find успешны. Перед запуском проверены все1324 source pins и SHA Chromium;
+использован headless:false, DISPLAY=:1. Процесс завершился до /proc snapshot, поэтому
+отдельного /proc подтверждения headed нет; не приписывать его этой диагностике.
+
+Loginom показал предупреждение: сохранённый writer13 package открыт только для
+чтения, потому что уже открыт другим пользователем либо файл доступен только для
+чтения; сохранить можно под другим именем. Native FReadOnly=true, HasRunningNodes=false.
+Это подтверждает режим, но не отличает server-session lock от файловых прав и не
+доказывает причинную связь со случайным кликом пользователя. Предыдущий writer13
+с двумя подтверждёнными сохранениями остаётся валидным отдельным свидетельством;
+полный cold persistence ещё не пройден.
+
+Диагностика не меняла настройки, не вызывала Execute/Save. Штатное закрытие пакета
+остановлено ДО ClosePackage на Close menu owner mismatch; повтор не отправлялся.
+Own browser закрыт, отсутствие Chromium проверено. Package close и logout не
+подтверждены. Реестр: closed_diagnostic_cleanup_unconfirmed, active_exec_session=null.
+Private source114-readonly-diagnostic-01.json/log сохраняют наблюдение и ошибку.
+Не объявлять новый пустой сеанс доказательством освобождения старого lock.
+
+Далее: определить штатным способом владельца открытия/права пакета и точный
+контекст menu label перед изменением cleanup. Не обходить toast guards, не делать
+Save As и не запускать очередной cold с тем же известным readonly препятствием.
+Next fresh profile145. Source/runtime не изменены, общий план остаётся открытым.
+
+
 ### Cold04: блокирующий toast и readonly package требуют чтения
 
 Source114 main original90231 exit0:3615PASS; full client original69008 exit0:
