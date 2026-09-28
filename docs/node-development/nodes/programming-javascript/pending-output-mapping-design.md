@@ -1,7 +1,8 @@
 # Выходное сопоставление до материализации исходных полей
 
 2026-09-28. Уточнение private G7 persistence flow по live source105 writer08.
-Реализация этого уточнения ещё не выполнена; это не закрытие G3/G7.
+Reader и explicit private admission реализованы в source106; интеграция
+source-cycle/writer/cold/auditor ещё не выполнена. Это не закрытие G3/G7.
 
 ## Подтверждённое состояние
 

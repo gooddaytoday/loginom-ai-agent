@@ -15,6 +15,45 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source106: configured-only reader и явный private opt-in
+
+Runtime commit `81c7c9b53c` (полный SHA в private verification receipt).
+Shared readMappingBrowser распознаёт только observed DataSetOutputSocketWizard:
+source store0, target>0, active targets без ConnectedRecord/SourceDisplayName/
+SourceDataType; exact owned headercontainer/SourceDisplayName column,
+dataIndex/itemId, hidden:true/visible:false, без source cells. Полнота stores,
+record identities, прочие visible cells/autosync и native bracketing сохранены.
+Возвращает verified:false/source_identity_verified:false,
+configured_inventory_verified:true/inventory_complete:true,
+reason:mapping_source_pending и source_pending native proof с полными target fields.
+Это новое различимое состояние, не успешное полное сопоставление. Любая source
+cell (даже пустая) при этом hidden layout — отказ.
+
+Новый javascript-mapping-state.mjs классифицирует complete/configured_only,
+проверяет flags/owner/header path/output port, source count0, полноту rendered
+indices и отсутствие target sources. Без allowConfiguredOnly:true не допускает
+configured-only. Runtime readPortMapping принимает эту опцию только для output
+и не вместе с characterize; подтверждает proof после наблюдения. Default reader
+не изменил критерий допуска этого нового verified:false состояния. Writer/cold
+пока не передают opt-in; source-cycle raw proof и новый auditor ещё не реализованы.
+
+Main3589PASS/0FAIL/0SKIP (original79989 exit0); full client2797PASS/0FAIL/10SKIP
+(original54036 exit0). Full client запускался на окончательном reader/test source;
+private mapping-state/runtime admission добавлены позже и проверены final main.
+Focused reader/procedure93PASS;5 syntax checks;127 preexisting docs сохранены.
+Private source106-configured-reader-verification.json содержит source/test hashes.
+Source106 пока не frozen live candidate: нового браузера не запускали; последний
+закреплённый live freeze105, recovery08/profile130 завершён.
+
+Продолжение по pending-output-mapping-design.md: source cycle должен сохранить
+raw mapping evidence до semantic projection; writer до Execute сравнивает
+configured targets и strict input, после Execute требует полное равенство обоих
+mapping до save2. Cold before/after и независимый auditor должны отражать те же
+границы без использования runtime predicate как oracle. После интеграции —
+новый freeze относительно105 и fresh headed writer/cold для обоих режимов.
+Полная цель, public handler, knowledge, formal review и CLI acceptance открыты.
+
+
 ### Source105: owned header/cached target диагностика
 
 Runtime commit `bc34daf8fa02d8ed131a4b5e90f449dde1b73ffd`. Только при прежнем
