@@ -35,7 +35,9 @@ test("an unconfirmed dispatch survives process recreation; concurrent calls are 
       "chat",
       "generation",
       "id",
+      "recoveryMode",
     ])
+    expect(JSON.parse(await readFile(join(directory, `${second}.json`), "utf8")).recoveryMode).toBe("strict")
     await journal.settle(second, false)
     expect(journal.pending()).toEqual([second])
     const third = await journal.begin("a".repeat(64), 1)
