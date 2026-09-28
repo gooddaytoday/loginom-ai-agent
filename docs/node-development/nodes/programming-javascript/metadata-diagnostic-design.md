@@ -52,6 +52,24 @@ SHA256 `774407b4a13e15eeb9084e7a49f46e86e7353a35d1cd4a69833a604cab8cff32`.
 произошло переименование. Старый payload reader сохраняет Value/Value/Integer guard;
 новый diagnostic не передаёт ему наблюдённое имя как expected name.
 
+## Уточнение review: происхождение загруженных функций
+
+До первого metadata API call нужно проверить реализации новых используемых
+`bg.select`, `bg.selectAsync`, `bg.selectRangeAsync` и штатного
+`rpc.TBGSession.GetPropertyValues`/`GetPropertyValues$1` по reviewed source.
+Существующая проверка native runtime не включает эти функции; сохранение их
+references и сравнение с ними же не подтверждает совместимость с reviewed API.
+
+Использовать reflection-only сбор Function.prototype.toString и сравнение хешей
+с ожидаемыми, полученными из сохранённых reviewed sources, а не со стенда в момент
+проверки. Дополнительно удерживать проверенные function identities в том же
+owner/document/session и проверять их перед применением. Это не дополнительный
+metadata RPC и не разрешение менять global functions. Замена реализации до
+первого запроса должна отклоняться без metadata RPC. Такой отпечаток публичных
+функций не доказывает содержимое всех lexical closures — этот предел сохранить
+в отчёте. Тесты synthetic transport должны явно отделять эту границу от production
+attestation; обход проверок в live mode недопустим.
+
 ## Отказ и ресурсы
 
 Не менять глобальные функции Loginom, allocator или buffer Release. Использовать

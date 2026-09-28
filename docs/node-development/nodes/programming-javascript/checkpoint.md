@@ -15,6 +15,24 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source94 review: реальный journal ACK и новые runtime fingerprints
+
+ROOT независимо проверил metadata host с настоящим createExecutionJournal и
+synthetic DTO, без browser: актуальная версия принимает служебный journal envelope,
+сохраняя сравнение submitted fields. Receipt `operator94-root-journal-ack-success/`,
+terminalexit0, moduleSHA726bbaabc775722395276e6c1d8fdb175595c0b4dd11a1c74ac4e74159f06b12.
+Первый repro ожидал уже исправленную ошибку и завершился1 только на устаревшем
+ожидании самого repro; сохранён отдельно, не записан как новый runtime failure.
+
+Во время review обнаружено, что existing native runtime pins не включают новые
+selector/GetPropertyValues functions. Reference stability недостаточна для
+подтверждения reviewed implementation. В metadata design добавлен reflection-only
+pre-RPC fingerprint guard; поручен той же active developer задаче revision47.
+Private receipt `operator94-root-metadata-runtime-provenance-review.json`.
+Также запрошен успешный metadata-enabled actual driver path в дополнение к socket/
+timeout/ACK failure tests. Freeze94 ещё не принят; нового live не было.
+
+
 ### Source94: первый независимый запуск тестов выявил18сбоев
 
 Developer revision46 terminal, но актуальный freeze94/handoff отсутствовал;
