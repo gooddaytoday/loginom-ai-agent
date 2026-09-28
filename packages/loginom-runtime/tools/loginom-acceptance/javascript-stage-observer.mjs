@@ -84,6 +84,13 @@ export function readJavascriptStage({root,native,binding,prefix,account,build}) 
     &&proof.ancestors_visible&&proof.ancestor_bound_complete;
   const dialogs=[...document.querySelectorAll('[role="dialog"],.x-message-box')].filter(visible);
   const foreignDialogs=dialogs.filter(element=>!(owner&&element===root)&&!(previewBound&&element===preview));
+  const errorTid=prefix+';WizrdMCF;btnError';
+  const errorButtons=[...root.querySelectorAll('[data-tid='+JSON.stringify(errorTid)+']')];
+  const errorButton=errorButtons.length===1&&root.contains(errorButtons[0])&&visible(errorButtons[0])?errorButtons[0]:null;
+  const errorTooltip=errorButton?.getAttribute('data-qtip');
+  const wizardError={exact_count:errorButtons.length,visible:!!nativeOwner&&connectionValid&&!!errorButton,
+    tooltip:typeof errorTooltip==='string'?errorTooltip.slice(0,4096):null,
+    tooltip_truncated:typeof errorTooltip==='string'&&errorTooltip.length>4096,tid:errorButton?errorTid:null};
   const boundaryRefusal=!connectionDiagnostic.connected?'connection_unavailable'
     :!connectionDiagnostic.account_matches?'account_changed':!connectionDiagnostic.build_matches?'build_changed'
     :foreignDialogs.length?'foreign_dialog':null;
@@ -108,6 +115,7 @@ export function readJavascriptStage({root,native,binding,prefix,account,build}) 
     connection_diagnostic:connectionDiagnostic,dialog_diagnostic:{visible_count:dialogs.length,foreign_count:foreignDialogs.length,
       roots:foreignDialogs.slice(0,3).map(element=>({tid:(element.getAttribute('data-tid')??'').slice(0,160),
         native_el:dom(globalThis.Ext?.getCmp?.(element.id))===element}))},wizard_visible:visible(root),preview_visible:previews.length>0,preview_owned:previewOwned,preview_settled:previewSettled,
+    wizard_error:wizardError,
     preview_diagnostic:{exact_count:exactPreviews.length,visible_count:previews.length,code_count:codeRoots.length,code_owned:!!codeOwned,code_checks:codeChecks,
       wizard_item_count:Array.isArray(items)?items.length:null,matched_item_count:matches.length,
       controller_present:!!previewController,form_present:!!previewForm,loaded:typeof loaded==='boolean'?loaded:null,roots:previewDiagnostic},
@@ -119,6 +127,7 @@ export function readJavascriptStage({root,native,binding,prefix,account,build}) 
 export async function recordJavascriptStageChange({state,identity,snapshot,record}) {
   const diagnostic={owner_verified:snapshot.owner_verified,native_owner_verified:snapshot.native_owner_verified,
     boundary_refusal:snapshot.boundary_refusal,connection_diagnostic:snapshot.connection_diagnostic,dialog_diagnostic:snapshot.dialog_diagnostic,wizard_visible:snapshot.wizard_visible,
+    wizard_error:snapshot.wizard_error,
     preview_visible:snapshot.preview_visible,preview_owned:snapshot.preview_owned,preview_settled:snapshot.preview_settled,
     page_tid:snapshot.page_tid,pending:snapshot.pending,preview_diagnostic:snapshot.preview_diagnostic,
     ...(snapshot.calibration_native_exception?{calibration_native_exception:snapshot.calibration_native_exception}:{}),
@@ -160,11 +169,22 @@ export async function requireJavascriptStageAdmission({stage,before,identity,rec
 }
 
 export async function waitJavascriptStageObservation({read,wait,deadline,stage,before,identity,record}) {
-  const changes={count:0};let after;
+  const changes={count:0};let after,pendingSeen=false,refusalPolls=0;
   while(Date.now()<deadline){
     after=await read();
     await recordJavascriptStageChange({state:changes,identity,snapshot:after,record});
-    if(after.boundary_refusal||javascriptStageTerminal({stage,before,after}))break;
+    if(javascriptStageTerminal({stage,before,after}))break;
+    pendingSeen ||= after.pending===true;
+    const currentError=after.native_owner_verified===true&&after.wizard_visible===true
+      &&after.page_tid===before.page_tid&&!!after.page_tid&&after.pending===false&&after.wizard_error?.visible===true
+      &&(after.boundary_refusal===null||after.boundary_refusal==='foreign_dialog')
+      &&(after.boundary_refusal!=='foreign_dialog'||before.dialog_diagnostic?.visible_count===0
+        &&after.dialog_diagnostic?.foreign_count===1&&/^msgbox(?:-\d+)?$/.test(after.dialog_diagnostic.roots?.[0]?.tid??''))
+      &&(before.wizard_error?.visible!==true||before.wizard_error.tooltip!==after.wizard_error.tooltip
+        ||pendingSeen);
+    refusalPolls=currentError?refusalPolls+1:0;
+    if(currentError&&(refusalPolls>=2||after.boundary_refusal==='foreign_dialog')){after.wizard_error_refusal=true;break;}
+    if(after.boundary_refusal)break;
     await wait(Math.min(200,Math.max(1,deadline-Date.now())));
   }
   return after;

@@ -74,6 +74,26 @@ export function javascriptDiscoveryWizardDiagnostic({probe,identity,stage,before
     syntax_support:'not_determined',class_observed:null,position_observed:null,gate_passed:false,native_bytes_verified:false,gates_closed:[]};
 }
 
+export function javascriptDiscoveryErrorButtonDiagnostic({probe,identity,error}){
+  const pinned=javascriptDiscoveryProbe(probe?.id);
+  need(probe.source===pinned.source&&identity?.source_sha256===pinned.source_sha256&&identity.node_id,
+    'Error button source/identity differs');
+  need(error?.identity?.effect_id===identity.effect_id&&error.identity.node_id===identity.node_id
+    &&error.dialog_closed===true&&error.native_owner_verified===true&&error.page_tid
+    &&typeof error.dialog_text==='string'&&error.dialog_text.length>0&&error.dialog_text.length<=4096,
+    'Owned native wizard error dialog required');
+  const classObserved=error.dialog_text.match(/^([A-Za-z]+Error):/)?.[1]??null;
+  const position=error.dialog_text.match(/\(:([0-9]+):([0-9]+)\)/);
+  return {id:pinned.id,status:'owned_wizard_refusal',stage:error.stage,source_sha256:pinned.source_sha256,
+    node_id:identity.node_id,button_tid:error.button_tid,page_tid:error.page_tid,
+    tooltip:error.tooltip,tooltip_truncated:error.tooltip_truncated,dialog_text:error.dialog_text,
+    dialog_text_truncated:error.dialog_text_truncated,dialog_closed:true,
+    class_observed:classObserved,position_observed:position?{line:Number(position[1]),column:Number(position[2])}:null,
+    explicit_execute_dispatched:false,execution:'not_started_by_operator',
+    syntax_support:classObserved==='SyntaxError'?'native_parse_refusal':'not_determined',
+    gate_passed:false,native_bytes_verified:false,gates_closed:[]};
+}
+
 export async function observeJavascriptDiscovery({probe,node,execution,readOutput,record,onProgress=async()=>{},deadline,now=Date.now}){
   const pinned=javascriptDiscoveryProbe(probe?.id);
   need(probe.source===pinned.source&&hash(probe.source)===pinned.source_sha256

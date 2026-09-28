@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
-import {javascriptDiscoveryIds,javascriptDiscoveryProbe,javascriptDiscoveryOracle,observeJavascriptDiscovery,javascriptDiscoveryWizardDiagnostic} from './javascript-discovery-probes.mjs';
+import {javascriptDiscoveryIds,javascriptDiscoveryProbe,javascriptDiscoveryOracle,observeJavascriptDiscovery,javascriptDiscoveryWizardDiagnostic,javascriptDiscoveryErrorButtonDiagnostic} from './javascript-discovery-probes.mjs';
 import {runJavascriptOperator} from './javascript-live.mjs';
 
 function fixture(id='engine-literal-trim'){
@@ -179,4 +179,23 @@ test('fresh owned wizard diagnostic is distinct from process failure and never p
   assert.equal(javascriptDiscoveryWizardDiagnostic({probe,identity,stage:'next',before,after:state}),null);
  }
  assert.throws(()=>javascriptDiscoveryWizardDiagnostic({probe,identity:{...identity,source_sha256:'other'},stage:'next',before,after}));
+});
+
+test('closed native error button preserves exact SyntaxError and refuses unowned or unclosed diagnostics',()=>{
+ const probe=javascriptDiscoveryProbe('engine-nullish');
+ const identity={effect_id:'once',node_id:'js',source_sha256:probe.source_sha256};
+ const error={identity,stage:'next',page_tid:'MF;TF-1;WizrdMCF;JavaScriptCodeWizard',
+  button_tid:'MF;TF-1;WizrdMCF;btnError',tooltip:'SyntaxError: Syntax error at code (:4:33)',
+  tooltip_truncated:false,dialog_text:'SyntaxError: Syntax error at code (:4:33)',dialog_text_truncated:false,
+  dialog_closed:true,native_owner_verified:true};
+ const result=javascriptDiscoveryErrorButtonDiagnostic({probe,identity,error});
+ assert.equal(result.status,'owned_wizard_refusal');assert.equal(result.class_observed,'SyntaxError');
+ assert.deepEqual(result.position_observed,{line:4,column:33});
+ assert.equal(result.syntax_support,'native_parse_refusal');assert.equal(result.gate_passed,false);
+ assert.equal(result.explicit_execute_dispatched,false);
+ for(const change of [e=>e.dialog_closed=false,e=>e.native_owner_verified=false,e=>e.identity.node_id='other',
+  e=>e.dialog_text='']){
+  const bad=structuredClone(error);change(bad);
+  assert.throws(()=>javascriptDiscoveryErrorButtonDiagnostic({probe,identity,error:bad}));
+ }
 });
