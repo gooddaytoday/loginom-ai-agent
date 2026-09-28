@@ -183,7 +183,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readOutputs = false, readMappings = false, readCalculator = false, readGrouping = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, readCalculator = false, readGrouping = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -194,7 +194,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
-      if ((readProcesses || readOutputs || readMappings || readCalculator || readGrouping || readDateTime || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readJoin || readUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
+      if ((readProcesses || readProcessControls || readOutputs || readMappings || readCalculator || readGrouping || readDateTime || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readJoin || readUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
       // A failed wait must invalidate even a previously usable observation.
       snapshot = null;
       evidenceSnapshot = null;
@@ -247,7 +247,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(portals.length>1)throw new Error('Node procedure dropdown owner is ambiguous');
         // Dropdowns live outside the wizard subtree. Reading the unique
         // portal plus fixed wizard guards avoids scanning unrelated file tabs.
-        const processRoot=readProcesses ? ['mnContextMenu','ConsoleForm','MF;cntMain;tlbMainToolbar'].map(tid=>(roots.output.ui?.elements??[]).filter(e=>e.tid===tid))
+        const processRoot=(readProcesses||readProcessControls) ? ['mnContextMenu','ConsoleForm','MF;cntMain;tlbMainToolbar'].map(tid=>(roots.output.ui?.elements??[]).filter(e=>e.tid===tid))
           .find(xs=>xs.length===1)?.[0].ref : undefined;
         const outputRoot=readOutputs ? [preparedNodeContext.workflow_ref.prefix+';ViewsForm;BrowseView',preparedNodeContext.workflow_ref.prefix+';ViewsForm',preparedNodeContext.workflow_ref.prefix+';ModelForm;cmpDiagram']
           .map(tid=>(roots.output.ui?.elements??[]).filter(e=>e.tid===tid)).find(xs=>xs.length===1)?.[0].ref : undefined;
@@ -349,6 +349,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         }
         if(result.output.geometry)lastGeometry=structuredClone(result.output.geometry);
         if(readNavigation)result.output.node_navigation_read=true;
+        if(readProcessControls)result.output.node_process_controls_read=true;
         if(boundWizardConfirmation(result.output,wizardConfirmation))result.output.node_wizard_confirmation=structuredClone(wizardConfirmation);
         // These are bounded reads of native UI caches and DOM, guarded by the
         // prepared node before and after. Preserve them in the same journal
@@ -508,6 +509,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readJoin:initialObservation?.node_join!==undefined,
           readUnion:initialObservation?.node_union!==undefined,
           readPreview:initialObservation?.node_preview_schema!==undefined,
+          readProcessControls:initialObservation?.node_process_controls_read===true,
           readProcesses:initialObservation?.node_processes!==undefined,readOutputs:initialObservation?.node_outputs!==undefined,tableDialog:initialObservation?.node_table_dialog,
           tableFormatPage:initialObservation?.table_settings?.format?.page?{offset:initialObservation.table_settings.format.page.offset,limit:initialObservation.table_settings.format.page.limit}:undefined });
         const action = resolve(observed), object = identity(observed);

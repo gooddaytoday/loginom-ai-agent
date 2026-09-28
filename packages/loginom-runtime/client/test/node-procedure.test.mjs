@@ -280,6 +280,14 @@ test('native process, port and mapping reads share the prepared node and durable
  state.ui.elements=[{tid:'MF;cntMain;tlbMainToolbar',ref:'ui-toolbar'}];
  await make().observe({condition:'closed console is opened from its toolbar',readProcesses:true,ready:()=>true});
  assert.ok(calls[1].includes('"root_ref":"ui-toolbar"'));
+ calls.length=0;
+ const controls=await make().observe({condition:'console controls without history',readProcessControls:true,ready:()=>true});
+ assert.equal(calls.length,2,'only root and UI reads; no native process history');
+ assert.ok(calls[1].includes('"root_ref":"ui-toolbar"'));
+ assert.equal(controls.node_process_controls_read,true);
+ assert.equal(controls.node_processes,undefined);
+ assert.equal(records.at(-1).outcome.output.node_process_controls_read,true);
+ await assert.rejects(fixture().channel.observe({condition:'unbound controls',readProcessControls:true,ready:()=>true}),/prepared node/);
 });
 
 test('Table dialogs require an explicit active port binding and never waive unrelated dialogs',async()=>{
