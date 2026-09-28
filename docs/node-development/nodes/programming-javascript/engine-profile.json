@@ -355,9 +355,23 @@
       "source_sha256": "7fed91e7806940c59098fc8e962513b1de6a5b913ba150778ffdfcf1b1e45f86",
       "schema_mode": "code",
       "expectation": "diagnostic",
-      "status": "not_checked",
+      "status": "observed_owned_native_failure",
       "native_bytes_verified": false,
-      "gates_closed": []
+      "gates_closed": [],
+      "proof_level": "owned_native_child_error",
+      "native_error_code": "NODE_EXECUTION_FAILED",
+      "native_error_message": "ReferenceError: Variable undefined in strict mode\n   at Anonymous function (<main>:5:56)\n   at Anonymous function (<main>:5:1)\n   at module (<main>:1:1)",
+      "class_observed": null,
+      "position_observed": null,
+      "output_refreshed": false,
+      "cleanup_complete": true,
+      "evidence": {
+        "campaign": "javascript-20260926-ubuntu",
+        "report": "engine-strict-error-16/report.json",
+        "report_sha256": "fd022496f9f5d903500bd0dae12559536861279d9d5c76bcf7c7d69e1a446469",
+        "journal_sha256": "d4400a153779336cbd0d004e4ae165f9c72577d6c5c538763c1efb3e898c82e8",
+        "operator_commit": "180f1d5810610e9e71a7fe05f5603aa8064f4776"
+      }
     },
     {
       "id": "engine-sync-throw",

@@ -1,5 +1,26 @@
 # JavaScript: checkpoint исполнения
 
+## Engine strict-mode: принадлежащий native failure — 2026-09-28
+
+Отдельный headed `engine-strict-error-16`/profile180 на child revision
+`180f1d5810` доставил source SHA256
+`7fed91e7806940c59098fc8e962513b1de6a5b913ba150778ffdfcf1b1e45f86`.
+После явного запуска native process JS-узла завершился `failed`; ownership
+проверен связкой Model/Show Node, output не обновлялся. В собственных child
+error details точный текст начинается `ReferenceError: Variable undefined in
+strict mode` и содержит кадры `<main>:5:56`, `<main>:5:1`, `<main>:1:1`.
+Текущий reader вернул `class_observed=null`, `position_observed=null`; эти
+поля не заполнять догадкой по строке. Запись имеет status
+`observed_owned_native_failure`, не закрывает калибровку G6/J25 и не
+утверждает общее соответствие координат source.
+
+Run exit0, report `OBSERVED`; package_closed/logged_out/browser_closed=true,
+после завершения pinned Chromium не осталось. Private report SHA256
+`fd022496f9f5d903500bd0dae12559536861279d9d5c76bcf7c7d69e1a446469`,
+journal SHA256
+`d4400a153779336cbd0d004e4ae165f9c72577d6c5c538763c1efb3e898c82e8`.
+Реестр закрыт, следующий fresh profile181.
+
 ## Engine top-level await: native refusal и полный cleanup — 2026-09-28
 
 Отдельный headed `engine-top-level-await-15`/profile179 на child revision
