@@ -17,6 +17,30 @@
 
 ### Source98: начата реализация AST policy и effective-source admission
 
+ROOT исправление candidate lock pin подтверждено. Product release SHA256 теперь
+`086772558f28ada38f5491b91e62e3b2a383b75352fe76cf21fd06e2553fb6a1`;
+изменено только runtimeLockSha256. Addressed MCP1PASS. Повторный полный client
+original88234 terminalexit0:2756PASS/0FAIL/10SKIP,178311ms. Все1300pins,
+включая product release, до/после совпали (`operator98-stage-inputs.json`).
+Предыдущие client60962exit1 и developer18fail сохранены отдельно.
+
+Реальный stageResources flavorcli/Linux в новом
+`source98-resource-candidate-01`, original79252 terminalexit0:4390files.
+ROOT независимо проверил каждый inventory hash/containment, Node/browser/lock;
+manifest SHA256 `f4860bd025f07771e8f707c08b9b73b536d72d2410f8341394c3ae6278176e98`.
+Staged Node24.19.0 обычным ESM без loader разрешил Acorn8.15.0 из staged tree,
+Data-policyADMITTED/FS-policyREFUSED, admission import PASS. Receipts
+`operator98-stage-{result,verification,module-verification}.json`, stage.log,
+`operator98-root-client-fixed.log` и обновлённый test-progress.
+Это ресурсы CLI, не сборка исполняемого CLI и не platform/live acceptance.
+
+Задача разработчика перешла к turn01a0e6a9-0eee-77b1-8eb4-d978394c9da8,
+последний cursor ef4fdbda-223c-4344-9756-08ee1a070ea1:3 active/inProgress.
+Перед commit нужен её окончательный freeze с3changed/5new и новой product pin;
+старый draft freeze ещё содержал прежнюю product pin. ROOT original jobs terminal;
+браузеров не запускали. Не повторять уже прошедшие tests без новых изменений.
+
+
 ROOT full source checks завершены: main/original94991 exit0,3294PASS/0FAIL;
 client/original60962 exit1,2755PASS/1FAIL/10SKIP; deny3PASS,Python15PASS.
 Все1300source pins до/после неизменны. Commands используют явный test-only
