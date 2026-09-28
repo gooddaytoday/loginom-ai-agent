@@ -15,6 +15,22 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source96: первые runtime edits и предварительное ROOT review
+
+В active revision55 появились telemetry catalog, изменения owner/binding/read/
+contract. ROOT сверил5catalog sources побайтно/SHA с proposal и просмотрел два
+field references/scalar snapshots в binding; default Value guard сохранён.
+Это ещё изменяемый кандидат без freeze96, итоговых integration tests и live.
+Private `operator96-root-preliminary-review.json` закрепляет просмотренные hashes;
+не использовать его как приёмку будущей версии.
+
+Дополнительный independent oracle extremes test прошёл4случая: controls128units,
+кириллица128units, surrogate pairs128units, пустые строки. Максимум6441bytes
+telemetry JSON; receipt `operator96-root-telemetry-extremes.json`.
+Это предел synthetic payload данного control source, не проверка полного
+runtime binding/proof serialization budget. Никакой новый браузер не открыт.
+
+
 ### Source96 возобновлён после неактуального final
 
 Authoritative wait подтвердил завершение developer revision54/turn
