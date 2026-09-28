@@ -15,6 +15,32 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source96: первый реальный T-schema-control подтверждён
+
+`native-schema-telemetry-control-probe-01`, fresh headed profile109,
+original session57994 завершился exit0/CHARACTERIZED. ROOT наблюдал отсутствие
+headless/no-sandbox flags. Package closed/logout/browser closed подтверждены;
+после завершения pinned Chromium отсутствует. Source commit `9d9a2af27a`,1289pins
+не изменились. Report SHA256
+`6a0163d575385d8a58c66c1b586cc251403e4477fe09cba1fd6874306439a155`.
+
+Независимый Python audit проверил10native cells и616journal refs; дополнительная
+проверка связала exact source hash, execution и runtime witnesses всех3чтений.
+Integer=-9007199254740991, int64LE010000000000e0ff. JSON369UTF8bytes. API before,
+after и Preview physical schema совпадают: index0 Value/Value/Integer4,
+index1 __JS_Metadata/__JS_Metadata/String5. Input/upstream сохраняют NULL,
+-9007199254740991,0,9007199254740991. Неиспользуемые bytes NULL не трактуются как
+значение; transport message IDs разных чтений не обязаны совпадать.
+
+Private receipts: `native-schema-telemetry-control-probe-01-verification.json`
+и `native-schema-telemetry-control-probe-01-source-verification.json`.
+Independent live auditor SHA256
+`67e0ce5a25bbc5353177b685b34720ac3546c7099b522fc452c33a9cacb57a5a`.
+Bridge_verified=false, только observed-local; persistence/atomicity/ABA не доказаны.
+Контроль принят; следующие4T sources допустимы по одному, с fresh profiles110–113
+и отдельной проверкой. Они ещё не запускались. СтарыеD cases/G5/public handler/CLI
+этим результатом не закрыты. Весь план остаётся в работе.
+
 ### Source96: независимые проверки завершены; runtime закоммичен
 
 Developer revision56 завершён. ROOT принял frozen candidate и самостоятельно
