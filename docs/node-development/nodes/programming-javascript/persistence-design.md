@@ -132,3 +132,24 @@ Cleanup: закрытие браузера и пустой новый сеанс
 закрытия прежнего пакета/сеанса либо явно сообщённого пользователем admin cleanup.
 Для cold05 ROOT через headed Диспетчер подтвердил exact path в jsteach:2970, закрыл
 пакет и сеанс, подтвердил отсутствие строки2970, затем admin logout/browser close.
+
+
+## Source116: ожидание открытия порта и запрет cleanup при неизвестном эффекте
+
+Cold06 подтвердил открытие консоли и process baseline. Output port Configure
+отправлен и вернулся; pending diagnostics увидели4 samples без wizard до15s deadline.
+Поздний screenshot показал уже открытый output wizard; cleanup встретил locked-node
+confirmation. Поэтому выбран оставшийся исходный operation deadline для port open
+и его transport, вместо независимых15s/20s. Срок самой операции не увеличивается,
+прошлая операция не возобновляется, Configure не повторяется. Произвольное увеличение
+лимита на N секунд и повторный Configure не нужны.
+
+readPortMapping должен помечать nativeReadUncertain при отказе открытия до получения
+verified receipt, а также при отказе Close/graph proof. Это блокирует внешний UI
+cleanup при возможно открывающемся мастере. Успешные read/Close сохраняют обычное
+закрытие пакета. Отдельный admin recovery после завершения исходного browser разрешён
+только для установленного своего пакета/сеанса, с чтением точного подтверждения.
+
+Actual node-procedure test проверяет deadline и transport остаток больше20s;
+actual readPortMapping tests проверяют отсутствие Close после ambiguous/lost opening
+и uncertainty после отказа cleanup. Затем runtime regression перед новым live.
