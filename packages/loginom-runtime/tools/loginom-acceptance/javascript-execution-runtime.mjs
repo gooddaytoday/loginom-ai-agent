@@ -1124,7 +1124,11 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
     async verifyExecutionBoundary(boundary) {
       await accountGuard();
       await page.evaluate(captureJavascriptNativeTopology,{previous:boundary.native,checkOnly:true});
-      requireJavascriptGraphUnchanged(boundary.before,await graph());
+      const after=await graph();
+      // Retain the already observed graph even when the strict comparison fails.
+      // Do not re-read/retry after a refusal or weaken the native owner check.
+      await record({phase:'execution_boundary_observed',before:structuredClone(boundary.before),after:structuredClone(after)});
+      requireJavascriptGraphUnchanged(boundary.before,after);
       await record({phase:'execution_boundary_verified',before:boundary.before});
     },
     async executeNode(node,operationDeadline=deadline,trial) {
