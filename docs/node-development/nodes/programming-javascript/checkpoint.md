@@ -15,6 +15,26 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source97: реальный цикл existing source read подтверждён
+
+`source-read-cycle-probe-01`, fresh headed profile114, original session63008
+завершился exit0/OBSERVED. Два независимых open/read/Close rounds прочли
+376UTF8bytes/8LF-lines fixed code-table-v1, по1chunk на round, SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`.
+Source/chunk/offset ACK совпали с фактическими квитанциями; наблюдаемые settings
+и input/output mappings до/после совпали. Process witness удержал7records.
+После baseline нет новых явных Execute/Done и Next с JavaScriptCodeWizard.
+
+Независимый ROOT audit/session85312 terminalexit0 проверил1056journal refs,
+1295pins и cleanup: package_closed/logged_out/browser_closed=true, pinned Chromium
+после завершения отсутствует. Report SHA256
+`539a1b9f13968f5de7ff76ff842054a41afb7aad4549d7f495d98ca126b2e464`.
+Private `source-read-cycle-probe-01-verification.json` и launch receipt сохраняют
+границы наблюдения. Snapshot settings получен первым post-commit reopen и
+независимо повторён вторым; это не cold persistence и не доказательство отсутствия
+скрытых server transactions/ABA. Public route остаётся выключенной; общий G/J/CLI
+ещё не закрыты. Следующий свободный профиль115.
+
 ### Source97: frozen candidate проверен ROOT и закоммичен
 
 Developer revision61 завершён. ROOT проверил1295pins до/после,118прежних docs,
