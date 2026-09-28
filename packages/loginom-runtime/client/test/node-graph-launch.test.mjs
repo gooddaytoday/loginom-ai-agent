@@ -10,7 +10,7 @@ function fixture({selected=false,fail=false,active=false,allowDeactivate=false,l
  ui:{elements:[element('MF;cntMain;tlbMainToolbar;btnProgress',['click']),element('mnContextMenu;mniShowCompletedProcesses',['click','press']),element('ConsoleForm;btnClose',['click']),
  ...(consoleOpen?[element('ConsoleForm;ProgressForm;trpProgress;grd;tbl',['right_click'])]:[]),element('graph-node',['click'],{graph_node:{part:'body'}}),
  ...(selected?[element('launch',[active?'deactivate_graph_node':'execute_graph_node'],{graph_execution:{node_id:'node',mode:active?'deactivate':'execute',source:'native_selected_graph_node'}})]:[])]}});
- const channel={observe:async({ready,condition,readProcesses})=>{observations.push({condition,readProcesses});if(condition==='prepared node available for process console')assert.equal(readProcesses,false,'unopened console cannot provide process grids');const s=state();assert.equal(ready(s),true);return s;},perform:async p=>{const s=state();assert.equal(p.ready(s),true);const a=p.resolve(s);actions.push(a);
+ const channel={observe:async({ready,condition,readProcesses,readProcessControls})=>{observations.push({condition,readProcesses,readProcessControls});if(condition==='prepared node available for process console')assert.equal(readProcesses,false,'unopened console cannot provide process grids');const s=state();assert.equal(ready(s),true);return s;},perform:async p=>{const s=state();assert.equal(p.ready(s),true);const a=p.resolve(s);actions.push(a);
  if(a.ref==='MF;cntMain;tlbMainToolbar;btnProgress')consoleOpen=true;
  if(a.ref==='ConsoleForm;btnClose')consoleOpen=false;
  if(a.ref==='graph-node')selected=true;
@@ -72,6 +72,7 @@ test('lost deactivation response blocks retries and does not execute',async()=>{
 test('process prepare materializes console before requesting its native history',async()=>{
  const f=fixture();await f.driver.prepare();
  assert.equal(f.observations[0].readProcesses,false);
+ assert.equal(f.observations[0].readProcessControls,true);
  assert.equal(f.observations.slice(1).every(x=>x.readProcesses===true),true);
  assert.equal(f.actions[0].ref,'MF;cntMain;tlbMainToolbar;btnProgress');
  assert.equal(f.actions.some(x=>x.verb==='execute_graph_node'),false);
