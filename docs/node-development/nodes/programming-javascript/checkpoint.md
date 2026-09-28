@@ -23,6 +23,14 @@ Rebase 437 коммитов прошёл без конфликтов; прежн
 портальный reader после последних двух коммитов проверен адресными тестами и
 ниже живым стендом; полная suite повторно не запускалась.
 
+После финального code commit независимый от операторского прогона private
+closure audit закрепил revision `180f1d5810610e9e71a7fe05f5603aa8064f4776`:
+`javascript-freeze124-root-final-source.json` SHA256
+`ea6f9ee7cec0acabb124e5990cfafb6968a292954d071c20388a54a058ee6245`,
+1326 pins, 214 closure files, 650 literal import edges, computed imports 0;
+относительно freeze120 — два новых и пять изменённых файлов. Freeze хранится
+только в private campaign dir и не заменяет интеграционную приёмку.
+
 Первые две headed попытки `engine-optional-chain-08`/profile170 и
 `engine-optional-chain-09`/profile172 сохранили native
 `SyntaxError: Syntax error at code (:4:48)`, но reader потребовал несуществующее
