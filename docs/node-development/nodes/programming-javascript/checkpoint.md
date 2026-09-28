@@ -15,6 +15,28 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source104: bounded диагностика несовпавшей mapping ячейки
+
+Runtime commit `0b9b7e2c1cbdd7a4ac4fc1a175ac950e7b10d042`. Общий cached mapping
+reader при прежнем mapping_render_value возвращает render_mismatch: form/row/
+column/field_name/expected, cell_count и первые2 текста по240 символов с
+truncated, source_connected/source_count/target_count. verified:false и все
+предшествующие record/native/DOM/ownership guards неизменны; это не допуск
+частичного результата. Bracketing native owner check удаляет диагностику при
+смене владельца. Данные не читаются из server getters или dataset APIs.
+
+Main3563PASS/0FAIL/0SKIP (original80552 exit0,55964ms); full client2770PASS/
+0FAIL/10SKIP (original83764 exit0,178515ms). Пропущены обычные browser integration
+cases: env LOGINOM_DOCK_TEST_BROWSER/CI сняты, headless browser не запускался.
+Новые6 тестов actual serialized reader проверяют value/missing/duplicate/long/
+disconnected и смену native owner.127 preexisting child docs сохранены.
+Freeze104:1322 pins, closure203 files/629 edges,2 syntax checks;
+manifest javascript-freeze104-root-final-source.json SHA
+80167f7c9c3d21a2c6b680b9092d5084fc88e4f6e890dc6975434e3771e3a360.
+Writer07/profile127 headed/sandbox запущен, original56220 ожидает terminal.
+Не запускать второй browser до его завершения. OpenViking health успешен.
+
+
 ### Source103: освобождение после Done до фиксации baseline
 
 Runtime commit `5254c6a6735edd764a171a276ae66b76e78c9df4`. Только после своего
