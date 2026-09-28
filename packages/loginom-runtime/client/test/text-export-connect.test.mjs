@@ -19,7 +19,14 @@ async function fixture(mode,targetType='exports.text'){
    if(phase==='setup')return structuredClone(graph);reads++;
    if(mode==='foreign')throw Error('Prepared workflow changed');
    if(mode==='mask_forever'||reads===1)throw Error('Graph is blocked');
-   return mode==='changed'?{...graph,links:[{}]}:structuredClone(graph);
+   const current=structuredClone(graph);
+   if(mode.startsWith('epoch'))current.nodes[1].dom_epoch++;
+   if(mode==='epoch_links')current.links.push({source:'source',target:'target'});
+   if(mode==='epoch_root')current.dom_epoch++;
+   if(mode==='epoch_owner')current.nodes[1].ref.node_id='other';
+   if(mode==='epoch_locked')current.nodes[1].locked=true;
+   if(mode==='epoch_ports')current.nodes[1].inputs=[1];
+   return mode==='changed'?{...graph,links:[{}]}:current;
   }
   if(code.includes('page.evaluate(edge=>')){if(mode==='cancel_rebind')controller.abort();return {source:{label:'Source',index:0},target:{label:'Export',index:1}};}
   links++;return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};
@@ -37,4 +44,13 @@ test('transient mask before an ordinary node link also waits read-only and invok
 });
 test('export link never starts after wrong graph, persistent mask, expired budget or cancellation',async()=>{
  for(const mode of ['foreign','changed','mask_forever','deadline','cancel','cancel_rebind']){const r=await fixture(mode);assert.equal(r.links,0,mode);assert.ok(r.error||r.outcome?.status==='NOT_APPLIED',mode);assert.ok(r.reads<=3,mode);}
+});
+
+test('initial connect observation rebinds only node drawing epochs',async()=>{
+ const r=await fixture('epoch','bg-vendor-icon-javascript');assert.equal(r.outcome?.status,'SUCCEEDED');assert.equal(r.links,1);
+ for(const mode of ['epoch_links','epoch_root','epoch_owner','epoch_locked','epoch_ports']){
+  const rejected=await fixture(mode,'bg-vendor-icon-javascript');
+  assert.equal(rejected.links,0,mode);assert.equal(rejected.outcome?.status,'NOT_APPLIED',mode);
+  assert.equal(rejected.outcome?.reason,'connect_graph_changed',mode);
+ }
 });
