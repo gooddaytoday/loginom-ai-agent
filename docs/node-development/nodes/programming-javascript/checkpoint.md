@@ -15,6 +15,19 @@
 
 ## Актуальная диагностика после запроса пользователя
 
+### Source97 выполняется; проверена дополнительная граница точности source delivery
+
+Authoritative developer revision58/turn01a0e622-99ec-7f73-9b0f-56c90bdc65f5
+подтверждён inProgress. Frozen source97/handoff ещё не получен; браузеры закрыты.
+ROOT read-only проверил client/lib/redact.mjs на pinned Node: для `[ 1, 2 ]`
+`redactor.text` сохраняет исходник, но `redactor.redact({source_text:source})`
+возвращает `[1,2]`. Причина — разбор JSON-подобных строк внутри clean().
+Поэтому сравнение только text(source) недостаточно для полного source readback.
+Уточнение внесено в plan1A и передано в ту же активную задачу: проверять реальную
+очистку выдаваемых chunks, отказывать при изменении, не ослаблять общий redactor.
+Это дополнительный необходимый тест source97, а не изменение source96 или
+основание повторять уже принятые T-пробы. Private baseline97 сохраняет118docs.
+
 ### Source96: все пять T-проб завершены; следующий этап — existing source reader
 
 После control отдельно выполнены cyrillic/profile110/session15546,
