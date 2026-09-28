@@ -1,4 +1,6 @@
 import {javascriptCalibrationCase} from './javascript-calibration-cases.mjs';
+import {bindJavascriptPackage, javascriptPackageBindingRequest, observeJavascriptPackageBinding} from './javascript-package-binding.mjs';
+import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from './javascript-persistence-save.mjs';
 import {javascriptNamedCase} from './javascript-native-named-cases.mjs';
 import {verifyJavascriptIntegerInput,verifyJavascriptNamedInput,verifyJavascriptNamedOutcome} from './javascript-native-named-contract.mjs';
 import {requireJavascriptTelemetryMode} from './javascript-schema-telemetry-cases.mjs';
@@ -156,18 +158,22 @@ export async function waitJavascriptExecutionNotifications(page,{binding,deadlin
 
 // Cleanup waits are read-only and retain both the original workflow and the
 // currently displayed native surface. A foreign owner never becomes ready.
-export async function waitJavascriptCleanupReady(page,{owner,prepared,account,deadline,record}) {
+export async function waitJavascriptCleanupReady(page,{owner,prepared,account,deadline,record,savedPath}) {
+  if(savedPath!==undefined)javascriptPackageBindingRequest({prepared,account,savedPath});
   const current=await page.evaluateHandle(()=>{
     const card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
     return {document,card,controller:card?.Controller,node:card?.Controller?.Node?.data?.node};
   });
-  const inspect=({owner,prepared,account,current,poll=false})=>{
+  const inspect=({owner,prepared,account,current,savedPath,poll=false})=>{
     const app=globalThis.bg?.app,f=app?.Application?.FInstance?.FMainForm,map=f?.FMapTree,p=globalThis.__loginomDockPreparationV1;
     const card=f?.Items?.Workspace?.getActiveTab?.(),records=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===prepared.workflow_ref.workflow_id);
     const ancestors=new Set();for(let n=owner.workflow;n&&ancestors.size<32&&!ancestors.has(n);n=n.ParentNode)ancestors.add(n);
+    const rawPath=owner.packageNode.PackageFileName;
+    const pathMatches=savedPath===undefined?rawPath==='':typeof rawPath==='string'
+      &&'/'+rawPath.replaceAll('\\','/').replace(/^\/+/, '')===savedPath;
     const valid=document===current.document&&p?.document===document&&location.origin==='http://logi-test-plan.bg.local'&&app?.Version==='7.4.2'&&p?.id===prepared.document_id
       &&map?.FServerConnection?.UserName===account&&map.FServerConnection.Connected===true&&map.PackageNodes?.Count===1
-      &&map.PackageNodes.Items(0)===owner.packageNode&&owner.packageNode.PackageFileName===''
+      &&map.PackageNodes.Items(0)===owner.packageNode&&pathMatches
       &&ancestors.has(owner.packageNode)&&owner.card.Controller===owner.controller&&owner.controller.Node?.data?.node===owner.workflow
       &&records.length===1&&records[0].packageNode===owner.packageNode&&records[0].tab===owner.tab
       &&card===current.card&&card?.Controller===current.controller&&card?.Controller?.Node?.data?.node===current.node
@@ -183,7 +189,7 @@ export async function waitJavascriptCleanupReady(page,{owner,prepared,account,de
     })};
     return poll?(observed.ready?observed:false):observed;
   };
-  const args={owner,prepared,account,current};
+  const args={owner,prepared,account,current,savedPath};
   try {
     const before=await page.evaluate(inspect,args);await record({phase:'cleanup_workflow_settlement_before',...before,deadline});
     if(!before.ready){
@@ -650,7 +656,11 @@ export async function configureJavascriptManualMapping({reader,cleanupReader,ref
   }
 }
 
-export async function createJavascriptExecutionRuntime({page,prepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real',nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic=false}) {
+export async function createJavascriptExecutionRuntime({page,prepared:inputPrepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real',nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic=false,persistence=false}) {
+  const prepared=structuredClone(inputPrepared);
+  if(typeof persistence!=='boolean'||persistence&&(nativeInputOnly||metadataDiagnostic||nativeNamedCaseId!==undefined
+    ||nativeCalibrationId!==undefined||nativeTelemetryCaseId!==undefined||!Number.isSafeInteger(deadline)||deadline<=Date.now()))
+    throw Error('Separate bounded JavaScript persistence mode required');
   requireJavascriptTelemetryMode(nativeTelemetryCaseId,{namedCaseId:nativeNamedCaseId,calibrationId:nativeCalibrationId,metadataDiagnostic});
   requireJavascriptMetadataMode(metadataDiagnostic,{nativeRoundtrip:nativeInputOnly,namedCaseId:nativeNamedCaseId,calibrationId:nativeCalibrationId});
   const metadataLifecycle=createJavascriptMetadataLifecycle();
@@ -660,7 +670,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
   const origin='http://logi-test-plan.bg.local',build='7.4.2',sessionId='js-g2-'+randomUUID();
   const journalOnce=createJavascriptEffectJournal({record,deadline});
   const once=(id,identity,perform)=>journalOnce(caseEffect(effectScope(),id),identity,perform);
-  let nativeInputEvidence,nativeInputOwner,nativeReadUncertain=false;
+  let nativeInputEvidence,nativeInputOwner,nativeReadUncertain=false,persistenceSaver,savedPath,persistenceUncertain=false;
   const validateNativeSource=()=>verifyNativeRoundtripProvenance(nativeInputOwner);
   const executeUntil=async(code,until)=>{
     if(Date.now()>=until)throw Error('Original JavaScript operation deadline expired');
@@ -691,12 +701,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
   const runtime=createActionRuntime({pinned,execute,artifactStore,allowCandidate:true,onRecord:record,targetOrigin:origin,targetBuild:build,...support});
   const adapter=createNodeTargetBrowserAdapter({execute,origin,build,pinned});
   const graphRequest={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref};
-  const workflowOwner=await page.evaluateHandle(prepared=>{
-    const p=globalThis.__loginomDockPreparationV1,card=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
-    const matches=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===prepared.workflow_ref.workflow_id);
-    if(p?.id!==prepared.document_id||matches.length!==1||!card?.Controller?.Node?.data?.node)throw Error('Original workflow cleanup binding unavailable');
-    return {card,controller:card.Controller,workflow:card.Controller.Node.data.node,packageNode:matches[0].packageNode,tab:matches[0].tab};
-  },prepared);
+  const workflowOwner=await bindJavascriptPackage({page,prepared,account});
   let cleanupRestore,passiveSurface,pendingWizard,pendingMapping;
   const executionPhases=new Map();
   const graph=()=>adapter.observe(graphRequest,deadline);
@@ -731,6 +736,8 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     return binding;
   };
   return {
+    get persistenceUncertain(){return persistenceUncertain;},
+    get persistencePackage(){return savedPath?{path:savedPath,prepared:structuredClone(prepared)}:null;},
     get nativeReadUncertain(){return nativeReadUncertain||metadataLifecycle.uncertain;},
     get metadataReadUncertain(){return metadataLifecycle.uncertain;},
     graph,channel,once,
@@ -749,7 +756,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
           const settled=await waitJavascriptViewsSettlement(page,{...passiveSurface,deadline:cleanupDeadline,record,allowGraph:true});
           if(settled.surface==='views')await returnJavascriptViewsForCleanup(channel(passiveSurface.prepared.node,cleanupDeadline),passiveSurface.prepared.node,passiveSurface.output.port_guid,record,{returnAlreadyDispatched:passiveSurface.returnDispatched});
         }
-        await waitJavascriptCleanupReady(page,{owner:workflowOwner,prepared,account,deadline:cleanupDeadline,record});
+        await waitJavascriptCleanupReady(page,{owner:workflowOwner,prepared,account,deadline:cleanupDeadline,record,savedPath});
         await record({phase:'cleanup_workflow_activation_dispatch',document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,deadline:cleanupDeadline});
         const restored=await activatePreparedWorkflow(page,{request:graphRequest,origin,build,deadline:cleanupDeadline});
         await record({phase:'cleanup_workflow_activation_observed',restored});
@@ -781,6 +788,30 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       if(!pendingWizard?.lifecycle.handoffReady||pendingWizard.lifecycle.cleanup)throw Error('Reopened wizard is not ready for runner ownership');
       // The caller has already set its openedWizard flag and owns Close now.
       const binding=pendingWizard.binding;pendingWizard=undefined;await binding.dispose();
+    },
+    async savePersistenceCheckpoint(revision) {
+      if(!persistence||!persistenceSaver||persistenceUncertain||pendingWizard||pendingMapping||passiveSurface)
+        throw Error('Persistence writer is not ready to save');
+      persistenceUncertain=true;
+      await accountGuard();
+      const admitted=javascriptPackageBindingRequest({prepared,account,savedPath});
+      await page.evaluate(observeJavascriptPackageBinding,{...admitted,previous:workflowOwner,checkOnly:true});
+      const before=await graph();requireJavascriptTopology(before);
+      const saved=await persistenceSaver.save(revision);
+      // Only a verified save authorizes this transition. On any later failure,
+      // retain the saved path for owned cleanup; never retry the write.
+      savedPath=saved.path;
+      prepared.workflow_ref=structuredClone(saved.workflow_ref);
+      prepared.package_ref={...prepared.package_ref,persisted:true,path:savedPath};
+      graphRequest.workflow_ref=prepared.workflow_ref;
+      const request=javascriptPackageBindingRequest({prepared,account,savedPath});
+      const binding=await page.evaluate(observeJavascriptPackageBinding,{...request,previous:workflowOwner,checkOnly:true});
+      const after=await graph();
+      requireJavascriptGraphUnchanged({...before,workflow_ref:prepared.workflow_ref},after);
+      await record({phase:'persistence_saved_binding_verified',revision,path:savedPath,binding,before,after});
+      if(Date.now()>=deadline)throw Error('Persistence binding deadline expired');
+      persistenceUncertain=false;
+      return {...saved,prepared:structuredClone(prepared),graph:after};
     },
     async prepareManualMapping(node) {
       if(pendingMapping)throw Error('Previous manual mapping remains unresolved');
@@ -832,6 +863,7 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
     },
 
     async prepareInput() {
+      if(persistenceSaver)throw Error('Persistence input cannot be prepared twice');
       const fixture=nativeInputOnly?new URL((nativeInputFixture.coercion?'../../../../docs/node-development/nodes/programming-javascript/fixtures/operator-only/':'./fixtures/')+nativeInputFixture.file,import.meta.url)
         :new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/model-input/sales.csv',import.meta.url);
       const pin=nativeInputOnly?verifyNativeInputFixture(await readFile(fixture),nativeFixtureId)
@@ -880,6 +912,10 @@ export async function createJavascriptExecutionRuntime({page,prepared,directory,
       if(nativeInputOnly&&(!nativeInputEvidence?.native.exact.native_bytes_verified||nativeReadUncertain))throw Error('Native input proof/cleanup unavailable');
       if(nativeFixtureId==='civil-datetime'||nativeInputFixture.output_input_rows)verifyNativeRoundtripInput({node:imported.output.node,table:result,native_input:nativeInputEvidence},nativeFixtureId);
       await record({phase:'input_verified',node:imported.output.node,pin,storage,proof,table:result});
+      if(persistence){
+        pinned.actions.set('package.save_checkpoint',javascriptPersistenceSaveAction(pinned.actions.get('package.save_checkpoint'),storage));
+        persistenceSaver=createJavascriptPersistenceSaver({runtime,storage,prepared,deadline,record});
+      }
       return {node:imported.output.node,storage,pin,table:result,proof,...(nativeInputOnly?{native_input:nativeInputEvidence}: {})};
     },
     async armNativeRoundtrip(input) {

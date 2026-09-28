@@ -620,8 +620,9 @@ test('lifecycle journal write failure is reported and never throws from a browse
   assert.doesNotThrow(()=>page.emit('close'));await observer.beforeClose();assert.equal((await observer.finish()).write_failed,true);
 });
 
-function cleanupFixture(fault) {
-  const packageNode={PackageFileName:''},workflow={ParentNode:packageNode},tab={};
+function cleanupFixture(fault,saved=false) {
+  const savedPath=saved?'/jsteach/js-g2-9150c962-ad60-4cd4-a13e-bcba89b982d8/JavaScript-9150c962-ad60-4cd4-a13e-bcba89b982d8.lgp':undefined;
+  const packageNode={PackageFileName:savedPath??''},workflow={ParentNode:packageNode},tab={};
   const original={Controller:{Node:{data:{node:workflow}}}};
   const owner={card:original,controller:original.Controller,workflow,packageNode,tab};
   const storage={constructor:{name:'StorageDirectoryTreeNode'}};
@@ -629,7 +630,8 @@ function cleanupFixture(fault) {
   const blocker={isConnected:true,className:'bg-mask-message',getBoundingClientRect:()=>({x:1,y:2,width:30,height:40}),
     getAttribute:key=>key==='data-tid'?'owned-mask':key==='bg-mask-text'?'Загрузка':null};
   const document={querySelectorAll:()=>blocked?[blocker]:[]};
-  const prepared={document_id:'document',workflow_ref:{workflow_id:'workflow'}};
+  const prepared={status:'READY',document_id:'document',workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'tab'},
+    package_ref:{persisted:saved,path:savedPath??null}};
   const context=vm.createContext({document,location:{origin:'http://logi-test-plan.bg.local'},getComputedStyle:()=>({visibility:'visible'}),
     __loginomDockPreparationV1:{document,id:'document',receipts:new Map([['r',{phase:'verified',workflowId:'workflow',packageNode,tab}]])},
     bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>active}},
@@ -641,17 +643,25 @@ function cleanupFixture(fault) {
       waits++;assert.ok(options.timeout>0&&options.timeout<=5000);
       assert.equal(run(fn,arg),false,'a blocker must keep the first sample pending');
       if(fault==='owner')active={...active};
+      if(fault==='saved-path')packageNode.PackageFileName='/foreign.lgp';
       if(fault!=='blocked')blocked=false;
       if(!run(fn,arg))throw Error('Settlement timeout');return {dispose:async()=>{}};
     }};
   const records=[];
-  return {run:(deadline=Date.now()+5000)=>waitJavascriptCleanupReady(page,{owner,prepared,account:'jsteach',deadline,record:async r=>records.push(r)}),records,
+  return {run:(deadline=Date.now()+5000)=>waitJavascriptCleanupReady(page,{owner,prepared,account:'jsteach',deadline,record:async r=>records.push(r),savedPath}),records,
     get disposed(){return disposed;},get waits(){return waits;}};
 }
 test('cleanup waits read-only for bounded blockers with the original native owners',async()=>{
   const f=cleanupFixture();await f.run();assert.equal(f.waits,1);assert.equal(f.disposed,1);
   assert.equal(f.records[0].blockers[0].tid,'owned-mask');assert.equal(f.records[0].blockers[0].mask_text,'Загрузка');
   assert.equal(f.records.at(-1).ready,true);assert.equal(f.records[0].deadline,f.records.at(-1).deadline);
+});
+test('cleanup accepts only its explicitly admitted saved package path',async()=>{
+  const saved=cleanupFixture(undefined,true);await saved.run();
+  assert.equal(saved.records.at(-1).ready,true);
+  const changed=cleanupFixture('saved-path',true);
+  await assert.rejects(changed.run(),/surface changed/);
+  assert.equal(changed.records.at(-1).owner_verified,false);
 });
 test('expired cleanup deadline cannot start a new settlement wait',async()=>{
   const f=cleanupFixture();await assert.rejects(f.run(Date.now()-1),/deadline/);assert.equal(f.waits,0);assert.equal(f.disposed,1);
