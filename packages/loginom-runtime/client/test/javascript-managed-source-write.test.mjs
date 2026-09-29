@@ -70,6 +70,7 @@ test('one owned browser action replaces exact Unicode text and journals only dig
   assert.ok(f.events.every(event => !JSON.stringify(event).includes('Привет')
     && !JSON.stringify(event).includes('source_text')));
   assert.equal(f.lease.sourceWriteAttempted, true);
+  assert.equal(f.lease.sourceDraftSha256, result.source_sha256);
 });
 
 test('wrong existing digest refuses before any editor action', async () => {
@@ -87,6 +88,7 @@ test('lost insertText reply leaves the original action uncertain and refuses bro
   await assert.rejects(f.replace(), /lost insert reply/);
   assert.equal(f.getSource(), source);
   assert.equal(f.state.uncertain, true);
+  assert.equal(f.lease.sourceDraftSha256, undefined);
   assert.equal(f.calls.filter(call => call === 'insertText').length, 1);
   const gesture = {...task, gesture_id: task.operation_id + ':source-replace',
     previous_source_sha256: javascriptSourceIdentity(old).source_sha256,
