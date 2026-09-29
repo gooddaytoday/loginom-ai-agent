@@ -689,7 +689,9 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
       const prefix=(await table.getAttribute('data-tid')).split(';FileStorageForm;')[0];
       const nav=prefix+';cnrNaviMode;b.s_Сервер>Файлы>jsteach';
       if(await at(nav).count()===0)await once('storage-user-folder',{account,prefix},()=>at(prefix+';FileStorageForm;colName_jsteach').dblclick());
-      await at(nav).waitFor();await accountGuard();
+      // The preceding folder gesture is one-shot. Wait for its exact account
+      // breadcrumb within the original phase, then recheck the account.
+      await at(nav).waitFor({timeout:Math.max(1,Math.min(90000,deadline-Date.now()))});await accountGuard();
       const observedDirectory=async()=>{
         const roots=await runtime.observe({scope:'roots'});
         const navigation=roots.output.ui.elements.filter(element=>element.tid===prefix+';NavigationBar;NavigationPanel');
