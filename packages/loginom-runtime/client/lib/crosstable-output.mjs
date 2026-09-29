@@ -25,7 +25,7 @@ export function resolveCrossTableOutputSchema(configuration,parameters,columns){
  need(rows.every((field,index)=>columns[index]?.name===field.name&&columns[index]?.type===field.type),
   'CrossTable output row keys differ');
  const functions=['sum','min','max','avg'];
- const measures=functions.flatMap(fn=>parameters.facts.filter(fact=>fact.functions.includes(fn)).map(fact=>({
+ const measures=parameters.facts.flatMap(fact=>functions.filter(fn=>fact.functions.includes(fn)).map(fn=>({
   field:source.find(item=>item.name===fact.field.name),fn,definition:CROSSTABLE_FUNCTIONS[fn],
  })));
  need(measures.every(measure=>measure.field&&measure.definition),'CrossTable fact source disappeared');
@@ -51,12 +51,9 @@ export function resolveCrossTableOutputSchema(configuration,parameters,columns){
   categories.push(names[0]);
  }
  need(new Set(categories).size===categories.length,'CrossTable category labels are ambiguous');
- const ordered=[measures.filter(measure=>measure.fn==='sum'),
-  parameters.facts.flatMap(fact=>functions.filter(fn=>fn!=='sum'&&fact.functions.includes(fn))
-   .map(fn=>measures.find(measure=>measure.fn===fn&&measure.field.name===fact.field.name)))].flatMap(block=>
-  categories.flatMap((category,index)=>block.map(measure=>({
+ const ordered=categories.flatMap((category,index)=>measures.map(measure=>({
    name:`C_${index+1}_${measure.field.name}_${measure.definition.suffix}`,
-   label:category+'|'+measure.field.label+'|'+measure.definition.label}))));
+   label:category+'|'+measure.field.label+'|'+measure.definition.label})));
  need(generated.every((column,index)=>column.name===ordered[index].name&&column.label===ordered[index].label),
   'CrossTable output field order differs');
  if(parameters.columns.mode==='fixed'){

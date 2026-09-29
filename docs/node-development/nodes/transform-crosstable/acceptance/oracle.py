@@ -55,19 +55,18 @@ base = rows("base.csv")
 assert sorted({row["Category"] for row in base}) == ["<...>", "A", "B", "C"]
 assert "D" in {row["Category"] for row in source}
 measures = [
-    ("Amount", "Sum", "Сумма", "real"),
-    ("Quantity", "Sum", "Сумма", "real"),
-    ("Amount", "Min", "Минимум", "integer"),
-    ("Amount", "Max", "Максимум", "integer"),
-    ("Amount", "Avg", "Среднее", "real"),
+    ("Amount", "Sum", "Сумма"),
+    ("Amount", "Min", "Минимум"),
+    ("Amount", "Max", "Максимум"),
+    ("Amount", "Avg", "Среднее"),
+    ("Quantity", "Sum", "Сумма"),
 ]
 assert expected["columns"] == [
     {"name": "Region", "type": "string"},
     *[
-        {"name": f"C_{index}_{fact}_{function}", "label": f"{category}|{fact}|{label}", "type": kind}
-        for block in [measures[:2], measures[2:]]
+        {"name": f"C_{index}_{fact}_{function}", "label": f"{category}|{fact}|{label}", "type": "real"}
         for index, category in enumerate(categories, 1)
-        for fact, function, label, kind in block
+        for fact, function, label in measures
     ],
 ]
 grouped = defaultdict(list)
@@ -92,9 +91,8 @@ assert expected["rows"] == [
         "Region": region,
         **{
             f"C_{index}_{fact}_{function}": aggregate(region, category, fact, function)
-            for block in [measures[:2], measures[2:]]
             for index, category in enumerate(categories, 1)
-            for fact, function, _, _ in block
+            for fact, function, _ in measures
         },
     }
     for region in ["North", "South"]

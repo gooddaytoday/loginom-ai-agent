@@ -16,12 +16,10 @@ const columns=[
  {name:'Region',label:'Region',type:'string'},
  ...['A','B','<Прочее>'].flatMap((category,index)=>[
   {name:`C_${index+1}_Amount_Sum`,label:`${category}|Amount|Сумма`,type:'real'},
-  {name:`C_${index+1}_Quantity_Sum`,label:`${category}|Quantity|Сумма`,type:'real'},
- ]),
- ...['A','B','<Прочее>'].flatMap((category,index)=>[
-  {name:`C_${index+1}_Amount_Min`,label:`${category}|Amount|Минимум`,type:'integer'},
-  {name:`C_${index+1}_Amount_Max`,label:`${category}|Amount|Максимум`,type:'integer'},
+  {name:`C_${index+1}_Amount_Min`,label:`${category}|Amount|Минимум`,type:'real'},
+  {name:`C_${index+1}_Amount_Max`,label:`${category}|Amount|Максимум`,type:'real'},
   {name:`C_${index+1}_Amount_Avg`,label:`${category}|Amount|Среднее`,type:'real'},
+  {name:`C_${index+1}_Quantity_Sum`,label:`${category}|Quantity|Сумма`,type:'real'},
  ]),
 ];
 
