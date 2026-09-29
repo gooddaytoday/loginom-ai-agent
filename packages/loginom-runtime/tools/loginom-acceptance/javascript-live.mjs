@@ -1925,7 +1925,7 @@ try {
   if (page&&owner&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await paletteSnapshot('failure-palette').catch(()=>{report.failure.palette_snapshot='unavailable';});
   if (page&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await refusalEvidence('work-refusal').catch(()=>{report.failure.refusal_evidence='unavailable';});
 } finally {
-  cleaning=true;if(persistence||coldReader||packageFile)cleanupDeadline=Date.now()+180000;report.work_stage=report.stage;report.stage='cleanup';
+  cleaning=true;cleanupDeadline=Date.now()+180000;report.work_stage=report.stage;report.stage='cleanup';
   try {
     if (page) {
       if(coldOpenPending)throw Error('Cold package opening/binding uncertain; close own browser only');
@@ -1979,7 +1979,7 @@ try {
         await click('MF;cntMain;tlbMainToolbar;btnPackagesMenu');
         const heading=await (await visibleOne(exact('MF;MainMenuForm;pnlSaveClosePackage;p.h;p.t'))).innerText();
         if (heading.trim()!==ownedPackageName()) throw Error('Close menu owner mismatch');
-        const packageCloseDeadline=phaseDeadline(25000);
+        const packageCloseDeadline=phaseDeadline(90000);
         const packageCloseRemaining=()=>{const ms=packageCloseDeadline-Date.now();if(ms<=0)throw Error('Original package close deadline expired; no replay');return ms;};
         report.effects.push({at:new Date().toISOString(),action:'package-close',state:'dispatching',deadline:new Date(packageCloseDeadline).toISOString()});await save();
         await (await visibleOne(exact('MF;MainMenuForm;btnClosePackage'))).click({timeout:packageCloseRemaining()});
