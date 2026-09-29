@@ -1,5 +1,28 @@
 # JavaScript: checkpoint исполнения
 
+## Проверка Cursor-правила и G4 draft writer — 2026-09-29
+
+После `git fetch origin loginom javascript` повторный `git rebase origin/loginom`
+ветки `javascript` ответил `Current branch javascript is up to date`:
+`3f35c5f232` уже её предок. Локальная Cursor-сессия
+`d69de234-826c-4e08-a8ac-184749a58d47` (указанный пользователем
+`79e41aa8-71f2-4345-861f-d6510fe0344b` — ID запроса в этой сессии)
+подтвердила назначение: общее правило кнопки ошибки в `loginom`, а в JS-подплане
+и частном операторе — раннее чтение причины до дальнейших syntax probes.
+Это уже реализовано в child `node-javascript` до текущего шага; повторно
+проверены 22/22 адресных теста stage observer / error dialog и общий
+`validate.py` со статусом PASS. `engine-probe-06` не повторялся.
+
+Child source `af0b971c03` добавил внутренний one-shot writer полного исходника
+с owner/epoch и exact expected SHA, проверкой синтаксической module policy,
+одним keyboard replacement, журналом только хешей и точным readback draft.
+Потерянный ответ после начала жеста переводит writer в `uncertain` без повтора.
+Адресный набор source-read/write/admission/cycle/cold на pinned Node24.19.0
+прошёл 226/226; `node --check` и `git diff --check` прошли. Это пока
+**source-only**: writer не подключён к публичному handler или CLI-приёмке и
+не проверен новым живым headed запуском. Другие незавершённые файлы child
+worktree не включались в коммит и остаются на месте.
+
 ## Фаза 1B: подготовлен versioned knowledge-asset — 2026-09-29
 
 Child source `1d2c0590ba` добавил
