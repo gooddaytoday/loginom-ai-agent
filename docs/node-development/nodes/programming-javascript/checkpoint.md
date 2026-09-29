@@ -1,5 +1,17 @@
 # JavaScript: checkpoint исполнения
 
+## Source receipt через настоящий MCP bridge — 2026-09-29
+
+Code commit `d17723e59c` в `origin/node-javascript` расширил протокольный
+`bridge-contract` тест. Он проходит через настоящий `createBridge`, MCP
+Server/Client и `dock_node_read` в full и user-v1 профилях: точные source
+`content`/`structuredContent`, compact expansion подготовленного workflow и
+same-ID cache без второго чтения. Внешний Loginom browser adapter в тесте
+подставлен; `bridge.test.mjs` **11 PASS / 0 FAIL**, `node --check` и
+`git diff --check` прошли. Это доказательство доставки и формы MCP, не live
+кандидата CLI, модели или JavaScript apply/execute handler. Последний реальный
+headed proof и свободный следующий profile 261 — в разделе ниже.
+
 ## Публичный `dock_node_read kind:source` — headed proof, 2026-09-29
 
 Code commit `0c513c445a` в `origin/node-javascript` подключил ранее проверенные
