@@ -1,5 +1,24 @@
 # JavaScript: checkpoint исполнения
 
+## Managed settlement после Setting — 2026-09-29
+
+Child `ee41af1bd9` добавил read-only ожидание результата единственного
+Setting-жеста в рамках прежнего deadline. Повторное чтение использует тот же
+page-local lease, preparation receipt, account, workflow и native owner;
+различает открытый мастер, принадлежащий узлу диалог деактивации и пока ещё
+не завершившийся граф. Диалог не подтверждается автоматически. Неизвестный
+исход к deadline не разрешает повтор Setting или cleanup. После deadline
+возможны только inspect/dispose; новый body/Setting эффект отвергается.
+
+На закреплённом Ubuntu Node24.19.0: адресные тесты managed-пути 11/11 PASS,
+client JS suite 231/231 PASS, полный JS acceptance unit-набор 17830/17830
+PASS, `node --check` и `git diff --check` PASS. Проверка сериализованного
+браузерного кода пока проводилась на VM fixtures; headed Loginom для этого
+managed пути и public handler/CLI J20 ещё не подтверждены. Правило чтения
+кнопки ошибки мастера из `loginom` уже действует в private операторе и
+закреплено в подплане; следующий этап — живое подтверждение managed-пути,
+затем интеграция в публичный обработчик с тем же правилом отказа.
+
 ## Managed Setting gesture — 2026-09-29
 
 Child `0da375fb08` добавил отдельный Setting dispatch после подтверждённого
