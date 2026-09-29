@@ -34,6 +34,34 @@ existing code-table через public API-path изолированного runt
 Затем C code, D declared с Save/cold, E остаток J и F ревью/candidate/CLI.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### C0: подготовка материализации output0 — 2026-09-30
+
+После private P1 run08 следующий этап — C; выполненные P1 не повторялись.
+Child `d4102c6d6c` сохраняет семантический `UI_EPOCH_CHANGED` через Playwright:
+отказ финальной typed Stop inspection возвращается как данные из browser,
+host восстанавливает точный code для существующего bounded no-effect refresh.
+Успешный gesture path не изменён; 165 адресных tests PASS, live run08 остаётся
+доказательством source `0328cadfc9`, а не нового commit.
+
+Child `e7f675b9cb` добавляет fixed operator-only `c0-code-materialization`.
+Source/oracle неизменны относительно `p1-business-code-base`; новый case читает
+полный output0 mapping после Done и после одного собственного Execute, затем
+Table именно того же native port GUID. Сравниваются фактические linked record/field
+IDs, имена, метки и типы mapping targets с bound Table. Бизнес-oracle отдельный.
+Даже успешное сравнение сохраняет `generated_logical_schema_observed=false`,
+`bridge_verified=false`, native bytes=false и gates_closed=[]: логическая
+OutputTable→physical lineage этой пробой не доказана. Это подготовка C,
+не полный public handler или закрытие G3. Unknown effects не переигрываются;
+исходный deadline и owned cleanup остаются прежними.
+
+Full client suite на текущих общих контрактах: 2923 PASS, 10 skips,
+0 failures, exit 0; browser geometry integrations пропущены без назначенного
+`LOGINOM_DOCK_TEST_BROWSER`, headless browser не запускался. Log SHA256
+`f451936004ca69ec3ab8d8e53bf62ba183c56982dd23d2d8ebd97e7b8d6ff8d5`.
+56 адресных materialization/business/discovery/mapping tests PASS; log SHA256
+`17ec4ac73f9731bd221d444a3070c764cca0a3fabe8bd2463c3ed4d8de7a58dd`.
+Syntax и diff-check PASS. Свежий headed live/evidence ещё не получен.
+
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
 Child code commits `05dfebe85a`, `7fe5978c0f`, `cbfb793c95` добавили operator-only

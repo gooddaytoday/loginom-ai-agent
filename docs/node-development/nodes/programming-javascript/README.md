@@ -78,13 +78,14 @@ Linux установлена отдельным чтением `Session.Version.
   handler не включён в продуктовый registry. Повторять этот run без
   затронувшего изменения не требуется.
 - Оставшиеся решения 0B — G1 identity/assistant, G3 source→physical, G5
-  обязательные API/J24, G6 Stop/cancel; отдельно от приёмки в [discovery](discovery.md).
+  обязательные API/J24 и остаток G6; отдельно от приёмки в [discovery](discovery.md).
 - Private P1 бизнес 6×4 проверен для code/base, declared/base и code
   changed/reordered с неизменным oracle и cleanup 3/3; точные SHA и границы
-  в checkpoint. Следующий связный результат — конечный Stop/cancel и short
-  same-node rerun, затем code/declared через handler с независимым Save/cold.
-  Local read cancel доказан отдельно; он не закрывает server Stop. Частные
-  результаты не заменяют public/CLI приёмку.
+  в checkpoint. Private конечный native Stop, отдельный local read cancel и
+  short same-node rerun 6×4 подтверждены run08/source `0328cadfc9`, cleanup 3/3.
+  Следующий связный результат — C: public code lifecycle и G3 bridge, затем
+  declared через handler с независимым Save/cold. Полный G6 и public/CLI
+  приёмка остаются открытыми.
 - После ревью проверить knowledge/budgets и J27 на immutable CLI candidate,
   затем две автономные попытки Sol low только на назначенном стенде.
   Source fix explicit URL уже есть; альтернативный fix согласовать до сборки.
