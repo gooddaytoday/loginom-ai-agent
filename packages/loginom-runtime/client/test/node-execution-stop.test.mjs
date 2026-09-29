@@ -6,7 +6,7 @@ const grid='ConsoleForm;ProgressForm;trpProgress;grd;tbl',cancel='mnContextMenu;
 const element=(tid,verbs=['click'])=>({tid,ref:'ui-'+tid,allowed_actions:verbs});
 async function fixture(fault, multiple=false) {
  let opened=true,menu=false,launched=false,terminal=false,cancelCalls=0;
- const actions=[];
+ const actions=[],reads=[];
  const proof={root_id:'root',record_id:'child',process_id:'1.1',node_id:'node',owner_verified:true,can_cancel:true,source:'native_process_model_identity'};
  const state=()=>{
   const progress_state={verified:true,state:terminal?'cancelled':'running',terminal,can_cancel:!terminal};
@@ -26,7 +26,7 @@ async function fixture(fault, multiple=false) {
    ui:{elements:[element('MF;cntMain;tlbMainToolbar;btnProgress'),...(opened?[element(grid,['right_click']),element('ConsoleForm;btnClose'),element('child-row',['right_click'])]:[]),
     ...(menu?[element('mnContextMenu;mniShowCompletedProcesses',['click','press']),{...element(cancel,['cancel_process']),process_menu:{cancellation:actualProof}}]:[])]}};
  };
- const channel={observe:async o=>{const s=state();if(!o.ready(s))throw Error('Readiness refused: '+o.condition);return structuredClone(s);},
+ const channel={observe:async o=>{reads.push(o);const s=state();if(o.readProcesses===false)delete s.node_processes;if(!o.ready(s))throw Error('Readiness refused: '+o.condition);return structuredClone(s);},
   perform:async o=>{const s=state();assert.equal(o.ready(s),true);const identity=o.identity(s);assert.ok(identity);const a=o.resolve(s);actions.push(a);
    if(a.verb==='cancel_process') {cancelCalls++;if(fault==='unknown_receipt')throw Error('Unknown stop receipt');terminal=true;menu=false;}
    else if(a.verb==='right_click')menu=true;
@@ -36,8 +36,14 @@ async function fixture(fault, multiple=false) {
    return {status:'SUCCEEDED'};
   }};
  const driver=createNodeExecutionProcedure(channel,node);await driver.prepare();launched=true;await driver.identify();actions.length=0;
- return {driver,channel,actions,get cancelCalls(){return cancelCalls;}};
+ reads.length=0;
+ return {driver,channel,actions,reads,get cancelCalls(){return cancelCalls;}};
 }
+test('Stop refreshes native inventory when the process console was already visible',async()=>{
+ const f=await fixture();const stopped=await f.driver.stop();assert.equal(stopped.stop_verified,true);
+ assert.equal(f.reads[0].readProcesses,false);assert.equal(f.reads[1].readProcesses,true);
+ assert.equal(f.reads[1].condition,'process console visible');assert.equal(f.cancelCalls,1);
+});
 test('stop driver cancels only its identified native child and returns terminal evidence once',async()=>{
  const f=await fixture(),first=f.driver.stop(),second=f.driver.stop();assert.equal(first,second);
  const result=await first;assert.equal(result.status,'cancelled');assert.equal(result.stop_verified,true);
