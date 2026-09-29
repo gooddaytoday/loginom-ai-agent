@@ -66,6 +66,14 @@ try {
     await row.waitFor({ state: "hidden", timeout: 5000 })
     closed += 1
   }
+  // A disappeared row is insufficient if another session appeared meanwhile.
+  await page.locator(suffix("SessionsManagerForm;btnRefresh")).click()
+  const remaining = await page.locator('[data-tid*="SessionsManagerForm;colSession_Root>"]').evaluateAll((elements, user) =>
+    elements.some((element) => {
+      const id = element.getAttribute("data-tid")?.match(/;colSession_Root>([^>;]+)$/)?.[1]
+      return id === user || id?.startsWith(`${user}:`)
+    }), slotUser)
+  if (remaining) throw Error("SLOT_SESSIONS_REMAIN")
   await page.locator(tid("MF;cntMain;tlbMainToolbar;btnAvatar")).click()
   await page.locator(tid("MF;AppMenuForm;btnLogOut")).click()
   await page.locator(tid("LoginForm;Login;edtUsername")).waitFor({ timeout: 30000 })
