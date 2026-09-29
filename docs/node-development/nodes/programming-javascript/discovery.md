@@ -11,8 +11,8 @@ Linux по принадлежащему `Session.Version.IsWindows=false`; ди�
 Исходные отчёты и журналы находятся в приватной кампании; подтверждённые SHA,
 ревизии операторов и границы каждой попытки перечислены в [checkpoint](checkpoint.md).
 
-Сводка обновлена по [acceleration review](acceleration-review.md) на docs
-`13a02e8be2` / code `7b8e19bee0`. В этой правке новые live-прогоны не выполнялись.
+Исходная сводка обновлена по [acceleration review](acceleration-review.md) на docs
+`13a02e8be2` / code `7b8e19bee0`; позже выполнен B-live на code `f8ceebcac9`.
 Решение 0B доказывает осуществимость/выбирает контракт; последняя колонка
 остаётся проверкой реализации и приёмки. Непроверенные пункты в ней не возвращают
 закрытое решение исследования в начало.
@@ -68,11 +68,14 @@ trigger `EditColumnDefForm;cbxUsageType;trg_picker` (`rendered=true`,
 независимый byte-auditor подтвердил `DefaultUsageType="utPredicted"` в сохранённом
 `Unit.xml`. Точные SHA и граница доказательства — в [checkpoint](checkpoint.md).
 
-Для продолжения использовать B и ранние P1-пробы из [плана](plan.md): публичный
-configure existing через ограниченный injected handler в испытательном runtime,
-с предварительным согласованием Done/result-контрактов, бизнес 6×4 и bounded
-Stop/cancel. `configured_only` относится к mapping evidence, публичный Done
-возвращает `output.status=not_refreshed`. Реализация уже идёт;
+Ограниченный B public configure existing подтверждён в испытательном runtime:
+headed `public-node-apply-03`, независимый public source-read, сохранённые
+settings/input mapping/связи и cleanup 3/3. `configured_only` относится к
+output mapping evidence; публичный Done вернул `output.status=not_refreshed`,
+`execution.status=not_requested` и сохранил неизвестность внутренних эффектов
+как `execution_started=null`. Точные SHA и границы — в [checkpoint](checkpoint.md).
+Для продолжения использовать ранние P1-пробы из [плана](plan.md): бизнес 6×4
+и bounded Stop/cancel до полного Execute/read контракта. Реализация продолжается;
 наличие этого кода не закрывает неизвестные G1/G3/G5/G6, а отсутствие CLI не
 блокирует выход 0B. `ready_for_development` требует решений по точным вопросам
 третьей колонки; окончательное закрытие gates — по четвёртой.

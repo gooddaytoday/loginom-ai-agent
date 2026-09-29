@@ -2,44 +2,87 @@
 
 ## Текущее состояние
 
-Сводка на 2026-09-29 после применения [acceleration review](acceleration-review.md)
-к [плану](plan.md). Проверены docs HEAD `13a02e8be2d698d5fbc7f19d146fa82d55f53e48`
-и code HEAD `7b8e19bee073cb596607688173234e57052e27b1`. Ниже пересказ ранее
-зафиксированных evidence, а не новые tests/live. Официальная готовность в
+Сводка на 2026-09-29 после результата B. Исходный срез
+[acceleration review](acceleration-review.md) к [плану](plan.md): docs
+`13a02e8be2d698d5fbc7f19d146fa82d55f53e48`, code
+`7b8e19bee073cb596607688173234e57052e27b1`. Новые live evidence B
+записаны ниже. Официальная готовность в
 registry не повышалась; 0B остаётся `discovery_required` с точным остатком
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
+Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
+это isolated acceptance support, не регистрация продуктового JS handler.
 
 | Возможность / связанные J | Уровень и evidence | Остаток |
 | --- | --- | --- |
 | Ubuntu/worktree/toolchain/memory admission | Подтверждён ранее в этой истории, поколение `20260926.2` | Проверять изменения окружения/сбои; не повторять bootstrap без причины |
-| Типовая оболочка, параметры/module policy, knowledge — J01/J21/J26 | Runtime/source `168d4f88d0`, `1d2c0590ba`; см. «Фаза 1A/1B» и «Фаза 1B/1C» ниже | Реальный apply handler отсутствует; describe с test handler/staged asset не равен candidate delivery |
+| Типовая оболочка, параметры/module policy, knowledge — J01/J21/J26 | Runtime/source `168d4f88d0`, `1d2c0590ba`; см. «Фаза 1A/1B» и «Фаза 1B/1C» ниже | Полный продуктовый apply handler отсутствует; isolated B injection не равен candidate delivery |
 | Публичный source-read — J05/J21/J23 | Runtime/live `0c513c445a`: 376 bytes / 8 lines; MCP test `d17723e59c` с подставленным browser adapter | Границы/chunks/redaction/empty и фактический candidate/CLI; базовый путь заново не разрабатывать |
-| Writer/discard — J05/J10/J13/J14/J23 | Runtime/live `66027dc9c3`, `1e0da9265a`; `managed-writer-02`, report `7619312306916790ffa2c6d727eb873ebf0656eb03d2d93e4abea09b31f30c6e` | Public configure-композиция и непроверенные случаи |
-| Code Next → Done → новый source-read — J10/J14 | Runtime/live `7b8e19bee0`; `managed-code-next-01`, report `ab50f8ce65cdf3fc4ee8b60f8a92dec01bff329ff979a472548163840bbda682` | Existing code-table без смены схемы; runtime settlement пока в операторе, output mapping `configured_only`, public apply/Execute не доказаны |
+| Writer/discard — J05/J10/J13/J14/J23 | Runtime/live `66027dc9c3`, `1e0da9265a`; `managed-writer-02`, report `7619312306916790ffa2c6d727ebf0656eb03d2d93e4abea09b31f30c6e` | Узкий public configure B подтверждён отдельно; прочие случаи открыты |
+| Code Next → Done → новый source-read — J10/J14 | Runtime/live `7b8e19bee0`; `managed-code-next-01`, report `ab50f8ce65cdf3fc4ee8b60f8a92dec01bff329ff979a472548163840bbda682` | В B settlement перенесён в runtime для fixed code case; output mapping `configured_only`, Execute не доказан |
+| B: public existing configure — J05/J10/J14/J21 | Isolated `dock_node_apply` + независимый `dock_node_read`, `public-node-apply-03`, report SHA `3b5a18c93ec139edd311f0058b542fc7d70d84f38bdf9c4b5be74312eb5647f4`, cleanup 3/3 | Только фиксированный code/comment source; output mapping `configured_only`, Execute, Save/cold и полный продуктовый handler не доказаны |
 | Scalar/precision/cardinality/engine/names/errors — J06–J09/J12/J20/J24/J25 | Приватные native/typed, 30/30 engine observations, T-пробы; ссылки в discovery | G3 bridge, обязательный остаток G5/G6 и подтверждение через handler; число snippets не означает PASS |
 | Persistence — J15/J23 | Приватные code/declared/usage writer–cold–bytes, dirty-state; см. G7 discovery и исторические SHA ниже | Только фиксированные 6×2; нужны handler 6×4 и CLI |
 | Бизнес и freshness — J03/J04/J11 | Не проверено для 6×4, changed/reordered | Ранние private пробы с неизменным oracle, затем public сценарии C/D |
 | Stop/cancel — J13 | Runtime/unit части lost reply; живого Stop/cancel нет | Конечный цикл ≤60 секунд, owned terminal/cleanup/rerun до фиксации Execute-контракта |
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
-**Следующий связный результат:** B — configure existing code-table через public
-API в испытательном runtime с ограниченным injected handler. До B-live
-согласовать JS finish verifier (Done `execution_started=null`, не `false`)
-и публичный результат `output.status=not_refreshed`; `configured_only` относится
-только к mapping evidence. Затем effective source/digest/policy → managed
-write/readback → Code Next/Done → settlement → независимый source-read с cleanup. Последний run
-успешно наблюдён; повторять его без затронувшего изменения не требуется.
-До окончательного Execute/read контракта — ранние private 6×4 и Stop/cancel.
+**Следующий связный результат:** ранние private 6×4 и конечный Stop/cancel
+из P1 [плана](plan.md) до окончательного Execute/read контракта. B уже подтвердил
+existing code-table через public API-path изолированного runtime; повторять
+этот фиксированный run без затронувшего изменения не требуется.
 Затем C code, D declared с Save/cold, E остаток J и F ревью/candidate/CLI.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
 Канонические документы читать в основном checkout `javascript`, код —
-в `.worktrees/node-javascript`. В child на момент сверки нет tracked правок,
-есть 20 untracked документов и `__pycache__/`; его tracked checkpoint устарел.
-Эти файлы сохранены, не включены в данную правку и не являются новым bootstrap.
+в `.worktrees/node-javascript`. Child содержит коммиты B и прежние untracked
+документы/`__pycache__/`; его tracked checkpoint устарел.
+Untracked файлы сохранены, в code commits не включены и не являются новым bootstrap.
 Решение об их перемещении/удалении отдельно; пользование каноническими docs
-не зависит от уборки child. Приватные leases/профили этой правкой не менялись;
-следующий профиль определять по свежему assignment под lock, не по старой записи.
+не зависит от уборки child. Следующий приватный профиль — назначенный под
+registry lock `javascript-discovery-profile-280`; перед новым live всё равно
+сверять свежий assignment, процессы и закрытие предыдущего пакета.
+
+### B: публичный configure existing — 2026-09-29
+
+В child commits `57b074fc7b`, `7cd36bb763`, `f8ceebcac9` собран узкий
+injected JS handler для испытательного `createActionRuntime`, без продуктовой
+регистрации. До target/editor pure admission допускает только existing code,
+expected digest, пустые inputs/mappings/read и Done. JS-specific finish
+сохраняет `execution_started=null`; публичные schema/types/user-v1 передают
+`configuration.status=applied`, `execution.status=not_requested`,
+`output.status=not_refreshed`. `configured_only` остаётся отдельным operator
+mapping evidence. Source-write, Code Next и Done — one-shot с ACK/receipts.
+
+Первые два headed прогона на собственных свежих профилях остались отдельными
+неуспешными evidence. `public-node-apply-01` (report SHA256
+`6986119c70704616ab85f2c42bb9e71efaa8754e1204cdef26db1d4580ccddcf`)
+дошёл до Done, но первая graph observation увидела `surface_unavailable`;
+публичный job был AMBIGUOUS. Отдельный headed Диспетчер закрыл ровно
+`Package1` и `jsteach:3533`; recovery journal SHA256
+`a99a644b1f356859d486d637307e3361b5e64dc0ee482bd23da4e8c35ee7932a`.
+`public-node-apply-02` (report SHA256
+`d46098b2f820a239b5320323176caa07ba8ae76d225cb62e0e7f5d429d44ccc5`)
+получил публичный `SUCCEEDED`, но operator mapping-close строгим сравнением
+отклонил единственное `locked:true→false` у собственного JS. Его пакет и
+`jsteach:3537` закрыты отдельным headed recovery; journal SHA256
+`1e9624d380befa82bc342778ae6d0aad560fad7b4e11afc6f7ee2ba3aa2a25e0`.
+Исходный cleanup этих двух runs не переименован в успешный.
+
+Третий обычный headed `public-node-apply-03` на профиле 279 — **OBSERVED**.
+Report SHA256 `3b5a18c93ec139edd311f0058b542fc7d70d84f38bdf9c4b5be74312eb5647f4`,
+journal SHA256 `5101ab0e3207973c8865106734be3b7178d7e6d3622e9841f84fa4a4c9bd9b28`.
+Публичный `dock_node_apply` подтвердил все восемь фаз и тот же JS owner;
+независимый `dock_node_read` прочитал точный комментарийный source SHA256
+`acfb0d0bcf767e46bea9a88ed429759ccaf94790a96ff62d8a9c7b4641461eb5`
+(424 UTF-8 bytes, 9 LF lines), settings сохранились. Input mapping complete,
+output targets `configured_only`, связи графа сохранены. После закрытия
+собственного input-port единственная lock-дельта проверена отдельным
+строгим predicate и native identity; финальный execution boundary совпал.
+Явный Execute не вызывался, свежие output cells и сохранение пакета не
+доказывались. Cleanup: package closed, UI logout, headed browser closed — 3/3.
+Локальные B tests: 109 client и 48 operator PASS, syntax и diff-check PASS.
+Это внутренняя веха fixed case; C/D, G3 bridge, Stop/cancel, candidate/CLI
+и полный J01–J27 остаются открытыми.
 
 ## Указания пользователя
 
@@ -54,11 +97,12 @@ write/readback → Code Next/Done → settlement → независимый sour
 | Случайный клик (27.09 20:24:06) | Единственное сообщение; первоначальный разбор выполнен. Поздние записи о «новом» сообщении исправляет примечание ниже, а не новый browser run |
 | Одна итерация с X11-защитой фокуса (29.09 07:11) | Выполнено: `24745d80bd`, `managed-opening-focus-probe-03` и recovery; это не постоянное назначение |
 | Продолжать общую цель, браузер «как обычно» (29.09 07:47) | Текущее постоянное правило: обычный headed без `--x11-no-focus`; поздний флаг оператора сам не меняет поручение |
-| Доработать план по acceleration review (29.09, текущая задача) | Выполнена правка plan/discovery/card и этой сводки; реализация и запуск другой задачи этим не назначены |
+| Доработать план по acceleration review (29.09) | Выполнена правка plan/discovery/card и этой сводки; реализация B затем выполнена по отдельному указанию продолжать цель |
+| Уточнение перед B-live (29.09, текущая задача) | `ad92ddbf8c` — канонический план; rebase/клик не повторять, память дополнительно проверять только при ошибке; обычный headed без X11-флага, untracked `acceleration-review.md` не коммитить |
 
 Общие правила: стенд только `http://logi-test-plan.bg.local/app/`, Loginom 7.4.2,
-один owner и fresh profile на новый browser process; память недоступна —
-диагностика, сообщение и остановка. Предложенное в обзоре исключение из правила
+один owner и fresh profile на новый browser process; при ошибке памяти —
+диагностика, а при недоступности сообщение и остановка. Предложенное в обзоре исключение из правила
 памяти не принято. Эти ограничения сохранять при продолжении существующей Goal;
 её objective/state из этой задачи не изменялись. Новое явное указание пользователя
 может изменить правило; сначала записать его время, область и результат.

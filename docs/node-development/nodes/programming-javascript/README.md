@@ -23,12 +23,12 @@ source-read без исполнения и отдельное declared-зада�
 
 **discovery_required**, 2026-09-29. Проведено исследование исходников,
 официальной справки, приложенного системного справочника и e2e-репозитория.
-Публичного apply handler JavaScript пока нет. В коде `node-javascript`
-`7b8e19bee0` уже реализованы типовая оболочка, preflight/knowledge, публичный
-source-read и managed write/Code Next/Done. Headed existing code-table proof
-подтвердил точный новый source после Done, но output mapping остался
-`configured_only` (полная source identity не доказана);
-полная конфигурация/Execute через handler этим не доказана. Краткая актуальная
+Продуктового apply handler JavaScript пока нет. В child code
+`f8ceebcac9` реализован ограниченный injected existing-code handler:
+headed `public-node-apply-03` подтвердил публичный configure/Done,
+независимый source-read и cleanup 3/3. Output mapping остался
+`configured_only` (полная source identity не доказана); Execute, Save/cold и
+полный продуктовый handler этим не доказаны. Краткая актуальная
 сводка и SHA — в [checkpoint](checkpoint.md#текущее-состояние).
 Исследование мастера проводится в Ubuntu headed-браузере; private
 пробы подтвердили real/boolean/string/safe-int64 и Date civil/native identity,
@@ -73,15 +73,14 @@ Linux установлена отдельным чтением `Session.Version.
 
 - Сверить текущие docs/code и обработанные указания в каноническом checkpoint;
   допуск Ubuntu/worktree/памяти повторять только при изменении предпосылок/сбое.
-- Следующий результат **B — публичный configure existing code-table**:
-  согласовать JS Done/result-контракты, связать managed-функции с lifecycle
-  и перенести ожидания Next/Done в runtime. Проверить public API через
-  ограниченный injected handler в испытательной среде; частичный handler
-  не включать в продуктовый registry. Базовый source-read заново не разрабатывать.
+- Результат **B — публичный configure existing code-table** подтверждён
+  только для fixed comment-only source в изолированном runtime; частичный
+  handler не включён в продуктовый registry. Повторять этот run без
+  затронувшего изменения не требуется.
 - Оставшиеся решения 0B — G1 identity/assistant, G3 source→physical, G5
   обязательные API/J24, G6 Stop/cancel; отдельно от приёмки в [discovery](discovery.md).
-- Рано проверить приватный бизнес-результат 6×4 с changed/reordered input и
-  конечный Stop/cancel-case, затем довести code и declared через handler с
+- Следующий связный результат: приватный бизнес-результат 6×4 с
+  changed/reordered input и конечный Stop/cancel-case, затем довести code и declared через handler с
   независимым Save/cold. Частные 6×2 не заменяют бизнес-oracle.
 - После ревью проверить knowledge/budgets и J27 на immutable CLI candidate,
   затем две автономные попытки Sol low только на назначенном стенде.

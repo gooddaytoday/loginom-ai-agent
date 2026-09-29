@@ -130,7 +130,7 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
 Выход A: актуальные сводки, уровни J01–J27 и следующий результат B записаны.
 Это документационное условие в данной правке выполнено; новых live PASS нет.
 
-### B. Публичный configure существующего узла — ближайший результат
+### B. Публичный configure существующего узла — внутренняя веха подтверждена
 
 В фазах 1–3 связать действующие `validateJavascriptParameters`,
 `inspectJavascriptModulePolicy`, source admission и managed adapter/writer
@@ -209,6 +209,14 @@ helper — отдельная адресная правка с прежними 
 input mapping, настроенными output targets/связями графа и cleanup 3/3.
 Неподтверждённые source→physical связи не выдавать за сохранённое полное mapping.
 Existing configure остаётся внутренней вехой полного v1.
+
+Результат 2026-09-29: узкий injected handler в child code
+`f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` прошёл headed
+`public-node-apply-03` с независимым public source-read и cleanup 3/3.
+Точный SHA, source/settings/mapping/graph evidence, два предыдущих отказа и
+границы результата записаны в [checkpoint](checkpoint.md).
+Обе несовместимости перед B-live закрыты; продуктовый registry JS не расширен.
+Следующий связный результат — ранние P1-пробы 6×4 и Stop/cancel ниже, затем C/D.
 
 ### Ранние различающие пробы — P1, до фиксации Execute/read контракта
 
