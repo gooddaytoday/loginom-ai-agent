@@ -6,7 +6,8 @@ import {validateJavascriptParameters} from '../lib/javascript-parameters.mjs';
 
 const source='import {InputTable, OutputTable} from "builtIn/Data";\nOutputTable.AssignColumns([]);';
 const column={name:'ObservedID',label:'Идентификатор',type:'integer',data_kind:'Дискретный',usage:'Выходное'};
-const request=(kind='new')=>({target:{kind},inputs:kind==='new'?[{input:0}]:[]});
+const request=(kind='new')=>({target:{kind},inputs:kind==='new'?[{input:0}]:[],mappings:[],
+  finish:'execute',read:{ports:[0]}});
 const checked=(parameters,kind='new')=>{
   validateActionParameters(javascriptParametersSchema,parameters);
   return validateJavascriptParameters(parameters,'script',request(kind));
@@ -49,6 +50,25 @@ test('mode, source and port invariants refuse unsupported request shapes',()=>{
     {source_text:source,schema_mode:'code',source:{artifact_id:'csv'}}])
     assert.throws(()=>validateJavascriptParameters(parameters,'script',request()),/Invalid parameters/);
   assert.throws(()=>validateJavascriptParameters({source_text:source,schema_mode:'code'},'expression',request()),/Invalid parameters.mode/);
-  assert.throws(()=>validateJavascriptParameters({source_text:source,schema_mode:'code'},'script',{target:{kind:'new'},inputs:[]}),/Invalid parameters.inputs/);
-  assert.throws(()=>validateJavascriptParameters({source_text:source,schema_mode:'code'},'script',{target:{kind:'new'},inputs:[{input:1}]}),/Invalid parameters.inputs/);
+  assert.throws(()=>validateJavascriptParameters({source_text:source,schema_mode:'code'},'script',
+    {...request(),inputs:[]}),/Invalid parameters.inputs/);
+  assert.throws(()=>validateJavascriptParameters({source_text:source,schema_mode:'code'},'script',
+    {...request(),inputs:[{input:1}]}),/Invalid parameters.inputs/);
+});
+
+test('JavaScript core refuses foreign mapping/read ports and effectful Close before target mutation',()=>{
+  const parameters={source_text:source,schema_mode:'code'};
+  for(const mappings of [[{direction:'input',port:1}],[{direction:'output',port:1}],
+    [{direction:'input',port:0},{direction:'input',port:0}]])
+    assert.throws(()=>validateJavascriptParameters(parameters,'script',{...request(),mappings}),/Invalid parameters.mappings/);
+  assert.throws(()=>validateJavascriptParameters(parameters,'script',
+    {...request(),read:{ports:[1]}}),/Invalid parameters.read.ports/);
+  assert.throws(()=>validateJavascriptParameters(parameters,'script',
+    {...request(),finish:'close'}),/Invalid parameters.finish/);
+  assert.throws(()=>validateJavascriptParameters({},'script',
+    {...request('existing'),mappings:[{direction:'output',port:0}],finish:'close',read:{ports:[]}}),/Invalid parameters.finish/);
+  assert.deepEqual(validateJavascriptParameters({},'script',
+    {...request('existing'),finish:'close',read:{ports:[]}}),{});
+  assert.equal(validateJavascriptParameters(parameters,'script',{...request(),mappings:[
+    {direction:'input',port:0},{direction:'output',port:0}]}),parameters);
 });
