@@ -255,11 +255,12 @@ export function javascriptMappingUnlockReceipt(receipt,reference) {
   return canonical({...before,locked:false})===canonical(after)&&canonical(receipt.output?.prepared_node_context??{})===canonical(after);
 }
 
-export async function closeJavascriptPortMapping({reader,direction,reference,record,deadline,verifyGraph}) {
+export async function closeJavascriptPortMapping({reader,direction,reference,record,deadline,verifyGraph,allowOwnedUnlock=false}) {
   let closed;
   try {closed=await closePreparedWizard(reader);}
   catch(error){
-    if(direction!=='input'||error.name!=='NodeProcedureStepError'||!javascriptMappingUnlockReceipt(error.receipt,reference))throw error;
+    if(!(direction==='input'||direction==='output'&&allowOwnedUnlock===true)
+      ||error.name!=='NodeProcedureStepError'||!javascriptMappingUnlockReceipt(error.receipt,reference))throw error;
     await record({phase:'port_mapping_close_unlock_receipt',direction,operation_id:error.receipt.operation_id,
       original_status:error.receipt.status,reference,transition:'same_graph_locked_true_to_false'});
     const remaining=deadline-Date.now();if(remaining<=0)throw error;
@@ -438,7 +439,7 @@ export async function createJavascriptSavedExecutionRuntime(options) {
     readOutput:(node,deadline)=>runtime.readPassive(node,'cold-observed',deadline)});
 }
 
-async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real',nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic=false,persistence=false,coldPackagePath,inputVariant='base'}) {
+async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real',nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic=false,persistence=false,coldPackagePath,inputVariant='base',materialization=false}) {
   const prepared=structuredClone(inputPrepared);
   const businessInput=javascriptBusinessInputVariant(inputVariant);
   if(inputVariant!=='base'&&(nativeInputOnly||persistence||coldPackagePath))throw Error('Business input variant requires isolated draft trial');
@@ -634,7 +635,7 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
       if(!['input','output'].includes(direction))throw Error('Unknown mapping direction');
       if(characterize&&direction!=='output')throw Error('Only output mapping characterization is supported');
       if(typeof allowConfiguredOnly!=='boolean'||allowConfiguredOnly&&(direction!=='output'||characterize)
-        ||typeof allowOwnedUnlock!=='boolean'||allowOwnedUnlock&&direction!=='input')
+        ||typeof allowOwnedUnlock!=='boolean')
         throw Error('Configured-only or owned-unlock mapping admission differs');
       const readDeadline=Math.min(deadline,operationDeadline);
       const reader=channel(node,readDeadline),reference={document_id:prepared.document_id,workflow_id:prepared.workflow_ref.workflow_id,node_id:node.node_id};
@@ -652,7 +653,7 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
           await record({phase:characterize?'port_mapping_characterized':'port_mapping_observed',direction,node,mapping});return mapping;
         } catch(error){if(!opened)nativeReadUncertain=true;observationError=error;throw error;
         } finally {
-          try{if(opened)await closeJavascriptPortMapping({reader,direction,reference,record,deadline:Math.min(readDeadline,Date.now()+15000),verifyGraph:async()=>{
+          try{if(opened)await closeJavascriptPortMapping({reader,direction,reference,record,allowOwnedUnlock,deadline:Math.min(readDeadline,Date.now()+15000),verifyGraph:async()=>{
             const checked=await page.evaluate(captureJavascriptNativeTopology,{previous:native,checkOnly:true});
             const after=await graph();
             await record({phase:'port_mapping_original_graph_observed',direction,checked,
@@ -962,6 +963,12 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
       const phaseIdentity=javascriptExecutionIdentity(node,trial);
       if(executionPhases.has(phaseIdentity.effect_id))throw Error('JavaScript execution phase already reserved; no replay');
       if(trial.phase==='persistence-final'&&!persistence)throw Error('Persistence execution requires private writer mode');
+      if(trial.phase==='materialization-final'){
+        const initial=executionPhases.get('execute-initial-'+node.node_id)?.terminal;
+        if(materialization!==true||initial?.verified!==true||initial.owner_verified!==true||initial.status!=='completed'
+          ||initial.trial.source_sha256!==trial.source_sha256)
+          throw Error('Materialization final execution requires its private mode and completed same source');
+      }
       if(['generated-mismatch','persistence-final'].includes(trial.phase)){
         const initial=executionPhases.get('execute-initial-'+node.node_id)?.terminal;
         if(initial?.verified!==true||initial.owner_verified!==true||initial.status!=='completed'
@@ -971,7 +978,7 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
       const executionDeadline=Math.min(deadline,operationDeadline);
       const driver=createNodeExecutionProcedure(channel(node,executionDeadline),node,{verifyFailedChild:true});
       const baseline=await driver.prepare();
-      if(['generated-mismatch','persistence-final'].includes(trial.phase))verifyJavascriptPreviousExecution(baseline,executionPhases.get('execute-initial-'+node.node_id).terminal);
+      if(['generated-mismatch','persistence-final','materialization-final'].includes(trial.phase))verifyJavascriptPreviousExecution(baseline,executionPhases.get('execute-initial-'+node.node_id).terminal);
       const binding=await privateGraphBinding(node);
       try {
         const identity=await page.evaluate(b=>({node:b.node,icon:b.icon}),binding);

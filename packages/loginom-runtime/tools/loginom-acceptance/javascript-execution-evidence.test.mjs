@@ -1194,7 +1194,7 @@ test('the live readiness inspector serializes the same classifier without browse
 });
 
 
-function mappingCloseFixture({bad=false,foreignGraph=false}={}) {
+function mappingCloseFixture({bad=false,foreignGraph=false,direction="input",allowOwnedUnlock=false}={}) {
   const reference={document_id:'doc',workflow_id:'workflow',node_id:'node'};
   const graph={verified:true,...reference,surface:'graph',tid:'MF;TF-1;Graph;JS',locked:false};
   const receipt={status:'AMBIGUOUS',action_key:'ui.act',operation_id:'close:n7',effect_possible:true,
@@ -1209,11 +1209,15 @@ function mappingCloseFixture({bad=false,foreignGraph=false}={}) {
   const stages=[{prepared_node_context:node,wizard,ui:{elements:[close],dialogs:[],masks:[]}},
     {prepared_node_context:node,wizard,ui:{elements:controls,dialogs:[{ref:'dialog',title:'Подтвердить',text:'Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'}],masks:[]}},
     {prepared_node_context:graph,wizard:{status:'absent'},ui:{dialogs:[],masks:[]}}];
+  if(direction==='output'){
+    node.output_port={...node.input_port,direction:'output'};delete node.input_port;
+    wizard.stage='output_mapping';wizard.port_context={status:'observed',kind:'output_data',node:{ref:'node-ref'},port:{ref:'port-ref'}};
+  }
   let index=0,current,verified=0;const effects=[],events=[];
   const reader={observe:async options=>{current=stages[index++];assert.ok(options.ready(current));return current;},
     perform:async options=>{assert.ok(options.ready(current));const action=options.resolve(current);effects.push(action.verb);
       if(action.verb==='confirm_wizard_close'){const error=Error('surface changed');error.name='NodeProcedureStepError';error.receipt=receipt;throw error;}}};
-  const run=()=>closeJavascriptPortMapping({reader,direction:'input',reference,record:async e=>events.push(e),deadline:Date.now()+1000,
+  const run=()=>closeJavascriptPortMapping({reader,direction,allowOwnedUnlock,reference,record:async e=>events.push(e),deadline:Date.now()+1000,
     verifyGraph:async()=>{verified++;if(foreignGraph)throw Error('native graph changed');}});
   return {reference,receipt,effects,events,run,get verified(){return verified;}};
 }
@@ -1706,4 +1710,16 @@ test('private selection DOM refusal explains replacement without replay',async()
   return true;
  });
  assert.equal(f.clicks,0);assert.equal(f.disposed,1);
+});
+
+for(const [name,options,success] of [
+ ['default',{direction:'output'},false],['explicit',{direction:'output',allowOwnedUnlock:true},true],
+ ['transport',{direction:'output',allowOwnedUnlock:true,bad:true},false],
+ ['foreign',{direction:'output',allowOwnedUnlock:true,foreignGraph:true},false],
+])test('output mapping Close unlock proof: '+name,async()=>{
+ const f=mappingCloseFixture(options);
+ if(success){const closed=await f.run();assert.equal(closed.reconciled_from,f.receipt.operation_id);}
+ if(!success)await assert.rejects(f.run());
+ assert.deepEqual(f.effects,['click','confirm_wizard_close']);
+ assert.equal(f.events.some(e=>e.phase==='port_mapping_close_verified'),success);
 });
