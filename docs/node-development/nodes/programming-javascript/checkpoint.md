@@ -1,5 +1,26 @@
 # JavaScript: checkpoint исполнения
 
+## Managed Setting gesture — 2026-09-29
+
+Child `0da375fb08` добавил отдельный Setting dispatch после подтверждённого
+native selection. Lease допускает его только после точного read-back того же
+узла; затем перед единственным кликом повторно сверяет owner, полный снимок,
+Setting point, разрешённую одну owned-перерисовку и `graph_tid` заранее
+привязанного opening confirmation. Durable ACK
+`javascript_managed_setting_prepared` предшествует браузерному эффекту;
+`withBrowserReceipt` хранит отдельную квитанцию. При stale point или
+неподтверждённом ACK — zero clicks; потерянный ответ не переигрывает Setting.
+Возврат жеста явно отдаёт `wizard_open_verified=false`.
+
+На закреплённом Ubuntu Node24.19.0: адресный selection файл 146/146 PASS,
+полный JS acceptance unit-набор 17825/17825 PASS, client JS unit-набор
+231/231 PASS; `node --check` и `git diff --check` PASS. Код отправлен в
+`origin/node-javascript`; незавершённые child docs не включены. Браузер для
+этого managed пути ещё не запускался. Следующий шаг — read-only settlement
+с native owner/wizard/deactivation по исходному deadline, затем headed
+проверка на стенде и подключение к public node.apply. Открытие мастера,
+handler и CLI-приёмка этим commit не подтверждены.
+
 ## Managed body selection — 2026-09-29
 
 Child `e36a70d496` добавил первый управляемый gesture поверх сохранённого
