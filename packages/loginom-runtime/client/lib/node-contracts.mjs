@@ -13,6 +13,7 @@ const definitions = [
   ['transform.reform_columns', 'Параметры полей', 'reformcolumns', 1, 1, false, ['scalar'], 'processors/transformation/fields-features.md'],
   ['transform.filter_data', 'Фильтр строк', 'filterdata', 1, 2, false, ['conditions', 'row_number'], 'processors/transformation/row-filter/README.md'],
   ['transform.group_data', 'Группировка', 'groupdata', 1, 1, false, ['aggregate'], 'processors/transformation/grouping.md'],
+  ['transform.cross_table', 'Кросс-таблица', 'crosstab', 1, 1, false, ['pivot'], 'processors/transformation/cross-table.md'],
   ['transform.replace_columns', 'Замена', 'replacecolumns', 1, 1, false, ['exact'], 'processors/transformation/substitution/README.md'],
   ['transform.date_time', 'Дата и время', 'datereform', 1, 1, false, ['calendar'], 'processors/transformation/trans-datatime/README.md'],
   ['transform.collapse_columns', 'Свертка столбцов', 'columnflipping', 1, 1, false, ['unpivot'], 'processors/transformation/collapse-columns.md'],

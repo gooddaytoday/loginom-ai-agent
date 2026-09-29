@@ -1,0 +1,7 @@
+Region,Category,Amount,Quantity
+North,A,10,1
+North,A,5,1
+North,B,?,1
+South,B,7,1
+South,C,8,1
+South,?,4,1

@@ -89,13 +89,13 @@
     },
     "runtime-registry": {
       "path": "../../packages/loginom-runtime/client/lib/node-support.mjs",
-      "sha256": "ad4e46a95b88681128bd25b6628b78ebe2014a8f1be1ba576d9b3077e3757352",
+      "sha256": "2d8cc3db1f064e055066e8c9a0d89382ceb642f4d5bd7128a58d69258d37a43a",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
+      "source_commit": null,
       "runtime": null,
       "platform": null,
-      "scope": "Статически зарегистрированы 14 обработчиков; код не исполнялся."
+      "scope": "Статически зарегистрированы 15 обработчиков в текущем worktree; код узла проверен адресными тестами, автономная приёмка ожидается."
     },
     "migration-map": {
       "path": "../../docs/migration/source-map.json",
@@ -5029,13 +5029,22 @@
       "name": "Кросс-таблица",
       "slug": "transform-crosstable",
       "legacy_subplan": "15",
-      "queue_class": "backlog",
-      "handler": null,
+      "queue_class": "implemented",
+      "handler": {
+        "type": "transform.cross_table",
+        "modes": [
+          "pivot"
+        ],
+        "source": "../../packages/loginom-runtime/client/lib/crosstable-node.mjs",
+        "parameters_source": "../../packages/loginom-runtime/client/lib/crosstable-parameters.mjs"
+      },
       "card": "nodes/transform-crosstable/README.md",
       "initial_scope": "Сохранить подплан 15: фиксированные и скользящие колонки, агрегаты и изменение схемы; календарные поля можно задать в CSV.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "scope_basis": "loginom_7_4_2_live_discovery_and_candidate_source_tests",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Автономная standalone приёмка ожидает восстановления штатного headed harness; наличие обработчика пока не означает PASS.",
+        "Скользящий режим меняет схему при новом Execute; технические C_n имена относятся только к свежему результату.",
+        "Фиксированный режим проверяет полный запрошенный список категорий на свежем выходе; ручное редактирование списка в мастере не подтверждено."
       ],
       "prerequisites": [
         "accepted_base",
@@ -5050,11 +5059,11 @@
       },
       "readiness": {
         "implementation": {
-          "status": "not_implemented",
+          "status": "implemented",
           "evidence": [
-            "runtime-registry",
-            "historical-roadmap"
-          ]
+            "runtime-registry"
+          ],
+          "note": "Source tests проходят, автономная приёмка пока заблокирована отсутствующим headed harness."
         },
         "historical_acceptance": {
           "status": "not_accepted",
@@ -5079,9 +5088,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения.",
+      "next_action": "Восстановить штатный headed harness, затем запустить автономную standalone приёмку, открыть PR и передать узел в ревью.",
       "plan": "nodes/transform-crosstable/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "implementation_in_progress"
     },
     {
       "component_id": "component.transform.EnrichData",
