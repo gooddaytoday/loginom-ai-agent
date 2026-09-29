@@ -1,5 +1,38 @@
 # JavaScript: checkpoint исполнения
 
+## Source admission через managed existing wizard — headed proof, 2026-09-29
+
+Code commit `2174479dd9` в `origin/node-javascript` связал
+`createJavascriptSourceAdmission` с host-only адаптером. Для каждого чтения
+он проверяет document/workflow/node, operation и UI epoch, открывает только
+существующий узел управляемым Setting, считывает semantic settings на странице
+Columns, делает один journaled Next, трижды читает полный source на Code и
+управляемым Close/Yes возвращается к исходному graph. Лишь после полной
+проверки secret-redaction и закрытия мастера source reader
+может отдать chunk; квитанция admission содержит digest и settings hash без
+исходного текста. Неоднозначный ответ Close исключает повторный клик.
+Адресные тесты адаптера, admission и managed gesture: **81 PASS / 0 FAIL**;
+`node --check` и `git diff --check` прошли.
+
+Live `managed-source-admission-01` в свежем **headed Chromium** profile 255 на
+назначенном стенде: `OBSERVED` / `typed_output_verified`, полный source
+**376 UTF-8 bytes / 8 LF lines**, SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`.
+`javascript_source_admitted` с intent `preserve` и semantic settings SHA256
+`e5cbe4e387605e623851346733621cb052cefea858eae76df5076160a3749489`.
+В журнале admission ровно по одному open/discard/delivery, оба managed
+Close (предшествующий independent readback и admission) подтверждены. Исходник
+в admission receipt не попал. Cleanup package/logout/browser **3/3**;
+report SHA256 `739a53427c1b335100a2a5d8251357a22e5db4ae67bf6637cf0840a577634c29`.
+X11 no-focus guard подтвердил **0 browser focus samples / 2829** наблюдений,
+без ошибок poll. Под file-lock назначен новый не созданный profile 256,
+receipt `profile-reassignment-256.json`; profile 255 повторно не использовать.
+
+Следующий шаг — публичная `dock_node_read kind=source`: отдельная схема
+запроса/ответа, маршрутизация, compact/full совместимость, owner/cursor,
+redaction результата и CLI J01/J20/J21. Этот live-прогон доказал приватный
+host/admission цикл, но не публичную доставку chunk агенту и не CLI-приёмку.
+
 ## Managed Close существующего мастера — headed proof, 2026-09-29
 
 Code commit `8e95175c6f` в `origin/node-javascript` добавил
