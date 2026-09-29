@@ -417,7 +417,7 @@ export async function cleanupJavascriptColumnEditor({page,state,record,deadline}
   pending.cleanupPromise=(async()=>{
     if(!pending.addDispatched){await pending.held.dispose();state.pending=null;return;}
     if(pending.applyDispatched||pending.cancelDispatched){
-      await settleJavascriptColumnEditor({page,state,record,deadline,phase:pending.applyDispatched?'applied':'cancelled'});return;
+      return settleJavascriptColumnEditor({page,state,record,deadline,phase:pending.applyDispatched?'applied':'cancelled'});
     }
     await waitJavascriptColumnEditor({page,pending,phase:'editing',deadline,record});
     await closeJavascriptColumnUsagePicker({page,state,record,deadline});

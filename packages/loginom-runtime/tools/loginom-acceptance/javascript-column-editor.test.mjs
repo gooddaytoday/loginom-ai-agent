@@ -577,6 +577,15 @@ test('Apply waits for own sync and clean cached records even after editor closes
   }
 });
 
+test('cleanup reports the settled Apply receipt without Cancel',async()=>{
+  const f=fixture();await f.open();f.state.pending.applyDispatched=true;f.form.ModalResultOk=true;f.hide();
+  f.records[0].data.DefaultUsageType=4;
+  const applied=await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
+  assert.equal(applied.status,'settled');assert.equal(applied.reason,'apply_settlement');
+  assert.equal(applied.checks.applied,true);assert.equal(f.records[0].data.DefaultUsageType,4);
+  assert.equal(f.effects.includes('cancel'),false);assert.equal(f.state.pending,null);
+});
+
 test('failed Apply write keeps pending binding and cannot authorize Cancel or replay',async()=>{
   const f=fixture();await f.open();f.state.pending.applyDispatched=true;f.form.ModalResultOk=true;f.hide();
   f.store.isSyncing=false;f.records[0].dirty=true;

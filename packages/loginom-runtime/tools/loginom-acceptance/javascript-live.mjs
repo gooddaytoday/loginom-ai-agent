@@ -21,7 +21,7 @@ import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {javascriptNativeRoundtripProbe,verifyNativeRoundtripMapping} from './javascript-native-roundtrip-contract.mjs';
 import {bindJavascriptNativeRoundtripSource,bindJavascriptNativeRoundtripSchema,prepareJavascriptNativeRoundtripWizard,sealJavascriptNativeRoundtripDone} from './javascript-native-roundtrip-owner.mjs';
 import {withJavascriptWizardAddress} from './javascript-wizard-settlement.mjs';
-import {cleanupJavascriptColumnEditor,openJavascriptColumnEditor,observeJavascriptColumnEditor,openJavascriptColumnUsagePicker,selectJavascriptColumnUsageOption} from './javascript-column-editor.mjs';
+import {cleanupJavascriptColumnEditor,openJavascriptColumnEditor,observeJavascriptColumnEditor,openJavascriptColumnUsagePicker,selectJavascriptColumnUsageOption,fillJavascriptColumnField,openJavascriptColumnTypePicker,selectJavascriptColumnTypeOption,verifyJavascriptColumnEditor} from './javascript-column-editor.mjs';
 import {dragJavascriptPalette} from './javascript-palette-drag.mjs';
 import {withJavascriptWizardMasks} from './javascript-wizard-masks.mjs';
 // Operator-only G1/G4 discovery. No public editor guards are changed here.
@@ -63,17 +63,17 @@ const batchDeadline=coldReader||packageFile?Math.floor(performance.timeOrigin)+6
 let cleaning=false,cleanupDeadline=Infinity;
 const phaseDeadline=ms=>Math.min(cleaning?cleanupDeadline:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=(cleaning?cleanupDeadline:batchDeadline)-Date.now();if(ms<=0)throw Error(cleaning?'Original cleanup deadline expired':'Original batch deadline expired');return ms;};
-const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--server-version-only | --palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor [--inspect-usage-picker [--select-usage-option]] | --probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
+const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--server-version-only | --palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor [--inspect-usage-picker [--select-usage-option [--apply-usage-option]]] | --probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
 if(args.includes('--help')&&coldReader){console.log('node javascript-persistence-read-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nCold reader: observe actual source/settings/mappings, one fresh Execute and full output; 10 minutes from process start; headed only. No source or configuration input.');return;}
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
-  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--probe-source','--metadata-diagnostic'].includes(key) ? true : args[++i];
+  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
 }
 if(coldReader){
@@ -118,11 +118,12 @@ if(executionCase){
   options['--create-node']=true;options['--inspect-pages']=true;
 }
 if (['--create-node','--palette-only','--palette-hit-test'].filter(k=>options[k]).length>1) throw Error('Choose one discovery mode');
-if(options['--server-version-only']&&(['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--probe-source','--execution-case','--discovery-probe'].some(k=>options[k])
+if(options['--server-version-only']&&(['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--discovery-probe'].some(k=>options[k])
   ||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||batch))throw Error('Server version requires its own read-only mode');
 if(options['--inspect-pages']&&!options['--create-node'])throw Error('--inspect-pages requires --create-node');
 if(options['--inspect-usage-picker']&&!options['--inspect-declared-editor'])throw Error('--inspect-usage-picker requires --inspect-declared-editor');
 if(options['--select-usage-option']&&!options['--inspect-usage-picker'])throw Error('--select-usage-option requires --inspect-usage-picker');
+if(options['--apply-usage-option']&&!options['--select-usage-option'])throw Error('--apply-usage-option requires --select-usage-option');
 if(options['--probe-source']&&!options['--inspect-pages'])throw Error('--probe-source requires --inspect-pages');
 if(options['--inspect-declared-editor']&&(!options['--inspect-pages']||options['--probe-source']||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||batch))
   throw Error('--inspect-declared-editor requires its own create-node page inspection');
@@ -551,42 +552,75 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
       if(!before.verified||before.generation?.checked!==false||before.grids.find(grid=>grid.tid===before.page_tid+';grdTargetColumns;tbl')?.count!==0
         ||add?.length!==1||add[0].disabled||!add[0].visible)throw Error('Owned empty declared editor admission unavailable');
       const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']').filter({visible:true});
-      let cancellation;
+      const columnOnce=async(id,identity,perform)=>{
+        report.effects.push({at:new Date().toISOString(),action:id,state:'dispatching',identity});await save();await perform();
+      };
+      let settlement;
       try{
         await openJavascriptColumnEditor({page,context:schemaContext(),index:0,state:columnState,record:executionRecord,deadline,
-          once:async(id,identity,perform)=>{report.effects.push({at:new Date().toISOString(),action:id,state:'dispatching',identity});await save();await perform();},
+          once:columnOnce,
           add:()=>at(add[0].tid).click({timeout:Math.max(1,Math.min(10000,deadline-Date.now()))})});
         const inventory=await page.evaluate(observeJavascriptColumnEditor,{held:columnState.pending.held,phase:'editing',readDeclaredControls:true});
         if(inventory.status!=='ready'||!inventory.declared_controls?.cbxDataKind||!inventory.declared_controls?.cbxUsageType)
           throw Error('Owned declared control inventory unavailable: '+(inventory.reason??inventory.status));
         report.declared_editor_controls=inventory.declared_controls;await save();
+        if(options['--apply-usage-option']){
+          for(const field of ['edtName','edtDisplayName']){
+            await fillJavascriptColumnField({page,state:columnState,record:executionRecord,once:columnOnce,deadline,
+              id:'usage-column-'+field,target:field,expected:'UsageValue',
+              fill:text=>at(inventory.base+';'+field).locator('input').fill(text,{timeout:Math.max(1,deadline-Date.now())})});
+          }
+          await openJavascriptColumnTypePicker({page,state:columnState,record:executionRecord,once:columnOnce,deadline,
+            id:'usage-column-type-open',expectedType:4,expectedLabel:'Целый',click:(tid,timeout)=>at(tid).click({timeout})});
+          await selectJavascriptColumnTypeOption({page,state:columnState,record:executionRecord,once:columnOnce,deadline,
+            id:'usage-column-type-select',expectedType:4,expectedLabel:'Целый'});
+        }
         if(options['--inspect-usage-picker']){
           const opened=await openJavascriptColumnUsagePicker({page,state:columnState,record:executionRecord,deadline,id:'usage-picker-open',
-            once:async(id,identity,perform)=>{report.effects.push({at:new Date().toISOString(),action:id,state:'dispatching',identity});await save();await perform();},
+            once:columnOnce,
             click:(tid,timeout)=>at(tid).click({timeout})});
           report.declared_usage_picker=opened.usage_picker;await save();
           if(options['--select-usage-option']){
             const selected=await selectJavascriptColumnUsageOption({page,state:columnState,record:executionRecord,deadline,
-              id:'usage-option-select',once:async(id,identity,perform)=>{
-                report.effects.push({at:new Date().toISOString(),action:id,state:'dispatching',identity});await save();await perform();
-              }});
+              id:'usage-option-select',once:columnOnce});
             report.declared_usage_selected=selected.usage_picker;await save();
+            if(options['--apply-usage-option']){
+              await columnOnce('usage-column-apply',{base:inventory.base,name:'UsageValue',default_usage_type:4},async()=>{
+                const current=await page.evaluate(observeJavascriptColumnEditor,
+                  {held:columnState.pending.held,phase:'editing',readUsagePicker:'selected'});
+                if(current.status!=='ready'||current.usage_picker?.cached_value!==4)
+                  throw Error('Selected default usage changed before Apply');
+                await verifyJavascriptColumnEditor({page,state:columnState,record:executionRecord,deadline,target:'btnApply'});
+                columnState.pending.applyDispatched=true;
+                await at(inventory.base+';btnApply').click({timeout:Math.max(1,deadline-Date.now())});
+              });
+            }
           }
         }
-      }finally{cancellation=await cleanupJavascriptColumnEditor({page,state:columnState,record:executionRecord,deadline});}
+      }finally{settlement=await cleanupJavascriptColumnEditor({page,state:columnState,record:executionRecord,deadline});}
       const after=await page.evaluate(readJavascriptSchema,schemaContext());
-      await executionRecord({phase:'declared_editor_cancel_readback',schema:after});
-      const cancelled=cancellation?.status==='settled'&&cancellation.reason==='cancel_settlement'
-        &&cancellation.checks?.baseline===true&&cancellation.checks?.record_removed===true
-        &&cancellation.checks?.writes_clean===true&&cancellation.checks?.records_clean===true
-        &&cancellation.record_count===0&&cancellation.source_count===0;
       const target=after.grids.find(grid=>grid.tid===before.page_tid+';grdTargetColumns;tbl');
-      const staleTotal=after.diagnostic_only===true&&after.reason==='JavaScript schema cache is filtered or incomplete'
-        &&target?.view_bound===true&&target.store_class==='Ext.data.Store'&&target.records?.length===0
-        &&target.total===cancellation?.proxy_total_count&&target.total>0&&cancellation.checks?.proxy_total_matches===false;
-      if(!cancelled||!(after.verified===true&&target?.count===0||staleTotal))
-        throw Error('Cancelled declared editor changed output schema');
-      report.declared_editor_cancelled=true;report.declared_editor_stale_total=staleTotal;await save();
+      if(options['--apply-usage-option']){
+        await executionRecord({phase:'declared_usage_apply_readback',settlement,schema:after});
+        const field=target?.fields?.[0];
+        if(settlement?.status!=='settled'||settlement.reason!=='apply_settlement'||settlement.checks?.applied!==true
+          ||after.verified!==true||target?.count!==1||field?.Name!=='UsageValue'||field.DisplayName!=='UsageValue'
+          ||field.DataType!==4||field.DefaultUsageType!==4||field.Index!==0||typeof field.Required!=='boolean')
+          throw Error('Applied default usage native record unconfirmed');
+        report.declared_usage_applied={field,record_count:target.count,source:'native_grid_after_apply'};await save();
+      }else{
+        await executionRecord({phase:'declared_editor_cancel_readback',schema:after});
+        const cancelled=settlement?.status==='settled'&&settlement.reason==='cancel_settlement'
+          &&settlement.checks?.baseline===true&&settlement.checks?.record_removed===true
+          &&settlement.checks?.writes_clean===true&&settlement.checks?.records_clean===true
+          &&settlement.record_count===0&&settlement.source_count===0;
+        const staleTotal=after.diagnostic_only===true&&after.reason==='JavaScript schema cache is filtered or incomplete'
+          &&target?.view_bound===true&&target.store_class==='Ext.data.Store'&&target.records?.length===0
+          &&target.total===settlement?.proxy_total_count&&target.total>0&&settlement.checks?.proxy_total_matches===false;
+        if(!cancelled||!(after.verified===true&&target?.count===0||staleTotal))
+          throw Error('Cancelled declared editor changed output schema');
+        report.declared_editor_cancelled=true;report.declared_editor_stale_total=staleTotal;await save();
+      }
     }
     if(coldReader&&!remainingPages&&current.tid.endsWith(';JavaScriptColumnsWizard')){
       const schema=await page.evaluate(readJavascriptSchema,schemaContext());
