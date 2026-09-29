@@ -5,6 +5,7 @@ import {makeJavascriptManagedSourceCode} from './javascript-managed-source.mjs';
 import {closeManagedJavascriptWizard} from './javascript-managed-close.mjs';
 import {makeJavascriptManagedSelectionReadCode} from './javascript-managed-selection.mjs';
 import {makeJavascriptSchemaContextCode} from './javascript-schema-context.mjs';
+import {makeJavascriptExistingGraphTypeCode} from './javascript-existing-type.mjs';
 
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const need = (condition, message) => { if (!condition) throw Error(message); };
@@ -27,7 +28,8 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
   execute, record, receiptOptions, channel, wait = ms => new Promise(resolve => setTimeout(resolve, ms)),
   driver = {openManagedJavascriptExistingWizard, dispatchManagedJavascriptNext,
     closeManagedJavascriptWizard, makeJavascriptManagedPageCode, makeJavascriptManagedSourceCode,
-    makeJavascriptManagedSelectionReadCode, makeJavascriptSchemaContextCode}}) {
+    makeJavascriptManagedSelectionReadCode, makeJavascriptSchemaContextCode,
+    makeJavascriptExistingGraphTypeCode}}) {
   need(page && prepared?.document_id === node?.document_id
     && prepared.workflow_ref?.workflow_id === node.workflow_id && node.node_id
     && Number.isSafeInteger(uiEpoch) && uiEpoch >= 0
@@ -71,6 +73,11 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
     async open({owner, deadline: operationDeadline}) {
       check(owner, operationDeadline);
       need(active === null, 'Managed JavaScript source wizard already open');
+      const type = await execute(driver.makeJavascriptExistingGraphTypeCode({document_id: prepared.document_id,
+        workflow_ref: prepared.workflow_ref, node}));
+      need(type?.verified === true && type.node_id === node.node_id
+        && type.icon_class === 'bg-vendor-icon-javascript',
+      'Managed JavaScript source node type unconfirmed');
       // An ambiguous opening is terminal: a second Setting could edit a draft.
       uncertain = true;
       const openingDeadline = Math.min(deadline, Date.now() + 90000);

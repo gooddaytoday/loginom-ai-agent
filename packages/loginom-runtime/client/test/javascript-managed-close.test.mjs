@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {closeManagedJavascriptWizard,inspectManagedJavascriptClosePoint,
+import {closeManagedJavascriptWizard,inspectManagedJavascriptClosePoint,inspectManagedJavascriptCloseDecision,
   makeJavascriptManagedClosePointCode,makeJavascriptManagedCloseDecisionCode,
   makeJavascriptManagedCloseGestureCode,makeJavascriptManagedCloseConfirmationCode,
   runManagedJavascriptCloseGesture,runManagedJavascriptCloseConfirmation} from '../lib/javascript-managed-close.mjs';
@@ -58,14 +58,38 @@ test('managed Close and confirmation each dispatch at most once',async()=>{
 test('managed Close journals before each gesture and waits for owned graph',async()=>{
   const events=[];let stage=0;
   const execute=async code=>{
+    if(code.includes('readJavascriptExistingGraphType'))return {verified:true,node_id:'node',graph_tid:'MF;TF-1;Graph;node'};
     if(code.includes('runManagedJavascriptCloseGesture'))return {status:'SUCCEEDED',action_key:'javascript.wizard.close',operation_id:'owned-js:close'};
     if(code.includes('runManagedJavascriptCloseConfirmation'))return {status:'SUCCEEDED',action_key:'javascript.wizard.close.confirm',operation_id:'owned-js:close-confirm'};
     if(code.includes('inspectManagedJavascriptClosePoint'))return point;
-    return stage++===0?{state:'confirm',point:confirmPoint}:{state:'closed',node_id:'node'};
+    return stage++===0?{state:'confirm',point:confirmPoint}:{state:'closed',node_id:'node',graph_tid:'MF;TF-1;Graph;node'};
   };
   const receiptOptions=(id,key,signature)=>({receipt_namespace:'private-test',receipt_id:id,receipt_signature:signature});
   const result=await closeManagedJavascriptWizard({task,execute,record:async event=>{events.push(event);return event;},receiptOptions});
   assert.equal(result.closed,true);assert.equal(result.confirmation_required,true);
   assert.deepEqual(events.map(event=>event.phase),['javascript_managed_close_prepared',
     'javascript_managed_close_confirm_prepared','javascript_managed_close_verified']);
+});
+
+test('managed Close accepts a rebound graph only with the same workflow, node and rendered JS type',()=>{
+  class ModelForm {}
+  const packageNode={},workflow={},shape={isConnected:true,getAttribute:()=> 'MF;TF-1;Graph;node'};
+  const graphRoot={contains:value=>value===shape},native={FGuid:'node',FIconCls:'bg-vendor-icon-javascript',FCell:{}};
+  const model=new ModelForm();model.FDiagram={FNodes:{FCollection:[native]},FmxGraph:{container:graphRoot,
+    view:{getState:()=>({shape:{node:shape}})}}};
+  const tab={Controller:{Node:{data:{node:workflow}},FController:model}};
+  const receipt={phase:'verified',workflowId:'flow',nodeTargetWorkflowNode:workflow,packageNode};
+  const document={querySelectorAll:()=>[graphRoot]};
+  const preparation={document,id:'doc'};
+  const held={binding:{document,tab,workflow},preparation,account:'jsteach',receipt,
+    wizardRoot:{isConnected:false},node:{tid:'MF;TF-1;Graph;node'},retained:{model:{},native:{}}};
+  const context={args:{held,task},document,location:{origin:task.targetOrigin},
+    bg:{app:{Version:task.targetBuild,ModelForm,Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:'jsteach'},
+      PackageNodes:{Count:1,Items:()=>packageNode}},Items:{Workspace:{getActiveTab:()=>tab}}}}}}},
+    __loginomDockPreparationV1:preparation,getComputedStyle:()=>({visibility:'visible'})};
+  const read=()=>vm.runInNewContext('('+inspectManagedJavascriptCloseDecision.toString()+')(args)',context);
+  assert.deepEqual({...read()},{state:'closed',node_id:'node',root_visible:false,dialog_count:0,
+    graph_tid:'MF;TF-1;Graph;node',graph_rebound:true});
+  shape.getAttribute=()=> 'MF;TF-1;Graph;foreign';
+  assert.throws(read,/graph owner changed/);
 });
