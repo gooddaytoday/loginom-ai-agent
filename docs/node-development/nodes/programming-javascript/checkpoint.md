@@ -132,6 +132,28 @@ Table. Бизнес6×4 проверяется отдельной проекци
 log SHA256 `80d076b1993361d3c934c0c2649e095aa1cf02e671d5dec578b7e8e93f80715b`.
 Live G3 пока не запускался; общий план и статус registry остаются прежними.
 
+### G3 witness: fixed source и live admission — 2026-09-30
+
+Child `1965b71edd` включает private `g3-code-business-bridge`; source1692 UTF-8
+bytes, SHA256 `fd4ea4370a24c0fb13846b7c2b3b1d476c4e35994dcb0227ebd8b2c6845c41b0`.
+Прежний бизнес-body без ожидаемых денежных значений дополнен пятой String
+колонкой: каждая строка содержит canonical JSON actual GetColumn index/name/
+display_name/data_type before/after Append. Parser отвергает duplicate keys,
+truncation, неверные типы/порядок/row и посторонние поля. Сравнение использует
+наблюдённые logical metadata, cached source/target IDs и bound Table physical0;
+requested names не являются доказательством. Independent business oracle
+остаётся прежним: projection первых четырёх колонок проверяется отдельно.
+
+C0 lifecycle с двумя owned Execute и отдельным post-mapping fresh terminal
+переиспользован без нового generic workspace/UI контракта. Strict source hash,
+prior native process root/group record, собственный port GUID, полный output,
+graph/input boundaries и cleanup сохраняются. G3 success не доказывает native
+bytes/public handler/CLI; gates_closed=[] остаётся в private report.
+236 targeted tests PASS, log SHA256
+`4141880d319066cdf08624e69f9b515723586c96b0057f1f0871249f68cd9b47`,
+syntax/diff PASS. Fresh профиль310/evidence `g3-code-business-bridge-01`;
+новый live пока не получен. Активный handle записывать в private registry.
+
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
 Child code commits `05dfebe85a`, `7fe5978c0f`, `cbfb793c95` добавили operator-only
