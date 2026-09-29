@@ -42,6 +42,7 @@ import {loginBrowser} from '../../src/connection-check.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
 import {javascriptEngineProbes} from './javascript-engine-probes.mjs';
 import {javascriptDiscoveryIds,javascriptDiscoveryProbe,observeJavascriptDiscovery,javascriptDiscoveryWizardDiagnostic,javascriptDiscoveryErrorButtonDiagnostic} from './javascript-discovery-probes.mjs';
+import {javascriptMaterializationObservation} from './javascript-materialization-observation.mjs';
 import {javascriptSourceSample,javascriptSourceBoundary} from './javascript-source-probes.mjs';
 import {makeWorkspacePrepareCode} from '../../client/lib/workspace.mjs';
 import {createJavascriptExecutionRuntime,createJavascriptSavedExecutionRuntime} from './javascript-execution-runtime.mjs';
@@ -1044,13 +1045,22 @@ const runExecutionTrial=async probe=>{
         await executionRuntime.verifyExecutionBoundary(boundary);await verifyBatchInputIdentity();
         report.stop_result.boundary_verified=true;await save();return;
       }
+      const mappingBefore=discoveryProbe.scope==='C0-materialization'
+        ?await executionRuntime.readPortMapping(executionNode,'output',{operationDeadline:deadline,allowConfiguredOnly:true}):undefined;
       const execution=await executionRuntime.executeNode(executionNode,deadline,{phase:'initial',source_sha256:probe.source_sha256});
       report.execution_probe.execution=execution;await save();
       await executionRuntime.verifyExecutionBoundary(boundary);await verifyBatchInputIdentity();
+      const mappingAfter=mappingBefore?await executionRuntime.readPortMapping(executionNode,'output',
+        {operationDeadline:deadline,allowConfiguredOnly:true}):undefined;
       const result=await observeJavascriptDiscovery({probe,node:executionNode,execution,deadline,
-        readOutput:()=>executionRuntime.readPassive(executionNode,'discovery',deadline),record:executionRecord,
+        readOutput:()=>executionRuntime.readPassive(executionNode,mappingBefore?'bridge':'discovery',deadline),record:executionRecord,
         onProgress:async progress=>{report.discovery_result={...progress,oracle_passed:progress.gate_passed,gate_passed:false,boundary_verified:false};await save();}});
       await executionRuntime.verifyExecutionBoundary(boundary);await verifyBatchInputIdentity();
+      if(mappingBefore){
+        report.materialization_result=javascriptMaterializationObservation({node:executionNode,
+          before:mappingBefore,after:mappingAfter,table:result.output});
+        await executionRecord({phase:'c0_materialization_observed',...report.materialization_result});
+      }
       report.discovery_result={...result,boundary_verified:true};await save();return;
     }finally{await boundary.native.dispose();}
   }
@@ -1853,7 +1863,7 @@ try {
     report.stage='graph-ready';await waitGraphReady(createRemaining());
     await snapshot('graph-ready-baseline');
     if(executionCase||nativeInputOnly){
-      report.scope=telemetryTrial?'private fixed schema telemetry: '+nativeTelemetryCaseId:calibrationTrial?'private fixed error calibration: '+nativeCalibrationId:namedTrial?'private stage A/B named access: '+nativeNamedCaseId:coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?.scope==='P1-business'?'private P1 business 6x4 oracle':discoveryProbe?.scope==='P1-stop'?'private P1 finite Stop and same-node rerun':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
+      report.scope=telemetryTrial?'private fixed schema telemetry: '+nativeTelemetryCaseId:calibrationTrial?'private fixed error calibration: '+nativeCalibrationId:namedTrial?'private stage A/B named access: '+nativeNamedCaseId:coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?.scope==='P1-business'?'private P1 business 6x4 oracle':discoveryProbe?.scope==='P1-stop'?'private P1 finite Stop and same-node rerun':discoveryProbe?.scope==='C0-materialization'?'private C0 output0 mapping materialization and bound Table; G3 lineage unverified':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
       if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=1;report.gates_closed=[];}
       if(persistence){report.scope='private G7 persistence writer: '+persistence.schema_mode;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}

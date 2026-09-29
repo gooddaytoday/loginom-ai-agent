@@ -986,7 +986,7 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
       }finally{await binding.dispose();}
     },
     async readPassive(node,kind='output',operationDeadline=deadline) {
-      if(!['input','output','mismatch','discovery','persistence-final','cold-observed'].includes(kind)
+      if(!['input','output','mismatch','discovery','bridge','persistence-final','cold-observed'].includes(kind)
         ||kind==='persistence-final'&&!persistence||kind==='cold-observed'&&!coldPackagePath)throw Error('Unknown passive JavaScript table kind');
       // No execution driver is called here. openNewOutputTable refuses an
       // inactive port instead of activating or executing its node.
@@ -1010,12 +1010,13 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
         const readSettings=await prepareTableRead(reader,opened.table),raw=await readTableOutputPages(reader,opened.table,{sampleRows:10});
         // Characterization decodes the independently observed Table schema;
         // a separate fixed mismatch oracle classifies it, never the old oracle.
-        result=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:['mismatch','discovery','cold-observed'].includes(kind)?raw.columns:
+        result=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:['mismatch','discovery','bridge','cold-observed'].includes(kind)?raw.columns:
           kind==='input'?javascriptInputColumns:javascriptOutputColumns,requireExactNumbers:true});
         if(kind==='cold-observed'){
           if(result.sample_complete!==true||result.sample_rows!==result.row_count)throw Error('Cold output incomplete');
         }else if(kind==='persistence-final')verifyJavascriptPersistenceOutput(result,2);
-        else if(['mismatch','discovery'].includes(kind))verifyJavascriptMismatchTable(result);else verifyJavascriptTable(result,kind);
+        else if(['mismatch','discovery','bridge'].includes(kind))verifyJavascriptMismatchTable(result);else verifyJavascriptTable(result,kind);
+        if(kind==='bridge')result.physical_output={port_index:opened.port,table_ref:structuredClone(opened.table)};
       } finally {
         await restoreTablePrecision(reader,formatProof);
         if(kind!=='input'&&passiveSurface)passiveSurface.returnDispatched=true;
