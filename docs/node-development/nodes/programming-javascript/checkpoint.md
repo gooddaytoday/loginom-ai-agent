@@ -1,5 +1,53 @@
 # JavaScript: checkpoint исполнения
 
+## G1: два выбранных proxy мастера кода — 2026-09-29
+
+Ветка `javascript` уже содержит общий регламент отказа мастера из `loginom`
+`3f35c5f232`; `git rebase origin/loginom` подтвердил отсутствие новых коммитов
+базы. Cursor-сессия `d69de234-826c-4e08-a8ac-184749a58d47` передала JS-ветке
+барьер чтения кнопки; подплан и child operator уже выполняют его. Адресные
+22/22 теста отказа мастера и валидатор документации прошли в этой ревизии.
+
+Первый headed G1 reader на profile210/source `ba43c7e13f` отказал в
+`inspect-pages`: он ошибочно требовал, чтобы `FEngine` и `FModuleSystem`
+указывали на один remote object. Это **отказ вспомогательного наблюдателя**,
+не отказ мастера Loginom. Исходный процесс exit1, package close/logout/browser
+close 3/3, процессов профиля нет. Report SHA256
+`67dd062ae6ed4524e62538ae3fd310294174c8331242d0b34880ba3688fa9deb`,
+journal SHA256
+`7968568ecb962217eb5323b08fc1e9f6fa0c75af490b95ac2a7ca4836d504915`;
+private verification SHA256
+`341e758bad5eea7dd8fb8869ff06f04ce578b19eb09faffabe971ed465e7deae`.
+Эту попытку не считать успешным чтением G1 и не повторять на её профиле.
+
+Child commit `6064821333` убрал предположение о равенстве proxy и сохраняет
+наблюдаемые идентификаторы раздельно, без remote getters и новых cast RPC.
+На pinned Node 24.19.0 полный JS-набор прошёл 18 046/18 046, fail/skip 0;
+private log SHA256
+`0e76db450d291aaa6d55e0b39ff17bb958f540e1a75cf752e690f5c06118dced`.
+Private freeze134 SHA256
+`92020235b7f23402f05d647fab5d880175b03cc367c715f3b62fc893ac482e94`
+закрепил 1334 pin, 222 файла import-closure, 660 literal edges, computed 0;
+от freeze133 отличаются только reader и его тест.
+
+В отдельном headed profile211/source `6064821333` тот же принадлежащий JS-мастер
+открыл страницу `JavaScriptCodeWizard`. Read-only reader увидел
+`$bg_rpc_TIBGJavaScriptEngine_Proxy` у `FEngine` и
+`$bg_rpc_TIBGJavaScriptModuleSystem_Proxy` у `FModuleSystem`: один RPC session,
+разные remote object IDs и разные interface IDs. Это два выбранных поля
+собственного code controller, **не** доказательство того, что module system
+является cast того же объекта. `runtime_full_type=null`,
+`full_type_observed=false`. Done/Preview/Execute не нажимались. Процесс exit0,
+`OBSERVED`, package close/logout/browser close 3/3, процессов профиля нет.
+Report SHA256
+`c23b474c49cc2bf26616858ed4af735a2e7cc0e3bb8a22c5fc135377952c799f`,
+journal SHA256
+`f25681e3bdc776b1a9badcb0ecf76437fcd07bed244ab2c05e44cc89e378347c`,
+private verification SHA256
+`b5a961a0e32677a023396d002fc5401b5ccf9f4487114fb9abec6fae60f741c8`.
+Browser lease свободен, следующий пустой profile212. Runtime `FullType`,
+остальные G1 маршруты и публичный handler остаются открытыми.
+
 ## G1: полный проход собственного мастера без Done — 2026-09-29
 
 В новом Ubuntu headed Chromium, profile209, child source `70b384418f`,
