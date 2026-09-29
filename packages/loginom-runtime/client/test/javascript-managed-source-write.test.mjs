@@ -71,6 +71,7 @@ test('one owned browser action replaces exact Unicode text and journals only dig
     && !JSON.stringify(event).includes('source_text')));
   assert.equal(f.lease.sourceWriteAttempted, true);
   assert.equal(f.lease.sourceDraftSha256, result.source_sha256);
+  assert.equal(f.lease.sourceDraftText, source);
 });
 
 test('wrong existing digest refuses before any editor action', async () => {

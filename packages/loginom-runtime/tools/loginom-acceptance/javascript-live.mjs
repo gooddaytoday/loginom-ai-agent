@@ -58,6 +58,7 @@ import {makeJavascriptManagedSelectionReadCode} from '../../client/lib/javascrip
 import {wizardReadiness} from '../../client/lib/javascript-wizard-page.mjs';
 import {makeJavascriptManagedPageCode} from '../../client/lib/javascript-managed-page.mjs';
 import {dispatchManagedJavascriptNext} from '../../client/lib/javascript-managed-next.mjs';
+import {dispatchManagedJavascriptCodeNext} from '../../client/lib/javascript-managed-code-next.mjs';
 import {dispatchManagedJavascriptDone} from '../../client/lib/javascript-managed-done.mjs';
 import {openManagedJavascriptExistingWizard} from '../../client/lib/javascript-managed-existing.mjs';
 import {closeManagedJavascriptWizard} from '../../client/lib/javascript-managed-close.mjs';
@@ -1180,8 +1181,15 @@ const runExecutionTrial=async probe=>{
         await save();
         if(options['--verify-managed-source-commit']){
           report.stage='managed-source-commit';
-          await inspectWizardPages({remainingPages:true,deadline:existingDeadline});
-          const done=await waitWizardReady({deadline:existingDeadline,inputOnly:false});
+          const codeNext=await dispatchManagedJavascriptCodeNext({task:existingManaged.task,
+            expected_source_sha256:written.source_sha256,
+            execute:code=>Function('return ('+code+')')()(page),record:executionRecord,
+            receiptOptions:(id,key,signature)=>({receipt_namespace:'private-managed-js-existing-'+existingReceiptNamespace,
+              receipt_id:id,receipt_signature:signature})});
+          if(codeNext.output?.transition_verified!==false)
+            throw Error('Managed JavaScript Code Next gesture claimed premature transition');
+          const done=await waitWizardReady({deadline:existingDeadline,inputOnly:false,
+            afterIndex:1,afterPageTid:owner.prefix+';WizrdMCF;JavaScriptCodeWizard'});
           if(done.page?.tid!==owner.prefix+';WizrdMCF;DoneWizard'
             ||done.page.index!==done.page.indicator_count-1)
             throw Error('Managed JavaScript commit Done page unavailable');

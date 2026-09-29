@@ -51,6 +51,7 @@ export async function runManagedJavascriptSourceReplace(page, task, target, insp
     || after.source_lf_lines !== target.source_lf_lines)
     throw Error('Managed source exact readback differs');
   lease.sourceDraftSha256 = target.source_sha256;
+  lease.sourceDraftText = target.source_text;
   timely();
   return outcome('SUCCEEDED', 'draft_verified', true, {
     previous_source_sha256: task.previous_source_sha256,
