@@ -280,6 +280,12 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(produceMenus.length>1)throw Error('Derived output policy menu is ambiguous');
         const root = missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
         if (observationNow() >= deadline) break;
+        // Polling repaints the native process console. Read its cache before
+        // issuing final UI refs/epoch, so those refs do not age across the
+        // separate native transport. The exact node context must still match.
+        const nativeProcesses=readProcesses?await execute(makeNodeProcessContextCode(preparedNodeContext),
+          {timeout:readTimeout()}):null;
+        if (observationNow() >= deadline) break;
         result = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
           ...boundOptions,
           root_ref: root, expected_origin: targetOrigin, expected_build: targetBuild,
@@ -354,12 +360,17 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(result.output.geometry)lastGeometry=structuredClone(result.output.geometry);
         if(readNavigation)result.output.node_navigation_read=true;
         if(readProcessControls)result.output.node_process_controls_read=true;
+        if(readProcesses) {
+          result.output.node_processes=nativeProcesses;
+          if(nativeProcesses.node_context&&JSON.stringify(canonical(nativeProcesses.node_context))
+            !==JSON.stringify(canonical(result.output.prepared_node_context)))
+            throw new Error('Native process/output context changed during observation');
+        }
         if(boundWizardConfirmation(result.output,wizardConfirmation))result.output.node_wizard_confirmation=structuredClone(wizardConfirmation);
         // These are bounded reads of native UI caches and DOM, guarded by the
         // prepared node before and after. Preserve them in the same journal
         // observation; they are not an execution or data-freshness claim.
-        for (const [requested,key,makeCode] of [[readProcesses,'node_processes',makeNodeProcessContextCode],
-          [readOutputs,'node_outputs',makeNodeOutputContextCode], [readMappings,'node_mapping',makeNodeMappingContextCode],
+        for (const [requested,key,makeCode] of [[readOutputs,'node_outputs',makeNodeOutputContextCode], [readMappings,'node_mapping',makeNodeMappingContextCode],
           [readCollapse,'node_collapse',makeCollapseContextCode], [readDateTime,'node_date_time',makeDateTimeContextCode], [readDuplicates,'node_duplicates',makeDuplicatesContextCode], [readUnion,'node_union',makeUnionContextCode], [readJoin,'node_join',makeJoinContextCode], [readCalculator,'node_calculator',makeCalculatorContextCode], [readJavascript,'node_javascript_schema',makeJavascriptSchemaContextCode], [readGrouping,'node_grouping',makeGroupingContextCode], [readReplacement,'node_replacement',makeReplacementContextCode], [readSorting,'node_sorting',makeSortingContextCode], [readReform,'node_reform',makeReformContextCode]]) {
           if (!requested) continue;
           if (observationNow() >= deadline) break;

@@ -267,11 +267,15 @@ test('native process, port and mapping reads share the prepared node and durable
    execute:async code=>{
      calls.push(code);
      if(code.includes('function workspaceUiCapability'))return {status:'SUCCEEDED',output:structuredClone(state)};
+     if(code.includes('async function readNodeProcesses'))state.dom_epoch.revision++;
      return {verified:true,node_context:{...node,node_id:changed?'foreign':'node'},processes:[],ports:[]};
    }});
  const s=await make().observe({condition:'native state',readProcesses:true,readOutputs:true,readMappings:true,ready:s=>s.node_processes?.verified&&s.node_outputs?.verified&&s.node_mapping?.verified});
  assert.equal(s.node_processes.verified,true);assert.equal(calls.length,5);
- assert.ok(calls[1].includes('"root_ref":"ui-console"'));
+ assert.equal(s.dom_epoch.revision,state.dom_epoch.revision,'issued UI epoch follows the native process transport');
+ assert.equal(records.at(-1).outcome.output.dom_epoch.revision,state.dom_epoch.revision);
+ assert.ok(calls[1].includes('async function readNodeProcesses'));
+ assert.ok(calls[2].includes('"root_ref":"ui-console"'));
  assert.equal(records.at(-1).outcome.output.node_outputs.node_context.node_id,'node');
  assert.equal(records.at(-1).outcome.output.node_mapping.node_context.node_id,'node');
  await assert.rejects(make(true).observe({condition:'native mapping',readMappings:true,ready:()=>true}),/context changed/);
@@ -279,7 +283,7 @@ test('native process, port and mapping reads share the prepared node and durable
  calls.length=0;
  state.ui.elements=[{tid:'MF;cntMain;tlbMainToolbar',ref:'ui-toolbar'}];
  await make().observe({condition:'closed console is opened from its toolbar',readProcesses:true,ready:()=>true});
- assert.ok(calls[1].includes('"root_ref":"ui-toolbar"'));
+ assert.ok(calls[2].includes('"root_ref":"ui-toolbar"'));
  calls.length=0;
  const controls=await make().observe({condition:'console controls without history',readProcessControls:true,ready:()=>true});
  assert.equal(calls.length,2,'only root and UI reads; no native process history');

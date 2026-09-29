@@ -23,7 +23,8 @@ async function fixture(fault, multiple=false,{keepConsoleOpen=false}={}) {
   if(terminal&&fault==='completed_race')ps[1].progress_state={verified:true,state:'completed',terminal:true,can_cancel:false};
   return {prepared_node_context:{...node,verified:true,surface:'graph'},node_processes:{verified:true,inventory_complete:true,
    root_id:'root',show_completed:true,node_context:{...node,verified:true},processes:ps},
-   ui:{elements:[element('MF;cntMain;tlbMainToolbar;btnProgress'),...(opened?[element(grid,['right_click']),element('ConsoleForm;btnClose'),element('child-row',['right_click'])]:[]),
+   ui:{elements:[element('MF;cntMain;tlbMainToolbar;btnProgress'),...(opened?[element(grid,['right_click']),element('ConsoleForm;btnClose'),
+     {...element('child-row',['right_click']),process_row:{record_id:fault==='reused_row'?'foreign-record':'child'}}]:[]),
     ...(menu?[element('mnContextMenu;mniShowCompletedProcesses',['click','press']),{...element(cancel,['cancel_process']),process_menu:{cancellation:actualProof}}]:[])]}};
  };
  const channel={observe:async o=>{reads.push(o);const s=state();if(o.readProcesses===false)delete s.node_processes;if(!o.ready(s))throw Error('Readiness refused: '+o.condition);return structuredClone(s);},
@@ -62,11 +63,11 @@ test('stop driver cancels only its identified native child and returns terminal 
  assert.equal(f.cancelCalls,1);assert.equal(await f.driver.stop(),result);
  assert.deepEqual(f.actions.map(a=>a.verb),['right_click','cancel_process','click']);
 });
-for(const fault of ['foreign_owner','unknown_receipt','replaced_terminal','completed_race'])
+for(const fault of ['foreign_owner','reused_row','unknown_receipt','replaced_terminal','completed_race'])
  test('stop driver preserves '+fault+' without a second gesture',async()=>{
   const f=await fixture(fault);const first=f.driver.stop();await assert.rejects(first);
   assert.equal(f.driver.stop(),first);await assert.rejects(f.driver.stop());
-  assert.equal(f.cancelCalls,fault==='foreign_owner'?0:1);
+  assert.equal(f.cancelCalls,['foreign_owner','reused_row'].includes(fault)?0:1);
  });
 
 test('long execution repeats only bounded observations, never launches or stops again',async()=>{
