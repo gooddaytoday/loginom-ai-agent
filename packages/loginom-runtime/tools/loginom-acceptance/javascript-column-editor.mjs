@@ -292,12 +292,20 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
       return result('refused','usage_trigger_unconfirmed',{...counts,trigger:trigger??null});
     const triggerDom=exact(trigger.tid)[0],picker=value(combo,'picker'),pickerDom=dom(picker);
     const expanded=value(combo,'isExpanded')===true,shown=visible(pickerDom),pickerStore=value(picker,'store'),comboStore=value(combo,'store');
-    const owner=!!picker&&!!pickerDom&&value(picker,'pickerField')===combo
-      &&globalThis.Ext?.getCmp?.(pickerDom.id)===picker&&pickerStore===comboStore&&value(picker,'dataSource')===pickerStore;
+    const ownerChecks={picker_exists:!!picker,dom_exists:!!pickerDom,
+      field_matches:!!picker&&value(picker,'pickerField')===combo,
+      component_matches:!!pickerDom&&globalThis.Ext?.getCmp?.(pickerDom.id)===picker,
+      store_matches:!!picker&&pickerStore===comboStore,
+      data_source_matches:!!picker&&value(picker,'dataSource')===pickerStore,
+      held_picker_matches:!held.editor.usagePicker||held.editor.usagePicker===picker,
+      held_store_matches:!held.editor.usageStore||held.editor.usageStore===pickerStore,
+      held_dom_matches:!held.editor.usagePickerDom||held.editor.usagePickerDom===pickerDom};
+    const owner=ownerChecks.picker_exists&&ownerChecks.dom_exists&&ownerChecks.field_matches
+      &&ownerChecks.component_matches&&ownerChecks.store_matches&&ownerChecks.data_source_matches;
     if(picker&&(!owner||held.editor.usagePicker&&held.editor.usagePicker!==picker
       ||held.editor.usageStore&&held.editor.usageStore!==pickerStore
       ||held.editor.usagePickerDom&&held.editor.usagePickerDom!==pickerDom))
-      return result('refused','usage_picker_owner_changed',{...counts,expanded,shown,owner});
+      return result('refused','usage_picker_owner_changed',{...counts,expanded,shown,owner,owner_checks:ownerChecks});
     if(picker&&!held.editor.usagePicker){held.editor.usagePicker=picker;held.editor.usageStore=pickerStore;held.editor.usagePickerDom=pickerDom;}
     const records=owner?dense(pickerStore.getData?.()?.items,64):null;
     const options=owner?[...pickerDom.querySelectorAll('.x-boundlist-item')]:[];
