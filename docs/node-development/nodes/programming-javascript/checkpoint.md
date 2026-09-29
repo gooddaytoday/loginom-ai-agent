@@ -1,5 +1,47 @@
 # JavaScript: checkpoint исполнения
 
+## Pre-Setting type guard и возврат к пересозданному graph — 2026-09-29
+
+Code commit `8f651c499c` в `origin/node-javascript` добавил read-only
+проверку фактического типа existing graph node **до Setting**: подготовленные
+document/workflow/node и rendered graph сверяются с native
+`bg-vendor-icon-javascript`. Managed Close теперь допускает пересоздание
+объектов graph после закрытия мастера, только если свежие workflow, один
+rendered node, его GUID/TID и JS-тип совпадают. Затем отдельный prepared
+graph-type read повторно подтверждает владельца до `close_verified` ACK.
+Потерянный ответ Close/Yes по-прежнему не приводит к повторному клику.
+Адресные тесты нового guard/Close/adapter: **11 PASS / 0 FAIL**;
+`node --check` и `git diff --check` прошли.
+
+Live `managed-source-type-01`, headed profile 256, завершился `FAILED` ещё
+на `inspect-pages` (`Native process/output context changed during
+observation`), до нового type guard; cleanup **3/3**, report SHA256
+`1438128471d5b397d7ce0b35e4e7c3cdbf2904a21fa2e74570b369c51daa4815`.
+На profile 257 `managed-source-type-02` дошёл до independent existing source,
+но старый Close inspector не подтвердил graph после Yes, хотя диагностический
+снимок показал тот же workflow и rendered JS node. Оригинал оставлен
+`CLEANUP_UNCONFIRMED`, browser закрыт, package/logout не подтверждены;
+report SHA256 `2b93bbec52dca3d2524dc4eb414ced665d222488c31bd3fa5f4ca1d7a7f38a46`.
+Отдельный headed read-only `managed-source-type-recovery-01` на profile 258
+под `jsteach` увидел **0 пакетов**, завершил logout/browser close **3/3**;
+report SHA256 `c54f2b61e0396106cdbcf0f29013c227a824587cd3777fe5bac8e5df231e6ce6`.
+Этот recovery не переписывает статус оригинального прогона.
+
+После исправления `managed-source-type-03` на свежем headed profile 259
+завершился `OBSERVED` / `typed_output_verified`: оба managed Close и source
+admission подтверждены, source SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`,
+cleanup package/logout/browser **3/3**. Report SHA256
+`e8ec3e54626630f3ff3bf35146bde45f1ea5dd3680880f01cef26101c96ced84`.
+Новый pre-Setting type guard прошёл по успешному пути адаптера; отдельного
+type-event в журнале этот прогон не пишет. X11 guard подтвердил **0 browser
+focus samples / 2864**. Под file-lock назначен ещё не созданный profile 260
+(`profile-reassignment-260.json`); profiles 256–259 не использовать повторно.
+
+Следующий шаг остаётся публичной регистрацией source-read через host runtime,
+full/compact API и MCP-ответ. Live выше проверяет private admission, а не
+доставку исходника модели через `dock_node_read`.
+
 ## Source-read operation/cursor contract — 2026-09-29
 
 Code commit `08b3b60927` в `origin/node-javascript` добавил host-only
