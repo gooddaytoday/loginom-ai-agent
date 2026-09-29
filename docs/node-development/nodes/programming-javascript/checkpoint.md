@@ -156,7 +156,28 @@ Operator `3c8f6de9ab` задаёт cleanup budget 180s и close window до 90s
 сохранены. Проверены syntax/diff; успешный новый cleanup ещё не доказан.
 
 Под registry lock после recovery запущен headed `p1-business-code-base-04`,
-profile285/source `3c8f6de9ab`; его результат ещё не подтверждён.
+profile285/source `3c8f6de9ab`; он завершился **FAILED до JS** с подтверждённым
+package close/UI logout/browser close 3/3 и без своих процессов.
+Report SHA256
+`e9d60050265bb06af85ac6206033c10271b0cf20192cff34793b8cb6fddeabf1`,
+journal SHA256
+`80ea019f8f38cd6eaff1e270f64cd869c8c8f37ee839f7d834943c538ee21a29`.
+Opening и format refresh прошли; после одного Add Table наблюдение карточки
+истекло по обычному readiness 15000ms. Native node/views/port panel были
+verified, tables пусты, маска `MF;TF-1;ViewsForm` оставалась видимой.
+Это не доказательство отсутствия таблицы после завершения загрузки.
+Cleanup нового run выполнен самим оператором, admin recovery не потребовался.
+
+Runtime `75d04b7489` после единственного Add задаёт private
+`settleOutputPort`: чтения потребляют только remaining original node deadline,
+при том же node/views и exact native port panel. Foreign node/port/mask/dialog,
+cancel и expiry прекращают ожидание; unusable snapshot не допускает следующего
+жеста. Ordinary readiness 15000ms у остальных чтений сохранён; journal
+показывает фактический budget и port settlement. 129 targeted tests PASS,
+syntax/diff-check PASS; test log SHA256
+`4113580cb163196d32da5bf3beca52e1dabd9ef92a85bd031333694f38a71b53`.
+Под lock запущен новый headed `p1-business-code-base-05`, profile286/source
+`75d04b7489`; его результат ещё не подтверждён.
 `expected.json` остаётся неизменным. Далее — declared base, changed/reordered
 и конечный Stop/cancel по P1; до результата code-base их не считать проверенными.
 
