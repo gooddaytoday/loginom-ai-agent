@@ -322,23 +322,46 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
       const record=records.find(rec=>String(value(rec,'internalId'))===item.getAttribute('data-recordId'));
       return value(value(record,'data'),'Value')===expectedUsage&&value(value(record,'data'),'DisplayText')===expectedUsageLabel;
     });
+    const fullyBound=expanded&&shown&&owner&&records?.length===7&&options.length===7
+      &&visibleOptions.length===7&&matched.length===1&&pickerStore?.isLoading?.()!==true;
+    if(readUsagePicker===true&&fullyBound){
+      const item=matched[0],record=records.find(rec=>String(value(rec,'internalId'))===item.getAttribute('data-recordId'));
+      const previous=held.editor.usageOption;
+      if(previous&&(previous.item!==item||previous.record!==record||previous.cache!==value(record,'data')))
+        return result('refused','usage_option_changed',{...counts,expected_usage:expectedUsage});
+      if(!previous)held.editor.usageOption={item,record,cache:value(record,'data')};
+    }
     usagePickerSnapshot={expanded,visible:shown,owner,lazy_owner:lazyOwner,trigger_tid:trigger.tid,record_count:records?.length??null,
       option_count:options.length,verified_option_count:visibleOptions.length,expected_match_count:matched.length,
-      expected_usage:expectedUsage,expected_label:expectedUsageLabel};
-    if(usageAction){
+      expected_usage:expectedUsage,expected_label:expectedUsageLabel,
+      cached_value:declaredControls.cbxUsageType.cached_value};
+    if(usageAction==='open'||usageAction==='close'){
       const rect=triggerDom.getBoundingClientRect(),x=rect.x+rect.width/2,y=rect.y+rect.height/2,hit=document.elementFromPoint(x,y);
       const interactive=!combo.readOnly&&x>=0&&y>=0&&x<innerWidth&&y<innerHeight
         &&!!hit&&(hit===triggerDom||triggerDom.contains(hit));
-      if(!interactive||usageAction==='open'&&(expanded||shown)||usageAction==='close'&&(!expanded||!shown||!owner)
-        ||!['open','close'].includes(usageAction))return result('refused','usage_trigger_not_interactive',{...counts,usage_picker:usagePickerSnapshot});
+      if(!interactive||usageAction==='open'&&(expanded||shown)||usageAction==='close'&&(!expanded||!shown||!owner))
+        return result('refused','usage_trigger_not_interactive',{...counts,usage_picker:usagePickerSnapshot});
     }
+    if(usageAction==='select'){
+      const rect=option?.getBoundingClientRect(),x=rect?rect.x+rect.width/2:-1,y=rect?rect.y+rect.height/2:-1;
+      const hit=rect?document.elementFromPoint(x,y):null;
+      const interactive=!!option&&matched.length===1&&matched[0]===option
+        &&held.editor.usageOption?.item===option&&pickerDom.contains(option)
+        &&option.classList.contains('x-boundlist-item')&&option.disabled!==true
+        &&x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&!!hit&&(hit===option||option.contains(hit));
+      if(!interactive)return result('refused','usage_option_not_interactive',{...counts,usage_picker:usagePickerSnapshot});
+    }
+    if(usageAction&&!['open','close','select'].includes(usageAction))
+      return result('refused','usage_action_unsupported',{...counts});
     if(readUsagePicker==='state'&&(expanded!==shown||expanded&&!owner||pickerStore?.isLoading?.()===true))
       return result('pending','usage_picker_transition',{...counts,usage_picker:usagePickerSnapshot});
     if(readUsagePicker==='collapsed'&&(expanded||shown||pickerStore?.isLoading?.()===true))
       return result('pending','usage_picker_collapsing',{...counts,usage_picker:usagePickerSnapshot});
-    if(readUsagePicker===true&&(!expanded||!shown||!owner||records?.length!==7||options.length!==7
-      ||visibleOptions.length!==7||matched.length!==1||pickerStore?.isLoading?.()===true))
+    if(readUsagePicker===true&&!fullyBound)
       return result('pending','usage_picker_opening',{...counts,usage_picker:usagePickerSnapshot});
+    if(readUsagePicker==='selected'&&(expanded||shown||declaredControls.cbxUsageType.cached_value!==expectedUsage
+      ||pickerStore?.isLoading?.()===true))
+      return result('pending','usage_option_selecting',{...counts,usage_picker:usagePickerSnapshot});
   }
   return result('ready',null,{...counts,base:editorBase,...(pickerSnapshot?{picker:pickerSnapshot}:{}),...(usagePickerSnapshot?{usage_picker:usagePickerSnapshot}:{}),...(helperSource?{helper_source:helperSource}:{}),...(fieldReadback?{field_readback:fieldReadback}:{}),...(declaredControls?{declared_controls:declaredControls}:{})});
 });
@@ -565,6 +588,46 @@ export async function openJavascriptColumnUsagePicker({page,state,record,once,de
   }
   await record({phase:'column_usage_opening_refused',snapshot:last??null,deadline_expired:Date.now()>=limit});
   throw Error('Column usage picker opening unconfirmed');
+}
+
+export async function selectJavascriptColumnUsageOption({page,state,record,once,deadline,id,expectedUsage=4,expectedUsageLabel='Выходное'}) {
+  const pending=state.pending;
+  if(pending.usageSelectAttempted)throw Error('Column usage selection already attempted; do not replay');
+  const limit=Math.min(deadline,Date.now()+5000);
+  const handle=await pending.held.evaluateHandle(h=>h.editor?.usageOption?.item??null);
+  try {
+    const option=handle.asElement();
+    if(!option){await record({phase:'column_usage_option_refused',reason:'held_item_unavailable'});throw Error('Proven column usage option unavailable');}
+    const read=usageAction=>page.evaluate(observeJavascriptColumnEditor,
+      {held:pending.held,phase:'editing',readUsagePicker:true,usageAction,option,expectedUsage,expectedUsageLabel});
+    const before=await read('select');
+    if(before.status!=='ready'){
+      await record({phase:'column_usage_option_refused',snapshot:before});
+      throw Error('Owned column usage option unavailable: '+(before.reason??before.status));
+    }
+    pending.usageSelectAttempted=true;
+    await once(id,{expected_usage:expectedUsage,expected_label:expectedUsageLabel},async()=>{
+      const current=await read('select');
+      if(current.status!=='ready'){
+        await record({phase:'column_usage_option_dispatch_refused',snapshot:current});
+        throw Error('Column usage option changed before selection');
+      }
+      pending.usageSelectDispatched=true;
+      await option.click({timeout:Math.max(1,limit-Date.now())});
+    });
+    let fingerprint,count=0,last;
+    while(Date.now()<limit){
+      last=await page.evaluate(observeJavascriptColumnEditor,
+        {held:pending.held,phase:'editing',readUsagePicker:'selected',expectedUsage,expectedUsageLabel});
+      const key=JSON.stringify(last.usage_picker??{status:last.status,reason:last.reason});
+      if(key!==fingerprint&&count++<8){fingerprint=key;await record({phase:'column_usage_selecting',observation:count,snapshot:last});}
+      if(last.status==='ready'){pending.usageSelectObserved=true;return last;}
+      if(last.status==='refused')break;
+      await page.waitForTimeout(Math.min(100,Math.max(1,limit-Date.now())));
+    }
+    await record({phase:'column_usage_selection_refused',snapshot:last??null,deadline_expired:Date.now()>=limit});
+    throw Error('Column usage selection unconfirmed');
+  }finally{await handle.dispose();}
 }
 
 export async function closeJavascriptColumnUsagePicker({page,state,record,deadline}) {
