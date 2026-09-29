@@ -42,6 +42,7 @@ import {createJavascriptColdSource} from './javascript-cold-source.mjs';
 import {requireJavascriptSavedPackagePath,bindJavascriptPackage} from './javascript-package-binding.mjs';
 import {javascriptColdNodes,observeJavascriptWizardBinding} from './javascript-cold-binding.mjs';
 import {openJavascriptInitialWizard,requireJavascriptInitialOpeningCleanup} from './javascript-initial-opening.mjs';
+import {openManagedJavascriptInitialWizard} from './javascript-managed-initial-opening.mjs';
 import {javascriptExecutionProbes} from './javascript-execution-probes.mjs';
 import {javascriptMismatchSource,runJavascriptMismatchMaterialization,javascriptMismatchExecutionProgress,javascriptProbeFailure} from './javascript-mismatch-probe.mjs';
 import {readJavascriptSchema,configureJavascriptSchema} from './javascript-schema-probe.mjs';
@@ -64,17 +65,17 @@ const batchDeadline=coldReader||packageFile?Math.floor(performance.timeOrigin)+6
 let cleaning=false,cleanupDeadline=Infinity;
 const phaseDeadline=ms=>Math.min(cleaning?cleanupDeadline:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=(cleaning?cleanupDeadline:batchDeadline)-Date.now();if(ms<=0)throw Error(cleaning?'Original cleanup deadline expired':'Original batch deadline expired');return ms;};
-const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--server-version-only | --palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor [--inspect-usage-picker [--select-usage-option [--apply-usage-option]]] | --probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
+const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--server-version-only | --palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor [--inspect-usage-picker [--select-usage-option [--apply-usage-option]]] | --probe-source]] | --execution-case CASE [--managed-opening-probe] | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
 if(args.includes('--help')&&coldReader){console.log('node javascript-persistence-read-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nCold reader: observe actual source/settings/mappings, one fresh Execute and full output; 10 minutes from process start; headed only. No source or configuration input.');return;}
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
-  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--metadata-diagnostic'].includes(key) ? true : args[++i];
+  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
 }
 if(coldReader){
@@ -94,6 +95,9 @@ if(sourceReadCycle){
   if(batch||nativeInputOnly||nativeRoundtrip||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence'].includes(k)))throw Error('Source cycle requires its separate fixed private entrypoint');
   options['--execution-case']='code-table-execute';
 }
+if(options['--managed-opening-probe']&&(options['--execution-case']!=='code-table-execute'
+  ||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--discovery-probe']))
+  throw Error('Managed opening probe requires one isolated code-table-execute case');
 if(batch&&options['--execution-case'])throw Error('Batch cannot also select a single case');
 if(nativeInputOnly||nativeRoundtrip){
   if(batch||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence','--native-fixture',...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])].includes(k)))throw Error('Native input-only requires its separate private entrypoint and no JS modes');
@@ -149,7 +153,7 @@ const directory=resolve(options['--evidence']);
 // Refuse reuse: no old evidence is overwritten and no uncertain run is replayed.
 await mkdir(directory,{mode:0o700});
 const redactor=createRedactor([config.password]);
-if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--server-version-only']){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
+if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--server-version-only']||options['--managed-opening-probe']){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},knownSecrets:[config.password]});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
   ...(coldReader||persistence||packageFile?{host_process:{pid:process.pid,started_at:new Date(performance.timeOrigin).toISOString(),profile:resolve(options['--profile'])}}:{}),
@@ -1396,7 +1400,11 @@ const runPreparedCase=async()=>{
     report.stage='open-wizard';
     wizardBinding=await page.evaluateHandle(observeJavascriptWizardBinding,{id:node.id,tid:node.tid,icon:expectedIcon,owned:packageHandle});
     wizardDeadline=phaseDeadline(90000);report.wizard_open_deadline=new Date(wizardDeadline).toISOString();await save();
-    if(executionCase){
+    if(options['--managed-opening-probe']){
+      await openManagedJavascriptInitialWizard({page,prepared:executionPrepared,node,deadline:wizardDeadline,
+        record:executionRecord,lifecycle:initialOpening,report,save});
+      openedWizard=true;
+    }else if(executionCase){
       await openJavascriptInitialWizard({page,binding:wizardBinding,node,icon:expectedIcon,deadline:wizardDeadline,
         record:executionRecord,guard,report,save,lifecycle:initialOpening,
         waitVisible:async deadline=>{await exact(owner.prefix+';WizrdMCF').waitFor({state:'visible',timeout:Math.max(1,deadline-Date.now())});openedWizard=true;}});
