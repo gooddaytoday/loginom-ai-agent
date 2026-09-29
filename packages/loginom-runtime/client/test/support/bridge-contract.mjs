@@ -1,6 +1,6 @@
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createArtifactStore } from '../../lib/artifacts.mjs';
 import { tmpdir } from 'node:os';
@@ -10,6 +10,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import * as actionCatalog from '../../lib/action-catalog.mjs';
 import * as skill from '../../lib/skill.mjs';
 import * as workspace from '../../lib/workspace.mjs';
+import * as executor from '../../lib/executor.mjs';
 import { actions, selectors, build, Page, nodeParameters } from './executor-fixture.mjs';
 
 // Exercise the actual bridge request handler and MCP Server/Client protocol.
@@ -17,7 +18,8 @@ import { actions, selectors, build, Page, nodeParameters } from './executor-fixt
 // no localhost listener, real browser, credentials or model is involved.
 test('MCP application refusals remain typed normal content and the same connection can create a node afterwards', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dock-bridge-contract-'));
-  const page = new Page(); let browserCalls = 0;
+  const page = new Page(); let browserCalls = 0, preparationPath=[];
+  const sourceCalls=[];
   const compatibility = { profile_id: 'unit-macos-chromium', loginom_build: build, platform: 'macos', browser: 'chromium' };
   const pinned = { actions, selectors, pins: {}, compatibility, manifest: { compatibility } };
   class ExternalClient {
@@ -31,7 +33,7 @@ test('MCP application refusals remain typed normal content and the same connecti
       browserCalls++;
       const code = request.arguments.code;
       const output = code.includes('async function prepareWorkspace(')
-        ? { status: 'READY', target: compatibility, authenticated: true, created_draft: true, effect_possible: true, document_id: 'fixture-document', target_verified: true, package_ref: {path:null,persisted:false}, workflow_ref: { tab_tid: page.tabTid, prefix: page.prefix, workflow_id: 'fixture-workflow', navigation_path: [] } }
+        ? { status: 'READY', target: compatibility, authenticated: true, created_draft: true, effect_possible: true, document_id: 'fixture-document', target_verified: true, package_ref: {path:null,persisted:false}, workflow_ref: { tab_tid: page.tabTid, prefix: page.prefix, workflow_id: 'fixture-workflow', navigation_path: preparationPath } }
         : code.includes('async function observeGeometry(')
         ? { version:1, source:'prepare_same_browser_page', observed:{document_id:'fixture-document'}, fixture:true }
         : await page.execute(code);
@@ -53,6 +55,15 @@ test('MCP application refusals remain typed normal content and the same connecti
   mock.module(new URL('../../lib/skill.mjs', import.meta.url).href, { namedExports: { ...skill,
     skillTransport: () => ({}), createSkillLoader: () => ({ prepare: async () => ({ main: '/unit/skill', directory: '/unit/skill',
       detail: { revision: 'unit-skill', source: 'unit-source', content: 'Legacy skill context without the new recovery tools.' } }) }),
+  } });
+  mock.module(new URL('../../lib/executor.mjs', import.meta.url).href, { namedExports: {
+    ...executor,createActionRuntime: options => executor.createActionRuntime({...options,
+      javascriptSourceAdapterFactory: () => ({active:false,uncertain:false,
+      async open({owner}) {sourceCalls.push('open');return {owner};},
+      async read(handle,{owner}) {assert.deepEqual(handle.owner,owner);sourceCalls.push('read');
+        return {owner,source:'const sample = "Привет 😀";\n',settings:{generation:true}};},
+      async discard(handle,{owner}) {assert.deepEqual(handle.owner,owner);sourceCalls.push('discard');
+        return {closed:true,owner};}})}),
   } });
   const { createBridge } = await import('../../lib/bridge.mjs');
   const session = { directory, browserCli: '/unit/browser.mjs', browserConfig: '/unit/browser.json', browserRoot: '/unit/browser',
@@ -124,6 +135,23 @@ test('MCP application refusals remain typed normal content and the same connecti
     const beforeInvalid = browserCalls;
     assert.ok(metadata.executor.candidate_operation_tools.includes('dock_node_apply'));
     assert.ok(metadata.executor.candidate_operation_tools.includes('dock_artifact_deliver'));
+    const sourceRequest={kind:'source',operation_id:'bridge-source',document_id:'fixture-document',
+      workflow_ref:{workflow_id:'fixture-workflow',tab_tid:page.tabTid,prefix:page.prefix,
+        navigation_path:[{tid:page.prefix+';scenario',label:'Scenario'}]},
+      node:{document_id:'fixture-document',workflow_id:'fixture-workflow',node_id:'source-node'}};
+    const beforeSource=browserCalls;
+    const sourceResponse=await client.callTool({name:'dock_node_read',arguments:sourceRequest});
+    assert.notEqual(sourceResponse.isError,true,JSON.stringify(sourceResponse).slice(0,1000));
+    const sourceReceipt=JSON.parse(sourceResponse.content[0].text);
+    assert.equal(sourceReceipt.kind,'source');
+    assert.equal(sourceReceipt.source_text,'const sample = "Привет 😀";\n');
+    assert.equal(sourceReceipt.source_sha256,createHash('sha256').update(sourceReceipt.source_text).digest('hex'));
+    assert.deepEqual(sourceResponse.structuredContent,sourceReceipt);
+    assert.deepEqual(sourceCalls,['open','read','read','read','discard']);
+    assert.equal(browserCalls,beforeSource,'the fixture adapter owns the source path without output Execute');
+    const replay=await client.callTool({name:'dock_node_read',arguments:sourceRequest});
+    assert.deepEqual(replay.structuredContent,sourceReceipt);
+    assert.deepEqual(sourceCalls,['open','read','read','read','discard']);
     const cards=await client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text','transform.calculator']}});
     const nodeCards=JSON.parse(cards.content[0].text).node_types;
     assert.equal(nodeCards[0].candidate_node_apply_available,true);
@@ -174,6 +202,32 @@ test('MCP application refusals remain typed normal content and the same connecti
       assert.ok(observedReceipt.output.ui.elements.some(e => e.ref === args.root_ref && e.kind === 'region' && e.allowed_actions.length === 0));
       assert.equal(args.observation_id, observedReceipt.output.observation_id);
     }
+    await client.close();client=null;
+    await bridge.close();bridge=null;
+    preparationPath=[{tid:page.prefix+';scenario',label:'Scenario'}];
+    sourceCalls.length=0;
+    const compactDirectory=join(directory,'compact');await mkdir(compactDirectory);
+    const compactSession={directory:compactDirectory,browserCli:session.browserCli,browserConfig:session.browserConfig,
+      browserRoot:session.browserRoot,metadata:{...session.metadata,sessionId:'unit-bridge-compact'},async save(){},
+      artifactStore:await createArtifactStore({directory:join(compactDirectory,'input')})};
+    bridge=await createBridge({...config,resultProfile:'user-v1',stateDir:compactDirectory},compactSession);
+    client=new ProtocolClient({name:'test-compact-agent',version:'1.0.0'});
+    const [compactAgentTransport,compactBridgeTransport]=InMemoryTransport.createLinkedPair();
+    await Promise.all([bridge.server.connect(compactBridgeTransport),client.connect(compactAgentTransport)]);
+    await client.callTool({name:'dock_workspace_observe',arguments:{scope:'bootstrap'}});
+    const compactPrepare=await client.callTool({name:'dock_prepare',arguments:{}});
+    assert.equal(JSON.parse(compactPrepare.content[0].text).prepared,true);
+    const compactRequest={...sourceRequest,operation_id:'bridge-compact-source',
+      workflow_ref:{workflow_id:'fixture-workflow'}};
+    const beforeCompact=browserCalls;
+    const compactResponse=await client.callTool({name:'dock_node_read',arguments:compactRequest});
+    assert.notEqual(compactResponse.isError,true,JSON.stringify(compactResponse).slice(0,1000));
+    const compactReceipt=JSON.parse(compactResponse.content[0].text);
+    assert.equal(compactReceipt.kind,'source');
+    assert.equal(compactReceipt.source_text,sourceReceipt.source_text);
+    assert.deepEqual(compactResponse.structuredContent,compactReceipt);
+    assert.deepEqual(sourceCalls,['open','read','read','read','discard']);
+    assert.equal(browserCalls,beforeCompact);
   } finally {
     await client?.close();
     await bridge?.close();
