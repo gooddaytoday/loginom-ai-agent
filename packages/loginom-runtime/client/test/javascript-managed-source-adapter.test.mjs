@@ -14,9 +14,10 @@ const task = {operation_id: 'managed-js-1', owner: node, workflow_ref: prepared.
   targetOrigin: 'http://logi-test-plan.bg.local', targetBuild: '7.4.2', deadline,
   prepared: {...prepared, node}, allowDeactivation: true};
 
-function fixture({closeFails = false, pageTransientOnce = false, wrongType = false, doneFails = false} = {}) {
+function fixture({closeFails = false, pageTransientOnce = false, wrongType = false,
+  doneFails = false, graphTransientOnce = false, graphOwnerChanged = false} = {}) {
   const calls = [], events = [];
-  let pageReads = 0, codeNextSent = false;
+  let pageReads = 0, graphReads = 0, codeNextSent = false;
   const driver = {
     openManagedJavascriptExistingWizard: async args => {calls.push('open'); assert.equal(args.node, node); return {task};},
     dispatchManagedJavascriptNext: async () => {calls.push('next'); return {status: 'SUCCEEDED', output: {next_gesture_returned: true}};},
@@ -54,8 +55,16 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
   const record = async event => {events.push(structuredClone(event)); return event;};
   const sourceAdapter = async () => createJavascriptManagedSourceAdapter({page: {}, prepared, node, uiEpoch: 9,
     deadline, targetOrigin: 'http://logi-test-plan.bg.local', execute, record,
-    receiptOptions: () => ({}), channel: () => ({observe:async()=>{calls.push('graph');return {
-      prepared_node_context:{...node,verified:true,surface:'graph'},wizard:{status:'absent'}};}}), driver});
+    receiptOptions: () => ({}), wait: async () => {}, channel: () => ({observe:async()=>{
+      calls.push('graph');graphReads++;
+      if(graphOwnerChanged || graphTransientOnce && graphReads === 1){
+        const error=Error('Node procedure roots could not be observed: PREPARED_NODE_CONTEXT_CHANGED');
+        error.nodeObservationRefusal={error:{code:'PREPARED_NODE_CONTEXT_CHANGED'},
+          binding_reason:graphOwnerChanged?'node_guid':'surface_unavailable'};
+        throw error;
+      }
+      return {prepared_node_context:{...node,verified:true,surface:'graph'},wizard:{status:'absent'}};
+    }}), driver});
   return {calls, events, sourceAdapter, record};
 }
 
@@ -126,6 +135,25 @@ test('managed source commit uses one Code Next and Done and settles the same gra
   assert.deepEqual(f.calls.filter(call=>['code-next','done','graph','dispose'].includes(call)),
     ['code-next','done','graph','dispose']);
   await assert.rejects(()=>adapter.commit(handle,{owner,deadline}),/handle unavailable/);
+});
+
+test('Done graph observation retries only a transient unmounted surface',async()=>{
+  const f=fixture({graphTransientOnce:true}),adapter=await f.sourceAdapter();
+  const handle=await adapter.open({owner,deadline});
+  await adapter.replace(handle,{owner,deadline,expected_source_sha256:'0'.repeat(64),source_text:'// changed\n'});
+  assert.equal((await adapter.commit(handle,{owner,deadline})).graph_owner_verified,true);
+  assert.equal(f.calls.filter(call=>call==='graph').length,2);
+  assert.equal(f.calls.filter(call=>call==='done').length,1);
+});
+
+test('Done graph observation never retries a changed node owner',async()=>{
+  const f=fixture({graphOwnerChanged:true}),adapter=await f.sourceAdapter();
+  const handle=await adapter.open({owner,deadline});
+  await adapter.replace(handle,{owner,deadline,expected_source_sha256:'0'.repeat(64),source_text:'// changed\n'});
+  await assert.rejects(()=>adapter.commit(handle,{owner,deadline}),/PREPARED_NODE_CONTEXT_CHANGED/);
+  assert.equal(f.calls.filter(call=>call==='graph').length,1);
+  assert.equal(f.calls.filter(call=>call==='done').length,1);
+  assert.equal(adapter.uncertain,true);
 });
 
 test('lost managed Done reply retains uncertainty and never retries the gesture',async()=>{

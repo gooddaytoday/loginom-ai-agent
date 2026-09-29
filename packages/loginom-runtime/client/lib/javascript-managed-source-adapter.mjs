@@ -166,12 +166,24 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       need(done?.status === 'SUCCEEDED' && done.output?.done_gesture_returned === true
         && done.output.wizard_commit_verified === false && done.output.execution_started === null,
         'Managed JavaScript Done gesture unconfirmed');
-      const graph = await channel(handle.task.deadline).observe({condition: 'owned JavaScript graph after Done',
-        ready: state => state.prepared_node_context?.verified === true
-          && state.prepared_node_context.surface === 'graph' && state.wizard?.status === 'absent'
-          && ['document_id','workflow_id','node_id'].every(key =>
-            state.prepared_node_context[key] === node[key])});
-      need(graph.prepared_node_context?.verified === true
+      let graph = null;
+      for (let attempt = 0; attempt < 60 && Date.now() < handle.task.deadline; attempt++) {
+        try {
+          graph = await channel(handle.task.deadline).observe({condition: 'owned JavaScript graph after Done',
+            ready: state => state.prepared_node_context?.verified === true
+              && state.prepared_node_context.surface === 'graph' && state.wizard?.status === 'absent'
+              && ['document_id','workflow_id','node_id'].every(key =>
+                state.prepared_node_context[key] === node[key])});
+          break;
+        } catch (error) {
+          // The Done click can briefly unmount both wizard and graph. Retry
+          // only this read-only transition, never a changed owner or gesture.
+          if (error?.nodeObservationRefusal?.error?.code !== 'PREPARED_NODE_CONTEXT_CHANGED'
+            || error.nodeObservationRefusal.binding_reason !== 'surface_unavailable') throw error;
+          await wait(Math.min(250, Math.max(1, handle.task.deadline - Date.now())));
+        }
+      }
+      need(graph?.prepared_node_context?.verified === true
         && graph.prepared_node_context.surface === 'graph' && graph.wizard?.status === 'absent'
         && ['document_id','workflow_id','node_id'].every(key => graph.prepared_node_context[key] === node[key]),
       'Managed JavaScript Done graph owner unconfirmed');
