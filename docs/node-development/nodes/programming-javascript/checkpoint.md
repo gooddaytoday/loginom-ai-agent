@@ -1,5 +1,40 @@
 # JavaScript: checkpoint исполнения
 
+## Публичный `dock_node_read kind:source` — headed proof, 2026-09-29
+
+Code commit `0c513c445a` в `origin/node-javascript` подключил ранее проверенные
+source-read session/registry/managed adapter к host `createActionRuntime` и
+публичному `dock_node_read`. Начальный запрос требует prepared existing JS node;
+продолжение использует тот же operation ID, cursor и исходный SHA-256. Отдельная
+ветка output-read сохранила прежнее повторное Execute. Full/compact MCP-схемы,
+маршрут, user-v1 ответ и общий с журналом redactor теперь согласованы; raw
+source не копируется в локальную full-result диагностику. После неоднозначного
+Close host удерживает браузер и запрещает новую source-операцию. Успешный
+точный повтор отдаётся из cache, а одновременный повтор присоединяется к
+одному чтению. MCP SDK требует корневой `type:object` у input/output schema:
+это выявил bridge-тест, форма исправлена до commit.
+
+Адресный набор bridge/source/adapter/node/runtime/journal/user-regression:
+**126 PASS / 0 FAIL**; `node --check` и `git diff --check` прошли. На свежем
+headed Chromium profile 260 оператор вызвал именно публичный
+`dispatchNodeApi(..., 'dock_node_read', {kind:'source', ...})` через настоящий
+`createActionRuntime` в своей аутентифицированной Playwright-сессии. Получен
+точный source **376 UTF-8 bytes / 8 LF lines**, SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`,
+один chunk, cursor null; обычный и user-v1 MCP response совпали с источником.
+Журнал: один source open/discard/delivery, Close подтверждён; cleanup
+package/logout/browser **3/3**. Report SHA256
+`d9aee7dd91c75e85068807c5ee40637c86c075f3faad2e745f7705d3f96c94f6`.
+X11 no-focus: **0 browser focus samples / 2967**, poll failures 0.
+Под `registry.lock` назначен новый ещё не созданный profile 261 с receipt
+`profile-reassignment-261.json`; profile 260 повторно не использовать.
+
+Этот live proof проверяет публичный runtime и форму ответа в том же headed
+операторском browser context. Он ещё не является независимым запуском
+установленного CLI/модели через MCP bridge. Следующее: кандидат CLI с J01/J21,
+проверка managed передачи tool response модели и затем JS apply/execute
+handler. Общая цель плана остаётся незавершённой.
+
 ## Pre-Setting type guard и возврат к пересозданному graph — 2026-09-29
 
 Code commit `8f651c499c` в `origin/node-javascript` добавил read-only
