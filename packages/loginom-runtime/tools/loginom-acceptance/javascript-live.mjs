@@ -111,7 +111,8 @@ if(sourceReadCycle){
 if(options['--managed-opening-probe']&&(options['--execution-case']!=='code-table-execute'
   ||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--discovery-probe']))
   throw Error('Managed opening probe requires one isolated code-table-execute case');
-if(options['--x11-no-focus']&&!options['--managed-opening-probe'])throw Error('X11 focus guard requires the isolated managed opening probe');
+if(options['--x11-no-focus']&&!options['--managed-opening-probe']&&!options['--server-version-only'])
+  throw Error('X11 focus guard requires the isolated managed opening probe or read-only recovery');
 if(options['--verify-source-admission']&&!options['--managed-opening-probe'])throw Error('Source admission requires the isolated managed opening probe');
 if(options['--verify-public-source-read']&&!options['--managed-opening-probe'])throw Error('Public source read requires the isolated managed opening probe');
 if(options['--verify-runtime-schema']&&(options['--execution-case']!=='code-table-execute'||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile))

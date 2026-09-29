@@ -44,15 +44,25 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
   const dialogs=[...document.querySelectorAll('[role="dialog"],.x-message-box')].filter(visible);
   const root=held.wizardRoot,current=tab?.Controller?.Node?.data?.node,model=tab?.Controller?.FController;
   if(!visible(root)&&dialogs.length===0){
+    // The confirmation can hide its wizard before the graph and rendered node
+    // return. Wait under the original Close deadline while the retained tab
+    // still owns this transition; a different active owner remains terminal.
+    if(current===held.wizard&&model?.FView?.el?.dom===root)
+      return {state:'waiting',node_id:task.owner.node_id,root_visible:false,dialog_count:0};
+    if(current!==held.binding.workflow)throw Error('Managed JavaScript Close graph owner changed');
+    if(!app?.ModelForm||!(model instanceof app.ModelForm))
+      return {state:'waiting',node_id:task.owner.node_id,root_visible:false,dialog_count:0};
     const diagram=model?.FDiagram,nodes=diagram?.FNodes?.FCollection;
     const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===task.owner.node_id):[];
     const graph=diagram?.FmxGraph,shape=found.length===1?graph?.view?.getState?.(found[0].FCell)?.shape?.node:null;
     const roots=[...document.querySelectorAll('[data-tid='+JSON.stringify(task.workflow_ref.prefix+';ModelForm;cmpDiagram')+']')];
-    if(current!==held.binding.workflow||!app?.ModelForm||!(model instanceof app.ModelForm)
-      ||found.length!==1||found[0].FIconCls!=='bg-vendor-icon-javascript'
-      ||roots.length!==1||roots[0]!==graph?.container
-      ||!shape?.isConnected||!roots[0].contains(shape)||shape.getAttribute('data-tid')!==held.node.tid)
+    if(!Array.isArray(nodes)||nodes.length>20||found.length>1||roots.length>1
+      ||found.length===1&&found[0].FIconCls!=='bg-vendor-icon-javascript'
+      ||roots.length===1&&graph?.container&&roots[0]!==graph.container
+      ||shape?.isConnected&&roots.length===1&&(!roots[0].contains(shape)||shape.getAttribute('data-tid')!==held.node.tid))
       throw Error('Managed JavaScript Close graph owner changed');
+    if(found.length===0||roots.length===0||!graph?.container||!shape?.isConnected)
+      return {state:'waiting',node_id:task.owner.node_id,root_visible:false,dialog_count:0};
     return {state:'closed',node_id:task.owner.node_id,root_visible:false,dialog_count:0,
       graph_tid:held.node.tid,graph_rebound:model!==held.retained.model||found[0]!==held.retained.native};
   }
