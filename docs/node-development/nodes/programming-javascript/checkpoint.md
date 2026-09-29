@@ -1,5 +1,41 @@
 # JavaScript: checkpoint исполнения
 
+## Managed CodeMirror identity и Close settlement — 2026-09-29
+
+Code commits `b77d795181` и `260944a3ea` в `origin/node-javascript`.
+Managed source-read теперь удерживает один конкретный CodeMirror/document/input
+на открытом JS wizard и проверяет его до/после каждого полного чтения;
+смена focus, editor instance, текста или владельца вызывает отказ. Lease
+освобождает editor handle перед wizard/graph handles. После подтверждения
+Close скрытый мастер может опередить появление rendered graph; read-only
+инспектор теперь ждёт только эту переходную фазу в пределах исходного
+deadline. Чужой workflow, тип или node по-прежнему отвергаются. Адресные
+managed/source-public тесты: **30 PASS / 0 FAIL**; `node --check` и
+`git diff --check` прошли. Операторский read-only recovery теперь может
+использовать `--x11-no-focus` и с `--server-version-only`.
+
+Первая headed-попытка `managed-editor-01`, profile 262, дошла до managed
+existing source read, но после Close confirmation прежний инспектор сразу
+отказал с `Managed JavaScript Close graph owner changed`. Оригинал
+`CLEANUP_UNCONFIRMED`: browser закрыт, package/logout не подтверждены;
+report SHA256 `8c496e0068effce89a0a2e4d861ea754702b5a8e7a9175f7fe7baddb4f275e22`.
+Отдельный headed read-only recovery `managed-editor-recovery-01`, profile 263,
+увидел у `jsteach` **0 пакетов**, завершил logout/browser **3/3**; report SHA256
+`ed9a816a962bc8a72dab92001b70ce23d84da3071594104ddf3f716deca5394e`.
+Recovery не меняет статус оригинального прогона.
+
+После исправления `managed-editor-02` на fresh headed profile 264 завершился
+`OBSERVED`: managed Close/возврат к графу, публичный source-read через
+удержанный CodeMirror и user-v1 ответ подтверждены. Источник **376 UTF-8
+bytes / 8 LF lines**, SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`,
+один chunk, cursor null. Cleanup package/logout/browser **3/3**, X11 no-focus
+**0 browser focus samples / 2862**, poll failures 0; report SHA256
+`f442db67f548a2b3927e41693a642a66b708b5a9190f3bfd542c6116525c3991`.
+Под `registry.lock` назначен новый ещё не созданный profile 265, receipt
+`profile-reassignment-265.json`. Эта проверка не является JS apply/execute
+handler или независимой CLI-приёмкой; общая цель остаётся активной.
+
 ## Повторная headed-проверка публичного source-read — 2026-09-29
 
 На свежем profile 261 повторён live `public-source-read-02` с текущим code
