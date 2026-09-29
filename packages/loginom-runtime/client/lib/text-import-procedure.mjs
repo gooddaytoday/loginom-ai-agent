@@ -236,6 +236,29 @@ export async function selectImportColumnOption(channel,initial,index,property,la
     resolve:state=>({verb:'select_wizard_option',ref:option(state).ref})});
 }
 
+// A delayed parse mask can invalidate a format snapshot before the gesture.
+// Only the existing proven no-effect refresh route may reacquire this field.
+export function setImportFormatField(channel,initial,name,text) {
+  requireValue(['delimiter','text_qualifier','null_marker','decimal_separator'].includes(name),'Unsupported import format field');
+  const describe=state=>{
+    const w=state.wizard,f=w?.settings?.fields?.[name];
+    requireValue(w?.status==='observed'&&w.stage==='text_import_format'&&w.owner_context?.status==='observed'
+      &&f?.status==='observed'&&f.truncated!==true&&typeof f.value==='string','Import format field is incomplete');
+    const input=one(state.ui.elements.filter(e=>e.ref===f.input_ref&&e.allowed_actions?.includes('set_wizard_field')
+      &&e.wizard_field?.scope==='import_format'&&e.wizard_field.name===name
+      &&e.wizard_field.owner_ref===f.owner_ref&&e.wizard_field.root_ref===w.root_ref),'Bound import format input unavailable');
+    requireValue(Object.values(w.settings.fields).every(field=>field.status==='observed'&&field.truncated!==true),'Import format settings are incomplete');
+    return {root:w.root_tid,root_ref:w.root_ref,owner:{node:w.owner_context.node.tid,path:w.owner_context.path.map(({tid,label})=>({tid,label}))},
+      native:state.prepared_node_context?Object.fromEntries(['document_id','workflow_id','node_id'].map(k=>[k,state.prepared_node_context[k]])):null,
+      field:{name,owner_ref:f.owner_ref,tid:input.tid,value:f.value},
+      settings:Object.fromEntries(Object.entries(w.settings.fields).map(([key,field])=>[key,field.value]))};
+  };
+  const expected=describe(initial);
+  return channel.perform({condition:'set bound import format '+name,initialObservation:initial,
+    ready:state=>same(describe(state),expected),identity:describe,
+    resolve:state=>({verb:'set_wizard_field',ref:state.wizard.settings.fields[name].input_ref,text})});
+}
+
 async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   (patch?validateTextImportPatch:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(parameters);
   parameters=structuredClone(parameters);
@@ -364,7 +387,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
         state.wizard.settings.fields[name]?.value === text), name);
       requireValue(after.value === text && after.owner_ref === f.owner_ref && after.input_ref === f.input_ref,
         'Null marker field or case changed after selection');
-    } else await act(s, { verb: 'set_wizard_field', ref: f.input_ref, text });
+    } else await setImportFormatField(channel,s,name,text);
   }
   let parsedColumns;
   if(patch) {
