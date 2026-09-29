@@ -231,7 +231,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         s=await revealExecutionControl(channel,node,s,child,childTid,'right_click');
         const sameTarget=s=>JSON.stringify(expectedExecutionStopProof(execution,s.node_processes))===JSON.stringify(target);
         const cancellableRow=s=>control(s,childTid,'right_click').filter(e=>e.process_row?.record_id===target.record_id);
-        await channel.perform({condition:'open exact cancellable process menu',initialObservation:s,
+        await channel.perform({condition:'open exact cancellable process menu',initialObservation:s,processControl:execution,
           ready:s=>sameTarget(s)&&cancellableRow(s).length===1,
           resolve:s=>({verb:'right_click',ref:one(cancellableRow(s),'Stop process row unavailable').ref}),
           identity:()=>({node,...target})});
@@ -239,7 +239,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
           JSON.stringify(e.process_menu?.cancellation)===JSON.stringify(target));
         s=await observe('native owner-bound process cancel available',s=>sameTarget(s)&&cancel(s).length===1);
         const proof=structuredClone(one(cancel(s),'Native stop proof unavailable').process_menu.cancellation);
-        await channel.perform({condition:'cancel exact node execution',initialObservation:s,
+        await channel.perform({condition:'cancel exact node execution',initialObservation:s,processControl:execution,
           ready:s=>sameTarget(s)&&cancel(s).length===1,
           resolve:s=>({verb:'cancel_process',ref:one(cancel(s),'Native stop control changed').ref}),
           identity:()=>({node,...proof})});
