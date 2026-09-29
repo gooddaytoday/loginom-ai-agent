@@ -59,6 +59,21 @@ test('complete import and existing patch pass the public schema and installed ha
  assert.equal(calls.length,5);
 });
 
+test('published JavaScript full UI request requires the bounded exact read window',async()=>{
+ const {runtime,calls}=fixture();
+ const request={operation_id:'js-full',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'tab',prefix:'prefix',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'new',type:'programming.javascript',position:{x:128,y:128},label:'JavaScript'},
+  inputs:[{source:{document_id:'doc',workflow_id:'wf',node_id:'input'},output:0,input:0}],
+  mode:'script',parameters:{source_text:'',schema_mode:'code'},mappings:[],finish:'execute',
+  read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},
+  budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ await dispatchNodeApi(runtime,'dock_node_apply',request);
+ for(const read of [{...request.read,sample_rows:10},{...request.read,require_exact_numbers:false}])
+  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,read}));
+ assert.equal(calls.length,1);
+});
+
 test('Field Parameters dispatch uses the catalog scalar mode and rejects malformed changes',async()=>{
  const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
  const {runtime,calls}=fixture(),support=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
