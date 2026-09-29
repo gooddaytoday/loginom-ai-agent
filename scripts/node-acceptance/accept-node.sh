@@ -379,7 +379,9 @@ setsid "$BWRAP" \
   >"$RAW_STDOUT" 2>"$RAW_STDERR" &
 BWRAP_PID=$!
 
-LIMIT_S=1800
+# Лимит работы CLI с моделью: 2 часа (раньше 30 минут). Худший случай всей попытки около 2 ч 15 мин,
+# поэтому у агентов-разработчиков лимит тишины Codex (outputInactivityTimeoutMs) выше и равен 150 минутам.
+LIMIT_S=7200
 GRACE_S=60
 elapsed=0
 while kill -0 "$BWRAP_PID" 2>/dev/null; do
