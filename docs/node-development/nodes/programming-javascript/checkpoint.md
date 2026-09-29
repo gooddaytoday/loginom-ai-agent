@@ -84,6 +84,26 @@ output targets `configured_only`, связи графа сохранены. По
 Это внутренняя веха fixed case; C/D, G3 bridge, Stop/cancel, candidate/CLI
 и полный J01–J27 остаются открытыми.
 
+### Пауза по просьбе пользователя — 2026-09-29
+
+После B проверены fixtures `sales.csv`, `expected.json` и существующий
+двухколоночный оператор. P1 business 6×4 и Stop/cancel **ещё не запускались**;
+нового исходника, жеста Execute или browser process для них нет. Основной
+docs commit перед паузой — `c0c8cb5a75`, child code HEAD — `f8ceebcac9`.
+Реестр под lock назначил пустой `javascript-discovery-profile-280`, активный
+browser evidence снят. На момент остановки процессов `javascript-live.mjs`
+и Chromium профилей 279/280 нет; B03 package/logout/browser cleanup 3/3.
+Прежний untracked `acceleration-review.md` в основном checkout и untracked
+child design-файлы оставлены без изменения.
+
+При возобновлении сверить свежие HEAD/status, assignment/lease и процессы,
+затем начать P1 с закреплённого oracle: приватный 6×4 для обоих schema mode,
+после этого changed/reordered и отдельный ≤60 секунд Stop/cancel-case.
+Сначала проверить 6×5 вход, технические имена и пробелы Customer;
+не подгонять `expected.json` под наблюдённый результат. Существующий
+`javascript-execution-probes.mjs` покрывает лишь 6×2, поэтому для 6×4 нужен
+отдельный закреплённый source и полный typed oracle; B повторять не надо.
+
 ## Указания пользователя
 
 Перед действием сверять этот блок. Повтор текста из контекста/компакции
