@@ -39,9 +39,11 @@ const tid = (value) => `[data-tid=${JSON.stringify(value)}]`
 const suffix = (value) => `[data-tid$=${JSON.stringify(value)}]:visible`
 try {
   const target = "MapTreeForm;colNavigation_Сервер>Администрирование>Диспетчер;TreeText"
-  if (!(await page.locator(suffix(target)).count()))
+  const navigation = page.locator(`${tid("MF;" + target)}:visible`)
+  if (!(await navigation.count()))
     await page.locator(tid("MF;cntMain;tlbMainToolbar;btnNavigator")).click()
-  await page.locator(suffix(target)).first().click()
+  await navigation.waitFor({ state: "visible", timeout: 30000 })
+  await navigation.click()
   await page.locator(suffix("SessionsManagerForm;btnRefresh")).click()
   const ids = await page.locator('[data-tid*="SessionsManagerForm;colSession_Root>"]').evaluateAll((elements) => [
     ...new Set(
@@ -79,5 +81,18 @@ try {
   await page.locator(tid("LoginForm;Login;edtUsername")).waitFor({ timeout: 30000 })
   process.stdout.write(JSON.stringify({ slotUser, seen: owned.length, closed, loggedOut: true }) + "\n")
 } finally {
+  // An earlier administrative navigation failure must also attempt logout.
+  const login = page.locator(tid("LoginForm;Login;edtUsername"))
+  if (!(await login.isVisible().catch(() => false))) {
+    try {
+      if (await page.locator('[data-tid="MF;MapTreeForm"]:visible').count())
+        await page.locator(tid("MF;cntMain;tlbMainToolbar;btnNavigator")).click()
+      await page.locator(tid("MF;cntMain;tlbMainToolbar;btnAvatar")).click()
+      await page.locator(tid("MF;AppMenuForm;btnLogOut")).click()
+      await login.waitFor({ timeout: 15000 })
+    } catch {
+      console.error("ADMIN_LOGOUT_UNCONFIRMED")
+    }
+  }
   await authenticated.context.close().catch(() => undefined)
 }

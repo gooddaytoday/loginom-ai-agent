@@ -187,10 +187,10 @@ def main():
                 result['release'] = release(slot_root, args.slot, args.resources, output)
                 result['cleanup_confirmed'] = True
                 result['status'] = 'RECOVERED' if args.mode == 'recover' and not interrupted_run else ('COMPLETED' if result['command_exit'] == 0 and not interrupted_run else 'FAILED')
-            except (Exception, KeyboardInterrupt):
+            except (Exception, KeyboardInterrupt) as error:
                 result['status'] = 'BLOCKED'
                 # Do not copy exception text: errors can contain credentials.
-                result['reason'] = 'Cleanup not confirmed; inspect private logs and slot ownership before recovery'
+                result['reason'] = str(error) if type(error) is RuntimeError else 'Cleanup not confirmed; inspect private logs and slot ownership before recovery'
             write_json(output / 'lifecycle.json', result)
     print(json.dumps(result, ensure_ascii=False))
     return 0 if result['status'] in ['RECOVERED', 'COMPLETED'] else 1
