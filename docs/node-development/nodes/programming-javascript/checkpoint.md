@@ -1,5 +1,20 @@
 # JavaScript: checkpoint исполнения
 
+## Guard публичного повторного Execute/read — 2026-09-29
+
+Child `19105bd87d` закрыл опасный shortcut перед регистрацией JS-handler:
+общий `dock_node_read` повторно исполняет сохранённый узел, не открывая его
+настройку. Для `programming.javascript` он теперь отказывает с требованием
+source-bound admission, пока отдельный JS-specific маршрут не сможет заново
+прочитать полный effective source, сверить digest/module policy и привязать
+их к свежему Execute. Это сохраняет работу остальных поддержанных узлов и
+не объявляет JS-read реализованным. Pinned Node24.19.0: `node-read` и
+`node-apply` 97/97 PASS, `git diff --check` PASS. Коммит отправлен в
+`origin/node-javascript`. Следующая разработка — owned configure/execute/read
+driver и регистрация JS-handler только вместе с проверкой source identity,
+затем autonomous CLI J01/J20/J21; операторские live-проверки ниже их не
+заменяют.
+
 ## Headed regression временной блокировки после Close — 2026-09-29
 
 Child `bb65450569` исправил отказ `existing-source-readback` из предыдущего
