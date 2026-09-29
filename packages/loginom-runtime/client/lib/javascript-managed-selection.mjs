@@ -1,4 +1,6 @@
 import {captureJavascriptSelection,inspectJavascriptSelection} from './javascript-owned-selection.mjs';
+import {withBrowserReceipt} from './executor.mjs';
+import {createHash} from 'node:crypto';
 
 // These functions run inside the authenticated Loginom page. The generated
 // wrappers below embed their fixed dependencies; no caller-provided code runs.
@@ -52,7 +54,8 @@ export function inspectManagedJavascriptSelection({held,task},inspect) {
     throw Error('Managed JavaScript account or preparation changed');
   return inspect({binding:held.binding,node:held.node,icon:held.icon,retained:held.retained,
     requireSettings:true,requireVisualizers:false,inspectPhase:task.inspectPhase??'managed_observe',
-    deadline:task.deadline,targetOrigin:task.targetOrigin,targetBuild:task.targetBuild});
+    deadline:task.deadline,targetOrigin:task.targetOrigin,targetBuild:task.targetBuild,
+    afterGesture:task.afterGesture===true});
 }
 
 // The page-level lease is local to the same authenticated Playwright Page used
@@ -65,7 +68,7 @@ export async function runManagedJavascriptSelectionRead(page,task,capture,inspec
     if(leases.has(task.operation_id)||leases.size>=8)throw Error('Managed JavaScript selection lease already held or full');
     const handle=await page.evaluateHandle(capture,task);
     leases.set(task.operation_id,{handle,identity});
-    try{return await page.evaluate(inspect,{held:handle,task});}
+    try{return await page.evaluate(inspect,{held:handle,task:{...task,afterGesture:false}});}
     catch(error){leases.delete(task.operation_id);await handle.dispose();throw error;}
   }
   const lease=leases.get(task.operation_id);
@@ -74,7 +77,28 @@ export async function runManagedJavascriptSelectionRead(page,task,capture,inspec
     leases.delete(task.operation_id);await lease.handle.dispose();return {disposed:true};
   }
   if(task.mode!=='inspect')throw Error('Unsupported managed JavaScript selection read');
-  return page.evaluate(inspect,{held:lease.handle,task});
+  return page.evaluate(inspect,{held:lease.handle,task:{...task,afterGesture:lease.afterGesture===true}});
+}
+
+// A browser receipt wraps this function. A pre-click refusal is completed with
+// no effect; a lost click reply leaves both browser receipt and lease uncertain.
+export async function runManagedJavascriptSelectionBody(page,task,inspect) {
+  const leases=page[Symbol.for('loginom-dock.javascript-owned-selection-v1')];
+  const lease=leases?.get(task.operation_id);
+  const identity=JSON.stringify([task.owner,task.workflow_ref,task.targetOrigin,task.targetBuild,task.deadline]);
+  const outcome=(status,phase,effect_possible,output,error=null)=>({status,phase,effect_possible,
+    cleanup_complete:true,action_key:'javascript.selection.body',action_revision:'1',
+    operation_id:task.gesture_id,output,error,trace:[]});
+  if(!lease||lease.identity!==identity||lease.bodyAttempted===true)
+    return outcome('NOT_APPLIED','preflight',false,{}, {code:'SELECTION_LEASE_UNAVAILABLE',message:'Selection lease unavailable'});
+  const current=await page.evaluate(inspect,{held:lease.handle,task:{...task,afterGesture:false}});
+  if(current.blocked===true||current.ready===true||!current.body_point
+    ||JSON.stringify(current)!==JSON.stringify(task.expected)||Date.now()>=task.deadline)
+    return outcome('NOT_APPLIED','preflight',false,{}, {code:'SELECTION_SNAPSHOT_CHANGED',message:'Selection snapshot changed'});
+  lease.bodyAttempted=true;
+  lease.afterGesture=true;
+  await page.mouse.click(current.body_point.x,current.body_point.y);
+  return outcome('SUCCEEDED','gesture_returned',true,{body_gesture_returned:true});
 }
 
 export function makeJavascriptManagedSelectionReadCode(task) {
@@ -96,4 +120,45 @@ export function makeJavascriptManagedSelectionReadCode(task) {
   const capture=`function capture(task){const native=${captureJavascriptSelection.toString()};return (${captureManagedJavascriptSelection.toString()})(task,native);}`;
   const inspect=`function inspect(args){const native=${inspectJavascriptSelection.toString()};return (${inspectManagedJavascriptSelection.toString()})(args,native);}`;
   return `async page=>(${runManagedJavascriptSelectionRead.toString()})(page,${JSON.stringify(task)},${capture},${inspect})`;
+}
+
+export function makeJavascriptManagedSelectionBodyCode(task) {
+  const {expected,gesture_id,...base}=task??{};
+  makeJavascriptManagedSelectionReadCode({...base,mode:'inspect'});
+  if(typeof gesture_id!=='string'||!/^[A-Za-z0-9_.:-]{1,128}$/.test(gesture_id)
+    ||!expected||expected.ready!==false||expected.blocked===true
+    ||!Number.isFinite(expected.body_point?.x)||!Number.isFinite(expected.body_point?.y)
+    ||JSON.stringify(expected).length>32768)
+    throw Error('Invalid managed JavaScript body gesture');
+  const inspect=`function inspect(args){const native=${inspectJavascriptSelection.toString()};return (${inspectManagedJavascriptSelection.toString()})(args,native);}`;
+  return `async page=>(${runManagedJavascriptSelectionBody.toString()})(page,${JSON.stringify(task)},${inspect})`;
+}
+
+// The caller owns the node operation journal. An exact ACK precedes the only
+// browser mutation, and the same gesture ID is never retried after uncertainty.
+export async function dispatchManagedJavascriptBody({task,before,execute,record,receiptOptions,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}) {
+  const gesture_id=task.operation_id+':body';
+  const gesture={...task,mode:'body',gesture_id,expected:before};
+  const code=makeJavascriptManagedSelectionBodyCode(gesture);
+  const digest=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  const signature=digest([gesture_id,task.owner,before,task.deadline]);
+  const prepared={phase:'javascript_managed_body_prepared',operation_id:task.operation_id,gesture_id,
+    owner:task.owner,point:before.body_point,snapshot_sha256:digest(before),deadline:task.deadline,
+    effect_possible:false};
+  const saved=await record(prepared);
+  if(JSON.stringify(Object.fromEntries(Object.keys(prepared).map(key=>[key,saved?.[key]])))!==JSON.stringify(prepared))
+    throw Error('Managed JavaScript body journal ACK differs');
+  const result=await execute(withBrowserReceipt('('+code+')(page)',{
+    ...receiptOptions(gesture_id,'javascript.selection.body',signature),operation_id:gesture_id}),
+    {timeout:Math.max(1,Math.min(35000,task.deadline-Date.now()+5000))});
+  if(result?.operation_id!==gesture_id||result.action_key!=='javascript.selection.body')
+    throw Error('Managed JavaScript body receipt identity differs');
+  if(result.status!=='SUCCEEDED')return result;
+  while(Date.now()<task.deadline){
+    const after=await execute(makeJavascriptManagedSelectionReadCode({...task,mode:'inspect',inspectPhase:'post_body'}));
+    if(after.blocked===true)throw Error('Managed JavaScript body blocked after gesture');
+    if(after.ready===true)return {...result,output:{...result.output,ready:true,selection:after}};
+    await wait(Math.min(100,Math.max(1,task.deadline-Date.now())));
+  }
+  throw Error('Managed JavaScript body selection unconfirmed before original deadline');
 }
