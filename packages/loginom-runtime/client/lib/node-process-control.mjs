@@ -125,9 +125,14 @@ export async function runNodeProcessControl(page,task,readNode,inspect) {
   const after=await readNode(page,task.binding);
   if(JSON.stringify(before)!==JSON.stringify(after))throw Error('Prepared node changed');
   const fresh=await held.evaluate((ticket,{task,inspect})=>{
-   const checked=eval('('+inspect+')')({task,held:ticket});
-   return {point:checked.point,epoch:checked.epoch};
+   // Return semantic refusals as data: Playwright prefixes thrown messages
+   // with the API name, which must not erase the bounded epoch-refresh code.
+   try {
+    const checked=eval('('+inspect+')')({task,held:ticket});
+    return {point:checked.point,epoch:checked.epoch};
+   }catch(error){return {refused:error.message};}
   },{task,inspect:inspect.toString()});
+  if(typeof fresh.refused==='string')throw Error(fresh.refused);
   if(Date.now()>=task.deadline)throw Error('Stop deadline elapsed');
   trace.push({event:'process_control_preconditions_verified',proof:task.proof,epoch:fresh.epoch,point:fresh.point});
   phase='applying';effect=true;
