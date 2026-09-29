@@ -24,7 +24,7 @@ test('isolated catalog has immutable-by-copy sources, exact hashes and an indepe
  for(const id of javascriptDiscoveryIds){
   const p=javascriptDiscoveryProbe(id);
   assert.equal(p.source_sha256,createHash('sha256').update(p.source).digest('hex'));
-  assert.equal(p.schema_mode,id==='p1-business-declared-base'?'declared':'code');assert.equal(p.build,'7.4.2');assert.ok(p.schema.every(c=>c.type));
+  assert.equal(p.schema_mode,id.startsWith('p1-business-declared-')?'declared':'code');assert.equal(p.build,'7.4.2');assert.ok(p.schema.every(c=>c.type));
  }
  const p=javascriptDiscoveryProbe('engine-input-text');
  assert.deepEqual(p.expected,[['["Alpha","  alpha  ","  ALPHA  "]'],['["BETA","beta","BETA"]'],

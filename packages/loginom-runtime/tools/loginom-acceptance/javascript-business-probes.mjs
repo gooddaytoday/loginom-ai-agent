@@ -33,13 +33,15 @@ const body='for (var row=0;row<InputTable.RowCount;row++) {\n'
   +'}\n';
 
 export function javascriptBusinessProbes() {
-  return ['code','declared'].map(schema_mode=>{
+  return ['code','declared'].flatMap(schema_mode=>['base','changed','reordered'].map(input_variant=>{
     const source=prefix+(schema_mode==='code'?columns:'')+body;
-    return {id:'p1-business-'+schema_mode+'-base',scope:'P1-business',schema_mode,source,
+    const rows=structuredClone(oracle.ordered_rows);
+    if(input_variant==='changed')rows[0][2]=oracle.changed.net_cents;
+    return {id:'p1-business-'+schema_mode+'-'+input_variant,scope:'P1-business',schema_mode,input_variant,source,
       source_sha256:createHash('sha256').update(source,'utf8').digest('hex'),
       schema:oracle.schema.map(column=>({name:column.name,label:column.name,type:column.type})),
-      expected:oracle.ordered_rows.map(row=>row.map((value,index)=>
+      expected:rows.map(row=>row.map((value,index)=>
         oracle.schema[index].type==='integer'?String(value):value)),
       oracle_sha256:pin.sha256,expectation:'fixed',build:'7.4.2',status:'not_run'};
-  });
+  }));
 }
