@@ -2,7 +2,7 @@
 
 ## Текущее состояние
 
-Сводка на 2026-09-29 после результата B. Исходный срез
+Сводка на 2026-09-29 после результата B и подготовки P1. Исходный срез
 [acceleration review](acceleration-review.md) к [плану](plan.md): docs
 `13a02e8be2d698d5fbc7f19d146fa82d55f53e48`, code
 `7b8e19bee073cb596607688173234e57052e27b1`. Новые live evidence B
@@ -32,6 +32,35 @@ existing code-table через public API-path изолированного runt
 этот фиксированный run без затронувшего изменения не требуется.
 Затем C code, D declared с Save/cold, E остаток J и F ревью/candidate/CLI.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
+
+Child code commit `05dfebe85a` добавил два operator-only пробника с единым
+заранее закреплённым `expected.json`: `p1-business-code-base` и
+`p1-business-declared-base`. В обоих используется `sales.csv` с фактическими
+technical names; source не содержит ожидаемых денежных значений. В declared
+режиме оператор устанавливает четыре поля `RowID`, `CustomerKey`, `NetCents`,
+`Status` и проверяет их native readback. Независимый typed UI oracle сравнивает
+полную схему, шесть упорядоченных строк и каждую ячейку, допуск ноль. Это
+приватная осуществимость, не публичная или модельная приёмка. Локально:
+229 адресных тестов PASS, syntax и `git diff --check` PASS.
+
+Первый обычный headed запуск `p1-business-code-base-01` на профиле 280
+завершился **CLEANUP_UNCONFIRMED до входа**, `LOGINOM_LOGIN_UNAVAILABLE`.
+Исходный report SHA256
+`61e7cc94a573339159b7b67a6f44ed1aa83f7a60e5db76c2516b895f8cab6d83`.
+Системный resolver не смог разрешить `logi-test-plan.bg.local`; прямые DNS
+запросы к `172.18.0.2` и `192.168.1.1` вернули NXDOMAIN. После выхода нет
+процессов оператора/Chromium; native открытие пакета, logout и его закрытие
+не наблюдались, поэтому исходный cleanup не повышать до 3/3. Ни input 6×5,
+ни Execute, ни результат 6×4 этим запуском не проверены.
+
+Под registry lock попытка записана без смены её статуса, active browser снят,
+следующий чистый профиль — `javascript-discovery-profile-281`. Возобновлять
+live только после восстановления разрешения имени и HTTP стенда; сначала
+сверить assignment/процессы/чистоту профиля, затем новый evidence ID.
+`expected.json` не менять по наблюдениям. Changed/reordered и Stop/cancel
+ещё не запускались.
 
 Канонические документы читать в основном checkout `javascript`, код —
 в `.worktrees/node-javascript`. Child содержит коммиты B и прежние untracked
