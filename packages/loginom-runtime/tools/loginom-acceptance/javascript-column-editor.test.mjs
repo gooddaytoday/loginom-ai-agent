@@ -92,6 +92,10 @@ test('owned declared editor inventories DataKind and default usage caches withou
     const control={el:{dom:element},value:selected,store:{getData:()=>({items:records}),isLoading:()=>false}};
     Object.defineProperty(control,'FullType',{get(){throw Error('remote getter');}});
     f.form.FItems[name]=control;f.controls[name]=control;
+    if(name==='cbxUsageType'){
+      const wrap=f.element('usageWrap','',element),triggerDom=f.element('usageTrigger','EditColumnDefForm;cbxUsageType;trg_picker',wrap);
+      control.triggerWrap={dom:wrap};control.orderedTriggers=[{id:'picker',field:control,el:{dom:triggerDom},rendered:true}];
+    }
   }
   await f.open();
   const result=await f.page.evaluate(observeJavascriptColumnEditor,{held:f.state.pending.held,phase:'editing',readDeclaredControls:true});
@@ -99,6 +103,8 @@ test('owned declared editor inventories DataKind and default usage caches withou
   assert.deepEqual(JSON.parse(JSON.stringify(result.declared_controls.cbxDataKind.options)),
     [{Value:1,DisplayText:'Непрерывный'},{Value:2,DisplayText:'Дискретный'}]);
   assert.equal(result.declared_controls.cbxUsageType.cached_value,0);
+  assert.equal(result.declared_controls.cbxUsageType.trigger.bound,true);
+  assert.equal(result.declared_controls.cbxUsageType.trigger.visible,true);
   const cancelled=await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
   assert.equal(cancelled.status,'settled');
   assert.equal(cancelled.checks.baseline,true);
