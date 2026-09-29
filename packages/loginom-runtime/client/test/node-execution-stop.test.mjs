@@ -4,8 +4,8 @@ import {createNodeExecutionProcedure} from '../lib/node-execution-procedure.mjs'
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 const grid='ConsoleForm;ProgressForm;trpProgress;grd;tbl',cancel='mnContextMenu;mniCancel';
 const element=(tid,verbs=['click'])=>({tid,ref:'ui-'+tid,allowed_actions:verbs});
-async function fixture(fault, multiple=false,{keepConsoleOpen=false}={}) {
- let opened=true,menu=false,launched=false,terminal=false,cancelCalls=0;
+async function fixture(fault, multiple=false,{keepConsoleOpen=false,initialPinned=false}={}) {
+ let opened=true,pinned=initialPinned,menu=false,launched=false,terminal=false,cancelCalls=0;
  const actions=[],reads=[];
  const proof={root_id:'root',record_id:'child',process_id:'1.1',node_id:'node',owner_verified:true,can_cancel:true,source:'native_process_model_identity'};
  const state=()=>{
@@ -24,6 +24,7 @@ async function fixture(fault, multiple=false,{keepConsoleOpen=false}={}) {
   return {prepared_node_context:{...node,verified:true,surface:'graph'},node_processes:{verified:true,inventory_complete:true,
    root_id:'root',show_completed:true,node_context:{...node,verified:true},processes:ps},
    ui:{elements:[element('MF;cntMain;tlbMainToolbar;btnProgress'),...(opened?[element(grid,['right_click']),element('ConsoleForm;btnClose'),
+     ...(fault==='missing_pin'?[]:[element(pinned?'ConsoleForm;btnPin':'ConsoleForm;btnUnpin')]),
      {...element('child-row',['right_click']),process_row:{record_id:fault==='reused_row'?'foreign-record':'child'}}]:[]),
     ...(menu?[element('mnContextMenu;mniShowCompletedProcesses',['click','press']),{...element(cancel,['cancel_process']),process_menu:{cancellation:actualProof}}]:[])]}};
  };
@@ -32,6 +33,7 @@ async function fixture(fault, multiple=false,{keepConsoleOpen=false}={}) {
    if(a.verb==='cancel_process') {cancelCalls++;if(fault==='unknown_receipt')throw Error('Unknown stop receipt');terminal=true;menu=false;}
    else if(a.verb==='right_click')menu=true;
    else if(a.verb==='press')menu=false;
+   else if(a.ref==='ui-ConsoleForm;btnUnpin'){if(fault==='unknown_pin')throw Error('Unknown pin receipt');pinned=true;}
    else if(a.ref==='ui-ConsoleForm;btnClose')opened=false;
    else if(a.ref==='ui-MF;cntMain;tlbMainToolbar;btnProgress')opened=true;
    return {status:'SUCCEEDED'};
@@ -45,7 +47,16 @@ test('private prelaunch admission can retain the owned process console without a
  const normal=await fixture(),held=await fixture(undefined,false,{keepConsoleOpen:true});
  assert.equal(normal.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnClose').length,1);
  assert.equal(held.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnClose').length,0);
+ assert.equal(held.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnUnpin').length,1);
  const stopped=await held.driver.stop();assert.equal(stopped.stop_verified,true);assert.equal(held.cancelCalls,1);
+});
+test('a retained console already pinned is not toggled again',async()=>{
+ const f=await fixture(undefined,false,{keepConsoleOpen:true,initialPinned:true});
+ assert.equal(f.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnUnpin'||a.ref==='ui-ConsoleForm;btnPin').length,0);
+});
+test('missing pin state or unknown pin receipt prevents execution preparation',async()=>{
+ await assert.rejects(fixture('missing_pin',false,{keepConsoleOpen:true}),/pin state unavailable/);
+ await assert.rejects(fixture('unknown_pin',false,{keepConsoleOpen:true}),/Unknown pin receipt/);
 });
 test('invalid retained console mode refuses before observations or gestures',async()=>{
  const f=await fixture();await assert.rejects(f.driver.prepare({keepConsoleOpen:'yes'}),/must be boolean/);
