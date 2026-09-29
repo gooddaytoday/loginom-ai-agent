@@ -139,7 +139,7 @@ export function makeJavascriptManagedSelectionReadCode(task) {
     ||task.workflow_ref.prefix!=='MF;TF'+(task.workflow_ref.tab_tid.match(/;tb(-\d+)?$/)?.[1]??'')
     ||typeof task.targetOrigin!=='string'||!/^https?:\/\//.test(task.targetOrigin)
     ||task.targetBuild!=='7.4.2'||!Number.isSafeInteger(task.deadline)
-    ||task.mode!=='dispose'&&task.deadline<=Date.now()
+    ||task.mode==='capture'&&task.deadline<=Date.now()
     ||task.inspectPhase!==undefined&&(typeof task.inspectPhase!=='string'||task.inspectPhase.length>64)
     ||Object.keys(task).some(key=>!['mode','operation_id','owner','workflow_ref','targetOrigin','targetBuild','deadline','inspectPhase'].includes(key)))
     throw Error('Invalid managed JavaScript selection read');
@@ -152,6 +152,7 @@ export function makeJavascriptManagedSelectionBodyCode(task) {
   const {expected,gesture_id,...base}=task??{};
   makeJavascriptManagedSelectionReadCode({...base,mode:'inspect'});
   if(typeof gesture_id!=='string'||!/^[A-Za-z0-9_.:-]{1,128}$/.test(gesture_id)
+    ||base.deadline<=Date.now()
     ||!expected||expected.ready!==false||expected.blocked===true
     ||!Number.isFinite(expected.body_point?.x)||!Number.isFinite(expected.body_point?.y)
     ||JSON.stringify(expected).length>32768)
@@ -164,6 +165,7 @@ export function makeJavascriptManagedSettingCode(task) {
   const {expected,gesture_id,confirmation,...base}=task??{};
   makeJavascriptManagedSelectionReadCode({...base,mode:'inspect'});
   if(typeof gesture_id!=='string'||!/^[A-Za-z0-9_.:-]{1,128}$/.test(gesture_id)
+    ||base.deadline<=Date.now()
     ||!expected||expected.ready!==true
     ||!Number.isFinite(expected.setting_point?.x)||!Number.isFinite(expected.setting_point?.y)
     ||JSON.stringify(expected).length>32768

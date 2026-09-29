@@ -15,6 +15,7 @@ import {javascriptInputColumns,javascriptOutputColumns,javascriptInputRows,verif
 import {javascriptInputRequest,waitJavascriptCleanupReady,selectJavascriptForSettings,javascriptWizardBinding,openJavascriptWizard,cleanupJavascriptWizardOpening,javascriptMappingUnlockReceipt,closeJavascriptPortMapping,inspectJavascriptExecutionNotifications,waitJavascriptExecutionNotifications,javascriptManualMappingRequest,configureJavascriptManualMapping} from './javascript-execution-runtime.mjs';
 import {captureJavascriptSelection,inspectJavascriptSelection} from '../../client/lib/javascript-owned-selection.mjs';
 import {makeJavascriptManagedSelectionReadCode,dispatchManagedJavascriptBody,dispatchManagedJavascriptSetting} from '../../client/lib/javascript-managed-selection.mjs';
+import {waitManagedJavascriptWizardSettlement} from '../../client/lib/javascript-managed-opening.mjs';
 import {assertActionOutcome} from '../../client/lib/action-catalog.mjs';
 import {validateNodeApplyRequest} from '../../client/lib/node-apply.mjs';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
@@ -110,7 +111,39 @@ function managedSelectionFixture(deadlineMs=5000,fault) {
     workflow_ref:{tab_tid:tabTid,prefix:'MF;TF-1'},targetOrigin:'http://logi-test-plan.bg.local',
     targetBuild:'7.4.2',deadline:Date.now()+deadlineMs};
   const run=mode=>vm.runInNewContext('('+makeJavascriptManagedSelectionReadCode({...task,mode})+')')(f.page);
-  return {f,task,run,execute:code=>vm.runInNewContext('('+code+')')(f.page)};
+  return {f,task,run,tabElement,execute:code=>vm.runInNewContext('('+code+')')(f.page)};
+}
+function managedWizardFixture(managed) {
+  const {f,task,tabElement}=managed,app=f.realm.bg.app;
+  app.ModelNodeTreeNode=class ModelNodeTreeNode{};
+  app.WizardTreeNode=class WizardTreeNode{};
+  const packageNode=f.realm.__loginomDockPreparationV1.receipts.get('wf-1').packageNode;
+  f.binding.workflow.ParentNode=packageNode;
+  const tree=new app.ModelNodeTreeNode();
+  Object.assign(tree,{ParentNode:f.binding.workflow,FGuid:f.node.id,FModelNode:f.native.data});
+  const wizard=new app.WizardTreeNode();wizard.ParentNode=tree;
+  const root={isConnected:true,getBoundingClientRect:()=>({width:100,height:100}),querySelectorAll:()=>[]};
+  const label=(tid,text)=>({id:tid,isConnected:true,textContent:text,
+    getAttribute:key=>key==='data-tid'?tid:null});
+  const crumb=label('nav','Workflow'),nodeCrumb=label('node','JavaScript'),wizardCrumb=label('wizard','Настройка');
+  const dialog={isConnected:true,
+    innerText:'Loginom 7.4.2 Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел? Да Да, больше не спрашивать Нет',
+    getBoundingClientRect:()=>({width:100,height:100})};
+  f.realm.Ext={getCmp:id=>id==='node'?{el:{dom:nodeCrumb},_node:{data:{node:tree}}}
+    :id==='wizard'?{el:{dom:wizardCrumb},_node:{data:{node:wizard}}}:null};
+  class WizardModelComponentForm {constructor(){this.FModelNode=f.native.data;this.FView={el:{dom:root}};}}
+  let surface='graph';const originalQuery=f.realm.document.querySelectorAll;
+  f.realm.document.querySelectorAll=selector=>selector.startsWith('[data-tid^=')
+    ?surface==='graph'?[crumb]:[crumb,nodeCrumb,wizardCrumb]
+    :selector==='[data-tid="MF;TF-1;WizrdMCF"]'?(surface==='wizard'?[root]:[])
+    :selector==='[role="dialog"],.x-message-box'?(surface==='deactivation'?[dialog]:[])
+    :originalQuery(selector);
+  const prepared={document_id:task.owner.document_id,node:task.owner,
+    workflow_ref:{...task.workflow_ref,workflow_id:task.owner.workflow_id,
+      navigation_path:[{tid:'nav',label:'Workflow'}]}};
+  return {prepared,tree,activate:()=>{surface='wizard';f.tab.Controller.Node.data.node=wizard;
+    f.tab.Controller.FController=new WizardModelComponentForm();},
+    activateDeactivation:()=>{surface='deactivation';},tabElement};
 }
 test('managed serialized selection binds prepared workflow and releases its lease after deadline',async()=>{
   const {f,task,run}=managedSelectionFixture(200);
@@ -126,7 +159,21 @@ test('managed serialized selection binds prepared workflow and releases its leas
   await new Promise(resolve=>setTimeout(resolve,220));
   assert.equal((await run('dispose')).disposed,true);
   assert.equal(f.disposed,1);assert.equal(f.clicks,0);
-  assert.throws(()=>run('inspect'),/Invalid managed JavaScript selection read/);
+  await assert.rejects(run('inspect'),/lease changed/);
+});
+test('managed lease stays readable after deadline but refuses a new Setting dispatch',async()=>{
+  const managed=managedSelectionFixture(150,'already');await managed.run('capture');
+  await new Promise(resolve=>setTimeout(resolve,170));
+  assert.equal((await managed.run('inspect')).ready,true);
+  let records=0;
+  await assert.rejects(dispatchManagedJavascriptSetting({task:managed.task,
+    before:await managed.run('inspect'),confirmation:{kind:'deactivation',
+      graph_tid:managed.f.node.tid,node:managed.task.owner,opening:{}},
+    execute:managed.execute,record:async event=>{records++;return event;},
+    receiptOptions:(id,key,signature)=>({receipt_namespace:'managed-js-test',receipt_id:id,
+      receipt_signature:signature})}),/Invalid managed JavaScript Setting gesture/);
+  assert.equal(records,0);assert.equal(managed.f.clicks,0);
+  assert.equal((await managed.run('dispose')).disposed,true);
 });
 test('managed body gesture requires durable ACK, exact pre-click read and one browser receipt',async()=>{
   const {f,task,run,execute}=managedSelectionFixture();
@@ -204,6 +251,71 @@ test('managed Setting refuses stale point and never replays a lost click reply',
   await assert.rejects(dispatchManagedJavascriptSetting(options),/lost Setting reply/);
   await assert.rejects(dispatchManagedJavascriptSetting(options),/already started/);
   assert.equal(clicks,1);await lost.run('dispose');
+});
+test('managed settlement observes graph then exact owned wizard after one Setting gesture',async()=>{
+  const managed=managedSelectionFixture(5000,'already'),before=await managed.run('capture');
+  const confirmation={kind:'deactivation',graph_tid:managed.f.node.tid,
+    node:managed.task.owner,opening:{part:'settings'}};
+  const receiptOptions=(id,key,signature)=>({receipt_namespace:'managed-js-test',receipt_id:id,
+    receipt_signature:signature});
+  const gesture=await dispatchManagedJavascriptSetting({task:managed.task,before,confirmation,
+    execute:managed.execute,receiptOptions,record:async event=>event});
+  assert.equal(gesture.status,'SUCCEEDED');assert.equal(gesture.output.wizard_open_verified,false);
+  const wizard=managedWizardFixture(managed),events=[];let waits=0;
+  const settled=await waitManagedJavascriptWizardSettlement({task:{...managed.task,
+    prepared:wizard.prepared,allowDeactivation:true},execute:managed.execute,
+    record:async event=>{events.push(event);return event;},
+    wait:async()=>{assert.equal(++waits,1);wizard.activate();}});
+  assert.equal(settled.ready,true);assert.equal(settled.surface,'wizard');
+  assert.equal(settled.native_owner_verified,true);
+  assert.deepEqual(events.map(event=>event.phase),[
+    'javascript_managed_wizard_settlement_before','javascript_managed_wizard_settlement_verified']);
+  assert.equal(events[0].observation.surface,'graph');
+  assert.equal(managed.f.clicks,1);
+  assert.equal((await managed.run('dispose')).disposed,true);
+});
+test('managed settlement refuses a foreign wizard node without verified receipt',async()=>{
+  const managed=managedSelectionFixture(5000,'already'),before=await managed.run('capture');
+  await dispatchManagedJavascriptSetting({task:managed.task,before,
+    confirmation:{kind:'deactivation',graph_tid:managed.f.node.tid,node:managed.task.owner,opening:{}},
+    execute:managed.execute,record:async event=>event,
+    receiptOptions:(id,key,signature)=>({receipt_namespace:'managed-js-test',receipt_id:id,receipt_signature:signature})});
+  const wizard=managedWizardFixture(managed),events=[];wizard.activate();wizard.tree.FGuid='foreign';
+  await assert.rejects(waitManagedJavascriptWizardSettlement({task:{...managed.task,
+    prepared:wizard.prepared,allowDeactivation:true},execute:managed.execute,
+    record:async event=>{events.push(event);return event;}}),/current native owner changed/);
+  assert.equal(events.length,0);assert.equal(managed.f.clicks,1);
+  assert.equal((await managed.run('dispose')).disposed,true);
+});
+test('managed settlement attributes native deactivation without claiming an opened wizard',async()=>{
+  const managed=managedSelectionFixture(5000,'already'),before=await managed.run('capture');
+  await dispatchManagedJavascriptSetting({task:managed.task,before,
+    confirmation:{kind:'deactivation',graph_tid:managed.f.node.tid,node:managed.task.owner,opening:{}},
+    execute:managed.execute,record:async event=>event,
+    receiptOptions:(id,key,signature)=>({receipt_namespace:'managed-js-test',receipt_id:id,receipt_signature:signature})});
+  const wizard=managedWizardFixture(managed);wizard.activateDeactivation();
+  const settled=await waitManagedJavascriptWizardSettlement({task:{...managed.task,
+    prepared:wizard.prepared,allowDeactivation:true},execute:managed.execute,record:async event=>event});
+  assert.equal(settled.ready,true);assert.equal(settled.surface,'deactivation');
+  assert.equal(settled.pending_owner_verified,true);assert.equal(settled.root_visible,false);
+  assert.equal((await managed.run('dispose')).disposed,true);
+});
+test('managed settlement keeps a stalled Setting opening unresolved until its original deadline',async()=>{
+  const managed=managedSelectionFixture(250,'already'),before=await managed.run('capture');
+  const wizard=managedWizardFixture(managed),task={...managed.task,prepared:wizard.prepared,allowDeactivation:true};
+  await assert.rejects(waitManagedJavascriptWizardSettlement({task,execute:managed.execute,
+    record:async event=>event}),/no owned lease/);
+  await dispatchManagedJavascriptSetting({task:managed.task,before,
+    confirmation:{kind:'deactivation',graph_tid:managed.f.node.tid,node:managed.task.owner,opening:{}},
+    execute:managed.execute,record:async event=>event,
+    receiptOptions:(id,key,signature)=>({receipt_namespace:'managed-js-test',receipt_id:id,receipt_signature:signature})});
+  const events=[];
+  await assert.rejects(waitManagedJavascriptWizardSettlement({task,execute:managed.execute,
+    record:async event=>{events.push(event);return event;},
+    wait:ms=>new Promise(resolve=>setTimeout(resolve,ms))}),/unconfirmed before original deadline/);
+  assert.deepEqual(events.map(event=>event.phase),['javascript_managed_wizard_settlement_before']);
+  assert.equal(managed.f.clicks,1);
+  assert.equal((await managed.run('dispose')).disposed,true);
 });
 test('descendant Execute, Preview, ports or foreign Setting child never authorize body/Setting clicks',async()=>{
   for(const fault of ['overlay_Execute','overlay_Preview','overlay_Input_Data-0','overlay_Setting','setting_overlay']){
