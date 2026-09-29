@@ -541,8 +541,9 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
     }
     if(options['--inspect-declared-editor']&&!remainingPages&&current.tid.endsWith(';JavaScriptColumnsWizard')){
       const before=await page.evaluate(readJavascriptSchema,schemaContext());
+      await executionRecord({phase:'declared_editor_admission',schema:before});
       const add=before.controls?.filter(control=>control.tid===before.page_tid+';btnAddMappingColumn');
-      if(!before.verified||before.generation?.checked!==true||before.grids.find(grid=>grid.tid===before.page_tid+';grdTargetColumns;tbl')?.count!==0
+      if(!before.verified||before.generation?.checked!==false||before.grids.find(grid=>grid.tid===before.page_tid+';grdTargetColumns;tbl')?.count!==0
         ||add?.length!==1||add[0].disabled||!add[0].visible)throw Error('Owned empty declared editor admission unavailable');
       const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']').filter({visible:true});
       try{
