@@ -48,6 +48,8 @@ import {javascriptMismatchSource,runJavascriptMismatchMaterialization,javascript
 import {readJavascriptSchema,configureJavascriptSchema} from './javascript-schema-probe.mjs';
 import {makeJavascriptSchemaContextCode} from '../../client/lib/javascript-schema-context.mjs';
 import {makeJavascriptSourceContextCode} from '../../client/lib/javascript-source-context.mjs';
+import {makeJavascriptManagedSourceCode} from '../../client/lib/javascript-managed-source.mjs';
+import {makeJavascriptManagedSelectionReadCode} from '../../client/lib/javascript-managed-selection.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
@@ -182,7 +184,7 @@ let executionJournalLine=0;
 let nativeClassifierBinding;
 let sourceCycleUncertain=false,coldOpenPending=false,packageFileReadUncertain=false;
 const sourceReaders=[];
-let readingExisting=false,initialOpening={};
+let readingExisting=false,initialOpening={},managedSourceTask=null;
 const schemaContext=()=>({root:wizardRoot,native:wizardHandle,binding:wizardBinding,prefix:owner.prefix,account:config.username,build:'7.4.2'});
 const executionRecord=async event=>{
   if(discoveryProbe&&event.phase==='execution_terminal'){
@@ -1428,8 +1430,9 @@ const runPreparedCase=async()=>{
     wizardBinding=await page.evaluateHandle(observeJavascriptWizardBinding,{id:node.id,tid:node.tid,icon:expectedIcon,owned:packageHandle});
     wizardDeadline=phaseDeadline(90000);report.wizard_open_deadline=new Date(wizardDeadline).toISOString();await save();
     if(options['--managed-opening-probe']){
-      await openManagedJavascriptInitialWizard({page,prepared:executionPrepared,node,deadline:wizardDeadline,
-        record:executionRecord,lifecycle:initialOpening,report,save});
+      const managed=await openManagedJavascriptInitialWizard({page,prepared:executionPrepared,node,deadline:wizardDeadline,
+        record:executionRecord,lifecycle:initialOpening,report,save,retainLease:options['--verify-runtime-source']===true});
+      managedSourceTask=managed.source_task??null;
       openedWizard=true;
     }else if(executionCase){
       await openJavascriptInitialWizard({page,binding:wizardBinding,node,icon:expectedIcon,deadline:wizardDeadline,
@@ -1487,6 +1490,23 @@ const runPreparedCase=async()=>{
         options:Object.fromEntries(['readOnly','mode','indentUnit','indentWithTabs','smartIndent','electricChars'].map(k=>[k,cm.getOption(k)]).filter(([,v])=>['string','number','boolean'].includes(typeof v)))};
     },{prefix:owner.prefix,expectedPage:editorPage,root:wizardRoot,native:wizardHandle,binding:wizardBinding});
     const baselineSource=editor.source_text;
+    if(managedSourceTask){
+      try{
+        const observed=await Function('return ('+makeJavascriptManagedSourceCode(managedSourceTask)+')')()(page);
+        if(observed.verified!==true||observed.source!==baselineSource
+          ||observed.source_utf8_bytes!==Buffer.byteLength(baselineSource,'utf8'))
+          throw Error('Managed JavaScript source differs from the owned editor baseline');
+        report.managed_source_observation={verified:true,source_sha256:digest(observed.source),
+          source_utf8_bytes:observed.source_utf8_bytes,source_lf_lines:observed.source_lf_lines,
+          node_context:observed.node_context};
+        await executionRecord({phase:'managed_javascript_source_observed',...report.managed_source_observation});
+        await save();
+      }finally{
+        const {prepared,allowDeactivation,...selectionTask}=managedSourceTask;
+        await Function('return ('+makeJavascriptManagedSelectionReadCode({...selectionTask,mode:'dispose'})+')')()(page);
+        managedSourceTask=null;
+      }
+    }
     if(typeof editor.source_text==='string'){
       editor.source_sha256=digest(Buffer.from(editor.source_text,'utf8'));
       editor.source_redaction_changed=redactor.text(editor.source_text)!==editor.source_text;

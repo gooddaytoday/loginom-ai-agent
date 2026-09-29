@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 
 // Private headed probe for the same serialized boundary used by node.apply.
 // A fresh node cannot require deactivation; an uncertain Setting keeps cleanup gated.
-export async function openManagedJavascriptInitialWizard({page,prepared,node,deadline,record,lifecycle,report,save}) {
+export async function openManagedJavascriptInitialWizard({page,prepared,node,deadline,record,lifecycle,report,save,retainLease=false}) {
   if(lifecycle.attempted)throw Error('Managed initial JavaScript opening already attempted');
   Object.assign(lifecycle,{attempted:true,deadline,openingIntent:false,settingDispatched:false,
     settingGestureReturned:false,wizardVisible:false});
@@ -40,6 +40,7 @@ export async function openManagedJavascriptInitialWizard({page,prepared,node,dea
     throw Error('Managed initial JavaScript wizard not confirmed');
   lifecycle.wizardVisible=true;
   await save();
-  await execute(makeJavascriptManagedSelectionReadCode({...task,mode:'dispose'}));
-  return settled;
+  if(!retainLease)await execute(makeJavascriptManagedSelectionReadCode({...task,mode:'dispose'}));
+  return retainLease?{...settled,source_task:{...task,prepared:{document_id:owner.document_id,
+    workflow_ref:prepared.workflow_ref,node:owner},allowDeactivation:true}}:settled;
 }
