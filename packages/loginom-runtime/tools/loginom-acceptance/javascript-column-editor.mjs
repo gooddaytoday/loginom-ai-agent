@@ -529,11 +529,17 @@ export async function openJavascriptColumnUsagePicker({page,state,record,once,de
   const read=(readUsagePicker,usageAction)=>page.evaluate(observeJavascriptColumnEditor,
     {held:pending.held,phase:'editing',readUsagePicker,usageAction});
   const before=await read('state','open');
-  if(before.status!=='ready')throw Error('Owned column usage trigger unavailable');
+  if(before.status!=='ready'){
+    await record({phase:'column_usage_preflight_refused',snapshot:before});
+    throw Error('Owned column usage trigger unavailable: '+(before.reason??before.status));
+  }
   pending.usageOpening=true;
   await once(id,{trigger_tid:before.usage_picker.trigger_tid},async()=>{
     const current=await read('state','open');
-    if(current.status!=='ready')throw Error('Column usage trigger changed before opening');
+    if(current.status!=='ready'){
+      await record({phase:'column_usage_dispatch_refused',snapshot:current});
+      throw Error('Column usage trigger changed before opening: '+(current.reason??current.status));
+    }
     pending.usageOpeningDispatched=true;
     await click(before.usage_picker.trigger_tid,Math.max(1,limit-Date.now()));
     pending.usageOpeningResponseObserved=true;

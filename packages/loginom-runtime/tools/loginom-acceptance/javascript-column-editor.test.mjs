@@ -120,6 +120,8 @@ test('foreign usage picker refuses before opening gesture',async()=>{
   await assert.rejects(openJavascriptColumnUsagePicker({page:f.page,state:f.state,record:f.record,once:f.once,
     deadline:Date.now()+1000,id:'usage-open',click:async()=>{clicks++;}}));
   assert.equal(clicks,0);assert.equal(f.effects.includes('usage-open'),false);
+  assert.equal(f.events.at(-1).phase,'column_usage_preflight_refused');
+  assert.equal(f.events.at(-1).snapshot.reason,'usage_picker_owner_changed');
 });
 
 test('lost usage trigger response closes the observed popup once without replay',async()=>{
