@@ -1,5 +1,25 @@
 # JavaScript: checkpoint исполнения
 
+## Пауза по запросу пользователя — 2026-09-29
+
+После предыдущего HTTP 503 через системный proxy прямое разрешение
+`logi-test-plan.bg.local` восстановилось: `curl --noproxy '*'` получил
+HTTP 200 от `10.200.11.224`. Штатный `loginBrowser` уже запускает Chromium
+с `--no-proxy-server`; в назначенном пустом profile236 начался headed
+`managed-opening-probe-02`. Он дошёл до `link-js-input`, но завершился
+`FAILED` с сообщением `JavaScript palette topology delta differs`, **до
+проверки managed-opening**. Report SHA256
+`c483777be7caaa54d1e55c2cdd088537a2357600af554a47403d9721e990fa4f`.
+Operator подтвердил закрытие собственного пакета, logout и browser close
+(3/3); pinned Chrome-процессов после завершения нет. Под registry lock
+назначен новый пустой profile237, receipt
+`profile-reassignment-237.json` SHA256
+`f59cf0a30a7762b6a28c8ef7151fc65ae26e1f5c96896d8881c12507173ee8fb`.
+Профиль 236 не переиспользовать. Пользователь сообщил, что исправил вопрос
+в соседнем чате, и попросил паузу; перед следующим запуском сверить его
+изменения и сохранённый failure, не считать исход probe доказательством
+работы managed-opening. Новых браузерных операций после паузы не начинать.
+
 ## Ограниченное полное UI-чтение JS — 2026-09-29
 
 Child `7e3f608577` добавил в общий `node.apply` opt-in capability
