@@ -1198,16 +1198,21 @@ const runExecutionTrial=async probe=>{
     report.stage='existing-mapping-baseline';
     const before={input:await executionRuntime.readPortMapping(executionNode,'input'),output:await executionRuntime.readPortMapping(executionNode,'output')};
     report.stage='existing-source-readback';
-    const reopened=await executionRuntime.reopen(executionNode);wizardAddressEpoch++;
-    wizardHandle=null;wizardRoot=null;openedWizard=true;closeDispatched=false;closeConfirmed=false;closeDeadline=0;wizardDeadline=phaseDeadline(90000);
-    await executionRuntime.handoffReopenedWizard();
-    await executionRecord({phase:'existing_wizard_opened',reopened});
-    await waitWizardReady();readingExisting=true;
-    await inspectWizardPages();
-    const source=await readOwnedExecutionSource();
-    if(source!==probe.source)throw Error('Existing JavaScript source differs from applied trial');
-    await executionRecord({phase:'existing_source_verified',source_sha256:digest(source)});
-    await closeWizardOnce();
+    const boundary=await executionRuntime.captureExecutionBoundary();
+    try{
+      const reopened=await executionRuntime.reopen(executionNode);wizardAddressEpoch++;
+      wizardHandle=null;wizardRoot=null;openedWizard=true;closeDispatched=false;closeConfirmed=false;closeDeadline=0;wizardDeadline=phaseDeadline(90000);
+      await executionRuntime.handoffReopenedWizard();
+      await executionRecord({phase:'existing_wizard_opened',reopened});
+      await waitWizardReady();readingExisting=true;
+      await inspectWizardPages();
+      const source=await readOwnedExecutionSource();
+      if(source!==probe.source)throw Error('Existing JavaScript source differs from applied trial');
+      await executionRecord({phase:'existing_source_verified',source_sha256:digest(source)});
+      await closeWizardOnce();
+      await executionRuntime.settleClosedExecutionBoundary(boundary,executionNode,deadline);
+      await executionRuntime.verifyExecutionBoundary(boundary);
+    }finally{await boundary.native.dispose();}
     const after={input:await executionRuntime.readPortMapping(executionNode,'input'),output:await executionRuntime.readPortMapping(executionNode,'output')};
     const semantic=mapping=>({autosync:mapping.autosync,
       source_fields:mapping.source_fields.map(({record_id,field_id,...field})=>field),
