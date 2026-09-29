@@ -18,6 +18,12 @@ export function validateJavascriptParameters(parameters,mode,request) {
   need(Array.isArray(request.inputs)&&request.inputs.length<=1
     &&request.inputs.every(input=>input?.input===0),'inputs');
   if(request.target.kind==='new')need(request.inputs.length===1,'inputs');
+  need(Array.isArray(request.mappings)&&request.mappings.length<=2
+    &&request.mappings.every(mapping=>mapping?.port===0&&['input','output'].includes(mapping.direction))
+    &&new Set(request.mappings.map(mapping=>mapping.direction)).size===request.mappings.length,'mappings');
+  need(request.read&&Array.isArray(request.read.ports)
+    &&request.read.ports.every(port=>port===0),'read.ports');
+  if(request.finish==='close')need(request.inputs.length===0&&request.mappings.length===0,'finish');
 
   const hasSource=Object.hasOwn(parameters,'source_text');
   const hasExpected=Object.hasOwn(parameters,'expected_source_sha256');
