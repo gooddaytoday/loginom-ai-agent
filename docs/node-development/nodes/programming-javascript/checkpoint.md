@@ -66,6 +66,14 @@ live только после восстановления разрешения �
 `expected.json` не менять по наблюдениям. Changed/reordered и Stop/cancel
 ещё не запускались.
 
+Локальная применимость общей Stop-процедуры просмотрена: после `identify()`
+`createNodeExecutionProcedure(...).stop()` требует native owner именно
+отменяемого дочернего процесса, фиксирует один cancel-эффект и проверяет
+terminal той же группы. Повторный вызов возвращает ту же попытку; local abort
+во время read wait не является server Stop. Адресные `node-execution-stop`
+tests — 16/16 PASS. Это не live G6: конечный JS-цикл ≤60 секунд, Stop,
+cleanup и короткий rerun ещё предстоит провести на доступном стенде.
+
 Канонические документы читать в основном checkout `javascript`, код —
 в `.worktrees/node-javascript`. Child содержит коммиты B и прежние untracked
 документы/`__pycache__/`; его tracked checkpoint устарел.
