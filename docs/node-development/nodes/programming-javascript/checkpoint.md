@@ -23,11 +23,11 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Scalar/precision/cardinality/engine/names/errors — J06–J09/J12/J20/J24/J25 | Приватные native/typed, 30/30 engine observations, T-пробы; ссылки в discovery | G3 bridge, обязательный остаток G5/G6 и подтверждение через handler; число snippets не означает PASS |
 | Persistence — J15/J23 | Приватные code/declared/usage writer–cold–bytes, dirty-state; см. G7 discovery и исторические SHA ниже | Только фиксированные 6×2; нужны handler 6×4 и CLI |
 | Бизнес и freshness — J03/J04/J11 | Private code/base и declared/base 6×4 `ba46d2ecda`: полный typed UI oracle и fresh owned Execute | Code changed/reordered тоже прошли; остаются existing freshness, declared variants и public C/D/E; native bytes этими runs не доказаны |
-| Stop/cancel — J13 | Runtime/unit части lost reply; живого Stop/cancel нет | Конечный цикл ≤60 секунд, owned terminal/cleanup/rerun до фиксации Execute-контракта |
+| Stop/cancel — J13 | Private native Stop + отдельный local cancel + same-node 6×4 rerun, run08/source `0328cadfc9`, terminal за 6,612 с, cleanup 3/3 | Public/CLI lifecycle, deadline/error/recovery cases; весь G6 этим fixed case не закрыт |
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
-**Следующий связный результат:** конечный Stop/cancel
-из P1 [плана](plan.md) до окончательного Execute/read контракта. Ранний private
+**Следующий связный результат:** C — полный public code lifecycle и G3 bridge
+из [плана](plan.md). Ранний P1 Stop/cancel подтверждён ниже. Ранний private
 бизнес 6×4 для обоих base modes и code changed/reordered проверен ниже. B уже подтвердил
 existing code-table через public API-path изолированного runtime; повторять
 этот фиксированный run без затронувшего изменения не требуется.
@@ -500,6 +500,30 @@ terminal/selection/deadline/geometry/covered/blockers/ABA и lost dispatch);
 log SHA256 `935d892127d58b1cb4106252cbb952582a34c2fa997b2b2d99b55d7664bdf6dc`.
 Syntax/diff PASS. Fresh profile306/run `p1-stop-finite-08`, exec50386;
 результат Stop/short rerun пока не установлен, G6 остаётся открытым.
+
+### P1 Stop/cancel и короткий повтор — 2026-09-29
+
+`p1-stop-finite-08`/profile306/source `0328cadfc9` — **OBSERVED**.
+Report SHA256 `cca36e06a5000f1665b6a824d0881b24cb270f0d9947c5d5500600d89981e7fa`,
+journal SHA256 `acf96784fce29434beb1f34ff829d26f629595f10ba5ac78613e88f6580d6a94`.
+Один finite Execute, один menu right-click и один Cancel. Native group3/child3.1
+(record1367) на exact JS owner достигли `cancelled` за **6612,033 мс**;
+local read cancellation отдельно подтверждена до server Stop. Консоль закрыта,
+output свежим не объявлен. Исходник заменён на прежний закреплённый short
+SHA `1bc0f8123e1c2a6f1924ee69e0e9373d720e4ea301f4f928d347535e06b61ec3`,
+независимый owned source-read/discard подтвердил его. Второй явный Execute
+того же node GUID дал новый group4/child4.1 и native owned `completed`.
+
+Независимый Python audit повторно сверил immutable fixture manifest/oracle,
+все 6×5 входных и 6×4 выходных cells, типы/NULL/order, сумму **1950**,
+source hashes, distinct execution IDs, one-shot controls и boundary proof.
+Receipt SHA256 `2a1b2e816579a5de28edf55cf80eb94a1d2baea04fc3b6112080b30dafca4d07`.
+Это `private_native_stop_and_typed_ui`, **не native bytes/public/CLI acceptance**;
+`gates_closed=[]`. Package closed, UI logout, browser closed 3/3 и отсутствие
+собственных процессов проверены; registry reconciled под lock. B и ранние
+P1 business/Stop не повторять без изменения их контракта. Следующий шаг —
+C code/public create–materialize–Execute–read6×4 и G3 bridge, затем Save/cold;
+D declared, E/F и aggregate G6/J13 пока открыты.
 
 ### B: публичный configure existing — 2026-09-29
 
