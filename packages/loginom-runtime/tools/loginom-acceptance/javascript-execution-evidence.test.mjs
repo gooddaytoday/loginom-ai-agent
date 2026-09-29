@@ -46,10 +46,12 @@ function privateSelectionFixture(fault) {
       if(fault==='node_after')native.data={};if(fault==='cell_after')native.FCell={};if(fault==='controller_after')tab.Controller={...tab.Controller};
     }},
     waitForFunction:async(fn,arg,options)=>{assert.equal(typeof fn,'function');assert.ok(options.timeout>0&&options.timeout<=5000);
-      assert.ok(invoke(fn,arg));if(fault==='replace_twice'){shape.isConnected=false;shape=element(node.tid);}return {dispose:async()=>{}};}};
+      assert.ok(invoke(fn,arg));if(['replace_twice','replace_thrice'].includes(fault)){shape.isConnected=false;shape=element(node.tid);}return {dispose:async()=>{}};}};
   const records=[];
   const record=async e=>{records.push(e);if(e.phase==='javascript_private_selection_dispatch'){
     if(fault==='node')native.data={};if(fault==='dom')shape=element(node.tid);if(fault==='journal')throw Error('journal failure');
+  }else if(fault==='replace_thrice'&&e.phase==='javascript_private_selection_after'){
+    shape.isConnected=false;shape=element(node.tid);
   }return e;};
   return {run:(deadline=Date.now()+5000,options={})=>selectJavascriptForSettings(page,{binding,node,icon:'js',deadline,record,...options}),node,records,page,binding,realm,record,tab,native,
     get clicks(){return clicks;},get disposed(){return disposed;}};
@@ -74,13 +76,17 @@ test('private selection keeps a lost click ambiguous without replay',async()=>{
   assert.equal(f.records.at(-1).phase,'javascript_private_selection_refused');assert.equal(f.records.at(-1).effect_possible,true);
 });
 
-test('selection admits one detached DOM replacement only after the returned gesture on the same selected cell',async()=>{
+test('selection admits two detached DOM redraws only after the returned gesture on the same selected cell',async()=>{
   const f=privateSelectionFixture('replace');const result=await f.run();
   assert.equal(result.dom_replacements,1);assert.equal(f.clicks,1);assert.equal(f.records.at(-1).node_selected,true);
-  for(const fault of ['replace_connected','replace_twice','foreign_selected','duplicate_after','node_after','cell_after','controller_after','covered_after']){
+  const twice=privateSelectionFixture('replace_twice');const twiceResult=await twice.run(undefined,{openSettings:true});
+  assert.equal(twiceResult.dom_replacements,2);assert.equal(twiceResult.opening_dispatched,true);assert.equal(twice.clicks,2);
+  for(const fault of ['replace_connected','foreign_selected','duplicate_after','node_after','cell_after','controller_after','covered_after']){
     const rejected=privateSelectionFixture(fault);await assert.rejects(rejected.run());assert.equal(rejected.clicks,1);
     assert.equal(rejected.records.at(-1).effect_possible,true);
   }
+  const third=privateSelectionFixture('replace_thrice');await assert.rejects(third.run(undefined,{openSettings:true}),/Private selection DOM changed/);
+  assert.equal(third.clicks,1);assert.equal(third.records.at(-1).opening_dispatched,false);
 });
 
 test('private Setting opening has one journaled click after selection and refuses a changed owner before dispatch',async()=>{

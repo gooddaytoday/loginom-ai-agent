@@ -263,8 +263,8 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
     if(!shape?.isConnected||shape.getAttribute('data-tid')!==node.tid||!graph.contains(shape)
       ||unique.length!==1||unique[0]!==shape)throw Error('Private selection DOM changed: '+JSON.stringify({kind:'current_shape',phase:inspectPhase,connected:shape?.isConnected===true,tid_matches:typeof shape?.getAttribute==='function'&&shape.getAttribute('data-tid')===node.tid,inside_graph:!!shape&&graph.contains(shape),unique_count:unique.length,unique_matches:unique[0]===shape,after_gesture:afterGesture,node_selected:nodeSelected}));
     if(shape!==r.shape){
-      if(!afterGesture||r.replacements!==0||r.shape?.isConnected||!nodeSelected)throw Error('Private selection DOM changed: '+JSON.stringify({kind:'replacement',phase:inspectPhase,after_gesture:afterGesture,replacements:r.replacements,previous_connected:r.shape?.isConnected===true,node_selected:nodeSelected}));
-      // Only the DOM association can change, once, after our returned gesture.
+      if(!afterGesture||r.replacements>=2||r.shape?.isConnected||!nodeSelected)throw Error('Private selection DOM changed: '+JSON.stringify({kind:'replacement',phase:inspectPhase,after_gesture:afterGesture,replacements:r.replacements,previous_connected:r.shape?.isConnected===true,node_selected:nodeSelected}));
+      // Loginom may redraw the same selected native cell twice before Setting opens.
       r.shape=shape;r.replacements++;
     }
     const visible=e=>e.isConnected&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
