@@ -624,7 +624,7 @@ test('Apply refuses unknown record flags and replacement data cache without call
 
 // Run the production configurator and serialized observers against the same
 // native/DOM editor fixture; UI gestures update its native cached records.
-for(const mode of ['empty','sales','code','wrong-ack','wrong-phase','wrong-type','wrong-label','apply-lost'])test('production schema configuration preserves '+mode,async()=>{
+for(const mode of ['empty','sales','usage','code','wrong-ack','wrong-phase','wrong-type','wrong-label','apply-lost'])test('production schema configuration preserves '+mode,async()=>{
   const f=fixture(),root=f.context.root,page=f.controls.page.el.dom,base=page.tid;
   const generation=f.element('generation',base+';BooleanPropEdit;ValueControl',page),input=f.element('generationInput',generation.tid+';InputEl',generation),display=f.element('generationDisplay',generation.tid+';DisplayEl',generation);
   generation.classList.add('x-form-cb-checked');
@@ -632,10 +632,12 @@ for(const mode of ['empty','sales','code','wrong-ack','wrong-phase','wrong-type'
   const add=f.element('add',base+';btnAddMappingColumn',page);f.controls.add={el:{dom:add}};
   root.querySelectorAll=selector=>f.nodes.filter(e=>root.contains(e)&&e!==root&&(selector==='[data-tid]'||selector.includes(';tbl')&&e.tid.endsWith(';tbl')));
   page.querySelectorAll=()=>[f.controls.grid.el.dom];
-  let picker;
+  let picker,usage;
   const evaluate=f.page.evaluate;
   f.page.evaluate=async(fn,arg)=>{
     if(arg?.target){const target=arg.target==='cbxDataType'?(arg.kind==='option'?picker.option:picker.triggerDom):f.form.FItems[arg.target]?.inputEl?.dom??f.form.FItems[arg.target]?.el?.dom;f.setHit(()=>target);}
+    if(arg?.usageAction==='open')f.setHit(()=>usage.triggerDom);
+    if(arg?.usageAction==='select')f.setHit(()=>usage.options[2]);
     return evaluate(fn,arg);
   };
   f.page.locator=selector=>{
@@ -647,21 +649,28 @@ for(const mode of ['empty','sales','code','wrong-ack','wrong-phase','wrong-type'
       if(element===display){control.checked=false;generation.classList.delete('x-form-cb-checked');return;}
       if(element===add){
         f.addRecord();f.records.at(-1).internalId='declared-'+f.records.length;f.form.ModalResultOk=false;f.show();
+        if(mode==='usage')f.records.at(-1).data.DefaultUsageType=0;
         for(const key of ['edtName','edtDisplayName']){const field=f.form.FItems[key];field.value=field.rawValue=field.inputEl.dom.value='COL1';}
         if(picker)for(let i=f.nodes.length-1;i>=0;i--)if(picker.wrap.contains(f.nodes[i])||picker.pickerDom.contains(f.nodes[i]))f.nodes.splice(i,1);
         picker=typeFixture(f,{expanded:false,type:f.records.length===1?4:5,label:f.records.length===1?'Целый':'Строковый'});
+        if(mode==='usage'&&f.records.length===1){
+          usage=usageFixture(f,{lazy:true});
+          usage.options[2].onClick=()=>{usage.combo.value=4;usage.setExpanded(false);};
+        }
         picker.option.onClick=async()=>{f.records.at(-1).data.DataType=mode==='wrong-type'?3:picker.records[0].data.Value;picker.combo.isExpanded=false;picker.pickerDom.shown=false;picker.option.shown=false;};return;
       }
       if(element===picker.triggerDom){picker.expand();return;}
-      if(element===f.form.FItems.btnApply.el.dom){f.form.ModalResultOk=true;f.hide();if(mode==='wrong-label')f.records.at(-1).data.DisplayName='Other';if(mode==='apply-lost')throw Error('lost Apply');return;}
+      if(element===usage?.triggerDom){usage.setExpanded(true);return;}
+      if(element===f.form.FItems.btnApply.el.dom){f.form.ModalResultOk=true;f.hide();if(mode==='usage'&&f.records.length===1)f.records.at(-1).data.DefaultUsageType=usage.combo.value;if(mode==='wrong-label')f.records.at(-1).data.DisplayName='Other';if(mode==='apply-lost')throw Error('lost Apply');return;}
       assert.fail('unexpected gesture '+tid);
     }};
   };
-  const run=()=>configureJavascriptSchema({page:f.page,context:f.context,mode:mode==='code'?'code':'declared',fixedCase:mode==='sales'||mode==='code'?undefined:'cardinality-empty',columnState:f.state,once:f.once,deadline:Date.now()+1000,
+  const run=()=>configureJavascriptSchema({page:f.page,context:f.context,mode:mode==='code'?'code':'declared',fixedCase:mode==='usage'?'usage-output':mode==='sales'||mode==='code'?undefined:'cardinality-empty',columnState:f.state,once:f.once,deadline:Date.now()+1000,
     record:async event=>{f.events.push(event);return event.phase==='javascript_declared_empty_verified'?(mode==='wrong-ack'?{}:mode==='wrong-phase'?{...event,phase:'wrong'}:event):event;}});
   if(['wrong-ack','wrong-phase','wrong-type','wrong-label','apply-lost'].includes(mode)){await assert.rejects(run);assert.equal(f.events.some(e=>e.phase==='javascript_declared_empty_verified'),['wrong-ack','wrong-phase'].includes(mode));return;}
   const result=await run();assert.equal(result.verified,true);
   if(mode==='empty'){verifyJavascriptDeclaredEmpty(result.declaration,result.declaration_sha256);assert.deepEqual(f.records.map(r=>[r.data.Name,r.data.DisplayName,r.data.DataType]),[['Value','Value',4]]);assert.equal(f.state.pending,null);assert.equal(f.effects.filter(e=>e==='schema-apply-0').length,1);}
   if(mode==='sales')assert.deepEqual(f.records.map(r=>[r.data.Name,r.data.DataType]),[['ObservedID',4],['PhaseMarker',5]]);
+  if(mode==='usage'){assert.deepEqual(f.records.map(r=>[r.data.Name,r.data.DataType,r.data.DefaultUsageType]),[['ObservedID',4,4],['PhaseMarker',5,0]]);assert.equal(f.effects.filter(e=>e==='schema-usage-select').length,1);}
   if(mode==='code'){assert.equal(result.generation.checked,true);assert.equal(f.records.length,0);assert.equal(f.effects.length,0);}
 });

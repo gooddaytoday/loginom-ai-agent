@@ -6,14 +6,15 @@ export const javascriptPersistenceMarker = 'JS_G7_FINAL_V2 — Сумма & <tag
 // Fixed operator fixtures, never caller-provided JavaScript. The cold reader
 // must not import this module: expectations belong to the writer and auditor.
 export function javascriptPersistenceCase(mode) {
-  if (!['code', 'declared'].includes(mode)) throw Error('Persistence schema mode refused');
-  const initial = javascriptExecutionProbes('RowID').find(item => item.id === mode + '-table-v1');
+  if (!['code', 'declared', 'usage'].includes(mode)) throw Error('Persistence schema mode refused');
+  const schemaMode = mode === 'usage' ? 'declared' : mode;
+  const initial = javascriptExecutionProbes('RowID').find(item => item.id === schemaMode + '-table-v1');
   const oldMarker = JSON.stringify('JS_G2_TABLE_V1');
   if (initial.source.split(oldMarker).length !== 2) throw Error('Persistence baseline marker differs');
   const finalSource = '// Сохранённая редакция 2: & < > " \' \\ 😀\n'
     + initial.source.replace(oldMarker, JSON.stringify(javascriptPersistenceMarker));
   return Object.freeze({
-    id: 'persistence-' + mode, schema_mode: mode,
+    id: 'persistence-' + mode, schema_mode: schemaMode,
     revisions: Object.freeze([initial.source, finalSource].map((source, index) => Object.freeze({
       revision: index + 1, source, ...javascriptSourceIdentity(source),
     }))),

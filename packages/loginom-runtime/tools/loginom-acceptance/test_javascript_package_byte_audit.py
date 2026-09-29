@@ -39,7 +39,7 @@ class SavedPackageAuditTests(unittest.TestCase):
     def write_json(self, path, value):
         path.write_text(json.dumps(value, ensure_ascii=False) + "\n", encoding="utf-8")
 
-    def write_package(self, *, source=None, mode=None, guid=None, name=None):
+    def write_package(self, *, source=None, mode=None, guid=None, name=None, output_usage=None):
         root = ElementTree.Element("Unit")
         item = ElementTree.SubElement(ElementTree.SubElement(ElementTree.SubElement(root, "WorkFlow"), "Nodes"), "Item", Guid=guid or self.node)
         engine = ElementTree.SubElement(ElementTree.SubElement(item, "Component"), "Engine", {XSI_TYPE: "TBGJavaScriptEngine", "Code": self.source if source is None else source})
@@ -48,7 +48,9 @@ class SavedPackageAuditTests(unittest.TestCase):
             engine.attrib["CodeConfigurableColumns"] = "true"
         columns = ElementTree.SubElement(engine, "ColumnDefs")
         if actual == "declared":
-            ElementTree.SubElement(columns, "Item", Name="ObservedID", DataType="dtInteger")
+            first = ElementTree.SubElement(columns, "Item", Name="ObservedID", DataType="dtInteger")
+            if output_usage is not None:
+                first.attrib["DefaultUsageType"] = output_usage
             ElementTree.SubElement(columns, "Item", Name="PhaseMarker", DataType="dtString")
         with zipfile.ZipFile(self.package, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("PackageInfo.xml", ElementTree.tostring(ElementTree.Element("PackageInfo", Name=name or self.name)))
@@ -171,6 +173,27 @@ class SavedPackageAuditTests(unittest.TestCase):
                     (self.read / "execution-events.jsonl").write_text("\n".join(json.dumps(event) for event in events) + "\n")
                 with self.assertRaises(ValueError):
                     audit(self.audit_path, self.read)
+
+    def test_output_usage_requires_exact_saved_attribute(self):
+        self.mode = "declared"
+        self.write_fixture()
+        writer_path = self.writer / "report.json"
+        writer = json.loads(writer_path.read_text())
+        writer["persistence"]["case_id"] = "persistence-usage"
+        self.write_json(writer_path, writer)
+        base = json.loads(self.audit_path.read_text())
+        base["case_id"] = "persistence-usage"
+        base["files"][0]["sha256"] = sha(writer_path.read_bytes())
+        self.write_json(self.audit_path, base)
+        for usage, accepted in ((None, False), ("utActive", False), ("utPredicted", True)):
+            with self.subTest(usage=usage):
+                self.write_package(mode="declared", output_usage=usage)
+                self.refresh_read_receipt()
+                if accepted:
+                    self.assertEqual(audit(self.audit_path, self.read)["case_id"], "persistence-usage")
+                else:
+                    with self.assertRaisesRegex(ValueError, "saved output usage differs"):
+                        audit(self.audit_path, self.read)
 
     def test_refuses_changed_persistence_pin_and_corrupt_zip(self):
         (self.writer / "report.json").write_text("{}\n", encoding="utf-8")

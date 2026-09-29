@@ -87,7 +87,7 @@ if(packageFile){
 if(persistence){
   if(batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence'].includes(k)))throw Error('Persistence requires its separate fixed writer entrypoint');
   for(const revision of persistence.revisions)if(inspectJavascriptModulePolicy(revision.source).status!=='ADMITTED')throw Error('Fixed persistence source policy refused');
-  options['--execution-case']=persistenceMode+'-table-execute';
+  options['--execution-case']=persistence.schema_mode+'-table-execute';
 }
 if(sourceReadCycle){
   if(batch||nativeInputOnly||nativeRoundtrip||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence'].includes(k)))throw Error('Source cycle requires its separate fixed private entrypoint');
@@ -633,7 +633,7 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
         await executionRecord({phase:'existing_schema_read',schema});
         if(!schema.verified||schema.generation?.checked!==report.execution_schema.generation.checked)throw Error('Existing JavaScript schema mode changed');
         report.execution_existing_schema=schema;
-      }else report.execution_schema=await configureJavascriptSchema({page,context:schemaContext(),mode:executionCase.split('-')[0],fixedCase:nativeRoundtrip&&nativeFixtureId==='cardinality-empty'?'cardinality-empty':undefined,
+      }else report.execution_schema=await configureJavascriptSchema({page,context:schemaContext(),mode:executionCase.split('-')[0],fixedCase:persistence?.id==='persistence-usage'?'usage-output':nativeRoundtrip&&nativeFixtureId==='cardinality-empty'?'cardinality-empty':undefined,
         once:(id,identity,perform)=>executionRuntime.once(caseEffect(report.case_id,id),identity,perform),record:executionRecord,deadline,columnState});
       if(nativeRoundtrip){
         if(nativeFixtureId==='cardinality-empty')verifyJavascriptDeclaredEmpty(report.execution_schema.declaration,report.execution_schema.declaration_sha256);
@@ -1111,7 +1111,7 @@ const runExecutionTrial=async probe=>{
       if(execution.verified!==true||execution.cleanup_complete!==true||execution.trial?.source_sha256!==first.source_sha256
         ||execution.trial.node_id!==executionNode.node_id||!execution.execution_id)throw Error('Persistence initial execution unconfirmed');
       verifyJavascriptPersistenceOutput(report.execution_probe.output,1);
-      report.persistence={status:'RUNNING',schema_mode:persistence.schema_mode,deadline,
+      report.persistence={status:'RUNNING',case_id:persistence.id,schema_mode:persistence.schema_mode,deadline,
         initial:{source:first,execution,output:report.execution_probe.output},saves:[]};
       const initialCycle=await runSourceReadCycle(first,deadline);
       report.persistence.initial.source_cycle=initialCycle;

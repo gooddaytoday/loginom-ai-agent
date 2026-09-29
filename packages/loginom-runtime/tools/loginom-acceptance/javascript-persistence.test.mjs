@@ -14,9 +14,9 @@ const observed = revision => ({row_count: 6, sample_rows: 6, sample_complete: tr
   ]),
 });
 
-for (const mode of ['code', 'declared']) test('fixed persistence sources and policy: ' + mode, () => {
+for (const mode of ['code', 'declared', 'usage']) test('fixed persistence sources and policy: ' + mode, () => {
   const fixture = javascriptPersistenceCase(mode);
-  assert.equal(fixture.schema_mode, mode);
+  assert.equal(fixture.schema_mode, mode === 'usage' ? 'declared' : mode);
   assert.equal(fixture.revisions.length, 2);
   assert.ok(Object.isFrozen(fixture) && Object.isFrozen(fixture.revisions));
   assert.notEqual(fixture.revisions[0].source_sha256, fixture.revisions[1].source_sha256);

@@ -25,7 +25,11 @@ const sourcePins={
 // ROOT must also verify the original process handles and frozen source manifest.
 export function auditJavascriptPersistence({writer,cold,writerEvents,coldEvents}) {
   need(writer?.persistence?.status==='WRITER_OBSERVED'&&cold?.cold?.status==='COLD_OBSERVED','both observations required');
-  const mode=writer.persistence.schema_mode,expected=javascriptPersistenceCase(mode);
+  const mode=writer.persistence.schema_mode,caseId=writer.persistence.case_id??'persistence-'+mode;
+  need(['persistence-code','persistence-declared','persistence-usage'].includes(caseId),'fixed persistence case');
+  const expected=javascriptPersistenceCase(caseId.slice('persistence-'.length));
+  need(expected.schema_mode===mode&&(writer.persistence.case_id===undefined||writer.persistence.case_id===expected.id),
+    'persistence case/schema identity');
   const first=writer.persistence.initial,last=writer.persistence.final,read=cold.cold,saves=writer.persistence.saves;
   reportComplete(writer,expected.writer_budget_ms);reportComplete(cold,expected.reader_budget_ms);
   need(writer.host_process.profile!==cold.host_process.profile&&writer.host_process.pid!==cold.host_process.pid,'separate processes/profiles');
@@ -65,6 +69,14 @@ export function auditJavascriptPersistence({writer,cold,writerEvents,coldEvents}
   for(const [index,cycle] of cycles.entries())sourceCycle(cycle,index===0?first.source:last.source,writerNode);
   const settings=settingsMeaning(first.source_cycle.rounds[0].settings,saved.workflow_ref.prefix);
   need(settings.generation===(mode==='code'),'schema mode');
+  if(caseId==='persistence-usage'){
+    const fields=settings.grids.find(grid=>grid.tid==='grdTargetColumns;tbl')?.fields;
+    need(fields?.length===2&&fields[0].Name==='ObservedID'&&fields[0].DataType===4
+      &&fields[0].DefaultUsageType===4,
+      'output usage must be the saved first declared column');
+    const applied=writer.execution_schema?.grids?.find(grid=>grid.tid===writer.execution_schema.page_tid+';grdTargetColumns;tbl')?.fields;
+    need(applied?.length===2&&applied[0].DefaultUsageType===4,'output usage Apply readback');
+  }
   for(const cycle of cycles)for(const round of cycle.rounds)same(settingsMeaning(round.settings,saved.workflow_ref.prefix),settings,'writer settings preserved');
   same(settingsMeaning(read.source.settings,read.prepared.workflow_ref.prefix),settings,'cold settings preserved');
   const mappings=first.source_cycle.mappings.after;
@@ -181,7 +193,7 @@ export function auditJavascriptPersistence({writer,cold,writerEvents,coldEvents}
   }
   need(!coldEvents.some(event=>event.phase==='persistence_save_reserved'||event.phase==='persistence_save_confirmed'
     ||event.phase?.startsWith('javascript_source_mutation')),'cold mutation journal');
-  return {version:1,status:'VERIFIED',schema_mode:mode,path,source_sha256:sourcePins[mode][1],
+  return {version:1,status:'VERIFIED',case_id:caseId,schema_mode:mode,path,source_sha256:sourcePins[mode][1],
     source_utf8_bytes:read.source.source_utf8_bytes,source_lf_lines:read.source.source_lf_lines,
     output:{rows:6,columns:2,numeric_tolerance:0},writer_document_id:saved.document_id,cold_document_id:node.document_id,
     execution_ids:[first.execution.execution_id,last.execution.execution_id,read.execution.execution_id],
