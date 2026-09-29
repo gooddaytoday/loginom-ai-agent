@@ -40,6 +40,8 @@ const probes=[
   {id:'g5-empty-output',scope:'G5',source:source('Integer','// Deliberately append no rows.'),
     schema:column('integer'),expected:[],expectation:'fixed'},
   ...javascriptBusinessProbes(),
+  {...javascriptBusinessProbes().find(probe=>probe.id==='p1-business-code-base'),
+    id:'c0-code-materialization',scope:'C0-materialization'},
   javascriptStopProbe(),
 ].map(p=>({...p,schema_mode:p.schema_mode??'code',build:'7.4.2',source_sha256:hash(p.source),status:'not_run'}));
 
