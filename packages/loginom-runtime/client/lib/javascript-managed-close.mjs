@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 import {withBrowserReceipt} from './executor.mjs';
 import {inspectManagedJavascriptPage, makeJavascriptManagedPageCode} from './javascript-managed-page.mjs';
 import {wizardReadiness} from './javascript-wizard-page.mjs';
+import {makeJavascriptExistingGraphTypeCode} from './javascript-existing-type.mjs';
 
 export function inspectManagedJavascriptClosePoint({held,task},inspect) {
   const state=inspect({held,task});
@@ -43,13 +44,17 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
   const dialogs=[...document.querySelectorAll('[role="dialog"],.x-message-box')].filter(visible);
   const root=held.wizardRoot,current=tab?.Controller?.Node?.data?.node,model=tab?.Controller?.FController;
   if(!visible(root)&&dialogs.length===0){
-    const nodes=model?.FDiagram?.FNodes?.FCollection;
+    const diagram=model?.FDiagram,nodes=diagram?.FNodes?.FCollection;
     const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===task.owner.node_id):[];
-    if(current!==held.binding.workflow||model!==held.retained.model||model?.FDiagram!==held.retained.diagram
-      ||found.length!==1||found[0]!==held.retained.native||found[0].data!==held.binding.nodeData
-      ||found[0].FCell!==held.retained.cell)
+    const graph=diagram?.FmxGraph,shape=found.length===1?graph?.view?.getState?.(found[0].FCell)?.shape?.node:null;
+    const roots=[...document.querySelectorAll('[data-tid='+JSON.stringify(task.workflow_ref.prefix+';ModelForm;cmpDiagram')+']')];
+    if(current!==held.binding.workflow||!app?.ModelForm||!(model instanceof app.ModelForm)
+      ||found.length!==1||found[0].FIconCls!=='bg-vendor-icon-javascript'
+      ||roots.length!==1||roots[0]!==graph?.container
+      ||!shape?.isConnected||!roots[0].contains(shape)||shape.getAttribute('data-tid')!==held.node.tid)
       throw Error('Managed JavaScript Close graph owner changed');
-    return {state:'closed',node_id:task.owner.node_id,root_visible:false,dialog_count:0};
+    return {state:'closed',node_id:task.owner.node_id,root_visible:false,dialog_count:0,
+      graph_tid:held.node.tid,graph_rebound:model!==held.retained.model||found[0]!==held.retained.native};
   }
   if(!visible(root)||current!==held.wizard||model?.FView?.el?.dom!==root
     ||model?.FModelNode!==held.binding.nodeData)
@@ -197,9 +202,12 @@ export async function closeManagedJavascriptWizard({task,execute,record,receiptO
   }
   const after=decision.state==='closed'?decision:await decide();
   if(after.state!=='closed')throw Error('Managed JavaScript Close did not restore graph');
+  const graph=await execute(makeJavascriptExistingGraphTypeCode(task.prepared));
+  if(graph?.verified!==true||graph.node_id!==task.owner.node_id||graph.graph_tid!==after.graph_tid)
+    throw Error('Managed JavaScript Close independent graph type changed');
   await journal({phase:'javascript_managed_close_verified',operation_id:task.operation_id,
     owner:task.owner,deadline:task.cleanup_deadline,confirmation_required:decision.state==='confirm',
-    graph:after,settings_applied:false,execution_started:false,draft_discarded:true});
+    graph:after,independent_graph_type:graph,settings_applied:false,execution_started:false,draft_discarded:true});
   return {verified:true,closed:true,confirmation_required:decision.state==='confirm',
     node_id:task.owner.node_id,settings_applied:false,execution_started:false,draft_discarded:true};
 }

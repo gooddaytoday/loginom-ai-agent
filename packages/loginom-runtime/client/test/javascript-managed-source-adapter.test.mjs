@@ -13,7 +13,7 @@ const task = {operation_id: 'managed-js-1', owner: node, workflow_ref: prepared.
   targetOrigin: 'http://logi-test-plan.bg.local', targetBuild: '7.4.2', deadline,
   prepared: {...prepared, node}, allowDeactivation: true};
 
-function fixture({closeFails = false, pageTransientOnce = false} = {}) {
+function fixture({closeFails = false, pageTransientOnce = false, wrongType = false} = {}) {
   const calls = [], events = [];
   let pageReads = 0;
   const driver = {
@@ -25,9 +25,12 @@ function fixture({closeFails = false, pageTransientOnce = false} = {}) {
     makeJavascriptManagedPageCode: () => 'page',
     makeJavascriptManagedSourceCode: () => 'source',
     makeJavascriptManagedSelectionReadCode: () => 'dispose',
+    makeJavascriptExistingGraphTypeCode: () => 'type',
   };
   const execute = async code => {
     calls.push(code);
+    if (code === 'type') return {verified: true, node_id: 'node',
+      icon_class: wrongType ? 'bg-vendor-icon-calculator' : 'bg-vendor-icon-javascript'};
     if (code === 'schema') return {verified: true, node_context: {...node, verified: true, surface: 'wizard'},
       generation: {checked: true}, grids: [{tid: 'grid', fields: [{record_id: 'volatile', Name: 'Value'}]}]};
     if (code === 'page') return {ready: true, node_guid: 'node',
@@ -53,7 +56,7 @@ test('managed source adapter admits full source after owned open/schema/Next/thr
   assert.equal(receipt.intent, 'preserve');
   assert.equal(receipt.previous_source.source_utf8_bytes, Buffer.byteLength(source, 'utf8'));
   assert.ok(!JSON.stringify(receipt).includes(source));
-  assert.deepEqual(f.calls, ['open', 'schema', 'next', 'page', 'source', 'source', 'source', 'close', 'dispose']);
+  assert.deepEqual(f.calls, ['type', 'open', 'schema', 'next', 'page', 'source', 'source', 'source', 'close', 'dispose']);
   assert.equal(f.events.filter(event => event.phase === 'source_delivery_verified').length, 1);
   assert.equal(f.events.filter(event => event.phase === 'source_discard_settled').length, 1);
 });
@@ -63,6 +66,13 @@ test('managed source adapter refuses owner drift before any UI action', async ()
   const adapter = await f.sourceAdapter();
   await assert.rejects(() => adapter.open({owner: {...owner, ui_epoch: 10}, deadline}), /owner changed/);
   assert.deepEqual(f.calls, []);
+});
+
+test('existing non-JavaScript graph type refuses before Setting', async () => {
+  const f = fixture({wrongType: true});
+  const adapter = await f.sourceAdapter();
+  await assert.rejects(() => adapter.open({owner, deadline}), /type unconfirmed/);
+  assert.deepEqual(f.calls, ['type']);
 });
 
 test('managed Next waits for the owned Code page without repeating Next', async () => {
