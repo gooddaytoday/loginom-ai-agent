@@ -22,7 +22,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | B: public existing configure — J05/J10/J14/J21 | Isolated `dock_node_apply` + независимый `dock_node_read`, `public-node-apply-03`, report SHA `3b5a18c93ec139edd311f0058b542fc7d70d84f38bdf9c4b5be74312eb5647f4`, cleanup 3/3 | Только фиксированный code/comment source; output mapping `configured_only`, Execute, Save/cold и полный продуктовый handler не доказаны |
 | Scalar/precision/cardinality/engine/names/errors — J06–J09/J12/J20/J24/J25 | Приватные native/typed, 30/30 engine observations, T-пробы; ссылки в discovery | G3 bridge, обязательный остаток G5/G6 и подтверждение через handler; число snippets не означает PASS |
 | Persistence — J15/J23 | Приватные code/declared/usage writer–cold–bytes, dirty-state; см. G7 discovery и исторические SHA ниже | Только фиксированные 6×2; нужны handler 6×4 и CLI |
-| Бизнес и freshness — J03/J04/J11 | Не проверено для 6×4, changed/reordered | Ранние private пробы с неизменным oracle, затем public сценарии C/D |
+| Бизнес и freshness — J03/J04/J11 | Private code/base 6×4 `ba46d2ecda`, run07: полный typed UI oracle и fresh owned Execute | Declared, changed/reordered, затем public C/D; native bytes этим run не доказаны |
 | Stop/cancel — J13 | Runtime/unit части lost reply; живого Stop/cancel нет | Конечный цикл ≤60 секунд, owned terminal/cleanup/rerun до фиксации Execute-контракта |
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
@@ -218,8 +218,27 @@ Present foreign card, чужой panel, другой invalid descriptor, сме�
 `191316fbbd4ea628a06dbd02a1f2732203a1ac6eaa91d9bcb8cf46d139db5812`.
 Следующий run07/profile289 различает эти состояния в live и проверяет полный
 input 6×5 перед JS; новый pending path ещё не доказан на стенде.
+Run07/profile289/source `ba46d2ecda` — **OBSERVED**, private code/base
+`typed_oracle_verified`, cleanup package/logout/browser 3/3, своих процессов нет.
+Report SHA256
+`65dbc559ebb9e5d2e4a1cc2d648ce0e55c971bf821385f6b3d05ebe513a7d7bb`,
+journal SHA256
+`6c51ba39c6540114ec70674a22b7f0ee414fb469f7c6838811f4bd5c0d519311`.
+Четыре pending Table observations под owned busy-маской сменились verified
+card того же порта; один Add, settlement около 8.0s. Полный input 6×5,
+technical names/порядок и исходные пробелы Customer подтверждены.
+Отдельный owned JS Execute completed: группа3/child3.1, source SHA256
+`1bc0f8123e1c2a6f1924ee69e0e9373d720e4ea301f4f928d347535e06b61ec3`.
+Независимое повторное сравнение report с закреплёнными sales.csv/expected.json
+подтвердило все input/output cells, четыре типа/порядок полей и шесть строк,
+сумма NetCents=1950, допуск ноль; receipt SHA256
+`9365ad98a038b8656bcf589899e5d4c3a02928b266e5175b5109bd9a36bc1e82`.
+Уровень `typed_ui_only`, native bytes=false, gates_closed=[]; это P1
+осуществимость, не public handler, Save/cold или CLI. Результат Done сам по
+себе не доказывает Execute; успех отнесён только к отдельной tracked группе.
+Под lock зарезервирован чистый profile290 для declared/base.
 `expected.json` остаётся неизменным. Далее — declared base, changed/reordered
-и конечный Stop/cancel по P1; до результата code-base их не считать проверенными.
+и конечный Stop/cancel по P1; code/base не доказывает эти случаи.
 
 ### B: публичный configure existing — 2026-09-29
 
