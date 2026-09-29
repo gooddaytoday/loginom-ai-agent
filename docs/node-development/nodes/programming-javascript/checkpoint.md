@@ -459,6 +459,35 @@ Logs SHA256 соответственно
 Под lock назначен fresh profile304/run `p1-stop-finite-07`, exec8580;
 обычный headed. Успех Stop пока не заявлен, G6 открыт.
 
+`p1-stop-finite-07`/profile304/source `8c05bcc6d7` — **CLEANUP_UNCONFIRMED**.
+Report SHA256 `e6c9a5e2e090d4faddfedd78f7c0566b7fc6647f643ce434c5bd631a9d251ba6`,
+journal SHA256 `1b963ddec2e5b92a9cee3117f2d6760eb9085009255f6f4696b45ff6db66e964`.
+Pin сохранил доступную консоль; finite Execute один, identify/local read cancel
+PASS. Right-click steps21/23/25 — три no-effect epoch отказа; Cancel/short rerun
+не отправлены. Idle0 mutations; before Stop3446/overflow3055, after1670/overflow1405.
+Наблюдены repaint graph SVG и process rows; это не полная причинная трасса.
+Recovery/profile305 закрыл только Package1/jsteach:3611 (creation22:27,
+disconnect22:31 UTC). Refresh подтвердил отсутствие пакета, затем сеанса;
+admin logout/browser/process cleanup проверены. Recovery journal SHA256
+`0ee72c8cbe8a6f3ffc1e91c84049dde51542e04665fd69ad85b699aaa26cf1e8`,
+receipt SHA256 `36e36d8b87e594382a46a5f9e5b63e03062035a7dd13d44c7caf5f93bf7a5be6`.
+Исходные report/journal не изменены; registry reconciled под lock.
+
+Следующая реализация в пределах P1: узкая **typed process-control capability**
+для двух Stop-жестов. Повторные попытки общей UI action уже исчерпаны;
+глобальное игнорирование paint-mutations отвергнуто. Capability принимает
+только host-owned native root/group/child proof и opaque наблюдённый ref;
+после durable admission получает свежий browser-local ticket, удерживающий
+точные document/preparation/tab/package/workflow/node/store/root/record/DOM
+objects. Перед одним trusted mouse gesture повторно проверяет этот ticket,
+native canCancel/owner/record, геометрию/hit-test, отсутствие blockers и
+свежую document epoch. Обе локальные проверки epoch действуют от новой typed
+observation; общие workspace-ui epoch guards не меняются. Unknown receipt
+не разрешает повтор, прежний stopPromise сохраняется. Нельзя использовать
+новый путь для Execute/редактора/произвольного click/чужого процесса. Локально
+проверить owner/record replacement, terminal race, masks/menus/ref/geometry,
+ABA/epoch/deadline и lost reply, затем fresh headed finite trial. G6 открыт.
+
 ### B: публичный configure existing — 2026-09-29
 
 В child commits `57b074fc7b`, `7cd36bb763`, `f8ceebcac9` собран узкий
