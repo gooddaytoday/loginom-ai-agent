@@ -1,5 +1,45 @@
 # JavaScript: checkpoint исполнения
 
+## Управляемое чтение исходника — 2026-09-29
+
+В code worktree `node-javascript` опубликован commit `ea783f4ae1`
+(`feat(javascript): bind managed source read to wizard lease`). Новый
+`client/lib/javascript-managed-source.mjs` читает полный текст только при
+удерживаемой аренде того же `operation_id` после подтверждённого Setting:
+проверяет точную identity задачи, исходный deadline, account и receipt
+подготовленного workflow, затем выполняет bracketed prepared-node read до и
+после CodeMirror. Сырой исходник остаётся внутри доверенного host response;
+оператор записывает только SHA256, длину, число строк и владельца. Для
+публичной доставки ещё обязательно подключить source reader с полной
+redaction/chunk admission и открытие/закрытие existing wizard; этот commit
+сам по себе не регистрирует публичный JS handler.
+
+Адресные тесты `javascript-managed-source.test.mjs` и
+`javascript-execution-evidence.test.mjs`: **156 PASS / 0 FAIL** из pinned
+Node 24.19.0, включая отказ при потере аренды, смене узла и удалённом
+preparation receipt. Дополнительно source-context/node-apply suites:
+**62 PASS / 0 FAIL**. `git diff --check` и `node --check` прошли.
+
+Два последовательных headed Chromium прогона на стенде Loginom 7.4.2:
+
+| Evidence, свежий profile | Результат | SHA256 report.json |
+| --- | --- | --- |
+| `managed-source-combined-01`, profile 245 | Управляемое открытие, production schema/source reader, `typed_output_verified`, cleanup 3/3 | `19ffec8d880257a7475f46b48624f45552aed4f2cb115ef8a317801e2347af64` |
+| `managed-source-lease-01`, profile 246 | Новый lease-bound reader: baseline 130 UTF-8 bytes/2 LF lines, SHA256 `6eb6e2f9e8395c9b00185f1fa9f77cae18c041784f2b2033da946e74aebecc64`; после замены production reader: 376 bytes/8 lines, SHA256 `d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`; `typed_output_verified`, cleanup 3/3 | `e53261361811e6c7ad2f902fc83dabe51e305ff0cfe33a1d2490bcb812fd0feb` |
+
+В журнале второго прогона `managed_javascript_source_observed` содержит
+digest/bytes/lines/owner без поля с кодом. Процесс Chromium с profile 246
+после cleanup не обнаружен. В `assignment.json` и общем `host-resources.json`
+под file-lock назначен **новый ещё не созданный profile 247**, receipt
+`profile-reassignment-247.json`; profile 245/246 повторно не использовать.
+
+Следующий шаг: построить host-side source adapter для existing node поверх
+управляемых navigation/Open/Close в той же authenticated Playwright Page;
+встроить его в `createJavascriptSourceAdmission`, затем зарегистрировать
+публичный JS handler и пройти CLI J01/J20/J21. Простой transport-ответ с
+сырым исходником нельзя записывать в execution journal или выдавать модели
+до redaction/chunk admission. Общая цель остаётся открытой.
+
 ## Полное runtime-чтение effective source — 2026-09-29
 
 Child `e8a4cf6e5b` добавил `javascript-source-context.mjs`: полный текст
