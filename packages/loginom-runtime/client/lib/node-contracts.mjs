@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import {JAVASCRIPT_CARD_LIMITATIONS,JAVASCRIPT_KNOWLEDGE_SHA256,describeJavascriptKnowledge} from './javascript-knowledge.mjs';
 
 export const NODE_CONTRACT_REVISION = '1.0.0';
 // Native node labels and ports extend above/left of the model-space origin.
@@ -19,15 +20,17 @@ const definitions = [
   ['transform.sorting', 'Сортировка', 'sorting', 1, 1, false, ['keys'], 'processors/transformation/sorting.md'],
   ['transform.join_data', 'Слияние', 'joindata', 2, 1, false, ['inner', 'left'], 'processors/transformation/join/README.md'],
   ['transform.union_data', 'Объединение', 'uniondata', 2, 1, true, ['append_all'], 'processors/transformation/union.md'],
+  ['programming.javascript', 'JavaScript', 'javascript', 1, 1, false, ['script'], 'processors/programming/java-script/index.html'],
 ];
 const freeze = value => { if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); } return value; };
 export const NODE_TYPES = freeze(Object.fromEntries(definitions.map(([type, title, icon, inputs, outputs, additional, modes, help]) => [type, {
-  type, title, palette_group: type === 'exports.text' ? 'Экспорт' : type === 'research.duplicates' ? 'Исследование' : type === 'preprocessing.data_recovery' ? 'Предобработка' : type === 'imports.text' ? 'Импорт' : 'Трансформация', icon_class: 'bg-vendor-icon-' + icon, contract_revision: NODE_CONTRACT_REVISION,
+  type, title, palette_group: type === 'programming.javascript' ? 'Программирование' : type === 'exports.text' ? 'Экспорт' : type === 'research.duplicates' ? 'Исследование' : type === 'preprocessing.data_recovery' ? 'Предобработка' : type === 'imports.text' ? 'Импорт' : 'Трансформация', icon_class: 'bg-vendor-icon-' + icon, contract_revision: NODE_CONTRACT_REVISION,
   tabular_inputs: inputs, tabular_outputs: outputs, additional_tabular_inputs: additional, modes,
-  semantics: type === 'transform.join_data' ? 'Join two tables by keys; not positional Соединение.'
+  semantics: type === 'programming.javascript' ? 'Loginom 7.4.2 synchronous scalar Data API, one tabular input and output (port 0); declared or code-defined schema. Requires an installed owned handler.'
+    : type === 'transform.join_data' ? 'Join two tables by keys; not positional Соединение.'
     : type === 'transform.union_data' ? 'Append rows, preserving duplicates; not UNION DISTINCT.' : type === 'research.duplicates' ? 'Mark all copies and contradictions; retain all rows. Filtering Duplicate=false removes every member of a duplicate group. Unassigned fields are preserved and ignored. No automatic deduplication or conflict resolution.' : title,
   graph_handler: 'node_target_v1', graph_handler_status: 'internal_candidate', configuration_handler: null,
-  configuration_status: type==='exports.text'?'candidate_in_subplan_17':'planned_in_subplans_03_to_10',
+  configuration_status: type==='programming.javascript'?'planned_in_subplan_javascript':type==='exports.text'?'candidate_in_subplan_17':'planned_in_subplans_03_to_10',
   sources: { e2e: ['bg/helpers/workflow/node.ts', 'bg/helpers/workflow/ports.ts', 'bg/helpers/workflow/links.ts'],
     help_root: 'viking://resources/loginom-dock/sources/loginom-help', help_path: 'data/' + help },
 }])));
@@ -81,19 +84,23 @@ export function validateNodeTargetRequest(request) {
 }
 
 // Cards are data only. They never install handlers or imply platform/license availability.
-export function describeNodeTypes(types, pins = {}, actions = new Map(), candidateHandlers = new Map()) {
+export function describeNodeTypes(types, pins = {}, actions = new Map(), candidateHandlers = new Map(), observedBuild) {
   if (!Array.isArray(types) || !types.length || types.length > 32 || new Set(types).size !== types.length
     || types.some(type => !Object.hasOwn(NODE_TYPES, type))) throw new Error('Select one to thirty-two distinct supported node types');
   return types.map(type => {
     const card = structuredClone(NODE_TYPES[type]);
     const admitted = actions.get('node.add')?.input_schema?.properties?.component_key?.enum?.includes(type) === true;
     const candidate=candidateHandlers.get(type);
-    const identity = { type, contract_revision: NODE_CONTRACT_REVISION, pins, candidate_handler_revision:candidate?.revision??null };
+    const javascript=type==='programming.javascript'&&candidate?describeJavascriptKnowledge(observedBuild):null;
+    const identity = { type, contract_revision: NODE_CONTRACT_REVISION, pins, candidate_handler_revision:candidate?.revision??null,
+      ...(type==='programming.javascript'?{knowledge_sha256:JAVASCRIPT_KNOWLEDGE_SHA256}:{}) };
     return { ...card, catalog_add_available: admitted, platform_availability: 'requires_live_preflight',
       full_node_apply_available: false, cache_key: createHash('sha256').update(JSON.stringify(identity)).digest('hex'),
       candidate_node_apply_available:!!candidate,
       ...(candidate?{configuration_handler:candidate.revision,configuration_status:'candidate_pending_autonomous_acceptance',candidate_apply_tool:'dock_node_apply',candidate_modes:[...candidate.modes]}:{}),
       ...(candidate?.parameter_schema?{parameter_schema:structuredClone(candidate.parameter_schema)}:{}),
+      ...(javascript?{limitations:[...JAVASCRIPT_CARD_LIMITATIONS],knowledge_sha256:JAVASCRIPT_KNOWLEDGE_SHA256,
+        validated_for:javascript.validated_for,javascript_knowledge:javascript}:{}),
       session_manifest: structuredClone(pins) };
   });
 }

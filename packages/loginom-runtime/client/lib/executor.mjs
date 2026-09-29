@@ -1813,7 +1813,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           || query.action_keys.length > 16 || new Set(query.action_keys).size !== query.action_keys.length)) throw new Error('Select distinct action keys');
         return { actions: (query.action_keys ?? []).map(key => structuredClone(find(key))),
           node_types: query.node_types === undefined ? [] : describeNodeTypes(query.node_types, getNodeContractPins(), pinned.actions,
-            allowCandidate&&nodeApplyDriverFactory?nodeApplyHandlers:new Map()),
+            allowCandidate&&nodeApplyDriverFactory?nodeApplyHandlers:new Map(),targetBuild),
           session_manifest: structuredClone(pinned.pins) };
       }
       if (actionKey === undefined) return { available_actions: [...pinned.actions.keys()],

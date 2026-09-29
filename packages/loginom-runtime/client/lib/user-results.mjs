@@ -207,6 +207,6 @@ export function compactKnowledgeBundle(description) {
     version: 'user-v1', session_manifest: description.session_manifest,
     actions: description.actions.map(action => pick(action, ['action_key', 'revision', 'description', 'input_schema', 'effect'])),
     node_types: description.node_types.map(node => pick(node, ['type', 'contract_revision', 'cache_key', 'candidate_node_apply_available',
-      'candidate_apply_tool', 'configuration_handler', 'modes', 'limitations'])),
+      'candidate_apply_tool', 'configuration_handler', 'modes', 'limitations', 'knowledge_sha256', 'validated_for'])),
   };
 }

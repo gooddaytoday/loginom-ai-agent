@@ -1,7 +1,7 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
 export type NodeType = 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
-  | 'transform.join_data' | 'transform.union_data';
+  | 'transform.join_data' | 'transform.union_data' | 'programming.javascript';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
 export interface NodeRef { document_id: string; workflow_id: string; node_id: string }
 export interface Position { x: number; y: number }
@@ -208,10 +208,10 @@ export interface NodeJobSnapshot {
   outcome: NodeApplyOutcome | null; error: NodeError | null;
 }
 export const NODE_CONTRACT_REVISION: string;
-export const NODE_TYPES: Readonly<Record<NodeType, {type: NodeType; title: string; palette_group: 'Импорт' | 'Трансформация' | 'Предобработка' | 'Исследование' | 'Экспорт'; tabular_inputs: number; tabular_outputs: number; additional_tabular_inputs: boolean; modes: readonly string[]}>>;
+export const NODE_TYPES: Readonly<Record<NodeType, {type: NodeType; title: string; palette_group: 'Импорт' | 'Трансформация' | 'Предобработка' | 'Исследование' | 'Экспорт' | 'Программирование'; tabular_inputs: number; tabular_outputs: number; additional_tabular_inputs: boolean; modes: readonly string[]}>>;
 export function validateNodeReference(ref: unknown): void;
 export function validateNodeTargetRequest(request: unknown): NodeTargetRequest;
-export function describeNodeTypes(types: NodeType[], pins?: object, actions?: Map<string, object>, candidateHandlers?: Map<NodeType, {revision: string}>): object[];
+export function describeNodeTypes(types: NodeType[], pins?: object, actions?: Map<string, object>, candidateHandlers?: Map<NodeType, {revision: string}>, observedBuild?: string): object[];
 
 export type JoinParameters = {keys: Array<{left: string; right: string}>;
   case_sensitive: boolean; include_joined_keys: boolean} | Record<string, never>;

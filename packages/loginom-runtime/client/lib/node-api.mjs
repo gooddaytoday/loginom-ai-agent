@@ -62,13 +62,14 @@ export const textExportParametersSchema=object({destination:text(512),overwrite:
 export const nodeApplyInputSchema=object({
  operation_id:id,contract_revision:choice('1.0.0'),document_id:id,
  workflow_ref:object({workflow_id:id,tab_tid:text(128),prefix:text(128),navigation_path:array(object({tid:text(512),label:{type:'string'}}),32,1)}),
- target:object({kind:choice('new','existing'),type:choice('exports.text','transform.collapse_columns','preprocessing.data_recovery','transform.date_time','research.duplicates','imports.text','transform.calculator','transform.group_data','transform.sorting','transform.replace_columns','transform.reform_columns','transform.filter_data','transform.join_data','transform.union_data'),label:text(200),ref,
+ target:object({kind:choice('new','existing'),type:choice('exports.text','transform.collapse_columns','preprocessing.data_recovery','transform.date_time','research.duplicates','imports.text','transform.calculator','transform.group_data','transform.sorting','transform.replace_columns','transform.reform_columns','transform.filter_data','transform.join_data','transform.union_data','programming.javascript'),label:text(200),ref,
   position:{...object({x:{type:'number',minimum:NODE_POSITION_MIN,maximum:10000},y:{type:'number',minimum:NODE_POSITION_MIN,maximum:10000}}),description:'Optional model-space coordinates, each 64..10000. The margin keeps node labels and ports away from the top/left canvas edge. Omit for automatic free placement; explicit coordinates are never silently changed.'}},['kind','type']),
  inputs:array(object({source:ref,output:integer(0,99),input:integer(0,99)}),15),
- mode:choice('unpivot','impute','calendar','mark','delimited','expression','aggregate','keys','scalar','conditions','inner','left','append_all','exact'),parameters:object({...textExportParametersSchema.properties,information:collapseParametersSchema.properties.information,transposed:collapseParametersSchema.properties.transposed,ignore_empty:boolean,input_fields:duplicatesParametersSchema.properties.input_fields,output_fields:duplicatesParametersSchema.properties.output_fields,
+ mode:choice('unpivot','impute','calendar','mark','delimited','expression','aggregate','keys','scalar','conditions','inner','left','append_all','exact','script'),parameters:object({...textExportParametersSchema.properties,information:collapseParametersSchema.properties.information,transposed:collapseParametersSchema.properties.transposed,ignore_empty:boolean,input_fields:duplicatesParametersSchema.properties.input_fields,output_fields:duplicatesParametersSchema.properties.output_fields,
   source:object({artifact_id:id,upload_operation_id:id,bytes:integer(0,16777216),sha256:{...text(64),minLength:64,pattern:'^[a-f0-9]{64}$'}},['artifact_id','upload_operation_id']),
   settings:object({source:sourceSettings,format,columns:array(column,1000,1)},[]),
-  fields:{anyOf:[dateTimeParametersSchema.properties.fields,missingValuesParametersSchema.properties.fields]},max_nulls_percent:missingValuesParametersSchema.properties.max_nulls_percent,ordered:missingValuesParametersSchema.properties.ordered,rules:replacementParametersSchema.properties.rules,output_mode:replacementParametersSchema.properties.output_mode,prefixes:unionParametersSchema.properties.prefixes,tables:unionParametersSchema.properties.tables,expressions:array(calculatorExpressionSchema,128),order:array(text(128),128,1),group_by:array(groupingFieldSchema,128,1),measures:array(groupingMeasureSchema,256,1),keys:array({anyOf:[sortingKeySchema,joinKeySchema]},1000,1),case_sensitive:boolean,include_joined_keys:boolean,compare_with_locale:boolean,changes:array(reformChangeSchema,128),groups:filterParametersSchema.properties.groups},[]),
+  fields:{anyOf:[dateTimeParametersSchema.properties.fields,missingValuesParametersSchema.properties.fields]},max_nulls_percent:missingValuesParametersSchema.properties.max_nulls_percent,ordered:missingValuesParametersSchema.properties.ordered,rules:replacementParametersSchema.properties.rules,output_mode:replacementParametersSchema.properties.output_mode,prefixes:unionParametersSchema.properties.prefixes,tables:unionParametersSchema.properties.tables,expressions:array(calculatorExpressionSchema,128),order:array(text(128),128,1),group_by:array(groupingFieldSchema,128,1),measures:array(groupingMeasureSchema,256,1),keys:array({anyOf:[sortingKeySchema,joinKeySchema]},1000,1),case_sensitive:boolean,include_joined_keys:boolean,compare_with_locale:boolean,changes:array(reformChangeSchema,128),groups:filterParametersSchema.properties.groups,
+  ...javascriptParametersSchema.properties},[]),
  mappings:array(object({direction:choice('input','output'),port:integer(0,14),autosync:boolean,
   changes:array(object({source:object({kind:choice('configured_field'),name:text(128)}),name:text(128),label:text(120),excluded:boolean},['source']),1000),
   fields:array(object({source:object({kind:choice('configured_field'),name:text(128)}),name:text(128),label:text(120),excluded:boolean},['source']),1000,1)},['direction','port']),16),
@@ -91,6 +92,9 @@ export const textImportParametersSchema=object({
 // Cross-field restrictions survive the compact user envelope. Runtime guards
 // remain authoritative after optional defaults are expanded.
 nodeApplyInputSchema.allOf=[
+ {if:{properties:{target:{properties:{type:{const:'programming.javascript'}},required:['type']}},required:['target']},
+  then:{properties:{mode:{const:'script'},parameters:javascriptParametersSchema}},
+  else:{properties:{mode:{not:{const:'script'}},parameters:{not:{anyOf:Object.keys(javascriptParametersSchema.properties).map(key=>({required:[key]}))}}}}},
  {if:{properties:{finish:{enum:['done','close']}},required:['finish']},
   then:{properties:{read:{properties:{ports:{maxItems:0}}}}}},
  {if:{properties:{target:{properties:{type:{const:'exports.text'}},required:['type']}},required:['target']},
@@ -121,10 +125,22 @@ export const deliveryApiTools=Object.freeze([
  tool('dock_artifact_delivery_resume','Explicitly resume the SAME known delivery job after inspecting status. Uses the original upload receipt; never repeats an unresolved download. Requires the original live runtime and unchanged grant.',resumeDelivery),
 ]);
 export const isNodeApiTool=name=>[...nodeApiTools,...deliveryApiTools].some(tool=>tool.name===name);
+export function validateNodeApplyEnvelope(args) {
+ const javascript=args.target?.type==='programming.javascript';
+ if(javascript){
+  if(args.mode!=='script')throw Error('Invalid parameters.mode: programming.javascript requires script');
+  validateActionParameters(javascriptParametersSchema,args.parameters,'parameters.parameters');
+  return args;
+ }
+ if(args.mode==='script'||Object.keys(javascriptParametersSchema.properties).some(key=>Object.hasOwn(args.parameters??{},key)))
+  throw Error('Invalid parameters.target.type: JavaScript mode and fields require programming.javascript');
+ return args;
+}
 export async function dispatchNodeApi(runtime,name,args,{signal}={}) {
  const definition=runtime.tools.find(tool=>tool.name===name);
  if(!definition||!isNodeApiTool(name))throw Error('Node operation tool is unavailable in this session');
  validateActionParameters(definition.inputSchema,args);
+ if(name==='dock_node_apply'||name==='dock_node_resume'&&Object.keys(args).length>1)validateNodeApplyEnvelope(args);
  signal?.throwIfAborted();
  switch(name){
   case 'dock_node_read':return runtime.startNodeRead(args);
