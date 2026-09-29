@@ -46,6 +46,15 @@ Close/port invariants там проверяются до browser effect. Поп�
 адресные тесты параметров, module policy, node API и node apply снова PASS.
 Не повторять эту замену; подключать имеющийся validator к handler.
 
+Child `c0217169b6` подключил `makeJavascriptSchemaContextCode` к
+`node-procedure.observe({readJavascript:true})`. Read выполняется в общем
+authenticated browser/operation, `node_javascript_schema` записывается в
+тот же durable observation и повторно сопоставляется с prepared node context;
+при последующем `perform` опция сохраняется для свежего наблюдения.
+Pinned Node24.19.0: `node-procedure` и `javascript-schema-context` tests PASS.
+Это source-level интеграция; отдельной headed-проверки через публичный
+handler ещё нет, так как он пока не зарегистрирован.
+
 ## Guard публичного повторного Execute/read — 2026-09-29
 
 Child `19105bd87d` закрыл опасный shortcut перед регистрацией JS-handler:
