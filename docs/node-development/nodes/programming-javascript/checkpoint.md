@@ -20,11 +20,22 @@ file SHA256 `22c4d6fcffa4b539c2cb3ec0977d472d74d35927f4b62389902b3fe2157573d1`.
 
 На pinned Node24.19.0 адресные tests 8/8 PASS: source/hash соответствуют
 исполнявшемуся fixture, иной build отклоняется, изменение asset меняет
-`createRuntimeSourcePin` revision. Это **подготовка 1B**, ещё не доставка
-модели. Публичная JS-карточка и `dock_action_describe` не включены до owned
-handler; staged bundle/resource manifest, фактические `clientRevision` и
-`skillRevision` candidate не выпускались и не сверялись. Перед признанием 1B
-завершённой надо провести эту интеграцию, проверить бюджеты и CLI-ответ.
+`createRuntimeSourcePin` revision. Из child source `1d2c0590ba` затем собран
+отдельный private Linux `stageResources(flavor=cli)` candidate
+`knowledge-resource-candidate-01`: 4392 файла, Node24.19.0/Chromium1246,
+`verifyResources` PASS всех manifest entries. Manifest SHA256
+`08525691e727df8b0586eaa621d619cd6ef4c0475d35fe34827b89849259c2ad`;
+его запись `runtime/client/lib/javascript-knowledge.mjs` совпала с file SHA выше.
+Стадированный ordinary ESM импорт вернул тот же semantic knowledge SHA;
+`clientRevision=e2b4843df96f194ae6fc869e47a562257491c16688e0deb3a43d1abe9e2a6815`
+по managed source-pin (218 файлов) включает этот asset. Private независимая
+квитанция `knowledge-resource-candidate-01-verification.json` имеет SHA256
+`9453e6f511073f1cc0572ed3d402a47122a47df3bf539e865a91c1802f0e6c03`.
+Это **подготовка 1B**,
+ещё не доставка модели и не собранный CLI executable. Публичная JS-карточка
+и `dock_action_describe` не включены до owned handler; `skillRevision` candidate
+не получен. Перед признанием 1B завершённой надо проверить доставленный
+ответ модели, бюджеты, фактическую skill revision и автономную CLI-приёмку.
 
 ## Фаза 1A: подготовлен чистый контракт параметров — 2026-09-29
 
