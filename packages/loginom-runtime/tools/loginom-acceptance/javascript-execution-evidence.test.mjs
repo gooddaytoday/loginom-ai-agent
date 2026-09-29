@@ -17,6 +17,7 @@ import {javascriptInputRequest,waitJavascriptCleanupReady,selectJavascriptForSet
 import {captureJavascriptSelection,inspectJavascriptSelection} from '../../client/lib/javascript-owned-selection.mjs';
 import {makeJavascriptManagedSelectionReadCode,dispatchManagedJavascriptBody,dispatchManagedJavascriptSetting} from '../../client/lib/javascript-managed-selection.mjs';
 import {waitManagedJavascriptWizardSettlement} from '../../client/lib/javascript-managed-opening.mjs';
+import {openManagedJavascriptExistingWizard} from '../../client/lib/javascript-managed-existing.mjs';
 import {assertActionOutcome} from '../../client/lib/action-catalog.mjs';
 import {validateNodeApplyRequest} from '../../client/lib/node-apply.mjs';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
@@ -332,6 +333,37 @@ test('private headed probe opens a fresh managed JavaScript wizard with the real
     assert.ok(events.some(event=>event.phase==='javascript_managed_setting_prepared'));
     assert.ok(events.some(event=>event.phase==='javascript_managed_wizard_settlement_verified'));
   }finally{clearTimeout(timer);}
+});
+test('managed existing opener binds the observed Setting and retains its source lease',async()=>{
+  const managed=managedSelectionFixture(5000,'already'),wizard=managedWizardFixture(managed),events=[];
+  const graph={prepared_node_context:{verified:true,surface:'graph',...managed.task.owner,tid:managed.f.node.tid},
+    wizard:{status:'absent'},ui:{elements:[{tid:managed.f.node.tid+';Setting',
+      wizard_open:{node:{part:'settings',node_label:'JavaScript'},workflow_path:[{tid:'nav',label:''}]}}]}};
+  const timer=setTimeout(()=>wizard.activate(),40);
+  try{
+    const opened=await openManagedJavascriptExistingWizard({prepared:wizard.prepared,node:managed.task.owner,
+      deadline:Date.now()+5000,targetOrigin:managed.task.targetOrigin,execute:managed.execute,
+      record:async event=>{events.push(event);return event;},
+      receiptOptions:(id,key,signature)=>({receipt_namespace:'managed-js-existing-test',receipt_id:id,receipt_signature:signature}),
+      channel:{observe:async()=>graph,perform:async()=>assert.fail('unexpected deactivation') }});
+    assert.equal(opened.opened.surface,'wizard');
+    assert.equal(opened.opened.native_owner_verified,true);
+    assert.equal(managed.f.clicks,1);
+    assert.equal(managed.f.disposed,0);
+    assert.ok(events.some(event=>event.phase==='javascript_managed_wizard_settlement_verified'));
+    const {prepared,allowDeactivation,...task}=opened.task;
+    assert.equal((await managed.execute(makeJavascriptManagedSelectionReadCode({...task,mode:'dispose'}))).disposed,true);
+    assert.equal(managed.f.disposed,1);
+  }finally{clearTimeout(timer);}
+});
+test('managed existing opener refuses foreign prepared node before selection',async()=>{
+  const managed=managedSelectionFixture(5000,'already'),wizard=managedWizardFixture(managed);
+  let calls=0;
+  await assert.rejects(openManagedJavascriptExistingWizard({prepared:wizard.prepared,
+    node:{...managed.task.owner,node_id:'foreign'},deadline:Date.now()+5000,
+    targetOrigin:managed.task.targetOrigin,execute:async()=>{calls++;throw Error('Unexpected browser call');},
+    record:async event=>event,receiptOptions:()=>({}),channel:{observe:async()=>({})}}));
+  assert.equal(calls,0);assert.equal(managed.f.clicks,0);
 });
 test('private headed probe keeps uncertain managed Setting out of cleanup and never replays it',async()=>{
   const managed=managedSelectionFixture(5000,'already'),wizard=managedWizardFixture(managed);
