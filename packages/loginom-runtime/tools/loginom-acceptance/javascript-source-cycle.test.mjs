@@ -95,7 +95,7 @@ test('source uncertain actual operator catch/finally only closes its browser',as
  const forbidden=name=>()=>{calls.push(name);throw Error('unexpected '+name);};
  const report={stage:'source-read',cleanup:{package_closed:false,logged_out:false,browser_closed:false}};
  const cleanup=vm.runInNewContext('(async()=>{try{throw Error("lost source reply");'+live.slice(start,end)+'}})',{
-  report,sourceCycleUncertain:true,sourceReaders:[],executionRuntime:{nativeReadUncertain:false,metadataReadUncertain:false},page:{},owner:{},session:{context:{close:async()=>calls.push('browser-close')}},browserLifecycle:null,
+  report,sourceCycleUncertain:true,sourceReaders:[],executionRuntime:{nativeReadUncertain:false,metadataReadUncertain:false},page:{},owner:{},session:{context:{close:async()=>calls.push('browser-close')}},browserLifecycle:null,focusGuard:null,
   nativeRoundtrip:false,nativeClassifierBinding:undefined,captureJavascriptNativeClassifierDiagnostic:forbidden('classifier'),javascriptProbeFailure:e=>({message:e.message}),redactor:createRedactor(),discoveryProbe:null,
   snapshot:forbidden('snapshot'),paletteSnapshot:forbidden('palette'),refusalEvidence:forbidden('refusal'),guard:forbidden('guard'),observe:forbidden('observe'),click:forbidden('click'),
   calibrationTrial:null,coercionTrial:null,namedTrial:null,telemetryTrial:null,executionRecord:async e=>e,save:async()=>{},Date,cleaning:false,persistence:null,coldReader:false,packageFile:false,packageFileReadUncertain:false,coldOpenPending:false,cleanupDeadline:Infinity
