@@ -49,6 +49,7 @@ import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitial
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
 import {captureJavascriptWizardError} from './javascript-wizard-error.mjs';
 import {readJavascriptG1Type} from './javascript-g1-type.mjs';
+import {readJavascriptServerVersion} from './javascript-server-version.mjs';
 import {openJavascriptPackageFileTab,readJavascriptPackageFile} from './javascript-package-file.mjs';
 
 export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false}={}) {
@@ -62,17 +63,17 @@ const batchDeadline=coldReader||packageFile?Math.floor(performance.timeOrigin)+6
 let cleaning=false,cleanupDeadline=Infinity;
 const phaseDeadline=ms=>Math.min(cleaning?cleanupDeadline:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=(cleaning?cleanupDeadline:batchDeadline)-Date.now();if(ms<=0)throw Error(cleaning?'Original cleanup deadline expired':'Original batch deadline expired');return ms;};
-const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor | --probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
+const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--server-version-only | --palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor | --probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
 if(args.includes('--help')&&coldReader){console.log('node javascript-persistence-read-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nCold reader: observe actual source/settings/mappings, one fresh Execute and full output; 10 minutes from process start; headed only. No source or configuration input.');return;}
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
-  options[key]=['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--probe-source','--metadata-diagnostic'].includes(key) ? true : args[++i];
+  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--probe-source','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
 }
 if(coldReader){
@@ -117,6 +118,8 @@ if(executionCase){
   options['--create-node']=true;options['--inspect-pages']=true;
 }
 if (['--create-node','--palette-only','--palette-hit-test'].filter(k=>options[k]).length>1) throw Error('Choose one discovery mode');
+if(options['--server-version-only']&&(['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--probe-source','--execution-case','--discovery-probe'].some(k=>options[k])
+  ||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||batch))throw Error('Server version requires its own read-only mode');
 if(options['--inspect-pages']&&!options['--create-node'])throw Error('--inspect-pages requires --create-node');
 if(options['--probe-source']&&!options['--inspect-pages'])throw Error('--probe-source requires --inspect-pages');
 if(options['--inspect-declared-editor']&&(!options['--inspect-pages']||options['--probe-source']||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||batch))
@@ -142,7 +145,7 @@ const directory=resolve(options['--evidence']);
 // Refuse reuse: no old evidence is overwritten and no uncertain run is replayed.
 await mkdir(directory,{mode:0o700});
 const redactor=createRedactor([config.password]);
-if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
+if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--server-version-only']){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},knownSecrets:[config.password]});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
   ...(coldReader||persistence||packageFile?{host_process:{pid:process.pid,started_at:new Date(performance.timeOrigin).toISOString(),profile:resolve(options['--profile'])}}:{}),
@@ -1444,6 +1447,13 @@ try {
   report.geometry={viewport:page.viewportSize(),...await page.evaluate(()=>({inner_width:innerWidth,outer_width:outerWidth,available_width:screen.availWidth}))};
   if (report.geometry.viewport!==null) throw Error('Expected headed null viewport');
   report.server_os={status:'not_established',candidates:home.fields.filter(f=>/ServerOS|OperatingSystem|OSName|ServerPlatform/i.test(f.path))};
+  if(options['--server-version-only']){
+    report.stage='read-server-version';
+    report.server_os=await page.evaluate(readJavascriptServerVersion,{account:config.username,build:'7.4.2'});
+    await executionRecord({phase:'server_version_read',observation:report.server_os});
+    if(report.server_os.status!=='observed'||report.server_os.edition!=='Enterprise')throw Error('Owned Loginom server version unavailable');
+    await save();
+  }
   report.storage={status:'not_established',candidates:home.fields.filter(f=>/Storage|Directory/i.test(f.path)),expected_account_folder:'/jsteach',permissions:'not_checked'};
   if(packageFile){
     report.stage='package-file-open';coldOpenPending=true;
