@@ -1,3 +1,4 @@
+import {makeNodeProcessControlCode} from './node-process-control.mjs';
 import {makeReplacementContextCode} from './replacement-context.mjs';
 import {makeDateTimeContextCode} from './date-time-context.mjs';
 import {makeMissingValuesContextCode} from './missing-values-context.mjs';
@@ -454,7 +455,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw error;
       }
     },
-    async act(action) {
+    async act(action,processControl) {
       checkBudget();
       if (!snapshot) throw new Error('A fresh internal observation is required');
       validateUiAction(action, snapshot);
@@ -463,13 +464,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
       snapshot = null;
-      const signature = digest([id, action, evidenceSnapshot]);
+      const signature = digest([id, action, evidenceSnapshot,...(processControl?[processControl]:[])]);
+      const processCode=processControl?makeNodeProcessControlCode(preparedNodeContext,before,action,processControl,
+        {operation_id:id,deadline:operation.deadline,origin:targetOrigin,build:targetBuild}):null;
       // This write must be durable before the browser receives the mutation.
       const persisted = await entry('node_step_prepared', { step, internal_operation_id: id,
-        action: structuredClone(action), observation_sha256: digest(evidenceSnapshot), signature });
+        action: structuredClone(action), observation_sha256: digest(evidenceSnapshot), signature,
+        ...(processControl?{process_control:structuredClone(processControl)}:{}) });
       evidenceSnapshot = null;
       if (!persisted || JSON.stringify(persisted.action) !== JSON.stringify(action)
-        || persisted.signature !== signature) throw new Error('Prepared step was not durably preserved after redaction');
+        || persisted.signature !== signature||processControl&&JSON.stringify(persisted.process_control)!==JSON.stringify(processControl)) throw new Error('Prepared step was not durably preserved after redaction');
       lastPreparedStep = structuredClone(persisted);
       signal?.throwIfAborted();
       if (now() >= operation.deadline) throw new Error('Node procedure deadline elapsed before mutation');
@@ -477,7 +481,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const settlementWait=preparedNodeContext&&['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb)
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
-      const code = makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
+      const code = processCode??makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
         ...(settlementWait?{settlement_timeout_ms:settlementWait}:{}),
         ...(openingWait?{opening_timeout_ms:openingWait}:{}),
         ...boundOptions,
@@ -509,7 +513,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     // input never contains a resolver or a recipe. Only a durably recorded,
     // strictly pre-gesture epoch/scan refusal or proved body replacement
     // permits a new local attempt with unchanged identity and intent.
-    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody }) {
+    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, processControl }) {
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
       }
@@ -560,7 +564,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw new Error('Node procedure recovery target or intent changed');
         }
         binding = nextBinding; intent = nextIntent;
-        try { return await channel.act(action); }
+        try { return await channel.act(action,processControl); }
         catch (error) {
           const r = error instanceof NodeProcedureStepError ? error.receipt : null;
           if (attempt === 2 || r?.status !== 'NOT_APPLIED'
