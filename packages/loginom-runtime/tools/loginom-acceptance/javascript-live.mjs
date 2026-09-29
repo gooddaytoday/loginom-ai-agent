@@ -152,7 +152,7 @@ const namedTrial=nativeNamedCaseId!==undefined?createJavascriptNamedTrial(native
 const coercionTrial=nativeRoundtrip&&nativeFixture.coercion?createJavascriptCoercionTrial(nativeFixtureId):null;
 const discoveryProbe=options['--discovery-probe']?javascriptDiscoveryProbe(options['--discovery-probe']):null;
 if(discoveryProbe&&(batch||options['--execution-case']))throw Error('Discovery requires one isolated probe, not a batch or execution case');
-let executionCase=nativeRoundtrip?nativeRoundtripProbe.schema_mode+'-table-execute':discoveryProbe?'code-table-execute':batch?.[0]??options['--execution-case'];
+let executionCase=nativeRoundtrip?nativeRoundtripProbe.schema_mode+'-table-execute':discoveryProbe?discoveryProbe.schema_mode+'-table-execute':batch?.[0]??options['--execution-case'];
 if(executionCase){
   if(!/^(declared|code)-(sentinel-(next|done|preview|execute)|table-execute)$/.test(executionCase)&&executionCase!=='code-table-mismatch')throw Error('Unknown execution case');
   if(!nativeRoundtrip&&['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--probe-source'].some(k=>options[k]))throw Error('Execution case is a separate mode');
@@ -538,7 +538,7 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
         await executionRecord({phase:'existing_schema_read',schema});
         if(!schema.verified||schema.generation?.checked!==report.execution_schema.generation.checked)throw Error('Existing JavaScript schema mode changed');
         report.execution_existing_schema=schema;
-      }else report.execution_schema=await configureJavascriptSchema({page,context:schemaContext(),mode:executionCase.split('-')[0],fixedCase:persistence?.id==='persistence-usage'?'usage-output':nativeRoundtrip&&nativeFixtureId==='cardinality-empty'?'cardinality-empty':undefined,
+      }else report.execution_schema=await configureJavascriptSchema({page,context:schemaContext(),mode:executionCase.split('-')[0],fixedCase:discoveryProbe?.id==='p1-business-declared-base'?'business-output':persistence?.id==='persistence-usage'?'usage-output':nativeRoundtrip&&nativeFixtureId==='cardinality-empty'?'cardinality-empty':undefined,
         once:(id,identity,perform)=>executionRuntime.once(caseEffect(report.case_id,id),identity,perform),record:executionRecord,deadline,columnState});
       if(options['--verify-runtime-schema']){
         const prepared={document_id:executionPrepared.document_id,
@@ -1844,7 +1844,7 @@ try {
     report.stage='graph-ready';await waitGraphReady(createRemaining());
     await snapshot('graph-ready-baseline');
     if(executionCase||nativeInputOnly){
-      report.scope=telemetryTrial?'private fixed schema telemetry: '+nativeTelemetryCaseId:calibrationTrial?'private fixed error calibration: '+nativeCalibrationId:namedTrial?'private stage A/B named access: '+nativeNamedCaseId:coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
+      report.scope=telemetryTrial?'private fixed schema telemetry: '+nativeTelemetryCaseId:calibrationTrial?'private fixed error calibration: '+nativeCalibrationId:namedTrial?'private stage A/B named access: '+nativeNamedCaseId:coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?.scope==='P1-business'?'private P1 business 6x4 oracle':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
       if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=1;report.gates_closed=[];}
       if(persistence){report.scope='private G7 persistence writer: '+persistence.schema_mode;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
