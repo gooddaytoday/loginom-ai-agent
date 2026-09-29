@@ -58,6 +58,7 @@ import {makeJavascriptManagedSelectionReadCode} from '../../client/lib/javascrip
 import {wizardReadiness} from '../../client/lib/javascript-wizard-page.mjs';
 import {makeJavascriptManagedPageCode} from '../../client/lib/javascript-managed-page.mjs';
 import {dispatchManagedJavascriptNext} from '../../client/lib/javascript-managed-next.mjs';
+import {dispatchManagedJavascriptDone} from '../../client/lib/javascript-managed-done.mjs';
 import {openManagedJavascriptExistingWizard} from '../../client/lib/javascript-managed-existing.mjs';
 import {closeManagedJavascriptWizard} from '../../client/lib/javascript-managed-close.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
@@ -1184,24 +1185,15 @@ const runExecutionTrial=async probe=>{
           if(done.page?.tid!==owner.prefix+';WizrdMCF;DoneWizard'
             ||done.page.index!==done.page.indicator_count-1)
             throw Error('Managed JavaScript commit Done page unavailable');
-          const point=await exact(owner.prefix+';WizrdMCF;btnDone').filter({visible:true}).evaluate(element=>{
-            const control=globalThis.Ext?.getCmp?.(element.id),box=element.getBoundingClientRect();
-            const x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);
-            if(control?.el?.dom!==element||control.disabled===true
-              ||element.getAttribute('aria-disabled')==='true'||!(hit===element||element.contains(hit)))
-              throw Error('Managed JavaScript Done native control unavailable');
-            return {x,y};
-          });
-          const intent={phase:'javascript_managed_source_commit_prepared',
-            node_id:executionNode.node_id,source_sha256:written.source_sha256,
-            from_tid:done.page.tid,deadline:existingDeadline,effect_possible:false};
-          const ack=await executionRecord(intent);
-          if(JSON.stringify(Object.fromEntries(Object.keys(intent).map(key=>[key,ack?.[key]])))!==JSON.stringify(intent))
-            throw Error('Managed JavaScript Done journal ACK differs');
           report.effects.push({at:new Date().toISOString(),action:'managed-source-done',state:'dispatching',
             node_id:executionNode.node_id,source_sha256:written.source_sha256});await save();
-          await executionRuntime.once(caseEffect(report.case_id,'managed-source-done'),
-            {node_id:executionNode.node_id,source_sha256:written.source_sha256},()=>page.mouse.click(point.x,point.y));
+          const doneReceipt=await dispatchManagedJavascriptDone({task:existingManaged.task,
+            expected_source_sha256:written.source_sha256,
+            execute:code=>Function('return ('+code+')')()(page),record:executionRecord,
+            receiptOptions:(id,key,signature)=>({receipt_namespace:'private-managed-js-existing-'+existingReceiptNamespace,
+              receipt_id:id,receipt_signature:signature})});
+          if(doneReceipt.output?.wizard_commit_verified!==false)
+            throw Error('Managed JavaScript Done gesture claimed premature commit');
           await exact(owner.prefix+';WizrdMCF').waitFor({state:'hidden',timeout:Math.max(1,existingDeadline-Date.now())});
           openedWizard=false;await waitGraphReady(Math.max(1,existingDeadline-Date.now()));
           const graph=await snapshot('managed-source-done-settled');
