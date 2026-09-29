@@ -1,5 +1,46 @@
 # JavaScript: checkpoint исполнения
 
+## One-shot managed JS draft writer — 2026-09-29
+
+Code commit `66027dc9c3` в `origin/node-javascript` добавил host-only
+`replaceManagedJavascriptSource` и `adapter.replace`: после двух полных чтений
+baseline проверяются expected SHA-256 и module policy; точный ACK журнала с
+хешами предшествует одному browser action. Он проверяет retained CodeMirror и
+последовательно выполняет focus, полное выделение, Backspace, `insertText` и
+полный readback. Browser receipt/lease запрещают повтор жеста после потерянного
+ответа. Ответ и журнал не содержат raw source; мастер остаётся открытым, запись
+сама по себе не делает Done/Execute. Адресные managed/source тесты: **107 PASS /
+0 FAIL**, `node --check` и `git diff --check` прошли. Отдельный live-флаг
+`--verify-managed-source-write` проверяет discard и независимое публичное
+чтение исходного кода.
+
+Первая headed-попытка `managed-writer-01`, profile 265, подтвердила точную
+запись draft **420 UTF-8 bytes / 9 LF lines**, SHA256
+`df9be69e448048406985c3906a952dff05600ed155e90eaa04e5c258374ad6fd`,
+но Close confirmation попал в ещё один промежуточный active-node state.
+Оригинал `CLEANUP_UNCONFIRMED`: browser закрыт, package/logout не доказаны;
+report SHA256 `c21ef46e4d55704334ca165297dad3718ca3c24dcb737b35929a9c1701e2555c`.
+Отдельный headed read-only `managed-writer-recovery-01`, profile 266, увидел
+у `jsteach` **0 пакетов**, завершил logout/browser **3/3**; report SHA256
+`f5f5707ca401ddcf1afd42d681bc752df803ea0d75b1a8aadd475bf8cbb484f2`.
+Оригинальный статус не переписан. Code commit `1e0da9265a` разрешил ожидание
+только при отсутствующем active node или ещё скрывающемся собственном wizard;
+непустой чужой owner по-прежнему отклоняется.
+
+Повторный headed `managed-writer-02` на profile 267 завершился `OBSERVED`:
+однократная точная запись того же draft, отдельный readback, подтверждённый
+Close с `draft_discarded=true`, затем новый публичный source-read прежнего
+committed source (**376 UTF-8 bytes / 8 LF lines**, SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`).
+Журнал содержит все три write-phase ACK без draft text. Cleanup
+package/logout/browser **3/3**, X11 no-focus **0 browser focus samples / 3007**,
+poll failures 0. Report SHA256
+`7619312306916790ffa2c6d727eb873ebf0656eb03d2d93e4abea09b31f30c6e`.
+Под `registry.lock` назначен новый ещё не созданный profile 268, receipt
+`profile-reassignment-268.json`. Это доказательство безопасной записи и
+отмены черновика; JS `dock_node_apply`/Done/Execute и независимая CLI-приёмка
+ещё не реализованы.
+
 ## Managed CodeMirror identity и Close settlement — 2026-09-29
 
 Code commits `b77d795181` и `260944a3ea` в `origin/node-javascript`.
