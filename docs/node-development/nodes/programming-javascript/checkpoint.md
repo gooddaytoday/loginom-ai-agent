@@ -1,5 +1,46 @@
 # JavaScript: checkpoint исполнения
 
+## Managed source Done — headed proof, 2026-09-29
+
+Code commit `95b49f1107` в `origin/node-javascript` добавил отдельный private
+операторский сценарий `--verify-managed-source-commit`. Он проходит существующий
+JS wizard после exact managed draft readback, один раз нажимает принадлежащий
+мастеру Done под journal ACK, ждёт возврата к графу и независимо вызывает
+публичный `dock_node_read kind:source`. Он проверяет execution boundary,
+сохранность input mapping и настроенных output targets; состояние выхода после
+Done допускает только явное `configured_only`, не выдавая его за исполнение или
+полную source mapping. Это пока **доказательство операторского пути**, не
+реализация публичного JS `dock_node_apply`/Execute.
+
+Успешный headed `managed-commit-05` на profile 272 завершился `OBSERVED`:
+записанный исходник **420 UTF-8 bytes / 9 LF lines**, SHA256
+`df9be69e448048406985c3906a952dff05600ed155e90eaa04e5c258374ad6fd`,
+точно прочитан после Done через новый публичный source-read и user-v1 ответ.
+Журнал содержит `javascript_managed_source_commit_prepared` и `..._observed`,
+после закрытия мастера строгая граница графа подтверждена; post-Done mapping
+`input=complete`, `output=configured_only`, настроенные targets сохранены.
+Исходник черновика отсутствует в report и execution journal. Cleanup
+package/logout/browser **3/3**, X11 no-focus **0 browser focus samples / 2910**, poll
+failures 0. Report SHA256
+`98818ee48003633b87f808444dfd964a9e8c6d7891f0d5732a89f28ea51cf74f`.
+
+Промежуточные отчёты `managed-commit-01`…`04` сохранены как `FAILED`, не
+переписаны: после подтверждённого Done оператор ошибочно звал Close; затем
+требовал full output mapping до Execute, передавал ненормализованный baseline
+в сравнение и использовал переменную вне её scope. Во всех четырёх случаях
+cleanup **3/3**; в `02`…`04` точный публичный source-read после Done успел
+подтвердиться. Их report SHA256 соответственно
+`981e0eece7fbdf02b97c1c8838651c3653de7c903279448bd0060b49b72ea51e`,
+`82ca0770bffdffa179943dc87d1e1923b1b4a462e87eb4f19e460156c4c53e31`,
+`1275e5a520b7c0d86f02601d923404bd235501f3e4fd508103eccfa14fd16208`,
+`2f699293b2e1a5896e9094632644f67415497032569599abcc01da59bf328937`.
+Под `registry.lock` назначен новый ещё не созданный profile 273,
+`profile-reassignment-273.json`. Адресные тесты mapping/source/Close/execution
+boundary **84 PASS / 0 FAIL**, `node --check` и `git diff --check` прошли.
+Отдельное Execute, полное output mapping после него, save/cold и CLI-приёмка
+этим proof не покрыты. Он также не устанавливает отсутствие внутренних
+серверных эффектов Verify при Done; ограничение G2 сохраняется.
+
 ## One-shot managed JS draft writer — 2026-09-29
 
 Code commit `66027dc9c3` в `origin/node-javascript` добавил host-only
