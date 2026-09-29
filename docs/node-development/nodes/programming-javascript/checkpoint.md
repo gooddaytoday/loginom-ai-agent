@@ -35,15 +35,19 @@ existing code-table через public API-path изолированного runt
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
-Child code commit `05dfebe85a` добавил два operator-only пробника с единым
-заранее закреплённым `expected.json`: `p1-business-code-base` и
-`p1-business-declared-base`. В обоих используется `sales.csv` с фактическими
-technical names; source не содержит ожидаемых денежных значений. В declared
+Child code commits `05dfebe85a`, `7fe5978c0f` добавили operator-only
+пробники для `code`/`declared` и `base`/`changed`/`reordered` с единым заранее
+закреплённым `expected.json`. Исходный `code-base` и `declared-base`
+используют `sales.csv` с фактическими technical names; тот же JS source SHA
+сохраняется при changed/reordered, source не содержит ожидаемых денежных
+значений. Для дополнительных вариантов импорт берёт заранее закреплённые
+байты CSV и проверяет 6×5 в фактическом порядке колонок, прежде чем связывать
+JS. В declared
 режиме оператор устанавливает четыре поля `RowID`, `CustomerKey`, `NetCents`,
 `Status` и проверяет их native readback. Независимый typed UI oracle сравнивает
 полную схему, шесть упорядоченных строк и каждую ячейку, допуск ноль. Это
 приватная осуществимость, не публичная или модельная приёмка. Локально:
-229 адресных тестов PASS, syntax и `git diff --check` PASS.
+278 адресных тестов PASS, syntax и `git diff --check` PASS.
 
 Первый обычный headed запуск `p1-business-code-base-01` на профиле 280
 завершился **CLEANUP_UNCONFIRMED до входа**, `LOGINOM_LOGIN_UNAVAILABLE`.
