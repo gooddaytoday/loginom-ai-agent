@@ -1,5 +1,30 @@
 # JavaScript: checkpoint исполнения
 
+## Перенос owned открытия мастера в runtime — 2026-09-29
+
+Child `7a7f79c141` перенёс уже проверенные private операции выбора JS-узла,
+единственного Setting-жеста, атрибуции деактивации, mask settlement и
+memoized cleanup из acceptance-скриптов в `client/lib/javascript-owned-*.mjs`
+и `client/lib/javascript-wizard-*.mjs`. Исторические entrypoints re-export
+те же функции, а initial opener обращается к общей реализации напрямую.
+Новые параметры `targetOrigin`/`targetBuild` сверяются до жеста; прежний
+private стенд по умолчанию остаётся `logi-test-plan.bg.local`/7.4.2.
+Неверные origin/build в адресном тесте дали ноль кликов. Pinned Node24.19.0:
+полный client JS unit-набор 231/231 PASS, acceptance JS unit-набор
+17818/17818 PASS, `node --check`/`git diff --check` PASS. Все четыре новые
+runtime-библиотеки входят в вычисленный `clientRevision`
+`ce87297e423a32bfcb3ac32d0d1665d51601069a8eede1bcc96896af5a18fcdb`.
+Live-браузер в этом переносе не запускался; последний подтверждённый headed
+writer/cold audit сохранён в предыдущем разделе.
+
+Это общий механизм, ещё не callable `dock_node_apply`: managed executor
+передаёт драйверу сериализованный `execute` callback, а перенесённое открытие
+пока ожидает прямой принадлежащий `page`. Следующая разработка должна
+разделить owned наблюдение, журналированный dispatch и ровно один браузерный
+жест по штатным receipt/gate правилам, затем связать source read/write,
+настройки declared/code, Execute/read и cleanup с узловым lifecycle. До этого
+карточка JS остаётся `candidate_node_apply_available=false`.
+
 ## Фаза 1A/1B: публичная форма контракта и маршрут знаний — 2026-09-29
 
 В изолированной ветке `node-javascript` коммит `168d4f88d0` добавил
