@@ -46,6 +46,7 @@ import {openManagedJavascriptInitialWizard} from './javascript-managed-initial-o
 import {javascriptExecutionProbes} from './javascript-execution-probes.mjs';
 import {javascriptMismatchSource,runJavascriptMismatchMaterialization,javascriptMismatchExecutionProgress,javascriptProbeFailure} from './javascript-mismatch-probe.mjs';
 import {readJavascriptSchema,configureJavascriptSchema} from './javascript-schema-probe.mjs';
+import {makeJavascriptSchemaContextCode} from '../../client/lib/javascript-schema-context.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
@@ -71,12 +72,12 @@ if(args.includes('--help')&&coldReader){console.log('node javascript-persistence
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-runtime-schema','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
-  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
+  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-runtime-schema','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
 }
 if(coldReader){
@@ -100,6 +101,8 @@ if(options['--managed-opening-probe']&&(options['--execution-case']!=='code-tabl
   ||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--discovery-probe']))
   throw Error('Managed opening probe requires one isolated code-table-execute case');
 if(options['--x11-no-focus']&&!options['--managed-opening-probe'])throw Error('X11 focus guard requires the isolated managed opening probe');
+if(options['--verify-runtime-schema']&&(options['--execution-case']!=='code-table-execute'||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile))
+  throw Error('Runtime schema verification requires one isolated code-table-execute case');
 if(batch&&options['--execution-case'])throw Error('Batch cannot also select a single case');
 if(nativeInputOnly||nativeRoundtrip){
   if(batch||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence','--native-fixture',...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])].includes(k)))throw Error('Native input-only requires its separate private entrypoint and no JS modes');
@@ -642,6 +645,20 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
         report.execution_existing_schema=schema;
       }else report.execution_schema=await configureJavascriptSchema({page,context:schemaContext(),mode:executionCase.split('-')[0],fixedCase:persistence?.id==='persistence-usage'?'usage-output':nativeRoundtrip&&nativeFixtureId==='cardinality-empty'?'cardinality-empty':undefined,
         once:(id,identity,perform)=>executionRuntime.once(caseEffect(report.case_id,id),identity,perform),record:executionRecord,deadline,columnState});
+      if(options['--verify-runtime-schema']){
+        const prepared={document_id:executionPrepared.document_id,
+          workflow_ref:executionPrepared.workflow_ref,
+          node:{document_id:executionPrepared.document_id,workflow_id:executionPrepared.workflow_ref.workflow_id,node_id:executionNode.node_id}};
+        const observed=await Function('return ('+makeJavascriptSchemaContextCode(prepared)+')')()(page);
+        await executionRecord({phase:'runtime_javascript_schema_observed',schema:observed});
+        if(observed.verified!==true||observed.form!==report.execution_schema.form
+          ||observed.generation?.checked!==report.execution_schema.generation?.checked
+          ||JSON.stringify(observed.grids)!==JSON.stringify(report.execution_schema.grids))
+          throw Error('Prepared runtime JavaScript schema differs from owned operator observation');
+        report.runtime_schema_observation={verified:true,form:observed.form,generation:observed.generation,
+          node_context:observed.node_context,grid_count:observed.grids.length};
+        await save();
+      }
       if(nativeRoundtrip){
         if(nativeFixtureId==='cardinality-empty')verifyJavascriptDeclaredEmpty(report.execution_schema.declaration,report.execution_schema.declaration_sha256);
         const event={phase:'native_roundtrip_schema_bound',...await page.evaluate(bindJavascriptNativeRoundtripSchema,{...schemaContext(),schema:report.execution_schema})};
