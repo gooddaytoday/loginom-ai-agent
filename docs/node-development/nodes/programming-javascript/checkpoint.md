@@ -1,5 +1,32 @@
 # JavaScript: checkpoint исполнения
 
+## G3: DefaultUsageType после Apply — 2026-09-29
+
+Child source `2c33216916` добавил фиксированную операторскую пробу Apply:
+новая declared-колонка `UsageValue` типа «Целый», один выбор `4 — Выходное`,
+один Apply и независимое чтение native grid. Cleanup теперь возвращает
+`apply_settlement`, если Apply уже отправлен, без повторного жеста и без Cancel.
+
+Ubuntu headed profile222/Loginom Enterprise 7.4.2 подтвердил
+`apply_settlement=true`. Собственная запись grid после Apply имеет
+`Name=DisplayName=UsageValue`, `DataType=4`, `Index=0`,
+`DefaultUsageType=4`, тогда как отдельное поле `UsageType=0`. Пакет был
+отброшен без Save/Execute/Done; process exit0/`OBSERVED`, package
+close/logout/browser close 3/3, процессов профиля нет. Report SHA256
+`b0d5e0f4b393792bb65815e9ed664f42ef98f974deab3789798e169409b96c04`,
+journal SHA256
+`9b4d817db8d6642fec7a2f544b89d3fc555cb0599112bfae7dc6932713751506`,
+independent verification SHA256
+`edaab0333af9f4d97b4cbecb76af3fd92c650df488abb502413cb00f4b0bed86`.
+Private freeze145 SHA256
+`f71c48e3ba526666a8f9a75143738a84495d8892f6f2f6a2b4908e36f7998d9c`
+сверил 1336 pins, closure223 файла/661 literal edge, computed0; JS suite
+18 057/18 057 PASS, fail/skip0, log SHA256
+`f2beb497867e869c58c79876ded785225cad5c126ce2d5a93eae4a3ee00872fa`.
+Browser lease свободен, следующий пустой profile223. Подтверждена только
+локальная запись после Apply: Save, cold read и package bytes для
+`DefaultUsageType` ещё не выполнены. G3 generated→physical bridge открыт.
+
 ## G3: native выбор назначения, до Apply — 2026-09-29
 
 Child source `8e983b81c7` добавил только операторскую пробу выбора собственного
