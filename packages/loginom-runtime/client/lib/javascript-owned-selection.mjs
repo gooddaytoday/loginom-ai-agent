@@ -1,14 +1,13 @@
-// Owned JavaScript graph selection and Setting gesture. Generic script-node actions stay denied.
-export async function selectJavascriptForSettings(page,{binding,node,icon,deadline,record,openSettings=false,requireSettings=true,requireVisualizers=false,beforeSelect=async()=>{},beforeOpen=async()=>{},lifecycle={},targetOrigin="http://logi-test-plan.bg.local",targetBuild="7.4.2"}) {
-  if(openSettings&&(!requireSettings||requireVisualizers))throw Error('Private opening requires Setting readiness');
-  const retained=await page.evaluateHandle(({binding,node})=>{
+// Browser-serializable native captures. They have no host-side closures.
+export function captureJavascriptSelection({binding,node}) {
     const tab=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
     const diagram=tab?.Controller?.FController?.FDiagram,nodes=diagram?.FNodes?.FCollection;
     const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===node.id):[];
     if(tab!==binding.tab||found.length!==1)throw Error('Private selection binding unavailable');
     return {document,controller:tab.Controller,model:tab.Controller.FController,diagram,graph:diagram.FmxGraph,container:diagram.FmxGraph.container,native:found[0],cell:found[0].FCell,shape:diagram.FmxGraph.view.getState(found[0].FCell)?.shape?.node,replacements:0};
-  },{binding,node});
-  const inspect=({binding,node,icon,retained:r,requireSettings,requireVisualizers,inspectPhase,deadline,targetOrigin,targetBuild,poll=false,afterGesture=false})=>{
+  }
+
+export function inspectJavascriptSelection({binding,node,icon,retained:r,requireSettings,requireVisualizers,inspectPhase,deadline,targetOrigin,targetBuild,poll=false,afterGesture=false}) {
     const app=globalThis.bg?.app,tab=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
     const diagram=tab?.Controller?.FController?.FDiagram,nodes=diagram?.FNodes?.FCollection;
     const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===node.id):[];
@@ -105,7 +104,12 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
       point_snapshot:inspectPhase==='terminal'?pointFailure:r.selectionPointFailure??null,point_diagnostic_failed:pointDiagnosticFailed};
     if(poll&&pointDiagnosticFailed)throw Error('Private selection point diagnostic failed');
     return poll?(result.ready?result:false):result;
-  };
+}
+
+// Owned JavaScript graph selection and Setting gesture. Generic script-node actions stay denied.
+export async function selectJavascriptForSettings(page,{binding,node,icon,deadline,record,openSettings=false,requireSettings=true,requireVisualizers=false,beforeSelect=async()=>{},beforeOpen=async()=>{},lifecycle={},targetOrigin="http://logi-test-plan.bg.local",targetBuild="7.4.2"}) {
+  if(openSettings&&(!requireSettings||requireVisualizers))throw Error('Private opening requires Setting readiness');
+  const retained=await page.evaluateHandle(captureJavascriptSelection,{binding,node});
   const args={binding,node,icon,retained,requireSettings,requireVisualizers,deadline,targetOrigin,targetBuild};let dispatched=false,openingDispatched=false,blockerSnapshot=null,pointSnapshot=null,pointJournalAttempted=false;
   const acknowledge=async(event,message)=>{
     const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
@@ -121,7 +125,7 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
       effect_possible:dispatched||openingDispatched,opening_dispatched:openingDispatched,deadline,snapshot},'Private selection point journal ACK differs');
   };
   const read=async inspectPhase=>{
-    const result=await page.evaluate(inspect,{...args,inspectPhase});
+    const result=await page.evaluate(inspectJavascriptSelection,{...args,inspectPhase});
     if(result.blocked===true){blockerSnapshot=result;throw Error('Private selection blocked');}
     await recordPoint(result.point_snapshot);
     if(result.point_diagnostic_failed)throw Error('Private selection point diagnostic failed');
@@ -143,7 +147,7 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
       await record({phase:'javascript_private_selection_gesture_returned',node_id:node.id});
       args.afterGesture=true;
       const remaining=deadline-Date.now();if(remaining<=0)throw Error('Private selection deadline');
-      const ready=await page.waitForFunction(inspect,{...args,inspectPhase:'post_select_poll',poll:true},{timeout:remaining,polling:100});await ready.dispose();
+      const ready=await page.waitForFunction(inspectJavascriptSelection,{...args,inspectPhase:'post_select_poll',poll:true},{timeout:remaining,polling:100});await ready.dispose();
     }
     const after=await read('final');
     await record({phase:'javascript_private_selection_after',node_id:node.id,...after});
@@ -172,7 +176,7 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
     if(snapshot)await acknowledge({phase:'javascript_private_selection_blocked',node_id:node.id,
       effect_possible:dispatched||openingDispatched,opening_dispatched:openingDispatched,deadline,snapshot},'Private selection blocker journal ACK differs');
     await recordPoint(capture.point_snapshot);
-    const terminal=await page.evaluate(inspect,{...args,inspectPhase:'terminal'}).catch(()=>({observation_status:'unavailable'}));
+    const terminal=await page.evaluate(inspectJavascriptSelection,{...args,inspectPhase:'terminal'}).catch(()=>({observation_status:'unavailable'}));
     await record({phase:'javascript_private_selection_refused',node_id:node.id,effect_possible:dispatched||openingDispatched,
       opening_dispatched:openingDispatched,deadline,reason:String(error.message),blocker_snapshot:snapshot,point_snapshot:pointSnapshot,
       snapshot_observation_available:!!blockerSnapshot||capture.available,terminal_observation:terminal});throw error;

@@ -13,6 +13,8 @@ import {EventEmitter} from 'node:events';
 import {observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {javascriptInputColumns,javascriptOutputColumns,javascriptInputRows,verifyJavascriptFixture,verifyJavascriptTable,javascriptSentinelOutcome,createJavascriptEffectJournal,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord} from './javascript-execution-evidence.mjs';
 import {javascriptInputRequest,waitJavascriptCleanupReady,selectJavascriptForSettings,javascriptWizardBinding,openJavascriptWizard,cleanupJavascriptWizardOpening,javascriptMappingUnlockReceipt,closeJavascriptPortMapping,inspectJavascriptExecutionNotifications,waitJavascriptExecutionNotifications,javascriptManualMappingRequest,configureJavascriptManualMapping} from './javascript-execution-runtime.mjs';
+import {captureJavascriptSelection,inspectJavascriptSelection} from '../../client/lib/javascript-owned-selection.mjs';
+import {makeJavascriptManagedSelectionReadCode} from '../../client/lib/javascript-managed-selection.mjs';
 import {validateNodeApplyRequest} from '../../client/lib/node-apply.mjs';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
@@ -74,6 +76,52 @@ test('owned selection binds the caller origin and build before any gesture',asyn
   }
   const matched=privateSelectionFixture();
   assert.equal((await matched.run(undefined,{targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2'})).verified,true);
+});
+test('standalone serialized inspector retains the exact native owner across reads',async()=>{
+  const f=privateSelectionFixture(),retained=await f.page.evaluateHandle(captureJavascriptSelection,{binding:f.binding,node:f.node});
+  const args={binding:f.binding,node:f.node,icon:'js',retained,requireSettings:true,requireVisualizers:false,
+    inspectPhase:'initial',deadline:Date.now()+5000,targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2'};
+  const first=await f.page.evaluate(inspectJavascriptSelection,args);
+  assert.equal(first.ready,false);
+  assert.ok(first.body_point);
+  f.native.data={};
+  await assert.rejects(f.page.evaluate(inspectJavascriptSelection,args),/Private selection native owner changed/);
+  await retained.dispose();
+  assert.equal(f.clicks,0);
+});
+test('managed serialized selection binds prepared workflow and releases its lease after deadline',async()=>{
+  const f=privateSelectionFixture(),form=f.realm.bg.app.Application.FInstance.FMainForm;
+  const tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
+  const tabElement={getAttribute:key=>key==='data-tid'?tabTid:null,
+    classList:{contains:name=>name==='x-tab-active'}};
+  const graphRoot=f.tab.Controller.FController.FDiagram.FmxGraph.container;
+  f.realm.bg.app.ModelForm=class ModelForm{};
+  Object.setPrototypeOf(f.tab.Controller.FController,f.realm.bg.app.ModelForm.prototype);
+  const originalQuery=f.realm.document.querySelectorAll;
+  f.realm.document.querySelectorAll=selector=>selector.includes(tabTid)?[tabElement]
+    :selector.includes('MF;TF-1;ModelForm;cmpDiagram')?[graphRoot]:originalQuery(selector);
+  f.realm.__loginomDockPreparationV1={id:'doc-1',document:f.realm.document,
+    receipts:new Map([['wf-1',{phase:'verified',workflowId:'wf-1',tab:tabElement,
+      packageNode:{},nodeTargetWorkflowNode:f.binding.workflow}]])};
+  form.FMapTree={FServerConnection:{UserName:'jsteach'}};
+  f.native.FIconCls='bg-vendor-icon-javascript';
+  const task={mode:'capture',operation_id:'js-owned-1',owner:{document_id:'doc-1',workflow_id:'wf-1',node_id:'js-guid'},
+    workflow_ref:{tab_tid:tabTid,prefix:'MF;TF-1'},targetOrigin:'http://logi-test-plan.bg.local',
+    targetBuild:'7.4.2',deadline:Date.now()+200};
+  const run=mode=>vm.runInNewContext('('+makeJavascriptManagedSelectionReadCode({...task,mode})+')')(f.page);
+  const before=await run('capture');assert.equal(before.ready,false);assert.ok(before.body_point);
+  await assert.rejects(run('capture'),/lease already held/);
+  assert.deepEqual(JSON.parse(JSON.stringify(await run('inspect'))),JSON.parse(JSON.stringify(before)));
+  const receipt=f.realm.__loginomDockPreparationV1.receipts.get('wf-1');
+  receipt.phase='stale';
+  await assert.rejects(run('inspect'),/preparation changed/);
+  receipt.phase='verified';
+  f.native.data={};
+  await assert.rejects(run('inspect'),/native owner changed/);
+  await new Promise(resolve=>setTimeout(resolve,220));
+  assert.equal((await run('dispose')).disposed,true);
+  assert.equal(f.disposed,1);assert.equal(f.clicks,0);
+  assert.throws(()=>run('inspect'),/Invalid managed JavaScript selection read/);
 });
 test('descendant Execute, Preview, ports or foreign Setting child never authorize body/Setting clicks',async()=>{
   for(const fault of ['overlay_Execute','overlay_Preview','overlay_Input_Data-0','overlay_Setting','setting_overlay']){
