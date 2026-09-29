@@ -25,6 +25,12 @@ done
 [[ -n "$NODE" && -n "$SLOT" && -n "$CLI" && -n "$OUT" ]] || usage
 [[ "$SLOT" =~ ^[a-z]$ ]] || { echo "slot must be a single letter a-z" >&2; exit 1; }
 [[ "$CLI" == /* && "$OUT" == /* ]] || { echo "--cli and --out must be absolute" >&2; exit 1; }
+
+# Запуск из среды агента может унаследовать пустой OPENAI_BASE_URL: провайдер склеивает из него некорректный адрес
+# /responses, и CLI падает до первого действия. Пустое значение убираем; заданное не трогаем.
+if [[ -z "${OPENAI_BASE_URL:-}" ]]; then
+  unset OPENAI_BASE_URL
+fi
 [[ -x "$CLI" ]] || { echo "CLI is not executable: $CLI" >&2; exit 1; }
 [[ ! -e "$OUT" ]] || { echo "out already exists: $OUT" >&2; exit 1; }
 
@@ -148,8 +154,30 @@ PY
   fi
 }
 
+# Записывает канал в маркер профиля слота атомарно (права 0600). Формат и версию маркера проверяет.
+set_profile_channel() {
+  python3 - "$PROFILE/cli-profile.json" "$1" <<'PY'
+import json, os, sys, tempfile
+marker, channel = sys.argv[1:]
+data = json.load(open(marker, encoding="utf-8"))
+if data.get("format") != "loginom-cli" or data.get("version") != 1:
+    raise SystemExit("unexpected cli-profile.json format")
+data["channel"] = channel
+fd, temp = tempfile.mkstemp(dir=os.path.dirname(marker))
+with os.fdopen(fd, "w", encoding="utf-8") as f:
+    json.dump(data, f)
+    f.write("\n")
+os.chmod(temp, 0o600)
+os.replace(temp, marker)
+PY
+}
+
 cleanup() {
   local code=$?
+  # Возвращаем исходный канал профиля. Если запуск убит и сюда не дошли, следующая попытка выровняет канал заново.
+  if [[ -n "${PROFILE_CHANNEL_ORIGINAL:-}" ]]; then
+    set_profile_channel "$PROFILE_CHANNEL_ORIGINAL" 2>/dev/null || true
+  fi
   if [[ -n "${CONFIG_TMP:-}" && -f "$CONFIG_TMP" ]]; then
     rm -f "$CONFIG_TMP"
   fi
@@ -237,6 +265,20 @@ fi
 mkdir -m 700 "$OUT"
 WORK="$OUT/work"
 mkdir -m 700 "$WORK"
+
+# Канал профиля должен совпадать с каналом кандидата. build-candidate.sh собирает dev, а профиль слота создан
+# релизным CLI (prod), и CLI с другим каналом отказывается открыть профиль (PROFILE_FORMAT_INVALID). Раньше агент
+# правил маркер вручную перед каждой попыткой. На время попытки выравниваем канал здесь, после неё возвращаем.
+CANDIDATE_CHANNEL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1],encoding="utf-8")).get("metadata",{}).get("channel") or "")' "$PAYLOAD_ROOT/cli-manifest.json" 2>/dev/null || true)"
+PROFILE_CHANNEL_ORIGINAL=""
+if [[ -n "$CANDIDATE_CHANNEL" && -f "$PROFILE/cli-profile.json" ]]; then
+  PROFILE_CHANNEL_CURRENT="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1],encoding="utf-8")).get("channel") or "")' "$PROFILE/cli-profile.json")"
+  if [[ "$PROFILE_CHANNEL_CURRENT" != "$CANDIDATE_CHANNEL" ]]; then
+    set_profile_channel "$CANDIDATE_CHANNEL"
+    PROFILE_CHANNEL_ORIGINAL="$PROFILE_CHANNEL_CURRENT"
+    echo "profile channel aligned: $PROFILE_CHANNEL_CURRENT -> $CANDIDATE_CHANNEL" >&2
+  fi
+fi
 SLOT_USER="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1],encoding="utf-8"))["username"])' "$CONNECTION_JSON")"
 # Каждая попытка пишет свой пакет: модели запрещено перезаписывать файл,
 # поэтому фиксированное имя ломало бы повторную приёмку в том же слоте.
