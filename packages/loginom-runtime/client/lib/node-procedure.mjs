@@ -92,9 +92,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     &&dialog.identity?.anchor_tid===state.wizard.root_tid+';FactorEditDialog';
   const allowedCrossTableColumnEditor=(dialog,state)=>state.wizard?.stage==='cross_table'
     &&state.wizard.column_editor?.status==='rendered_column_options'
-    &&state.node_cross_table?.verified===true
-    &&state.node_cross_table.selected_records?.length===1
-    &&state.node_cross_table.selected_records[0]===state.wizard.column_editor.selected_field?.record_id
+    &&state.wizard.column_editor.selected_field?.record_id
     &&dialog.ref===state.wizard.column_editor.dialog_ref
     &&dialog.identity?.anchor_tid===state.wizard.root_tid+';ColumnEditDialog';
   const allowedPreview=(dialog,state)=>state.node_preview_schema?.verified===true
