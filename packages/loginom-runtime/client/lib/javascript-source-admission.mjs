@@ -50,7 +50,7 @@ function canonicalSettings(settings) {
   need(Buffer.byteLength(JSON.stringify(value), 'utf8') <= 32768, 'settings_bound');
   return value;
 }
-function settingsDigest(settings) {
+export function javascriptSourceSettingsDigest(settings) {
   return createHash('sha256').update(JSON.stringify(canonicalSettings(settings))).digest('hex');
 }
 function policyFor(source) {
@@ -69,7 +69,7 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
   need(settingsTransition === undefined || settingsTransition && equal(Object.keys(settingsTransition).sort(), ['expected_after','kind'])
     && settingsTransition.kind === 'replace', 'settings_transition');
   const plannedSettings = settingsTransition === undefined ? undefined : immutable(canonicalSettings(settingsTransition.expected_after));
-  const plannedSettingsDigest = settingsTransition === undefined ? null : settingsDigest(plannedSettings);
+  const plannedSettingsDigest = settingsTransition === undefined ? null : javascriptSourceSettingsDigest(plannedSettings);
   need(Number.isSafeInteger(deadline) && deadline > Date.now(), 'deadline');
   need(typeof sourceAdapter === 'function' && typeof record === 'function'
     && typeof redactor?.text === 'function' && typeof redactor?.redact === 'function'
@@ -113,7 +113,7 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
         && typeof part.source_text === 'string' && part.offset_utf8_bytes === Buffer.byteLength(source, 'utf8')
         && part.chunk_utf8_bytes === Buffer.byteLength(part.source_text, 'utf8'), 'read_receipt');
       const identity = {source_sha256: part.source_sha256, source_utf8_bytes: part.source_utf8_bytes, source_lf_lines: part.source_lf_lines};
-      const snapshot = settingsDigest(observed.settings);
+      const snapshot = javascriptSourceSettingsDigest(observed.settings);
       need(!metadata || equal(identity, metadata) && settings === snapshot, 'read_drift');
       metadata = identity; settings = snapshot; source += part.source_text;
       need(Buffer.byteLength(source, 'utf8') <= 32768, 'read_bound');

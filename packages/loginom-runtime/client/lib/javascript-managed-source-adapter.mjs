@@ -7,6 +7,8 @@ import {makeJavascriptManagedSelectionReadCode} from './javascript-managed-selec
 import {makeJavascriptSchemaContextCode} from './javascript-schema-context.mjs';
 import {makeJavascriptExistingGraphTypeCode} from './javascript-existing-type.mjs';
 import {replaceManagedJavascriptSource} from './javascript-managed-source-write.mjs';
+import {dispatchManagedJavascriptCodeNext} from './javascript-managed-code-next.mjs';
+import {dispatchManagedJavascriptDone} from './javascript-managed-done.mjs';
 
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const need = (condition, message) => { if (!condition) throw Error(message); };
@@ -27,7 +29,9 @@ export function javascriptManagedSourceSettings(schema) {
 // No model-provided script, navigation target, or executable callback enters it.
 export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEpoch, deadline, targetOrigin,
   execute, record, receiptOptions, channel, wait = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  openingBudgetMs = 90000,
   driver = {openManagedJavascriptExistingWizard, dispatchManagedJavascriptNext,
+    dispatchManagedJavascriptCodeNext, dispatchManagedJavascriptDone,
     closeManagedJavascriptWizard, makeJavascriptManagedPageCode, makeJavascriptManagedSourceCode,
     makeJavascriptManagedSelectionReadCode, makeJavascriptSchemaContextCode,
     makeJavascriptExistingGraphTypeCode, replaceManagedJavascriptSource}}) {
@@ -39,6 +43,8 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
     && typeof execute === 'function' && typeof record === 'function'
     && typeof receiptOptions === 'function' && typeof channel === 'function',
   'Managed JavaScript source adapter dependencies unavailable');
+  need(Number.isSafeInteger(openingBudgetMs) && openingBudgetMs >= 1 && openingBudgetMs <= 180000,
+    'Managed JavaScript opening budget unavailable');
   const expectedOwner = {document_id: node.document_id, workflow_id: node.workflow_id,
     node_id: node.node_id, ui_epoch: uiEpoch};
   let active = null, uncertain = false;
@@ -81,7 +87,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       'Managed JavaScript source node type unconfirmed');
       // An ambiguous opening is terminal: a second Setting could edit a draft.
       uncertain = true;
-      const openingDeadline = Math.min(deadline, Date.now() + 90000);
+      const openingDeadline = Math.min(deadline, Date.now() + openingBudgetMs);
       const opened = await driver.openManagedJavascriptExistingWizard({prepared, node, deadline: openingDeadline,
         targetOrigin, execute, record, receiptOptions, channel: channel(openingDeadline)});
       const task = opened.task;
@@ -116,10 +122,66 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       need(active === handle && same(handle.owner, owner) && handle.writeAttempted !== true,
         'Managed JavaScript source write handle changed or already used');
       handle.writeAttempted = true;
-      return driver.replaceManagedJavascriptSource({task: handle.task, handle, owner,
+      const written = await driver.replaceManagedJavascriptSource({task: handle.task, handle, owner,
         deadline: operationDeadline, expected_source_sha256, source_text,
         read: (sourceHandle, request) => this.read(sourceHandle, request),
         execute, record, receiptOptions, markUncertain: value => { uncertain = value; }});
+      need(written?.draft_exact === true && /^[a-f0-9]{64}$/.test(written.source_sha256),
+        'Managed JavaScript source replacement digest unavailable');
+      handle.draftSha256 = written.source_sha256;
+      return written;
+    },
+    async commit(handle, {owner, deadline: operationDeadline}) {
+      check(owner, operationDeadline);
+      need(active === handle && same(handle.owner, owner) && handle.writeAttempted === true
+        && /^[a-f0-9]{64}$/.test(handle.draftSha256) && handle.commitAttempted !== true,
+        'Managed JavaScript commit handle unavailable or already used');
+      handle.commitAttempted = true;
+      uncertain = true;
+      const next = await driver.dispatchManagedJavascriptCodeNext({task: handle.task,
+        expected_source_sha256: handle.draftSha256, execute, record, receiptOptions});
+      need(next?.status === 'SUCCEEDED' && next.output?.next_gesture_returned === true
+        && next.output.transition_verified === false, 'Managed JavaScript Code Next unconfirmed');
+      let donePage = null;
+      while (Date.now() < handle.task.deadline) {
+        const current = await execute(driver.makeJavascriptManagedPageCode(handle.task)).catch(error => {
+          if (error?.message === 'Managed JavaScript page not ready') return null;
+          throw error;
+        });
+        if (current?.ready === true) {
+          need(current.node_guid === node.node_id && current.page?.indicator_count === 4,
+            'Managed JavaScript Done page owner changed');
+          if (current.page.tid === handle.task.workflow_ref.prefix + ';WizrdMCF;DoneWizard'
+            && current.page.index === 3 && current.page.visible_editors === 0) {
+            donePage = current; break;
+          }
+          need([1,2].includes(current.page.index), 'Managed JavaScript unexpected page after Code Next');
+        }
+        await wait(Math.min(100, Math.max(1, handle.task.deadline - Date.now())));
+      }
+      need(donePage !== null && Date.now() < handle.task.deadline,
+        'Managed JavaScript Done page original deadline expired');
+      const done = await driver.dispatchManagedJavascriptDone({task: handle.task,
+        expected_source_sha256: handle.draftSha256, execute, record, receiptOptions});
+      need(done?.status === 'SUCCEEDED' && done.output?.done_gesture_returned === true
+        && done.output.wizard_commit_verified === false && done.output.execution_started === null,
+        'Managed JavaScript Done gesture unconfirmed');
+      const graph = await channel(handle.task.deadline).observe({condition: 'owned JavaScript graph after Done',
+        ready: state => state.prepared_node_context?.verified === true
+          && state.prepared_node_context.surface === 'graph' && state.wizard?.status === 'absent'
+          && ['document_id','workflow_id','node_id'].every(key =>
+            state.prepared_node_context[key] === node[key])});
+      need(graph.prepared_node_context?.verified === true
+        && graph.prepared_node_context.surface === 'graph' && graph.wizard?.status === 'absent'
+        && ['document_id','workflow_id','node_id'].every(key => graph.prepared_node_context[key] === node[key]),
+      'Managed JavaScript Done graph owner unconfirmed');
+      const {prepared: ignoredPrepared, allowDeactivation: ignoredDeactivation, ...selectionTask} = handle.task;
+      await execute(driver.makeJavascriptManagedSelectionReadCode({...selectionTask, mode: 'dispose'}));
+      active = null;
+      uncertain = false;
+      return {graph_owner_verified: true, owned_done_settled: true,
+        done_gesture_returned: true, execution_started: null, explicit_execute_requested: false,
+        source_sha256: handle.draftSha256};
     },
     async discard(handle, {owner, deadline: operationDeadline}) {
       check(owner, operationDeadline);
