@@ -79,7 +79,8 @@ export function resolveReadOutputSchema(actual,retained,nodeType){
  need(nodeType==='transform.cross_table'&&dynamic.kind==='crosstable_sliding'
   &&dynamic.parameters?.columns?.mode==='sliding','Unsupported dynamic output schema');
  const result=resolveCrossTableOutputSchema(dynamic.configuration,dynamic.parameters,actual);
- need(actual.every((field,index)=>field.index===index),'Output field indices differ');
+ need(new Set(actual.map(field=>field.name)).size===actual.length
+  &&actual.every((field,index)=>field.index===index),'Output field indices or names differ');
  const rowCount=dynamic.parameters.rows.length;
  alignReadSchema(actual.slice(0,rowCount),retained.schema.slice(0,rowCount));
  for(const field of actual.slice(rowCount)){
