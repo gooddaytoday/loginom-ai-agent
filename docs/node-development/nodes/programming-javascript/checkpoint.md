@@ -1,5 +1,36 @@
 # JavaScript: checkpoint исполнения
 
+## Управляемый Next «Столбцы → Код» — 2026-09-29
+
+Code commit `8049b4a69a` в `origin/node-javascript` добавил приватный
+`client/lib/javascript-managed-next.mjs`. Он допускает только проверенный
+переход `JavaScriptColumnsWizard` (native indicator 0/4) →
+`JavaScriptCodeWizard` (1/4) в той же удерживаемой lease после Setting.
+Перед жестом общий inspector повторно проверяет native/DOM owner, страницу,
+маски, точную кнопку и hit-test. Точный journal ACK предшествует одному
+`page.mouse.click`; потерянный ответ или изменившаяся точка не приводят к
+повторному клику. После жеста оператор читает страницу тем же inspector
+в пределах исходного deadline и пишет отдельный verified ACK. Общие
+`workspace-ui`/`dock_ui_action` этим не расширены. Адресные тесты:
+**162 PASS / 0 FAIL**, синтаксис и `git diff --check` прошли.
+
+В обычном **headed Chromium** с новым profile 249 на
+`http://logi-test-plan.bg.local/app/` частный прогон
+`managed-next-columns-code-01` подтвердил один `next_prepared` и один
+`next_verified` в журнале, страницу Code того же node ID, последующие
+lease-bound source/readback и `typed_output_verified`. Итог `OBSERVED`,
+cleanup package/logout/browser **3/3**, report SHA256
+`64f09bc70f787f91b6f4c29393a3872ec1bdee3e176f1455c1aae1766588c3ad`.
+Старый browser process закрыт. Под file-lock назначен новый ещё не созданный
+profile 250, receipt `profile-reassignment-250.json`; profiles 247–249 не
+использовать повторно.
+
+Следующий шаг — управляемое закрытие мастера после read-only existing-node
+source, затем host adapter с `createJavascriptSourceAdmission` и публичная
+регистрация JS handler. Нужно отдельно проверить existing-node opening live,
+source delivery и CLI J01/J20/J21. Этот live-прогон проверил только одну
+приватную навигацию, не публичное обучение агента.
+
 ## Управляемая проверка страницы мастера — 2026-09-29
 
 Code commit `7e127923f3` в `node-javascript` вынес прежний операторский
@@ -27,11 +58,10 @@ cleanup 3/3, report SHA256
 `8726f8f0df78fdff2cb843acf96cc3316fdc3d36d0a09095542caa5ebd543809`.
 Оба браузерных процесса закрыты; profile 247/248 не повторять.
 
-Следующий участок: приватный однократный Next Input/Columns → Code в той же
-аренде с точным journal ACK перед жестом, pre-click native/DOM/hit-test
-проверкой и post-click чтением общего inspector. После этого — закрытие
-мастера, existing-node source admission, публичный handler и CLI J01/J20/J21.
-Live успешность **не** означает готовность публичного обработчика.
+Следующий участок на тот момент был приватный Next. Он выполнен для
+наблюдённого `Columns → Code` в разделе выше. Вариант `Input → Columns`
+в этом маршруте пока не проверен. Live успешность **не** означает готовность
+публичного обработчика.
 
 ## Existing-node managed opening — source-only, 2026-09-29
 
@@ -45,14 +75,15 @@ execution evidence: **159 PASS / 0 FAIL**. Отдельного live-прого�
 этого helper для existing node пока **нет**; headed прогоны выше относятся
 к initial managed opening и чтению уже открытого мастера.
 
-Следующее необходимое звено установлено по исходнику `workspace-ui.mjs`:
+На момент этого commit следующее звено установлено по исходнику `workspace-ui.mjs`:
 его `wizardMarkers` не содержат `JavaScriptColumnsWizard` и
 `JavaScriptCodeWizard`, а `wizard_step` требует распознанный stage и
 `expected_stage`. Общий Next поэтому не является доказанным маршрутом для
 JS. Нужна приватная однократная навигация Input/Columns → Code с native/DOM
 owner, journal ACK и наблюдаемым результатом без раскрытия произвольных
 script-node действий в `dock_ui_action`; затем Close, settings readback и
-source admission. Публичный обработчик и CLI-приёмка всё ещё не выполнены.
+source admission. Узкий `Columns → Code` теперь проверен выше; публичный
+обработчик и CLI-приёмка всё ещё не выполнены.
 
 ## Управляемое чтение исходника — 2026-09-29
 
