@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { expect } from "bun:test"
 import { Cause, Deferred, Duration, Effect, Exit, Fiber, Layer } from "effect"
+import { cp } from "fs/promises"
 import path from "path"
 import { fileURLToPath, pathToFileURL } from "url"
 import { NamedError } from "@loginom-ai-agent/core/util/error"
@@ -915,6 +916,99 @@ it.instance("glob tool keeps instance context during prompt runs", () =>
     expect(tool.state.output).not.toContain("No context found for instance")
     expect(result.parts.some((part) => part.type === "text" && part.text === "done")).toBe(true)
   }),
+)
+
+it.instance("package_docs loads through the agent and extracts a local package", () =>
+  Effect.gen(function* () {
+    const { dir, llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const source = fileURLToPath(new URL("../../../../.loginom-ai-agent/skills/package_docs", import.meta.url))
+    const skillDir = path.join(dir, ".loginom-ai-agent", "skills", "package_docs")
+    const lgp = path.join(dir, "demo.lgp")
+    const structure = path.join(dir, "structure.json")
+    yield* Effect.promise(() => cp(source, skillDir, { recursive: true }))
+    yield* Effect.promise(async () => {
+      const proc = Bun.spawn(
+        [
+          "python3",
+          "-c",
+          `
+import zipfile
+from pathlib import Path
+p = Path(${JSON.stringify(lgp)})
+info = '<?xml version="1.0" encoding="UTF-8"?><PackageInfo Guid="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" Name="demo" ApplicationVersion="7.4.0" />'
+index = """<?xml version="1.0" encoding="UTF-8"?>
+<PackageIndex><Units><Item BasePath="\\\\Unit_0"><Info XMLFile="\\\\Unit_0\\\\Info.xml" /><Unit XMLFile="\\\\Unit_0\\\\Unit.xml" /></Item></Units></PackageIndex>
+"""
+unit_info = '<?xml version="1.0" encoding="UTF-8"?><Info Guid="11111111-1111-1111-1111-111111111111" Name="Unit1" DisplayName="Демо" />'
+unit = """<?xml version="1.0" encoding="UTF-8"?>
+<Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><WorkFlow><Nodes>
+<Item Guid="aaaaaaaa-0000-0000-0000-000000000001" DisplayName="Источник"><Component><Engine xsi:type="TBGImportNative" /></Component></Item>
+</Nodes></WorkFlow></Unit>
+"""
+with zipfile.ZipFile(p, "w") as zf:
+    zf.writestr("PackageInfo.xml", info)
+    zf.writestr("PackageIndex.xml", index)
+    zf.writestr("Unit_0/Info.xml", unit_info)
+    zf.writestr("Unit_0/Unit.xml", unit)
+`,
+        ],
+        { stdout: "pipe", stderr: "pipe" },
+      )
+      const code = await proc.exited
+      if (code !== 0) throw new Error(await new Response(proc.stderr).text())
+    })
+
+    const session = yield* sessions.create({
+      title: "Package docs",
+      permission: [{ permission: "*", pattern: "*", action: "allow" }],
+    })
+    yield* prompt.prompt({
+      sessionID: session.id,
+      agent: "build",
+      noReply: true,
+      parts: [{ type: "text", text: `Сформируй ИИ Отчет по ${lgp}` }],
+    })
+    yield* llm.tool("skill", { name: "package_docs" })
+    yield* llm.tool("bash", {
+      command: `python3 ${JSON.stringify(path.join(skillDir, "scripts", "extract_scenario_structure.py"))} ${JSON.stringify(lgp)} -o ${JSON.stringify(structure)}`,
+      workdir: dir,
+    })
+    yield* llm.text("отчёт подготовлен")
+
+    const result = yield* prompt.loop({ sessionID: session.id })
+    expect(result.info.role).toBe("assistant")
+    const request = JSON.stringify(yield* llm.inputs)
+    expect(request).toContain("<name>package_docs</name>")
+
+    const msgs = yield* MessageV2.filterCompactedEffect(session.id)
+    const tools = msgs.flatMap((msg) => msg.parts).filter((part): part is SessionV1.ToolPart => part.type === "tool")
+    const loaded = tools.find((part) => part.tool === "skill")
+    const extracted = tools.find((part) => part.tool === "bash")
+    expect(loaded?.state.status).toBe("completed")
+    if (loaded?.state.status === "completed") {
+      expect(loaded.state.output).toContain('<skill_content name="package_docs">')
+      expect(loaded.state.output).toContain(`Base directory for this skill: ${skillDir}`)
+      expect(loaded.state.output).toContain("абсолютный путь")
+      expect(loaded.state.output).toContain("файлового хранилища")
+      expect(loaded.state.output).toContain("viking://resources/loginom-dock/sources/loginom-help")
+      expect(loaded.state.output).toContain(path.join(skillDir, "scripts", "extract_scenario_structure.py"))
+      expect(loaded.state.output).not.toContain("hermes")
+      expect(loaded.state.output).not.toContain("Cognee")
+    }
+    expect(extracted?.state.status).toBe("completed")
+    if (extracted?.state.status === "completed") {
+      expect(extracted.state.metadata?.exit).toBe(0)
+    }
+    const written = (yield* Effect.promise(() => Bun.file(structure).json())) as {
+      schema_version: string
+      package: { name: string }
+    }
+    expect(written.schema_version).toBe("package_docs.structure.v1")
+    expect(written.package.name).toBe("demo")
+  }),
+  60_000,
 )
 
 it.instance("loop continues when finish is stop but assistant has tool parts", () =>
