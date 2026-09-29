@@ -1,5 +1,24 @@
 # JavaScript: checkpoint исполнения
 
+## Фаза 1A: подготовлен чистый контракт параметров — 2026-09-29
+
+Child source `e75e8ad99cd881dd748eeb0b0a5f9882b147f4be` добавил
+`javascriptParametersSchema` и `validateJavascriptParameters` без регистрации
+типа в публичном каталоге. New требует ровно один вход0, полный `source_text`
+и `schema_mode`; declared требует полный упорядоченный набор колонок. Existing
+допускает `{}` для сохранения настроек, а явная замена исходника требует
+`expected_source_sha256`. Проверяются LF/UTF-8 bounds, статический module
+policy, допустимые scalar types, metadata и уникальность technical names без
+учёта регистра. `parameters.source` Текстового импорта не затронут.
+
+Адресный client regression на pinned Node24.19.0: 223/223 PASS
+(`node-api`, module policy, source admission, JavaScript parameters),
+`node --check` и `git diff --check` PASS. Это **часть фазы 1A**, не готовый
+handler: schema ещё не выдаётся через `dock_action_describe`, не связана с
+owned browser driver, не доказывает G3/G4 или CLI-приёмку. Следующий шаг —
+проверить режимные настройки и сформировать owned JS configuration/readback
+driver; до публичной регистрации нужны G1–G7 и границы полного подплана.
+
 ## G3/G7: сохранённое назначение выходной колонки — 2026-09-29
 
 Child source `a28bdfca4b5ebe49fe5b64ddc5145e421d82cb7c` добавил отдельный
