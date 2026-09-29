@@ -22,11 +22,17 @@ export async function openManagedJavascriptInitialWizard({page,prepared,node,dea
   lifecycle.openingIntent=true;
   const confirmation={kind:'deactivation',node:owner,graph_tid:node.tid,
     opening:{initial_fresh_node:true,workflow_id:owner.workflow_id}};
-  report.effects.push({at:new Date().toISOString(),action:'open-wizard-managed',node_id:node.id,state:'dispatching'});
-  await save();
-  lifecycle.settingDispatched=true;
-  const gesture=await dispatchManagedJavascriptSetting({task,before:selected,confirmation,execute,record,receiptOptions});
-  if(gesture.status!=='SUCCEEDED')throw Error('Managed initial JavaScript Setting refused');
+  const gesture=await dispatchManagedJavascriptSetting({task,before:selected,confirmation,execute,record,receiptOptions,
+    onPrepared:async()=>{
+      lifecycle.settingDispatched=true;
+      report.effects.push({at:new Date().toISOString(),action:'open-wizard-managed',node_id:node.id,state:'dispatching'});
+      await save();
+    }});
+  if(gesture.status!=='SUCCEEDED'){
+    if(gesture.status==='NOT_APPLIED'&&gesture.phase==='preflight'&&gesture.effect_possible===false)
+      lifecycle.settingDispatched=false;
+    throw Error('Managed initial JavaScript Setting refused');
+  }
   lifecycle.settingGestureReturned=true;
   const settled=await waitManagedJavascriptWizardSettlement({task:{...task,prepared:{document_id:owner.document_id,
     workflow_ref:prepared.workflow_ref,node:owner},allowDeactivation:true},execute,record});

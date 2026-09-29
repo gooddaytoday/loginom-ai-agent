@@ -206,7 +206,7 @@ export async function dispatchManagedJavascriptBody({task,before,execute,record,
   throw Error('Managed JavaScript body selection unconfirmed before original deadline');
 }
 
-export async function dispatchManagedJavascriptSetting({task,before,confirmation,execute,record,receiptOptions}) {
+export async function dispatchManagedJavascriptSetting({task,before,confirmation,execute,record,receiptOptions,onPrepared=async()=>{}}) {
   const gesture_id=task.operation_id+':setting';
   const gesture={...task,mode:'setting',gesture_id,expected:before,confirmation};
   const code=makeJavascriptManagedSettingCode(gesture);
@@ -218,6 +218,7 @@ export async function dispatchManagedJavascriptSetting({task,before,confirmation
   const saved=await record(prepared);
   if(JSON.stringify(Object.fromEntries(Object.keys(prepared).map(key=>[key,saved?.[key]])))!==JSON.stringify(prepared))
     throw Error('Managed JavaScript Setting journal ACK differs');
+  await onPrepared();
   const result=await execute(withBrowserReceipt('('+code+')(page)',{
     ...receiptOptions(gesture_id,'javascript.selection.setting',signature),operation_id:gesture_id}),
     {timeout:Math.max(1,Math.min(35000,task.deadline-Date.now()+5000))});

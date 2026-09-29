@@ -39,7 +39,7 @@ export function makeJavascriptManagedWizardSettlementCode(task) {
     ||!Array.isArray(path)||path.length<1||path.length>32
     ||path.some(item=>!item||Object.keys(item).sort().join(',')!=='label,tid'
       ||typeof item.tid!=='string'||item.tid.length<1||item.tid.length>1024
-      ||typeof item.label!=='string'||item.label.length<1||item.label.length>256))
+      ||typeof item.label!=='string'||item.label.length>256))
     throw Error('Invalid managed JavaScript wizard settlement');
   const inspector=`function inspect(args){const native=${inspectJavascriptWizardSettlement.toString()};return (${inspectManagedJavascriptWizardSettlement.toString()})(args,native);}`;
   return `async page=>(${runManagedJavascriptWizardSettlement.toString()})(page,${JSON.stringify(task)},${inspector})`;
