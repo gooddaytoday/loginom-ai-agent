@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
+import {createTabularTransformNodeSupport} from '../lib/calculator-node.mjs';
 import {NodeProcedureStepError} from '../lib/node-procedure.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 const request=()=>({operation_id:'apply1',contract_revision:'1.0.0',document_id:'doc',
@@ -389,8 +390,39 @@ for(const finish of ['done','close'])test('incompatible '+finish+' read identifi
 });
 test('unsupported full coverage identifies its field before graph changes',()=>{
  const p=request();p.read.coverage='full';
- assert.throws(()=>validateNodeApplyRequest(p,fixture().handlers),/Invalid parameters\.read\.coverage:.*other handlers support sample/);
+ assert.throws(()=>validateNodeApplyRequest(p,fixture().handlers),/Invalid parameters\.read\.coverage:.*JavaScript UI full-read support/);
  p.read.coverage='sample';assert.doesNotThrow(()=>validateNodeApplyRequest(p,fixture().handlers));
+});
+
+test('JavaScript full UI read requires an installed capability and the complete bounded window before effects',()=>{
+ const f=fixture(),p=request();p.target.type='programming.javascript';p.mode='script';p.read={ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'};
+ f.handlers.set(p.target.type,{revision:'javascript-test',modes:['script'],validate(){},configure(){}});
+ assert.throws(()=>validateNodeApplyRequest(p,f.handlers),/full-read support/);
+ f.handlers.get(p.target.type).fullUiOutput=true;
+ assert.doesNotThrow(()=>validateNodeApplyRequest(p,f.handlers));
+ p.read.sample_rows=10;
+ assert.throws(()=>validateNodeApplyRequest(p,f.handlers),/full-read support/);
+ p.read.sample_rows=100;p.read.require_exact_numbers=false;
+ assert.throws(()=>validateNodeApplyRequest(p,f.handlers),/full-read support/);
+ p.read.require_exact_numbers=true;p.read.ports=[];
+ assert.throws(()=>validateNodeApplyRequest(p,f.handlers),/full-read support/);
+});
+
+test('tabular handler publishes JavaScript full UI capability only when its implementation opts in',()=>{
+ const config={targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2'};
+ const implementation={type:'programming.javascript',mode:'script',revision:'javascript-test',validate(){},configure(){}};
+ assert.equal(createTabularTransformNodeSupport(config,implementation).nodeApplyHandlers.get(implementation.type).fullUiOutput,undefined);
+ assert.equal(createTabularTransformNodeSupport(config,{...implementation,fullUiOutput:true}).nodeApplyHandlers.get(implementation.type).fullUiOutput,true);
+});
+
+for(const complete of [true,false])test('JavaScript full UI read accepts only complete observed rows '+complete,async()=>{
+ const f=fixture(),p=request();p.target.type='programming.javascript';p.mode='script';p.read={ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'};
+ f.handlers.set(p.target.type,{revision:'javascript-test',modes:['script'],fullUiOutput:true,validate(){},configure:f.handlers.get('imports.text').configure});
+ f.drivers.readOutput=async()=>({verified:true,cleanup_complete:true,status:complete?'complete':'partial',
+  evidence_ref:'evidence1',execution_id:'execution1',ports:[{port:0,fresh:true,row_count:2,sample_rows:complete?2:1,sample_complete:complete}]});
+ const result=await f.run(p);
+ assert.equal(result.status,complete?'SUCCEEDED':'AMBIGUOUS');
+ if(!complete){assert.equal(result.pending_phase,'read');assert.match(result.error.message,/full JavaScript row coverage/);}
 });
 
 test('output sample accepts the expanded 100-row boundary',()=>{const f=fixture(),p=request();p.read.sample_rows=100;assert.doesNotThrow(()=>validateNodeApplyRequest(p,f.handlers));});

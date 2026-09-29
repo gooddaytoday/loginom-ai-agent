@@ -74,7 +74,7 @@ export const nodeApplyInputSchema=object({
   changes:array(object({source:object({kind:choice('configured_field'),name:text(128)}),name:text(128),label:text(120),excluded:boolean},['source']),1000),
   fields:array(object({source:object({kind:choice('configured_field'),name:text(128)}),name:text(128),label:text(120),excluded:boolean},['source']),1000,1)},['direction','port']),16),
  finish:{...choice('done','execute','close'),description:'execute commits settings, executes and reads fresh output. done only commits settings; close discards the wizard draft. done/close require read.ports=[] and cannot read output. Usually choose execute; omit read for normal defaults.'},
- read:object({ports:{...array(integer(0,1),2),description:'Only finish=execute can read ports. done/close and text export require []. Omit read for defaults.'},sample_rows:integer(0,100),require_exact_numbers:boolean,coverage:{...choice('full','sample'),description:'Default sample: 10 rows; explicitly request up to 100 rows, bounded by 10000 cells and 512 KiB of UI row data. full is restricted to executed transform.collapse_columns output 0, <=50 rows and <=8 columns with verified native provenance; other types cannot request full.'}},['ports','sample_rows','require_exact_numbers']),
+ read:object({ports:{...array(integer(0,1),2),description:'Only finish=execute can read ports. done/close and text export require []. Omit read for defaults.'},sample_rows:integer(0,100),require_exact_numbers:boolean,coverage:{...choice('full','sample'),description:'Default sample: 10 rows; explicitly request up to 100 rows, bounded by 10000 cells and 512 KiB of UI row data. full is available for executed Collapse output 0 (native provenance, <=50 rows and <=8 columns), or installed JavaScript UI handler output 0 with sample_rows=100 and require_exact_numbers=true. JavaScript full refuses when the native UI cannot prove every row within the bounded preview; it does not claim native-byte provenance.'}},['ports','sample_rows','require_exact_numbers']),
  budgets:{...object({
   configure_ms:{...integer(1,1800000),description:'Shared wall-clock budget for all setup phases, including source/workflow, port mappings and finish. Wide imports can take more than 120000 ms.'},
   execute_ms:{...integer(1,1800000),description:'Budget for waiting on the identified server execution.'},
@@ -100,7 +100,9 @@ nodeApplyInputSchema.allOf=[
  {if:{properties:{target:{properties:{type:{const:'exports.text'}},required:['type']}},required:['target']},
   then:{properties:{read:{properties:{ports:{maxItems:0}}}}}},
  {if:{properties:{read:{properties:{coverage:{const:'full'}},required:['coverage']}},required:['read']},
-  then:{properties:{finish:{const:'execute'},target:{properties:{type:{const:'transform.collapse_columns'}}},read:{properties:{ports:{const:[0]}}}}}}
+  then:{properties:{finish:{const:'execute'},target:{properties:{type:{enum:['transform.collapse_columns','programming.javascript']}}},read:{properties:{ports:{const:[0]}}}}}},
+ {if:{properties:{target:{properties:{type:{const:'programming.javascript'}},required:['type']},read:{properties:{coverage:{const:'full'}},required:['coverage']}},required:['target','read']},
+  then:{properties:{read:{properties:{sample_rows:{const:100},require_exact_numbers:{const:true}}}}}}
 ];
 const operation=object({operation_id:id});
 const deliveryId={...id,maxLength:80};
@@ -130,6 +132,9 @@ export function validateNodeApplyEnvelope(args) {
  if(javascript){
   if(args.mode!=='script')throw Error('Invalid parameters.mode: programming.javascript requires script');
   validateActionParameters(javascriptParametersSchema,args.parameters,'parameters.parameters');
+  if(args.read?.coverage==='full'&&(args.finish!=='execute'||JSON.stringify(args.read.ports)!=='[0]'
+    ||args.read.sample_rows!==100||args.read.require_exact_numbers!==true))
+   throw Error('Invalid parameters.read.coverage: JavaScript full UI read requires executed port 0, 100 rows and exact numbers');
   return args;
  }
  if(args.mode==='script'||Object.keys(javascriptParametersSchema.properties).some(key=>Object.hasOwn(args.parameters??{},key)))

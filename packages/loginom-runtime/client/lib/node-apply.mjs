@@ -66,8 +66,11 @@ export function validateNodeApplyRequest(request, handlers) {
   }
   object(request.read, ['ports','sample_rows','require_exact_numbers',...(Object.hasOwn(request.read??{},'coverage')?['coverage']:[])]);
   requireValue(request.read.coverage===undefined||['full','sample'].includes(request.read.coverage),'Invalid output coverage');
-  if(request.read.coverage==='full')requireValue(request.target.type==='transform.collapse_columns'&&request.finish==='execute'
-    &&JSON.stringify(request.read.ports)==='[0]','Invalid parameters.read.coverage: full requires executed Collapse output 0; other handlers support sample');
+  if(request.read.coverage==='full')requireValue(request.finish==='execute'&&JSON.stringify(request.read.ports)==='[0]'
+    &&(request.target.type==='transform.collapse_columns'
+      ||request.target.type==='programming.javascript'&&handler.fullUiOutput===true
+        &&request.read.sample_rows===100&&request.read.require_exact_numbers===true),
+    'Invalid parameters.read.coverage: full requires executed Collapse output 0 or installed JavaScript UI full-read support with 100 exact rows');
   requireValue(Array.isArray(request.read.ports) && request.read.ports.length <= 16
     && new Set(request.read.ports).size === request.read.ports.length
     && request.read.ports.every(p=>Number.isInteger(p) && p>=0 && p<100)
@@ -333,7 +336,10 @@ export async function applyNode({request, operation, handlers, drivers, record,
         value.execution_id===state.execution.execution_id && ['partial','complete'].includes(value.status)
         && typeof value.evidence_ref==='string' && value.evidence_ref.length>0 && Array.isArray(value.ports)
         && value.ports.length===request.read.ports.length
-        && value.ports.every((p,i)=>p.port===request.read.ports[i] && p.fresh===true), 'Output is not bound to the requested execution and ports')});
+        && value.ports.every((p,i)=>p.port===request.read.ports[i] && p.fresh===true)
+        &&(request.read.coverage!=='full'||request.target.type!=='programming.javascript'
+          ||value.status==='complete'&&value.ports.every(p=>p.sample_complete===true&&p.sample_rows===p.row_count)),
+        'Output is not bound to the requested execution, ports or full JavaScript row coverage')});
       state.output=output;
     }
     check();
