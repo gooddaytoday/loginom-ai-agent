@@ -51,6 +51,7 @@ import {makeJavascriptManagedSelectionReadCode} from '../../client/lib/javascrip
 import {wizardReadiness} from '../../client/lib/javascript-wizard-page.mjs';
 import {makeJavascriptManagedPageCode} from '../../client/lib/javascript-managed-page.mjs';
 import {dispatchManagedJavascriptNext} from '../../client/lib/javascript-managed-next.mjs';
+import {openManagedJavascriptExistingWizard} from '../../client/lib/javascript-managed-existing.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
@@ -1107,16 +1108,42 @@ const runExecutionTrial=async probe=>{
     report.stage='existing-source-readback';
     const boundary=await executionRuntime.captureExecutionBoundary();
     try{
-      const reopened=await executionRuntime.reopen(executionNode);wizardAddressEpoch++;
-      wizardHandle=null;wizardRoot=null;openedWizard=true;closeDispatched=false;closeConfirmed=false;closeDeadline=0;wizardDeadline=phaseDeadline(90000);
-      await executionRuntime.handoffReopenedWizard();
+      const existingDeadline=phaseDeadline(90000);
+      const existingReceiptNamespace=randomUUID();
+      const existingManaged=options['--managed-opening-probe']
+        ?await openManagedJavascriptExistingWizard({prepared:executionPrepared,node:executionNode,
+          deadline:existingDeadline,targetOrigin:new URL(config.url).origin,
+          execute:code=>Function('return ('+code+')')()(page),record:executionRecord,
+          receiptOptions:(id,key,signature)=>({receipt_namespace:'private-managed-js-existing-'+existingReceiptNamespace,
+            receipt_id:id,receipt_signature:signature}),
+          channel:executionRuntime.channel(executionNode,existingDeadline)})
+        :null;
+      const reopened=existingManaged?.opened??await executionRuntime.reopen(executionNode);wizardAddressEpoch++;
+      wizardHandle=null;wizardRoot=null;openedWizard=true;closeDispatched=false;closeConfirmed=false;closeDeadline=0;
+      wizardDeadline=existingManaged?existingDeadline:phaseDeadline(90000);
+      if(!existingManaged)await executionRuntime.handoffReopenedWizard();
       await executionRecord({phase:'existing_wizard_opened',reopened});
       await waitWizardReady();readingExisting=true;
+      if(existingManaged)managedSourceTask=existingManaged.task;
       await inspectWizardPages();
+      managedSourceTask=null;
       const source=await readOwnedExecutionSource();
       if(source!==probe.source)throw Error('Existing JavaScript source differs from applied trial');
       await executionRecord({phase:'existing_source_verified',source_sha256:digest(source)});
+      if(existingManaged){
+        const observed=await Function('return ('+makeJavascriptManagedSourceCode(existingManaged.task)+')')()(page);
+        if(observed.verified!==true||observed.source!==source)throw Error('Managed existing JavaScript source differs');
+        report.managed_existing_observation={verified:true,node_id:existingManaged.task.owner.node_id,
+          source_sha256:digest(observed.source),source_utf8_bytes:observed.source_utf8_bytes,
+          source_lf_lines:observed.source_lf_lines};
+        await executionRecord({phase:'javascript_managed_existing_source_observed',...report.managed_existing_observation});
+        await save();
+      }
       await closeWizardOnce();
+      if(existingManaged){
+        const {prepared,allowDeactivation,...selectionTask}=existingManaged.task;
+        await Function('return ('+makeJavascriptManagedSelectionReadCode({...selectionTask,mode:'dispose'})+')')()(page);
+      }
       await executionRuntime.settleClosedExecutionBoundary(boundary,executionNode,deadline);
       await executionRuntime.verifyExecutionBoundary(boundary);
     }finally{await boundary.native.dispose();}
