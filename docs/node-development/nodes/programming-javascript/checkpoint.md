@@ -82,9 +82,54 @@ cleanup и короткий rerun ещё предстоит провести н�
 документы/`__pycache__/`; его tracked checkpoint устарел.
 Untracked файлы сохранены, в code commits не включены и не являются новым bootstrap.
 Решение об их перемещении/удалении отдельно; пользование каноническими docs
-не зависит от уборки child. Следующий приватный профиль — назначенный под
-registry lock `javascript-discovery-profile-280`; перед новым live всё равно
+не зависит от уборки child. Актуальный приватный профиль назначается под
+registry lock в свежем assignment; перед новым live всё равно
 сверять свежий assignment, процессы и закрытие предыдущего пакета.
+
+### P1: доступ восстановлен, отказ открытия импорта и адресный recovery — 2026-09-29
+
+После команды пользователя продолжать системный resolver разрешил стенд в
+`10.200.11.224`, HTTP вернул 200. Fresh headed
+`p1-business-code-base-02` на профиле 281, source `cbfb793c95`, дошёл до
+`prepare-typed-input`, но получил `WIZARD_OPEN_NOT_CONFIRMED` после единственного
+клика открытия JSInput. Report SHA256
+`19b529fe5512f7f4384f0ccd3225a1c3c8e68740989ae3fdd609f07e12b3363a`;
+исходный статус **CLEANUP_UNCONFIRMED** сохранён: browser closed, package
+close/logout не подтверждены. JS Execute, input 6×5 и output 6×4 не доказаны.
+
+В journal отказа мастер `text_import_file` уже наблюдался с intended path и
+native `prepared_node_context.verified=true`, тем же GUID JSInput, surface
+wizard; собственная busy-маска `MF;TF-1;WizrdMCF` оставалась видимой.
+Проверка открытия после native surface wait была ограничена 24 короткими
+ожиданиями, а private opening budget — 45 секундами. Это объясняет отказ
+подтверждения при занятом владельце; исчезновение маски в исходном run не
+наблюдалось. Следующая проверка должна различить длительную загрузку и
+нарушение владельца, без повторения неизвестного эффекта.
+
+Отдельный обычный headed admin recovery на профиле 282 закрыл только
+`Package1` и сеанс `jsteach:3560`, связанные по пользователю, времени и имени
+с этим run. После Refresh их отсутствие проверено; admin UI logout и browser
+close подтверждены, процессов оператора/Chromium этих профилей нет.
+Recovery journal SHA256
+`8763602f59c5d6a88145c49dbf683fe20c3c4f7e8eca32558df91442c5f7b6eb`,
+receipt SHA256
+`19b7b2c56cda26f16a075c8ebb2b24fd7271ecf9753f759652dfefaac56e0ec1`.
+Recovery не повышает cleanup исходного run.
+
+Runtime fix `05186b8f67` передаёт remaining original node deadline в private
+opening wait; native surface wait не обрезается количеством samples. После
+одного settings-click наблюдается только busy-маска точного wizard root при
+неизменных native GUID, document/workflow/path и отсутствии чужих dialogs.
+Смена GUID, foreign mask/dialog и истечение исходного deadline не допускают
+успеха или повторного клика. Локально 409 tests PASS (workspace-ui,
+node-procedure, wizard open/close), syntax и diff-check PASS; test log SHA256
+`602b31cf76383d5ef206d039cb2376735b1dea476507f5134d8134dd359f87d3`.
+
+После подтверждённого recovery под registry lock назначен профиль 283,
+запущен новый headed `p1-business-code-base-03`, source `05186b8f67`.
+Результат этого запуска ещё не подтверждён; прежние reports не изменяются.
+`expected.json` остаётся неизменным. Далее — declared base, changed/reordered
+и конечный Stop/cancel по P1; до результата code-base их не считать проверенными.
 
 ### B: публичный configure existing — 2026-09-29
 
