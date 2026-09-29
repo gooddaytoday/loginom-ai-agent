@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {configureJavascriptSchema} from './javascript-schema-probe.mjs';
 import {verifyJavascriptDeclaredEmpty} from './javascript-native-zero.mjs';
-import {observeJavascriptColumnEditor,openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,cleanupJavascriptColumnEditor,waitJavascriptColumnEditor,fillJavascriptColumnField,javascriptColumnFieldMatches,recordJavascriptColumnHelperSource,openJavascriptColumnTypePicker,selectJavascriptColumnTypeOption,closeJavascriptColumnTypePicker,openJavascriptColumnUsagePicker} from './javascript-column-editor.mjs';
+import {observeJavascriptColumnEditor,openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,cleanupJavascriptColumnEditor,waitJavascriptColumnEditor,fillJavascriptColumnField,javascriptColumnFieldMatches,recordJavascriptColumnHelperSource,openJavascriptColumnTypePicker,selectJavascriptColumnTypeOption,closeJavascriptColumnTypePicker,openJavascriptColumnUsagePicker,selectJavascriptColumnUsageOption} from './javascript-column-editor.mjs';
 
 function fixture({count=0,globalForm=true}={}) {
   const prefix='MF;TF-1',pageTid=prefix+';WizrdMCF;JavaScriptColumnsWizard',nodes=[],controls={};
@@ -124,6 +124,46 @@ test('lazy unrendered usage picker requires full DOM owner after one opening cli
     deadline:Date.now()+1000,id:'usage-open',click:async()=>usage.setExpanded(true)});
   assert.equal(opened.usage_picker.owner,true);
   assert.equal(opened.usage_picker.verified_option_count,7);
+});
+
+test('owned usage option selects value four once, reads back and cancels without Apply',async()=>{
+  const f=fixture();await f.open();const usage=usageFixture(f,{lazy:true});f.setHit(()=>usage.triggerDom);
+  await openJavascriptColumnUsagePicker({page:f.page,state:f.state,record:f.record,once:f.once,
+    deadline:Date.now()+1000,id:'usage-open',click:async()=>usage.setExpanded(true)});
+  const target=usage.options[2];let clicks=0;f.setHit(()=>target);
+  target.onClick=()=>{clicks++;usage.combo.value=4;usage.setExpanded(false);f.setHit(()=>f.form.FItems.btnCancel.el.dom);};
+  const selected=await selectJavascriptColumnUsageOption({page:f.page,state:f.state,record:f.record,once:f.once,
+    deadline:Date.now()+1000,id:'usage-select'});
+  assert.equal(selected.usage_picker.cached_value,4);assert.equal(clicks,1);
+  const cancelled=await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
+  assert.equal(cancelled.status,'settled');assert.equal(f.effects.includes('usage-select'),true);
+  assert.equal(f.effects.includes('cancel'),true);assert.equal(f.effects.includes('apply'),false);
+});
+
+test('foreign usage option refuses selection before click',async()=>{
+  const f=fixture();await f.open();const usage=usageFixture(f,{lazy:true});f.setHit(()=>usage.triggerDom);
+  await openJavascriptColumnUsagePicker({page:f.page,state:f.state,record:f.record,once:f.once,
+    deadline:Date.now()+1000,id:'usage-open',click:async()=>usage.setExpanded(true)});
+  let clicks=0;usage.options[2].onClick=()=>{clicks++;};f.setHit(()=>usage.options[2]);
+  usage.picker.pickerField={};
+  await assert.rejects(selectJavascriptColumnUsageOption({page:f.page,state:f.state,record:f.record,once:f.once,
+    deadline:Date.now()+1000,id:'usage-select'}),/usage_picker_owner_changed/);
+  assert.equal(clicks,0);assert.equal(f.effects.includes('usage-select'),false);
+});
+
+test('lost usage option click is never replayed and observed selection can be cancelled',async()=>{
+  const f=fixture();await f.open();const usage=usageFixture(f,{lazy:true});f.setHit(()=>usage.triggerDom);
+  await openJavascriptColumnUsagePicker({page:f.page,state:f.state,record:f.record,once:f.once,
+    deadline:Date.now()+1000,id:'usage-open',click:async()=>usage.setExpanded(true)});
+  const target=usage.options[2];let clicks=0;f.setHit(()=>target);
+  target.onClick=()=>{clicks++;usage.combo.value=4;usage.setExpanded(false);
+    f.setHit(()=>f.form.FItems.btnCancel.el.dom);throw Error('lost usage click response');};
+  const select=()=>selectJavascriptColumnUsageOption({page:f.page,state:f.state,record:f.record,once:f.once,
+    deadline:Date.now()+1000,id:'usage-select'});
+  await assert.rejects(select(),/lost usage click response/);
+  await assert.rejects(select(),/do not replay/);
+  const cancelled=await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
+  assert.equal(clicks,1);assert.equal(cancelled.status,'settled');
 });
 
 test('foreign usage picker refuses before opening gesture',async()=>{
