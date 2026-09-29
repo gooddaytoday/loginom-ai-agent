@@ -53,6 +53,7 @@ import {captureJavascriptWizardError} from './javascript-wizard-error.mjs';
 import {readJavascriptG1Type} from './javascript-g1-type.mjs';
 import {readJavascriptServerVersion} from './javascript-server-version.mjs';
 import {openJavascriptPackageFileTab,readJavascriptPackageFile} from './javascript-package-file.mjs';
+import {createJavascriptHeadedFocusX11} from './javascript-headed-focus-x11.mjs';
 
 export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false}={}) {
 process.umask(0o077);
@@ -65,17 +66,17 @@ const batchDeadline=coldReader||packageFile?Math.floor(performance.timeOrigin)+6
 let cleaning=false,cleanupDeadline=Infinity;
 const phaseDeadline=ms=>Math.min(cleaning?cleanupDeadline:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=(cleaning?cleanupDeadline:batchDeadline)-Date.now();if(ms<=0)throw Error(cleaning?'Original cleanup deadline expired':'Original batch deadline expired');return ms;};
-const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--server-version-only | --palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor [--inspect-usage-picker [--select-usage-option [--apply-usage-option]]] | --probe-source]] | --execution-case CASE [--managed-opening-probe] | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
+const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--server-version-only | --palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor [--inspect-usage-picker [--select-usage-option [--apply-usage-option]]] | --probe-source]] | --execution-case CASE [--managed-opening-probe --x11-no-focus] | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
 if(args.includes('--help')&&coldReader){console.log('node javascript-persistence-read-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nCold reader: observe actual source/settings/mappings, one fresh Execute and full output; 10 minutes from process start; headed only. No source or configuration input.');return;}
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
-  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--metadata-diagnostic'].includes(key) ? true : args[++i];
+  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
 }
 if(coldReader){
@@ -98,6 +99,7 @@ if(sourceReadCycle){
 if(options['--managed-opening-probe']&&(options['--execution-case']!=='code-table-execute'
   ||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--discovery-probe']))
   throw Error('Managed opening probe requires one isolated code-table-execute case');
+if(options['--x11-no-focus']&&!options['--managed-opening-probe'])throw Error('X11 focus guard requires the isolated managed opening probe');
 if(batch&&options['--execution-case'])throw Error('Batch cannot also select a single case');
 if(nativeInputOnly||nativeRoundtrip){
   if(batch||Object.keys(options).some(k=>!['--config','--profile','--browser','--evidence','--native-fixture',...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])].includes(k)))throw Error('Native input-only requires its separate private entrypoint and no JS modes');
@@ -168,7 +170,7 @@ let session,page,owner,packageHandle,wizardBinding,wizardHandle,wizardRoot,opene
 let executionRuntime,executionInput,executionNode,executionPrepared,executionInputProof,executionDrop,paletteAdmission;
 const ownedPackageName=()=>executionRuntime?.persistencePackage?.prepared.package_ref.name??(coldReader||packageFile?executionPrepared?.package_ref?.name:owner?.package_name);
 const ownedPackagePath=()=>executionRuntime?.persistencePackage?.path??(coldReader||packageFile?executionPrepared?.package_ref?.path??null:null);
-let browserLifecycle,inputBinding,previewCloseState={dispatched:false};
+let browserLifecycle,focusGuard,inputBinding,previewCloseState={dispatched:false};
 const columnState={pending:null};
 let executionJournalLine=0;
 let nativeClassifierBinding;
@@ -1506,7 +1508,13 @@ const runPreparedCase=async()=>{
 
 try {
   await save();
-  session=await loginBrowser({browserPath:options['--browser'],profile:options['--profile'],candidate:config,headless:false,keepOpen:true});
+  if(options['--x11-no-focus']){
+    report.stage='focus-setup';
+    focusGuard=await createJavascriptHeadedFocusX11({profile:options['--profile'],browserPath:options['--browser'],
+      record:async value=>{report.focus_x11=value;await save();}});
+  }
+  session=await loginBrowser({browserPath:options['--browser'],profile:options['--profile'],candidate:config,headless:false,keepOpen:true,
+    ...(focusGuard?{onContextCreated:focusGuard.onContextCreated}:{})});
   page=session.context.pages()[0];page.setDefaultTimeout(10000);
   await mkdir(directory+'/browser-lifecycle',{mode:0o700});
   browserLifecycle=observeJavascriptBrowserLifecycle({context:session.context,page,stage:()=>report.stage,
@@ -1838,6 +1846,7 @@ try {
     if(browserLifecycle)await browserLifecycle.beforeClose();
     await session.context.close().then(()=>{report.cleanup.browser_closed=true;},()=>{report.cleanup.browser_closed=false;});
   }
+  if(focusGuard)report.focus_x11={...report.focus_x11,monitor:await focusGuard.stop()};
   if(browserLifecycle)Object.assign(report.browser_lifecycle,await browserLifecycle.finish());
   if (!report.cleanup.package_closed||!report.cleanup.logged_out||!report.cleanup.browser_closed) report.status='CLEANUP_UNCONFIRMED';
   report.finished_at=new Date().toISOString();

@@ -29,7 +29,9 @@ export function javascriptCreatedTopology(before,after,source,id) {
   if(source.document_id!==before.document_id||source.workflow_id!==before.workflow_ref.workflow_id
     ||before.nodes.filter(n=>n.ref.node_id===source.node_id&&n.outputs.includes(0)).length!==1)
     throw Error('JavaScript source output identity differs');
-  const created=verifyNodeTargetEffect({kind:'create',before,parameters:{type:'bg-vendor-icon-javascript'}},after);
+  // The graph adapter reports the catalog runtime type; the palette icon is
+  // verified separately by the native owner checks around this transition.
+  const created=verifyNodeTargetEffect({kind:'create',before,parameters:{type:'programming.javascript'}},after);
   if(!created||created.node_id!==id)throw Error('JavaScript palette topology delta differs');
   const target=after.nodes.find(n=>n.ref.node_id===id);
   if(!same(target.inputs,[0])||!same(target.outputs,[0]))throw Error('JavaScript single input/output ports differ');

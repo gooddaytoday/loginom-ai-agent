@@ -7,7 +7,7 @@ import {createJavascriptEffectJournal} from './javascript-execution-evidence.mjs
 function fixture() {
   const node=(id,type='imports.text')=>({ref:{document_id:'doc',workflow_id:'flow',node_id:id},
     type,label:id,dom_epoch:1,position:{x:0,y:0},inputs:[0],outputs:[0,1],other_ports:[],locked:false});
-  const source=node('source'),old=node('old'),created={...node('js','bg-vendor-icon-javascript'),outputs:[0]};
+  const source=node('source'),old=node('old'),created={...node('js','programming.javascript'),outputs:[0]};
   const before={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:{workflow_id:'flow'},dom_epoch:1,
     nodes:[old,source],links:[{source:'source',output:1,target:'old',input:0}],foreign_links:['retained-variable-link']};
   const after=structuredClone(before);after.nodes=[created,...after.nodes];
@@ -36,6 +36,7 @@ test('wrong/extra links, changed old topology, ports and foreign owners refuse a
     f=>f.after.nodes[1].outputs=[0],
     f=>f.after.nodes[1].position.x=80,
     f=>f.after.nodes[0].inputs=[0,1],
+    f=>f.after.nodes[0].type='bg-vendor-icon-javascript',
     f=>f.after.foreign_links.push('new-variable-link'),
     f=>f.after.workflow_ref.workflow_id='foreign',
     f=>f.after.complete=false,
