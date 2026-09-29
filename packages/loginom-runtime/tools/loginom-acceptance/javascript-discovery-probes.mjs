@@ -3,6 +3,7 @@
 import {createHash} from 'node:crypto';
 import {javascriptEngineProbes,inputTextProbe} from './javascript-engine-probes.mjs';
 import {javascriptBusinessProbes} from './javascript-business-probes.mjs';
+import {javascriptStopProbe} from './javascript-stop-case.mjs';
 import {verifyJavascriptMismatchTable} from './javascript-mismatch-probe.mjs';
 
 const need=(v,m)=>{if(!v)throw Error(m);};
@@ -39,6 +40,7 @@ const probes=[
   {id:'g5-empty-output',scope:'G5',source:source('Integer','// Deliberately append no rows.'),
     schema:column('integer'),expected:[],expectation:'fixed'},
   ...javascriptBusinessProbes(),
+  javascriptStopProbe(),
 ].map(p=>({...p,schema_mode:p.schema_mode??'code',build:'7.4.2',source_sha256:hash(p.source),status:'not_run'}));
 
 export const javascriptDiscoveryIds=Object.freeze(probes.map(p=>p.id));
