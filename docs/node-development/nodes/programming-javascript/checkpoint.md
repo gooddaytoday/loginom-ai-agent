@@ -433,6 +433,32 @@ state и unknown pin receipt отказывают preparation, default callers �
 введён. Profile303/run `p1-stop-finite-06` проверяет эту конкретную предпосылку
 обычным headed запуском. G6 остаётся открытым.
 
+`p1-stop-finite-06`/profile303/source `0d306421f7` — **FAILED** до Execute.
+Pin click step4 SUCCEEDED; Loginom перенёс консоль в `MF;ConsoleForm`.
+Preparation искала только `ConsoleForm` и получила readiness timeout;
+finite Execute/identify/local cancel/Stop/short rerun не вызывались.
+Report SHA256 `3b29797e5c500efeec58abc9d018f7f02daf5241bb94a6520227c738666e0cb5`,
+journal SHA256 `d3bf8182048f35143089644e5a57262b5430835e70875653a667e447e7f4850c`.
+Package/logout/browser cleanup 3/3 и отсутствие собственных процессов проверены;
+registry reconciled под lock. Следующая адресная правка — поддержать оба
+точно наблюдённых namespace консоли с уникальностью/native binding; затем
+локальные регрессии и fresh headed run07. Epoch guards остаются прежними.
+
+Child `8c05bcc6d7` поддерживает точные `ConsoleForm`/`MF;ConsoleForm`
+в region discovery, native inventory, Stop controls, source history и focus repair.
+Две панели/несвязанные grids/чужой store отказываются; actual refs/tids,
+record_id, native owner и обе epoch проверки сохранены. Regression pin
+моделирует реальную смену namespace, включая последующий Stop/Close.
+Локально 309 runtime + 8 console + 74 source/cold tests PASS, syntax/diff PASS.
+Полная первая серия дала 601/605: четыре ошибки новых fixture устранены и
+перепроверены адресно; legacy cold fixture получил отсутствующий focusGuard=null.
+Logs SHA256 соответственно
+`3cf35bc21c4a879ed53befca2b74c1043ae48243a0d174a50e5f75437de1092f`,
+`03cca24fc93b7a5bc8efae3ef0614917e2708767c01f9c83e288aaa8b622532c`,
+`2dd48bff179e7cf2dedba00ebddc341686e2825285a2bc004e469443a081a801`.
+Под lock назначен fresh profile304/run `p1-stop-finite-07`, exec8580;
+обычный headed. Успех Stop пока не заявлен, G6 открыт.
+
 ### B: публичный configure existing — 2026-09-29
 
 В child commits `57b074fc7b`, `7cd36bb763`, `f8ceebcac9` собран узкий
