@@ -1,5 +1,41 @@
 # JavaScript: checkpoint исполнения
 
+## G3: собственный список назначения открыт и закрыт — 2026-09-29
+
+Ветка `javascript` уже содержит `loginom` `3f35c5f232`: повторный
+`git rebase origin/loginom` после `fetch` завершился `up to date`.
+Указанная Cursor-сессия `d69de234-826c-4e08-a8ac-184749a58d47`
+закрепила общее правило кнопки ошибки мастера на `loginom`; подплан JS и
+оператор чтения отказа уже приведены к нему. Повторная проверка:
+`validate.py` PASS, адресные тесты observer/error reader 22/22 PASS.
+
+Для G3 источники `7ac8679ebb`/`1653230051`/`7f3862d110` на отдельных
+Ubuntu headed профилях 217–219 отказали **до клика** и каждый раз завершили
+cleanup 3/3. Диагностика profile219 установила точную причину: у свёрнутого
+`cbxUsageType` native picker уже связан с полем и store, но его DOM создаётся
+только при открытии. Source `81179bd1e5` разрешил лишь это состояние перед
+жестом, сохранив полную проверку DOM owner после открытия.
+
+Profile220/Loginom Enterprise 7.4.2 подтвердил один `usage-picker-open`:
+`EditColumnDefForm;cbxUsageType;trg_picker` открыл принадлежащий полю список,
+7/7 native records соответствовали 7/7 видимым options; `4 — Выходное`
+совпало ровно один раз. Тот же trigger закрыл список, после чего был выполнен
+`Cancel`: ноль локальных записей, ни Save, ни Execute, ни Done. Process
+exit0/`OBSERVED`, package close/logout/browser close 3/3, процессов профиля
+нет. Report SHA256
+`3f827ceba47886005ec249ec4851b08226fef95d5dad5cff2ef632e238905f03`,
+journal SHA256
+`97d9fb1ea98d135b067a5e96a701bbebeeafb9007213b582758bff27953dd458`,
+independent verification SHA256
+`150b308225d462612be44ab59799bb0f7be2842533a4a14555762472c9accb23`.
+Private freeze143 SHA256
+`16962b3546a71b2351f217d357146d80b2491edcf3c173b217c549274fa75bb5`
+сверил 1336 pins, closure223 файла/661 literal edge, computed0; JS suite
+18 053/18 053 PASS, fail/skip0, log SHA256
+`f2ec54ade2f4d6266f54ef4ae340779d57ba9c6c9ef4ee50cc217444edbae977`.
+Browser lease свободен, следующий пустой profile221. Выбор ненулевого usage,
+Apply, Save, cold read и generated schema → physical output0 остаются открыты.
+
 ## G3: собственный trigger назначения столбца — 2026-09-29
 
 Child source `fb55a63a49` дополнил только read-only inventory собственного

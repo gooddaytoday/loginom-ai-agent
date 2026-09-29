@@ -15,7 +15,7 @@ Linux по принадлежащему `Session.Version.IsWindows=false`; ди�
 | --- | --- | --- |
 | G1 — узел и редактор | Собственный JS GUID, иконка `bg-vendor-icon-javascript`. Для несоединённого узла fresh headed проход подтвердил страницы `TuneDataSourceInputPortWizard` index0 → `JavaScriptColumnsWizard` index1 → `JavaScriptCodeWizard` index2 → `DoneWizard` index4 с условно пропущенным index3. При уже подключённом input0 первая страница пропускается. CodeMirror 4.11.1, `mode=javascript`, `readOnly=false`, отступ 4, `smartIndent/electricChars=true`; код прочитан целиком и восстановлен после G4 probe. Собственный code controller держит `FEngine`/`FModuleSystem`: native proxy одного сеанса, но разных remote objects и interfaces. Два сохранённых `.lgp` 7.4.2 содержат JS `VendorGuid=28865f89-eea0-4143-b155-291791324a4b` и сериализованный `TBGJavaScriptEngine`. | Установить runtime native component/`FullType`, остальные условные маршруты и наличие помощника либо переключателя движка. Два proxy не считать cast одного объекта; XML-тип сохранённого engine и видимый заголовок не заменяют runtime type. |
 | G2 — моменты исполнения | В обоих режимах `code`/`declared` переходы `Next` и `Done` наблюдены. `Preview` и отдельный `Execute` положительно подтвердили исполнение собственными sentinel/child evidence. | Эффекты `Next`/`Done` остаются неопределёнными: отсутствие sentinel не доказывает отсутствие исполнения внутри `Verify`. Нужен подтверждённый порядок materialization и консервативный контракт без повтора жеста с неизвестным эффектом. |
-| G3 — схема и связи | Оба schema mode дали полный результат 6×2. Ручной output mapping с `autosync=false` сохранился; при несовместимой смене исходного поля новый Execute вернул собственную ошибку о пропавшем `PhaseMarker`, связь не переназначилась молча. Пять отдельных двухколоночных проб наблюдали фактические имена/метки до и после записи. На пустой declared-схеме отдельно наблюдены native списки `Вид данных` и `Назначение`; последний связан с `DefaultUsageType`. | Доказать связь code-generated schema с physical output0, переход configured-only → materialized, допустимую смену схемы и полную сохранность двухсторонних связей existing-узла. `bridge_verified=false`; не выводить общий алгоритм нормализации Name из пяти примеров. |
+| G3 — схема и связи | Оба schema mode дали полный результат 6×2. Ручной output mapping с `autosync=false` сохранился; при несовместимой смене исходного поля новый Execute вернул собственную ошибку о пропавшем `PhaseMarker`, связь не переназначилась молча. Пять отдельных двухколоночных проб наблюдали фактические имена/метки до и после записи. На пустой declared-схеме отдельно наблюдены native списки `Вид данных` и `Назначение`; последний связан с `DefaultUsageType`. Собственный picker назначения открывался одним жестом: 7/7 native records соответствовали 7/7 видимым options, включая `4 — Выходное`; список закрыт до Cancel. | Доказать связь code-generated schema с physical output0, переход configured-only → materialized, допустимую смену схемы и полную сохранность двухсторонних связей existing-узла. `bridge_verified=false`; не выводить общий алгоритм нормализации Name из пяти примеров. |
 | G4 — точность кода | `keyboard.insertText` на реальном CodeMirror передал 849 байт/8 строк и граничные 32768 байт/1024 строки с полным readback; `keyboard.type` изменил контрольный текст и отклонён. Отдельный source97 дважды выполнил принадлежащий узлу полный open/read/Close без нового явного Execute/Done. В G7 последняя редакция прочитана после холодного открытия. | Связать точный source receipt, UTF-8/LF digest и полную redaction-проверку с публичной записью и source-read. Не считать отсутствие явного Execute доказательством отсутствия любых скрытых серверных эффектов. |
 | G5 — типы и доступ | Индексированная discovery-матрица имеет наблюдения для всех 30/30 закреплённых snippets; отдельные native/typed пробы показали scalar, NULL/empty/undefined, safe/unsafe int64, Date, именованный доступ и пустой output. | Завершить заранее закреплённый native roundtrip и одноколоночные D/J24 cases только после доказанной source→physical связи. Typed UI без native bytes не закрывает точность; 30/30 observation не означает G5/J20 PASS. |
 | G6 — ошибки и восстановление | Синтаксический отказ `Next` даёт собственную кнопку ошибки и штатный диалог; синхронный `throw` даёт failed child после отдельного Execute. Исправленный оператор читает причину, закрывает диалог OK и завершает пакет; свежий headed regression проверен на `?.`. | Проверить сохранение прежнего кода/соседнего графа при отказах, ремонт того же узла, cancel/Stop/lost reply и доставку диагностики модели. Позицию выдавать только из текста Loginom. |
@@ -45,12 +45,15 @@ editor; доступность вариантов для других типов
 `Cancel` локальная коллекция пуста и чиста, но native `totalCount` оставался
 равным 1. Оператор принял только эту точную комбинацию квитанции Cancel и
 диагностики store; Save и Execute не вызывались. SHA и cleanup — в checkpoint.
-Следующий read-only проход на profile216 подтвердил для `cbxUsageType`
-единственный собственный видимый trigger
-`EditColumnDefForm;cbxUsageType;trg_picker` (`rendered=true`,
-`repeatClick=false`, `disabled=false`). Список не открывали и значение не
-выбирали: это доказательство адреса управляющего элемента, не persistence
-`DefaultUsageType`.
+Profile216 подтвердил для `cbxUsageType` единственный собственный видимый
+trigger `EditColumnDefForm;cbxUsageType;trg_picker` (`rendered=true`,
+`repeatClick=false`, `disabled=false`). В отдельных headed попытках 217–219
+предусловие открытия выявило ленивое создание DOM picker; все отказали до
+клика и закрылись штатно. Source `81179bd1e5` допустил только эту наблюдённую
+форму связи поля и store без DOM перед кликом. Profile220 подтвердил один
+`usage-picker-open`, все семь собственных видимых вариантов и закрытие списка
+до `Cancel` с нулём локальных записей и cleanup 3/3. Ненулевое значение не
+выбирали: persistence `DefaultUsageType` пока не подтверждена.
 
 Следующие проверки — установить оставшиеся свойства редактора,
 определить безопасный контракт `Next`/`Done`, доказать G3 bridge для generated
