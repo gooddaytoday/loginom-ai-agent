@@ -2,7 +2,7 @@
 
 ## Текущее состояние
 
-Сводка на 2026-09-29 после результата B и подготовки P1. Исходный срез
+Сводка на 2026-09-30 после B, private P1 и C0/G3. Исходный срез
 [acceleration review](acceleration-review.md) к [плану](plan.md): docs
 `13a02e8be2d698d5fbc7f19d146fa82d55f53e48`, code
 `7b8e19bee073cb596607688173234e57052e27b1`. Новые live evidence B
@@ -26,8 +26,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Stop/cancel — J13 | Private native Stop + отдельный local cancel + same-node 6×4 rerun, run08/source `0328cadfc9`, terminal за 6,612 с, cleanup 3/3 | Public/CLI lifecycle, deadline/error/recovery cases; весь G6 этим fixed case не закрыт |
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
-**Следующий связный результат:** C — полный public code lifecycle и G3 bridge
-из [плана](plan.md). Ранний P1 Stop/cancel подтверждён ниже. Ранний private
+**Следующий связный результат:** C — полный public code lifecycle
+из [плана](plan.md); fixed private G3 bridge подтверждён ниже. Ранний P1 Stop/cancel подтверждён ниже. Ранний private
 бизнес 6×4 для обоих base modes и code changed/reordered проверен ниже. B уже подтвердил
 existing code-table через public API-path изолированного runtime; повторять
 этот фиксированный run без затронувшего изменения не требуется.
@@ -182,6 +182,35 @@ gates_closed=[]; не общий PASS arbitrary names/types/declared или publ
 handler и full read6×4, затем Save/cold; D/E/F и G1/G5/G6 остаток открыты.
 Готовность registry не повышалась. Live процессов нет, следующий fresh
 browser profile311; назначать только после реализации/test/source pin.
+
+### Точка продолжения C после G3 — 2026-09-30
+
+Все собственные browser/operator процессы завершены; private registry и
+assignment — closed_verified/profile310, active_exec_session/evidence=null.
+Код child `1965b71edd`, canonical docs — основной checkout. Следующий fresh
+profile311 пока не создан. P1, C0 и fixed G3 без причины не повторять.
+
+Перед реализацией C учесть наблюдённое и существующие seams:
+
+- Новый JS starts `generation.checked=false`, source/target grids0; G3 journal
+  javascript_schema_before/after подтвердил переход false→true. Managed source
+  adapter сейчас сохраняет generation и допускает уже настроенный existing
+  Code. Для new Code нужен owned generation transition на Columns page с
+  actual readback; source reader без запроса не должен менять эту настройку.
+- B injection допускает только fixed existing/comment source, Done и пустые
+  mappings/read; это не C handler. Переиспользовать owned writer/admission,
+  Next/Done settlement, независимый source-read, native execution и Table reader.
+- Если выбран separate output wizard, общий node_apply intermediate node_finish
+  всё ещё требует execution_started=false, тогда как JS Done корректно null.
+  Нельзя подставлять false. Output wizard может деактивировать узел, поэтому
+  отдельный final fresh Execute после mapping обязателен. Его ownership,
+  Stop/local cancel/deadline, journal admission и no-replay требуется сохранить.
+- Выбор порядка public materialization/mapping/Execute фиксировать с учётом
+  реального shell и публичных jobs, а не механически переносить private C0.
+  Продуктовые API и knowledge не должны содержать operator telemetry/oracle.
+
+Далее: code handler/new input и полный public6×4, Save/cold, затем D/E/F.
+Общий Goal остаётся active; завершение всего обучения не объявлено.
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
