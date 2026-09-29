@@ -65,6 +65,16 @@ test('private JS selection works with observed generic deny and sends only one b
   const ready=privateSelectionFixture('already');assert.equal((await ready.run()).selected,false);assert.equal(ready.clicks,0);
   const icon=privateSelectionFixture('icon');assert.equal((await icon.run()).verified,true);assert.equal(icon.clicks,1);
 });
+test('owned selection binds the caller origin and build before any gesture',async()=>{
+  for(const options of [{targetOrigin:'http://foreign.test'},{targetBuild:'7.4.3'}]){
+    const f=privateSelectionFixture();
+    await assert.rejects(f.run(undefined,options),/Private selection native owner changed/);
+    assert.equal(f.clicks,0);
+    assert.equal(f.disposed,1);
+  }
+  const matched=privateSelectionFixture();
+  assert.equal((await matched.run(undefined,{targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2'})).verified,true);
+});
 test('descendant Execute, Preview, ports or foreign Setting child never authorize body/Setting clicks',async()=>{
   for(const fault of ['overlay_Execute','overlay_Preview','overlay_Input_Data-0','overlay_Setting','setting_overlay']){
     const f=privateSelectionFixture(fault);await assert.rejects(f.run(),/covered/);assert.equal(f.clicks,0);assert.equal(f.disposed,1);
