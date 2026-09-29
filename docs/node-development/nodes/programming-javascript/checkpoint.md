@@ -1,5 +1,59 @@
 # JavaScript: checkpoint исполнения
 
+## G3: declared editor, DefaultUsageType и Cancel — 2026-09-29
+
+На Loginom Enterprise 7.4.2 в Ubuntu headed Chromium прочитаны собственные
+`EditColumnDefForm;cbxDataKind` и `cbxUsageType` пустой declared-схемы. В
+profile214/source `3a50a79a5c` `cbxDataKind` имел значения 0
+«Неопределенное», 1 «Непрерывный», 2 «Дискретный» (выбрано 2, control
+disabled); `cbxUsageType` — 0 «Не задано», 3 «Активное», 4 «Выходное»,
+6 «Группа», 7 «Показатель», 8 «Транзакция», 9 «Элемент» (выбрано 0). Retained
+frontend `CodeColumnsWizard.js` SHA256
+`af4f512a9981e70066aadb3351a324b038dea3cc6d7bd00e1b5647043e0e3173`
+показывает `colDefaultUsageType`; `EditColumnDefForm.js` SHA256
+`ab095a30d436fa14a9d6a0c238aadebd4e2d0eb8e7ddce80caebcf46f16f4a36`
+читает `fpDefaultUsageType` и записывает `DefaultUsageType`. Это точное
+сопоставление для будущего G3 handler, не доказательство доступности всех
+значений у каждого типа.
+
+Первый profile212/source `23029dcd29` отказал **до Add** из-за ошибочного
+требования `generation.checked=true` при declared режиме `false`; полный
+cleanup3/3, report SHA256
+`c193502d23402cb0da1d4f05cc4da2d35b7bb60690e1d2b790f4995a0c2abf2b`,
+journal SHA256
+`cbce1d1355c4b7188b5182b28a84fcacce005821e4b48bec11c5f51679666db3`,
+verification SHA256
+`91e12cad85edb0bd1b8158641d087cc3954c27b7d93018d1c8d10148e5ac69dd`.
+Исправление `2e52f12530` дало profile213: оба списка прочитаны, Cancel
+settled и удалил строку, но общий schema reader отказал из-за оставшегося
+`totalCount=1` при нуле записей. Оператор завершился FAILED с cleanup3/3;
+report SHA256
+`c6080526ff3b3f3e4b7978eb68b27ccef0a9b8b9c896fabf1a6c98c8db139caf`,
+journal SHA256
+`a9123dd967fc3b666814ed9fccbb4e19977222b432421b979e687414dce65dda`,
+verification SHA256
+`992ec63bbea14437ca31f9be599fd86c43888fbfcade71d2133d9bdf05aa962b`.
+
+Source `3a50a79a5c` оставил строгую проверку Cancel по owner, пустой/чистой
+коллекции и отдельно допускает только известный stale `totalCount` в
+диагностике. Profile214 завершился exit0/`OBSERVED`: Add один раз, read-only
+combo inventory, Cancel, затем обычный проход мастера без Done; никакого
+Save/Execute. Package close/logout/browser close 3/3, процессов профиля нет.
+Report SHA256
+`4667b6dd278505f23b9e756beb617abf8342fb6bf7797ee2beddc8a6b312f831`,
+journal SHA256
+`52226122005fbeed71ba5c908cd4f41574dcef25c5cfe69ddb922a57de68d7a1`,
+independent verification SHA256
+`447c5db561e90c0a6e5f39e28ebee51c31bba72f3c68ea89e651405a041f46fa`.
+Все файлы попыток приватные. Pinned Node24.19.0: JS suite 18 047/18 047
+PASS, fail/skip0; log SHA256
+`f14d4a9ebc686ed441707109a3da4ecb28f6d9e8ef0ed37bc7312d3f1dc2e98c`.
+Private freeze137 SHA256
+`6443cdb6e9025a108fe0d3b5bffcac5e33b921d8030925012e8e2c2ce8ef07d2`
+проверил 1334 pin, 222 файла import-closure, 660 literal edges, computed0.
+Browser lease свободен; следующий пустой profile215. G3 bridge и публичный
+handler всё ещё открыты.
+
 ## G1: два выбранных proxy мастера кода — 2026-09-29
 
 Ветка `javascript` уже содержит общий регламент отказа мастера из `loginom`
