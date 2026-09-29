@@ -1,8 +1,8 @@
 import {openJavascriptInitialWizard,requireJavascriptInitialOpeningCleanup} from './javascript-initial-opening.mjs';
 import {openManagedJavascriptInitialWizard} from './javascript-managed-initial-opening.mjs';
 import {javascriptExecutionIdentity} from './javascript-mismatch-probe.mjs';
-import {withJavascriptWizardMasks} from './javascript-wizard-masks.mjs';
-import {waitJavascriptWizardSettlement,inspectJavascriptWizardAddress,withJavascriptWizardAddress} from './javascript-wizard-settlement.mjs';
+import {waitJavascriptWizardSettlement,inspectJavascriptWizardAddress} from './javascript-wizard-settlement.mjs';
+import {wizardReadiness} from '../../client/lib/javascript-wizard-page.mjs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,mkdtemp,rm} from 'node:fs/promises';
@@ -1184,12 +1184,9 @@ test('wizard mask diagnostics are capped without truncating blocker admission or
 
 test('the live readiness inspector serializes the same classifier without browser imports or host closures',async()=>{
  const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
- const start=source.indexOf('const wizardReadiness=')+'const wizardReadiness='.length;
- const end=source.indexOf(';\nconst waitWizardReady=',start);
- assert.ok(start>0&&end>start);
- const inspect=vm.runInNewContext(source.slice(start,end),{withJavascriptWizardMasks,withJavascriptWizardAddress});
+ assert.ok(source.includes("import {wizardReadiness} from '../../client/lib/javascript-wizard-page.mjs'"));
  const realm=vm.createContext({document:{querySelectorAll:()=>[]},getComputedStyle:()=>({visibility:'visible'})});
- const result=vm.runInContext('('+inspect.toString()+')',realm)({prefix:'MF;TF-1',inspect:true});
+ const result=vm.runInContext('('+wizardReadiness.toString()+')',realm)({prefix:'MF;TF-1',inspect:true});
  assert.equal(result.ready,false);assert.equal(result.fatal,true);assert.equal(result.counts.overlays,0);
  assert.equal(result.mask_classification.length,0);
 });

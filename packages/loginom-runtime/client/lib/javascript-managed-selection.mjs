@@ -76,7 +76,10 @@ export async function runManagedJavascriptSelectionRead(page,task,capture,inspec
   const lease=leases.get(task.operation_id);
   if(!lease||lease.identity!==identity)throw Error('Managed JavaScript selection lease changed');
   if(task.mode==='dispose'){
-    leases.delete(task.operation_id);await lease.handle.dispose();return {disposed:true};
+    leases.delete(task.operation_id);
+    try { await lease.wizardCaptured?.dispose(); }
+    finally { await lease.handle.dispose(); }
+    return {disposed:true};
   }
   if(task.mode!=='inspect')throw Error('Unsupported managed JavaScript selection read');
   const result=await page.evaluate(inspect,{held:lease.handle,task:{...task,afterGesture:lease.afterGesture===true}});
