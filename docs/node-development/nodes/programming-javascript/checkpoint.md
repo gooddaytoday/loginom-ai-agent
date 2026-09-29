@@ -1,5 +1,33 @@
 # JavaScript: checkpoint исполнения
 
+## One-shot managed Done gesture — 2026-09-29
+
+Code commit `7ed53e0ee0` в `origin/node-javascript` перенёс действие Done из
+private-оператора в `client/lib/javascript-managed-done.mjs`. Browser lease
+запоминает SHA-256 только после точного полного readback черновика; новый жест
+требует тот же owner, удержанный wizard/root, страницу Done 3/4, собственную
+доступную кнопку и совпадение SHA. Подготовка записывается в журнал до клика,
+попытка помечается до первого browser gesture, browser receipt запрещает
+повтор после потерянного ответа. Возврат `SUCCEEDED` означает только возврат
+клика: `wizard_commit_verified=false`; фиксация устанавливается лишь после
+возврата к графу и независимого нового source-read. Сама runtime-функция пока
+не подключена к публичному JS `dock_node_apply`.
+
+Видимый Chromium `managed-done-runtime-01`, fresh profile 273,
+`--x11-no-focus`: **OBSERVED**. Новый runtime Done был вызван после managed
+draft write; отдельный `dock_node_read kind:source` и user-v1 ответ прочитали
+точные **420 UTF-8 bytes / 9 LF lines**, SHA256
+`df9be69e448048406985c3906a952dff05600ed155e90eaa04e5c258374ad6fd`.
+Post-Done mapping `input=complete`, `output=configured_only`; строгая граница
+графа подтверждена, raw draft в report/journal отсутствует. Cleanup **3/3**,
+X11 focus **0/2899 samples**, poll failures 0. Report SHA256
+`0e3c8da434acb3fb66bf1ac4b2a4e763d498ea89d7ff70dd2028ee0411b48871`.
+Под `registry.lock` назначен новый ещё не созданный profile 274,
+`profile-reassignment-274.json`. Адресные client tests **18 PASS / 0 FAIL**,
+operator/source mapping tests **46 PASS / 0 FAIL**, синтаксис и diff проверены.
+Путь Code→Done до этого жеста пока остаётся в private-операторе; полноценный
+handler, отдельное Execute, save/cold и CLI-приёмка открыты.
+
 ## Managed source Done — headed proof, 2026-09-29
 
 Code commit `95b49f1107` в `origin/node-javascript` добавил отдельный private
