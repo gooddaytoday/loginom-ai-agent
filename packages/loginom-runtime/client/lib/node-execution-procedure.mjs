@@ -219,9 +219,10 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         const childTid=processControl(child);
         s=await revealExecutionControl(channel,node,s,child,childTid,'right_click');
         const sameTarget=s=>JSON.stringify(expectedExecutionStopProof(execution,s.node_processes))===JSON.stringify(target);
+        const cancellableRow=s=>control(s,childTid,'right_click').filter(e=>e.process_row?.record_id===target.record_id);
         await channel.perform({condition:'open exact cancellable process menu',initialObservation:s,
-          ready:s=>sameTarget(s)&&control(s,childTid,'right_click').length===1,
-          resolve:s=>({verb:'right_click',ref:one(control(s,childTid,'right_click'),'Stop process row unavailable').ref}),
+          ready:s=>sameTarget(s)&&cancellableRow(s).length===1,
+          resolve:s=>({verb:'right_click',ref:one(cancellableRow(s),'Stop process row unavailable').ref}),
           identity:()=>({node,...target})});
         const cancel=s=>control(s,'mnContextMenu;mniCancel','cancel_process').filter(e=>
           JSON.stringify(e.process_menu?.cancellation)===JSON.stringify(target));
