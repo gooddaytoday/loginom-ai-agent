@@ -1,5 +1,31 @@
 # JavaScript: checkpoint исполнения
 
+## Повторная сверка Cursor-правила и recovery declared — 2026-09-29
+
+Указанный пользователем Cursor request `79e41aa8-71f2-4345-861f-d6510fe0344b`
+найден в локальной беседе `d69de234-826c-4e08-a8ac-184749a58d47`.
+Его требование — общее правило кнопки ошибки в `loginom`, а для JS раннее
+чтение `btnError` и штатного диалога без повторного `Next`. Коммит
+`3f35c5f232` уже предок `javascript`; повторный `git rebase loginom`
+сообщил `Current branch javascript is up to date`. Реализация child
+`node-javascript` содержит staged observer, чтение/закрытие диалога и
+приоритет отказа над общим сообщением; адресный набор на Node 24.19.0 —
+37/37 PASS, общий `docs/node-development/tools/validate.py` — PASS.
+Это подтверждает прежнюю реализацию правила, не новую CLI-приёмку.
+
+Следующий headed declared writer/profile229 записал S1 и S2 exact draft, но
+остановился перед следующим открытием мастера из-за второго detached DOM
+replacement при сохранённом native selection owner. Report
+`persistence-declared-writer-15` завершился `CLEANUP_UNCONFIRMED`;
+writer report SHA256 `f9cf57d090f6f1dd191fde284dba34b8ada619e9bac9b7223989fcb92306c91b`.
+Повтор эффекта не выполнялся. В отдельном headed admin/profile230 Диспетчер
+показал ровно этот пакет под `jsteach:3340`; он закрыт без сохранения,
+после Refresh отсутствовал. Admin logout и закрытие браузера подтверждены.
+Recovery journal SHA256 `248d7446a3c8daca5b7832f2146e135230ee9f0e72ccb8e9b2723e7c8c047579`,
+private receipt `profile-reassignment-231.json`; следующий пустой profile231
+назначен. Перед новой declared попыткой исследовать guard DOM replacement
+в `javascript-execution-runtime.mjs`, сохраняя owner/epoch и запрет replay.
+
 ## G4/G7: writer → два Save → cold Execute, режим code — 2026-09-29
 
 Child source `b94b9d6805` расширил внутренний one-shot writer на фиксированный
