@@ -180,7 +180,7 @@ try {
     const object = Object.create(null)
     for (const column of expected.columns) {
       const cell = row[schema.findIndex((item) => item.name === column.name)]
-      object[column.name] = column.type === "real" || column.type === "integer" ? Number(cell.value) : cell.value
+      object[column.name] = cell.value === null ? null : column.type === "real" || column.type === "integer" ? Number(cell.value) : cell.value
     }
     return object
   })
