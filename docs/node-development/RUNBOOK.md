@@ -84,8 +84,8 @@ scripts/node-acceptance/accept-node.sh \
 1. Обновить запись узла в `docs/node-development/registry.json` и выполнить
    `python3 docs/node-development/tools/validate.py --render`.
 2. Открыть PR в `loginom`. В описании — ссылка на задачу Paperclip и на `result.json`.
-3. Перевести задачу в `in_review` и назначить «Ревьюера узлов». Если у задачи уже есть
-   стадия review, Paperclip передаст её ревьюеру сам.
+3. Перевести задачу в `in_review`. Стадия review назначит «Ревьюера узлов» сама, но не разбудит его:
+   в финальном комментарии упомянуть `[@Ревьюер узлов](agent://6cf0d209-bcc2-4ed4-bd93-a73f65adad5e)`.
 4. Не сливать PR и не выпускать релиз. Это делает владелец на стадии approval.
 
 Раскладка приёмки узла: `docs/node-development/nodes/<slug>/acceptance/task.md`,

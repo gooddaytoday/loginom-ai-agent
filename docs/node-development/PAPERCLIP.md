@@ -128,6 +128,9 @@ scripts/node-acceptance/accept-node.sh --node grouping --slot d --cli <cli> --ou
   `/opt/loginom-worker/tools/codex` нет исполнителя команд той же версии.
 - В worktree ветка `dev` и нет RUNBOOK: выключен `enableIsolatedWorkspaces` («Instance settings → Experimental»).
 - Ошибка SSH или worktree: «Settings → Environments → loginom-host → Probe» должен ответить `Connected`.
+- Задача стоит в `in_review` на ревьюере, а он не запускается: Paperclip назначает ревьюера стадией review, но не будит.
+  Разработчик обязан упомянуть его в комментарии; если не упомянул, напишите комментарий
+  `[@Ревьюер узлов](agent://6cf0d209-bcc2-4ed4-bd93-a73f65adad5e) задача на ревью.`
 - Вход в Paperclip даёт 429: подождите минуту; скрипты кешируют cookie.
 - Приёмка вручную на хосте — команда из раздела «Сборка и приёмка» в [RUNBOOK.md](RUNBOOK.md).
 
