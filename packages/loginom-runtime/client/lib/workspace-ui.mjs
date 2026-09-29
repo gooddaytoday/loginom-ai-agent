@@ -85,7 +85,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // or GUID failures do not enter this wait.
     for(let sample=0;binding?.surface_pending===true && effectPossible
       && (['open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','enter_table'].includes(task.action?.verb)
-        ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true) && sample<(task.opening_timeout_ms?900:200);sample++) {
+        ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true) && (task.opening_timeout_ms || sample<200);sample++) {
       record('node_surface_wait',{condition:'prepared_node_surface_ready',sample});
       await page.waitForTimeout(Math.min(50,timeout()));
       binding=await readNodeContext(page,task.prepared_node_context);
@@ -3801,32 +3801,44 @@ function readRenderedInputMapping(observation) {
           const opening=task.action.verb==='confirm_wizard_deactivation'?task.snapshot.node_wizard_confirmation.opening
             :current.ui.elements.find(e=>e.ref===task.action.ref).wizard_open;
           const contextMatches=lifecycleContextMatches;
+          const intendedWizard=fresh=>{
+            const owner=fresh.wizard?.owner_context;
+            if(fresh.wizard?.status!=='observed'||owner?.status!=='observed')return false;
+            // Duplicate labels use different graph and breadcrumb keys. Require
+            // the same native GUID and displayed label before accepting them.
+            const beforeNode=current.prepared_node_context,afterNode=fresh.prepared_node_context;
+            if(task.prepared_node_context&&(!afterNode?.verified
+              ||!['document_id','workflow_id','node_id'].every(k=>typeof beforeNode?.[k]==='string'&&beforeNode[k]===afterNode[k])))return false;
+            const labels=current.ui.elements.filter(e=>e.graph_node?.part==='label'&&e.graph_node.node_label===opening.node.node_label);
+            const normalizeLabel=value=>typeof value==='string'?value.replace(/\s/g,''):'';
+            const guidOwnerMatches=task.prepared_node_context&&beforeNode?.verified===true&&afterNode?.verified===true
+              &&beforeNode.surface==='graph'&&afterNode.surface==='wizard'
+              &&beforeNode.node_id===task.prepared_node_context.node.node_id
+              &&['document_id','workflow_id','node_id'].every(k=>typeof beforeNode[k]==='string'&&beforeNode[k]===afterNode[k])
+              &&beforeNode.tid===current.workflow_ref.prefix+';Graph;'+opening.node.node_label
+              &&(task.action.verb==='confirm_wizard_deactivation'
+                ?typeof beforeNode.pending_wizard_node?.tid==='string'&&beforeNode.pending_wizard_node.tid===owner.node.tid
+                  &&beforeNode.pending_wizard_node.label===owner.node.label
+                :labels.length===1&&normalizeLabel(labels[0].label)!==''
+                  &&normalizeLabel(labels[0].label)===normalizeLabel(owner.node.label));
+            return (guidOwnerMatches||owner.node.tid===opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label)
+              &&same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path);
+          };
+          const ownedLoading=fresh=>contextMatches(fresh)&&intendedWizard(fresh)
+            &&fresh.ui.masks.every(mask=>mask.kind==='busy'&&mask.ref===fresh.wizard.root_ref
+              &&mask.target_tid===current.workflow_ref.prefix+';WizrdMCF'&&!mask.dialog_ref);
+          // The opening click is already sent. Observe its own loading mask
+          // within the original node deadline; never reissue the click.
+          observed=await waitForMasks(observed,readOpeningUi,ownedLoading);
           for(let attempt=0;attempt<24 && contextMatches(observed) && !(task.action.verb==='begin_wizard'&&exactDeactivation(observed))
-            && (observed.wizard?.owner_context?.status!=='observed' || observed.ui.masks.length);attempt++) {
-            timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readOpeningUi();
+            && observed.wizard?.owner_context?.status!=='observed';attempt++) {
+            timeout();await page.waitForTimeout(Math.min(200,timeout()));
+            observed=await waitForMasks(await readOpeningUi(),readOpeningUi,ownedLoading);
           }
           const deactivationPending=task.action.verb==='begin_wizard'&&exactDeactivation(observed);
           if(deactivationPending)record('wizard_deactivation_question_observed',{node:opening.node,workflow_path:opening.workflow_path});
           const owner=observed.wizard?.owner_context;
-          // Duplicate labels use different native keys in graph (@1) and
-          // breadcrumb (-3). Accept that difference only with the original GUID
-          // independently bound to both surfaces and unchanged displayed label.
-          const beforeNode=current.prepared_node_context,afterNode=observed.prepared_node_context;
-          const labels=current.ui.elements.filter(e=>e.graph_node?.part==='label'&&e.graph_node.node_label===opening.node.node_label);
-          const normalizeLabel=value=>typeof value==='string'?value.replace(/\s/g,''):'';
-          const guidOwnerMatches=task.prepared_node_context&&beforeNode?.verified===true&&afterNode?.verified===true
-            &&beforeNode.surface==='graph'&&afterNode.surface==='wizard'
-            &&beforeNode.node_id===task.prepared_node_context.node.node_id
-            &&['document_id','workflow_id','node_id'].every(k=>typeof beforeNode[k]==='string'&&beforeNode[k]===afterNode[k])
-            &&beforeNode.tid===current.workflow_ref.prefix+';Graph;'+opening.node.node_label
-            &&(task.action.verb==='confirm_wizard_deactivation'
-              ?typeof beforeNode.pending_wizard_node?.tid==='string'&&beforeNode.pending_wizard_node.tid===owner?.node?.tid
-                &&beforeNode.pending_wizard_node.label===owner?.node?.label
-              :labels.length===1&&normalizeLabel(labels[0].label)!==''
-                &&normalizeLabel(labels[0].label)===normalizeLabel(owner?.node?.label));
-          if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || observed.wizard?.status!=='observed'
-            || owner?.status!=='observed' || !guidOwnerMatches&&owner.node.tid!==opening.workflow_path.at(-1)?.tid+'>'+opening.node.node_label
-            || !same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path)))
+          if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || !intendedWizard(observed)))
             fail('WIZARD_OPEN_NOT_CONFIRMED','The intended node wizard was not confirmed after one click; inspect the current view before retry');
           if(!deactivationPending)record('wizard_open_verified',{node:opening.node,workflow_path:opening.workflow_path,wizard_root_ref:observed.wizard.root_ref,
             owner_node:owner.node,settings_applied:false});
@@ -4092,8 +4104,8 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
     throw Error('Mask settlement requires a bound completion action and the remaining node deadline');
   if(options.opening_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
     ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)
-    ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>45000))
-    throw Error('Extended opening wait requires a bound node wizard and at most 45000 ms');
+    ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>1800000))
+    throw Error('Extended opening wait requires a bound node wizard and the remaining node deadline');
   if(options.mode==='act'&&['begin_wizard','confirm_wizard_deactivation','cancel_process'].includes(options.action?.verb)
     &&!options.prepared_node_context)throw Error('Node wizard deactivation requires a prepared native node binding');
   if(options.prepared_node_context!==undefined)validatePreparedNodeContext(options.prepared_node_context);
