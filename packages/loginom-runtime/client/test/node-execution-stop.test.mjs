@@ -4,7 +4,7 @@ import {createNodeExecutionProcedure} from '../lib/node-execution-procedure.mjs'
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 const grid='ConsoleForm;ProgressForm;trpProgress;grd;tbl',cancel='mnContextMenu;mniCancel';
 const element=(tid,verbs=['click'])=>({tid,ref:'ui-'+tid,allowed_actions:verbs});
-async function fixture(fault, multiple=false) {
+async function fixture(fault, multiple=false,{keepConsoleOpen=false}={}) {
  let opened=true,menu=false,launched=false,terminal=false,cancelCalls=0;
  const actions=[],reads=[];
  const proof={root_id:'root',record_id:'child',process_id:'1.1',node_id:'node',owner_verified:true,can_cancel:true,source:'native_process_model_identity'};
@@ -35,10 +35,21 @@ async function fixture(fault, multiple=false) {
    else if(a.ref==='ui-MF;cntMain;tlbMainToolbar;btnProgress')opened=true;
    return {status:'SUCCEEDED'};
   }};
- const driver=createNodeExecutionProcedure(channel,node);await driver.prepare();launched=true;await driver.identify();actions.length=0;
+ const driver=createNodeExecutionProcedure(channel,node);await driver.prepare({keepConsoleOpen});
+ const preparationActions=structuredClone(actions);launched=true;await driver.identify();actions.length=0;
  reads.length=0;
- return {driver,channel,actions,reads,get cancelCalls(){return cancelCalls;}};
+ return {driver,channel,actions,reads,preparationActions,get cancelCalls(){return cancelCalls;}};
 }
+test('private prelaunch admission can retain the owned process console without a close gesture',async()=>{
+ const normal=await fixture(),held=await fixture(undefined,false,{keepConsoleOpen:true});
+ assert.equal(normal.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnClose').length,1);
+ assert.equal(held.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnClose').length,0);
+ const stopped=await held.driver.stop();assert.equal(stopped.stop_verified,true);assert.equal(held.cancelCalls,1);
+});
+test('invalid retained console mode refuses before observations or gestures',async()=>{
+ const f=await fixture();await assert.rejects(f.driver.prepare({keepConsoleOpen:'yes'}),/must be boolean/);
+ assert.equal(f.reads.length,0);assert.deepEqual(f.actions,[]);
+});
 test('Stop refreshes native inventory when the process console was already visible',async()=>{
  const f=await fixture();const stopped=await f.driver.stop();assert.equal(stopped.stop_verified,true);
  assert.equal(f.reads[0].readProcesses,false);assert.equal(f.reads[1].readProcesses,true);

@@ -14,7 +14,9 @@ export async function runJavascriptStopProbe({page,runtime,prepared,node,probe,d
   need(probe.id===fixed.id&&probe.source===fixed.source&&probe.source_sha256===fixed.source_sha256
     &&deadline>Date.now()&&typeof onSourcePending==='function','Fixed finite Stop probe admission differs');
   const driver=createNodeExecutionProcedure(runtime.channel(node,deadline),node);
-  const baseline=await driver.prepare(),started=performance.now();
+  // Establish and retain this owned console before the graph starts repainting.
+  // This avoids opening it during execution; all epoch guards remain intact.
+  const baseline=await driver.prepare({keepConsoleOpen:true}),started=performance.now();
   const launch=await runtime.once('p1-stop-launch',{node,baseline,source_sha256:probe.source_sha256},()=>driver.launchGraph());
   await record({phase:'p1_stop_launch',node,baseline,launch,source_sha256:probe.source_sha256,finite_loop:fixed.finite_loop});
   const identified=await driver.identify();
