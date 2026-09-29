@@ -302,10 +302,12 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
       held_dom_matches:!held.editor.usagePickerDom||held.editor.usagePickerDom===pickerDom};
     const owner=ownerChecks.picker_exists&&ownerChecks.dom_exists&&ownerChecks.field_matches
       &&ownerChecks.component_matches&&ownerChecks.store_matches&&ownerChecks.data_source_matches;
-    if(picker&&(!owner||held.editor.usagePicker&&held.editor.usagePicker!==picker
+    const lazyOwner=!expanded&&!shown&&ownerChecks.picker_exists&&!ownerChecks.dom_exists
+      &&ownerChecks.field_matches&&ownerChecks.store_matches&&ownerChecks.data_source_matches;
+    if(picker&&(!owner&&!lazyOwner||held.editor.usagePicker&&held.editor.usagePicker!==picker
       ||held.editor.usageStore&&held.editor.usageStore!==pickerStore
       ||held.editor.usagePickerDom&&held.editor.usagePickerDom!==pickerDom))
-      return result('refused','usage_picker_owner_changed',{...counts,expanded,shown,owner,owner_checks:ownerChecks});
+      return result('refused','usage_picker_owner_changed',{...counts,expanded,shown,owner,lazy_owner:lazyOwner,owner_checks:ownerChecks});
     if(picker&&!held.editor.usagePicker){held.editor.usagePicker=picker;held.editor.usageStore=pickerStore;held.editor.usagePickerDom=pickerDom;}
     const records=owner?dense(pickerStore.getData?.()?.items,64):null;
     const options=owner?[...pickerDom.querySelectorAll('.x-boundlist-item')]:[];
@@ -320,7 +322,7 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
       const record=records.find(rec=>String(value(rec,'internalId'))===item.getAttribute('data-recordId'));
       return value(value(record,'data'),'Value')===expectedUsage&&value(value(record,'data'),'DisplayText')===expectedUsageLabel;
     });
-    usagePickerSnapshot={expanded,visible:shown,owner,trigger_tid:trigger.tid,record_count:records?.length??null,
+    usagePickerSnapshot={expanded,visible:shown,owner,lazy_owner:lazyOwner,trigger_tid:trigger.tid,record_count:records?.length??null,
       option_count:options.length,verified_option_count:visibleOptions.length,expected_match_count:matched.length,
       expected_usage:expectedUsage,expected_label:expectedUsageLabel};
     if(usageAction){
