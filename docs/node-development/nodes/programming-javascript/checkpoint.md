@@ -1,5 +1,51 @@
 # JavaScript: checkpoint исполнения
 
+## Existing-node managed opening — headed proof, 2026-09-29
+
+Code commit `aac8ce8e37` в `origin/node-javascript` подключил
+`openManagedJavascriptExistingWizard` к частному existing-source readback.
+Сначала проверяется подготовленный graph node через `node-procedure`, затем
+managed selection/Setting связываются с той же арендой и native settlement.
+Обычный `workspace-ui` скрывает `wizard_open` для script-узла, поэтому
+existing helper больше не требует этого generic действия. Если Loginom
+покажет точный вопрос деактивации, новый приватный
+`javascript-managed-deactivation.mjs` проверит native pending owner, диалог,
+кнопку и hit-test перед единичным journaled Yes; в успешном live-прогоне
+ветка деактивации **не понадобилась** и остаётся без live-доказательства.
+Перед source-read полный `prepared` нормализуется в
+`document_id/workflow_ref/node`, а не принимается в форме только workflow.
+Адресные тесты: **162 PASS / 0 FAIL**, `node --check` и `git diff --check` прошли.
+
+Попытка `managed-existing-opening-01`, profile 250, отказала **до повторного
+Setting**: generic script `wizard_open` отсутствовал. Cleanup 3/3; report
+SHA256 `7498db64c6745964a13885f1a6d8e12d1fa1f6b8ad77248381cd343c63d3ffe4`.
+Следующая попытка `managed-existing-opening-02`, profile 251, обнаружила
+неполный `prepared` в managed settlement. Итоговый статус оригинального
+оператора — `CLEANUP_UNCONFIRMED`: browser закрыт, package/logout не
+подтверждены; report SHA256
+`ca2b3dc5fdc359b6835cb3cddc6c20b6427995bd87515a7d0e267ebf31ad716f`.
+Отдельный **headed read-only recovery** `managed-existing-recovery-01`,
+profile 252, подтвердил вход `jsteach`, **0 пакетов**, успешный logout и
+browser close 3/3; report SHA256
+`017480f836c80b605e6f2f617e321f8246b772ba53546fb795fe753955473c89`.
+Оригинальный FAIL не переписан на успех.
+
+После исправления контрактной формы `managed-existing-opening-03` на свежем
+profile 253 завершился `OBSERVED` / `typed_output_verified`, cleanup 3/3.
+Два managed Setting и два native wizard settlement подтверждены журналом —
+initial и existing; оба сразу пришли к мастеру, без deactivation dialog.
+Повторный `Columns → Code` и полное source-read существующего узла подтвердили
+376 UTF-8 bytes/8 LF lines, SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`.
+Report SHA256 `372b1b642572dd87441cf02da444a7fa3a7aba66d56acf58b8dcd2f6395105bd`.
+Старые процессы закрыты; новый ещё не созданный profile 254 назначен под
+file-lock (`profile-reassignment-254.json`).
+
+Следующий участок — private managed Close/discard того же existing wizard.
+Сейчас live использует прежний операторский `closeWizardOnce`, и успешное
+открытие/чтение не является доказательством нового Close adapter. Затем
+`createJavascriptSourceAdmission` и публичный `dock_node_read kind=source`.
+
 ## Управляемый Next «Столбцы → Код» — 2026-09-29
 
 Code commit `8049b4a69a` в `origin/node-javascript` добавил приватный
@@ -71,9 +117,8 @@ Code commit `2e9f6d2e80` добавил внутренний
 единичным Setting, наблюдает native wizard и через общий `node-procedure`
 допускает только точный диалог деактивации этого узла. Возвращает аренду для
 последующего чтения и явного Close. Адресные тесты managed source/opening и
-execution evidence: **159 PASS / 0 FAIL**. Отдельного live-прогона вызова
-этого helper для existing node пока **нет**; headed прогоны выше относятся
-к initial managed opening и чтению уже открытого мастера.
+execution evidence: **159 PASS / 0 FAIL** на тот момент. Поздний headed
+existing-прогон и корректировки helper зафиксированы в верхнем разделе.
 
 На момент этого commit следующее звено установлено по исходнику `workspace-ui.mjs`:
 его `wizardMarkers` не содержат `JavaScriptColumnsWizard` и
