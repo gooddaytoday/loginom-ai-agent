@@ -1,5 +1,27 @@
 # JavaScript: checkpoint исполнения
 
+## Ограниченное полное UI-чтение JS — 2026-09-29
+
+Child `7e3f608577` добавил в общий `node.apply` opt-in capability
+`fullUiOutput` для будущего установленного JS-handler. `coverage=full`
+для JavaScript допускается до graph/browser только с Execute, портом 0,
+`sample_rows=100` и `require_exact_numbers=true`; без такого handler
+запрос по-прежнему отказывает. Путь читает через существующие bounded
+Table pages, закрывает просмотр таблицы и принимает результат только если
+прочитаны все строки в пределах 100 строк, 10 000 ячеек и 512 KiB UI-данных.
+Это **UI-полнота**, а не native-byte provenance и не независимый oracle.
+Неполное чтение не даёт `SUCCEEDED`; текущая оболочка оставляет read-phase
+pending/`AMBIGUOUS`, что требует отдельного inspect вместо повторного Execute.
+
+Pinned Node24.19.0: полный client suite 2776 PASS, 10 SKIP, 0 FAIL до
+последнего уточнения public envelope; после него адресные 97/97 PASS,
+`git diff --check` PASS. Это проверка контрактов и shared reader в тестах,
+не browser acceptance. `fullUiOutput` не включён ни у одного установленного
+handler: публичный JavaScript ещё не зарегистрирован. Стенд снова HTTP 503,
+пустой profile236 сохранён для следующего headed запуска. Следующий шаг —
+managed-opening probe после HTTP 200, JS-specific configure/driver и
+проверка этого full-read режима на реальной малой таблице.
+
 ## Public preflight для JS port/Close — 2026-09-29
 
 Child `eb48d3768c` дополнил чистую проверку JS-запроса до target/browser:
