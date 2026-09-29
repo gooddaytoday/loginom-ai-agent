@@ -1,5 +1,27 @@
 # JavaScript: checkpoint исполнения
 
+## Managed-opening probe: локальная проверка и отказ стенда при login — 2026-09-29
+
+Child `3cb50cddcc` исправил реальный контракт `workflow_ref.navigation_path`:
+первый breadcrumb у Loginom 7.4.2 имеет пустой `label`, поэтому serializer
+settlement не должен отвергать его до чтения мастера. В private probe
+`settingDispatched` теперь устанавливается после точного journal ACK и перед
+браузерным эффектом; подтверждённый `NOT_APPLIED` до клика снимает этот gate,
+а потерянный ответ его сохраняет. Адресный файл 154/154 PASS, весь JS
+acceptance unit-набор 17833/17833 PASS, client JS suite 231/231 PASS,
+`node --check` и `git diff --check` PASS.
+
+Один headed запуск `managed-opening-probe-01` на назначенном profile235
+завершился до входа: `LOGINOM_LOGIN_UNAVAILABLE`, work_stage=`login`,
+HTTP стенда через proxy — 503; прямое разрешение `.local` отсутствует.
+Report SHA256 `f8f77c76568286f25fd5db50e3298dd27f70a1818373db6ceda251ae11952a0f`.
+Процесс браузера отсутствует; browser/login/package cleanup в report не
+подтверждены, поэтому этот запуск **не** доказывает работу managed-пути.
+Профиль 235 не переиспользовать. Приватные assignment/host-resources атомарно
+переведены на пустой profile236 с receipt `profile-reassignment-236.json`.
+Повтор live допустим после восстановления HTTP 200; затем требуется доказать
+точное закрытие пакета, logout и браузера. Public handler и CLI J20 открыты.
+
 ## Пауза: черновик headed managed-opening probe — 2026-09-29
 
 По просьбе пользователя работа остановлена до следующего живого прогона.
