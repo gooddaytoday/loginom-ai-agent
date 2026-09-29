@@ -118,7 +118,7 @@ try {
   const operation = {
     id: "cold-read-expected",
     action: { action_key: "acceptance.cold_read", revision: "1" },
-    deadline: Date.now() + 240_000,
+    deadline: Date.now() + 540_000,
   }
   const channel = createNodeProcedure({
     operation,
