@@ -1,5 +1,42 @@
 # JavaScript: checkpoint исполнения
 
+## Полное runtime-чтение effective source — 2026-09-29
+
+Child `e8a4cf6e5b` добавил `javascript-source-context.mjs`: полный текст
+активного CodeMirror читается только у подготовленного JS-узла, с проверкой
+account/build, verified workflow receipt, точной активной DOM-вкладки,
+native wizard/node/model, единственного видимого CodeMirror и точного корня
+мастера. Общий prepared node context сравнивается до и после чтения.
+Предел — 32768 UTF-8 bytes и 1024 LF lines; никакие editor setters,
+dataset proxies, Preview/Execute или чужой browser не вызываются. Этот
+trusted-host результат содержит текст, поэтому будущая публичная доставка
+обязана пройти существующий full-source redaction/chunk reader;
+операторский report хранит только SHA-256/bytes/lines и owner.
+
+Обычный **headed Chromium1246** на стенде `http://logi-test-plan.bg.local/app/`
+проверил новый reader в private opt-in `code-table-execute`. Первый run
+`runtime-source-context-01` подтвердил полный код и схему и завершился
+`OBSERVED`/`typed_output_verified` с cleanup 3/3; report SHA256
+`a60a28ed81be07ee5bbcb7ec2fb58b3e10b8994a7e44115d6d7b3a3b7b6703a3`.
+Дополнительный guard прямого parent workflow в run
+`runtime-source-context-02` дал `FAILED` до Execute: такой формы дерева
+Loginom общий prepared-context не требует. Пакет/сеанс/browser закрыты 3/3;
+report SHA256
+`a95cf267278c5ef4e6af76cd33830c79a05f89cd52b3504f8abfbe05ece113a9`.
+Guard удалён, а точная DOM-привязка корня сохранена. Текущий source-коммит
+проверен run `runtime-source-context-03` в fresh profile244:
+`OBSERVED`/`typed_output_verified`, source SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`
+(376 bytes, 8 lines), schema verified, existing source readback true,
+cleanup 3/3. Report SHA256
+`744be504fac457dfc04fb3b79c7d3830fe3bbb7bba9c6778082515e2a4f906ec`.
+Адресные pinned Node24.19.0 source-context/source-reader/source-writer/
+source-admission/node-context/execution-evidence tests PASS. После полного
+cleanup под registry lock назначен пустой profile245; 242–244 не
+переиспользовать. Публичный handler/source-read всё ещё выключены: следующий
+этап — подключить owner-bound open/read/discard, source-admission и
+проверку effective source непосредственно перед mutation/Execute.
+
 ## Runtime-чтение схемы из подготовленного JS-узла — 2026-09-29
 
 В child `node-javascript` commit `4923c5932e` перенёс неизменённый
