@@ -1,5 +1,37 @@
 # JavaScript: checkpoint исполнения
 
+## 0A: ОС сервера Loginom подтверждена — 2026-09-29
+
+Frontend `MainForm.DoServerPrepare` Loginom 7.4.2 читает
+`Session.Version.IsWindows` и `PlatformEdition` через `bg.selectAsyncValue`,
+после чего его же `GetExceptionDetailTitle` называет `false` Linux.
+Retained source `fix47-bg_app_MainForm.js` SHA256
+`d0b2324d7162816d675e52adc5a5674b46b635d516157ced799ea33690a3c42e`,
+interface metadata `fix61-bg.model.js` SHA256
+`d3ab87a3aca82985d41a8b9d4b3502c9d8d662204c67c07fb3ff2156d802407a`
+содержит remote getter `IsWindows` (1931). Это источник именно серверного
+признака, не пользовательский agent/Chromium `navigator.platform`.
+
+Child source `ad48f23228` добавил отдельное read-only чтение на собственной
+странице «Начало»: тот же account/build/session, 0 пакетов до и после,
+без JS-узла и без записи. В Ubuntu headed profile215 native ответ дал
+`IsWindows=false`, `PlatformEdition=Enterprise`, следовательно ОС сервера
+**Linux**. Process exit0/`OBSERVED`, package close/logout/browser close 3/3,
+процессов профиля нет. Report SHA256
+`01753c77083437f86326809242122e7657b74c6003a78f013dd4f3b889286f5b`,
+journal SHA256
+`c14cf8821e1ac8ed5ffbcb31c67b935d60fa691402f2e21e5d2aa1d5459059eb`,
+independent verification SHA256
+`e9e0ea55d3e4c7b243960fa57c64a78e26418e1f87f89d71458a621ae0379521`.
+Private freeze138 SHA256
+`99b397c6753d8fa5c3cad7e2c9c69b6f0e5618e0d5820acb5573fab714a2f839`
+сверил 1336 pins, closure223 файла/661 literal edge, computed0. На pinned
+Node24.19.0 JS suite 18 049/18 049 PASS, fail/skip0; log SHA256
+`7580b62143debb4d0dfece1d3778afa9a76dc24937235cba58d8d94190a7ccb1`.
+Следующий пустой profile216; lease свободен. Дистрибутив и версия ядра
+не наблюдались. Это закрывает только требование 0A о записи ОС сервера;
+G1–G7, публичный handler и CLI-кандидат по-прежнему открыты.
+
 ## G3: declared editor, DefaultUsageType и Cancel — 2026-09-29
 
 На Loginom Enterprise 7.4.2 в Ubuntu headed Chromium прочитаны собственные

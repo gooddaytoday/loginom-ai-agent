@@ -15,7 +15,9 @@ Component ID: `component.programming.JavaScript`.
 К нему относится исходный [справочник](references/js_node_loginom_system_prompt.md),
 и тот же build допускает текущий graph adapter (`node-target-browser.mjs:318`).
 В 0A подтверждён фактический Loginom **Enterprise 7.4.2** под выделенным
-аккаунтом; evidence — [checkpoint](checkpoint.md). ОС сервера ещё не установлена.
+аккаунтом; evidence — [checkpoint](checkpoint.md). Через принадлежащий сеансу
+`Session.Version.IsWindows=false` отдельно подтверждена ОС сервера **Linux**;
+дистрибутив и версия ядра не установлены.
 Иной build — блокер подготовки, а не основание переносить знания 7.4.2.
 Первая платформа приёмки — Linux x64; остальные не сертифицируются этим планом.
 Все браузерные действия, диагностические пробы и CLI-приёмка выполняются
@@ -824,7 +826,7 @@ worktree и полный цикл общей памяти поколения `20
 подтверждены создание собственной storage UUID-папки, upload без overwrite,
 штатный CSV import и полный точный typed input6×5; затем JS input0 link.
 Серверный диагностический CSV сохранён, session recovery/logout подтверждены.
-Открыто: G1–G7 и runtime/CLI строки матрицы, ОС сервера,
+Открыто: G1–G7 и runtime/CLI строки матрицы,
 полный candidate, JS auditor. Внешний e2e suite
 остаётся `not_run`; его зависимости не являются предусловием этого подплана.
 Решения по всем [рекомендациям](review-recommendations.md) и границы доказательств

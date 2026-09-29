@@ -7,7 +7,11 @@
   "operator_platform": "Ubuntu Linux x64",
   "browser_mode": "headed",
   "server_os": {
-    "status": "not_observed"
+    "status": "observed",
+    "value": "Linux",
+    "source": "owned Session.Version.IsWindows=false",
+    "source_commit": "ad48f23228a2ecb83722ae7538aacfa00a8f6bd2",
+    "report_sha256": "01753c77083437f86326809242122e7657b74c6003a78f013dd4f3b889286f5b"
   },
   "engine_version": {
     "status": "not_observed"
