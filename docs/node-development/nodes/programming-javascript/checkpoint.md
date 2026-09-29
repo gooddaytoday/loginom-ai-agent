@@ -1,5 +1,20 @@
 # JavaScript: checkpoint исполнения
 
+## Повторная headed-проверка публичного source-read — 2026-09-29
+
+На свежем profile 261 повторён live `public-source-read-02` с текущим code
+commit `d17723e59c`: штатный оператор в видимом Chromium вызвал публичный
+`dock_node_read kind:source` через `createActionRuntime`, проверил точный
+обычный и user-v1 ответ, SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`
+и один полный chunk (376 UTF-8 bytes / 8 LF lines, cursor null). Итог
+`OBSERVED`; package/logout/browser cleanup **3/3**. Report SHA256
+`daafc35edf48c807c6ff5d303f5ec4fb47e5b7420262d8f2df0b729b410526ca`.
+X11 no-focus: **0 browser focus samples / 2886**, poll failures 0. Под
+`registry.lock` назначен новый ещё не созданный profile 262; receipt
+`profile-reassignment-262.json`. Это подтверждение браузерного runtime после
+MCP-правок, но сам live-оператор не использовал MCP transport или модель.
+
 ## Source receipt через настоящий MCP bridge — 2026-09-29
 
 Code commit `d17723e59c` в `origin/node-javascript` расширил протокольный
@@ -10,7 +25,7 @@ same-ID cache без второго чтения. Внешний Loginom browser
 подставлен; `bridge.test.mjs` **11 PASS / 0 FAIL**, `node --check` и
 `git diff --check` прошли. Это доказательство доставки и формы MCP, не live
 кандидата CLI, модели или JavaScript apply/execute handler. Последний реальный
-headed proof и свободный следующий profile 261 — в разделе ниже.
+headed proof и свободный следующий profile 262 — в разделе выше.
 
 ## Публичный `dock_node_read kind:source` — headed proof, 2026-09-29
 
@@ -38,11 +53,10 @@ headed Chromium profile 260 оператор вызвал именно публ�
 package/logout/browser **3/3**. Report SHA256
 `d9aee7dd91c75e85068807c5ee40637c86c075f3faad2e745f7705d3f96c94f6`.
 X11 no-focus: **0 browser focus samples / 2967**, poll failures 0.
-Под `registry.lock` назначен новый ещё не созданный profile 261 с receipt
+После этого прогона назначался profile 261 с receipt
 `profile-reassignment-261.json`; profile 260 повторно не использовать.
 Live был выполнен до заключительной правки корневой MCP-схемы и concurrent
-same-ID join; последовательный browser path ими не изменён, финальные изменения
-проверены протокольными и registry-тестами, но не повторным live запуском.
+same-ID join; повторная headed-проверка текущего кода описана выше.
 
 Этот live proof проверяет публичный runtime и форму ответа в том же headed
 операторском browser context. Он ещё не является независимым запуском
