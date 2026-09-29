@@ -1,5 +1,39 @@
 # JavaScript: checkpoint исполнения
 
+## Headed regression временной блокировки после Close — 2026-09-29
+
+Child `bb65450569` исправил отказ `existing-source-readback` из предыдущего
+checkpoint. Перед открытием existing-мастера сохраняется native/graph boundary;
+после собственного Close узел может кратковременно сохранять `locked=true`.
+Теперь уже используемый в source-read цикле `settleClosedExecutionBoundary`
+ждёт только эту допустимую временную блокировку, проверяет неизменность
+остального графа и владельца, после чего `verifyExecutionBoundary` допускает
+чтение входного и выходного mapping. Остальные изменения графа по-прежнему
+отказывают. Pinned Node24.19.0: адресные тесты 46/46 PASS, синтаксис и
+`git diff --check` PASS. Code-коммит отправлен в `origin/node-javascript`.
+
+Два новых Loginom прогона в **видимом headed Chromium1246** на стенде 7.4.2
+выполнены на свежих profile238 и profile239. Первый включал opt-in managed
+opening, второй использовал обычное открытие Setting; оба дошли до исходного
+readback и закончили `OBSERVED`/`typed_output_verified`. В каждом доказаны
+видимый initial wizard, полный исходник existing JS, сохранённый schema mode,
+неизменные input/output mappings, завершённый собственный Execute и полный
+табличный результат на 6 строк. Журнал содержит `javascript_close_boundary_settled`
+и `execution_boundary_verified` перед последующими чтениями портов. `Done`
+по-прежнему классифицирован как `execution=ambiguous`; отдельный Execute
+подтверждён и не приписывается Done. В обоих случаях package close, logout и
+browser close подтверждены 3/3, recovery не требовалась.
+
+Приватные reports: `managed-opening-close-settlement-04/report.json` SHA256
+`e113711d35326da633f38c09f63255b68eeacd75accb8686d19be0d132146669` и
+`code-table-close-settlement-05/report.json` SHA256
+`764c929f65becd4a7f1c930c796f36093c9e9ef0a1936be7c5552ed91b750407`.
+Под registry lock после каждого полного cleanup назначался новый профиль;
+следующий пустой profile240 закреплён receipt SHA256
+`8e832fdd87654047a0be5d37e70c335d6403107e33a5e7880590d97a028a9b73`.
+Профили238/239 не переиспользовать. Публичный JS-handler и автономная
+CLI-приёмка остаются открытыми; операторский `OBSERVED` их не заменяет.
+
 ## Одна headed live-итерация с защитой фокуса — 2026-09-29
 
 Продолжение по запросу пользователя ограничено одной итерацией. В child
