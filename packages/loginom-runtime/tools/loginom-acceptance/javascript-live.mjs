@@ -26,7 +26,7 @@ import {dragJavascriptPalette} from './javascript-palette-drag.mjs';
 // Operator-only G1/G4 discovery. No public editor guards are changed here.
 import {readFile, mkdir, writeFile, readdir} from 'node:fs/promises';
 import {resolve, isAbsolute, dirname} from 'node:path';
-import {createHash} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {javascriptBatchCases,runJavascriptBatch,caseEffect,javascriptBatchInputIdentity,javascriptDropPoint} from './javascript-batch-plan.mjs';
 import {loginBrowser} from '../../src/connection-check.mjs';
@@ -50,6 +50,7 @@ import {makeJavascriptManagedSourceCode} from '../../client/lib/javascript-manag
 import {makeJavascriptManagedSelectionReadCode} from '../../client/lib/javascript-managed-selection.mjs';
 import {wizardReadiness} from '../../client/lib/javascript-wizard-page.mjs';
 import {makeJavascriptManagedPageCode} from '../../client/lib/javascript-managed-page.mjs';
+import {dispatchManagedJavascriptNext} from '../../client/lib/javascript-managed-next.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
@@ -541,6 +542,26 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
     if(step===8||!Number.isInteger(current.index)||current.indicator_count<2||current.indicator_count>12
       ||current.index>=current.indicator_count-1)throw Error('Editor not reached within observed page bounds');
     await guard();
+    if(managedSourceTask&&!remainingPages&&current.tid===owner.prefix+';WizrdMCF;JavaScriptColumnsWizard'){
+      const namespace='private-managed-js-next-'+randomUUID();
+      const execute=code=>Function('return ('+code+')')()(page);
+      const receiptOptions=(id,key,signature)=>({receipt_namespace:namespace,receipt_id:id,receipt_signature:signature});
+      const result=await dispatchManagedJavascriptNext({task:managedSourceTask,execute,record:executionRecord,receiptOptions});
+      if(result.status!=='SUCCEEDED'||result.output?.next_gesture_returned!==true)
+        throw Error('Managed JavaScript Next gesture refused');
+      const after=await waitWizardReady({deadline:Math.min(deadline,managedSourceTask.deadline),
+        inputOnly:false,afterIndex:current.index,afterPageTid:current.tid});
+      if(after.page?.tid!==owner.prefix+';WizrdMCF;JavaScriptCodeWizard'
+        ||after.page.index!==1||after.page.visible_editors!==1)throw Error('Managed JavaScript Next transition differs');
+      report.managed_next_observation={verified:true,from_tid:current.tid,to_tid:after.page.tid,
+        from_index:current.index,to_index:after.page.index,node_id:managedSourceTask.owner.node_id};
+      const event={phase:'javascript_managed_next_verified',...report.managed_next_observation};
+      const saved=await executionRecord(event);
+      if(JSON.stringify(Object.fromEntries(Object.keys(event).map(key=>[key,saved?.[key]])))!==JSON.stringify(event))
+        throw Error('Managed JavaScript Next verification journal ACK differs');
+      await save();
+      continue;
+    }
     const point=await page.evaluate(({prefix,root,native,binding,current})=>{
       const visible=e=>!!e?.isConnected&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
       const tab=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
