@@ -84,11 +84,13 @@ export async function openNewOutputTable(channel,port,{openViews}={}) {
     &&s.ui.elements.some(e=>e.viewer_card?.kind==='add'&&e.viewer_card.port_guid===output.port_guid));
   s=await revealViewerCard(channel,s,e=>e.viewer_card?.kind==='add'&&e.viewer_card.port_guid===output.port_guid,'click');
   await perform(s,'add Table to native output',e=>e.viewer_card?.kind==='add'&&e.viewer_card.port_guid===output.port_guid);
-  s=await observe('new Table card bound to output',s=>{
+  // One Add has already been dispatched. A native ViewsForm mask may outlast
+  // ordinary readiness; observe this same port within the original node budget.
+  s=await channel.observe({condition:'new Table card bound to output',readOutputs:true,settleOutputPort:output.port_guid,ready:s=>{
     const added=s.node_outputs?.verified?s.node_outputs.tables.filter(t=>!before.includes(t.view_guid)&&t.port_guid===output.port_guid):[];
     return added.length===1&&s.ui.elements.filter(e=>e.viewer_card?.kind==='enter'&&e.viewer_card.view_guid===added[0].view_guid
       &&e.viewer_card.port_guid===output.port_guid).length===1;
-  },s=>({epoch:s.dom_epoch,tables:s.node_outputs.tables}));
+  },confirmIdentity:s=>({epoch:s.dom_epoch,tables:s.node_outputs.tables})});
   const added=s.node_outputs.tables.find(t=>!before.includes(t.view_guid)&&t.port_guid===output.port_guid);
   s=await revealViewerCard(channel,s,e=>e.viewer_card?.kind==='enter'&&e.viewer_card.view_guid===added.view_guid&&e.viewer_card.port_guid===output.port_guid,'enter_table');
   await perform(s,'enter new Table',e=>e.viewer_card?.kind==='enter'&&e.viewer_card.view_guid===added.view_guid,'enter_table');
