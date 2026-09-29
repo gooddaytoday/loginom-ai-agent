@@ -14,7 +14,8 @@ import {observeJavascriptBrowserLifecycle} from './javascript-execution-evidence
 import {javascriptInputColumns,javascriptOutputColumns,javascriptInputRows,verifyJavascriptFixture,verifyJavascriptTable,javascriptSentinelOutcome,createJavascriptEffectJournal,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord} from './javascript-execution-evidence.mjs';
 import {javascriptInputRequest,waitJavascriptCleanupReady,selectJavascriptForSettings,javascriptWizardBinding,openJavascriptWizard,cleanupJavascriptWizardOpening,javascriptMappingUnlockReceipt,closeJavascriptPortMapping,inspectJavascriptExecutionNotifications,waitJavascriptExecutionNotifications,javascriptManualMappingRequest,configureJavascriptManualMapping} from './javascript-execution-runtime.mjs';
 import {captureJavascriptSelection,inspectJavascriptSelection} from '../../client/lib/javascript-owned-selection.mjs';
-import {makeJavascriptManagedSelectionReadCode} from '../../client/lib/javascript-managed-selection.mjs';
+import {makeJavascriptManagedSelectionReadCode,dispatchManagedJavascriptBody} from '../../client/lib/javascript-managed-selection.mjs';
+import {assertActionOutcome} from '../../client/lib/action-catalog.mjs';
 import {validateNodeApplyRequest} from '../../client/lib/node-apply.mjs';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
@@ -89,8 +90,8 @@ test('standalone serialized inspector retains the exact native owner across read
   await retained.dispose();
   assert.equal(f.clicks,0);
 });
-test('managed serialized selection binds prepared workflow and releases its lease after deadline',async()=>{
-  const f=privateSelectionFixture(),form=f.realm.bg.app.Application.FInstance.FMainForm;
+function managedSelectionFixture(deadlineMs=5000,fault) {
+  const f=privateSelectionFixture(fault),form=f.realm.bg.app.Application.FInstance.FMainForm;
   const tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
   const tabElement={getAttribute:key=>key==='data-tid'?tabTid:null,
     classList:{contains:name=>name==='x-tab-active'}};
@@ -107,8 +108,12 @@ test('managed serialized selection binds prepared workflow and releases its leas
   f.native.FIconCls='bg-vendor-icon-javascript';
   const task={mode:'capture',operation_id:'js-owned-1',owner:{document_id:'doc-1',workflow_id:'wf-1',node_id:'js-guid'},
     workflow_ref:{tab_tid:tabTid,prefix:'MF;TF-1'},targetOrigin:'http://logi-test-plan.bg.local',
-    targetBuild:'7.4.2',deadline:Date.now()+200};
+    targetBuild:'7.4.2',deadline:Date.now()+deadlineMs};
   const run=mode=>vm.runInNewContext('('+makeJavascriptManagedSelectionReadCode({...task,mode})+')')(f.page);
+  return {f,task,run,execute:code=>vm.runInNewContext('('+code+')')(f.page)};
+}
+test('managed serialized selection binds prepared workflow and releases its lease after deadline',async()=>{
+  const {f,task,run}=managedSelectionFixture(200);
   const before=await run('capture');assert.equal(before.ready,false);assert.ok(before.body_point);
   await assert.rejects(run('capture'),/lease already held/);
   assert.deepEqual(JSON.parse(JSON.stringify(await run('inspect'))),JSON.parse(JSON.stringify(before)));
@@ -122,6 +127,45 @@ test('managed serialized selection binds prepared workflow and releases its leas
   assert.equal((await run('dispose')).disposed,true);
   assert.equal(f.disposed,1);assert.equal(f.clicks,0);
   assert.throws(()=>run('inspect'),/Invalid managed JavaScript selection read/);
+});
+test('managed body gesture requires durable ACK, exact pre-click read and one browser receipt',async()=>{
+  const {f,task,run,execute}=managedSelectionFixture();
+  const before=await run('capture'),records=[];
+  const receiptOptions=(id,key,signature)=>({receipt_namespace:'managed-js-test',receipt_id:id,
+    receipt_signature:signature});
+  const result=await dispatchManagedJavascriptBody({task,before,execute,receiptOptions,
+    record:async event=>{records.push(event);return event;},wait:async()=>{}});
+  assert.equal(assertActionOutcome(result).status,'SUCCEEDED');assert.equal(result.output.ready,true);
+  assert.equal(result.output.selection.node_selected,true);
+  assert.equal(f.clicks,1);assert.equal(records.length,1);
+  assert.equal(records[0].phase,'javascript_managed_body_prepared');
+  assert.equal(records[0].effect_possible,false);
+  assert.equal((await run('dispose')).disposed,true);
+});
+test('managed body refuses stale point or journal ACK before any click',async()=>{
+  const stale=managedSelectionFixture(),before=await stale.run('capture');
+  const receiptOptions=(id,key,signature)=>({receipt_namespace:'managed-js-test',receipt_id:id,
+    receipt_signature:signature});
+  const noAck=await assert.rejects(dispatchManagedJavascriptBody({task:stale.task,before,
+    execute:stale.execute,receiptOptions,record:async()=>({})}),/journal ACK differs/);
+  assert.equal(noAck,undefined);assert.equal(stale.f.clicks,0);
+  const changed=await dispatchManagedJavascriptBody({task:stale.task,
+    before:{...before,body_point:{...before.body_point,x:before.body_point.x+1}},
+    execute:stale.execute,receiptOptions,record:async event=>event});
+  assert.equal(changed.status,'NOT_APPLIED');assert.equal(changed.effect_possible,false);
+  assert.equal(stale.f.clicks,0);
+  assert.equal((await stale.run('dispose')).disposed,true);
+});
+test('managed body lost click reply leaves receipt unknown and never replays',async()=>{
+  const {f,task,run,execute}=managedSelectionFixture(5000,'lost');
+  const before=await run('capture');
+  const options={task,before,execute,record:async event=>event,
+    receiptOptions:(id,key,signature)=>({receipt_namespace:'managed-js-test',receipt_id:id,
+      receipt_signature:signature})};
+  await assert.rejects(dispatchManagedJavascriptBody(options),/lost click reply/);
+  await assert.rejects(dispatchManagedJavascriptBody(options),/already started/);
+  assert.equal(f.clicks,1);
+  assert.equal((await run('dispose')).disposed,true);
 });
 test('descendant Execute, Preview, ports or foreign Setting child never authorize body/Setting clicks',async()=>{
   for(const fault of ['overlay_Execute','overlay_Preview','overlay_Input_Data-0','overlay_Setting','setting_overlay']){
