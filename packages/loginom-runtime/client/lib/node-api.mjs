@@ -33,7 +33,7 @@ export const javascriptParametersSchema=object({source_text:{type:'string',maxLe
  schema_mode:choice('declared','code'),
  columns:array(object({name:fieldName,label:text(120),type:choice('integer','real','string','boolean','datetime'),
   data_kind:choice('Неопределенное','Непрерывный','Дискретный'),
-  usage:choice('Не задано','Активное','Выходное','Группа','Показатель','Транзакция','Элемент')}),1000,1)},[]);
+  usage:choice('Не задано','Активное','Выходное','Группа','Показатель','Транзакция','Элемент')}),64,1)},[]);
 export const groupingFieldSchema=object({kind:choice('input_field'),name:fieldName});
 export const groupingMeasureSchema=object({field:groupingFieldSchema,function:choice('sum','count','avg','min','max'),name:fieldName,label:text(120)});
 export const groupingParametersSchema=object({group_by:array(groupingFieldSchema,128,1),measures:array(groupingMeasureSchema,256,1)},[]);
