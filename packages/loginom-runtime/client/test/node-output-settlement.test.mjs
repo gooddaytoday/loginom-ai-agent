@@ -12,13 +12,15 @@ function fixture(mode='ready',{bound=true}={}) {
   const state=()=>({authenticated:true,origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:clock},
     prepared_node_context:{verified:true,document_id:'doc',workflow_id:'wf',node_id:mode==='foreign_node'&&clock>=10000?'foreign':'node',surface:'views',tid:'MF;TF-1;ViewsForm'},
     scan:{complete:true},wizard:{status:'absent'},ui:{elements:[{ref:'ui-safe',allowed_actions:['click']}],
-      masks:clock<60000||mode==='permanent'?[{kind:'busy',ref:'views',target_tid:mode==='foreign_mask'&&clock>=10000?'foreign':'MF;TF-1;ViewsForm'}]:[],
+      masks:mode==='pending_without_mask'&&clock>=10000?[]:clock<60000||mode==='permanent'?[{kind:'busy',ref:'views',target_tid:mode==='foreign_mask'&&clock>=10000?'foreign':'MF;TF-1;ViewsForm'}]:[],
       dialogs:mode==='foreign_dialog'&&clock>=10000?[{ref:'foreign',title:'Other'}]:[],truncated:{dialogs:false,masks:false}}});
   const channel=createNodeProcedure({operation,...(bound?{preparedNodeContext:binding}:{}),targetOrigin:'http://example.test',targetBuild:'7.4.2',
     signal:controller.signal,now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{clock+=ms;if(mode==='cancel'&&clock>=10000)controller.abort();},
     record:async e=>{records.push(e);return structuredClone(e);},execute:async code=>{
       assert.equal(typeof code,'string');
-      if(code.includes('async function readOutputContext'))return {verified:true,surface:'views',
+      if(code.includes('async function readOutputContext'))return {
+        ...(mode.startsWith('pending')&&clock>=10000&&clock<60000?{verified:false,reason:mode==='pending_wrong_reason'?'table_card_binding':'table_card_pending',
+          pending_tables:[{view_guid:'new',port_guid:mode==='pending_foreign_port'?'foreign':port},...(mode==='pending_multiple'?[{view_guid:'other',port_guid:port}]:[])]}:{verified:true}),surface:'views',
         port_panels:[{port_guid:mode==='foreign_port'&&clock>=10000?'foreign':port,tid:'MF;TF-1;ViewsForm;cntPorts;'+port}],
         tables:clock>=60000?[{view_guid:'new',port_guid:port}]:[]};
       if(code.includes('"mode":"act"')){gestures++;throw Error('Settlement must be read-only');}
@@ -35,7 +37,13 @@ test('owned output settlement waits past ordinary readiness within the unchanged
   assert.equal(f.records.at(-1).readiness.timeout_ms,90000);
   assert.equal(f.records.at(-1).readiness.settle_output_port,port);
 });
-for(const mode of ['foreign_node','foreign_port','foreign_mask','foreign_dialog','cancel'])test('output settlement stops on '+mode,async()=>{
+test('one native descriptor awaiting its card is read-only until fully verified',async()=>{
+  const f=fixture('pending');const r=await f.run();assert.equal(r.node_outputs.verified,true);
+  assert.ok(f.clock>=60000&&f.clock<90000);assert.equal(f.gestures,0);
+  const pending=f.records.filter(e=>e.phase==='node_observation_sample'&&e.outcome.output.node_outputs.verified===false);
+  assert.ok(pending.length>0);assert.ok(pending.every(e=>e.readiness.satisfied===false));
+});
+for(const mode of ['foreign_node','foreign_port','foreign_mask','foreign_dialog','cancel','pending_foreign_port','pending_multiple','pending_wrong_reason','pending_without_mask'])test('output settlement stops on '+mode,async()=>{
   const f=fixture(mode);await assert.rejects(f.run());assert.equal(f.clock,10000);assert.equal(f.gestures,0);
   await assert.rejects(f.channel.act({verb:'click',ref:'ui-safe'}),/observation|aborted/i);
 });
