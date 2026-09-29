@@ -21,12 +21,9 @@ export function validateCrossTableParameters(parameters,mode,request){
   need(columns&&typeof columns==='object'&&!Array.isArray(columns),'CrossTable column mode required');
   if(columns.mode==='sliding')need(Object.keys(columns).sort().join(',')==='min_values,mode'
    &&Number.isInteger(columns.min_values)&&columns.min_values===0,'Sliding CrossTable requires unbounded observed categories');
-  else if(columns.mode==='fixed')need(Object.keys(columns).sort().join(',')==='categories,include_null,include_other,mode'
-   &&Array.isArray(columns.categories)&&columns.categories.length>0&&columns.categories.length<=128
-   &&columns.categories.every(v=>typeof v==='string'&&v.length>0&&v.length<=256&&!/[\x00-\x1f]/.test(v))
-   &&new Set(columns.categories).size===columns.categories.length
+  else if(columns.mode==='fixed')need(Object.keys(columns).sort().join(',')==='include_null,include_other,mode'
    &&typeof columns.include_null==='boolean'&&typeof columns.include_other==='boolean',
-  'Fixed CrossTable requires a complete explicit category list and policies');
+  'Fixed CrossTable uses all source categories; columns.categories is unsupported');
   else need(false,'Unknown CrossTable column mode');
  }
  need(request.target.kind==='existing'||request.inputs.length===1,'New CrossTable requires one explicit input');

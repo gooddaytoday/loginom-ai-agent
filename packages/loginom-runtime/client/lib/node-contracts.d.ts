@@ -95,7 +95,7 @@ export interface CrossTableParameters {
   column: {kind: 'input_field'; name: string};
   facts: Array<{field: {kind: 'input_field'; name: string}; functions: Array<'sum' | 'avg' | 'min' | 'max'>}>;
   columns: {mode: 'sliding'; min_values: 0} |
-    {mode: 'fixed'; categories: string[]; include_null: boolean; include_other: boolean};
+    {mode: 'fixed'; include_null: boolean; include_other: boolean};
 }
 export interface GroupingConfigurationReadback {
   kind: 'grouping'; scope: 'observed_before_verified_finish'; node: NodeRef;

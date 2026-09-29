@@ -30,8 +30,8 @@ test('CrossTable rejects ambiguous roles and silent sliding truncation before mu
  assert.throws(()=>resolveCrossTableParameters(parameters,fields.map(field=>field.name==='Category'?{...field,data_kind:'Непрерывный'}:field)),/must be discrete/);
 });
 
-test('CrossTable fixed categories require a complete unique list and explicit policies',()=>{
- const fixed={...parameters,columns:{mode:'fixed',categories:['A','B'],include_null:true,include_other:true}};
+test('CrossTable fixed uses every source category and rejects an explicit subset',()=>{
+ const fixed={...parameters,columns:{mode:'fixed',include_null:true,include_other:true}};
  assert.equal(validateCrossTableParameters(fixed,'pivot',request(fixed)),fixed);
- assert.throws(()=>validateCrossTableParameters({...fixed,columns:{...fixed.columns,categories:['A','A']}},'pivot',request(fixed)),/complete explicit category list/);
+ assert.throws(()=>validateCrossTableParameters({...fixed,columns:{...fixed.columns,categories:['A','B']}},'pivot',request(fixed)),/columns.categories is unsupported/);
 });

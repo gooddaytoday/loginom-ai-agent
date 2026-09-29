@@ -31,7 +31,7 @@ export const groupingParametersSchema=object({group_by:array(groupingFieldSchema
 export const crossTableFactSchema=object({field:groupingFieldSchema,functions:array(choice('sum','avg','min','max'),4,1)});
 export const crossTableColumnsSchema={oneOf:[
  object({mode:choice('sliding'),min_values:{const:0}}),
- object({mode:choice('fixed'),categories:array(text(256),128,1),include_null:boolean,include_other:boolean}),
+ object({mode:choice('fixed'),include_null:boolean,include_other:boolean}),
 ]};
 export const crossTableParametersSchema=object({rows:array(groupingFieldSchema,128,1),column:groupingFieldSchema,
  facts:array(crossTableFactSchema,64,1),columns:crossTableColumnsSchema});

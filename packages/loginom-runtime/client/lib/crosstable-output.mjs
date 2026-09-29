@@ -60,9 +60,8 @@ export function resolveCrossTableOutputSchema(configuration,parameters,columns){
  need(generated.every((column,index)=>column.name===ordered[index].name&&column.label===ordered[index].label),
   'CrossTable output field order differs');
  if(parameters.columns.mode==='fixed'){
-  const expected=[...(parameters.columns.include_null?['<...>']:[]),...parameters.columns.categories,
-   ...(parameters.columns.include_other?['<Прочее>']:[])];
-  need(JSON.stringify(categories)===JSON.stringify(expected),'Fixed CrossTable categories differ from the complete request');
+  need((categories[0]==='<...>')===parameters.columns.include_null,'Fixed CrossTable NULL group differs');
+  need((categories.at(-1)==='<Прочее>')===parameters.columns.include_other,'Fixed CrossTable Other group differs');
  }
  need(new Set(generated.map(column=>column.name)).size===generated.length,'CrossTable generated field names collide');
  need(generated.length===count*measures.length,'CrossTable generated fields are incomplete');

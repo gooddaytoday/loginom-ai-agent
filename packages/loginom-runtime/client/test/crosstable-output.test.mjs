@@ -11,7 +11,7 @@ const configuration={input_fields:[
 const parameters={rows:[{name:'Region'}],facts:[
  {field:{name:'Amount'},functions:['sum','min','max','avg']},
  {field:{name:'Quantity'},functions:['sum']},
-],columns:{mode:'fixed',categories:['A','B'],include_null:false,include_other:true}};
+],columns:{mode:'fixed',include_null:false,include_other:true}};
 const columns=[
  {name:'Region',label:'Region',type:'string'},
  ...['A','B','<Прочее>'].flatMap((category,index)=>[

@@ -49,22 +49,52 @@ def matrix(source, categories):
     }
 
 
-dense = rows("dense.csv")
+categories = diagnostics["changed_fixed"]["categories"]
+source = rows("changed.csv")
+base = rows("base.csv")
+assert sorted({row["Category"] for row in base}) == ["<...>", "A", "B", "C"]
+assert "D" in {row["Category"] for row in source}
+measures = [
+    ("Amount", "Sum", "Сумма", "real"),
+    ("Quantity", "Sum", "Сумма", "real"),
+    ("Amount", "Min", "Минимум", "integer"),
+    ("Amount", "Max", "Максимум", "integer"),
+    ("Amount", "Avg", "Среднее", "real"),
+]
 assert expected["columns"] == [
     {"name": "Region", "type": "string"},
     *[
-        {"name": f"C_{index}_{fact}_Sum", "label": f"{category}|{fact}|Сумма", "type": "real"}
-        for index, category in enumerate(["A", "B"], 1)
-        for fact in ["Amount", "Quantity"]
+        {"name": f"C_{index}_{fact}_{function}", "label": f"{category}|{fact}|{label}", "type": kind}
+        for block in [measures[:2], measures[2:]]
+        for index, category in enumerate(categories, 1)
+        for fact, function, label, kind in block
     ],
 ]
+grouped = defaultdict(list)
+for row in source:
+    category = row["Category"] if row["Category"] in categories else "<Прочее>"
+    grouped[row["Region"], category].append(row)
+
+def aggregate(region, category, fact, function):
+    values = [row[fact] for row in grouped[region, category] if row[fact] is not None]
+    if not values:
+        return None
+    if function == "Sum":
+        return float(sum(values))
+    if function == "Min":
+        return float(min(values))
+    if function == "Max":
+        return float(max(values))
+    return float(sum(values) / len(values))
+
 assert expected["rows"] == [
     {
         "Region": region,
         **{
-            f"C_{index}_{fact}_Sum": matrix(dense, ["A", "B"])[region][category][fact_index]
-            for index, category in enumerate(["A", "B"], 1)
-            for fact_index, fact in enumerate(["Amount", "Quantity"])
+            f"C_{index}_{fact}_{function}": aggregate(region, category, fact, function)
+            for block in [measures[:2], measures[2:]]
+            for index, category in enumerate(categories, 1)
+            for fact, function, _, _ in block
         },
     }
     for region in ["North", "South"]

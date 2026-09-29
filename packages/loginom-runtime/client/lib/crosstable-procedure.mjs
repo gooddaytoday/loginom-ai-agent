@@ -164,5 +164,5 @@ export async function configureCrossTable(channel,parameters,{inputMapping}){
  if(parameters.columns.mode==='fixed')need(after.node_cross_table.columns[0].null_group===parameters.columns.include_null
   &&after.node_cross_table.columns[0].other_group===parameters.columns.include_other,'CrossTable fixed groups differ');
  return {verified:true,cleanup_complete:true,effect_possible:true,
-  configuration:{...after.node_cross_table,input_fields:fields,requested_categories:parameters.columns.mode==='fixed'?parameters.columns.categories:null}};
+  configuration:{...after.node_cross_table,input_fields:fields}};
 }
