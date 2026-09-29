@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {createJavascriptSourceReader} from '../../client/lib/javascript-source-read.mjs';
 import {observeJavascriptSource,observeJavascriptSourceProcesses} from '../../client/lib/javascript-source-browser.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
-import {sourceFixture} from '../../client/test/javascript-source-read.test.mjs';
+import {sourceFixture} from '../../client/test/support/javascript-source-fixture.mjs';
 import {verifyJavascriptSourceCycle,javascriptSourceSettings} from './javascript-source-cycle.mjs';
 import {runJavascriptOperator} from './javascript-live.mjs';
 const owner={document_id:'document',workflow_id:'workflow',node_id:'node',operation_id:'cycle',ui_epoch:0};

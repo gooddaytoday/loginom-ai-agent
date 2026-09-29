@@ -2,28 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {createJavascriptSourceReader,javascriptSourceIdentity} from '../lib/javascript-source-read.mjs';
-import {observeJavascriptSource,observeJavascriptSourceProcesses} from '../lib/javascript-source-browser.mjs';
 import {createRedactor} from '../lib/redact.mjs';
-const owner={document_id:'document',workflow_id:'workflow',node_id:'node',operation_id:'source-read',ui_epoch:3};
-export function sourceFixture(source='const value="Сумма ё😀";') {
- const visible={isConnected:true,getBoundingClientRect:()=>({width:100,height:30})};
- const input={...visible,disabled:false},document={activeElement:{}},doc={lineCount:()=>source.split('\n').length,firstLine:()=>0,lastLine:()=>source.split('\n').length-1,getLine:i=>source.split('\n')[i]};
- const cm={getDoc:()=>doc,getInputField:()=>input,getOption:()=>false},wrapper={...visible,CodeMirror:cm};
- const codePage={...visible,contains:e=>e===wrapper};
- const root={...visible,querySelectorAll:q=>q==='.CodeMirror'?[wrapper]:[codePage],contains:e=>e===input||e===wrapper};
- const nodeData={},workflow={},cell={},node={FGuid:'node',data:nodeData,FCell:cell};
- const native={FParentNode:{FParentNode:workflow,FGuid:'node',FModelNode:nodeData}},model={FModelNode:nodeData,FView:{el:{dom:root}}};
- const tab={Controller:{Node:{data:{node:native}},FController:model}},binding={document,workflow,tab,nodeData,native:node,cell,wizardAddress:{epoch:1,wizard:native,node}};
- const processRecord={internalId:'child',data:{id:'1.1',Status:3,ErrorDetails:'',ModelNode:nodeData},childNodes:[]};
- const processRoot={internalId:'root',data:{loaded:true},childNodes:[processRecord]},tree={id:'tree'},store={getRoot:()=>processRoot,isLoading:()=>false};
- document.querySelectorAll=q=>q.includes('trpProgress')?[tree]:q.includes('WizrdMCF')?[root]:[];
- const environment={document,TextEncoder,getComputedStyle:()=>({visibility:'visible'}),
- __loginomDockPreparationV1:{document,id:'document',receipts:new Map([['receipt',{phase:'verified',workflowId:'workflow',nodeTargetWorkflowNode:workflow}]])},
- bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>tab}},FMapTree:{FServerConnection:{UserName:'owner'}}}}}}},Ext:{getCmp:()=>({getStore:()=>store})}};
- const realm=vm.createContext(environment),observe=vm.runInContext('('+observeJavascriptSource.toString()+')',realm),processes=vm.runInContext('('+observeJavascriptSourceProcesses.toString()+')',realm);
- const context={root,native,binding,prefix:'workflow',account:'owner',build:'7.4.2'};
- return {environment,document,context,codePage,doc,cm,input,wrapper,tab,model,binding,node,processRoot,processRecord,store,observe,processes,setSource:value=>{source=value;},capture:()=>observe({context,owner,epoch:1,capture:true}),read:held=>observe({context,owner,epoch:1,held})};
-}
+import {javascriptSourceOwner,sourceFixture} from './support/javascript-source-fixture.mjs';
+const owner=javascriptSourceOwner;
 export function readerFixture(source,options={}) {
  const browser=sourceFixture(source),events=[],calls=[];
  const adapter={open:async()=>{calls.push('open');return browser.capture();},read:async held=>{calls.push('read');return {...browser.read(held),settings:{mode:'code'}};},discard:async()=>{calls.push('discard');return {closed:true,owner};}};

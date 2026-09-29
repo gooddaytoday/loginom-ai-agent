@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createJavascriptSourceAdmission} from '../lib/javascript-source-admission.mjs';
 import {createRedactor} from '../lib/redact.mjs';
-import {sourceFixture} from './javascript-source-read.test.mjs';
+import {sourceFixture} from './support/javascript-source-fixture.mjs';
 const digest=text=>createHash('sha256').update(text).digest('hex');
 const original='import {InputTable} from "builtIn/Data"; const a="Сумма ё😀";';
 const owner={document_id:'document',workflow_id:'workflow',node_id:'node',operation_id:'admission',ui_epoch:1};
