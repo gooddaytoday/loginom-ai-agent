@@ -391,7 +391,11 @@ export async function selectJavascriptForSettings(page,{binding,node,icon,deadli
       if(!opening.ready)throw Error('Private Setting no longer ready');
       await acknowledge({phase:'javascript_private_open_dispatch',node_id:node.id,point:opening.setting_point,deadline},'Private Setting dispatch journal ACK differs');
       const checked=await read('pre_open_click');
-      if(JSON.stringify(checked)!==JSON.stringify(opening)||Date.now()>=deadline)throw Error('Private Setting changed before click');
+      const redrawCountUnchanged=checked.dom_replacements===opening.dom_replacements;
+      const oneMoreOwnedRedraw=checked.dom_replacements===opening.dom_replacements+1;
+      if((!redrawCountUnchanged&&!oneMoreOwnedRedraw)
+        ||JSON.stringify({...checked,dom_replacements:opening.dom_replacements})!==JSON.stringify(opening)
+        ||Date.now()>=deadline)throw Error('Private Setting changed before click');
       openingDispatched=true;lifecycle.settingDispatched=true;
       await page.mouse.click(opening.setting_point.x,opening.setting_point.y);
       lifecycle.settingGestureReturned=true;
