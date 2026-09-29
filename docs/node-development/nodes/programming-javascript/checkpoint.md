@@ -127,7 +127,36 @@ node-procedure, wizard open/close), syntax и diff-check PASS; test log SHA256
 
 После подтверждённого recovery под registry lock назначен профиль 283,
 запущен новый headed `p1-business-code-base-03`, source `05186b8f67`.
-Результат этого запуска ещё не подтверждён; прежние reports не изменяются.
+Этот run завершился **CLEANUP_UNCONFIRMED до JS**; report SHA256
+`b3c071761dc107be02ac0c5c2df2130c663ad817a41063dca1f5431169842062`,
+journal SHA256
+`acab69f0e6303cb08ecd66fad9789ac24281a75746bb628082dc5db8e9901fed`.
+Открытие JSInput теперь SUCCEEDED: native surface готов примерно через 28.8s,
+owned mask wait ещё 11.3s, единственный opening подтверждён через 40.0s.
+Следующий отказ — pre-gesture `UI_EPOCH_CHANGED` у decimal separator после
+изменения delimiter; квитанция NOT_APPLIED/effect=false/cleanup=true,
+маска прежнего мастера появилась после предыдущего чтения.
+
+Отдельный headed recovery/profile284 закрыл ровно `Package1`/`jsteach:3567`;
+после Refresh сеанс отсутствует, admin logout/browser close и отсутствие
+своих процессов подтверждены. Recovery journal SHA256
+`77ddabfe780275a5b6020ad6c723f91ce3d1ed90f6cf04d5f8ea6a7d3d9b9102`,
+receipt SHA256
+`8225dca2ae96d88cbff48b36eaafe3ccbec9396c1823680701c1edb8b9cc170d`.
+Исходный cleanup run03 не повышен до 3/3.
+
+Runtime `dbd93e32d4` привязал изменение format field к существующему
+`channel.perform`: новое наблюдение разрешается только после доказанного
+pre-gesture отказа, с тем же native owner/полем/root и неизменными parsing
+settings; unknown effect/cleanup и смена владельца запрещают refresh.
+218 import/procedure tests PASS, syntax/diff-check PASS; log SHA256
+`5e7cee6c2f20508c942fac9b98478a2ab2f7fdf93609bbbddd4f15b0d6788eab`.
+Operator `3c8f6de9ab` задаёт cleanup budget 180s и close window до 90s
+в его пределах вместо 25s; Close/discard guards и запрет повторения эффекта
+сохранены. Проверены syntax/diff; успешный новый cleanup ещё не доказан.
+
+Под registry lock после recovery запущен headed `p1-business-code-base-04`,
+profile285/source `3c8f6de9ab`; его результат ещё не подтверждён.
 `expected.json` остаётся неизменным. Далее — declared base, changed/reordered
 и конечный Stop/cancel по P1; до результата code-base их не считать проверенными.
 
