@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,fillJavascriptColumnField,recordJavascriptColumnHelperSource,openJavascriptColumnTypePicker,selectJavascriptColumnTypeOption} from './javascript-column-editor.mjs';
+import {openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,fillJavascriptColumnField,recordJavascriptColumnHelperSource,openJavascriptColumnTypePicker,selectJavascriptColumnTypeOption,openJavascriptColumnUsagePicker,selectJavascriptColumnUsageOption} from './javascript-column-editor.mjs';
 // Private native-cache observer for the two JavaScript wizard pages. A missing
 // cache contract is a refusal with inventory, never permission to read a proxy.
 export function readJavascriptSchema({root,native,binding,prefix}) {
@@ -88,11 +88,12 @@ export function javascriptDeclaredColumnsMatch(snapshot,fixedCase) {
   if(fixedCase==='cardinality-empty')return snapshot?.verified===true&&snapshot.inventory_complete===true&&snapshot.generation?.checked===false&&fields?.length===1
     &&fields[0].Name==='Value'&&fields[0].DisplayName==='Value'&&fields[0].DataType===4&&fields[0].Index===0&&typeof fields[0].Required==='boolean'&&fields[0].Broken!==true;
   return snapshot?.verified===true&&snapshot.generation?.checked===false&&fields?.length===2
-    &&fields.every((field,i)=>field.Name===['ObservedID','PhaseMarker'][i]&&field.DataType===[4,5][i]);
+    &&fields.every((field,i)=>field.Name===['ObservedID','PhaseMarker'][i]&&field.DataType===[4,5][i])
+    &&(fixedCase!=='usage-output'||fields[0].DefaultUsageType===4);
 }
 
 export async function configureJavascriptSchema({page,context,mode,once,record,deadline,columnState,fixedCase}) {
-  if(fixedCase!==undefined&&(fixedCase!=='cardinality-empty'||mode!=='declared'))throw Error('Fixed declared empty mode required');
+  if(fixedCase!==undefined&&(!['cardinality-empty','usage-output'].includes(fixedCase)||mode!=='declared'))throw Error('Fixed declared schema mode required');
   let applied;
   const names=fixedCase==='cardinality-empty'?['Value']:['ObservedID','PhaseMarker'];
   const read=()=>page.evaluate(readJavascriptSchema,context);
@@ -131,11 +132,18 @@ export async function configureJavascriptSchema({page,context,mode,once,record,d
       await openJavascriptColumnTypePicker({page,state:columnState,record,once,deadline,id:'schema-type-open-'+index,expectedType,expectedLabel,
         click:(tid,timeout)=>at(tid).click({timeout})});
       await selectJavascriptColumnTypeOption({page,state:columnState,record,once,deadline,id:'schema-type-select-'+index,expectedType,expectedLabel});
+      if(fixedCase==='usage-output'&&index===0){
+        await openJavascriptColumnUsagePicker({page,state:columnState,record,once,deadline,id:'schema-usage-open',
+          click:(tid,timeout)=>at(tid).click({timeout})});
+        const selected=await selectJavascriptColumnUsageOption({page,state:columnState,record,once,deadline,id:'schema-usage-select'});
+        if(selected.usage_picker?.cached_value!==4)throw Error('Declared output usage selection differs before Apply');
+      }
       await effect('schema-apply-'+index,{base,name},'btnApply','click',async()=>{columnState.pending.applyDispatched=true;await at(base+';btnApply').click({timeout:Math.max(1,deadline-Date.now())});});
       applied=await settleJavascriptColumnEditor({page,state:columnState,record,deadline,phase:'applied'});
       const added=await read();await record({phase:'javascript_schema_added',index,snapshot:added});
       const observed=added.grids.find(grid=>grid.tid===added.page_tid+';grdTargetColumns;tbl').fields;
-      if(observed.length!==index+1||observed[index].Name!==name||observed[index].DataType!==[4,5][index])throw Error('Declared column readback differs');
+      if(observed.length!==index+1||observed[index].Name!==name||observed[index].DataType!==[4,5][index]
+        ||fixedCase==='usage-output'&&index===0&&observed[index].DefaultUsageType!==4)throw Error('Declared column readback differs');
     }
   }
   const after=await read();await record({phase:'javascript_schema_after',snapshot:after});

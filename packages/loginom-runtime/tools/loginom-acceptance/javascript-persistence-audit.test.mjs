@@ -15,6 +15,7 @@ const path='/jsteach/js-g2-9150c962-ad60-4cd4-a13e-bcba89b982d8/JavaScript-9150c
 const finalMarker='JS_G7_FINAL_V2 — Сумма & <tag> "quotes" \'single\' \\ backslash 😀';
 function fixture(mode='code'){
   const sources=javascriptPersistenceCase(mode).revisions;
+  const schemaMode=mode==='usage'?'declared':mode;
   const prepared=(document_id,prefix)=>({status:'READY',target_verified:true,document_id,workflow_ref:{workflow_id:document_id+'-workflow',prefix,tab_tid:prefix+'-tab'},package_ref:{name:'saved',persisted:true,path}});
   const wp=prepared('writer','MF;TF-1'),cp=prepared('cold','MF;TF-7');
   const node=p=>({document_id:p.document_id,workflow_id:p.workflow_ref.workflow_id,node_id:'js'}),wn=node(wp),cn=node(cp);
@@ -22,7 +23,7 @@ function fixture(mode='code'){
     nodes:[{ref:node(p),type:'bg-vendor-icon-javascript',label:'JS',position:{x:200,y:80},inputs:[0],outputs:[0],other_ports:['Input_Add','Input_Var-1','Output_Add'],locked:false,dom_epoch:p===wp?1:90},
       {ref:{...node(p),node_id:'import'},type:'imports.text',label:'Input',position:{x:80,y:80},inputs:[],outputs:[0],other_ports:['Input_Connection-0','Input_Var-1'],locked:false,dom_epoch:2}],
     links:[{source:'import',target:'js',input:0,output:0}],foreign_links:[]});
-  const settings=prefix=>({generation:mode==='code',grids:['grdSourceColumns','grdTargetColumns'].map(name=>({tid:prefix+';WizrdMCF;JavaScriptColumnsWizard;'+name+';tbl',fields:mode==='code'?[]:[{Name:'ObservedID',DataType:4},{Name:'PhaseMarker',DataType:1}]}))});
+  const settings=prefix=>({generation:mode==='code',grids:['grdSourceColumns','grdTargetColumns'].map(name=>({tid:prefix+';WizrdMCF;JavaScriptColumnsWizard;'+name+';tbl',fields:mode==='code'?[]:[{Name:'ObservedID',DataType:4,...(mode==='usage'&&name==='grdTargetColumns'?{DefaultUsageType:4,UsageType:0}:{})},{Name:'PhaseMarker',DataType:1}]}))});
   const mapping={autosync:true,source_fields:[{index:0,name:'RowID',type:'integer'}],target_fields:[{index:0,name:'RowID',type:'integer',excluded:false,source:{index:0,name:'RowID',type:'integer'},exclusion_source:null}]};
   const mappings={input:mapping,output:mapping};
   const rawMappings=n=>Object.fromEntries(['input','output'].map(direction=>[direction,{...structuredClone(mapping),verified:true,inventory_complete:true,source_identity_verified:true,
@@ -44,7 +45,9 @@ function fixture(mode='code'){
     receipt:{operation_id:'save-'+revision,action_key:'package.save_checkpoint',status:'SUCCEEDED',phase:'verified',error:null,
       output:{save_completed:true,reopened:false,workflow_preserved:true,package_ref:{path,active_identity:path},
         workflow_continuations:[{document_id:wp.document_id,previous_workflow_ref:wp.workflow_ref,workflow_ref:wp.workflow_ref}]}}}));
-  const writer={...report(111,start,1800000),explicit_execution_limit:2,persistence:{status:'WRITER_OBSERVED',schema_mode:mode,saves,
+  const writer={...report(111,start,1800000),explicit_execution_limit:2,
+    ...(mode==='usage'?{execution_schema:{page_tid:wp.workflow_ref.prefix+';WizrdMCF;JavaScriptColumnsWizard',grids:settings(wp.workflow_ref.prefix).grids}}:{}),
+    persistence:{status:'WRITER_OBSERVED',schema_mode:schemaMode,...(mode==='usage'?{case_id:'persistence-usage'}:{}),saves,
     initial:{source:sources[0],execution:execution(wn,1,'1','initial'),output:output(1),source_cycle:cycle(1)},
     final:{source:sources[1],execution:execution(wn,2,'2','persistence-final'),output:output(2),before_execute:cycle(2),source_cycle:cycle(2),mappings_after_execute:rawMappings(wn)}}};
   const coldMappings=rawMappings(cn);
@@ -70,6 +73,28 @@ function fixture(mode='code'){
 for(const mode of ['code','declared'])test('independent full persistence audit: '+mode,()=>{
   const result=auditJavascriptPersistence(fixture(mode));assert.equal(result.status,'VERIFIED');assert.equal(result.schema_mode,mode);
   assert.equal(result.cold_execution_verified,true);assert.equal(result.package_bytes_verified,false);assert.equal(result.public_handler_verified,false);
+});
+test('output usage persistence requires Apply, writer settings and cold settings',()=>{
+  const accepted=fixture('usage');
+  assert.equal(auditJavascriptPersistence(accepted).case_id,'persistence-usage');
+  const missingApply=fixture('usage');delete missingApply.writer.execution_schema;
+  assert.throws(()=>auditJavascriptPersistence(missingApply),/output usage Apply readback/);
+  const missingWriter=fixture('usage');
+  for(const cycle of [missingWriter.writer.persistence.initial.source_cycle,
+    missingWriter.writer.persistence.final.before_execute,missingWriter.writer.persistence.final.source_cycle]){
+    for(const round of cycle.rounds){
+      delete round.settings.grids[1].fields[0].DefaultUsageType;
+      round.settings_sha256=sha(JSON.stringify(round.settings));
+    }
+  }
+  delete missingWriter.cold.cold.source.settings.grids[1].fields[0].DefaultUsageType;
+  const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'
+    ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+  missingWriter.cold.cold.source.admission.settings_sha256=sha(JSON.stringify(canonical(missingWriter.cold.cold.source.settings)));
+  assert.throws(()=>auditJavascriptPersistence(missingWriter),/output usage must be the saved first declared column/);
+  const missingCold=fixture('usage');delete missingCold.cold.cold.source.settings.grids[1].fields[0].DefaultUsageType;
+  missingCold.cold.cold.source.admission.settings_sha256=sha(JSON.stringify(canonical(missingCold.cold.cold.source.settings)));
+  assert.throws(()=>auditJavascriptPersistence(missingCold),/cold settings preserved/);
 });
 function withDirtyState(evidence,modified=[false,false]){
   for(const [index,save] of evidence.writer.persistence.saves.entries()){

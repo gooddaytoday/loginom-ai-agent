@@ -58,8 +58,12 @@ def audit(persistence_audit_path, read_directory):
             and base.get("graph_verified") is True and base.get("cold_execution_verified") is True,
             "writer/cold persistence audit not verified")
     mode, path = base.get("schema_mode"), base.get("path")
+    case_id = base.get("case_id", "persistence-" + str(mode))
     require(mode in ("code", "declared") and isinstance(path, str) and PACKAGE.fullmatch(path),
             "fixed schema mode and saved path required")
+    require(case_id in ("persistence-code", "persistence-declared", "persistence-usage")
+            and (case_id != "persistence-code") == (mode == "declared"),
+            "fixed persistence case and schema mode required")
     files = base.get("files")
     require(isinstance(files, list) and len(files) == 4, "four pinned persistence files required")
     pinned = []
@@ -109,6 +113,7 @@ def audit(persistence_audit_path, read_directory):
     final = writer["persistence"]["final"]["source"]
     source = final["source"]
     require(writer["persistence"]["schema_mode"] == mode
+            and writer["persistence"].get("case_id", "persistence-" + mode) == case_id
             and writer["persistence"]["saves"][-1]["path"] == path
             and cold["cold"]["path"] == path
             and cold["cold"]["prepared"]["package_ref"]["path"] == path,
@@ -188,8 +193,11 @@ def audit(persistence_audit_path, read_directory):
         require(engine.attrib.get("CodeConfigurableColumns") != "true"
                 and actual == [("ObservedID", "dtInteger"), ("PhaseMarker", "dtString")],
                 "declared schema differs")
+        if case_id == "persistence-usage":
+            require(list(columns)[0].attrib.get("DefaultUsageType") == "utPredicted",
+                    "saved output usage differs")
     return {
-        "version": 1, "status": "VERIFIED", "schema_mode": mode,
+        "version": 1, "status": "VERIFIED", "case_id": case_id, "schema_mode": mode,
         "package_path": path, "package_bytes": len(package), "package_sha256": digest(package),
         "source_sha256": digest(source.encode("utf-8")), "zip_members": len(names),
         "package_bytes_verified": True, "dirty_state_verified": dirty_verified,
