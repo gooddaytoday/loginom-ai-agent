@@ -538,7 +538,7 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
         await executionRecord({phase:'existing_schema_read',schema});
         if(!schema.verified||schema.generation?.checked!==report.execution_schema.generation.checked)throw Error('Existing JavaScript schema mode changed');
         report.execution_existing_schema=schema;
-      }else report.execution_schema=await configureJavascriptSchema({page,context:schemaContext(),mode:executionCase.split('-')[0],fixedCase:discoveryProbe?.id==='p1-business-declared-base'?'business-output':persistence?.id==='persistence-usage'?'usage-output':nativeRoundtrip&&nativeFixtureId==='cardinality-empty'?'cardinality-empty':undefined,
+      }else report.execution_schema=await configureJavascriptSchema({page,context:schemaContext(),mode:executionCase.split('-')[0],fixedCase:discoveryProbe?.scope==='P1-business'&&discoveryProbe.schema_mode==='declared'?'business-output':persistence?.id==='persistence-usage'?'usage-output':nativeRoundtrip&&nativeFixtureId==='cardinality-empty'?'cardinality-empty':undefined,
         once:(id,identity,perform)=>executionRuntime.once(caseEffect(report.case_id,id),identity,perform),record:executionRecord,deadline,columnState});
       if(options['--verify-runtime-schema']){
         const prepared={document_id:executionPrepared.document_id,
@@ -1849,7 +1849,7 @@ try {
       if(persistence){report.scope='private G7 persistence writer: '+persistence.schema_mode;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
-        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence});
+        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence,inputVariant:discoveryProbe?.input_variant??'base'});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
       if(nativeRoundtrip)await executionRuntime.armNativeRoundtrip(executionInput);

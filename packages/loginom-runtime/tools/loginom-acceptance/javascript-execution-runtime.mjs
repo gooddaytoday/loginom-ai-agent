@@ -42,16 +42,17 @@ import {decodeTableOutput} from '../../client/lib/table-output-values.mjs';
 import {closePreparedWizard,wizardCloseBinding} from '../../client/lib/node-wizard-close.mjs';
 import {configureSeparateOutputPort} from '../../client/lib/port-mapping-procedure.mjs';
 import {activatePreparedWorkflow} from '../../client/lib/node-workflow-activation.mjs';
-import {javascriptInputColumns,javascriptOutputColumns,verifyJavascriptFixture,verifyJavascriptTable,createJavascriptEffectJournal} from './javascript-execution-evidence.mjs';
+import {javascriptBusinessInputVariant,javascriptInputColumns,javascriptOutputColumns,verifyJavascriptFixture,verifyJavascriptTable,createJavascriptEffectJournal} from './javascript-execution-evidence.mjs';
 
 export {selectJavascriptForSettings,javascriptWizardBinding,openJavascriptWizard,finishJavascriptWizardOpening,cleanupJavascriptWizardOpening};
 
-export function javascriptInputRequest({prepared,storage,artifact,uploadOperationId,totalMs}) {
+export function javascriptInputRequest({prepared,storage,artifact,uploadOperationId,totalMs,inputVariant='base'}) {
   if(!/^\/jsteach\/js-g2-[a-f0-9-]{36}$/.test(storage))throw Error('Owned UUID input directory required');
+  const variant=javascriptBusinessInputVariant(inputVariant);
   return {operation_id:'js-input-import',contract_revision:'1.0.0',document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,
     target:{kind:'new',type:'imports.text',label:'JSInput',position:{x:96,y:80}},inputs:[],mode:'delimited',parameters:{
-      settings:{source:{source_path:storage+'/sales.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},
-        format:{delimiter:',',decimal_separator:'.',null_marker:'NULL',text_qualifier:'"'},columns:javascriptInputColumns.map(c=>({...c}))},
+      settings:{source:{source_path:storage+'/'+variant.name,encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},
+        format:{delimiter:',',decimal_separator:'.',null_marker:'NULL',text_qualifier:'"'},columns:variant.columns.map(c=>({...c}))},
       source:{artifact_id:artifact.artifact_id,upload_operation_id:uploadOperationId,bytes:artifact.bytes,sha256:artifact.sha256}},
     mappings:[],finish:'execute',read:{ports:[0],sample_rows:10,require_exact_numbers:true},
     budgets:{configure_ms:240000,execute_ms:60000,total_ms:Math.min(600000,totalMs)}};
@@ -437,8 +438,10 @@ export async function createJavascriptSavedExecutionRuntime(options) {
     readOutput:(node,deadline)=>runtime.readPassive(node,'cold-observed',deadline)});
 }
 
-async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real',nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic=false,persistence=false,coldPackagePath}) {
+async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directory,record,account,deadline,effectScope=()=>null,nativeInputOnly=false,nativeFixtureId='real',nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic=false,persistence=false,coldPackagePath,inputVariant='base'}) {
   const prepared=structuredClone(inputPrepared);
+  const businessInput=javascriptBusinessInputVariant(inputVariant);
+  if(inputVariant!=='base'&&(nativeInputOnly||persistence||coldPackagePath))throw Error('Business input variant requires isolated draft trial');
   if(typeof persistence!=='boolean'||persistence&&(nativeInputOnly||metadataDiagnostic||nativeNamedCaseId!==undefined
     ||nativeCalibrationId!==undefined||nativeTelemetryCaseId!==undefined||!Number.isSafeInteger(deadline)||deadline<=Date.now()))
     throw Error('Separate bounded JavaScript persistence mode required');
@@ -673,9 +676,9 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
     async prepareInput() {
       if(persistenceSaver)throw Error('Persistence input cannot be prepared twice');
       const fixture=nativeInputOnly?new URL((nativeInputFixture.coercion?'../../../../docs/node-development/nodes/programming-javascript/fixtures/operator-only/':'./fixtures/')+nativeInputFixture.file,import.meta.url)
-        :new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/model-input/sales.csv',import.meta.url);
+        :new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/'+businessInput.path,import.meta.url);
       const pin=nativeInputOnly?verifyNativeInputFixture(await readFile(fixture),nativeFixtureId)
-        :verifyJavascriptFixture(await readFile(fixture),JSON.parse(await readFile(new URL('../manifest.json',fixture),'utf8')));
+        :verifyJavascriptFixture(await readFile(fixture),JSON.parse(await readFile(new URL('../manifest.json',fixture),'utf8')),inputVariant);
       const folder='js-g2-'+randomUUID(),storage='/jsteach/'+folder;
       await record({phase:'input_fixture_verified',pin,storage});
       await accountGuard();
@@ -709,14 +712,14 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
       await once('storage-enter',{storage},()=>at(prefix+';FileStorageForm;colName_'+folder).dblclick());
       await at(nav+'>'+folder).waitFor();
       if(await observedDirectory()!==storage)throw Error('Own storage directory did not open');
-      const artifact=await artifactStore.admit({sourcePath:fileURLToPath(fixture),name:nativeInputOnly?nativeInputFixture.file:'sales.csv',bytes:pin.bytes,sha256:pin.sha256,upload:{directory:storage,overwrite:'reject'}});
+      const artifact=await artifactStore.admit({sourcePath:fileURLToPath(fixture),name:nativeInputOnly?nativeInputFixture.file:businessInput.name,bytes:pin.bytes,sha256:pin.sha256,upload:{directory:storage,overwrite:'reject'}});
       const delivered=await once('input-delivery',{storage,artifact_id:artifact.artifact_id,sha256:pin.sha256},()=>runtime.deliverArtifact({operation_id:'js-input-delivery',artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:Math.min(120000,deadline-Date.now())}));
       if(delivered.outcome?.status!=='SUCCEEDED'||!delivered.upload_operation_id)throw Error('JavaScript source delivery unconfirmed');
-      const request=(nativeInputOnly?nativeInputRequest:javascriptInputRequest)({prepared,storage,artifact,uploadOperationId:delivered.upload_operation_id,totalMs:deadline-Date.now(),fixtureId:nativeFixtureId});
+      const request=(nativeInputOnly?nativeInputRequest:javascriptInputRequest)({prepared,storage,artifact,uploadOperationId:delivered.upload_operation_id,totalMs:deadline-Date.now(),fixtureId:nativeFixtureId,inputVariant});
       const imported=await once('input-import',{artifact_id:artifact.artifact_id,source_path:request.parameters.settings.source.source_path},()=>runtime.runNodeApply(request));
       if(imported.status!=='SUCCEEDED')throw Error('JavaScript input import unconfirmed: '+JSON.stringify(imported.error??{}));
       const result=imported.output?.output?.ports?.find(p=>p.port===0);
-      const proof=nativeInputOnly?verifyNativeInputUi(result,nativeFixtureId):verifyJavascriptTable(result,'input');
+      const proof=nativeInputOnly?verifyNativeInputUi(result,nativeFixtureId):verifyJavascriptTable(result,'input',inputVariant);
       if(nativeInputOnly&&(!nativeInputEvidence?.native.exact.native_bytes_verified||nativeReadUncertain))throw Error('Native input proof/cleanup unavailable');
       if(nativeFixtureId==='civil-datetime'||nativeInputFixture.output_input_rows)verifyNativeRoundtripInput({node:imported.output.node,table:result,native_input:nativeInputEvidence},nativeFixtureId);
       await record({phase:'input_verified',node:imported.output.node,pin,storage,proof,table:result});
@@ -724,7 +727,7 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
         pinned.actions.set('package.save_checkpoint',javascriptPersistenceSaveAction(pinned.actions.get('package.save_checkpoint'),storage));
         persistenceSaver=createJavascriptPersistenceSaver({runtime,storage,prepared,deadline,record});
       }
-      return {node:imported.output.node,storage,pin,table:result,proof,...(nativeInputOnly?{native_input:nativeInputEvidence}: {})};
+      return {node:imported.output.node,storage,pin,table:result,proof,input_variant:inputVariant,...(nativeInputOnly?{native_input:nativeInputEvidence}: {})};
     },
     async armNativeRoundtrip(input) {
       if(!nativeInputOnly||nativeReadUncertain)throw Error('Private native input required');

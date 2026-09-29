@@ -9,6 +9,24 @@ export const javascriptInputRows = Object.freeze([
   ['3','Alpha','-3','250','0'], ['4','Гамма','4','125','20'],
   ['5','Ёж','1','999','100'], ['6','delta','5','100','0'],
 ].map(Object.freeze));
+const businessInputVariants=Object.freeze({
+  base:Object.freeze({path:'model-input/sales.csv',name:'sales.csv',bytes:157,
+    sha256:'4fce338d2edd2901ba35732ed148a1a80eba4a5fbf927f2828f3cdbe6b8fa09e',
+    columns:javascriptInputColumns,rows:javascriptInputRows}),
+  changed:Object.freeze({path:'operator-only/sales-changed.csv',name:'sales-changed.csv',bytes:157,
+    sha256:'97b2be2549ab389a1b5e2fd1605125ab2b158cd788b1c6c43a24ed85d84e32d7',
+    columns:javascriptInputColumns,rows:Object.freeze(javascriptInputRows.map((row,i)=>Object.freeze(i===0?[row[0],row[1],'3',row[3],row[4]]:[...row])))}),
+  reordered:Object.freeze({path:'operator-only/sales-reordered.csv',name:'sales-reordered.csv',bytes:157,
+    sha256:'405a8f4515087df2ca0eecbc8169df235dc81f2eb6981d36baaabbbf96202c0b',
+    columns:Object.freeze(['DiscountPct','Customer','UnitPriceCents','RowID','Qty'].map(name=>javascriptInputColumns.find(column=>column.name===name))),
+    rows:Object.freeze(javascriptInputRows.map(row=>Object.freeze([row[4],row[1],row[3],row[0],row[2]])))}),
+});
+
+export function javascriptBusinessInputVariant(id='base'){
+  const variant=businessInputVariants[id];
+  if(!variant)throw Error('Unknown JavaScript business input variant');
+  return variant;
+}
 export const javascriptOutputColumns = Object.freeze([
   Object.freeze({name:'ObservedID',label:'ObservedID',type:'integer',data_kind:'Дискретный'}),
   Object.freeze({name:'PhaseMarker',label:'PhaseMarker',type:'string',data_kind:'Дискретный'}),
@@ -49,10 +67,11 @@ export function compactJavascriptJournalRecord(saved,line) {
   return reference;
 }
 
-export function verifyJavascriptTable(table, kind) {
+export function verifyJavascriptTable(table, kind, inputVariant='base') {
   if(!['input','output'].includes(kind))throw Error('Unknown JavaScript table oracle');
-  const columns=kind==='input'?javascriptInputColumns:javascriptOutputColumns;
-  const rows=kind==='input'?javascriptInputRows:javascriptInputRows.map(row=>[row[0],'JS_G2_TABLE_V1']);
+  const variant=javascriptBusinessInputVariant(inputVariant);
+  const columns=kind==='input'?variant.columns:javascriptOutputColumns;
+  const rows=kind==='input'?variant.rows:javascriptInputRows.map(row=>[row[0],'JS_G2_TABLE_V1']);
   if(table?.sample_complete!==true||table.row_count!==6||table.sample_rows!==6||table.sample?.length!==6
     ||table.schema?.length!==columns.length||!table.schema.every((c,i)=>c.name===columns[i].name&&c.type===columns[i].type)
     ||!table.sample.every((row,i)=>row.length===columns.length&&row.every((cell,j)=>cell.type===columns[j].type
@@ -61,10 +80,11 @@ export function verifyJavascriptTable(table, kind) {
   return {verified:true,rows:6,columns:columns.length,numeric_tolerance:0,whitespace_preserved:true};
 }
 
-export function verifyJavascriptFixture(bytes, manifest) {
-  const pins=manifest?.files?.filter(file=>file.path==='model-input/sales.csv');
+export function verifyJavascriptFixture(bytes, manifest, inputVariant='base') {
+  const variant=javascriptBusinessInputVariant(inputVariant);
+  const pins=manifest?.files?.filter(file=>file.path===variant.path);
   const sha256=createHash('sha256').update(bytes).digest('hex');
-  if(pins?.length!==1||pins[0].bytes!==157||pins[0].sha256!=='4fce338d2edd2901ba35732ed148a1a80eba4a5fbf927f2828f3cdbe6b8fa09e'
+  if(pins?.length!==1||pins[0].bytes!==variant.bytes||pins[0].sha256!==variant.sha256
     ||bytes.length!==pins[0].bytes||sha256!==pins[0].sha256)throw Error('JavaScript input fixture pin differs');
   return {path:pins[0].path,bytes:bytes.length,sha256};
 }

@@ -51,7 +51,8 @@ export function javascriptDiscoveryProbe(id){
 
 export function javascriptDiscoveryOracle(probe,table){
   const pinned=javascriptDiscoveryProbe(probe?.id);
-  need(probe.source===pinned.source&&probe.source_sha256===pinned.source_sha256,'Discovery source pin changed');
+  need(probe.source===pinned.source&&probe.source_sha256===pinned.source_sha256
+    &&probe.input_variant===pinned.input_variant,'Discovery source/input pin changed');
   verifyJavascriptMismatchTable(table);
   const schema=JSON.stringify(table.schema.map(c=>({name:c.name,label:c.label,type:c.type})))===JSON.stringify(pinned.schema);
   const values=pinned.expected!==null&&table.row_count===pinned.expected.length
@@ -99,6 +100,7 @@ export function javascriptDiscoveryErrorButtonDiagnostic({probe,identity,error})
 export async function observeJavascriptDiscovery({probe,node,execution,readOutput,record,onProgress=async()=>{},deadline,now=Date.now}){
   const pinned=javascriptDiscoveryProbe(probe?.id);
   need(probe.source===pinned.source&&hash(probe.source)===pinned.source_sha256
+    &&probe.input_variant===pinned.input_variant
     &&execution?.verified===true&&execution.owner_verified===true&&execution.cleanup_complete===true
     &&['completed','failed'].includes(execution.status)&&execution.trial?.phase==='initial'
     &&execution.trial.source_sha256===pinned.source_sha256&&execution.trial.node_id===node?.node_id
