@@ -41,8 +41,9 @@ import {javascriptBatchCases,runJavascriptBatch,caseEffect,javascriptBatchInputI
 import {loginBrowser} from '../../src/connection-check.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
 import {javascriptEngineProbes} from './javascript-engine-probes.mjs';
-import {javascriptDiscoveryIds,javascriptDiscoveryProbe,observeJavascriptDiscovery,javascriptDiscoveryWizardDiagnostic,javascriptDiscoveryErrorButtonDiagnostic} from './javascript-discovery-probes.mjs';
+import {javascriptDiscoveryIds,javascriptDiscoveryProbe,javascriptDiscoveryOracle,observeJavascriptDiscovery,javascriptDiscoveryWizardDiagnostic,javascriptDiscoveryErrorButtonDiagnostic} from './javascript-discovery-probes.mjs';
 import {javascriptMaterializationObservation} from './javascript-materialization-observation.mjs';
+import {javascriptBridgeObservation} from './javascript-bridge-probe.mjs';
 import {javascriptSourceSample,javascriptSourceBoundary} from './javascript-source-probes.mjs';
 import {makeWorkspacePrepareCode} from '../../client/lib/workspace.mjs';
 import {createJavascriptExecutionRuntime,createJavascriptSavedExecutionRuntime} from './javascript-execution-runtime.mjs';
@@ -153,6 +154,7 @@ const nativeFixtureId=telemetryTrial?javascriptTelemetryCase(nativeTelemetryCase
 const namedTrial=nativeNamedCaseId!==undefined?createJavascriptNamedTrial(nativeNamedCaseId):null;
 const coercionTrial=nativeRoundtrip&&nativeFixture.coercion?createJavascriptCoercionTrial(nativeFixtureId):null;
 const discoveryProbe=options['--discovery-probe']?javascriptDiscoveryProbe(options['--discovery-probe']):null;
+const materializationProbe=['C0-materialization','G3-bridge'].includes(discoveryProbe?.scope);
 if(discoveryProbe&&(batch||options['--execution-case']))throw Error('Discovery requires one isolated probe, not a batch or execution case');
 let executionCase=nativeRoundtrip?nativeRoundtripProbe.schema_mode+'-table-execute':discoveryProbe?discoveryProbe.schema_mode+'-table-execute':batch?.[0]??options['--execution-case'];
 if(executionCase){
@@ -1045,7 +1047,7 @@ const runExecutionTrial=async probe=>{
         await executionRuntime.verifyExecutionBoundary(boundary);await verifyBatchInputIdentity();
         report.stop_result.boundary_verified=true;await save();return;
       }
-      const mappingBefore=discoveryProbe.scope==='C0-materialization'
+      const mappingBefore=materializationProbe
         ?await executionRuntime.readPortMapping(executionNode,'output',{operationDeadline:deadline,allowConfiguredOnly:true}):undefined;
       const execution=await executionRuntime.executeNode(executionNode,deadline,{phase:'initial',source_sha256:probe.source_sha256});
       report.execution_probe.execution=execution;await save();
@@ -1064,6 +1066,16 @@ const runExecutionTrial=async probe=>{
         report.materialization_result=javascriptMaterializationObservation({node:executionNode,
           before:mappingBefore,after:mappingAfter,table:result.output});
         await executionRecord({phase:'c0_materialization_observed',...report.materialization_result});
+        if(discoveryProbe.scope==='G3-bridge'){
+          const projected={...result.output,schema:result.output.schema.slice(0,4),
+            sample:result.output.sample.map(row=>row.slice(0,4))};
+          const businessOracle=javascriptDiscoveryOracle(javascriptDiscoveryProbe('p1-business-code-base'),projected);
+          report.bridge_result={...javascriptBridgeObservation({node:executionNode,before:mappingBefore,
+            after:mappingAfter,table:result.output}),business_oracle:businessOracle};
+          result.gate_passed=report.bridge_result.bridge_verified&&businessOracle.gate_passed;
+          result.status=result.gate_passed?'logical_physical_bridge_verified':'logical_physical_characterization';
+          await executionRecord({phase:'g3_bridge_observed',...report.bridge_result});
+        }
       }
       report.discovery_result={...result,boundary_verified:true};await save();return;
     }finally{await boundary.native.dispose();}
@@ -1867,12 +1879,12 @@ try {
     report.stage='graph-ready';await waitGraphReady(createRemaining());
     await snapshot('graph-ready-baseline');
     if(executionCase||nativeInputOnly){
-      report.scope=telemetryTrial?'private fixed schema telemetry: '+nativeTelemetryCaseId:calibrationTrial?'private fixed error calibration: '+nativeCalibrationId:namedTrial?'private stage A/B named access: '+nativeNamedCaseId:coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?.scope==='P1-business'?'private P1 business 6x4 oracle':discoveryProbe?.scope==='P1-stop'?'private P1 finite Stop and same-node rerun':discoveryProbe?.scope==='C0-materialization'?'private C0 output0 mapping materialization and bound Table; G3 lineage unverified':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
-      if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=discoveryProbe.scope==='C0-materialization'?2:1;report.gates_closed=[];}
+      report.scope=telemetryTrial?'private fixed schema telemetry: '+nativeTelemetryCaseId:calibrationTrial?'private fixed error calibration: '+nativeCalibrationId:namedTrial?'private stage A/B named access: '+nativeNamedCaseId:coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?.scope==='P1-business'?'private P1 business 6x4 oracle':discoveryProbe?.scope==='P1-stop'?'private P1 finite Stop and same-node rerun':discoveryProbe?.scope==='C0-materialization'?'private C0 output0 mapping materialization and bound Table; G3 lineage unverified':discoveryProbe?.scope==='G3-bridge'?'private G3 observed logical metadata to physical output0; business oracle separate':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
+      if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=materializationProbe?2:1;report.gates_closed=[];}
       if(persistence){report.scope='private G7 persistence writer: '+persistence.schema_mode;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
-        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence,inputVariant:discoveryProbe?.input_variant??'base',materialization:discoveryProbe?.scope==='C0-materialization'});
+        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence,inputVariant:discoveryProbe?.input_variant??'base',materialization:materializationProbe});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
       if(nativeRoundtrip)await executionRuntime.armNativeRoundtrip(executionInput);
