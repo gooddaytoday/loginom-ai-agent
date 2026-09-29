@@ -1,5 +1,6 @@
 import {javascriptMappingState,javascriptPreservedMappings} from './javascript-mapping-state.mjs';
 import {createJavascriptSourceReader} from '../../client/lib/javascript-source-read.mjs';
+import {createJavascriptSourceWriter} from '../../client/lib/javascript-source-write.mjs';
 import {inspectJavascriptModulePolicy} from '../../client/lib/javascript-module-policy.mjs';
 import {verifyJavascriptPersistenceOutput} from './javascript-persistence-oracle.mjs';
 import {observeJavascriptSource,observeJavascriptSourceProcesses} from '../../client/lib/javascript-source-browser.mjs';
@@ -691,6 +692,20 @@ const probeOwnedSource=async (baseline,executionSource=null)=>{
   const deadline=phaseDeadline(120000);
   report.source_probe_deadline=new Date(deadline).toISOString();await save();
   await waitWizardReady({deadline,inputOnly:false});
+  if(sourceReadCycle&&executionSource!==null){
+    if(redactor.text(baseline)!==baseline)throw Error('Source baseline redacted before owned write');
+    const sourceOwner={operation_id:'source97-draft',document_id:executionPrepared.document_id,
+      workflow_id:executionPrepared.workflow_ref.workflow_id,node_id:executionNode.node_id,ui_epoch:wizardAddressEpoch};
+    const writer=createJavascriptSourceWriter({page,context:schemaContext(),owner:sourceOwner,
+      epoch:wizardAddressEpoch,deadline,record:executionRecord});
+    try{
+      report.source_write=await writer.replace({expected_source_sha256:digest(baseline),source_text:executionSource});
+      await save();return;
+    }catch(error){
+      if(error.code==='JAVASCRIPT_SOURCE_WRITE_UNCERTAIN')sourceCycleUncertain=true;
+      throw error;
+    }
+  }
   const handle=await page.evaluateHandle(({root,native,binding})=>{
     const wrappers=[...root.querySelectorAll('.CodeMirror')].filter(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden');
     if(wrappers.length!==1)throw Error('Probe editor is ambiguous');
