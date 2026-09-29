@@ -14,7 +14,11 @@ export async function captureProcessNodeFocus(page, task) {
   if(!Array.isArray(nodes)||nodes.length>200)return null;
   const owners=nodes.filter(n=>n.FGuid===binding.node.node_id);
   if(owners.length!==1||!owners[0].data)return null;
-  const grids=['treepanel;tree','grd;tbl'].map(s=>exact('ConsoleForm;ProgressForm;trpProgress;'+s));
+  const panels=['ConsoleForm','MF;ConsoleForm'].flatMap(tid=>exact(tid));
+  if(panels.length!==1)return null;
+  const base=panels[0].getAttribute('data-tid')+';ProgressForm;';
+  const grids=['treepanel;tree','grd;tbl'].map(s=>exact(base+'trpProgress;'+s));
+  if(grids.some(es=>es.length!==1||!panels[0].contains(es[0])))return null;
   if(grids.some(es=>es.length!==1)||!Array.isArray(process.grid_ids)||grids.some((es,i)=>es[0].id!==process.grid_ids[i]))return null;
   const views=grids.map(es=>globalThis.Ext?.getCmp?.(es[0].id)),store=views[0]?.getStore?.(),root=store?.getRoot?.()??store?.getRootNode?.();
   if(store?.$className!=='Ext.data.TreeStore'||store.isLoading?.()||!root?.isModel||root.data?.loaded!==true||root.data?.loading||!Array.isArray(root.childNodes)
@@ -23,7 +27,7 @@ export async function captureProcessNodeFocus(page, task) {
   const walk=rs=>{for(const r of rs){if(++count>2000||!r?.isModel||seen.has(r)||!Array.isArray(r.childNodes)){valid=false;return;}seen.add(r);if(String(r.internalId)===process.record_id){if(record){valid=false;return;}record=r;}walk(r.childNodes);if(!valid)return;}};walk(root.childNodes);
   if(!valid||!record||record.data?.ModelNode!==owners[0].data||!/^\d+\.\d+(?:\.\d+)*$/.test(String(record.data.id)))return null;
   for(const [grid] of grids){const selected=[...grid.querySelectorAll('table.x-grid-item-selected')];if(selected.length!==1||selected[0].getAttribute('data-recordid')!==process.record_id||selected[0].getAttribute('data-boundview')!==grid.id)return null;}
-  const cells=exact('ConsoleForm;ProgressForm;colProcess_'+process.path);
+  const cells=exact(base+'colProcess_'+process.path);
   if(cells.length!==1||!grids[0][0].contains(cells[0])||cells[0].closest('table')?.getAttribute('data-recordid')!==process.record_id)return null;
   return {document,app,preparation:p,receipt,packageNode:receipt.packageNode,workflowNode:receipt.nodeTargetWorkflowNode,workspace,card,tab:tabs[0],owner:owners[0],nodeData:owners[0].data,
     store,root,record,recordData:record.data,parent:record.parentNode,processId:String(record.data.id),rootId:String(root.internalId),
@@ -53,7 +57,11 @@ export async function restoreProcessNodeFocus(page, ticket) {
   if(!Array.isArray(nodes)||nodes.length>200||nodes.filter(o=>o.FGuid===binding.node.node_id).length!==1||!nodes.includes(t.owner)||t.owner.data!==t.nodeData)return null;
   const selected=graph?.getSelectionCells?.();
   if(!Array.isArray(selected)||selected.length!==1||selected[0]!==t.owner.FCell)return null;
-  const grids=['treepanel;tree','grd;tbl'].map(s=>exact('ConsoleForm;ProgressForm;trpProgress;'+s));
+  const panels=['ConsoleForm','MF;ConsoleForm'].flatMap(tid=>exact(tid));
+  if(panels.length!==1)return null;
+  const base=panels[0].getAttribute('data-tid')+';ProgressForm;';
+  const grids=['treepanel;tree','grd;tbl'].map(s=>exact(base+'trpProgress;'+s));
+  if(grids.some(es=>es.length!==1||!panels[0].contains(es[0])))return null;
   if(grids.some((es,i)=>es.length!==1||es[0]!==t.gridElements[i]||es[0].id!==process.grid_ids[i]))return null;
   const views=grids.map(es=>globalThis.Ext?.getCmp?.(es[0].id)),store=views[0]?.getStore?.(),root=store?.getRoot?.()??store?.getRootNode?.();
   if(store!==t.store||root!==t.root||String(root.internalId)!==t.rootId||root.data?.loaded!==true||root.data?.loading||store.isLoading?.()

@@ -13,7 +13,7 @@ function fake(mode){
  const schema=[{Name:'Scalar',DisplayName:'Scalar',DataType:6}];const store={proxy:{dataSource:ds},loading:false};
  const dt={FDataSource:ds,FDataSourceStore:store,FTotalRowCount:1};const dc={FModelNode:node.data,FDataSource:ds,FDataTable:dt,FColumnInfosStore:{data:{items:schema.map(data=>({data}))}}};
  const tab={classList:{contains:()=>true}},preview={id:'preview',checkVisibility:()=>true},tree={id:'tree'};
- const document={querySelector:q=>q.includes('ConsoleForm')?tree:q.includes('DataSetForm')?preview:tab};
+ const document={querySelectorAll:q=>q.includes('ConsoleForm')?[tree]:[],querySelector:q=>q.includes('ConsoleForm')?tree:q.includes('DataSetForm')?preview:tab};
  const manager={FPreviewVisible:true,FPreviewForm:{FCurrentPreviewNode:node,FCurrentPreviewPort:port},FShowDataLastCall:{Node:node,Port:port}};
  const sourceNode={FGuid:'source',data:{},FStatus:1,FRunning:false,FIconCls:'bg-vendor-icon-importtextfile',FLabel:{FRawValue:'Source'}};
  node.FLabel={FRawValue:'Target'};node.FIconCls='bg-vendor-icon-columnflipping';

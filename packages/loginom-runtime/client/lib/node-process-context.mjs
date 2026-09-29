@@ -11,8 +11,11 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo
   const result=await page.evaluate(nodeId=>{
     const fail=reason=>({verified:false,reason});
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
-    const body=exact('ConsoleForm;ProgressForm;trpProgress;treepanel;tree'),right=exact('ConsoleForm;ProgressForm;trpProgress;grd;tbl');
-    if(body.length!==1||right.length!==1)return fail('console_grids');
+    const panels=['ConsoleForm','MF;ConsoleForm'].flatMap(tid=>[...exact(tid)]);
+    if(panels.length!==1)return fail('console_panel');
+    const base=panels[0].getAttribute('data-tid')+';ProgressForm;';
+    const body=exact(base+'trpProgress;treepanel;tree'),right=exact(base+'trpProgress;grd;tbl');
+    if(body.length!==1||right.length!==1||!panels[0].contains(body[0])||!panels[0].contains(right[0]))return fail('console_grids');
     const view=globalThis.Ext?.getCmp?.(body[0].id),rightView=globalThis.Ext?.getCmp?.(right[0].id);
     if(view?.el?.dom!==body[0]||rightView?.el?.dom!==right[0])return fail('console_binding');
     const store=view.getStore?.();
@@ -43,9 +46,9 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo
         const rows=nativeRows.filter(r=>r.getAttribute('data-recordid')===record),rs=nativeRight.filter(r=>r.getAttribute('data-recordid')===record);
         let rendered=false,path=null,selected=false,expander_tid=null,expanded=null;
         if(rows.length===1&&rs.length===1) {
-          const cells=[...rows[0].querySelectorAll('td[data-tid]')],progress=[...rs[0].querySelectorAll('td[data-tid]')].filter(e=>e.getAttribute('data-tid')?.startsWith('ConsoleForm;ProgressForm;colProgress_'));
-          const ids=cells.filter(e=>e.getAttribute('data-tid')?.startsWith('ConsoleForm;ProgressForm;colId_'));
-          const texts=cells.filter(e=>e.getAttribute('data-tid')?.startsWith('ConsoleForm;ProgressForm;colProcess_'));
+          const cells=[...rows[0].querySelectorAll('td[data-tid]')],progress=[...rs[0].querySelectorAll('td[data-tid]')].filter(e=>e.getAttribute('data-tid')?.startsWith(base+'colProgress_'));
+          const ids=cells.filter(e=>e.getAttribute('data-tid')?.startsWith(base+'colId_'));
+          const texts=cells.filter(e=>e.getAttribute('data-tid')?.startsWith(base+'colProcess_'));
           if(ids.length===1&&texts.length===1&&progress.length===1&&ids[0].textContent.trim()===id
             && rows[0].getAttribute('data-boundview')===body[0].id&&rs[0].getAttribute('data-boundview')===right[0].id) {
             path=texts[0].getAttribute('data-tid');selected=rows[0].classList.contains('x-grid-item-selected');

@@ -69,7 +69,7 @@ export function observeJavascriptSource({context, owner, epoch, held = null, cap
 // Operator witness only: cache observation cannot certify hidden server effects.
 export function observeJavascriptSourceProcesses({held = null, capture = false} = {}) {
   const need = (ok, message) => { if (!ok) throw Error('Source process boundary: ' + message); };
-  const trees = [...document.querySelectorAll('[data-tid="ConsoleForm;ProgressForm;trpProgress;treepanel;tree"]')];
+  const trees = [...document.querySelectorAll('[data-tid="ConsoleForm;ProgressForm;trpProgress;treepanel;tree"],[data-tid="MF;ConsoleForm;ProgressForm;trpProgress;treepanel;tree"]')];
   need(trees.length === 1, 'tree ambiguous');
   const tree = trees[0], store = globalThis.Ext?.getCmp?.(tree.id)?.getStore?.(), root = store?.getRoot?.();
   need(store && !store.isLoading() && root?.data?.loaded === true, 'tree incomplete');

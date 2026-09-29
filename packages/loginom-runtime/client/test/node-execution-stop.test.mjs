@@ -9,6 +9,7 @@ async function fixture(fault, multiple=false,{keepConsoleOpen=false,initialPinne
  const actions=[],reads=[];
  const proof={root_id:'root',record_id:'child',process_id:'1.1',node_id:'node',owner_verified:true,can_cancel:true,source:'native_process_model_identity'};
  const state=()=>{
+  const prefix=pinned?'MF;':'',consoleElement=(tid,verbs)=>element(prefix+tid,verbs);
   const progress_state={verified:true,state:terminal?'cancelled':'running',terminal,can_cancel:!terminal};
   const ps=launched?[{process_id:'1',record_id:'group',parent_id:null,rendered:true,expanded:true,children_loaded:true,progress_state},
    {process_id:'1.1',record_id:'child',parent_id:'1',rendered:true,process_tid:'child-row',progress_state}]:[];
@@ -23,8 +24,8 @@ async function fixture(fault, multiple=false,{keepConsoleOpen=false,initialPinne
   if(terminal&&fault==='completed_race')ps[1].progress_state={verified:true,state:'completed',terminal:true,can_cancel:false};
   return {prepared_node_context:{...node,verified:true,surface:'graph'},node_processes:{verified:true,inventory_complete:true,
    root_id:'root',show_completed:true,node_context:{...node,verified:true},processes:ps},
-   ui:{elements:[element('MF;cntMain;tlbMainToolbar;btnProgress'),...(opened?[element(grid,['right_click']),element('ConsoleForm;btnClose'),
-     ...(fault==='missing_pin'?[]:[element(pinned?'ConsoleForm;btnPin':'ConsoleForm;btnUnpin')]),
+   ui:{elements:[element('MF;cntMain;tlbMainToolbar;btnProgress'),...(opened?[consoleElement(grid,['right_click']),consoleElement('ConsoleForm;btnClose'),
+     ...(fault==='missing_pin'?[]:[consoleElement(pinned?'ConsoleForm;btnPin':'ConsoleForm;btnUnpin')]),
      {...element('child-row',['right_click']),process_row:{record_id:fault==='reused_row'?'foreign-record':'child'}}]:[]),
     ...(menu?[element('mnContextMenu;mniShowCompletedProcesses',['click','press']),{...element(cancel,['cancel_process']),process_menu:{cancellation:actualProof}}]:[])]}};
  };
@@ -34,7 +35,7 @@ async function fixture(fault, multiple=false,{keepConsoleOpen=false,initialPinne
    else if(a.verb==='right_click')menu=true;
    else if(a.verb==='press')menu=false;
    else if(a.ref==='ui-ConsoleForm;btnUnpin'){if(fault==='unknown_pin')throw Error('Unknown pin receipt');pinned=true;}
-   else if(a.ref==='ui-ConsoleForm;btnClose')opened=false;
+   else if(a.ref==='ui-ConsoleForm;btnClose'||a.ref==='ui-MF;ConsoleForm;btnClose')opened=false;
    else if(a.ref==='ui-MF;cntMain;tlbMainToolbar;btnProgress')opened=true;
    return {status:'SUCCEEDED'};
   }};
@@ -45,10 +46,12 @@ async function fixture(fault, multiple=false,{keepConsoleOpen=false,initialPinne
 }
 test('private prelaunch admission can retain the owned process console without a close gesture',async()=>{
  const normal=await fixture(),held=await fixture(undefined,false,{keepConsoleOpen:true});
- assert.equal(normal.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnClose').length,1);
- assert.equal(held.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnClose').length,0);
+ assert.equal(normal.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnClose'||a.ref==='ui-MF;ConsoleForm;btnClose').length,1);
+ assert.equal(held.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnClose'||a.ref==='ui-MF;ConsoleForm;btnClose').length,0);
  assert.equal(held.preparationActions.filter(a=>a.ref==='ui-ConsoleForm;btnUnpin').length,1);
  const stopped=await held.driver.stop();assert.equal(stopped.stop_verified,true);assert.equal(held.cancelCalls,1);
+ assert.equal(held.preparationActions.some(a=>a.ref==='ui-MF;'+grid&&a.verb==='right_click'),true);
+ assert.equal(held.actions.at(-1).ref,'ui-MF;ConsoleForm;btnClose');
 });
 test('a retained console already pinned is not toggled again',async()=>{
  const f=await fixture(undefined,false,{keepConsoleOpen:true,initialPinned:true});
