@@ -22,7 +22,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | B: public existing configure — J05/J10/J14/J21 | Isolated `dock_node_apply` + независимый `dock_node_read`, `public-node-apply-03`, report SHA `3b5a18c93ec139edd311f0058b542fc7d70d84f38bdf9c4b5be74312eb5647f4`, cleanup 3/3 | Только фиксированный code/comment source; output mapping `configured_only`, Execute, Save/cold и полный продуктовый handler не доказаны |
 | Scalar/precision/cardinality/engine/names/errors — J06–J09/J12/J20/J24/J25 | Приватные native/typed, 30/30 engine observations, T-пробы; ссылки в discovery | G3 bridge, обязательный остаток G5/G6 и подтверждение через handler; число snippets не означает PASS |
 | Persistence — J15/J23 | Приватные code/declared/usage writer–cold–bytes, dirty-state; см. G7 discovery и исторические SHA ниже | Только фиксированные 6×2; нужны handler 6×4 и CLI |
-| Бизнес и freshness — J03/J04/J11 | Private code/base 6×4 `ba46d2ecda`, run07: полный typed UI oracle и fresh owned Execute | Declared, changed/reordered, затем public C/D; native bytes этим run не доказаны |
+| Бизнес и freshness — J03/J04/J11 | Private code/base и declared/base 6×4 `ba46d2ecda`: полный typed UI oracle и fresh owned Execute | Changed/reordered, затем public C/D; native bytes этими runs не доказаны |
 | Stop/cancel — J13 | Runtime/unit части lost reply; живого Stop/cancel нет | Конечный цикл ≤60 секунд, owned terminal/cleanup/rerun до фиксации Execute-контракта |
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
@@ -237,6 +237,21 @@ technical names/порядок и исходные пробелы Customer по�
 осуществимость, не public handler, Save/cold или CLI. Результат Done сам по
 себе не доказывает Execute; успех отнесён только к отдельной tracked группе.
 Под lock зарезервирован чистый profile290 для declared/base.
+
+Private `p1-business-declared-base-01`/profile290/source `ba46d2ecda` —
+**OBSERVED**, `typed_oracle_verified`, cleanup 3/3, своих процессов нет.
+Report SHA256 `e768cf6402bbea88f654886f3a7412ffe2cfaad937b1411a2b8c9b2efd9b20fc`,
+journal SHA256 `a4133cc10733bf2d2fcdfe670c5ec2e68ef2cc6ef20307f2c7cebae5155e9080`.
+Generation=false; native target fields RowID/CustomerKey/NetCents/Status,
+DataType 4/5/4/5, Index 0/1/2/3, DataKind 1/2/1/2,
+UsageType=DefaultUsageType=0 в observed schema. Source SHA256
+`cdce335d2c41f2cdcce8cf28018991210c4402404aca46dd24a7d6a6131313a2`.
+Отдельный owned Execute и независимое сравнение всех input/output cells,
+типов, схемы и порядка подтвердили сумму1950; receipt SHA256
+`bd06d75eaa852529651f5eabb30bbb05ff73e06525801532d262705119b5f8fd`.
+Уровень тот же private typed UI, native bytes=false, public/Save/cold/CLI
+не подтверждены. Под lock чистый profile291 для code/changed; ранний P1
+variant scope фиксировать по фактическому режиму, не распространять на D/E.
 `expected.json` остаётся неизменным. Далее — declared base, changed/reordered
 и конечный Stop/cancel по P1; code/base не доказывает эти случаи.
 

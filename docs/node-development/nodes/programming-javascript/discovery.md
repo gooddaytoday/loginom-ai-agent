@@ -74,7 +74,11 @@ settings/input mapping/связи и cleanup 3/3. `configured_only` относи
 output mapping evidence; публичный Done вернул `output.status=not_refreshed`,
 `execution.status=not_requested` и сохранил неизвестность внутренних эффектов
 как `execution_started=null`. Точные SHA и границы — в [checkpoint](checkpoint.md).
-Для продолжения использовать ранние P1-пробы из [плана](plan.md): бизнес 6×4
+Ранние private P1 code/base и declared/base 6×4 прошли: полные typed UI
+input/output, независимый unchanged oracle, отдельные owned Execute и cleanup
+3/3. Это не native byte или public handler evidence. Source `ba46d2ecda`,
+точные report/journal/receipt SHA и ограничения — в [checkpoint](checkpoint.md).
+Для продолжения использовать ранние P1-пробы из [плана](plan.md): changed/reordered
 и bounded Stop/cancel до полного Execute/read контракта. Реализация продолжается;
 наличие этого кода не закрывает неизвестные G1/G3/G5/G6, а отсутствие CLI не
 блокирует выход 0B. `ready_for_development` требует решений по точным вопросам
