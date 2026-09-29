@@ -252,8 +252,18 @@ UsageType=DefaultUsageType=0 в observed schema. Source SHA256
 Уровень тот же private typed UI, native bytes=false, public/Save/cold/CLI
 не подтверждены. Под lock чистый profile291 для code/changed; ранний P1
 variant scope фиксировать по фактическому режиму, не распространять на D/E.
-`expected.json` остаётся неизменным. Далее — declared base, changed/reordered
-и конечный Stop/cancel по P1; code/base не доказывает эти случаи.
+Private `p1-business-code-changed-01`/profile291/source `ba46d2ecda` —
+**OBSERVED**, полный typed UI oracle и cleanup 3/3, своих процессов нет.
+Report SHA256 `7c680244b5ee546341383e6667a3ca332981188238cb2bb9b12b3267bac92033`,
+journal SHA256 `b408a6c47c970fc23f20639e79e3310a64752cbcaff1bea45b74735c9994f084`,
+independent receipt SHA256
+`b45e2bf47811481b2c07ef1270f658a48339428c0bf0eada658bb694dd7e21e4`.
+Проверены все input6×5/output6×4 cells и schema/types/order; RowID1 NetCents=2700,
+сумма2850. Source SHA совпадает с code/base, отдельный owned Execute completed.
+Это отдельный свежий private пакет; обновление старого input в том же графе,
+declared variants и public freshness не доказаны. Под lock profile292
+назначен для code/reordered. `expected.json` неизменен; затем конечный
+Stop/cancel P1, после него полные C/D/E/F по плану.
 
 ### B: публичный configure existing — 2026-09-29
 
