@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {configureJavascriptSchema} from './javascript-schema-probe.mjs';
 import {verifyJavascriptDeclaredEmpty} from './javascript-native-zero.mjs';
-import {observeJavascriptColumnEditor,openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,cleanupJavascriptColumnEditor,waitJavascriptColumnEditor,fillJavascriptColumnField,javascriptColumnFieldMatches,recordJavascriptColumnHelperSource,openJavascriptColumnTypePicker,selectJavascriptColumnTypeOption,closeJavascriptColumnTypePicker} from './javascript-column-editor.mjs';
+import {observeJavascriptColumnEditor,openJavascriptColumnEditor,verifyJavascriptColumnEditor,settleJavascriptColumnEditor,cleanupJavascriptColumnEditor,waitJavascriptColumnEditor,fillJavascriptColumnField,javascriptColumnFieldMatches,recordJavascriptColumnHelperSource,openJavascriptColumnTypePicker,selectJavascriptColumnTypeOption,closeJavascriptColumnTypePicker,openJavascriptColumnUsagePicker} from './javascript-column-editor.mjs';
 
 function fixture({count=0,globalForm=true}={}) {
   const prefix='MF;TF-1',pageTid=prefix+';WizrdMCF;JavaScriptColumnsWizard',nodes=[],controls={};
@@ -73,6 +73,67 @@ function typeFixture(f,{expanded=true,type=4,label='Целый'}={}) {
   return {combo,wrap,triggerDom,trigger,pickerDom,picker,option,records,store,
     expand(){combo.isExpanded=true;pickerDom.shown=true;option.shown=true;}};
 }
+
+function usageFixture(f,{expanded=false}={}) {
+  for(const [name,values] of [['cbxDataKind',[[1,'Непрерывный'],[2,'Дискретный']]],
+    ['cbxUsageType',[[0,'Не задано'],[3,'Активное'],[4,'Выходное'],[6,'Группа'],[7,'Показатель'],[8,'Транзакция'],[9,'Элемент']]]]){
+    const element=f.element(name,'EditColumnDefForm;'+name,f.editor);
+    const records=values.map(([Value,DisplayText])=>({isModel:true,internalId:'usage'+Value,data:{Value,DisplayText}}));
+    const store={getData:()=>({items:records}),isLoading:()=>false};
+    const combo={el:{dom:element},value:name==='cbxUsageType'?0:2,store,disabled:false};
+    f.form.FItems[name]=combo;f.controls[name]=combo;
+  }
+  const combo=f.form.FItems.cbxUsageType,wrap=f.element('usageWrap','',combo.el.dom);
+  const triggerDom=f.element('usageTrigger','EditColumnDefForm;cbxUsageType;trg_picker',wrap);
+  combo.triggerWrap={dom:wrap};combo.orderedTriggers=[{id:'picker',field:combo,el:{dom:triggerDom},rendered:true}];combo.isExpanded=expanded;
+  const pickerDom=f.element('usagePicker','EditColumnDefForm;cbxUsageType;boundlist');pickerDom.shown=expanded;
+  const options=combo.store.getData().items.map(record=>{
+    const option=f.element('option'+record.data.Value,'usage-option-'+record.data.Value,pickerDom);
+    option.shown=expanded;option.textContent=record.data.DisplayText;option.classList.add('x-boundlist-item');
+    option.getAttribute=key=>key==='data-recordId'?record.internalId:key==='data-boundView'?pickerDom.id:key==='data-tid'?option.tid:null;
+    return option;
+  });
+  pickerDom.querySelectorAll=selector=>selector==='.x-boundlist-item'?options:[];
+  const picker={el:{dom:pickerDom},pickerField:combo,store:combo.store,dataSource:combo.store};
+  combo.picker=picker;f.controls.usagePicker=picker;
+  const setExpanded=value=>{combo.isExpanded=value;pickerDom.shown=value;for(const option of options)option.shown=value;};
+  return {combo,triggerDom,pickerDom,picker,options,setExpanded};
+}
+
+test('owned usage picker opens once, binds all seven options and closes before Cancel',async()=>{
+  const f=fixture();await f.open();const usage=usageFixture(f);f.setHit(()=>usage.triggerDom);
+  const original=f.page.locator;let closes=0;
+  f.page.locator=selector=>selector==='[data-tid="EditColumnDefForm;cbxUsageType;trg_picker"]'
+    ?{filter(){return this;},async click(){closes++;usage.setExpanded(false);f.setHit(()=>f.form.FItems.btnCancel.el.dom);}}:original(selector);
+  const opened=await openJavascriptColumnUsagePicker({page:f.page,state:f.state,record:f.record,once:f.once,
+    deadline:Date.now()+1000,id:'usage-open',click:async()=>usage.setExpanded(true)});
+  assert.equal(opened.usage_picker.expected_match_count,1);
+  assert.equal(opened.usage_picker.verified_option_count,7);
+  const cancelled=await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
+  assert.equal(closes,1);assert.equal(cancelled.status,'settled');assert.equal(f.records.length,0);
+  assert.equal(f.effects.filter(effect=>effect==='usage-open').length,1);
+});
+
+test('foreign usage picker refuses before opening gesture',async()=>{
+  const f=fixture();await f.open();const usage=usageFixture(f);usage.picker.pickerField={};f.setHit(()=>usage.triggerDom);
+  let clicks=0;
+  await assert.rejects(openJavascriptColumnUsagePicker({page:f.page,state:f.state,record:f.record,once:f.once,
+    deadline:Date.now()+1000,id:'usage-open',click:async()=>{clicks++;}}));
+  assert.equal(clicks,0);assert.equal(f.effects.includes('usage-open'),false);
+});
+
+test('lost usage trigger response closes the observed popup once without replay',async()=>{
+  const f=fixture();await f.open();const usage=usageFixture(f);f.setHit(()=>usage.triggerDom);
+  const original=f.page.locator;let closes=0,opens=0;
+  f.page.locator=selector=>selector==='[data-tid="EditColumnDefForm;cbxUsageType;trg_picker"]'
+    ?{filter(){return this;},async click(){closes++;usage.setExpanded(false);f.setHit(()=>f.form.FItems.btnCancel.el.dom);}}:original(selector);
+  const open=()=>openJavascriptColumnUsagePicker({page:f.page,state:f.state,record:f.record,once:f.once,
+    deadline:Date.now()+1000,id:'usage-open',click:async()=>{opens++;usage.setExpanded(true);throw Error('lost response');}});
+  await assert.rejects(open(),/lost response/);
+  await assert.rejects(open(),/do not replay/);
+  const cancelled=await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
+  assert.equal(opens,1);assert.equal(closes,1);assert.equal(cancelled.status,'settled');
+});
 
 test('one Add waits for asynchronous record then global form, with a same-native portal binding',async()=>{
   const f=fixture();const ready=await f.open();assert.equal(ready.status,'ready');assert.equal(ready.base,'EditColumnDefForm');
