@@ -99,7 +99,9 @@ test('owned declared editor inventories DataKind and default usage caches withou
   assert.deepEqual(JSON.parse(JSON.stringify(result.declared_controls.cbxDataKind.options)),
     [{Value:1,DisplayText:'Непрерывный'},{Value:2,DisplayText:'Дискретный'}]);
   assert.equal(result.declared_controls.cbxUsageType.cached_value,0);
-  await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
+  const cancelled=await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
+  assert.equal(cancelled.status,'settled');
+  assert.equal(cancelled.checks.baseline,true);
   assert.equal(f.effects.filter(effect=>effect==='cancel').length,1);
 });
 
