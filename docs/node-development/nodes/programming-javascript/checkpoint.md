@@ -1,5 +1,26 @@
 # JavaScript: checkpoint исполнения
 
+## Managed body selection — 2026-09-29
+
+Child `e36a70d496` добавил первый управляемый gesture поверх сохранённого
+native-owner lease: до браузера — точный durable ACK
+`javascript_managed_body_prepared`, в браузере — повторное read-only сравнение
+полного снимка и точки, затем ровно один `page.mouse.click` под
+`withBrowserReceipt`. После подтверждённого возврата клика тот же lease
+проверяет native selection в исходный deadline без второго жеста. При
+изменённом снимке возвращается `NOT_APPLIED`/zero clicks; потерянный ответ
+оставляет receipt unknown и повтор блокируется. Отдельные тесты покрыли ACK,
+stale point, успешный click/settlement и потерю ответа.
+
+На закреплённом Node24.19.0: JS acceptance unit-набор 17823/17823 PASS,
+client JS unit-набор 231/231 PASS, `node --check` и `git diff --check` PASS.
+Код отправлен в `origin/node-javascript`; общий client suite после предыдущего
+read-only коммита был 2771 PASS/0 FAIL/10 SKIP и повторно после этого
+локального body change не запускался. Headed Loginom этот новый путь ещё не
+исполнял. Следующий шаг — такой же owner-bound/journaled Setting gesture,
+наблюдение открытого мастера и проверка полного пути в живом headed сеансе.
+Public handler/CLI и исходная матрица плана остаются открытыми.
+
 ## Managed read-only owner lease — 2026-09-29
 
 Child `f6046dddb0` разделил private JS selection на сериализуемые browser
