@@ -14,7 +14,7 @@ import {observeJavascriptBrowserLifecycle} from './javascript-execution-evidence
 import {javascriptInputColumns,javascriptOutputColumns,javascriptInputRows,verifyJavascriptFixture,verifyJavascriptTable,javascriptSentinelOutcome,createJavascriptEffectJournal,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord} from './javascript-execution-evidence.mjs';
 import {javascriptInputRequest,waitJavascriptCleanupReady,selectJavascriptForSettings,javascriptWizardBinding,openJavascriptWizard,cleanupJavascriptWizardOpening,javascriptMappingUnlockReceipt,closeJavascriptPortMapping,inspectJavascriptExecutionNotifications,waitJavascriptExecutionNotifications,javascriptManualMappingRequest,configureJavascriptManualMapping} from './javascript-execution-runtime.mjs';
 import {captureJavascriptSelection,inspectJavascriptSelection} from '../../client/lib/javascript-owned-selection.mjs';
-import {makeJavascriptManagedSelectionReadCode,dispatchManagedJavascriptBody} from '../../client/lib/javascript-managed-selection.mjs';
+import {makeJavascriptManagedSelectionReadCode,dispatchManagedJavascriptBody,dispatchManagedJavascriptSetting} from '../../client/lib/javascript-managed-selection.mjs';
 import {assertActionOutcome} from '../../client/lib/action-catalog.mjs';
 import {validateNodeApplyRequest} from '../../client/lib/node-apply.mjs';
 import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
@@ -166,6 +166,44 @@ test('managed body lost click reply leaves receipt unknown and never replays',as
   await assert.rejects(dispatchManagedJavascriptBody(options),/already started/);
   assert.equal(f.clicks,1);
   assert.equal((await run('dispose')).disposed,true);
+});
+test('managed Setting gesture requires selected native owner and distinct journaled receipt',async()=>{
+  const {f,task,run,execute}=managedSelectionFixture(5000,'already');
+  const before=await run('capture');assert.equal(before.ready,true);
+  const confirmation={kind:'deactivation',graph_tid:f.node.tid,node:task.owner,opening:{part:'settings'}};
+  const records=[];
+  const options={task,before,confirmation,execute,record:async event=>{records.push(event);return event;},
+    receiptOptions:(id,key,signature)=>({receipt_namespace:'managed-js-test',receipt_id:id,
+      receipt_signature:signature})};
+  const result=await dispatchManagedJavascriptSetting(options);
+  assert.equal(assertActionOutcome(result).status,'SUCCEEDED');
+  assert.equal(result.output.setting_gesture_returned,true);
+  assert.equal(result.output.wizard_open_verified,false);
+  assert.equal(f.clicks,1);assert.equal(records[0].phase,'javascript_managed_setting_prepared');
+  const repeated=await dispatchManagedJavascriptSetting(options);
+  assert.equal(repeated.status,'SUCCEEDED');assert.equal(f.clicks,1);
+  assert.equal((await run('dispose')).disposed,true);
+});
+test('managed Setting refuses stale point and never replays a lost click reply',async()=>{
+  const stale=managedSelectionFixture(5000,'already'),before=await stale.run('capture');
+  const confirmation={kind:'deactivation',graph_tid:stale.f.node.tid,node:stale.task.owner,opening:{part:'settings'}};
+  const receiptOptions=(id,key,signature)=>({receipt_namespace:'managed-js-test',receipt_id:id,
+    receipt_signature:signature});
+  await assert.rejects(dispatchManagedJavascriptSetting({task:stale.task,confirmation,before,
+    execute:stale.execute,receiptOptions,record:async()=>({})}),/journal ACK differs/);
+  assert.equal(stale.f.clicks,0);
+  const changed=await dispatchManagedJavascriptSetting({task:stale.task,confirmation,
+    before:{...before,setting_point:{...before.setting_point,x:before.setting_point.x+1}},
+    execute:stale.execute,receiptOptions,record:async event=>event});
+  assert.equal(changed.status,'NOT_APPLIED');assert.equal(changed.effect_possible,false);
+  assert.equal(stale.f.clicks,0);await stale.run('dispose');
+  const lost=managedSelectionFixture(5000,'already'),ready=await lost.run('capture');
+  let clicks=0;lost.f.page.mouse.click=async()=>{clicks++;throw Error('lost Setting reply');};
+  const options={task:lost.task,before:ready,confirmation:{...confirmation,graph_tid:lost.f.node.tid},
+    execute:lost.execute,receiptOptions,record:async event=>event};
+  await assert.rejects(dispatchManagedJavascriptSetting(options),/lost Setting reply/);
+  await assert.rejects(dispatchManagedJavascriptSetting(options),/already started/);
+  assert.equal(clicks,1);await lost.run('dispose');
 });
 test('descendant Execute, Preview, ports or foreign Setting child never authorize body/Setting clicks',async()=>{
   for(const fault of ['overlay_Execute','overlay_Preview','overlay_Input_Data-0','overlay_Setting','setting_overlay']){
