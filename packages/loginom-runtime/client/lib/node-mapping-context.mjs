@@ -163,7 +163,10 @@ export function readMappingBrowser(prefix) {
       ['colSourceDisplayName_',target.data.ConnectedRecord?.data.DisplayName??'']])) {
       const cells=exact(base+key+target.data.Name).filter(c=>row.contains(c));
       if(pendingSource&&key==='colSourceDisplayName_'){
-        // Ext renders an unconnected source cell as one NBSP. This is a
+        if(cells.length!==0)return fail('mapping_hidden_source_cell');
+        continue;
+      }
+      // Ext renders an unconnected source cell as one NBSP. This is a
       // placeholder for a verified absent link, not whitespace in a label.
       const emptySource=key==='colSourceDisplayName_'&&target.data.ConnectedRecord==null
         &&value===''&&cells[0]?.textContent==='\u00a0';
