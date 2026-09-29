@@ -72,6 +72,7 @@ import {readJavascriptG1Type} from './javascript-g1-type.mjs';
 import {readJavascriptServerVersion} from './javascript-server-version.mjs';
 import {openJavascriptPackageFileTab,readJavascriptPackageFile} from './javascript-package-file.mjs';
 import {createJavascriptHeadedFocusX11} from './javascript-headed-focus-x11.mjs';
+import {runJavascriptStopProbe} from './javascript-stop-probe.mjs';
 
 export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false}={}) {
 process.umask(0o077);
@@ -1035,6 +1036,14 @@ const runExecutionTrial=async probe=>{
     const boundary=await executionRuntime.captureExecutionBoundary();
     try{
       await verifyBatchInputIdentity();
+      if(discoveryProbe.scope==='P1-stop'){
+        report.stage='p1-stop-finite';report.explicit_execution_limit=2;await save();
+        report.stop_result=await runJavascriptStopProbe({page,runtime:executionRuntime,prepared:executionPrepared,
+          node:executionNode,probe,deadline,record:executionRecord,redactor,
+          onSourcePending:value=>{managedCloseUncertain=value;}});
+        await executionRuntime.verifyExecutionBoundary(boundary);await verifyBatchInputIdentity();
+        report.stop_result.boundary_verified=true;await save();return;
+      }
       const execution=await executionRuntime.executeNode(executionNode,deadline,{phase:'initial',source_sha256:probe.source_sha256});
       report.execution_probe.execution=execution;await save();
       await executionRuntime.verifyExecutionBoundary(boundary);await verifyBatchInputIdentity();
@@ -1844,7 +1853,7 @@ try {
     report.stage='graph-ready';await waitGraphReady(createRemaining());
     await snapshot('graph-ready-baseline');
     if(executionCase||nativeInputOnly){
-      report.scope=telemetryTrial?'private fixed schema telemetry: '+nativeTelemetryCaseId:calibrationTrial?'private fixed error calibration: '+nativeCalibrationId:namedTrial?'private stage A/B named access: '+nativeNamedCaseId:coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?.scope==='P1-business'?'private P1 business 6x4 oracle':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
+      report.scope=telemetryTrial?'private fixed schema telemetry: '+nativeTelemetryCaseId:calibrationTrial?'private fixed error calibration: '+nativeCalibrationId:namedTrial?'private stage A/B named access: '+nativeNamedCaseId:coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?.scope==='P1-business'?'private P1 business 6x4 oracle':discoveryProbe?.scope==='P1-stop'?'private P1 finite Stop and same-node rerun':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
       if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=1;report.gates_closed=[];}
       if(persistence){report.scope='private G7 persistence writer: '+persistence.schema_mode;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
