@@ -281,6 +281,20 @@ refresh, native byte, public C/D/E или CLI. Чистый profile293 заре�
 конечный ≤60s цикл, отдельный local read cancel, exact native server Stop,
 terminal/cleanup и короткий same-node rerun. Затем C/D/E/F по плану.
 
+Stop operator-only подготовка добавлена в child: fixed `p1-stop-finite`,
+конечный пустой цикл с wall-clock bound45s и hard iteration cap100000000,
+затем тот же private бизнес-код. Общий execution driver prepare/launch/identify,
+отдельный local read cancel с continuation proof, one-shot exact native
+Stop/terminal, ≤60s launch-to-terminal observation gate. Затем owned managed
+replace коротким code/base, независимый source admission readback и отдельный
+same-node Execute с полным typed UI бизнес-oracle. При unknown effect или
+refused owner никаких Stop/Execute повторно; source uncertainty сохраняется
+для cleanup. Product registry/API/knowledge не расширяются.
+49 адресных Stop/discovery/business/source-adapter tests PASS; syntax/diff PASS,
+log SHA256 `c2864eae4b810a525d587d1c6fff8f5af4a48663f823a0b85ab12006a8e81781`.
+Live Stop и применимость driver во время активного JS ещё не доказаны;
+чистый profile293 назначен для отдельного `p1-stop-finite-01`.
+
 ### B: публичный configure existing — 2026-09-29
 
 В child commits `57b074fc7b`, `7cd36bb763`, `f8ceebcac9` собран узкий
