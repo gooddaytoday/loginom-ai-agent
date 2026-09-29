@@ -21,7 +21,7 @@ import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {javascriptNativeRoundtripProbe,verifyNativeRoundtripMapping} from './javascript-native-roundtrip-contract.mjs';
 import {bindJavascriptNativeRoundtripSource,bindJavascriptNativeRoundtripSchema,prepareJavascriptNativeRoundtripWizard,sealJavascriptNativeRoundtripDone} from './javascript-native-roundtrip-owner.mjs';
 import {withJavascriptWizardAddress} from './javascript-wizard-settlement.mjs';
-import {cleanupJavascriptColumnEditor} from './javascript-column-editor.mjs';
+import {cleanupJavascriptColumnEditor,openJavascriptColumnEditor,observeJavascriptColumnEditor} from './javascript-column-editor.mjs';
 import {dragJavascriptPalette} from './javascript-palette-drag.mjs';
 import {withJavascriptWizardMasks} from './javascript-wizard-masks.mjs';
 // Operator-only G1/G4 discovery. No public editor guards are changed here.
@@ -62,17 +62,17 @@ const batchDeadline=coldReader||packageFile?Math.floor(performance.timeOrigin)+6
 let cleaning=false,cleanupDeadline=Infinity;
 const phaseDeadline=ms=>Math.min(cleaning?cleanupDeadline:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=(cleaning?cleanupDeadline:batchDeadline)-Date.now();if(ms<=0)throw Error(cleaning?'Original cleanup deadline expired':'Original batch deadline expired');return ms;};
-const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
+const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor | --probe-source]] | --execution-case CASE | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
 if(args.includes('--help')&&coldReader){console.log('node javascript-persistence-read-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nCold reader: observe actual source/settings/mappings, one fresh Execute and full output; 10 minutes from process start; headed only. No source or configuration input.');return;}
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--probe-source','--execution-case','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
-  options[key]=['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source','--metadata-diagnostic'].includes(key) ? true : args[++i];
+  options[key]=['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--probe-source','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
 }
 if(coldReader){
@@ -113,12 +113,14 @@ if(discoveryProbe&&(batch||options['--execution-case']))throw Error('Discovery r
 let executionCase=nativeRoundtrip?nativeRoundtripProbe.schema_mode+'-table-execute':discoveryProbe?'code-table-execute':batch?.[0]??options['--execution-case'];
 if(executionCase){
   if(!/^(declared|code)-(sentinel-(next|done|preview|execute)|table-execute)$/.test(executionCase)&&executionCase!=='code-table-mismatch')throw Error('Unknown execution case');
-  if(!nativeRoundtrip&&['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--probe-source'].some(k=>options[k]))throw Error('Execution case is a separate mode');
+  if(!nativeRoundtrip&&['--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--probe-source'].some(k=>options[k]))throw Error('Execution case is a separate mode');
   options['--create-node']=true;options['--inspect-pages']=true;
 }
 if (['--create-node','--palette-only','--palette-hit-test'].filter(k=>options[k]).length>1) throw Error('Choose one discovery mode');
 if(options['--inspect-pages']&&!options['--create-node'])throw Error('--inspect-pages requires --create-node');
 if(options['--probe-source']&&!options['--inspect-pages'])throw Error('--probe-source requires --inspect-pages');
+if(options['--inspect-declared-editor']&&(!options['--inspect-pages']||options['--probe-source']||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||batch))
+  throw Error('--inspect-declared-editor requires its own create-node page inspection');
 for (const key of ['--config','--profile','--browser','--evidence']) {
   if (typeof options[key]!=='string' || !isAbsolute(options[key])) throw Error('Absolute '+key+' required');
 }
@@ -536,6 +538,26 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
       if(!schema.verified)throw Error('Native JavaScript input schema contract unconfirmed');
       const fields=schema.grids.find(grid=>grid.tid===schema.page_tid+';grdTargetColumns;tbl')?.fields;
       if(nativeRoundtrip?fields?.length!==1||fields[0].Name!=='Value'||fields[0].DataType!==nativeFixture.native_type:fields?.length!==5||!fields.some(field=>field.Name==='RowID'&&field.DataType===4))throw Error('Verified fixed input mapping unavailable');
+    }
+    if(options['--inspect-declared-editor']&&!remainingPages&&current.tid.endsWith(';JavaScriptColumnsWizard')){
+      const before=await page.evaluate(readJavascriptSchema,schemaContext());
+      const add=before.controls?.filter(control=>control.tid===before.page_tid+';btnAddMappingColumn');
+      if(!before.verified||before.generation?.checked!==true||before.grids.find(grid=>grid.tid===before.page_tid+';grdTargetColumns;tbl')?.count!==0
+        ||add?.length!==1||add[0].disabled||!add[0].visible)throw Error('Owned empty declared editor admission unavailable');
+      const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']').filter({visible:true});
+      try{
+        await openJavascriptColumnEditor({page,context:schemaContext(),index:0,state:columnState,record:executionRecord,deadline,
+          once:async(id,identity,perform)=>{report.effects.push({at:new Date().toISOString(),action:id,state:'dispatching',identity});await save();await perform();},
+          add:()=>at(add[0].tid).click({timeout:Math.max(1,Math.min(10000,deadline-Date.now()))})});
+        const inventory=await page.evaluate(observeJavascriptColumnEditor,{held:columnState.pending.held,phase:'editing',readDeclaredControls:true});
+        if(inventory.status!=='ready'||!inventory.declared_controls?.cbxDataKind||!inventory.declared_controls?.cbxUsageType)
+          throw Error('Owned declared control inventory unavailable: '+(inventory.reason??inventory.status));
+        report.declared_editor_controls=inventory.declared_controls;await save();
+      }finally{await cleanupJavascriptColumnEditor({page,state:columnState,record:executionRecord,deadline});}
+      const after=await page.evaluate(readJavascriptSchema,schemaContext());
+      if(!after.verified||after.grids.find(grid=>grid.tid===after.page_tid+';grdTargetColumns;tbl')?.count!==0)
+        throw Error('Cancelled declared editor changed output schema');
+      report.declared_editor_cancelled=true;await save();
     }
     if(coldReader&&!remainingPages&&current.tid.endsWith(';JavaScriptColumnsWizard')){
       const schema=await page.evaluate(readJavascriptSchema,schemaContext());
