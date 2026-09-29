@@ -27,6 +27,10 @@ test('unknown, failed, unsettled, file-only and absent-port sources refuse befor
  validateNodeApplyRequest(request,handlers);assert.deepEqual(s,before);
  assert.deepEqual(request.inputs,[]);assert.deepEqual(request.mappings,[]);assert.equal(request.target.kind,'existing');
 });
+test('JavaScript output reread refuses until it can verify the effective source',()=>{
+ const prior=source();prior.parameters.target.type='programming.javascript';
+ assert.throws(()=>buildNodeReadRequest(args,prior),/source-bound admission/);
+});
 test('host reread allowance reaches every phase while full diagnostic defaults and explicit budgets remain unchanged',()=>{
  const s=source(),before=structuredClone(s),expanded=createUserWorkflowBindings().expandNodeRead(args);
  const request=buildNodeReadRequest(expanded,s);validateNodeApplyRequest(request,handlers);

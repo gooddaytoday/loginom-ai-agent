@@ -31,6 +31,10 @@ export function buildNodeReadRequest(args,source){
  need(outcome?.status==='SUCCEEDED'&&outcome.cleanup_complete===true&&node?.cleanup_complete===true
   &&node.execution?.status==='completed'&&node.node&&request?.target?.type!=='exports.text',
   'Invalid parameters.source_operation_id: a completed local table node operation with confirmed cleanup is required');
+ // The existing output-read route re-executes the node without opening its
+ // configuration. JavaScript needs a fresh owned source/policy check first.
+ need(request.target.type!=='programming.javascript',
+  'JavaScript output reread requires source-bound admission');
  const previews=node.output?.ports?.map(p=>({port:p.port,schema:p.schema}))??[];
  // A verified local configuration retains the full mapping even when the
  // original operation requested no preview. Fresh execution and table-schema
