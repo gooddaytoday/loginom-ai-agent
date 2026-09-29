@@ -25,6 +25,15 @@ export const calculatorExpressionSchema={...object({target:{...object({kind:choi
  allOf:[{if:{properties:{target:{properties:{kind:{const:'new'}},required:['kind']}},required:['target']},then:{required:['name','label','type','formula','replace']}}]};
 export const calculatorParametersSchema={...object({expressions:array(calculatorExpressionSchema,128),order:{...array(text(128),128,1),description:'Optional complete order of calculated expression names only. Do not include inherited input columns. Omit to keep expression declaration order.'}},['expressions']),
  description:'For a new calculator, inputs must contain one table connection to input 0. target.kind=new ADDS an expression and must not repeat a saved expression name. For an existing calculator, parameters:{expressions:[]} preserves every formula (use finish=execute to read output); edits address target:{kind:existing,name:saved_name} inside each expression. Analytical formulas remain your choice.'};
+// Prepared schema for the JavaScript handler. It is not exposed in the node
+// catalog until the owned editor/execute/read driver is registered.
+export const javascriptParametersSchema=object({source_text:{type:'string',maxLength:32768,
+ description:'Full LF JavaScript source. New node requires it; existing omission preserves saved source, while an empty string replaces it. UTF-8 bytes <=32768, LF lines <=1024, no CR/NUL; local validation enforces the byte bound.'},
+ expected_source_sha256:{...text(64),minLength:64,pattern:'^[a-f0-9]{64}$',description:'Required only when replacing an existing source; use the digest from a complete owned source read.'},
+ schema_mode:choice('declared','code'),
+ columns:array(object({name:fieldName,label:text(120),type:choice('integer','real','string','boolean','datetime'),
+  data_kind:choice('Неопределенное','Непрерывный','Дискретный'),
+  usage:choice('Не задано','Активное','Выходное','Группа','Показатель','Транзакция','Элемент')}),1000,1)},[]);
 export const groupingFieldSchema=object({kind:choice('input_field'),name:fieldName});
 export const groupingMeasureSchema=object({field:groupingFieldSchema,function:choice('sum','count','avg','min','max'),name:fieldName,label:text(120)});
 export const groupingParametersSchema=object({group_by:array(groupingFieldSchema,128,1),measures:array(groupingMeasureSchema,256,1)},[]);
