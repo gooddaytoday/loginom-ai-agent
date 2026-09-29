@@ -62,6 +62,48 @@ Full client suite на текущих общих контрактах: 2923 PASS
 `17ec4ac73f9731bd221d444a3070c764cca0a3fabe8bd2463c3ed4d8de7a58dd`.
 Syntax и diff-check PASS. Свежий headed live/evidence ещё не получен.
 
+### C0 live01: generated mapping наблюдён, Close/recovery — 2026-09-30
+
+Ordinary headed `c0-code-materialization-01`, profile307/source `e7f675b9cb`,
+exec77365/exit1 завершился **CLEANUP_UNCONFIRMED**. После Done output0 имел
+полные пустые source/target stores. Один explicit Execute завершился native
+completed/owner_verified: node `1b42cf1e-95c1-4908-9b39-57733f67f736`, group3,
+child3.1/record1373/root1049. Последующее чтение exact output0 GUID
+`58f7e6c3-511e-39d7-8853-036e0a1a7612` наблюдало четыре source records
+1374–1377, field IDs 0–3: RowID/integer, CustomerKey/string, NetCents/integer,
+Status/string, с четырьмя взаимными source-target связями и autosync=true.
+Это фактическая материализация cached mapping, но не G3 bridge или Table oracle.
+
+Opening output wizard потребовал собственную deactivation confirmation,
+наблюдённую в native opening receipt. При единственном Close confirmation
+произошёл точный graph `locked=true→false`; generic post-gesture observation
+отклонил его `PREPARED_NODE_CONTEXT_CHANGED`, AMBIGUOUS. Граф/node identity
+в trace совпадают, но original Close не повторялся. Table ещё не читалась.
+Report SHA256 `404708606af24548a213475359896017c33a5a010ed41bb4be5a6991049d199d`,
+journal `00d45b9fd25838277dc4d6a9be77f2f2f10d07c936a4dbed44e2af41c5ddc571`.
+Browser closed, package/logout не подтверждены; своих процессов нет.
+
+После ownership handoff под registry.lock отдельный ordinary headed admin
+recovery/profile308/exec57080/exit0 закрыл только Package1/`jsteach:3621`
+(создание 23:14, disconnect23:17 UTC соответствует run). Отсутствие пакета и
+сеанса проверено после Refresh; admin logout/browser close и отсутствие
+своих процессов подтверждены. Journal SHA256
+`a8d636d198bd70321957af26ed2276154c7a99bce037342ffde9ab0076210012`,
+recovery receipt `d204c5469e44fd5bd13f0d2daf30fabdc775f47fe29b6e670ebe9ba86acf2942`.
+Исходный статус не повышен и файлы live01 не изменены.
+
+Child `f2d02cafad` даёт output read явно opt-in reconciliation уже существующего
+input Close proof: один подтверждённый gesture, только same graph lock delta,
+точный owner, затем read-only graph/native topology proof; default output
+остаётся строгим. Общий workspace guard не менялся. Поскольку opening output
+mapping деактивирует узел, C0 делает второй explicit `materialization-final`
+Execute после чтения mapping. Он требует private materialization mode,
+completed initial той же source SHA и сохранённый native root/group record
+в fresh baseline. Чтение связывается с новым execution ID; резерв фазы
+запрещает повтор при lost reply. 254 адресных tests PASS, syntax/diff PASS,
+log SHA256 `89b76365bab715cf1936681ee69ec47bec86b968ebeeaa5afad918cc6521bf5e`.
+Следующий fresh профиль309/evidence C0 live02; новый live ещё не получен.
+
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
 Child code commits `05dfebe85a`, `7fe5978c0f`, `cbfb793c95` добавили operator-only
