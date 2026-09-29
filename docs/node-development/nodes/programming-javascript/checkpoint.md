@@ -1,5 +1,53 @@
 # JavaScript: checkpoint исполнения
 
+## Одна headed live-итерация с защитой фокуса — 2026-09-29
+
+Продолжение по запросу пользователя ограничено одной итерацией. В child
+`node-javascript` commit `24745d80bd` исправил проверку топологии: API-тип
+узла `programming.javascript` больше не смешивается с CSS-иконкой
+`bg-vendor-icon-javascript`. Добавлен opt-in `--x11-no-focus` для собственного
+headed managed-opening probe. X11 helper по инструкции
+`docs/testing/loginom-ai-agent/headed-browser-focus-x11.md` привязывается к
+единственному Chromium PID/XID конкретного приватного профиля, устанавливает
+`WM_HINTS InputHint=false`, удаляет `WM_TAKE_FOCUS` и однократно возвращает
+исходный активный XID **до действий в Loginom**. Hook в `loginBrowser`
+закрывает context при неудаче настройки. Инструкция X11 в корне сейчас
+предоставлена пользователем как untracked файл; при фиксации кода её не
+включали и не изменяли.
+
+Локальный headed preflight `focus-guard-preflight-02`: ввод и JS alert
+выполнились; 17 замеров, 0 захватов фокуса браузером, 0 переключений на иные
+окна, 0 ошибок опроса. Приватный report SHA256
+`62c67d1d2c342f14bcfa30a7303adb003c26e7a5643885933540e17c8082c97b`.
+Pinned Node24.19.0: адресные runtime tests 10/10 PASS, `node --check`,
+Python compile и `git diff --check` PASS.
+
+Единственный Loginom live run — `managed-opening-focus-probe-03` в новом
+profile237, headed Chromium1246, `DISPLAY=:1`, стенд
+`http://logi-test-plan.bg.local/app/` (HTTP 200). После исправления topology
+пройдены подготовка JS body и setting; managed-opening wizard наблюдался
+видимым (`openingIntent`, dispatch, gesture и `wizardVisible=true`). За 2825
+замеров не наблюдалось захвата фокуса браузером или иным окном; было 17 ошибок
+опроса, поэтому гарантия на каждый момент времени из этих замеров не следует.
+Исходный активный XID сохранился. Приватный report SHA256
+`c06f19be903bea43f9ba92b23fe7b3b0c18c5bce8329499cb7ef99388aa65ed6`.
+
+Дальше run завершился на `existing-source-readback` с
+`JavaScript complete graph changed`: в наблюдаемой дельте графа у `/nodes/2`
+изменилось `locked: true -> false`. Причина этой дельты пока не доказана;
+следующая доработка должна адресно разобрать контракт lock-state при чтении
+исходника и только затем повторить live. Исходный report остаётся
+`CLEANUP_UNCONFIRMED`: браузер закрыт, UI-close/logout не подтверждены из-за
+pending/retired native input. Отдельным собственным headed admin-сеансом в
+Диспетчере закрыты ровно пакет `Package1` и сеанс `jsteach:3347`; после Refresh
+оба отсутствуют, admin logout и browser close подтверждены. Admin focus monitor:
+2472 замера, 0 захватов фокуса, 0 ошибок опроса. Журнал recovery SHA256
+`453d1f5c594fd6863a863e14891d8da0d3655b954156eeca7febd5304e506983`.
+Под registry lock назначен следующий **пустой** profile238; receipt SHA256
+`9b904d04f0f004d4fca6b03f450c0394c919a06ec498f979b8d2b724f943422a`.
+В этой итерации второго Loginom run не выполнять. Полная JS acceptance и
+публичный handler ещё не подтверждены.
+
 ## Пауза по запросу пользователя — 2026-09-29
 
 После предыдущего HTTP 503 через системный proxy прямое разрешение
