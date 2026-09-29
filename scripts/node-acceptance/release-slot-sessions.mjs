@@ -38,11 +38,13 @@ const page = authenticated.context.pages()[0]
 const tid = (value) => `[data-tid=${JSON.stringify(value)}]`
 const suffix = (value) => `[data-tid$=${JSON.stringify(value)}]:visible`
 try {
-  const target = "MapTreeForm;colNavigation_Сервер>Администрирование>Диспетчер;TreeText"
-  const navigation = page.locator(`${tid("MF;" + target)}:visible`)
-  if (!(await navigation.count()))
-    await page.locator(tid("MF;cntMain;tlbMainToolbar;btnNavigator")).click()
+  await page.locator(tid("MF;cntMain;tlbMainToolbar;btnAvatar")).waitFor({ timeout: 30000 })
+  const target = "MF;TF;AdminStartForm;MapTreeForm;colNavigation_Сервер>Администрирование>Диспетчер;TreeText"
+  const navigation = page.locator(`${tid(target)}:visible`)
   await navigation.waitFor({ state: "visible", timeout: 30000 })
+  // The admin landing link is covered if the floating navigator is open.
+  if (await page.locator('[data-tid="MF;MapTreeForm"]:visible').count())
+    await page.locator(tid("MF;cntMain;tlbMainToolbar;btnNavigator")).click()
   await navigation.click()
   await page.locator(suffix("SessionsManagerForm;btnRefresh")).click()
   const ids = await page.locator('[data-tid*="SessionsManagerForm;colSession_Root>"]').evaluateAll((elements) => [
