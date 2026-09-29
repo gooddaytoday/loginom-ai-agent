@@ -341,12 +341,14 @@ test('managed existing opener binds the observed Setting and retains its source 
       wizard_open:{node:{part:'settings',node_label:'JavaScript'},workflow_path:[{tid:'nav',label:''}]}}]}};
   const timer=setTimeout(()=>wizard.activate(),40);
   try{
-    const opened=await openManagedJavascriptExistingWizard({prepared:wizard.prepared,node:managed.task.owner,
+    const opened=await openManagedJavascriptExistingWizard({prepared:{document_id:wizard.prepared.document_id,
+      workflow_ref:wizard.prepared.workflow_ref},node:managed.task.owner,
       deadline:Date.now()+5000,targetOrigin:managed.task.targetOrigin,execute:managed.execute,
       record:async event=>{events.push(event);return event;},
       receiptOptions:(id,key,signature)=>({receipt_namespace:'managed-js-existing-test',receipt_id:id,receipt_signature:signature}),
       channel:{observe:async()=>graph,perform:async()=>assert.fail('unexpected deactivation') }});
     assert.equal(opened.opened.surface,'wizard');
+    assert.deepEqual(opened.task.prepared.node,managed.task.owner);
     assert.equal(opened.opened.native_owner_verified,true);
     assert.equal(managed.f.clicks,1);
     assert.equal(managed.f.disposed,0);
