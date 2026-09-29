@@ -5042,7 +5042,7 @@
       "initial_scope": "Сохранить подплан 15: фиксированные и скользящие колонки, агрегаты и изменение схемы; календарные поля можно задать в CSV.",
       "scope_basis": "loginom_7_4_2_live_discovery_and_candidate_source_tests",
       "limitations": [
-        "Прежняя standalone приёмка sliding/Sum прошла PASS; новая приёмка fixed/Min/Max/Avg готовится.",
+        "Исторический серверный Fixed/Min/Max/Avg PASS на 1e994aa50; Mac Sliding FAIL на том же SHA. Исправление Sliding требует нового публичного 9→7 и C→D, cold и независимого child-вердикта.",
         "Скользящий режим меняет схему при новом Execute; технические C_n имена относятся только к свежему результату.",
         "По решению владельца fixed сохраняет все категории источника при настройке, новые значения идут в «Прочие»; явное подмножество отклоняется контрактом."
       ],
@@ -5063,7 +5063,7 @@
           "evidence": [
             "runtime-registry"
           ],
-          "note": "Source tests и прежняя автономная приёмка sliding/Sum прошли; fixed-контракт приведён к решению владельца, ожидается свежая автономная приёмка."
+          "note": "Sliding reader исправлен адресно с регрессиями; native fixed контракт сохранён. Свежие серверные доказательства и независимая проверка ещё NOT_RUN."
         },
         "historical_acceptance": {
           "status": "not_accepted",
@@ -5088,7 +5088,7 @@
           "evidence": []
         }
       },
-      "next_action": "Выполнить свежую автономную приёмку fixed/Min/Max/Avg, приложить нативный результат и передать PR на ревью.",
+      "next_action": "Проверить исправление Sliding через публичный node_read, сохранение/cold/cleanup; создать child-проверку на запушенном SHA до сдачи владельцу.",
       "plan": "nodes/transform-crosstable/plan.md",
       "plan_status": "implementation_in_progress"
     },
