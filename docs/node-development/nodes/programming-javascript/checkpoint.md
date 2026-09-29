@@ -1,5 +1,50 @@
 # JavaScript: checkpoint исполнения
 
+## G3/G7: сохранённое назначение выходной колонки — 2026-09-29
+
+Child source `a28bdfca4b5ebe49fe5b64ddc5145e421d82cb7c` добавил отдельный
+фиксированный `usage`-вариант существующего G7 writer: declared-колонка
+`ObservedID` типа «Целый» получает `4 — Выходное` до Apply, затем выполняются
+две редакции source, два явных Execute и два Save одного собственного пакета.
+Новый cold reader не получает ни код, ни ожидаемые настройки; независимый аудит
+требует `DefaultUsageType=4` в Apply readback, шести writer settings rounds и
+cold settings. Byte-auditor отдельно проверяет реальный XML-атрибут
+`DefaultUsageType="utPredicted"`. Прежние `code`/`declared` сценарии сохранены.
+
+Три последовательных Ubuntu headed процесса на Loginom Enterprise 7.4.2:
+
+| Процесс / профиль | Подтверждённый результат | Private evidence |
+| --- | --- | --- |
+| writer `62806` / 223 | `OBSERVED`, два `SUCCEEDED` Save, `WRITER_OBSERVED`; `ObservedID.DefaultUsageType=4` после Apply и во всех шести settings rounds | `usage-persistence-writer-01/report.json`, SHA256 `6cff20b44df13ee23c16b412a02a1969efcd3e757fe6b43acfb84ddb9b24560a` |
+| cold `48500` / 224 | `OBSERVED`, новый document/workflow, полный source/settings/mappings и свежий Execute; `DefaultUsageType=4` после нового открытия | `usage-persistence-cold-01/report.json`, SHA256 `0a10660004498142b63608b8f462a85bd947b52c4e49f4dc1ba3e2cd06ef7e70` |
+| byte read `24629` / 225 | `OBSERVED`, read-only скачивание того же `.lgp` через штатный `FileDownloader`; XML первой колонки содержит `DefaultUsageType="utPredicted"` | `usage-persistence-package-bytes-01/report.json`, SHA256 `4fdb8400bbc2e9f1293ce8d6f75bd7c4757836ac89e0cb468439e9ad79580b55` |
+
+Оригинальные process handles завершились exit0; каждый процесс подтвердил
+package close/logout/browser close 3/3, процессов своих профилей после завершения
+нет. Writer и cold отчёты/журналы связаны independent
+`usage-persistence-audit-01.json` (`VERIFIED`, SHA256
+`53e6e462bbd39ba1295f296e6b5776a6b2434070b4b94177ab1b5cab7cf8a094`).
+ZIP/CRC, exact package GUID, `Engine.Code`, declared schema и
+`DefaultUsageType="utPredicted"` проверены в
+`usage-persistence-byte-audit-01.json` (`VERIFIED`, SHA256
+`61d7e3b4193ffff275481ce29d3e88e74c139f15b333182c581e119d03bc6599`),
+байты пакета SHA256 `8f01420d03115b23fd9df9cf8092804cef7119e5641fd903391040b8f385d083`.
+У обоих аудитов `dirty_state_verified=true`; у byte audit
+`package_bytes_verified=true`, `public_handler_verified=false`.
+
+Private freeze146 SHA256
+`0548d2503e63ad8b3d5890a5b2847e6d220fec61da079ca1c88501e17740f0aa`
+повторно сверил 1337 pins, import-closure 225 файлов/665 literal edges,
+computed imports 0. На закреплённом Node 24.19.0 весь
+`javascript*.test.mjs` набор 18 060/18 060 PASS, log SHA256
+`503a6d4dbd5ed18065fdb21a9d2c28a13e7305dfae04d71f7a8605b821cefdc3`;
+Python byte-auditor — 5/5 PASS, log SHA256
+`43f8f9825a693142eb5ce75418c15f9fb483537fa16c5e5f233cbf4daff9ae13`.
+Browser lease свободен, следующий пустой profile226.
+Это доказательство одного фиксированного двухколоночного declared-пакета.
+Generated→physical bridge, остальные назначения/типы, публичный handler и
+standalone CLI-приёмка остаются открытыми.
+
 ## G3: DefaultUsageType после Apply — 2026-09-29
 
 Child source `2c33216916` добавил фиксированную операторскую пробу Apply:
