@@ -154,6 +154,35 @@ bytes/public handler/CLI; gates_closed=[] остаётся в private report.
 syntax/diff PASS. Fresh профиль310/evidence `g3-code-business-bridge-01`;
 новый live пока не получен. Активный handle записывать в private registry.
 
+### G3 live01: logical → cached source → physical output0 доказан — 2026-09-30
+
+Ordinary headed `g3-code-business-bridge-01`, profile310/source `1965b71edd`,
+exec25645/exit0 — **OBSERVED**, `logical_physical_bridge_verified`, cleanup3/3.
+Независимый Python audit подтвердил actual logical metadata во всех шести
+строках, каждый index/name/display_name/data_type before/after Append и их
+стабильность. Все пять колонок (четыре бизнес-поля и служебная metadata)
+совпали с complete native source records/field IDs, reciprocal targets и
+схемой independently bound physical output0 Table того же GUID. Проверка
+использует GetColumn-значения из результата собственного fixed source,
+не names из AssignColumns и не ожидаемые business values.
+
+Отдельно прежний oracle подтвердил полный input6×5, projection output6×4:
+все cells/types/NULL/order, сумма1950. Два explicit Execute различны,
+последний retained prior native process root/group record; полный original
+graph/input boundary сохранён. Пакет закрыт, UI logout/browser close и
+отсутствие operator/Chromium независимо проверены; admin recovery не нужен.
+Report SHA256 `5049a1bc3f080e1b153f2fefc9f22f639eb09004cf0f6be110af0cdbed408d47`,
+journal `d03cb75955089e9d03b2bef0632d7d813438affe82136866429f554090ba68c6`,
+independent receipt `be051ea4704a782ed118b580a6975d07052d7d3c45375dd348be92d3831bf43f`.
+
+Граница доказательства: fixed code/ASCII technical names на Loginom7.4.2,
+private logical metadata + cached mapping + bound Table; native bytes=false,
+gates_closed=[]; не общий PASS arbitrary names/types/declared или public handler.
+Не повторять C0/G3 без затронувшего изменения. Теперь next — C public code
+handler и full read6×4, затем Save/cold; D/E/F и G1/G5/G6 остаток открыты.
+Готовность registry не повышалась. Live процессов нет, следующий fresh
+browser profile311; назначать только после реализации/test/source pin.
+
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
 Child code commits `05dfebe85a`, `7fe5978c0f`, `cbfb793c95` добавили operator-only

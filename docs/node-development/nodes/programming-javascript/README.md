@@ -77,8 +77,10 @@ Linux установлена отдельным чтением `Session.Version.
   только для fixed comment-only source в изолированном runtime; частичный
   handler не включён в продуктовый registry. Повторять этот run без
   затронувшего изменения не требуется.
-- Оставшиеся решения 0B — G1 identity/assistant, G3 source→physical, G5
-  обязательные API/J24 и остаток G6; отдельно от приёмки в [discovery](discovery.md).
+- Private G3 fixed code bridge GetColumn → native mapping → physical output0
+  подтверждён live01/source `1965b71edd`; остальные name/type/declared случаи
+  и public lifecycle открыты. Остаток 0B — G1 identity/assistant, G5 API/J24
+  и G6; точные границы — в [discovery](discovery.md).
 - Private P1 бизнес 6×4 проверен для code/base, declared/base и code
   changed/reordered с неизменным oracle и cleanup 3/3; точные SHA и границы
   в checkpoint. Private конечный native Stop, отдельный local read cancel и
