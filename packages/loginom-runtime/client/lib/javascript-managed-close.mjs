@@ -47,9 +47,9 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
     // The confirmation can hide its wizard before the graph and rendered node
     // return. Wait under the original Close deadline while the retained tab
     // still owns this transition; a different active owner remains terminal.
-    if(current===held.wizard&&model?.FView?.el?.dom===root)
+    if(current===held.wizard||current==null)
       return {state:'waiting',node_id:task.owner.node_id,root_visible:false,dialog_count:0};
-    if(current!==held.binding.workflow)throw Error('Managed JavaScript Close graph owner changed');
+    if(current!==held.binding.workflow)throw Error('Managed JavaScript Close foreign active owner');
     if(!app?.ModelForm||!(model instanceof app.ModelForm))
       return {state:'waiting',node_id:task.owner.node_id,root_visible:false,dialog_count:0};
     const diagram=model?.FDiagram,nodes=diagram?.FNodes?.FCollection;
