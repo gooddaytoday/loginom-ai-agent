@@ -1,5 +1,36 @@
 # JavaScript: checkpoint исполнения
 
+## Фаза 1A/1B: публичная форма контракта и маршрут знаний — 2026-09-29
+
+В изолированной ветке `node-javascript` коммит `168d4f88d0` добавил
+`programming.javascript`/`script` в общую типовую оболочку, сохранив отдельную
+форму `imports.text.parameters.source`. До передачи операции браузеру
+`validateNodeApplyEnvelope` отклоняет JavaScript-поля и `script` у другого
+типа и чужие параметры у JavaScript. Карточка узла содержит один вход/выход,
+группу «Программирование» и явный `candidate_node_apply_available=false` до
+регистрации owned handler.
+
+Для установленного в тесте handler действующий `createActionRuntime.describe`
+отдаёт версию, `validated_for`, SHA и подробный Data API только по выборочному
+`dock_action_describe`; `compactKnowledgeBundle` сохраняет семь ограничений,
+SHA и область проверки, но не переносит примеры в краткий `dock_prepare`.
+На другом закреплённом build выдача знаний отказывает. Source-only размер
+двойного JSON wire: 5152 байта для knowledge и 9844 для полного ответа с одной
+JS-карточкой, ниже проектных 20/46 KiB. Это не проверка фактической доставки
+через CLI: рабочий JS-handler ещё не зарегистрирован, поэтому `dock_prepare`
+пока не перечисляет JavaScript. Предел batch из нескольких больших карточек
+также требует отдельной J21-проверки.
+
+Pinned Node24.19.0: адресные contract/knowledge/user workflow/action tests
+80/80 PASS; широкий набор `javascript*.test.mjs` и смежных suites 294/294 PASS.
+`git diff --check` PASS. Канонический docs validator в основной ветке PASS.
+Запуск валидатора в child по всем локальным документам пока FAIL на прежних
+неперенесённых черновиках и устаревшем evidence hash; эти незакоммиченные
+материалы не включены в кодовый commit. Live-браузер в этом шаге не запускался;
+профиль235 остаётся назначенным для будущего headed прогона. Следующий шаг —
+owned configure/execute/read driver и регистрация handler, затем прямые
+J01/J21, source-read API и CLI-приёмка.
+
 ## G4/G7: declared writer → cold Execute — 2026-09-29
 
 Child `a08bb085d9` разрешил вторую отсоединённую DOM-перерисовку выбранного
