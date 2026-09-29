@@ -1,5 +1,7 @@
 import {javascriptMappingState,javascriptPreservedMappings} from './javascript-mapping-state.mjs';
 import {createJavascriptSourceReader} from '../../client/lib/javascript-source-read.mjs';
+import {createJavascriptSourceAdmission} from '../../client/lib/javascript-source-admission.mjs';
+import {createJavascriptManagedSourceAdapter} from '../../client/lib/javascript-managed-source-adapter.mjs';
 import {createJavascriptSourceWriter} from '../../client/lib/javascript-source-write.mjs';
 import {inspectJavascriptModulePolicy} from '../../client/lib/javascript-module-policy.mjs';
 import {verifyJavascriptPersistenceOutput} from './javascript-persistence-oracle.mjs';
@@ -78,12 +80,12 @@ if(args.includes('--help')&&coldReader){console.log('node javascript-persistence
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-source-admission','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
-  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
+  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-source-admission','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
 }
 if(coldReader){
@@ -107,6 +109,7 @@ if(options['--managed-opening-probe']&&(options['--execution-case']!=='code-tabl
   ||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--discovery-probe']))
   throw Error('Managed opening probe requires one isolated code-table-execute case');
 if(options['--x11-no-focus']&&!options['--managed-opening-probe'])throw Error('X11 focus guard requires the isolated managed opening probe');
+if(options['--verify-source-admission']&&!options['--managed-opening-probe'])throw Error('Source admission requires the isolated managed opening probe');
 if(options['--verify-runtime-schema']&&(options['--execution-case']!=='code-table-execute'||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile))
   throw Error('Runtime schema verification requires one isolated code-table-execute case');
 if(options['--verify-runtime-source']&&(options['--execution-case']!=='code-table-execute'||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile))
@@ -1159,6 +1162,39 @@ const runExecutionTrial=async probe=>{
       if(existingManaged){
         const {prepared,allowDeactivation,...selectionTask}=existingManaged.task;
         await Function('return ('+makeJavascriptManagedSelectionReadCode({...selectionTask,mode:'dispose'})+')')()(page);
+      }
+      if(options['--verify-source-admission']){
+        const admissionDeadline=phaseDeadline(90000);
+        const admissionOwner={document_id:executionPrepared.document_id,
+          workflow_id:executionPrepared.workflow_ref.workflow_id,node_id:executionNode.node_id,
+          operation_id:'managed-source-admission',ui_epoch:wizardAddressEpoch};
+        const admissionNamespace=randomUUID();
+        let managedAdapter=null;
+        report.stage='managed-source-admission';managedCloseUncertain=true;openedWizard=true;await save();
+        const admission=createJavascriptSourceAdmission({kind:'existing',owner:admissionOwner,
+          deadline:admissionDeadline,redactor,record:executionRecord,
+          sourceAdapter:async boundOwner=>{
+            if(JSON.stringify(boundOwner)!==JSON.stringify(admissionOwner))throw Error('Admission owner changed');
+            managedAdapter=createJavascriptManagedSourceAdapter({page,prepared:executionPrepared,node:executionNode,
+              uiEpoch:admissionOwner.ui_epoch,deadline:admissionDeadline,targetOrigin:new URL(config.url).origin,
+              execute:code=>Function('return ('+code+')')()(page),record:executionRecord,
+              receiptOptions:(id,key,signature)=>({receipt_namespace:'private-managed-js-admission-'+admissionNamespace,
+                receipt_id:id,receipt_signature:signature}),
+              channel:operationDeadline=>executionRuntime.channel(executionNode,operationDeadline)});
+            return managedAdapter;
+          }});
+        const admitted=await admission.admit({}).catch(error=>{
+          if(managedAdapter&&!managedAdapter.uncertain&&!managedAdapter.active){
+            openedWizard=false;managedCloseUncertain=false;
+          }
+          throw error;
+        });
+        if(admitted.intent!=='preserve'||admitted.previous_source?.source_sha256!==digest(probe.source)
+          ||admitted.effective_source?.source_sha256!==digest(probe.source)
+          ||admitted.settings_sha256===null||admission.state!=='admitted')
+          throw Error('Managed JavaScript source admission differs from executed baseline');
+        report.managed_source_admission={verified:true,receipt:admitted,raw_source_in_report:false};
+        openedWizard=false;managedCloseUncertain=false;await save();
       }
       await executionRuntime.settleClosedExecutionBoundary(boundary,executionNode,deadline);
       await executionRuntime.verifyExecutionBoundary(boundary);
