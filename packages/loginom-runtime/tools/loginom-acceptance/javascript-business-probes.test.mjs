@@ -7,6 +7,9 @@ import {javascriptDiscoveryOracle,javascriptDiscoveryProbe} from './javascript-d
 import {javascriptDeclaredColumnsMatch} from './javascript-schema-probe.mjs';
 import {javascriptBusinessInputVariant,verifyJavascriptFixture,verifyJavascriptTable} from './javascript-execution-evidence.mjs';
 import {javascriptInputRequest} from './javascript-execution-runtime.mjs';
+import {createTextImportNodeSupport} from '../../client/lib/text-import-node.mjs';
+import {validateNodeApplyRequest} from '../../client/lib/node-apply.mjs';
+import {bindImportSourceColumns} from '../../client/lib/text-import-procedure.mjs';
 
 const root=new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/',import.meta.url);
 const expected=JSON.parse(readFileSync(new URL('operator-only/expected.json',root),'utf8'));
@@ -40,6 +43,9 @@ test('P1 modes pin separate sources to one preauthored complete 6x4 oracle',()=>
 
 test('changed/reordered fixture bytes, import column order and all 6x5 cells stay pinned',()=>{
   const manifest=JSON.parse(readFileSync(new URL('manifest.json',root),'utf8'));
+  const prepared={document_id:'js-document',workflow_ref:{workflow_id:'js-workflow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
+    prefix:'MF;TF-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_workflow',label:'Сценарий'}]}};
+  const support=createTextImportNodeSupport({targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2'});
   for(const id of ['base','changed','reordered']){
     const variant=javascriptBusinessInputVariant(id);
     const bytes=readFileSync(new URL(variant.path,root));
@@ -48,11 +54,15 @@ test('changed/reordered fixture bytes, import column order and all 6x5 cells sta
       sample:variant.rows.map(row=>row.map((value,i)=>({type:variant.columns[i].type,is_null:false,value,
         precision:variant.columns[i].type==='integer'?'exact_integer':'display_text'})))};
     assert.equal(verifyJavascriptTable(input,'input',id).verified,true);
-    const request=javascriptInputRequest({prepared:{document_id:'doc',workflow_ref:{workflow_id:'flow'}},
+    const request=javascriptInputRequest({prepared,
       storage:'/jsteach/js-g2-11111111-1111-4111-8111-111111111111',artifact:{artifact_id:'a',bytes:variant.bytes,sha256:variant.sha256},
       uploadOperationId:'upload',totalMs:600000,inputVariant:id});
+    assert.doesNotThrow(()=>validateNodeApplyRequest(request,support.nodeApplyHandlers));
     assert.equal(request.parameters.settings.source.source_path.endsWith('/'+variant.name),true);
     assert.deepEqual(request.parameters.settings.columns.map(column=>column.name),variant.columns.map(column=>column.name));
+    const observed=variant.columns.map((column,index)=>({...column,index,status:'observed'}));
+    assert.deepEqual(bindImportSourceColumns(request.parameters.settings.columns,observed).map(column=>column.name),
+      variant.columns.map(column=>column.name));
     if(id==='reordered'){
       assert.deepEqual(variant.columns.map(column=>column.name),['DiscountPct','Customer','UnitPriceCents','RowID','Qty']);
       const wrong=structuredClone(input);wrong.schema=[...javascriptBusinessInputVariant('base').columns];
@@ -63,6 +73,9 @@ test('changed/reordered fixture bytes, import column order and all 6x5 cells sta
       assert.throws(()=>verifyJavascriptTable(input,'input','base'));
     }
   }
+  const parsed=javascriptBusinessInputVariant('reordered').columns.map((column,index)=>({...column,index,status:'observed'}));
+  assert.deepEqual(bindImportSourceColumns(javascriptBusinessInputVariant('base').columns,parsed).map(column=>column.name),
+    ['DiscountPct','Customer','UnitPriceCents','RowID','Qty']);
   assert.throws(()=>javascriptBusinessInputVariant('unknown'));
 });
 
