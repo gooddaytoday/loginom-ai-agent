@@ -1,5 +1,32 @@
 # JavaScript: checkpoint исполнения
 
+## Source-read operation/cursor contract — 2026-09-29
+
+Code commit `08b3b60927` в `origin/node-javascript` добавил host-only
+`javascript-source-read-session.mjs` и `javascript-source-read-registry.mjs`.
+Начальный `kind=source` принимает только operation ID, prepared
+document/workflow, existing JS node ref и необязательный budget; он
+запрещает source/settings, output options и Execute. Продолжение связано с
+тем же operation ID, opaque UUID cursor и полным SHA-256. Сессия выдаёт
+только проверенный source receipt после managed discard; реестр удерживает
+точные успешные ответы, объединяет одновременно ожидающие одинаковые
+запросы, запрещает повторное открытие после неопределённого Close и отвергает
+повторное использование ID с другой начальной формой. Это подготовка к
+публичному маршруту, **не** зарегистрированный `dock_node_read`.
+
+Адресные source/session/registry тесты: **70 PASS / 0 FAIL**; `node --check`,
+`git diff --check` прошли. Они охватывают Unicode/chunks, digest drift,
+full-source и structured redaction, idempotence и потерянный ответ Close.
+Live браузер в этой итерации не запускался; последний headed proof и cleanup
+на profile 255 зафиксированы ниже. Следующий профиль 256 не создан.
+
+Следующий шаг — связать registry с host `createActionRuntime` под общим
+browser/operation gate, общей known-secrets redaction и prepared node owner,
+затем зарегистрировать `dock_node_read kind=source` в full/compact схемах,
+маршрутизации и ответе MCP. Существующий output-read остаётся отдельной
+веткой и не должен выполняться для source-запроса. После этого нужны
+headed live delivery и CLI J01/J21.
+
 ## Source admission через managed existing wizard — headed proof, 2026-09-29
 
 Code commit `2174479dd9` в `origin/node-javascript` связал
