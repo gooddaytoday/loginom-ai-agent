@@ -84,6 +84,8 @@ export async function readCrossTableOutputs(channel,read,context,deferred){
  return {verified:true,cleanup_complete:true,effect_possible:true,status:data.sample_complete?'complete':'partial',
   execution_id:context.execution.execution_id,evidence_ref:context.receipt_id,
   ports:[{port:0,port_guid:table.port_guid,fresh:true,execution_id:context.execution.execution_id,
-   ...data,category_mapping:schema.category_mapping}],
+   ...data,category_mapping:schema.category_mapping,
+   ...(deferred.parameters.columns.mode==='sliding'?{dynamic_schema:{kind:'crosstable_sliding',
+    configuration:structuredClone(deferred.configuration),parameters:structuredClone(deferred.parameters)}}:{})}],
   table_creation:table,format_proof:format,format_restoration:restoration,read_settings:settings,workflow_return:returned};
 }

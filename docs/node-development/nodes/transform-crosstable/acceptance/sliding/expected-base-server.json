@@ -47,12 +47,12 @@
     },
     {
       "name": "C_4_Amount_Sum",
-      "label": "D|Amount|Сумма",
+      "label": "C|Amount|Сумма",
       "type": "real"
     },
     {
       "name": "C_4_Quantity_Sum",
-      "label": "D|Quantity|Сумма",
+      "label": "C|Quantity|Сумма",
       "type": "real"
     }
   ],

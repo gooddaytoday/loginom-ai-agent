@@ -1,5 +1,5 @@
 {
-  "package_path": "{{PACKAGE_PATH}}",
+  "package_path": "/test-6/LOG-29-mac-sliding-test6-20260929.lgp",
   "nodes": [
     {
       "type": "imports.text"
@@ -12,7 +12,6 @@
   "columns": [
     {
       "name": "Region",
-      "label": "Region",
       "type": "string"
     },
     {
@@ -47,12 +46,12 @@
     },
     {
       "name": "C_4_Amount_Sum",
-      "label": "D|Amount|Сумма",
+      "label": "C|Amount|Сумма",
       "type": "real"
     },
     {
       "name": "C_4_Quantity_Sum",
-      "label": "D|Quantity|Сумма",
+      "label": "C|Quantity|Сумма",
       "type": "real"
     }
   ],
