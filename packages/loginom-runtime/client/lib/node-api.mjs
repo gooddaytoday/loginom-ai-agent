@@ -40,6 +40,15 @@ export const crossTableParametersSchema={...object({
  local_variables:{...array(object({name:fieldName,type:choice('integer','boolean','string'),value:{anyOf:[integer(0,1000),boolean,text(120)]}}),3),description:'Create or update up to three local control-port default values. Existing names retain their IDs and types. Only local variables are supported; other local values are preserved.'},
  bindings:{...object({limit:object({variable:fieldName}),unique_names:object({variable:fieldName}),separator:object({variable:fieldName})},[]),description:'Bind schema settings to exact local variable names. New bindings need local_variables declarations; never supply the same static setting. Existing parameters containing only local_variables/bindings preserve roles and change actual variable values.'}
 },[]),description:'New CrossTable requires row_keys, column or columns, facts and category_mode. fixed also requires explicit include_null/include_other. Existing parameters={} preserves supported settings; refresh output with dock_node_read instead. Explicit category lists are unsupported. Output mappings require execute and exact configured_field names: rename, label, order and autosync are supported; own output fields are mandatory. Exclusion requires a separate downstream Field Parameters node.'};
+// Prepared schema for the JavaScript handler. It is not exposed in the node
+// catalog until the owned editor/execute/read driver is registered.
+export const javascriptParametersSchema=object({source_text:{type:'string',maxLength:32768,
+ description:'Full LF JavaScript source. New node requires it; existing omission preserves saved source, while an empty string replaces it. UTF-8 bytes <=32768, LF lines <=1024, no CR/NUL; local validation enforces the byte bound.'},
+ expected_source_sha256:{...text(64),minLength:64,pattern:'^[a-f0-9]{64}$',description:'Required only when replacing an existing source; use the digest from a complete owned source read.'},
+ schema_mode:choice('declared','code'),
+ columns:array(object({name:fieldName,label:text(120),type:choice('integer','real','string','boolean','datetime'),
+  data_kind:choice('Неопределенное','Непрерывный','Дискретный'),
+  usage:choice('Не задано','Активное','Выходное','Группа','Показатель','Транзакция','Элемент')}),1000,1)},[]);
 export const groupingFieldSchema=object({kind:choice('input_field'),name:fieldName});
 export const groupingMeasureSchema=object({field:groupingFieldSchema,function:choice('sum','count','avg','min','max'),name:fieldName,label:text(120)});
 export const groupingParametersSchema=object({group_by:array(groupingFieldSchema,128,1),measures:array(groupingMeasureSchema,256,1)},[]);
