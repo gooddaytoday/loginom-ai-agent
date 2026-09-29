@@ -3,7 +3,7 @@ import {readFile,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 const [eventsPath,expectedDirectory,outputPath]=process.argv.slice(2);
-const calls=(await readFile(eventsPath,'utf8')).trim().split('\n').map(line=>JSON.parse(line)).filter(event=>event.part?.type==='tool'&&event.part.state?.status==='completed').map(event=>({tool:event.part.tool,input:event.part.state.input,result:JSON.parse(event.part.state.output.split('\n\n')[0]),timestamp:event.timestamp}));
+const calls=(await readFile(eventsPath,'utf8')).trim().split('\n').map(line=>JSON.parse(line)).filter(event=>event.part?.type==='tool'&&event.part.state?.status==='completed').map(event=>({tool:event.part.tool,input:event.part.state.input,result:JSON.parse(event.part.state.output.split('\n\n')[0].replace(/(:\s*)\[redacted\](?=[,}])/g,'$1"[redacted]"')),timestamp:event.timestamp}));
 const settled=id=>calls.filter(call=>call.result.operation_id===id&&call.result.status==='SUCCEEDED').at(-1);
 const source=settled('sliding-base');assert(source,'Initial Sliding output missing');
 const reads=[['sliding-base','base'],['sliding-changed-read','changed'],['sliding-restored-read','base'],['sliding-same-count-read','same-count']];

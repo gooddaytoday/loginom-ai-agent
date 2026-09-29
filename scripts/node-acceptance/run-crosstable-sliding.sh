@@ -56,12 +56,15 @@ PY
 run_headed "$SCRIPT_DIR/cold-check.mjs" --config "$OUT/.cold-config.json" --resources "$RESOURCES" \
  --saved "$OUT/saved.json" --expected "$OUT/expected.json" --output "$OUT/cold" \
  > "$OUT/cold-stdout.txt" 2> "$OUT/cold-stderr.txt"
+run_headed "$SCRIPT_DIR/crosstable-graph-proof.mjs" --resources "$RESOURCES" --connection "$CONNECTION" \
+ --public "$OUT/public/public-result.json" --output "$OUT/graph" \
+ > "$OUT/graph-stdout.txt" 2> "$OUT/graph-stderr.txt"
 python3 - "$OUT" "$CANDIDATE/cli-manifest.json" "$SCENARIO" <<'PY'
 import json,pathlib,sys
-out=pathlib.Path(sys.argv[1]);cold=json.load(open(out/'cold/result.json'));public=json.load(open(out/'public/public-result.json'))
-assert cold['status']=='PASS' and public['status']=='PASS'
+out=pathlib.Path(sys.argv[1]);cold=json.load(open(out/'cold/result.json'));public=json.load(open(out/'public/public-result.json'));graph=json.load(open(out/'graph/graph-result.json'))
+assert cold['status']=='PASS' and public['status']=='PASS' and graph['status']=='PASS'
 assert cold['cleanup']['package_closed'] and cold['cleanup']['logged_out']
-result={'status':'PASS','source_sha':json.load(open(sys.argv[2]))['metadata']['sourceCommit'],'scenario':sys.argv[3],'public':public,'cold':cold,'cleanup':cold['cleanup']}
+result={'status':'PASS','source_sha':json.load(open(sys.argv[2]))['metadata']['sourceCommit'],'scenario':sys.argv[3],'public':public,'cold':cold,'graph':graph,'cleanup':graph['cleanup']}
 (out/'addressed-result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
 print('PASS: public Sliding '+sys.argv[3]+' and independent cold Execute/cleanup')
 PY
