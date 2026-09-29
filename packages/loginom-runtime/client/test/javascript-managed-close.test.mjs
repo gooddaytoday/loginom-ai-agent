@@ -96,8 +96,12 @@ test('managed Close accepts a rebound graph only with the same workflow, node an
   shape.isConnected=false;
   assert.equal(read().state,'waiting');
   shape.isConnected=true;
+  tab.Controller.Node.data.node=null;
+  assert.equal(read().state,'waiting');
+  tab.Controller.Node.data.node=held.wizard={};
+  assert.equal(read().state,'waiting');
   tab.Controller.Node.data.node={};
-  assert.throws(read,/graph owner changed/);
+  assert.throws(read,/foreign active owner/);
   tab.Controller.Node.data.node=workflow;
   shape.getAttribute=()=> 'MF;TF-1;Graph;foreign';
   assert.throws(read,/graph owner changed/);
