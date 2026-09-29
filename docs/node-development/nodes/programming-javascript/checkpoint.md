@@ -488,6 +488,19 @@ observation; общие workspace-ui epoch guards не меняются. Unknown
 проверить owner/record replacement, terminal race, masks/menus/ref/geometry,
 ABA/epoch/deadline и lost reply, затем fresh headed finite trial. G6 открыт.
 
+Child `0328cadfc9` реализует этот host-only typed путь только для двух Stop
+controls. Durable prepared step содержит execution binding/signature; перед
+жестом native ticket удерживает объекты, проверяет opaque ref, native record
+ordinal, owner/canCancel/state, ancestry, blockers, point и epoch. Общий
+workspace-ui не изменён; unknown mouse reply возвращает AMBIGUOUS с
+cleanup=false, освобождает локальный mouse и не вызывает второй gesture.
+312 targeted tests PASS (в том числе сериализованный prepared-node reader,
+реальный channel admission/journal, foreign/replaced record/store/root/owner,
+terminal/selection/deadline/geometry/covered/blockers/ABA и lost dispatch);
+log SHA256 `935d892127d58b1cb4106252cbb952582a34c2fa997b2b2d99b55d7664bdf6dc`.
+Syntax/diff PASS. Fresh profile306/run `p1-stop-finite-08`, exec50386;
+результат Stop/short rerun пока не установлен, G6 остаётся открытым.
+
 ### B: публичный configure existing — 2026-09-29
 
 В child commits `57b074fc7b`, `7cd36bb763`, `f8ceebcac9` собран узкий
