@@ -1,5 +1,31 @@
 # JavaScript: checkpoint исполнения
 
+## Фаза 1B: подготовлен versioned knowledge-asset — 2026-09-29
+
+Child source `1d2c0590ba` добавил
+`packages/loginom-runtime/client/lib/javascript-knowledge.mjs`: 7 коротких
+ограничений, scalar Data API и два **точных диагностических** примера для
+`declared`/`code`. Их source совпадает побайтно с уже проверенными headed
+`declared-table-v1`/`code-table-v1` пробами на Loginom Enterprise 7.4.2:
+SHA256 `816b086fe447eb42afbf87ac46b18b01153f731f3baf0de2bcd280da1104957f`
+и `d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`.
+`RowID` и `JS_G2_TABLE_V1` относятся к тестовой таблице; новая бизнес-программа
+должна брать technical names, типы и значения из свежего наблюдения. Asset
+указывает оригинальный prompt SHA256
+`c9c2d44d4dc4cf34b8f21a98504cf9f6acfc70cac510c36fe2725e7c0d7c2d16`,
+официальные страницы (не закреплённые за build), наблюдённую ОС сервера Linux
+и строгое `validated_for.loginom_build=7.4.2`. Его semantic
+`knowledge_sha256=4a8a2d6e712fc56d039d1e595361dde9afb7e16eb7f3b8fd1959d5f5908bc2ef`,
+file SHA256 `22c4d6fcffa4b539c2cb3ec0977d472d74d35927f4b62389902b3fe2157573d1`.
+
+На pinned Node24.19.0 адресные tests 8/8 PASS: source/hash соответствуют
+исполнявшемуся fixture, иной build отклоняется, изменение asset меняет
+`createRuntimeSourcePin` revision. Это **подготовка 1B**, ещё не доставка
+модели. Публичная JS-карточка и `dock_action_describe` не включены до owned
+handler; staged bundle/resource manifest, фактические `clientRevision` и
+`skillRevision` candidate не выпускались и не сверялись. Перед признанием 1B
+завершённой надо провести эту интеграцию, проверить бюджеты и CLI-ответ.
+
 ## Фаза 1A: подготовлен чистый контракт параметров — 2026-09-29
 
 Child source `e75e8ad99cd881dd748eeb0b0a5f9882b147f4be` добавил
