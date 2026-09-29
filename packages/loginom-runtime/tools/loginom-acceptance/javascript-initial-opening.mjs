@@ -1,4 +1,4 @@
-import {selectJavascriptForSettings} from './javascript-execution-runtime.mjs';
+import {selectJavascriptForSettings} from '../../client/lib/javascript-owned-selection.mjs';
 
 // Fresh-node opening has no reopen/deactivation confirmation authority.
 export async function openJavascriptInitialWizard({page,binding,node,icon,deadline,record,guard,report,save,waitVisible,lifecycle}) {
