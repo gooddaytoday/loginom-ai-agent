@@ -77,8 +77,9 @@ export async function runManagedJavascriptSelectionRead(page,task,capture,inspec
   if(!lease||lease.identity!==identity)throw Error('Managed JavaScript selection lease changed');
   if(task.mode==='dispose'){
     leases.delete(task.operation_id);
-    try { await lease.wizardCaptured?.dispose(); }
-    finally { await lease.handle.dispose(); }
+    try { await lease.sourceEditorCaptured?.dispose(); }
+    finally { try { await lease.wizardCaptured?.dispose(); }
+      finally { await lease.handle.dispose(); } }
     return {disposed:true};
   }
   if(task.mode!=='inspect')throw Error('Unsupported managed JavaScript selection read');
