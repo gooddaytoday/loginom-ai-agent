@@ -41,6 +41,28 @@ test('Done never waits or reads stale output',async()=>{
  assert.equal(r.status,'SUCCEEDED');assert.deepEqual(r.execution,{status:'not_requested',execution_id:null});assert.equal(r.output.status,'not_refreshed');
  assert.ok(!f.calls.includes('execute')&&!f.calls.includes('read'));
 });
+test('JavaScript Done accepts a settled commit while retaining unknown internal execution',async()=>{
+ const f=fixture(),p=request();p.target={kind:'existing',type:'programming.javascript',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node1'}};
+ p.mode='script';p.parameters={source_text:'// unchanged schema\n',expected_source_sha256:'a'.repeat(64)};
+ p.finish='done';p.read.ports=[];
+ f.handlers.set('programming.javascript',{revision:'js-trial',modes:['script'],validate:()=>{},configure:async()=>({verified:true,cleanup_complete:true,effect_possible:true})});
+ f.drivers.finish=async mode=>({verified:true,cleanup_complete:true,effect_possible:true,mode,
+  execution_id:null,execution_started:null,explicit_execute_requested:false,settings_applied:true,
+  wizard_commit_verified:true,graph_owner_verified:true,source_readback_verified:true,owned_done_settled:true});
+ const result=await f.run(p);
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.configuration.status,'applied');
+ assert.deepEqual(result.execution,{status:'not_requested',execution_id:null});
+ assert.equal(result.output.status,'not_refreshed');assert.ok(!f.calls.includes('execute')&&!f.calls.includes('read'));
+ for(const field of ['wizard_commit_verified','graph_owner_verified','source_readback_verified','owned_done_settled']){
+  const bad=fixture(),finish=f.drivers.finish;
+  bad.handlers.set('programming.javascript',f.handlers.get('programming.javascript'));
+  bad.drivers.finish=async mode=>({...await finish(mode),[field]:false});
+  const rejected=await bad.run(p);assert.equal(rejected.status,'AMBIGUOUS');assert.equal(rejected.pending_phase,'finish');
+ }
+ const other=fixture();other.drivers.finish=async mode=>({...await f.drivers.finish(mode)});
+ const standard=request();standard.finish='done';standard.read.ports=[];
+ assert.equal((await other.run(standard)).status,'AMBIGUOUS');
+});
 test('Close requires discarded settings and never executes or refreshes output',async()=>{
  for(const discarded of [true,false]) {
   const f=fixture(),p=request();p.finish='close';p.read.ports=[];

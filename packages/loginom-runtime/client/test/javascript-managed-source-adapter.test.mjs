@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {createJavascriptManagedSourceAdapter, javascriptManagedSourceSettings} from '../lib/javascript-managed-source-adapter.mjs';
 import {createJavascriptSourceAdmission} from '../lib/javascript-source-admission.mjs';
 import {createRedactor} from '../lib/redact.mjs';
@@ -13,12 +14,16 @@ const task = {operation_id: 'managed-js-1', owner: node, workflow_ref: prepared.
   targetOrigin: 'http://logi-test-plan.bg.local', targetBuild: '7.4.2', deadline,
   prepared: {...prepared, node}, allowDeactivation: true};
 
-function fixture({closeFails = false, pageTransientOnce = false, wrongType = false} = {}) {
+function fixture({closeFails = false, pageTransientOnce = false, wrongType = false, doneFails = false} = {}) {
   const calls = [], events = [];
-  let pageReads = 0;
+  let pageReads = 0, codeNextSent = false;
   const driver = {
     openManagedJavascriptExistingWizard: async args => {calls.push('open'); assert.equal(args.node, node); return {task};},
     dispatchManagedJavascriptNext: async () => {calls.push('next'); return {status: 'SUCCEEDED', output: {next_gesture_returned: true}};},
+    dispatchManagedJavascriptCodeNext: async () => {calls.push('code-next');codeNextSent = true;
+      return {status: 'SUCCEEDED', output: {next_gesture_returned: true, transition_verified: false}};},
+    dispatchManagedJavascriptDone: async () => {calls.push('done');if(doneFails)throw Error('lost Done reply');
+      return {status: 'SUCCEEDED', output: {done_gesture_returned: true,wizard_commit_verified: false,execution_started: null}};},
     closeManagedJavascriptWizard: async () => {calls.push('close'); if (closeFails) throw Error('lost Close reply');
       return {verified: true, closed: true, node_id: 'node'};},
     makeJavascriptSchemaContextCode: () => 'schema',
@@ -26,9 +31,10 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     makeJavascriptManagedSourceCode: () => 'source',
     makeJavascriptManagedSelectionReadCode: () => 'dispose',
     makeJavascriptExistingGraphTypeCode: () => 'type',
-    replaceManagedJavascriptSource: async ({markUncertain}) => {calls.push('replace');
+    replaceManagedJavascriptSource: async ({markUncertain,source_text}) => {calls.push('replace');
       if (closeFails) {markUncertain(true); throw Error('lost source write reply');}
-      return {draft_exact: true, wizard_commit_verified: false};},
+      return {draft_exact: true, wizard_commit_verified: false,
+        source_sha256:createHash('sha256').update(source_text).digest('hex')};},
   };
   const execute = async code => {
     calls.push(code);
@@ -37,9 +43,10 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     if (code === 'schema') return {verified: true, node_context: {...node, verified: true, surface: 'wizard'},
       generation: {checked: true}, grids: [{tid: 'grid', fields: [{record_id: 'volatile', Name: 'Value'}]}]};
     if (code === 'page') return {ready: true, node_guid: 'node',
-      page: pageTransientOnce && pageReads++ === 0
-        ? {tid: 'MF;TF-1;WizrdMCF;JavaScriptColumnsWizard', index: 0, visible_editors: 0}
-        : {tid: 'MF;TF-1;WizrdMCF;JavaScriptCodeWizard', visible_editors: 1}};
+      page:codeNextSent?{tid:'MF;TF-1;WizrdMCF;DoneWizard',index:3,indicator_count:4,visible_editors:0}
+        : pageTransientOnce && pageReads++ === 0
+          ? {tid: 'MF;TF-1;WizrdMCF;JavaScriptColumnsWizard', index: 0, visible_editors: 0}
+          : {tid: 'MF;TF-1;WizrdMCF;JavaScriptCodeWizard', visible_editors: 1}};
     if (code === 'source') return {verified: true, source, node_context: {...node, verified: true, surface: 'wizard'}};
     if (code === 'dispose') return {disposed: true};
     throw Error('Unexpected browser code');
@@ -47,7 +54,8 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
   const record = async event => {events.push(structuredClone(event)); return event;};
   const sourceAdapter = async () => createJavascriptManagedSourceAdapter({page: {}, prepared, node, uiEpoch: 9,
     deadline, targetOrigin: 'http://logi-test-plan.bg.local', execute, record,
-    receiptOptions: () => ({}), channel: () => ({}), driver});
+    receiptOptions: () => ({}), channel: () => ({observe:async()=>{calls.push('graph');return {
+      prepared_node_context:{...node,verified:true,surface:'graph'},wizard:{status:'absent'}};}}), driver});
   return {calls, events, sourceAdapter, record};
 }
 
@@ -107,6 +115,27 @@ test('managed source adapter admits only one owned replacement attempt', async (
     expected_source_sha256: '0'.repeat(64), source_text: 'const next=2;'}), /already used/);
   assert.equal(f.calls.filter(call => call === 'replace').length, 1);
   await adapter.discard(handle, {owner, deadline});
+});
+
+test('managed source commit uses one Code Next and Done and settles the same graph',async()=>{
+  const f=fixture(),adapter=await f.sourceAdapter(),handle=await adapter.open({owner,deadline});
+  await adapter.replace(handle,{owner,deadline,expected_source_sha256:'0'.repeat(64),source_text:'// changed\n'});
+  const result=await adapter.commit(handle,{owner,deadline});
+  assert.equal(result.owned_done_settled,true);assert.equal(result.execution_started,null);
+  assert.equal(adapter.uncertain,false);assert.equal(adapter.active,false);
+  assert.deepEqual(f.calls.filter(call=>['code-next','done','graph','dispose'].includes(call)),
+    ['code-next','done','graph','dispose']);
+  await assert.rejects(()=>adapter.commit(handle,{owner,deadline}),/handle unavailable/);
+});
+
+test('lost managed Done reply retains uncertainty and never retries the gesture',async()=>{
+  const f=fixture({doneFails:true}),adapter=await f.sourceAdapter(),handle=await adapter.open({owner,deadline});
+  await adapter.replace(handle,{owner,deadline,expected_source_sha256:'0'.repeat(64),source_text:'// changed\n'});
+  await assert.rejects(()=>adapter.commit(handle,{owner,deadline}),/lost Done reply/);
+  assert.equal(adapter.uncertain,true);assert.equal(adapter.active,true);
+  await assert.rejects(()=>adapter.commit(handle,{owner,deadline}),/owner changed/);
+  assert.equal(f.calls.filter(call=>call==='code-next').length,1);
+  assert.equal(f.calls.filter(call=>call==='done').length,1);
 });
 
 test('lost managed source replacement retains the wizard lease', async () => {

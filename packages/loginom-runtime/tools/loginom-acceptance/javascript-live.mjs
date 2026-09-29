@@ -1,10 +1,12 @@
 import {javascriptMappingState,javascriptPreservedMappings} from './javascript-mapping-state.mjs';
 import {javascriptSourceMappings} from './javascript-source-cycle.mjs';
-import {createJavascriptSourceReader} from '../../client/lib/javascript-source-read.mjs';
+import {createJavascriptSourceReader,javascriptSourceIdentity} from '../../client/lib/javascript-source-read.mjs';
 import {createJavascriptSourceAdmission} from '../../client/lib/javascript-source-admission.mjs';
 import {createJavascriptManagedSourceAdapter} from '../../client/lib/javascript-managed-source-adapter.mjs';
 import {replaceManagedJavascriptSource} from '../../client/lib/javascript-managed-source-write.mjs';
 import {createActionRuntime} from '../../client/lib/executor.mjs';
+import {createCandidateNodeSupport} from '../../client/lib/node-support.mjs';
+import {createJavascriptTrialNodeSupport} from '../../client/lib/javascript-trial-node.mjs';
 import {dispatchNodeApi} from '../../client/lib/node-api.mjs';
 import {nodeResultReply} from '../../client/lib/node-result-reply.mjs';
 import {createJavascriptSourceWriter} from '../../client/lib/javascript-source-write.mjs';
@@ -82,17 +84,17 @@ const batchDeadline=coldReader||packageFile?Math.floor(performance.timeOrigin)+6
 let cleaning=false,cleanupDeadline=Infinity;
 const phaseDeadline=ms=>Math.min(cleaning?cleanupDeadline:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=(cleaning?cleanupDeadline:batchDeadline)-Date.now();if(ms<=0)throw Error(cleaning?'Original cleanup deadline expired':'Original batch deadline expired');return ms;};
-const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--server-version-only | --palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor [--inspect-usage-picker [--select-usage-option [--apply-usage-option]]] | --probe-source]] | --execution-case CASE [--managed-opening-probe --x11-no-focus [--verify-managed-source-write | --verify-managed-source-commit]] | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
+const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--server-version-only | --palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor [--inspect-usage-picker [--select-usage-option [--apply-usage-option]]] | --probe-source]] | --execution-case CASE [--managed-opening-probe --x11-no-focus [--verify-managed-source-write | --verify-managed-source-commit] | --verify-public-node-apply] | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
 if(args.includes('--help')&&coldReader){console.log('node javascript-persistence-read-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nCold reader: observe actual source/settings/mappings, one fresh Execute and full output; 10 minutes from process start; headed only. No source or configuration input.');return;}
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-managed-source-commit','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-managed-source-commit','--verify-public-node-apply','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
-  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-managed-source-commit','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
+  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-managed-source-commit','--verify-public-node-apply','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
 }
 if(coldReader){
@@ -124,6 +126,10 @@ if(options['--verify-managed-source-write']&&(!options['--managed-opening-probe'
 if(options['--verify-managed-source-commit']&&(!options['--managed-opening-probe']||!options['--verify-public-source-read']
   ||options['--verify-managed-source-write']))
   throw Error('Managed source commit requires managed opening, independent public source read and no discard trial');
+if(options['--verify-public-node-apply']&&(options['--execution-case']!=='code-table-execute'
+  ||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile
+  ||options['--managed-opening-probe']||options['--x11-no-focus']))
+  throw Error('Public JavaScript trial requires one isolated code-table-execute case in ordinary headed mode');
 if(options['--verify-runtime-schema']&&(options['--execution-case']!=='code-table-execute'||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile))
   throw Error('Runtime schema verification requires one isolated code-table-execute case');
 if(options['--verify-runtime-source']&&(options['--execution-case']!=='code-table-execute'||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile))
@@ -183,7 +189,7 @@ const directory=resolve(options['--evidence']);
 // Refuse reuse: no old evidence is overwritten and no uncertain run is replayed.
 await mkdir(directory,{mode:0o700});
 const redactor=createRedactor([config.password]);
-if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--server-version-only']||options['--managed-opening-probe']){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
+if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--server-version-only']||options['--managed-opening-probe']||options['--verify-public-node-apply']){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},redactor});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
   ...(coldReader||persistence||packageFile?{host_process:{pid:process.pid,started_at:new Date(performance.timeOrigin).toISOString(),profile:resolve(options['--profile'])}}:{}),
@@ -1123,6 +1129,64 @@ const runExecutionTrial=async probe=>{
     if(sourceReadCycle){await runSourceReadCycle(probe,Math.min(deadline,batchDeadline));return;}
     report.stage='existing-mapping-baseline';
     const before={input:await executionRuntime.readPortMapping(executionNode,'input'),output:await executionRuntime.readPortMapping(executionNode,'output')};
+    if(options['--verify-public-node-apply']){
+      const boundary=await executionRuntime.captureExecutionBoundary();
+      try{
+      const source=probe.source+'\n// public Done trial: "Проверка" \\ 😀';
+      const identity=javascriptSourceIdentity(source);
+      const remaining=deadline-Date.now()-60000;
+      if(remaining<120000)throw Error('Public JavaScript trial has insufficient original cleanup budget');
+      const target={document_id:executionNode.document_id,workflow_id:executionNode.workflow_id,node_id:executionNode.node_id};
+      const origin=new URL(config.url).origin,base=createCandidateNodeSupport({targetOrigin:origin,targetBuild:'7.4.2'});
+      const trial=createJavascriptTrialNodeSupport({page,targetOrigin:origin,targetBuild:'7.4.2',redactor,
+        pinned:{node:target,expected_source_sha256:probe.source_sha256,source_text:source}});
+      const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},
+        allowCandidate:true,targetOrigin:origin,targetBuild:'7.4.2',redactor,onRecord:executionRecord,
+        execute:code=>Function('return ('+code+')')()(page),
+        nodeApplyHandlers:new Map([...base.nodeApplyHandlers,...trial.nodeApplyHandlers]),
+        nodeApplyDriverFactory:options=>options.operation.parameters.target.type==='programming.javascript'
+          ?trial.nodeApplyDriverFactory(options):base.nodeApplyDriverFactory(options)});
+      const request={operation_id:'js-public-'+randomUUID(),contract_revision:'1.0.0',
+        document_id:executionPrepared.document_id,workflow_ref:executionPrepared.workflow_ref,
+        target:{kind:'existing',type:'programming.javascript',ref:target},inputs:[],mode:'script',
+        parameters:{source_text:source,expected_source_sha256:probe.source_sha256},mappings:[],finish:'done',
+        read:{ports:[],sample_rows:0,require_exact_numbers:true},
+        budgets:{configure_ms:Math.min(360000,remaining),execute_ms:30000,total_ms:Math.min(420000,remaining)}};
+      report.stage='public-node-apply';report.public_node_apply={status:'RUNNING',operation_id:request.operation_id,
+        previous_source_sha256:probe.source_sha256,expected_source_sha256:identity.source_sha256};
+      managedCloseUncertain=true;await save();
+      let job=await dispatchNodeApi(runtime,'dock_node_apply',request);
+      while(job.state==='running'){
+        job=await dispatchNodeApi(runtime,'dock_node_wait',{operation_id:request.operation_id,timeout_ms:30000});
+        report.public_node_apply.progress=job.progress;await save();
+      }
+      report.public_node_apply.job=job;await save();
+      if(job.outcome?.status!=='SUCCEEDED'||job.outcome.output?.configuration?.readback?.source?.sha256!==identity.source_sha256
+        ||job.outcome.output?.execution?.status!=='not_requested'||job.outcome.output?.output?.status!=='not_refreshed'
+        ||runtime.hasUnsettledWork())throw Error('Public JavaScript Done result unconfirmed');
+      const projected=nodeResultReply(job,{userProfile:true});
+      if(projected.structuredContent?.configuration?.readback?.source?.sha256!==identity.source_sha256
+        ||projected.structuredContent?.configuration?.readback?.execution_effects?.internal_execution_started!==null)
+        throw Error('Public JavaScript user-v1 readback differs');
+      const read=await dispatchNodeApi(runtime,'dock_node_read',{kind:'source',operation_id:'js-after-'+randomUUID(),
+        document_id:executionPrepared.document_id,workflow_ref:executionPrepared.workflow_ref,node:target,
+        budget_ms:Math.max(1,Math.min(180000,deadline-Date.now()-30000))});
+      if(read.kind!=='source'||read.source_text!==source||read.source_sha256!==identity.source_sha256
+        ||read.cursor!==null||runtime.hasUnsettledWork())throw Error('Independent public JavaScript source read differs');
+      const after={input:await executionRuntime.readPortMapping(executionNode,'input'),
+        output:await executionRuntime.readPortMapping(executionNode,'output',{allowConfiguredOnly:true})};
+      const mapping=javascriptPreservedMappings(javascriptSourceMappings(before),after,executionNode,{allowConfiguredOnly:true});
+      await executionRuntime.verifyExecutionBoundary(boundary);
+      report.public_node_apply={status:'OBSERVED',operation_id:request.operation_id,
+        previous_source_sha256:probe.source_sha256,source_sha256:identity.source_sha256,
+        source_utf8_bytes:identity.source_utf8_bytes,source_lf_lines:identity.source_lf_lines,
+        configuration:job.outcome.output.configuration,execution:job.outcome.output.execution,
+        output:job.outcome.output.output,public_source_read_verified:true,
+        input_mapping_preserved:true,output_mapping: mapping.output,graph_links_preserved:true,
+        raw_source_in_report:false};
+      managedCloseUncertain=false;await save();return;
+      }finally{await boundary.native.dispose();}
+    }
     report.stage='existing-source-readback';
     const boundary=await executionRuntime.captureExecutionBoundary();
     try{

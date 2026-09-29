@@ -296,7 +296,16 @@ export async function applyNode({request, operation, handlers, drivers, record,
       requireValue(value.mode===request.finish, 'Wrong wizard finish mode');
       if(readingOnly)requireValue(value.settings_applied===false,'Output read must not apply node settings');
       if(request.finish==='execute')requireValue(id(value.execution_id), 'A fresh execution identity is required');
-      else requireValue(value.execution_id==null && value.execution_started===false, 'Done must not execute');
+      else if(request.target.type==='programming.javascript'&&request.finish==='done'){
+        // Loginom does not expose whether Done ran internal work. The owned
+        // gesture, graph settlement and independent source readback establish
+        // the commit without claiming that unknown internal effects are false.
+        requireValue(value.execution_id==null&&value.execution_started===null
+          &&value.explicit_execute_requested===false&&value.settings_applied===true
+          &&value.wizard_commit_verified===true&&value.graph_owner_verified===true
+          &&value.source_readback_verified===true&&value.owned_done_settled===true,
+        'JavaScript Done requires settled owner and independent source readback');
+      }else requireValue(value.execution_id==null && value.execution_started===false, 'Done must not execute');
       if(request.finish==='close')requireValue(value.draft_discarded===true && value.settings_applied===false,'Close must discard draft settings');
     }});
     if(request.finish==='execute') {

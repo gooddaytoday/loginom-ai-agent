@@ -15,6 +15,21 @@ test('explicit workflow activation survives public result validation',()=>{
  const r=result();r.pending_phase='workflow';r.phases=[{phase:'workflow',receipt_id:'op:workflow',status:'verified',effect_possible:true}];
  assert.equal(validate(r).valid,true);
 });
+test('JavaScript Done readback keeps internal execution unknown and output unrefreshed',()=>{
+ const r=result();r.status='SUCCEEDED';r.node={document_id:'d',workflow_id:'w',node_id:'n'};
+ r.execution={status:'not_requested',execution_id:null};r.output={status:'not_refreshed',evidence_ref:null,ports:[]};
+ r.configuration={status:'applied',readback:{kind:'javascript',scope:'observed_after_verified_finish',node:r.node,
+  receipt_ids:['source','target','input_mapping','open','configure','output_mapping','finish'],
+  values_are:'independent_owned_source_readback',schema_mode:'code',
+  source:{sha256:'a'.repeat(64),utf8_bytes:420,lf_lines:9},settings_preserved:true,wizard_commit_verified:true,
+  execution_effects:{explicit_execute_requested:false,internal_execution_started:null},package_persistence_verified:false}};
+ assert.equal(validate(r).valid,true);
+ for(const change of [v=>v.execution_effects.internal_execution_started=false,
+  v=>v.execution_effects.explicit_execute_requested=true,v=>v.package_persistence_verified=true,
+  v=>v.source.sha256='bad',v=>v.source.raw_text='hidden']){
+  const bad=structuredClone(r);change(bad.configuration.readback);assert.equal(validate(bad).valid,false);
+ }
+});
 test('table output requires typed values, precision and bounded samples',()=>{
  const r=result();r.output={status:'complete',evidence_ref:'read',ports:[{port:0,port_guid:'p',fresh:true,execution_id:'e',
   schema:[{index:0,name:'Id',label:'Id',type:'integer'}],row_count:1,

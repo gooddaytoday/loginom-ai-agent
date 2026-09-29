@@ -35,7 +35,7 @@ export interface NodeHandler<T extends NodeType, P> {
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -52,7 +52,7 @@ export interface NodeApplyResult {
   execution: NodeExecution; output: NodeOutput;
   /** A local node checkpoint never proves that the package was saved. */
   package_saved: false; cleanup_complete: boolean; warnings: string[];
-  configuration?: {status: 'applied' | 'discarded'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback};
+  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; readback?: TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | JoinConfigurationReadback};
   checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped' | 'local_node_failed';
   persisted_package_verified?: false; pending_phase?: PhaseName | null; error?: NodeError;
 }
@@ -64,6 +64,15 @@ export interface TextImportConfigurationReadback {
   columns: Array<{index: number; name: string; label: string; type: string; data_kind: string; used: boolean}>;
   output_mapping: {port: 0; autosync: boolean;
     fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string}>};
+}
+export interface JavascriptConfigurationReadback {
+  kind: 'javascript'; scope: 'observed_after_verified_finish'; node: NodeRef;
+  receipt_ids: string[]; values_are: 'independent_owned_source_readback'; schema_mode: 'code';
+  source: {sha256: string; utf8_bytes: number; lf_lines: number};
+  settings_preserved: true; wizard_commit_verified: true;
+  /** Done does not request Execute; Loginom's internal effects remain unknown. */
+  execution_effects: {explicit_execute_requested: false; internal_execution_started: null};
+  package_persistence_verified: false;
 }
 export interface CalculatorParameters {
   expressions: Array<{target: {kind: 'new'} | {kind: 'existing'; name: string};

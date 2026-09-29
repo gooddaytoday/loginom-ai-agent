@@ -61,6 +61,20 @@ test('compact node result keeps references, precision and errors without configu
   raw.outcome.status = 'AMBIGUOUS';raw.outcome.error = { code: 'UNCERTAIN', message: 'inspect same ID' };
   assert.equal(compactNodeResult(raw).error.code, 'UNCERTAIN');
 });
+test('compact JavaScript Done result retains the typed readback and unknown internal effect',()=>{
+ const readback={kind:'javascript',scope:'observed_after_verified_finish',node:{document_id:'d',workflow_id:'w',node_id:'n'},
+  receipt_ids:['source','target','input_mapping','open','configure','output_mapping','finish'],
+  values_are:'independent_owned_source_readback',schema_mode:'code',
+  source:{sha256:'a'.repeat(64),utf8_bytes:420,lf_lines:9},settings_preserved:true,wizard_commit_verified:true,
+  execution_effects:{explicit_execute_requested:false,internal_execution_started:null},package_persistence_verified:false};
+ const raw={operation_id:'js',state:'settled',outcome:{status:'SUCCEEDED',action_key:'node.apply',
+  effect_possible:true,cleanup_complete:true,output:{node:readback.node,configuration:{status:'applied',readback},
+   execution:{status:'not_requested',execution_id:null},output:{status:'not_refreshed',evidence_ref:null,ports:[]},package_saved:false}}};
+ const compact=compactNodeResult(raw);
+ assert.equal(validate(compact).valid,true);assert.deepEqual(compact.configuration.readback,readback);
+ assert.equal(compact.output.status,'not_refreshed');assert.equal(compact.execution.status,'not_requested');
+ assert.ok(!JSON.stringify(compact).includes('source_text'));
+});
 test('all-null sample warning is bounded and never treats missing values or unseen rows as NULL',()=>{
  const port={port:0,row_count:72,schema:[{name:'converted',type:'integer'},{name:'present',type:'integer'},{name:'unknown',type:'integer'}],
   sample:[[{is_null:true},{is_null:false,value:'1'},{}],[{is_null:true},{is_null:true},{}]],sample_complete:false};
