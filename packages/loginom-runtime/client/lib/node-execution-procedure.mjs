@@ -87,8 +87,10 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
   const consoleVisible=s=>s.ui.elements.some(e=>e.tid===grid);
   async function openConsole() {
     let s=await observe('prepared node available for process console',s=>consoleVisible(s)||control(s,button).length===1,{readProcesses:false,readProcessControls:true});
-    if(!consoleVisible(s)) {await act(s,button);s=await observe('process console visible',consoleVisible);}
-    return s;
+    if(!consoleVisible(s))await act(s,button);
+    // The control-only read above has no native inventory, even when the
+    // console was already open. Stop must refresh its root/process proof.
+    return observe('process console visible',consoleVisible);
   }
   async function closeConsole(s) {
     if(consoleVisible(s))await act(s,'ConsoleForm;btnClose');
