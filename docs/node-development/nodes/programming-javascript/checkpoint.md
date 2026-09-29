@@ -35,14 +35,17 @@ existing code-table через public API-path изолированного runt
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
-Child code commits `05dfebe85a`, `7fe5978c0f` добавили operator-only
+Child code commits `05dfebe85a`, `7fe5978c0f`, `cbfb793c95` добавили operator-only
 пробники для `code`/`declared` и `base`/`changed`/`reordered` с единым заранее
 закреплённым `expected.json`. Исходный `code-base` и `declared-base`
 используют `sales.csv` с фактическими technical names; тот же JS source SHA
 сохраняется при changed/reordered, source не содержит ожидаемых денежных
 значений. Для дополнительных вариантов импорт берёт заранее закреплённые
 байты CSV и проверяет 6×5 в фактическом порядке колонок, прежде чем связывать
-JS. В declared
+JS. Локальная проверка через `validateNodeApplyRequest` допускает все три
+импорта; `bindImportSourceColumns` возвращает порядок реального заголовка даже
+для перестановки при старом порядке запроса. Это не заменяет native readback
+живого импорта. В declared
 режиме оператор устанавливает четыре поля `RowID`, `CustomerKey`, `NetCents`,
 `Status` и проверяет их native readback. Независимый typed UI oracle сравнивает
 полную схему, шесть упорядоченных строк и каждую ячейку, допуск ноль. Это
