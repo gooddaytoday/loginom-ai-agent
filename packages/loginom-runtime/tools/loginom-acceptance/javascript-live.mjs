@@ -1051,8 +1051,12 @@ const runExecutionTrial=async probe=>{
       report.execution_probe.execution=execution;await save();
       await executionRuntime.verifyExecutionBoundary(boundary);await verifyBatchInputIdentity();
       const mappingAfter=mappingBefore?await executionRuntime.readPortMapping(executionNode,'output',
-        {operationDeadline:deadline,allowConfiguredOnly:true}):undefined;
-      const result=await observeJavascriptDiscovery({probe,node:executionNode,execution,deadline,
+        {operationDeadline:deadline,allowConfiguredOnly:true,allowOwnedUnlock:true}):undefined;
+      const readExecution=mappingBefore?await executionRuntime.executeNode(executionNode,deadline,
+        {phase:'materialization-final',source_sha256:probe.source_sha256}):execution;
+      if(mappingBefore){report.materialization_initial_execution=execution;report.execution_probe.execution=readExecution;await save();}
+      const result=await observeJavascriptDiscovery({probe,node:executionNode,execution:readExecution,
+        previousExecution:mappingBefore?execution:undefined,deadline,
         readOutput:()=>executionRuntime.readPassive(executionNode,mappingBefore?'bridge':'discovery',deadline),record:executionRecord,
         onProgress:async progress=>{report.discovery_result={...progress,oracle_passed:progress.gate_passed,gate_passed:false,boundary_verified:false};await save();}});
       await executionRuntime.verifyExecutionBoundary(boundary);await verifyBatchInputIdentity();
@@ -1864,11 +1868,11 @@ try {
     await snapshot('graph-ready-baseline');
     if(executionCase||nativeInputOnly){
       report.scope=telemetryTrial?'private fixed schema telemetry: '+nativeTelemetryCaseId:calibrationTrial?'private fixed error calibration: '+nativeCalibrationId:namedTrial?'private stage A/B named access: '+nativeNamedCaseId:coercionTrial?'private Integer coercion characterization: '+nativeFixtureId:nativeRoundtrip?'private native '+nativeFixtureId+'/NULL identity roundtrip':nativeInputOnly?'private native '+nativeFixtureId+' input-only admission':discoveryProbe?.scope==='P1-business'?'private P1 business 6x4 oracle':discoveryProbe?.scope==='P1-stop'?'private P1 finite Stop and same-node rerun':discoveryProbe?.scope==='C0-materialization'?'private C0 output0 mapping materialization and bound Table; G3 lineage unverified':discoveryProbe?'isolated engine/G5 UI/diagnostic discovery':'G2/G3 operator trial';report.execution_case=executionCase;
-      if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=1;report.gates_closed=[];}
+      if(discoveryProbe){report.discovery_probe=discoveryProbe;report.explicit_execution_limit=discoveryProbe.scope==='C0-materialization'?2:1;report.gates_closed=[];}
       if(persistence){report.scope='private G7 persistence writer: '+persistence.schema_mode;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
-        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence,inputVariant:discoveryProbe?.input_variant??'base'});
+        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence,inputVariant:discoveryProbe?.input_variant??'base',materialization:discoveryProbe?.scope==='C0-materialization'});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
       if(nativeRoundtrip)await executionRuntime.armNativeRoundtrip(executionInput);

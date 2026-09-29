@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {javascriptEngineProbes,inputTextProbe} from './javascript-engine-probes.mjs';
 import {javascriptBusinessProbes} from './javascript-business-probes.mjs';
 import {javascriptStopProbe} from './javascript-stop-case.mjs';
-import {verifyJavascriptMismatchTable} from './javascript-mismatch-probe.mjs';
+import {verifyJavascriptMismatchTable,verifyJavascriptPreviousExecution} from './javascript-mismatch-probe.mjs';
 
 const need=(v,m)=>{if(!v)throw Error(m);};
 const hash=s=>createHash('sha256').update(s,'utf8').digest('hex');
@@ -101,12 +101,12 @@ export function javascriptDiscoveryErrorButtonDiagnostic({probe,identity,error})
     gate_passed:false,native_bytes_verified:false,gates_closed:[]};
 }
 
-export async function observeJavascriptDiscovery({probe,node,execution,readOutput,record,onProgress=async()=>{},deadline,now=Date.now}){
+export async function observeJavascriptDiscovery({probe,node,execution,previousExecution,readOutput,record,onProgress=async()=>{},deadline,now=Date.now}){
   const pinned=javascriptDiscoveryProbe(probe?.id);
   need(probe.source===pinned.source&&hash(probe.source)===pinned.source_sha256
     &&probe.input_variant===pinned.input_variant
     &&execution?.verified===true&&execution.owner_verified===true&&execution.cleanup_complete===true
-    &&['completed','failed'].includes(execution.status)&&execution.trial?.phase==='initial'
+    &&['completed','failed'].includes(execution.status)&&execution.trial?.phase===(pinned.scope==='C0-materialization'?'materialization-final':'initial')
     &&execution.trial.source_sha256===pinned.source_sha256&&execution.trial.node_id===node?.node_id
     &&['document_id','workflow_id','node_id'].every(k=>node?.[k]&&execution.fresh_baseline?.node?.[k]===node[k])
     &&execution.execution_id&&execution.group_id&&Array.isArray(execution.fresh_baseline.roots)
@@ -115,6 +115,11 @@ export async function observeJavascriptDiscovery({probe,node,execution,readOutpu
     &&typeof execution.launch_identity.group_record_id==='string'&&execution.launch_identity.group_record_id
     &&['document_id','workflow_id','node_id'].every(k=>execution.launch_identity.node?.[k]===node[k])
     &&!execution.fresh_baseline.roots.some(p=>p.process_id===execution.group_id),'Discovery execution owner/source/freshness incomplete');
+  if(pinned.scope==='C0-materialization'){
+    need(previousExecution?.trial?.phase==='initial'&&previousExecution.trial.source_sha256===pinned.source_sha256
+      &&previousExecution.execution_id!==execution.execution_id,'C0 requires distinct same-source materialization and read executions');
+    verifyJavascriptPreviousExecution(execution.fresh_baseline,previousExecution);
+  }
   const result={id:pinned.id,source_sha256:pinned.source_sha256,status:'execution_terminal',execution,
     execution_started:true,gate_passed:false,output:null,scope:pinned.scope,expectation:pinned.expectation,
     proof_level:'typed_ui_only',native_bytes_verified:false,gates_closed:[]};

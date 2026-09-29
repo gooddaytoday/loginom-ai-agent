@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {javascriptDiscoveryProbe,javascriptDiscoveryOracle} from './javascript-discovery-probes.mjs';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+import {javascriptDiscoveryProbe,javascriptDiscoveryOracle,observeJavascriptDiscovery} from './javascript-discovery-probes.mjs';
 import {javascriptMaterializationObservation} from './javascript-materialization-observation.mjs';
+import {javascriptExecutionIdentity,verifyJavascriptPreviousExecution} from './javascript-mismatch-probe.mjs';
 
 function fixture() {
   const probe=javascriptDiscoveryProbe('c0-code-materialization');
@@ -48,4 +51,46 @@ for(const [name,change] of Object.entries({
 }))test('C0 records unmatched '+name+' without promoting bridge',()=>{
   const f=fixture();change(f);const result=javascriptMaterializationObservation(f);
   assert.equal(result.mapping_target_table_schema_matched,false);assert.equal(result.bridge_verified,false);
+});
+
+const runtimeSource=await readFile(new URL('./javascript-execution-runtime.mjs',import.meta.url),'utf8');
+const start=runtimeSource.indexOf('    async executeNode('),end=runtimeSource.indexOf('    async readPassive(',start);
+assert.ok(start>0&&end>start);
+for(const fault of ['ok','mode','source','initial','history','lost-reply'])test('actual C0 final execution admission: '+fault,async()=>{
+  const f=fixture(),deadline=Date.now()+5000,events=[];
+  const previous={verified:true,owner_verified:true,cleanup_complete:true,status:'completed',execution_id:'doc:r:1',group_id:'1',
+    trial:{phase:'initial',source_sha256:f.probe.source_sha256},
+    fresh_baseline:{root_id:'r',node:f.node,roots:[]},
+    launch_identity:{execution_id:'doc:r:1',root_id:'r',group_id:'1',group_record_id:'record1',node:f.node}};
+  const fresh={root_id:'r',node:structuredClone(f.node),roots:[{process_id:'1',record_id:'record1',completed:true}]};
+  if(fault==='source')previous.trial.source_sha256='0'.repeat(64);
+  if(fault==='initial')previous.status='failed';
+  if(fault==='history')fresh.roots[0].record_id='replaced';
+  const identity={execution_id:'doc:r:2',root_id:'r',group_id:'2',group_record_id:'record2',node:f.node};
+  const phases=new Map([['execute-initial-js',{terminal:previous}]]);
+  const driver={prepare:async()=>{events.push('prepare');return fresh;},
+    launchGraph:async()=>{events.push('launch');return {verified:true};},
+    identify:async()=>identity,waitCompleted:async()=>({verified:true,owner_verified:true,cleanup_complete:true,status:'completed',execution_id:'doc:r:2',group_id:'2'})};
+  const runtime=vm.runInNewContext('({'+runtimeSource.slice(start,end)+'})',{
+    deadline,materialization:fault!=='mode',executionPhases:phases,javascriptExecutionIdentity,verifyJavascriptPreviousExecution,
+    createNodeExecutionProcedure:()=>driver,channel:()=>({}),
+    privateGraphBinding:async()=>({dispose:async()=>events.push('dispose')}),page:{evaluate:async()=>({node:{id:'js'},icon:'js'})},
+    selectJavascriptForSettings:async()=>events.push('select'),
+    once:async(id,parameters,action)=>{const result=await action();if(fault==='lost-reply')throw Error('lost reply');return result;},
+    record:async event=>events.push(event.phase),waitJavascriptExecutionNotifications:async()=>{},
+  });
+  const run=()=>runtime.executeNode(f.node,deadline,{phase:'materialization-final',source_sha256:f.probe.source_sha256});
+  if(fault==='ok'){
+    const execution=await run();assert.equal(execution.execution_id,'doc:r:2');
+    const result=await observeJavascriptDiscovery({probe:f.probe,node:f.node,execution,previousExecution:previous,
+      readOutput:async()=>f.table,record:async()=>{},deadline});assert.equal(result.gate_passed,true);
+    await assert.rejects(run(),/already reserved/);assert.equal(events.filter(event=>event==='launch').length,1);
+    await assert.rejects(observeJavascriptDiscovery({probe:f.probe,node:f.node,execution,readOutput:async()=>f.table,
+      record:async()=>{},deadline}),/distinct same-source/);
+  }
+  if(fault!=='ok'){
+    await assert.rejects(run());assert.equal(events.includes('launch'),fault==='lost-reply');
+    if(['history','lost-reply'].includes(fault))await assert.rejects(run(),/already reserved/);
+    if(['mode','source','initial'].includes(fault))assert.deepEqual(events,[]);
+  }
 });
