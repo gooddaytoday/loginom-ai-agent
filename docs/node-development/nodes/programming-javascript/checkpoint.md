@@ -295,6 +295,34 @@ log SHA256 `c2864eae4b810a525d587d1c6fff8f5af4a48663f823a0b85ab12006a8e81781`.
 Live Stop и применимость driver во время активного JS ещё не доказаны;
 чистый profile293 назначен для отдельного `p1-stop-finite-01`.
 
+`p1-stop-finite-01`/profile293/source `68dad903de` — **CLEANUP_UNCONFIRMED**,
+report SHA256 `35011396a981f5c1e305fb1b402488fcd87a95b498ee82a482379be73a953c7a`,
+journal SHA256 `eec1aeea2ab2be8ef3e59592db8305a1373f578dac14969fa7d0a416ddaf8cf0`.
+Input6×5 verified; отдельный finite Execute запущен один раз, group3
+identified. Local read cancel вернул read_only/cleanup_complete continuation
+proof той же execution identity. Server cancel не отправлен: общий
+`openConsole()` при уже открытой консоли вернул control-only observation
+(`readProcesses=false`) без native inventory, и Stop отказал
+`Stop process root changed`. Это отсутствие root proof, не доказанная смена
+native root. Original cleanup отказал close (`running state not proven false`),
+browser closed; короткий rerun не начат, G6 остаётся открытым.
+
+Separate headed admin recovery/profile294 закрыл только `Package1`/`jsteach:3583`,
+по времени creation/disconnect этого run. Refresh подтвердил отсутствие
+package/session; admin logout/browser close и отсутствие собственных процессов
+проверены. Recovery journal SHA256
+`4adf60beee9afa0894a1db1c4ba8ba266859c36cbb2b54c0fe69b5e7dd15f73b`,
+receipt SHA256 `8513f88786580425b251d937a291d2fff6063596ca5c9fcb4b93b6c3e110b26c`.
+Original status/cleanup сохранены без повышения.
+
+Child `c5415d9316` всегда дочитывает native inventory после control-only
+console observation, включая уже открытую консоль; новых жестов не добавляет.
+83 targeted execution/Stop/probe tests PASS; fixture теперь действительно
+не выдаёт native process inventory при readProcesses=false. Syntax/diff PASS;
+log SHA256 `1d796be86a83e3d440e9965eed1f5adb1f06919dc60cda67eea2ad5d24f325d3`.
+Под lock назначен чистый profile295 для `p1-stop-finite-02`; новый native
+Stop и short same-node rerun ещё не проверены.
+
 ### B: публичный configure existing — 2026-09-29
 
 В child commits `57b074fc7b`, `7cd36bb763`, `f8ceebcac9` собран узкий
