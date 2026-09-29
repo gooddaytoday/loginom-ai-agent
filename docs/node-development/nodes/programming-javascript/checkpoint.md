@@ -1,5 +1,147 @@
 # JavaScript: checkpoint исполнения
 
+## Текущее состояние
+
+Сводка на 2026-09-29 после применения [acceleration review](acceleration-review.md)
+к [плану](plan.md). Проверены docs HEAD `13a02e8be2d698d5fbc7f19d146fa82d55f53e48`
+и code HEAD `7b8e19bee073cb596607688173234e57052e27b1`. Ниже пересказ ранее
+зафиксированных evidence, а не новые tests/live. Официальная готовность в
+registry не повышалась; 0B остаётся `discovery_required` с точным остатком
+в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
+
+| Возможность / связанные J | Уровень и evidence | Остаток |
+| --- | --- | --- |
+| Ubuntu/worktree/toolchain/memory admission | Подтверждён ранее в этой истории, поколение `20260926.2` | Проверять изменения окружения/сбои; не повторять bootstrap без причины |
+| Типовая оболочка, параметры/module policy, knowledge — J01/J21/J26 | Runtime/source `168d4f88d0`, `1d2c0590ba`; см. «Фаза 1A/1B» и «Фаза 1B/1C» ниже | Реальный apply handler отсутствует; describe с test handler/staged asset не равен candidate delivery |
+| Публичный source-read — J05/J21/J23 | Runtime/live `0c513c445a`: 376 bytes / 8 lines; MCP test `d17723e59c` с подставленным browser adapter | Границы/chunks/redaction/empty и фактический candidate/CLI; базовый путь заново не разрабатывать |
+| Writer/discard — J05/J10/J13/J14/J23 | Runtime/live `66027dc9c3`, `1e0da9265a`; `managed-writer-02`, report `7619312306916790ffa2c6d727eb873ebf0656eb03d2d93e4abea09b31f30c6e` | Public configure-композиция и непроверенные случаи |
+| Code Next → Done → новый source-read — J10/J14 | Runtime/live `7b8e19bee0`; `managed-code-next-01`, report `ab50f8ce65cdf3fc4ee8b60f8a92dec01bff329ff979a472548163840bbda682` | Existing code-table без смены схемы; runtime settlement пока в операторе, output mapping `configured_only`, public apply/Execute не доказаны |
+| Scalar/precision/cardinality/engine/names/errors — J06–J09/J12/J20/J24/J25 | Приватные native/typed, 30/30 engine observations, T-пробы; ссылки в discovery | G3 bridge, обязательный остаток G5/G6 и подтверждение через handler; число snippets не означает PASS |
+| Persistence — J15/J23 | Приватные code/declared/usage writer–cold–bytes, dirty-state; см. G7 discovery и исторические SHA ниже | Только фиксированные 6×2; нужны handler 6×4 и CLI |
+| Бизнес и freshness — J03/J04/J11 | Не проверено для 6×4, changed/reordered | Ранние private пробы с неизменным oracle, затем public сценарии C/D |
+| Stop/cancel — J13 | Runtime/unit части lost reply; живого Stop/cancel нет | Конечный цикл ≤60 секунд, owned terminal/cleanup/rerun до фиксации Execute-контракта |
+| Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
+
+**Следующий связный результат:** B — configure existing code-table через public
+API в испытательном runtime с ограниченным injected handler. До B-live
+согласовать JS finish verifier (Done `execution_started=null`, не `false`)
+и публичный результат `output.status=not_refreshed`; `configured_only` относится
+только к mapping evidence. Затем effective source/digest/policy → managed
+write/readback → Code Next/Done → settlement → независимый source-read с cleanup. Последний run
+успешно наблюдён; повторять его без затронувшего изменения не требуется.
+До окончательного Execute/read контракта — ранние private 6×4 и Stop/cancel.
+Затем C code, D declared с Save/cold, E остаток J и F ревью/candidate/CLI.
+Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+Канонические документы читать в основном checkout `javascript`, код —
+в `.worktrees/node-javascript`. В child на момент сверки нет tracked правок,
+есть 20 untracked документов и `__pycache__/`; его tracked checkpoint устарел.
+Эти файлы сохранены, не включены в данную правку и не являются новым bootstrap.
+Решение об их перемещении/удалении отдельно; пользование каноническими docs
+не зависит от уборки child. Приватные leases/профили этой правкой не менялись;
+следующий профиль определять по свежему assignment под lock, не по старой записи.
+
+## Указания пользователя
+
+Перед действием сверять этот блок. Повтор текста из контекста/компакции
+не является новым указанием. Разовые поручения с отметкой «выполнено» не
+переигрывать; постоянные ограничения применять при каждом соответствующем шаге.
+
+| Указание / исходное время UTC | Состояние и подтверждение |
+| --- | --- |
+| Ubuntu (26.09 14:13), всегда headed (26.09 14:23) | Постоянно; отражено в плане и objective основной Goal, окружение допущено |
+| Rebase `javascript` на `loginom`, прочитать Cursor-сессию (28.09 15:22) | Выполнено, не повторять: `3f35c5f232` — предок docs HEAD; результат чтения и внедрения правила ошибки мастера записан ниже в «Фаза 1B/1C»/истории rebase |
+| Случайный клик (27.09 20:24:06) | Единственное сообщение; первоначальный разбор выполнен. Поздние записи о «новом» сообщении исправляет примечание ниже, а не новый browser run |
+| Одна итерация с X11-защитой фокуса (29.09 07:11) | Выполнено: `24745d80bd`, `managed-opening-focus-probe-03` и recovery; это не постоянное назначение |
+| Продолжать общую цель, браузер «как обычно» (29.09 07:47) | Текущее постоянное правило: обычный headed без `--x11-no-focus`; поздний флаг оператора сам не меняет поручение |
+| Доработать план по acceleration review (29.09, текущая задача) | Выполнена правка plan/discovery/card и этой сводки; реализация и запуск другой задачи этим не назначены |
+
+Общие правила: стенд только `http://logi-test-plan.bg.local/app/`, Loginom 7.4.2,
+один owner и fresh profile на новый browser process; память недоступна —
+диагностика, сообщение и остановка. Предложенное в обзоре исключение из правила
+памяти не принято. Эти ограничения сохранять при продолжении существующей Goal;
+её objective/state из этой задачи не изменялись. Новое явное указание пользователя
+может изменить правило; сначала записать его время, область и результат.
+
+### Поправка к повторным сообщениям о клике — 2026-09-29
+
+Связанная задача прочитана через `read_thread`; адресная сверка её оригинальных
+пользовательских сообщений в журнале подтвердила только одно сообщение о клике
+27.09 20:24:06 UTC. До последнего сообщения журнала новых сообщений о клике нет.
+Повторные формулировки в истории ниже не доказывают нового вмешательства;
+история сохраняется без переписывания. Не переносить этот единственный эпизод
+на более поздние runs и не требовать их повтора только по этой причине.
+
+Writer08/source105 адресно переоценён по собственным приватным файлам:
+`persistence-code-writer-08/report.json`, SHA256
+`f8aa9b4655a6e9b9662fbb57f158f0d2f341f9a1481eb174dc4c946cab5b0728`, и
+`source105-code-writer-result-08.json`, SHA256
+`b5cf4c569cc0d172b3808128fbc04c69b0c79fe93e1f9251a9d273cbb3857911`.
+Run 28.09 09:00:57–09:03:23 UTC сохранил S1, но не отправил Save2; отказ —
+`NodeReadinessTimeout` полного output mapping. Evidence содержит source_count=0,
+target_count=2 и owned скрытую SourceDisplayName column. Это пригодное ограниченное
+наблюдение configured-only, а не доказательство полного mapping/успешного G7.
+Недоказанная привязка к «новому клику» снимается. Статус исходного отчёта
+**CLEANUP_UNCONFIRMED сохраняется**; отдельный recovery увидел 0 пакетов,
+завершил logout/browser и не выполнял package mutation. Остальные спорные
+observations перед использованием оценивать адресно по их собственным evidence;
+массово повышать их до PASS или перепроверять весь архив не требуется.
+
+Краткую сводку дальше обновлять на границе возможности/фазы, при решении,
+блокере, unknown effect и остановке. Каждый run сохраняет report+SHA;
+отдельная глава checkpoint после каждого helper/run не обязательна.
+
+Проверка этой документационной правки: `validate.py` — PASS (87 active /
+302 total Markdown), `git diff --check` — PASS. Отдельная проверка подтвердила
+сохранность всех 27 требований/ожидаемых результатов J, фаз 0–6, G1–G7,
+scope v1/расширений, всей прежней истории checkpoint и SHA fixtures по manifest.
+Изменены только четыре канонических Markdown-файла; tracked код child не менялся.
+Runtime tests, браузер, сборка candidate и CLI в этой задаче не запускались.
+
+### Архитектурная перепроверка доработки плана — 2026-09-29
+
+По отдельному запросу пользователя проверены изменения plan/discovery/card,
+регламент и фактические границы runtime на прежнем code SHA `7b8e19bee0`.
+Две независимые адресные проверки: порядок gates и соответствие runtime API.
+Это аудит документации перед продолжением, не ревью готовой реализации фазы 5.
+
+Подтверждённые риски и исправления в плане:
+
+- **P1, finish:** общий `node-apply.mjs:288–300` требует false после Done,
+  managed JS Done возвращает null/commit unverified. До B-live теперь явно
+  требуется JS-specific verifier с settlement, без подмены unknown→false
+  и без ослабления verifier остальных узлов.
+- **P1, public result:** `configured_only` — operator mapping evidence, а не
+  значение public `output.status`. Для Done закреплены not_requested /
+  not_refreshed, отдельно от наблюдений configured targets; модельный JS
+  readback требует schema/types/compact проверки.
+- **P1, подключение B:** текущий registry не описывает частичную поддержку,
+  общий JS validator допускает больше, чем проверено. B использует существующий
+  injection `createActionRuntime` и ограниченный pre-target admission в
+  испытательной среде; продуктовая регистрация ждёт полного handler.
+- **P2, схема:** доказанный writer меняет комментарий. B ограничен этим
+  фиксированным case/settings-preserve; произвольному source не приписывается
+  сохранность materialized schema до G3/Execute.
+- **P2, Stop:** исправлена ссылка на отсутствовавший `node-execution-stop.mjs`;
+  указаны реальная execution procedure, evidence и существующий test.
+- **Recovery:** явно запрещены новый context при живом owner/pending операции,
+  forced termination и освобождение unsettled lease по завершению worker.
+  Fresh-profile диагностика не подтверждает cleanup старой session/document.
+
+Статический просмотр literal imports: 31 JS-модуль `client/lib/javascript-*`,
+обратных импортов в operator нет; существующий SCC через `executor` и managed
+adapter охватывает 14 модулей. Изменение плана его не создаёт/не исправляет.
+Зафиксирована граница operator → runtime и запрет новых обратных зависимостей;
+если выделение receipt helper понадобится, оно идёт адресно с регрессиями.
+JS-модулей длиннее 500 строк в проверенной группе нет. Полный динамический
+dependency graph и работоспособность будущего handler этим не доказаны.
+
+G1–G7/J01–J27, независимый oracle, оба schema mode, Save/cold и две CLI-попытки
+сохранены. Source/direct часть J21 для B отделена от candidate/CLI в F, чтобы
+не создать цикл условий готовности. Адресная повторная проверка исправлений
+не выявила других подтверждённых регрессий этих границ. Проверки документации
+и hashes fixtures повторены; код, ресурсы кампании и статус готовности не менялись.
+
 ## Managed Code Next → Done — headed proof, 2026-09-29
 
 Code commit `7b8e19bee0` в `origin/node-javascript` добавил

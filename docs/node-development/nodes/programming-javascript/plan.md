@@ -2,12 +2,15 @@
 
 [Карточка](README.md) · [исследование](research.md) · [e2e](e2e-coverage.md) ·
 [fixtures/oracle](fixtures/README.md) · [рекомендации ревью](review-recommendations.md) ·
-[проверка рекомендаций](review-verification.md) · [регламент](../../README.md) · [реестр](../../registry.json).
+[проверка рекомендаций](review-verification.md) · [перепроверка ускорения](acceleration-review.md) ·
+[регламент](../../README.md) · [реестр](../../registry.json).
 
-Дата: 2026-09-26. Подготовительный статус: **discovery_required**.
+Дата: 2026-09-26; порядок продолжения обновлён 2026-09-29 по acceleration review.
+Подготовительный статус: **discovery_required**; часть runtime уже реализована.
 Component ID: `component.programming.JavaScript`.
-Предлагаемый runtime type: `programming.javascript`; proposed mode: `script`.
-Они **не существуют в текущем публичном API**. Исторического номера нет.
+Runtime type: `programming.javascript`; mode: `script`. В ветке `node-javascript`
+они уже описаны в схемах, но публичный apply handler ещё не зарегистрирован.
+Исторического номера нет.
 Исследованная база `loginom`: `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Живой стенд по назначению пользователя:
 **[http://logi-test-plan.bg.local/app/](http://logi-test-plan.bg.local/app/)**.
@@ -25,6 +28,13 @@ Component ID: `component.programming.JavaScript`.
 общий `client/lib/browser-launch.mjs`: `headless: false`, maximized,
 `--force-device-scale-factor=1`, viewport `null`. Не заменять видимый запуск
 headless или виртуальным экраном без отдельного назначения пользователя.
+Режим фокуса — **обычный headed-запуск без `--x11-no-focus`**: последнее
+указание основной задачи от 2026-09-29 07:47 UTC — «запуская браузер как обычно».
+Предыдущее указание X11 относилось к одной итерации и выполнено; последующее
+использование флага оператором не является новым пользовательским назначением.
+Исторические no-focus evidence сохраняются со своим режимом. Возвращать этот
+opt-in можно по новому явному назначению с зафиксированной инструкцией, а не по
+отсутствующему `headed-browser-focus-x11.md`.
 
 Первоначальный подплан подготовлен в режиме plan-authoring. Пользователь затем
 назначил исполнение; актуальная фаза и допуск памяти зафиксированы в
@@ -77,13 +87,246 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
 Ограниченный scope не является песочницей для произвольного JS: не обещать
 доказательство отсутствия побочных эффектов простым поиском слов в исходнике.
 
+## Порядок продолжения после acceleration review
+
+Срез этой правки: docs `13a02e8be2d698d5fbc7f19d146fa82d55f53e48`, code
+`7b8e19bee073cb596607688173234e57052e27b1`. Это ревизии чтения, не новая
+продуктовая база. Решения ниже применяют разделы 6–9 и 13
+[обзора](acceleration-review.md); обязательные G1–G7, J01–J27 и фазы 0–6
+сохраняются. Буквы A–F задают порядок связанных результатов внутри этих фаз,
+а не дополнительные gates. Правка документов не запускает исполнение.
+
+### A. Однократная актуализация и правила возобновления — P0
+
+- Читать сначала текущую сводку и «Указания пользователя» в
+  [checkpoint](checkpoint.md), затем нужный gate в [discovery](discovery.md)
+  и строки J-матрицы ниже. Историю открывать адресно по указанному evidence.
+  Перед новой операцией сверить реальные процессы, browser context, pending
+  operation/receipts и ownership/leases. Живую попытку наблюдать по её handle;
+  timeout наблюдения не разрешает новый запуск или смену профиля.
+  Выполненные разовые указания не повторять после компакции; новый запрос
+  отличать по времени/содержанию, а не по повторному появлению в контексте.
+- Canonical docs/checkpoint находятся в основном checkout ветки `javascript`;
+  код — в `.worktrees/node-javascript`. Проверять оба HEAD и status. Старый
+  checkpoint и untracked handoff/design файлы child не заменяют каноническую
+  сводку и не включаются в code commit через `git add .`. Их перенос/удаление
+  не является предпосылкой разработки; до отдельного решения сохранять на месте.
+- Таблица discovery разделяет решение 0B и проверку реализации. Публичный
+  source-read, managed writer/Code Next/Done, типовая оболочка, knowledge и
+  module preflight уже существуют. Подключать их по фактическим exports;
+  переизобретать source-read или валидатор не требуется. Полный JS apply ещё
+  отсутствует; возврат клика Next/Done не подтверждает переход/commit.
+- В 0B остаются точные вопросы G1 identity/assistant, G3 source→physical,
+  G5 обязательных API/J24 и G6 Stop/cancel. G2 принимает консервативную
+  трактовку Next/Done как потенциально эффектных действий; доказывать отсутствие
+  скрытого исполнения не требуется. Решения G4/G7 об осуществимости приняты
+  в пределах имеющихся probes, а public/candidate/CLI проверки остаются в фазах
+  1–6. Статус `discovery_required` не обнуляет выполненную реализацию.
+- Допуск Ubuntu/worktree/памяти из 0A не проходить заново без затрагивающей
+  перемены окружения или фактического отказа. При недоступной памяти действует
+  пользовательское правило остановки; исключение из обзора P2.4 **не принято**.
+  После восстановления сверить состояние и capture, затем продолжить с checkpoint.
+
+Выход A: актуальные сводки, уровни J01–J27 и следующий результат B записаны.
+Это документационное условие в данной правке выполнено; новых live PASS нет.
+
+### B. Публичный configure существующего узла — ближайший результат
+
+В фазах 1–3 связать действующие `validateJavascriptParameters`,
+`inspectJavascriptModulePolicy`, source admission и managed adapter/writer
+из `client/lib/javascript-*.mjs` с owned lifecycle. Опорные точки на code SHA
+выше: `javascript-managed-code-next.mjs:109`
+(`dispatchManagedJavascriptCodeNext`) и `javascript-managed-done.mjs:99`
+(`dispatchManagedJavascriptDone`); actual public source-read уже зарегистрирован
+в `node-api.mjs` и `executor.mjs`. Перед изменением прочитать эти реализации
+и соответствующие `client/test/javascript-*.test.mjs`.
+
+Один связный результат: existing code-table с сохранением settings, expected
+digest и effective module policy проходит write → full readback → Code Next →
+Done → подтверждение своего графа → независимый публичный source-read.
+Проверенный исходный case меняет только комментарий (`javascript-live.mjs:1161`).
+«Без смены схемы» — граница этого фиксированного operator-only source, а не
+гарантия для произвольного кода. Схему нельзя доказывать парсингом source.
+
+**До B-live устранить две конкретные несовместимости композиции:**
+
+1. `node-apply.mjs:288–300` требует `execution_started=false` после Done,
+   а `javascript-managed-done.mjs:67` возвращает `null` и
+   `wizard_commit_verified=false`. Ожидание графа и новый source-read должны
+   подтвердить commit, но не превращают неизвестные внутренние эффекты Verify
+   в доказанное отсутствие исполнения. Нужен узкий JS-specific finish verifier:
+   различить подтверждённую конфигурацию, наблюдённую границу execution и
+   отсутствие **явного** Execute от неизвестных внутренних эффектов. Сохранить
+   эту неопределённость в evidence/диагностике; не приводить `null` к `false`
+   ради общего guard. Старый verifier остальных типов остаётся строгим.
+   При незавершённом переходе или неопределённом собственном действии операция
+   остаётся unsettled; успешное чтение source само это не отменяет.
+2. Публичный Done использует `configuration.status=applied`,
+   `execution.status=not_requested`, `output.status=not_refreshed` (без нового
+   execution ID и свежих ячеек). `not_requested` означает, что явный Execute
+   не запрашивался, а не доказанное отсутствие внутренних эффектов.
+   `configured_only` — отдельное operator mapping evidence с
+   `source_identity_verified=false`; это не `output.status` и не полное
+   сопоставление выходных полей. Если оно или JS readback выводится модели,
+   согласованно расширить `node-result-schema.mjs`, `node-contracts.d.ts`
+   и compact projection в `user-results.mjs`,
+   проверить локальную full/user-v1 projection и относящуюся к B source/direct
+   часть J21 до B-live; candidate/CLI часть остаётся в F. Нельзя добавлять сырой operator-объект
+   в ответ в обход публичной схемы. Полный source mapping требует G3 и Execute.
+
+Маршрут B — публичный dispatcher в изолированном acceptance runtime:
+`createActionRuntime` (`executor.mjs:1358–1360`) уже принимает
+`nodeApplyHandlers`/`nodeApplyDriverFactory`. При `allowCandidate:true` только
+в испытательной среде подключить реальный ограниченный JS handler поверх
+штатного набора/drivers, сохранив `imports.text`, нужный
+для доступности node tools; браузер, gate и журнал остаются теми же.
+Его pure admission до target/graph/editor допускает только existing,
+`finish=done`, `inputs=[]`, `mappings=[]`, `read.ports=[]`, замену source с
+expected digest; прочие parameters, включая смену режима/columns, запрещены.
+До редакторной мутации наблюдением подтвердить текущий code-режим и сохранение
+settings. Live использует закреплённый
+source+комментарий и исходную code-схему; остальное отклоняется до мутации.
+`validateJavascriptParameters` переиспользовать, но он сам по себе допускает
+new/declared/execute и не заменяет это ограничение trial. В продуктовом
+`createCandidateNodeSupport` JS до готовности полного handler не регистрировать:
+текущая карточка не описывает частичную поддержку. B даёт public API-path
+evidence в испытательной среде, не installed candidate или CLI-приёмку.
+
+Перенести из private operator только нужные ожидания/предикаты в `client/lib`;
+направление зависимости — operator → runtime. Runtime не импортирует
+`tools/loginom-acceptance` и его fixtures/oracle. Каждый эффект сохраняет свой
+ACK/receipt и остаток исходного deadline; неизвестный ответ не повторяется.
+Текущий цикл imports через `executor`/managed adapter из-за `withBrowserReceipt`
+не расширять новыми обратными зависимостями. При необходимом выделении receipt
+helper — отдельная адресная правка с прежними receipt/gate tests, без переноса
+всего executor или operator. Это сохраняет проверенную композицию ценой
+отложенного общего рефакторинга; независимый oracle по-прежнему не использует
+продуктовый verifier для доказательства правильности результата.
+
+Проверка B: локальные wrong owner/focus/digest, lost reply/no duplicate,
+отказ неподдержанного trial до target, точные Done/result schemas и regression
+остальных типов, затем headed case с точным source/settings, неизменными
+input mapping, настроенными output targets/связями графа и cleanup 3/3.
+Неподтверждённые source→physical связи не выдавать за сохранённое полное mapping.
+Existing configure остаётся внутренней вехой полного v1.
+
+### Ранние различающие пробы — P1, до фиксации Execute/read контракта
+
+1. **Бизнес 6×4 (J02–J04/J11/J16/J20).** На существующем операторе провести
+   минимально достаточные 1–3 сгруппированных прогона: оба schema mode на
+   `sales.csv`, затем changed/reordered с заранее закреплённым oracle.
+   Сначала проверить input 6×5, краевые пробелы Customer и реальные mappings
+   переставленного импорта; потом все 6×4 значения, типы, порядок и freshness.
+   Брать задания/ожидания из [fixtures README](fixtures/README.md) и hashes
+   manifest. Эталонный JS остаётся operator-only, без передачи модели/knowledge.
+   Это ранняя проверка осуществимости и oracle, не public/CLI приёмка и не
+   замена C/D. Диагностический результат 6×2 недостаточен. Если найден дефект
+   oracle, остановить сравнение и оформить отдельное решение до модельных
+   попыток; expected под наблюдённый output не менять.
+2. **Stop/cancel (G6/J13).** До долгого исполнения через handler провести
+   отдельную пробу конечного цикла с пределом не более 60 секунд и собственным
+   native execution. Сначала проверить применимость общего
+   `createNodeExecutionProcedure(...).stop()` из `node-execution-procedure.mjs`
+   и native proofs `node-execution-evidence.mjs`; образец проверки —
+   `client/test/node-execution-stop.test.mjs`. Затем наблюдать Stop, terminal,
+   cleanup и успешный короткий rerun того же узла. Local cancel проверить
+   отдельно: он не доказывает server stop. Lost reply не допускает повтор Stop
+   или Execute без inspect. Бесконечный цикл и стресс общего стенда запрещены.
+   Результат определяет контракт Stop/deadline и правило ограниченных циклов
+   в knowledge; неизвестный Stop блокирует соответствующий путь и приёмку.
+
+Безопасность проб проверяется локально до live. Новая неопределённость требует
+связи с обязательным требованием, различающего наблюдения и условия завершения
+в существующем checkpoint; отдельный исследовательский трекер не нужен.
+
+### C–F. Полные сценарии и неизменная приёмка
+
+- **C — code:** создание нового JS-узла и входа, доказанный G3 bridge,
+  материализация, отдельный Execute, полный public read 6×4; затем Save и
+  независимый cold reopen/Execute с точным source/settings/mapping (фазы 2–4).
+- **D — declared:** тот же lifecycle и результат, отдельно заданные columns,
+  порядок/типы/data_kind/usage с readback `DefaultUsageType`; собственный
+  Save/cold (фазы 2–4). Успех code не доказывает declared.
+- **E — остаток J01–J27:** existing/schema edits, changed/reordered freshness,
+  типы/NULL/точность/0–1–N, limits/redaction/chunks, диагностика, recovery,
+  context, module policy, budgets и соседние узлы. Переиспользовать evidence
+  только при совпадающих пути, scope и незатронутом контракте; обязательную
+  защиту очередного live-шага нельзя откладывать до E.
+- **F — фазы 5–6:** один проход ревью и исправления, immutable standalone
+  candidate, J01/J21 delivery и J27, затем две независимые последовательные
+  CLI-попытки code/declared на Sol low по 30 минут. Обе — только
+  `http://logi-test-plan.bg.local/app/`. Source/direct J01/J21 нужны до ревью,
+  candidate-часть — после сборки; J18 не является gate разработки.
+
+### Итерации, диагностика и автоматизация — P1/P2
+
+Единица работы — законченная возможность или снятая неопределённость. В начале
+итерации кратко назвать результат, связанные изменения, локальные tests/live-case
+и затронутые evidence; не требовать полного стендового цикла после каждого helper.
+После второго сходного FAIL пересмотреть гипотезу; повтор допустим лишь после
+изменения проверяемого фактора. Unknown effect сначала разрешается inspect/recovery.
+
+При дефекте ожидания проверить все ожидания того же класса **на пути сценария**
+(например, disabled `x-mask` в editor/port/mapping), вынести совпадающий predicate
+в runtime и покрыть одной адресной регрессией с вариантами состояний. Не игнорировать
+все masks и не продлевать deadline. В имеющийся report/journal писать stage,
+elapsed/remaining, owner, waiting/refused/ready, blocker и переходы; измерять
+browser-call latency отдельно. Ограниченные samples вместо DOM/screenshot на poll;
+причину отказа мастера читать сразу по lifecycle, не ждать остаток timeout.
+
+`CLEANUP_UNCONFIRMED` разбирать как собственный класс дефектов. Сначала установить
+состояние исходного процесса/context и native execution. Пока владелец жив или
+операция pending, пользоваться его status/inspect/recovery; второй browser/context
+и новый login того же аккаунта не запускать. Unsettled lease не освобождать
+по одному завершению процесса; не форсировать завершение владельца ради recovery.
+Лишь после подтверждённого отсутствия живого
+browser/context и записи передачи ownership под `registry.lock` тонкая обёртка
+может запустить отдельный read-only recovery на свежем профиле: только точный
+account/package identity, без повтора неизвестного жеста, с отдельным report.
+Logout/browser close выполнять только после подтверждённого безопасного
+состояния своей recovery-сессии; отсутствие browser не доказывает завершения
+серверного исполнения или закрытия пакета. При неопределённой передаче — отказ,
+без автоматической второй попытки восстановления.
+Если наблюдается открытый пакет, нужны применимый безопасный owned cleanup или
+явная эскалация по lifecycle; не называть такую мутацию read-only и не закрывать
+пакет по одному имени. Recovery не переписывает статус исходного прогона.
+`package-cleanup.mjs` требует receipts/session/document текущего контекста;
+его нельзя вызвать из нового профиля как доказательство cleanup старой сессии.
+
+После первого полного public сценария допустимы две небольшие команды поверх
+существующих инструментов: (1) выбранные tests → validator → pins → явный список
+файлов commit/push; (2) fresh profile/lease → headed run → audit → recovery →
+краткая сводка. **Это планируемые обёртки, готовых команд пока нет**. Они прекращают
+работу при отказе шага, не повторяют мутации, не меняют семантику доказательств
+и не добавляют новую систему автоматизации. До использования закрепить точные
+invocations и проверить fault path. Автоматизация не блокирует B–D.
+
+Полный client suite нужен при изменении общих контрактов/editor/journal перед
+handoff связанной пачки; без нового изменения его не повторять после docs.
+Независимые cold reopen, code/declared CLI и recovery остаются отдельными,
+каждый browser process получает свежий профиль. Batch допустим только с
+проверенными graph/input identities каждого case; ресурсы одного аккаунта
+не параллелить. Счётчики перекрывающихся tests не складывать в уникальное покрытие.
+
+Checkpoint обновлять на границе возможности/фазы, при решении, блокере,
+неизвестном эффекте и остановке; факты отдельных runs хранятся в report+SHA.
+В текущей сводке — уровень, evidence и остаток, затем неизменённая история.
+Эффект оценивать по числу запросов модели на связанную итерацию, времени
+подготовки/ожидания/проверки, повторам без новых данных и причинам cleanup.
+Baseline раздела 12 обзора — ориентир, не обещание процента ускорения; новая
+телеметрия и полный повторный аудит архива не требуются.
+
 ## Фаза 0. Документация, окружение и live discovery
 
-Владелец — будущий разработчик single-задачи. Перед кодом прочитать источники
+Владелец — назначенный разработчик single-задачи. Перед кодом прочитать источники
 ниже; файлы с точными номерами строк и хешами перечислены в
 [research](research.md), [e2e](e2e-coverage.md), [sources.json](sources.json).
 
 ### 0A. Допуск к работе
+
+Ниже исходный bootstrap нового worktree. Для уже допущенной кампании
+`javascript-20260926-ubuntu` пользоваться её receipts из checkpoint и проверять
+только изменившиеся предпосылки; не создавать повторную кампанию/worktree/Peer.
 
 1. Сверить HEAD/base/незавершённые изменения. Исходный пользовательский
    [справочник](references/js_node_loginom_system_prompt.md) хранится в Git;
@@ -150,13 +393,19 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
    managed Host добавляет его штатно. Исторические `test-2`/`test-4` не являются
    текущим назначением аккаунта. Нужен подтверждённый владелец ресурсов;
    имя `user` само по себе не доказывает ни занятость, ни изоляцию.
-   **Отдельная предпосылка CLI:** `connection-service.ts:61–74,381–383`
-   при запуске мигрирует сохранённый exact URL этого стенда на текущий
-   `Product.connection.url` (`https://app.loginom.ai`). Исторический default
-   нельзя путать с текущим. До CLI-приёмки доказать сохранение явно назначенного
-   origin/path между setup/status и новым процессом. Если кандидат мигрирует
-   профиль, это блокер подключения: отдельно исправить различение legacy default
-   и явного назначения тестового URL в owning Host с адресной regression-проверкой.
+   **Отдельная предпосылка CLI — J27:** исходная база мигрировала exact URL
+   стенда на `Product.connection.url` (`https://app.loginom.ai`). В текущем
+   `node-javascript` уже есть fix `9d75933fac`: `urlSource: explicit` сохраняет
+   явно заданный URL, прежние записи без provenance проходят legacy migration.
+   Для текущего candidate использовать это решение. Альтернативный
+   `1b8d100392` в `origin/preserve-loginom-url` убирает миграцию полностью;
+   автоматически складывать оба исправления или брать тесты одного с кодом
+   другого нельзя. До сборки сверить ancestry/diff итогового source, записать
+   один выбранный контракт и выполнить owning Host regression/typecheck.
+   Если база получила альтернативное решение, сначала явно обновить это решение
+   и его тесты в плане. На собранном candidate доказать сохранение exact
+   origin/path между setup/status и новым процессом. Миграция назначенного URL
+   остаётся блокером подключения даже после успешных source tests.
    Не обходить проблему чужим адресом, скрытым URL alias или ослаблением проверки
    origin; до её решения direct source probes не засчитываются как CLI-приёмка.
 6. Для приёмки понадобится самостоятельный CLI candidate и собственный OAuth
@@ -165,9 +414,10 @@ Fetch/FS, внешние ESM/CJS/JSON, builtIn/Calc, derived/locked components,
 
 **Проверка выхода 0A:** заполненное assignment, действительные receipts
 изолированных ресурсов/памяти, explicit base/source/pins, подтверждённый build
-стенда 7.4.2 и записанная ОС сервера. Здесь уже
-обнаруженные пробелы — отсутствие CLI в проверенных путях, кампании/локальной
-регистрации, mismatch shell Node/Bun; это устранимые задачи подготовки.
+стенда 7.4.2 и записанная ОС сервера. Исторические пробелы CLI, кампании,
+регистрации и shell Node/Bun не считать текущими без новой проверки: Ubuntu
+допуск и source toolchain уже подтверждены в checkpoint. Immutable candidate
+и его OAuth/target persistence проверяются отдельно в фазах 5–6.
 Неизвестный аккаунт/доступ — уточнить у пользователя только если его нельзя
 надёжно установить из разрешённого контекста.
 
@@ -180,7 +430,7 @@ observations. Источники: Help JS/API/output-tables/ports; e2e `js_helpe
 
 Инструмент исследования — операторский
 `packages/loginom-runtime/tools/loginom-acceptance/javascript-live.mjs`
-(**TO_IMPLEMENT**) по архитектуре соседних `*-live.mjs`: одна принадлежащая
+уже существует в `node-javascript`; переиспользовать его: одна принадлежащая
 задаче runtime/browser session, наблюдаемые UI-жесты, bounded snippets,
 очищенные evidence и обязательный cleanup. Общий `dock_ui_action` запрещает
 редакторы кода, JS handler ещё отсутствует. Не снимать этот запрет ради discovery.
@@ -188,7 +438,11 @@ observations. Источники: Help JS/API/output-tables/ports; e2e `js_helpe
 ресурсы из 0A; не копировать raw dumps и зашитый build как доказательство версии.
 Пробы не запускают сторонний чат-помощник или ещё одну LLM.
 
-| Gate | Что установить | Условие закрытия |
+Таблица ниже задаёт полное требование gate, включая реализацию. Для выхода
+именно из 0B применять отдельные колонки решения и остатка в [discovery](discovery.md);
+public handler и CLI не являются условиями завершения исследования.
+
+| Gate | Что установить | Условие окончательного закрытия в фазах 1–4 |
 | --- | --- | --- |
 | G1 identity/editor | Component/fulltype/icon/group, реальный wizard/editor, дополнительные settings, порядок страниц | Наблюдаемые owner paths и полный readback принадлежащего узла; исторические selectors сверены |
 | G2 execution points | Выполняют ли код Next, Done, Preview/Test, Execute; когда доступны generated columns | Явная диаграмма переходов/эффектов для обоих режимов; нет скрытого повторного исполнения |
@@ -310,7 +564,7 @@ source hash каждого snippet, build/ОС, observed/not_checked, резул
 с помощником не взаимодействовать. В G3 отдельно проверить допустимость и
 нормализацию кириллических/недопустимых Name, возвращать реальные technical names.
 
-**Выход 0B:** `discovery.md` (создать при выполнении) с наблюдениями, версией,
+**Выход 0B:** актуальный [discovery.md](discovery.md) с наблюдениями, версией,
 подтверждённым порядком действий и ограничениями. Для G1–G7 здесь доказывается
 осуществимость на прямых probes и фиксируются решения; готовый handler на этом
 этапе не требуется. После этого статус плана — `ready_for_development`.
@@ -326,7 +580,8 @@ checkpoint с owner/next trigger. Никаких вымышленных controls
 
 ### 1A. Предлагаемый публичный контракт
 
-После discovery-решений G1–G7 закрепить его в plan/discovery до реализации:
+Контракт частично реализован (`168d4f88d0`, см. checkpoint). Сопоставлять
+существующие schemas/preflight с решениями G1–G7 и дополнять остаток:
 
 - Тип `programming.javascript`, mode `script`, input/output 0. Не добавлять
   возможность выбирать произвольный browser script или RPC.
@@ -359,9 +614,10 @@ UTF-8 bytes, число строк, равенство принятому зап
 32 KiB — предел входа, а не обещание размера JSON-ответа. Уменьшение до 16 KiB
 не устраняет worst-case экранирование; бюджет доставки проверяется отдельно.
 
-Для чтения existing-кода до исполнения запланировать явно новую source-ветку
-`dock_node_read` с `kind: "source"` (**TO_IMPLEMENT**); прежний output-read без
-этого discriminator сохраняет контракт. Source-запрос содержит operation ID,
+Для чтения existing-кода до исполнения использовать уже подключённую source-ветку
+`dock_node_read` с `kind: "source"` (`0c513c445a`, headed proof в checkpoint);
+прежний output-read без этого discriminator сохраняет контракт.
+Source-запрос содержит operation ID,
 prepared document/workflow и existing JS node ref, но не source/settings,
 output options или разрешение Execute. Completed execution/source_operation_id
 не требуется: существующий output-read заново выполняет узел и здесь непригоден.
@@ -386,13 +642,14 @@ known-secrets контекстом: проверка отдельных chunks �
 
 Поддержанный module policy v1: статический импорт `builtIn/Data`.
 Явные static imports/re-exports других модулей, direct `require(...)` и
-`import(...)` отклонять до мутации. В фазе 1A реализовать и проверить
-синтаксический preflight, различающий комментарии, литералы, templates и
-декодированные module specifiers; regex-поиск слов не является реализацией.
+`import(...)` отклонять до мутации. В фазе 1A подключить уже реализованный
+и локально проверенный синтаксический preflight, различающий комментарии,
+литералы, templates и декодированные module specifiers; regex-поиск слов
+не является реализацией.
 Если анализ не может классифицировать исходник, вернуть отдельный preflight
-refusal, не угадывать разрешённость. Это новое ограничение контракта, не
-существующая возможность runtime и не доказательство отсутствия косвенных
-побочных эффектов JS. Нативные parse/runtime diagnostics проверить отдельно
+refusal, не угадывать разрешённость. Это ограничение preflight, а не
+доказательство отсутствия косвенных побочных эффектов JS.
+Нативные parse/runtime diagnostics проверить отдельно
 операторскими probes, включая исходник, проходящий preflight, но не ChakraCore.
 Preflight относится к effective source: переданному новому тексту либо полному
 наблюдённому тексту existing-узла, включая `{}`/omitted source. Для existing
@@ -403,7 +660,7 @@ Preflight относится к effective source: переданному нов�
 не освобождается от проверки preserved source. При расхождении — отказ/явное
 состояние уже выполненных эффектов, а не исполнение неизвестной новой редакции.
 
-Это предварительная форма, не пример существующего callable API. Если discovery
+Оболочка и source-read существуют; весь apply lifecycle ещё не callable. Если discovery
 покажет несовместимость, исправить спецификацию до объявления ready; не оставлять
 исполнителю выбор двух несовместимых контрактов. Общие файлы закрепить за одним
 owner этой single-задачи; согласовать перенос при наличии другой кампании.
@@ -422,8 +679,11 @@ SHA исходного файла и ОС сервера, на которой в
 наблюдённом build — отказ до мутации, согласованный с graph adapter; знания
 7.4.2 не выдавать за проверенные для другой версии.
 
-Создать `client/lib/javascript-knowledge.mjs`: версия, `validated_for`,
-короткие правила и примеры. `.mjs` входит в вычисление clientRevision;
+Доработать существующий `client/lib/javascript-knowledge.mjs`: версия,
+`validated_for`, короткие правила и примеры. Asset и source-only describe уже
+проверены (`1d2c0590ba`, `168d4f88d0`); выдача JS knowledge сейчас требует
+установленного handler, поэтому delivery целого candidate остаётся открытой.
+`.mjs` входит в вычисление clientRevision;
 проверить также staged bundle/resource manifest и мутационный тест pin.
 5–7 критичных правил поместить в `limitations` JS-карточки, доступные уже
 через `dock_prepare`/compactKnowledgeBundle: область 7.4.2/v1, static Data,
@@ -495,7 +755,7 @@ graph/editor. Запрет generic browser JS остаётся действую�
 `calculator-readback.mjs`; компактный handler: `reform-node.mjs:25–46`.
 Копировать принципы ownership/полного чтения, не selectors калькулятора.
 
-G4 сначала сравнивает `keyboard.type`, `insertText` и, если нужен, native paste
+Исходная проба G4 сравнивала `keyboard.type`, `insertText` и, если нужен, native paste
 под host clipboard lease на фактическом редакторе. CodeMirror 5 stand-in
 показал изменения autoindent/electric chars даже у части insertText-вводов;
 это не доказательство настроек Loginom. Не выбирать способ только по названию API
@@ -512,9 +772,13 @@ editor options не менялись. Это частичное доказате
 execution и остальные сценарии остаются обязательными. Подробности и hashes —
 [checkpoint](checkpoint.md), private evidence `g1-operator-16/report.json`.
 
-Создать JS-specific modules (предлагаемые имена `javascript-parameters.mjs`,
-`javascript-context.mjs`, `javascript-node.mjs`, `javascript-readback.mjs`)
-и узкий private intent замены текста. До/после жеста проверить тот же
+Переиспользовать `javascript-parameters.mjs`, managed source adapter/write,
+Code Next/Done; добавить недостающую композицию handler/context/readback
+по результату B. Имена `javascript-context.mjs`, `javascript-node.mjs`,
+`javascript-readback.mjs` остаются предложением, не требованием создать дубли.
+Узкий managed writer уже реализован (`66027dc9c3`) и проверен headed вместе с
+discard (`1e0da9265a`); повторить только затронутые и непроверенные границы.
+До/после жеста проверить тот же
 document/workflow/node/editor, полный старый текст и фокус. Чтение видимых pre
 не является доказательством полного документа. Не применять setValue,
 модельный page.evaluate, eval/Function, прямой RPC или редактирование XML пакета
@@ -704,6 +968,7 @@ oracle и candidate зафиксированы; собственный OAuth/pro
 локальная single campaign не создаёт второй слот.
 
 Две независимые последовательные попытки — code и declared schema — получают
+назначенный `http://logi-test-plan.bg.local/app/` как единственную цель и
 только бизнес-задачу/входы/уникальный save path. Условия model workspace и
 вариант задания описаны в [fixtures README](fixtures/README.md).
 Модель сама генерирует код и собирает сценарий; подача готового JS/графа/
@@ -733,38 +998,44 @@ push, релиз или обновление установленного кли
 
 ## Матрица требований → проверки → результата → доказательства
 
-Все строки ниже пока **not_checked**, кроме статического исследования и
-baseline 24/24, указанных в research. Идентификаторы пригодны для отчёта.
+Срез 2026-09-29 по code `7b8e19bee0` и каноническому checkpoint. Уровни:
+**не проверено**, **приватная проба**, **runtime** (source/unit либо live —
+уточнено в строке), **публичный handler**, **candidate**, **CLI**. Уровень
+показывает путь доказательства, а не процент или принятие всей строки.
+Публичный source-read отмечен отдельно: он не доказывает apply handler.
+Частичные proofs сохраняются; обязательные непроверенные части остаются открытыми.
+SHA/отчёты и пределы — в [текущей сводке checkpoint](checkpoint.md#текущее-состояние)
+и связанных с ней исторических записях. В этой правке tests/live не повторялись.
 
-| ID / требование | Проверка | Ожидаемый результат | Evidence |
-| --- | --- | --- | --- |
-| J01 knowledge | Actual describe/prepare в candidate | Версия/hash, validated_for=7.4.2 и Data API доступны модели; нет ложного editor context; при ином build — отказ | Очищённый tool response + knowledge manifest |
-| J02 input/schema | Imported sales, technical names/types | 6×5, пробелы и порядок сохранены до JS | Input receipt + hash |
-| J03 code output | Sales task, code mode | expected.json 6×4 exact | Native execution + полный typed output |
-| J04 declared output | Те же данные, declared mode | Тот же бизнес-результат, другое проверенное setting | Configuration + typed output |
-| J05 source | Empty/Unicode/LF/URL/long/cap+1 | Полное равенство в bound, сверх bound отказ до записи | Source digests + editor receipt |
-| J06 null/types | Нативные typed-cases | null/empty/0/false различимы; Date/real по заданному правилу | Typed values/native bytes |
-| J07 safe integer | Decimal-string/native inputs | Exact safe-range; вне него нет ложной гарантии | Input/output precision evidence |
-| J08 empty/cardinality | Empty и 0/1/N rows | Полная схема и верное число/порядок | row_count + complete read |
-| J09 schema edits | declared↔code, manual required fields | Нет silent reset; допустимое изменение или явный отказ | Before/after mapping |
-| J10 same node | Изменить исходник, сохранить другие свойства | Один узел, точный новый код, нет дублей | Node identity + configuration |
-| J11 freshness | Changed/reordered source | 2700/2850 в changed; reordered равен baseline | Новый execution + all-cell oracle |
-| J12 validation | Invalid code/parameter/unknown field | Раздельные ошибки, нет false success | Owned diagnostic + cleanup |
-| J13 recovery | Lost reply/same-ID/cancel/stop | Нет повторного неизвестного эффекта | Журнал фаз/operation/native execution |
-| J14 Done/Close | Configure и discard | Нет ложного fresh output; предыдущие настройки сохранены | Config/dirty-state receipts |
-| J15 persistence | Save/new open/execute | Последний source/options/schema и те же результаты | Saved artifact + cold audit |
-| J16 oracle integrity | Преднамеренные подмены | Каждая подмена отклоняется | Oracle negative report |
-| J17 UI regression | Общий deny и соседний calculator | Generic code запрещён, прежние узлы работают | Адресные source tests |
-| J18 autonomy | Две Sol low попытки | Без технических подсказок, полный заявленный scope | Sessions/events/completion |
-| J19 context | Изменённые поля/старый код, label/comment с текстом инструкции | Используется текущее наблюдение; содержимое данных не меняет задачу | Context/source identities + tool evidence |
-| J20 engine profile | Business/API primitives и все v1 knowledge examples на 7.4.2 | Нужные возможности подтверждены; дополнительные features явно not_checked | Build/ОС, snippet hashes, профиль |
-| J21 response budgets | Prepare/describe (включая multi-type), apply/output/source chunks с worst-case source | Соблюдены оба бюджета; нет backend truncation, readback summary или потери полного результата | Source/direct проверка до ревью, candidate/CLI delivery после сборки |
-| J22 assistant isolation | Наблюдение мастера и действия своего handler | Встроенный помощник не вызывается; отсутствие отмечено наблюдением | UI profile + журнал действий |
-| J23 editor fidelity | Вложенные блоки/tabs/пробелы/Unicode, saved Code | Совпадает декодированный canonical source и cold readback | Source/artifact hashes + live receipts |
-| J24 column names | Кириллица/недопустимые Name в code mode | Фактические имена/ошибки установлены без догадок | Native schema + knowledge rule |
-| J25 diagnostics | Preflight refusal, native parse error и sync throw | Доставлены наблюдённые класс/текст/позиция либо явное отсутствие, digest и owner | Очищённые diagnostics + delivery |
-| J26 import policy | Data import, явные unsupported declarations/calls и похожий текст в comments/strings/templates | Preflight различает синтаксис, неподдержанное отклонено до мутации; не заявлена sandbox-гарантия | Pure parser tests + журнал без editor effects |
-| J27 target persistence | Exact назначенный URL в новом CLI profile и после restart | Origin/path остаются назначенными; legacy migration не уводит приёмку на другой сервер | Host regression + actual CLI status; gate перед приёмкой |
+| ID / требование | Проверка | Ожидаемый результат | Evidence | Уровень и остаток |
+| --- | --- | --- | --- | --- |
+| J01 knowledge | Actual describe/prepare в candidate | Версия/hash, validated_for=7.4.2 и Data API доступны модели; нет ложного editor context; при ином build — отказ | Очищённый tool response + knowledge manifest | runtime/source: `168d4f88d0`, `1d2c0590ba`; test handler + staged asset. Actual candidate/CLI delivery открыта |
+| J02 input/schema | Imported sales, technical names/types | 6×5, пробелы и порядок сохранены до JS | Input receipt + hash | приватная проба: operator17, полный typed input 6×5; новый business/public input ещё проверить |
+| J03 code output | Sales task, code mode | expected.json 6×4 exact | Native execution + полный typed output | не проверено: бизнес 6×4; сначала ранняя private проба, затем public code и CLI |
+| J04 declared output | Те же данные, declared mode | Тот же бизнес-результат, другое проверенное setting | Configuration + typed output | не проверено: бизнес 6×4; declared 6×2 не заменяет эту строку |
+| J05 source | Empty/Unicode/LF/URL/long/cap+1 | Полное равенство в bound, сверх bound отказ до записи | Source digests + editor receipt | приватная проба operator16 (граница); runtime/live `0c513c445a`, `1e0da9265a`; остаток limits/chunks/empty через handler |
+| J06 null/types | Нативные typed-cases | null/empty/0/false различимы; Date/real по заданному правилу | Typed values/native bytes | приватные native scalar/Date probes; полный набор через handler открыт |
+| J07 safe integer | Decimal-string/native inputs | Exact safe-range; вне него нет ложной гарантии | Input/output precision evidence | приватные safe/unsafe int64 identity и coercion; handler/precision delivery открыты |
+| J08 empty/cardinality | Empty и 0/1/N rows | Полная схема и верное число/порядок | row_count + complete read | приватные keep2/odd/duplicate/declared-empty; public 0/1/N и пустой input открыты |
+| J09 schema edits | declared↔code, manual required fields | Нет silent reset; допустимое изменение или явный отказ | Before/after mapping | приватные manual mapping/mismatch; G3 bridge и полная матрица смены режимов открыты |
+| J10 same node | Изменить исходник, сохранить другие свойства | Один узел, точный новый код, нет дублей | Node identity + configuration | приватный persistence + runtime/live managed write; public same-node edit открыт |
+| J11 freshness | Changed/reordered source | 2700/2850 в changed; reordered равен baseline | Новый execution + all-cell oracle | не проверено: changed/reordered бизнес-входы; сначала ранняя private проба |
+| J12 validation | Invalid code/parameter/unknown field | Раздельные ошибки, нет false success | Owned diagnostic + cleanup | приватные parse/throw + runtime preflight; public repair/diagnostic delivery открыты |
+| J13 recovery | Lost reply/same-ID/cancel/stop | Нет повторного неизвестного эффекта | Журнал фаз/operation/native execution | runtime/unit lost reply/ACK; live Stop/cancel и public recovery не проверены |
+| J14 Done/Close | Configure и discard | Нет ложного fresh output; предыдущие настройки сохранены | Config/dirty-state receipts | приватные configure/discard + runtime/live `7b8e19bee0`; public lifecycle открыт |
+| J15 persistence | Save/new open/execute | Последний source/options/schema и те же результаты | Saved artifact + cold audit | приватные code/declared/usage writer–cold–bytes 6×2; handler 6×4 и CLI открыты |
+| J16 oracle integrity | Преднамеренные подмены | Каждая подмена отклоняется | Oracle negative report | runtime/source: частные persistence oracle negatives; итоговый business auditor открыт |
+| J17 UI regression | Общий deny и соседний calculator | Generic code запрещён, прежние узлы работают | Адресные source tests | runtime/source: guards и смежные regression tests; итоговая проверка с JS handler открыта |
+| J18 autonomy | Две Sol low попытки | Без технических подсказок, полный заявленный scope | Sessions/events/completion | не проверено: две независимые CLI-попытки только в фазе 6 |
+| J19 context | Изменённые поля/старый код, label/comment с текстом инструкции | Используется текущее наблюдение; содержимое данных не меняет задачу | Context/source identities + tool evidence | не проверено: фактический public context/instruction-in-data сценарий |
+| J20 engine profile | Business/API primitives и все v1 knowledge examples на 7.4.2 | Нужные возможности подтверждены; дополнительные features явно not_checked | Build/ОС, snippet hashes, профиль | приватные 30/30 observations и отдельные knowledge examples; required subset/полная редакция ещё не закрыты |
+| J21 response budgets | Prepare/describe (включая multi-type), apply/output/source chunks с worst-case source | Соблюдены оба бюджета; нет backend truncation, readback summary или потери полного результата | Source/direct проверка до ревью, candidate/CLI delivery после сборки | runtime/source budget + MCP test с подставленным browser adapter; worst-case/full batch/candidate/CLI открыты |
+| J22 assistant isolation | Наблюдение мастера и действия своего handler | Встроенный помощник не вызывается; отсутствие отмечено наблюдением | UI profile + журнал действий | не проверено: наличие assistant/engine selector не установлено; нельзя объявить неприменимым |
+| J23 editor fidelity | Вложенные блоки/tabs/пробелы/Unicode, saved Code | Совпадает декодированный canonical source и cold readback | Source/artifact hashes + live receipts | приватные editor/cold probes + runtime/live writer; полный public fidelity/cold открыт |
+| J24 column names | Кириллица/недопустимые Name в code mode | Фактические имена/ошибки установлены без догадок | Native schema + knowledge rule | приватные двухколоночные T-пробы source96; D cases/source→physical и knowledge delivery открыты |
+| J25 diagnostics | Preflight refusal, native parse error и sync throw | Доставлены наблюдённые класс/текст/позиция либо явное отсутствие, digest и owner | Очищённые diagnostics + delivery | приватные parse/throw/calibration + runtime/source knowledge; public native delivery открыта |
+| J26 import policy | Data import, явные unsupported declarations/calls и похожий текст в comments/strings/templates | Preflight различает синтаксис, неподдержанное отклонено до мутации; не заявлена sandbox-гарантия | Pure parser tests + журнал без editor effects | runtime/source parser/preflight/admission; интеграция effective source на всех apply/Execute/read путях открыта |
+| J27 target persistence | Exact назначенный URL в новом CLI profile и после restart | Origin/path остаются назначенными; legacy migration не уводит приёмку на другой сервер | Host regression + actual CLI status; gate перед приёмкой | runtime/source Host `9d75933fac`; сверка альтернативы `1b8d100392` и actual candidate restart открыты |
 
 Для J24 внешние `js_data_output.ts:307–400` на E2E SHA
 `7a41b5adbb9c45dca8d756a8220615554301c2e0` содержат гипотезы
@@ -815,32 +1086,29 @@ oracle и CLI-приёмку; ядро не считается «всем JavaSc
 
 ## Точка продолжения
 
-Подтверждено: статическое исследование процесса/docs/код/Help/e2e; исходные
-SHA; отсутствие handler; условия окружения; набор fixtures и независимые
-ожидания; baseline 24/24 и document validation; целевой build 7.4.2 и
-принадлежность ему справочника (решение пользователя). Публичный JS-handler
-ещё не реализован; выполненный Host URL fix учитывается отдельно в checkpoint.
+Начать с [текущей сводки и указаний](checkpoint.md), сверить docs/code HEAD,
+затем выполнить **B — публичный configure existing code-table** по разделу
+порядка продолжения. Последнее подтверждение — managed write → Code Next →
+Done → новый публичный source-read (`managed-code-next-01`); оно не является
+текущим FAIL и не требует ещё одного повторного source-read ради прогресса.
+Нужны продуктовые settlement после Next/Done и композиция apply lifecycle.
 
-На Ubuntu подтверждены аккаунт `jsteach`, Enterprise 7.4.2, изолированный
-worktree и полный цикл общей памяти поколения `20260926.2`. В operator17
-подтверждены создание собственной storage UUID-папки, upload без overwrite,
-штатный CSV import и полный точный typed input6×5; затем JS input0 link.
-Серверный диагностический CSV сохранён, session recovery/logout подтверждены.
-Открыто: G1–G7 и runtime/CLI строки матрицы,
-полный candidate, JS auditor. Внешний e2e suite
-остаётся `not_run`; его зависимости не являются предусловием этого подплана.
-Решения по всем [рекомендациям](review-recommendations.md) и границы доказательств
-зафиксированы в [проверке ревью](review-verification.md). Требования новых probes
-приняты; их наличие в плане не означает выполненного live discovery.
-URL стенда уже назначен: `http://logi-test-plan.bg.local/app/`; повторно
-спрашивать выбор адреса не нужно. Владелец продолжения — назначенный single-разработчик;
-исполнение уже разрешено. Следующий шаг — устранение текущего подтверждённого
-отказа, новый source handoff и headed-прогон по актуальному checkpoint; номер
-попытки и остаточные ограничения определяются последним evidence.
+До фиксации Execute/read провести ранние private 6×4 и bounded Stop/cancel
+пробы. G1/G3/G5/G6 имеют конкретный остаток в discovery; G4/G7 feasibility
+переиспользуется. `ready_for_development` выставляется по решениям 0B,
+`ready_for_first_review` — по реализации фаз 1–4, G1–G7 и source/direct J,
+`ready_for_acceptance` — после ревью/сборки и candidate gates. Непроверенные
+обязательные требования не закрываются документальной правкой.
 
-При таком назначении Astra/medium создаёт Goal до готовности к первому ревью,
-без самоназначенного token_budget; checkpoint сохраняется на каждой границе.
-Историческая задача plan-authoring Goal не создавала; текущее исполнение
-и остановки учитываются отдельно в checkpoint. Обычные probes/правки/проверки
-в уже назначенном scope не требуют повторного разрешения. При реальном блокере
-указать конкретное недостающее условие, owner и безопасный следующий шаг.
+Канонический checkpoint — ветка `javascript`, продуктовый worktree —
+`node-javascript`; fixtures/oracle, продуктовая база, стенд, Linux x64,
+headed и правила памяти/изоляции сохранены. Внешний TestCafe остаётся `not_run`
+и не блокирует обучение. Модели, бюджеты и scope менять не требуется.
+
+В основной задаче исполнение уже назначено. Эта доработка плана не создаёт
+новую Goal и не возобновляет/не меняет состояние другой задачи. При продолжении
+владелец существующей Goal использует обновлённый план до первого ревью, без
+самоназначенного token_budget. Обычные правки и проверки в согласованном scope
+не требуют повторного разрешения. На границе результата/фазы, при блокере,
+неизвестном эффекте и остановке обновить краткую сводку; при реальном блокере
+указать недостающее условие, owner и безопасный следующий шаг.

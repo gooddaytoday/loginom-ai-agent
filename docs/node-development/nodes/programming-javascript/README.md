@@ -1,11 +1,12 @@
 # JavaScript
 
 Устойчивый ID: `component.programming.JavaScript`. Slug: `programming-javascript`.
-Исторического номера подплана нет. Предлагаемый runtime type:
-`programming.javascript` — **ещё не зарегистрирован**.
+Исторического номера подплана нет. Runtime type `programming.javascript`
+описан в оболочке ветки `node-javascript`; **apply handler ещё не зарегистрирован**.
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
-[рекомендации ревью](review-recommendations.md) · [реестр](../../registry.json) ·
+[рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·
+[реестр](../../registry.json) ·
 [один узел](../../workflow/single-node.md).
 
 [Результаты перепроверки рекомендаций](review-verification.md) отделяют
@@ -22,7 +23,14 @@ source-read без исполнения и отдельное declared-зада�
 
 **discovery_required**, 2026-09-29. Проведено исследование исходников,
 официальной справки, приложенного системного справочника и e2e-репозитория.
-Обработчика JavaScript в текущем runtime нет. Живое исследование мастера продолжается в Ubuntu headed-браузере; private
+Публичного apply handler JavaScript пока нет. В коде `node-javascript`
+`7b8e19bee0` уже реализованы типовая оболочка, preflight/knowledge, публичный
+source-read и managed write/Code Next/Done. Headed existing code-table proof
+подтвердил точный новый source после Done, но output mapping остался
+`configured_only` (полная source identity не доказана);
+полная конфигурация/Execute через handler этим не доказана. Краткая актуальная
+сводка и SHA — в [checkpoint](checkpoint.md#текущее-состояние).
+Исследование мастера проводится в Ubuntu headed-браузере; private
 пробы подтвердили real/boolean/string/safe-int64 и Date civil/native identity,
 а также keep2/odd/duplicate cardinality с сохранением исходных данных и отдельно
 изменение точности outside-safe int64. Для двух фиксированных режимов сохранения
@@ -63,18 +71,23 @@ Linux установлена отдельным чтением `Session.Version.
 
 ## Главные условия продолжения
 
-- Подготовить изолированную среду и отдельный допуск памяти нового worktree.
-- Подтвердить, что стенд работает на Loginom 7.4.2, реальный тип, мастер,
-  момент исполнения кода, способ формирования и сопоставления выходных полей.
-- Определить отдельный путь ввода/полного чтения JavaScript без открытия
-  произвольного выполнения кода в браузере.
-- Решить сохранение точного исходника, его digest и очищенных журналов;
-  обычная очистка текста способна изменить даже URL-литерал.
-- Доставить проверенную справку модели через фактический `user-v1` путь,
-  закрепить её в runtime pin; наличия Markdown-файла недостаточно.
-- Подготовить независимый typed oracle и кандидат standalone CLI.
-- Проверить, что CLI после рестарта сохраняет назначенный адрес стенда:
-  текущий Host мигрирует его exact URL как прежний default (подробнее в плане).
+- Сверить текущие docs/code и обработанные указания в каноническом checkpoint;
+  допуск Ubuntu/worktree/памяти повторять только при изменении предпосылок/сбое.
+- Следующий результат **B — публичный configure existing code-table**:
+  согласовать JS Done/result-контракты, связать managed-функции с lifecycle
+  и перенести ожидания Next/Done в runtime. Проверить public API через
+  ограниченный injected handler в испытательной среде; частичный handler
+  не включать в продуктовый registry. Базовый source-read заново не разрабатывать.
+- Оставшиеся решения 0B — G1 identity/assistant, G3 source→physical, G5
+  обязательные API/J24, G6 Stop/cancel; отдельно от приёмки в [discovery](discovery.md).
+- Рано проверить приватный бизнес-результат 6×4 с changed/reordered input и
+  конечный Stop/cancel-case, затем довести code и declared через handler с
+  независимым Save/cold. Частные 6×2 не заменяют бизнес-oracle.
+- После ревью проверить knowledge/budgets и J27 на immutable CLI candidate,
+  затем две автономные попытки Sol low только на назначенном стенде.
+  Source fix explicit URL уже есть; альтернативный fix согласовать до сборки.
 
-Следующий шаг — фаза 0 [подплана](plan.md). Текущий документ не разрешает
+Порядок A–F, уровни J01–J27 и правила итераций закреплены в [подплане](plan.md).
+Режим браузера — обычный headed по последнему указанию пользователя; правило
+остановки при недоступной памяти сохранено. Текущий документ не разрешает
 подменять пользовательский клиент, публиковать выпуск или сливать ветку.
