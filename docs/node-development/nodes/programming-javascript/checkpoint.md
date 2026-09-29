@@ -1,5 +1,42 @@
 # JavaScript: checkpoint исполнения
 
+## Runtime-чтение схемы из подготовленного JS-узла — 2026-09-29
+
+В child `node-javascript` commit `4923c5932e` перенёс неизменённый
+operator-only native-cache observer двух страниц JavaScript-мастера в
+`client/lib/javascript-schema-browser.mjs`; частный сценарий теперь импортирует
+его из runtime. Commit `d5ef2b548f` добавил
+`makeJavascriptSchemaContextCode`: до и после чтения проверяется один
+prepared document/workflow/node, активный wizard и отсутствие отдельного
+редактора порта. Сам browser-reader независимо связывает текущую native
+модель, дерево узла, verified preparation receipt и активную DOM-вкладку.
+Чтение при смене владельца возвращает отказ; proxy для этой проверки не
+загружается. Это только безопасный observer, публичный JS-handler ещё не
+зарегистрирован.
+
+Первый headed прогон `runtime-schema-context-01` в profile240 выявил ошибку
+нового guard: сравнивались native card и DOM-элемент вкладки. Он завершился
+`FAILED` до исполнения; package close, logout и browser close подтверждены
+3/3. Report SHA256
+`eab069d4e5fbf97ed31c8874ca769b5340631bd672ea13e1ebb8aefd907dd7e1`.
+После исправления второй прогон `runtime-schema-context-02` в **видимом
+Chromium1246**, `DISPLAY=:1`, на `http://logi-test-plan.bg.local/app/`
+завершился `OBSERVED`/`typed_output_verified`. Новый runtime-reader подтвердил
+тот же `JavaScriptColumnsWizard`, `generation.checked=true` и обе native
+таблицы схемы, что исходный операторский reader; `node_context` verified и
+указывает точный JS GUID. Существующий полный source/mode readback после
+выполнения также подтверждён. Cleanup 3/3; процессов pinned Chromium после
+закрытия нет. Report SHA256
+`059891ea827617e204deff513e93121e36aed3920e8263aa3ebcc6ac88646dbc`.
+Оба прогона использовали обычный headed browser, без X11 focus guard.
+Адресные pinned Node24.19.0 тесты `javascript-schema-context`,
+`node-context`, `javascript-schema-telemetry` и `javascript-execution-evidence`
+прошли; `git diff --check` и синтаксис проверены. Профили240/241 не
+переиспользовать. Под registry lock после полного cleanup назначен новый
+пустой profile242. Следующий шаг: owner-bound configure/execute/read driver,
+сохранение source digest и module policy при каждом fresh Execute,
+регистрация публичного handler и затем CLI J01/J20/J21.
+
 ## Guard публичного повторного Execute/read — 2026-09-29
 
 Child `19105bd87d` закрыл опасный shortcut перед регистрацией JS-handler:
