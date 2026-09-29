@@ -53,8 +53,8 @@ dense = rows("dense.csv")
 assert expected["columns"] == [
     {"name": "Region", "type": "string"},
     *[
-        {"name": f"C_{index}_{fact}_Sum", "type": "real"}
-        for index, _category in enumerate(["A", "B"], 1)
+        {"name": f"C_{index}_{fact}_Sum", "label": f"{category}|{fact}|Сумма", "type": "real"}
+        for index, category in enumerate(["A", "B"], 1)
         for fact in ["Amount", "Quantity"]
     ],
 ]

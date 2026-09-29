@@ -153,7 +153,7 @@ try {
         sampleRows: Math.max(10, expected.rows.length),
       })
       const expectedColumns = new Map(
-        expected.columns.map((column) => [column.name, { name: column.name, label: column.name, type: column.type }]),
+        expected.columns.map((column) => [column.name, { name: column.name, label: column.label ?? column.name, type: column.type }]),
       )
       if (
         raw.columns.length !== expected.columns.length ||
