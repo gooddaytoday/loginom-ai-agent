@@ -742,7 +742,7 @@ test('existing post-body poll preserves first unavailable sample even after a la
 
 test('live initial branch uses the production wrapper only for executionCase and retains discovery path',async()=>{
   const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
-  const start=source.indexOf("    if(options['--managed-opening-probe']){\n      await openManagedJavascriptInitialWizard");
+  const start=source.indexOf("    if(options['--managed-opening-probe']){\n      const managed=await openManagedJavascriptInitialWizard");
   const end=source.indexOf("    report.stage='wizard-ready';",start);assert.ok(start>0&&end>start);
   const run=vm.runInNewContext('(async function(ctx){with(ctx){'+source.slice(start,end)+';return openedWizard;}})');
   for(const executionCase of [true,false]){
@@ -755,8 +755,8 @@ test('live initial branch uses the production wrapper only for executionCase and
   }
   const h=initialOpeningFixture({fault:'already'}),o=h.options();let managedCalls=0;
   const opened=await run({options:{'--managed-opening-probe':true},executionCase:true,
-    openManagedJavascriptInitialWizard:async args=>{managedCalls++;assert.equal(args.lifecycle,o.lifecycle);},
-    page:o.page,executionPrepared:{},node:o.node,wizardDeadline:o.deadline,
+    openManagedJavascriptInitialWizard:async args=>{managedCalls++;assert.equal(args.lifecycle,o.lifecycle);return {};},
+    page:o.page,executionPrepared:{},node:o.node,wizardDeadline:o.deadline,managedSourceTask:null,
     executionRecord:o.record,report:o.report,save:o.save,initialOpening:o.lifecycle,openedWizard:false});
   assert.equal(opened,true);assert.equal(managedCalls,1);assert.equal(h.f.clicks,0);
 });
