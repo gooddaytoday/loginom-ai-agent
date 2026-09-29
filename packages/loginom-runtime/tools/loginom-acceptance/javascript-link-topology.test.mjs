@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {javascriptCreatedTopology,connectJavascriptInput,captureJavascriptNativeTopology,requireJavascriptGraphUnchanged} from './javascript-link-topology.mjs';
+import {javascriptCreatedTopology,connectJavascriptInput,captureJavascriptNativeTopology,requireJavascriptGraphUnchanged,requireJavascriptOwnedUnlock} from './javascript-link-topology.mjs';
 import {createJavascriptEffectJournal} from './javascript-execution-evidence.mjs';
 
 function fixture() {
@@ -108,4 +108,21 @@ test('pre-drag check rejects topology changes while allowing only DOM repaint ep
   const f=fixture(),same=structuredClone(f.before);same.nodes[0].dom_epoch=42;
   requireJavascriptGraphUnchanged(f.before,same);
   same.links=[];assert.throws(()=>requireJavascriptGraphUnchanged(f.before,same));
+});
+
+test('owned port Close admits only the exact target unlock',()=>{
+  const f=fixture(),before=structuredClone(f.after),after=structuredClone(f.after),owner=f.after.nodes[0].ref;
+  before.nodes[0].locked=true;
+  requireJavascriptOwnedUnlock(before,after,owner);
+  assert.throws(()=>requireJavascriptGraphUnchanged(before,after),/complete graph changed/);
+  for(const change of [
+    graph=>graph.nodes[0].locked=true,
+    graph=>graph.nodes[1].locked=true,
+    graph=>graph.nodes[0].position.x=1,
+    graph=>graph.links.push(f.edge),
+    graph=>graph.nodes[0].ref.node_id='other',
+  ]){
+    const altered=structuredClone(after);change(altered);
+    assert.throws(()=>requireJavascriptOwnedUnlock(before,altered,owner));
+  }
 });

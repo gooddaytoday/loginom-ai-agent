@@ -1173,7 +1173,7 @@ const runExecutionTrial=async probe=>{
         budget_ms:Math.max(1,Math.min(180000,deadline-Date.now()-30000))});
       if(read.kind!=='source'||read.source_text!==source||read.source_sha256!==identity.source_sha256
         ||read.cursor!==null||runtime.hasUnsettledWork())throw Error('Independent public JavaScript source read differs');
-      const after={input:await executionRuntime.readPortMapping(executionNode,'input'),
+      const after={input:await executionRuntime.readPortMapping(executionNode,'input',{allowOwnedUnlock:true}),
         output:await executionRuntime.readPortMapping(executionNode,'output',{allowConfiguredOnly:true})};
       const mapping=javascriptPreservedMappings(javascriptSourceMappings(before),after,executionNode,{allowConfiguredOnly:true});
       await executionRuntime.verifyExecutionBoundary(boundary);

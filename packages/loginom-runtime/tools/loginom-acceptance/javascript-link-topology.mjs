@@ -24,6 +24,19 @@ export function requireJavascriptGraphUnchanged(before,after) {
   if(!same(domain(before),domain(after)))throw Error('JavaScript complete graph changed');
 }
 
+// Closing an owned mapping surface can unlock the same node after Done. The
+// full graph still has to match with only this one observed lock transition.
+export function requireJavascriptOwnedUnlock(before,after,node) {
+  requireJavascriptTopology(before);requireJavascriptTopology(after);
+  const previous=before.nodes.find(item=>item.ref.node_id===node.node_id);
+  const current=after.nodes.find(item=>item.ref.node_id===node.node_id);
+  if(!previous||!current||previous.locked!==true||current.locked!==false
+    ||!['document_id','workflow_id','node_id'].every(key=>previous.ref[key]===node[key]
+      &&current.ref[key]===node[key]))throw Error('JavaScript owned unlock differs');
+  requireJavascriptGraphUnchanged({...before,nodes:before.nodes.map(item=>
+    item===previous?{...item,locked:false}:item)},after);
+}
+
 export function javascriptCreatedTopology(before,after,source,id) {
   requireJavascriptTopology(before);requireJavascriptTopology(after);
   if(source.document_id!==before.document_id||source.workflow_id!==before.workflow_ref.workflow_id

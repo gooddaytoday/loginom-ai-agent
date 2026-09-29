@@ -22,7 +22,7 @@ import {javascriptWizardBinding,openJavascriptWizard,finishJavascriptWizardOpeni
 // All generated runtime code runs against the caller's authenticated page.
 // No browser launch, credentials, server RPC, or second MCP context lives here.
 import {openJavascriptOutputViews,waitJavascriptViewsSettlement} from './javascript-output-opening.mjs';
-import {captureJavascriptNativeTopology,connectJavascriptInput,requireJavascriptTopology,requireJavascriptGraphUnchanged} from './javascript-link-topology.mjs';
+import {captureJavascriptNativeTopology,connectJavascriptInput,requireJavascriptTopology,requireJavascriptGraphUnchanged,requireJavascriptOwnedUnlock} from './javascript-link-topology.mjs';
 import {caseEffect} from './javascript-batch-plan.mjs';
 import {characterizeJavascriptMapping,javascriptExecutionIdentity,verifyJavascriptMismatchTable,verifyJavascriptPreviousExecution} from './javascript-mismatch-probe.mjs';
 import {readFile} from 'node:fs/promises';
@@ -626,10 +626,13 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
         if(lifecycle.closed){pendingMapping=undefined;await native.dispose();}
       }
     },
-    async readPortMapping(node,direction,{characterize=false,allowConfiguredOnly=false,operationDeadline=deadline,failedExecution}={}) {
+    async readPortMapping(node,direction,{characterize=false,allowConfiguredOnly=false,
+      allowOwnedUnlock=false,operationDeadline=deadline,failedExecution}={}) {
       if(!['input','output'].includes(direction))throw Error('Unknown mapping direction');
       if(characterize&&direction!=='output')throw Error('Only output mapping characterization is supported');
-      if(typeof allowConfiguredOnly!=='boolean'||allowConfiguredOnly&&(direction!=='output'||characterize))throw Error('Configured-only admission requires separate output read');
+      if(typeof allowConfiguredOnly!=='boolean'||allowConfiguredOnly&&(direction!=='output'||characterize)
+        ||typeof allowOwnedUnlock!=='boolean'||allowOwnedUnlock&&direction!=='input')
+        throw Error('Configured-only or owned-unlock mapping admission differs');
       const readDeadline=Math.min(deadline,operationDeadline);
       const reader=channel(node,readDeadline),reference={document_id:prepared.document_id,workflow_id:prepared.workflow_ref.workflow_id,node_id:node.node_id};
       const before=await graph();requireJavascriptTopology(before);
@@ -651,7 +654,11 @@ async function createJavascriptBoundRuntime({page,prepared:inputPrepared,directo
             const after=await graph();
             await record({phase:'port_mapping_original_graph_observed',direction,checked,
               before:structuredClone(before),after:structuredClone(after)});
-            requireJavascriptGraphUnchanged(before,after);
+            if(allowOwnedUnlock&&before.nodes.find(item=>item.ref.node_id===node.node_id)?.locked===true
+              &&after.nodes.find(item=>item.ref.node_id===node.node_id)?.locked===false){
+              requireJavascriptOwnedUnlock(before,after,node);
+              await record({phase:'port_mapping_owned_unlock_verified',direction,node});
+            }else requireJavascriptGraphUnchanged(before,after);
             await record({phase:'port_mapping_original_graph_verified',direction,checked,before,after});
           }});}catch(cleanupError){
             nativeReadUncertain=true;
