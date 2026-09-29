@@ -74,7 +74,7 @@ function typeFixture(f,{expanded=true,type=4,label='Целый'}={}) {
     expand(){combo.isExpanded=true;pickerDom.shown=true;option.shown=true;}};
 }
 
-function usageFixture(f,{expanded=false}={}) {
+function usageFixture(f,{expanded=false,lazy=false}={}) {
   for(const [name,values] of [['cbxDataKind',[[1,'Непрерывный'],[2,'Дискретный']]],
     ['cbxUsageType',[[0,'Не задано'],[3,'Активное'],[4,'Выходное'],[6,'Группа'],[7,'Показатель'],[8,'Транзакция'],[9,'Элемент']]]]){
     const element=f.element(name,'EditColumnDefForm;'+name,f.editor);
@@ -94,9 +94,9 @@ function usageFixture(f,{expanded=false}={}) {
     return option;
   });
   pickerDom.querySelectorAll=selector=>selector==='.x-boundlist-item'?options:[];
-  const picker={el:{dom:pickerDom},pickerField:combo,store:combo.store,dataSource:combo.store};
+  const picker={el:{dom:lazy&&!expanded?null:pickerDom},pickerField:combo,store:combo.store,dataSource:combo.store};
   combo.picker=picker;f.controls.usagePicker=picker;
-  const setExpanded=value=>{combo.isExpanded=value;pickerDom.shown=value;for(const option of options)option.shown=value;};
+  const setExpanded=value=>{combo.isExpanded=value;if(value)picker.el.dom=pickerDom;pickerDom.shown=value;for(const option of options)option.shown=value;};
   return {combo,triggerDom,pickerDom,picker,options,setExpanded};
 }
 
@@ -112,6 +112,18 @@ test('owned usage picker opens once, binds all seven options and closes before C
   const cancelled=await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
   assert.equal(closes,1);assert.equal(cancelled.status,'settled');assert.equal(f.records.length,0);
   assert.equal(f.effects.filter(effect=>effect==='usage-open').length,1);
+});
+
+test('lazy unrendered usage picker requires full DOM owner after one opening click',async()=>{
+  const f=fixture();await f.open();const usage=usageFixture(f,{lazy:true});f.setHit(()=>usage.triggerDom);
+  const preflight=await f.page.evaluate(observeJavascriptColumnEditor,
+    {held:f.state.pending.held,phase:'editing',readUsagePicker:'state',usageAction:'open'});
+  assert.equal(preflight.status,'ready');assert.equal(preflight.usage_picker.owner,false);
+  assert.equal(preflight.usage_picker.lazy_owner,true);
+  const opened=await openJavascriptColumnUsagePicker({page:f.page,state:f.state,record:f.record,once:f.once,
+    deadline:Date.now()+1000,id:'usage-open',click:async()=>usage.setExpanded(true)});
+  assert.equal(opened.usage_picker.owner,true);
+  assert.equal(opened.usage_picker.verified_option_count,7);
 });
 
 test('foreign usage picker refuses before opening gesture',async()=>{
