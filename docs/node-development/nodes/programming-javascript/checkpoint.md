@@ -323,6 +323,32 @@ log SHA256 `1d796be86a83e3d440e9965eed1f5adb1f06919dc60cda67eea2ad5d24f325d3`.
 Под lock назначен чистый profile295 для `p1-stop-finite-02`; новый native
 Stop и short same-node rerun ещё не проверены.
 
+`p1-stop-finite-02`/profile295/source `c5415d9316` — **CLEANUP_UNCONFIRMED**,
+report SHA256 `493bb37d2968ec5155188072db02d645b3cc924849dcd58b93a0910b4d4fab5e`,
+journal SHA256 `1913e0302168a1a65dd290233311c27375871cab03275ff73ce3c66453d943af`.
+Input6×5 и один finite launch подтверждены. Identify не завершился: toolbar
+btnProgress click получил три NOT_APPLIED/UI_EPOCH_CHANGED/effect=false/
+cleanup=true pre-gesture receipts, с двумя разрешёнными same-intent refresh.
+Ни один click не применился; Stop/local cancel/rerun этого run не выполнены.
+Original cleanup отказал close из-за running state not proven false;
+browser closed. Это не дисквалификация по клику пользователя и не Stop PASS.
+
+Separate headed admin recovery/profile296 закрыл только Package1/jsteach:3586
+(creation21:19/disconnect21:23 UTC). Refresh подтвердил отсутствие package/session,
+admin logout/browser close и отсутствие собственных процессов проверены.
+Journal SHA256 `e4e846670d2b078523af15f0368403bc7b8ec4bb228c192457da778ae2b96cd0`,
+receipt SHA256 `463bf0d0b5c8110f8efaf4210bbed1792eef4f65c1c32d373eccbaf129123733`.
+Original status/cleanup не повышены.
+
+Child `feca3b193e` добавил private `prepare({keepConsoleOpen:true})` для
+конечного Stop-пробника: тот же baseline/inventory, консоль остаётся открытой
+до graph launch; default callers по-прежнему закрывают её. Epoch/owner/cancel
+proofs не ослаблены, новых повторов нет. 85 execution/Stop/probe tests PASS,
+syntax/diff PASS; log SHA256
+`1fd293ac7a5500d2860f9d6be6412b45fc8c444756be2f7f99a79727b4baf31b`.
+Следующая различающая проба `p1-stop-finite-03`/profile297 должна пройти
+identify/Stop без открытия консоли после запуска; G6 пока открыт.
+
 ### B: публичный configure existing — 2026-09-29
 
 В child commits `57b074fc7b`, `7cd36bb763`, `f8ceebcac9` собран узкий
