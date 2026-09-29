@@ -177,7 +177,27 @@ cancel и expiry прекращают ожидание; unusable snapshot не �
 syntax/diff-check PASS; test log SHA256
 `4113580cb163196d32da5bf3beca52e1dabd9ef92a85bd031333694f38a71b53`.
 Под lock запущен новый headed `p1-business-code-base-05`, profile286/source
-`75d04b7489`; его результат ещё не подтверждён.
+`75d04b7489`; он завершился **CLEANUP_UNCONFIRMED до импорта и JS**.
+Report SHA256
+`8ad3de68c17df8283057df88f5e694074acd32ccfab302724d69e694f9e0cebf`.
+После одного confirmed storage-user-folder dblclick exact breadcrumb
+`MF;TF-2;cnrNaviMode;b.s_Сервер>Файлы>jsteach` не появился за default 10s;
+cleanup отказал restore текущего native storage surface. Browser closed;
+пакет/logout исходным run не доказаны. Table settlement этого run не проверен.
+
+Source `a30f27ea20` ждёт именно этот breadcrumb до 90s, clamped remaining
+original phase deadline, с тем же one-shot folder gesture и account guard
+после ожидания. Syntax/diff PASS, 160 business/evidence regression tests PASS;
+log SHA256 `f3c5c2886aae423883ae6ab2d17da79e5f0c2f1e35252c8f02db82df447b17bc`.
+Сам новый timeout path ещё требует live. Separate headed recovery/profile287
+закрыл только `Package1`/`jsteach:3570`; Refresh подтвердил их отсутствие,
+admin logout/browser close и отсутствие своих процессов проверены.
+Recovery journal SHA256
+`b1f545992819e17f07998c9bde697c3fc0133c63d43324b26f638e9156826047`,
+receipt SHA256
+`2e3c3837f7dac8fb24fdbed7a5f46fc1011db6d82f746dacfca0497feec7fe26`.
+Исходный статус run05 сохранён. Под registry lock назначен чистый profile288
+для нового `p1-business-code-base-06`, source `a30f27ea20`.
 `expected.json` остаётся неизменным. Далее — declared base, changed/reordered
 и конечный Stop/cancel по P1; до результата code-base их не считать проверенными.
 
