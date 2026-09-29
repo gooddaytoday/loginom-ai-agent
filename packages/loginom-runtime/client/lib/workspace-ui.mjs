@@ -184,7 +184,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if (dom.length >= maxElements) { const error=new Error('Selected region or global guards exceed the scan budget');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error; }
       seenElements.add(element);dom.push(element);
     };
-    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
+    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
     // E2E utils/selectors.Format: whitespace -> underscore, comma removed.
     // This finds candidates, not filesystem identity or absence. CSS hex escapes
     // keep arbitrary filename characters data rather than selector syntax.
@@ -331,7 +331,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     if(requestedRoot?.getAttribute('data-tid')==='mnContextMenu'
       && requestedRoot.querySelectorAll('[data-tid="mnContextMenu;mniShowNodeToProcess"]').length===1
       && requestedRoot.querySelectorAll('[data-tid="mnContextMenu;mniShowCompletedProcesses"]').length===1) {
-      const panels=document.querySelectorAll('[data-tid="ConsoleForm"]');charge();
+      const panels=document.querySelectorAll('[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"]');charge();
       if(panels.length===1) {include(panels[0]);const descendants=panels[0].querySelectorAll('*');charge();
         for(const element of descendants)include(element);}
     }
@@ -1934,9 +1934,10 @@ function readRenderedInputMapping(observation) {
     }
     const processConsole={status:'unobserved',top_groups:[],rows:[],top_level_complete:false,
       details_complete:false,execution_verified:false,owner_verified:false};
-    const consoles=tids.get('ConsoleForm')??[];
+    const consoles=[...document.querySelectorAll('[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"]')];charge();
+    const processBase=consoles.length===1?getTid(consoles[0])+';ProgressForm;':null;
     if(consoles.length===1 && (!requestedRoot || requestedRoot===consoles[0] || requestedRoot.contains(consoles[0]) || getTid(requestedRoot)==='mnContextMenu')) {
-      const panel=consoles[0],base='ConsoleForm;ProgressForm;';
+      const panel=consoles[0],base=processBase;
       const inside=(e,parent)=>{const b=boxOf(e),p=boxOf(parent);return visible(e) && !sensitive(e)
         && b.x>=0 && b.y>=0 && b.x+b.width<=globalThis.innerWidth && b.y+b.height<=globalThis.innerHeight
         && b.x>=p.x && b.y>=p.y && b.x+b.width<=p.x+p.width && b.y+b.height<=p.y+p.height;};
@@ -1970,7 +1971,7 @@ function readRenderedInputMapping(observation) {
           if(!record || seen.has(record) || pair[1].getAttribute('data-recordid')!==record || left.length!==2 || right.length!==8){valid=false;break;}
           const fields={},cells=[...left,...right];let path;
           for(const cell of cells) {
-            const match=/^ConsoleForm;ProgressForm;col(Id|Process|Percent|Progress|ActionStop|ActionDelete|ErrorDetails|ProgressStart|ProgressFinish|ProcessTime)_(Root>.+)$/.exec(getTid(cell)??'');
+            const match=/^col(Id|Process|Percent|Progress|ActionStop|ActionDelete|ErrorDetails|ProgressStart|ProgressFinish|ProcessTime)_(Root>.+)$/.exec((getTid(cell)??'').startsWith(base)?getTid(cell).slice(base.length):'');
             if(!match || fields[match[1]] || (tids.get(getTid(cell))??[]).length!==1 || !inside(cell,cell.closest('table'))
               || path && path!==match[2]){valid=false;break;}
             path=match[2];fields[match[1]]=cell;
@@ -2003,7 +2004,7 @@ function readRenderedInputMapping(observation) {
     // blank body authorizes only a context click, not an execution claim.
     const processGridControls=new Map();
     if(consoles.length===1 && visible(consoles[0])) {
-      const grids=['treepanel;tree','grd;tbl'].map(suffix=>(tids.get('ConsoleForm;ProgressForm;trpProgress;'+suffix)??[]));
+      const grids=['treepanel;tree','grd;tbl'].map(suffix=>(tids.get(processBase+'trpProgress;'+suffix)??[]));
       if(grids.every(xs=>xs.length===1&&consoles[0].contains(xs[0])&&visible(xs[0]))) {
         const views=grids.map(xs=>globalThis.Ext?.getCmp?.(xs[0].id));
         const store=views[0]?.getStore?.();
@@ -2015,7 +2016,7 @@ function readRenderedInputMapping(observation) {
     // A scrolled console is a visible window, never a complete DOM inventory.
     // Admit each row only through both native views and their shared cached model.
     if(processCells.size===0 && processGridControls.size===2) {
-      const grids=['treepanel;tree','grd;tbl'].map(suffix=>tids.get('ConsoleForm;ProgressForm;trpProgress;'+suffix)[0]);
+      const grids=['treepanel;tree','grd;tbl'].map(suffix=>tids.get(processBase+'trpProgress;'+suffix)[0]);
       const store=globalThis.Ext.getCmp(grids[0].id).getStore();
       const root=store.getRoot?.()??store.getRootNode?.(),records=new Map();let valid=true,visited=0;
       const walk=nodes=>{for(const model of nodes??[]){
@@ -2037,14 +2038,14 @@ function readRenderedInputMapping(observation) {
         const rightRow=rightRows[0];
         if(leftRow.getAttribute('data-boundview')!==grids[0].id||rightRow.getAttribute('data-boundview')!==grids[1].id
           ||rightRow.getAttribute('data-recordindex')!==String(index))continue;
-        const ids=[...leftRow.querySelectorAll('td[data-tid]')].filter(e=>getTid(e)?.startsWith('ConsoleForm;ProgressForm;colId_'));
-        const cells=[...leftRow.querySelectorAll('td[data-tid]')].filter(e=>getTid(e)?.startsWith('ConsoleForm;ProgressForm;colProcess_'));
-        const progress=[...rightRow.querySelectorAll('td[data-tid]')].filter(e=>getTid(e)?.startsWith('ConsoleForm;ProgressForm;colProgress_'));
+        const ids=[...leftRow.querySelectorAll('td[data-tid]')].filter(e=>getTid(e)?.startsWith(processBase+'colId_'));
+        const cells=[...leftRow.querySelectorAll('td[data-tid]')].filter(e=>getTid(e)?.startsWith(processBase+'colProcess_'));
+        const progress=[...rightRow.querySelectorAll('td[data-tid]')].filter(e=>getTid(e)?.startsWith(processBase+'colProgress_'));
         if(ids.length!==1||cells.length!==1||progress.length!==1||!visibleCell(cells[0],grids[0])
           ||textOf(ids[0],true)!==String(model.data.id))continue;
-        const cell=cells[0],path=getTid(cell).slice('ConsoleForm;ProgressForm;colProcess_'.length);
+        const cell=cells[0],path=getTid(cell).slice((processBase+'colProcess_').length);
         if(!path.startsWith('Root>')||(tids.get(getTid(cell))??[]).length!==1
-          ||getTid(progress[0])!=='ConsoleForm;ProgressForm;colProgress_'+path)continue;
+          ||getTid(progress[0])!==processBase+'colProgress_'+path)continue;
         const row={record_id:id,path,ordinal:String(model.data.id),process_cell_ref:refOf(cell),
           selected:leftRow.classList.contains('x-grid-item-selected'),record_index:index};
         rows.push(row);processCells.set(row.process_cell_ref,{record_id:id,path,record_index:index,
@@ -2070,7 +2071,7 @@ function readRenderedInputMapping(observation) {
       // prepared graph node. ModelNode is compared by identity, never dereferenced.
       let cancellation=null;
       if(preparedNodeId && processGridControls.size===2) {
-        const grid=tids.get('ConsoleForm;ProgressForm;trpProgress;treepanel;tree')[0];
+        const grid=tids.get(processBase+'trpProgress;treepanel;tree')[0];
         const store=globalThis.Ext.getCmp(grid.id).getStore(),root=store.getRoot?.()??store.getRootNode?.();
         const nodes=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()
           ?.Controller?.FController?.FDiagram?.FNodes?.FCollection;

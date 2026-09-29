@@ -18,8 +18,8 @@ export async function readNativeVariant(page,b,decode,options={}) {
    const manager=v(model,'FPreviewManager'),form=v(manager,'FPreviewForm'),node=v(form,'FCurrentPreviewNode'),port=v(form,'FCurrentPreviewPort');
    need(v(manager,'FPreviewVisible')===true&&node?.FGuid===b.node_id&&port?.parent===node&&port.FGuid===b.port_guid&&port.FType===1&&port.FSubType===1&&port.FParam===0,'preview owner/port');
    need(manager.FShowDataLastCall.Node===node&&manager.FShowDataLastCall.Port===port&&node.FStatus===1&&node.FRunning===false&&port.FStatus===1,'active execution');
-   const tree=document.querySelector('[data-tid="ConsoleForm;ProgressForm;trpProgress;treepanel;tree"]');
-   need(tree,'execution tree unavailable');const processStore=Ext.getCmp(tree.id).getStore(),processRoot=processStore.getRoot();
+   const trees=[...document.querySelectorAll('[data-tid="ConsoleForm;ProgressForm;trpProgress;treepanel;tree"],[data-tid="MF;ConsoleForm;ProgressForm;trpProgress;treepanel;tree"]')];
+   need(trees.length===1,'execution tree unavailable');const tree=trees[0];const processStore=Ext.getCmp(tree.id).getStore(),processRoot=processStore.getRoot();
    need(!processStore.isLoading()&&processRoot.data.loaded===true,'execution tree not complete');
    const parts=b.execution.execution_id.slice(b.document_id.length+1).split(':');
    need(parts.length===2&&String(processRoot.internalId)===parts[0],'execution root changed');

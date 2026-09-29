@@ -7,8 +7,9 @@ const button='MF;cntMain;tlbMainToolbar;btnProgress';
 const grid='ConsoleForm;ProgressForm;trpProgress;grd;tbl';
 const filter='mnContextMenu;mniShowCompletedProcesses';
 const showNode='mnContextMenu;mniShowNodeToProcess';
+const consoleTid=(actual,canonical)=>actual===canonical||canonical.startsWith('ConsoleForm;')&&actual==='MF;'+canonical;
 const consoleMenuIdentity=s=>({epoch:s.dom_epoch,root:s.node_processes?.root_id,
-  grid:s.ui.elements.find(e=>e.tid===grid)?.signature});
+  grid:one(s.ui.elements.filter(e=>consoleTid(e.tid,grid)),'Unique console grid required').signature});
 const processControl=(process,part='process_tid')=>s=>s.node_processes?.processes.find(p=>
   p.process_id===process.process_id&&p.record_id===process.record_id)?.[part];
 
@@ -47,7 +48,7 @@ export async function revealExecutionControl(channel,node,initial,process,tid,ve
     requireValue(valid(state),'Process identity changed while revealing its control');
     if(matches(state).length===1)return state;
     requireValue(matches(state).length===0,'Process control is ambiguous');
-    const owners=state.ui.elements.filter(e=>e.tid==='ConsoleForm;ProgressForm;trpProgress;treepanel;tree'
+    const owners=state.ui.elements.filter(e=>consoleTid(e.tid,'ConsoleForm;ProgressForm;trpProgress;treepanel;tree')
       &&e.process_grid&&e.scroll?.ref===e.ref&&e.allowed_actions.includes('scroll'));
     const owner=one(owners,'Bound process scroll owner unavailable');
     if(!reset&&owner.scroll.top===0)reset=true;
@@ -79,12 +80,12 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
   let baseline,execution,stopPromise,launchAttempted=false,deactivationAttempted=false,failedChildAttempted=false;
   const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,...extra});
   const control=(s,tid,verb='click')=>{const current=typeof tid==='function'?tid(s):tid;
-    return typeof current==='string'&&current.length?s.ui.elements.filter(e=>e.tid===current&&e.allowed_actions.includes(verb)):[];};
+    return typeof current==='string'&&current.length?s.ui.elements.filter(e=>consoleTid(e.tid,current)&&e.allowed_actions.includes(verb)):[];};
   const act=async(s,tid,verb='click',identity=()=>node,key)=>channel.perform({condition:'execution control '+tid,
     initialObservation:s,ready:s=>control(s,tid,verb).length===1,
     ...(tid===grid?{confirmIdentity:consoleMenuIdentity}:{}),
     resolve:s=>({verb,ref:one(control(s,tid,verb),'Unique execution control required').ref,...(key?{key}:{})}),identity});
-  const consoleVisible=s=>s.ui.elements.some(e=>e.tid===grid);
+  const consoleVisible=s=>s.ui.elements.filter(e=>consoleTid(e.tid,grid)).length===1;
   async function openConsole() {
     let s=await observe('prepared node available for process console',s=>consoleVisible(s)||control(s,button).length===1,{readProcesses:false,readProcessControls:true});
     if(!consoleVisible(s))await act(s,button);

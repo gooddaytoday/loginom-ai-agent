@@ -183,7 +183,7 @@ for(const kind of ['cold-open','cold-source'])test('actual cold uncertain cleanu
   const forbidden=name=>()=>{calls.push(name);throw Error('Unexpected '+name);};
   const report={stage:kind,cleanup:{package_closed:false,logged_out:false,browser_closed:false}};
   const env={report,coldReader:true,coldOpenPending:kind==='cold-open',sourceCycleUncertain:kind==='cold-source',sourceReaders:[],
-    executionRuntime:undefined,page:{},owner:undefined,packageHandle:undefined,session:{context:{close:async()=>calls.push('browser-close')}},browserLifecycle:null,
+    executionRuntime:undefined,page:{},focusGuard:null,owner:undefined,packageHandle:undefined,session:{context:{close:async()=>calls.push('browser-close')}},browserLifecycle:null,
     nativeRoundtrip:false,nativeClassifierBinding:undefined,captureJavascriptNativeClassifierDiagnostic:forbidden('classifier'),
     javascriptProbeFailure:e=>({message:e.message}),redactor:createRedactor(),discoveryProbe:null,
     snapshot:forbidden('snapshot'),paletteSnapshot:forbidden('palette'),refusalEvidence:forbidden('refusal'),

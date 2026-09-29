@@ -251,7 +251,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(portals.length>1)throw new Error('Node procedure dropdown owner is ambiguous');
         // Dropdowns live outside the wizard subtree. Reading the unique
         // portal plus fixed wizard guards avoids scanning unrelated file tabs.
-        const processRoot=(readProcesses||readProcessControls) ? ['mnContextMenu','ConsoleForm','MF;cntMain;tlbMainToolbar'].map(tid=>(roots.output.ui?.elements??[]).filter(e=>e.tid===tid))
+        if((readProcesses||readProcessControls)&&(roots.output.ui?.elements??[]).filter(e=>['ConsoleForm','MF;ConsoleForm'].includes(e.tid)).length>1)throw Error('Process console root is ambiguous');
+        const processRoot=(readProcesses||readProcessControls) ? ['mnContextMenu','ConsoleForm','MF;ConsoleForm','MF;cntMain;tlbMainToolbar'].map(tid=>(roots.output.ui?.elements??[]).filter(e=>e.tid===tid))
           .find(xs=>xs.length===1)?.[0].ref : undefined;
         const outputRoot=readOutputs ? [preparedNodeContext.workflow_ref.prefix+';ViewsForm;BrowseView',preparedNodeContext.workflow_ref.prefix+';ViewsForm',preparedNodeContext.workflow_ref.prefix+';ModelForm;cmpDiagram']
           .map(tid=>(roots.output.ui?.elements??[]).filter(e=>e.tid===tid)).find(xs=>xs.length===1)?.[0].ref : undefined;

@@ -4380,14 +4380,14 @@ test('native process scroll uses only the observed console grid owner',async()=>
  assert.notEqual(stale.status,'SUCCEEDED');assert.equal(grids[0].scrollTop,87);
 });
 
-function scrolledProcessWindowFixture() {
+function scrolledProcessWindowFixture(prefix='ConsoleForm') {
  const page=new Page();page.context.innerWidth=1000;page.context.innerHeight=800;
- const panel=page.add('div','ConsoleForm','',{x:0,y:400,width:900,height:300});
+ const panel=page.add('div',prefix,'',{x:0,y:400,width:900,height:300});
  const model={isModel:true,internalId:'record-5',data:{id:'5',loaded:true},childNodes:[]};
  const root={isModel:true,data:{loaded:true},childNodes:[model]};
  const store={$className:'Ext.data.TreeStore',isLoading:()=>false,getRoot:()=>root,getAt:i=>i===4?model:null},views={};
  const grids=['treepanel;tree','grd;tbl'].map((suffix,i)=>{
-  const e=page.add('div','ConsoleForm;ProgressForm;trpProgress;'+suffix,'',{x:i*400,y:420,width:400,height:154},panel);
+  const e=page.add('div',prefix+';ProgressForm;trpProgress;'+suffix,'',{x:i*400,y:420,width:400,height:154},panel);
   Object.assign(e,{scrollTop:87,scrollHeight:241,clientHeight:154});e.style.overflowY='auto';e.attrs.id='process-window'+i;e.id=e.attrs.id;
   views[e.id]={el:{dom:e},getStore:()=>store};return e;
  });
@@ -4395,9 +4395,9 @@ function scrolledProcessWindowFixture() {
   const row=page.add('table',null,'',{x:i*400,y:440,width:400,height:24},g);
   Object.assign(row.attrs,{class:'x-grid-item','data-recordid':'record-5','data-recordindex':'4','data-boundview':g.id});return row;
  });
- const id=page.add('td','ConsoleForm;ProgressForm;colId_Root>Task','5',{x:0,y:440,width:40,height:24},rows[0]);
- const cell=page.add('td','ConsoleForm;ProgressForm;colProcess_Root>Task','Task',{x:40,y:440,width:300,height:24},rows[0]);
- const progress=page.add('td','ConsoleForm;ProgressForm;colProgress_Root>Task','',{x:400,y:440,width:300,height:24},rows[1]);
+ const id=page.add('td',prefix+';ProgressForm;colId_Root>Task','5',{x:0,y:440,width:40,height:24},rows[0]);
+ const cell=page.add('td',prefix+';ProgressForm;colProcess_Root>Task','Task',{x:40,y:440,width:300,height:24},rows[0]);
+ const progress=page.add('td',prefix+';ProgressForm;colProgress_Root>Task','',{x:400,y:440,width:300,height:24},rows[1]);
  page.context.Ext={getCmp:id=>views[id]};return {page,store,root,model,grids,rows,id,cell,progress};
 }
 
@@ -5065,4 +5065,16 @@ test('JavaScript output port remains publicly denied for click and F3',async()=>
     assert.equal(result.error.code,'UI_REFERENCE_STALE');assert.equal(result.effect_possible,false);
   }
   assert.equal(page.events.length,0);
+});
+
+for(const prefix of ['ConsoleForm','MF;ConsoleForm'])test('bounded '+prefix+' console exposes native rows through roots and refuses two panels',async()=>{
+ const f=scrolledProcessWindowFixture(prefix),roots=await f.page.execute({mode:'observe',discover_roots:true});
+ const root=roots.output.ui.elements.find(e=>e.tid===prefix);assert.ok(root);
+ const scoped=await f.page.execute({mode:'observe',root_ref:root.ref});
+ assert.equal(scoped.output.process_console.status,'rendered_process_window');
+ const row=scoped.output.ui.elements.find(e=>e.process_row?.record_id==='record-5');
+ assert.equal(row.tid,prefix+';ProgressForm;colProcess_Root>Task');assert.ok(row.allowed_actions.includes('right_click'));
+ f.page.add('div',prefix==='ConsoleForm'?'MF;ConsoleForm':'ConsoleForm','',{x:0,y:0,width:50,height:50});
+ const ambiguous=await f.page.execute({mode:'observe',root_ref:root.ref});
+ assert.equal(ambiguous.output.ui.elements.some(e=>e.process_row||e.process_grid),false);
 });

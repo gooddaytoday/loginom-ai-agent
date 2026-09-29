@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {captureProcessNodeFocus,restoreProcessNodeFocus} from '../lib/process-node-focus.mjs';
 
-function fixture(){
+function fixture(prefix='ConsoleForm'){
  class ModelForm{};class ModelNodeTreeNode{};class WorkFlowTreeNode{};class PackageTreeNode{};
  const pkg=new PackageTreeNode(),workflow=Object.assign(new WorkFlowTreeNode(),{ParentNode:pkg}),data={},cell={};
  const tree=Object.assign(new ModelNodeTreeNode(),{FGuid:'node',FModelNode:data,ParentNode:workflow});
@@ -20,7 +20,8 @@ function fixture(){
  const parent={isModel:true,internalId:'group',data:{id:'1'},parentNode:root,childNodes:[]};
  const record={isModel:true,internalId:'record',data:{id:'1.1',ModelNode:data},parentNode:parent,childNodes:[]};root.childNodes=[parent];parent.childNodes=[record];
  const store={$className:'Ext.data.TreeStore',isLoading:()=>false,getRoot:()=>root};
- const document={querySelectorAll:s=>s.includes('role=')?[]:s.includes('"tab"')?[tab]:s.includes('treepanel;tree')?[grids[0]]:s.includes('grd;tbl')?[grids[1]]:s.includes('colProcess_')?[processCell]:[],elementFromPoint:()=>tab};
+ const panel={getAttribute:()=>prefix,contains:e=>grids.includes(e)};
+ const document={querySelectorAll:s=>s==='[data-tid="'+prefix+'"]'?[panel]:s.includes('role=')?[]:s.includes('"tab"')?[tab]:s.includes(prefix+';ProgressForm;trpProgress;treepanel;tree')?[grids[0]]:s.includes(prefix+';ProgressForm;trpProgress;grd;tbl')?[grids[1]]:s.includes(prefix+';ProgressForm;colProcess_')?[processCell]:[],elementFromPoint:()=>tab};
  const receipt={phase:'verified',workflowId:'workflow',tab,packageNode:pkg,nodeTargetWorkflowNode:workflow};
  const workspace={items:{items:[card,files]},getActiveTab:()=>active};
  const app={Version:'7.4.2',ModelForm,ModelNodeTreeNode,WorkFlowTreeNode,PackageTreeNode,Application:{FInstance:{FMainForm:{Items:{Workspace:workspace}}}}};
@@ -76,4 +77,9 @@ test('cannot capture a different process owner or an already inactive graph',asy
 test('lost click response remains an error and does not repeat the click',async()=>{
  const f=fixture(),ticket=await captureProcessNodeFocus(f.page,f.task);f.show();f.page.mouse.click=async(...args)=>{f.clicks.push(args);throw Error('lost response');};
  await assert.rejects(restoreProcessNodeFocus(f.page,ticket),/lost response/);assert.equal(f.clicks.length,1);
+});
+
+test('pinned console focus preserves the same native objects across Show Node',async()=>{
+ const f=fixture('MF;ConsoleForm'),ticket=await captureProcessNodeFocus(f.page,f.task);assert.ok(ticket.value);f.show();
+ assert.equal((await restoreProcessNodeFocus(f.page,ticket)).restored,true);assert.equal(f.clicks.length,1);
 });
