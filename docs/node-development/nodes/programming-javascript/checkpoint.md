@@ -1,5 +1,42 @@
 # JavaScript: checkpoint исполнения
 
+## G4/G7: writer → два Save → cold Execute, режим code — 2026-09-29
+
+Child source `b94b9d6805` расширил внутренний one-shot writer на фиксированный
+private persistence-сценарий. Для S1 и S2 создаются отдельные owner/operation ID;
+неопределённый ответ после начала жеста запрещает UI cleanup/replay. Адресный
+writer/source-cycle/persistence-writer набор на pinned Node24.19.0 —
+63/63 PASS, `node --check` и `git diff --check` прошли.
+
+Ubuntu headed profile227/Loginom Enterprise 7.4.2 подтвердил S1 SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`
+и S2 SHA256
+`82b59a9d136dd1de484fe005db3b50c7ed8b314c1a2e3f2a832ce90903f94cdf`:
+по одному `prepared`/`mutation_dispatch`/`draft_verified` на каждую запись,
+два отдельных Execute и два подтверждённых Save одного собственного `.lgp`.
+Writer завершился exit0/`OBSERVED` с package close/logout/browser close 3/3.
+Отчёт SHA256
+`6c46add4f903abf0150036dde5d2d88d240e29b67de93bda85a596494aaecaa1`,
+journal SHA256
+`bdde31f4414a9963643a18d8494cd62e7a552fa55ccf6c20ad8ed7b903114851`,
+private writer verification SHA256
+`3ffb931f1135fa04793936e4ae7252b1f18f99b4e35b4f9e28e19591020d3d57`.
+
+Новый Ubuntu headed profile228 открыл тот же сохранённый пакет без передачи
+нового кода/настроек, прочитал S2 и выполнил JS заново. Cold reader exit0 /
+`OBSERVED`, package close/logout/browser close 3/3; report SHA256
+`6ccabbe7ecb6f85050a55e13155c4de07e11439c0ccbebd3e5798e5e35dc3772`,
+journal SHA256
+`2c9b8a5eacb19b9f80a6836329de9445080ea5500fafb77e61be713d6464959b`.
+Независимый `javascript-persistence-audit.mjs` сравнил оба Save, исходник,
+настройки, mapping, граф, исполнения и полный малый output: `VERIFIED`,
+audit SHA256
+`1fcf2e62b9e46723149cdfbaf422033ee373fc95cf19128738746a09ce63c4f6`.
+Процессов профилей227/228 не осталось; оба профиля сохранены, следующий
+пустой profile229 назначен. Это доказательство только фиксированного режима
+`code`; `declared`, публичный handler, доставка модели и автономная
+CLI-приёмка остаются открытыми.
+
 ## G4: one-shot writer проверен на headed стенде — 2026-09-29
 
 Child source `ccc8fb01f3` подключил внутренний `createJavascriptSourceWriter`
