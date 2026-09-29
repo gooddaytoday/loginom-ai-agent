@@ -37,6 +37,15 @@ Chromium1246**, `DISPLAY=:1`, на `http://logi-test-plan.bg.local/app/`
 сохранение source digest и module policy при каждом fresh Execute,
 регистрация публичного handler и затем CLI J01/J20/J21.
 
+Перед реализацией следующего слоя повторно установлено, что pure
+`javascript-parameters.mjs` и его тесты **уже находятся** в child-ветке:
+контракт new/existing, module policy, source bounds, declared columns и
+Close/port invariants там проверяются до browser effect. Попытка заменить
+этот валидатор в `7ffe7ac1fc` ухудшала существующие проверки; она полностью
+откачена отдельным `82ff10da7e`, оба коммита отправлены. После отката
+адресные тесты параметров, module policy, node API и node apply снова PASS.
+Не повторять эту замену; подключать имеющийся validator к handler.
+
 ## Guard публичного повторного Execute/read — 2026-09-29
 
 Child `19105bd87d` закрыл опасный shortcut перед регистрацией JS-handler:
