@@ -82,6 +82,27 @@ test('one Add waits for asynchronous record then global form, with a same-native
   await verifyJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
 });
 
+test('owned declared editor inventories DataKind and default usage caches without invoking proxy getters',async()=>{
+  const f=fixture();
+  for(const [name,selected,options] of [
+    ['cbxDataKind',1,[{Value:1,DisplayText:'Непрерывный'},{Value:2,DisplayText:'Дискретный'}]],
+    ['cbxUsageType',0,[{Value:0,DisplayText:'Не задано'},{Value:4,DisplayText:'Выходное'}]]]){
+    const element=f.element(name,'EditColumnDefForm;'+name,f.editor);
+    const records=options.map(data=>({isModel:true,data}));
+    const control={el:{dom:element},value:selected,store:{getData:()=>({items:records}),isLoading:()=>false}};
+    Object.defineProperty(control,'FullType',{get(){throw Error('remote getter');}});
+    f.form.FItems[name]=control;f.controls[name]=control;
+  }
+  await f.open();
+  const result=await f.page.evaluate(observeJavascriptColumnEditor,{held:f.state.pending.held,phase:'editing',readDeclaredControls:true});
+  assert.equal(result.status,'ready');
+  assert.deepEqual(JSON.parse(JSON.stringify(result.declared_controls.cbxDataKind.options)),
+    [{Value:1,DisplayText:'Непрерывный'},{Value:2,DisplayText:'Дискретный'}]);
+  assert.equal(result.declared_controls.cbxUsageType.cached_value,0);
+  await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
+  assert.equal(f.effects.filter(effect=>effect==='cancel').length,1);
+});
+
 test('nested editor and second-column baseline preserve all earlier record identities and cached fields',async()=>{
   const f=fixture({count:1,globalForm:false});await f.open();const old=f.records[0];
   await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});

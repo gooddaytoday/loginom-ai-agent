@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import {withJavascriptWizardMasks} from './javascript-wizard-masks.mjs';
 // Serialized, read-only UI/cache observer. Held references belong to this
 // operator only. No server proxy property, form method or store mutation is used.
-export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function observeJavascriptColumnEditor({context,held,phase='capture',expectedCount,target,kind='click',option,readField,readHelper=false,readPicker=false,expectedType,expectedLabel}) {
+export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function observeJavascriptColumnEditor({context,held,phase='capture',expectedCount,target,kind='click',option,readField,readHelper=false,readPicker=false,readDeclaredControls=false,expectedType,expectedLabel}) {
   const c=held?.context??context,checks={};
   const finish=(status,reason,extra={})=>({status,reason,checks,...extra});
   const result=(status,reason,extra={})=>phase==='capture'?{snapshot:finish(status,reason,extra)}:finish(status,reason,extra);
@@ -252,7 +252,29 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
       native_raw_value_available:typeof raw==='string',placeholder};
 
   }
-  return result('ready',null,{...counts,base:editorBase,...(pickerSnapshot?{picker:pickerSnapshot}:{}),...(helperSource?{helper_source:helperSource}:{}),...(fieldReadback?{field_readback:fieldReadback}:{})});
+  let declaredControls;
+  if(readDeclaredControls){
+    declaredControls={};
+    for(const name of ['cbxDataKind','cbxUsageType']){
+      const elements=exact(editorBase+';'+name),field=elements.length===1?elements[0]:null,combo=value(items,name);
+      if(!field||!visible(field)||!element.contains(field)||dom(combo)!==field
+        ||globalThis.Ext?.getCmp?.(field.id)!==combo)return result('refused','declared_control_owner_unconfirmed',{...counts,name});
+      const store=value(combo,'store'),records=store?dense(store.getData?.()?.items,64):null;
+      if(!records||records.length<1||store.isLoading?.()===true)return result('refused','declared_control_options_unavailable',{...counts,name});
+      const options=records.map(record=>{
+        const data=value(record,'data'),descriptors=data&&Object.entries(Object.getOwnPropertyDescriptors(data));
+        if(record.isModel!==true||!descriptors||descriptors.length>16||descriptors.some(([,d])=>!Object.hasOwn(d,'value')))
+          return null;
+        return Object.fromEntries(descriptors.filter(([,d])=>['string','number','boolean'].includes(typeof d.value)
+          &&(typeof d.value!=='string'||d.value.length<=120)).map(([key,d])=>[key,d.value]));
+      });
+      if(options.some(entry=>entry===null))return result('refused','declared_control_option_cache_unconfirmed',{...counts,name});
+      const cached=value(combo,'value');
+      declaredControls[name]={tid:editorBase+';'+name,disabled:combo.disabled===true,
+        cached_value:Number.isInteger(cached)?cached:null,options};
+    }
+  }
+  return result('ready',null,{...counts,base:editorBase,...(pickerSnapshot?{picker:pickerSnapshot}:{}),...(helperSource?{helper_source:helperSource}:{}),...(fieldReadback?{field_readback:fieldReadback}:{}),...(declaredControls?{declared_controls:declaredControls}:{})});
 });
 
 export async function waitJavascriptColumnEditor({page,pending,phase,deadline,record}) {
