@@ -1,7 +1,27 @@
 // Owned native-cache observer for the two JavaScript wizard pages. A missing
 // cache contract is a refusal with inventory, never permission to read a proxy.
-export function readJavascriptSchema({root,native,binding,prefix}) {
+export function readJavascriptSchema({root,native,binding,prefix,prepared}) {
   try {
+  if(prepared){
+    const app=globalThis.bg?.app,active=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
+    const wizard=active?.Controller?.Node?.data?.node,node=wizard?.ParentNode,model=active?.Controller?.FController;
+    const preparation=globalThis.__loginomDockPreparationV1;
+    const receipts=[...(preparation?.receipts?.values()??[])].filter(receipt=>receipt.phase==='verified'
+      &&receipt.workflowId===prepared.workflow_ref.workflow_id);
+    const receipt=receipts.find(entry=>entry.nodeTargetWorkflowNode);
+    const tabs=[...document.querySelectorAll('[data-tid='+JSON.stringify(prepared.workflow_ref.tab_tid)+']')];
+    if(preparation?.document!==document||preparation.id!==prepared.document_id||!receipt
+      ||receipts.some(entry=>entry.tab!==receipt.tab||entry.packageNode!==receipt.packageNode)
+      ||tabs.length!==1||tabs[0]!==receipt.tab||!tabs[0].classList.contains('x-tab-active')
+      ||node?.ParentNode!==receipt.nodeTargetWorkflowNode
+      ||!app?.WizardTreeNode||!(wizard instanceof app.WizardTreeNode)
+      ||!app.ModelNodeTreeNode||!(node instanceof app.ModelNodeTreeNode)
+      ||!model?.FModelNode||!model.FView?.el?.dom
+      ||node.FGuid!==prepared.node.node_id||node.FModelNode!==model?.FModelNode)
+      throw Error('Prepared JavaScript schema owner changed');
+    root=model.FView?.el?.dom;native=wizard;binding={tab:active,nodeData:node.FModelNode};
+    prefix=prepared.workflow_ref.prefix;
+  }
   const tab=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
   if(tab!==binding.tab||tab.Controller.Node?.data?.node!==native||tab.Controller.FController?.FModelNode!==binding.nodeData
     ||tab.Controller.FController?.FView?.el?.dom!==root||!root.isConnected)throw Error('JavaScript schema owner changed');
@@ -80,4 +100,3 @@ export function readJavascriptSchema({root,native,binding,prefix}) {
     })};
   }
 }
-
