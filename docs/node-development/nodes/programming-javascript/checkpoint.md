@@ -1,5 +1,34 @@
 # JavaScript: checkpoint исполнения
 
+## Managed Code Next → Done — headed proof, 2026-09-29
+
+Code commit `7b8e19bee0` в `origin/node-javascript` добавил
+`client/lib/javascript-managed-code-next.mjs`. Перед одним Next с Code-страницы
+runtime проверяет удержанный JS wizard/editor, SHA-256 и полный текст точно
+прочитанного draft, собственную доступную кнопку и ACK журнала. Browser lease
+помечает попытку до клика; receipt запрещает повтор при потерянном ответе.
+Возврат жеста не утверждает переход: private оператор отдельно дождался
+принадлежащей страницы Done 3/4 и только затем вызвал managed Done. Это
+подтверждённый маршрут **existing code-table с исходником, не меняющим
+схему**; другие режимы и ручное output mapping требуют своих проверок.
+
+Headed `managed-code-next-01`, fresh profile 274, завершился `OBSERVED`:
+managed write → managed Code Next → managed Done → независимый публичный
+`dock_node_read kind:source` и user-v1 вернули точные **420 UTF-8 bytes /
+9 LF lines**, SHA256
+`df9be69e448048406985c3906a952dff05600ed155e90eaa04e5c258374ad6fd`.
+Журнал содержит отдельные `javascript_managed_code_next_prepared` и
+`javascript_managed_done_prepared`; граница графа и post-Done input mapping
+сохранены, output честно `configured_only`. Draft marker не попал в report и
+journal. Cleanup **3/3**, X11 focus **0/3166 samples**, poll failures 0.
+Report SHA256
+`ab50f8ce65cdf3fc4ee8b60f8a92dec01bff329ff979a472548163840bbda682`.
+Под `registry.lock` назначен новый ещё не созданный profile 275,
+`profile-reassignment-275.json`. Адресные client tests **21 PASS / 0 FAIL**,
+operator/mapping tests **46 PASS / 0 FAIL**, синтаксис и diff проверены.
+Публичный JS `dock_node_apply`, отдельное Execute, save/cold и CLI-приёмка
+по-прежнему открыты.
+
 ## One-shot managed Done gesture — 2026-09-29
 
 Code commit `7ed53e0ee0` в `origin/node-javascript` перенёс действие Done из
