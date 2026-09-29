@@ -1,5 +1,16 @@
 # JavaScript: checkpoint исполнения
 
+## Public preflight для JS port/Close — 2026-09-29
+
+Child `eb48d3768c` дополнил чистую проверку JS-запроса до target/browser:
+только input/output mapping порта 0, только read порта 0, и Close без
+предварительно коммитящих входов или mappings. Existing Close без таких
+эффектов остаётся допустимым; new с обязательным входом отвергается до
+создания узла. Client JS 232/232 PASS, node API/apply 76/76 PASS,
+`git diff --check` PASS. Это preflight будущего handler, а не его
+регистрация. Стенд на момент проверки всё ещё возвращал HTTP 503;
+profile236 остаётся пустым и назначенным для следующего headed запуска.
+
 ## Managed-opening probe: локальная проверка и отказ стенда при login — 2026-09-29
 
 Child `3cb50cddcc` исправил реальный контракт `workflow_ref.navigation_path`:
