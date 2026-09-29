@@ -1,5 +1,32 @@
 # JavaScript: checkpoint исполнения
 
+## G3: native выбор назначения, до Apply — 2026-09-29
+
+Child source `8e983b81c7` добавил только операторскую пробу выбора собственного
+`cbxUsageType` option `4 — Выходное`. До клика проверяются native owner picker,
+его store, все семь DOM-вариантов и точный option; повтор жеста при потерянном
+ответе запрещён. После клика читаются native cached value и закрытое состояние
+списка; затем собственный `Cancel`, без Apply/Save/Execute/Done.
+
+Ubuntu headed profile221/Loginom Enterprise 7.4.2 подтвердил один
+`usage-option-select`: до него `cbxUsageType.value=0`, после — `4`, picker
+автоматически свернулся. `Cancel` завершился с нулём локальных записей;
+process exit0/`OBSERVED`, package close/logout/browser close 3/3, процессов
+профиля нет. Report SHA256
+`a3a25e3579f30e2ddb6c2885bcbb491ab0ae20aa7a3e9cd102b017dc3726077c`,
+journal SHA256
+`268b66628b05de7a74405d8367532687a76a8eb243e8ac1128f00805a0859564`,
+independent verification SHA256
+`abc77def336411b01449f69eae2fe51a49b43c7fbcfb17194e5892351db8c827`.
+Private freeze144 SHA256
+`ce67ac099565906396b1818745c946901dba5712dd3dfe032ee622de04470ca6`
+сверил 1336 pins, closure223 файла/661 literal edge, computed0; JS suite
+18 056/18 056 PASS, fail/skip0, log SHA256
+`c2a4aae791a54fa765fddced5c08f15f31db609c04b735863a8a63f92e03282d`.
+Browser lease свободен, следующий пустой profile222. Это доказательство
+только UI-кэша до Apply. `DefaultUsageType` в record, сохранённом пакете и после
+холодного открытия пока не проверен; G3 generated→physical bridge также открыт.
+
 ## G3: собственный список назначения открыт и закрыт — 2026-09-29
 
 Ветка `javascript` уже содержит `loginom` `3f35c5f232`: повторный
