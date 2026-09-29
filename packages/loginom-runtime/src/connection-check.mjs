@@ -70,7 +70,7 @@ export async function checkKnowledge(endpoint, apiKey) {
   }
 }
 
-export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false }) {
+export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, onContextCreated }) {
   const { chromium } = require("playwright-core")
   const launch = browserLaunch(headless)
   await mkdir(profile, { recursive: true, mode: 0o700 })
@@ -107,6 +107,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     // This authenticated page predates MCP; its capability choice must already
     // match the executor's download/byte-verification path on the first load.
     await context.addInitScript({ content: browserDownloadScript(candidate.url) })
+    if (onContextCreated) await onContextCreated(context)
     const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate)
     if (!keepOpen) {
       await context.close()
@@ -116,7 +117,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     return { ...result, context }
   } catch (error) {
     await context.close().catch(() => undefined)
-    if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED"].includes(error?.message)) throw error
+    if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED", "LOGINOM_FOCUS_SETUP_FAILED"].includes(error?.message)) throw error
     throw Error("LOGINOM_LOGIN_UNAVAILABLE")
   }
 }
