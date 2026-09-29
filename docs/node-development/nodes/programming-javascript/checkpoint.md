@@ -404,6 +404,35 @@ reused row/foreign owner/unknown reply/terminal race остаются отказ
 Под lock зарезервирован profile301 и запущен `p1-stop-finite-05` для live
 проверки этой перестановки; успех Stop ещё не заявлен.
 
+`p1-stop-finite-05`/profile301/source `daf5605a8b` —
+**CLEANUP_UNCONFIRMED**, report SHA256
+`2d5765f337948558755adbe8d3dedd240ef7598946eeac819714956551a4fb41`,
+journal SHA256
+`15f00c6f3e4f28a24e747e5fedc2fc99909bab854752766387766cc202eaffdd`.
+Finite Execute отправлен один раз; identify снова потребовал открыть консоль.
+Три toolbar click отклонены с no-effect/cleanup=true, последний отказ —
+`UI_EPOCH_CHANGED` **while checking the target**. Следовательно, перестановка
+native/UI reads сама по себе live Stop не решает. Identify/local cancel/Stop/
+short rerun здесь не выполнены. Исходный browser closed; package/logout нет.
+Headed recovery/profile302 закрыл только Package1/jsteach:3599
+(creation21:58/disconnect22:01 UTC), Refresh подтвердил отсутствие обоих;
+admin logout/browser/process cleanup проверены. Journal SHA256
+`02fcc4899692829c39629a1341e84271e62827c6a0974e4d725da72facfbdd8c`,
+receipt SHA256 `b25a456a99ff76d4965195aa9713788b767d74d8beb84ecf33df52cd760fb586`.
+
+Адресное чтение e2e `bg/helpers/progressForm.ts:Show` и
+`bg/sels/sProgressForm.ts` выявило **pin**, отсутствовавший в подготовке:
+`btnUnpin` закрепляет панель, `btnPin` подтверждает закреплённое состояние.
+Live journal05 действительно содержит observed `ConsoleForm;btnUnpin`.
+Child `0d306421f7` добавил один guarded pin до Execute для private
+`keepConsoleOpen:true`; уже закреплённая панель не переключается. Missing pin
+state и unknown pin receipt отказывают preparation, default callers не меняются.
+190 targeted tests и diff-check PASS; log SHA256
+`8ee481f54f8df8eef59c95539743af0546f4268c6b02cc652176e073ff96c53b`.
+Глобальные epoch guards не ослаблены; полный дизайн scoped admission пока не
+введён. Profile303/run `p1-stop-finite-06` проверяет эту конкретную предпосылку
+обычным headed запуском. G6 остаётся открытым.
+
 ### B: публичный configure existing — 2026-09-29
 
 В child commits `57b074fc7b`, `7cd36bb763`, `f8ceebcac9` собран узкий
