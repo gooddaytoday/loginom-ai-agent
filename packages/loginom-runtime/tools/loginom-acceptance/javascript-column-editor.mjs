@@ -272,6 +272,17 @@ export const observeJavascriptColumnEditor=withJavascriptWizardMasks(function ob
       const cached=value(combo,'value');
       declaredControls[name]={tid:editorBase+';'+name,disabled:combo.disabled===true,
         cached_value:Number.isInteger(cached)?cached:null,options};
+      if(name==='cbxUsageType'){
+        const triggers=dense(value(combo,'orderedTriggers'),8),pickers=(triggers??[]).filter(trigger=>value(trigger,'id')==='picker');
+        const trigger=pickers.length===1?pickers[0]:null,triggerDom=dom(trigger),wrap=value(value(combo,'triggerWrap'),'dom');
+        const triggerTid=editorBase+';cbxUsageType;trg_picker';
+        declaredControls[name].trigger={tid:triggerDom?.getAttribute('data-tid')??null,
+          expected_tid:triggerTid,inventory_count:triggers?.length??null,picker_count:pickers.length,
+          bound:!!triggerDom&&value(trigger,'field')===combo&&!!wrap&&field.contains(wrap)&&wrap.contains(triggerDom)
+            &&exact(triggerTid).length===1&&exact(triggerTid)[0]===triggerDom,
+          visible:visible(triggerDom),rendered:value(trigger,'rendered')===true,
+          repeat_click:value(trigger,'repeatClick')===true,disabled:combo.disabled===true};
+      }
     }
   }
   return result('ready',null,{...counts,base:editorBase,...(pickerSnapshot?{picker:pickerSnapshot}:{}),...(helperSource?{helper_source:helperSource}:{}),...(fieldReadback?{field_readback:fieldReadback}:{}),...(declaredControls?{declared_controls:declaredControls}:{})});
