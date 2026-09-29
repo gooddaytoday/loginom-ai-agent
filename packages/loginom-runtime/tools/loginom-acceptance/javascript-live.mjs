@@ -52,6 +52,7 @@ import {wizardReadiness} from '../../client/lib/javascript-wizard-page.mjs';
 import {makeJavascriptManagedPageCode} from '../../client/lib/javascript-managed-page.mjs';
 import {dispatchManagedJavascriptNext} from '../../client/lib/javascript-managed-next.mjs';
 import {openManagedJavascriptExistingWizard} from '../../client/lib/javascript-managed-existing.mjs';
+import {closeManagedJavascriptWizard} from '../../client/lib/javascript-managed-close.mjs';
 import {createExecutionJournal} from '../../client/lib/execution-journal.mjs';
 import {javascriptSentinelOutcome,verifyJavascriptInputMapping,javascriptInitialPages,compactJavascriptJournalRecord,observeJavascriptBrowserLifecycle} from './javascript-execution-evidence.mjs';
 import {readJavascriptStage,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
@@ -186,7 +187,7 @@ let executionJournalLine=0;
 let nativeClassifierBinding;
 let sourceCycleUncertain=false,coldOpenPending=false,packageFileReadUncertain=false;
 const sourceReaders=[];
-let readingExisting=false,initialOpening={},managedSourceTask=null;
+let readingExisting=false,initialOpening={},managedSourceTask=null,managedCloseUncertain=false;
 const schemaContext=()=>({root:wizardRoot,native:wizardHandle,binding:wizardBinding,prefix:owner.prefix,account:config.username,build:'7.4.2'});
 const executionRecord=async event=>{
   if(discoveryProbe&&event.phase==='execution_terminal'){
@@ -1139,7 +1140,22 @@ const runExecutionTrial=async probe=>{
         await executionRecord({phase:'javascript_managed_existing_source_observed',...report.managed_existing_observation});
         await save();
       }
-      await closeWizardOnce();
+      if(existingManaged){
+        managedCloseUncertain=true;
+        const cleanupDeadline=phaseDeadline(60000);
+        report.effects.push({at:new Date().toISOString(),action:'wizard-close-managed',state:'dispatching',
+          deadline:new Date(cleanupDeadline).toISOString()});await save();
+        const closed=await closeManagedJavascriptWizard({task:{...existingManaged.task,cleanup_deadline:cleanupDeadline},
+          execute:code=>Function('return ('+code+')')()(page),record:executionRecord,
+          receiptOptions:(id,key,signature)=>({receipt_namespace:'private-managed-js-existing-'+existingReceiptNamespace,
+            receipt_id:id,receipt_signature:signature})});
+        await waitGraphReady(Math.max(1,cleanupDeadline-Date.now()));
+        const afterClose=await snapshot('managed-wizard-close-settled');
+        if(!afterClose.nodes?.some(item=>item.id===existingManaged.task.owner.node_id
+          &&item.icon_class==='bg-vendor-icon-javascript'&&item.rendered))
+          throw Error('Managed JavaScript Close did not restore owned node');
+        report.managed_existing_close=closed;openedWizard=false;managedCloseUncertain=false;await save();
+      }else await closeWizardOnce();
       if(existingManaged){
         const {prepared,allowDeactivation,...selectionTask}=existingManaged.task;
         await Function('return ('+makeJavascriptManagedSelectionReadCode({...selectionTask,mode:'dispose'})+')')()(page);
@@ -1705,6 +1721,7 @@ try {
       if(coldOpenPending)throw Error('Cold package opening/binding uncertain; close own browser only');
       if(packageFileReadUncertain)throw Error('Native package read uncertain; no UI cleanup replay, close own browser');
       if(sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain))throw Error('Source cycle uncertain; no UI cleanup replay, close own browser');
+      if(managedCloseUncertain)throw Error('Managed JavaScript Close uncertain; no UI cleanup replay, close own browser');
       if(executionRuntime?.persistenceUncertain)throw Error('Persistence save/binding uncertain; no UI cleanup replay, close own browser');
       if(executionRuntime?.nativeReadUncertain)throw Error('Native input pending/retired or buffer cleanup unconfirmed; UI cleanup refused, close own browser');
       if(paletteAdmission?.inputReleaseConfirmed===false)throw Error('Palette mouse/Alt release unconfirmed; UI cleanup refused, browser must close');
