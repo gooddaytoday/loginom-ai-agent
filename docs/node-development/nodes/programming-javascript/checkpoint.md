@@ -28,6 +28,9 @@ package/logout/browser **3/3**. Report SHA256
 X11 no-focus: **0 browser focus samples / 2967**, poll failures 0.
 Под `registry.lock` назначен новый ещё не созданный profile 261 с receipt
 `profile-reassignment-261.json`; profile 260 повторно не использовать.
+Live был выполнен до заключительной правки корневой MCP-схемы и concurrent
+same-ID join; последовательный browser path ими не изменён, финальные изменения
+проверены протокольными и registry-тестами, но не повторным live запуском.
 
 Этот live proof проверяет публичный runtime и форму ответа в том же headed
 операторском browser context. Он ещё не является независимым запуском
