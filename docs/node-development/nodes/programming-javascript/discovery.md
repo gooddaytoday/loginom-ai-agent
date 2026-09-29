@@ -78,8 +78,10 @@ output mapping evidence; публичный Done вернул `output.status=not
 input/output, независимый unchanged oracle, отдельные owned Execute и cleanup
 3/3. Это не native byte или public handler evidence. Source `ba46d2ecda`,
 точные report/journal/receipt SHA и ограничения — в [checkpoint](checkpoint.md).
-Для продолжения использовать ранние P1-пробы из [плана](plan.md): changed/reordered
-и bounded Stop/cancel до полного Execute/read контракта. Реализация продолжается;
+Code changed/reordered также прошли с тем же source SHA: полный pinned input,
+fresh owned Execute и unchanged independent oracle, cleanup 3/3.
+Для продолжения использовать раннюю P1-пробу из [плана](plan.md): bounded
+Stop/cancel до полного Execute/read контракта. Реализация продолжается;
 наличие этого кода не закрывает неизвестные G1/G3/G5/G6, а отсутствие CLI не
 блокирует выход 0B. `ready_for_development` требует решений по точным вопросам
 третьей колонки; окончательное закрытие gates — по четвёртой.

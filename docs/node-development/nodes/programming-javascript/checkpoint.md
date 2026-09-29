@@ -22,12 +22,13 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | B: public existing configure — J05/J10/J14/J21 | Isolated `dock_node_apply` + независимый `dock_node_read`, `public-node-apply-03`, report SHA `3b5a18c93ec139edd311f0058b542fc7d70d84f38bdf9c4b5be74312eb5647f4`, cleanup 3/3 | Только фиксированный code/comment source; output mapping `configured_only`, Execute, Save/cold и полный продуктовый handler не доказаны |
 | Scalar/precision/cardinality/engine/names/errors — J06–J09/J12/J20/J24/J25 | Приватные native/typed, 30/30 engine observations, T-пробы; ссылки в discovery | G3 bridge, обязательный остаток G5/G6 и подтверждение через handler; число snippets не означает PASS |
 | Persistence — J15/J23 | Приватные code/declared/usage writer–cold–bytes, dirty-state; см. G7 discovery и исторические SHA ниже | Только фиксированные 6×2; нужны handler 6×4 и CLI |
-| Бизнес и freshness — J03/J04/J11 | Private code/base и declared/base 6×4 `ba46d2ecda`: полный typed UI oracle и fresh owned Execute | Changed/reordered, затем public C/D; native bytes этими runs не доказаны |
+| Бизнес и freshness — J03/J04/J11 | Private code/base и declared/base 6×4 `ba46d2ecda`: полный typed UI oracle и fresh owned Execute | Code changed/reordered тоже прошли; остаются existing freshness, declared variants и public C/D/E; native bytes этими runs не доказаны |
 | Stop/cancel — J13 | Runtime/unit части lost reply; живого Stop/cancel нет | Конечный цикл ≤60 секунд, owned terminal/cleanup/rerun до фиксации Execute-контракта |
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
-**Следующий связный результат:** ранние private 6×4 и конечный Stop/cancel
-из P1 [плана](plan.md) до окончательного Execute/read контракта. B уже подтвердил
+**Следующий связный результат:** конечный Stop/cancel
+из P1 [плана](plan.md) до окончательного Execute/read контракта. Ранний private
+бизнес 6×4 для обоих base modes и code changed/reordered проверен ниже. B уже подтвердил
 existing code-table через public API-path изолированного runtime; повторять
 этот фиксированный run без затронувшего изменения не требуется.
 Затем C code, D declared с Save/cold, E остаток J и F ревью/candidate/CLI.
@@ -262,8 +263,23 @@ independent receipt SHA256
 сумма2850. Source SHA совпадает с code/base, отдельный owned Execute completed.
 Это отдельный свежий private пакет; обновление старого input в том же графе,
 declared variants и public freshness не доказаны. Под lock profile292
-назначен для code/reordered. `expected.json` неизменен; затем конечный
-Stop/cancel P1, после него полные C/D/E/F по плану.
+назначен для code/reordered. `expected.json` неизменен.
+
+Private `p1-business-code-reordered-01`/profile292/source `ba46d2ecda` —
+**OBSERVED**, полный typed UI oracle и cleanup 3/3, своих процессов нет.
+Report SHA256 `e231bf952897d31ab14c36ecbb96e1f12114e187eec722616f6110c8a6f62198`,
+journal SHA256 `3e03e9ca9ee2502a2779f2119f418378111f6a6ba1ba60c7740684c2c03c290e`,
+independent receipt SHA256
+`53c9fdc62b5056c7a3138b7e3185845eeabacb6e00385b450bb3d819f6edf299`.
+Фактический input order DiscountPct/Customer/UnitPriceCents/RowID/Qty и
+все 6×5 значения/mappings подтверждены до JS; тот же code source SHA дал
+полные 6×4 и сумму1950 после отдельного owned Execute.
+P1 business осуществимость подтверждена для code/base, declared/base,
+code/changed и code/reordered. Это не declared variants, existing-input
+refresh, native byte, public C/D/E или CLI. Чистый profile293 зарезервирован
+под lock; Stop/cancel ещё не запускался. Следующий связный результат —
+конечный ≤60s цикл, отдельный local read cancel, exact native server Stop,
+terminal/cleanup и короткий same-node rerun. Затем C/D/E/F по плану.
 
 ### B: публичный configure existing — 2026-09-29
 
