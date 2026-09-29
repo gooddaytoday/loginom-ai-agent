@@ -134,3 +134,11 @@ test('a failed durable Stop preparation never enters the browser capability',asy
   resolve:()=>f.task.action,identity:()=>f.task.proof}),/disk failure/);
  assert.equal(mutations,0);assert.equal(f.clicks.length,0);
 });
+
+test('Playwright API error prefixes cannot erase the semantic epoch refusal',async()=>{
+ const f=fixture(),original=f.page.evaluateHandle;f.setHook(()=>f.epoch.revision++);
+ f.page.evaluateHandle=async(...args)=>{const handle=await original(...args),evaluate=handle.evaluate;
+  handle.evaluate=async(...args)=>{try{return await evaluate(...args)}catch(error){throw Error('JSHandle.evaluate: '+error.message)}};return handle;};
+ const r=await runNodeProcessControl(f.page,f.task,f.readNode,inspectNodeProcessControl);
+ assert.equal(r.status,'NOT_APPLIED');assert.equal(r.error.code,'UI_EPOCH_CHANGED');assert.equal(r.effect_possible,false);assert.equal(f.clicks.length,0);
+});
