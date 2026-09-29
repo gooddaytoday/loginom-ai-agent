@@ -1,5 +1,41 @@
 # JavaScript: checkpoint исполнения
 
+## G4/G7: declared writer → cold Execute — 2026-09-29
+
+Child `a08bb085d9` разрешил вторую отсоединённую DOM-перерисовку выбранного
+native JS-узла после собственного жеста, сохранив проверки owner, selection,
+единственности текущего shape и предел двух замен. Первая новая headed
+попытка/profile231 прошла прежний отказ, но остановилась до клика Setting:
+`pre_open_click` увидел вторую допустимую замену после сохранённого снимка.
+Report SHA256 `81449fff08a3240f38807553626d8ff0ed9ee2047c2e024f5579444b2f61d8b3`
+остался `CLEANUP_UNCONFIRMED`. Только этот пакет закрыт в отдельном headed
+admin/profile232; после Refresh он отсутствовал, admin logout/browser close
+подтверждены, recovery journal SHA256
+`fe4539ebbe4e042afde8f52b8d2dcd69fd54483f4c28722404c3cce1a4610fc2`.
+
+Child `341dbde42e` сохранил обязательное побайтовое равенство остальных
+полей снимка Setting и допускает лишь увеличение счётчика на одну проверенную
+перерисовку; смещение точки по-прежнему отказывает до клика. Адресный набор
+`javascript-execution-evidence.test.mjs` на pinned Node24.19.0 — 138/138 PASS.
+Полный `javascript*.test.mjs` набор после правки — 17817/17817 PASS.
+В новом Ubuntu headed profile233/Loginom Enterprise 7.4.2 fixed declared writer
+записал S1 SHA256 `816b086fe447eb42afbf87ac46b18b01153f731f3baf0de2bcd280da1104957f`
+и S2 SHA256 `ceae03ba038a6fb0f9889a3c98cbc6a93efea8c1448cd2e4693ee34a01d51c1a`,
+дважды исполнил JS и дважды сохранил один собственный `.lgp`.
+Writer exit0/`OBSERVED`, package close/logout/browser close 3/3; report SHA256
+`f8c6125e7e2e14da55bbd5ae8324f8db967f2fa30a0d310466bb2f934ec924e7`,
+journal SHA256 `c2e220fbcbda8c97851e0c1dbdeaf79d57fdc79eb72c34af989a3215037bf625`.
+
+Новый headed profile234 открыл тот же сохранённый пакет без передачи исходника
+или настроек и выполнил JS заново. Cold reader exit0/`OBSERVED`, cleanup 3/3;
+report SHA256 `17c432c4179192d2706ab0d0b50c6d7ab4fa7accfd6de1674556bff877c7f299`,
+journal SHA256 `19c9fc5ab9125eb69bf66156e8f55ce918352f5d3f0908c16aa71ca09e2acbae`.
+Независимый `javascript-persistence-audit.mjs` сравнил Save, source,
+настройки, mapping, граф, исполнения и малый output: `VERIFIED`, audit SHA256
+`4bf3b181bdd5acf24b15e2fe29e08ce8582bc2e7967969336927f15fa9815119`.
+Процессы профилей233/234 отсутствуют, следующий пустой profile235 назначен;
+публичный handler и CLI J20 этим не приняты.
+
 ## Повторная сверка Cursor-правила и recovery declared — 2026-09-29
 
 Указанный пользователем Cursor request `79e41aa8-71f2-4345-861f-d6510fe0344b`
@@ -22,9 +58,8 @@ writer report SHA256 `f9cf57d090f6f1dd191fde284dba34b8ada619e9bac9b7223989fcb923
 показал ровно этот пакет под `jsteach:3340`; он закрыт без сохранения,
 после Refresh отсутствовал. Admin logout и закрытие браузера подтверждены.
 Recovery journal SHA256 `248d7446a3c8daca5b7832f2146e135230ee9f0e72ccb8e9b2723e7c8c047579`,
-private receipt `profile-reassignment-231.json`; следующий пустой profile231
-назначен. Перед новой declared попыткой исследовать guard DOM replacement
-в `javascript-execution-runtime.mjs`, сохраняя owner/epoch и запрет replay.
+private receipt `profile-reassignment-231.json`; пустой profile231 был назначен
+для следующей попытки. Исход продолжения зафиксирован выше.
 
 ## G4/G7: writer → два Save → cold Execute, режим code — 2026-09-29
 
