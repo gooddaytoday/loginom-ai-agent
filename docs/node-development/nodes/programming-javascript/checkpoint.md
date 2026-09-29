@@ -1,5 +1,23 @@
 # JavaScript: checkpoint исполнения
 
+## Пауза: черновик headed managed-opening probe — 2026-09-29
+
+По просьбе пользователя работа остановлена до следующего живого прогона.
+Child `893b134c81` сохранил **непроверенный черновик** одноразового режима
+`--managed-opening-probe` в `javascript-live.mjs` и отдельный helper
+`javascript-managed-initial-opening.mjs`. Он должен провести уже подготовленный
+`code-table-execute` через managed capture → body selection → Setting →
+read-only settlement под прежним deadline. До паузы выполнены только
+`node --check` обоих файлов и `git diff --check`; адресные тесты и headed
+стенд для этого черновика **не запускались**. Не считать его принятым и не
+запускать без ревью текущих ownership/receipt/lifecycle границ и тестов.
+
+Назначен пустой profile235; новый браузер/пакет не открывался. Следующее
+действие после возобновления: проверить helper и CLI flag, добавить адресную
+проверку для fresh-node открытия/неопределённого Setting, затем использовать
+только новый headed профиль с журналом и подтвердить закрытие точного пакета,
+logout и браузера. Публичный JS handler и CLI J20 остаются открытыми.
+
 ## Managed settlement после Setting — 2026-09-29
 
 Child `ee41af1bd9` добавил read-only ожидание результата единственного
