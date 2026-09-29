@@ -290,6 +290,29 @@ test('native process, port and mapping reads share the prepared node and durable
  await assert.rejects(fixture().channel.observe({condition:'unbound controls',readProcessControls:true,ready:()=>true}),/prepared node/);
 });
 
+test('JavaScript schema read uses the prepared node channel and journals its exact owner',async()=>{
+ const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]};
+ const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'js'}};
+ const context={verified:true,document_id:'doc',workflow_id:'flow',node_id:'js',surface:'wizard',tid:'MF;TF-1;WizrdMCF'};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},
+  prepared_node_context:context,scan:{complete:true},wizard:{status:'observed',root_ref:'wizard',root_tid:context.tid},
+  ui:{elements:[],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+ const calls=[],records=[];
+ const channel=createNodeProcedure({operation:{id:'js-schema',deadline:10000,action:{action_key:'node.apply',revision:'1'}},
+  preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>1,
+  record:async entry=>{records.push(entry);return structuredClone(entry)},execute:async code=>{
+   calls.push(code);
+   if(code.includes('function workspaceUiCapability'))return {status:'SUCCEEDED',output:structuredClone(state)};
+   assert.ok(code.includes('function readJavascriptSchemaContext'));
+   return {verified:true,node_context:context,form:'JavaScriptColumnsWizard',grids:[]};
+  }});
+ const observed=await channel.observe({condition:'owned JavaScript schema',readJavascript:true,
+  ready:value=>value.node_javascript_schema?.verified===true});
+ assert.equal(observed.node_javascript_schema.form,'JavaScriptColumnsWizard');
+ assert.equal(records.at(-1).outcome.output.node_javascript_schema.node_context.node_id,'js');
+ assert.equal(calls.length,3);
+});
+
 test('Table dialogs require an explicit active port binding and never waive unrelated dialogs',async()=>{
  const table={view_guid:'11111111-1111-1111-1111-111111111111',port_guid:'22222222-2222-2222-2222-222222222222',table_tid:'MF;TF-1;ViewsForm;BrowseView'};
  for(const mode of ['valid','closing','undeclared','foreign_dialog','foreign_port']) {
