@@ -104,6 +104,34 @@ completed initial той же source SHA и сохранённый native root/g
 log SHA256 `89b76365bab715cf1936681ee69ec47bec86b968ebeeaa5afad918cc6521bf5e`.
 Следующий fresh профиль309/evidence C0 live02; новый live ещё не получен.
 
+### C0 live02: материализация и физический output0 подтверждены — 2026-09-30
+
+Ordinary headed profile309/source `f2d02cafad`, exec83479/exit0,
+`c0-code-materialization-02` — **OBSERVED**, cleanup package/logout/browser 3/3.
+Независимый Python audit проверил immutable manifest/oracle, полный input6×5,
+все output6×4 cells/types/NULL/order и сумму1950; свой browser/operator отсутствует.
+Report SHA256 `9a2883310881208dac334dbec35bba2018f355e573129285e90cc5fa62a00ed8`,
+journal `49aa4225cc5eeb9fd7859d7aff2b205972dc3ccbff2a4b2de2068f34a335edd7`,
+independent receipt `9a53a04aa9633c4fa2c8d57dea4baa6f13a5d2b2d4a04cd23a8c14fd02350b10`.
+
+После собственного первого Execute source store materialized4, target4,
+reciprocal native record/field IDs подтверждены; schema names/labels/types
+совпали с independently bound Table того же physical output0 GUID. Собственный
+post-mapping Execute имеет другой ID и retained prior root/group history;
+в журнале ровно два execute_graph_node preparations. Output Close lock delta
+примирён без повторного gesture, original uncertain receipt сохранён.
+
+Границы: `generated_logical_schema_observed=false`, `bridge_verified=false`,
+native bytes=false/gates_closed=[]; это не public handler/Save/cold/CLI.
+Следующий G3 fixed witness добавляет служебную пятую колонку с canonical JSON,
+вычисленным из actual OutputTable.GetColumn before/after каждого Append.
+Requested names и expected business cells не заменяют наблюдённые metadata.
+Сравниваются logical metadata со source/target cached mapping и physical output0
+Table. Бизнес6×4 проверяется отдельной проекцией по прежнему oracle; metadata
+не входит в продуктовый source/knowledge. 14 локальных witness/parser tests PASS,
+log SHA256 `80d076b1993361d3c934c0c2649e095aa1cf02e671d5dec578b7e8e93f80715b`.
+Live G3 пока не запускался; общий план и статус registry остаются прежними.
+
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
 Child code commits `05dfebe85a`, `7fe5978c0f`, `cbfb793c95` добавили operator-only
