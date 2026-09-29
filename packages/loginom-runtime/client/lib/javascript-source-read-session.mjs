@@ -47,6 +47,7 @@ export function createJavascriptSourceReadSession({request, uiEpoch, deadline, a
     get owner() { return owner; },
     get deadline() { return deadline; },
     get uncertain() { return reader.uncertain; },
+    get cleanupUnconfirmed() { return adapter.uncertain === true || adapter.active === true; },
     async read(next) {
       const kind = validateJavascriptSourceReadRequest(next);
       need(next.operation_id === initial.operation_id, 'JavaScript source operation changed');

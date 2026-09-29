@@ -13,6 +13,7 @@ export function createJavascriptSourceReadRegistry({openSession, maxOperations =
   const operations = new Map();
   return Object.freeze({
     get busy() { return [...operations.values()].some(entry => entry.inflight !== null); },
+    get unsettled() { return [...operations.values()].some(entry => entry.session?.cleanupUnconfirmed === true); },
     async read(request) {
       const kind = validateJavascriptSourceReadRequest(request);
       const key = signature(request);

@@ -20,6 +20,9 @@ import {reconcileOutputMappingPhase} from './node-output-mapping-recovery.mjs';
 import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
 import { createNodeOperationRunner } from './node-operation-runner.mjs';
 import {nodeApiTools,deliveryApiTools} from './node-api.mjs';
+import {createJavascriptSourceReadRegistry} from './javascript-source-read-registry.mjs';
+import {createJavascriptSourceReadSession} from './javascript-source-read-session.mjs';
+import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import { configureTextImportDraft, validateTextImportRequest } from './text-import-procedure.mjs';
 
 const identifier = { type: 'string', minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$' };
@@ -1352,7 +1355,8 @@ export function parseCapabilityResult(response) {
   throw new Error('Pinned browser capability returned no typed result');
 }
 
-export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
+export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
+  javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
   nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   let pending = null;
@@ -1790,9 +1794,54 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         accepted_phases:state.phases.map(p=>p.phase),pending_phase:state.pending?.phase??null,
         effect_possible:state.effect_possible,cleanup_complete:state.cleanup_complete}):null;
     }});
+  const sourceReads=createJavascriptSourceReadRegistry({openSession:async request=>{
+    if(!redactor || typeof redactor.text!=='function' || typeof redactor.redact!=='function'
+      || typeof targetOrigin!=='string' || typeof targetBuild!=='string')
+      throw Error('JavaScript source read host dependencies unavailable');
+    if(operations.has(request.operation_id)||auxiliary.has(request.operation_id)||nodeJobs.has(request.operation_id))
+      throw Error('JavaScript source operation ID conflicts with another operation');
+    const deadline=Date.now()+(request.budget_ms??300000);
+    const uiEpoch=Date.now();
+    const operation={id:request.operation_id,action:{action_key:'node.source',revision:'1'},
+      checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline};
+    const prepared={document_id:request.document_id,workflow_ref:request.workflow_ref,node:request.node};
+    const executeSourceScript=async (code,options)=>{
+      const wrapped='async page => {const base={action_key:"node.source.transport",action_revision:"1",operation_id:'
+        +JSON.stringify(operation.id)+',phase:"transport",effect_possible:true,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('
+        +code+')(page)}};}catch(error){return {...base,status:"FAILED",cleanup_complete:false,output:{},error:{code:"NODE_SOURCE_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
+      const response=await execute(wrapped,{timeout:Math.max(1,deadline-Date.now()),...options});
+      if(response.status!=='SUCCEEDED')throw Error(response.error?.message??'JavaScript source transport failed');
+      return response.output.value;
+    };
+    const adapter=javascriptSourceAdapterFactory({page:{},prepared,node:request.node,
+      uiEpoch,deadline,targetOrigin,execute:executeSourceScript,record:onRecord,
+      receiptOptions:(id,key,signature)=>receiptOptions(operation,id,key,signature),
+      channel:()=>createNodeProcedure({operation,execute:executeSourceScript,record:onRecord,
+        targetOrigin,targetBuild,preparedNodeContext:prepared,
+        wrapMutation:(code,reference)=>withBrowserReceipt('('+code+')(page)',{
+          ...receiptOptions(operation,reference.id,reference.action_key,reference.signature),
+          operation_id:reference.id})})});
+    const session=createJavascriptSourceReadSession({request,uiEpoch,deadline,adapter,redactor,record:onRecord});
+    auxiliary.set(request.operation_id,{signature:'node.source:'+fingerprint('node.source',request)});
+    return session;
+  }});
   const runtime=Object.freeze({
-    startNodeApply:(request,options)=>nodeJobs.start(request,options),
-    startNodeRead:args=>nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id))),
+    startNodeApply:(request,options)=>{
+      if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
+      return nodeJobs.start(request,options);
+    },
+    startNodeRead:async args=>{
+      if(args.kind!=='source'){
+        if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
+        return nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id)));
+      }
+      if(sourceReads.busy)return sourceReads.read(args);
+      if(running||pending||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled)
+        throw Error('Resolve the pending Dock operation before JavaScript source reading');
+      running=true;
+      try{return await sourceReads.read(args);}
+      finally{running=false;}
+    },
     nodeApplyStatus:id=>nodeJobs.status(id),
     waitNodeApply:(id,options)=>nodeJobs.wait(id,options),
     cancelNodeApply:id=>nodeJobs.cancel(id),
@@ -1800,7 +1849,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     tools: [...executorTools,...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
       ...(allowCandidate&&nodeApplyHandlers.has('imports.text')&&nodeApplyDriverFactory?nodeApiTools:[])],
     assertPreparationAllowed() {
-      if (running || pending) throw new Error('Dock preparation cannot run while an action is running or its effect remains uncertain');
+      if (running || pending || sourceReads.unsettled) throw new Error('Dock preparation cannot run while an action is running or its effect remains uncertain');
     },
     describe(actionKey) {
       if (actionKey && typeof actionKey === 'object') {
@@ -2468,7 +2517,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     (...args)=>{
       if(delivery.busy){const error=Error('Artifact delivery is in progress');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
-      if(nodeJobs.busy&&!nodeControls.has(name)){const error=Error('A background node operation is running');
+      if((nodeJobs.busy||sourceReads.busy||sourceReads.unsettled)&&!nodeControls.has(name)){const error=Error('A background node operation is running');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
       return value(...args);
     }]));
@@ -2477,8 +2526,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // running. Keep the same host lease so the next model turn can use the
     // explicitly bounded status/resume tools instead of dead-ending in global
     // recovery mode.
-    hasActiveWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
-    hasUnsettledWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled),
+    hasActiveWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
+    hasUnsettledWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
     resumeArtifactDelivery:(request,options)=>delivery.resume(request,options),
     artifactDeliveryStatus:id=>delivery.status(id)});

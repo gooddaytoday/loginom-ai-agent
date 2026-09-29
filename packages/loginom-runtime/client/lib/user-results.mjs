@@ -162,6 +162,12 @@ CSV по умолчанию: UTF-8, запятая, header=names, bom=false, LF,
 с новым operation_id, source_operation_id успешной локальной операции и read
 (например, sample_rows:100, require_exact_numbers:true). Dock выполняет существующий
 узел и читает свежий выход без мастера настройки; не передавай формулы, mappings и finish.
+Для чтения сохранённого кода существующего JavaScript-узла до его изменения
+используй dock_node_read с kind:source, новым operation_id, document_id,
+workflow_ref:{workflow_id} и полным node ref. Это чтение не выполняет код.
+Собирай source_text из chunks по cursor до null; при продолжении передавай тот же
+operation_id, cursor и expected_source_sha256. Не считай первый chunk полным
+исходником и не запускай новый source-read после неопределённого Close.
 При running жди тот же ID через dock_node_wait.
 Для исправления уже завершённого узла используй dock_node_apply с новым operation_id,
 target.kind=existing, выданным target.ref и inputs:[] для сохранения связей.

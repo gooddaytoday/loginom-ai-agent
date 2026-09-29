@@ -5,9 +5,8 @@ import { createRedactor } from './redact.mjs';
 
 // The caller awaits this record before applying a mutation. This is independent
 // of native transcript capture, which may arrive after the browser response.
-export function createExecutionJournal({ directory, metadata, knownSecrets = [] }) {
+export function createExecutionJournal({ directory, metadata, knownSecrets = [], redactor = createRedactor(knownSecrets) }) {
   const path = join(directory, 'execution-events.jsonl');
-  const redactor = createRedactor(knownSecrets);
   let pending = Promise.resolve();
   return async record => {
     const write = async () => {

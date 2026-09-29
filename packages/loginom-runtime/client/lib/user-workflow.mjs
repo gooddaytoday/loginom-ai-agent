@@ -26,8 +26,13 @@ export function userNodeTool(tool) {
   if (!['dock_node_apply', 'dock_node_resume', 'dock_node_read'].includes(tool.name)) return tool;
   const copy = structuredClone(tool);
   if(tool.name==='dock_node_read'){
+    for(const branch of copy.inputSchema.oneOf)delete branch.properties.budget_ms;
     delete copy.inputSchema.properties.budget_ms;
-    copy.description+=' The application manages the bounded deadline for execution, exact-format reads and restoration. Do not supply budget_ms; a wait timeout does not end or restart the read.';
+    const sourceInitial=copy.inputSchema.oneOf[1].properties.workflow_ref;
+    sourceInitial.properties={workflow_id:sourceInitial.properties.workflow_id};
+    sourceInitial.required=['workflow_id'];
+    copy.inputSchema.properties.workflow_ref=structuredClone(sourceInitial);
+    copy.description+=' In the compact profile use workflow_ref:{workflow_id} for an initial source read; the application restores its prepared full workflow. The application manages the bounded deadline for execution, exact-format reads and restoration. Do not supply budget_ms; a wait timeout does not end or restart the read.';
     return copy;
   }
   if(tool.name==='dock_node_resume'){
@@ -74,6 +79,13 @@ export function createUserWorkflowBindings() {
     expandNodeRead(request) {
       // Exact-format reads must also restore every column and return to the
       // graph. The compact schema rejects caller budgets before this expansion.
+      if(request.kind==='source'){
+        if(Object.hasOwn(request,'budget_ms'))throw Error('Compact JavaScript source read budget is host-owned');
+        if(Object.hasOwn(request,'cursor'))return request;
+        const ref=references.get(key(request.document_id,request.workflow_ref?.workflow_id));
+        if(!ref)throw Error('UNKNOWN_PREPARED_WORKFLOW: read source using document_id and workflow_id issued together by successful dock_prepare.');
+        return {...request,workflow_ref:structuredClone(ref),budget_ms:300000};
+      }
       return {budget_ms:600000,...request};
     },
     expandNode(request) {
