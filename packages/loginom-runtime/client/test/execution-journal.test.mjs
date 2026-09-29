@@ -4,12 +4,14 @@ import { mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promise
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createExecutionJournal } from '../lib/execution-journal.mjs';
+import {createRedactor} from '../lib/redact.mjs';
 
 test('operation evidence is durable, ordered and redacted independently of transcripts', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'dock-execution-journal-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const metadata = { sessionId: 'session', clientRevision: 'runtime', actionManifestDigest: 'manifest' };
-  const record = createExecutionJournal({ directory, metadata, knownSecrets: ['private-key-value'] });
+  const redactor=createRedactor(['private-key-value']);
+  const record = createExecutionJournal({ directory, metadata, redactor });
   await Promise.all([
     record({ operation_id: 'one', phase: 'intent', detail: 'value private-key-value', password: 'user-password' }),
     record({ operation_id: 'one', phase: 'completed', detail: 'user-password' }),
@@ -20,6 +22,8 @@ test('operation evidence is durable, ordered and redacted independently of trans
   const records = text.trim().split('\n').map(JSON.parse);
   assert.deepEqual(records.map(item => item.phase), ['intent', 'completed']);
   assert.equal(records[0].manifest_sha256, 'manifest');
+  assert.equal(redactor.text('user-password'),'[redacted]',
+    'the source reader must inherit secrets learned by the same journal');
   if (process.platform !== 'win32') assert.equal((await stat(path)).mode & 0o777, 0o600);
 });
 

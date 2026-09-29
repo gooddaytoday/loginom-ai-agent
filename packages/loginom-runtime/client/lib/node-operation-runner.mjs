@@ -33,6 +33,7 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
   return snapshot(job);
  };
  return Object.freeze({
+  has:id=>jobs.has(id),
   get busy(){return [...jobs.values()].some(job=>job.state==='running');},
   get active(){const job=[...jobs.values()].find(job=>job.state==='running');return job?snapshot(job):null;},
   get unsettled(){return [...jobs.values()].some(job=>job.state==='running'||job.outcome?.status==='AMBIGUOUS'

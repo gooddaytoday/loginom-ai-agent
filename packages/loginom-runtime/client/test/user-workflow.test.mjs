@@ -99,7 +99,7 @@ test('compact rereads reject model deadlines and dispatch a bounded host deadlin
  const short={...args,budget_ms:60000};
  assert.throws(()=>validateActionParameters(compact.inputSchema,short),/unknown field.*budget_ms/);
  assert.equal(new AjvJsonSchemaValidator().getValidator(compact.inputSchema)(short).valid,false);
- assert.ok(original.inputSchema.properties.budget_ms);
+ assert.ok(original.inputSchema.oneOf[0].properties.budget_ms);
  validateActionParameters(compact.inputSchema,args);
  const before=structuredClone(args),calls=[],runtime={tools:nodeApiTools,startNodeRead:r=>{calls.push(r);return r;}};
  await dispatchNodeApi(runtime,'dock_node_read',bindings.expandNodeRead(args));

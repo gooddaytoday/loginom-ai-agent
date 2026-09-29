@@ -413,6 +413,21 @@ function deepFreeze(value, seen = new Set()) {
 
 export function validateActionParameters(schema, value, where = 'parameters') {
   const error = message => { throw new Error(`Invalid ${where}: ${message}`); };
+  if (schema.oneOf) {
+    const attempts=schema.oneOf.map(branch=>{
+      try {validateActionParameters(branch,value,where);return {valid:true};}
+      catch (failure) {return {valid:false,failure};}
+    });
+    if(attempts.filter(attempt=>attempt.valid).length===1)return value;
+    const matching=typeof value==='object'&&value!==null&&!Array.isArray(value)
+      ?schema.oneOf.map((branch,index)=>({branch,index})).filter(({branch})=>branch.type==='object'
+        &&(branch.required??[]).every(key=>Object.hasOwn(value,key))
+        &&Object.entries(branch.properties??{}).every(([key,property])=>property.const===undefined
+          ||!Object.hasOwn(value,key)||Object.is(value[key],property.const))) : [];
+    if(matching.length===1)throw attempts[matching[0].index].failure;
+    error('expected exactly one permitted request shape');
+  }
+  if (schema.const !== undefined && !Object.is(schema.const,value)) error('value differs from the required constant');
   if (schema.enum && !schema.enum.some(item => Object.is(item, value))) {
     const allowed=JSON.stringify(schema.enum);
     error('value is not in the allowed enum'+(schema.enum.length<=20&&allowed.length<=1000?'; allowed: '+allowed:''));

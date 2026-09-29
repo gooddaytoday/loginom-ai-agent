@@ -2,6 +2,9 @@ import {javascriptMappingState,javascriptPreservedMappings} from './javascript-m
 import {createJavascriptSourceReader} from '../../client/lib/javascript-source-read.mjs';
 import {createJavascriptSourceAdmission} from '../../client/lib/javascript-source-admission.mjs';
 import {createJavascriptManagedSourceAdapter} from '../../client/lib/javascript-managed-source-adapter.mjs';
+import {createActionRuntime} from '../../client/lib/executor.mjs';
+import {dispatchNodeApi} from '../../client/lib/node-api.mjs';
+import {nodeResultReply} from '../../client/lib/node-result-reply.mjs';
 import {createJavascriptSourceWriter} from '../../client/lib/javascript-source-write.mjs';
 import {inspectJavascriptModulePolicy} from '../../client/lib/javascript-module-policy.mjs';
 import {verifyJavascriptPersistenceOutput} from './javascript-persistence-oracle.mjs';
@@ -80,12 +83,12 @@ if(args.includes('--help')&&coldReader){console.log('node javascript-persistence
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-source-admission','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
-  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-source-admission','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
+  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
 }
 if(coldReader){
@@ -110,6 +113,7 @@ if(options['--managed-opening-probe']&&(options['--execution-case']!=='code-tabl
   throw Error('Managed opening probe requires one isolated code-table-execute case');
 if(options['--x11-no-focus']&&!options['--managed-opening-probe'])throw Error('X11 focus guard requires the isolated managed opening probe');
 if(options['--verify-source-admission']&&!options['--managed-opening-probe'])throw Error('Source admission requires the isolated managed opening probe');
+if(options['--verify-public-source-read']&&!options['--managed-opening-probe'])throw Error('Public source read requires the isolated managed opening probe');
 if(options['--verify-runtime-schema']&&(options['--execution-case']!=='code-table-execute'||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile))
   throw Error('Runtime schema verification requires one isolated code-table-execute case');
 if(options['--verify-runtime-source']&&(options['--execution-case']!=='code-table-execute'||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile))
@@ -170,7 +174,7 @@ const directory=resolve(options['--evidence']);
 await mkdir(directory,{mode:0o700});
 const redactor=createRedactor([config.password]);
 if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--server-version-only']||options['--managed-opening-probe']){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
-const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},knownSecrets:[config.password]});
+const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},redactor});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
   ...(coldReader||persistence||packageFile?{host_process:{pid:process.pid,started_at:new Date(performance.timeOrigin).toISOString(),profile:resolve(options['--profile'])}}:{}),
   ...(coldReader?{scope:'private G7 cold saved-package observation',original_deadline:batchDeadline,explicit_execution_limit:1,gates_closed:[]}:{}),
@@ -1194,6 +1198,32 @@ const runExecutionTrial=async probe=>{
           ||admitted.settings_sha256===null||admission.state!=='admitted')
           throw Error('Managed JavaScript source admission differs from executed baseline');
         report.managed_source_admission={verified:true,receipt:admitted,raw_source_in_report:false};
+        openedWizard=false;managedCloseUncertain=false;await save();
+      }
+      if(options['--verify-public-source-read']){
+        const publicDeadline=phaseDeadline(180000);
+        const publicRuntime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},
+          allowCandidate:true,nodeApplyHandlers:new Map([['imports.text',{}]]),nodeApplyDriverFactory:()=>({}),
+          targetOrigin:address.origin,targetBuild:'7.4.2',redactor,onRecord:executionRecord,
+          execute:code=>Function('return ('+code+')')()(page)});
+        const request={kind:'source',operation_id:'public-source-'+randomUUID(),
+          document_id:executionPrepared.document_id,workflow_ref:executionPrepared.workflow_ref,
+          node:{document_id:executionPrepared.document_id,workflow_id:executionPrepared.workflow_ref.workflow_id,
+            node_id:executionNode.node_id},budget_ms:Math.max(1,publicDeadline-Date.now())};
+        report.stage='public-source-read';managedCloseUncertain=true;openedWizard=true;await save();
+        const receipt=await dispatchNodeApi(publicRuntime,'dock_node_read',request).catch(error=>{
+          if(!publicRuntime.hasUnsettledWork()){managedCloseUncertain=false;openedWizard=false;}
+          throw error;
+        });
+        const delivered=nodeResultReply(receipt,{userProfile:true});
+        if(receipt.kind!=='source'||receipt.source_text!==probe.source||receipt.source_sha256!==digest(probe.source)
+          ||receipt.cursor!==null||delivered.structuredContent?.source_text!==probe.source
+          ||JSON.parse(delivered.content[0].text).source_text!==probe.source
+          ||publicRuntime.hasUnsettledWork())throw Error('Public JavaScript source receipt differs from baseline');
+        report.public_source_read={verified:true,kind:receipt.kind,source_sha256:receipt.source_sha256,
+          source_utf8_bytes:receipt.source_utf8_bytes,source_lf_lines:receipt.source_lf_lines,
+          chunk_utf8_bytes:receipt.chunk_utf8_bytes,cursor:receipt.cursor,
+          user_reply_verified:true,raw_source_in_report:false};
         openedWizard=false;managedCloseUncertain=false;await save();
       }
       await executionRuntime.settleClosedExecutionBoundary(boundary,executionNode,deadline);

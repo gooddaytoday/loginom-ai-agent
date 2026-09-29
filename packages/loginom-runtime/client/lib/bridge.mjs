@@ -18,6 +18,8 @@ import {isNodeApiTool,dispatchNodeApi} from './node-api.mjs';
 import { makeWorkspacePrepareCode, parseWorkspacePreparation, prepareWorkspaceSession, requirePreparedWorkspace, workspaceObserveTool } from './workspace.mjs';
 import { makeBrowserGeometryCode, parseBrowserGeometry } from './browser-geometry.mjs';
 import { createExecutionJournal } from './execution-journal.mjs';
+import {createRedactor} from './redact.mjs';
+import {javascriptSourceReceiptSchema} from './javascript-source-read-schema.mjs';
 import { createRecoveryContext } from './recovery-context.mjs';
 import { outcomeVerification } from './outcome-verification.mjs';
 import { createHostArtifactAdmission, codexInputIdentity } from './host-artifacts.mjs';
@@ -91,6 +93,9 @@ export async function createBridge(config, session, { browserTransport: managedB
   let userBundleDelivered = false;
   const logResult = async (tool, result) => {
     if (!userProfile || session.metadata.workspaceReady !== true) return;
+    // The source receipt is delivered only to the caller. A diagnostics copy
+    // would retain exact executable text outside the owned source-read record.
+    if(tool==='dock_node_read'&&result?.kind==='source')return;
     try { await recordLocalDiagnostics(config.stateDir, 'dock:' + session.metadata.sessionId,
       [{ event: 'tool.full_result', tool_name: tool, dock_session_id: session.metadata.sessionId, host_pid: process.pid, result }],
       { knownSecrets: [config.apiKey] }); }
@@ -130,8 +135,9 @@ export async function createBridge(config, session, { browserTransport: managedB
   let actionRuntime = null;
   let pinnedActions = null;
   let recoveryContext = null;
+  const redactor=createRedactor([config.apiKey]);
   const recordExecution = createExecutionJournal({ directory: session.directory,
-    metadata: session.metadata, knownSecrets: [config.apiKey] });
+    metadata: session.metadata, redactor });
   try {
     const connections = await Promise.allSettled([connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() })).then(client => { remote = client; }), browser.connect(browserTransport)]);
     const failed = connections.find(result => result.status === 'rejected');
@@ -152,7 +158,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         ...(replay?createCandidateNodeSupport({targetOrigin:config.loginomUrl?new URL(config.loginomUrl).origin:undefined,targetBuild:pinned.compatibility?.loginom_build,storageDirectories:config.storageDirectories}):{}),
         getStorageBinding: () => session.metadata.storageBinding ?? null,
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
-        artifactStore:session.artifactStore, allowCandidate: replay, onRecord: recordExecution,
+        artifactStore:session.artifactStore, allowCandidate: replay, onRecord: recordExecution, redactor,
         targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, options) => {
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
           code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding) : code,
@@ -168,7 +174,9 @@ export async function createBridge(config, session, { browserTransport: managedB
     if (userProfile) {
       groups.remote=groups.remote.filter(tool=>['find','search','read','grep','glob','list','tree'].includes(tool.name));
       groups.local=groups.local.filter(tool=>!['dock_ui_action','dock_artifact_upload','dock_artifact_verify'].includes(tool.name))
-        .map(tool=>isNodeApiTool(tool.name)?{...userNodeTool(tool),outputSchema:userResultSchema}:userActionTool(tool));
+        .map(tool=>isNodeApiTool(tool.name)?{...userNodeTool(tool),outputSchema:tool.name==='dock_node_read'
+          ?{type:'object',properties:{...userResultSchema.properties,...javascriptSourceReceiptSchema.properties},
+            additionalProperties:false,oneOf:[userResultSchema,javascriptSourceReceiptSchema]}:userResultSchema}:userActionTool(tool));
     }
     const catalog = combineCatalogs(groups);
     if (actionRuntime) {
