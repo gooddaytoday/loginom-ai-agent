@@ -1,5 +1,37 @@
 # JavaScript: checkpoint исполнения
 
+## G4: one-shot writer проверен на headed стенде — 2026-09-29
+
+Child source `ccc8fb01f3` подключил внутренний `createJavascriptSourceWriter`
+только к фиксированному private `javascript-source-read-live.mjs`. До замены
+проверяются owner/epoch, исходный полный SHA и module policy; после одного
+keyboard replacement читается точный draft. Потерянный ответ после начала
+жеста оставляет source cycle uncertain и запрещает автоматический cleanup.
+Адресные тесты writer/operator — 30/30 PASS на pinned Node24.19.0;
+синтаксис и diff check прошли.
+
+Ubuntu headed profile226/Loginom Enterprise 7.4.2 выполнил сценарий
+`source-draft-writer-01`: writer записал 376 UTF-8 байт/8 строк с SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`;
+после Done/Execute независимое повторное открытие мастера дважды прочитало
+тот же полный SHA, source/settings/mappings не изменились, а выход содержал
+6 ожидаемых строк `ObservedID` 1–6 с `PhaseMarker=JS_G2_TABLE_V1`.
+В журнале ровно по одному `prepared`, `mutation_dispatch`, `draft_verified`;
+события writer содержат digest и длины без исходного текста. Отчёт exit0 /
+`OBSERVED`, package close/logout/browser close 3/3, процессов profile226 нет.
+Private report SHA256
+`efe0ea0603ccf8e167ebeb251f20888fa3dac7fab2ca9ddc48121646557e71f4`,
+journal SHA256
+`cbf4bbedbdddc53a966a30edbec4751e0ff1cd5ead26d6552a6d01d4ece7a04c`,
+независимая квитанция `source-draft-writer-01-verification.json` SHA256
+`e53deb35a9836a07358ccbdff5c924c777efb27b3753ebdaa5b4f87c4f3c0eaa`.
+Профиль226 сохранён, новый пустой profile227 назначен с отдельной квитанцией.
+
+Это доказывает draft → Done/Execute → повторное чтение в одном пакете.
+Save, отдельный cold reopen `.lgp`, публичный handler, доставка модели и
+автономная CLI-приёмка ещё не проверены этим запуском. Отсутствие скрытого
+server commit этот source cycle не доказывает.
+
 ## Проверка Cursor-правила и G4 draft writer — 2026-09-29
 
 После `git fetch origin loginom javascript` повторный `git rebase origin/loginom`
