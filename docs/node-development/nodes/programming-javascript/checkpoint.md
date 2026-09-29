@@ -1,5 +1,30 @@
 # JavaScript: checkpoint исполнения
 
+## Managed read-only owner lease — 2026-09-29
+
+Child `f6046dddb0` разделил private JS selection на сериализуемые browser
+capture/inspect и добавил `client/lib/javascript-managed-selection.mjs` для
+штатного `execute` callback. Capture удерживает native object и DOM shape
+того же GUID; admission сверяет preparation receipt, активный tab DOM,
+`ModelForm`/graph root, `bg-vendor-icon-javascript`, account, origin/build.
+Повторный inspect сверяет тот же receipt, tab/root и native owner. Page-local
+lease keyed по operation ID и точному заданию удерживает JSHandle между
+вызовами; duplicate capture отказывает, dispose доступен и после исходного
+deadline. Этот этап только читает: не отправляет body/Setting gesture и не
+считает собственное наблюдение подтверждением настройки.
+
+На закреплённом Ubuntu Node 24.19.0: acceptance JS unit-набор
+17820/17820 PASS, client JS unit-набор 231/231 PASS, полный client unit-набор
+2771 PASS/0 FAIL/10 SKIP; адресный owned-selection файл 141/141 PASS.
+Системный Node 20.19.2 дал 10 отказов в полном client-наборе; для принятого
+результата использован закреплённый Node 24.19.0. `git diff --check` PASS.
+Кодовый commit отправлен в `origin/node-javascript`; незавершённые child docs
+не включены. Новый мост ещё не вызван из public handler, не входит в
+candidate/`clientRevision` и не проверен живым headed браузером. Следующий
+шаг — журналированный один body/Setting gesture через managed receipt,
+проверка на стенде и регистрация полного JS-handler. Карточка остаётся
+`candidate_node_apply_available=false`, CLI-приёмка открыта.
+
 ## Перенос owned открытия мастера в runtime — 2026-09-29
 
 Child `7a7f79c141` перенёс уже проверенные private операции выбора JS-узла,
