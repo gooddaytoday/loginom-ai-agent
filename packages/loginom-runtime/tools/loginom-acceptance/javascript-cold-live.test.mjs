@@ -9,7 +9,7 @@ import {javascriptSourceSettings} from './javascript-source-cycle.mjs';
 import {requireJavascriptSavedPackagePath} from './javascript-package-binding.mjs';
 import {observeJavascriptSource,observeJavascriptSourceProcesses} from '../../client/lib/javascript-source-browser.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
-import {sourceFixture} from '../../client/test/javascript-source-read.test.mjs';
+import {sourceFixture} from '../../client/test/support/javascript-source-fixture.mjs';
 import {runJavascriptOperator} from './javascript-live.mjs';
 
 const source='import {InputTable} from "builtIn/Data";\nconst text="Фактический текст 😀";';

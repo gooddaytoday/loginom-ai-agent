@@ -1,6 +1,7 @@
 // Serialized read-only boundary. Only local CodeMirror/cache access; never JS
 // source evaluation, model setters, proxy reads, or editor input gestures.
-export function observeJavascriptSource({context, owner, epoch, held = null, capture = false}) {
+export function observeJavascriptSource({context, owner, epoch, held = null, capture = false,
+  requireInputFocus = false, locate = false, selectionCheck = false}) {
   const {root, native, binding, prefix} = context;
   const need = (ok, message) => { if (!ok) throw Error('Source browser: ' + message); };
   const visible = element => !!element?.isConnected && element.getBoundingClientRect().width > 0
@@ -32,7 +33,8 @@ export function observeJavascriptSource({context, owner, epoch, held = null, cap
     && input.disabled !== true, 'editor unavailable');
   if (held) need(held.document === document && held.root === root && held.native === native && held.tab === tab
     && held.model === tab.Controller.FController && held.binding === binding && held.wrapper === wrapper && held.cm === cm
-    && held.page === pages[0] && held.doc === doc && held.input === input && held.focus === document.activeElement && held.epoch === epoch,
+    && held.page === pages[0] && held.doc === doc && held.input === input
+    && (requireInputFocus ? document.activeElement === input : held.focus === document.activeElement) && held.epoch === epoch,
   'retained editor/focus changed');
   const count = doc.lineCount();
   need(Number.isInteger(count) && count >= 1 && count <= 1024 && doc.firstLine() === 0 && doc.lastLine() === count - 1, 'line bound');
@@ -47,6 +49,20 @@ export function observeJavascriptSource({context, owner, epoch, held = null, cap
   if (capture) return {document, root, native, binding, tab, model: tab.Controller.FController, wrapper, cm, doc, input,
     focus: document.activeElement, epoch, page: pages[0]};
   need(held, 'retained handle required');
+  if (locate) {
+    need(!requireInputFocus && !selectionCheck && cm.getWrapperElement?.() === wrapper && wrapper.contains(input),
+      'editor point identity');
+    const bounds = wrapper.getBoundingClientRect(), x = bounds.x + Math.min(35, bounds.width / 2),
+      y = bounds.y + Math.min(15, bounds.height / 2);
+    const hit = document.elementFromPoint(x, y);
+    need(x >= 0 && y >= 0 && x < innerWidth && y < innerHeight && !!hit && wrapper.contains(hit),
+      'editor point covered');
+    return {owner, source, point: {x, y}};
+  }
+  if (selectionCheck) {
+    need(requireInputFocus && typeof doc.getSelection === 'function', 'editor selection unavailable');
+    return {owner, source, selection_full: doc.getSelection() === source};
+  }
   return {owner, source};
 }
 

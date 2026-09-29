@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createJavascriptColdSource} from './javascript-cold-source.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
-import {sourceFixture} from '../../client/test/javascript-source-read.test.mjs';
+import {sourceFixture} from '../../client/test/support/javascript-source-fixture.mjs';
 
 const owner = {document_id:'document',workflow_id:'workflow',node_id:'node',operation_id:'cold-source',ui_epoch:1};
 const source = 'import {InputTable} from "builtIn/Data";\nconst text="Фактический текст 😀";';
