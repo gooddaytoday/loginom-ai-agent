@@ -1,5 +1,38 @@
 # JavaScript: checkpoint исполнения
 
+## Управляемая проверка страницы мастера — 2026-09-29
+
+Code commit `7e127923f3` в `node-javascript` вынес прежний операторский
+native/DOM inspector страницы в общий read-only модуль
+`client/lib/javascript-wizard-page.mjs` и добавил
+`javascript-managed-page.mjs`. Новый маршрут использует удерживаемую
+аренду выбранного JS-узла, исходный deadline, точные account/preparation
+receipt и workflow. Он дважды читает страницу с захватом identity native
+wizard/root между чтениями; не переключает страницы и не читает исходник.
+Оператор вызывает его перед управляемым чтением CodeMirror и записывает
+только метаданные страницы и node ID. Адресные тесты и прежний
+execution-evidence suite: **159 PASS / 0 FAIL**, `node --check` и
+`git diff --check` прошли. Commit опубликован в `origin/node-javascript`.
+
+Первая headed попытка `managed-page-context-01`, свежий profile 247,
+обнаружила реальный дефект нового захвата: вкладка сравнивалась с полем
+оболочки lease вместо `binding.tab`. Статус `FAILED` до изменения кода,
+cleanup 3/3, report SHA256
+`be21f9929f082bc3b5f46c30e5ea29e515ea5837ca12c09117c75144d92fba87`.
+Сравнение исправлено и закреплено тестом. Повтор `managed-page-context-02`
+на новом profile 248 завершился `OBSERVED` / `typed_output_verified`:
+`JavaScriptCodeWizard`, page index 1 из четырёх native indicators,
+единственный видимый CodeMirror, тот же node ID; lease-bound source и
+последующий runtime source подтвердились, cleanup 3/3. Report SHA256
+`8726f8f0df78fdff2cb843acf96cc3316fdc3d36d0a09095542caa5ebd543809`.
+Оба браузерных процесса закрыты; profile 247/248 не повторять.
+
+Следующий участок: приватный однократный Next Input/Columns → Code в той же
+аренде с точным journal ACK перед жестом, pre-click native/DOM/hit-test
+проверкой и post-click чтением общего inspector. После этого — закрытие
+мастера, existing-node source admission, публичный handler и CLI J01/J20/J21.
+Live успешность **не** означает готовность публичного обработчика.
+
 ## Existing-node managed opening — source-only, 2026-09-29
 
 Code commit `2e9f6d2e80` добавил внутренний
@@ -8,9 +41,9 @@ Code commit `2e9f6d2e80` добавил внутренний
 единичным Setting, наблюдает native wizard и через общий `node-procedure`
 допускает только точный диалог деактивации этого узла. Возвращает аренду для
 последующего чтения и явного Close. Адресные тесты managed source/opening и
-execution evidence: **159 PASS / 0 FAIL**. Отдельного live-прогона этой новой
-ветви пока **нет**; предыдущие два headed прогона ниже относятся к
-initial managed opening и чтению уже открытого мастера.
+execution evidence: **159 PASS / 0 FAIL**. Отдельного live-прогона вызова
+этого helper для existing node пока **нет**; headed прогоны выше относятся
+к initial managed opening и чтению уже открытого мастера.
 
 Следующее необходимое звено установлено по исходнику `workspace-ui.mjs`:
 его `wizardMarkers` не содержат `JavaScriptColumnsWizard` и
