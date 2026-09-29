@@ -119,7 +119,8 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       p.process_id===group.process_id&&p.record_id===group.record_id&&p.children_loaded===true&&p.expanded===true));
   }
   return Object.freeze({
-    async prepare() {
+    async prepare({keepConsoleOpen=false}={}) {
+      requireValue(typeof keepConsoleOpen==='boolean','Owned process console mode must be boolean');
       requireValue(!baseline,'Execution baseline has already been captured');
       let s=await openConsole();
       // A long buffered process list can repaint after the panel becomes
@@ -153,7 +154,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         }
       }
       baseline=captureExecutionBaseline(s.node_processes,node);
-      await closeConsole(s);
+      if(!keepConsoleOpen)await closeConsole(s);
       return structuredClone(baseline);
     },
     async launchGraph() {
