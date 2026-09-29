@@ -198,6 +198,26 @@ receipt SHA256
 `2e3c3837f7dac8fb24fdbed7a5f46fc1011db6d82f746dacfca0497feec7fe26`.
 Исходный статус run05 сохранён. Под registry lock назначен чистый profile288
 для нового `p1-business-code-base-06`, source `a30f27ea20`.
+Run06/profile288/source `a30f27ea20` завершился **FAILED до JS**, cleanup
+package/logout/browser 3/3; своих процессов нет. Report SHA256
+`0a84e52fca544bcc892406ad1df8ac2a696c0e28a91a236a43c26833caf5b0a5`,
+journal SHA256
+`4c4cde965503baf7248a6ffce943e54b3c0930de83a1ce148d3dbee5cf10677c`.
+Storage /jsteach и own folder, delivery/configure/Done импорта подтверждены.
+Table settlement в sample7 отказал: тот же verified native node/views и
+собственная busy-маска, но output inventory `table_card_binding`.
+Отказ сам по себе не различает отсутствующую и чужую native card.
+
+Source `ba46d2ecda` различает native descriptor без созданной UI card:
+`table_card_pending` сохраняет только проверенные panel/node identities,
+`verified:false`. Private settlement ждёт ровно один такой descriptor на
+intended port только под собственной busy-маской, до исходного deadline.
+Present foreign card, чужой panel, другой invalid descriptor, смена owner
+или отсутствие маски остаются отказом; до verified card жест запрещён.
+158 targeted output/procedure tests PASS, syntax/diff PASS; log SHA256
+`191316fbbd4ea628a06dbd02a1f2732203a1ac6eaa91d9bcb8cf46d139db5812`.
+Следующий run07/profile289 различает эти состояния в live и проверяет полный
+input 6×5 перед JS; новый pending path ещё не доказан на стенде.
 `expected.json` остаётся неизменным. Далее — declared base, changed/reordered
 и конечный Stop/cancel по P1; до результата code-base их не считать проверенными.
 
