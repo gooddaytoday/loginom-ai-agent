@@ -349,6 +349,28 @@ syntax/diff PASS; log SHA256
 Следующая различающая проба `p1-stop-finite-03`/profile297 должна пройти
 identify/Stop без открытия консоли после запуска; G6 пока открыт.
 
+`p1-stop-finite-03`/profile297/source `feca3b193e` завершился
+**CLEANUP_UNCONFIRMED**. Report SHA256
+`69ed7c8af8625bccafa3b144e4f3ac8d0211e14ee4d3cebb6ecf67198e052f2a`,
+journal SHA256
+`cd4238d48850446e243a2830c7bcb4ef03110f72212af6b2ac54b0d924e3ffe1`.
+Консоль сохранена до Execute; native group3/child3.1 идентифицированы,
+local read cancel подтверждён. Stop увидел тот же owner и RUNNING/can_cancel,
+но три right_click (steps20/22/24) отклонены pre-gesture
+`UI_EPOCH_CHANGED`, effect=false/cleanup=true, с двумя разрешёнными refresh.
+Меню не открывалось, Cancel и short rerun не отправлялись. Причина DOM churn
+ещё не установлена; не приписывать её пользователю или одной анимации.
+Browser closed; package/logout исходного run не подтверждены, running=true.
+
+Отдельный headed recovery/profile298 закрыл только Package1/jsteach:3592
+(creation21:30/disconnect21:34 UTC); Refresh подтвердил отсутствие обоих.
+Admin logout/browser close и отсутствие собственных процессов проверены.
+Journal SHA256 `0b46bcb9f2e859b970157ce34d754cf5486fe520d39f80cfce4f267d333df210`,
+receipt SHA256 `36cd5d6c8429ffb2fd4a3ca8d988dad0d209b32edf47c4be371cc6337247a7f0`.
+Исходный report/cleanup сохранён. Под registry lock назначен профиль299;
+следующий шаг — ограниченная read-only диагностика причин смены эпохи вокруг
+Stop, до изменения допуска действий. G6 и вся публичная приёмка открыты.
+
 ### B: публичный configure existing — 2026-09-29
 
 В child commits `57b074fc7b`, `7cd36bb763`, `f8ceebcac9` собран узкий
