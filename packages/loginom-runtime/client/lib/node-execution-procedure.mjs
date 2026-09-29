@@ -123,6 +123,16 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       requireValue(typeof keepConsoleOpen==='boolean','Owned process console mode must be boolean');
       requireValue(!baseline,'Execution baseline has already been captured');
       let s=await openConsole();
+      if(keepConsoleOpen) {
+        const pinned=s=>consoleVisible(s)&&control(s,'ConsoleForm;btnPin').length===1
+          &&control(s,'ConsoleForm;btnUnpin').length===0;
+        if(!pinned(s)) {
+          requireValue(control(s,'ConsoleForm;btnUnpin').length===1
+            &&control(s,'ConsoleForm;btnPin').length===0,'Owned process console pin state unavailable');
+          await act(s,'ConsoleForm;btnUnpin');
+          s=await observe('owned process console pinned before launch',pinned);
+        }
+      }
       // A long buffered process list can repaint after the panel becomes
       // visible. Require two matching epochs before its menu gesture, and
       // retain this readiness check on strictly pre-gesture recovery.
