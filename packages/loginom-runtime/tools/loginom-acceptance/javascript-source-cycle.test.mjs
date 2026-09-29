@@ -35,6 +35,36 @@ test('source private verification actual reader procedure independent reopen and
 for(const fault of ['settings','source','mapping','execution','ack'])test('source private cycle rejects '+fault,async()=>{const f=cycleFixture(fault);await assert.rejects(()=>verifyJavascriptSourceCycle(f.args));});
 for(const args of [['--execution-case','code-table-execute'],['--probe-source'],['--schema-telemetry-case','T-schema-control'],['--create-node']])test('source operator refuses mixed modes '+args.join(' '),async()=>{await assert.rejects(()=>runJavascriptOperator(args,{sourceReadCycle:true}));});
 
+test('fixed source cycle routes one owned draft write and preserves uncertainty on a lost reply',async()=>{
+ const live=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
+ const start=live.indexOf('const probeOwnedSource=async'),end=live.indexOf('  const handle=',start);
+ assert.ok(start>=0&&end>start);
+ const body=live.slice(start,end)+'  throw Error("Legacy source path reached");\n};\nglobalThis.probe=probeOwnedSource;';
+ const baseline='old',target='const next=1;',source_sha256=createHash('sha256').update(target).digest('hex');
+ for(const lost of [false,true]){
+  const calls=[],report={},env={sourceReadCycle:true,sourceCycleUncertain:false,report,
+   phaseDeadline:()=>Date.now()+60000,Date,Error,redactor:{text:value=>value},digest:value=>createHash('sha256').update(value).digest('hex'),
+   save:async()=>calls.push('save'),waitWizardReady:async()=>calls.push('ready'),
+   executionPrepared:{document_id:'document',workflow_ref:{workflow_id:'workflow'}},executionNode:{node_id:'node'},wizardAddressEpoch:3,
+   page:{},schemaContext:()=>({build:'7.4.2'}),executionRecord:async event=>event,
+   createJavascriptSourceWriter:options=>({replace:async request=>{
+    calls.push({owner:options.owner,request});
+    if(lost)throw Object.assign(Error('reply lost'),{code:'JAVASCRIPT_SOURCE_WRITE_UNCERTAIN'});
+    return {source_sha256,draft_exact:true};
+   }})};
+  vm.runInNewContext(body,env);
+  if(lost){
+   await assert.rejects(()=>env.probe(baseline,target),error=>error.code==='JAVASCRIPT_SOURCE_WRITE_UNCERTAIN');
+   assert.equal(env.sourceCycleUncertain,true);assert.equal(report.source_write,undefined);
+  }else{
+   await env.probe(baseline,target);
+   assert.equal(env.sourceCycleUncertain,false);assert.deepEqual(report.source_write,{source_sha256,draft_exact:true});
+  }
+  assert.equal(calls.filter(x=>typeof x==='object').length,1);
+  assert.equal(calls.find(x=>typeof x==='object').owner.ui_epoch,3);
+ }
+});
+
 // Execute the actual private operator adapter around the production reader.
 // Browser navigation/transport and schema UI are synthetic; reader/process
 // browser functions execute unchanged in a separate realm, no browser launch.
