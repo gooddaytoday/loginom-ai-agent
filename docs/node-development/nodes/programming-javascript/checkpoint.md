@@ -371,6 +371,39 @@ receipt SHA256 `36cd5d6c8429ffb2fd4a3ca8d988dad0d209b32edf47c4be371cc6337247a7f0
 следующий шаг — ограниченная read-only диагностика причин смены эпохи вокруг
 Stop, до изменения допуска действий. G6 и вся публичная приёмка открыты.
 
+`p1-stop-finite-04`/profile299/source `c441628d6d` —
+**CLEANUP_UNCONFIRMED**. Report SHA256
+`ebbe4417f170b19dcebc160b16680857992fc76059aa3fcdc6640e5fd982f920`,
+journal SHA256
+`21b9ed587e9c652c453ee6c81b749d796900633217c47dae04e244511c719a86`.
+Operator-only bounded MutationObserver не менял DOM или допуск действий.
+Idle перед Execute: 0 mutations. До Stop: 2407, после попытки: 1950;
+диагностика неполна (overflow1947/1726), поэтому не объявлять единственную
+причину для всех записей. Зафиксированы повторные обновления содержимого и
+атрибутов строк консоли, включая старые группы. После Execute консоль всё же
+пришлось открыть: два no-effect epoch отказа, третий click SUCCEEDED.
+Identify/local cancel прошли; right_click steps24/26/28 снова NOT_APPLIED,
+effect=false/cleanup=true. Меню/Cancel/short rerun не выполнены.
+
+Headed recovery/profile300 закрыл только Package1/jsteach:3597
+(creation21:46/disconnect21:49 UTC), Refresh подтвердил отсутствие обоих;
+admin logout/browser/process cleanup проверены. Journal SHA256
+`015ef67457282c6424ae1029877c22e70c816094128dc4ec28dab020004d6e58`,
+receipt SHA256 `e34dfe3a1cba516a6ee40ddeacbf7940a49f5a8587c32f36c56263368a0a65fc`.
+Исходный outcome не переписан.
+
+Child `daf5605a8b` переставил native process cache read **перед** окончательной
+UI observation: refs/epoch больше не стареют через отдельный native transport.
+Prepared node context должен совпасть; Stop дополнительно сверяет rendered
+row record_id с exact child record_id. Обе проверки pre-gesture epoch, лимит
+трёх попыток и запрет unknown replay сохранены. Регрессия моделирует DOM
+изменение при native read и проверяет актуальную issued/journalled epoch;
+reused row/foreign owner/unknown reply/terminal race остаются отказами.
+188 targeted tests и diff-check PASS; log SHA256
+`26393c19b488707da0851d27b60426fd1b0089a675c8a037a4166723da8d6a07`.
+Под lock зарезервирован profile301 и запущен `p1-stop-finite-05` для live
+проверки этой перестановки; успех Stop ещё не заявлен.
+
 ### B: публичный configure existing — 2026-09-29
 
 В child commits `57b074fc7b`, `7cd36bb763`, `f8ceebcac9` собран узкий
