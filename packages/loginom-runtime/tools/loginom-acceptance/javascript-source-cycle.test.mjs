@@ -41,8 +41,8 @@ test('fixed source cycle routes one owned draft write and preserves uncertainty 
  assert.ok(start>=0&&end>start);
  const body=live.slice(start,end)+'  throw Error("Legacy source path reached");\n};\nglobalThis.probe=probeOwnedSource;';
  const baseline='old',target='const next=1;',source_sha256=createHash('sha256').update(target).digest('hex');
- for(const lost of [false,true]){
-  const calls=[],report={},env={sourceReadCycle:true,sourceCycleUncertain:false,report,
+ for(const mode of ['source-cycle','persistence'])for(const lost of [false,true]){
+  const calls=[],report={},env={sourceReadCycle:mode==='source-cycle',persistence:mode==='persistence'?{id:'fixed'}:null,sourceCycleUncertain:false,report,
    phaseDeadline:()=>Date.now()+60000,Date,Error,redactor:{text:value=>value},digest:value=>createHash('sha256').update(value).digest('hex'),
    save:async()=>calls.push('save'),waitWizardReady:async()=>calls.push('ready'),
    executionPrepared:{document_id:'document',workflow_ref:{workflow_id:'workflow'}},executionNode:{node_id:'node'},wizardAddressEpoch:3,
@@ -62,6 +62,8 @@ test('fixed source cycle routes one owned draft write and preserves uncertainty 
   }
   assert.equal(calls.filter(x=>typeof x==='object').length,1);
   assert.equal(calls.find(x=>typeof x==='object').owner.ui_epoch,3);
+  assert.equal(calls.find(x=>typeof x==='object').owner.operation_id,
+   mode==='persistence'?'source99-draft-'+source_sha256.slice(0,12):'source97-draft');
  }
 });
 

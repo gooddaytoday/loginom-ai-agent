@@ -692,9 +692,9 @@ const probeOwnedSource=async (baseline,executionSource=null)=>{
   const deadline=phaseDeadline(120000);
   report.source_probe_deadline=new Date(deadline).toISOString();await save();
   await waitWizardReady({deadline,inputOnly:false});
-  if(sourceReadCycle&&executionSource!==null){
+  if((sourceReadCycle||persistence)&&executionSource!==null){
     if(redactor.text(baseline)!==baseline)throw Error('Source baseline redacted before owned write');
-    const sourceOwner={operation_id:'source97-draft',document_id:executionPrepared.document_id,
+    const sourceOwner={operation_id:persistence?'source99-draft-'+digest(executionSource).slice(0,12):'source97-draft',document_id:executionPrepared.document_id,
       workflow_id:executionPrepared.workflow_ref.workflow_id,node_id:executionNode.node_id,ui_epoch:wizardAddressEpoch};
     const writer=createJavascriptSourceWriter({page,context:schemaContext(),owner:sourceOwner,
       epoch:wizardAddressEpoch,deadline,record:executionRecord});
