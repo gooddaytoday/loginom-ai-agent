@@ -1,5 +1,26 @@
 # JavaScript: checkpoint исполнения
 
+## Existing-node managed opening — source-only, 2026-09-29
+
+Code commit `2e9f6d2e80` добавил внутренний
+`client/lib/javascript-managed-existing.mjs`: он связывает подготовленный
+существующий JS-узел с управляемой арендой графа, сохраняет точный ACK перед
+единичным Setting, наблюдает native wizard и через общий `node-procedure`
+допускает только точный диалог деактивации этого узла. Возвращает аренду для
+последующего чтения и явного Close. Адресные тесты managed source/opening и
+execution evidence: **159 PASS / 0 FAIL**. Отдельного live-прогона этой новой
+ветви пока **нет**; предыдущие два headed прогона ниже относятся к
+initial managed opening и чтению уже открытого мастера.
+
+Следующее необходимое звено установлено по исходнику `workspace-ui.mjs`:
+его `wizardMarkers` не содержат `JavaScriptColumnsWizard` и
+`JavaScriptCodeWizard`, а `wizard_step` требует распознанный stage и
+`expected_stage`. Общий Next поэтому не является доказанным маршрутом для
+JS. Нужна приватная однократная навигация Input/Columns → Code с native/DOM
+owner, journal ACK и наблюдаемым результатом без раскрытия произвольных
+script-node действий в `dock_ui_action`; затем Close, settings readback и
+source admission. Публичный обработчик и CLI-приёмка всё ещё не выполнены.
+
 ## Управляемое чтение исходника — 2026-09-29
 
 В code worktree `node-javascript` опубликован commit `ea783f4ae1`
