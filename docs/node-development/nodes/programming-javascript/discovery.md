@@ -45,6 +45,12 @@ editor; доступность вариантов для других типов
 `Cancel` локальная коллекция пуста и чиста, но native `totalCount` оставался
 равным 1. Оператор принял только эту точную комбинацию квитанции Cancel и
 диагностики store; Save и Execute не вызывались. SHA и cleanup — в checkpoint.
+Следующий read-only проход на profile216 подтвердил для `cbxUsageType`
+единственный собственный видимый trigger
+`EditColumnDefForm;cbxUsageType;trg_picker` (`rendered=true`,
+`repeatClick=false`, `disabled=false`). Список не открывали и значение не
+выбирали: это доказательство адреса управляющего элемента, не persistence
+`DefaultUsageType`.
 
 Следующие проверки — установить оставшиеся свойства редактора,
 определить безопасный контракт `Next`/`Done`, доказать G3 bridge для generated

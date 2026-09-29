@@ -1,5 +1,28 @@
 # JavaScript: checkpoint исполнения
 
+## G3: собственный trigger назначения столбца — 2026-09-29
+
+Child source `fb55a63a49` дополнил только read-only inventory собственного
+declared editor: `cbxUsageType.orderedTriggers`, ровно один `picker`, native
+`field` и DOM/TID в границах form. На Ubuntu headed profile216/Loginom 7.4.2
+подтверждён `EditColumnDefForm;cbxUsageType;trg_picker`, bound/visible/rendered
+true, `repeatClick=false`, control enabled. `Add` был один, затем `Cancel`
+settled с нулём локальных записей; Save/Execute/Done не вызывались. Process
+exit0/`OBSERVED`, package close/logout/browser close 3/3, процессов профиля нет.
+Report SHA256
+`f4c339e18c699fc7fbd47702aaee431acb871421ace683ab937a87a6b99a14ad`,
+journal SHA256
+`31701ff368cd62af1f40071f1d4a9c9344dce384dc129915673922a332c3aeac`,
+independent verification SHA256
+`4d46a749c1ca61c506b9d0530f1bb0170f03021c1e5fc1074fb5d7e349352f6a`.
+Private freeze139 SHA256
+`096e644552b33309e0da8b25fb8d670024145659d99ebfe1d68c1531cc1ac12f`
+сверил 1336 pins, closure223 файла/661 literal edge, computed0. JS suite
+18 049/18 049 PASS на pinned Node24.19.0, fail/skip0; log SHA256
+`c227db62dd3808859f66a52c21777add9426f8679da1d574ff08c38f8343b23d`.
+Browser lease свободен, следующий пустой profile217. Picker не открывался,
+ненулевой usage не выбирался и не сохранялся; это следующий G3 шаг.
+
 ## 0A: ОС сервера Loginom подтверждена — 2026-09-29
 
 Frontend `MainForm.DoServerPrepare` Loginom 7.4.2 читает
