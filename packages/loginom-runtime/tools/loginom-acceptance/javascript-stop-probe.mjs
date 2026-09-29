@@ -6,6 +6,7 @@ import {javascriptDiscoveryOracle} from './javascript-discovery-probes.mjs';
 import {createNodeExecutionProcedure} from '../../client/lib/node-execution-procedure.mjs';
 import {createJavascriptManagedSourceAdapter} from '../../client/lib/javascript-managed-source-adapter.mjs';
 import {createJavascriptSourceAdmission} from '../../client/lib/javascript-source-admission.mjs';
+import {captureJavascriptStopMutations} from './javascript-stop-mutations.mjs';
 
 const need=(value,message)=>{if(!value)throw Error(message);};
 const sha=text=>createHash('sha256').update(text,'utf8').digest('hex');
@@ -16,7 +17,13 @@ export async function runJavascriptStopProbe({page,runtime,prepared,node,probe,d
   const driver=createNodeExecutionProcedure(runtime.channel(node,deadline),node);
   // Establish and retain this owned console before the graph starts repainting.
   // This avoids opening it during execution; all epoch guards remain intact.
-  const baseline=await driver.prepare({keepConsoleOpen:true}),started=performance.now();
+  const baseline=await driver.prepare({keepConsoleOpen:true});
+  const mutations=await captureJavascriptStopMutations(page);
+  try {
+  // This idle sample establishes whether churn precedes graph execution.
+  await page.waitForTimeout(Math.min(250,Math.max(1,deadline-Date.now())));
+  await record({phase:'p1_stop_mutation_diagnostics',stage:'before_launch',diagnostics:await mutations.read()});
+  const started=performance.now();
   const launch=await runtime.once('p1-stop-launch',{node,baseline,source_sha256:probe.source_sha256},()=>driver.launchGraph());
   await record({phase:'p1_stop_launch',node,baseline,launch,source_sha256:probe.source_sha256,finite_loop:fixed.finite_loop});
   const identified=await driver.identify();
@@ -32,7 +39,10 @@ export async function runJavascriptStopProbe({page,runtime,prepared,node,probe,d
   need(local?.execution_id===identified.execution_id&&local.read_only===true&&local.cleanup_complete===true,
     'Local cancellation did not prove a read-only wait boundary');
   await record({phase:'p1_local_read_cancel',identified,proof:local,server_stop_verified:false});
-  const stopped=await driver.stop();
+  await record({phase:'p1_stop_mutation_diagnostics',stage:'before_stop',diagnostics:await mutations.read()});
+  let stopped;
+  try{stopped=await driver.stop();}
+  finally{await record({phase:'p1_stop_mutation_diagnostics',stage:'after_stop_attempt',diagnostics:await mutations.read()});}
   need(stopped.verified===true&&stopped.stop_verified===true&&stopped.status==='cancelled'
     &&stopped.owner_verified===true&&stopped.cleanup_complete===true&&stopped.output_refreshed===false
     &&stopped.execution_id===identified.execution_id,'Owned terminal cancellation not verified');
@@ -73,4 +83,5 @@ export async function runJavascriptStopProbe({page,runtime,prepared,node,probe,d
     source_before_sha256:fixed.source_sha256,source_after_sha256:fixed.short.source_sha256,
     rerun:{identified:next,terminal,output,oracle},proof_level:'private_native_stop_and_typed_ui',gates_closed:[]};
   await record({phase:'p1_stop_rerun_verified',result});return result;
+  }finally{await mutations.close();}
 }
