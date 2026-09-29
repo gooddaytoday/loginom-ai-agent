@@ -624,7 +624,7 @@ test('Apply refuses unknown record flags and replacement data cache without call
 
 // Run the production configurator and serialized observers against the same
 // native/DOM editor fixture; UI gestures update its native cached records.
-for(const mode of ['empty','sales','usage','code','wrong-ack','wrong-phase','wrong-type','wrong-label','apply-lost'])test('production schema configuration preserves '+mode,async()=>{
+for(const mode of ['empty','sales','usage','business','code','wrong-ack','wrong-phase','wrong-type','wrong-label','apply-lost'])test('production schema configuration preserves '+mode,async()=>{
   const f=fixture(),root=f.context.root,page=f.controls.page.el.dom,base=page.tid;
   const generation=f.element('generation',base+';BooleanPropEdit;ValueControl',page),input=f.element('generationInput',generation.tid+';InputEl',generation),display=f.element('generationDisplay',generation.tid+';DisplayEl',generation);
   generation.classList.add('x-form-cb-checked');
@@ -652,7 +652,8 @@ for(const mode of ['empty','sales','usage','code','wrong-ack','wrong-phase','wro
         if(mode==='usage')f.records.at(-1).data.DefaultUsageType=0;
         for(const key of ['edtName','edtDisplayName']){const field=f.form.FItems[key];field.value=field.rawValue=field.inputEl.dom.value='COL1';}
         if(picker)for(let i=f.nodes.length-1;i>=0;i--)if(picker.wrap.contains(f.nodes[i])||picker.pickerDom.contains(f.nodes[i]))f.nodes.splice(i,1);
-        picker=typeFixture(f,{expanded:false,type:f.records.length===1?4:5,label:f.records.length===1?'Целый':'Строковый'});
+        const type=mode==='business'?[4,5,4,5][f.records.length-1]:f.records.length===1?4:5;
+        picker=typeFixture(f,{expanded:false,type,label:type===4?'Целый':'Строковый'});
         if(mode==='usage'&&f.records.length===1){
           usage=usageFixture(f,{lazy:true});
           usage.options[2].onClick=()=>{usage.combo.value=4;usage.setExpanded(false);};
@@ -665,12 +666,13 @@ for(const mode of ['empty','sales','usage','code','wrong-ack','wrong-phase','wro
       assert.fail('unexpected gesture '+tid);
     }};
   };
-  const run=()=>configureJavascriptSchema({page:f.page,context:f.context,mode:mode==='code'?'code':'declared',fixedCase:mode==='usage'?'usage-output':mode==='sales'||mode==='code'?undefined:'cardinality-empty',columnState:f.state,once:f.once,deadline:Date.now()+1000,
+  const run=()=>configureJavascriptSchema({page:f.page,context:f.context,mode:mode==='code'?'code':'declared',fixedCase:mode==='business'?'business-output':mode==='usage'?'usage-output':mode==='sales'||mode==='code'?undefined:'cardinality-empty',columnState:f.state,once:f.once,deadline:Date.now()+1000,
     record:async event=>{f.events.push(event);return event.phase==='javascript_declared_empty_verified'?(mode==='wrong-ack'?{}:mode==='wrong-phase'?{...event,phase:'wrong'}:event):event;}});
   if(['wrong-ack','wrong-phase','wrong-type','wrong-label','apply-lost'].includes(mode)){await assert.rejects(run);assert.equal(f.events.some(e=>e.phase==='javascript_declared_empty_verified'),['wrong-ack','wrong-phase'].includes(mode));return;}
   const result=await run();assert.equal(result.verified,true);
   if(mode==='empty'){verifyJavascriptDeclaredEmpty(result.declaration,result.declaration_sha256);assert.deepEqual(f.records.map(r=>[r.data.Name,r.data.DisplayName,r.data.DataType]),[['Value','Value',4]]);assert.equal(f.state.pending,null);assert.equal(f.effects.filter(e=>e==='schema-apply-0').length,1);}
   if(mode==='sales')assert.deepEqual(f.records.map(r=>[r.data.Name,r.data.DataType]),[['ObservedID',4],['PhaseMarker',5]]);
+  if(mode==='business')assert.deepEqual(f.records.map(r=>[r.data.Name,r.data.DataType]),[['RowID',4],['CustomerKey',5],['NetCents',4],['Status',5]]);
   if(mode==='usage'){assert.deepEqual(f.records.map(r=>[r.data.Name,r.data.DataType,r.data.DefaultUsageType]),[['ObservedID',4,4],['PhaseMarker',5,0]]);assert.equal(f.effects.filter(e=>e==='schema-usage-select').length,1);}
   if(mode==='code'){assert.equal(result.generation.checked,true);assert.equal(f.records.length,0);assert.equal(f.effects.length,0);}
 });

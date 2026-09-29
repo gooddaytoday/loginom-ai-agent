@@ -2,6 +2,7 @@
 // importing this module never evaluates a Loginom source or derives its oracle.
 import {createHash} from 'node:crypto';
 import {javascriptEngineProbes,inputTextProbe} from './javascript-engine-probes.mjs';
+import {javascriptBusinessProbes} from './javascript-business-probes.mjs';
 import {verifyJavascriptMismatchTable} from './javascript-mismatch-probe.mjs';
 
 const need=(v,m)=>{if(!v)throw Error(m);};
@@ -37,7 +38,8 @@ const probes=[
     schema:column('integer'),expected:null,expectation:'characterization',note:'Named-access case sensitivity is unknown.'},
   {id:'g5-empty-output',scope:'G5',source:source('Integer','// Deliberately append no rows.'),
     schema:column('integer'),expected:[],expectation:'fixed'},
-].map(p=>({...p,schema_mode:'code',build:'7.4.2',source_sha256:hash(p.source),status:'not_run'}));
+  ...javascriptBusinessProbes(),
+].map(p=>({...p,schema_mode:p.schema_mode??'code',build:'7.4.2',source_sha256:hash(p.source),status:'not_run'}));
 
 export const javascriptDiscoveryIds=Object.freeze(probes.map(p=>p.id));
 

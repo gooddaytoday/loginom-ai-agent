@@ -7,15 +7,20 @@ export function javascriptDeclaredColumnsMatch(snapshot,fixedCase) {
   const fields=snapshot?.grids?.find(grid=>grid.tid===snapshot.page_tid+';grdTargetColumns;tbl')?.fields;
   if(fixedCase==='cardinality-empty')return snapshot?.verified===true&&snapshot.inventory_complete===true&&snapshot.generation?.checked===false&&fields?.length===1
     &&fields[0].Name==='Value'&&fields[0].DisplayName==='Value'&&fields[0].DataType===4&&fields[0].Index===0&&typeof fields[0].Required==='boolean'&&fields[0].Broken!==true;
+  if(fixedCase==='business-output')return snapshot?.verified===true&&snapshot.inventory_complete===true&&snapshot.generation?.checked===false&&fields?.length===4
+    &&fields.every((field,i)=>field.Name===['RowID','CustomerKey','NetCents','Status'][i]
+      &&field.DisplayName===field.Name&&field.DataType===[4,5,4,5][i]
+      &&field.Index===i&&typeof field.Required==='boolean'&&field.Broken!==true);
   return snapshot?.verified===true&&snapshot.generation?.checked===false&&fields?.length===2
     &&fields.every((field,i)=>field.Name===['ObservedID','PhaseMarker'][i]&&field.DataType===[4,5][i])
     &&(fixedCase!=='usage-output'||fields[0].DefaultUsageType===4);
 }
 
 export async function configureJavascriptSchema({page,context,mode,once,record,deadline,columnState,fixedCase}) {
-  if(fixedCase!==undefined&&(!['cardinality-empty','usage-output'].includes(fixedCase)||mode!=='declared'))throw Error('Fixed declared schema mode required');
+  if(fixedCase!==undefined&&(!['cardinality-empty','usage-output','business-output'].includes(fixedCase)||mode!=='declared'))throw Error('Fixed declared schema mode required');
   let applied;
-  const names=fixedCase==='cardinality-empty'?['Value']:['ObservedID','PhaseMarker'];
+  const names=fixedCase==='cardinality-empty'?['Value']:fixedCase==='business-output'?['RowID','CustomerKey','NetCents','Status']:['ObservedID','PhaseMarker'];
+  const types=fixedCase==='business-output'?[4,5,4,5]:[4,5];
   const read=()=>page.evaluate(readJavascriptSchema,context);
   const first=await read();await record({phase:'javascript_schema_before',snapshot:first});
   if(first.verified!==true||first.form!=='JavaScriptColumnsWizard')throw Error('JavaScript output schema contract unconfirmed');
@@ -48,7 +53,7 @@ export async function configureJavascriptSchema({page,context,mode,once,record,d
           fill:text=>field.fill(text,{timeout:Math.max(1,deadline-Date.now())})});
       };
       await fill('edtName',name);await fill('edtDisplayName',name);
-      const expectedType=[4,5][index],expectedLabel=['Целый','Строковый'][index];
+      const expectedType=types[index],expectedLabel=expectedType===4?'Целый':'Строковый';
       await openJavascriptColumnTypePicker({page,state:columnState,record,once,deadline,id:'schema-type-open-'+index,expectedType,expectedLabel,
         click:(tid,timeout)=>at(tid).click({timeout})});
       await selectJavascriptColumnTypeOption({page,state:columnState,record,once,deadline,id:'schema-type-select-'+index,expectedType,expectedLabel});
@@ -62,7 +67,7 @@ export async function configureJavascriptSchema({page,context,mode,once,record,d
       applied=await settleJavascriptColumnEditor({page,state:columnState,record,deadline,phase:'applied'});
       const added=await read();await record({phase:'javascript_schema_added',index,snapshot:added});
       const observed=added.grids.find(grid=>grid.tid===added.page_tid+';grdTargetColumns;tbl').fields;
-      if(observed.length!==index+1||observed[index].Name!==name||observed[index].DataType!==[4,5][index]
+      if(observed.length!==index+1||observed[index].Name!==name||observed[index].DataType!==types[index]
         ||fixedCase==='usage-output'&&index===0&&observed[index].DefaultUsageType!==4)throw Error('Declared column readback differs');
     }
   }
