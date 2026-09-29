@@ -546,6 +546,7 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
       if(!before.verified||before.generation?.checked!==false||before.grids.find(grid=>grid.tid===before.page_tid+';grdTargetColumns;tbl')?.count!==0
         ||add?.length!==1||add[0].disabled||!add[0].visible)throw Error('Owned empty declared editor admission unavailable');
       const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']').filter({visible:true});
+      let cancellation;
       try{
         await openJavascriptColumnEditor({page,context:schemaContext(),index:0,state:columnState,record:executionRecord,deadline,
           once:async(id,identity,perform)=>{report.effects.push({at:new Date().toISOString(),action:id,state:'dispatching',identity});await save();await perform();},
@@ -554,11 +555,20 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
         if(inventory.status!=='ready'||!inventory.declared_controls?.cbxDataKind||!inventory.declared_controls?.cbxUsageType)
           throw Error('Owned declared control inventory unavailable: '+(inventory.reason??inventory.status));
         report.declared_editor_controls=inventory.declared_controls;await save();
-      }finally{await cleanupJavascriptColumnEditor({page,state:columnState,record:executionRecord,deadline});}
+      }finally{cancellation=await cleanupJavascriptColumnEditor({page,state:columnState,record:executionRecord,deadline});}
       const after=await page.evaluate(readJavascriptSchema,schemaContext());
-      if(!after.verified||after.grids.find(grid=>grid.tid===after.page_tid+';grdTargetColumns;tbl')?.count!==0)
+      await executionRecord({phase:'declared_editor_cancel_readback',schema:after});
+      const cancelled=cancellation?.status==='settled'&&cancellation.reason==='cancel_settlement'
+        &&cancellation.checks?.baseline===true&&cancellation.checks?.record_removed===true
+        &&cancellation.checks?.writes_clean===true&&cancellation.checks?.records_clean===true
+        &&cancellation.record_count===0&&cancellation.source_count===0;
+      const target=after.grids.find(grid=>grid.tid===before.page_tid+';grdTargetColumns;tbl');
+      const staleTotal=after.diagnostic_only===true&&after.reason==='JavaScript schema cache is filtered or incomplete'
+        &&target?.view_bound===true&&target.store_class==='Ext.data.Store'&&target.records?.length===0
+        &&target.total===cancellation?.proxy_total_count&&target.total>0&&cancellation.checks?.proxy_total_matches===false;
+      if(!cancelled||!(after.verified===true&&target?.count===0||staleTotal))
         throw Error('Cancelled declared editor changed output schema');
-      report.declared_editor_cancelled=true;await save();
+      report.declared_editor_cancelled=true;report.declared_editor_stale_total=staleTotal;await save();
     }
     if(coldReader&&!remainingPages&&current.tid.endsWith(';JavaScriptColumnsWizard')){
       const schema=await page.evaluate(readJavascriptSchema,schemaContext());

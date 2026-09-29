@@ -337,7 +337,7 @@ export async function cleanupJavascriptColumnEditor({page,state,record,deadline}
     await record({phase:'column_editor_cancel_dispatch',snapshot});
     await verifyJavascriptColumnEditor({page,state,record,deadline,target:'btnCancel'});
     await page.locator('[data-tid='+JSON.stringify(snapshot.base+';btnCancel')+']').filter({visible:true}).click({timeout:Math.max(1,deadline-Date.now())});
-    await settleJavascriptColumnEditor({page,state,record,deadline,phase:'cancelled'});
+    return settleJavascriptColumnEditor({page,state,record,deadline,phase:'cancelled'});
   })();
   return pending.cleanupPromise;
 }
