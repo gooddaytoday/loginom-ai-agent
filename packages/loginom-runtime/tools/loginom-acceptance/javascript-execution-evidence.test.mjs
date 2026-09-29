@@ -1,4 +1,5 @@
 import {openJavascriptInitialWizard,requireJavascriptInitialOpeningCleanup} from './javascript-initial-opening.mjs';
+import {openManagedJavascriptInitialWizard} from './javascript-managed-initial-opening.mjs';
 import {javascriptExecutionIdentity} from './javascript-mismatch-probe.mjs';
 import {withJavascriptWizardMasks} from './javascript-wizard-masks.mjs';
 import {waitJavascriptWizardSettlement,inspectJavascriptWizardAddress,withJavascriptWizardAddress} from './javascript-wizard-settlement.mjs';
@@ -125,7 +126,7 @@ function managedWizardFixture(managed) {
   const root={isConnected:true,getBoundingClientRect:()=>({width:100,height:100}),querySelectorAll:()=>[]};
   const label=(tid,text)=>({id:tid,isConnected:true,textContent:text,
     getAttribute:key=>key==='data-tid'?tid:null});
-  const crumb=label('nav','Workflow'),nodeCrumb=label('node','JavaScript'),wizardCrumb=label('wizard','Настройка');
+  const crumb=label('nav',''),nodeCrumb=label('node','JavaScript'),wizardCrumb=label('wizard','Настройка');
   const dialog={isConnected:true,
     innerText:'Loginom 7.4.2 Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел? Да Да, больше не спрашивать Нет',
     getBoundingClientRect:()=>({width:100,height:100})};
@@ -140,7 +141,7 @@ function managedWizardFixture(managed) {
     :originalQuery(selector);
   const prepared={document_id:task.owner.document_id,node:task.owner,
     workflow_ref:{...task.workflow_ref,workflow_id:task.owner.workflow_id,
-      navigation_path:[{tid:'nav',label:'Workflow'}]}};
+      navigation_path:[{tid:'nav',label:''}]}};
   return {prepared,tree,activate:()=>{surface='wizard';f.tab.Controller.Node.data.node=wizard;
     f.tab.Controller.FController=new WizardModelComponentForm();},
     activateDeactivation:()=>{surface='deactivation';},tabElement};
@@ -316,6 +317,43 @@ test('managed settlement keeps a stalled Setting opening unresolved until its or
   assert.deepEqual(events.map(event=>event.phase),['javascript_managed_wizard_settlement_before']);
   assert.equal(managed.f.clicks,1);
   assert.equal((await managed.run('dispose')).disposed,true);
+});
+test('private headed probe opens a fresh managed JavaScript wizard with the real empty root breadcrumb',async()=>{
+  const managed=managedSelectionFixture(5000,'already'),wizard=managedWizardFixture(managed);
+  const lifecycle={},report={effects:[]},events=[];
+  const timer=setTimeout(()=>wizard.activate(),40);
+  try{
+    const settled=await openManagedJavascriptInitialWizard({page:managed.f.page,
+      prepared:wizard.prepared,node:managed.f.node,deadline:Date.now()+5000,
+      record:async event=>{events.push(event);return event;},lifecycle,report,save:async()=>{}});
+    assert.equal(settled.surface,'wizard');assert.equal(lifecycle.settingGestureReturned,true);
+    assert.equal(lifecycle.wizardVisible,true);assert.equal(managed.f.clicks,1);
+    assert.equal(managed.f.disposed,1);
+    assert.ok(events.some(event=>event.phase==='javascript_managed_setting_prepared'));
+    assert.ok(events.some(event=>event.phase==='javascript_managed_wizard_settlement_verified'));
+  }finally{clearTimeout(timer);}
+});
+test('private headed probe keeps uncertain managed Setting out of cleanup and never replays it',async()=>{
+  const managed=managedSelectionFixture(5000,'already'),wizard=managedWizardFixture(managed);
+  const lifecycle={},report={effects:[]},events=[];
+  managed.f.page.mouse.click=async()=>{throw Error('lost Setting reply');};
+  const options={page:managed.f.page,prepared:wizard.prepared,node:managed.f.node,
+    deadline:Date.now()+5000,record:async event=>{events.push(event);return event;},
+    lifecycle,report,save:async()=>{}};
+  await assert.rejects(openManagedJavascriptInitialWizard(options),/lost Setting reply/);
+  assert.equal(lifecycle.settingDispatched,true);assert.equal(lifecycle.wizardVisible,false);
+  assert.throws(()=>requireJavascriptInitialOpeningCleanup(lifecycle),/cleanup unconfirmed/);
+  await assert.rejects(openManagedJavascriptInitialWizard(options),/already attempted/);
+  assert.deepEqual(events.map(event=>event.phase),['javascript_managed_setting_prepared']);
+});
+test('private headed probe does not reserve uncertain cleanup when Setting journal ACK is absent',async()=>{
+  const managed=managedSelectionFixture(5000,'already'),wizard=managedWizardFixture(managed);
+  const lifecycle={},report={effects:[]};
+  await assert.rejects(openManagedJavascriptInitialWizard({page:managed.f.page,
+    prepared:wizard.prepared,node:managed.f.node,deadline:Date.now()+5000,
+    record:async()=>({}),lifecycle,report,save:async()=>{}}),/journal ACK differs/);
+  assert.equal(lifecycle.settingDispatched,false);assert.equal(managed.f.clicks,0);
+  assert.doesNotThrow(()=>requireJavascriptInitialOpeningCleanup(lifecycle));
 });
 test('descendant Execute, Preview, ports or foreign Setting child never authorize body/Setting clicks',async()=>{
   for(const fault of ['overlay_Execute','overlay_Preview','overlay_Input_Data-0','overlay_Setting','setting_overlay']){
@@ -704,17 +742,23 @@ test('existing post-body poll preserves first unavailable sample even after a la
 
 test('live initial branch uses the production wrapper only for executionCase and retains discovery path',async()=>{
   const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
-  const start=source.indexOf('    if(executionCase){\n      await openJavascriptInitialWizard');
+  const start=source.indexOf("    if(options['--managed-opening-probe']){\n      await openManagedJavascriptInitialWizard");
   const end=source.indexOf("    report.stage='wizard-ready';",start);assert.ok(start>0&&end>start);
   const run=vm.runInNewContext('(async function(ctx){with(ctx){'+source.slice(start,end)+';return openedWizard;}})');
   for(const executionCase of [true,false]){
     const h=initialOpeningFixture({fault:executionCase?'replace':'already'}),o=h.options();
-    const opened=await run({executionCase,openJavascriptInitialWizard,page:o.page,wizardBinding:o.binding,node:o.node,expectedIcon:o.icon,
+    const opened=await run({options:{},executionCase,openJavascriptInitialWizard,page:o.page,wizardBinding:o.binding,node:o.node,expectedIcon:o.icon,
       wizardDeadline:o.deadline,executionRecord:o.record,guard:o.guard,report:o.report,save:o.save,initialOpening:o.lifecycle,
       owner:{prefix:'MF;TF-1'},openedWizard:false,exact:()=>({waitFor:async options=>{assert.equal(options.state,'visible');assert.ok(options.timeout>0);}})});
     assert.equal(opened,true);assert.equal(h.f.clicks,executionCase?2:1);
     assert.equal(h.lifecycle.attempted,executionCase?true:undefined);assert.equal(h.report.effects.length,1);
   }
+  const h=initialOpeningFixture({fault:'already'}),o=h.options();let managedCalls=0;
+  const opened=await run({options:{'--managed-opening-probe':true},executionCase:true,
+    openManagedJavascriptInitialWizard:async args=>{managedCalls++;assert.equal(args.lifecycle,o.lifecycle);},
+    page:o.page,executionPrepared:{},node:o.node,wizardDeadline:o.deadline,
+    executionRecord:o.record,report:o.report,save:o.save,initialOpening:o.lifecycle,openedWizard:false});
+  assert.equal(opened,true);assert.equal(managedCalls,1);assert.equal(h.f.clicks,0);
 });
 
 test('live cleanup guard rejects uncertain initial dispatch before restoration or Close',async()=>{
