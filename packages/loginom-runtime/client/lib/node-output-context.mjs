@@ -51,14 +51,19 @@ export async function readOutputContext(page,binding,readNode=readPreparedNodeCo
       if(!guid(id)||els.length!==1||p.Panel?.el?.dom!==els[0])return fail('view_port_binding');
       portPanels.push({port_guid:id,tid});
     }
-    const descriptors=[];
+    const descriptors=[],pending=[];
     for(const [id,v] of Object.entries(views)) {
       if(v.Vendor?.constructor?.name!=='BrowseViewVendor')continue;
       const matching=portPanels.filter(p=>ports[p.port_guid].Panel===v.PortPanel);
       const nativeCard=v.ViewerCard?.FView?.el?.dom;
       const cardTid=nativeCard?.getAttribute('data-tid'),cardBase=b.workflow_ref.prefix+';ViewsForm;ViewerCard';
-      if(!guid(id)||matching.length!==1||!nativeCard || !v.PortPanel.el.dom.contains(nativeCard)
-        || !cardTid?.startsWith(cardBase)||!/^(-[0-9]+)?$/.test(cardTid.slice(cardBase.length)))return fail('table_card_binding');
+      if(!guid(id)||matching.length!==1)return fail('table_card_binding');
+      // A registered native descriptor can precede creation of its UI card.
+      // Preserve only its proved panel identity; it cannot authorize a gesture.
+      if(!nativeCard){pending.push({view_guid:id,port_guid:matching[0].port_guid});continue;}
+      if(!v.PortPanel.el.dom.contains(nativeCard)
+        || !cardTid?.startsWith(cardBase)||!/^(-[0-9]+)?$/.test(cardTid.slice(cardBase.length)))
+        return {...fail('table_card_binding'),card_state:'foreign_or_invalid_card',view_guid:id};
       const active=model.FActiveViewGuid===id;
       let tableTid=null;
       if(active) {
@@ -69,7 +74,8 @@ export async function readOutputContext(page,binding,readNode=readPreparedNodeCo
       }
       descriptors.push({view_guid:id,port_guid:matching[0].port_guid,active,table_tid:tableTid});
     }
-    return {verified:true,surface:'views',port_panels:portPanels,tables:descriptors,execution_freshness_verified:false};
+    return {verified:pending.length===0,...(pending.length?{reason:'table_card_pending',pending_tables:pending}:{}),
+      surface:'views',port_panels:portPanels,tables:descriptors,execution_freshness_verified:false};
   },{binding,context:before});
   const after=await readNode(page,binding);
   if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,reason:'node_context_changed'};

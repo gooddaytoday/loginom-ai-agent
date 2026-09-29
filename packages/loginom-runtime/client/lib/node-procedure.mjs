@@ -383,12 +383,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         }
         if(settleOutputPort){
           const state=result.output,context=state.prepared_node_context;
+          const outputs=state.node_outputs;
+          const pending=outputs?.verified===false&&outputs.reason==='table_card_pending'
+            &&outputs.pending_tables?.length===1&&outputs.pending_tables[0].port_guid===settleOutputPort
+            &&state.ui.masks.length>0;
           if(context?.verified!==true||context.surface!=='views'
             ||context.document_id!==preparedNodeContext.document_id
             ||context.workflow_id!==preparedNodeContext.workflow_ref.workflow_id
             ||context.node_id!==preparedNodeContext.node.node_id
-            ||state.node_outputs?.verified!==true||state.node_outputs.surface!=='views'
-            ||state.node_outputs.port_panels?.filter(p=>p.port_guid===settleOutputPort).length!==1
+            ||!(outputs?.verified===true||pending)||outputs.surface!=='views'
+            ||outputs.port_panels?.filter(p=>p.port_guid===settleOutputPort).length!==1
             ||state.ui.masks.some(mask=>mask.kind!=='busy'||mask.dialog_ref
               ||mask.target_tid!==preparedNodeContext.workflow_ref.prefix+';ViewsForm')){
             await entry('node_observation_context_refused',{step,sample,internal_operation_id:id,condition,

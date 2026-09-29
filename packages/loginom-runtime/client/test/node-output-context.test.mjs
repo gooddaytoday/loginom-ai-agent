@@ -32,6 +32,24 @@ test('view descriptors bind the active table to a native port panel, not its tit
  assert.deepEqual(r.tables.map(t=>[t.port_guid,t.view_guid,t.active]),[[portGuid,viewGuid,true]]);
  assert.equal(r.execution_freshness_verified,false);
 });
+test('native descriptor without its UI card retains only pending panel proof',async()=>{
+ const f=fixture('views');delete f.desc.ViewerCard;
+ const r=await readOutputContext(f.page,f.binding,f.readNode);
+ assert.equal(r.verified,false);assert.equal(r.reason,'table_card_pending');assert.equal(r.tables.length,0);
+ assert.deepEqual(r.pending_tables,[{port_guid:portGuid,view_guid:viewGuid}]);
+ assert.equal(r.port_panels[0].port_guid,portGuid);assert.equal(r.node_context.verified,true);
+ assert.equal(r.execution_freshness_verified,false);
+});
+test('missing UI card does not hide a foreign panel or another invalid descriptor',async()=>{
+ const f=fixture('views');delete f.desc.ViewerCard;f.desc.PortPanel={el:{dom:f.panelEl}};
+ const r=await readOutputContext(f.page,f.binding,f.readNode);assert.equal(r.reason,'table_card_binding');
+ assert.equal(r.pending_tables,undefined);
+ const g=fixture('views');g.model.FViewDescList['33333333-3333-3333-3333-333333333333']={...g.desc};
+ delete g.desc.ViewerCard;g.panelEl.children=[];
+ const other=await readOutputContext(g.page,g.binding,g.readNode);
+ assert.equal(other.reason,'table_card_binding');assert.equal(other.card_state,'foreign_or_invalid_card');
+ assert.equal(other.pending_tables,undefined);
+});
 for(const [name,change] of Object.entries({
  foreign_panel:f=>f.desc.PortPanel={el:{dom:f.panelEl}},foreign_card:f=>f.panelEl.children=[],
  foreign_table:f=>f.desc.BaseView.FView.el.dom={getAttribute:()=> 'MF;TF-2;ViewsForm;BrowseView'},
