@@ -2,6 +2,7 @@ import {javascriptMappingState,javascriptPreservedMappings} from './javascript-m
 import {createJavascriptSourceReader} from '../../client/lib/javascript-source-read.mjs';
 import {createJavascriptSourceAdmission} from '../../client/lib/javascript-source-admission.mjs';
 import {createJavascriptManagedSourceAdapter} from '../../client/lib/javascript-managed-source-adapter.mjs';
+import {replaceManagedJavascriptSource} from '../../client/lib/javascript-managed-source-write.mjs';
 import {createActionRuntime} from '../../client/lib/executor.mjs';
 import {dispatchNodeApi} from '../../client/lib/node-api.mjs';
 import {nodeResultReply} from '../../client/lib/node-result-reply.mjs';
@@ -83,12 +84,12 @@ if(args.includes('--help')&&coldReader){console.log('node javascript-persistence
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
-  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
+  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
 }
 if(coldReader){
@@ -115,6 +116,8 @@ if(options['--x11-no-focus']&&!options['--managed-opening-probe']&&!options['--s
   throw Error('X11 focus guard requires the isolated managed opening probe or read-only recovery');
 if(options['--verify-source-admission']&&!options['--managed-opening-probe'])throw Error('Source admission requires the isolated managed opening probe');
 if(options['--verify-public-source-read']&&!options['--managed-opening-probe'])throw Error('Public source read requires the isolated managed opening probe');
+if(options['--verify-managed-source-write']&&(!options['--managed-opening-probe']||!options['--verify-public-source-read']))
+  throw Error('Managed source write requires the isolated managed opening and independent public source read');
 if(options['--verify-runtime-schema']&&(options['--execution-case']!=='code-table-execute'||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile))
   throw Error('Runtime schema verification requires one isolated code-table-execute case');
 if(options['--verify-runtime-source']&&(options['--execution-case']!=='code-table-execute'||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile))
@@ -1117,7 +1120,7 @@ const runExecutionTrial=async probe=>{
     report.stage='existing-source-readback';
     const boundary=await executionRuntime.captureExecutionBoundary();
     try{
-      const existingDeadline=phaseDeadline(90000);
+      const existingDeadline=phaseDeadline(options['--verify-managed-source-write']?150000:90000);
       const existingReceiptNamespace=randomUUID();
       const existingManaged=options['--managed-opening-probe']
         ?await openManagedJavascriptExistingWizard({prepared:executionPrepared,node:executionNode,
@@ -1146,6 +1149,29 @@ const runExecutionTrial=async probe=>{
           source_sha256:digest(observed.source),source_utf8_bytes:observed.source_utf8_bytes,
           source_lf_lines:observed.source_lf_lines};
         await executionRecord({phase:'javascript_managed_existing_source_observed',...report.managed_existing_observation});
+        await save();
+      }
+      if(existingManaged&&options['--verify-managed-source-write']){
+        const draft=probe.source+'\n// managed draft: "Проверка" \\ 😀';
+        const sourceOwner={...existingManaged.task.owner,operation_id:existingManaged.task.operation_id,
+          ui_epoch:wizardAddressEpoch};
+        const handle={task:existingManaged.task,owner:sourceOwner};
+        const read=async()=>{
+          const observed=await Function('return ('+makeJavascriptManagedSourceCode(existingManaged.task)+')')()(page);
+          if(observed.verified!==true)throw Error('Managed writer owned source unavailable');
+          return {owner:sourceOwner,source:observed.source,settings:{}};
+        };
+        report.stage='managed-source-write';managedCloseUncertain=true;await save();
+        const written=await replaceManagedJavascriptSource({task:existingManaged.task,handle,
+          owner:sourceOwner,deadline:existingManaged.task.deadline,expected_source_sha256:digest(probe.source),
+          source_text:draft,read,execute:code=>Function('return ('+code+')')()(page),record:executionRecord,
+          receiptOptions:(id,key,signature)=>({receipt_namespace:'private-managed-js-existing-'+existingReceiptNamespace,
+            receipt_id:id,receipt_signature:signature}),markUncertain:()=>{}});
+        if(written.draft_exact!==true||written.source_sha256!==digest(draft))
+          throw Error('Managed writer draft exact readback differs');
+        report.managed_source_write={verified:true,source_sha256:written.source_sha256,
+          source_utf8_bytes:written.source_utf8_bytes,source_lf_lines:written.source_lf_lines,
+          wizard_commit_verified:false,raw_source_in_report:false};
         await save();
       }
       if(existingManaged){

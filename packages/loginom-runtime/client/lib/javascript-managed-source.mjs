@@ -5,7 +5,8 @@ import {makeJavascriptManagedWizardSettlementCode} from './javascript-managed-op
 // The retained selection lease binds every source read to one actual editor.
 // Reconstructed context alone can accept a newly mounted CodeMirror with the
 // same node ID; a writer must never treat that as the original draft.
-export function inspectManagedJavascriptSourceEditor({held, editor, task, capture = false}) {
+export function inspectManagedJavascriptSourceEditor({held, editor, task, capture = false,
+  requireInputFocus = false, locate = false, selectionCheck = false}) {
   const fail = message => { throw Error('Managed JavaScript editor ' + message); };
   const visible = element => !!element?.isConnected && element.getBoundingClientRect().width > 0
     && element.getBoundingClientRect().height > 0 && getComputedStyle(element).visibility !== 'hidden';
@@ -37,7 +38,8 @@ export function inspectManagedJavascriptSourceEditor({held, editor, task, captur
   if (editor && (editor.document !== document || editor.tab !== tab || editor.native !== native
     || editor.model !== model || editor.root !== root || editor.page !== pages[0]
     || editor.wrapper !== wrapper || editor.cm !== cm || editor.doc !== doc
-    || editor.input !== input || editor.focus !== document.activeElement)) fail('identity changed');
+    || editor.input !== input || (requireInputFocus ? document.activeElement !== input
+      : editor.focus !== document.activeElement))) fail('identity changed');
   const count = doc.lineCount?.();
   if (!Number.isSafeInteger(count) || count < 1 || count > 1024
     || doc.firstLine?.() !== 0 || doc.lastLine?.() !== count - 1) fail('lines changed');
@@ -52,7 +54,23 @@ export function inspectManagedJavascriptSourceEditor({held, editor, task, captur
   if (capture) return {document, tab, native, model, root, page: pages[0], wrapper, cm, doc, input,
     focus: document.activeElement};
   if (!editor) fail('retained identity required');
-  return {source: lines.join('\n'), source_utf8_bytes: bytes, source_lf_lines: count};
+  const source = lines.join('\n');
+  if (locate) {
+    if (requireInputFocus || selectionCheck) fail('point state changed');
+    const bounds = wrapper.getBoundingClientRect();
+    const x = bounds.x + Math.min(35, bounds.width / 2);
+    const y = bounds.y + Math.min(15, bounds.height / 2);
+    const hit = document.elementFromPoint(x, y);
+    if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight || !hit || !wrapper.contains(hit))
+      fail('point covered');
+    return {source, source_utf8_bytes: bytes, source_lf_lines: count, point: {x, y}};
+  }
+  if (selectionCheck) {
+    if (!requireInputFocus || typeof doc.getSelection !== 'function') fail('selection unavailable');
+    return {source, source_utf8_bytes: bytes, source_lf_lines: count,
+      selection_full: doc.getSelection() === source};
+  }
+  return {source, source_utf8_bytes: bytes, source_lf_lines: count};
 }
 
 // The source stays in the trusted host response. A caller must pass it through
@@ -79,7 +97,8 @@ export async function readManagedJavascriptSource(page, task, readSource = readJ
       {held: lease.handle, editor: null, task, capture: true});
   }
   const before = await page.evaluate(inspectEditor,
-    {held: lease.handle, editor: lease.sourceEditorCaptured, task});
+    {held: lease.handle, editor: lease.sourceEditorCaptured, task,
+      requireInputFocus: lease.sourceWriteAttempted === true});
   const result = await readSource(page, task.prepared, held.account);
   if (result.verified !== true || result.node_context?.verified !== true
     || result.node_context.surface !== 'wizard'
@@ -88,9 +107,11 @@ export async function readManagedJavascriptSource(page, task, readSource = readJ
     || result.source_lf_lines !== before.source_lf_lines || Date.now() >= task.deadline)
     throw Error('Managed JavaScript source owner changed');
   const after = await page.evaluate(inspectEditor,
-    {held: lease.handle, editor: lease.sourceEditorCaptured, task});
+    {held: lease.handle, editor: lease.sourceEditorCaptured, task,
+      requireInputFocus: lease.sourceWriteAttempted === true});
   if (JSON.stringify(after) !== JSON.stringify(before))
     throw Error('Managed JavaScript source editor changed during read');
+  lease.sourceBaseline = result.source;
   return result;
 }
 

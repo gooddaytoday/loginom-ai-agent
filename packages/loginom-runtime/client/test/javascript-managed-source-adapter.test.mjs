@@ -26,6 +26,9 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     makeJavascriptManagedSourceCode: () => 'source',
     makeJavascriptManagedSelectionReadCode: () => 'dispose',
     makeJavascriptExistingGraphTypeCode: () => 'type',
+    replaceManagedJavascriptSource: async ({markUncertain}) => {calls.push('replace');
+      if (closeFails) {markUncertain(true); throw Error('lost source write reply');}
+      return {draft_exact: true, wizard_commit_verified: false};},
   };
   const execute = async code => {
     calls.push(code);
@@ -92,6 +95,30 @@ test('lost managed Close reply is terminal and never dispatches a second Close',
   await assert.rejects(() => adapter.discard(handle, {owner, deadline}), /owner changed/);
   assert.equal(f.calls.filter(call => call === 'close').length, 1);
   assert.equal(adapter.uncertain, true);
+});
+
+test('managed source adapter admits only one owned replacement attempt', async () => {
+  const f = fixture();
+  const adapter = await f.sourceAdapter();
+  const handle = await adapter.open({owner, deadline});
+  assert.equal((await adapter.replace(handle, {owner, deadline,
+    expected_source_sha256: '0'.repeat(64), source_text: 'const next=1;'})).draft_exact, true);
+  await assert.rejects(() => adapter.replace(handle, {owner, deadline,
+    expected_source_sha256: '0'.repeat(64), source_text: 'const next=2;'}), /already used/);
+  assert.equal(f.calls.filter(call => call === 'replace').length, 1);
+  await adapter.discard(handle, {owner, deadline});
+});
+
+test('lost managed source replacement retains the wizard lease', async () => {
+  const f = fixture({closeFails: true});
+  const adapter = await f.sourceAdapter();
+  const handle = await adapter.open({owner, deadline});
+  await assert.rejects(() => adapter.replace(handle, {owner, deadline,
+    expected_source_sha256: '0'.repeat(64), source_text: 'const next=1;'}), /lost source write reply/);
+  assert.equal(adapter.uncertain, true);
+  await assert.rejects(() => adapter.discard(handle, {owner, deadline}), /owner changed/);
+  assert.equal(f.calls.filter(call => call === 'replace').length, 1);
+  assert.equal(f.calls.filter(call => call === 'close').length, 0);
 });
 
 test('semantic settings drop volatile records but retain field order', () => {

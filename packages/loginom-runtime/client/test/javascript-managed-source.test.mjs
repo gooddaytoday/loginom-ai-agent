@@ -97,8 +97,12 @@ test('serialized editor inspector retains native CodeMirror and focus identity',
   const editor = inspect({held, editor: null, task: request, capture: true});
   assert.deepEqual(JSON.parse(JSON.stringify(inspect({held, editor, task: request}))),
     {source: f.getSource(), source_utf8_bytes: Buffer.byteLength(f.getSource()), source_lf_lines: 2});
+  assert.deepEqual(JSON.parse(JSON.stringify(inspect({held, editor, task: request, locate: true}).point)),
+    {x: 45, y: 25});
   f.document.activeElement = f.input;
   assert.throws(() => inspect({held, editor, task: request}), /identity changed/);
+  f.setSelection(f.getSource());
+  assert.equal(inspect({held, editor, task: request, requireInputFocus: true, selectionCheck: true}).selection_full, true);
   f.document.activeElement = editor.focus;
   f.wrapper.CodeMirror = {...f.cm, getWrapperElement: () => f.wrapper};
   assert.throws(() => inspect({held, editor, task: request}), /identity changed/);
