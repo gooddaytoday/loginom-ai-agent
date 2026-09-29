@@ -1,5 +1,36 @@
 # JavaScript: checkpoint исполнения
 
+## Managed Close существующего мастера — headed proof, 2026-09-29
+
+Code commit `8e95175c6f` в `origin/node-javascript` добавил
+`client/lib/javascript-managed-close.mjs`. После полного чтения source он
+использует ту же lease/native wizard/root: проверяет активную Code-страницу,
+точный Close и hit-test; сохраняет journal ACK до единственного клика.
+Отдельный read-only settlement различает ожидание, точный диалог
+«закрыть мастер» и возврат к исходной graph model/node. При диалоге второй
+точный ACK предшествует единственному Yes. Потеря ответа или неизвестный
+результат не дают повторить Close/Yes; оператор в таком случае прекращает
+UI-cleanup и закрывает свой browser. Source text в этих событиях не пишется.
+Адресные тесты: **165 PASS / 0 FAIL**; `node --check`, `git diff --check` прошли.
+
+Live `managed-existing-close-01` на свежем **headed Chromium** profile 254:
+managed existing source — 376 UTF-8 bytes/8 LF lines, SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`.
+Журнал содержит ровно по одному `javascript_managed_close_prepared`,
+`javascript_managed_close_confirm_prepared` и
+`javascript_managed_close_verified`. Реальный Loginom потребовал Yes;
+после него вернулись исходный node/graph. Итог `OBSERVED` /
+`typed_output_verified`, cleanup package/logout/browser **3/3**;
+report SHA256 `0e5119a4f7f1290dab2b4cf26eddad4ac2c768f40f2d704b16ceb035bff27d06`.
+Процесс закрыт. Под file-lock назначен новый ещё не созданный profile 255,
+receipt `profile-reassignment-255.json`.
+
+Следующий шаг — связать verified existing open → full source/settings read →
+managed Close с `createJavascriptSourceAdmission`, затем реализовать
+публичный `dock_node_read kind=source` и проверить доставку chunks/redaction.
+Managed Close пока доказан только в private headed операторе; J01/J21 и
+публичный обработчик не завершены.
+
 ## Existing-node managed opening — headed proof, 2026-09-29
 
 Code commit `aac8ce8e37` в `origin/node-javascript` подключил
@@ -41,9 +72,8 @@ Report SHA256 `372b1b642572dd87441cf02da444a7fa3a7aba66d56acf58b8dcd2f6395105bd`
 Старые процессы закрыты; новый ещё не созданный profile 254 назначен под
 file-lock (`profile-reassignment-254.json`).
 
-Следующий участок — private managed Close/discard того же existing wizard.
-Сейчас live использует прежний операторский `closeWizardOnce`, и успешное
-открытие/чтение не является доказательством нового Close adapter. Затем
+Следующий участок на момент этого прогона — private managed Close/discard.
+Он выполнен и проверен в верхнем разделе; затем
 `createJavascriptSourceAdmission` и публичный `dock_node_read kind=source`.
 
 ## Управляемый Next «Столбцы → Код» — 2026-09-29
