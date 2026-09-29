@@ -33,8 +33,8 @@ export function readJavascriptG1Type({root,native,binding,prefix,account,build})
     return {session,owner:numbers[0],object:numbers[1],interface:numbers[2]};
   };
   const engineId=id(engine),moduleId=id(moduleSystem);
-  if(engineId.session!==moduleId.session||engineId.owner!==moduleId.owner||engineId.object!==moduleId.object
-    ||engineId.interface===moduleId.interface)throw Error('G1 engine/module selected casts differ');
+  const sameSession=engineId.session===moduleId.session;
+  const sameRemoteObject=sameSession&&engineId.owner===moduleId.owner&&engineId.object===moduleId.object;
   const className=object=>{
     const names=[];
     for(let proto=Object.getPrototypeOf(object);proto&&names.length<4;proto=Object.getPrototypeOf(proto)){
@@ -47,6 +47,7 @@ export function readJavascriptG1Type({root,native,binding,prefix,account,build})
     ?own(controller,'$className').slice(0,160):null,
     engine:{owner:engineId.owner,object:engineId.object,interface:engineId.interface,prototype_classes:className(engine)},
     module_system:{owner:moduleId.owner,object:moduleId.object,interface:moduleId.interface,
-      prototype_classes:className(moduleSystem)},same_remote_object:true,
+      prototype_classes:className(moduleSystem)},same_session:sameSession,same_remote_object:sameRemoteObject,
+    distinct_interfaces:engineId.interface!==moduleId.interface,
     runtime_full_type:null,full_type_observed:false};
 }

@@ -27,6 +27,8 @@ test('owned code controller gives two selected interfaces of one held native eng
   const f=fixture(),result=f.read();
   assert.equal(result.verified,true);
   assert.equal(result.same_remote_object,true);
+  assert.equal(result.same_session,true);
+  assert.equal(result.distinct_interfaces,true);
   assert.equal(result.engine.object,18);
   assert.equal(result.engine.interface,781);
   assert.equal(result.module_system.interface,900);
@@ -34,9 +36,22 @@ test('owned code controller gives two selected interfaces of one held native eng
   assert.equal(result.runtime_full_type,null);
 });
 
-test('G1 type reader rejects changed owner and mismatched selected cast',()=>{
+test('G1 type reader records distinct engine and module proxy identities without inferring a cast',()=>{
+  for(const mutate of [f=>f.moduleSystem.$.$O++,f=>f.moduleSystem.$S={},
+    f=>f.moduleSystem.$.$I=f.engine.$.$I]){
+    const f=fixture();mutate(f);
+    const result=f.read();
+    assert.equal(result.verified,true);
+    assert.equal(result.same_session,f.engine.$S===f.moduleSystem.$S);
+    assert.equal(result.same_remote_object,f.engine.$S===f.moduleSystem.$S
+      &&f.engine.$.$OW===f.moduleSystem.$.$OW&&f.engine.$.$O===f.moduleSystem.$.$O);
+    assert.equal(result.distinct_interfaces,f.engine.$.$I!==f.moduleSystem.$.$I);
+  }
+});
+
+test('G1 type reader rejects changed wizard owner or absent selected engine',()=>{
   for(const mutate of [f=>f.connection.UserName='foreign',f=>f.model.FModelNode={},
-    f=>f.moduleSystem.$.$O++,f=>f.moduleSystem.$S={},f=>f.controller.FEngine=null]){
+    f=>f.controller.FEngine=null]){
     const f=fixture();mutate(f);assert.throws(f.read);
   }
 });
