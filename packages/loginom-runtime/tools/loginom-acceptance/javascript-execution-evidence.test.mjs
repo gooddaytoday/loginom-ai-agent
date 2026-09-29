@@ -52,6 +52,9 @@ function privateSelectionFixture(fault) {
     if(fault==='node')native.data={};if(fault==='dom')shape=element(node.tid);if(fault==='journal')throw Error('journal failure');
   }else if(fault==='replace_thrice'&&e.phase==='javascript_private_selection_after'){
     shape.isConnected=false;shape=element(node.tid);
+  }else if(['replace_before_open_click','replace_moved_before_open_click'].includes(fault)&&e.phase==='javascript_private_open_dispatch'){
+    shape.isConnected=false;shape=element(node.tid);
+    if(fault==='replace_moved_before_open_click')setting.getBoundingClientRect=()=>({x:110,y:100,width:80,height:100});
   }return e;};
   return {run:(deadline=Date.now()+5000,options={})=>selectJavascriptForSettings(page,{binding,node,icon:'js',deadline,record,...options}),node,records,page,binding,realm,record,tab,native,
     get clicks(){return clicks;},get disposed(){return disposed;}};
@@ -81,6 +84,10 @@ test('selection admits two detached DOM redraws only after the returned gesture 
   assert.equal(result.dom_replacements,1);assert.equal(f.clicks,1);assert.equal(f.records.at(-1).node_selected,true);
   const twice=privateSelectionFixture('replace_twice');const twiceResult=await twice.run(undefined,{openSettings:true});
   assert.equal(twiceResult.dom_replacements,2);assert.equal(twiceResult.opening_dispatched,true);assert.equal(twice.clicks,2);
+  const late=privateSelectionFixture('replace_before_open_click');const lateResult=await late.run(undefined,{openSettings:true});
+  assert.equal(lateResult.opening_dispatched,true);assert.equal(late.clicks,2);
+  const moved=privateSelectionFixture('replace_moved_before_open_click');await assert.rejects(moved.run(undefined,{openSettings:true}),/Private Setting changed before click/);
+  assert.equal(moved.clicks,1);assert.equal(moved.records.at(-1).opening_dispatched,false);
   for(const fault of ['replace_connected','foreign_selected','duplicate_after','node_after','cell_after','controller_after','covered_after']){
     const rejected=privateSelectionFixture(fault);await assert.rejects(rejected.run());assert.equal(rejected.clicks,1);
     assert.equal(rejected.records.at(-1).effect_possible,true);
