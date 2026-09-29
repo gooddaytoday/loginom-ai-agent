@@ -6,6 +6,7 @@ import {closeManagedJavascriptWizard} from './javascript-managed-close.mjs';
 import {makeJavascriptManagedSelectionReadCode} from './javascript-managed-selection.mjs';
 import {makeJavascriptSchemaContextCode} from './javascript-schema-context.mjs';
 import {makeJavascriptExistingGraphTypeCode} from './javascript-existing-type.mjs';
+import {replaceManagedJavascriptSource} from './javascript-managed-source-write.mjs';
 
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const need = (condition, message) => { if (!condition) throw Error(message); };
@@ -29,7 +30,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
   driver = {openManagedJavascriptExistingWizard, dispatchManagedJavascriptNext,
     closeManagedJavascriptWizard, makeJavascriptManagedPageCode, makeJavascriptManagedSourceCode,
     makeJavascriptManagedSelectionReadCode, makeJavascriptSchemaContextCode,
-    makeJavascriptExistingGraphTypeCode}}) {
+    makeJavascriptExistingGraphTypeCode, replaceManagedJavascriptSource}}) {
   need(page && prepared?.document_id === node?.document_id
     && prepared.workflow_ref?.workflow_id === node.workflow_id && node.node_id
     && Number.isSafeInteger(uiEpoch) && uiEpoch >= 0
@@ -109,6 +110,16 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
         && ['document_id', 'workflow_id', 'node_id'].every(key => observed.node_context[key] === handle.task.owner[key])
         && typeof observed.source === 'string', 'Managed JavaScript source owner changed');
       return {owner: {...owner}, source: observed.source, settings: structuredClone(handle.settings)};
+    },
+    async replace(handle, {owner, deadline: operationDeadline, expected_source_sha256, source_text}) {
+      check(owner, operationDeadline);
+      need(active === handle && same(handle.owner, owner) && handle.writeAttempted !== true,
+        'Managed JavaScript source write handle changed or already used');
+      handle.writeAttempted = true;
+      return driver.replaceManagedJavascriptSource({task: handle.task, handle, owner,
+        deadline: operationDeadline, expected_source_sha256, source_text,
+        read: (sourceHandle, request) => this.read(sourceHandle, request),
+        execute, record, receiptOptions, markUncertain: value => { uncertain = value; }});
     },
     async discard(handle, {owner, deadline: operationDeadline}) {
       check(owner, operationDeadline);
