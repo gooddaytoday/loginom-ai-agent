@@ -92,8 +92,14 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
     const ack = await bounded(() => record(structuredClone(expected)));
     need(Object.keys(expected).every(key => equal(ack?.[key], expected[key])), 'ack');
   };
-  const retire = error => {
+  const retire = async error => {
     state = 'retired';
+    // Preserve the trusted adapter/driver refusal privately before replacing
+    // its public message. Recording it cannot authorize a retry or an effect.
+    if (!(error instanceof SourceAdmissionError) && Date.now() < deadline) {
+      await journal({phase:'javascript_source_boundary_refused',owner:targetOwner,read_id:readId,
+        reason:redactor.text(String(error?.message ?? 'Source boundary failed')).slice(0,1024)});
+    }
     throw error instanceof SourceAdmissionError ? error : new SourceAdmissionError('boundary');
   };
   const readFull = async boundOwner => {
