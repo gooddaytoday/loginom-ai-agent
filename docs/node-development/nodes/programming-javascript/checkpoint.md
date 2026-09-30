@@ -46,6 +46,43 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### Пауза по просьбе пользователя: Done ACK сохранён — 2026-09-30 14:46 UTC
+
+Работа приостановлена по явному указанию пользователя. Main docs до этой
+записи — `5a2c065d66`; child code — `406f695256e90aa3d8deea790626585183b2044e`.
+Сохранён только первый участок Done barrier: immutable prepared ACK с original
+deadline, строгая проверка returned browser receipt и отдельный durable
+`javascript_managed_done_returned` ACK. Возвращённый click по-прежнему не
+доказывает commit; `wizard_commit_verified=false`, `execution_started=null`.
+Неизвестный reply/ACK не разрешает повтор Done или discard.
+
+Адресные tests на сохранённом коде: **78 PASS/0 FAIL**, actual exit0.
+Private log `e-native-done-receipt-pause-tests-01.log`, SHA256
+`cbd9b8f8027f5ae280b45e7ae8895f2ddb4a6fef7afb0f27123f7bc68c44b648`;
+Done/source adapter/native error/code handler/existing code. `git diff --check`
+PASS. Full suites после этой правки и новый live **не запускались**.
+OpenViking find и exact read Experience успешны; это не новый bootstrap/health.
+
+Безопасное состояние сверено: profile388 `closed_verified`, active exec/evidence/
+kind=null, процессы live/Chromium профилей кампании отсутствуют. Последние Code02
+и Declared01 reports сохраняют package/logout/browser cleanup3/3 и принятые
+independent audits. Новый profile389 ещё не назначен. Main untracked
+`acceleration-review.md` и исторические untracked child files сохранены вне commits.
+Цель не завершена; приостановлена по просьбе пользователя.
+
+**При продолжении:** не повторять принятые SyntaxError runs и rebase. Начать
+с оставшейся реализации source-backed Done settlement: оригинальный deadline,
+same owned wizard refusal либо verified graph return через existing Close
+decision observer; hidden retained CodeMirror/full source proof, stage-specific
+diagnostic/OK и owned Close на Done. До независимого нового source admission/
+полного baseline/complete graph не объявлять rollback или discarded. Затем
+адресные regression/fixed independent expectations и fresh ordinary headed
+sync throw/repair; фактическую стадию ошибки брать из native evidence. Полный
+Done refusal barrier, public sync throw и остальной E/F/candidate/CLI ещё открыты.
+Design отражён в следующем блоке; новые runtime изменения кроме Done ACK
+не сделаны. До live закрепить новый source freeze/assignment, не менять старые
+oracle/receipts и не переиспользовать закрытый profile388.
+
 ### E/J12/J25: оба native syntax refusal/repair приняты — 2026-09-30
 
 Declared ordinary headed fresh388/exec21172 actual exit0, freeze `cf78f5b61a`.
