@@ -45,6 +45,25 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public native cardinality2/4 принято; duplicate выполняется — 2026-09-30
+
+Keep2 и odd на frozen child `3bfbd9968b` independently приняты. Odd01/
+profile378/exec82808 actual exit0/OBSERVED, input whole native3×1/releases3/3,
+ordered typed output2×1 [1,3], source/metadata/mappings/graph/Views/13 phases/
+2 fresh Execute и package/logout/browser/process cleanup проверены.
+Completed IDs `1790764949423-j0i3vxm9p3b:1253:3` / `:1253:4`.
+Report SHA256 `d39a2a2d60debe2e1380f104abea80842569a2937dcde0084d836069f51598d9`,
+journal `6e6c4bc7555d59b59fede333bdf807eeab0dd929fe5fbdda5b3adca4b6467578`,
+receipt `174c9f8c9c9711ade91c59c7748fd55725dd1eefa697826554427041b8ebd2df`.
+Profile378 closed_verified, browser/processes absent. Native output/upstream
+bytes/Save/cold/candidate/CLI не заявляются.
+
+Duplicate01 ordinary headed fresh profile379, exec10580 зарегистрирован под
+lock; evidence `e-public-types-native-cardinality-duplicate-01`, результат
+не установлен. Наблюдать этот handle, затем independent audit/cleanup/
+reconciliation; после успешной проверки fresh canonical declared-empty.
+Полная J/E/F матрица и registry readiness прежние.
+
 ### E: public native cardinality keep2 принят; odd выполняется — 2026-09-30
 
 Keep2 Code01/profile377/child `3bfbd9968b`, exec9636/exit0 — OBSERVED,
