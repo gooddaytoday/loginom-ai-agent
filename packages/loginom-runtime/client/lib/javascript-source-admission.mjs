@@ -1,5 +1,5 @@
 import {createHash, randomUUID} from 'node:crypto';
-import {createJavascriptSourceReader, javascriptSourceIdentity} from './javascript-source-read.mjs';
+import {createJavascriptSourceReader, javascriptSourceIdentity, prepareJavascriptSourceDelivery} from './javascript-source-read.mjs';
 import {inspectJavascriptModulePolicy} from './javascript-module-policy.mjs';
 
 const equal = (left, right) => JSON.stringify(left) === JSON.stringify(right);
@@ -134,6 +134,7 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
     need(Object.keys(input).every(key => ['receipt','owner'].includes(key)), 'request');
     timely();
   };
+  const prepareDelivery=source=>prepareJavascriptSourceDelivery({source,owner:targetOwner,redactor,chunkBytes});
   const currentReceipt = phase => immutable({admission_id: admissionId, phase, kind, owner: targetOwner, deadline,
     intent,
     previous_source: previous?.identity ?? null, effective_source: effectivePolicy, settings_sha256: observedSettings ?? null, planned_settings_sha256: plannedSettingsDigest});
@@ -151,11 +152,13 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
         need(kind !== 'new' || supplied && !expected, 'new_source');
         need(kind !== 'existing' || (supplied ? expected && typeof requested.expected_source_sha256 === 'string'
           && /^[a-f0-9]{64}$/.test(requested.expected_source_sha256) : !expected), 'expected_digest');
+        if (supplied) prepareDelivery(requested.source_text);
         if (kind === 'existing') {
           previous = await readFull(initialOwner); observedSettings = previous.settings;
           need(!supplied || requested.expected_source_sha256 === previous.identity.source_sha256, 'stale_digest');
         }
         effectiveSource = supplied ? requested.source_text : previous.source;
+        prepareDelivery(effectiveSource);
         effectivePolicy = policyFor(effectiveSource);
         // Preserve explicit empty/same-text replacement intent; digest equality
         // must never turn a supplied replacement into an omitted-source request.
@@ -173,6 +176,7 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
           const fresh = await readFull(targetOwner);
           need(equal(fresh.identity, previous.identity) && fresh.settings === observedSettings, 'mutation_drift');
         }
+        prepareDelivery(effectiveSource);
         need(equal(policyFor(effectiveSource), effectivePolicy), 'policy_drift');
         await journal({phase: 'javascript_source_mutation_dispatch', receipt});
         // The asynchronous dispatch ACK is not a source freshness proof.
@@ -180,6 +184,7 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
           const fresh = await readFull(targetOwner);
           need(equal(fresh.identity, previous.identity) && fresh.settings === observedSettings, 'mutation_drift');
         }
+        prepareDelivery(effectiveSource);
         need(equal(policyFor(effectiveSource), effectivePolicy), 'policy_drift');
         const result = await bounded(() => perform({owner: targetOwner, deadline, intent: receipt.intent, source_text: effectiveSource, policy: effectivePolicy, planned_settings: plannedSettings}));
         const observedOwner = normalizedOwner(result?.owner, 'existing');
