@@ -45,8 +45,11 @@ foreign masks/owner/editor/source/gesture/ACK guards сохранены. Full cl
 3106PASS/10SKIP, operator18201PASS. Fresh Code public native SyntaxError17:26 /
 typed FAILED/discard/independent committed baseline и NEW same-node repair /
 2 fresh Execute/full6×4 прошли independent audit/cleanup, auditor negatives57/57.
-Declared отдельный live выполняется; Done refusal/technical details/public throw/
-Stop/recovery и прочий J/F остаток сохраняются. Точные hashes — в checkpoint.
+Declared отдельный live также PASS: native SyntaxError16:26, independent retained
+source/native settings/schema/graph, NEW same-node repair/2 fresh Execute/full6×4,
+both audits/negative57/57 и cleanup. Source fix подтверждён этими fixed paths;
+Done refusal/technical details/public throw/Stop/recovery и прочий J/F остаток
+сохраняются. Точные hashes — в checkpoint.
 
 | Gate | Непосредственно наблюдено | Решение / точный остаток 0B и следующий тест | Реализация / приёмка (фазы 1–6) |
 | --- | --- | --- | --- |

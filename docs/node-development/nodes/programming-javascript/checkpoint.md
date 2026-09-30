@@ -46,6 +46,38 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J12/J25: оба native syntax refusal/repair приняты — 2026-09-30
+
+Declared ordinary headed fresh388/exec21172 actual exit0, freeze `cf78f5b61a`.
+`e-public-wizard-refusal-syntax-declared-01` report SHA256
+`bdf2622413c2734f479651ea3c11e02ccdbb4ee7cd1c8321891f131c03a6e76a`,
+journal SHA256
+`0fcbd16aa7bbc9217c0d450b93eee221daed08c9c4a1eaaa2cb5bc4906563422`.
+Original pinned auditor PASS, additional pre-pinned v3 PASS, receipt SHA256
+`ed92a9d3a96476f21a1661d62a52e98805f1f20145e7a6217696866ef8704f4e`.
+Native SyntaxError actual position16:26; full bounded user-v1 diagnostic,
+verified dialog/discard, independently retained committed source/native schema/
+settings/complete graph. NEW same-node repair,2 distinct fresh Execute/full6×4/
+1950, final independent public source-read — PASS. Auditor meaningful negatives
+57/57 refused; receipt SHA256
+`e67ba5f13c37ff7cec6bba4d39c5aa13e5ff44493ddf727ef000fda1a14c5ce5`.
+Cleanup package/logout/browser/process absence verified; registry388
+closed_verified/active_exec=null/active evidence=null. No Save/candidate/CLI.
+Code evidence ниже; это два fixed Code Next parse-refusal paths, не весь J12/J25.
+
+Следующий связный шаг — source-backed Done refusal barrier и public sync throw/
+repair: читать WizardForm.DoDoneAsync, WizardModelComponentForm/BaseWizard,
+managed Done/Close/stage и существующие tests; переиспользовать exact retained
+ownership/editor/source и verified graph return. Done может отказать до CloseWizard
+и оставить тот же мастер; не дожидаться общего timeout и не replay Done.
+Диагностика перед discard; baseline proof после independently verified Close
+остаётся обязательным. Не приписывать sync throw Code Next/Done/child stage без
+actual native evidence. Technical details нужны только при недостаточном тексте.
+Сначала regression/fixed independent expectations, потом fresh389 ordinary headed.
+Other remaining J19/J20/J22/J24/module/source-direct budgets/public Stop/lost reply/
+same-ID recovery, E/F/candidate/CLI не закрыты. Не повторять принятые parse runs
+без затронувшего изменения. Full plan незавершён; Goal active.
+
 ### E/J12/J25: Code native syntax refusal/repair принят; declared live — 2026-09-30
 
 Freeze `cf78f5b61a`, ordinary headed profile387/exec51568 actual exit0.
