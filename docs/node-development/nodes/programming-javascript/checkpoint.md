@@ -44,6 +44,27 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: empty input — fixed оператор и live — 2026-09-30
+
+Child `64221b01c8fe1e7caae79f10e0e85d6b238bc400` допускает pinned empty input
+только для `g5-empty-input`, используя прежний46-byte `operator-only/empty.csv`
+из manifest. Входная схема прежние5 полей; полный typed oracle требует0 rows,
+sample_complete и все names/types. Остальные base/changed/reordered rows и
+cold/write admission не изменены. Exact JS source совпадает с named-access
+SHA `f18c22929b8dfbd4587497a4ec66520314cb3607ad4bad88cdc43bfebbe42b41`;
+expected output0×1 Result/integer закреплён до live.
+
+На точном SHA полный JS operator suite: **17903 PASS / 0 FAIL**, exec45813/exit0,
+log SHA256 `a23af5e6e59e617eb44bf790255faa999ab7635ae26154167097ffd1349406e0`.
+Адресные250 tests и syntax/diff checks PASS. Client sources не менялись.
+Private independent oracle/auditor v3 подготовлены до live, прежние v1/v2
+и PASS receipts не изменены.
+
+Ordinary headed `e-public-types-empty-input-01`, fresh profile355, exec32733,
+запущен. Input0×5/output0×1, execution/source/mapping и cleanup результаты
+пока не установлены. После terminal необходим independent audit и registry
+reconciliation. J08/E/F не закрыты; остальные требования прежние.
+
 ### E: one-row output — принят — 2026-09-30
 
 One-output01/profile354/child `2eef052e7a`, exec63502/exit0 — **OBSERVED**,
