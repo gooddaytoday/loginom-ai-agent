@@ -5,6 +5,7 @@ import {javascriptEngineProbes,inputTextProbe} from './javascript-engine-probes.
 import {javascriptBusinessProbes} from './javascript-business-probes.mjs';
 import {javascriptStopProbe} from './javascript-stop-case.mjs';
 import {javascriptBridgeProbe} from './javascript-bridge-probe.mjs';
+import {describeJavascriptKnowledge} from '../../client/lib/javascript-knowledge.mjs';
 import {verifyJavascriptMismatchTable,verifyJavascriptPreviousExecution} from './javascript-mismatch-probe.mjs';
 
 const need=(v,m)=>{if(!v)throw Error(m);};
@@ -13,11 +14,26 @@ const column=type=>[{name:'Result',label:'Result',type}];
 const source=(type,expression)=>'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
   +'OutputTable.AssignColumns([{Name:"Result",DataType:DataType.'+type+'}]);\n'+expression+'\n';
 const rows=expressions=>expressions.map(e=>'OutputTable.Append(); OutputTable.Set("Result", '+e+');').join('\n');
+const knowledge=describeJavascriptKnowledge('7.4.2');
+need(knowledge.version==='1.0.0'&&knowledge.examples.length===2,'Fixed knowledge v1 examples changed');
+const knowledgeProbes=knowledge.examples.map(example=>{
+  need(['code-table-v1','declared-table-v1'].includes(example.id)
+    &&example.id===example.schema_mode+'-table-v1'&&example.input_technical_name==='RowID'
+    &&hash(example.source)===example.source_sha256,'Fixed knowledge v1 source identity changed');
+  return {id:(example.schema_mode==='declared'?'declared-':'')+'g5-knowledge-v1',scope:'J20-knowledge',
+    schema_mode:example.schema_mode,source:example.source,
+    schema:[{name:'ObservedID',label:'ObservedID',type:'integer'},{name:'PhaseMarker',label:'PhaseMarker',type:'string'}],
+    expected:[['1','JS_G2_TABLE_V1'],['2','JS_G2_TABLE_V1'],['3','JS_G2_TABLE_V1'],
+      ['4','JS_G2_TABLE_V1'],['5','JS_G2_TABLE_V1'],['6','JS_G2_TABLE_V1']],expectation:'fixed',
+    knowledge:{version:knowledge.version,knowledge_sha256:knowledge.knowledge_sha256,
+      example_id:example.id,example_source_sha256:example.source_sha256,validated_for:knowledge.validated_for}};
+});
 const typed=(id,type,expressions,values,note)=>({id,scope:'G5',source:source(type,rows(expressions)),
   schema:column({String:'string',Boolean:'boolean',Integer:'integer',Float:'real',DateTime:'datetime'}[type]),
   expected:values===null?null:values.map(value=>[value]),note,expectation:values===null?'characterization':'fixed'});
 
 const codeProbes=[
+  ...knowledgeProbes,
   ...javascriptEngineProbes.map(p=>({...p,id:'engine-'+p.id,schema:column('string'),
     expected:p.expected?.map(v=>[v])??null,expectation:p.expectedError?'diagnostic':'fixed'})),
   {...inputTextProbe('Customer'),id:'engine-input-text',schema:column('string'),expectation:'fixed',
