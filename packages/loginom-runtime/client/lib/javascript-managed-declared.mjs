@@ -11,8 +11,14 @@ import {waitJavascriptColumnEditor,verifyJavascriptColumnEditor,fillJavascriptCo
 const need=(value,message)=>{if(!value)throw Error(message);};
 const usages={'Не задано':0,'Активное':3,'Выходное':4,'Группа':6,'Показатель':7,'Транзакция':8,'Элемент':9};
 
-// Initial D scope. Non-default data-kind changes and other types must be
-// refused before target creation until their owned picker paths are supported.
+const primitiveTypes={boolean:{value:1,label:'Логический',kind:'Дискретный'},
+  datetime:{value:2,label:'Дата/Время',kind:'Непрерывный'},
+  real:{value:3,label:'Вещественный',kind:'Непрерывный'},
+  integer:{value:4,label:'Целый',kind:'Непрерывный'},
+  string:{value:5,label:'Строковый',kind:'Дискретный'}};
+
+// Only default data kinds are supported. Each native picker must independently
+// confirm its value and exact label before the owned selection gesture.
 export function validateJavascriptDeclaredPrimitiveColumns(columns) {
   need(Array.isArray(columns)&&columns.length>0&&columns.length<=64,
     'Managed JavaScript declared column coverage unavailable');
@@ -21,8 +27,8 @@ export function validateJavascriptDeclaredPrimitiveColumns(columns) {
     &&typeof column.name==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(column.name)
     &&typeof column.label==='string'&&column.label.length>0&&column.label.length<=120
     &&column.label.isWellFormed()&&!/[\x00-\x1f\x7f]/.test(column.label)
-    &&['integer','string'].includes(column.type)
-    &&column.data_kind===(column.type==='integer'?'Непрерывный':'Дискретный')
+    &&Object.hasOwn(primitiveTypes,column.type)
+    &&column.data_kind===primitiveTypes[column.type].kind
     &&Object.hasOwn(usages,column.usage))
     &&new Set(columns.map(column=>column.name.toLowerCase())).size===columns.length,
   'Managed JavaScript declared column parameters unsupported');
@@ -48,7 +54,7 @@ export function inspectManagedJavascriptDeclaredContext({held,task,capture=false
     binding:held.wizardBinding,account:held.account,build:task.targetBuild}:{verified:true};
 }
 
-export async function runManagedJavascriptDeclaredStep(page,task,inspect,observe,helpers,readSchema) {
+export async function runManagedJavascriptDeclaredStep(page,task,inspect,observe,helpers,readSchema,typeOptions) {
   const lease=page[Symbol.for('loginom-dock.javascript-owned-selection-v1')]?.get(task.operation_id);
   const identity=JSON.stringify([task.owner,task.workflow_ref,task.targetOrigin,task.targetBuild,task.deadline]);
   if(!lease||lease.identity!==identity||lease.settingAttempted!==true||!lease.wizardCaptured
@@ -70,7 +76,7 @@ export async function runManagedJavascriptDeclaredStep(page,task,inspect,observe
     ...(column.usage==='Не задано'?[]:['usage_open','usage_select']),'apply'];
   if(state.columns!==JSON.stringify(task.columns)||state.index!==task.index||steps[state.step]!==task.step)
     throw Error('Managed declared column order or parameters changed');
-  const expectedType=column.type==='integer'?4:5,expectedLabel=column.type==='integer'?'Целый':'Строковый';
+  const expectedType=typeOptions[column.type].value,expectedLabel=typeOptions[column.type].label;
   const events=[],record=async event=>{events.push(event);return event;};
   const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']').filter({visible:true});
   const argumentsForStep=()=>({held:state.pending.held,phase:task.step==='add'?'baseline':'editing',
@@ -156,7 +162,7 @@ export function makeJavascriptManagedDeclaredCode(task) {
     +functions.map(fn=>'const '+fn.name+'='+fn.toString()+';').join('')
     +'return ('+runManagedJavascriptDeclaredStep.toString()+')(page,'+JSON.stringify(task)+','
     +inspectManagedJavascriptDeclaredContext.toString()+',observeJavascriptColumnEditor,{'
-    +functions.map(fn=>fn.name).join(',')+'},'+readJavascriptSchema.toString()+');}';
+    +functions.map(fn=>fn.name).join(',')+'},'+readJavascriptSchema.toString()+','+JSON.stringify(primitiveTypes)+');}';
 }
 
 export async function dispatchManagedJavascriptDeclared({task,columns,execute,record,receiptOptions}) {

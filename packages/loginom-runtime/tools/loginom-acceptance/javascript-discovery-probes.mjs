@@ -17,7 +17,7 @@ const typed=(id,type,expressions,values,note)=>({id,scope:'G5',source:source(typ
   schema:column({String:'string',Boolean:'boolean',Integer:'integer',Float:'real',DateTime:'datetime'}[type]),
   expected:values===null?null:values.map(value=>[value]),note,expectation:values===null?'characterization':'fixed'});
 
-const probes=[
+const codeProbes=[
   ...javascriptEngineProbes.map(p=>({...p,id:'engine-'+p.id,schema:column('string'),
     expected:p.expected?.map(v=>[v])??null,expectation:p.expectedError?'diagnostic':'fixed'})),
   {...inputTextProbe('Customer'),id:'engine-input-text',schema:column('string'),expectation:'fixed',
@@ -50,6 +50,18 @@ const probes=[
   javascriptBridgeProbe(),
   javascriptStopProbe(),
 ].map(p=>({...p,schema_mode:p.schema_mode??'code',build:'7.4.2',source_sha256:hash(p.source),status:'not_run'}));
+
+// Operator-only declared counterparts: the authored body and expected values
+// stay identical; schema creation belongs to the native wizard.
+const declaredIds=new Set(['g5-null-empty','g5-boolean','g5-real','g5-safe-integer',
+  'g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
+const probes=[...codeProbes,...codeProbes.filter(probe=>declaredIds.has(probe.id)).map(probe=>{
+  const lines=probe.source.split('\n');
+  need(lines[1].startsWith('OutputTable.AssignColumns(')&&lines[1].endsWith(');'),
+    'Declared fixed source schema statement unavailable');
+  const body=lines.filter((_,index)=>index!==1).join('\n');
+  return {...probe,id:'declared-'+probe.id,schema_mode:'declared',source:body,source_sha256:hash(body)};
+})];
 
 export const javascriptDiscoveryIds=Object.freeze(probes.map(p=>p.id));
 

@@ -20,13 +20,15 @@ export async function javascriptPublicCodePins() {
     selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
 }
 
-export const javascriptPublicTypedIds=Object.freeze(['g5-null-empty','g5-boolean','g5-real',
+const codeTypedIds=Object.freeze(['g5-null-empty','g5-boolean','g5-real',
   'g5-safe-integer','g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
+export const javascriptPublicTypedIds=Object.freeze([...codeTypedIds,...codeTypedIds.map(id=>'declared-'+id)]);
 
 export function javascriptPublicCodeProbe(probeId,schemaMode) {
-  need(probeId===null||schemaMode==='code'&&javascriptPublicTypedIds.includes(probeId),
-    'Public typed probe requires a fixed code case');
-  return javascriptDiscoveryProbe(probeId??'p1-business-'+schemaMode+'-base');
+  need(probeId===null||javascriptPublicTypedIds.includes(probeId),'Public typed probe requires a fixed typed case');
+  const probe=javascriptDiscoveryProbe(probeId??'p1-business-'+schemaMode+'-base');
+  need(probe.schema_mode===schemaMode,'Public typed probe requires its fixed schema mode');
+  return probe;
 }
 
 export function javascriptPublicCodeRequest({prepared,input,probe,schemaMode,remaining}) {
@@ -40,7 +42,7 @@ export function javascriptPublicCodeRequest({prepared,input,probe,schemaMode,rem
     inputs:[{source:input.node,output:0,input:0}],mode:'script',
     parameters:{schema_mode:schemaMode,source_text:probe.source,
       ...(schemaMode==='declared'?{columns:probe.schema.map((column,index)=>({...column,
-        data_kind:column.type==='integer'?'Непрерывный':'Дискретный',usage:index===0?'Выходное':'Не задано'}))}:{})},mappings:[],finish:'execute',
+        data_kind:['integer','real','datetime'].includes(column.type)?'Непрерывный':'Дискретный',usage:index===0?'Выходное':'Не задано'}))}:{})},mappings:[],finish:'execute',
     read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},
     budgets:{configure_ms:remaining,execute_ms:300000,total_ms:remaining}};
 }
