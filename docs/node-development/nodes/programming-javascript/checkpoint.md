@@ -43,6 +43,30 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public String null/empty — принят — 2026-09-30
+
+`e-public-types-null-empty-01`, profile347, child `bccc8a0a08`, exec84275/exit0 —
+**OBSERVED**, independent audit **PASS**. Новый Code JS GUID
+`cbd99f27-be3d-4318-a82f-ab6f0ed26b58`, exact source SHA256
+`5b312ad7ea5af26aa32759246e2162adff5d235579863fc0159c511f07c78c37`.
+Полный input6×5 совпал. Output5×1 String различает null (exact_null), пустую
+строку и строки null/0/false (display_text); схема Result/String и порядок
+совпали с закреплённым oracle. Все13 public phases, полные input/output
+mappings и graph, source-read проверены. Два свежих completed IDs:
+`1790753494388-q8agg8gxtkn:1129:3` и `:1129:4`.
+
+Report SHA256 `3b5cea087b644ef66afc7ea642740f54d2709697d2bd34d355b20d938606d66a`,
+journal `14516258620159cbb6f760cd999871ace2f870405f5468ff51aed0814a3527f9`,
+audit receipt `cd507c6ed09ab562ec0e6a264376e0f1dbafc77890dd5c00131c8df42a57b553`.
+Package/logout/browser/process cleanup проверен; registry reconciled.
+Save/cold/native bytes/candidate/CLI не проверены. J06 целиком не закрыт:
+подтверждён только этот fixed public Code String output case, остальные scalar
+и native input пути остаются отдельными проверками.
+
+Следующий Boolean01/g5-boolean запущен на fresh ordinary headed profile348,
+exec16250. Его результат пока не установлен; ожидаются null/false/true с
+exact typed evidence. Затем real/safe integer/civil Date и 0–1–N, остаток E/F.
+
 ### E: public types — fixed оператор и первый live — 2026-09-30
 
 Child `bccc8a0a08e21b11d9c0168b4eb8e539ac320074` переиспользует actual public C
