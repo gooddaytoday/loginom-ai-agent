@@ -1,6 +1,6 @@
 # Кросс-таблица: скользящая схема
 
-Доставь три CSV в свой каталог Loginom штатной доставкой вложений с подтверждёнными upload receipts. Импортируй base.csv: Region и Category — дискретные строки, Amount — real, Quantity — integer, разделитель запятая, `?` — NULL.
+Доставь три CSV в свой каталог Loginom штатной доставкой вложений с подтверждёнными upload receipts. CSV содержат 32 начальных строковых поля Unused00…Unused31. Оставь их в импорте; в CrossTable их не назначай: требуемые поля находятся за видимой областью списка. Импортируй base.csv: Region и Category — дискретные строки, Amount — real, Quantity — integer, разделитель запятая, `?` — NULL.
 
 Построй один Sliding CrossTable: строки Region, колонка Category, без лимита категорий (`columns: {mode: "sliding", min_values: 0}`). Для Amount и Quantity — сумма. Выполни и прочитай полный выход с точными числами (sample_rows=100, require_exact_numbers=true). Используй operation_id `sliding-base`. Сохрани возвращённые IDs импорта, CrossTable и исходную операцию.
 

@@ -5088,7 +5088,7 @@
           "evidence": []
         }
       },
-      "next_action": "Проверить исправление Sliding через публичный node_read, сохранение/cold/cleanup; создать child-проверку на запушенном SHA до сдачи владельцу.",
+      "next_action": "Проверить два P2 (scroll CrossTable и CLI exit verdict), широкие CSV и публичный Sliding reread/cold/cleanup; свежая приёмка и независимая child-проверка нового SHA до approval.",
       "plan": "nodes/transform-crosstable/plan.md",
       "plan_status": "implementation_in_progress"
     },

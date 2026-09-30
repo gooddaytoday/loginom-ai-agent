@@ -45,11 +45,22 @@ export async function configureCrossTable(channel,parameters,{inputMapping}){
     need(same(selectedRecords(selected),[field.record_id]),'CrossTable selection differs');
     return selected;
    }
-   const scroll=state.ui.elements.find(item=>item.grouping_field?.role===role&&item.scroll?.ref===item.ref
-    &&item.allowed_actions.includes('scroll'));
-   need(scroll&&attempt<127,'CrossTable field cannot be revealed');
+   const order=item=>role==='available'?item.source_index:item.order;
+   const visible=state.ui.elements.filter(item=>item.grouping_field?.role===role&&item.scroll
+    &&item.allowed_actions.includes('scroll')).map(element=>({element,field:state.node_cross_table.input_fields
+     .find(item=>item.record_id===element.grouping_field.record_id)})).filter(item=>item.field)
+    .sort((a,b)=>order(a.field)-order(b.field));
+   need(visible.length&&attempt<127&&new Set(visible.map(item=>item.element.scroll.ref)).size===1,
+    'CrossTable field cannot be revealed');
+   const direction=order(current)<order(visible[0].field)?-1:order(current)>order(visible.at(-1).field)?1:0;
+   need(direction!==0,'CrossTable field is obscured');
+   // Field metadata belongs to cells; scroll.ref identifies their shared list container.
+   const anchor=visible[Math.floor(visible.length/2)].element,scroll=anchor.scroll;
    await channel.perform({condition:'reveal CrossTable field',initialObservation:state,ready,
-    identity:()=>({record_id:field.record_id,role,scroll:scroll.ref}),resolve:()=>({verb:'scroll',ref:scroll.ref,delta_y:400})});
+    identity:()=>({record_id:field.record_id,role,scroll:scroll.ref}),resolve:()=>({verb:'scroll',ref:anchor.ref,delta_y:direction*400})});
+   const after=await observe('CrossTable list scrolled');
+   const next=after.ui.elements.find(item=>item.scroll?.ref===scroll.ref)?.scroll;
+   need(next&&direction*(next.top-scroll.top)>0,'CrossTable list did not scroll');
   }
  };
  for(const field of fields.filter(item=>item.disposition!==0&&wanted.get(item.name)!==item.disposition)){

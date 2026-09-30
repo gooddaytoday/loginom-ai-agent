@@ -729,7 +729,8 @@ CONFIG_TMP=""
 
 if [[ "$TIMED_OUT" == "true" ]]; then
   RESULT_STATUS="FAIL"
-elif [[ "$ORACLE_EXIT" -eq 0 && "$ORACLE_STATUS" == "PASS" ]]; then
+elif [[ "$CLI_EXIT" -eq 0 && "$ORACLE_EXIT" -eq 0 && "$ORACLE_STATUS" == "PASS" \
+  && "$CLEANUP_PACKAGE_CLOSED" == "true" && "$CLEANUP_LOGGED_OUT" == "true" ]]; then
   RESULT_STATUS="PASS"
 else
   RESULT_STATUS="FAIL"
