@@ -46,6 +46,45 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J12/J25: throw Code02 назначен после exact recovery и TabForm mask fix — 2026-09-30
+
+Code01/profile389/exec95839 actual exit1: source `349486dabd` принял Next и
+Done и записал `javascript_managed_done_settled`; native wizard refusal не было.
+Последующий independent source-read остановился на раннем foreign-mask guard
+при Close. Execute не запрашивался. Report сохраняет `CLEANUP_UNCONFIRMED`,
+SHA256 `de7c8fcfba8a670dc6da5f25269a568e87ab31fa324fc53c8098b3d79b312254`.
+Не повторять жесты этой операции и не переклассифицировать её как успешную.
+Headed admin recovery390/exec52686 exit0 закрыл только её точный пакет
+`JavaScript_57c4ec51_aafd_4d71_8508_17209482af04` и сеанс `jsteach:3756`.
+После Refresh обе записи отсутствуют; admin logout/browser close/actual process
+absence проверены. Receipt вне git `e-public-wizard-throw-admin-recovery-01-receipt.json`,
+journal SHA256 `d2dd76b5a7ce3457ba22a0a21cfc1ee1a42ea2bfc4b24ab19de3659b793b2655`.
+
+Child fix `5e55e53f8a1542d5b7ac44bcf351e0d090019865`: Close/Done graph observer
+ждёт также native TabForm bg.Lock mask, только при exact retained tab/controller/
+View/DOM/Ext identity и существующем active mask context. Чужой owner/mask,
+подменённый root или getter вместо context по-прежнему запрещены. Основание —
+live source TabForm.ChangeNode/bg.Lock и ext.MethodLock/AfterElementTextMaskContext.
+Fixed throw operator теперь требует explicit failed materialization execution,
+applied source и NEW repair с digest реально committed throw source; не обещает
+rollback после Done и не присваивает позиции из неоднозначного runtime stack.
+
+Client all01:3143 PASS/10 SKIP/0 FAIL, actual exit0, SHA256
+`f9bc58e18c1273f414b8752a2e721fd79ac87d7753ae154a066fb8c36d85a650`.
+Operator all02:18204 PASS/0 FAIL, actual exit0, до последней адресной проверки
+optional pending_phase; final addressed03:12 PASS/0 FAIL, actual exit0.
+Fresh391/exec5321 ordinary headed назначен `e-public-wizard-refusal-throw-code-02`.
+Pre-live v5 auditor/oracle закреплены вне git: SHA256 соответственно
+`0d9410be8588754d2fc0664dc08e953bb41764d962a85193098f17323bbb60a0` /
+`5159e4ba42cfb35771957ac27d809c5859944be403bbaee14d66071724772fec`.
+Old v4 oracle/auditor и failed389 evidence не менялись.
+
+При продолжении сначала наблюдать только exec5321 до actual terminal, затем
+independent v5 audit, meaningful auditor negatives, cleanup/process absence и
+registry reconciliation. При незавершённом Close/gesture не replay и не запускать
+следующий live. Declared throw — после принятого Code02. Остальной E/F,
+candidate/CLI и live Done refusal остаются открытыми; full Goal не завершена.
+
 ### E/J12/J25: Done barrier реализован; sync throw live назначен — 2026-09-30
 
 Работа возобновлена пользователем; code freeze `349486dabd4cf93ffb87d367a8ba888cd402aea1`.
