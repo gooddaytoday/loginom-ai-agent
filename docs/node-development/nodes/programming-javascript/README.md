@@ -65,7 +65,10 @@ native input bytes до JS и полный typed output/cleanup подтверж
 bytes/owned civil attestation и полный millisecond output без UTC/epoch claims.
 Outside-safe2/2 characterized на `81b4bfef74`: native9007199254740993
 переходит в9007199254740992 в обоих modes, общей гарантии int64 нет.
-Следующий шаг — native cardinality и E остаток J06–J08, затем остальные J.
+Native cardinality4/4 принят на `3bfbd9968b`: native input baseline,
+ordered keep2/odd/duplicate Code и canonical declared-empty/schema/cleanup.
+Следующий шаг — public source fidelity/limits/chunks/redaction/schema refusals
+(J05/J09/J23/J26), затем точный остаток E/J/F.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 

@@ -30,7 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — native cardinality через public JS и оставшиеся J06–J08.
+следующий шаг — public source fidelity/limits/chunks/redaction и
+сохранение/явный отказ schema edits (J05/J09/J23/J26), затем точный остаток E/J/F.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
 Fixed public Code scalar output5/5, named access и empty output приняты ниже.
 Fixed public existing changed/reordered freshness для обоих modes принят ниже.
@@ -44,6 +45,40 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E: public native cardinality4/4 принято — 2026-09-30
+
+Keep2/odd/duplicate Code и canonical declared-empty на frozen child `3bfbd9968b`
+independently приняты: actual terminal exit0/OBSERVED, native input whole
+baseline3×1/releases3/3, полный ordered typed output [2]/[1,3]/[1,1,2,2,3,3]/[],
+сохранённая Value Integer schema, source/native metadata/mappings/graph/Views/
+13 phases/2 fresh Execute и package/logout/browser/process cleanup. Первые
+три proofs/hashes ниже. Declared-empty01/profile380/exec39036 completed IDs
+`1790765264504-qxsjki0k7z:1261:3` / `:1261:4`.
+Empty report SHA256 `674010f8a606ec0bab55dd000a635882eec6f20ee5230337bc7095f678fd8231`,
+journal `8943026f5726896e45e18a6a8ea41b05524dd1b9af8ae6cc7c3808e0812ed634`,
+receipt `60808d64a7a9d7bd1f4fbcba1c78e30574c80718d4774d19c5aa9c807524ee92`.
+Independent auditor77/77 actual mutation refusals across all4 cases,
+receipt SHA256 `91e3729778287d0ae8528058b38e12f8e800ae2f8ab31657b73511429d1b7b09`.
+Проверены count/schema/rows/order (включая ошибочный grouped duplicate),
+native baseline/owner/raw bytes/releases, missing schema/phantom row на empty
+и cleanup. Source-only copies не browser runs. Public native output/upstream
+bytes/Save/cold/candidate/CLI не заявлены. Profile380 closed_verified,
+active_exec=null; браузеры/actual processes отсутствуют.
+
+Следующий связный результат E — public source fidelity/limits/chunks/redaction,
+сохранение/явный отказ schema edits и effective source module policy
+(J05/J09/J23/J26; source/direct J21 измеряется до review). Не повторять принятые
+native scalar/cardinality runs без затрагивающего изменения. Проверенный
+`createJavascriptCodeNodeSupport` требует finish=execute и preserved mappings;
+configure-only B остаётся отдельным pinned trial support, не продуктовой
+полной поддержкой. Existing baseline уже явно отказывает смене schema_mode
+и columns после independent source/settings read; нужно проверить actual
+public refusal и сохранение исходного узла/графа, без обхода через B.
+Для fidelity использовать actual handler и public chunked source-read, fixed
+source/oracle до live; source bounds/redaction/policy надо подтвердить до
+editor mutation, empty source учитывать в собственном scope без ложного output
+proof. Full E/J/F и registry readiness остаются открыты.
 
 ### E: public native cardinality3/4 принято; declared-empty выполняется — 2026-09-30
 
