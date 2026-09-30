@@ -389,9 +389,36 @@ execution prepare до её wrapping в admission boundary; новых разр�
 на Execute/replay нет. 400 адресных runtime tests PASS, SHA256
 `01afa74ce129bc364d44e2bbf31735df8f41673d8324267baaba36982f7b9b2b`.
 После verified recovery назначен fresh profile319, ordinary headed
-`c-public-code-04`/exec68658 на immutable source `9c4163c9aa` выполняется.
-Следующий связный результат — full6×4, независимый audit и cleanup; затем
-Save/cold, D/E/F. Цель active, gates/готовность не повышены.
+`c-public-code-04`/exec68658 на immutable source `9c4163c9aa` завершился exit1.
+Owned Done и первый full source read/Close подтверждены. До первого explicit
+Execute второй source adapter open остановился после body prepared ACK;
+receipt body не подтверждён, материализация/Views/read не достигнуты.
+Точная причина исходного boundary ещё не установлена; новое открытие того же
+unresolved действия не выполнялось. Original report **CLEANUP_UNCONFIRMED**,
+SHA256 `cc76db30b2fa130a1c2a3ff2298c74f6ecabac28d3174b220a84733f225fb244`;
+journal SHA256
+`b228038b42ac32d9c7b243eb9d21c6afa09805986c38f4df107f1bbf3fa881d7`.
+После absence оригинальных процессов separate headed recovery05/profile320,
+exec11110/exit0, закрыл только Package1/`jsteach:3656`
+(создание01:29/disconnect01:32 UTC). Refresh подтвердил отсутствие пакета и
+сеанса; admin logout/browser close/process absence проверены. Recovery receipt
+SHA256 `27e2e18a54b3dd21b82a4df160c6500e5cb77d7be33513a87ca94f74444b555a`.
+Original CLEANUP_UNCONFIRMED сохранён.
+
+Child `97098322a1` сохраняет generic trusted boundary error в private
+`javascript_source_boundary_refused` journal с redactor и exact ACK только
+в пределах original deadline. Retired/error semantics и запрет replay
+сохранены. Regression проверяет secret redaction и один effect после
+ошибки callback. 401 адресный runtime test PASS, SHA256
+`f3eae551926edfae1a9c00538d2962f790eca9cdc04230847efc4f1dfa9b9a38`;
+полный client suite — 2957 PASS / 10 SKIP / 0 FAIL, 2967 total,
+157,995 секунд, SHA256
+`128fb55570ef033e42eb02412ec1922ade380f5ce1ba07c7f5ce1a3f9c5849d6`.
+После verified recovery/absence и suite назначен fresh profile321;
+ordinary headed `c-public-code-05`, exec40153, source `97098322a1` выполняется.
+Следующий связный результат — адресно получить underlying boundary reason,
+если отказ повторится, либо full6×4/audit/cleanup, затем Save/cold, D/E/F.
+Цель active, gates/готовность не повышены.
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
