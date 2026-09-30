@@ -21,7 +21,7 @@ export async function javascriptPublicCodePins() {
 }
 
 export const javascriptPublicTypedIds=Object.freeze(['g5-null-empty','g5-boolean','g5-real',
-  'g5-safe-integer','g5-date-civil','g5-named-access','g5-empty-output']);
+  'g5-safe-integer','g5-date-civil','g5-named-access','g5-empty-output','g5-one-output']);
 
 export function javascriptPublicCodeProbe(probeId,schemaMode) {
   need(probeId===null||schemaMode==='code'&&javascriptPublicTypedIds.includes(probeId),
