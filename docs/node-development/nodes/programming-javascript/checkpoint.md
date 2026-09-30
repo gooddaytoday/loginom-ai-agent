@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — public native input roundtrip и оставшиеся J06–J08.
+следующий шаг — native Boolean input через public JS и оставшиеся J06–J08.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
 Fixed public Code scalar output5/5, named access и empty output приняты ниже.
 Fixed public existing changed/reordered freshness для обоих modes принят ниже.
@@ -44,6 +44,32 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E: public native-real2/2 принят — 2026-09-30
+
+Code и declared на frozen child `a679a63595` приняты независимыми native
+аудитами; оба terminal exit0, ordinary headed. Для каждого pinned input4×1
+NULL/0/-1.25/10.125, native bytes до JS/releases4/4 и source/owner/Import Execute
+подтверждены, затем полный public output4×1,2 fresh JS Execute, source/mappings/
+graph/Views и package/logout/browser/process cleanup. Code365/exec43757 proof
+выше/ниже; declared366/exec83317 completed IDs
+`1790759858392-ytlrkxf4hn:1205:3` / `:1205:4`.
+Declared report SHA256 `b8c2edca312bf02954aeba4b0d90dab4d9c3aad7213bb5c9fd2f3ce4dd9222c9`,
+journal `b84bb2f6b0db11a88b9caae7e94174813a8cdfc43a2adccf3c700dfb7c94ae40`,
+receipt `043a5c263be80c60e5c2f3d87f6632b763d96c3701adbc12258439db116c6b05`.
+Independent native auditor20/20 mutations refused, source-only receipt
+`4ea7336988dd3908ffeae10d7c6ce3ea7e73b047a514847eb9fa3739f9a39c54`.
+Исходные reports/receipts/oracles неизменны. Profile366 closed_verified,
+active_exec=null; browser/processes прогона отсутствуют.
+
+Следующий шаг: тем же фиксированным путём native Boolean input (прежний CSV,
+3×1 NULL/false/true, exact bytes до JS), Code/declared отдельными runs. Расширять
+operator-only allowlist и native input validator явно, сохранить business/
+empty/real guards. Actual admission/decoder/provenance/negative ownership и
+release checks, новый independent Boolean oracle/auditor и freeze до headed.
+Затем native String/safe-int64/civil Date и точный остаток J06–J08/E, остальные
+J и F. Native **output** bytes/Save/cold/product candidate/CLI остаются
+непроверенными; full J06–J08 и registry readiness не закрыты.
 
 ### E: native-real Code принят; declared выполняется — 2026-09-30
 

@@ -56,7 +56,9 @@ output также прошли independent typed audits и cleanup. На `2eef05
 independent audits и cleanup: String NULL/empty, Boolean, real, safe integer,
 civil Date. На том же SHA отдельно приняты named access, output0/1/N и
 empty input; все9 declared runs получили independent PASS и полную уборку.
-Следующий шаг — E остаток J06–J08, затем остальные J.
+На `a679a63595` public native real identity-copy отдельно прошёл Code/declared:
+native input bytes до JS и полный typed output/cleanup подтверждены.
+Следующий шаг — native Boolean/String/int64/Date и E остаток J06–J08, затем остальные J.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 
