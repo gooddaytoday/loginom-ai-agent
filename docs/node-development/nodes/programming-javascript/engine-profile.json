@@ -281,7 +281,9 @@
       "output_rows": 1,
       "all_cells_verified": true,
       "observed_values": [
-        ["object"]
+        [
+          "object"
+        ]
       ],
       "cleanup_complete": true,
       "evidence": {
@@ -314,7 +316,9 @@
       "output_rows": 1,
       "all_cells_verified": true,
       "observed_values": [
-        ["function"]
+        [
+          "function"
+        ]
       ],
       "cleanup_complete": true,
       "evidence": {
@@ -484,11 +488,21 @@
       "output_rows": 5,
       "all_cells_verified": true,
       "observed_values": [
-        [null],
-        [""],
-        ["null"],
-        ["0"],
-        ["false"]
+        [
+          null
+        ],
+        [
+          ""
+        ],
+        [
+          "null"
+        ],
+        [
+          "0"
+        ],
+        [
+          "false"
+        ]
       ],
       "cleanup_complete": true,
       "evidence": {
@@ -520,7 +534,9 @@
       ],
       "output_rows": 1,
       "observed_values": [
-        [null]
+        [
+          null
+        ]
       ],
       "null_verified": true,
       "gate_passed": false,
@@ -555,9 +571,15 @@
       "output_rows": 3,
       "all_cells_verified": true,
       "observed_values": [
-        [null],
-        [false],
-        [true]
+        [
+          null
+        ],
+        [
+          false
+        ],
+        [
+          true
+        ]
       ],
       "cleanup_complete": true,
       "evidence": {
@@ -590,10 +612,18 @@
       "output_rows": 4,
       "all_cells_verified": true,
       "observed_values": [
-        [null],
-        [0],
-        [-1.25],
-        [10.125]
+        [
+          null
+        ],
+        [
+          0
+        ],
+        [
+          -1.25
+        ],
+        [
+          10.125
+        ]
       ],
       "number_precision": "17_significant_digits",
       "cleanup_complete": true,
@@ -627,9 +657,15 @@
       "output_rows": 3,
       "all_cells_verified": true,
       "observed_values": [
-        ["-9007199254740991"],
-        ["0"],
-        ["9007199254740991"]
+        [
+          "-9007199254740991"
+        ],
+        [
+          "0"
+        ],
+        [
+          "9007199254740991"
+        ]
       ],
       "number_precision": "exact_integer_decimal",
       "cleanup_complete": true,
@@ -663,7 +699,9 @@
       ],
       "output_rows": 1,
       "observed_values": [
-        ["9007199254740992"]
+        [
+          "9007199254740992"
+        ]
       ],
       "number_precision": "exact_integer_decimal_output_only",
       "gate_passed": false,
@@ -698,7 +736,9 @@
       ],
       "output_rows": 1,
       "observed_values": [
-        ["1"]
+        [
+          "1"
+        ]
       ],
       "number_precision": "exact_integer_decimal_output_only",
       "gate_passed": false,
@@ -733,7 +773,9 @@
       ],
       "output_rows": 1,
       "observed_values": [
-        ["42"]
+        [
+          "42"
+        ]
       ],
       "number_precision": "exact_integer_decimal_output_only",
       "gate_passed": false,
@@ -768,7 +810,9 @@
       ],
       "output_rows": 1,
       "observed_values": [
-        [null]
+        [
+          null
+        ]
       ],
       "null_verified": true,
       "gate_passed": false,
@@ -803,7 +847,9 @@
       ],
       "output_rows": 1,
       "observed_values": [
-        ["-9223372036854775808"]
+        [
+          "-9223372036854775808"
+        ]
       ],
       "number_precision": "exact_integer_decimal_output_only",
       "gate_passed": false,
@@ -838,7 +884,9 @@
       ],
       "output_rows": 1,
       "observed_values": [
-        ["-9223372036854775808"]
+        [
+          "-9223372036854775808"
+        ]
       ],
       "number_precision": "exact_integer_decimal_output_only",
       "gate_passed": false,
@@ -873,8 +921,12 @@
       "output_rows": 2,
       "all_cells_verified": true,
       "observed_values": [
-        [null],
-        ["2024-02-29T23:59:59.123"]
+        [
+          null
+        ],
+        [
+          "2024-02-29T23:59:59.123"
+        ]
       ],
       "datetime_precision": "millisecond_local_timezone_unspecified",
       "cleanup_complete": true,
@@ -909,12 +961,24 @@
       "output_rows": 6,
       "all_cells_verified": true,
       "observed_values": [
-        ["1"],
-        ["2"],
-        ["3"],
-        ["4"],
-        ["5"],
-        ["6"]
+        [
+          "1"
+        ],
+        [
+          "2"
+        ],
+        [
+          "3"
+        ],
+        [
+          "4"
+        ],
+        [
+          "5"
+        ],
+        [
+          "6"
+        ]
       ],
       "number_precision": "exact_integer_decimal",
       "cleanup_complete": true,
@@ -1093,5 +1157,121 @@
       "mapping_status": "unverified",
       "source_span": null
     }
-  ]
+  ],
+  "required_runtime_subset": {
+    "status": "verified_at_isolated_public_runtime_level",
+    "validated_for": {
+      "loginom_build": "7.4.2",
+      "server_os": "Linux",
+      "operator_platform": "Ubuntu",
+      "browser_mode": "ordinary_headed"
+    },
+    "scope": "Required primitives of current knowledge 1.0.0 and the pinned sales business task. No full ECMAScript/Data API conformance or candidate/CLI acceptance. Existing extra cases retain their own observation statuses.",
+    "source_commit": "bc6494476a5f35379d3a70b3e510fb5c8d805ab5",
+    "knowledge_version": "1.0.0",
+    "knowledge_sha256": "4a8a2d6e712fc56d039d1e595361dde9afb7e16eb7f3b8fd1959d5f5908bc2ef",
+    "all_knowledge_examples": [
+      {
+        "example_id": "code-table-v1",
+        "schema_mode": "code",
+        "source_sha256": "d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2",
+        "report_sha256": "283c2e7741ad7f4fd805d26d725944d723086de505e40ac19c5db750672bb1fc",
+        "journal_sha256": "7167dab4fb1bd8a8aaea1ffcbe1504df62364e1b231500dfb3563ca0b24dc325",
+        "materialization_execution_id": "1790799555961-v0l9px6uxn:1265:3",
+        "final_execution_id": "1790799555961-v0l9px6uxn:1265:4",
+        "all_cells_retained_in_user_v1": true,
+        "cleanup_verified": [
+          "package",
+          "logout",
+          "browser",
+          "process_absence"
+        ],
+        "evidence": "e-public-knowledge-code-01",
+        "output_rows": 6,
+        "output_columns": 2,
+        "negative_mutations_refused": 32
+      },
+      {
+        "example_id": "declared-table-v1",
+        "schema_mode": "declared",
+        "source_sha256": "816b086fe447eb42afbf87ac46b18b01153f731f3baf0de2bcd280da1104957f",
+        "report_sha256": "41fc396ab1438132ec61e4963c5c37dd46ebef8238c5073a8e49582af7ab69d5",
+        "journal_sha256": "576f8ab83354a731e7b23f2b53f98f31c9f7f32834b5d3d45b1e7edfdb66115c",
+        "materialization_execution_id": "1790799988740-41ss54lbu8s:1269:3",
+        "final_execution_id": "1790799988740-41ss54lbu8s:1269:4",
+        "all_cells_retained_in_user_v1": true,
+        "cleanup_verified": [
+          "package",
+          "logout",
+          "browser",
+          "process_absence"
+        ],
+        "evidence": "e-public-knowledge-declared-01",
+        "output_rows": 6,
+        "output_columns": 2,
+        "negative_mutations_refused": 32
+      }
+    ],
+    "required_api": [
+      {
+        "primitive": "static named import from builtIn/Data",
+        "evidence": [
+          "code-table-v1",
+          "declared-table-v1"
+        ]
+      },
+      {
+        "primitive": "InputTable.RowCount and InputTable.Get(row, technicalName)",
+        "evidence": [
+          "code-table-v1",
+          "declared-table-v1"
+        ]
+      },
+      {
+        "primitive": "OutputTable.Append and OutputTable.Set(technicalName, value)",
+        "evidence": [
+          "code-table-v1",
+          "declared-table-v1"
+        ]
+      },
+      {
+        "primitive": "OutputTable.AssignColumns before Append; DataType.Integer",
+        "evidence": [
+          "code-table-v1"
+        ]
+      },
+      {
+        "primitive": "native declared schema; source without AssignColumns",
+        "evidence": [
+          "declared-table-v1"
+        ]
+      },
+      {
+        "primitive": "DataType.String; String(value).trim().toLowerCase(); multiplication/division/subtraction, comparisons and conditional expressions",
+        "evidence": [
+          "e-public-required-code-01",
+          "e-public-required-declared-01"
+        ],
+        "scope": "Exact authored sales6x4/current Code and declared source; no arbitrary arithmetic/Unicode normalization claim."
+      },
+      {
+        "primitive": "synchronous for loops with var/let, assignments and scalar literals",
+        "evidence": [
+          "code-table-v1",
+          "declared-table-v1",
+          "e-public-required-code-01",
+          "e-public-required-declared-01"
+        ]
+      }
+    ],
+    "boundaries": [
+      "Output named access is checked for the exact observed ASCII technical names; J24 other names remains separate.",
+      "No general outside-safe integer or epoch/timezone guarantee. Scalar/native precision evidence remains in J06-J08.",
+      "Additional syntax/API does not enter the required subset solely because a private engine snippet was observed.",
+      "Actual candidate knowledge delivery, current context J19/J21 and autonomous CLI acceptance remain required."
+    ],
+    "candidate_verified": false,
+    "cli_verified": false,
+    "gates_closed": []
+  }
 }

@@ -84,7 +84,11 @@ admission; адресные238/full18270 PASS. Code399/declared400 принят�
 independent audit v2, negative38/38 каждый, full6×4 и cleanup/process absence;
 исходный отказ auditor v1
 на неверных именах фаз сохранён, исправление сверено с runtime contract.
-Следующий шаг — J19 context/instruction-in-data, затем engine/module/budgets
+Все два exact knowledge1.0 examples также приняты в Code401/declared402 на
+`bc6494476a`: independent audit/negative32/32 каждый, full6×2/user-v1/source и
+cleanup. Required primitives отделены в [engine profile](engine-profile.json),
+остальные engine observations не превращены в общую гарантию ES/Data API.
+Следующий шаг — [J19/J21 context и delivery](context-delivery-design.md), затем module/budgets
 и точный остаток E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.

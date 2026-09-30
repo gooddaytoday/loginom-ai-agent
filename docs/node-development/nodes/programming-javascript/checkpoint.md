@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — свежий public context/instruction-in-data (J19); J09 Code399/declared400 приняты ниже. Fixed source32768/
+следующий шаг — реализация свежего public context/instruction-in-data и его delivery budgets (J19/J21); J09 Code399/declared400 и exact knowledge v1 Code401/declared402 приняты ниже. Fixed source32768/
 empty и schema-mode refusal уже приняты ниже; сохранение manual mapping, дополнительные
 limits/redaction и context/engine/module/budgets остаются открытыми.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
@@ -46,6 +46,43 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J20: весь required knowledge v1 subset принят на isolated public уровне — 2026-09-30
+
+Тот же child `bc6494476a5f35379d3a70b3e510fb5c8d805ab5` прошёл ordinary headed
+fresh402/exec26742, `e-public-knowledge-declared-01`, actual exit0. Новый JS на
+своём sales, native declared ObservedID Integer/PhaseMarker String и точный
+published `declared-table-v1` source/SHA256
+`816b086fe447eb42afbf87ac46b18b01153f731f3baf0de2bcd280da1104957f`
+проверены. Полный typed input6×5/output6×2, обе native mappings/graph, actual
+user-v1 schema/12 cells, independent public source-read и fresh completed
+executions `1790799988740-41ss54lbu8s:1269:3` / `:4` подтверждены.
+Report/journal SHA256:
+`41fc396ab1438132ec61e4963c5c37dd46ebef8238c5073a8e49582af7ab69d5` /
+`576f8ab83354a731e7b23f2b53f98f31c9f7f32834b5d3d45b1e7edfdb66115c`.
+Тот же pre-live auditor v1 PASS, receipt SHA256
+`1bb886467ee6fbabaca943dbda33fabf88340c02e906e7e6742fd0f8f62d0599`.
+Meaningful negatives32/32 отказали, checker actual exit0, receipt SHA256
+`2d8fd8a885d34bbb6545470586068f8e0a30c27fd644c9107bb1982b561036bf`.
+Close/logout/browser3/3 и actual process absence проверены. Registry402
+reconciled `closed_verified`, active exec/evidence null.
+
+Таким образом, все два examples текущего knowledge1.0.0 и их required API
+подтверждены на isolated public runtime. В [engine profile](engine-profile.json)
+добавлен отдельный required_runtime_subset: static named builtIn/Data import,
+RowCount/Get по technical name, Append/Set, Code AssignColumns/DataType.Integer,
+native declared schema и var/let loops. Sales Code/declared6×4 дополнительно
+подтверждают DataType.String/String.trim().toLowerCase(), фиксированные scalar
+арифметику/comparisons/conditional. Math.round, произвольную Unicode
+нормализацию, весь ES/Data API, точность вне safe range этим не объявлять.
+Старые extra engine observations/их статусы сохранены. Candidate/model delivery
+и CLI остаются открытыми; общий discovery_required/G1–G7 не повышен.
+
+Следующий связный результат — [context delivery J19/J21](context-delivery-design.md):
+композиция существующих source/port/graph readers и bounded actual public reply.
+Дизайн записан, runtime API ещё не добавлен, live/context/model resistance PASS
+нет. После реализации остаются J22/J24/J26/cold long source/Done refusal,
+один F review/fix, immutable candidate и два sequential Sol low CLI modes.
 
 ### E/J20: Code knowledge v1 example принят — 2026-09-30
 
