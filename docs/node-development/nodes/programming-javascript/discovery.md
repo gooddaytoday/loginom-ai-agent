@@ -95,8 +95,13 @@ input/output, независимый unchanged oracle, отдельные owned 
 точные report/journal/receipt SHA и ограничения — в [checkpoint](checkpoint.md).
 Code changed/reordered также прошли с тем же source SHA: полный pinned input,
 fresh owned Execute и unchanged independent oracle, cleanup 3/3.
-Для продолжения использовать раннюю P1-пробу из [плана](plan.md): bounded
-Stop/cancel до полного Execute/read контракта. Реализация продолжается;
+Fixed public C/D writer/Save/independent cold уже приняты в checkpoint.
+На source `467da5ab9a` fixed isolated public existing comment edit/Execute/read
+для code и declared отдельно прошёл independent audit: full native settings,
+input5/output4 mappings/graph, fresh6×4, public source-read и cleanup3/3/process
+absence. Это не проверка changed/reordered или всей матрицы schema edits.
+Следующий результат E — public existing input freshness; P1 Stop/cancel принят
+ранее и без затрагивающего изменения не повторяется. Реализация продолжается;
 наличие этого кода не закрывает неизвестные G1/G3/G5/G6, а отсутствие CLI не
 блокирует выход 0B. `ready_for_development` требует решений по точным вопросам
 третьей колонки; окончательное закрытие gates — по четвёртой.

@@ -30,7 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-сначала existing source edit/Execute/read с сохранением native schema.
+следующий шаг — public existing changed/reordered input freshness.
+Fixed existing source edit/Execute/read для code и declared принят ниже.
 D05 writer/Save и independent cold01 прошли audit/cleanup (подробности ниже). Fixed C public
 Code/Save/independent cold и private G3 bridge
 подтверждены ниже. Ранний P1 Stop/cancel подтверждён ниже. Ранний private
@@ -105,10 +106,35 @@ Private independent auditor подготовлен до первого запу�
 E по-прежнему — комментарий к source, два собственных Execute, полный
 output6×4 и независимый public source-read. Save не запрашивается; очередной
 live только после проверки текущего source и fresh-profile handoff.
-Запущен `e-public-existing-code-03`, ordinary headed profile339/source
-`467da5ab9a`, exec47923 на точном сохранённом C-пакете. Наблюдать тот же handle;
-child source неизменен до конца/audit. Предыдущий profile338 закрыт, новая
-assignment/lease принадлежит этой попытке. Затем existing declared.
+`e-public-existing-code-03`, headed profile339/source `467da5ab9a`,
+exec47923/exit0 — **OBSERVED**, independent audit PASS. На exact C saved package
+тот же GUID `b5a6620a-bc9c-4694-a9f9-812a7d2f87ba`, новый document/workflow;
+source изменён только фиксированным комментарием. Все 13 public phases verified,
+полные native input5/output4 mappings, exact settings и граф сохранены.
+Два собственных completed Execute `1790749622279-thazhdralhl:680:1` и `:680:2`,
+полный output6×4/all cells/types/order/precision, сумма1950 и независимый public
+source-read подтверждены. Report SHA256
+`8f2e73aebb2f7b23b04f9df3b1f8c29282a69bb68346ab83d938c3bb58435b89`,
+journal `867b6c0b844814bddca0be742df0ba5eb73462140b22715704f6973ef20024c5`,
+independent receipt `be2b84705fbd4e23b8eaeffea608e76fdb9a295165f146b48ed007bba3367597`.
+
+Отдельный `e-public-existing-declared-01`, headed profile340/тот же source,
+exec12640/exit0 — **OBSERVED**, independent audit PASS. На exact D saved package
+тот же GUID `a6aef906-682a-4d08-8a1f-d8cf18a688f8`, новый document/workflow;
+все 13 phases, два completed Execute `1790749760976-2x4ea7l6b8g:704:1` и `:704:2`,
+полный output6×4/1950 и independent public source-read проверены. Full native
+settings равны нормализованным сохранённым D settings; публичный columns
+readback также полностью равен writer: порядок, names/labels/types/data_kind,
+RowID DefaultUsageType4/UsageType0, остальные0/0, Required=false.
+Report SHA256 `22575158c98812b1fb3404804c81ba52f32f98d238ec262c5a3002297185ed9f`,
+journal `ee6c0e2ab390e58a11f8268bad57667ec6f3feb73448b9b1aa9761e9869fb901`,
+receipt `83b53899faadb0db18fb61bc45109e1befc7ddd7465cb51646cb57dded14fd04`.
+
+Оба runs: no Save/package_saved=false; исходные сохранённые пакеты не заменялись.
+Обычный cleanup package/logout/browser 3/3 и process absence независимо
+проверены; assignment/lease reconciled, profile340 closed_verified. Это fixed
+isolated public existing source edit/Execute evidence, не полный E: смена
+режима/columns, changed/reordered freshness и остальные J ещё открыты.
 Product registration, candidate/CLI и оставшиеся E/J/F этой записью не закрыты.
 
 ### C0: подготовка материализации output0 — 2026-09-30

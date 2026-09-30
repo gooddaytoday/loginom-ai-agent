@@ -43,7 +43,11 @@ cold reader без source/oracle подтвердил source/settings, fresh Exe
 результат6×4; cleanup3/3 проверен. D05/source `418abc95c0` также прошёл полный
 public declared6×4/metadata/default usage/Save audit и cleanup3/3;
 отдельный cold reader без source/oracle подтвердил source/settings/new Execute/
-все6×4 cells и cleanup3/3. Следующий этап E.
+все6×4 cells и cleanup3/3. В первой части E/source `467da5ab9a` isolated public
+existing comment edit/Execute/read прошёл отдельно для code и declared:
+полные native settings/mappings/graph, fresh6×4 и independent public source
+проверены, cleanup3/3/process absence подтверждены. Следующий шаг — E public
+changed/reordered input freshness и остальные J.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 
@@ -103,7 +107,8 @@ Linux установлена отдельным чтением `Session.Version.
   в checkpoint. Private конечный native Stop, отдельный local read cancel и
   short same-node rerun 6×4 подтверждены run08/source `0328cadfc9`, cleanup 3/3.
   Fixed public C/D writer/Save и independent cold подтверждены; следующий
-  результат — E existing source edit/Execute/read, затем остаток J и F.
+  fixed E existing source edit/Execute/read для code/declared также принят;
+  следующий результат — public input freshness, затем остаток J и F.
   Полный G6 и product candidate/CLI
   приёмка остаются открытыми.
 - После ревью проверить knowledge/budgets и J27 на immutable CLI candidate,
