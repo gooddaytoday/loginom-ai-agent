@@ -179,10 +179,16 @@ export async function captureManagedJavascriptWizardError({task,before,after,exp
   let observed;
   while(Date.now()<task.deadline) {
     const stage=await execute(makeJavascriptManagedStageCode(task));
+    if(stage.mask_diagnostic?.foreign_count!==0)throw Error('Managed JavaScript error opening foreign mask');
     if(stage.boundary_refusal==='foreign_dialog') {
-      observed=await execute(readCode);break;
+      const roots=stage.dialog_diagnostic?.roots;
+      if(stage.dialog_diagnostic?.foreign_count!==1||roots?.length!==1
+        ||!/^msgbox(?:-\d+)?$/.test(roots[0].tid)||roots[0].native_el!==true)
+        throw Error('Managed JavaScript error opening foreign dialog');
+      if(stage.pending===false) { observed=await execute(readCode);break; }
     }
-    if(stage.boundary_refusal!==null||stage.page_tid!==base.page_tid||stage.wizard_visible!==true)
+    if(stage.boundary_refusal!==null&&stage.boundary_refusal!=='foreign_dialog'
+      ||stage.page_tid!==base.page_tid||stage.wizard_visible!==true||stage.preview_visible)
       throw Error('Managed JavaScript error opening owner changed');
     await wait(Math.min(100,Math.max(1,task.deadline-Date.now())));
   }
@@ -192,6 +198,7 @@ export async function captureManagedJavascriptWizardError({task,before,after,exp
   await send('ok',observed);
   while(Date.now()<task.deadline) {
     const stage=await execute(makeJavascriptManagedStageCode(task));
+    if(stage.mask_diagnostic?.foreign_count!==0)throw Error('Managed JavaScript error closure foreign mask');
     if(stage.boundary_refusal===null&&stage.owner_verified===true&&stage.wizard_visible===true
       &&stage.page_tid===base.page_tid&&!stage.pending&&!stage.preview_visible
       &&stage.dialog_diagnostic.foreign_count===0) {
@@ -203,7 +210,7 @@ export async function captureManagedJavascriptWizardError({task,before,after,exp
       await journal({phase:'javascript_managed_error_observed',deadline:task.deadline,...result});
       return result;
     }
-    if(stage.boundary_refusal==='foreign_dialog')await execute(readCode);
+    if(stage.boundary_refusal==='foreign_dialog'&&!stage.pending)await execute(readCode);
     if(stage.page_tid!==base.page_tid||stage.boundary_refusal!==null&&stage.boundary_refusal!=='foreign_dialog')
       throw Error('Managed JavaScript error closure owner changed');
     await wait(Math.min(100,Math.max(1,task.deadline-Date.now())));

@@ -17,10 +17,11 @@ export function javascriptStageFixture() {
   codeView.Controller={};previewView.Controller=form;
   const native={},tab={Controller:{Node:{data:{node:native}},FController:model}},binding={tab,nodeData:model.FModelNode};
   const connection={Connected:true,UserName:'jsteach'},dialogs=[];
-  const previews=[preview],masks=[],controls={wizard:model.FView,code:codeView,preview:previewView};
+  const previews=[preview],masks=[],plainMasks=[],controls={wizard:model.FView,code:codeView,preview:previewView};
   const context=vm.createContext({innerWidth:1000,innerHeight:800,getComputedStyle:e=>e.style,
-    document:{querySelectorAll:selector=>selector.includes('bg-mask')?masks:selector.includes('role=')?dialogs:previews},Ext:{getCmp:id=>controls[id]},
+    document:{querySelectorAll:selector=>selector.includes('bg-mask')?masks:selector==='.x-mask'?plainMasks
+      :selector.includes('role=')||selector==='.x-message-box'?dialogs:previews},Ext:{getCmp:id=>controls[id]},
     bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:connection},Items:{Workspace:{getActiveTab:()=>tab}}}}}}}});
   const read=()=>vm.runInContext('('+readJavascriptStage.toString()+')',context)({root,native,binding,prefix,account:'jsteach',build:'7.4.2'});
-  return {read,context,native,binding,connection,dialogs,item,root,code,error,preview,model,codeView,previewView,form,controller,tab,previews,masks,element};
+  return {read,context,native,binding,connection,dialogs,item,root,code,error,preview,model,codeView,previewView,form,controller,tab,previews,masks,plainMasks,element};
 }
