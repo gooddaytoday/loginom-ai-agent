@@ -29,6 +29,11 @@ const codeProbes=[
       +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Float}]);\n'
       +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
     schema:[{name:'Value',label:'Value',type:'real'}],expected:[[null],[0],[-1.25],[10.125]],expectation:'fixed'},
+  {id:'g5-native-string',scope:'G5',native_input_fixture:'string',
+    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.String}]);\n'
+      +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
+    schema:[{name:'Value',label:'Value',type:'string'}],expected:[[null], [""], ["null"], ["NULL"], ["0"], ["false"], ["Привет, Ёж 😀"], ["quote\"\\slash\nline"]],expectation:'fixed'},
   {id:'g5-native-boolean',scope:'G5',native_input_fixture:'boolean',
     source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
       +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Boolean}]);\n'
@@ -63,7 +68,7 @@ const codeProbes=[
 
 // Operator-only declared counterparts: the authored body and expected values
 // stay identical; schema creation belongs to the native wizard.
-const declaredIds=new Set(['g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real','g5-safe-integer',
+const declaredIds=new Set(['g5-native-string','g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real','g5-safe-integer',
   'g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
 const probes=[...codeProbes,...codeProbes.filter(probe=>declaredIds.has(probe.id)).map(probe=>{
   const lines=probe.source.split('\n');
