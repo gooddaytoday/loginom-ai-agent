@@ -1,3 +1,4 @@
+import {javascriptPublicCodeProbe,verifyJavascriptPublicCodeInput} from './javascript-public-code-live.mjs';
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -567,4 +568,30 @@ for(const fixtureId of ['real','boolean','string','integer-safe','integer-outsid
 test('count loader pin verification rejects missing/changed actual source',()=>{
   assert.throws(()=>verifyNativeInputCountLoaders({}),/count loader/);
   assert.throws(()=>verifyNativeInputCountLoaders({PrepareColumnInfoAndRowCount:'function changed(){}'}),/count loader/);
+});
+
+// Exercise the public operator boundary with the production native decoder and
+// provenance checker; no browser action is available at this pure boundary.
+test('public native-real admission requires exact before-JS bytes, typed cells, owner and released reads',async()=>{
+ const f=await fake(),raw=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'public-input'});
+ const lifecycle=await javascriptNativeInputStatus(f.page),binding={...f.b,read_id:'public-input'};
+ const provenance=nativeInputProvenance(sourceEvidence());
+ const exact=verifyNativeInputRead(raw,{binding,lifecycle,provenance});
+ const input={node:provenance.node,table:{...ui(),port_guid:binding.port_guid,execution_id:provenance.execution.execution_id},
+   native_input:{native:{exact,raw,binding,lifecycle}}};
+ for(const [id,mode] of [['g5-native-real','code'],['declared-g5-native-real','declared']]){
+  const probe=javascriptPublicCodeProbe(id,mode),proof=verifyJavascriptPublicCodeInput(probe,input);
+  assert.equal(proof.native_input_bytes_verified,true);assert.equal(proof.row_count,4);
+  for(const change of [x=>x.native_input.native.lifecycle.pending=1,
+    x=>x.native_input.native.lifecycle.releasedResponses=3,
+    x=>x.native_input.native.exact.js_created=true,
+    x=>x.native_input.native.exact.cells[3].native.bytes_le='0000000000000000',
+    x=>x.node.document_id='foreign',x=>x.node.node_id='foreign',
+    x=>x.table.execution_id='stale',x=>x.table.sample[2][0].value=0,
+    x=>x.table.schema[0].name='Foreign',x=>delete x.native_input]){
+   const bad=structuredClone(input);change(bad);assert.throws(()=>verifyJavascriptPublicCodeInput(probe,bad));
+  }
+  assert.throws(()=>verifyJavascriptPublicCodeInput({...probe,native_input_fixture:'boolean'},input),/pin changed/);
+ }
+ assert.deepEqual(f.counters,{sent:4,requests:4,responses:4});
 });

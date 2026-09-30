@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {javascriptPublicCodePins,javascriptPublicTypedIds,javascriptPublicCodeProbe,javascriptPublicCodeRequest} from './javascript-public-code-live.mjs';
+import {javascriptPublicCodePins,javascriptPublicTypedIds,javascriptPublicCodeProbe,javascriptPublicCodeRequest,verifyJavascriptPublicCodeInput} from './javascript-public-code-live.mjs';
 import {validateNodeApplyRequest} from '../../client/lib/node-apply.mjs';
 import {createJavascriptCodeNodeSupport} from '../../client/lib/javascript-code-node.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
@@ -64,4 +64,16 @@ test('typed operator refuses characterizations, declared, Save and cold writes b
     [['--config','/not-read/private.json'],{publicProbeId:'g5-null-empty'},/fixed schema lifecycle without Save/],
     [['--config','/not-read/private.json','--execution-case','code-table-execute','--verify-public-code-lifecycle','--verify-public-code-save'],{publicProbeId:'g5-null-empty'},/fixed schema lifecycle without Save/]])
     await assert.rejects(()=>runJavascriptOperator(args,options),error);
+});
+
+test('public native input extension preserves business and empty input boundaries before effects',async()=>{
+ for(const mode of ['code','declared']){
+  const business=javascriptPublicCodeProbe(null,mode);
+  const input={table:{row_count:6,sample_rows:6,sample_complete:true,schema:Array.from({length:5},()=>({}))}};
+  assert.equal(verifyJavascriptPublicCodeInput(business,input).native_input_bytes_verified,false);
+  assert.throws(()=>verifyJavascriptPublicCodeInput(business,{table:{...input.table,row_count:4,sample_rows:4}}));
+  const empty=javascriptPublicCodeProbe(mode==='code'?'g5-empty-input':'declared-g5-empty-input',mode);
+  assert.equal(verifyJavascriptPublicCodeInput(empty,{table:{...input.table,row_count:0,sample_rows:0}}).verified,true);
+  await assert.rejects(runJavascriptOperator(['--discovery-probe',mode==='code'?'g5-native-real':'declared-g5-native-real']),/fixed public entrypoint/);
+ }
 });
