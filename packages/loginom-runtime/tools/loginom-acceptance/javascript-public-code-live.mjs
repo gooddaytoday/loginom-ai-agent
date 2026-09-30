@@ -22,7 +22,7 @@ export async function javascriptPublicCodePins() {
     selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
 }
 
-const codeTypedIds=Object.freeze(['g5-native-real','g5-null-empty','g5-boolean','g5-real',
+const codeTypedIds=Object.freeze(['g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real',
   'g5-safe-integer','g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
 export const javascriptPublicTypedIds=Object.freeze([...codeTypedIds,...codeTypedIds.map(id=>'declared-'+id)]);
 
@@ -55,16 +55,16 @@ export function verifyJavascriptPublicCodeInput(probe,input) {
   const pinned=javascriptPublicCodeProbe(javascriptPublicTypedIds.includes(probe.id)?probe.id:null,mode);
   need(JSON.stringify(probe)===JSON.stringify(pinned),'Public Code input probe pin changed');
   if(probe.native_input_fixture!==undefined){
-    need(probe.native_input_fixture==='real','Public Code native input fixture unavailable');
-    const native=verifyNativeRoundtripInput(input,'real');
-    verifyNativeInputUi(input.table,'real');
+    need(['real','boolean'].includes(probe.native_input_fixture),'Public Code native input fixture unavailable');
+    const native=verifyNativeRoundtripInput(input,probe.native_input_fixture);
+    verifyNativeInputUi(input.table,probe.native_input_fixture);
     need(['document_id','workflow_id','node_id'].every(key=>native.binding[key]===input.node[key]
       &&native.exact.provenance.node[key]===input.node[key])
       &&input.table.execution_id===native.exact.provenance.execution.execution_id,
       'Public Code native input owner/execution differs');
-    return {verified:true,native_input_bytes_verified:true,fixture_id:'real',node:input.node,
+    return {verified:true,native_input_bytes_verified:true,fixture_id:probe.native_input_fixture,node:input.node,
       input_source_sha256:native.exact.provenance.source.sha256,
-      native_read_released:true,row_count:4};
+      native_read_released:true,row_count:input.table.row_count};
   }
   need(input.table?.sample_complete===true&&input.table.row_count===(probe.input_variant==='empty'?0:6)
     &&input.table.sample_rows===input.table.row_count&&input.table.schema.length===5,
