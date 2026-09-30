@@ -80,10 +80,11 @@ cancelled14,118s/NEW repair6×4, audit/negative88/88 и cleanup/process absence.
 Первоначальный failed395 сохранён. Для J09 child `0529096969` подготовил fixed
 Code/declared native source Required=true/target Required=false, сохранение
 manual label/autosync false после public source edit и mapping refusal before
-admission; адресные238/full18270 PASS. Code399 принят: independent audit v2,
-negative38/38, full6×4 и cleanup/process absence; исходный отказ auditor v1
+admission; адресные238/full18270 PASS. Code399/declared400 приняты2/2:
+independent audit v2, negative38/38 каждый, full6×4 и cleanup/process absence;
+исходный отказ auditor v1
 на неверных именах фаз сохранён, исправление сверено с runtime contract.
-Следующий шаг — J09 declared live, затем context/engine/module/budgets
+Следующий шаг — J19 context/instruction-in-data, затем engine/module/budgets
 и точный остаток E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
