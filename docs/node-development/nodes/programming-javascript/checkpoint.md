@@ -4,7 +4,8 @@
 
 Сводка на 2026-09-30 после B, private P1, C0/G3 и public C full read 6×4.
 Public run05 дал ограниченный output proof; исправленный Code → Save и
-независимый cold Execute/read6×4 прошли audit и cleanup. Следующий этап D. Исходный срез
+независимый cold Execute/read6×4 прошли audit и cleanup. D declared → Save и
+независимый cold Execute/read6×4 также проверены; текущий этап E. Исходный срез
 [acceleration review](acceleration-review.md) к [плану](plan.md): docs
 `13a02e8be2d698d5fbc7f19d146fa82d55f53e48`, code
 `7b8e19bee073cb596607688173234e57052e27b1`. Новые live evidence B
@@ -36,8 +37,56 @@ Code/Save/independent cold и private G3 bridge
 бизнес 6×4 для обоих base modes и code changed/reordered проверен ниже. B уже подтвердил
 existing code-table через public API-path изолированного runtime; повторять
 этот фиксированный run без затронувшего изменения не требуется.
-Затем C code, D declared с Save/cold, E остаток J и F ревью/candidate/CLI.
+Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
+без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E: existing source edit/Execute — подготовка и live — 2026-09-30
+
+Child `a6a76401c803c7c25935739e8c53a20f7d609152` расширяет isolated public
+handler на существующий узел с `finish=execute`: сначала независимый полный
+source/settings/schema admission, затем owned writer/Done, новое чтение
+фактически committed source и допускающая исполнение preserve receipt.
+Полная native schema сравнивается до/после Done; существующие columns берутся
+из полного проверенного native cache. Явная смена schema mode/columns и ручные
+mappings в этой первой части E пока отклоняются. Новые узлы C/D сохраняют свой
+путь. Oracle и business source находятся только в operator.
+
+На этом точном SHA полный client suite: 2981 PASS / 10 SKIP / 0 FAIL,
+log SHA256 `6076b0295e649046ca36de7528bc96f7f008a4f5bcc4830dede31da0302b997e`.
+61 operator test PASS, log SHA256
+`f222f1252bc2efec9149e6362c259564c11ba057ce057f98d9aa4fd35bfb9423`.
+Browser integrations пропущены без назначенного тестового браузера; headless
+не запускался. Syntax/diff checks PASS. Это source-only проверки, не live PASS.
+
+Ordinary headed `e-public-existing-code-01`, profile336/source `a6a76401c8`,
+exec32867/exit1 остановился до target/source mutation: public API
+`NOT_APPLIED`, effect=false, cleanup=true, только phase source accepted;
+workflow refusal `Workflow activation blocked`. Execute/Save не отправлены.
+Общий operator report остаётся **CLEANUP_UNCONFIRMED**: browser closed,
+package/logout не подтверждены. Report SHA256
+`419547cdb9ee913f4bd6cafd474b81283f3b0fb95025f6f8dab67eff661d84da`,
+journal `9f7fc8ecc862e53b6833c8a473dd6c1d5d8e766386d9aac55e6cc73a49932a37`.
+После process absence отдельный headed admin recovery/profile337/exec61376
+закрыл только пакет этой попытки и `jsteach:3673` (04:31 UTC).
+Refresh подтвердил отсутствие пакета/сеанса; admin logout/browser/process
+absence проверены. Recovery receipt SHA256
+`f430de53368755a14493fa3fe3959f672b25b332d8c62336741af650c0787905`;
+исходные файлы и статус не изменены.
+
+Child `b6c25559fd5c7e3c87bc4719a0c05c365e26f437` добавляет operator-only
+read-only blocker observation перед apply и снимает pending только при
+settled NOT_APPLIED/effect=false/cleanup=true без unsettled runtime work.
+Это позволяет обычную owned уборку после доказанного no-effect отказа;
+unknown effects и runtime guards прежние. 57 адресных operator tests PASS.
+Назначен `e-public-existing-code-02`, fresh profile338, exec91785 на том же
+сохранённом пакете C. Private independent auditor подготовлен до первого
+запуска; целевой результат — комментарий к source, два собственных Execute,
+полный output6×4 и независимый public source-read. Deadline 30 минут от
+старта процесса; Save не запрашивается. Не менять child source до окончания
+попытки/audit. После результата проверить package/logout/browser/process
+absence и согласовать assignment/lease; затем existing declared.
+Product registration, candidate/CLI и оставшиеся E/J/F этой записью не закрыты.
 
 ### C0: подготовка материализации output0 — 2026-09-30
 
