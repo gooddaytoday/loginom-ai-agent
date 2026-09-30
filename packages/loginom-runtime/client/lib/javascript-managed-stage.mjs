@@ -16,9 +16,29 @@ export function inspectManagedJavascriptStage({held,task},inspectPage,readStage)
       throw Error('Managed JavaScript stage retained wizard changed');
     const stage=readStage({root:held.wizardRoot,native:held.wizard,binding:args.binding,
       prefix:args.prefix,account:args.account,build:task.targetBuild});
-    stage.pending ||= [...document.querySelectorAll('.x-mask')].some(element=>element.isConnected
-      &&element.getBoundingClientRect().width>0&&element.getBoundingClientRect().height>0
-      &&getComputedStyle(element).visibility!=='hidden');
+    const visible=element=>element.isConnected&&element.getBoundingClientRect().width>0
+      &&element.getBoundingClientRect().height>0&&getComputedStyle(element).visibility!=='hidden';
+    const dialogs=[...document.querySelectorAll('.x-message-box')].filter(visible);
+    const dialog=dialogs.length===1?dialogs[0]:null,component=dialog&&globalThis.Ext?.getCmp?.(dialog.id);
+    const manager=component?.zIndexManager;
+    // Ext.ZIndexManager.showModalMask creates a plain x-mask behind a modal
+    // window. Read its existing native identity; never call mask/getTargetEl.
+    // The dialog remains a boundary refusal until the error capability proves it.
+    const modalMask=dialog&&/^msgbox(?:-\d+)?$/.test(dialog.getAttribute('data-tid')??'')
+      &&component?.el?.dom===dialog&&component.modal===true&&component.hidden===false
+      &&!component.floatParent&&manager?.front===component&&manager.mask?.maskTarget===component.container
+      ?manager.mask?.dom:null;
+    const masks=[...document.querySelectorAll('.x-mask')].filter(visible);
+    stage.pending ||= masks.some(element=>element!==modalMask);
+    const loading=[...document.querySelectorAll('.bg-mask-message,.x-mask-msg')].filter(visible);
+    const rootView=globalThis.Ext?.getCmp?.(held.wizardRoot.id);
+    const maskSymbol=globalThis.bg?.ext?.AfterElementTextMaskContext?.ElementSymb;
+    const lock=typeof maskSymbol==='symbol'?Object.getOwnPropertyDescriptor(rootView??{},maskSymbol)?.value:null;
+    const ownedLoading=element=>element===held.wizardRoot&&rootView?.el?.dom===element
+      &&lock?.FController===rootView&&lock.FElement===element&&lock.FIsActive===true
+      &&Array.isArray(lock.FSequence)&&lock.FSequence.length>0&&lock.FSequence.length<=32;
+    stage.mask_diagnostic={visible_count:masks.length,modal_count:masks.filter(element=>element===modalMask).length,
+      foreign_count:masks.filter(element=>element!==modalMask).length+loading.filter(element=>!ownedLoading(element)).length};
     if(stage.native_owner_verified!==true||!Object.values(stage.connection_diagnostic).every(Boolean))
       throw Error('Managed JavaScript stage native owner/connection changed');
     const result={owner:task.owner,...stage};

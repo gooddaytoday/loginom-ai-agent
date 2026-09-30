@@ -6,7 +6,7 @@ import {captureManagedJavascriptWizardError,makeJavascriptManagedErrorReadCode,m
 import {managedJavascriptStageFixture} from './support/javascript-managed-stage-fixture.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 
-function fixture({auto=false,close=true}={}) {
+function fixture({auto=false,close=true,modal=true}={}) {
   const f=managedJavascriptStageFixture(),tid='msgbox-1',events=[],calls=[],sha='a'.repeat(64);
   f.previews.length=0;f.lease.codeNextAttempted=true;f.lease.sourceDraftSha256=sha;
   const input=f.element('input','input'),wrapper=f.element('cm','wrapper');
@@ -22,15 +22,17 @@ function fixture({auto=false,close=true}={}) {
   const dialog=f.element('dialog',tid);dialog.innerText='Loginom 7.4.2\nSyntaxError: Syntax error at code (:4:33)\nТехнические подробности\nOK';
   dialog.querySelectorAll=()=>[ok];dialog.contains=e=>e===ok;
   const get=f.context.Ext.getCmp,query=f.context.document.querySelectorAll;
-  const controls={[f.error.id]:{el:{dom:f.error}},[dialog.id]:{el:{dom:dialog}},[ok.id]:{el:{dom:ok}}};
+  const mask=f.element('modal-mask',''),container={},dialogComponent={el:{dom:dialog},modal:true,hidden:false,container};
+  dialogComponent.zIndexManager={front:dialogComponent,mask:{dom:mask,maskTarget:container}};
+  const controls={[f.error.id]:{el:{dom:f.error}},[dialog.id]:dialogComponent,[ok.id]:{el:{dom:ok}}};
   f.context.Ext.getCmp=id=>controls[id]??get(id);
   f.context.document.querySelectorAll=selector=>selector.includes('.x-message-box')?f.dialogs
     :selector.includes(';tlb;ok')?(f.dialogs.length?[ok]:[]):query(selector);
   f.context.document.elementFromPoint=()=>f.dialogs.length?ok:f.error;
-  if(auto)f.dialogs.push(dialog);
+  if(auto){f.dialogs.push(dialog);if(modal)f.plainMasks.push(mask);}
   f.page.mouse={click:async()=>{
-    if(f.dialogs.length){calls.push('ok');if(close)f.dialogs.length=0;return;}
-    calls.push('button');f.dialogs.push(dialog);
+    if(f.dialogs.length){calls.push('ok');if(close){f.dialogs.length=0;f.plainMasks.length=0;}return;}
+    calls.push('button');f.dialogs.push(dialog);if(modal)f.plainMasks.push(mask);
   }};
   const execute=async code=>Function('return ('+code+')')()(f.page);
   const after={...f.read(),owner:f.task.owner,wizard_error_refusal:true,pending_seen:false};
@@ -39,7 +41,7 @@ function fixture({auto=false,close=true}={}) {
   const receiptOptions=(id,key,signature)=>({receipt_namespace:'error-test',receipt_id:id,receipt_signature:signature});
   const options={task:f.task,before,after,expected_source_sha256:sha,execute,
     record:async event=>{events.push(structuredClone(event));return event;},receiptOptions,wait:async()=>{}};
-  return {...f,sha,dialog,ok,controls,events,calls,execute,base,before,after,options};
+  return {...f,sha,dialog,dialogComponent,mask,ok,controls,events,calls,execute,base,before,after,options};
 }
 
 for(const auto of [false,true])test('real generated browser bodies capture '+(auto?'automatic':'quiet')+' native error and verify dialog close',async()=>{
@@ -78,8 +80,45 @@ for(const [name,change] of [
 
 test('automatic dialog requires native Ext identity and exact captured root for OK',async()=>{
   const f=fixture({auto:true});f.controls[f.dialog.id]={};
-  await assert.rejects(()=>f.execute(makeJavascriptManagedErrorReadCode({...f.base,mode:'dialog'})),/dialog changed/);
+  await assert.rejects(()=>f.execute(makeJavascriptManagedErrorReadCode({...f.base,mode:'dialog'})),/dialog changed|wizard changed/);
   assert.deepEqual(f.calls,[]);
+});
+
+for(const [name,change] of [
+  ['front window',f=>f.dialogComponent.zIndexManager.front={}],
+  ['mask native identity',f=>f.dialogComponent.zIndexManager.mask.dom=f.element('other-mask','')],
+  ['mask target',f=>f.dialogComponent.zIndexManager.mask.maskTarget={}],
+  ['modal flag',f=>f.dialogComponent.modal=false],
+  ['hidden native dialog',f=>f.dialogComponent.hidden=true],
+  ['unknown float parent',f=>f.dialogComponent.floatParent={}],
+  ['additional mask',f=>f.plainMasks.push(f.element('foreign-mask',''))],
+])test('native modal mask exemption refuses changed '+name+' before any OK',async()=>{
+  const f=fixture({auto:true});change(f);
+  await assert.rejects(()=>f.execute(makeJavascriptManagedErrorReadCode({...f.base,mode:'dialog'})),/wizard changed/);
+  assert.deepEqual(f.calls,[]);
+});
+
+test('after one error button, owned loading settles read-only before capturing the native modal',async()=>{
+  const f=fixture(),click=f.page.mouse.click,maskSymbol=Symbol('MaskWithText');let waits=0;
+  f.context.bg.ext={AfterElementTextMaskContext:{ElementSymb:maskSymbol}};
+  f.model.FView[maskSymbol]={FController:f.model.FView,FElement:f.root,FIsActive:true,FSequence:['Загрузка']};
+  f.page.mouse.click=async()=>{await click();if(f.calls.length===1)f.masks.push(f.root);};
+  const result=await captureManagedJavascriptWizardError({...f.options,wait:async()=>{waits++;f.masks.length=0;}});
+  assert.equal(waits,1);assert.equal(result.dialog_closed,true);assert.deepEqual(f.calls,['button','ok']);
+});
+
+for(const plain of [false,true])test('after button a foreign '+(plain?'plain':'loading')+' mask stops without OK',async()=>{
+  const f=fixture(),click=f.page.mouse.click;
+  f.page.mouse.click=async()=>{await click();(plain?f.plainMasks:f.masks).push(f.element('foreign-mask',''));};
+  await assert.rejects(captureManagedJavascriptWizardError(f.options),/opening foreign mask/);
+  assert.deepEqual(f.calls,['button']);
+});
+
+test('error opening refuses an additional foreign dialog without replaying button or sending OK',async()=>{
+  const f=fixture(),click=f.page.mouse.click;
+  f.page.mouse.click=async()=>{await click();f.dialogs.push(f.element('foreign-dialog','foreign'));};
+  await assert.rejects(captureManagedJavascriptWizardError(f.options),/opening foreign dialog|opening foreign mask/);
+  assert.deepEqual(f.calls,['button']);
 });
 
 test('OK cannot dismiss a dialog without the prior native capture',async()=>{
