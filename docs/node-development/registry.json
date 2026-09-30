@@ -945,6 +945,36 @@
       "source_sha256": "959637abddd0952e3a802894f60826a8d7f2626eab220be7a2c24d6fb80b75a8",
       "provenance_id": "source-9d25d9064b0d",
       "document_adaptation": "Navigation adapted; original checks and runtime pins remain historical."
+    },
+    "crosstable-standalone-20260930": {
+      "path": "nodes/transform-crosstable/plan.md",
+      "sha256": "dad34e1f08e743662b2821aed2a5471f4acbe38ec5e3ab9f89f42be1e5b2077f",
+      "kind": "acceptance",
+      "availability": "retained_document",
+      "source_commit": "f0b38a68f89b9327a6bec9d38e458faa101b4b41",
+      "runtime": "standalone CLI 0.0.0-dev-202609300934 / reviewer 0.0.0-dev-202609301113",
+      "platform": {
+        "client": "Linux standalone CLI",
+        "loginom": "7.4.2/Linux"
+      },
+      "scope": "Серверная standalone CLI-приёмка LOG-29 и независимая матрица LOG-36: Fixed/Sliding, оба P2, публичное повторное чтение, persistence/cold, граф и cleanup; ограничения перечислены в подплане.",
+      "raw_evidence": "external_report_reviewed_not_rerun",
+      "verified_date": "2026-09-30"
+    },
+    "crosstable-merge-20260930": {
+      "path": "nodes/transform-crosstable/plan.md",
+      "sha256": "dad34e1f08e743662b2821aed2a5471f4acbe38ec5e3ab9f89f42be1e5b2077f",
+      "kind": "integration",
+      "availability": "retained_document",
+      "source_commit": "bacebd5696f040c6e49aa37881cf12335d512cf7",
+      "runtime": "standalone CLI 0.0.0-dev-202609300934 / reviewer 0.0.0-dev-202609301113",
+      "platform": {
+        "client": "Linux standalone CLI",
+        "loginom": "7.4.2/Linux"
+      },
+      "scope": "PR #15 слит в loginom 30.09.2026; код runtime и node-acceptance в принятом объёме совпадает с проверенным SHA. Выпуск не подтверждён.",
+      "raw_evidence": "external_report_reviewed_not_rerun",
+      "verified_date": "2026-09-30"
     }
   },
   "nodes": [
@@ -5043,7 +5073,7 @@
       "initial_scope": "Сохранить подплан 15: фиксированные и скользящие колонки, агрегаты и изменение схемы; календарные поля можно задать в CSV.",
       "scope_basis": "loginom_7_4_2_live_discovery_and_candidate_source_tests",
       "limitations": [
-        "Исторический серверный Fixed/Min/Max/Avg PASS на 1e994aa50; Mac Sliding FAIL на том же SHA. Исправление Sliding требует нового публичного 9→7 и C→D, cold и независимого child-вердикта.",
+        "Серверная CLI-приёмка и независимый PASS LOG-36 на f0b38a68f89b9327a6bec9d38e458faa101b4b41 закрывают обязательный Fixed/Sliding/P2 scope. Installed Desktop/Mac/Windows, unknown-effect resume/cancel, большие CSV и дополнительные исследовательские крайние случаи отдельно не сертифицированы; выпуск не подтверждён.",
         "Скользящий режим меняет схему при новом Execute; технические C_n имена относятся только к свежему результату.",
         "По решению владельца fixed сохраняет все категории источника при настройке, новые значения идут в «Прочие»; явное подмножество отклоняется контрактом."
       ],
@@ -5062,36 +5092,53 @@
         "implementation": {
           "status": "implemented",
           "evidence": [
-            "runtime-registry"
+            "runtime-registry",
+            "crosstable-standalone-20260930"
           ],
-          "note": "Sliding reader исправлен адресно с регрессиями; native fixed контракт сохранён. Свежие серверные доказательства и независимая проверка ещё NOT_RUN."
+          "note": "Fixed/Sliding реализованы; оба P2 исправлены и подтверждены серверной CLI-приёмкой и независимой проверкой на f0b38a68f89b9327a6bec9d38e458faa101b4b41."
         },
         "historical_acceptance": {
-          "status": "not_accepted",
-          "evidence": []
+          "status": "accepted_scoped",
+          "evidence": [
+            "crosstable-standalone-20260930"
+          ],
+          "source_commit": "f0b38a68f89b9327a6bec9d38e458faa101b4b41",
+          "note": "Принят только обязательный серверный Fixed/Sliding/P2 scope LOG-29/LOG-36; полная матрица и оставшиеся ограничения — в подплане."
         },
         "client_technical_validation": {
-          "status": "not_validated",
-          "evidence": [],
-          "standalone_status": "not_revalidated"
+          "status": "validated_standalone_cli",
+          "evidence": [
+            "crosstable-standalone-20260930"
+          ],
+          "standalone_status": "validated",
+          "source_commit": "f0b38a68f89b9327a6bec9d38e458faa101b4b41",
+          "note": "Принят только обязательный серверный Fixed/Sliding/P2 scope LOG-29/LOG-36; полная матрица и оставшиеся ограничения — в подплане."
         },
         "analytical_validation": {
-          "status": "not_revalidated_standalone",
-          "evidence": [],
-          "historical_scope_preserved": false
+          "status": "accepted_scoped_standalone",
+          "evidence": [
+            "crosstable-standalone-20260930"
+          ],
+          "historical_scope_preserved": false,
+          "source_commit": "f0b38a68f89b9327a6bec9d38e458faa101b4b41",
+          "note": "Принят только обязательный серверный Fixed/Sliding/P2 scope LOG-29/LOG-36; полная матрица и оставшиеся ограничения — в подплане."
         },
         "integration": {
-          "status": "not_integrated",
-          "evidence": []
+          "status": "present_in_source",
+          "evidence": [
+            "crosstable-merge-20260930"
+          ],
+          "source_commit": "bacebd5696f040c6e49aa37881cf12335d512cf7",
+          "note": "PR #15 слит в loginom 30.09.2026; проверенный runtime и скрипты node-acceptance не менялись после принятого SHA."
         },
         "release": {
           "status": "not_released",
           "evidence": []
         }
       },
-      "next_action": "Проверить два P2 (scroll CrossTable и CLI exit verdict), широкие CSV и публичный Sliding reread/cold/cleanup; свежая приёмка и независимая child-проверка нового SHA до approval.",
+      "next_action": "Сопровождать принятые Fixed/Sliding режимы; расширение scope и приёмка установленных клиентов — отдельные назначения. Выпуск не подтверждён.",
       "plan": "nodes/transform-crosstable/plan.md",
-      "plan_status": "implementation_in_progress"
+      "plan_status": "accepted"
     },
     {
       "component_id": "component.transform.EnrichData",
