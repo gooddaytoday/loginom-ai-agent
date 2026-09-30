@@ -45,6 +45,26 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: native safe-int64 Code принят; declared выполняется — 2026-09-30
+
+Code01/profile371/child `0be6a698c1`, exec85090/exit0 — OBSERVED,
+independent native audit PASS. Input signed-int644×1 NULL/±9007199254740991/0,
+bytes до JS/releases4/4 и точные decimal strings на полном output4×1 проверены;
+source/13 phases/native mappings/graph/Views/2 fresh Execute и package/logout/
+browser/process cleanup также подтверждены. Completed IDs
+`1790761870387-cabf318njsu:1225:3` / `:1225:4`.
+Report SHA256 `c681a5f6433d6cc56c3f2037fec6dd052c8e2dba1d96d8b21b375ff87dc8e514`,
+journal `61299bf2b3d770749d016ac53043b0922322de46c1504c868eea840f5e4aa9be`,
+receipt `d537f1ec5992b2024c8a110d68c7638f3879aeb8cb8a43f62549f5065de69410`.
+Profile371 reconciled/closed_verified. Native input bytes доказаны, native
+output bytes/Save/cold/candidate/CLI и outside-safe guarantee отсутствуют.
+
+Fresh profile372 ordinary headed `e-public-types-native-integer-safe-declared-01`,
+exec62731 выполняется: тот же input, native output declaration Value/Integer/
+continuous/output и identity-copy body. После terminal independent int64
+audit/cleanup/reconciliation; затем civil Date/outside-safe и J/E/F остаток.
+Результат пока не установлен, full readiness не повышена.
+
 ### E: native safe-int64 Code live — выполняется — 2026-09-30
 
 Frozen child `0be6a698c1`, полный operator suite **18000 PASS / 0 FAIL**,
