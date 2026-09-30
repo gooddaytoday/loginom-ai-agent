@@ -103,7 +103,9 @@ absence. На `e1fd122320` отдельно приняты все4 public existi
 варианта Code/declared × changed/reordered: полный input6×5/output6×4,
 сохранённые GUID/settings/graph, новые executions и cleanup независимо проверены.
 Это не закрывает всю матрицу schema edits или product candidate/CLI.
-Следующий результат E — public types/NULL/precision/0–1–N; P1 Stop/cancel принят
+На `bccc8a0a08` отдельно приняты public Code scalar output5/5, named access
+и empty output: independent typed audits и cleanup, без native bytes/candidate/CLI.
+Следующий результат E — one-row/empty input и точный остаток J06–J08; P1 Stop/cancel принят
 ранее и без затрагивающего изменения не повторяется. Реализация продолжается;
 наличие этого кода не закрывает неизвестные G1/G3/G5/G6, а отсутствие CLI не
 блокирует выход 0B. `ready_for_development` требует решений по точным вопросам

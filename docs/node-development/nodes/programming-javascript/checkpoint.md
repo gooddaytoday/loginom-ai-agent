@@ -30,7 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — public types/NULL/precision и 0–1–N.
+следующий шаг — public one-row/empty input и оставшиеся J06–J08.
+Fixed public Code scalar output5/5, named access и empty output приняты ниже.
 Fixed public existing changed/reordered freshness для обоих modes принят ниже.
 Fixed existing source edit/Execute/read для code и declared принят ниже.
 D05 writer/Save и independent cold01 прошли audit/cleanup (подробности ниже). Fixed C public
@@ -42,6 +43,34 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E: public typed 7/7 приняты; empty output — 2026-09-30
+
+Empty-output01/profile353/child `bccc8a0a08`, exec61420/exit0 — **OBSERVED**,
+independent audit **PASS**. Output0×1 сохранил Result/integer schema;
+row_count/sample_rows0, sample_complete=true, fresh=true, полный input6×5,
+source/mappings/graph и independent public source-read проверены. Source SHA256
+`435312fcd4d5c3cba1032cb684db6990ffb05da08f9890783d6d1d2088876562`;
+свежие completed IDs `1790754521442-16lm0engv0ij:1153:3` и `:1153:4`.
+Report SHA256 `75b3873593189d8ef04e86980105aae9a5a62a5712f3a2af8218f13b402f3094`,
+journal `7ae3d2d3a90bedd6720a3aa6ee2b3b6b903b15a3b9dc5e8904ec29dae3af07eb`,
+audit receipt `0109b4a55e30968cacf7a75bc5daeacb179453f025745cfe1b3727b57939fad3`.
+Package/logout/browser/process cleanup проверен; Save/cold/native bytes и
+candidate/CLI отсутствуют.
+
+Итого на `bccc8a0a08`: fixed Code public typed **7/7** — String null/empty,
+Boolean, real, safe integer, civil Date, named access6 rows и empty output.
+Все cases прошли actual public13 phases, полный typed UI audit,
+свежие executions/source/mappings и own cleanup. Независимый auditor отдельно
+отклонил12/12 подмен. Это не закрывает целиком J06–J08/J16/J20:
+public declared scalar/native input roundtrip, outside-safe limitations,
+empty input/one-row и остальная API/knowledge матрица остаются открытыми.
+
+Profile353 reconciled closed_verified, active_exec=null. Следующий связный
+результат E — fixed public one-row output, затем empty input и точный остаток
+J06–J08; source limits/chunks/redaction, schema edits, diagnostics/recovery/Stop,
+context/module policy/budgets/neighbor regression и F остаются в плане.
+Не повторять completed C/D, freshness4/4 или typed7/7 без затрагивающего изменения.
 
 ### E: public named access — принят — 2026-09-30
 

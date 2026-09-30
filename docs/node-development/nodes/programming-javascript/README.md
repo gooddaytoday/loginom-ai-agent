@@ -49,7 +49,9 @@ existing comment edit/Execute/read прошёл отдельно для code и 
 проверены, cleanup3/3/process absence подтверждены. На `e1fd122320` отдельно
 приняты public existing changed/reordered input freshness для обоих modes:
 все input6×5/output6×4 cells, fresh executions и cleanup проверены.
-Следующий шаг — E types/NULL/precision/0–1–N и остальные J.
+На `bccc8a0a08` fixed public Code scalar output5/5, named access и empty
+output также прошли independent typed audits и cleanup. Следующий шаг — E
+one-row/empty input и точный остаток J06–J08, затем остальные J.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 
@@ -111,7 +113,8 @@ Linux установлена отдельным чтением `Session.Version.
   Fixed public C/D writer/Save и independent cold подтверждены; следующий
   fixed E existing source edit/Execute/read для code/declared также принят;
   public input freshness 4/4 также принят на `e1fd122320`; следующий
-  результат — types/NULL/precision/0–1–N, затем остаток J и F.
+  результат — one-row/empty input и точный остаток J06–J08 после
+  принятых fixed Code typed7/7, затем остаток J и F.
   Полный G6 и product candidate/CLI
   приёмка остаются открытыми.
 - После ревью проверить knowledge/budgets и J27 на immutable CLI candidate,
