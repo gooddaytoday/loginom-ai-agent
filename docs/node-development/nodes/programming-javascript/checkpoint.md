@@ -46,6 +46,44 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: pre-mutation source delivery/redaction исправлено — 2026-09-30
+
+Frozen child `a3eea77077203e1de7e0573c213789912016c78f` переносит общий pure
+`prepareJavascriptSourceDelivery` в source reader и admission. Supplied new/
+existing replacement проверяет full source/UTF-8 bound/redaction и все future
+chunks до owned read/create/write; сохранённый omitted source читается своим
+owned reader/discard. Planned chunk boundaries одинаковы для null/new и actual
+owner; conservative16KiB envelope учитывает максимальный JSON-escaped owner.
+Actual receipt по-прежнему повторно проверяется после ACK. Requested source
+rechecks before mutation и после dispatch ACK; растущий redactor context не
+допускает callback. Runtime не импортирует operator fixtures; Protocol/HttpApi
+не менялись, generated files не затронуты.
+
+Actual source-only reproduction baseline ниже; regression-before7/7 FAIL
+на прежнем admission сохранён. После исправления addressed reader/admission/
+session/registry/code-handler/writer tests02:167PASS/0FAIL. Full client suite01
+exec59649/exit0:2992PASS/10SKIP/0FAIL, SHA256
+`79854077452e2246ce12654b991f45aa41224984ac534227f0ac10a91ca40c8b`;
+full affected operator suite01 exec57073/exit0:18114PASS/0FAIL, SHA256
+`19c521d8aaf455db1433721f34c27150599314aaa84d7273059ff1275a36d739`.
+Actual reader собрал32KiB escaped source под максимальным escaped operation ID,
+все response<=16384bytes; pre-target и actual-node chunk arrays идентичны.
+Новый live ещё не выполнялся; это source/runtime proof, не candidate/CLI.
+
+Следующий fixed live — public existing Code source fidelity до32768UTF-8 bytes/
+1024LF-lines с неизменной бизнес-логикой, public apply/2 fresh Execute/full6×4,
+затем independent **chunked** source-read и whole source digest/settings/graph
+proof. Использовать прежний saved C package, не делать новый bootstrap/Save.
+Отдельный declared empty-source public handler case нужен для source0bytes/1line
+и сохранения native declared schema при0 output rows; это не Code-empty/native
+cardinality replacement. Before live fixed cases/source/oracle/auditor,
+preflight bounds/redaction/module/unsupported columns и meaningful local tests.
+Смена schema mode сама по себе требует отдельного owned-refusal proof; её не
+объявлять проверенной только по columns preflight. Native ранее принятых8 runs
+короткие sources/chunks не изменяются, повтор не требуется. Profile380 closed_
+verified, active_exec=null; browser/processes отсутствуют. Остаток J/E/F и
+registry readiness открыты.
+
 ### E: requested-source redaction admission gap подтверждён — 2026-09-30
 
 Следующий J05/J21/J23/J26 результат уточнён по actual source `3bfbd9968b`:
