@@ -20,6 +20,21 @@ function fixture({kind='existing',source=original,deadline=Date.now()+60000,chun
   mutate:async args=>{calls.push('mutate');browser.setSource(args.source_text);return {owner};},effect:async args=>{calls.push('effect');assert.equal(args.deadline,deadline);return {host_result:'returned'};}};
 }
 const input=(f,receipt,boundOwner=f.owner)=>({receipt,owner:boundOwner});
+test('admission records a redacted host boundary refusal and remains retired without replay',async()=>{
+ const f=fixture({secret:'PRIVATE_CREDENTIAL'}),receipt=await f.admission.admit({});
+ let effects=0;
+ await assert.rejects(()=>f.admission.withEffect(input(f,receipt),async()=>{
+  effects++;throw Error('Owned preparation failed: PRIVATE_CREDENTIAL');
+ }),{code:'boundary'});
+ const refused=f.events.filter(event=>event.phase==='javascript_source_boundary_refused');
+ assert.equal(refused.length,1);
+ assert.equal(refused[0].reason,'Owned preparation failed: [redacted]');
+ assert.deepEqual(refused[0].owner,f.owner);
+ assert.equal(refused[0].read_id,3);
+ assert.equal(f.admission.state,'retired');
+ await assert.rejects(()=>f.admission.withEffect(input(f,receipt),f.effect),{code:'state'});
+ assert.equal(effects,1);assert.ok(!f.calls.includes('effect'));
+});
 test('admission existing omitted source actual reader/Close before policy/effect',async()=>{
  const f=fixture(),receipt=await f.admission.admit({});assert.equal(receipt.intent,'preserve');assert.equal(receipt.effective_source.source_sha256,digest(original));assert.equal(f.calls.at(-1),'close');
  assert.ok(Object.isFrozen(receipt)&&Object.isFrozen(receipt.effective_source));assert.ok(!JSON.stringify(receipt).includes('Сумма'));
