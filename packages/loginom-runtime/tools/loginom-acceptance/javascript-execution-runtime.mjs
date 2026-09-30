@@ -250,7 +250,7 @@ export function javascriptManualMappingRequest() {
 // A separate port wizard is not the node wizard retained by the outer runner.
 // Cleanup is allowed only for its proven opening and no possible mapping edits,
 // including one confirmed field-editor opening followed by verified cancellation.
-export async function configureJavascriptManualMapping({reader,cleanupReader,reference,record,verifyGraph,lifecycle}) {
+export async function configureJavascriptManualMapping({reader,cleanupReader,reference,record,verifyGraph,lifecycle,configuration=javascriptManualMappingRequest()}) {
   if(lifecycle.started)throw Error('Manual mapping already attempted; no replay');
   lifecycle.started=true;lifecycle.attempts=0;
   const bind=state=>{
@@ -313,7 +313,7 @@ export async function configureJavascriptManualMapping({reader,cleanupReader,ref
       }
     }};
   try{
-    const {mapping,configured}=javascriptManualMappingRequest();
+    const {mapping,configured}=configuration;
     const result=await configureSeparateOutputPort(tracked,mapping,configured);
     lifecycle.closed=true;return result;
   }catch(error){
