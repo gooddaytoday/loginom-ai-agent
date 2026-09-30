@@ -1889,7 +1889,7 @@ test('wizard owner context uses bounded active-tab breadcrumbs and survives narr
 });
 
 test('typed wizard opening verifies node and workflow path after one settings click',async()=>{
-  for(const mode of ['bound_begin_pending_long','bound_begin_busy_long','bound_begin_busy_expired','bound_begin_busy_foreign','bound_begin_busy_dialog','bound_begin_busy_wrong_owner','bound_begin_suffix','bound_begin_pending','bound_begin_lock','bound_begin_foreign','bound_begin_churn','success','clipped_settings','clipped_settings_covered','formatted_name','same_label_wrong_key','renamed_tab','replaced_tab','wrong_node','wrong_workflow','dialog','lost_reply',
+  for(const mode of ['bound_begin_busy_import_preview','bound_begin_busy_import_preview_only','bound_begin_busy_import_preview_unbound','bound_begin_busy_import_preview_outside','bound_begin_busy_import_preview_duplicate','bound_begin_busy_import_preview_foreign','bound_begin_busy_import_preview_expired','bound_begin_busy_import_preview_wrong_owner','bound_begin_busy_import_preview_changed_stage','bound_begin_pending_long','bound_begin_busy_long','bound_begin_busy_expired','bound_begin_busy_foreign','bound_begin_busy_dialog','bound_begin_busy_wrong_owner','bound_begin_suffix','bound_begin_pending','bound_begin_lock','bound_begin_foreign','bound_begin_churn','success','clipped_settings','clipped_settings_covered','formatted_name','same_label_wrong_key','renamed_tab','replaced_tab','wrong_node','wrong_workflow','dialog','lost_reply',
     'stale_region','stale_origin','stale_document','stale_tab','stale_wrong_owner','stale_exhausted']) {
     const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
     let path='';
@@ -1904,16 +1904,16 @@ test('typed wizard opening verifies node and workflow path after one settings cl
     const body=page.add('g',base+'Graph;'+nodeKey,'',undefined,graph);
     page.add('span',base+'Graph;'+nodeKey+';Label;Label',nodeLabel,undefined,body);
     page.add('g',base+'Graph;'+nodeKey+';Setting','',mode.startsWith('clipped_settings')?{x:500,y:86,width:24,height:24}:{x:500,y:300,width:30,height:30},graph);
-    let pending=false,detached=null,waits=0,loading;
+    let pending=false,detached=null,waits=0,loading,preview;
     if(mode.startsWith('bound_begin_')) {
       let post=0;
       const reader=async()=>{const clicked=page.events.includes('click');if(clicked)post++;
         if(clicked&&(mode==='bound_begin_pending'&&post<=90||mode==='bound_begin_pending_long'&&post<=1300))return {verified:false,surface_pending:true};
         const graph=!clicked||mode==='bound_begin_churn'||post<=2;
-        return {verified:true,document_id:'doc',workflow_id:'workflow',node_id:mode==='bound_begin_foreign'&&post>=2||mode==='bound_begin_busy_wrong_owner'&&waits>=2?'foreign':'node',
+        return {verified:true,document_id:'doc',workflow_id:'workflow',node_id:mode==='bound_begin_foreign'&&post>=2||['bound_begin_busy_wrong_owner','bound_begin_busy_import_preview_wrong_owner'].includes(mode)&&waits>=2?'foreign':'node',
           surface:graph?'graph':'wizard',tid:base+(graph?'Graph;'+nodeKey:'WizrdMCF'),...(graph?{locked:clicked&&post%2===0}:{})};};
       page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
-        {expected_build:build,expected_origin:origin,kind:'workspace-ui',...(mode.startsWith('bound_begin_busy_')||mode==='bound_begin_pending_long'?{opening_timeout_ms:120000}:{}),prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},reader));
+        {expected_build:build,expected_origin:origin,kind:'workspace-ui',...(mode.startsWith('bound_begin_busy_')||mode==='bound_begin_pending_long'?{opening_timeout_ms:120000}:{}),...(mode.endsWith('_unbound')?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}}),...options},reader));
     }
     if(mode.startsWith('clipped_settings')){page.context.innerWidth=1000;page.context.innerHeight=800;Object.assign(graph,{box:{x:0,y:103,width:1000,height:600},clientWidth:1000,clientHeight:600,scrollHeight:724,scrollTop:120,style:{overflowY:'auto'}});page.add('div','GraphTopToolbar','',{x:0,y:0,width:1000,height:103});}
     const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_open);
@@ -1922,9 +1922,15 @@ test('typed wizard opening verifies node and workflow path after one settings cl
       const tab=page.document.querySelectorAll('.x-tab-active')[0];
       if(mode==='renamed_tab')tab.ownText='Настройка';
       if(mode==='replaced_tab'){const tid=tab.getAttribute('data-tid');tab.remove();page.add('div',tid,'Настройка').attrs.class='x-tab-active';}
-      const wizard=page.add('div',base+'WizrdMCF');
+      const wizard=mode.includes('import_preview')?importSourceFixture(page).form:page.add('div',base+'WizrdMCF');
       if(mode.startsWith('bound_begin_busy_')){loading=wizard;wizard.attrs.class='bg-mask-message';}
-      page.add('button',base+'WizrdMCF;CalcDataWizard;btnAddExpr','',undefined,wizard);
+      if(mode.includes('import_preview')){
+        preview=page.add('div',base+'WizrdMCF;ImportTextFilePreviewWizard;pnlPreview','',undefined,mode.endsWith('_outside')?page.document.body:wizard);
+        preview.attrs.class='bg-mask-message';preview.attrs['bg-mask-text']='Подготовка предпросмотра';
+        if(mode.endsWith('_duplicate'))page.add('div',preview.attrs['data-tid'],'',undefined,wizard);
+        if(mode.endsWith('_only'))wizard.attrs.class='';
+      }
+      if(!mode.includes('import_preview'))page.add('button',base+'WizrdMCF;CalcDataWizard;btnAddExpr','',undefined,wizard);
       if(mode==='wrong_workflow')path=path.replace('Модуль1','Модуль2');
       const name=mode==='bound_begin_suffix'?'Сумма-3':['wrong_node','same_label_wrong_key','stale_wrong_owner'].includes(mode)?'Другой':nodeKey;
       const node=page.add('a',base+'cnrNaviMode;b.s_'+path+'>'+name,mode==='wrong_node'?'Другой':nodeLabel,undefined,panel);
@@ -1954,6 +1960,15 @@ test('typed wizard opening verifies node and workflow path after one settings cl
     page.waitForTimeout=async ms=>{
       waits++;clock.advance(ms+(loading?2500:0));
       if(mode==='bound_begin_busy_long'&&waits===30)loading.attrs.class='';
+      if(mode.includes('import_preview')&&!mode.endsWith('_expired')){
+        if(waits===1)loading.attrs.class='';
+        if(mode.endsWith('_foreign')&&waits===2)page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';
+        if(mode.endsWith('_changed_stage')&&waits===2){
+          page.document.querySelectorAll('[data-tid="'+base+'WizrdMCF;ImportTextFilePreviewWizard;edtFileName"]')[0].remove();
+          page.add('button',base+'WizrdMCF;CalcDataWizard;btnAddExpr','',undefined,loading);
+        }
+        if(waits===3)preview.attrs.class='';
+      }
       if(mode==='bound_begin_busy_foreign'&&waits===2){loading.attrs.class='';page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';}
       if(mode==='bound_begin_busy_dialog'&&waits===2)page.add('div','foreign-dialog','Other').attrs.class='x-window';
       if(detached){page.document.body.append(detached);detached=null;}
@@ -1963,12 +1978,22 @@ test('typed wizard opening verifies node and workflow path after one settings cl
     };
     if(mode==='clipped_settings_covered')page.document.querySelectorAll('[data-tid="GraphTopToolbar"]')[0].box.height=115;
     const result=await page.act({verb:mode.startsWith('bound_begin_')?'begin_wizard':'open_wizard',ref:button.ref},snapshot);
-    const success=['bound_begin_pending_long','bound_begin_busy_long','bound_begin_suffix','bound_begin_pending','bound_begin_lock','success','clipped_settings','formatted_name','renamed_tab','stale_region'].includes(mode);
+    const success=['bound_begin_busy_import_preview','bound_begin_busy_import_preview_only','bound_begin_pending_long','bound_begin_busy_long','bound_begin_suffix','bound_begin_pending','bound_begin_lock','success','clipped_settings','formatted_name','renamed_tab','stale_region'].includes(mode);
     assert.equal(result.status,success?'SUCCEEDED':mode==='clipped_settings_covered'?'NOT_APPLIED':'AMBIGUOUS',mode+JSON.stringify(result.error));
     assert.equal(page.events.filter(e=>e==='click').length,mode==='clipped_settings_covered'?0:1);
     assert.equal(result.trace.some(e=>e.event==='wizard_open_verified'),success);
     if(mode==='bound_begin_busy_long')assert.ok(result.trace.find(e=>e.event==='ui_mask_wait_finished').elapsed_ms>60000);
     if(mode==='bound_begin_busy_expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+    if(['bound_begin_busy_import_preview','bound_begin_busy_import_preview_only'].includes(mode)){
+      assert.equal(waits,3,mode);assert.equal(result.trace.find(e=>e.event==='ui_mask_wait_finished').mask_present,false);
+      const masks=result.trace.find(e=>e.event==='ui_mask_wait_started').masks;
+      assert.equal(masks.length,mode.endsWith('_only')?1:2);
+      assert.equal(masks.at(-1).target_tid,base+'WizrdMCF;ImportTextFilePreviewWizard;pnlPreview');
+      assert.equal(masks.at(-1).import_preview_owner_ref,result.output.wizard.root_ref);
+    }
+    if(mode==='bound_begin_busy_import_preview_expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+    if(['bound_begin_busy_import_preview_unbound','bound_begin_busy_import_preview_outside','bound_begin_busy_import_preview_duplicate'].includes(mode))assert.equal(waits,0,mode);
+    if(['bound_begin_busy_import_preview_foreign','bound_begin_busy_import_preview_wrong_owner','bound_begin_busy_import_preview_changed_stage'].includes(mode))assert.equal(waits,2,mode);
     if(['bound_begin_busy_dialog','bound_begin_busy_wrong_owner'].includes(mode))assert.equal(waits,2,mode+JSON.stringify({error:result.error,trace:result.trace}));
     if(mode==='bound_begin_pending_long')assert.equal(result.trace.filter(e=>e.event==='node_surface_wait').length,1300);
     if(mode==='bound_begin_pending')assert.equal(result.trace.filter(e=>e.event==='node_surface_wait').length,90);

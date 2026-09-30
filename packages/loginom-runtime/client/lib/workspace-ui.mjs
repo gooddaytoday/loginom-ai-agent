@@ -69,7 +69,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   const waitForMasks = async (observed, read, unchanged) => {
     if(!observed.ui.masks.length || !unchanged(observed))return observed;
     const maskStarted=Date.now();
-    record('ui_mask_wait_started',{remaining_ms:timeout()});
+    record('ui_mask_wait_started',{remaining_ms:timeout(),masks:observed.ui.masks.map(mask=>({ref:mask.ref,kind:mask.kind,target_tid:mask.target_tid,
+      dialog_ref:mask.dialog_ref,...(mask.import_preview_owner_ref?{import_preview_owner_ref:mask.import_preview_owner_ref}:{})}))});
     while (observed.ui.masks.length && unchanged(observed)) {
       await page.waitForTimeout(Math.min(250,timeout()));
       timeout();observed=await read();
@@ -2880,7 +2881,12 @@ function readRenderedInputMapping(observation) {
       // its controls must still pass exact painted hit ownership before acting.
       const owner = dialogRef(element), ownText = element.getAttribute('bg-mask-text');
       const kind = foregroundElement && !foregroundElement.contains(element) && !element.contains(foregroundElement) ? 'modal_background' : 'busy';
-      return { ref: refOf(element), kind, target_tid:getTid(element), dialog_ref: owner, text: ownText === null ? textOf(element) : short(ownText), bounding_box: boxOf(element) };
+      const importPreview=wizard.status==='observed'&&wizard.stage==='text_import_file'
+        &&getTid(element)===wizard.root_tid+';ImportTextFilePreviewWizard;pnlPreview'
+        &&wizardForms.length===1&&wizardForms[0].contains(element)
+        &&(tids.get(getTid(element))??[]).filter(visible).length===1;
+      return { ref: refOf(element), kind, target_tid:getTid(element), dialog_ref: owner, text: ownText === null ? textOf(element) : short(ownText), bounding_box: boxOf(element),
+        ...(importPreview?{import_preview_owner_ref:wizard.root_ref}:{}) };
     });
     const messages = readTexts('[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under');
     const definitionOnly=!!definitionPrefix && wizard.status==='observed';
@@ -3826,8 +3832,14 @@ function readRenderedInputMapping(observation) {
               &&same(owner.path.slice(0,-2).map(({tid,label})=>({tid,label})),opening.workflow_path);
           };
           const ownedLoading=fresh=>contextMatches(fresh)&&intendedWizard(fresh)
-            &&fresh.ui.masks.every(mask=>mask.kind==='busy'&&mask.ref===fresh.wizard.root_ref
-              &&mask.target_tid===current.workflow_ref.prefix+';WizrdMCF'&&!mask.dialog_ref);
+            &&fresh.ui.masks.every(mask=>mask.kind==='busy'&&!mask.dialog_ref
+              &&(mask.ref===fresh.wizard.root_ref&&mask.target_tid===current.workflow_ref.prefix+';WizrdMCF'
+                // Live text import has a second, independently settling preview
+                // mask. Admit only its exact contained DOM owner and native node.
+                ||task.prepared_node_context&&fresh.prepared_node_context?.verified===true
+                  &&fresh.prepared_node_context.surface==='wizard'&&fresh.wizard.stage==='text_import_file'
+                  &&mask.target_tid===current.workflow_ref.prefix+';WizrdMCF;ImportTextFilePreviewWizard;pnlPreview'
+                  &&mask.import_preview_owner_ref===fresh.wizard.root_ref));
           // The opening click is already sent. Observe its own loading mask
           // within the original node deadline; never reissue the click.
           observed=await waitForMasks(observed,readOpeningUi,ownedLoading);
