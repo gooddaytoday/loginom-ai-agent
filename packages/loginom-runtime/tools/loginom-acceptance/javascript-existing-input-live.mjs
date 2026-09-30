@@ -25,7 +25,9 @@ export function javascriptExistingInputRequest({prepared,node,storage,artifact,u
   if(inputVariant==='reordered')request.mappings=[{direction:'output',port:0,autosync:false,
     fields:javascriptBusinessInputVariant(inputVariant).columns.map(column=>({
       source:{kind:'configured_field',name:column.name},name:column.name,label:column.label}))}];
-  request.read.coverage='full';
+  // Import uses its installed sample reader. The operator separately requires
+  // sample_complete and verifies every cell of this six-row input.
+  request.read.coverage='sample';
   return request;
 }
 
