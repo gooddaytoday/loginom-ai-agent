@@ -9,6 +9,7 @@ import {createJavascriptCodeNodeSupport} from '../../client/lib/javascript-code-
 import {dispatchNodeApi} from '../../client/lib/node-api.mjs';
 import {nodeResultReply} from '../../client/lib/node-result-reply.mjs';
 import {nodeApplyResultSchema} from '../../client/lib/node-result-schema.mjs';
+import {verifyJavascriptMismatchTable} from './javascript-mismatch-probe.mjs';
 import {verifyNativeInputUi} from './javascript-native-input-contract.mjs';
 import {verifyNativeRoundtripInput} from './javascript-native-roundtrip-contract.mjs';
 import {javascriptDiscoveryProbe,javascriptDiscoveryOracle} from './javascript-discovery-probes.mjs';
@@ -22,7 +23,7 @@ export async function javascriptPublicCodePins() {
     selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
 }
 
-const codeTypedIds=Object.freeze(['g5-native-civil-datetime','g5-native-integer-safe','g5-native-string','g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real',
+const codeTypedIds=Object.freeze(['g5-native-integer-outside-safe','g5-native-civil-datetime','g5-native-integer-safe','g5-native-string','g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real',
   'g5-safe-integer','g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
 export const javascriptPublicTypedIds=Object.freeze([...codeTypedIds,...codeTypedIds.map(id=>'declared-'+id)]);
 
@@ -55,7 +56,7 @@ export function verifyJavascriptPublicCodeInput(probe,input) {
   const pinned=javascriptPublicCodeProbe(javascriptPublicTypedIds.includes(probe.id)?probe.id:null,mode);
   need(JSON.stringify(probe)===JSON.stringify(pinned),'Public Code input probe pin changed');
   if(probe.native_input_fixture!==undefined){
-    need(['real','boolean','string','integer-safe','civil-datetime'].includes(probe.native_input_fixture),'Public Code native input fixture unavailable');
+    need(['real','boolean','string','integer-safe','integer-outside-safe','civil-datetime'].includes(probe.native_input_fixture),'Public Code native input fixture unavailable');
     const native=verifyNativeRoundtripInput(input,probe.native_input_fixture);
     verifyNativeInputUi(input.table,probe.native_input_fixture);
     need(['document_id','workflow_id','node_id'].every(key=>native.binding[key]===input.node[key]
@@ -70,6 +71,30 @@ export function verifyJavascriptPublicCodeInput(probe,input) {
     &&input.table.sample_rows===input.table.row_count&&input.table.schema.length===5,
     'Public Code lifecycle requires complete own input');
   return {verified:true,native_input_bytes_verified:false};
+}
+
+// Outside-safe is an observation of exact decimal output, never a fixed
+// identity oracle. Safe-range cases keep their existing fixed-value contract.
+export function javascriptPublicCodeOracle(probe,table,input) {
+  if(probe.native_input_fixture!=='integer-outside-safe')return javascriptDiscoveryOracle(probe,table);
+  verifyJavascriptPublicCodeInput(probe,input);
+  verifyJavascriptMismatchTable(table);
+  need(table.row_count===3&&table.schema.length===1&&table.schema[0].name==='Value'
+    &&table.schema[0].label==='Value'&&table.schema[0].type==='integer',
+    'Public outside-safe requires full fixed output schema/cardinality');
+  const cells=table.sample.map((row,index)=>{
+    const cell=row[0];
+    need(cell.is_null===false&&typeof cell.value==='string'&&/^(?:0|-?[1-9][0-9]*)$/.test(cell.value)
+      &&BigInt(cell.value)>=-9223372036854775808n&&BigInt(cell.value)<=9223372036854775807n,
+      'Public outside-safe requires signed-int64 decimal observations');
+    const before=input.table.sample[index][0].value;
+    return {row:index,input_decimal:before,output_decimal:cell.value,
+      unchanged:cell.value===before,delta_decimal:(BigInt(cell.value)-BigInt(before)).toString()};
+  });
+  return {schema_verified:true,values_verified:false,gate_passed:false,expectation:'characterization',scope:probe.scope,
+    proof_level:'typed_ui_with_native_input',native_bytes_verified:false,gates_closed:[],
+    characterization_verified:true,characterization_only:true,exact_pass:false,
+    output_identity_exact:cells.every(cell=>cell.unchanged),general_integer_precision_guarantee:false,cells};
 }
 
 export async function runJavascriptPublicCodeLive({page,prepared,input,targetOrigin,redactor,record,
@@ -125,8 +150,9 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
   onPending(false);await save();
   const validation=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(result);
   need(validation.valid,'Public Code result violates its diagnostic schema');
-  const oracle=javascriptDiscoveryOracle(probe,table);
-  need(oracle.gate_passed===true,'Public Code full business oracle differs');
+  const oracle=javascriptPublicCodeOracle(probe,table,input);
+  need(oracle.gate_passed===true||oracle.characterization_verified===true&&oracle.characterization_only===true&&oracle.exact_pass===false,
+    'Public Code full business oracle/characterization differs');
   const projected=nodeResultReply(job,{userProfile:true}).structuredContent;
   const compact=projected?.output?.ports?.[0];
   need(projected?.configuration?.readback?.source.sha256===probe.source_sha256
