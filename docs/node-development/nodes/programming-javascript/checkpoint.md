@@ -2,7 +2,7 @@
 
 ## Текущее состояние
 
-Сводка на 2026-09-30 после B, private P1 и C0/G3. Исходный срез
+Сводка на 2026-09-30 после B, private P1, C0/G3 и runtime подготовки C. Исходный срез
 [acceleration review](acceleration-review.md) к [плану](plan.md): docs
 `13a02e8be2d698d5fbc7f19d146fa82d55f53e48`, code
 `7b8e19bee073cb596607688173234e57052e27b1`. Новые live evidence B
@@ -186,31 +186,102 @@ browser profile311; назначать только после реализац�
 ### Точка продолжения C после G3 — 2026-09-30
 
 Все собственные browser/operator процессы завершены; private registry и
-assignment — closed_verified/profile310, active_exec_session/evidence=null.
-Код child `1965b71edd`, canonical docs — основной checkout. Следующий fresh
-profile311 пока не создан. P1, C0 и fixed G3 без причины не повторять.
+assignment — closed_verified/profile311, active_exec_session/evidence=null.
+Код child `88fdebcd54`, canonical docs — основной checkout. Следующий fresh
+profile312 пока не создан. Generation transition и materialization shell
+проверены в разделах C ниже; handler ещё требуется соединить. P1, C0 и fixed G3 без причины не повторять.
 
 Перед реализацией C учесть наблюдённое и существующие seams:
 
 - Новый JS starts `generation.checked=false`, source/target grids0; G3 journal
   javascript_schema_before/after подтвердил переход false→true. Managed source
-  adapter сейчас сохраняет generation и допускает уже настроенный existing
-  Code. Для new Code нужен owned generation transition на Columns page с
-  actual readback; source reader без запроса не должен менять эту настройку.
+  adapter по умолчанию сохраняет generation; явный schemaMode code теперь
+  делает owned false→true с native schema readback (`aa2958e199`, headed PASS).
+  Source reader без запроса не меняет эту настройку.
 - B injection допускает только fixed existing/comment source, Done и пустые
   mappings/read; это не C handler. Переиспользовать owned writer/admission,
   Next/Done settlement, независимый source-read, native execution и Table reader.
-- Если выбран separate output wizard, общий node_apply intermediate node_finish
-  всё ещё требует execution_started=false, тогда как JS Done корректно null.
-  Нельзя подставлять false. Output wizard может деактивировать узел, поэтому
-  отдельный final fresh Execute после mapping обязателен. Его ownership,
-  Stop/local cancel/deadline, journal admission и no-replay требуется сохранить.
+- Для separate output wizard JS intermediate node_finish теперь требует
+  корректный null и independent source/owner/settlement proof (`88fdebcd54`);
+  остальные типы сохраняют строгий false. Нельзя подставлять false. Output wizard может деактивировать узел, поэтому
+  отдельный final fresh Execute после mapping обязателен. Shell materialization_start/materialization_execute публикует первый execution ID
+  и Stop; full client tests PASS. Actual handler должен обеспечить ownership,
+  Stop/local cancel/deadline, journal admission и no-replay своих drivers.
 - Выбор порядка public materialization/mapping/Execute фиксировать с учётом
   реального shell и публичных jobs, а не механически переносить private C0.
   Продуктовые API и knowledge не должны содержать operator telemetry/oracle.
 
 Далее: code handler/new input и полный public6×4, Save/cold, затем D/E/F.
 Общий Goal остаётся active; завершение всего обучения не объявлено.
+
+### C: переход нового узла к Code schema — 2026-09-30
+
+Child `aa2958e199` добавляет host-only managed переход false→true на Columns.
+Он использует прежнюю selection/wizard lease, проверяет native owner/page,
+полный cached schema и hit-test checkbox, пишет точный journal ACK до одного
+клика, затем проверяет schema readback. Lost reply оставляет one-shot attempt;
+повтор не переключает checkbox обратно. Уже true не вызывает жеста. Source
+adapter принимает явный `schemaMode: code`; по умолчанию `preserve`, поэтому
+обычный source reader не меняет режим. Product handler ещё не зарегистрирован.
+
+Локальные managed/source/trial/schema tests — 221 PASS; syntax/diff checks PASS.
+Private log `c-generation-tests-04.log`, SHA256
+`d12d9fc7191e047d7eea17b0d3b1abd190a5e34674a5de060efe1c1e66d04a5f`. `tests-01/02` содержат два отказа нового
+тестового fixture: task с лишним expected был передан строгому code generator;
+fixture исправлен без ослабления owner validator. Headed `c-managed-generation-01`
+завершён на fresh profile311, exec51474 (exit0), source `aa2958e199`: **OBSERVED**.
+Independent audit подтвердил точный false→true, один generation receipt/ACK,
+неизменный cached schema кроме checked, независимый schema readback и subsequent
+owned short Execute6×2. Cleanup package/logout/browser3/3 + process absence.
+Report SHA256 `61f996eb6954c67da20b2c626b70ec4e98e72c9a6252a02e79c1736e700efd1c`,
+journal `c687c020d55279ee902eeb91c1322fca5024c011b59f0bbd63f51ffc4fb52c6f`,
+private `c-managed-generation-01-independent-receipt.json`
+`dfcdc81526c3554aeab87b20e3bb5a82a58f77c1fe1c595cd8450be2bfaba19f`.
+Это runtime mode transition, не public new code6×4 или candidate delivery.
+Новый фактор — runtime managed mode transition, а не повтор P1/C0/G3.
+
+Для полного C требуется отдельная публичная граница первого materialization
+Execute и ожидания его terminal до output mapping. Во время этого ожидания
+status/Stop должны видеть именно первый execution ID; generic intermediate
+Done сохраняет JS `execution_started=null`, а не false. После mapping и его
+возможной деактивации — отдельный final fresh Execute. Новый handler пока
+допускать только через isolated injection; source/module policy, ownership,
+original deadlines и unknown-effect/no-replay остаются обязательными. Эти
+уточнения реализации сохраняют C–F и J/G; новый отдельный gate не вводится.
+
+### C: публичные фазы materialization execution — 2026-09-30
+
+Child `88fdebcd54` добавляет opt-in `materialize_output` только для JS с
+separate output wizard и explicit Execute. После подтверждённого intermediate
+Done (JS null + independent source/owner/settlement proof) shell сохраняет
+`materialization_start` и `materialization_execute`; ожидание публикует первый
+execution ID в status и доступно native Stop. Mapping начинается только после
+его подтверждённого owned terminal completed. Failed/cancelled завершают задачу
+без final Execute/read. Final Execute требует другого execution ID. Другие
+типы по-прежнему требуют intermediate `execution_started=false`.
+
+Общее ожидание terminal переиспользуется двумя execution phases; original
+wait deadline привязан к своей фазе. Read-only local cancel может сохранить
+checkpoint своего materialization wait, unknown effect остаётся pending и не
+повторяется. Result schema и TypeScript PhaseName включают обе новые фазы.
+Handler с этим opt-in ещё не зарегистрирован, actual public materialization
+live отсутствует; это shell support для следующего C handler.
+
+Локально 103 адресных tests PASS: порядок, source/Done refusal, lost replies,
+Stop materialization/final, wrong owner и reused final execution ID.
+`c-materialization-shell-tests-01.log` SHA256
+`c53a37b80502bd9ec1ab3491188f1057aa0c29ce41364f0180df0fb518ba9732`.
+После изменения общего shell — полный client suite **2948 PASS / 10 skips /
+0 FAIL** (2958 total), 157,265 с; log SHA256
+`370eaa7cd235ee7180f59531ee9b0a9702e8aef67a30e8729d09457c8e5ecfca`.
+Pinned Node24.19.0, tests из `packages/loginom-runtime/client`; browser integration
+skips без LOGINOM_DOCK_TEST_BROWSER, headless browser не запускался.
+Syntax и git diff checks PASS. Следующий результат — compose code handler,
+новый input/JS через public path, full6×4 и Save/cold; затем D/E/F.
+
+Private registry/assignment closed_verified/profile311, active exec/evidence=null;
+profile312 пока не создавался. G3/C0/P1/B без затронувшего изменения не повторять.
+Цель active, готовность registry не повышена.
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
