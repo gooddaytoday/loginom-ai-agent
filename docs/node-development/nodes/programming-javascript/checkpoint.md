@@ -42,6 +42,27 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: Code changed input — принят — 2026-09-30
+
+`e-public-existing-code-changed-02`, profile343, child `e1fd122320`,
+exec75930/exit0 — **OBSERVED**, independent audit **PASS**. Actual public
+imports.text обновил прежний input GUID `2177b526-fd68-452a-a66d-16b83c052a6b`
+проверенным changed CSV; все6×5 cells/types/order/padding совпали.
+JS GUID `b5a6620a-bc9c-4694-a9f9-812a7d2f87ba` сохранён; effective source SHA
+`2f7ba2e153c1749c90b68e557278fd52bb30ef580204414ad388eed505e4fd89`
+совпадает с fixed E Code03. Настройки, mappings и graph сохранены. Два свежих
+owned completed JS executions: `1790752105141-ywr9khw5u1q:1618:3` и `:1618:4`;
+полный6×4 oracle совпал, первая NetCents **2700**, сумма **2850**.
+Independent public source-read подтвердил S1. Save не отправлен.
+
+Report SHA256 `6c5575aa5fb68ac3a9d38b98accd1e6445ae22e25d56998e579e0cb2bfe4c708`,
+journal `59fe419b5ef74044b1e4627071313e4c61eff02d93ae1b3224b6a43b80e4d7dd`,
+audit receipt `1100c6e76ff89ee03c577fb9ce511e0a7c00e63729c26824c9ae483851249592`.
+Package/logout/browser cleanup3/3 и process absence проверены; registry
+reconciled. Это isolated public API + typed UI, не native bytes/candidate/CLI;
+E/F и aggregate J11 не закрыты. Следующий fixed Code/reordered01 запущен на
+fresh headed profile344, exec60216; результат пока не установлен.
+
 ### E: import read admission исправлен — 2026-09-30
 
 Freshness Code/changed01/profile341/exec48888/exit1 завершился
