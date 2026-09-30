@@ -45,6 +45,25 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public native cardinality keep2 принят; odd выполняется — 2026-09-30
+
+Keep2 Code01/profile377/child `3bfbd9968b`, exec9636/exit0 — OBSERVED,
+independent audit PASS. Full native input3×1 [1,2,3]/whole baseline/releases3/3
+и full typed output1×1 [2], source/metadata/mappings/graph/Views/13 phases/
+2 fresh Execute и package/logout/browser/process cleanup проверены.
+Completed IDs `1790764775558-czifkr6fhxj:1249:3` / `:1249:4`.
+Report SHA256 `3aa223155083e55fa87f57cd895092562e614ff2cc08af1a3c693bbd762c0306`,
+journal `6b4fd057cf3429182f852540936afa5d963337e4ef0a262b36654894349fdb75`,
+receipt `e76abab0f948c3cbe8dcde18ee1858933a87fd440369ffc8f28d2537038f201e`.
+Native output/upstream bytes/Save/cold/candidate/CLI не покрыты. Profile377
+closed_verified/processes absent.
+
+Odd01 ordinary headed fresh profile378, exec82808 зарегистрирован под lock;
+evidence `e-public-types-native-cardinality-odd-01`. Результат не установлен.
+Наблюдать этот handle; затем independent audit/cleanup/reconciliation,
+duplicate и canonical declared-empty отдельными fresh runs. Остаток E/J/F,
+registry readiness прежняя.
+
 ### E: public native cardinality — keep2 выполняется — 2026-09-30
 
 Frozen child `3bfbd9968b38a8f9e9f6db7825ce0f6019bbc83e` допуск четырёх
