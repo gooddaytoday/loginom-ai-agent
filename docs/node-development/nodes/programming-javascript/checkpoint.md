@@ -46,7 +46,44 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
-### E/J12/J25: первый public native syntax/repair live запущен — 2026-09-30
+### Точка продолжения: native syntax live отказал; память недоступна — 2026-09-30
+
+Пользователь разрешил продолжение после восстановления доступа. OpenViking
+`find` ответил, но exact `read` вернул `UND_ERR_CONNECT_TIMEOUT` к
+`ov.kartamyshev.dev:443`. Установленный `ov-memory-doctor` подтвердил
+`server unreachable`; curl `/health` через настроенный маршрут и напрямую
+также завершились SSL connection timeout / HTTP000. Настройки, ключи и сервер
+не менялись. По AGENTS дальнейшая работа остановлена до восстановления памяти;
+новый браузер, admin recovery и исправления runtime не запускались.
+
+Первый fixed public syntax-code live **не принят**. Exec89037 завершился exit1;
+`e-public-wizard-refusal-syntax-code-01/report.json` имеет
+`CLEANUP_UNCONFIRMED`, SHA256
+`77ad097485c093fe334a07ae8693c7031adb52303621b11ef5e209c55c24c20b`.
+После ACKed Code Next наблюдался свежий отказ и один ACKed btnError;
+затем `Managed JavaScript error wizard changed`. Dialog read/OK/owned Close
+не подтверждены. Repair, explicit Execute и Save не отправлены. Browser close
+есть, package close/logout нет; actual process absence profile385 проверено.
+Registry под lock reconciled: `recovery_required`, active_exec=null,
+исходные report/status сохранены. Отсутствие процесса не доказывает server cleanup.
+
+После успешного exact memory read: отдельный fresh ordinary headed admin
+recovery profile386, закрыть только сеанс собственного saved C пакета
+`JavaScript-57c4ec51-aafd-4d71-8508-17209482af04.lgp`, пользователя jsteach,
+начатый 2026-09-30T13:31:49.620Z; dispatcher Refresh/absence, admin logout,
+browser close/process absence и отдельная recovery receipt. Старый прогон
+остаётся CLEANUP_UNCONFIRMED. Не повторять неизвестные error/OK/Close gestures.
+
+Затем адресно проверить фактические Loginom `WizardForm.btnErrorClick`,
+`bg.Lock`, `bg.ErrMsg` и Ext modal mask в прежнем `preview-source-40`.
+Runtime после btnError требует quiet wizard до dialog read и добавляет любую
+видимую `.x-mask` к pending; это **гипотеза причины**, пока не proof.
+Различать modal backdrop и owned loading, сохранить owner/editor/source,
+foreign-dialog и original deadline guards. После обоснованного исправления:
+локальные regression/новый freeze, fresh live и независимый audit; старые
+oracle/auditor/source failed run не переписывать. Полный E/J/F остаётся открыт.
+
+### E/J12/J25: первый public native syntax/repair live назначен — 2026-09-30
 
 Frozen child `f42e7339f8c9d0983e5ceabb639d292653692694` добавляет fixed
 `javascript-public-wizard-refusal-live.mjs --case syntax-code|syntax-declared`.
@@ -69,8 +106,9 @@ native tooltip/dialog, не вычисляет из ожидаемого wrapper
 Ordinary headed fresh385 assigned под registry lock; exec89037 зарегистрирован.
 Evidence `e-public-wizard-refusal-syntax-code-01` в прежней приватной кампании;
 используется ранее проверенный saved C. Нет Save/new bootstrap/проверки памяти.
-Terminal/audit/cleanup ещё не получены. Следующее действие — наблюдать **только
-этот handle**; frozen code/oracle/auditor не менять. При unknown reply/owner/
+На момент назначения terminal/audit/cleanup ещё не были получены;
+actual terminal и актуальная recovery boundary записаны выше.
+Frozen code/oracle/auditor failed run не менять. При unknown reply/owner/
 Close/ACK сохранять gate и владение, не replay и не завершать browser owner
 принудительно. После actual terminal: independent audit + meaningful negatives,
 package close/logout/browser close/actual process absence, registry reconciliation.
