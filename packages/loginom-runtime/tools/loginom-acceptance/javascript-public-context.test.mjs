@@ -7,23 +7,25 @@ import {javascriptDiscoveryProbe} from './javascript-discovery-probes.mjs';
 import {javascriptContextReply} from '../../client/lib/javascript-context-read.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
 const node={document_id:'doc',workflow_id:'workflow',node_id:'node'};
-function fixture(mode,manual){
+function fixture(mode,manual,inputVariant='base'){
   const probe=javascriptDiscoveryProbe('p1-business-'+mode+'-base');
   const source=probe.source+(manual?javascriptContextDataComment:'');
   const schemas=[[['RowID','integer'],['Customer','string'],['Qty','integer'],['UnitPriceCents','integer'],['DiscountPct','integer']],
     probe.schema.map(c=>[c.name,c.type])];
   const ports=schemas.map((schema,index)=>{
     const source_fields=schema.map(([name,type],i)=>({index:i,name,label:name,type,required:true,field_id:String(i)}));
+    const ordered=index===0&&inputVariant==='reordered'?['DiscountPct','Customer','UnitPriceCents','RowID','Qty']
+      .map((name,i)=>({...source_fields.find(f=>f.name===name),index:i})):source_fields;
     return {direction:['input','output'][index],port:0,port_guid:'port'+index,autosync:index===0||!manual,
-      native_reciprocity_verified:true,source_fields,target_fields:source_fields.map((f,i)=>({...f,required:false,...(index===1?{excluded:false}:{}),
-        label:index===1&&manual&&i===2?javascriptContextDataLabel:f.label,source:{...f}}))};
+      native_reciprocity_verified:true,source_fields:ordered,target_fields:source_fields.map((f,i)=>({...f,required:false,...(index===1?{excluded:false}:{}),
+        label:index===1&&manual&&i===2?javascriptContextDataLabel:f.label,source:{...ordered.find(sf=>sf.name===f.name)}}))};
   });
   return {source,reply:javascriptContextReply({owner:{...node,operation_id:'context',ui_epoch:1},source,
     settings:{generation:mode==='code'},ports,redactor:createRedactor()})};
 }
-for(const mode of ['code','declared'])for(const manual of [false,true])
-  test('fixed context oracle verifies '+mode+' complete current source/mappings/data '+manual,()=>{
-    const f=fixture(mode,manual),expected={node,schemaMode:mode,source:f.source,manual};
+for(const mode of ['code','declared'])for(const manual of [false,true])for(const inputVariant of ['base','reordered'])
+  test('fixed context oracle verifies '+mode+' complete current source/mappings/data '+manual+' '+inputVariant,()=>{
+    const f=fixture(mode,manual,inputVariant),expected={node,schemaMode:mode,source:f.source,manual,inputVariant};
     assert.equal(verifyJavascriptPublicContext(f.reply,expected).structuredContent,f.reply);
     for(const mutate of [r=>r.source.text='different',r=>r.owner.node_id='foreign',r=>r.ports[0].source_fields.reverse(),
       r=>r.ports[0].target_fields[1].name='CustomerKey',r=>r.ports[1].target_fields[2].label='foreign',
