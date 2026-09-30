@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { actionCatalogForPlatform, catalogForTarget, stageResources } from "../script/stage-resources"
+import { actionCatalogForPlatform, catalogForTarget, setLinuxSandboxMode, stageResources } from "../script/stage-resources"
 import release from "../../product/loginom-release.json"
 
 test("resource staging selects the signed action catalog for the target platform", () => {
@@ -89,6 +89,18 @@ posixTest("resource staging rejects existing aliases before touching inputs", as
       ).rejects.toThrow("LOGINOM_BUILD_OUTPUT_OVERLAP")
       expect(await readFile(join(browsers, "keep"), "utf8")).toBe("original")
     }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test.skipIf(process.platform !== "linux")("linux sandbox mode keeps the setuid bit", async () => {
+  const root = await mkdtemp(join(tmpdir(), "sandbox-mode-"))
+  try {
+    const file = join(root, "chrome-sandbox")
+    await writeFile(file, "sandbox")
+    await setLinuxSandboxMode(file)
+    expect((await stat(file)).mode & 0o7777).toBe(0o4755)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

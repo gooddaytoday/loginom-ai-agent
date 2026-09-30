@@ -45,6 +45,7 @@ export async function installCli(artifact: string, home: string) {
     }
     try {
       await installDirectories(home, false)
+      await ownLinuxSandbox(destination)
       // Never replace an existing launcher, including a foreign or dangling symlink.
       await symlink(join(destination, "bin/loginom-ai-agent-cli"), launcher)
       await writeFile(join(base, "current.json"), JSON.stringify({ format: "loginom-cli-install-v1", name }) + "\n", {
@@ -111,6 +112,28 @@ export async function uninstallCli(home: string) {
   } finally {
     await rm(lock, { recursive: true, force: true })
   }
+}
+
+// Chromium's setuid sandbox must be root:root and 4755. The manifest checks the mode only.
+// A user install keeps that mode and asks sudo for the owner; without it the browser aborts.
+async function ownLinuxSandbox(payload: string) {
+  if (process.platform !== "linux") return
+  const path = join(payload, "resources/loginom/browsers/chromium-1243/chrome-linux64/chrome-sandbox")
+  const info = await lstat(path).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (!info || info.isSymbolicLink()) return
+  if ((info.mode & 0o7777) !== 0o4755) throw new Error("CLI_SANDBOX_MODE_INVALID")
+  if (info.uid === 0) return
+  await new Promise<void>((resolve, reject) => {
+    execFile("sudo", ["chown", "root:root", path], { timeout: 120_000, stdio: "inherit" }, (error) => {
+      if (error) reject(new Error("CLI_SANDBOX_OWNER_REQUIRED"))
+      else resolve()
+    })
+  })
+  const owned = await lstat(path)
+  if (owned.uid !== 0 || (owned.mode & 0o7777) !== 0o4755) throw new Error("CLI_SANDBOX_OWNER_REQUIRED")
 }
 
 async function absent(path: string) {
