@@ -58,7 +58,8 @@ export function javascriptRequiredOutputOracle(schemaMode,table,manualLabel=java
 }
 
 export async function runJavascriptPublicRequiredLive({page,prepared,node,targetOrigin,redactor,record,report,
-  save,deadline,onPending,schemaMode,graph,readGraph,contextCase=false}) {
+  save,deadline,onPending,schemaMode,graph,readGraph,contextCase=false,inputVariant='base'}) {
+  need(inputVariant==='base'||contextCase&&inputVariant==='reordered','Fixed required/context input variant unavailable');
   need(['code','declared'].includes(schemaMode)&&Date.now()+660000<deadline,'Required fixed mode/original budget unavailable');
   const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-base'),base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'}),
     support=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor}),mappings=new Map();
@@ -101,10 +102,10 @@ export async function runJavascriptPublicRequiredLive({page,prepared,node,target
   const context=contextCase?await import('./javascript-public-context.mjs'):null;
   const manualLabel=context?.javascriptContextDataLabel??javascriptRequiredManualLabel;
   if(contextCase){
-    report.public_context={status:'RUNNING',schema_mode:schemaMode,node,model_resistance_verified:false};
+    report.public_context={status:'RUNNING',schema_mode:schemaMode,input_variant:inputVariant,node,model_resistance_verified:false};
     report.stage='public-context-before';onPending(true);await save();
     report.public_context.before=await context.readJavascriptPublicContext({runtime,prepared,node,schemaMode,source:before.source_text,
-      manual:false,deadline,record,readGraph,onPending});onPending(false);await save();
+      manual:false,deadline,record,readGraph,onPending,inputVariant});onPending(false);await save();
   }
   const channel=until=>createNodeProcedure({operation:{id:'js-required-manual-'+randomUUID(),action:{action_key:'diagnostic.javascript.required',revision:'1'},deadline:until},
     execute:source=>Function('return ('+source+')')()(page),record,targetOrigin,targetBuild:'7.4.2',maxSteps:4096,
@@ -145,7 +146,7 @@ export async function runJavascriptPublicRequiredLive({page,prepared,node,target
   if(contextCase){
     report.stage='public-context-after';await save();
     report.public_context.after=await context.readJavascriptPublicContext({runtime,prepared,node,schemaMode,source:source_text,
-      manual:true,deadline,record,readGraph,onPending});
+      manual:true,deadline,record,readGraph,onPending,inputVariant});
     const proof=report.public_context.after,count=runtimeRecords;
     need(same(await dispatchNodeApi(runtime,'dock_node_read',proof.request),proof.reply)&&count===runtimeRecords,
       'Public context same-ID retry emitted runtime journal events');

@@ -108,7 +108,8 @@ if(publicRequiredCaseId!==null&&(publicRequiredCaseId!=='required-'+existingLife
   ||!['code','declared'].includes(existingLifecycle)||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null
   ||publicWizardRefusalCaseId!==null||publicStopCaseId!==null||publicCancelResumeCaseId!==null||publicLostReplyCaseId!==null))
   throw Error('Public required requires its separate fixed saved mode/base entrypoint');
-if(publicContextCaseId!==null&&(publicContextCaseId!=='context-'+existingLifecycle||existingInputVariant!==null
+if(publicContextCaseId!==null&&(publicContextCaseId!=='context-'+existingLifecycle+(existingInputVariant==='reordered'?'-reordered':'')
+  ||existingInputVariant!==null&&existingInputVariant!=='reordered'
   ||!['code','declared'].includes(existingLifecycle)||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null
   ||publicWizardRefusalCaseId!==null||publicStopCaseId!==null||publicCancelResumeCaseId!==null||publicLostReplyCaseId!==null||publicRequiredCaseId!==null))
   throw Error('Public context requires its separate fixed saved mode/base entrypoint');
@@ -1920,7 +1921,8 @@ try {
         const {runJavascriptPublicRequiredLive}=await import('./javascript-public-required.mjs');
         await runJavascriptPublicRequiredLive({page,prepared:executionPrepared,node:executionNode,targetOrigin:address.origin,
           redactor,record:executionRecord,report,save,deadline:batchDeadline,onPending:value=>{managedCloseUncertain=value;},
-          schemaMode:existingLifecycle,graph,readGraph:()=>executionRuntime.graph(),contextCase:publicContextCaseId!==null});
+          schemaMode:existingLifecycle,graph:existingInputVariant===null?graph:await executionRuntime.graph(),
+          readGraph:()=>executionRuntime.graph(),contextCase:publicContextCaseId!==null,inputVariant:existingInputVariant??'base'});
       }
       if(publicRequiredCaseId===null&&publicContextCaseId===null)await runJavascriptPublicExistingLive({page,prepared:executionPrepared,node:executionNode,
         targetOrigin:address.origin,redactor,record:executionRecord,report,save,deadline:batchDeadline,
@@ -1928,8 +1930,9 @@ try {
         graph:existingInputVariant===null?graph:await executionRuntime.graph(),
         inputVariant:existingInputVariant??'base',sourceCaseId:publicSourceCaseId,schemaRefusalCaseId:publicSchemaRefusalCaseId,
         wizardRefusalCaseId:publicWizardRefusalCaseId,stopCaseId:publicStopCaseId,cancelResumeCaseId:publicCancelResumeCaseId,lostReplyCaseId:publicLostReplyCaseId,readGraph:()=>executionRuntime.graph()});
-      if(existingInputVariant!==null){report.explicit_execution_limit=3;
-        report.scope='isolated E existing input freshness: one import and two JavaScript Execute; fixed '+existingInputVariant;}
+      if(existingInputVariant!==null){report.explicit_execution_limit=publicContextCaseId===null?3:5;
+        report.scope=publicContextCaseId===null?'isolated E existing input freshness: one import and two JavaScript Execute; fixed '+existingInputVariant
+          :'isolated E current JavaScript context: one reordered import and four warmup/edit JavaScript Execute; full typed business and read-only current mappings';}
       (report.public_required??report.public_existing).graph_after=await executionRuntime.graph();await save();
     }
     if(existingLifecycle===null)await runColdRead();
