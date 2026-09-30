@@ -45,6 +45,41 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public native civil Date — Code выполняется — 2026-09-30
+
+Frozen child `7d43cea0363d6fa1414551a692357b2c9c56a2c4` добавляет fixed
+`g5-native-civil-datetime` и declared counterpart через существующий public
+handler. Source выполняет только identity-copy Value, без JS Date parsing/
+UTC/epoch conversion. Прежний CSV66bytes SHA256
+`38f67790aa3c944c1fb465023157a128087e6781c9b8e22eca9e277468cdc708` и
+before-JS native/civil attestation сохраняются; NULL и две authored civil values
+с milliseconds. Admission повторно проверяет raw/native/civil baseline digest,
+owner/execution/releases и формат/restoration; 18 значимых negative mutations
+для каждого режима проверены через actual admission.
+
+Адресные tests02: 662PASS/0FAIL, exec43119/exit0; full operator suite01:
+18004PASS/0FAIL, exec11099/exit0, SHA256
+`00b29024020f72d475d421991e0c4ef6d9dc7986ce496fd8a4c047b09bbcd5e8`.
+Первый tests01 запущен с ошибочным cwd/путями, exit1 без выполнения tests;
+сохранён, не credited. Client runtime не менялся, прежний client suite не
+повторялся. Независимый Python native/civil section принял genuine retained
+Date input; это source-only проверка, не новый browser result.
+
+До live зафиксированы private independent oracle SHA256
+`661c31197ec826868cb94a3f081f69849d210a05334686fb2f90fd905c076e57` и
+independent auditor SHA256
+`c3f01fd8f8f63198ebd264040d2c8ceeb7fbf9c700a45b11c1860df3702aa351`.
+Auditor декодирует tag7/float64 actual bytes без predicted serial oracle,
+проверяет complete owned civil receipts и baseline digest, public output/
+source/metadata/13 phases/2 fresh Execute/cleanup. UTC/epoch/timezone conversion
+не утверждаются; native output bytes/Save/cold/candidate/CLI не покрываются.
+
+Code01 ordinary headed profile373, exec83222 зарегистрирован под lock,
+report/evidence `e-public-types-native-civil-datetime-code-01`; результат ещё
+не установлен. Следующий шаг — наблюдать только этот handle, затем independent
+audit и cleanup/reconciliation. Отдельный fresh declared run после PASS.
+J/E/F и registry readiness не повышены.
+
 ### E: public native safe-int642/2 принят — 2026-09-30
 
 Code/declared на frozen child `0be6a698c1` получили independent native audits
