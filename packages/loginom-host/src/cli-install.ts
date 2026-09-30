@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process"
+import { execFile, spawn } from "node:child_process"
 import {
   cp,
   lstat,
@@ -127,9 +127,13 @@ async function ownLinuxSandbox(payload: string) {
   if ((info.mode & 0o7777) !== 0o4755) throw new Error("CLI_SANDBOX_MODE_INVALID")
   if (info.uid === 0) return
   await new Promise<void>((resolve, reject) => {
-    execFile("sudo", ["chown", "root:root", path], { timeout: 120_000, stdio: "inherit" }, (error) => {
-      if (error) reject(new Error("CLI_SANDBOX_OWNER_REQUIRED"))
-      else resolve()
+    const child = spawn("sudo", ["chown", "root:root", path], { timeout: 120_000, stdio: "inherit" })
+    child.once("error", () => {
+      reject(new Error("CLI_SANDBOX_OWNER_REQUIRED"))
+    })
+    child.once("close", (code) => {
+      if (code === 0) resolve()
+      else reject(new Error("CLI_SANDBOX_OWNER_REQUIRED"))
     })
   })
   const owned = await lstat(path)
