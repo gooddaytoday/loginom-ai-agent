@@ -572,26 +572,28 @@ test('count loader pin verification rejects missing/changed actual source',()=>{
 
 // Exercise the public operator boundary with the production native decoder and
 // provenance checker; no browser action is available at this pure boundary.
-test('public native-real admission requires exact before-JS bytes, typed cells, owner and released reads',async()=>{
- const f=await fake(),raw=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'public-input'});
+for(const fixtureId of ['real','boolean'])test('public native '+fixtureId+' admission requires exact before-JS bytes, typed cells, owner and released reads',async()=>{
+ const f=await fake({fixtureId}),raw=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'public-input'});
  const lifecycle=await javascriptNativeInputStatus(f.page),binding={...f.b,read_id:'public-input'};
- const provenance=nativeInputProvenance(sourceEvidence());
+ const provenance=nativeInputProvenance(sourceEvidence(fixtureId));
  const exact=verifyNativeInputRead(raw,{binding,lifecycle,provenance});
- const input={node:provenance.node,table:{...ui(),port_guid:binding.port_guid,execution_id:provenance.execution.execution_id},
+ const fixed=javascriptNativeFixture(fixtureId),table=fixtureId==='real'?ui():{...ui(),row_count:3,sample_rows:3,
+   schema:[{name:'Value',label:'Value',type:'boolean'}],sample:[null,false,true].map(value=>[{type:'boolean',value,is_null:value===null,precision:value===null?'exact_null':'exact_boolean'}])};
+ const input={node:provenance.node,table:{...table,port_guid:binding.port_guid,execution_id:provenance.execution.execution_id},
    native_input:{native:{exact,raw,binding,lifecycle}}};
- for(const [id,mode] of [['g5-native-real','code'],['declared-g5-native-real','declared']]){
+ for(const [id,mode] of [['g5-native-'+fixtureId,'code'],['declared-g5-native-'+fixtureId,'declared']]){
   const probe=javascriptPublicCodeProbe(id,mode),proof=verifyJavascriptPublicCodeInput(probe,input);
-  assert.equal(proof.native_input_bytes_verified,true);assert.equal(proof.row_count,4);
+  assert.equal(proof.native_input_bytes_verified,true);assert.equal(proof.row_count,fixed.rows);
   for(const change of [x=>x.native_input.native.lifecycle.pending=1,
-    x=>x.native_input.native.lifecycle.releasedResponses=3,
+    x=>x.native_input.native.lifecycle.releasedResponses=fixed.rows-1,
     x=>x.native_input.native.exact.js_created=true,
-    x=>x.native_input.native.exact.cells[3].native.bytes_le='0000000000000000',
+    x=>x.native_input.native.exact.cells[2].native.bytes_le='0000000000000000',
     x=>x.node.document_id='foreign',x=>x.node.node_id='foreign',
     x=>x.table.execution_id='stale',x=>x.table.sample[2][0].value=0,
     x=>x.table.schema[0].name='Foreign',x=>delete x.native_input]){
    const bad=structuredClone(input);change(bad);assert.throws(()=>verifyJavascriptPublicCodeInput(probe,bad));
   }
-  assert.throws(()=>verifyJavascriptPublicCodeInput({...probe,native_input_fixture:'boolean'},input),/pin changed/);
+  assert.throws(()=>verifyJavascriptPublicCodeInput({...probe,native_input_fixture:fixtureId==='real'?'boolean':'real'},input),/pin changed/);
  }
- assert.deepEqual(f.counters,{sent:4,requests:4,responses:4});
+ assert.deepEqual(f.counters,{sent:fixed.rows,requests:fixed.rows,responses:fixed.rows});
 });
