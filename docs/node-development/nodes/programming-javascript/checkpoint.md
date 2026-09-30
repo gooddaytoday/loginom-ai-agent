@@ -45,6 +45,20 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public native-real Code live — выполняется — 2026-09-30
+
+Frozen child `a679a63595eea34cdcbf1b4e8a844bfad2499402`, полный operator suite
+**17937 PASS / 0 FAIL**, exec97995/exit0; log SHA256
+`e9be9991b64ffed5eb2a9335e052bfbb9d86e63af99bebe263cdab4abbf30365`.
+Client sources не менялись; прежний2983 PASS/10 SKIP/0 FAIL не повторялся.
+
+Ordinary headed `e-public-types-native-real-code-01`, fresh profile365,
+exec43757 запущен. Перед public Code apply проверяется pinned real input4×1
+и native before-JS bytes/releases. Результат пока не установлен; original
+30-minute deadline, no Save и no unknown-effect replay сохраняются. После
+terminal — independent native audit, cleanup/process absence и reconciliation;
+затем отдельный declared real. J06–J08/E/F не закрыты.
+
 ### E: fixed public native-real operator — подготовлен — 2026-09-30
 
 Child `7944b9e3d2` добавляет operator-only `g5-native-real` и declared counterpart:
