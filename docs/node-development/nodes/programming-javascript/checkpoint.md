@@ -46,6 +46,42 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: owned schema-mode refusal fixed; Code→declared live выполняется — 2026-09-30
+
+Frozen child `b17c5b77194d6f0febdaa6bdf452dbd4eaddd63d` вводит узкий
+trusted-driver refusal после actual admission/full source read/discard и
+полного native settings/schema baseline. Explicit mode mismatch durable ACK
+под первоначальным deadline даёт FAILED/cleanup=true/pending=null; UI activity
+possible сохраняется. Immutable proof включает own node/owner/admission ID/
+source identity/settings digest/requested-vs-observed mode/no editor mutation/
+no explicit Execute. Generic shell признаёт только этот exact existing-JS
+proof; unknown owner/settings/digest/Close/ACK/deadline/foreign-type остаются
+AMBIGUOUS. Configure последующего accepted request по-прежнему rechecks baseline.
+Нет Protocol/HttpApi/generated изменений, runtime не импортирует fixtures.
+
+Actual regression-before1FAIL (AMBIGUOUS вместо FAILED) сохранён. Addressed
+source/admission/refusal/shell/runtime tests03:171PASS/0FAIL; последующий ACK
+late-deadline case включён в full suite. Full client suite01 exec89756/exit0:
+3014PASS/10SKIP/0FAIL, SHA256
+`dc546e924c6e3e7f937cece0e7c8dbd95f00a7b737977a8742220ae25879a9d3`;
+full JavaScript operator suite02 exec18562/exit0:18121PASS/0FAIL, SHA256
+`47914353b75aeded9dbecfe7d2fa04193ddfd618583e9e57a5d08030357f808a`.
+Broader legacy fault wrappers5FAIL остаются отдельным ограничением.
+
+Fixed live oracle до запуска использует прежние saved C/D source/whole native
+settings/schema/metadata из audited writer+cold evidence. Oracle SHA256
+`8681fad738d58b05d94803e2f9f4e62cc41f6b7ff070230e510e83d3ec02de59`;
+frozen auditor `6383da83882d45253ea1d19909df0a17d2d1e954b9b9fb182bd63feb92aadbc2`.
+Private campaign files `e-schema-mode-refusal-independent-{oracle.json,audit.py}`
+и `e-schema-mode-refusal-host-handoff.py`. Code→declared01/profile383/exec3478
+выполняется на saved C, ordinary headed/original30min. Public request omits
+source, asks opposite mode with finish=execute; expected known FAILED without
+editor mutation/explicit Execute, independent source/settings/graph before/
+after и cleanup. Не повторять pending action, не менять freeze/oracle. После
+actual terminal independent audit/fullcleanup/registry finish; затем fresh
+profile384 declared→Code saved D. Live success пока не заявлен; full J/E/F,
+candidate/CLI и registry readiness открыты.
+
 ### E: public source fidelity/empty2/2 принято — 2026-09-30
 
 На frozen child `88ddfc958e` оба fixed cases приняты independent audit:
