@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — native source Required=true/target Required=false и manual fields (J09). Fixed source32768/
+следующий шаг — declared native source Required=true/target Required=false и manual fields (J09); Code399 принят ниже. Fixed source32768/
 empty и schema-mode refusal уже приняты ниже; сохранение manual mapping, дополнительные
 limits/redaction и context/engine/module/budgets остаются открытыми.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
@@ -46,6 +46,42 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J09: Code manual mapping принят; declared следующий — 2026-09-30
+
+Child `052909696931023b36653e4a941cc68986c4b882`, fresh399/exec4465,
+`e-public-required-code-01`: ordinary headed, actual exit0. Public warmup
+подтвердил сохранённый C source и full typed6×4. Собственная UI-процедура
+подтвердила Done с NetCents label `Сумма вручную`, output autosync=false.
+Public nonempty mapping/excluded=true отказал до admission по действующему
+`mappings:[]` guard. NEW public source comment/edit сохранил полный manual
+mapping: все четыре source Required=true, target Required=false, старые
+technical names/types/indices/reciprocal identities. Full typed6×4/1950,
+independent public source906bytes/18LF/SHA256
+`b98092844f67bbcab28acf7a38296cab1abad75a737087654136a327ce7862c6`
+и complete adjacent graph подтверждены. Четыре явных fresh completed Execute
+`:1/:2/:4/:5`; отсутствие внутреннего исполнения на Done не утверждается.
+Save не отправлялся.
+
+Report/journal SHA256:
+`e291fd3a59c9cc762290cb175152ffff098c229586cdcf7ae8575fcf24d1f067` /
+`235133834cbe4ebfecd0b8a2226b474bb655e5893403934e6d63aa0eebb4f074`.
+Pre-live auditor v1 отказал на ошибочно названных фазах `execute_start` /
+`read_output`. Actual node-apply и result schema требуют `finish` / `read`;
+их исходники закреплены в новом audit pin v2. Исходные auditor v1, assignment,
+report/journal и отказ сохранены. V2 исправляет только эти названия и цепочку
+версий audit, бизнес/source/mapping/ownership утверждения не ослаблены.
+Auditor v2 SHA256
+`bce614fb696e2498512aa73cdccad259306942973ddeea30f755cda24c1cd490`,
+receipt PASS SHA256
+`52ee8adc6c39cca931781f315a19698e0faef0c523dabda96b92d8015e8e0aa8`.
+Meaningful negatives38/38 (включая неверные/пропущенные finish/read) отказали;
+checker actual exit0, receipt SHA256
+`e30b3ecb16c9c6d7155c943ff396b5a9398b0daeeb923a6d4dc1ecc061f67348`.
+Close/logout/browser3/3 и actual process absence проверены, registry399
+reconciled `closed_verified`. Следующий run — fresh400 declared на том же HEAD,
+с прежним oracle/freeze и auditor v2, закреплённым до нового запуска.
+Target Required=true/его редактирование, candidate/CLI/full Goal не доказаны.
 
 ### E/J09: подготовлена проверка Required/manual mapping — 2026-09-30
 
