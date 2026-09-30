@@ -47,6 +47,35 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J13: controlled public apply reply loss реализован; fresh395 назначен — 2026-09-30
+
+Child `ad242702e83a3beb3d9712ac2600ce37bcdf833c` добавил fixed operator
+`lost-apply-execute-code`: один public apply запускает прежний45s finite source,
+ответ вызывающему управляемо отбрасывается после identified materialization
+Execute. Browser receipts и исходный backend worker сохраняются. Вызывающий
+сначала использует public inspection/status исходной operation, затем wait/Stop
+того же execution без повторного apply/Execute; после terminal — NEW short
+same-node repair/2 fresh Execute/full6×4/source/settings/graph/cleanup.
+Это не browser transport loss и не разрешение продолжать неизвестный gesture.
+
+Адресные operator tests89 PASS/0 FAIL, full all01:18240 PASS/0 FAIL, actual exit0,
+SHA256 `907c4a1781e27f893067c476d41a6df2acbaffa7f383a59c909e7c7fbd68eae9`.
+Client tree относительно проверенного `56f8df0250` неизменён (Git diff empty),
+повторный full client без нового изменения не запускался.
+Independent pre-live auditor/oracle SHA256:
+`2805ab21b3f15032dee310275a0656c6456658558305cf3ad32bc62826d94d12` /
+`a63ea5eb8e8f586fef97aa13643460645e89aebf4f48e8efc0609f906c912e2e`.
+Freeze SHA256 `1c955fe8319da248aa111f46cc0491f48347ededc0d3eb3899e76474603fabd1`.
+Auditor требует actual SUCCEEDED browser launch receipt до caller reply loss,
+один original Execute, тот же worker attempt1/native execution и inspection,
+cancelled terminal≤60s/NEW business repair/ordinary cleanup/process absence.
+
+Fresh395/exec76503 — ordinary headed `e-public-lost-reply-code-01`, assigned saved C.
+При продолжении наблюдать этот handle до actual terminal; frozen source/oracle
+не менять, повтор/новый профиль не запускать по wait timeout. Затем frozen
+audit/80 meaningful negatives/cleanup/process absence/registry reconciliation.
+Live case ещё не принят; remaining E/F/candidate/CLI/full Goal открыты.
+
 ### E/J13: public local cancel/SAME-ID continuation приняты — 2026-09-30
 
 Child `56f8df0250df9e60617e85f2b35bb58e754b99f6` (handler revision v4)

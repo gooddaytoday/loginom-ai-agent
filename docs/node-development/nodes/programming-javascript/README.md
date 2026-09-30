@@ -71,8 +71,8 @@ Fixed public Code32768bytes/1024lines и declared-empty source-read, schema-mode
 refusal2/2, native Code Next SyntaxError и explicit sync throw/NEW repair обоих
 modes приняты; точные SHA и пределы в checkpoint. Public finite Stop/NEW
 same-node repair на `69c1f3d60c` также принят: native cancelled за12,173s,
-independent audit/negative62/62 и cleanup/process absence. Следующий шаг —
-public local read cancel/SAME-ID continuation того же execution на `56f8df0250`
+independent audit/negative62/62 и cleanup/process absence. Public local read
+cancel/SAME-ID continuation того же execution на `56f8df0250`
 также принят: один Raw Execute, audit/negative87/87, repair6×4/1950 и cleanup.
 Следующий шаг — public lost-reply recovery (J13), затем Required=true/context/engine/module/budgets
 и точный остаток E/F/candidate/CLI.
