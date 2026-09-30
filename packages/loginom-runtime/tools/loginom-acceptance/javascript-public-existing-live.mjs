@@ -14,10 +14,10 @@ import {javascriptDiscoveryProbe,javascriptDiscoveryOracle} from './javascript-d
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 
 export async function runJavascriptPublicExistingLive({page,prepared,node,targetOrigin,redactor,record,
-  report,save,deadline,onPending,schemaMode,graph}) {
-  need(['code','declared'].includes(schemaMode)&&Date.now()+660000<deadline,
+  report,save,deadline,onPending,schemaMode,graph,inputVariant='base'}) {
+  need(['code','declared'].includes(schemaMode)&&['base','changed','reordered'].includes(inputVariant)&&Date.now()+660000<deadline,
     'Public existing JavaScript mode/original budget unavailable');
-  const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-base');
+  const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-'+inputVariant);
   const base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'});
   const support=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor});
   const runtime=createActionRuntime({pinned:await javascriptPublicCodePins(),allowCandidate:true,
@@ -27,9 +27,9 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
     nodeApplyDriverFactory:options=>options.operation.parameters.target.type==='programming.javascript'
       ?support.nodeApplyDriverFactory(options):base.nodeApplyDriverFactory(options)});
   Object.assign(report,{scope:'isolated E existing source edit/Execute/full typed UI; current schema preserved',
-    stage:'public-existing-source-before',original_deadline:deadline,explicit_execution_limit:2,
+    stage:'public-existing-source-before',original_deadline:deadline,explicit_execution_limit:inputVariant==='base'?2:3,
     candidate_verified:false,cli_verified:false,native_bytes_verified:false,gates_closed:[],
-    public_existing:{status:'RUNNING',schema_mode:schemaMode,node,raw_source_in_report:false}});
+    public_existing:{status:'RUNNING',schema_mode:schemaMode,input_variant:inputVariant,node,raw_source_in_report:false}});
   onPending(true);await save();
   const readSource=()=>dispatchNodeApi(runtime,'dock_node_read',{kind:'source',operation_id:'js-existing-source-'+randomUUID(),
     document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,
