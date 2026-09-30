@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — native Boolean input через public JS и оставшиеся J06–J08.
+следующий шаг — native String input через public JS и оставшиеся J06–J08.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
 Fixed public Code scalar output5/5, named access и empty output приняты ниже.
 Fixed public existing changed/reordered freshness для обоих modes принят ниже.
@@ -44,6 +44,31 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E: public native Boolean2/2 принят — 2026-09-30
+
+Code/declared на frozen child `14965ef148` получили independent native audits
+PASS и terminal exit0, ordinary headed. Input3×1 NULL/false/true и tag11/value
+bytes00/01 до JS/releases3/3 подтверждены; output3×1 Boolean, source/native
+metadata/mappings/graph/Views/13 phases/2 fresh Execute и package/logout/browser/
+process cleanup проверены. Code367/exec59644 proof ниже; declared368/exec91765
+completed IDs `1790760514811-4omttdb05wf:1213:3` / `:1213:4`.
+Declared report SHA256 `4d3480879d480bd7ca14b7d49ca786290f28a4d171b1242a9cbff9ae2c3a0e03`,
+journal `61e26863cfe0cdc78a29929adc91abf429526c84ba02792462e0379743322794`,
+receipt `101ef9d6b7391b2449a66298c6f67718763d5373930edadd7b677e79cca9cf94`.
+Independent Boolean auditor22/22 mutations refused; в том числе numeric0
+вместо false отдельно на input/output; source-only receipt SHA256
+`d0cbca72c00fe0baa245a1e6db4f792714232206861d3532c658273ea39c5acc`.
+Native input bytes доказаны; native output bytes/Save/cold/candidate/CLI нет.
+Profile368 closed_verified, active_exec=null, browser/processes отсутствуют.
+
+Следующий fixed блок — native String8×1: прежний CSV/native input reader,
+NULL/empty/literal strings/Unicode/quote/backslash/LF и bytes до JS; public
+Code/declared identity-copy и независимый full output/source audit. Явный fixed
+allowlist/schema/rowcount/pins, actual admission/provenance/release и negative
+ownership checks сохранить. Independent String oracle/auditor подготовить
+до live; Boolean не повторять без затронувшего изменения. Затем safe-int64/
+civil Date и точный остаток J06–J08/E, остальные J/F. Registry readiness прежняя.
 
 ### E: native Boolean Code принят; declared выполняется — 2026-09-30
 
