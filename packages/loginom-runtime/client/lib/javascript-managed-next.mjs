@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {withBrowserReceipt} from './executor.mjs';
 import {makeJavascriptManagedPageCode, inspectManagedJavascriptPage} from './javascript-managed-page.mjs';
+import {makeJavascriptManagedGenerationCode} from './javascript-managed-generation.mjs';
 import {wizardReadiness} from './javascript-wizard-page.mjs';
 
 // This private route admits only the observed Columns -> Code transition. The
@@ -104,5 +105,29 @@ export async function dispatchManagedJavascriptNext({task,execute,record,receipt
     {timeout:Math.max(1,Math.min(35000,task.deadline-Date.now()+5000))});
   if(result?.operation_id!==gesture_id||result.action_key!=='javascript.wizard.next')
     throw Error('Managed JavaScript Next receipt identity differs');
+  return result;
+}
+
+// Keep browser receipt composition at the existing managed dispatcher boundary.
+export async function dispatchManagedJavascriptGeneration({task, execute, record, receiptOptions}) {
+  await execute(makeJavascriptManagedPageCode(task));
+  const before = await execute(makeJavascriptManagedGenerationCode(task));
+  if (before.schema?.generation?.checked === true)
+    return {status: 'SUCCEEDED', effect_possible: false, output: {generation: true,
+      schema: before.schema, generation_readback_verified: true, wizard_commit_verified: false}};
+  const gesture_id = task.operation_id + ':generation-code';
+  const code = makeJavascriptManagedGenerationCode({...task, gesture_id}, before);
+  const signature = createHash('sha256').update(JSON.stringify([gesture_id, task.owner, before, task.deadline])).digest('hex');
+  const event = {phase: 'javascript_managed_generation_prepared', operation_id: task.operation_id,
+    gesture_id, owner: task.owner, deadline: task.deadline, previous_generation: false,
+    generation: true, snapshot_sha256: signature, effect_possible: false};
+  const ack = await record(event);
+  if (JSON.stringify(Object.fromEntries(Object.keys(event).map(key => [key, ack?.[key]]))) !== JSON.stringify(event))
+    throw Error('Managed JavaScript generation journal ACK differs');
+  const result = await execute(withBrowserReceipt('(' + code + ')(page)', {
+    ...receiptOptions(gesture_id, 'javascript.schema.generation', signature), operation_id: gesture_id}),
+    {timeout: Math.max(1, Math.min(35000, task.deadline - Date.now() + 5000))});
+  if (result?.operation_id !== gesture_id || result.action_key !== 'javascript.schema.generation')
+    throw Error('Managed JavaScript generation receipt identity differs');
   return result;
 }
