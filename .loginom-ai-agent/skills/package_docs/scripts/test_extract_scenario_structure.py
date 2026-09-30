@@ -15,6 +15,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+from emit_report import emit, markdown_to_html, report_destination, resolve_format
 from extract_scenario_structure import extract_package
 from render_report_skeleton import render
 
@@ -116,6 +117,64 @@ class ExtractTests(unittest.TestCase):
             self.assertIn("PLACEHOLDER_MODULE_1_DESCRIPTION", md)
             self.assertIn("Количество модулей", md)
             self.assertNotIn("Источники:", md)
+
+
+class EmitTests(unittest.TestCase):
+    def test_missing_or_unknown_format_is_pdf(self) -> None:
+        self.assertEqual(resolve_format(None), "pdf")
+        self.assertEqual(resolve_format(""), "pdf")
+        self.assertEqual(resolve_format("  "), "pdf")
+        self.assertEqual(resolve_format(".PDF"), "pdf")
+        self.assertEqual(resolve_format("docx"), "docx")
+        self.assertEqual(resolve_format("Word"), "docx")
+        self.assertEqual(resolve_format(".md"), "md")
+        self.assertEqual(resolve_format("markdown"), "md")
+        self.assertEqual(resolve_format("xlsx"), "pdf")
+        self.assertEqual(resolve_format("doc"), "pdf")
+        self.assertEqual(resolve_format("txt"), "pdf")
+
+    def test_destination_uses_package_stem(self) -> None:
+        self.assertEqual(
+            report_destination(Path("/data/demo.lgp"), "pdf"),
+            Path("/data/demo.lgp_report.pdf"),
+        )
+
+    def test_markdown_keeps_russian_structure(self) -> None:
+        html = markdown_to_html("# Отчет\n\n* **Модулей**: `1`\n\n> Описание\n")
+        self.assertIn("<h1>Отчет</h1>", html)
+        self.assertIn("<strong>Модулей</strong>", html)
+        self.assertIn("<code>1</code>", html)
+        self.assertIn("<blockquote><p>Описание</p></blockquote>", html)
+        self.assertNotIn("<script>", html)
+
+    def test_emit_md_copies_narrative(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lgp = root / "demo.lgp"
+            lgp.write_bytes(b"lgp")
+            destination = emit("# Отчет\n", lgp, "md")
+            self.assertEqual(destination, root / "demo.lgp_report.md")
+            self.assertEqual(destination.read_text(encoding="utf-8"), "# Отчет\n")
+
+    def test_emit_pdf_and_docx(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lgp = root / "demo.lgp"
+            lgp.write_bytes(b"lgp")
+            narrative = "# Отчет о пакете «demo.lgp»\n\n> Краткое **описание**.\n\n* Пункт\n"
+            pdf = emit(narrative, lgp, "xlsx")
+            docx = emit(narrative, lgp, "docx")
+            pdf_bytes = pdf.read_bytes()
+            self.assertEqual(pdf.name, "demo.lgp_report.pdf")
+            self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+            for char in "ОтчетописаниеПункт":
+                self.assertIn(char.encode("utf-16-be").hex().upper().encode(), pdf_bytes)
+            self.assertEqual(docx.suffix, ".docx")
+            xml = zipfile.ZipFile(docx).read("word/document.xml").decode("utf-8")
+            self.assertIn("Отчет", xml)
+            self.assertIn("описание", xml)
+            self.assertIn("<w:b/>", xml)
+            self.assertIn("Пункт", xml)
 
 
 if __name__ == "__main__":

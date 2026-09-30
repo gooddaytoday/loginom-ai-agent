@@ -994,6 +994,9 @@ with zipfile.ZipFile(p, "w") as zf:
       expect(loaded.state.output).toContain("файлового хранилища")
       expect(loaded.state.output).toContain("viking://resources/loginom-dock/sources/loginom-help")
       expect(loaded.state.output).toContain(path.join(skillDir, "scripts", "extract_scenario_structure.py"))
+      expect(loaded.state.output).toContain(path.join(skillDir, "scripts", "emit_report.py"))
+      expect(loaded.state.output).toContain("не поддерживается")
+      expect(loaded.state.output).toContain("docx")
       expect(loaded.state.output).not.toContain("hermes")
       expect(loaded.state.output).not.toContain("Cognee")
     }

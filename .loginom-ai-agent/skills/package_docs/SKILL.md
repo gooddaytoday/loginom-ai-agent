@@ -5,9 +5,11 @@ description: >-
   модулей и их содержимого (поток данных, подмодели, заметки) в структуре
   эталона tools.loginom.ru. Использовать по запросам «ИИ Отчет», package_docs,
   документировать сценарий/пакет Loginom. Вход MVP — абсолютный путь к .lgp
-  на машине пользователя. Не создавать и не изменять .lgp. Не скачивать пакет
-  из файлового хранилища Loginom. Help Dock MCP обязателен для контекста
-  narrative (порог B). Не использовать Help как evidence для .lgp internals.
+  на машине пользователя. Формат результата задаётся в запросе: .pdf, .docx
+  или .md; если формат не указан или не поддерживается — .pdf. Не создавать
+  и не изменять .lgp. Не скачивать пакет из файлового хранилища Loginom.
+  Help Dock MCP обязателен для контекста narrative (порог B). Не использовать
+  Help как evidence для .lgp internals.
 ---
 
 # package_docs («ИИ Отчет»)
@@ -15,9 +17,16 @@ description: >-
 ## Цель
 
 Вход: абсолютный путь к `.lgp` на машине пользователя.  
-Выход: рядом с пакетом файл `<name>.lgp_report.md` — русский Markdown той же
-структуры и тона, что эталонный PDF
+Выход: рядом с пакетом файл `<name>.lgp_report.<ext>` той же структуры и тона,
+что эталонный PDF
 https://downloads.loginom.ru/aitools/abc-xyz-analysis.lgp_report.pdf
+
+Формат `<ext>` берётся из запроса:
+
+- `.pdf` или слово pdf → `pdf`
+- `.docx`, docx или Word → `docx`
+- `.md`, markdown → `md`
+- формат не задан, не существует или не поддерживается → `pdf`
 
 **Документирование пакета** = описание **модулей** и **их содержимого**
 (связный business narrative), не инвентарь XML.
@@ -30,9 +39,10 @@ https://downloads.loginom.ru/aitools/abc-xyz-analysis.lgp_report.pdf
 - Факты структуры — только из экстрактора ZIP/XML.
 - Help Dock MCP — только user-facing смысл типов узлов; не как evidence для
   `Engine`, `VendorGuid`, GUID портов, BGB, XML internals.
-- В финальном `.md` **нет** таблиц всех узлов, dump настроек, списка
+- В финальном отчёте **нет** таблиц всех узлов, dump настроек, списка
   визуализаторов и блока `Источники:` Help.
-- PDF-экспорт — вне MVP.
+- Итоговый файл пишет только `scripts/emit_report.py`. Не сохраняй PDF, DOCX
+  или финальный Markdown вручную в обход этого скрипта.
 
 ## Скрипты skill
 
@@ -46,6 +56,11 @@ python3 "$SKILL_ROOT/scripts/extract_scenario_structure.py" /absolute/path/packa
 python3 "$SKILL_ROOT/scripts/render_report_skeleton.py" \
   .work/package_docs/structure.json \
   -o .work/package_docs/skeleton.md
+
+python3 "$SKILL_ROOT/scripts/emit_report.py" \
+  .work/package_docs/report.md \
+  --lgp /absolute/path/package.lgp \
+  --format pdf
 ```
 
 ## Workflow
@@ -123,14 +138,27 @@ python3 "$SKILL_ROOT/scripts/render_report_skeleton.py" \
 
 ### 6. EMIT
 
-Запиши итоговый Markdown (скелет + narrative, без плейсхолдеров) как:
+Сначала запиши итоговый Markdown (скелет + narrative, без плейсхолдеров) во
+временный файл, например `.work/package_docs/report.md`. Это ещё не результат
+для пользователя.
 
+Затем запусти `emit_report.py`. `--format` — одно из `pdf`, `docx`, `md` по
+правилам выше. Скрипт сам подставит `pdf`, если значение пустое или не из
+этого списка. PDF и DOCX он записывает сам, без LibreOffice и без
+дополнительных пакетов.
+
+Результат появляется рядом с пакетом:
+
+`<same-dir-as-lgp>/<lgp-stem>.lgp_report.pdf`
+`<same-dir-as-lgp>/<lgp-stem>.lgp_report.docx`
 `<same-dir-as-lgp>/<lgp-stem>.lgp_report.md`
 
-В ответе пользователю укажи путь к файлу и кратко подтверди, что отчёт
-сформирован. Не добавляй отдельный блок Help-источников и не добавляй строку
-`Используемая модель:` (в MVP её нет в финальном отчёте).
+В ответе пользователю укажи путь, который напечатал скрипт, и кратко
+подтверди, что отчёт сформирован. Если скрипт завершился с ошибкой, остановись
+и сообщи её: не подменяй запрошенный PDF или DOCX файлом Markdown. Не добавляй
+отдельный блок Help-источников и не добавляй строку `Используемая модель:`
+(в MVP её нет в финальном отчёте).
 
-## Оглавление финального `.md`
+## Оглавление финального отчёта
 
 См. `references/report-template.md` — должно совпадать с эталоном.
