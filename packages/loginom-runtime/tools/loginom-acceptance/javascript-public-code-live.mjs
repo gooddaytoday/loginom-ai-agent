@@ -23,7 +23,7 @@ export async function javascriptPublicCodePins() {
     selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
 }
 
-const codeTypedIds=Object.freeze(['g5-native-integer-outside-safe','g5-native-civil-datetime','g5-native-integer-safe','g5-native-string','g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real',
+const codeTypedIds=Object.freeze(['g5-knowledge-v1','g5-native-integer-outside-safe','g5-native-civil-datetime','g5-native-integer-safe','g5-native-string','g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real',
   'g5-safe-integer','g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
 export const javascriptPublicTypedIds=Object.freeze([...codeTypedIds,...codeTypedIds.map(id=>'declared-'+id),
   'g5-native-cardinality-keep2','g5-native-cardinality-odd','g5-native-cardinality-duplicate','declared-g5-native-cardinality-empty']);
@@ -48,7 +48,7 @@ export function javascriptPublicCodeRequest({prepared,input,probe,schemaMode,rem
       ...(schemaMode==='declared'?{columns:probe.schema.map((column,index)=>({...column,
         data_kind:['integer','real','datetime'].includes(column.type)?'Непрерывный':'Дискретный',usage:index===0?'Выходное':'Не задано'}))}:{})},mappings:[],finish:'execute',
     read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},
-    budgets:{configure_ms:remaining,execute_ms:300000,total_ms:remaining}};
+    budgets:{configure_ms:remaining,execute_ms:probe.knowledge?60000:300000,total_ms:remaining}};
 }
 
 // Pure operator boundary: native bytes and released reads precede public JS.
@@ -125,7 +125,8 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
     original_deadline:deadline,explicit_execution_limit:2,gates_closed:[],candidate_verified:false,
     cli_verified:false,native_bytes_verified:false,native_input_bytes_verified:inputProof.native_input_bytes_verified,stage:stage+'-apply',
     [key]:{status:'RUNNING',probe_id:probe.id,operation_id:request.operation_id,target_kind:'new',
-      source_sha256:probe.source_sha256,oracle_sha256:probe.oracle_sha256,raw_source_in_report:false}});
+      source_sha256:probe.source_sha256,oracle_sha256:probe.oracle_sha256,raw_source_in_report:false,
+      ...(probe.knowledge?{knowledge:structuredClone(probe.knowledge)}:{})}});
   onPending(true);await save();
   let job=await dispatchNodeApi(runtime,'dock_node_apply',request);
   while(job.state==='running'){
@@ -166,6 +167,7 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
     &&compact.sample.length===table.sample.length&&compact.sample.every((row,index)=>row.length===table.sample[index].length
       &&row.every((cell,column)=>['type','value','is_null','precision'].every(key=>cell[key]===table.sample[index][column][key]))),
   'Public Code user-v1 full output differs');
+  if(probe.knowledge)report[key].user_v1_result=structuredClone(projected);
   report.stage=stage+'-independent-source-read';await save();
   onPending(true);
   const sourceRead=await dispatchNodeApi(runtime,'dock_node_read',{kind:'source',operation_id:'js-code-after-'+randomUUID(),
