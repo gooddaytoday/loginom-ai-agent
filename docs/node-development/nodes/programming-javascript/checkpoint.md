@@ -45,6 +45,35 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: native safe-int64 fixed operator — подготовлен — 2026-09-30
+
+Frozen child `0be6a698c1235635426a971e63e5fcfb5fadc2a3` добавляет только fixed native integer-safe Code/declared
+IDs. Прежний55-byte CSV SHA256
+`86983c730cec045020a014b5bd365b2cf604c5f214774eb4a31b9344f6d0865d`;
+input/output4×1 NULL/"-9007199254740991"/"0"/"9007199254740991". Перед JS
+проверяются exact signed-int64 bytes, owner/Import Execute и releases4/4.
+Public output требует exact decimal strings; outside-safe гарантия не заявлена.
+Client runtime/registration не менялись. Addressed **427 PASS / 0 FAIL**,
+exec25167/exit0, log02. Первый log01 имел no-op negative: zero bytes→zero bytes;
+в02 выбрана nonzero boundary cell. Decoder/provenance/actual requests/negative
+ownership/releases и предыдущие primitive/business/empty guards PASS.
+Полный operator suite выполняется; browser ещё не запущен.
+
+Private independent safe-int64 oracle/auditor до live: SHA256
+`dd198eda28b8d929f4aaf97f0e0c21ac5cf99f90549c9a28640decda76607ee0` /
+`0637209b673eba0c42352ab4ed3c5b5f6d43a8518fe12441e0b09bf5a28e4505`.
+Аудитор сам декодирует tag20/eight signed LE bytes через Python int.from_bytes,
+проверяет safe bound/decimal strings/input-before-JS и весь public lifecycle.
+Authored source hashes сверены: Code
+`7cd3cfb2588a94f4a850002059ddd1c9ba204fb7a73d8cb41986f74d8f102618`,
+declared прежний `901ed4c40c4a062feefa484dbb3213349e85dcf10fb20c43f6c2cb425b9639d5`;
+input metadata Integer/discrete, declared output Integer/continuous/output.
+
+Profile370 closed_verified, active_exec=null. После full operator PASS — fresh
+ordinary headed profile371/Code, independent audit/reconciliation, затем
+отдельный declared safe-int64. Далее civil Date/outside-safe и J/E/F остаток.
+Native output bytes/Save/cold/candidate/CLI не доказываются этим case.
+
 ### E: public native String2/2 принят — 2026-09-30
 
 Code/declared на frozen child `800381592a` получили independent native audits
