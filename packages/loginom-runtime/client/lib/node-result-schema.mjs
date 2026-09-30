@@ -7,7 +7,7 @@ const object=(properties,required=Object.keys(properties),additionalProperties=f
 const array=items=>({type:'array',items});
 const nullable=schema=>({anyOf:[schema,{type:'null'}]});
 const ref=object({document_id:str,workflow_id:str,node_id:str});
-const javascriptNativeError=object({kind:values('javascript_wizard'),stage:values('code_next'),node:ref,
+const javascriptNativeError=object({kind:values('javascript_wizard'),stage:values('code_next','done'),node:ref,
  source_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},tooltip:{type:'string',maxLength:2048},tooltip_truncated:bool,
  dialog_text:{type:'string',maxLength:2048},dialog_text_truncated:bool,dialog_closed:{type:'boolean',const:true},
  error_class:{anyOf:[object({status:values('unrecognized')}),object({status:values('recognized'),

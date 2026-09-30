@@ -21,7 +21,7 @@ export function javascriptWizardDiagnostic(diagnostic,node) {
   const positions=[...new Set([...text.matchAll(/\(:(\d+):(\d+)\)/g)].map(item=>item[1]+':'+item[2]))];
   const at=positions.length===1?['',...positions[0].split(':')]:null;
   const line=at&&Number(at[1]),column=at&&Number(at[2]);
-  return {kind:'javascript_wizard',stage:'code_next',node,source_sha256:diagnostic.source_sha256,
+  return {kind:'javascript_wizard',stage:diagnostic.error_stage??'code_next',node,source_sha256:diagnostic.source_sha256,
     tooltip:tooltip.text,tooltip_truncated:diagnostic.tooltip_truncated||tooltip.truncated,
     dialog_text:dialog.text,dialog_text_truncated:diagnostic.dialog_text_truncated||dialog.truncated,dialog_closed:true,
     error_class:classes.length===1?{status:'recognized',name:classes[0]}:{status:'unrecognized'},
@@ -37,8 +37,10 @@ export async function retainedJavascriptWizardRefusal({refusal,owner,admitted,af
   const diagnostic=refusal?.diagnostic,closed=refusal?.closed;
   need(diagnostic?.dialog_closed===true&&diagnostic.native_owner_verified===true&&same(diagnostic.owner,node)
     &&diagnostic.explicit_execute_requested===false&&diagnostic.source_sha256===admitted.effective_source.source_sha256
-    &&closed?.verified===true&&closed.closed===true&&closed.node_id===node.node_id&&closed.draft_discarded===true
-    &&closed.settings_applied===false&&closed.execution_started===false,'JavaScript native draft discard proof unavailable');
+    &&['code_next','done'].includes(diagnostic.error_stage??'code_next')
+    &&closed?.verified===true&&closed.closed===true&&closed.node_id===node.node_id
+    &&(diagnostic.error_stage==='done'?closed.draft_discarded===null&&closed.settings_applied===null&&closed.execution_started===null
+      :closed.draft_discarded===true&&closed.settings_applied===false&&closed.execution_started===false),'JavaScript native draft discard proof unavailable');
   need(admitted.kind==='existing'&&afterReceipt.kind==='existing'&&afterReceipt.phase==='admitted'
     &&afterReceipt.intent==='preserve'&&same(admitted.owner,owner)&&same(afterReceipt.owner,owner)
     &&same(afterReceipt.previous_source,admitted.previous_source)
@@ -81,7 +83,7 @@ export function verifiedJavascriptWizardRefusal(refusal,request) {
         &&proof.rejected_source_sha256===javascriptSourceIdentity(request.parameters.source_text).source_sha256)
     &&proof.dialog_closed===true&&proof.draft_discarded===true&&proof.full_source_read_discard_verified===true
     &&proof.native_settings_unchanged===true&&proof.full_graph_unchanged===true&&proof.explicit_execute_requested===false
-    &&native?.kind==='javascript_wizard'&&native.stage==='code_next'&&same(native.node,node)
+    &&native?.kind==='javascript_wizard'&&['code_next','done'].includes(native.stage)&&same(native.node,node)
     &&native.source_sha256===proof.rejected_source_sha256&&native.dialog_closed===true
     &&typeof native.tooltip==='string'&&Buffer.byteLength(native.tooltip)<=2048&&typeof native.tooltip_truncated==='boolean'
     &&typeof native.dialog_text==='string'&&Buffer.byteLength(native.dialog_text)<=2048&&typeof native.dialog_text_truncated==='boolean'

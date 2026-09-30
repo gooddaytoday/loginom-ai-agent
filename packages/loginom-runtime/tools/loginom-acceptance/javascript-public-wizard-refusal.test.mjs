@@ -7,10 +7,11 @@ import {inspectJavascriptModulePolicy} from '../../client/lib/javascript-module-
 const entry=fileURLToPath(new URL('./javascript-public-wizard-refusal-live.mjs',import.meta.url));
 for(const mode of ['code','declared'])test('fixed native syntax case is parseable by admission and repair preserves the pinned business source '+mode,()=>{
  const source=javascriptDiscoveryProbe('p1-business-'+mode+'-base').source;
+ assert.equal(inspectJavascriptModulePolicy(source+'\nthrow new Error("E_JS_SYNC_THROW");\n').status,'ADMITTED');
  assert.equal(inspectJavascriptModulePolicy(source+'\nconst unsupported = ({})?.value;\n').status,'ADMITTED');
  assert.equal(inspectJavascriptModulePolicy(source+'\n// E: public native refusal repair on the SAME node.\n').status,'ADMITTED');
 });
-for(const args of [[],['--case','other'],['--case','syntax-code','--headless','true'],
+for(const args of [['--case','throw-code','--source','foreign'],['--case','throw-declared','--headless','true'],[],['--case','other'],['--case','syntax-code','--headless','true'],
  ['--case','syntax-code','--x11-no-focus','true'],['--case','syntax-code','--source','arbitrary'],
  ['--case','syntax-code','--case','syntax-declared']])test('fixed entrypoint refuses unassigned case or browser/source controls '+JSON.stringify(args),()=>{
  const result=spawnSync(process.execPath,[entry,...args],{encoding:'utf8'});
