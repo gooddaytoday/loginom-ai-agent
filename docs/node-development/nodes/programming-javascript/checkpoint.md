@@ -665,6 +665,42 @@ Diff-check PASS. Под lock назначен fresh profile332; ordinary headed
 При успехе independent writer audit/cleanup, затем отдельный cold; иначе
 сохранить точный отказ и own cleanup. D/E/F и цель остаются active/open.
 
+### D04: точная причина settings drift установлена — 2026-09-30
+
+D04/profile332/source `0b646d73b5`, exec92456/exit1,03:25:35–03:29:26 UTC:
+26 declared steps, source-write, Done/owned graph и независимый source-read
+прошли. Original CLEANUP_UNCONFIRMED report SHA256
+`fb0f0484a84949092e4c19a60bba26d02f12cf9354161467f3b61d5cacbfd531`,
+journal SHA256 `8caa137444fdfe8f81abb25d109342e88c9d1134e650660ef4c422048a162481`.
+JS Execute/Save не отправлены из-за прежнего strict settings guard.
+
+Обе private settings observations принадлежат тому же owner. Exact diff:
+только4 target fields добавляют scalar `ConnectedRecord:null` после Done;
+до Done свойство отсутствовало. Все остальные keys/values и порядок обоих
+grids совпадают. Before digest
+`770ee74c3561f6f3c21a75f7351952eb5dad5bc3a4c9a54a244128324007642b`, after
+`ec26e40bd8aad9cbd3c9d88fa2fc5a776e69d4feda39f974fef237679d37ec89`.
+Actual schema reader отдельно читает native ConnectedRecord identity; null
+попал также в общую scalar projection. Это представление пустой cache-ссылки,
+а не изменение объявленных settings.
+
+Child `418abc95c0` нормализует только `ConnectedRecord:null` к отсутствию
+этого ключа; неожиданное non-null scalar и все иные поля остаются в digest.
+Guard source/settings не ослаблен. 109 targeted tests PASS, log SHA256
+`e55b44089ce29c20f8e90b21015a205c7373ea94ae61b52cda48e67260f6e0de`:
+изменённые name/label/type/kind/order/usage/required/generation/unknown option
+и non-null reference по-прежнему дают другой digest. Production normalizer
+отдельно вызван на actual retained D04 observations: полные normalized settings
+равны, before digest сохранён. Receipt SHA256
+`6f0b050e6e28d7e217c77d39047666a94d2bc238cde5bbb66f2ab3cb455a5cca`;
+это адресный offline audit actual metadata, ещё не новый live PASS.
+
+Exact own recovery05/profile333/exec39147 выполняется. После verified cleanup
+и process absence — fresh D05 на source `418abc95c0`, полный writer/Save audit,
+затем независимый cold. Full client suite этой версии запущен отдельно
+(exec85959, log `d-settings-fixed-client-suite-01.log`), результата пока нет.
+Цель active, D/E/F/candidate/CLI открыты; source текущего browser не менять.
+
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
 Child code commits `05dfebe85a`, `7fe5978c0f`, `cbfb793c95` добавили operator-only
