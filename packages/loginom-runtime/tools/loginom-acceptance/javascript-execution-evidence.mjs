@@ -10,6 +10,9 @@ export const javascriptInputRows = Object.freeze([
   ['5','Ёж','1','999','100'], ['6','delta','5','100','0'],
 ].map(Object.freeze));
 const businessInputVariants=Object.freeze({
+  empty:Object.freeze({path:'operator-only/empty.csv',name:'empty.csv',bytes:46,
+    sha256:'9f20a282b37003a861e94cf6ee7ec54cc91f33d32a8fadfa5fd2997d3b8f4b2d',
+    columns:javascriptInputColumns,rows:Object.freeze([])}),
   base:Object.freeze({path:'model-input/sales.csv',name:'sales.csv',bytes:157,
     sha256:'4fce338d2edd2901ba35732ed148a1a80eba4a5fbf927f2828f3cdbe6b8fa09e',
     columns:javascriptInputColumns,rows:javascriptInputRows}),
@@ -71,13 +74,13 @@ export function verifyJavascriptTable(table, kind, inputVariant='base') {
   if(!['input','output'].includes(kind))throw Error('Unknown JavaScript table oracle');
   const variant=javascriptBusinessInputVariant(inputVariant);
   const columns=kind==='input'?variant.columns:javascriptOutputColumns;
-  const rows=kind==='input'?variant.rows:javascriptInputRows.map(row=>[row[0],'JS_G2_TABLE_V1']);
-  if(table?.sample_complete!==true||table.row_count!==6||table.sample_rows!==6||table.sample?.length!==6
+  const rows=kind==='input'?variant.rows:inputVariant==='empty'?[]:javascriptInputRows.map(row=>[row[0],'JS_G2_TABLE_V1']);
+  if(table?.sample_complete!==true||table.row_count!==rows.length||table.sample_rows!==rows.length||table.sample?.length!==rows.length
     ||table.schema?.length!==columns.length||!table.schema.every((c,i)=>c.name===columns[i].name&&c.type===columns[i].type)
     ||!table.sample.every((row,i)=>row.length===columns.length&&row.every((cell,j)=>cell.type===columns[j].type
       &&cell.is_null===false&&cell.value===rows[i][j]&&(cell.type!=='integer'||cell.precision==='exact_integer'))))
-    throw Error('JavaScript '+kind+' table differs from pinned typed six-row oracle');
-  return {verified:true,rows:6,columns:columns.length,numeric_tolerance:0,whitespace_preserved:true};
+    throw Error('JavaScript '+kind+' table differs from pinned typed row oracle');
+  return {verified:true,rows:rows.length,columns:columns.length,numeric_tolerance:0,whitespace_preserved:true};
 }
 
 export function verifyJavascriptFixture(bytes, manifest, inputVariant='base') {

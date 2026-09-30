@@ -209,3 +209,9 @@ test('one output row has a fixed authored oracle and refuses other cardinalities
  t.sample[0][0].value='07';assert.throws(()=>javascriptDiscoveryOracle(p,t));
  t.sample[0][0].value='7';t.row_count=0;assert.throws(()=>javascriptDiscoveryOracle(p,t));
 });
+
+test('empty input keeps the exact named-access source and has a distinct fixed empty oracle',()=>{
+ const empty=javascriptDiscoveryProbe('g5-empty-input'),full=javascriptDiscoveryProbe('g5-named-access');
+ assert.equal(empty.source,full.source);assert.equal(empty.source_sha256,full.source_sha256);
+ assert.equal(empty.input_variant,'empty');assert.deepEqual(empty.expected,[]);assert.equal(full.expected.length,6);
+});
