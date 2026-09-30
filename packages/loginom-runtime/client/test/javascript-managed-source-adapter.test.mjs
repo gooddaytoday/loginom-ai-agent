@@ -3,23 +3,27 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createJavascriptManagedSourceAdapter, javascriptManagedSourceSettings} from '../lib/javascript-managed-source-adapter.mjs';
 import {createJavascriptSourceAdmission, javascriptSourceSettingsDigest} from '../lib/javascript-source-admission.mjs';
+import {waitManagedJavascriptCodeSettlement} from '../lib/javascript-managed-code-settlement.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 
 const deadline = Date.now() + 60000;
-const prepared = {document_id: 'document', workflow_ref: {workflow_id: 'workflow', prefix: 'MF;TF-1', tab_tid: 'tab'}};
+const prepared = {document_id: 'document', workflow_ref: {workflow_id: 'workflow', prefix: 'MF;TF-1',
+  tab_tid: 'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'nav',label:'Scenario'}]}};
 const node = {document_id: 'document', workflow_id: 'workflow', node_id: 'node'};
 const owner = {...node, operation_id: 'read-source', ui_epoch: 9};
 const source = 'import {InputTable} from "builtIn/Data";\nconst label = "Сумма 😀";';
-const task = {operation_id: 'managed-js-1', owner: node, workflow_ref: prepared.workflow_ref,
+const task = {operation_id: 'managed-js-1', owner: node,
+  workflow_ref:{prefix:prepared.workflow_ref.prefix,tab_tid:prepared.workflow_ref.tab_tid},
   targetOrigin: 'http://logi-test-plan.bg.local', targetBuild: '7.4.2', deadline,
   prepared: {...prepared, node}, allowDeactivation: true};
 
 function fixture({closeFails = false, pageTransientOnce = false, wrongType = false,
   settingsAckChanged = false,
+  nativeRefusal=false,captureFails=false,recoveryAckChanged=false,closeRefusalFails=false,
   generationFalse = false, generationFails = false, declaredFails = false, doneFails = false,
   graphTransientOnce = false, graphTransientDetail = false, graphEffectPossible = false, graphOwnerChanged = false} = {}) {
   const calls = [], events = [];
-  let pageReads = 0, graphReads = 0, codeNextSent = false;
+  let pageReads = 0, graphReads = 0, codeNextSent = false,handleDraft;
   const driver = {
     openManagedJavascriptExistingWizard: async args => {calls.push('open'); assert.equal(args.node, node); return {task};},
     dispatchManagedJavascriptGeneration: async () => {calls.push('generation');
@@ -36,17 +40,21 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
       return {status: 'SUCCEEDED', output: {next_gesture_returned: true, transition_verified: false}};},
     dispatchManagedJavascriptDone: async () => {calls.push('done');if(doneFails)throw Error('lost Done reply');
       return {status: 'SUCCEEDED', output: {done_gesture_returned: true,wizard_commit_verified: false,execution_started: null}};},
-    closeManagedJavascriptWizard: async () => {calls.push('close'); if (closeFails) throw Error('lost Close reply');
-      return {verified: true, closed: true, node_id: 'node'};},
+    closeManagedJavascriptWizard: async () => {calls.push('close'); if (closeFails||closeRefusalFails) throw Error('lost Close reply');
+      return {verified: true, closed: true, node_id: 'node',draft_discarded:true,settings_applied:false,execution_started:false};},
     makeJavascriptSchemaContextCode: () => 'schema',
     makeJavascriptManagedPageCode: () => 'page',
+    makeJavascriptManagedStageCode: () => 'stage',
+    waitManagedJavascriptCodeSettlement,
+    captureManagedJavascriptWizardError:async()=>{calls.push('capture-error');if(captureFails)throw Error('lost error dialog reply');
+      return {owner:node,source_sha256:handleDraft,dialog_closed:true,native_owner_verified:true};},
     makeJavascriptManagedSourceCode: () => 'source',
     makeJavascriptManagedSelectionReadCode: () => 'dispose',
     makeJavascriptExistingGraphTypeCode: () => 'type',
     replaceManagedJavascriptSource: async ({markUncertain,source_text}) => {calls.push('replace');
       if (closeFails) {markUncertain(true); throw Error('lost source write reply');}
-      return {draft_exact: true, wizard_commit_verified: false,
-        source_sha256:createHash('sha256').update(source_text).digest('hex')};},
+      handleDraft=createHash('sha256').update(source_text).digest('hex');
+      return {draft_exact: true, wizard_commit_verified: false,source_sha256:handleDraft};},
   };
   const execute = async code => {
     calls.push(code);
@@ -54,6 +62,10 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
       icon_class: wrongType ? 'bg-vendor-icon-calculator' : 'bg-vendor-icon-javascript'};
     if (code === 'schema') return {verified: true, node_context: {...node, verified: true, surface: 'wizard'},
       generation: {checked: !generationFalse}, grids: [{tid: 'grid', fields: [{record_id: 'volatile', Name: 'Value'}]}]};
+    if(code==='stage'||code.includes('runManagedJavascriptStageRead'))return {owner:node,native_owner_verified:true,owner_verified:true,wizard_visible:true,
+      pending:false,preview_visible:false,boundary_refusal:null,dialog_diagnostic:{visible_count:0,foreign_count:0,roots:[]},
+      wizard_error:{visible:codeNextSent&&nativeRefusal,exact_count:1,tooltip:'SyntaxError: Syntax error at code (:4:33)',
+        tid:'MF;TF-1;WizrdMCF;btnError',tooltip_truncated:false},page_tid:codeNextSent&&!nativeRefusal?'MF;TF-1;WizrdMCF;DoneWizard':'MF;TF-1;WizrdMCF;JavaScriptCodeWizard'};
     if (code === 'page') return {ready: true, node_guid: 'node',
       page:codeNextSent?{tid:'MF;TF-1;WizrdMCF;DoneWizard',index:3,indicator_count:4,visible_editors:0}
         : pageTransientOnce && pageReads++ === 0
@@ -65,6 +77,7 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
   };
   const record = async event => {
     events.push(structuredClone(event));
+    if(recoveryAckChanged&&event.phase==='javascript_managed_rejected_draft_discarded')return {...event,source_sha256:'foreign'};
     return settingsAckChanged && event.phase === 'javascript_managed_source_settings_observed'
       ? {...event, settings_sha256: '0'.repeat(64)} : event;
   };
@@ -309,4 +322,27 @@ test('unsupported declared columns fail before Setting; uncertain Apply cannot r
   assert.equal(f.calls.includes('next'),false);
   await assert.rejects(adapter.open({owner,deadline,schemaMode:'declared',columns}),/owner changed/);
   assert.equal(f.calls.filter(call=>call==='declared').length,1);
+});
+
+test('known native refusal closes only its changed draft once and exposes private recovery evidence',async()=>{
+ const f=fixture({nativeRefusal:true}),adapter=await f.sourceAdapter(),handle=await adapter.open({owner,deadline});
+ await adapter.replace(handle,{owner,deadline,expected_source_sha256:'0'.repeat(64),source_text:'const value=object?.field;'});
+ await assert.rejects(adapter.commit(handle,{owner,deadline}),error=>{
+  assert.equal(error.javascriptWizardRefusal.diagnostic.dialog_closed,true);
+  assert.equal(error.javascriptWizardRefusal.closed.draft_discarded,true);return true;
+ });
+ assert.equal(adapter.active,false);assert.equal(adapter.uncertain,false);
+ assert.deepEqual(f.calls.filter(call=>['code-next','capture-error','close','done','dispose'].includes(call)),['code-next','capture-error','close','dispose']);
+ await assert.rejects(adapter.commit(handle,{owner,deadline}),/handle unavailable/);
+ assert.equal(f.calls.filter(call=>call==='code-next').length,1);
+});
+for(const failure of ['captureFails','closeRefusalFails','recoveryAckChanged'])test('uncertain native refusal never releases its gate '+failure,async()=>{
+ const f=fixture({nativeRefusal:true,[failure]:true}),adapter=await f.sourceAdapter(),handle=await adapter.open({owner,deadline});
+ await adapter.replace(handle,{owner,deadline,expected_source_sha256:'0'.repeat(64),source_text:'const value=object?.field;'});
+ await assert.rejects(adapter.commit(handle,{owner,deadline}),error=>{assert.equal(error.javascriptWizardRefusal,undefined);return true;});
+ assert.equal(adapter.uncertain,true);assert.equal(adapter.active,true);
+ await assert.rejects(adapter.discard(handle,{owner,deadline}),/owner changed/);
+ assert.equal(f.calls.filter(call=>call==='code-next').length,1);assert.ok(!f.calls.includes('done'));
+ if(failure==='captureFails')assert.ok(!f.calls.includes('close'));
+ if(failure==='closeRefusalFails')assert.ok(!f.calls.includes('dispose'));
 });

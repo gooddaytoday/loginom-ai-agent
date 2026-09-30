@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
+import {verifiedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
 import {NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
 import {NODE_READ_MODE,nodeReadHandler} from './node-read-contract.mjs';
 
@@ -191,6 +192,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
       // Explicit trusted-driver proof is required: a transport exception alone
       // never clears uncertainty, even in a nominally non-mutating phase.
       const refusal=error.nodePhaseRefusal;
+      if(name==='node_finish'&&refusal?.phase===name&&refusal.status==='FAILED'&&refusal.effect_possible===true
+        &&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&verifiedJavascriptWizardRefusal(refusal,request)) {
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+        state.javascript_wizard_refusal=structuredClone(refusal.proof);
+      }
       const importClosed=refusal?.proof?.closed;
       if(name==='configure'&&request.target.type==='imports.text'
         &&['text_import_binding_draft_discarded','text_import_readiness_draft_discarded'].includes(refusal?.verification)&&refusal.phase===name
@@ -392,15 +399,23 @@ export async function applyNode({request, operation, handlers, drivers, record,
     return {operation_id:operation.id,status:state.verified_refusal?'FAILED':state.effect_possible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:state.effect_possible,
       phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
       package_saved:false,cleanup_complete:state.cleanup_complete,warnings:[],
+      ...(state.javascript_wizard_refusal&&state.verified_refusal?{configuration:{status:'discarded'},
+        checkpoint_kind:'local_node_failed',persisted_package_verified:false}:{}),
       ...(state.verified_refusal&&state.cleanup_complete&&!state.pending&&state.node
-        ?{next_step:correctNodeRequest(request,state.node)}:{}),
+        ?{next_step:state.javascript_wizard_refusal?{tool:'dock_node_apply',original_operation_id:operation.id,
+          instruction:'Loginom rejected the JavaScript draft. Its dialog and draft were closed; the committed source, native settings and complete graph were independently rechecked unchanged. Correct source_text and submit a NEW operation_id on the SAME existing target '+JSON.stringify(state.node)
+            +' with expected_source_sha256:'+state.javascript_wizard_refusal.retained_source.source_sha256
+            +'. Preserve inputs:[] and mappings:[]. Do not recreate or save the package; no explicit Execute was sent.'}
+          :correctNodeRequest(request,state.node)}:{}),
       ...(state.correctable_import_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'The import wizard draft was discarded and the SAME node is back in the graph. '+(state.correctable_import_request==='readiness'
           ?'The wizard did not reach an expected state, so no setting was saved. Submit a NEW operation_id with the SAME settings and target:'
           :'Correct settings using the observed source names/labels and submit a NEW operation_id with target:')+JSON.stringify({kind:'existing',type:'imports.text',ref:state.node})+'. Keep the verified upload source, inputs:[] and mappings:[]. Supply source, format and columns again because the rejected draft was not saved. Do not recreate the node or reupload the file.'}}:{}),
       ...(state.correctable_calculator_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'Retained calculator settings were independently rechecked unchanged. Correct expressions and submit a NEW operation_id with the SAME existing target '+JSON.stringify(state.node)+'. '+(state.calculator_default_expression?'The restored node has the blank default Expr1. Correct the formula by updating target:{kind:"existing",name:"Expr1"} inside the first expression with replace:false (name/label/type may be changed). replace:true replaces an INPUT field, not the saved expression. Do not leave this blank default behind. ':'To execute/read without changing formulas use parameters:{expressions:[]}; to edit a retained expression use target:{kind:"existing",name:"existing_name"} inside that expression. ')+'Keep existing connections: inputs:[] and mappings:[]. Do not create another node.'}}:{}),
-      pending_phase:state.pending?.phase??null,error:{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
+      pending_phase:state.pending?.phase??null,error:state.javascript_wizard_refusal&&state.verified_refusal
+        ?{code:'JAVASCRIPT_WIZARD_SOURCE_REJECTED',message:String(error.message).slice(0,1000),native:state.javascript_wizard_refusal.native}
+        :{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
         ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }
