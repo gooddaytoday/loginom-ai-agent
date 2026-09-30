@@ -38,3 +38,21 @@ export function readJavascriptDeclaredColumns(schema,columns) {
       default_usage_type:field.DefaultUsageType,required:field.Required};
   });
 }
+
+// Existing-node preservation derives declarations only from the complete native
+// editor cache. It never guesses columns or roles from JavaScript source.
+export function readObservedJavascriptDeclaredColumns(schema) {
+  need(schema?.verified===true&&schema.inventory_complete===true
+    &&schema.generation?.checked===false&&typeof schema.page_tid==='string'
+    &&Array.isArray(schema.grids),'JavaScript existing declared schema unavailable');
+  const targets=schema.grids.filter(grid=>grid.tid===schema.page_tid+';grdTargetColumns;tbl');
+  need(targets.length===1&&Array.isArray(targets[0].fields)
+    &&targets[0].fields.length>0&&targets[0].fields.length<=64,
+  'JavaScript existing declared columns unavailable');
+  return readJavascriptDeclaredColumns(schema,targets[0].fields.map(field=>({
+    name:field.Name,label:field.DisplayName,
+    type:Object.keys(types).find(key=>types[key]===field.DataType),
+    data_kind:Object.keys(kinds).find(key=>kinds[key]===field.DataKind),
+    usage:Object.keys(usages).find(key=>usages[key]===field.DefaultUsageType)
+  })));
+}

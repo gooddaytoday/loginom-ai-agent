@@ -33,6 +33,24 @@ test('declared lifecycle admits explicit supported columns and rejects unknown p
  }
 });
 
+test('existing lifecycle admits source replace/preserve and refuses graph/schema/mapping edits before effects',()=>{
+ const existing={...structuredClone(request),target:{kind:'existing',type:'programming.javascript',ref:node},
+  inputs:[],parameters:{source_text:request.parameters.source_text,expected_source_sha256:'a'.repeat(64)}};
+ assert.equal(validateJavascriptCodeRequest(existing.parameters,'script',existing),existing.parameters);
+ assert.deepEqual(validateJavascriptCodeRequest({},'script',{...existing,parameters:{}}),{});
+ for(const schema_mode of ['code','declared']) {
+  const parameters={...existing.parameters,schema_mode};
+  assert.equal(validateJavascriptCodeRequest(parameters,'script',{...existing,parameters}),parameters);
+ }
+ for(const change of [r=>r.inputs=request.inputs,r=>r.finish='done',
+  r=>r.parameters.columns=[{name:'Value',label:'Value',type:'integer',data_kind:'Непрерывный',usage:'Не задано'}],
+  r=>delete r.parameters.expected_source_sha256,r=>r.parameters.expected_source_sha256='bad',
+  r=>r.parameters.source_text='import fs from "fs";',r=>r.mappings=[{direction:'output',port:0,autosync:false}]]) {
+  const bad=structuredClone(existing);change(bad);
+  assert.throws(()=>validateJavascriptCodeRequest(bad.parameters,'script',bad));
+ }
+});
+
 function graph(){return {complete:true,document_id:'doc',workflow_ref:{workflow_id:'flow'},nodes:[
  {ref:source,locked:false,dom_epoch:'old',inputs:[],outputs:[0],position:{x:10,y:10}},
  {ref:node,locked:true,dom_epoch:'old',inputs:[0],outputs:[0],position:{x:256,y:256}}],
