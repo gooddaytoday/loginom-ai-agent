@@ -47,7 +47,53 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
-### E/J13: controlled public apply reply loss реализован; fresh395 назначен — 2026-09-30
+### E/J13: fresh395 отказал на busy inspect; очистка подтверждена — 2026-09-30
+
+Fresh395/exec76503 завершился actual exit1: `CLEANUP_UNCONFIRMED`, ошибка
+`A background node operation is running` на public existing native Stop stage.
+Причина сверена с `client/lib/executor.mjs`: public facade разрешает
+`nodeApplyStatus`/`waitNodeApply` и node controls во время worker, но `inspect`
+остаётся за busy guard. Fixture первоначального operator test этот guard
+не моделировал; его PASS не подтверждал допустимость такого live порядка.
+Первый apply/identified materialization Execute был отправлен, ответ вызывающему
+управляемо потерян; второго apply, Execute или Stop не было. Исходный report
+сохранён, SHA256
+`4911119141fa0cd15b2924e95e3f6c1ff10bb6c31bf0f2657eb6b80c5937d7b2`.
+Auditor v1 и его 80 negative mutations не запускались; case не принят.
+
+Admin recovery396/exec2671 закрыл browser по собственному timer до Close;
+package/logout proof отсутствовал. Новый ordinary headed recovery397/exec28259
+завершился actual exit0. В Диспетчере выбран только точный пакет исходного
+`jsteach:3762`; native Stop disabled. Подтверждён Close без Save, затем закрыты
+этот старый сеанс и собственный пустой timed-out admin:3763. После Refresh они
+отсутствуют; current admin:3764 вышел, browser закрыт, Chrome/operator отсутствуют.
+Receipt SHA256 `aa746fde41369c77c8c353c0db2259a8fc1a6596f81d737e6303fbd4a9d228e7`;
+registry reconciled `closed_verified`. Чужие исторические сеансы не затронуты.
+
+Child `90c3bdd7c67258c5fd03884b7ae38ff94ccc7b34` исправляет этот порядок.
+Адресные tests95 PASS, full operator all02:18246 PASS/0 FAIL, actual exit0;
+SHA256 `77d09b6adf08d37d86ddbaa7da7beb665e1012d38ece6ec349c4095105239f3f`.
+Fixture использует actual NodeOperationRunner и моделирует наблюдённый busy guard;
+это source-only proof, новая live-приёмка ещё впереди. Client tree относительно
+проверенного `56f8df0250` неизменён; полный client повторно не запускался.
+Pre-live auditor v2 SHA256
+`762beeefc73e65ef5af62e5ed93ee1ae51921362fc35889063989b697b95a550`,
+oracle SHA256 `a63ea5eb8e8f586fef97aa13643460645e89aebf4f48e8efc0609f906c912e2e`,
+freeze02 SHA256 `be9a32de9c20e12d67a97aecc7ac9dacfd172505100a34dd486dce2debc3926e`.
+Auditor требует status до Stop, inspection после original terminal/completed
+record и тот же outcome; прежние business/source/graph/cleanup проверки сохранены.
+Подготовлены88 negative mutations; ещё не запускались.
+
+**Следующий шаг:** fresh398 `e-public-lost-reply-code-02` на этой ревизии.
+Исправленный operator получает status исходного worker,
+проверяет тот же pending execution/attempt1, один раз вызывает его native Stop,
+ожидает settled cancelled terminal и только затем public inspect. Inspection
+должна подтвердить тот же terminal outcome/cleanup. Runtime guard не ослабляется;
+потеря browser gesture receipt не становится разрешением повтора. Затем NEW
+short same-node repair/2 fresh Execute/full6×4/source/settings/graph/cleanup.
+Source/oracle/auditor v1 и failed395 сохраняются без изменения.
+
+### E/J13: исходная controlled reply loss реализация перед fresh395 — 2026-09-30
 
 Child `ad242702e83a3beb3d9712ac2600ce37bcdf833c` добавил fixed operator
 `lost-apply-execute-code`: один public apply запускает прежний45s finite source,
@@ -71,10 +117,8 @@ Auditor требует actual SUCCEEDED browser launch receipt до caller reply
 cancelled terminal≤60s/NEW business repair/ordinary cleanup/process absence.
 
 Fresh395/exec76503 — ordinary headed `e-public-lost-reply-code-01`, assigned saved C.
-При продолжении наблюдать этот handle до actual terminal; frozen source/oracle
-не менять, повтор/новый профиль не запускать по wait timeout. Затем frozen
-audit/80 meaningful negatives/cleanup/process absence/registry reconciliation.
-Live case ещё не принят; remaining E/F/candidate/CLI/full Goal открыты.
+Историческое назначение завершилось отказом; actual terminal и отдельная recovery
+описаны выше. Live case ещё не принят; remaining E/F/candidate/CLI/full Goal открыты.
 
 ### E/J13: public local cancel/SAME-ID continuation приняты — 2026-09-30
 

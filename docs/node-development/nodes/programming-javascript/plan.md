@@ -858,7 +858,7 @@ deny тест остаётся зелёным.
 | Syntax error | Ошибка относится к своему wizard; исходник/черновик и cleanup явно установлены, нет SUCCEEDED |
 | Отказ мастера (кнопка ошибки) | После одного жеста прочитать подсказку и принадлежащий ему диалог по [lifecycle](../../workflow/lifecycle.md#отказ-мастера-и-кнопка-ошибки), закрыть OK до cleanup; старую кнопку и неизвестный исход не считать новым отказом |
 | Sync runtime throw | Свежий native failed execution, bounded diagnostic, результат не refreshed; можно исправить тот же узел |
-| Lost reply после ввода/Done/Execute | Сначала inspect того же owner/operation; неизвестный эффект не повторять |
+| Lost reply после ввода/Done/Execute | Сначала read-only status/wait того же owner/operation, если backend worker ещё выполняется; public inspect доступен после его settlement. Один Stop допустим только для identified собственного execution с сохранённым browser launch receipt; неизвестный gesture не повторять |
 | Same operation ID, другой source/settings | Конфликт; не новый запуск |
 | Local cancel / server stop | Разные операции; Stop только identified execution, дождаться фактического terminal/cleanup |
 | Timeout | Оригинальный deadline не продлевать; wait timeout не доказывает завершения |

@@ -74,7 +74,10 @@ same-node repair на `69c1f3d60c` также принят: native cancelled з�
 independent audit/negative62/62 и cleanup/process absence. Public local read
 cancel/SAME-ID continuation того же execution на `56f8df0250`
 также принят: один Raw Execute, audit/negative87/87, repair6×4/1950 и cleanup.
-Следующий шаг — public lost-reply recovery (J13), затем Required=true/context/engine/module/budgets
+Следующий шаг — public lost-reply recovery (J13) на `90c3bdd7c6`:
+status/Stop/wait исходного worker, inspect после его settlement. Первоначальный
+fresh395 отказал на реальном busy guard; отдельная очистка подтверждена,
+исходный failed report сохранён. Затем Required=true/context/engine/module/budgets
 и точный остаток E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
