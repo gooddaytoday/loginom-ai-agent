@@ -14,6 +14,7 @@ import {javascriptDiscoveryProbe,javascriptDiscoveryOracle} from './javascript-d
 import {javascriptStopProbe} from './javascript-stop-case.mjs';
 import {stopJavascriptPublicExecution} from './javascript-public-stop.mjs';
 import {createJavascriptPublicCancelResume} from './javascript-public-cancel-resume.mjs';
+import {runJavascriptPublicLostApplyReply} from './javascript-public-lost-reply.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 
@@ -68,7 +69,7 @@ export async function readJavascriptPublicExistingSource({runtime,prepared,node,
 
 export async function runJavascriptPublicExistingLive({page,prepared,node,targetOrigin,redactor,record,
   report,save,deadline,onPending,schemaMode,graph,inputVariant='base',sourceCaseId=null,schemaRefusalCaseId=null,
-  wizardRefusalCaseId=null,stopCaseId=null,cancelResumeCaseId=null,readGraph}) {
+  wizardRefusalCaseId=null,stopCaseId=null,cancelResumeCaseId=null,lostReplyCaseId=null,readGraph}) {
   need(['code','declared'].includes(schemaMode)&&['base','changed','reordered'].includes(inputVariant)&&Date.now()+660000<deadline,
     'Public existing JavaScript mode/original budget unavailable');
   const sourceCase=sourceCaseId===null?null:javascriptPublicSourceCase(sourceCaseId);
@@ -83,13 +84,16 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   need(cancelResumeCaseId===null||cancelResumeCaseId==='cancel-resume-code'&&stopCaseId===null&&schemaMode==='code'
     &&inputVariant==='base'&&sourceCaseId===null&&schemaRefusalCaseId===null&&wizardRefusalCaseId===null&&typeof readGraph==='function',
   'Public cancel/resume requires its fixed Code mode/base');
+  need(lostReplyCaseId===null||lostReplyCaseId==='lost-apply-execute-code'&&stopCaseId===null&&cancelResumeCaseId===null
+    &&schemaMode==='code'&&inputVariant==='base'&&sourceCaseId===null&&schemaRefusalCaseId===null&&wizardRefusalCaseId===null&&typeof readGraph==='function',
+  'Public lost reply requires its fixed Code mode/base');
   const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-'+inputVariant);
   const base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'});
   const support=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor});
   let cancelResume;
   const runtime=createActionRuntime({pinned:await javascriptPublicCodePins(),allowCandidate:true,
     targetOrigin,targetBuild:'7.4.2',redactor,onRecord:async event=>{
-      if((stopCaseId!==null||cancelResumeCaseId!==null)&&event.phase==='node_phase_prepared'&&event.receipt?.phase==='materialization_start'
+      if((stopCaseId!==null||cancelResumeCaseId!==null||lostReplyCaseId!==null)&&event.phase==='node_phase_prepared'&&event.receipt?.phase==='materialization_start'
         &&event.operation_id===report.public_existing?.stop?.operation_id)
         report.public_existing.stop.launch_window_started=Date.now();
       const saved=await record(event);await cancelResume?.observe(saved);return saved;
@@ -194,11 +198,11 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
       independent_source:{complete:true,...javascriptSourceIdentity(after.source_text),chunks:after.chunks,source_read_operation_id:after.source_read_operation_id}});
     onPending(false);await save();
   }
-  if(stopCaseId!==null||cancelResumeCaseId!==null){
+  if(stopCaseId!==null||cancelResumeCaseId!==null||lostReplyCaseId!==null){
     const fixed=javascriptStopProbe(),identity=javascriptSourceIdentity(fixed.source),operation_id='js-public-stop-'+randomUUID();
     need(fixed.short.source===before.source_text,'Public finite Stop saved source differs');
     report.scope='isolated E public finite native Stop and NEW same-node short repair';report.explicit_execution_limit=3;
-    report.public_existing.stop={status:'RUNNING',case_id:stopCaseId??cancelResumeCaseId,operation_id,node,
+    report.public_existing.stop={status:'RUNNING',case_id:stopCaseId??cancelResumeCaseId??lostReplyCaseId,operation_id,node,
       previous_source_sha256:before.source_sha256,finite_source:identity,finite_loop:fixed.finite_loop,graph_before:graph};
     const request={operation_id,contract_revision:'1.0.0',document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,
       target:{kind:'existing',type:'programming.javascript',ref:node},inputs:[],mode:'script',
@@ -213,7 +217,11 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
       const resumed=await cancelResume.run({request,onProgress,deadline:deadline-60000});
       job=resumed.job;report.public_existing.stop.local_cancel_resume=resumed;
     }
-    if(cancelResumeCaseId===null)job=await stopJavascriptPublicExecution({runtime,request,node,record,deadline:deadline-60000,onProgress});
+    if(lostReplyCaseId!==null){
+      const recovered=await runJavascriptPublicLostApplyReply({runtime,request,node,record,onProgress,deadline:deadline-60000});
+      job=recovered.job;report.public_existing.stop.public_reply_loss=recovered;
+    }
+    if(cancelResumeCaseId===null&&lostReplyCaseId===null)job=await stopJavascriptPublicExecution({runtime,request,node,record,deadline:deadline-60000,onProgress});
     report.public_existing.stop.job=job;onPending(false);await save();
     const elapsed_ms=Date.now()-report.public_existing.stop.launch_window_started;
     need(Number.isFinite(elapsed_ms)&&elapsed_ms>0&&elapsed_ms<=60000&&!runtime.hasUnsettledWork(),
@@ -230,7 +238,8 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
       independent_source:{complete:true,...javascriptSourceIdentity(after.source_text),chunks:after.chunks,source_read_operation_id:after.source_read_operation_id}});
     onPending(false);await save();
   }
-  const source_text=sourceCase?.source??before.source_text+(cancelResumeCaseId!==null
+  const source_text=sourceCase?.source??before.source_text+(lostReplyCaseId!==null
+    ?'\n// E: public lost apply reply repair on the SAME node.\n':cancelResumeCaseId!==null
     ?'\n// E: public local cancel and SAME-ID resume repair on the SAME node.\n':stopCaseId!==null
     ?'\n// E: public native Stop repair on the SAME node.\n':wizardRefusalCaseId===null
     ?'\n// E: existing node source revision; business logic preserved.\n'
@@ -247,7 +256,8 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
     source_sha256:expected.source_sha256,oracle_sha256:probe.oracle_sha256,graph_before:graph,
     ...(wizardRefusalCaseId!==null?{wizard_refusal_case_id:wizardRefusalCaseId,repair_operation_id:operation_id}:{}),
     ...(stopCaseId!==null?{stop_case_id:stopCaseId,repair_operation_id:operation_id}:{}),
-    ...(cancelResumeCaseId!==null?{cancel_resume_case_id:cancelResumeCaseId,repair_operation_id:operation_id}:{})});
+    ...(cancelResumeCaseId!==null?{cancel_resume_case_id:cancelResumeCaseId,repair_operation_id:operation_id}:{}),
+    ...(lostReplyCaseId!==null?{lost_reply_case_id:lostReplyCaseId,repair_operation_id:operation_id}:{})});
   report.stage='public-existing-apply';await save();
   await record({phase:'javascript_existing_workflow_blockers_observed',operation_id,
     blockers:await page.evaluate(()=>[...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')]
