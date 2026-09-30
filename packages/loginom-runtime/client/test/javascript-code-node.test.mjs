@@ -27,7 +27,7 @@ test('declared lifecycle admits explicit supported columns and rejects unknown p
  const declared={...structuredClone(request),parameters:{source_text:request.parameters.source_text,schema_mode:'declared',
   columns:[{name:'Amount',label:'Amount',type:'integer',data_kind:'Непрерывный',usage:'Выходное'}]}};
  assert.equal(validateJavascriptCodeRequest(declared.parameters,'script',declared),declared.parameters);
- for(const patch of [{type:'real'},{data_kind:'Дискретный'},{usage:'unknown'}]){
+ for(const patch of [{type:'variant'},{data_kind:'Дискретный'},{usage:'unknown'}]){
   const bad=structuredClone(declared);Object.assign(bad.parameters.columns[0],patch);
   assert.throws(()=>validateJavascriptCodeRequest(bad.parameters,'script',bad));
  }

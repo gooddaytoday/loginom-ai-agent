@@ -24,7 +24,7 @@ test('isolated catalog has immutable-by-copy sources, exact hashes and an indepe
  for(const id of javascriptDiscoveryIds){
   const p=javascriptDiscoveryProbe(id);
   assert.equal(p.source_sha256,createHash('sha256').update(p.source).digest('hex'));
-  assert.equal(p.schema_mode,id.startsWith('p1-business-declared-')?'declared':'code');assert.equal(p.build,'7.4.2');assert.ok(p.schema.every(c=>c.type));
+  assert.equal(p.schema_mode,id.startsWith('p1-business-declared-')||id.startsWith('declared-')?'declared':'code');assert.equal(p.build,'7.4.2');assert.ok(p.schema.every(c=>c.type));
  }
  const p=javascriptDiscoveryProbe('engine-input-text');
  assert.deepEqual(p.expected,[['["Alpha","  alpha  ","  ALPHA  "]'],['["BETA","beta","BETA"]'],
@@ -214,4 +214,14 @@ test('empty input keeps the exact named-access source and has a distinct fixed e
  const empty=javascriptDiscoveryProbe('g5-empty-input'),full=javascriptDiscoveryProbe('g5-named-access');
  assert.equal(empty.source,full.source);assert.equal(empty.source_sha256,full.source_sha256);
  assert.equal(empty.input_variant,'empty');assert.deepEqual(empty.expected,[]);assert.equal(full.expected.length,6);
+});
+
+test('fixed declared counterparts keep body, schema and independent values while removing only AssignColumns',()=>{
+ for(const id of javascriptDiscoveryIds.filter(id=>id.startsWith('declared-'))){
+  const d=javascriptDiscoveryProbe(id),c=javascriptDiscoveryProbe(id.slice('declared-'.length));
+  assert.equal(d.source,c.source.split('\n').filter((_,index)=>index!==1).join('\n'));
+  assert.deepEqual(d.schema,c.schema);assert.deepEqual(d.expected,c.expected);
+  assert.equal(d.schema_mode,'declared');assert.equal(d.input_variant,c.input_variant);
+  assert.equal(d.source.includes('OutputTable.AssignColumns'),false);
+ }
 });

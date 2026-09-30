@@ -35,12 +35,54 @@ test('ordinary declared context validation returns serializable proof; native ob
 
 test('declared primitive scope refuses unsupported fields before browser effects',()=>{
   assert.equal(validateJavascriptDeclaredPrimitiveColumns(columns),columns);
-  for(const patch of [{type:'datetime'},{type:'real'},{data_kind:'Дискретный'},
+  for(const patch of [{type:'variant'},{type:'__proto__'},{data_kind:'Дискретный'},
     {name:'bad name'},{label:'bad\nlabel'},{usage:'unknown'},{extra:true}]){
     assert.throws(()=>validateJavascriptDeclaredPrimitiveColumns([{...columns[0],...patch}]));
   }
   assert.throws(()=>validateJavascriptDeclaredPrimitiveColumns([]));
   assert.throws(()=>validateJavascriptDeclaredPrimitiveColumns([...columns,...columns]));
+});
+
+test('all five primitive types reach serialized owned picker admission with default kinds',()=>{
+  for(const [type,kind,value,label] of [
+    ['boolean','Дискретный',1,'Логический'],['datetime','Непрерывный',2,'Дата/Время'],
+    ['real','Непрерывный',3,'Вещественный'],['integer','Непрерывный',4,'Целый'],
+    ['string','Дискретный',5,'Строковый']]){
+    const declared=[{...columns[0],type,data_kind:kind}];
+    assert.equal(validateJavascriptDeclaredPrimitiveColumns(declared),declared);
+    const code=makeJavascriptManagedDeclaredCode({...bound,columns:declared});
+    assert.equal(typeof Function('return ('+code+')')(),'function');
+    assert.ok(code.includes(JSON.stringify({value,label,kind})));
+    assert.throws(()=>makeJavascriptManagedDeclaredCode({...bound,
+      columns:[{...declared[0],data_kind:kind==='Непрерывный'?'Дискретный':'Непрерывный'}]}));
+  }
+});
+
+test('serialized primitive type steps observe exact picker value and label before effects',async()=>{
+  for(const [type,kind,value,label] of [
+    ['boolean','Дискретный',1,'Логический'],['datetime','Непрерывный',2,'Дата/Время'],
+    ['real','Непрерывный',3,'Вещественный'],['integer','Непрерывный',4,'Целый'],
+    ['string','Дискретный',5,'Строковый']]){
+    const declared=[{...columns[0],type,data_kind:kind}];
+    const step={...bound,columns:declared,step:'type_open',gesture_id:'managed-js-test:declared-0-type_open'};
+    const observations=[];
+    const lease={identity:JSON.stringify([step.owner,step.workflow_ref,step.targetOrigin,step.targetBuild,step.deadline]),
+      settingAttempted:true,wizardCaptured:{},handle:{},declared:{columns:JSON.stringify(declared),
+        index:0,step:3,pending:{held:{}},attempted:new Set()}};
+    const page={evaluate:async(fn,args)=>{
+      if(!Object.hasOwn(args,'expectedType'))return {verified:true};
+      observations.push(args);return {status:'ready',native_type:args.expectedType,label:args.expectedLabel};
+    }};
+    page[Symbol.for('loginom-dock.javascript-owned-selection-v1')]=new Map([[step.operation_id,lease]]);
+    const execute=Function('return ('+makeJavascriptManagedDeclaredCode(step)+')')();
+    assert.deepEqual(await execute(page),{status:'ready',native_type:value,label});
+    assert.equal(observations.length,1);
+    assert.equal(observations[0].expectedType,value);assert.equal(observations[0].expectedLabel,label);
+    delete lease.declared.prepared;
+    page.evaluate=async(fn,args)=>Object.hasOwn(args,'expectedType')?{status:'refused'}:{verified:true};
+    await assert.rejects(execute(page),/preflight refused/);
+    assert.equal(lease.declared.attempted.size,0);
+  }
 });
 
 test('serialized declared code pins step identity, index, native usage and owner',()=>{

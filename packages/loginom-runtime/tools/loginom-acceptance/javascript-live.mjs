@@ -152,8 +152,9 @@ if(options['--verify-public-declared-save']&&!options['--verify-public-declared-
 if(options['--verify-public-code-lifecycle']&&options['--verify-public-declared-lifecycle'])
   throw Error('Public JavaScript lifecycle requires one schema mode');
 const publicMode=options['--verify-public-code-lifecycle']?'code':options['--verify-public-declared-lifecycle']?'declared':null;
-if(publicProbeId!==null&&(publicMode!=='code'||options['--verify-public-code-save']))
-  throw Error('Public typed probe requires code lifecycle without Save');
+if(publicProbeId!==null&&(publicMode!==(publicProbeId.startsWith('declared-')?'declared':'code')
+  ||options['--verify-public-code-save']||options['--verify-public-declared-save']))
+  throw Error('Public typed probe requires its fixed schema lifecycle without Save');
 if(publicMode&&(options['--execution-case']!==publicMode+'-table-execute'
   ||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile
   ||Object.keys(options).some(key=>!['--config','--profile','--browser','--evidence','--execution-case',
@@ -1948,7 +1949,7 @@ try {
       if(persistence){report.scope='private G7 persistence writer: '+persistence.schema_mode;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
-        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence||publicMode?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence||options['--verify-public-code-save']===true||options['--verify-public-declared-save']===true,inputVariant:publicProbeId==='g5-empty-input'?'empty':discoveryProbe?.input_variant??'base',materialization:materializationProbe});
+        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence||publicMode?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence||options['--verify-public-code-save']===true||options['--verify-public-declared-save']===true,inputVariant:publicProbeId?.endsWith('g5-empty-input')?'empty':discoveryProbe?.input_variant??'base',materialization:materializationProbe});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
       if(nativeRoundtrip)await executionRuntime.armNativeRoundtrip(executionInput);
