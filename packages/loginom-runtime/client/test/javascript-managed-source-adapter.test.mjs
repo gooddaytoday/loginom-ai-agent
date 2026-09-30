@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createJavascriptManagedSourceAdapter, javascriptManagedSourceSettings} from '../lib/javascript-managed-source-adapter.mjs';
-import {createJavascriptSourceAdmission} from '../lib/javascript-source-admission.mjs';
+import {createJavascriptSourceAdmission, javascriptSourceSettingsDigest} from '../lib/javascript-source-admission.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 
 const deadline = Date.now() + 60000;
@@ -243,6 +243,28 @@ test('semantic settings drop volatile records but retain field order', () => {
     grids: [{tid: 'grid', fields: [{record_id: 'one', connected_record_id: 'two', connected_back_id: null,
       Name: 'First'}, {record_id: 'two', Name: 'Second'}]}]}),
   {generation: false, grids: [{tid: 'grid', fields: [{Name: 'First'}, {Name: 'Second'}]}]});
+});
+
+test('declared Done empty ConnectedRecord reference is canonical but semantic drift remains detectable', () => {
+  const before = {verified:true,generation:{checked:false},grids:[{tid:'target',fields:[
+    {record_id:'draft',Index:0,ID:0,Name:'RowID',DisplayName:'RowID',DataType:4,DataKind:1,
+      DefaultUsageType:4,UsageType:0,Required:false,Broken:false},
+    {record_id:'draft2',Index:1,ID:1,Name:'Status',DisplayName:'Status',DataType:5,DataKind:2,
+      DefaultUsageType:0,UsageType:0,Required:false,Broken:false}]}]};
+  const after = structuredClone(before);
+  after.grids[0].fields.forEach((field,index)=>{field.record_id='committed'+index;field.ConnectedRecord=null;});
+  const digest = schema=>javascriptSourceSettingsDigest(javascriptManagedSourceSettings(schema));
+  assert.equal(digest(before),digest(after));
+  assert.equal(Object.hasOwn(after.grids[0].fields[0],'ConnectedRecord'),true);
+  for (const change of [s=>s.generation.checked=true,s=>s.grids[0].fields.reverse(),
+    s=>s.grids[0].fields[0].Name='Different',s=>s.grids[0].fields[0].DisplayName='Changed label',
+    s=>s.grids[0].fields[0].DataType=5,s=>s.grids[0].fields[0].DataKind=2,
+    s=>s.grids[0].fields[0].DefaultUsageType=0,s=>s.grids[0].fields[0].UsageType=4,
+    s=>s.grids[0].fields[0].Required=true,s=>s.grids[0].fields[0].ConnectedRecord='unexpected',
+    s=>s.grids[0].fields[0].unknown_option=true]) {
+    const changed=structuredClone(after);change(changed);
+    assert.notEqual(digest(before),digest(changed));
+  }
 });
 
 test('code open enables generation before Next; ordinary read preserves false mode', async () => {

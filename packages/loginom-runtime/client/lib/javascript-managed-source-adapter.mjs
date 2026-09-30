@@ -22,7 +22,13 @@ export function javascriptManagedSourceSettings(schema) {
     && Array.isArray(schema.grids) && schema.grids.every(grid => typeof grid.tid === 'string'
       && Array.isArray(grid.fields)), 'Managed JavaScript source settings unavailable');
   return {generation: schema.generation.checked, grids: schema.grids.map(grid => ({
-    tid: grid.tid, fields: grid.fields.map(({record_id, connected_record_id, connected_back_id, ...field}) => field)
+    tid: grid.tid, fields: grid.fields.map(({record_id, connected_record_id, connected_back_id, ...field}) => {
+      // Loginom 7.4.2 adds this empty native cache reference after declared
+      // Done. It is absent before Done; both mean no connected record.
+      // Keep every other scalar, including an unexpected non-null value.
+      if (field.ConnectedRecord === null) delete field.ConnectedRecord;
+      return field;
+    })
   }))};
 }
 
