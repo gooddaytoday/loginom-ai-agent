@@ -43,6 +43,28 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public real precision — принят — 2026-09-30
+
+Real01/profile349/child `bccc8a0a08`, exec8495/exit0 — **OBSERVED**,
+independent audit **PASS**. Output4×1 Result/real: null,0,-1.25,10.125, NULL
+отдельно; ненулевые real имеют verified17 significant digits, нет precision
+limitations. Input6×5, source/mappings/graph проверены. Source SHA256
+`86e2b53e66428553709ba3656c6b18a3ded9c366fbb69a69cc9911c2d80f9800`;
+свежие completed IDs `1790753898340-080vralaegnh:1137:3` и `:1137:4`.
+Package/logout/browser/process cleanup проверен, Save/cold/native bytes и
+candidate/CLI отсутствуют.
+
+Report SHA256 `f7d99c7611a48147cf121919d8a872f85f520a7f6856ab22de19649afd26b26f`,
+journal `4b1b25f531b8c0c53193c5137f03045b245b4eb2bb1ee00ba9760bbd3bc45a08`,
+audit receipt `7601fed4ffe4776c37933771ba2a93772b4c3e41ea689e2057a4a2dba1a1496b`.
+Это fixed typed UI output, не доказательство полной native float transport
+матрицы. J06/J07/J08 остаются открытыми по точному остатку.
+
+Следующий safe-integer01/g5-safe-integer запущен в ordinary headed fresh
+profile350, exec21350. Ожидаются -9007199254740991,0,9007199254740991 в exact
+integer representation; результат пока не установлен. Затем civil Date,
+named access и empty/one/N output, остаток E/F.
+
 ### E: public Boolean и отрицательные проверки auditor — 2026-09-30
 
 Boolean01/profile348/child `bccc8a0a08`, exec16250/exit0 — **OBSERVED**,
