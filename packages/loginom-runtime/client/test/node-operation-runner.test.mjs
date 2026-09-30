@@ -56,3 +56,17 @@ test('ID-only resume does not duplicate a running or completed worker',async()=>
  assert.equal(runner.start({operation_id:'one'},{resume:true}).attempt,1);assert.equal(count,1);
  release();const done=await runner.wait('one');assert.deepEqual(runner.start({operation_id:'one'},{resume:true}),done);assert.equal(count,1);
 });
+
+
+for(const phase of ['execute','materialization_execute'])test('native Stop can address the identified '+phase+' wait only',async()=>{
+ let pending=phase,execution_id='own-execution',observedSignal,release;
+ const completion=new Promise(resolve=>{release=resolve;});
+ const runner=createNodeOperationRunner({validate:()=>1,
+  progress:()=>({pending_phase:pending,execution:{status:'pending',execution_id}}),
+  run:async(request,{stopSignal})=>{observedSignal=stopSignal;await completion;return {status:'FAILED'};}});
+ runner.start({operation_id:'stop-one'});
+ pending='materialization_start';assert.throws(()=>runner.stop('stop-one'),/currently being awaited/);
+ pending=phase;execution_id=null;assert.throws(()=>runner.stop('stop-one'),/identified execution/);
+ execution_id='own-execution';assert.equal(runner.stop('stop-one').server_stop_requested,true);
+ assert.equal(observedSignal.aborted,true);release();await runner.wait('stop-one');
+});

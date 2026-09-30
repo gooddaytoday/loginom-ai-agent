@@ -75,7 +75,7 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
    const job=find(id);
    if(job.stopController.signal.aborted||job.state!=='running')return snapshot(job);
    const state=progress(job.id);
-   if(state?.pending_phase!=='execute'||state.execution?.status!=='pending'||!state.execution.execution_id)
+   if(!['execute','materialization_execute'].includes(state?.pending_phase)||state.execution?.status!=='pending'||!state.execution.execution_id)
     throw Error('Server stop requires an identified execution currently being awaited');
    job.stopController.abort(new Error('Server node stop requested'));
    return snapshot(job);

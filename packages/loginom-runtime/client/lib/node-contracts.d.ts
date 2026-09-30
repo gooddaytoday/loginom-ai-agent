@@ -29,6 +29,8 @@ export interface NodeApplyRequest<T extends NodeType, P> extends NodeTargetReque
 export interface NodeHandler<T extends NodeType, P> {
   type?: T; revision: string; modes: readonly string[]; parameter_schema?: object;
   output_wizard?: 'embedded' | 'separate';
+  /** Host-only JavaScript lifecycle: await materialization before output mapping. */
+  materialize_output?: boolean;
   /** Must reject invalid/unsupported parameters before the graph phase. */
   validate(parameters: unknown, mode: string, request?: NodeApplyRequest<T, P>): P | void;
   /** Runs inside the caller's gate, journal, deadline and cancellation scope. */
@@ -44,7 +46,7 @@ export interface NodeProcedureContext {
   signal?: AbortSignal; stopSignal?: AbortSignal; receipt_id?: string;
 }
 export type PhaseName = 'validate' | 'source' | 'workflow' | 'target' | 'input_mapping' | 'open' | 'configure'
-  | 'node_finish' | 'output_mapping' | 'finish' | 'execute' | 'read';
+  | 'node_finish' | 'materialization_start' | 'materialization_execute' | 'output_mapping' | 'finish' | 'execute' | 'read';
 export interface PhaseReceipt { phase: PhaseName; receipt_id: string; status: 'pending' | 'verified' | 'not_requested'; effect_possible: boolean }
 export interface NodeApplyResult {
   operation_id: string; status: 'SUCCEEDED' | 'FAILED' | 'NOT_APPLIED' | 'AMBIGUOUS'; effect_possible: boolean;
