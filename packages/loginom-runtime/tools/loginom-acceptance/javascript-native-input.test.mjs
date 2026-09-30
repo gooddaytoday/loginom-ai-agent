@@ -1,4 +1,4 @@
-import {javascriptPublicCodeProbe,verifyJavascriptPublicCodeInput} from './javascript-public-code-live.mjs';
+import {javascriptPublicCodeProbe,verifyJavascriptPublicCodeInput,javascriptPublicCodeOracle} from './javascript-public-code-live.mjs';
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -572,7 +572,7 @@ test('count loader pin verification rejects missing/changed actual source',()=>{
 
 // Exercise the public operator boundary with the production native decoder and
 // provenance checker; no browser action is available at this pure boundary.
-for(const fixtureId of ['real','boolean','string','integer-safe'])test('public native '+fixtureId+' admission requires exact before-JS bytes, typed cells, owner and released reads',async()=>{
+for(const fixtureId of ['real','boolean','string','integer-safe','integer-outside-safe'])test('public native '+fixtureId+' admission requires exact before-JS bytes, typed cells, owner and released reads',async()=>{
  const f=await fake({fixtureId}),raw=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'public-input'});
  const lifecycle=await javascriptNativeInputStatus(f.page),binding={...f.b,read_id:'public-input'};
  const provenance=nativeInputProvenance(sourceEvidence(fixtureId));
@@ -595,6 +595,26 @@ for(const fixtureId of ['real','boolean','string','integer-safe'])test('public n
    const bad=structuredClone(input);change(bad);assert.throws(()=>verifyJavascriptPublicCodeInput(probe,bad));
   }
   assert.throws(()=>verifyJavascriptPublicCodeInput({...probe,native_input_fixture:fixtureId==='real'?'boolean':'real'},input),/pin changed/);
+  if(fixtureId==='integer-outside-safe'){
+   const output={...table,precision:{numbers_verified:true,limitations:[]},filter_enabled:false};
+   const identity=javascriptPublicCodeOracle(probe,output,input);
+   assert.equal(identity.output_identity_exact,true);assert.equal(identity.exact_pass,false);
+   assert.equal(identity.gate_passed,false);assert.equal(identity.general_integer_precision_guarantee,false);
+   const observed=structuredClone(output);observed.sample[2][0].value='9007199254740992';
+   const changed=javascriptPublicCodeOracle(probe,observed,input);
+   assert.equal(changed.output_identity_exact,false);assert.equal(changed.cells[2].delta_decimal,'-1');
+   assert.equal(changed.characterization_verified,true);assert.equal(changed.exact_pass,false);
+   for(const mutate of [x=>x.sample.pop(),x=>x.row_count=2,x=>x.sample_complete=false,
+     x=>x.schema[0].label='foreign',x=>x.filter_enabled=true,x=>x.precision.numbers_verified=false,
+     x=>x.sample[2][0].value=9007199254740992,x=>x.sample[2][0].value='9007199254740992.0',
+     x=>x.sample[2][0].value='9223372036854775808',x=>x.sample[2][0].value='-9223372036854775809',
+     x=>x.sample[2][0].value='-0',x=>x.sample[2][0].precision='display_text',
+     x=>x.sample[2][0].is_null=true]){
+    const bad=structuredClone(output);mutate(bad);assert.throws(()=>javascriptPublicCodeOracle(probe,bad,input));
+   }
+   assert.throws(()=>javascriptPublicCodeOracle({...probe,source:probe.source+'// altered'},output,input));
+  }
+
  }
  assert.deepEqual(f.counters,{sent:fixed.rows,requests:fixed.rows,responses:fixed.rows});
 });

@@ -35,6 +35,12 @@ const codeProbes=[
       +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
     schema:[{name:'Value',label:'Value',type:'datetime'}],
     expected:[[null],['2024-02-29T23:59:59.123'],['2026-03-29T01:59:59.999']],expectation:'fixed'},
+  {id:'g5-native-integer-outside-safe',scope:'G5',native_input_fixture:'integer-outside-safe',
+    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
+      +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
+    schema:[{name:'Value',label:'Value',type:'integer'}],expected:null,expectation:'characterization',
+    note:'Bounded native int64 input and typed output observation; never promises exact outside-safe identity or arithmetic.'},
   {id:'g5-native-integer-safe',scope:'G5',native_input_fixture:'integer-safe',
     source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
       +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
@@ -79,7 +85,7 @@ const codeProbes=[
 
 // Operator-only declared counterparts: the authored body and expected values
 // stay identical; schema creation belongs to the native wizard.
-const declaredIds=new Set(['g5-native-civil-datetime','g5-native-integer-safe','g5-native-string','g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real','g5-safe-integer',
+const declaredIds=new Set(['g5-native-integer-outside-safe','g5-native-civil-datetime','g5-native-integer-safe','g5-native-string','g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real','g5-safe-integer',
   'g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
 const probes=[...codeProbes,...codeProbes.filter(probe=>declaredIds.has(probe.id)).map(probe=>{
   const lines=probe.source.split('\n');
