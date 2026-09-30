@@ -2,6 +2,9 @@ import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
+import {javascriptContextReceiptSchema,javascriptContextReply} from '../../lib/javascript-context-read.mjs';
+import {createRedactor} from '../../lib/redact.mjs';
 import { createArtifactStore } from '../../lib/artifacts.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -214,6 +217,18 @@ test('MCP application refusals remain typed normal content and the same connecti
     client=new ProtocolClient({name:'test-compact-agent',version:'1.0.0'});
     const [compactAgentTransport,compactBridgeTransport]=InMemoryTransport.createLinkedPair();
     await Promise.all([bridge.server.connect(compactBridgeTransport),client.connect(compactAgentTransport)]);
+    const compactTools=await client.listTools(),contextTool=compactTools.tools.find(t=>t.name==='dock_node_read');
+    assert.deepEqual(contextTool.outputSchema.oneOf[2],javascriptContextReceiptSchema);
+    const sourceField={index:0,name:'Value',label:'Value',type:'integer',required:true,field_id:'0'};
+    const contextReceipt=javascriptContextReply({owner:sourceReceipt.owner,source:sourceReceipt.source_text,
+      settings:{generation:true},redactor:createRedactor(),ports:['input','output'].map(direction=>({direction,port:0,
+        port_guid:direction+'-guid',autosync:true,native_reciprocity_verified:true,source_fields:[sourceField],
+        target_fields:[{...sourceField,required:false,source:{...sourceField}}]}))});
+    const compactReadValidator=new AjvJsonSchemaValidator().getValidator(contextTool.outputSchema);
+    assert.equal(compactReadValidator(contextReceipt).valid,true);
+    assert.equal(compactReadValidator(sourceReceipt).valid,true);
+    const missingContext=structuredClone(contextReceipt);delete missingContext.ports;
+    assert.equal(compactReadValidator(missingContext).valid,false);
     await client.callTool({name:'dock_workspace_observe',arguments:{scope:'bootstrap'}});
     const compactPrepare=await client.callTool({name:'dock_prepare',arguments:{}});
     assert.equal(JSON.parse(compactPrepare.content[0].text).prepared,true);

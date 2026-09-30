@@ -20,6 +20,7 @@ import { makeBrowserGeometryCode, parseBrowserGeometry } from './browser-geometr
 import { createExecutionJournal } from './execution-journal.mjs';
 import {createRedactor} from './redact.mjs';
 import {javascriptSourceReceiptSchema} from './javascript-source-read-schema.mjs';
+import {javascriptContextReceiptSchema} from './javascript-context-read.mjs';
 import { createRecoveryContext } from './recovery-context.mjs';
 import { outcomeVerification } from './outcome-verification.mjs';
 import { createHostArtifactAdmission, codexInputIdentity } from './host-artifacts.mjs';
@@ -95,7 +96,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     if (!userProfile || session.metadata.workspaceReady !== true) return;
     // The source receipt is delivered only to the caller. A diagnostics copy
     // would retain exact executable text outside the owned source-read record.
-    if(tool==='dock_node_read'&&result?.kind==='source')return;
+    if(tool==='dock_node_read'&&['source','context'].includes(result?.kind))return;
     try { await recordLocalDiagnostics(config.stateDir, 'dock:' + session.metadata.sessionId,
       [{ event: 'tool.full_result', tool_name: tool, dock_session_id: session.metadata.sessionId, host_pid: process.pid, result }],
       { knownSecrets: [config.apiKey] }); }
@@ -175,8 +176,9 @@ export async function createBridge(config, session, { browserTransport: managedB
       groups.remote=groups.remote.filter(tool=>['find','search','read','grep','glob','list','tree'].includes(tool.name));
       groups.local=groups.local.filter(tool=>!['dock_ui_action','dock_artifact_upload','dock_artifact_verify'].includes(tool.name))
         .map(tool=>isNodeApiTool(tool.name)?{...userNodeTool(tool),outputSchema:tool.name==='dock_node_read'
-          ?{type:'object',properties:{...userResultSchema.properties,...javascriptSourceReceiptSchema.properties},
-            additionalProperties:false,oneOf:[userResultSchema,javascriptSourceReceiptSchema]}:userResultSchema}:userActionTool(tool));
+          ?{type:'object',properties:{...userResultSchema.properties,...javascriptSourceReceiptSchema.properties,
+              ...javascriptContextReceiptSchema.properties,kind:{enum:['source','context']}},
+            additionalProperties:false,oneOf:[userResultSchema,javascriptSourceReceiptSchema,javascriptContextReceiptSchema]}:userResultSchema}:userActionTool(tool));
     }
     const catalog = combineCatalogs(groups);
     if (actionRuntime) {
