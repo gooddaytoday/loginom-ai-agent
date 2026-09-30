@@ -105,7 +105,10 @@ absence. На `e1fd122320` отдельно приняты все4 public existi
 Это не закрывает всю матрицу schema edits или product candidate/CLI.
 На `bccc8a0a08` отдельно приняты public Code scalar output5/5, named access
 и empty output: independent typed audits и cleanup, без native bytes/candidate/CLI.
-Следующий результат E — one-row/empty input и точный остаток J06–J08; P1 Stop/cancel принят
+Fixed Code one-row output и empty input также приняты на `2eef052e7a`/
+`64221b01c8`. На `d4898cac03` отдельно принят declared String NULL/empty
+с native metadata/source/full typed audit и cleanup. Следующий результат E —
+remaining declared scalar/cardinality и точный остаток J06–J08; P1 Stop/cancel принят
 ранее и без затрагивающего изменения не повторяется. Реализация продолжается;
 наличие этого кода не закрывает неизвестные G1/G3/G5/G6, а отсутствие CLI не
 блокирует выход 0B. `ready_for_development` требует решений по точным вопросам

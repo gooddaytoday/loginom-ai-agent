@@ -50,8 +50,11 @@ existing comment edit/Execute/read прошёл отдельно для code и 
 приняты public existing changed/reordered input freshness для обоих modes:
 все input6×5/output6×4 cells, fresh executions и cleanup проверены.
 На `bccc8a0a08` fixed public Code scalar output5/5, named access и empty
-output также прошли independent typed audits и cleanup. Следующий шаг — E
-one-row/empty input и точный остаток J06–J08, затем остальные J.
+output также прошли independent typed audits и cleanup. На `2eef052e7a` и
+`64221b01c8` приняты one-row output и empty input с полной схемой/read.
+На `d4898cac03` declared String NULL/empty прошёл отдельный independent audit
+и cleanup; остальные declared scalar/cardinality cases выполняются.
+Следующий шаг — E остаток J06–J08, затем остальные J.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 
