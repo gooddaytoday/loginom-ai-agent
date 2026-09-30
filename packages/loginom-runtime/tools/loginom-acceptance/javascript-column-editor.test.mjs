@@ -140,6 +140,21 @@ test('owned usage option selects value four once, reads back and cancels without
   assert.equal(f.effects.includes('cancel'),true);assert.equal(f.effects.includes('apply'),false);
 });
 
+test('owned usage picker binds the requested group instead of a fixed output option',async()=>{
+  const f=fixture();await f.open();const usage=usageFixture(f,{lazy:true});f.setHit(()=>usage.triggerDom);
+  const opened=await openJavascriptColumnUsagePicker({page:f.page,state:f.state,record:f.record,once:f.once,
+    deadline:Date.now()+1000,id:'usage-open',expectedUsage:6,expectedUsageLabel:'Группа',
+    click:async()=>usage.setExpanded(true)});
+  assert.equal(opened.usage_picker.expected_usage,6);
+  const target=usage.options[3];let clicks=0;f.setHit(()=>target);
+  target.onClick=()=>{clicks++;usage.combo.value=6;usage.setExpanded(false);f.setHit(()=>f.form.FItems.btnCancel.el.dom);};
+  const selected=await selectJavascriptColumnUsageOption({page:f.page,state:f.state,record:f.record,once:f.once,
+    deadline:Date.now()+1000,id:'usage-select',expectedUsage:6,expectedUsageLabel:'Группа'});
+  assert.equal(selected.usage_picker.cached_value,6);assert.equal(clicks,1);
+  const cancelled=await cleanupJavascriptColumnEditor({page:f.page,state:f.state,record:f.record,deadline:Date.now()+1000});
+  assert.equal(cancelled.status,'settled');assert.equal(f.records.length,0);
+});
+
 test('foreign usage option refuses selection before click',async()=>{
   const f=fixture();await f.open();const usage=usageFixture(f,{lazy:true});f.setHit(()=>usage.triggerDom);
   await openJavascriptColumnUsagePicker({page:f.page,state:f.state,record:f.record,once:f.once,
@@ -368,7 +383,7 @@ test('persistent mismatch and lost fill never authorize a retry',async()=>{
   for(const fault of ['mismatch','lost']){
     const f=fixture();await f.open();const field=f.form.FItems.edtDisplayName;field.value='COL1';field.rawValue='COL1';field.inputEl.dom.value='COL1';f.setHit(()=>field.inputEl.dom);
     let fills=0;
-    await assert.rejects(fillJavascriptColumnField({page:f.page,state:f.state,record:f.record,once:f.once,deadline:Date.now()+15,
+    await assert.rejects(fillJavascriptColumnField({page:f.page,state:f.state,record:f.record,once:f.once,deadline:Date.now()+1000,
       id:'label',target:'edtDisplayName',expected:'ObservedID',fill:async()=>{fills++;if(fault==='lost')throw Error('lost fill');}}));
     assert.equal(fills,1);assert.equal(f.effects.filter(e=>e==='label').length,1);
     if(fault==='mismatch')assert.equal(f.events.at(-1).snapshot.field_readback.input_value,'COL1');

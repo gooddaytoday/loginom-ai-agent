@@ -11,17 +11,19 @@ import {openManagedJavascriptOutputViews} from './javascript-managed-views.mjs';
 import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
 import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
+import {validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
 const verified=(value={})=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
 
-// C lifecycle support, injected by acceptance until declared/edit/reread and
+// C/D lifecycle support, injected by acceptance until edit/reread and
 // candidate delivery are complete. No operator fixture or expected data enters it.
 export function validateJavascriptCodeRequest(parameters,mode,request) {
   validateJavascriptParameters(parameters,mode,request);
-  need(request.target.kind==='new'&&parameters.schema_mode==='code'&&request.finish==='execute'
-    &&request.mappings.length===0,'JavaScript Code lifecycle currently requires a new Code node, default mappings and Execute');
+  need(request.target.kind==='new'&&['code','declared'].includes(parameters.schema_mode)&&request.finish==='execute'
+    &&request.mappings.length===0,'JavaScript lifecycle requires a new script node, default mappings and Execute');
+  if(parameters.schema_mode==='declared')validateJavascriptDeclaredPrimitiveColumns(parameters.columns);
   return parameters;
 }
 
@@ -32,12 +34,14 @@ export function javascriptCodeReadback({node,phases}) {
   const first=phases.find(phase=>phase.phase==='materialization_execute')?.value;
   const final=phases.find(phase=>phase.phase==='execute')?.value;
   need(configured?.source_readback_verified===true&&configured.wizard_commit_verified===true
+    &&(configured.schema_mode!=='declared'||Array.isArray(configured.declared_columns)&&configured.declared_columns.length>0)
     &&input?.verified===true&&input.source_identity_verified===true
     &&mapping?.verified===true&&mapping.source_identity_verified===true
     &&first?.owner_verified===true&&first.status==='completed'&&final?.owner_verified===true
     &&final.status==='completed'&&first.execution_id!==final.execution_id,'JavaScript Code lifecycle readback incomplete');
   return {kind:'javascript',scope:'observed_after_verified_finish',node,
-    receipt_ids:phases.map(phase=>phase.receipt_id),values_are:'independent_owned_source_readback',schema_mode:'code',
+    receipt_ids:phases.map(phase=>phase.receipt_id),values_are:'independent_owned_source_readback',schema_mode:configured.schema_mode??'code',
+    ...(configured.schema_mode==='declared'?{columns:configured.declared_columns}:{}),
     source:{sha256:configured.source_sha256,utf8_bytes:configured.source_utf8_bytes,lf_lines:configured.source_lf_lines},
     settings_preserved:true,wizard_commit_verified:true,
     execution_effects:{explicit_execute_requested:true,internal_execution_started:null},
@@ -48,7 +52,7 @@ export function javascriptCodeReadback({node,phases}) {
 export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redactor}) {
   need(targetBuild==='7.4.2'&&typeof targetOrigin==='string'&&typeof redactor?.text==='function'
     &&typeof redactor?.redact==='function','JavaScript Code runtime dependencies unavailable');
-  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-code-lifecycle-v1',modes:['script'],
+  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v2',modes:['script'],
     parameter_schema:javascriptParametersSchema,output_wizard:'separate',materialize_output:true,fullUiOutput:true,
     validate:validateJavascriptCodeRequest,configure:(ctx,parameters,drivers)=>drivers.configureJavascript(ctx,parameters),
     configurationReadback:javascriptCodeReadback}]]);
@@ -155,9 +159,11 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       },
       async openWizard(ctx){
         enter(ctx);need(admitted&&inputMapping,'JavaScript source/input admission unavailable');
-        adapter=sourceAdapter(owner,ctx.deadline);handle=await adapter.open({owner,deadline:ctx.deadline,schemaMode:'code'});
-        need(handle.settings.generation===true,'JavaScript Code mode unconfirmed');
-        return verified({effect_possible:true,schema_mode:'code',settings_observed:true});
+        adapter=sourceAdapter(owner,ctx.deadline);handle=await adapter.open({owner,deadline:ctx.deadline,
+          schemaMode:request.parameters.schema_mode,
+          ...(request.parameters.schema_mode==='declared'?{columns:request.parameters.columns}:{})});
+        need(handle.settings.generation===(request.parameters.schema_mode==='code'),'JavaScript schema mode unconfirmed');
+        return verified({effect_possible:true,schema_mode:request.parameters.schema_mode,settings_observed:true});
       },
       async configureJavascript(ctx,parameters){
         enter(ctx);need(handle&&adapter,'JavaScript owned Code editor unavailable');
@@ -170,6 +176,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       async finish(mode,ctx){
         enter(ctx);need(mode==='done'&&handle&&adapter&&admission&&admitted,'JavaScript owned Done unavailable');
         const settings=javascriptSourceSettingsDigest(handle.settings);
+        const declaredColumns=handle.declaredColumns;
         configured=await admission.withMutation({receipt:admitted,owner:initialOwner},async()=>{
           committed=await adapter.commit(handle,{owner,deadline:ctx.deadline});
           return {owner};
@@ -178,6 +185,8 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           'JavaScript committed source/settings readback differs');
         handle=null;
         return verified({effect_possible:true,mode,settings_applied:true,execution_id:null,execution_started:null,
+          schema_mode:request.parameters.schema_mode,
+          ...(declaredColumns?{declared_columns:declaredColumns}:{}),
           explicit_execute_requested:false,wizard_commit_verified:true,graph_owner_verified:committed.graph_owner_verified,
           owned_done_settled:committed.owned_done_settled,source_readback_verified:true,settings_preserved:true,
           source_sha256:expected.source_sha256,source_utf8_bytes:expected.source_utf8_bytes,source_lf_lines:expected.source_lf_lines});

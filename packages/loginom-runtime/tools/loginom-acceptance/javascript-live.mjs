@@ -84,21 +84,21 @@ if(packageFile&&(coldReader||batchCases!==null||nativeInputOnly||nativeRoundtrip
 const {javascriptPersistenceCase}=persistenceMode===null?{}:await import('./javascript-persistence-cases.mjs');
 const batch=batchCases===null?null:javascriptBatchCases(batchCases);
 const persistence=persistenceMode===null?null:javascriptPersistenceCase(persistenceMode);
-const batchDeadline=coldReader||packageFile?Math.floor(performance.timeOrigin)+600000:persistence?Math.floor(performance.timeOrigin)+persistence.writer_budget_ms:nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch||args.includes('--verify-public-code-lifecycle')?Date.now()+1800000:Infinity;
+const batchDeadline=coldReader||packageFile?Math.floor(performance.timeOrigin)+600000:persistence?Math.floor(performance.timeOrigin)+persistence.writer_budget_ms:nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch||args.includes('--verify-public-code-lifecycle')||args.includes('--verify-public-declared-lifecycle')?Date.now()+1800000:Infinity;
 let cleaning=false,cleanupDeadline=Infinity;
 const phaseDeadline=ms=>Math.min(cleaning?cleanupDeadline:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=(cleaning?cleanupDeadline:batchDeadline)-Date.now();if(ms<=0)throw Error(cleaning?'Original cleanup deadline expired':'Original batch deadline expired');return ms;};
-const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--server-version-only | --palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor [--inspect-usage-picker [--select-usage-option [--apply-usage-option]]] | --probe-source]] | --execution-case CASE [--managed-opening-probe --x11-no-focus [--verify-managed-source-write | --verify-managed-source-commit] | --verify-public-node-apply | --verify-public-code-lifecycle [--verify-public-code-save]] | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
+const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--server-version-only | --palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor [--inspect-usage-picker [--select-usage-option [--apply-usage-option]]] | --probe-source]] | --execution-case CASE [--managed-opening-probe --x11-no-focus [--verify-managed-source-write | --verify-managed-source-commit] | --verify-public-node-apply | --verify-public-code-lifecycle [--verify-public-code-save] | --verify-public-declared-lifecycle [--verify-public-declared-save]] | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
 if(args.includes('--help')&&coldReader){console.log('node javascript-persistence-read-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nCold reader: observe actual source/settings/mappings, one fresh Execute and full output; 10 minutes from process start; headed only. No source or configuration input.');return;}
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-managed-source-commit','--verify-public-node-apply','--verify-public-code-lifecycle','--verify-public-code-save','--verify-runtime-schema','--verify-runtime-source','--verify-managed-generation','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-managed-source-commit','--verify-public-node-apply','--verify-public-code-lifecycle','--verify-public-code-save','--verify-public-declared-lifecycle','--verify-public-declared-save','--verify-runtime-schema','--verify-runtime-source','--verify-managed-generation','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
-  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-managed-source-commit','--verify-public-node-apply','--verify-public-code-lifecycle','--verify-public-code-save','--verify-runtime-schema','--verify-runtime-source','--verify-managed-generation','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
+  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-managed-source-commit','--verify-public-node-apply','--verify-public-code-lifecycle','--verify-public-code-save','--verify-public-declared-lifecycle','--verify-public-declared-save','--verify-runtime-schema','--verify-runtime-source','--verify-managed-generation','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
 }
 if(coldReader){
@@ -138,10 +138,16 @@ if(options['--verify-public-node-apply']&&(options['--execution-case']!=='code-t
   throw Error('Public JavaScript trial requires one isolated code-table-execute case in ordinary headed mode');
 if(options['--verify-public-code-save']&&!options['--verify-public-code-lifecycle'])
   throw Error('Public Code Save requires the isolated public Code lifecycle');
-if(options['--verify-public-code-lifecycle']&&(options['--execution-case']!=='code-table-execute'
+if(options['--verify-public-declared-save']&&!options['--verify-public-declared-lifecycle'])
+  throw Error('Public declared Save requires its isolated public declared lifecycle');
+if(options['--verify-public-code-lifecycle']&&options['--verify-public-declared-lifecycle'])
+  throw Error('Public JavaScript lifecycle requires one schema mode');
+const publicMode=options['--verify-public-code-lifecycle']?'code':options['--verify-public-declared-lifecycle']?'declared':null;
+if(publicMode&&(options['--execution-case']!==publicMode+'-table-execute'
   ||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile
-  ||Object.keys(options).some(key=>!['--config','--profile','--browser','--evidence','--execution-case','--verify-public-code-lifecycle','--verify-public-code-save'].includes(key))))
-  throw Error('Public Code lifecycle requires its isolated new-node case in ordinary headed mode');
+  ||Object.keys(options).some(key=>!['--config','--profile','--browser','--evidence','--execution-case',
+    '--verify-public-'+publicMode+'-lifecycle','--verify-public-'+publicMode+'-save'].includes(key))))
+  throw Error('Public '+(publicMode==='code'?'Code':'declared')+' lifecycle requires its isolated new-node case in ordinary headed mode');
 if(options['--verify-runtime-schema']&&(options['--execution-case']!=='code-table-execute'||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile))
   throw Error('Runtime schema verification requires one isolated code-table-execute case');
 if(options['--verify-runtime-source']&&(options['--execution-case']!=='code-table-execute'||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile))
@@ -202,7 +208,7 @@ const directory=resolve(options['--evidence']);
 // Refuse reuse: no old evidence is overwritten and no uncertain run is replayed.
 await mkdir(directory,{mode:0o700});
 const redactor=createRedactor([config.password]);
-if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--server-version-only']||options['--managed-opening-probe']||options['--verify-public-node-apply']||options['--verify-public-code-lifecycle']){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
+if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile||options['--server-version-only']||options['--managed-opening-probe']||options['--verify-public-node-apply']||publicMode){const entries=await readdir(options['--profile']).catch(error=>{if(error.code==='ENOENT')return [];throw error;});if(entries.length)throw Error('Isolated discovery/batch requires an empty fresh assigned profile');}
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},redactor});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
   ...(coldReader||persistence||packageFile?{host_process:{pid:process.pid,started_at:new Date(performance.timeOrigin).toISOString(),profile:resolve(options['--profile'])}}:{}),
@@ -1914,7 +1920,7 @@ try {
       if(persistence){report.scope='private G7 persistence writer: '+persistence.schema_mode;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
-        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence||options['--verify-public-code-lifecycle']?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence||options['--verify-public-code-save']===true,inputVariant:discoveryProbe?.input_variant??'base',materialization:materializationProbe});
+        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence||publicMode?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence||options['--verify-public-code-save']===true||options['--verify-public-declared-save']===true,inputVariant:discoveryProbe?.input_variant??'base',materialization:materializationProbe});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
       if(nativeRoundtrip)await executionRuntime.armNativeRoundtrip(executionInput);
@@ -1931,19 +1937,19 @@ try {
         },executionInput);
       }
     }
-    if(options['--verify-public-code-lifecycle']){
+    if(publicMode){
       executionNode=await runJavascriptPublicCodeLive({page,prepared:executionPrepared,input:executionInput,
         targetOrigin:address.origin,redactor,record:executionRecord,report,save,deadline:batchDeadline,
-        onPending:value=>{managedCloseUncertain=value;}});
-      if(options['--verify-public-code-save']){
+        onPending:value=>{managedCloseUncertain=value;},schemaMode:publicMode});
+      if(options['--verify-public-'+publicMode+'-save']){
         // Preserve the public result's package_saved=false. This separately
         // observed Save never turns configuration readback into disk evidence.
-        report.stage='public-code-save';await save();
+        report.stage='public-'+publicMode+'-save';await save();
         const saved=await executionRuntime.savePersistenceCheckpoint(1);
         executionPrepared=saved.prepared;
-        report.public_code.save=saved;
-        report.public_code.cold_persistence_verified=false;
-        report.stage='public-code-saved';await save();await guard();
+        report[publicMode==='code'?'public_code':'public_declared'].save=saved;
+        report[publicMode==='code'?'public_code':'public_declared'].cold_persistence_verified=false;
+        report.stage='public-'+publicMode+'-saved';await save();await guard();
       }
     }
     else if(nativeInputOnly){

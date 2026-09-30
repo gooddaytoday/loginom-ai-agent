@@ -22,3 +22,17 @@ test('public Code Save refuses unrelated and focus-changing modes before private
       error);
   }
 });
+
+test('public declared Save refuses mixed schema modes, wrong entrypoint and unrelated flags',async()=>{
+  const paths=['--config','/not-read/private.json','--profile','/not-created/profile',
+    '--browser','/not-opened/chrome','--evidence','/not-created/evidence'];
+  await assert.rejects(()=>runJavascriptOperator([...paths,'--verify-public-declared-save']),/Public declared Save requires/);
+  await assert.rejects(()=>runJavascriptOperator([...paths,'--verify-public-code-lifecycle','--verify-public-declared-lifecycle']),
+    /one schema mode/);
+  for(const extra of [['--execution-case','code-table-execute'],
+    ['--execution-case','declared-table-execute','--verify-public-code-save'],
+    ['--execution-case','declared-table-execute','--verify-public-source-read']]){
+    await assert.rejects(()=>runJavascriptOperator([...paths,'--verify-public-declared-lifecycle','--verify-public-declared-save',...extra]),
+      /Public (declared lifecycle|Code Save|source read) requires/);
+  }
+});
