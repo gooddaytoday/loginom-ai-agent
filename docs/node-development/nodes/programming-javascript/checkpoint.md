@@ -45,6 +45,33 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: native Boolean подготовлен; Code live выполняется — 2026-09-30
+
+Frozen child `14965ef1482607419cfb0686e1477e0af0655900` расширяет только fixed operator allowlist/native input
+validation на Boolean: прежний29-byte CSV, SHA256
+`bb1c31553e26a6c0a82e2c947df83a4491ff2b81761d069a0ce4c6f7272d3d46`,
+input3×1 Value/Boolean с NULL/false/true и byte literals00/01. Client runtime,
+knowledge и product registration не менялись. Addressed421 PASS/0 FAIL;
+полный operator suite **17958 PASS / 0 FAIL**, exec35471/exit0, log SHA256
+`f71079e6d368c145400f71d8aba186a899fb4698772dd244ad445fedc5516f30`.
+Wrong owner/execution/bytes/releases и прежние business/empty/real guards
+проверены. Native uncertainty handling прежний, новые запросы проходят actual
+apply admission. Pure tests используют production native decoder/provenance.
+
+Independent Boolean oracle/auditor закреплены до live: SHA256
+`1403b5b9e41a75b89b3507eefd964627d1deb5b297314b565d38e6f28f5bea4e` /
+`d3128417c76f702b6de0f29d00418c1e86ab2741e4c3f7db6dda1c313c38cb10`.
+Аудитор самостоятельно читает tag11/boolean8 value byte; неиспользуемые Variant
+slots не составляют Boolean value. Старые oracles/receipts не менялись.
+Code source SHA256 `746a08e2937ad9a4298a0cd2d9c02089139c123b64257f868dc904ba904041c2`;
+declared source совпадает с real identity-copy `901ed4c40c4a062feefa484dbb3213349e85dcf10fb20c43f6c2cb425b9639d5`;
+различие обязательно подтверждать input fixture и native declared schema.
+
+Ordinary headed `e-public-types-native-boolean-code-01`, fresh profile367,
+exec59644 выполняется. Результат пока не установлен; после terminal independent
+native audit/cleanup/reconciliation, затем отдельный declared Boolean. Остальные
+native String/int64/Date и J/E/F открыты; registry readiness не повышена.
+
 ### E: public native-real2/2 принят — 2026-09-30
 
 Code и declared на frozen child `a679a63595` приняты независимыми native
