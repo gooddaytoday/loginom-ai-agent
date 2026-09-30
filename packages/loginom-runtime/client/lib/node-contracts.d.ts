@@ -75,8 +75,9 @@ export interface JavascriptConfigurationReadback {
   /** Explicit execution is separate from Loginom's unknown internal Done effects. */
   execution_effects: {explicit_execute_requested: boolean; internal_execution_started: null};
   input_mapping?: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string;
+    type: string; data_kind: string; source_name: string}>};
+  output_mapping?: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string;
     type: string; data_kind: string; source_name: string; excluded: boolean}>};
-  output_mapping?: JavascriptConfigurationReadback['input_mapping'];
   package_persistence_verified: false;
 }
 export interface CalculatorParameters {

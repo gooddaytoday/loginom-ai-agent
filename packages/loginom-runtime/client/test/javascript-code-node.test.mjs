@@ -44,7 +44,8 @@ function phases(){
   'materialization_execute','output_mapping','finish','execute','read'].map(phase=>({phase,receipt_id:'op:'+phase,
   status:'verified',effect_possible:true,value:phase==='node_finish'?{source_readback_verified:true,wizard_commit_verified:true,
     source_sha256:'a'.repeat(64),source_utf8_bytes:80,source_lf_lines:3}
-    :phase==='output_mapping'||phase==='input_mapping'?{native_mapping:structuredClone(mapping)}
+    :phase==='output_mapping'?{native_mapping:structuredClone(mapping)}
+    :phase==='input_mapping'?{native_mapping:{...mapping,target_fields:mapping.target_fields.map(({excluded,...field})=>field)}}
     :phase==='materialization_execute'||phase==='execute'?{owner_verified:true,status:'completed',execution_id:phase}: {}}));
 }
 
@@ -53,16 +54,19 @@ test('executed Code readback survives full/user-v1 schemas and retains mapping w
  assert.equal(readback.execution_effects.explicit_execute_requested,true);
  assert.equal(readback.execution_effects.internal_execution_started,null);
  assert.equal(readback.output_mapping.fields[0].source_name,'Raw');
+ assert.equal(Object.hasOwn(readback.input_mapping.fields[0],'excluded'),false);
  const result={operation_id:'op',status:'SUCCEEDED',node,effect_possible:true,cleanup_complete:true,
   phases:p.map(({value,...phase})=>phase),execution:{status:'completed',execution_id:'execute'},
   output:{status:'not_refreshed',evidence_ref:null,ports:[]},package_saved:false,warnings:[],
   configuration:{status:'applied',readback},persisted_package_verified:false,checkpoint_kind:'local_node_checkpoint'};
  const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
  assert.equal(validate(result).valid,true,JSON.stringify(validate(result)));
+ assert.equal(validate(JSON.parse(JSON.stringify(result))).valid,true);
  assert.deepEqual(compactNodeResult({operation_id:'op',state:'settled',outcome:{status:'SUCCEEDED',output:result}}).configuration,
   result.configuration);
  for(const change of [r=>r.configuration.readback.execution_effects.explicit_execute_requested=false,
-  r=>delete r.configuration.readback.output_mapping,r=>r.configuration.readback.source.raw_text='private',
+  r=>delete r.configuration.readback.output_mapping,r=>delete r.configuration.readback.output_mapping.fields[0].excluded,
+  r=>r.configuration.readback.input_mapping.fields[0].excluded=false,r=>r.configuration.readback.source.raw_text='private',
   r=>r.configuration.readback.receipt_ids=['op:source'],r=>r.pending_phase='retry']){
   const bad=structuredClone(result);change(bad);assert.equal(validate(bad).valid,false);
  }

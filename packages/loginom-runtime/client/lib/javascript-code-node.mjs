@@ -41,7 +41,7 @@ export function javascriptCodeReadback({node,phases}) {
     source:{sha256:configured.source_sha256,utf8_bytes:configured.source_utf8_bytes,lf_lines:configured.source_lf_lines},
     settings_preserved:true,wizard_commit_verified:true,
     execution_effects:{explicit_execute_requested:true,internal_execution_started:null},
-    input_mapping:javascriptReadbackMapping(input),output_mapping:javascriptReadbackMapping(mapping),
+    input_mapping:javascriptReadbackMapping(input,'input'),output_mapping:javascriptReadbackMapping(mapping,'output'),
     package_persistence_verified:false};
 }
 
@@ -254,7 +254,8 @@ export function verifyJavascriptMappingGraph(before,after,node){
   return true;
 }
 
-function javascriptReadbackMapping(mapping){
+function javascriptReadbackMapping(mapping,direction){
   return {port:0,autosync:mapping.autosync,fields:mapping.target_fields.map(field=>({index:field.index,
-    name:field.name,label:field.label,type:field.type,data_kind:field.data_kind,source_name:field.source.name,excluded:field.excluded}))};
+    name:field.name,label:field.label,type:field.type,data_kind:field.data_kind,source_name:field.source.name,
+    ...(direction==='output'?{excluded:field.excluded}:{})}))};
 }
