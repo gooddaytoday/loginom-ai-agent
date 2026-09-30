@@ -1,5 +1,5 @@
 import {openManagedJavascriptExistingWizard} from './javascript-managed-existing.mjs';
-import {dispatchManagedJavascriptNext} from './javascript-managed-next.mjs';
+import {dispatchManagedJavascriptNext, dispatchManagedJavascriptGeneration} from './javascript-managed-next.mjs';
 import {makeJavascriptManagedPageCode} from './javascript-managed-page.mjs';
 import {makeJavascriptManagedSourceCode} from './javascript-managed-source.mjs';
 import {closeManagedJavascriptWizard} from './javascript-managed-close.mjs';
@@ -30,7 +30,7 @@ export function javascriptManagedSourceSettings(schema) {
 export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEpoch, deadline, targetOrigin,
   execute, record, receiptOptions, channel, wait = ms => new Promise(resolve => setTimeout(resolve, ms)),
   openingBudgetMs = 90000,
-  driver = {openManagedJavascriptExistingWizard, dispatchManagedJavascriptNext,
+  driver = {openManagedJavascriptExistingWizard, dispatchManagedJavascriptNext, dispatchManagedJavascriptGeneration,
     dispatchManagedJavascriptCodeNext, dispatchManagedJavascriptDone,
     closeManagedJavascriptWizard, makeJavascriptManagedPageCode, makeJavascriptManagedSourceCode,
     makeJavascriptManagedSelectionReadCode, makeJavascriptSchemaContextCode,
@@ -77,8 +77,9 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
     throw Error('Managed JavaScript Code page original deadline expired');
   };
   return {
-    async open({owner, deadline: operationDeadline}) {
+    async open({owner, deadline: operationDeadline, schemaMode = 'preserve'}) {
       check(owner, operationDeadline);
+      need(['preserve', 'code'].includes(schemaMode), 'Managed JavaScript schema mode unavailable');
       need(active === null, 'Managed JavaScript source wizard already open');
       const type = await execute(driver.makeJavascriptExistingGraphTypeCode({document_id: prepared.document_id,
         workflow_ref: prepared.workflow_ref, node}));
@@ -98,7 +99,13 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
         && schema.node_context.surface === 'wizard'
         && ['document_id', 'workflow_id', 'node_id'].every(key => schema.node_context[key] === task.owner[key]),
       'Managed JavaScript source schema owner changed');
-      const settings = javascriptManagedSourceSettings(schema);
+      const generation = schemaMode === 'code'
+        ? await driver.dispatchManagedJavascriptGeneration({task, execute, record, receiptOptions}) : null;
+      if (generation) need(generation.status === 'SUCCEEDED'
+        && generation.output?.generation_readback_verified === true
+        && generation.output.schema?.generation?.checked === true,
+      'Managed JavaScript generation transition unconfirmed');
+      const settings = javascriptManagedSourceSettings(generation?.output.schema ?? schema);
       const next = await driver.dispatchManagedJavascriptNext({task, execute, record, receiptOptions});
       need(next?.status === 'SUCCEEDED' && next.output?.next_gesture_returned === true,
         'Managed JavaScript source Next refused');

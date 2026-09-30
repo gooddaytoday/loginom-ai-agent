@@ -15,11 +15,15 @@ const task = {operation_id: 'managed-js-1', owner: node, workflow_ref: prepared.
   prepared: {...prepared, node}, allowDeactivation: true};
 
 function fixture({closeFails = false, pageTransientOnce = false, wrongType = false,
-  doneFails = false, graphTransientOnce = false, graphOwnerChanged = false} = {}) {
+  generationFalse = false, generationFails = false, doneFails = false, graphTransientOnce = false, graphOwnerChanged = false} = {}) {
   const calls = [], events = [];
   let pageReads = 0, graphReads = 0, codeNextSent = false;
   const driver = {
     openManagedJavascriptExistingWizard: async args => {calls.push('open'); assert.equal(args.node, node); return {task};},
+    dispatchManagedJavascriptGeneration: async () => {calls.push('generation');
+      if (generationFails) throw Error('lost generation reply');
+      return {status: 'SUCCEEDED', output: {generation_readback_verified: true, schema: {verified: true,
+        generation: {checked: true}, grids: [{tid: 'grid', fields: [{record_id: 'volatile', Name: 'Value'}]}]}}};},
     dispatchManagedJavascriptNext: async () => {calls.push('next'); return {status: 'SUCCEEDED', output: {next_gesture_returned: true}};},
     dispatchManagedJavascriptCodeNext: async () => {calls.push('code-next');codeNextSent = true;
       return {status: 'SUCCEEDED', output: {next_gesture_returned: true, transition_verified: false}};},
@@ -42,7 +46,7 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     if (code === 'type') return {verified: true, node_id: 'node',
       icon_class: wrongType ? 'bg-vendor-icon-calculator' : 'bg-vendor-icon-javascript'};
     if (code === 'schema') return {verified: true, node_context: {...node, verified: true, surface: 'wizard'},
-      generation: {checked: true}, grids: [{tid: 'grid', fields: [{record_id: 'volatile', Name: 'Value'}]}]};
+      generation: {checked: !generationFalse}, grids: [{tid: 'grid', fields: [{record_id: 'volatile', Name: 'Value'}]}]};
     if (code === 'page') return {ready: true, node_guid: 'node',
       page:codeNextSent?{tid:'MF;TF-1;WizrdMCF;DoneWizard',index:3,indicator_count:4,visible_editors:0}
         : pageTransientOnce && pageReads++ === 0
@@ -183,4 +187,24 @@ test('semantic settings drop volatile records but retain field order', () => {
     grids: [{tid: 'grid', fields: [{record_id: 'one', connected_record_id: 'two', connected_back_id: null,
       Name: 'First'}, {record_id: 'two', Name: 'Second'}]}]}),
   {generation: false, grids: [{tid: 'grid', fields: [{Name: 'First'}, {Name: 'Second'}]}]});
+});
+
+test('code open enables generation before Next; ordinary read preserves false mode', async () => {
+  for (const schemaMode of ['preserve', 'code']) {
+    const f = fixture({generationFalse: true}), adapter = await f.sourceAdapter();
+    const handle = await adapter.open({owner, deadline, schemaMode});
+    assert.equal(handle.settings.generation, schemaMode === 'code');
+    assert.equal(f.calls.filter(call => call === 'generation').length, schemaMode === 'code' ? 1 : 0);
+    if (schemaMode === 'code') assert.ok(f.calls.indexOf('generation') < f.calls.indexOf('next'));
+    await adapter.discard(handle, {owner, deadline});
+  }
+});
+
+test('lost generation reply blocks Next and a second opening', async () => {
+  const f = fixture({generationFalse: true, generationFails: true}), adapter = await f.sourceAdapter();
+  await assert.rejects(() => adapter.open({owner, deadline, schemaMode: 'code'}), /lost generation reply/);
+  assert.equal(adapter.uncertain, true);
+  assert.equal(f.calls.includes('next'), false);
+  await assert.rejects(() => adapter.open({owner, deadline, schemaMode: 'code'}), /owner changed/);
+  assert.equal(f.calls.filter(call => call === 'generation').length, 1);
 });

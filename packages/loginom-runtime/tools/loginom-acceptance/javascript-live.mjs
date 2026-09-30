@@ -61,7 +61,7 @@ import {makeJavascriptManagedSourceCode} from '../../client/lib/javascript-manag
 import {makeJavascriptManagedSelectionReadCode} from '../../client/lib/javascript-managed-selection.mjs';
 import {wizardReadiness} from '../../client/lib/javascript-wizard-page.mjs';
 import {makeJavascriptManagedPageCode} from '../../client/lib/javascript-managed-page.mjs';
-import {dispatchManagedJavascriptNext} from '../../client/lib/javascript-managed-next.mjs';
+import {dispatchManagedJavascriptNext,dispatchManagedJavascriptGeneration} from '../../client/lib/javascript-managed-next.mjs';
 import {dispatchManagedJavascriptCodeNext} from '../../client/lib/javascript-managed-code-next.mjs';
 import {dispatchManagedJavascriptDone} from '../../client/lib/javascript-managed-done.mjs';
 import {openManagedJavascriptExistingWizard} from '../../client/lib/javascript-managed-existing.mjs';
@@ -92,12 +92,12 @@ if(args.includes('--help')&&coldReader){console.log('node javascript-persistence
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
 if (args.includes('--help')) { if(nativeRoundtrip)console.log('Fixed telemetry: --schema-telemetry-case '+javascriptTelemetryIds.join('|')+'; first ROOT live control only'); if(nativeRoundtrip)console.log('Opt-in: --metadata-diagnostic with --native-named-case C-set-index only; one point-in-time metadata round, no D acceptance'); if(nativeRoundtrip)console.log('Fixed calibration: --error-calibration '+javascriptCalibrationIds.join('|')+'; no OUTPUT; K3/K4 inactive'); if(nativeRoundtrip)console.log('Stage A/B named cases: --native-named-case '+javascriptNamedIds.join('|')); if(nativeRoundtrip||nativeInputOnly)console.log('Fixed Integer coercion cases (one per fresh run): '+javascriptCoercionIds.join('|')); console.log(nativeRoundtrip?'node javascript-native-roundtrip-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private typed/NULL input admission then one fixed Data-only JS Execute (empty uses UI-declared schema), native output and upstream reread.':nativeInputOnly?'node javascript-native-input-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\n[--native-fixture real|boolean|string|integer-safe|integer-outside-safe|civil-datetime|cardinality-keep2|cardinality-odd|cardinality-duplicate|cardinality-empty] Private input-only Value typed admission; one import Execute, typed UI + full fixed native read; no JS creation.':usage); return; }
-const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-managed-source-commit','--verify-public-node-apply','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
+const allowed = new Set([...(coldReader||packageFile?['--package']:[]),'--config','--profile','--browser','--evidence','--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--execution-case','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-managed-source-commit','--verify-public-node-apply','--verify-runtime-schema','--verify-runtime-source','--verify-managed-generation','--x11-no-focus','--discovery-probe',...(nativeInputOnly||nativeRoundtrip?['--native-fixture']:[]),...(nativeRoundtrip?['--native-named-case','--error-calibration','--metadata-diagnostic','--schema-telemetry-case']:[])]);
 const options = {};
 for (let i=0;i<args.length;i++) {
   const key=args[i];
   if (!allowed.has(key) || key in options) throw Error('Unknown or duplicate option');
-  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-managed-source-commit','--verify-public-node-apply','--verify-runtime-schema','--verify-runtime-source','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
+  options[key]=['--server-version-only','--create-node','--palette-only','--palette-hit-test','--inspect-pages','--inspect-declared-editor','--inspect-usage-picker','--select-usage-option','--apply-usage-option','--probe-source','--managed-opening-probe','--verify-source-admission','--verify-public-source-read','--verify-managed-source-write','--verify-managed-source-commit','--verify-public-node-apply','--verify-runtime-schema','--verify-runtime-source','--verify-managed-generation','--x11-no-focus','--metadata-diagnostic'].includes(key) ? true : args[++i];
   if (options[key]===undefined) throw Error(usage);
 }
 if(coldReader){
@@ -122,6 +122,8 @@ if(options['--managed-opening-probe']&&(options['--execution-case']!=='code-tabl
   throw Error('Managed opening probe requires one isolated code-table-execute case');
 if(options['--x11-no-focus']&&!options['--managed-opening-probe']&&!options['--server-version-only'])
   throw Error('X11 focus guard requires the isolated managed opening probe or read-only recovery');
+if(options['--verify-managed-generation']&&(!options['--managed-opening-probe']||!options['--verify-runtime-source']))
+  throw Error('Managed generation requires owned initial opening and runtime source verification');
 if(options['--verify-source-admission']&&!options['--managed-opening-probe'])throw Error('Source admission requires the isolated managed opening probe');
 if(options['--verify-public-source-read']&&!options['--managed-opening-probe'])throw Error('Public source read requires the isolated managed opening probe');
 if(options['--verify-managed-source-write']&&(!options['--managed-opening-probe']||!options['--verify-public-source-read']))
@@ -542,8 +544,29 @@ const inspectWizardPages=async({remainingPages=false,deadline=phaseDeadline(1800
         await executionRecord({phase:'existing_schema_read',schema});
         if(!schema.verified||schema.generation?.checked!==report.execution_schema.generation.checked)throw Error('Existing JavaScript schema mode changed');
         report.execution_existing_schema=schema;
-      }else report.execution_schema=await configureJavascriptSchema({page,context:schemaContext(),mode:executionCase.split('-')[0],fixedCase:discoveryProbe?.scope==='P1-business'&&discoveryProbe.schema_mode==='declared'?'business-output':persistence?.id==='persistence-usage'?'usage-output':nativeRoundtrip&&nativeFixtureId==='cardinality-empty'?'cardinality-empty':undefined,
+      }else {
+        if(options['--verify-managed-generation']){
+          if(!managedSourceTask)throw Error('Managed generation initial lease unavailable');
+          const before=await page.evaluate(readJavascriptSchema,schemaContext());
+          if(before.verified!==true||before.generation?.checked!==false)throw Error('Fresh generation baseline unavailable');
+          const namespace='private-managed-generation-'+randomUUID();
+          managedCloseUncertain=true;await save();
+          const result=await dispatchManagedJavascriptGeneration({task:managedSourceTask,
+            execute:code=>Function('return ('+code+')')()(page),record:executionRecord,
+            receiptOptions:(id,key,signature)=>({receipt_namespace:namespace,receipt_id:id,receipt_signature:signature})});
+          if(result.status!=='SUCCEEDED'||result.output?.generation_readback_verified!==true)
+            throw Error('Managed generation transition unconfirmed');
+          const after=await page.evaluate(readJavascriptSchema,schemaContext());
+          if(JSON.stringify(after)!==JSON.stringify(result.output.schema)||after.generation?.checked!==true)
+            throw Error('Managed generation independent readback differs');
+          managedCloseUncertain=false;
+          report.managed_generation_observation={verified:true,before,after,receipt:result};
+          await executionRecord({phase:'javascript_managed_generation_independently_verified',
+            observation:report.managed_generation_observation});await save();
+        }
+        report.execution_schema=await configureJavascriptSchema({page,context:schemaContext(),mode:executionCase.split('-')[0],fixedCase:discoveryProbe?.scope==='P1-business'&&discoveryProbe.schema_mode==='declared'?'business-output':persistence?.id==='persistence-usage'?'usage-output':nativeRoundtrip&&nativeFixtureId==='cardinality-empty'?'cardinality-empty':undefined,
         once:(id,identity,perform)=>executionRuntime.once(caseEffect(report.case_id,id),identity,perform),record:executionRecord,deadline,columnState});
+      }
       if(options['--verify-runtime-schema']){
         const prepared={document_id:executionPrepared.document_id,
           workflow_ref:executionPrepared.workflow_ref,
