@@ -47,6 +47,27 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J19: reordered current context подготовлен к live — 2026-10-01
+
+Child `1bf25ca33b53911beeef8dfd45a7efefa9b06518` добавил два fixed cases
+context-code-reordered/context-declared-reordered. Existing input helper
+переиспользуется без изменения: verified upload sales-reordered.csv и один
+released import Execute, затем прежние warmup/edit4 JS Execute и context2 reads.
+Runtime/client не изменён; oracle различает текущий input source order и
+сохранённый input target order, проверяет полную reciprocity по name/field_id,
+а не по одинаковому array index. Старый JS source читается полностью.
+Addressed95 PASS, full operator18287 PASS/0 FAIL, actual exit0; diff PASS.
+Logs SHA256 `a3ec235b931cfa9d28a55a1eb74eafecdef5f09d32d573278843dbe4bea8fdf7` /
+`c199f259754d928bf56c374a23efde3174cb40a801082511ec22bd1a35303cc9`.
+Private independent pre-live oracle v1 SHA256
+`eadc1422c5f526b9051c1a01b0e4004e97ce8010f6fa259c0e141f0f76c89b1c`,
+auditor v1 `5dcf31f241e282d63d58799723c8118b6f5780f18bb3cf7ada140f4e79a45a3d`,
+freeze01/1448 files
+`0b8470d43400bb0b37825d544b12f0389415d9098c2e56637cf8c31078033102`.
+72 meaningful negative cases подготовлены, применяются после primary PASS.
+Registry404 closed_verified/active exec null. Следующий fresh405 Code на этом
+неизменном HEAD; reordered context/model/CLI PASS ещё нет.
+
 ### E/J19/J21: оба context modes приняты; compact bridge исправлен — 2026-10-01
 
 Тот же child `b0ecbeaadff8d77a30733ae08cb1e25ecd5937dc`, ordinary headed
