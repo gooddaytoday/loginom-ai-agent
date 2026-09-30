@@ -54,7 +54,8 @@ output также прошли independent typed audits и cleanup. На `2eef05
 `64221b01c8` приняты one-row output и empty input с полной схемой/read.
 На `d4898cac03` все пять fixed public declared scalar outputs прошли отдельные
 independent audits и cleanup: String NULL/empty, Boolean, real, safe integer,
-civil Date. Named access/cardinality/empty input выполняются.
+civil Date. На том же SHA отдельно приняты named access, output0/1/N и
+empty input; все9 declared runs получили independent PASS и полную уборку.
 Следующий шаг — E остаток J06–J08, затем остальные J.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.

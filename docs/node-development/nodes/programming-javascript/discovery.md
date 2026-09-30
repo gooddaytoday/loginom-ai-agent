@@ -109,7 +109,9 @@ Fixed Code one-row output и empty input также приняты на `2eef052
 `64221b01c8`. На `d4898cac03` отдельно приняты все пять fixed declared scalar outputs
 (String NULL/empty, Boolean, real, safe integer, civil Date) с native metadata/
 source/full typed audits и cleanup. Следующий результат E —
-remaining declared scalar/cardinality и точный остаток J06–J08; P1 Stop/cancel принят
+native input transport и точный остаток J06–J08. Fixed declared named access/
+output0/1/N/empty input тоже приняты на `d4898cac03` (9/9 runs, independent audit
+и cleanup); P1 Stop/cancel принят
 ранее и без затрагивающего изменения не повторяется. Реализация продолжается;
 наличие этого кода не закрывает неизвестные G1/G3/G5/G6, а отсутствие CLI не
 блокирует выход 0B. `ready_for_development` требует решений по точным вопросам
