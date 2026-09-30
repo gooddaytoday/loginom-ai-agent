@@ -4,7 +4,7 @@ export function captureJavascriptSelection({binding,node}) {
     const diagram=tab?.Controller?.FController?.FDiagram,nodes=diagram?.FNodes?.FCollection;
     const found=Array.isArray(nodes)&&nodes.length<=20?nodes.filter(n=>n.FGuid===node.id):[];
     if(tab!==binding.tab||found.length!==1)throw Error('Private selection binding unavailable');
-    return {document,controller:tab.Controller,model:tab.Controller.FController,diagram,graph:diagram.FmxGraph,container:diagram.FmxGraph.container,native:found[0],cell:found[0].FCell,shape:diagram.FmxGraph.view.getState(found[0].FCell)?.shape?.node,replacements:0};
+    return {document,controller:tab.Controller,tabRoot:tab.el?.dom,model:tab.Controller.FController,diagram,graph:diagram.FmxGraph,container:diagram.FmxGraph.container,native:found[0],cell:found[0].FCell,shape:diagram.FmxGraph.view.getState(found[0].FCell)?.shape?.node,replacements:0};
   }
 
 export function inspectJavascriptSelection({binding,node,icon,retained:r,requireSettings,requireVisualizers,inspectPhase,deadline,targetOrigin,targetBuild,poll=false,afterGesture=false}) {

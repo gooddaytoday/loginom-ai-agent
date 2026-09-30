@@ -14,6 +14,24 @@ import {javascriptDiscoveryProbe,javascriptDiscoveryOracle} from './javascript-d
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 
+// The fixed synchronous throw compiles successfully and fails on an explicit
+// execution. Its committed source must be used as the NEW repair baseline.
+export function verifyJavascriptPublicSyncThrow(job,node) {
+  const result=job?.outcome?.output;
+  need(job?.state==='settled'&&job.outcome.status==='FAILED'&&job.outcome.cleanup_complete===true
+    &&job.outcome.effect_possible===true&&result?.status==='FAILED'&&result.cleanup_complete===true
+    &&result.pending_phase==null&&JSON.stringify(result.node)===JSON.stringify(node)
+    &&result.configuration?.status==='applied'&&result.execution?.status==='failed'
+    &&result.execution.failure_verified===true&&typeof result.execution.execution_id==='string'
+    &&result.execution.execution_id===node.document_id+':'+result.execution.root_id+':'+result.execution.group_id
+    &&result.output?.status==='not_refreshed'&&result.output.ports?.length===0
+    &&result.error?.code==='NODE_EXECUTION_FAILED'&&result.error.message.includes('Error: E_JS_SYNC_THROW')
+    &&result.phases?.some(phase=>phase.phase==='materialization_execute'&&phase.status==='verified')
+    &&result.phases.every(phase=>phase.status==='verified'),
+  'Public synchronous throw execution/cleanup boundary unconfirmed');
+  return result;
+}
+
 // One public source session; continuations retain its original deadline.
 export async function readJavascriptPublicExistingSource({runtime,prepared,node,deadline,record}) {
   need(Number.isSafeInteger(deadline)&&deadline>Date.now()+30000,'Public source original deadline unavailable');
@@ -72,6 +90,7 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   onPending(true);await save();
   const readSource=()=>readJavascriptPublicExistingSource({runtime,prepared,node,deadline,record});
   const before=await readSource();
+  let repairBaseline=before.source_sha256;
   need(before.source_text===probe.source&&before.source_sha256===probe.source_sha256
     &&before.cursor===null&&!runtime.hasUnsettledWork(),'Public existing initial source differs from assigned package');
   if(schemaRefusalCaseId!==null){
@@ -134,13 +153,14 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
     }
     report.public_existing.wizard_refusal.job=job;await save();
     const result=job.outcome?.output,native=result?.error?.native;
-    need(job.state==='settled'&&job.outcome?.status==='FAILED'&&job.outcome.cleanup_complete===true
+    if(throwing){verifyJavascriptPublicSyncThrow(job,node);need(!runtime.hasUnsettledWork(),'Public failed execution remains unresolved');}
+    if(!throwing)need(job.state==='settled'&&job.outcome?.status==='FAILED'&&job.outcome.cleanup_complete===true
       &&result?.status==='FAILED'&&result.cleanup_complete===true&&result.pending_phase===null
       &&JSON.stringify(result.node)===JSON.stringify(node)&&result.configuration?.status==='discarded'
       &&result.execution.status==='not_requested'&&result.output.status==='not_refreshed'&&result.output.ports.length===0
       &&native?.kind==='javascript_wizard'&&['code_next','done'].includes(native.stage)&&native.source_sha256===identity.source_sha256
-      &&native.dialog_closed===true&&native.error_class?.name===(throwing?'Error':'SyntaxError')
-      &&(native.tooltip+'\n'+native.dialog_text).includes(throwing?'E_JS_SYNC_THROW':'SyntaxError: Syntax error at code')&&!runtime.hasUnsettledWork(),
+      &&native.dialog_closed===true&&native.error_class?.name==='SyntaxError'
+      &&(native.tooltip+'\n'+native.dialog_text).includes('SyntaxError: Syntax error at code')&&!runtime.hasUnsettledWork(),
     'Public native wizard diagnostic/discard/cleanup boundary unconfirmed');
     need(new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(result).valid,
       'Public native refusal violates diagnostic schema');
@@ -150,10 +170,12 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
     onPending(false);await save();
     report.stage='public-existing-native-refusal-source-after';onPending(true);await save();
     const after=await readSource(),afterGraph=await readGraph();
-    need(after.source_text===before.source_text&&after.source_sha256===before.source_sha256&&!runtime.hasUnsettledWork(),
+    need(after.source_text===(throwing?source_text:before.source_text)
+      &&after.source_sha256===(throwing?identity.source_sha256:before.source_sha256)&&!runtime.hasUnsettledWork(),
       'Public native refusal committed source changed');
+    repairBaseline=after.source_sha256;
     Object.assign(report.public_existing.wizard_refusal,{status:'OBSERVED',user_result:compact,
-      explicit_execute_requested:false,graph_after:afterGraph,
+      explicit_execute_requested:throwing,actual_stage:throwing?'materialization_execute':native.stage,graph_after:afterGraph,
       independent_source:{complete:true,...javascriptSourceIdentity(after.source_text),chunks:after.chunks,source_read_operation_id:after.source_read_operation_id}});
     onPending(false);await save();
   }
@@ -165,10 +187,10 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   need(remaining>=600000,'Public existing original time budget unavailable');
   const request={operation_id,contract_revision:'1.0.0',document_id:prepared.document_id,
     workflow_ref:prepared.workflow_ref,target:{kind:'existing',type:'programming.javascript',ref:node},
-    inputs:[],mode:'script',parameters:{source_text,expected_source_sha256:before.source_sha256,schema_mode:schemaMode},
+    inputs:[],mode:'script',parameters:{source_text,expected_source_sha256:repairBaseline,schema_mode:schemaMode},
     mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},
     budgets:{configure_ms:remaining,execute_ms:300000,total_ms:remaining}};
-  Object.assign(report.public_existing,{operation_id,previous_source_sha256:before.source_sha256,
+  Object.assign(report.public_existing,{operation_id,previous_source_sha256:repairBaseline,
     source_sha256:expected.source_sha256,oracle_sha256:probe.oracle_sha256,graph_before:graph,
     ...(wizardRefusalCaseId!==null?{wizard_refusal_case_id:wizardRefusalCaseId,repair_operation_id:operation_id}:{})});
   report.stage='public-existing-apply';await save();

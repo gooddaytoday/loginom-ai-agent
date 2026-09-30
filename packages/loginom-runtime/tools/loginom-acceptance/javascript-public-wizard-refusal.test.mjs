@@ -4,6 +4,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {javascriptDiscoveryProbe} from './javascript-discovery-probes.mjs';
 import {inspectJavascriptModulePolicy} from '../../client/lib/javascript-module-policy.mjs';
+import {verifyJavascriptPublicSyncThrow} from './javascript-public-existing-live.mjs';
 const entry=fileURLToPath(new URL('./javascript-public-wizard-refusal-live.mjs',import.meta.url));
 for(const mode of ['code','declared'])test('fixed native syntax case is parseable by admission and repair preserves the pinned business source '+mode,()=>{
  const source=javascriptDiscoveryProbe('p1-business-'+mode+'-base').source;
@@ -20,4 +21,24 @@ for(const args of [['--case','throw-code','--source','foreign'],['--case','throw
 test('fixed native-error help exposes only saved-package ordinary headed paths and no Save',()=>{
  const result=spawnSync(process.execPath,[entry,'--help'],{encoding:'utf8'});
  assert.equal(result.status,0);assert.match(result.stdout,/Ordinary headed/);assert.match(result.stdout,/no Save/);
+});
+
+test('fixed public sync throw requires applied source and verified failed explicit execution without output',()=>{
+ const node={document_id:'doc',workflow_id:'workflow',node_id:'node'};
+ const job={state:'settled',outcome:{status:'FAILED',cleanup_complete:true,effect_possible:true,output:{
+  status:'FAILED',cleanup_complete:true,pending_phase:null,node,configuration:{status:'applied'},
+  execution:{status:'failed',failure_verified:true,execution_id:'doc:root:1',root_id:'root',group_id:'1'},
+  output:{status:'not_refreshed',ports:[]},error:{code:'NODE_EXECUTION_FAILED',message:'Error: E_JS_SYNC_THROW\n at module (main:1:1)'},
+  phases:[{phase:'node_finish',status:'verified'},{phase:'materialization_execute',status:'verified'}]}}};
+ assert.equal(verifyJavascriptPublicSyncThrow(job,node),job.outcome.output);
+ for(const change of [v=>v.outcome.status='SUCCEEDED',v=>v.outcome.cleanup_complete=false,
+  v=>v.outcome.effect_possible=false,v=>v.outcome.output.cleanup_complete=false,
+  v=>v.outcome.output.pending_phase='execute',v=>v.outcome.output.node.node_id='foreign',
+  v=>v.outcome.output.configuration.status='discarded',v=>v.outcome.output.execution.status='completed',
+  v=>v.outcome.output.execution.failure_verified=false,v=>v.outcome.output.execution.execution_id='foreign',
+  v=>v.outcome.output.output.ports=[{port:0}],v=>v.outcome.output.output.status='complete',
+  v=>v.outcome.output.error.code='OTHER',v=>v.outcome.output.error.message='Error: unrelated',
+  v=>v.outcome.output.phases=[],v=>v.outcome.output.phases[1].status='pending']){
+   const changed=structuredClone(job);change(changed);assert.throws(()=>verifyJavascriptPublicSyncThrow(changed,node),/unconfirmed/);
+ }
 });
