@@ -45,6 +45,32 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: следующий native input/public JS блок — проектное решение — 2026-09-30
+
+Все9 declared cases завершены и profile364 closed_verified, active_exec=null.
+Следующая различающая проверка J06–J07: взять существующий pinned native real
+CSV/owned import reader, проверить исходные NULL/real bytes и завершённый
+read/release **до** создания JS, затем выполнить fixed identity-copy через тот
+же public C/D handler. Начать с одного real case; остальные primitive/native
+int64/Date cases добавлять по подтверждённому пути. CSV, authored JS и oracle
+остаются operator-only; product runtime/knowledge не получают fixtures.
+
+Выбран повтор существующего importer/native baseline с расширением fixed
+operator input descriptor. Альтернативы — повтор private native roundtrip
+(не проверяет public handler) или генерация значений в JS (не проверяет input
+transport) — уже представлены прежними probes и не закрывают это требование.
+Для нового fixed ID явно закрепить input fixture/row_count/schema/source до
+live; business/empty input guards сохранить. Pure actual admission и native
+baseline refusal проверить до browser. Native read uncertainty должна удержать
+cleanup/owner и остановить работу; никаких replay/import/Execute при неизвестном
+эффекте. Следом typed public output/source/mappings/graph/2 fresh Execute,
+independent audit и package/logout/browser/process cleanup. Native bytes output,
+outside-safe guarantee, Save/cold/candidate/CLI этим real case не доказываются.
+
+Код этого расширения и новый browser пока не созданы; далее реализация fixed
+real operator и адресные tests, отдельный independent oracle/auditor, freeze
+и fresh ordinary headed profile. Остальные E/F остаются открытыми.
+
 ### E: declared live — актуальная сводка — 2026-09-30
 
 Frozen child `d4898cac03ba8c6c5acc8ea20a15ad2094a49e31`: 9/9 fixed public declared cases приняли independent audit PASS. Каждый OBSERVED/terminal exit0, ordinary headed; input6×5 (empty-input0×5), точные output values/types/order/schema/precision, native declared columns/default usage,8 owned column steps,13 lifecycle phases, два свежих Execute, native mappings/graph/owned Views и независимый public source-read проверены. Package/logout/browser/process cleanup подтверждён отдельно для каждого run. Save/cold/native bytes/native-input roundtrip/candidate/CLI этими cases не доказаны.
