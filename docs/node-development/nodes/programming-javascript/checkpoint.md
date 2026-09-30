@@ -47,6 +47,38 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J20: exact knowledge v1 public probes подготовлены — 2026-09-30
+
+Child `bc6494476a5f35379d3a70b3e510fb5c8d805ab5` добавляет два fixed IDs
+существующему typed operator: `g5-knowledge-v1` и
+`declared-g5-knowledge-v1`. Sources совпадают byte-for-byte с двумя примерами
+knowledge1.0.0; asset/runtime/client не изменены. Knowledge SHA256
+`4a8a2d6e712fc56d039d1e595361dde9afb7e16eb7f3b8fd1959d5f5908bc2ef`.
+Существующий public lifecycle создаёт новый JS на своём imported sales,
+проводит два Execute (каждый budget60000ms), полный6×2, user-v1 projection и
+independent source-read. Projected результат дополнительно сохраняется для
+независимого audit; это не доказательство candidate/model delivery J01.
+
+Final addressed03:89 PASS, full operator all02:18274 PASS/0 FAIL, actual exit0.
+Logs SHA256 `d255942932279f0b5554c504eaed55e20d7c733ba96bb66531800594b68701ee` /
+`998861751047571ffc6e9f1b9e960bda5d21fb2567417087fd93552a33300004`.
+Client не менялся и повторно не тестировался, diff PASS. Initial addressed01
+имел две ошибки собственного table fixture (не указан filter_enabled=false),
+сохранён; oracle/value mismatch и invalid table проверяются раздельно.
+
+Private independent pre-live oracle v1 SHA256
+`148a3c19bcf8155ad996926f44892ce1c4f0e00e65346455c0e6ed53632609fb`,
+auditor v1 `1e08d71c762f34388438a4bebe58aef9e5aa608b5381499b0e73d3c57cbc6927`,
+source freeze01/707 files
+`e06da48aaf846e3ff0efb429bc87da3eee0b471b87a4664977e6bc15bb80ae31`.
+Auditor проверяет весь typed input6×5/output6×2, exact published source и
+knowledge identity, schema_mode/native mappings/own graph, две разные native
+completed identities, actual user-v1 cells/schema и own source-read/cleanup.
+32 meaningful negative copies подготовлены для проверки после primary PASS.
+Следующие fresh401 Code и fresh402 declared назначаются последовательно под
+lock на неизменном child HEAD. Live PASS ещё нет; registry400 closed_verified.
+J19/J21 композиция, полный J20 required profile и candidate/CLI остаются открытыми.
+
 ### E/J19/J20: порядок следующего результата уточнён — 2026-09-30
 
 Адресная сверка `javascript-source-read-session`, `node-contracts` и
