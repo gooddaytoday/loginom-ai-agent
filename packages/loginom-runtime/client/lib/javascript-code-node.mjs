@@ -116,7 +116,16 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       enter(ctx);need(committed?.owned_done_settled===true&&configured?.phase==='configured',
         'JavaScript source commit must precede execution');
       executionDriver=createNodeExecutionProcedure(channel,ctx.node,{allowDeactivate:true,verifyFailedChild:true});
-      await executionDriver.prepare();
+      try{await executionDriver.prepare();}
+      catch(error){
+        // Source admission retires a failed host callback as "boundary".
+        // Keep the actual preparation refusal in private redacted evidence;
+        // this read-only diagnostic never authorizes a launch or replay.
+        await onRecord({phase:'javascript_execution_prepare_refused',operation_id:operation.id,
+          node:ctx.node,deadline:ctx.deadline,
+          reason:redactor.text(String(error?.message??'Execution preparation failed')).slice(0,1024)});
+        throw error;
+      }
       const result=await finishConfiguredGraph(channel,executionDriver,'execute',ctx.node);
       return {...result,source_sha256:expected.source_sha256,explicit_execute_requested:true};
     };

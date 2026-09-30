@@ -90,6 +90,10 @@ test('managed Close accepts a rebound graph only with the same workflow, node an
   const read=()=>vm.runInNewContext('('+inspectManagedJavascriptCloseDecision.toString()+')(args)',context);
   assert.deepEqual({...read()},{state:'closed',node_id:'node',root_visible:false,dialog_count:0,
     graph_tid:'MF;TF-1;Graph;node',graph_rebound:true});
+  native.FLocked=true;
+  assert.equal(read().state,'waiting');
+  native.FLocked=false;
+  assert.equal(read().state,'closed');
   model.FDiagram.FNodes.FCollection=[];
   assert.equal(read().state,'waiting');
   model.FDiagram.FNodes.FCollection=[native];
