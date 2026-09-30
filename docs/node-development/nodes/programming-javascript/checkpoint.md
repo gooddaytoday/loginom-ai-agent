@@ -46,6 +46,56 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### Следующее продолжение E/J12/J25: native wizard refusal/repair — 2026-09-30
+
+Текущий docs HEAD после этой записи; child `3f3366e678` clean tracked. Registry
+profile384 closed_verified/active_exec=null/active evidence=null, browser/process
+absence доказаны; fresh385 не назначен. Goal active, full plan не завершён.
+В этой итерации приняты4 headed live: source fidelity32KiB и declared-empty
+(`88ddfc958e`), explicit schema-mode refusal code↔declared (`b17c5b7719`).
+Full client3014PASS/10SKIP и all operator18192PASS; подробности ниже.
+`acceleration-review.md` и child historical untracked files сохранены без добавления.
+
+Следующий связный результат — public native diagnostics/repair на SAME saved
+C/D node; нельзя начинать с console-only interpretation. Source-backed факт:
+`createJavascriptManagedSourceAdapter.commit` после verified Code Next loops
+`makeJavascriptManagedPageCode` до Done, признаёт page1/2 допустимыми, но не
+обрабатывает кнопку ошибки. `wizardReadiness` даёт transition/owner/page, а
+private `readJavascriptStage` + `captureJavascriptWizardError` уже распознают
+current completed gesture/no-mask/same-page/owned btnError и читают tooltip/
+native dialog. Historical actual `engine-optional-chain-regression-34` дал
+SyntaxError после Next, no explicit Execute, full cleanup; это приватное
+наблюдение, не новый public PASS. Parsed-valid `?.` — fixed native parser-refusal
+кандидат; syntactically invalid `(1 + )` public parser отклоняет до записи.
+Sync throw может отказать на wizard stage; этап брать из actual observations,
+не приписывать его child execution до owner-bound native proof.
+
+Порядок next: адресно прочитать [общий wizard error barrier](../../workflow/lifecycle.md#отказ-мастера-и-кнопка-ошибки),
+`javascript-stage-observer.mjs`, `javascript-wizard-error.mjs`, managed-page/
+code-next/source-adapter и их tests. Переиспользовать runtime native guards и
+вынести нужный owned read/dialog capability в client; **runtime не импортирует
+operator**. После одного ACKed Next/Done распознавать current native refusal до
+original deadline, не считать старую кнопку или timeout доказательством.
+Tooltip → один btnError, если dialog не открыт сам → bounded exact native text
+→ OK → same wizard/page proof. Owner/page/source digest и truncation обязательны;
+class/location только из native текста, absence/unrecognized явно. Не раскрывать
+raw source/secret; существующий redactor и response budgets обязательны.
+
+Только known owned diagnostic + dialog close разрешают один discard собственного
+изменённого draft. Затем fresh full source/settings/native schema/graph check
+под тем же original deadline должен доказать сохранение committed baseline.
+Typed FAILED/cleanup=true без stale output; unknown gesture/owner/Close/ACK
+по-прежнему ambiguous и без replay. Исправленный source — отдельный NEW operation
+ID на том же node с actual expected digest, public2 fresh Execute/full6×4.
+Сначала local regression/actual serialized reader/ACK negatives/schema+compact
+error delivery, fixed cases/oracle/auditor до live; затем fresh385 ordinary headed
+на assigned saved C, no Save/new bootstrap. Не запускать очередной public error
+case, пока mandatory wizard barrier и recovery не реализованы/проверены.
+Mode-refusal/source-fidelity runs не повторять: новая ветка касается native
+error settlement. После этой вехи остаются точные J19/J20/J22/J24, public Stop/
+recovery/module policy/source-direct budgets, затем F review/candidate/CLI.
+Все scopes/readiness сохранять; не вводить новый исследовательский tracker.
+
 ### E: public schema refusals2/2 closed; full operator regression PASS — 2026-09-30
 
 Declared→Code auditor31/31 actual mutations refused, receipt SHA256
