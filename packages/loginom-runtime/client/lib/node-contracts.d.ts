@@ -72,8 +72,11 @@ export interface JavascriptConfigurationReadback {
   receipt_ids: string[]; values_are: 'independent_owned_source_readback'; schema_mode: 'code';
   source: {sha256: string; utf8_bytes: number; lf_lines: number};
   settings_preserved: true; wizard_commit_verified: true;
-  /** Done does not request Execute; Loginom's internal effects remain unknown. */
-  execution_effects: {explicit_execute_requested: false; internal_execution_started: null};
+  /** Explicit execution is separate from Loginom's unknown internal Done effects. */
+  execution_effects: {explicit_execute_requested: boolean; internal_execution_started: null};
+  input_mapping?: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string;
+    type: string; data_kind: string; source_name: string; excluded: boolean}>};
+  output_mapping?: JavascriptConfigurationReadback['input_mapping'];
   package_persistence_verified: false;
 }
 export interface CalculatorParameters {

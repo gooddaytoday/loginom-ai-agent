@@ -133,13 +133,18 @@ const duplicatesConfigurationReadback=object({kind:values('duplicates'),scope:va
  input_mapping:object({port:{type:'integer',const:0},fields:boundedFields(object({name:str,source_name:str}))}),
  output_mapping:object({port:{type:'integer',const:0},fields:boundedFields(object({name:str,label:str,type:str,source_name:str}))}),
  package_persistence_verified:{type:'boolean',const:false}});
-const javascriptConfigurationReadback=object({kind:values('javascript'),scope:values('observed_after_verified_finish'),node:ref,
- receipt_ids:{...array(str),minItems:6,maxItems:9},values_are:values('independent_owned_source_readback'),schema_mode:values('code'),
+const javascriptReadbackProperties={kind:values('javascript'),scope:values('observed_after_verified_finish'),node:ref,
+ values_are:values('independent_owned_source_readback'),schema_mode:values('code'),
  source:object({sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},utf8_bytes:{type:'integer',minimum:0,maximum:32768},lf_lines:{type:'integer',minimum:1,maximum:1024}}),
  settings_preserved:{type:'boolean',const:true},wizard_commit_verified:{type:'boolean',const:true},
- execution_effects:object({explicit_execute_requested:{type:'boolean',const:false},internal_execution_started:{type:'null'}}),
- package_persistence_verified:{type:'boolean',const:false}});
-const configurationReadback={anyOf:[exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,javascriptConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
+ package_persistence_verified:{type:'boolean',const:false}};
+const javascriptConfigurationReadback=object({...javascriptReadbackProperties,receipt_ids:{...array(str),minItems:6,maxItems:9},
+ execution_effects:object({explicit_execute_requested:{type:'boolean',const:false},internal_execution_started:{type:'null'}})});
+const javascriptExecutedConfigurationReadback=object({...javascriptReadbackProperties,receipt_ids:{...array(str),minItems:12,maxItems:13},
+ execution_effects:object({explicit_execute_requested:{type:'boolean',const:true},internal_execution_started:{type:'null'}}),
+ input_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))}),
+ output_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))})});
+const configurationReadback={anyOf:[exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,javascriptConfigurationReadback,javascriptExecutedConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
 export const nodeApplyResultSchema=object({operation_id:str,status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),
  effect_possible:bool,phases:array(receipt),node:nullable(ref),execution,output,
  package_saved:{type:'boolean',const:false},cleanup_complete:bool,warnings:array(str),
