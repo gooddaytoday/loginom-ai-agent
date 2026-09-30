@@ -1,3 +1,6 @@
+import {verifyJavascriptMappingGraph} from './javascript-graph-preservation.mjs';
+import {retainedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
+export {verifyJavascriptMappingGraph} from './javascript-graph-preservation.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import {createJavascriptSourceAdmission,javascriptSourceSettingsDigest} from './javascript-source-admission.mjs';
 import {javascriptSourceIdentity} from './javascript-source-read.mjs';
@@ -70,7 +73,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       node_id:request.target.kind==='existing'?request.target.ref.node_id:null,operation_id:operation.id,ui_epoch:Date.now()};
     let expected=request.parameters.source_text===undefined?null:javascriptSourceIdentity(request.parameters.source_text);
     let owner,channel,signal,adapter,handle,admission,admitted,configured,committed,
-      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline;
+      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline;
     const enter=ctx=>{
       signal=ctx.signal;signal?.throwIfAborted();operation.deadline=ctx.deadline;
       if(ctx.node){
@@ -89,7 +92,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       need(owner&&same(boundOwner,owner),'JavaScript source admission owner changed');
       const selected=createJavascriptManagedSourceAdapter({page:{},
         prepared:{document_id:owner.document_id,workflow_ref:request.workflow_ref,node:nodeRef(owner)},node:nodeRef(owner),
-        uiEpoch:owner.ui_epoch,deadline,targetOrigin,execute,record:onRecord,receiptOptions,
+        uiEpoch:owner.ui_epoch,deadline,targetOrigin,execute,record:onRecord,receiptOptions,redactor,
         channel:remaining=>{operation.deadline=remaining;return channel;},openingBudgetMs:180000});
       const open=selected.open.bind(selected);
       selected.open=async input=>{
@@ -169,6 +172,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           expected??=admitted.effective_source;
           need(admitted.effective_source.source_sha256===expected.source_sha256,
             'JavaScript existing effective source admission differs');
+          existingGraphBaseline=await graph({...ctx,node:request.target.ref});
           return verified({effect_possible:true,source_sha256:expected.source_sha256,settings_changed:false});
         }
         need(admitted.intent==='create'&&admitted.effective_source.source_sha256===expected.source_sha256,
@@ -221,7 +225,18 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           // Here the owned writer already holds the changed draft. As in B,
           // commit that one-shot writer, then independently admit the actual
           // committed source/settings before allowing an execution effect.
-          committed=await adapter.commit(handle,{owner,deadline:ctx.deadline});
+          try { committed=await adapter.commit(handle,{owner,deadline:ctx.deadline}); }
+          catch(error) {
+            if(!error.javascriptWizardRefusal)throw error;
+            need(adapter.uncertain===false&&adapter.active===false,'JavaScript rejected draft remains unresolved');
+            const recovery=policyAdmission('existing',owner,ctx.deadline);
+            const afterReceipt=await recovery.admit({});
+            const afterBaseline=javascriptExistingLifecycleBaseline({receipt:afterReceipt,snapshot:sourceSnapshot,
+              parameters:{schema_mode:existingBaseline.schema_mode},owner});
+            const afterGraph=await graph(ctx);
+            await retainedJavascriptWizardRefusal({refusal:error.javascriptWizardRefusal,owner,admitted,afterReceipt,
+              baseline:existingBaseline,afterBaseline,beforeGraph:existingGraphBaseline,afterGraph,record:onRecord,deadline:ctx.deadline});
+          }
           admission=policyAdmission('existing',owner,ctx.deadline);
           configured=await admission.admit({});
           const after=javascriptExistingLifecycleBaseline({receipt:configured,snapshot:sourceSnapshot,
@@ -310,19 +325,6 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
 
 function nodeRef(owner){return {document_id:owner.document_id,workflow_id:owner.workflow_id,node_id:owner.node_id};}
 
-export function verifyJavascriptMappingGraph(before,after,node){
-  const domain=value=>({document_id:value.document_id,workflow_ref:value.workflow_ref,
-    nodes:value.nodes.map(({dom_epoch,...item})=>item),links:value.links,foreign_links:value.foreign_links});
-  need(before?.complete===true&&after?.complete===true&&before.document_id===node.document_id
-    &&after.document_id===node.document_id&&before.workflow_ref.workflow_id===node.workflow_id
-    &&after.workflow_ref.workflow_id===node.workflow_id,'JavaScript mapping graph owner changed');
-  const previous=before.nodes.find(item=>same(item.ref,node)),current=after.nodes.find(item=>same(item.ref,node));
-  need(previous&&current,'JavaScript mapping node disappeared');
-  const expected=previous.locked===true&&current.locked===false
-    ?{...before,nodes:before.nodes.map(item=>item===previous?{...item,locked:false}:item)}:before;
-  need(same(domain(expected),domain(after)),'JavaScript complete mapping graph changed');
-  return true;
-}
 
 function javascriptReadbackMapping(mapping,direction){
   return {port:0,autosync:mapping.autosync,fields:mapping.target_fields.map(field=>({index:field.index,

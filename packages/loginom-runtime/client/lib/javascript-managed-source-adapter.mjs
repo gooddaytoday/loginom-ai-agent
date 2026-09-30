@@ -11,6 +11,10 @@ import {dispatchManagedJavascriptCodeNext} from './javascript-managed-code-next.
 import {dispatchManagedJavascriptDone} from './javascript-managed-done.mjs';
 import {dispatchManagedJavascriptDeclared,validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
 import {javascriptSourceSettingsDigest} from './javascript-source-admission.mjs';
+import {makeJavascriptManagedStageCode} from './javascript-managed-stage.mjs';
+import {waitManagedJavascriptCodeSettlement} from './javascript-managed-code-settlement.mjs';
+import {captureManagedJavascriptWizardError,journalManagedJavascriptError} from './javascript-managed-wizard-error.mjs';
+import {createRedactor} from './redact.mjs';
 
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const need = (condition, message) => { if (!condition) throw Error(message); };
@@ -37,9 +41,11 @@ export function javascriptManagedSourceSettings(schema) {
 // No model-provided script, navigation target, or executable callback enters it.
 export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEpoch, deadline, targetOrigin,
   execute, record, receiptOptions, channel, wait = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  redactor=createRedactor(),
   openingBudgetMs = 90000,
   driver = {openManagedJavascriptExistingWizard, dispatchManagedJavascriptNext, dispatchManagedJavascriptGeneration,
     dispatchManagedJavascriptCodeNext, dispatchManagedJavascriptDone, dispatchManagedJavascriptDeclared,
+    makeJavascriptManagedStageCode,waitManagedJavascriptCodeSettlement,captureManagedJavascriptWizardError,
     closeManagedJavascriptWizard, makeJavascriptManagedPageCode, makeJavascriptManagedSourceCode,
     makeJavascriptManagedSelectionReadCode, makeJavascriptSchemaContextCode,
     makeJavascriptExistingGraphTypeCode, replaceManagedJavascriptSource}}) {
@@ -170,30 +176,45 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
         && /^[a-f0-9]{64}$/.test(handle.draftSha256) && handle.commitAttempted !== true,
         'Managed JavaScript commit handle unavailable or already used');
       handle.commitAttempted = true;
+      const before=await execute(driver.makeJavascriptManagedStageCode(handle.task));
+      need(before?.owner_verified===true&&before.native_owner_verified===true&&before.pending===false
+        &&!before.preview_visible&&before.page_tid===handle.task.workflow_ref.prefix+';WizrdMCF;JavaScriptCodeWizard',
+      'Managed JavaScript Code Next baseline unavailable');
       uncertain = true;
       const next = await driver.dispatchManagedJavascriptCodeNext({task: handle.task,
         expected_source_sha256: handle.draftSha256, execute, record, receiptOptions});
       need(next?.status === 'SUCCEEDED' && next.output?.next_gesture_returned === true
         && next.output.transition_verified === false, 'Managed JavaScript Code Next unconfirmed');
-      let donePage = null;
-      while (Date.now() < handle.task.deadline) {
-        const current = await execute(driver.makeJavascriptManagedPageCode(handle.task)).catch(error => {
-          if (error?.message === 'Managed JavaScript page not ready') return null;
-          throw error;
-        });
-        if (current?.ready === true) {
-          need(current.node_guid === node.node_id && current.page?.indicator_count === 4,
-            'Managed JavaScript Done page owner changed');
-          if (current.page.tid === handle.task.workflow_ref.prefix + ';WizrdMCF;DoneWizard'
-            && current.page.index === 3 && current.page.visible_editors === 0) {
-            donePage = current; break;
-          }
-          need([1,2].includes(current.page.index), 'Managed JavaScript unexpected page after Code Next');
-        }
-        await wait(Math.min(100, Math.max(1, handle.task.deadline - Date.now())));
+      await journalManagedJavascriptError({record,deadline:handle.task.deadline},{phase:'javascript_managed_code_next_returned',
+        operation_id:handle.task.operation_id,owner:handle.task.owner,source_sha256:handle.draftSha256,
+        receipt:next,deadline:handle.task.deadline});
+      const settled=await driver.waitManagedJavascriptCodeSettlement({task:handle.task,before,execute,record,wait});
+      if(settled.wizard_error_refusal===true) {
+        const diagnostic=await driver.captureManagedJavascriptWizardError({task:handle.task,before,after:settled,
+          expected_source_sha256:handle.draftSha256,execute,record,receiptOptions,wait,redactor});
+        need(diagnostic?.dialog_closed===true&&diagnostic.native_owner_verified===true
+          &&same(diagnostic.owner,handle.task.owner)&&diagnostic.source_sha256===handle.draftSha256,
+        'Managed JavaScript native refusal unconfirmed');
+        const closed=await driver.closeManagedJavascriptWizard({task:{...handle.task,
+          cleanup_deadline:Math.min(handle.task.deadline,Date.now()+60000)},execute,record,receiptOptions,wait});
+        need(closed?.verified===true&&closed.closed===true&&closed.node_id===node.node_id
+          &&closed.draft_discarded===true&&closed.settings_applied===false&&closed.execution_started===false,
+        'Managed JavaScript rejected draft discard unconfirmed');
+        const {prepared:ignoredPrepared,allowDeactivation:ignoredDeactivation,...selectionTask}=handle.task;
+        await execute(driver.makeJavascriptManagedSelectionReadCode({...selectionTask,mode:'dispose'}));
+        await journalManagedJavascriptError({record,deadline:handle.task.deadline},{phase:'javascript_managed_rejected_draft_discarded',
+          operation_id:handle.task.operation_id,owner:handle.task.owner,source_sha256:handle.draftSha256,
+          closed,deadline:handle.task.deadline});
+        active=null;uncertain=false;
+        const error=Error('Loginom JavaScript wizard rejected source');
+        error.javascriptWizardRefusal={diagnostic,closed};
+        throw error;
       }
-      need(donePage !== null && Date.now() < handle.task.deadline,
-        'Managed JavaScript Done page original deadline expired');
+      const donePage=await execute(driver.makeJavascriptManagedPageCode(handle.task));
+      need(donePage?.ready===true&&donePage.node_guid===node.node_id&&donePage.page?.indicator_count===4
+        &&donePage.page.tid===handle.task.workflow_ref.prefix+';WizrdMCF;DoneWizard'
+        &&donePage.page.index===3&&donePage.page.visible_editors===0&&Date.now()<handle.task.deadline,
+      'Managed JavaScript Done page owner changed');
       const done = await driver.dispatchManagedJavascriptDone({task: handle.task,
         expected_source_sha256: handle.draftSha256, execute, record, receiptOptions});
       need(done?.status === 'SUCCEEDED' && done.output?.done_gesture_returned === true

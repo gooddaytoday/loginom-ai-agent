@@ -1,34 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
+import {javascriptStageFixture} from '../../client/test/support/javascript-stage-fixture.mjs';
 import {readJavascriptStage,recordJavascriptStageChange,closeJavascriptPreviewOnce,javascriptStageTerminal,requireJavascriptStageAdmission,waitJavascriptStageObservation} from './javascript-stage-observer.mjs';
 
-function fixture() {
-  const prefix='MF;TF-1',base=prefix+';WizrdMCF';
-  const element=(id,tid)=>({id,tid,isConnected:true,parentElement:null,style:{display:'block',visibility:'visible'},
-    rect:{x:20,y:20,width:300,height:200},getBoundingClientRect(){return this.rect;},getAttribute(key){return key==='data-tid'?this.tid:null;},
-    contains(other){return this===other;},querySelectorAll(){return [];}});
-  const root=element('wizard',base),code=element('code',base+';JavaScriptCodeWizard'),preview=element('preview',base+';JavaScriptOutputPreviewForm');
-  const error=element('error',base+';btnError');error.rect.width=0;error.tip='SyntaxError: Syntax error at code (:4:33)';
-  error.getAttribute=key=>key==='data-tid'?error.tid:key==='data-qtip'?error.tip:null;
-  root.contains=e=>e===root||e===code||e===error;code.parentElement=root;error.parentElement=root;
-  root.querySelectorAll=selector=>selector.includes('bg-error')?[]:selector.includes('btnError')?[error]:[code];
-  const model={FView:{el:{dom:root}},FModelNode:{}},codeView={el:{dom:code}},previewView={el:{dom:preview},hidden:false};
-  const form={FView:previewView,FLoaded:true},controller={FWizardForm:model,FView:{el:{dom:{}}},FPreviewController:{FPreviewForm:form}};
-  const item={FWizard:controller,FPages:[codeView]};model.FWizardItems={FItems:[item]};
-  codeView.Controller={};previewView.Controller=form;
-  const native={},tab={Controller:{Node:{data:{node:native}},FController:model}},binding={tab,nodeData:model.FModelNode};
-  const connection={Connected:true,UserName:'jsteach'},dialogs=[];
-  const previews=[preview],masks=[],controls={wizard:model.FView,code:codeView,preview:previewView};
-  const context=vm.createContext({innerWidth:1000,innerHeight:800,getComputedStyle:e=>e.style,
-    document:{querySelectorAll:selector=>selector.includes('bg-mask')?masks:selector.includes('role=')?dialogs:previews},Ext:{getCmp:id=>controls[id]},
-    bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:connection},Items:{Workspace:{getActiveTab:()=>tab}}}}}}}});
-  const read=()=>vm.runInContext('('+readJavascriptStage.toString()+')',context)({root,native,binding,prefix,account:'jsteach',build:'7.4.2'});
-  return {read,context,connection,dialogs,item,root,code,error,preview,model,codeView,previewView,form,controller,tab,previews,masks,element};
-}
 
 test('serialized observer binds portal Preview through owned code wizard and reciprocal form view',()=>{
-  const f=fixture(),result=f.read();
+  const f=javascriptStageFixture(),result=f.read();
   assert.notEqual(f.controller.FView,f.codeView);assert.notEqual(f.codeView.Controller,f.controller);
   assert.equal(f.root.contains(f.preview),false);assert.equal(f.previewView.ownerCt,undefined);
   assert.equal(result.preview_owned,true);assert.equal(result.preview_settled,true);
@@ -39,7 +16,7 @@ test('same tid, DOM containment or Ext owner chain cannot substitute native form
   for(const change of [f=>f.controller.FWizardForm={},f=>f.item.FPages=[],f=>f.controller.FPreviewController={},
     f=>f.form.FView={el:{dom:f.preview}},f=>f.previewView.Controller={},f=>f.tab.Controller.FController.FModelNode={},
     f=>f.previews.push(f.element('duplicate',f.preview.tid))]){
-    const f=fixture();f.previewView.ownerCt=f.model.FView;change(f);
+    const f=javascriptStageFixture();f.previewView.ownerCt=f.model.FView;change(f);
     assert.equal(f.read().preview_owned,false);assert.equal(f.read().preview_settled,false);
   }
 });
@@ -49,12 +26,12 @@ test('hidden, offscreen, stale ancestor and native hidden Preview fail ownership
     f=>f.preview.rect.x=1100,f=>f.previewView.hidden=true,f=>f.preview.isConnected=false,
     f=>{f.preview.parentElement=f.element('hidden','');f.preview.parentElement.style.display='none';},
     f=>{f.preview.parentElement=f.preview;}]){
-    const f=fixture();change(f);assert.equal(f.read().preview_owned,false);
+    const f=javascriptStageFixture();change(f);assert.equal(f.read().preview_owned,false);
   }
 });
 
 test('local UI accessors and server proxy fields are never invoked',()=>{
-  const f=fixture();let calls=0;
+  const f=javascriptStageFixture();let calls=0;
   const poison={get(){calls++;throw Error('getter invoked');}};
   for(const field of ['FEngine','FPreview','View','WizardForm'])Object.defineProperty(f.controller,field,poison);
   Object.defineProperty(f.form,'Preview',poison);Object.defineProperty(f.previewView,'isVisible',poison);
@@ -64,7 +41,7 @@ test('local UI accessors and server proxy fields are never invoked',()=>{
 });
 
 test('owned preview includes only its current visible messages; loading remains unsettled',()=>{
-  const f=fixture(),message=f.element('message',f.preview.tid+';colMessage_0');message.textContent='sentinel';
+  const f=javascriptStageFixture(),message=f.element('message',f.preview.tid+';colMessage_0');message.textContent='sentinel';
   f.preview.querySelectorAll=()=>[message];f.form.FLoaded=false;
   const loading=f.read();assert.equal(loading.preview_owned,true);assert.equal(loading.preview_settled,false);
   assert.equal(loading.messages[0].text,'sentinel');
@@ -73,14 +50,14 @@ test('owned preview includes only its current visible messages; loading remains 
 });
 
 test('diagnostic inventories have fixed bounds and no foreign text payload',()=>{
-  const f=fixture();for(let i=0;i<20;i++)f.previews.push(f.element('other'+i,f.preview.tid));
+  const f=javascriptStageFixture();for(let i=0;i<20;i++)f.previews.push(f.element('other'+i,f.preview.tid));
   const result=f.read();assert.equal(result.preview_diagnostic.exact_count,21);
   assert.equal(result.preview_diagnostic.roots.length,3);assert.equal(result.preview_owned,false);
   assert.equal(JSON.stringify(result.preview_diagnostic).includes('textContent'),false);
 });
 
 test('changed-state journal suppresses unchanged polls and stops at sixteen records',async()=>{
-  const f=fixture(),state={count:0},records=[],identity={effect_id:'original'};
+  const f=javascriptStageFixture(),state={count:0},records=[],identity={effect_id:'original'};
   const record=async value=>records.push(value);
   for(let i=0;i<200;i++)await recordJavascriptStageChange({state,identity,snapshot:f.read(),record});
   assert.equal(records.length,1);
@@ -91,7 +68,7 @@ test('changed-state journal suppresses unchanged polls and stops at sixteen reco
 
 test('cleanup closes proven settled Preview once and refuses owner/loading/mask changes',async()=>{
   for(const fault of ['none','foreign','loading','mask','lost','journal']){
-    const f=fixture(),state={},events=[];
+    const f=javascriptStageFixture(),state={},events=[];
     if(fault==='foreign')f.controller.FWizardForm={};if(fault==='loading')f.form.FLoaded=false;
     if(fault==='mask')f.masks.push(f.element('mask',''));
     const run=()=>closeJavascriptPreviewOnce({read:f.read,state,record:async()=>{events.push('record');if(fault==='journal')throw Error('journal');},
@@ -118,16 +95,16 @@ test('wizard collection admission requires unique dense bounded local item/page 
     f=>f.model.FWizardItems.FItems.push({...f.item}),f=>f.item.FPages.push(f.codeView),
     f=>f.item.FPages=Array(1),f=>f.model.FWizardItems.FItems=Array(33).fill(f.item),
     f=>f.item.FPages=Array(33).fill(f.codeView),f=>f.item.FPages={},f=>f.item.FWizard={}]){
-    const f=fixture();change(f);const snapshot=f.read();assert.equal(snapshot.preview_diagnostic.code_owned,false);
+    const f=javascriptStageFixture();change(f);const snapshot=f.read();assert.equal(snapshot.preview_diagnostic.code_owned,false);
     assert.equal(snapshot.preview_owned,false);assert.ok(Object.values(snapshot.preview_diagnostic.code_checks).includes(false));
   }
-  const f=fixture();let getterCalls=0;
+  const f=javascriptStageFixture();let getterCalls=0;
   Object.defineProperty(f.item.FPages,'0',{get(){getterCalls++;throw Error('array accessor');}});
   assert.equal(f.read().preview_diagnostic.code_checks.pages_data_unique_bounded,false);assert.equal(getterCalls,0);
 });
 
 test('connection loss invalidates stale native owner and causes immediate read-only wait refusal',async()=>{
-  const f=fixture(),before=f.read(),records=[];f.connection.Connected=false;
+  const f=javascriptStageFixture(),before=f.read(),records=[];f.connection.Connected=false;
   let reads=0,waits=0;
   const after=await waitJavascriptStageObservation({read:async()=>{reads++;return f.read();},wait:async()=>{waits++;},
     deadline:Date.now()+5000,stage:'preview',before,identity:{effect_id:'once'},record:async e=>records.push(e)});
@@ -141,7 +118,7 @@ test('connection loss invalidates stale native owner and causes immediate read-o
 });
 
 test('foreign session dialogs refuse while exact owned wizard and Preview dialogs remain admitted',()=>{
-  const f=fixture();f.dialogs.push(f.root,f.preview);assert.equal(f.read().owner_verified,true);
+  const f=javascriptStageFixture();f.dialogs.push(f.root,f.preview);assert.equal(f.read().owner_verified,true);
   const foreign=f.element('session','msgbox');Object.defineProperty(foreign,'textContent',{get(){throw Error('foreign payload');}});
   f.dialogs.push(foreign);const snapshot=f.read();assert.equal(snapshot.boundary_refusal,'foreign_dialog');
   assert.equal(snapshot.owner_verified,false);assert.equal(snapshot.preview_owned,false);
@@ -151,7 +128,7 @@ test('foreign session dialogs refuse while exact owned wizard and Preview dialog
 });
 
 test('Preview preflight refuses unbound code before effects but permits lazily absent Preview controller',async()=>{
-  const f=fixture();delete f.controller.FPreviewController;f.previews.length=0;
+  const f=javascriptStageFixture();delete f.controller.FPreviewController;f.previews.length=0;
   const records=[],identity={effect_id:'original'};
   const admit=()=>requireJavascriptStageAdmission({stage:'preview',before:f.read(),identity,record:async e=>records.push(e)});
   await admit();assert.equal(records.length,0);
@@ -163,7 +140,7 @@ test('Preview preflight refuses unbound code before effects but permits lazily a
 });
 
 test('wait returns immediate connection refusal even after changed-state diagnostic cap is exhausted',async()=>{
-  const f=fixture(),before=f.read(),records=[];let reads=0;
+  const f=javascriptStageFixture(),before=f.read(),records=[];let reads=0;
   f.form.FLoaded=false;
   const after=await waitJavascriptStageObservation({read:async()=>{
     reads++;f.preview.rect.x=reads;if(reads===20)f.connection.Connected=false;return f.read();},wait:async()=>{},
@@ -173,7 +150,7 @@ test('wait returns immediate connection refusal even after changed-state diagnos
 });
 
 test('fresh quiet wizard error ends original Next wait after mask settles without replay',async()=>{
-  const f=fixture(),before=f.read(),records=[];let polls=0;
+  const f=javascriptStageFixture(),before=f.read(),records=[];let polls=0;
   const after=await waitJavascriptStageObservation({read:async()=>{
     polls++;if(polls===1)f.masks.push(f.element('mask',''));
     if(polls===2){f.masks.length=0;f.error.rect.width=30;}
@@ -186,7 +163,7 @@ test('fresh quiet wizard error ends original Next wait after mask settles withou
 });
 
 test('fresh wizard error takes precedence over a new generic message',async()=>{
-  const f=fixture(),before=f.read();f.error.rect.width=30;
+  const f=javascriptStageFixture(),before=f.read();f.error.rect.width=30;
   let polls=0;
   const after=await waitJavascriptStageObservation({read:async()=>{
     polls++;return {...f.read(),messages:[{id:'fresh',key:'error',text:'generic failure'}]};
@@ -198,7 +175,7 @@ test('fresh wizard error takes precedence over a new generic message',async()=>{
 });
 
 test('stale error button before a corrected transition does not end Next wait',async()=>{
-  const f=fixture();f.error.rect.width=30;
+  const f=javascriptStageFixture();f.error.rect.width=30;
   const before=f.read();let polls=0;
   const after=await waitJavascriptStageObservation({read:async()=>{
     polls++;if(polls===2)f.code.tid='MF;TF-1;WizrdMCF;DoneWizard';return f.read();},
@@ -208,12 +185,12 @@ test('stale error button before a corrected transition does not end Next wait',a
 });
 
 test('self-opened native dialog is attributable only with a fresh owned error button',async()=>{
-  const f=fixture(),before=f.read();f.error.rect.width=30;
+  const f=javascriptStageFixture(),before=f.read();f.error.rect.width=30;
   f.dialogs.push(f.element('dialog','msgbox-1'));
   const after=await waitJavascriptStageObservation({read:async()=>f.read(),wait:async()=>{},
     deadline:Date.now()+5000,stage:'next',before,identity:{effect_id:'once'},record:async()=>{}});
   assert.equal(after.boundary_refusal,'foreign_dialog');assert.equal(after.wizard_error_refusal,true);
-  const other=fixture(),prior=other.read();other.dialogs.push(other.element('dialog','msgbox-1'));
+  const other=javascriptStageFixture(),prior=other.read();other.dialogs.push(other.element('dialog','msgbox-1'));
   const foreign=await waitJavascriptStageObservation({read:async()=>other.read(),wait:async()=>{},
     deadline:Date.now()+5000,stage:'next',before:prior,identity:{effect_id:'once'},record:async()=>{}});
   assert.equal(foreign.boundary_refusal,'foreign_dialog');assert.equal(foreign.wizard_error_refusal,undefined);
