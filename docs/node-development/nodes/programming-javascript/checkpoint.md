@@ -26,11 +26,11 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Scalar/precision/cardinality/engine/names/errors — J06–J09/J12/J20/J24/J25 | Приватные native/typed, 30/30 engine observations, T-пробы; ссылки в discovery | G3 bridge, обязательный остаток G5/G6 и подтверждение через handler; число snippets не означает PASS |
 | Persistence — J15/J23 | Приватные code/declared/usage writer–cold–bytes, dirty-state; см. G7 discovery и исторические SHA ниже | Только фиксированные 6×2; нужны handler 6×4 и CLI |
 | Бизнес и freshness — J03/J04/J11 | Private code/base и declared/base 6×4 `ba46d2ecda`: полный typed UI oracle и fresh owned Execute | Code changed/reordered тоже прошли; остаются existing freshness, declared variants и public C/D/E; native bytes этими runs не доказаны |
-| Stop/cancel — J13 | Private run08; public Stop/repair fresh393 на `69c1f3d60c`; public local read cancel/SAME-ID continuation того же native execution fresh394 на `56f8df0250`, audit/negative87/87 и cleanup/process absence | Public lost reply и CLI lifecycle; весь G6 этим fixed case не закрыт |
+| Stop/cancel — J13 | Private run08; public Stop/repair fresh393 на `69c1f3d60c`; public local read cancel/SAME-ID continuation того же native execution fresh394 на `56f8df0250`, audit/negative87/87 и cleanup/process absence | Public lost reply fresh398 на `90c3bdd7c6` также принят, status/Stop/settlement/inspect и negative88/88; CLI lifecycle и полный G6 открыты |
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — public lost-reply recovery (J13). Fixed source32768/
+следующий шаг — Required=true/manual fields (J09). Fixed source32768/
 empty и schema-mode refusal уже приняты ниже; Required=true, дополнительные
 limits/redaction и context/engine/module/budgets остаются открытыми.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
@@ -46,6 +46,38 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J13: public apply reply loss/same worker Stop/repair принят — 2026-09-30
+
+Child `90c3bdd7c67258c5fd03884b7ae38ff94ccc7b34`, fresh398/exec72205,
+`e-public-lost-reply-code-02`: ordinary headed, actual exit0. Один public apply
+запустил конечный45s source, реальный browser launch receipt подтверждён;
+ответ вызывающему управляемо потерян. Read-only status сохранил worker attempt1,
+тот же own execution `1790793957711-52zzcjmj9gf:758:1`, group1/child1.2.
+Один native Cancel завершил именно этот execution за14,118s. После settlement
+public inspect подтвердил исходный terminal outcome и cleanup; повторных
+apply/Execute/Stop, local cancel или resume исходной operation нет.
+
+NEW same-node repair `js-public-existing-a71ae4ca-5596-4d89-a7be-092e8e25aa96`
+дал два fresh completed execution:2/:3, полный ordered typed6×4 oracle1950.
+Independent public source-read подтвердил892bytes/18LF, SHA256
+`05051e8f0965bc246ac4437acb668039fffca2c553b59a415687a87ccd3677e6`;
+сохранены native schema/settings и полный соседний graph. Save не отправлялся.
+Report/journal SHA256:
+`6ffb8099e0644a4d9a2b3bcbe8acf61086ae7a609be61f38dcfeda0dcaeaf3be` /
+`d74b5dad5428f5958b0acb8b496780ec99378b1c62c5f851c5d4779eab740c77`.
+Frozen auditor v2 PASS, receipt SHA256
+`e8b3693e9a7d6223ce538a85edda643d3b3a83d180fec1621079d3ed88cbd457`.
+Meaningful negative copies88/88 отказали, actual exit0 checker, receipt SHA256
+`29b1fd8d4a48fb5cd907afaa601ff4b05b4379bee78e034f31b102dcbac61fa2`.
+Package Close/logout/browser close3/3, actual process absence проверены;
+registry reconciled `closed_verified`. Исходный failed395 не изменён.
+
+Это fixed caller-reply-loss proof с retained backend и реальными browser receipts.
+Не доказан recovery потерянного browser gesture receipt или отсутствующего worker.
+Весь G6/продуктовый candidate/CLI/full Goal этим case не закрыт.
+**Далее:** J09 Required=true/manual fields, затем remaining context/engine/module/
+budgets/Done refusal, один F review/fix, candidate и два sequential CLI modes.
 
 ### E/J13: fresh395 отказал на busy inspect; очистка подтверждена — 2026-09-30
 
