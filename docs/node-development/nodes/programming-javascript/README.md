@@ -69,8 +69,10 @@ Native cardinality4/4 принят на `3bfbd9968b`: native input baseline,
 ordered keep2/odd/duplicate Code и canonical declared-empty/schema/cleanup.
 Fixed public Code32768bytes/1024lines и declared-empty source-read, schema-mode
 refusal2/2, native Code Next SyntaxError и explicit sync throw/NEW repair обоих
-modes приняты; точные SHA и пределы в checkpoint. Следующий шаг — public
-Stop/cancel/recovery (J13), затем Required=true/context/engine/module/budgets
+modes приняты; точные SHA и пределы в checkpoint. Public finite Stop/NEW
+same-node repair на `69c1f3d60c` также принят: native cancelled за12,173s,
+independent audit/negative62/62 и cleanup/process absence. Следующий шаг —
+public local cancel/same-ID/lost-reply recovery (J13), затем Required=true/context/engine/module/budgets
 и точный остаток E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
