@@ -16,7 +16,7 @@ const node = { mode: 'apply', action: action('node.add'), parameters: { componen
 const link = { mode: 'apply', action: action('link.create'), parameters: { source_node: { node_label: 'Источник' }, target_node: { node_label: 'Объединение' }, target_port: { kind: 'add' } } };
 const request = (task, ledger = true) => ({ name: 'browser_run_code_unsafe', arguments: { code: makeCapabilityCode(task.action, selectors, task.parameters, { mode: task.mode,
   ...(ledger ? { receipt_namespace: 'static-test-session', receipt_id: 'static-test-operation', receipt_signature: 'static-test-signature' } : {}) }) } });
-const response = key => ({ content: [{ type: 'text', text: JSON.stringify({ status: 'AMBIGUOUS', action_key: key, action_revision: '1.0.0', operation_id: 'static-harness-test', output: {}, error: null, trace: [{ event: 'operator_fault_injected' }] }) }] });
+const response = key => ({ content: [{ type: 'text', text: JSON.stringify({ status: 'AMBIGUOUS', action_key: key, action_revision: '1.0.0', operation_id: 'static-harness-test', phase:'cleanup', effect_possible:true, cleanup_complete:true, output: {}, error: null, trace: [{ event: 'operator_fault_injected' }] }) }] });
 test('fault gate rejects stale SHA, other run, other state and undeclared variant', () => {
   const runId = '20260905-120000-1234abcd';
   const context = { variant: 'lost_receipt', state: `/isolated/${runId}/private/dock-state`, runDirectory: `/isolated/${runId}`,
@@ -87,4 +87,18 @@ test('lost response leaves production code unchanged, saves successful receipt, 
   assert.equal(receipts[0].generated_code_modified, false);
   assert.equal(receipts[0].source_code_sha256, receipts[0].injected_code_sha256);
   assert.deepEqual(receipts[0].actual_browser_reply, body);
+});
+
+test('current reader arguments retain fixed task parsing without evaluating source or trusting inconsistent wrappers',()=>{
+ const original=request(node),code=original.arguments.code;
+ assert.equal(readTask(original).parameters.expected_label,'Источник');
+ for(const changed of [code.replace('function browserReceipt','function foreignReceipt'),
+   code.replace('function browserCapability','function foreignCapability'),
+   code.replace('"expected_label":"Источник"','"expected_label":"Foreign"'),
+   code+'; (()=>{throw Error("must not execute");})()',
+   'async (page) => (function browserCapability(){throw Error("must not execute")})(page, {parameters:(()=>{throw Error("must not execute")})()}, undefined, undefined, undefined)']) {
+  assert.equal(readTask({name:'browser_run_code_unsafe',arguments:{code:changed}}),null);
+ }
+ const unusual={...node,parameters:{...node.parameters,expected_label:'text ") (page, {\"foreign\":1}) 😀'}};
+ assert.deepEqual(readTask(request(unusual)).parameters,unusual.parameters);
 });

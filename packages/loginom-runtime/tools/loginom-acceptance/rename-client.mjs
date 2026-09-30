@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Private operator fault injection. Never shipped or registered as a product tool.
 import { createHash } from 'node:crypto';
+import {parse} from '../../client/node_modules/acorn/dist/acorn.mjs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseCapabilityResult } from '../../client/lib/executor.mjs';
@@ -10,33 +11,30 @@ export const RENAME_NEEDLE = "        await interact(timeout => resolve('workflo
 const INJECTION = "        record('operator_fault_injected', { fault: 'rename_interrupted_after_real_node_drag', added_label: label });\n        throw new Error('OPERATOR_RENAME_EDITOR_INTERRUPTED');\n";
 
 export function readTask(request) {
-  const code = request?.arguments?.code;
-  if (request?.name !== 'browser_run_code_unsafe' || typeof code !== 'string') return null;
-  const start = code.lastIndexOf(')(page, ');
-  if (!code.startsWith('async (page) => (') || start < 0 || !code.endsWith(')')) return null;
-  // Read the final JSON argument by its grammar boundary. A page-receipt wrapper
-  // adds one closing parenthesis; braces and parentheses inside JSON strings
-  // must never influence the boundary. No eval or executable parsing is used.
-  const jsonStart = start + 8;
-  if (code[jsonStart] !== '{') return null;
-  let depth = 0, quoted = false, escaped = false;
-  for (let index = jsonStart; index < code.length; index++) {
-    const char = code[index];
-    if (quoted) {
-      if (escaped) escaped = false;
-      else if (char === '\\') escaped = true;
-      else if (char === '"') quoted = false;
-    } else if (char === '"') quoted = true;
-    else if (char === '{' || char === '[') depth++;
-    else if (char === '}' || char === ']') {
-      depth--;
-      if (depth === 0) {
-        if (!/^\){1,2}$/.test(code.slice(index + 1))) return null;
-        try { return JSON.parse(code.slice(jsonStart, index + 1)); } catch { return null; }
-      }
-    }
-  }
-  return null;
+  const code=request?.arguments?.code;
+  if(request?.name!=='browser_run_code_unsafe'||typeof code!=='string'
+    ||!code.startsWith('async (page) => (')||Buffer.byteLength(code)>2097152)return null;
+  // Parse only syntax. Native reader functions follow the JSON task in the
+  // current generator; strings and nested functions cannot define its boundary.
+  const wrapped='('+code+')';
+  try{
+    const tree=parse(wrapped,{ecmaVersion:2025}),arrow=tree.body[0]?.expression,call=arrow?.body;
+    if(tree.body.length!==1||arrow?.type!=='ArrowFunctionExpression'||arrow.async!==true
+      ||arrow.params.length!==1||arrow.params[0].name!=='page'||call?.type!=='CallExpression'
+      ||call.callee.type!=='FunctionExpression'||call.arguments[0]?.type!=='Identifier'
+      ||call.arguments[0].name!=='page'||call.arguments[1]?.type!=='ObjectExpression')return null;
+    const task=JSON.parse(wrapped.slice(call.arguments[1].start,call.arguments[1].end));
+    if(call.callee.id?.name==='browserCapability'&&call.arguments.length===5)return task;
+    if(call.callee.id?.name!=='browserReceipt'||call.arguments.length!==3)return null;
+    const perform=call.arguments[2],inner=perform?.body;
+    if(perform?.type!=='ArrowFunctionExpression'||perform.async||perform.params.length!==0
+      ||inner?.type!=='CallExpression'||inner.callee.type!=='FunctionExpression'
+      ||inner.callee.id?.name!=='browserCapability'||inner.arguments.length!==5
+      ||inner.arguments[0]?.type!=='Identifier'||inner.arguments[0].name!=='page'
+      ||inner.arguments[1]?.type!=='ObjectExpression')return null;
+    const underlying=JSON.parse(wrapped.slice(inner.arguments[1].start,inner.arguments[1].end));
+    return JSON.stringify(task)===JSON.stringify(underlying)?task:null;
+  }catch{return null;}
 }
 
 export function injectRename(request) {
