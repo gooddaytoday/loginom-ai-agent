@@ -48,9 +48,9 @@ async function revealViewerCard(channel,state,select,verb){
   throw Error('Output viewer scroll bound exhausted');
 }
 
-// Normal callers provide only a port number. The private acceptance operator
-// may supply openViews for its own graph admission; it cannot bypass active
-// output or native Table checks and is never part of a public descriptor.
+// Normal callers provide only a port number. An internal owned node driver or
+// acceptance operator may supply openViews for its graph admission; it cannot
+// bypass active output or native Table checks and is never a public parameter.
 export async function openNewOutputTable(channel,port,{openViews}={}) {
   const observe=(condition,ready,confirmIdentity)=>channel.observe({condition,readOutputs:true,ready,confirmIdentity});
   const perform=(s,condition,select,verb='click')=>channel.perform({condition,initialObservation:s,
@@ -64,7 +64,7 @@ export async function openNewOutputTable(channel,port,{openViews}={}) {
   // Selected nodes can have their body covered by their own hover controls.
   // The verified prepared-node observation already attests this selection.
   if(openViews) {
-    // Internal operator admission only; never supplied by a public action.
+    // Internal owned admission only; never supplied by a public action.
     // Active-port admission above and normal native views/table checks below
     // remain mandatory. No UI capabilities are fabricated or broadened.
     await openViews({state:s,output});
