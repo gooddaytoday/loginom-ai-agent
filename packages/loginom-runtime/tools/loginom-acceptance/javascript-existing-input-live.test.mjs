@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {javascriptExistingInputRequest,runJavascriptExistingInputLive} from './javascript-existing-input-live.mjs';
+import {validateNodeApplyRequest} from '../../client/lib/node-apply.mjs';
+import {createCandidateNodeSupport} from '../../client/lib/node-support.mjs';
 import {validateTextImportNodeParameters} from '../../client/lib/text-import-node.mjs';
 import {validateActionParameters} from '../../client/lib/action-catalog.mjs';
 import {nodeApplyInputSchema} from '../../client/lib/node-api.mjs';
@@ -17,10 +19,13 @@ for(const variant of ['changed','reordered'])test('existing input request passes
   const request=javascriptExistingInputRequest({...input,inputVariant:variant});
   validateActionParameters(nodeApplyInputSchema,request);
   validateTextImportNodeParameters(request.parameters,request.mode,request);
+  const support=createCandidateNodeSupport({targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2'});
+  validateNodeApplyRequest(request,support.nodeApplyHandlers);
   assert.deepEqual(request.target,{kind:'existing',type:'imports.text',ref:node});
   assert.equal(request.parameters.settings.source.source_path,storage+'/sales-'+variant+'.csv');
   assert.equal(request.parameters.source.upload_operation_id,'uploaded');
-  assert.equal(request.read.coverage,'full');assert.equal(request.finish,'execute');
+  assert.equal(request.read.coverage,'sample');assert.equal(request.read.sample_rows,100);
+  assert.equal(request.read.require_exact_numbers,true);assert.equal(request.finish,'execute');
   if(variant==='reordered')assert.deepEqual(request.mappings[0].fields.map(f=>f.source.name),['DiscountPct','Customer','UnitPriceCents','RowID','Qty']);
   if(variant==='changed')assert.deepEqual(request.mappings,[]);
 });
