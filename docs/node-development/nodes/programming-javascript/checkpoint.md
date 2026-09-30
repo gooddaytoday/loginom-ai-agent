@@ -30,7 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — public one-row/empty input и оставшиеся J06–J08.
+следующий шаг — public declared scalar cases и оставшиеся J06–J08.
+Fixed Code output0/1/N и empty input приняты ниже.
 Fixed public Code scalar output5/5, named access и empty output приняты ниже.
 Fixed public existing changed/reordered freshness для обоих modes принят ниже.
 Fixed existing source edit/Execute/read для code и declared принят ниже.
@@ -43,6 +44,32 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E: public empty input — принят; следующий declared — 2026-09-30
+
+Empty-input01/profile355/child `64221b01c8`, exec32733/exit0 — **OBSERVED**,
+independent audit **PASS**. Pinned header-only CSV дал input0×5 с полной схемой
+RowID/Customer/Qty/UnitPriceCents/DiscountPct и точными типами; output0×1
+Result/integer сохранил схему, fresh=true/sample_complete=true. Source SHA
+`f18c22929b8dfbd4587497a4ec66520314cb3607ad4bad88cdc43bfebbe42b41`
+совпадает с named-access6-row case. Полные native mappings/graph/source-read и
+свежие completed IDs `1790755510980-nce0msfppmd:1161:3` и `:1161:4` проверены.
+Report SHA256 `f56aa654358e2d649bb4355f97000163f5cc2541d299c756d47ecf6afce6a95f`,
+journal `b93e15a2f9d7a465acf80a9ac4a0201ca343658f92cab1d3b071faec1dea5161`,
+audit receipt `efe11a53d644f12315697826877371fd4fe9464958d010f9265d5e9350182cd0`.
+Package/logout/browser/process cleanup проверен; profile355 closed_verified,
+active_exec=null. Save/cold/native bytes и candidate/CLI отсутствуют.
+
+Fixed public Code output0/1/N и empty input теперь приняты отдельно; exact
+native input roundtrip/declared counterparts и более широкая cardinality
+матрица ещё не объявлены закрытыми. Следующий связный блок E — public declared
+scalar outputs (String/Boolean/real/safe integer/civil Date). В мастере
+явно задавать type/data_kind/usage и проверять native readback: по проверенным
+Code output schemas integer/real/datetime непрерывные, string/boolean дискретные.
+Переиспользовать прежние G5 bodies, убрав только Code AssignColumns и закрепив
+новые source hashes до live. Code proofs не засчитывать за declared. Затем
+оставшиеся J06–J08, schema edits/source limits/diagnostics/recovery/context/
+module policy/budgets/neighbor regression и F. Product registration не повышена.
 
 ### E: empty input — fixed оператор и live — 2026-09-30
 
