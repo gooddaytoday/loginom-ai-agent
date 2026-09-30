@@ -45,6 +45,22 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: declared String live — выполняется — 2026-09-30
+
+Frozen child `d4898cac03ba8c6c5acc8ea20a15ad2094a49e31` (точный SHA в assignment/profile receipt) прошёл
+полный client suite: **2983 PASS / 10 SKIP / 0 FAIL**, exec41294/exit0;
+10 browser-integration skips не засчитываются как live. Log SHA256
+`2494862cfc6f4484a4aeab5c30c80a7be791e8c36c480d134bb9c4a13de94ba3`.
+Operator17913 suite выполнен на том же runtime source до test-only поправки
+`d4898cac03`. Source diff чистый; oracle/auditor v4 неизменны.
+
+Fresh profile356: ordinary headed `e-public-types-declared-null-empty-01`,
+exec81528 запущен. Fixed source SHA256
+`c4f47a99eadfa867febe11e78a13fec432056efdaca5b6c8203a9eb59fdaa03c`;
+expected String output5×1: NULL, empty, "null", "0", "false". Results пока не
+установлены. После terminal — independent audit и registry reconciliation,
+затем remaining declared cases. E/F и registry readiness не закрыты.
+
 ### E: declared primitive support — подготовка — 2026-09-30
 
 Child `8a3c25273b` расширяет owned declared picker на Boolean/real/datetime
