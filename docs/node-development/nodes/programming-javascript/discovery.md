@@ -37,9 +37,16 @@ owned Code Next refusal, читает native error dialog, закрывает е
 разрешает один discard своего draft. Existing handler независимо перечитывает
 полный committed source/settings/schema и complete graph перед typed FAILED;
 диагностика доставляется через bounded redacted user-v1. Full client3094PASS/
-10SKIP, operator18192PASS. Public native-error live/repair пока **не выполнен**;
-Done refusal/technical details и прочий J/F остаток сохраняются. Следующий
-fixed ordinary headed запуск и контрольные суммы — в текущей части checkpoint.
+10SKIP, operator18192PASS. Первый public native-error live отказал после btnError:
+plain Ext modal mask ошибочно считалась pending; original failed evidence
+сохранён, свой пакет/сеанс закрыт через headed dispatcher. Source-backed fix
+`cf78f5b61a` допускает только native ZIndexManager mask exact error dialog;
+foreign masks/owner/editor/source/gesture/ACK guards сохранены. Full client
+3106PASS/10SKIP, operator18201PASS. Fresh Code public native SyntaxError17:26 /
+typed FAILED/discard/independent committed baseline и NEW same-node repair /
+2 fresh Execute/full6×4 прошли independent audit/cleanup, auditor negatives57/57.
+Declared отдельный live выполняется; Done refusal/technical details/public throw/
+Stop/recovery и прочий J/F остаток сохраняются. Точные hashes — в checkpoint.
 
 | Gate | Непосредственно наблюдено | Решение / точный остаток 0B и следующий тест | Реализация / приёмка (фазы 1–6) |
 | --- | --- | --- | --- |

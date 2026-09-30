@@ -46,6 +46,43 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J12/J25: Code native syntax refusal/repair принят; declared live — 2026-09-30
+
+Freeze `cf78f5b61a`, ordinary headed profile387/exec51568 actual exit0.
+`e-public-wizard-refusal-syntax-code-02` прошёл original pinned independent
+audit; report SHA256
+`efe00218be09542bd216298963f60838b39f8dcf47834aec02731d5e701be08f`,
+journal SHA256
+`72c5dd86ede0f3a9917d0fd9810b27a584f1529337a597f734de3770eac7fa41`.
+Native SyntaxError с actual position17:26, full bounded user-v1 diagnostic,
+one btnError/OK/Close, independent full committed source/settings/schema/graph
+baseline retained, typed FAILED/cleanup=true/not_refreshed. NEW same-node repair
+прошёл2 distinct fresh Execute/full6×4/1950 и independent public source-read.
+Package close/logout/browser close/actual process absence — PASS; registry387
+closed_verified/active_exec=null. Это fixed code case, не полный J12/J25.
+
+Additional independent auditor v3 проверяет actual Next/btnError/OK receipt
+status/action/operation/effect/points/original deadline и отсутствие replay.
+Code audit v3 PASS, receipt SHA256
+`31dc0356ec98ac1043ce1fc035ff8582ec567b9423da75e2f63b689b7597b1c4`.
+Этот дополнительный срез создан после terminal Code run; исходный pre-live
+auditor и assignment не изменялись. В v2 был shadowed schema_mode=ok в summary
+receipt; та квитанция сохранена как invalid, v3 устранил ошибку и проверил code.
+Meaningful actual auditor negatives57/57 refused: source/settings/graph/output,
+native class/location/owner/discard, missing independent admission, repeated
+Next/button, unknown gesture receipts, forged OK/action/point/deadline. Receipt
+`e-public-wizard-refusal-syntax-code-02-auditor-negatives-01.json`, SHA256
+`83dfa7c53ec469134c26cc1afc2a6604ecb0a5d117d4ae03c3a52420d4f9ca1a`.
+
+После этого fresh388 assigned и exec21172 зарегистрирован: ordinary headed
+`e-public-wizard-refusal-syntax-declared-01` на прежнем saved D, no Save.
+Oracle/base auditor неизменны; additional v3 SHA256
+`6ab31e586953f6867f6008f18475c51c7d56409a7ffaf7b9dcfa3689c4b662a3`
+закреплён в assignment **до** declared live. Source/oracle/auditors не менять
+до actual terminal; наблюдать только exec21172. Затем оба audit, meaningful
+negatives, cleanup/process absence и registry reconciliation. Unknown gestures/
+Close/ACK не повторять. Полный E/J/F, candidate и CLI остаются открытыми.
+
 ### E/J12/J25: память восстановилась; native modal mask исправлена — 2026-09-30
 
 Exact OpenViking read снова ответил; configuration/Peer не менялись. Ordinary
