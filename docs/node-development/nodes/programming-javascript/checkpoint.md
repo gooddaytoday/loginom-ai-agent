@@ -45,6 +45,26 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: native String Code принят; declared выполняется — 2026-09-30
+
+Code01/profile369/child `800381592a`, exec43701/exit0 — OBSERVED,
+independent native audit PASS. Все8 String/NULL values (empty/literals/Unicode/
+quote/backslash/LF) и native input UTF-8 bytes до JS/releases8/8 подтверждены;
+public output8×1 Value/String сохранил точные значения/порядок/тип,2 fresh JS
+Execute, source/mappings/graph/Views и package/logout/browser/process cleanup
+проверены. Completed IDs `1790761057620-f3i7ke63vyt:1217:3` / `:1217:4`.
+Report SHA256 `316d47c08a16805fe84791d106db782d2c1d00a5125eee4d44f90262668342c6`,
+journal `7dbbe3b8eabe3715ab1c3ccf15799523ab4a1c23da525b812dc70b02bcc36af9`,
+receipt `1ee3c059fc5e1f4059d36d62e0825ccc94e1f4b9621cb7f67276e221eeadfcca`.
+Native input bytes доказаны; native output bytes/Save/cold/candidate/CLI нет.
+Profile369 reconciled/closed_verified.
+
+Fresh profile370 ordinary headed `e-public-types-native-string-declared-01`,
+exec22336 выполняется: тот же input8×1, native wizard Value/String/discrete/
+output и identity-copy source без AssignColumns. После terminal необходим
+independent String audit/cleanup/reconciliation. Результат пока не установлен;
+далее safe-int64/civil Date и J/E/F остаток, full readiness не повышается.
+
 ### E: native String Code live — выполняется — 2026-09-30
 
 Frozen child `800381592a`, полный operator suite **17979 PASS / 0 FAIL**,
