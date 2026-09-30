@@ -42,6 +42,32 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: existing input freshness — оператор и первый live — 2026-09-30
+
+Child `476b1e3ae9b2d42942138bf4eca7eefa2a3d1e54` добавляет отдельные fixed
+entrypoints для changed/reordered входа в Code и declared. Они обновляют
+существующий imports.text через публичный API и проверенную загрузку в новую
+собственную папку, читают весь input6×5, затем выполняют existing JS lifecycle
+и проверяют output6×4. GUID обоих узлов сохраняются; source revision совпадает
+с предыдущим E, бизнес-логика не меняется. Reordered явно задаёт физический
+порядок output импорта. Лимит — один import Execute и два JS Execute в исходные
+30 минут; Save отсутствует. Cold reader не получает права записи.
+
+Исправлены только устаревшие operator test fixtures в `c402645f75`:
+контекст VM теперь содержит актуальные переменные контроля уборки, topology
+использует канонический тип узла. Product guards не изменены. На точном
+`476b1e3ae9`: **17890 PASS / 0 FAIL**, exec20036/exit0; log SHA256
+`f5f995dbbe9ec6986008ca178bd5ea60b54d8e2202b9d294f711e9a3ddcf8ec8`.
+Syntax/diff checks PASS. Client runtime не менялся; полный client suite для
+`467da5ab9a` остаётся применим к тем же client sources.
+
+Первый ordinary headed `e-public-existing-code-changed-01`, fresh profile341,
+exec48888, запущен на сохранённом C package. Приёмочный результат пока не
+установлен; независимый auditor подготовлен до запуска. Его SHA256
+`90110fff74acf321a878892f5773b0056b2a8dabab82f40fb01603662e9e4299`.
+После terminal требуется полный независимый audit и проверка package/logout/
+browser/process cleanup; далее reordered и declared variants. E/F не закрыты.
+
 ### E: existing source edit/Execute — подготовка и live — 2026-09-30
 
 Child `a6a76401c803c7c25935739e8c53a20f7d609152` расширяет isolated public
