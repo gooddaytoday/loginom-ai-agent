@@ -43,6 +43,29 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public civil Date — принят — 2026-09-30
+
+Date-civil01/profile351/child `bccc8a0a08`, exec99974/exit0 — **OBSERVED**,
+independent audit **PASS**. Output2×1 Result/datetime: null и
+2024-02-29T23:59:59.123 с millisecond/local datetime precision; timezone
+не объявлен UTC. Full input6×5, source/mappings/graph проверены. Source SHA256
+`dcc1d1da4d0349de981d1fd7549786cc02ced4aaea28279647a6d45d31670c46`;
+свежие completed IDs `1790754218905-o6vcfynkjxe:1145:3` и `:1145:4`.
+Package/logout/browser/process cleanup проверен, Save/cold/native bytes и
+candidate/CLI отсутствуют. Это generated civil Date output, не native input
+Date roundtrip и не UTC transport guarantee.
+
+Report SHA256 `d810cdefb65ba3742b4ee63d56d96f3754cab9f23bc10bee9d7b4f930e3fd546`,
+journal `a2e9e943b0f551b6c98e2745071480355e43167f8d20da3b4747c21a1968db77`,
+audit receipt `608aac1c79fb525431984631ce8a2bc466ddb948289e4b611a097d50784d437e`.
+Fixed public Code scalar output **5/5** (String/Boolean/real/safe integer/civil
+Date) приняты с независимыми typed audits. Полный J06/J07 пока не закрыт;
+remaining native input/declared/precision boundaries и candidate/CLI открыты.
+
+Следующий named-access01/g5-named-access запущен на ordinary headed fresh
+profile352, exec25858; ожидаются RowID1–6 через InputTable.Get(i,"RowID").
+Результат пока не установлен. Затем empty/one/N output и остаток E/F.
+
 ### E: public safe integer — принят — 2026-09-30
 
 Safe-integer01/profile350/child `bccc8a0a08`, exec21350/exit0 — **OBSERVED**,
