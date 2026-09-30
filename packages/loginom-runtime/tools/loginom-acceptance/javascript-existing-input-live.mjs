@@ -27,7 +27,7 @@ export function javascriptExistingInputRequest({prepared,node,storage,artifact,u
       source:{kind:'configured_field',name:column.name},name:column.name,label:column.label}))}];
   // Import uses its installed sample reader. The operator separately requires
   // sample_complete and verifies every cell of this six-row input.
-  request.read.coverage='sample';
+  request.read.coverage='sample';request.read.sample_rows=100;
   return request;
 }
 
