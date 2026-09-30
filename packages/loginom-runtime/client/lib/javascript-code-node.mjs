@@ -141,7 +141,9 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           &&configured.kind==='existing'&&configured.intent==='preserve'),
         'JavaScript source commit must precede execution');
       executionDriver=createNodeExecutionProcedure(channel,ctx.node,{allowDeactivate:true,verifyFailedChild:true});
-      try{await executionDriver.prepare();}
+      // Retain the owned console before execution begins. Opening it during
+      // a long JavaScript execution can lose the native Stop target to redraws.
+      try{await executionDriver.prepare({keepConsoleOpen:true});}
       catch(error){
         // Source admission retires a failed host callback as "boundary".
         // Keep the actual preparation refusal in private redacted evidence;
