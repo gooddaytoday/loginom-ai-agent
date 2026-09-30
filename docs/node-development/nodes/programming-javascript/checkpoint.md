@@ -45,6 +45,32 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: native String fixed operator — подготовлен — 2026-09-30
+
+Frozen child `800381592abd98ed23cee5cd75324163e2e2a5a0` добавляет только fixed native String Code/declared IDs.
+Прежний94-byte CSV SHA256
+`c3adece846a9998d8003d2b4de019a4dda7940b471166ab0ca4c9fa364b34ce6`;
+input/output8×1 NULL/empty/"null"/"NULL"/"0"/"false"/Unicode/quote-backslash-LF.
+Existing native source/owner/port/Import Execute/releases проверки сохранены;
+String native utf8_hex проверяется до JS. Client runtime и registration прежние.
+Адресные **424 PASS / 0 FAIL**, exec45016/exit0; actual requests/production
+native decoder/provenance/negative bytes/owners/releases и прежние real/Boolean/
+business/empty guards проверены. Полный operator suite выполняется; live ещё нет.
+
+До browser закреплены independent String oracle/auditor: SHA256
+`40caed588bbf7f90a582f5615113d95860b56f86462b36a7956b9f30644a67ea` /
+`cd82f5448de6cf0f2c5b4e087c883e1651c6296aa5de647dcb44fa269034c659`.
+Аудитор независимо читает tag8/byte-length/codepage65001/UTF-8 payload и
+проверяет NULL/empty различие, все8 values/types/order и остальной публичный
+lifecycle/metadata/source/cleanup. Hashes authored sources сверены:
+Code `f421612ae5ee8ebb98c43e0f350f277d6bcdd030f1b30b45356c7353a3380cfd`;
+declared body прежний `901ed4c40c4a062feefa484dbb3213349e85dcf10fb20c43f6c2cb425b9639d5`,
+с отдельной String native metadata. Прежние proofs не меняются.
+
+Profile368 closed_verified, active_exec=null. После full operator PASS — fresh
+ordinary headed profile369/Code, independent audit/reconciliation, затем
+отдельный declared String. Остальные safe-int64/civil Date и J/E/F открыты.
+
 ### E: public native Boolean2/2 принят — 2026-09-30
 
 Code/declared на frozen child `14965ef148` получили independent native audits
