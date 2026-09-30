@@ -43,6 +43,32 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public types — fixed оператор и первый live — 2026-09-30
+
+Child `bccc8a0a08e21b11d9c0168b4eb8e539ac320074` переиспользует actual public C
+lifecycle для семи заранее закреплённых Code G5 cases: String null/empty,
+Boolean, real, safe integer, civil Date, named access и empty output. Отдельный
+entrypoint принимает только фиксированный case и assigned paths; source/oracle
+от пользователя, Save, cold writes и characterization cases запрещены.
+Actual JS apply request admission проверен для всех7 cases. Продуктовые handlers
+не менялись и не регистрировались; generic source в model tools не появился.
+
+На точном SHA полный JS operator suite: **17898 PASS / 0 FAIL**, exec8596/exit0,
+log SHA256 `712790f15486d52acbd0dc434a4445c59942a04f1f9038a8f8f270bf8b63638a`.
+Адресный набор70 PASS; syntax/diff checks PASS. Client sources совпадают с
+проверенным `467da5ab9a`; полный client suite заново не требовался.
+Независимый typed oracle с literal expected values и source hashes закреплён
+до live, SHA256 `fca98ddb74021dde3fd598d00cb515ee3dadd77588fd0beedb2d2a7fed00123b`;
+auditor без runtime verifier, SHA256
+`670212b386cc784d0167483bf1a5c141da1e72a3c744286f7c86080d3113cbac`.
+
+Ordinary headed `e-public-types-null-empty-01`, fresh profile347, exec84275,
+case `g5-null-empty` запущен. Ожидаются пять String rows: null, пустая строка,
+строки null/0/false. Результат пока не установлен. После terminal нужны
+independent full input/output/source/mapping/execution audit и own cleanup.
+Следом Boolean/real/safe integer/civil Date, empty/one/N output; оставшиеся E/F
+открыты. Семь заранее подготовленных cases сами по себе не означают PASS.
+
 ### E: public freshness 4/4 принята; следующий блок — 2026-09-30
 
 Declared/reordered01/profile346/child `e1fd122320`, exec25498/exit0 —
