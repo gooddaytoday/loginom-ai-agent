@@ -283,7 +283,7 @@ for(const fault of ['membership','socket','timeout','ack','ok'])test('metadata p
   const calls=[],report={stage:'roundtrip',cleanup:{package_closed:false,logged_out:false,browser_closed:false}};
   const forbidden=name=>()=>{calls.push(name);throw Error('unexpected '+name);};
   const cleanup=vm.runInNewContext('(async()=>{try{throw failure;'+live.slice(catchStart,catchEnd)+'}})',{
-    failure,report,executionRuntime:runtime,page:f.page,owner:{},session:{context:{close:async()=>{calls.push('own-context-close');}}},browserLifecycle:null,
+    failure,report,executionRuntime:runtime,page:f.page,owner:{},session:{context:{close:async()=>{calls.push('own-context-close');}}},browserLifecycle:null,focusGuard:null,managedCloseUncertain:false,
     sourceCycleUncertain:false,sourceReaders:[],nativeRoundtrip:true,nativeClassifierBinding:undefined,captureJavascriptNativeClassifierDiagnostic:forbidden('classifier'),
     javascriptProbeFailure:e=>({message:e.message}),redactor:{text:v=>v,redact:v=>v},discoveryProbe:null,
     snapshot:forbidden('snapshot'),paletteSnapshot:forbidden('palette'),refusalEvidence:forbidden('refusal'),guard:forbidden('guard'),observe:forbidden('observe'),
