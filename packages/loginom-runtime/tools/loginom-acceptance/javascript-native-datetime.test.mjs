@@ -12,6 +12,7 @@ import {decodeVariantFrame} from '../../client/lib/variant-native-decode.mjs';
 import {adaptRead} from '../../client/lib/variant-native-values.mjs';
 import {decodeTableOutput} from '../../client/lib/table-output-values.mjs';
 import {readJavascriptNativeRoundtrip,javascriptNativeRoundtripStatus} from './javascript-native-roundtrip-read.mjs';
+import {javascriptPublicCodeProbe,verifyJavascriptPublicCodeInput} from './javascript-public-code-live.mjs';
 import {sourceEvidence} from './javascript-native-input.test.mjs';
 import {roundtrip} from './javascript-native-roundtrip.test.mjs';
 const id='civil-datetime',f=javascriptNativeFixture(id),clone=x=>structuredClone(x);
@@ -243,4 +244,37 @@ test('Date shared GUID cannot substitute input port parent for JS native owner',
  const x=await roundtrip({fixtureId:id,sharedPortGuid,change:x=>{x.output.parent=x.f.node;}});
  const b=await x.bind('output');
  await assert.rejects(()=>readJavascriptNativeRoundtrip(x.f.page,b,decodeVariantFrame,{operationId:'output'}));
+});
+
+for(const mode of ['code','declared'])test('public native civil Date '+mode+' requires released native baseline and full civil attestation before JS',async()=>{
+ const {results}=await stages(),native=results.before,r=native.exact.provenance.civil.receipts;
+ const table=decodeTableOutput(r.raw,{formatProof:r.format_proof,readSettings:r.read_settings,
+  expectedColumns:r.raw.columns,requireExactNumbers:true});
+ const input={node:clone(native.exact.provenance.node),
+  table:{...table,port_guid:native.binding.port_guid,execution_id:native.exact.provenance.execution.execution_id},
+  native_input:{native}};
+ const probe=javascriptPublicCodeProbe((mode==='declared'?'declared-':'')+'g5-native-civil-datetime',mode);
+ assert.equal(verifyJavascriptPublicCodeInput(probe,input).native_input_bytes_verified,true);
+ assert.doesNotMatch(probe.source,/new Date|Date.parse|getTime|toISOString|UTC|2024|2026/);
+ const faults=[
+  x=>x.native_input.native.lifecycle.pending=1,
+  x=>x.native_input.native.lifecycle.releasedResponses--,
+  x=>x.native_input.native.exact.js_created=true,
+  x=>x.native_input.native.raw.cells[1].payload[2]^=1,
+  x=>x.native_input.native.exact.cells[1].native.bytes_le='0000000000000000',
+  x=>x.native_input.native.exact.civil_baseline_sha256='0'.repeat(64),
+  x=>delete x.native_input.native.exact.provenance.civil,
+  x=>x.native_input.native.exact.provenance.civil.receipts.raw.rows[1].cells[0].text='2024-02-29 23:59:59.12',
+  x=>x.native_input.native.exact.provenance.civil.receipts.format_restoration.restored=false,
+  x=>x.native_input.native.exact.provenance.civil.receipts.workflow_return.node_context.node_id='foreign',
+  x=>x.native_input.native.exact.cells[1].native.epoch_verified=true,
+  x=>x.node.document_id='foreign',
+  x=>x.node.node_id='foreign',
+  x=>x.table.execution_id='stale',
+  x=>x.table.sample[1][0].value='2024-02-29T23:59:59.120',
+  x=>x.table.sample[1][0].type='string',
+  x=>delete x.native_input,
+ ];
+ for(const mutate of faults){const changed=clone(input);mutate(changed);assert.throws(()=>verifyJavascriptPublicCodeInput(probe,changed));}
+ assert.throws(()=>verifyJavascriptPublicCodeInput({...probe,native_input_fixture:'real'},input));
 });
