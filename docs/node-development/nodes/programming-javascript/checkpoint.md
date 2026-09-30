@@ -46,6 +46,32 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public outside-safe Code characterized; declared выполняется — 2026-09-30
+
+Code01/profile375/child `81b4bfef74`, exec30088/exit0 — OBSERVED,
+independent characterization audit PASS. Точный native input3×1/releases3/3,
+full typed output/source/metadata/mappings/graph/Views/13 phases/2 fresh Execute
+и package/logout/browser/process cleanup проверены. Output -9007199254740992/
+9007199254740992/9007199254740992: третья строка input9007199254740993 потеряла
+единицу, delta_decimal=-1. Это observation, exact_pass=false,
+general_integer_precision_guarantee=false, gate_passed=false. Native output
+bytes/Save/cold/candidate/CLI не проверены. Completed IDs
+`1790764002539-txpg9j9odw:1241:3` / `:1241:4`.
+Report SHA256 `225c938a303ce6dfba48fd107f3dd7461e7732dbd29b66493af32e9c88b6ba52`,
+journal `9fd5083d843c99a68824a28e4ddc55979d073a12a8dfa284b9b5c310cf131c78`,
+receipt `9226b333dc67cbcd9c6ccc2fdc0dcc64aa94c18b1d7b1cf7593e9248cd94958b`.
+Independent auditor28/28 actual mutations refused; receipt SHA256
+`c287dfa6eb11e5774993ab41c23a4615060341ad8c56b2a5d93fc1180c885495`.
+Проверены ложные exact_pass/gate_pass/guarantee, numeric вместо string, source,
+owner/bytes/releases/cleanup и characterization delta. Source-only copies не
+browser runs. Profile375 reconciled closed_verified.
+
+Declared01 ordinary headed fresh profile376, exec96870 зарегистрирован под
+lock; evidence `e-public-types-native-outside-safe-declared-01`. Результат не
+установлен. Наблюдать только этот handle, затем independent audit/cleanup/
+reconciliation; далее native cardinality и J06–J08/E/J/F остаток.
+Registry readiness не повышена.
+
 ### E: public native outside-safe — Code выполняется — 2026-09-30
 
 Frozen child `81b4bfef745b2ce50c835e1dd0f926f3733e9dd4`: отдельные pinned
