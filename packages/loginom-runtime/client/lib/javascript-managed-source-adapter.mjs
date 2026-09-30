@@ -9,6 +9,7 @@ import {makeJavascriptExistingGraphTypeCode} from './javascript-existing-type.mj
 import {replaceManagedJavascriptSource} from './javascript-managed-source-write.mjs';
 import {dispatchManagedJavascriptCodeNext} from './javascript-managed-code-next.mjs';
 import {dispatchManagedJavascriptDone} from './javascript-managed-done.mjs';
+import {waitManagedJavascriptDoneSettlement} from './javascript-managed-done-settlement.mjs';
 import {dispatchManagedJavascriptDeclared,validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
 import {javascriptSourceSettingsDigest} from './javascript-source-admission.mjs';
 import {makeJavascriptManagedStageCode} from './javascript-managed-stage.mjs';
@@ -45,7 +46,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
   openingBudgetMs = 90000,
   driver = {openManagedJavascriptExistingWizard, dispatchManagedJavascriptNext, dispatchManagedJavascriptGeneration,
     dispatchManagedJavascriptCodeNext, dispatchManagedJavascriptDone, dispatchManagedJavascriptDeclared,
-    makeJavascriptManagedStageCode,waitManagedJavascriptCodeSettlement,captureManagedJavascriptWizardError,
+    makeJavascriptManagedStageCode,waitManagedJavascriptCodeSettlement,waitManagedJavascriptDoneSettlement,captureManagedJavascriptWizardError,
     closeManagedJavascriptWizard, makeJavascriptManagedPageCode, makeJavascriptManagedSourceCode,
     makeJavascriptManagedSelectionReadCode, makeJavascriptSchemaContextCode,
     makeJavascriptExistingGraphTypeCode, replaceManagedJavascriptSource}}) {
@@ -89,6 +90,28 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       await wait(Math.min(100, Math.max(1, task.deadline - Date.now())));
     }
     throw Error('Managed JavaScript Code page original deadline expired');
+  };
+  const rejectDraft=async(handle,before,settled,error_stage)=>{
+    const diagnostic=await driver.captureManagedJavascriptWizardError({task:handle.task,before,after:settled,
+      expected_source_sha256:handle.draftSha256,execute,record,receiptOptions,wait,redactor,error_stage});
+    need(diagnostic?.dialog_closed===true&&diagnostic.native_owner_verified===true
+      &&same(diagnostic.owner,handle.task.owner)&&diagnostic.source_sha256===handle.draftSha256,
+    'Managed JavaScript native refusal unconfirmed');
+    const closed=await driver.closeManagedJavascriptWizard({task:{...handle.task,
+      error_stage,cleanup_deadline:Math.min(handle.task.deadline,Date.now()+60000)},execute,record,receiptOptions,wait});
+    need(closed?.verified===true&&closed.closed===true&&closed.node_id===node.node_id
+      &&(error_stage==='done'?closed.draft_discarded===null&&closed.settings_applied===null&&closed.execution_started===null
+        :closed.draft_discarded===true&&closed.settings_applied===false&&closed.execution_started===false),
+    'Managed JavaScript rejected draft discard unconfirmed');
+    const {prepared:ignoredPrepared,allowDeactivation:ignoredDeactivation,...selectionTask}=handle.task;
+    await execute(driver.makeJavascriptManagedSelectionReadCode({...selectionTask,mode:'dispose'}));
+    await journalManagedJavascriptError({record,deadline:handle.task.deadline},{phase:error_stage==='done'?'javascript_managed_rejected_done_closed':'javascript_managed_rejected_draft_discarded',
+      operation_id:handle.task.operation_id,owner:handle.task.owner,source_sha256:handle.draftSha256,
+      closed,deadline:handle.task.deadline});
+    active=null;uncertain=false;
+    const error=Error('Loginom JavaScript wizard rejected source');
+    error.javascriptWizardRefusal={diagnostic,closed};
+    throw error;
   };
   return {
     async open({owner, deadline: operationDeadline, schemaMode = 'preserve', columns}) {
@@ -189,61 +212,33 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
         operation_id:handle.task.operation_id,owner:handle.task.owner,source_sha256:handle.draftSha256,
         receipt:next,deadline:handle.task.deadline});
       const settled=await driver.waitManagedJavascriptCodeSettlement({task:handle.task,before,execute,record,wait});
-      if(settled.wizard_error_refusal===true) {
-        const diagnostic=await driver.captureManagedJavascriptWizardError({task:handle.task,before,after:settled,
-          expected_source_sha256:handle.draftSha256,execute,record,receiptOptions,wait,redactor});
-        need(diagnostic?.dialog_closed===true&&diagnostic.native_owner_verified===true
-          &&same(diagnostic.owner,handle.task.owner)&&diagnostic.source_sha256===handle.draftSha256,
-        'Managed JavaScript native refusal unconfirmed');
-        const closed=await driver.closeManagedJavascriptWizard({task:{...handle.task,
-          cleanup_deadline:Math.min(handle.task.deadline,Date.now()+60000)},execute,record,receiptOptions,wait});
-        need(closed?.verified===true&&closed.closed===true&&closed.node_id===node.node_id
-          &&closed.draft_discarded===true&&closed.settings_applied===false&&closed.execution_started===false,
-        'Managed JavaScript rejected draft discard unconfirmed');
-        const {prepared:ignoredPrepared,allowDeactivation:ignoredDeactivation,...selectionTask}=handle.task;
-        await execute(driver.makeJavascriptManagedSelectionReadCode({...selectionTask,mode:'dispose'}));
-        await journalManagedJavascriptError({record,deadline:handle.task.deadline},{phase:'javascript_managed_rejected_draft_discarded',
-          operation_id:handle.task.operation_id,owner:handle.task.owner,source_sha256:handle.draftSha256,
-          closed,deadline:handle.task.deadline});
-        active=null;uncertain=false;
-        const error=Error('Loginom JavaScript wizard rejected source');
-        error.javascriptWizardRefusal={diagnostic,closed};
-        throw error;
-      }
+      if(settled.wizard_error_refusal===true)await rejectDraft(handle,before,settled,'code_next');
       const donePage=await execute(driver.makeJavascriptManagedPageCode(handle.task));
       need(donePage?.ready===true&&donePage.node_guid===node.node_id&&donePage.page?.indicator_count===4
         &&donePage.page.tid===handle.task.workflow_ref.prefix+';WizrdMCF;DoneWizard'
         &&donePage.page.index===3&&donePage.page.visible_editors===0&&Date.now()<handle.task.deadline,
       'Managed JavaScript Done page owner changed');
+      const doneBefore=await execute(driver.makeJavascriptManagedStageCode(handle.task));
+      need(doneBefore?.owner_verified===true&&doneBefore.native_owner_verified===true&&same(doneBefore.owner,handle.task.owner)
+        &&doneBefore.pending===false&&!doneBefore.preview_visible&&doneBefore.boundary_refusal===null
+        &&doneBefore.dialog_diagnostic?.foreign_count===0&&doneBefore.mask_diagnostic?.foreign_count===0
+        &&doneBefore.page_tid===donePage.page.tid,
+      'Managed JavaScript Done baseline unavailable');
       const done = await driver.dispatchManagedJavascriptDone({task: handle.task,
         expected_source_sha256: handle.draftSha256, execute, record, receiptOptions});
       need(done?.status === 'SUCCEEDED' && done.output?.done_gesture_returned === true
         && done.output.wizard_commit_verified === false && done.output.execution_started === null,
         'Managed JavaScript Done gesture unconfirmed');
-      let graph = null;
-      for (let attempt = 0; attempt < 60 && Date.now() < handle.task.deadline; attempt++) {
-        try {
-          graph = await channel(handle.task.deadline).observe({condition: 'owned JavaScript graph after Done',
-            ready: state => state.prepared_node_context?.verified === true
-              && state.prepared_node_context.surface === 'graph' && state.wizard?.status === 'absent'
-              && ['document_id','workflow_id','node_id'].every(key =>
-                state.prepared_node_context[key] === node[key])});
-          break;
-        } catch (error) {
-          // The Done click can briefly unmount both wizard and graph. Retry
-          // only this read-only transition, never a changed owner or gesture.
-          const refusal = error?.nodeObservationRefusal;
-          if (refusal?.status !== 'NOT_APPLIED' || refusal.action_key !== 'workspace.observe'
-            || refusal.phase !== 'observing' || refusal.effect_possible !== false
-            || refusal.cleanup_complete !== true || refusal.error?.code !== 'PREPARED_NODE_CONTEXT_CHANGED'
-            || !(refusal.binding_reason === 'surface_unavailable'
-              || refusal.error.message === 'The prepared package, workflow or node changed: surface_unavailable')) throw error;
-          await wait(Math.min(250, Math.max(1, handle.task.deadline - Date.now())));
-        }
-      }
-      need(graph?.prepared_node_context?.verified === true
-        && graph.prepared_node_context.surface === 'graph' && graph.wizard?.status === 'absent'
-        && ['document_id','workflow_id','node_id'].every(key => graph.prepared_node_context[key] === node[key]),
+      const doneSettled=await driver.waitManagedJavascriptDoneSettlement({task:handle.task,before:doneBefore,
+        expected_source_sha256:handle.draftSha256,execute,record,wait});
+      if(doneSettled.wizard_error_refusal===true)await rejectDraft(handle,doneBefore,doneSettled,'done');
+      need(doneSettled.owned_done_settled===true&&doneSettled.graph_owner_verified===true,
+        'Managed JavaScript Done graph owner unconfirmed');
+      const graph=await channel(handle.task.deadline).observe({condition:'owned JavaScript graph after Done',
+        ready:state=>state.prepared_node_context?.verified===true&&state.prepared_node_context.surface==='graph'
+          &&state.wizard?.status==='absent'&&['document_id','workflow_id','node_id'].every(key=>state.prepared_node_context[key]===node[key])});
+      need(graph?.prepared_node_context?.verified===true&&graph.prepared_node_context.surface==='graph'
+        &&graph.wizard?.status==='absent'&&['document_id','workflow_id','node_id'].every(key=>graph.prepared_node_context[key]===node[key]),
       'Managed JavaScript Done graph owner unconfirmed');
       const {prepared: ignoredPrepared, allowDeactivation: ignoredDeactivation, ...selectionTask} = handle.task;
       await execute(driver.makeJavascriptManagedSelectionReadCode({...selectionTask, mode: 'dispose'}));

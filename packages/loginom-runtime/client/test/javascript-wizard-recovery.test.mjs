@@ -102,3 +102,19 @@ for(const failure of [null,'owner','operation','digest','settings','graph','disc
  assert.equal(validate(result).valid,true);const compact=compactNodeResult(result);
  assert.equal(compact.error.native.location.line,4);assert.ok(Buffer.byteLength(JSON.stringify(compact))<16384);
 });
+
+for(const mode of ['code','declared'])test('Done recovery declares discard only after new full baseline and graph proof '+mode,async()=>{
+ const f=await fixture(mode);f.options.refusal.diagnostic.error_stage='done';
+ Object.assign(f.options.refusal.closed,{draft_discarded:null,settings_applied:null,execution_started:null});
+ const error=await refusalError(f.options);assert.equal(verifiedJavascriptWizardRefusal(error.nodePhaseRefusal,f.request),true);
+ assert.equal(error.nodePhaseRefusal.proof.native.stage,'done');assert.equal(error.nodePhaseRefusal.proof.draft_discarded,true);
+ for(const field of ['settings_sha256','schema_mode']){
+  const after=structuredClone(f.options.afterBaseline);f.options.afterBaseline[field]='changed';
+  assert.equal((await refusalError(f.options)).nodePhaseRefusal,undefined);f.options.afterBaseline=after;
+ }
+});
+
+test('invented wizard stage cannot produce a retained refusal proof',async()=>{
+ const f=await fixture();f.options.refusal.diagnostic.error_stage='execute';
+ assert.equal((await refusalError(f.options)).nodePhaseRefusal,undefined);
+});

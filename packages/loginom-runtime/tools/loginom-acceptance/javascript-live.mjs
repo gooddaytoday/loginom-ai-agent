@@ -93,7 +93,7 @@ if(publicSchemaRefusalCaseId!==null&&(publicSourceCaseId!==null||existingInputVa
   ||publicSchemaRefusalCaseId!==(existingLifecycle==='code'?'code-to-declared':'declared-to-code')))
   throw Error('Public schema refusal requires its separate fixed existing mode/base entrypoint');
 if(publicWizardRefusalCaseId!==null&&(publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null
-  ||existingInputVariant!==null||existingLifecycle===null||publicWizardRefusalCaseId!=='syntax-'+existingLifecycle))
+  ||existingInputVariant!==null||existingLifecycle===null||!['syntax-'+existingLifecycle,'throw-'+existingLifecycle].includes(publicWizardRefusalCaseId)))
   throw Error('Public wizard refusal requires its separate fixed existing mode/base entrypoint');
 if(existingInputVariant!==null&&(existingLifecycle===null||!['changed','reordered'].includes(existingInputVariant)))
   throw Error('Existing input freshness requires its assigned lifecycle and fixed variant');

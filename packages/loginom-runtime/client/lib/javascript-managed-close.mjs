@@ -2,15 +2,20 @@ import {createHash} from 'node:crypto';
 import {withBrowserReceipt} from './executor.mjs';
 import {inspectManagedJavascriptPage, makeJavascriptManagedPageCode} from './javascript-managed-page.mjs';
 import {wizardReadiness} from './javascript-wizard-page.mjs';
+import {inspectManagedJavascriptErrorDraft,journalManagedJavascriptError} from './javascript-managed-wizard-error.mjs';
 import {makeJavascriptExistingGraphTypeCode} from './javascript-existing-type.mjs';
 
-export function inspectManagedJavascriptClosePoint({held,task},inspect) {
+export function inspectManagedJavascriptClosePoint(args,inspect,readDraft) {
+  const {held,task}=args;
+  const done=task.error_stage==='done';
   const state=inspect({held,task});
   const prefix=task.workflow_ref.prefix;
   if(state.ready!==true||state.node_guid!==task.owner.node_id
-    ||state.page?.tid!==prefix+';WizrdMCF;JavaScriptCodeWizard'
-    ||state.page.visible_editors!==1||held.wizard===undefined||held.wizardRoot===undefined)
+    ||state.page?.tid!==prefix+';WizrdMCF;'+(done?'DoneWizard':'JavaScriptCodeWizard')
+    ||state.page.visible_editors!==(done?0:1)
+    ||done&&held.errorDialogClosedFor!==state.page.tid||held.wizard===undefined||held.wizardRoot===undefined)
     throw Error('Managed JavaScript Close owner unavailable');
+  if(done)readDraft(args);
   const root=held.wizardRoot,tab=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
   if(tab!==held.binding.tab||tab?.Controller?.Node?.data?.node!==held.wizard
     ||tab?.Controller?.FController?.FView?.el?.dom!==root)
@@ -44,6 +49,12 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
   const dialogs=[...document.querySelectorAll('[role="dialog"],.x-message-box')].filter(visible);
   const root=held.wizardRoot,current=tab?.Controller?.Node?.data?.node,model=tab?.Controller?.FController;
   if(!visible(root)&&dialogs.length===0){
+    const masks=[...document.querySelectorAll('.bg-mask-message,.x-mask-msg,.x-mask')].filter(visible);
+    if(masks.some(e=>!app?.ModelForm||!(model instanceof app.ModelForm)||current!==held.binding.workflow
+      ||e!==model.FView?.el?.dom||e.getAttribute('data-tid')!==task.workflow_ref.prefix+';ModelForm'
+      ||!e.classList.contains('bg-mask-message')||!model.FDiagram?.FmxGraph?.container
+      ||!e.contains(model.FDiagram.FmxGraph.container)))
+      throw Error('Managed JavaScript Close foreign loading mask');
     // The confirmation can hide its wizard before the graph and rendered node
     // return. Wait under the original Close deadline while the retained tab
     // still owns this transition; a different active owner remains terminal.
@@ -68,7 +79,6 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
     // Close can restore the graph before its asynchronous loading mask ends.
     // Wait only for the exact current ModelForm target under the original
     // cleanup deadline. A restored shape must not make a masked graph ready.
-    const masks=[...document.querySelectorAll('.bg-mask-message,.x-mask-msg,.x-mask')].filter(visible);
     if(masks.some(e=>e!==model.FView?.el?.dom||e.getAttribute('data-tid')!==task.workflow_ref.prefix+';ModelForm'
       ||!e.classList.contains('bg-mask-message')||!e.contains(graph.container)))
       throw Error('Managed JavaScript Close foreign loading mask');
@@ -103,8 +113,9 @@ export async function runManagedJavascriptCloseRead(page,task,inspect) {
   const lease=page[Symbol.for('loginom-dock.javascript-owned-selection-v1')]?.get(task.operation_id);
   const identity=JSON.stringify([task.owner,task.workflow_ref,task.targetOrigin,task.targetBuild,task.deadline]);
   if(!lease||lease.identity!==identity||lease.settingAttempted!==true||!lease.wizardCaptured
+    ||task.error_stage==='done'&&(lease.doneAttempted!==true||lease.errorOkAttempted!==true)
     ||Date.now()>=task.cleanup_deadline)throw Error('Managed JavaScript Close lease unavailable');
-  return page.evaluate(inspect,{held:lease.handle,task});
+  return page.evaluate(inspect,{held:lease.handle,task,editor:lease.sourceEditorCaptured,expectedSource:lease.sourceDraftText});
 }
 
 export async function runManagedJavascriptCloseGesture(page,task,inspect) {
@@ -114,9 +125,10 @@ export async function runManagedJavascriptCloseGesture(page,task,inspect) {
     cleanup_complete:true,action_key:'javascript.wizard.close',action_revision:'1',
     operation_id:task.gesture_id,output,error,trace:[]});
   if(!lease||lease.identity!==identity||!lease.wizardCaptured||lease.closeAttempted===true
+    ||task.error_stage==='done'&&(lease.doneAttempted!==true||lease.errorOkAttempted!==true)
     ||Date.now()>=task.cleanup_deadline)
     return outcome('NOT_APPLIED','preflight',false,{}, {code:'CLOSE_LEASE_UNAVAILABLE',message:'Close lease unavailable'});
-  const point=await page.evaluate(inspect,{held:lease.handle,task});
+  const point=await page.evaluate(inspect,{held:lease.handle,task,editor:lease.sourceEditorCaptured,expectedSource:lease.sourceDraftText});
   if(JSON.stringify(point)!==JSON.stringify(task.point)||Date.now()>=task.cleanup_deadline)
     return outcome('NOT_APPLIED','preflight',false,{}, {code:'CLOSE_POINT_CHANGED',message:'Close point changed'});
   lease.closeAttempted=true;
@@ -143,9 +155,9 @@ export async function runManagedJavascriptCloseConfirmation(page,task,inspect) {
 }
 
 function validate(task) {
-  const {cleanup_deadline,...opening}=task??{};
+  const {cleanup_deadline,error_stage='code_next',...opening}=task??{};
   makeJavascriptManagedPageCode(opening);
-  if(!Number.isSafeInteger(cleanup_deadline)||cleanup_deadline<=Date.now()
+  if(!['code_next','done'].includes(error_stage)||!Number.isSafeInteger(cleanup_deadline)||cleanup_deadline<=Date.now()
     ||cleanup_deadline>Date.now()+60000)throw Error('Invalid managed JavaScript Close deadline');
 }
 
@@ -153,7 +165,8 @@ export function makeJavascriptManagedClosePointCode(task) {
   validate(task);
   const inspect=`function inspect(args){const native=${wizardReadiness.toString()};`+
     `const read=(input)=>(${inspectManagedJavascriptPage.toString()})(input,native);`+
-    `return (${inspectManagedJavascriptClosePoint.toString()})(args,read);}`;
+    `const draft=${inspectManagedJavascriptErrorDraft.toString()};`+
+    `return (${inspectManagedJavascriptClosePoint.toString()})(args,read,draft);}`;
   return `async page=>(${runManagedJavascriptCloseRead.toString()})(page,${JSON.stringify(task)},${inspect})`;
 }
 
@@ -170,7 +183,8 @@ export function makeJavascriptManagedCloseGestureCode(task) {
     throw Error('Invalid managed JavaScript Close gesture');
   const inspect=`function inspect(args){const native=${wizardReadiness.toString()};`+
     `const read=(input)=>(${inspectManagedJavascriptPage.toString()})(input,native);`+
-    `return (${inspectManagedJavascriptClosePoint.toString()})(args,read);}`;
+    `const draft=${inspectManagedJavascriptErrorDraft.toString()};`+
+    `return (${inspectManagedJavascriptClosePoint.toString()})(args,read,draft);}`;
   return `async page=>(${runManagedJavascriptCloseGesture.toString()})(page,${JSON.stringify(task)},${inspect})`;
 }
 
@@ -187,18 +201,19 @@ export async function closeManagedJavascriptWizard({task,execute,record,receiptO
   wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}) {
   validate(task);
   const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
-  const journal=async event=>{
-    const saved=await record(event);
-    if(JSON.stringify(Object.fromEntries(Object.keys(event).map(key=>[key,saved?.[key]])))!==JSON.stringify(event))
-      throw Error('Managed JavaScript Close journal ACK differs');
-  };
+  const journal=event=>journalManagedJavascriptError({record,deadline:task.cleanup_deadline},event);
   const send=async(phase,key,gesture_id,point,code)=>{
     await journal({phase,operation_id:task.operation_id,gesture_id,owner:task.owner,
       point,deadline:task.cleanup_deadline,effect_possible:false});
     const result=await execute(withBrowserReceipt('('+code+')(page)',{
       ...receiptOptions(gesture_id,key,hash([gesture_id,task.owner,point,task.cleanup_deadline])),operation_id:gesture_id}),
       {timeout:Math.max(1,Math.min(35000,task.cleanup_deadline-Date.now()+5000))});
-    if(result?.status!=='SUCCEEDED'||result.action_key!==key||result.operation_id!==gesture_id)
+    if(result?.status!=='SUCCEEDED'||result.action_key!==key||result.operation_id!==gesture_id
+      ||task.error_stage==='done'&&(result.phase!=='gesture_returned'||result.effect_possible!==true
+        ||result.cleanup_complete!==true||result.error!==null||result.action_revision!=='1'
+        ||result.output?.discard_verified!==false
+        ||(key==='javascript.wizard.close'?result.output.close_gesture_returned!==true:result.output.confirmation_gesture_returned!==true))
+      ||Date.now()>=task.cleanup_deadline)
       throw Error('Managed JavaScript Close gesture refused');
   };
   const point=await execute(makeJavascriptManagedClosePointCode(task));
@@ -226,9 +241,10 @@ export async function closeManagedJavascriptWizard({task,execute,record,receiptO
   const graph=await execute(makeJavascriptExistingGraphTypeCode(task.prepared));
   if(graph?.verified!==true||graph.node_id!==task.owner.node_id||graph.graph_tid!==after.graph_tid)
     throw Error('Managed JavaScript Close independent graph type changed');
+  const done=task.error_stage==='done';
   await journal({phase:'javascript_managed_close_verified',operation_id:task.operation_id,
     owner:task.owner,deadline:task.cleanup_deadline,confirmation_required:decision.state==='confirm',
-    graph:after,independent_graph_type:graph,settings_applied:false,execution_started:false,draft_discarded:true});
+    graph:after,independent_graph_type:graph,settings_applied:done?null:false,execution_started:done?null:false,draft_discarded:done?null:true});
   return {verified:true,closed:true,confirmation_required:decision.state==='confirm',
-    node_id:task.owner.node_id,settings_applied:false,execution_started:false,draft_discarded:true};
+    node_id:task.owner.node_id,settings_applied:done?null:false,execution_started:done?null:false,draft_discarded:done?null:true};
 }

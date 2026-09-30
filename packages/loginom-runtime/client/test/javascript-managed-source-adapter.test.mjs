@@ -19,11 +19,11 @@ const task = {operation_id: 'managed-js-1', owner: node,
 
 function fixture({closeFails = false, pageTransientOnce = false, wrongType = false,
   settingsAckChanged = false,
-  nativeRefusal=false,captureFails=false,recoveryAckChanged=false,closeRefusalFails=false,
+  nativeRefusal=false,doneRefusal=false,captureFails=false,recoveryAckChanged=false,closeRefusalFails=false,
   generationFalse = false, generationFails = false, declaredFails = false, doneFails = false,
   graphTransientOnce = false, graphTransientDetail = false, graphEffectPossible = false, graphOwnerChanged = false} = {}) {
   const calls = [], events = [];
-  let pageReads = 0, graphReads = 0, codeNextSent = false,handleDraft;
+  let pageReads = 0, graphReads = 0, codeNextSent = false,doneSent=false,handleDraft;
   const driver = {
     openManagedJavascriptExistingWizard: async args => {calls.push('open'); assert.equal(args.node, node); return {task};},
     dispatchManagedJavascriptGeneration: async () => {calls.push('generation');
@@ -38,16 +38,18 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     dispatchManagedJavascriptNext: async () => {calls.push('next'); return {status: 'SUCCEEDED', output: {next_gesture_returned: true}};},
     dispatchManagedJavascriptCodeNext: async () => {calls.push('code-next');codeNextSent = true;
       return {status: 'SUCCEEDED', output: {next_gesture_returned: true, transition_verified: false}};},
-    dispatchManagedJavascriptDone: async () => {calls.push('done');if(doneFails)throw Error('lost Done reply');
+    dispatchManagedJavascriptDone: async () => {calls.push('done');doneSent=true;if(doneFails)throw Error('lost Done reply');
       return {status: 'SUCCEEDED', output: {done_gesture_returned: true,wizard_commit_verified: false,execution_started: null}};},
-    closeManagedJavascriptWizard: async () => {calls.push('close'); if (closeFails||closeRefusalFails) throw Error('lost Close reply');
-      return {verified: true, closed: true, node_id: 'node',draft_discarded:true,settings_applied:false,execution_started:false};},
+    closeManagedJavascriptWizard: async ({task}) => {calls.push('close'); if (closeFails||closeRefusalFails) throw Error('lost Close reply');
+      return {verified: true, closed: true, node_id: 'node',draft_discarded:task.error_stage==='done'?null:true,settings_applied:task.error_stage==='done'?null:false,execution_started:task.error_stage==='done'?null:false};},
     makeJavascriptSchemaContextCode: () => 'schema',
     makeJavascriptManagedPageCode: () => 'page',
     makeJavascriptManagedStageCode: () => 'stage',
     waitManagedJavascriptCodeSettlement,
-    captureManagedJavascriptWizardError:async()=>{calls.push('capture-error');if(captureFails)throw Error('lost error dialog reply');
-      return {owner:node,source_sha256:handleDraft,dialog_closed:true,native_owner_verified:true};},
+    waitManagedJavascriptDoneSettlement:async()=>{calls.push('done-settlement');return doneRefusal
+      ?{...await execute('stage'),wizard_error_refusal:true}: {owned_done_settled:true,graph_owner_verified:true};},
+    captureManagedJavascriptWizardError:async({error_stage})=>{calls.push('capture-error');if(captureFails)throw Error('lost error dialog reply');
+      return {error_stage,owner:node,source_sha256:handleDraft,dialog_closed:true,native_owner_verified:true};},
     makeJavascriptManagedSourceCode: () => 'source',
     makeJavascriptManagedSelectionReadCode: () => 'dispose',
     makeJavascriptExistingGraphTypeCode: () => 'type',
@@ -63,8 +65,8 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     if (code === 'schema') return {verified: true, node_context: {...node, verified: true, surface: 'wizard'},
       generation: {checked: !generationFalse}, grids: [{tid: 'grid', fields: [{record_id: 'volatile', Name: 'Value'}]}]};
     if(code==='stage'||code.includes('runManagedJavascriptStageRead'))return {owner:node,native_owner_verified:true,owner_verified:true,wizard_visible:true,
-      pending:false,preview_visible:false,boundary_refusal:null,dialog_diagnostic:{visible_count:0,foreign_count:0,roots:[]},
-      wizard_error:{visible:codeNextSent&&nativeRefusal,exact_count:1,tooltip:'SyntaxError: Syntax error at code (:4:33)',
+      pending:false,preview_visible:false,boundary_refusal:null,dialog_diagnostic:{visible_count:0,foreign_count:0,roots:[]},mask_diagnostic:{foreign_count:0},
+      wizard_error:{visible:codeNextSent&&nativeRefusal||doneSent&&doneRefusal,exact_count:1,tooltip:'SyntaxError: Syntax error at code (:4:33)',
         tid:'MF;TF-1;WizrdMCF;btnError',tooltip_truncated:false},page_tid:codeNextSent&&!nativeRefusal?'MF;TF-1;WizrdMCF;DoneWizard':'MF;TF-1;WizrdMCF;JavaScriptCodeWizard'};
     if (code === 'page') return {ready: true, node_guid: 'node',
       page:codeNextSent?{tid:'MF;TF-1;WizrdMCF;DoneWizard',index:3,indicator_count:4,visible_editors:0}
@@ -77,7 +79,7 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
   };
   const record = async event => {
     events.push(structuredClone(event));
-    if(recoveryAckChanged&&event.phase==='javascript_managed_rejected_draft_discarded')return {...event,source_sha256:'foreign'};
+    if(recoveryAckChanged&&['javascript_managed_rejected_draft_discarded','javascript_managed_rejected_done_closed'].includes(event.phase))return {...event,source_sha256:'foreign'};
     return settingsAckChanged && event.phase === 'javascript_managed_source_settings_observed'
       ? {...event, settings_sha256: '0'.repeat(64)} : event;
   };
@@ -191,12 +193,13 @@ test('managed source commit uses one Code Next and Done and settles the same gra
   await assert.rejects(()=>adapter.commit(handle,{owner,deadline}),/handle unavailable/);
 });
 
-test('Done graph observation retries only a transient unmounted surface',async()=>{
+test('a lost observation after native Done settlement remains uncertain',async()=>{
   const f=fixture({graphTransientOnce:true}),adapter=await f.sourceAdapter();
   const handle=await adapter.open({owner,deadline});
   await adapter.replace(handle,{owner,deadline,expected_source_sha256:'0'.repeat(64),source_text:'// changed\n'});
-  assert.equal((await adapter.commit(handle,{owner,deadline})).graph_owner_verified,true);
-  assert.equal(f.calls.filter(call=>call==='graph').length,2);
+  await assert.rejects(()=>adapter.commit(handle,{owner,deadline}),/PREPARED_NODE_CONTEXT_CHANGED/);
+  assert.equal(adapter.uncertain,true);
+  assert.equal(f.calls.filter(call=>call==='graph').length,1);
   assert.equal(f.calls.filter(call=>call==='done').length,1);
 });
 
@@ -210,12 +213,13 @@ test('Done graph observation never retries a changed node owner',async()=>{
   assert.equal(adapter.uncertain,true);
 });
 
-test('Done detail-read surface refusal rediscoveries are read-only and Done stays one-shot',async()=>{
+test('a changed detail-read surface after native settlement keeps Done one-shot and uncertain',async()=>{
   const f=fixture({graphTransientOnce:true,graphTransientDetail:true}),adapter=await f.sourceAdapter();
   const handle=await adapter.open({owner,deadline});
   await adapter.replace(handle,{owner,deadline,expected_source_sha256:'0'.repeat(64),source_text:'// changed\n'});
-  assert.equal((await adapter.commit(handle,{owner,deadline})).graph_owner_verified,true);
-  assert.equal(f.calls.filter(call=>call==='graph').length,2);
+  await assert.rejects(()=>adapter.commit(handle,{owner,deadline}),/PREPARED_NODE_CONTEXT_CHANGED/);
+  assert.equal(adapter.uncertain,true);
+  assert.equal(f.calls.filter(call=>call==='graph').length,1);
   assert.equal(f.calls.filter(call=>call==='done').length,1);
 });
 
@@ -345,4 +349,19 @@ for(const failure of ['captureFails','closeRefusalFails','recoveryAckChanged'])t
  assert.equal(f.calls.filter(call=>call==='code-next').length,1);assert.ok(!f.calls.includes('done'));
  if(failure==='captureFails')assert.ok(!f.calls.includes('close'));
  if(failure==='closeRefusalFails')assert.ok(!f.calls.includes('dispose'));
+});
+
+for(const failure of [null,'capture','close','ACK'])test('known Done refusal closes once without declaring rollback before fresh baseline proof '+failure,async()=>{
+ const f=fixture({doneRefusal:true,captureFails:failure==='capture',closeRefusalFails:failure==='close',recoveryAckChanged:failure==='ACK'});
+ const adapter=await f.sourceAdapter(),handle=await adapter.open({owner,deadline});
+ await adapter.replace(handle,{owner,deadline,expected_source_sha256:'0'.repeat(64),source_text:'// Done refusal\n'});
+ let error;try{await adapter.commit(handle,{owner,deadline});}catch(value){error=value;}
+ assert.equal(f.calls.filter(x=>x==='done').length,1);assert.equal(f.calls.filter(x=>x==='capture-error').length,1);
+ if(failure){assert.equal(adapter.uncertain,true);assert.equal(error.javascriptWizardRefusal,undefined);return;}
+ assert.equal(adapter.uncertain,false);assert.equal(adapter.active,false);
+ assert.equal(error.javascriptWizardRefusal.diagnostic.error_stage,'done');
+ assert.equal(error.javascriptWizardRefusal.closed.draft_discarded,null);
+ assert.equal(error.javascriptWizardRefusal.closed.settings_applied,null);
+ assert.equal(error.javascriptWizardRefusal.closed.execution_started,null);
+ assert.equal(f.calls.filter(x=>x==='close').length,1);assert.equal(f.calls.includes('graph'),false);
 });
