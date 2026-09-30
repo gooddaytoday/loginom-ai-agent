@@ -45,6 +45,20 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: native String Code live — выполняется — 2026-09-30
+
+Frozen child `800381592a`, полный operator suite **17979 PASS / 0 FAIL**,
+exec83264/exit0, log SHA256
+`8feb013b132f1d1c10e235ddc5729e9b665fcf6cfb08859a85baee09d19c2bfc`.
+Client runtime не менялся; прежний client suite не повторён.
+
+Ordinary headed `e-public-types-native-string-code-01`, fresh profile369,
+exec43701 выполняется: pinned String input8×1/native before-JS bytes, затем
+public Code output/source/mappings/Execute. Результат пока не установлен;
+после terminal independent String audit/cleanup/reconciliation, затем отдельный
+declared String. Native output bytes/Save/cold/candidate/CLI и остальные J/E/F
+остаются открытыми. No unknown-effect replay и original deadline сохраняются.
+
 ### E: native String fixed operator — подготовлен — 2026-09-30
 
 Frozen child `800381592abd98ed23cee5cd75324163e2e2a5a0` добавляет только fixed native String Code/declared IDs.
