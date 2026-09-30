@@ -77,3 +77,13 @@ test('public native input extension preserves business and empty input boundarie
   await assert.rejects(runJavascriptOperator(['--discovery-probe',mode==='code'?'g5-native-real':'declared-g5-native-real']),/fixed public entrypoint/);
  }
 });
+
+
+test('canonical public native cardinality binds nonempty Code and empty declared without mode substitutions',()=>{
+ for(const id of ['g5-native-cardinality-keep2','g5-native-cardinality-odd','g5-native-cardinality-duplicate']){
+  assert.throws(()=>javascriptPublicCodeProbe('declared-'+id,'declared'),/fixed typed case/);
+  assert.throws(()=>javascriptPublicCodeProbe(id,'declared'),/fixed schema mode/);
+ }
+ assert.throws(()=>javascriptPublicCodeProbe('g5-native-cardinality-empty','code'),/fixed typed case/);
+ assert.throws(()=>javascriptPublicCodeProbe('declared-g5-native-cardinality-empty','code'),/fixed schema mode/);
+});

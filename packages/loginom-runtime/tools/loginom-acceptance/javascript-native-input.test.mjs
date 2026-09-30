@@ -572,7 +572,7 @@ test('count loader pin verification rejects missing/changed actual source',()=>{
 
 // Exercise the public operator boundary with the production native decoder and
 // provenance checker; no browser action is available at this pure boundary.
-for(const fixtureId of ['real','boolean','string','integer-safe','integer-outside-safe'])test('public native '+fixtureId+' admission requires exact before-JS bytes, typed cells, owner and released reads',async()=>{
+for(const fixtureId of ['real','boolean','string','integer-safe','integer-outside-safe','cardinality-keep2','cardinality-odd','cardinality-duplicate','cardinality-empty'])test('public native '+fixtureId+' admission requires exact before-JS bytes, typed cells, owner and released reads',async()=>{
  const f=await fake({fixtureId}),raw=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'public-input'});
  const lifecycle=await javascriptNativeInputStatus(f.page),binding={...f.b,read_id:'public-input'};
  const provenance=nativeInputProvenance(sourceEvidence(fixtureId));
@@ -582,7 +582,10 @@ for(const fixtureId of ['real','boolean','string','integer-safe','integer-outsid
      precision:value===null?'exact_null':{real:'17_significant_digits',boolean:'exact_boolean',string:'display_text',integer:'exact_integer'}[fixed.type]}])};
  const input={node:provenance.node,table:{...table,port_guid:binding.port_guid,execution_id:provenance.execution.execution_id},
    native_input:{native:{exact,raw,binding,lifecycle}}};
- for(const [id,mode] of [['g5-native-'+fixtureId,'code'],['declared-g5-native-'+fixtureId,'declared']]){
+ const modes=fixtureId==='cardinality-empty'?[['declared-g5-native-'+fixtureId,'declared']]
+   :fixtureId.startsWith('cardinality-')?[['g5-native-'+fixtureId,'code']]
+   :[['g5-native-'+fixtureId,'code'],['declared-g5-native-'+fixtureId,'declared']];
+ for(const [id,mode] of modes){
   const probe=javascriptPublicCodeProbe(id,mode),proof=verifyJavascriptPublicCodeInput(probe,input);
   assert.equal(proof.native_input_bytes_verified,true);assert.equal(proof.row_count,fixed.rows);
   for(const change of [x=>x.native_input.native.lifecycle.pending=1,
@@ -595,6 +598,25 @@ for(const fixtureId of ['real','boolean','string','integer-safe','integer-outsid
    const bad=structuredClone(input);change(bad);assert.throws(()=>verifyJavascriptPublicCodeInput(probe,bad));
   }
   assert.throws(()=>verifyJavascriptPublicCodeInput({...probe,native_input_fixture:fixtureId==='real'?'boolean':'real'},input),/pin changed/);
+  if(fixtureId.startsWith('cardinality-')){
+   for(const mutate of [x=>x.native_input.native.raw.cells[1].payload[2]^=1,
+     x=>x.native_input.native.exact.native_baseline_sha256='0'.repeat(64),
+     x=>x.native_input.native.binding.completed_child.execution_id='foreign']){
+    const bad=structuredClone(input);mutate(bad);assert.throws(()=>verifyJavascriptPublicCodeInput(probe,bad));
+   }
+   const output={...table,row_count:fixed.output_rows,sample_rows:fixed.output_rows,
+     sample:fixed.output_values.map(value=>[{type:'integer',value,is_null:false,precision:'exact_integer'}]),
+     precision:{numbers_verified:true,limitations:[]},filter_enabled:false};
+   assert.equal(javascriptPublicCodeOracle(probe,output,input).gate_passed,true);
+   const wrong=structuredClone(output);
+   if(fixed.output_rows)wrong.sample[0][0].value='999';
+   else {wrong.schema[0].type='string';assert.doesNotMatch(probe.source,/AssignColumns|Append|Set\(/);}
+   assert.equal(javascriptPublicCodeOracle(probe,wrong,input).gate_passed,false);
+   if(fixtureId==='cardinality-duplicate'){
+    const wrongOrder=structuredClone(output);wrongOrder.sample=[0,2,4,1,3,5].map(index=>output.sample[index]);
+    assert.equal(javascriptPublicCodeOracle(probe,wrongOrder,input).gate_passed,false);
+   }
+  }
   if(fixtureId==='integer-outside-safe'){
    const output={...table,precision:{numbers_verified:true,limitations:[]},filter_enabled:false};
    const identity=javascriptPublicCodeOracle(probe,output,input);

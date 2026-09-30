@@ -35,6 +35,24 @@ const codeProbes=[
       +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
     schema:[{name:'Value',label:'Value',type:'datetime'}],
     expected:[[null],['2024-02-29T23:59:59.123'],['2026-03-29T01:59:59.999']],expectation:'fixed'},
+  {id:'g5-native-cardinality-keep2',scope:'G5',native_input_fixture:'cardinality-keep2',
+    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
+      +'for (let row=0;row<InputTable.RowCount;row++) {\n  const value=InputTable.Get(row,"Value");\n  if (value === 2) { OutputTable.Append(); OutputTable.Set("Value",value); }\n}\n',
+    schema:[{name:'Value',label:'Value',type:'integer'}],expected:[['2']],expectation:'fixed'},
+  {id:'g5-native-cardinality-odd',scope:'G5',native_input_fixture:'cardinality-odd',
+    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
+      +'for (let row=0;row<InputTable.RowCount;row++) {\n  const value=InputTable.Get(row,"Value");\n  if (value % 2 === 1) { OutputTable.Append(); OutputTable.Set("Value",value); }\n}\n',
+    schema:[{name:'Value',label:'Value',type:'integer'}],expected:[['1'],['3']],expectation:'fixed'},
+  {id:'g5-native-cardinality-duplicate',scope:'G5',native_input_fixture:'cardinality-duplicate',
+    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
+      +'for (let row=0;row<InputTable.RowCount;row++) {\n  const value=InputTable.Get(row,"Value");\n  OutputTable.Append(); OutputTable.Set("Value",value);\n  OutputTable.Append(); OutputTable.Set("Value",value);\n}\n',
+    schema:[{name:'Value',label:'Value',type:'integer'}],expected:[['1'],['1'],['2'],['2'],['3'],['3']],expectation:'fixed'},
+  {id:'declared-g5-native-cardinality-empty',scope:'G5',native_input_fixture:'cardinality-empty',schema_mode:'declared',
+    source:'import {InputTable,OutputTable} from "builtIn/Data";\n// UI-declared Value Integer; deliberately emit no rows.\n',
+    schema:[{name:'Value',label:'Value',type:'integer'}],expected:[],expectation:'fixed'},
   {id:'g5-native-integer-outside-safe',scope:'G5',native_input_fixture:'integer-outside-safe',
     source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
       +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Integer}]);\n'
