@@ -79,13 +79,36 @@ read-only blocker observation перед apply и снимает pending тол�
 settled NOT_APPLIED/effect=false/cleanup=true без unsettled runtime work.
 Это позволяет обычную owned уборку после доказанного no-effect отказа;
 unknown effects и runtime guards прежние. 57 адресных operator tests PASS.
-Назначен `e-public-existing-code-02`, fresh profile338, exec91785 на том же
-сохранённом пакете C. Private independent auditor подготовлен до первого
-запуска; целевой результат — комментарий к source, два собственных Execute,
-полный output6×4 и независимый public source-read. Deadline 30 минут от
-старта процесса; Save не запрашивается. Не менять child source до окончания
-попытки/audit. После результата проверить package/logout/browser/process
-absence и согласовать assignment/lease; затем existing declared.
+`e-public-existing-code-02`, profile338/source `b6c25559fd`, exec91785/exit1:
+**FAILED**, NOT_APPLIED/effect=false до target mutation/Execute; штатный cleanup
+package/logout/browser 3/3 и process absence проверены. Report SHA256
+`badf8256de936d1fde88f87034c7682dc1023728b7f23ecd613338ac87d36181`,
+journal `6dd0fef24b7b19cb2bb2b10913d1594299a3d5aa65dfe8cd7291a0107be26407`.
+Read-only diagnostic выявила exact current `MF;TF-1;ModelForm` с
+`bg-mask-message` сразу после source-read Close. Это реальная маска whole
+target (не текст вложенного workspace и не свидетельство foreign dialog).
+Close вернул owned graph раньше окончания его загрузки; workflow guard
+корректно отказал. Snapshot не доказывает постоянную блокировку.
+
+Child `467da5ab9a` ожидает исчезновения только exact текущей ModelForm-mask
+после owned Close: cached model/DOM/graph containment и prefix должны
+совпасть. Foreign loading masks остаются отказом; deadline прежний, Close
+gesture не повторяется. 100 адресных runtime tests PASS, включая waiting
+для own mask и refusal при подмене DOM/prefix. Первый общий suite был прерван
+без footer; его handle/process отсутствуют, PASS ему не присваивается.
+Повторный suite на точном `467da5ab9a` завершился exit0: 2981 PASS / 10 SKIP /
+0 FAIL, log SHA256
+`62fcead2495cfb2fe0c20414b462f956563f8b62c729a91d9924e087d7926af6`.
+57 адресных operator tests PASS, log SHA256
+`818240f1ada5044927f31c694bf5b249b238e0c82c2d4e63bf4bda4378886afd`.
+Private independent auditor подготовлен до первого запуска; целевой результат
+E по-прежнему — комментарий к source, два собственных Execute, полный
+output6×4 и независимый public source-read. Save не запрашивается; очередной
+live только после проверки текущего source и fresh-profile handoff.
+Запущен `e-public-existing-code-03`, ordinary headed profile339/source
+`467da5ab9a`, exec47923 на точном сохранённом C-пакете. Наблюдать тот же handle;
+child source неизменен до конца/audit. Предыдущий profile338 закрыт, новая
+assignment/lease принадлежит этой попытке. Затем existing declared.
 Product registration, candidate/CLI и оставшиеся E/J/F этой записью не закрыты.
 
 ### C0: подготовка материализации output0 — 2026-09-30
