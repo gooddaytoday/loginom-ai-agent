@@ -46,6 +46,36 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J12/J25: первый public native syntax/repair live запущен — 2026-09-30
+
+Frozen child `f42e7339f8c9d0983e5ceabb639d292653692694` добавляет fixed
+`javascript-public-wizard-refusal-live.mjs --case syntax-code|syntax-declared`.
+Сначала parsed-valid optional-chain source, затем public typed native refusal /
+полный independent source read; исправление — NEW operation ID на SAME node,
+actual retained expected digest и обычные2 fresh Execute/full6×4. Source,
+headless/X11 и Save flags не принимаются. Addressed37PASS, journal
+`e-public-wizard-refusal-operator-addressed-01.log`, SHA256
+`ce958b42abb377b433275045ddbe5dc5392af8ca9fad6774398026af76d09278`.
+Runtime не менялся после `010dca575d`; full checks — в записи ниже.
+
+Oracle `e-public-wizard-refusal-independent-oracle.json` SHA256
+`12623ceb48a81ece5fa357a1c2140b4174c17f2d2fcbedb229f2514262c401cd`;
+independent auditor `e-public-wizard-refusal-independent-audit.py` SHA256
+`ced37e61991035f2ce7ac13b13c85bf7226fbf48076b90100923a51bad202771`.
+Fixed ordered6×4/1950, saved C/D GUIDs/source/settings и rejected/repair digests
+закреплены до live; native position аудитор берёт только из согласованных
+native tooltip/dialog, не вычисляет из ожидаемого wrapper offset.
+
+Ordinary headed fresh385 assigned под registry lock; exec89037 зарегистрирован.
+Evidence `e-public-wizard-refusal-syntax-code-01` в прежней приватной кампании;
+используется ранее проверенный saved C. Нет Save/new bootstrap/проверки памяти.
+Terminal/audit/cleanup ещё не получены. Следующее действие — наблюдать **только
+этот handle**; frozen code/oracle/auditor не менять. При unknown reply/owner/
+Close/ACK сохранять gate и владение, не replay и не завершать browser owner
+принудительно. После actual terminal: independent audit + meaningful negatives,
+package close/logout/browser close/actual process absence, registry reconciliation.
+D назначать лишь после этого. Goal active; J/F этим пока не закрыты.
+
 ### E/J12/J25: runtime native Code Next refusal/recovery — 2026-09-30
 
 Child freeze `010dca575d51074073c37c3fc1153bb30fdd501d` реализует owned
