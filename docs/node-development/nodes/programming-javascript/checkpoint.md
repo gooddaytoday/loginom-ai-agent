@@ -47,6 +47,29 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J19/J20: порядок следующего результата уточнён — 2026-09-30
+
+Адресная сверка `javascript-source-read-session`, `node-contracts` и
+`javascript-code-node` на052909: public source-read доставляет полный код/
+digest/chunks; input/output mapping читаются внутри apply, а model-visible
+readback формируется после успешного Execute. Отдельного полного свежего
+JS context до apply нет. Поэтому fixed J09 не переоценивается как J19 или
+устойчивость модели к instruction-in-data. J19 остаётся открытым: нужна
+owner-bound композиция source/портов/schema_mode/mapping с явным data scope,
+redaction и общим delivery budget; существующие readers переиспользовать.
+
+Следующий независимый результат E — J20: два точных source из текущего
+knowledge1.0.0 на7.4.2 (`code-table-v1`, `declared-table-v1`) через существующий
+isolated public typed operator. Обе новые fixed probes используют импорт sales,
+наблюдённый RowID и независимый literal oracle6×2 (ObservedID1..6,
+PhaseMarker=`JS_G2_TABLE_V1`). Source/hash должны совпасть с knowledge asset;
+declared schema задаётся native мастером, Code AssignColumns остаётся в source.
+Public apply/2 fresh Execute/full typed read/user-v1 projection/independent
+source-read и ordinary cleanup обязательны. Save, новые API, изменение
+knowledge и candidate delivery не входят в этот срез; live ещё нет.
+Это порядок независимых проверок внутри E, все J19/J20/candidate/CLI требования
+сохранены. После J20 вернуться к композиции J19/J21 и остальному E/F.
+
 ### E/J09: manual mapping/Required Code и declared 2/2 приняты — 2026-09-30
 
 После принятого Code399 тот же child `052909696931023b36653e4a941cc68986c4b882`
