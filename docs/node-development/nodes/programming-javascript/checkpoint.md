@@ -46,6 +46,37 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: requested-source redaction admission gap подтверждён — 2026-09-30
+
+Следующий J05/J21/J23/J26 результат уточнён по actual source `3bfbd9968b`:
+`createJavascriptSourceAdmission(kind=new).admit` принял supplied source с
+синтетическим known-redactor marker, status=admitted и adapter_calls=0.
+Это source-only reproduction через настоящий admission/redactor, без browser,
+target creation/editor mutation/secret; факт не является live failure.
+Existing requested replacement также не проверяется на redaction до записи:
+reader проверяет прежний effective saved source, writer — source policy, а
+новый source redaction может отказать только на позднем readback. При этом
+нельзя утверждать pre-mutation отказ.
+
+Адресное решение в пределах E: общий pure source-delivery preparation для
+source reader и requested source admission. Сохранять полный source bound,
+UTF-8 code-point chunks, проверку full text + structured redaction и каждого
+будущего fragment/envelope до create/replacement. Размер prospective chunks
+должен быть одинаков при null/new и actual owner: фиксировать консервативный
+16KiB envelope budget по максимально разрешённым owner fields; каждый actual
+receipt всё равно повторно проверяется после ACK. При отказе никакого source
+или chunks в diagnostics, никакого нового read/write/effect/replay. Existing
+omitted source сохраняет owned read/discard before policy/effects. Public
+Protocol/HttpApi не меняются; runtime не импортирует operator fixtures.
+
+До live — regression, доказывающая исходный отказ теста на baseline, затем
+actual reader/admission/writer tests и full client suite; source/direct budgets
+и operator regression. После этого fixed public fidelity/chunks case с oracle
+и original bounded deadlines; native scalar/cardinality не повторять, поскольку
+их source/chunks/contract не меняются. Profile380 closed_verified, active_exec
+null, new live не запущен. Остаток schema-refusal/error/recovery/context/engine/
+assistant/J/F по-прежнему открыт; registry readiness не повышена.
+
 ### E: public native cardinality4/4 принято — 2026-09-30
 
 Keep2/odd/duplicate Code и canonical declared-empty на frozen child `3bfbd9968b`
