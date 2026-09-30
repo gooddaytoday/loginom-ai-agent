@@ -21,7 +21,7 @@ export async function javascriptPublicCodePins() {
 }
 
 export const javascriptPublicTypedIds=Object.freeze(['g5-null-empty','g5-boolean','g5-real',
-  'g5-safe-integer','g5-date-civil','g5-named-access','g5-empty-output','g5-one-output']);
+  'g5-safe-integer','g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
 
 export function javascriptPublicCodeProbe(probeId,schemaMode) {
   need(probeId===null||schemaMode==='code'&&javascriptPublicTypedIds.includes(probeId),
@@ -52,7 +52,8 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
   const stage=schemaMode==='declared'?'public-declared':'public-code';
   const probe=javascriptPublicCodeProbe(probeId,schemaMode);
   const remaining=deadline-Date.now()-60000;
-  need(remaining>=600000&&input.table?.sample_complete===true&&input.table.row_count===6
+  need(remaining>=600000&&input.table?.sample_complete===true&&input.table.row_count===(probe.input_variant==='empty'?0:6)
+    &&input.table.sample_rows===input.table.row_count
     &&input.table.schema.length===5,'Public Code lifecycle requires complete own input and original time budget');
   const base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'});
   const code=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor});

@@ -1948,7 +1948,7 @@ try {
       if(persistence){report.scope='private G7 persistence writer: '+persistence.schema_mode;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
-        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence||publicMode?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence||options['--verify-public-code-save']===true||options['--verify-public-declared-save']===true,inputVariant:discoveryProbe?.input_variant??'base',materialization:materializationProbe});
+        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence||publicMode?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence||options['--verify-public-code-save']===true||options['--verify-public-declared-save']===true,inputVariant:publicProbeId==='g5-empty-input'?'empty':discoveryProbe?.input_variant??'base',materialization:materializationProbe});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
       if(nativeRoundtrip)await executionRuntime.armNativeRoundtrip(executionInput);

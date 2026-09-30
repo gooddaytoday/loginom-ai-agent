@@ -1723,3 +1723,21 @@ for(const [name,options,success] of [
  assert.deepEqual(f.effects,['click','confirm_wizard_close']);
  assert.equal(f.events.some(e=>e.phase==='port_mapping_close_verified'),success);
 });
+
+test('header-only empty input uses existing immutable fixture and requires complete five-column zero rows',async()=>{
+ const fixture=new URL('../../../../docs/node-development/nodes/programming-javascript/fixtures/operator-only/empty.csv',import.meta.url);
+ const bytes=await readFile(fixture),manifest=JSON.parse(await readFile(new URL('../manifest.json',fixture),'utf8'));
+ const pin=verifyJavascriptFixture(bytes,manifest,'empty');assert.equal(pin.bytes,46);
+ const table={sample_complete:true,row_count:0,sample_rows:0,schema:javascriptInputColumns,sample:[]};
+ assert.equal(verifyJavascriptTable(table,'input','empty').rows,0);
+ assert.throws(()=>verifyJavascriptTable(table,'input','base'));
+ for(const change of [t=>t.sample_complete=false,t=>t.schema=[],t=>t.row_count=1,t=>t.sample.push([])]){
+  const wrong=structuredClone(table);change(wrong);assert.throws(()=>verifyJavascriptTable(wrong,'input','empty'));
+ }
+ const prepared={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'workflow',label:'Сценарий'}]}};
+ const request=javascriptInputRequest({prepared,storage:'/jsteach/js-g2-11111111-1111-4111-8111-111111111111',
+  artifact:{artifact_id:'fixture',bytes:pin.bytes,sha256:pin.sha256},uploadOperationId:'fixture:upload',totalMs:600000,inputVariant:'empty'});
+ const support=createTextImportNodeSupport({targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2'});
+ validateNodeApplyRequest(request,support.nodeApplyHandlers);assert.ok(request.parameters.settings.source.source_path.endsWith('/empty.csv'));
+ assert.equal(request.parameters.settings.columns.length,5);
+});
