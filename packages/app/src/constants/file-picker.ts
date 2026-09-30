@@ -1,5 +1,7 @@
 export const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"]
 
+export const LOGINOM_PACKAGE_MIME = "application/x-loginom-package"
+
 export const ACCEPTED_FILE_TYPES = [
   ...ACCEPTED_IMAGE_TYPES,
   "application/pdf",
@@ -53,6 +55,7 @@ export const ACCEPTED_FILE_TYPES = [
   ".yaml",
   ".yml",
   ".zsh",
+  ".lgp",
 ]
 
 const MIME_EXT = new Map([

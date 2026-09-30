@@ -58,7 +58,10 @@ const accepted = [
   ".yaml",
   ".yml",
   ".zsh",
+  ".lgp",
 ]
+
+const loginomPackageMime = "application/x-loginom-package"
 
 type PromptTarget = {
   current: () => PromptInputV2Prompt
@@ -103,8 +106,13 @@ export function createPromptInputV2Attachments(
       if (toast) input.warn()
       return false
     }
-    const blob = input.store ? await input.store(file) : await blobReference(file)
     const sourcePath = input.getPathForFile?.(file) || undefined
+    const blob =
+      mime === loginomPackageMime
+        ? { id: `lgp:${sourcePath ?? file.name}:${file.size}`, url: "" }
+        : input.store
+          ? await input.store(file)
+          : await blobReference(file)
     // Native clipboard images arrive with a fresh timestamped filename on every paste, so identical
     // clipboard content is matched on bytes alone.
     const duplicate = target.prompt
@@ -246,9 +254,10 @@ const textMimes = new Set([
 
 async function attachmentMime(file: File) {
   const type = file.type.split(";", 1)[0]?.trim().toLowerCase() ?? ""
-  if (imageMimes.has(type) || type === "application/pdf") return type
   const index = file.name.lastIndexOf(".")
   const suffix = index === -1 ? "" : file.name.slice(index + 1).toLowerCase()
+  if (suffix === "lgp") return loginomPackageMime
+  if (imageMimes.has(type) || type === "application/pdf") return type
   const fallback = imageExtensions.get(suffix) ?? (suffix === "pdf" ? "application/pdf" : undefined)
   if ((!type || type === "application/octet-stream") && fallback) return fallback
   if (type.startsWith("text/") || textMimes.has(type) || type.endsWith("+json") || type.endsWith("+xml")) {

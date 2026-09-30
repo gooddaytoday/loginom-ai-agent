@@ -991,6 +991,8 @@ with zipfile.ZipFile(p, "w") as zf:
       expect(loaded.state.output).toContain('<skill_content name="package_docs">')
       expect(loaded.state.output).toContain(`Base directory for this skill: ${skillDir}`)
       expect(loaded.state.output).toContain("абсолютный путь")
+      expect(loaded.state.output).toContain("прикрепил")
+      expect(loaded.state.output).toContain("Attached Loginom package path:")
       expect(loaded.state.output).toContain("файлового хранилища")
       expect(loaded.state.output).toContain("viking://resources/loginom-dock/sources/loginom-help")
       expect(loaded.state.output).toContain(path.join(skillDir, "scripts", "extract_scenario_structure.py"))
@@ -2261,6 +2263,44 @@ noLLMServer.instance(
       yield* sessions.remove(session.id)
     }),
   { config: cfg },
+)
+
+noLLMServer.instance(
+  "keeps an attached lgp as a path and does not inline the package",
+  () =>
+    Effect.gen(function* () {
+      const { directory: dir } = yield* TestInstance
+      const file = path.join(dir, "demo.lgp")
+      yield* Effect.promise(() => Bun.write(file, "PACKAGE_BYTES_MARKER\0zip"))
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const session = yield* sessions.create({})
+      const message = yield* prompt.prompt({
+        sessionID: session.id,
+        agent: "build",
+        noReply: true,
+        parts: [
+          { type: "text", text: "Сформируй ИИ Отчет" },
+          {
+            type: "file",
+            mime: "application/x-loginom-package",
+            url: pathToFileURL(file).href,
+            filename: "demo.lgp",
+          },
+        ],
+      })
+      const stored = yield* MessageV2.get({ sessionID: session.id, messageID: message.info.id })
+      const text = stored.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
+      expect(text).toContain(`Attached Loginom package path: ${file}`)
+      expect(text.includes("PACKAGE_BYTES_MARKER")).toBe(false)
+      const files = stored.parts.filter((part) => part.type === "file")
+      expect(files).toHaveLength(1)
+      if (files[0]?.type === "file") {
+        expect(files[0].url.startsWith("file:")).toBe(true)
+        expect(files[0].url.includes("base64")).toBe(false)
+      }
+      yield* sessions.remove(session.id)
+    }),
 )
 
 noLLMServer.instance(

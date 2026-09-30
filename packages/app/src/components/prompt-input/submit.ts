@@ -22,6 +22,9 @@ import { ScopedKey } from "@/utils/server-scope"
 import { createPromptSubmissionState } from "./submission-state"
 import { normalizeSessionInfo } from "@/utils/session"
 import { Event } from "@loginom-ai-agent/schema/event"
+import { LOGINOM_PACKAGE_MIME } from "@/constants/file-picker"
+import { encodeFilePath } from "@/context/file/path"
+import { getFilename } from "@loginom-ai-agent/core/util/path"
 import { blobDataUrl } from "@/utils/draft-store"
 
 type PendingPrompt = {
@@ -96,12 +99,23 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
           providerID: input.draft.model.providerID,
           variant: input.draft.variant,
         },
-        files: await Promise.all(
-          images.map(async (attachment) => ({
-            uri: await blobDataUrl(attachment.blob, attachment.mime),
-            name: attachment.filename,
-          })),
-        ),
+        files: (
+          await Promise.all(
+            images.map(async (attachment) => {
+              if (attachment.mime !== LOGINOM_PACKAGE_MIME) {
+                return {
+                  uri: await blobDataUrl(attachment.blob, attachment.mime),
+                  name: attachment.filename,
+                }
+              }
+              if (!attachment.sourcePath) return
+              return {
+                uri: `file://${encodeFilePath(attachment.sourcePath)}`,
+                name: getFilename(attachment.sourcePath),
+              }
+            }),
+          )
+        ).flatMap((item) => (item ? [item] : [])),
       })
       return true
     } catch (err) {
@@ -114,7 +128,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
   const encodedImages = await Promise.all(
     images.map(async (attachment) => ({
       ...attachment,
-      dataUrl: await blobDataUrl(attachment.blob, attachment.mime),
+      dataUrl: attachment.mime === LOGINOM_PACKAGE_MIME ? "" : await blobDataUrl(attachment.blob, attachment.mime),
     })),
   )
   const { requestParts, optimisticParts } = buildRequestParts({
