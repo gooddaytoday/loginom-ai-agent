@@ -4,7 +4,7 @@ import {compactNodeResult} from './user-results.mjs';
 // truncate exact_table or turn full coverage into an ordinary sample on overflow.
 // The runtime's completed mutation checkpoint is retained for inspection.
 export function nodeResultReply(result,{userProfile=false}={}) {
- const delivered=result?.kind==='source'?result:userProfile?compactNodeResult(result):result;
+ const delivered=['source','context'].includes(result?.kind)?result:userProfile?compactNodeResult(result):result;
  const reply={content:[{type:'text',text:JSON.stringify(delivered)}],structuredContent:delivered};
  const ports=result.outcome?.output?.output?.ports??[];
  if(ports.some(p=>p.exact_table!==undefined)&&Buffer.byteLength(JSON.stringify(reply),'utf8')>1048576) {

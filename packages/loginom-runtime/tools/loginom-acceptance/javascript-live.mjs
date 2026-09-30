@@ -79,7 +79,7 @@ import {runJavascriptStopProbe} from './javascript-stop-probe.mjs';
 import {javascriptPublicTypedIds,javascriptPublicCodeProbe,runJavascriptPublicCodeLive} from './javascript-public-code-live.mjs';
 import {runJavascriptPublicExistingLive} from './javascript-public-existing-live.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null,publicStopCaseId=null,publicCancelResumeCaseId=null,publicLostReplyCaseId=null,publicRequiredCaseId=null}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null,publicStopCaseId=null,publicCancelResumeCaseId=null,publicLostReplyCaseId=null,publicRequiredCaseId=null,publicContextCaseId=null}={}) {
 process.umask(0o077);
 if(publicProbeId!==null&&(!javascriptPublicTypedIds.includes(publicProbeId)||coldReader||packageFile||batchCases!==null
   ||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null||existingLifecycle!==null))
@@ -108,6 +108,10 @@ if(publicRequiredCaseId!==null&&(publicRequiredCaseId!=='required-'+existingLife
   ||!['code','declared'].includes(existingLifecycle)||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null
   ||publicWizardRefusalCaseId!==null||publicStopCaseId!==null||publicCancelResumeCaseId!==null||publicLostReplyCaseId!==null))
   throw Error('Public required requires its separate fixed saved mode/base entrypoint');
+if(publicContextCaseId!==null&&(publicContextCaseId!=='context-'+existingLifecycle||existingInputVariant!==null
+  ||!['code','declared'].includes(existingLifecycle)||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null
+  ||publicWizardRefusalCaseId!==null||publicStopCaseId!==null||publicCancelResumeCaseId!==null||publicLostReplyCaseId!==null||publicRequiredCaseId!==null))
+  throw Error('Public context requires its separate fixed saved mode/base entrypoint');
 if(existingInputVariant!==null&&(existingLifecycle===null||!['changed','reordered'].includes(existingInputVariant)))
   throw Error('Existing input freshness requires its assigned lifecycle and fixed variant');
 if(coldReader&&(batchCases!==null||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null))throw Error('Cold reader requires its separate private entrypoint');
@@ -1912,13 +1916,13 @@ try {
           directory,redactor,record:executionRecord,report,save,deadline:batchDeadline,
           onPending:value=>{managedCloseUncertain=value;}});
       }
-      if(publicRequiredCaseId!==null){
+      if(publicRequiredCaseId!==null||publicContextCaseId!==null){
         const {runJavascriptPublicRequiredLive}=await import('./javascript-public-required.mjs');
         await runJavascriptPublicRequiredLive({page,prepared:executionPrepared,node:executionNode,targetOrigin:address.origin,
           redactor,record:executionRecord,report,save,deadline:batchDeadline,onPending:value=>{managedCloseUncertain=value;},
-          schemaMode:existingLifecycle,graph,readGraph:()=>executionRuntime.graph()});
+          schemaMode:existingLifecycle,graph,readGraph:()=>executionRuntime.graph(),contextCase:publicContextCaseId!==null});
       }
-      if(publicRequiredCaseId===null)await runJavascriptPublicExistingLive({page,prepared:executionPrepared,node:executionNode,
+      if(publicRequiredCaseId===null&&publicContextCaseId===null)await runJavascriptPublicExistingLive({page,prepared:executionPrepared,node:executionNode,
         targetOrigin:address.origin,redactor,record:executionRecord,report,save,deadline:batchDeadline,
         onPending:value=>{managedCloseUncertain=value;},schemaMode:existingLifecycle,
         graph:existingInputVariant===null?graph:await executionRuntime.graph(),

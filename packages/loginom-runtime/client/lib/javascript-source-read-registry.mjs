@@ -7,15 +7,15 @@ const signature = value => JSON.stringify(canonical(value));
 
 // An operation ID retains its source reader and every successful reply. An
 // exact retry joins or replays that reply; no browser gesture is repeated.
-export function createJavascriptSourceReadRegistry({openSession, maxOperations = 128}) {
+export function createJavascriptSourceReadRegistry({openSession, maxOperations = 128,validateRequest=validateJavascriptSourceReadRequest}) {
   if (typeof openSession !== 'function' || !Number.isInteger(maxOperations)
-    || maxOperations < 1 || maxOperations > 1024) throw Error('Invalid JavaScript source registry');
+    || maxOperations < 1 || maxOperations > 1024||typeof validateRequest!=='function') throw Error('Invalid JavaScript source registry');
   const operations = new Map();
   return Object.freeze({
     get busy() { return [...operations.values()].some(entry => entry.inflight !== null); },
     get unsettled() { return [...operations.values()].some(entry => entry.session?.cleanupUnconfirmed === true); },
     async read(request) {
-      const kind = validateJavascriptSourceReadRequest(request);
+      const kind = validateRequest(request);
       const key = signature(request);
       let entry = operations.get(request.operation_id);
       if (!entry) {

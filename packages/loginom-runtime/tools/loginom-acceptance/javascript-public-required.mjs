@@ -24,7 +24,7 @@ export function javascriptRequiredManualConfiguration() {
       label:column.name==='NetCents'?javascriptRequiredManualLabel:column.label}))},
   configured:schema.map(column=>({...column,used:true}))};
 }
-export function verifyJavascriptRequiredManualMapping(mapping,node,{manual=true}={}) {
+export function verifyJavascriptRequiredManualMapping(mapping,node,{manual=true,manualLabel=javascriptRequiredManualLabel}={}) {
   const schema=javascriptDiscoveryProbe('p1-business-code-base').schema;
   need(mapping?.verified===true&&mapping.inventory_complete===true&&mapping.source_identity_verified===true
     &&mapping.state_source==='cached_mapping_stores'&&mapping.settings_applied===false&&mapping.package_saved===false
@@ -40,16 +40,16 @@ export function verifyJavascriptRequiredManualMapping(mapping,node,{manual=true}
     return source.index===i&&target.index===i&&typeof source.field_id==='string'
       &&source.name===c.name&&source.label===c.label&&source.type===c.type&&source.required===true
       &&target.name===c.name&&target.type===c.type&&target.required===false&&target.excluded===false&&target.inherited===false
-      &&target.label===(manual&&c.name==='NetCents'?javascriptRequiredManualLabel:c.label)
+      &&target.label===(manual&&c.name==='NetCents'?manualLabel:c.label)
       &&target.source?.record_id===source.record_id&&target.source.field_id===source.field_id;
   }),'Required native mapping fields or reciprocal source changed');
   return {source_required:[true,true,true,true],target_required:[false,false,false,false],
-    autosync:mapping.autosync,manual_label:manual?javascriptRequiredManualLabel:null,complete:true};
+    autosync:mapping.autosync,manual_label:manual?manualLabel:null,complete:true};
 }
-export function javascriptRequiredOutputOracle(schemaMode,table) {
+export function javascriptRequiredOutputOracle(schemaMode,table,manualLabel=javascriptRequiredManualLabel) {
   const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-base');
   verifyJavascriptMismatchTable(table);
-  const expected=probe.schema.map(c=>({...c,label:c.name==='NetCents'?javascriptRequiredManualLabel:c.label}));
+  const expected=probe.schema.map(c=>({...c,label:c.name==='NetCents'?manualLabel:c.label}));
   need(table.fresh===true&&same(table.schema.map(({name,label,type})=>({name,label,type})),expected)
     &&table.row_count===6&&table.sample.length===6&&table.sample.every((row,i)=>row.length===4
       &&row.every((cell,j)=>cell.is_null===false&&Object.is(cell.value,probe.expected[i][j]))),
@@ -58,12 +58,13 @@ export function javascriptRequiredOutputOracle(schemaMode,table) {
 }
 
 export async function runJavascriptPublicRequiredLive({page,prepared,node,targetOrigin,redactor,record,report,
-  save,deadline,onPending,schemaMode,graph,readGraph}) {
+  save,deadline,onPending,schemaMode,graph,readGraph,contextCase=false}) {
   need(['code','declared'].includes(schemaMode)&&Date.now()+660000<deadline,'Required fixed mode/original budget unavailable');
   const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-base'),base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'}),
     support=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor}),mappings=new Map();
+  let runtimeRecords=0;
   const runtime=createActionRuntime({pinned:await javascriptPublicCodePins(),allowCandidate:true,targetOrigin,targetBuild:'7.4.2',redactor,
-    onRecord:async event=>{const ack=await record(event);
+    onRecord:async event=>{runtimeRecords++;const ack=await record(event);
       if(event.phase==='node_phase_completed'&&event.receipt?.phase==='output_mapping')mappings.set(event.operation_id,structuredClone(event.receipt.value.native_mapping));
       return ack;},execute:source=>Function('return ('+source+')')()(page),
     nodeApplyHandlers:new Map([...base.nodeApplyHandlers,...support.nodeApplyHandlers]),
@@ -97,18 +98,28 @@ export async function runJavascriptPublicRequiredLive({page,prepared,node,target
   const nativeBefore=mappings.get(warmup.operation_id);
   verifyJavascriptRequiredManualMapping(nativeBefore,node,{manual:false});
   report.public_required.warmup={request:warmup,job:warmupJob,native_mapping:nativeBefore};onPending(false);await save();
+  const context=contextCase?await import('./javascript-public-context.mjs'):null;
+  const manualLabel=context?.javascriptContextDataLabel??javascriptRequiredManualLabel;
+  if(contextCase){
+    report.public_context={status:'RUNNING',schema_mode:schemaMode,node,model_resistance_verified:false};
+    report.stage='public-context-before';onPending(true);await save();
+    report.public_context.before=await context.readJavascriptPublicContext({runtime,prepared,node,schemaMode,source:before.source_text,
+      manual:false,deadline,record,readGraph,onPending});onPending(false);await save();
+  }
   const channel=until=>createNodeProcedure({operation:{id:'js-required-manual-'+randomUUID(),action:{action_key:'diagnostic.javascript.required',revision:'1'},deadline:until},
     execute:source=>Function('return ('+source+')')()(page),record,targetOrigin,targetBuild:'7.4.2',maxSteps:4096,
     preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},
     wrapMutation:(code,receipt)=>withBrowserReceipt('('+code+')(page)',{receipt_namespace:prepared.document_id,
       receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
   const lifecycle={};report.stage='public-required-manual-setup';onPending(true);await save();
+  const configuration=javascriptRequiredManualConfiguration();
+  configuration.mapping.fields.find(f=>f.name==='NetCents').label=manualLabel;
   const manual=await configureJavascriptManualMapping({reader:channel(deadline),cleanupReader:channel,reference:node,
-    record,lifecycle,configuration:javascriptRequiredManualConfiguration(),
+    record,lifecycle,configuration,
     verifyGraph:async()=>verifyJavascriptMappingGraph(graph,await readGraph(),node)});
   need(lifecycle.closed===true&&manual.verified===true&&manual.settings_applied===true,'Required manual setup unconfirmed');
-  verifyJavascriptRequiredManualMapping(manual.definition,node);verifyJavascriptMappingGraph(graph,await readGraph(),node);
-  report.public_required.manual={configuration:javascriptRequiredManualConfiguration(),result:manual};onPending(false);await save();
+  verifyJavascriptRequiredManualMapping(manual.definition,node,{manualLabel});verifyJavascriptMappingGraph(graph,await readGraph(),node);
+  report.public_required.manual={configuration,result:manual};onPending(false);await save();
   const refused={...request({schema_mode:schemaMode}),mappings:[{direction:'output',port:0,autosync:false,
     fields:javascriptRequiredManualConfiguration().mapping.fields.map(f=>({...f,...(f.name==='NetCents'?{excluded:true}:{})}))}]};
   let refusal;
@@ -120,10 +131,10 @@ export async function runJavascriptPublicRequiredLive({page,prepared,node,target
   await record({phase:'javascript_required_mapping_edit_refused',request:refused,refusal});
   report.public_required.refused={request:refused,refusal};
   report.stage='public-required-source-edit';onPending(true);await save();
-  const source_text=before.source_text+'\n// E/J09: preserve manual output mapping and required source fields.\n',identity=javascriptSourceIdentity(source_text);
+  const source_text=before.source_text+(context?.javascriptContextDataComment??'\n// E/J09: preserve manual output mapping and required source fields.\n'),identity=javascriptSourceIdentity(source_text);
   const edited=request({schema_mode:schemaMode,source_text,expected_source_sha256:before.source_sha256}),job=await apply(edited),result=job.outcome.output;
-  verifyJavascriptRequiredManualMapping(mappings.get(edited.operation_id),node);
-  const oracle=javascriptRequiredOutputOracle(schemaMode,result.output.ports[0]);
+  verifyJavascriptRequiredManualMapping(mappings.get(edited.operation_id),node,{manualLabel});
+  const oracle=javascriptRequiredOutputOracle(schemaMode,result.output.ports[0],manualLabel);
   need(result.configuration.readback.source.sha256===identity.source_sha256
     &&result.execution.execution_id!==warmupJob.outcome.output.execution.execution_id,'Required committed source/fresh execution identity differs');
   const after=await readSource(),afterGraph=await readGraph();
@@ -131,5 +142,15 @@ export async function runJavascriptPublicRequiredLive({page,prepared,node,target
     'Required independent final source differs');verifyJavascriptMappingGraph(graph,afterGraph,node);
   Object.assign(report.public_required,{status:'OBSERVED',before_source:before,request:edited,job,native_mapping:mappings.get(edited.operation_id),
     oracle,independent_source:after,graph_before:graph,graph_after:afterGraph});
+  if(contextCase){
+    report.stage='public-context-after';await save();
+    report.public_context.after=await context.readJavascriptPublicContext({runtime,prepared,node,schemaMode,source:source_text,
+      manual:true,deadline,record,readGraph,onPending});
+    const proof=report.public_context.after,count=runtimeRecords;
+    need(same(await dispatchNodeApi(runtime,'dock_node_read',proof.request),proof.reply)&&count===runtimeRecords,
+      'Public context same-ID retry emitted runtime journal events');
+    need(report.public_context.before.reply.semantic_sha256!==proof.reply.semantic_sha256,'Public context failed to observe changed source/label');
+    Object.assign(report.public_context,{status:'OBSERVED',same_id_runtime_events_added:0});
+  }
   report.stage='public-required-observed';onPending(false);await save();
 }
