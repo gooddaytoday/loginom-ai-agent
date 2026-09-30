@@ -60,7 +60,8 @@ empty input; все9 declared runs получили independent PASS и полн
 native input bytes до JS и полный typed output/cleanup подтверждены.
 На `14965ef148` тот же уровень отдельно подтверждён для native Boolean2/2,
 на `800381592a` — native String8×1 в обоих modes с NULL/empty/Unicode/LF.
-Следующий шаг — native int64/Date и E остаток J06–J08, затем остальные J.
+На `0be6a698c1` native safe-int644×1 подтверждён в обоих modes: input bytes
+и exact output decimal strings. Следующий шаг — native Date/outside-safe и E остаток J06–J08, затем остальные J.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 

@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — native safe-int64 input через public JS и оставшиеся J06–J08.
+следующий шаг — native civil Date input через public JS и оставшиеся J06–J08.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
 Fixed public Code scalar output5/5, named access и empty output приняты ниже.
 Fixed public existing changed/reordered freshness для обоих modes принят ниже.
@@ -44,6 +44,32 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E: public native safe-int642/2 принят — 2026-09-30
+
+Code/declared на frozen child `0be6a698c1` получили independent native audits
+PASS и terminal exit0, ordinary headed. Input4×1 NULL/±9007199254740991/0 и
+signed-int64 bytes до JS/releases4/4, полный output exact decimal strings,
+metadata/source/mappings/graph/Views/13 phases/2 fresh Execute и package/logout/
+browser/process cleanup проверены. Code371/exec85090 proof ниже;
+declared372/exec62731 completed IDs `1790762075570-sre898qnud:1229:3` / `:1229:4`.
+Declared report SHA256 `6c6e20d81712278e2f167abe5121d85b26055bc8948f3cc8e946c1ae50451195`,
+journal `97e95224fed6f0426cd0931cd56843d3839a66c44f5b7f9ee49d8bec343ecd5d`,
+receipt `ffa6b440f119d97cdc00d89ae18646f1f62ca563382b1f457e5ee825f9369a3c`.
+Independent safe-int64 auditor23/23 actual mutations refused, receipt SHA256
+`0e5c24e5f1942147a41eac1e49ac34c4dfe17f1f7837130353d365716b644717`;
+проверены decimal→number/sign/boundary alterations. Source-only negative copies
+не являются browser runs. Native input bytes доказаны; native output bytes/
+Save/cold/candidate/CLI и outside-safe guarantee не доказаны. Profile372
+closed_verified, active_exec=null, browser/processes отсутствуют.
+
+Следующий fixed блок — native civil Date3×1: прежний CSV/native before-JS
+baseline, NULL и две authored civil values с milliseconds, public Code/declared
+identity-copy и независимый typed output. Не приписывать UTC/epoch/timezone;
+обязательная native civil attestation/provenance сохранена. До live проверить
+actual admission/decoder/civil baseline/owner/releases, подготовить independent
+civil oracle/auditor и freeze. Затем outside-safe без ложной гарантии, точный
+остаток J06–J08/E и остальные J/F. Full gates/registry readiness не повышены.
 
 ### E: native safe-int64 Code принят; declared выполняется — 2026-09-30
 
