@@ -301,7 +301,7 @@ test('owned declared columns precede Next and become preserved source settings',
 test('unsupported declared columns fail before Setting; uncertain Apply cannot reopen',async()=>{
   const bad=fixture({generationFalse:true}),refused=await bad.sourceAdapter();
   await assert.rejects(refused.open({owner,deadline,schemaMode:'declared',columns:[
-    {name:'Value',label:'Value',type:'real',data_kind:'Непрерывный',usage:'Не задано'}]}),/unsupported/);
+    {name:'Value',label:'Value',type:'variant',data_kind:'Непрерывный',usage:'Не задано'}]}),/unsupported/);
   assert.deepEqual(bad.calls,[]);
   const f=fixture({generationFalse:true,declaredFails:true}),adapter=await f.sourceAdapter();
   const columns=[{name:'Value',label:'Value',type:'integer',data_kind:'Непрерывный',usage:'Выходное'}];
