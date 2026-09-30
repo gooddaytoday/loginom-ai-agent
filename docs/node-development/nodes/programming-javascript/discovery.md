@@ -133,3 +133,16 @@ output0/1/N/empty input тоже приняты на `d4898cac03` (9/9 runs, ind
 headed-режим по последнему указанию пользователя, подтверждённое закрытие
 именно своего пакета, logout и browser close. Правила неизвестного эффекта и
 памяти сохраняются; новые gates и повторный bootstrap не вводятся.
+
+### E: public source fidelity/empty — 2026-09-30
+
+Frozen child `88ddfc958e`: public existing Code32KiB/1024lines/8chunks сохранил
+Unicode/emoji/LF/URL/quotes/backslash/tabs/trailing spaces и business6×4;
+declared-empty сохранил4-column native schema при0rows. Оба actual exit0/OBSERVED,
+independent audit/2 fresh Execute/settings/mappings/graph/Views/cleanup/process
+absence. Source-read session original deadline/operation ID, whole digest и
+16KiB response bounds проверены; auditor25+23 mutations refused. Local handler
+cap+1/line+1/module/columns и driver redaction отказали до browser effects.
+No Save/native output bytes/candidate/CLI; mode-flip owned refusal — следующий
+шаг J09. Полный JavaScript operator suite18120PASS; broader all-operator5 legacy
+fault-wrapper failures не считать PASS. Точные SHA/profiles — checkpoint.

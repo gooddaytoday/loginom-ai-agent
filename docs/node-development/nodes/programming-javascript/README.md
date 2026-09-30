@@ -142,3 +142,9 @@ Linux установлена отдельным чтением `Session.Version.
 Режим браузера — обычный headed по последнему указанию пользователя; правило
 остановки при недоступной памяти сохранено. Текущий документ не разрешает
 подменять пользовательский клиент, публиковать выпуск или сливать ветку.
+
+На `88ddfc958e` E public source fidelity/empty2/2 приняты: Code32KiB/1024lines/
+8chunks и прежний6×4, declared-empty0bytes и retained4-column schema/0rows.
+Независимые source/settings/mappings/graph/Views/2 fresh Execute/cleanup proofs
+проверены; candidate/CLI/full E остаются открыты. Следующий шаг — public owned
+refusal mode flip; подробности и ограничения в checkpoint.

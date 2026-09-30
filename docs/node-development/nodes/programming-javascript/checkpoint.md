@@ -46,6 +46,33 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public source fidelity/empty2/2 принято — 2026-09-30
+
+На frozen child `88ddfc958e` оба fixed cases приняты independent audit:
+Code32KiB/1024lines/8chunks/full6×4 (подробности ниже), declared empty0bytes/
+1line/1chunk/full retained4-column schema/0rows. Declared empty01/profile382/
+exec54400 actual exit0/OBSERVED;13 phases/2 fresh Execute, source/settings/
+metadata/mappings/graph/Views сохранены, package/logout/browser/process absence.
+Completed IDs `1790768408639-8n11r91cay7:782:1` / `:782:2`.
+Report SHA256 `d2aa369db0a7948811e73d87b3f0360df294e8abb4758ba434c024f59fe51608`,
+journal `38c01aa6731e34cc76cb503e62122e4046ccf683e617affcb2a072fcec0d3e69`,
+receipt `ad4ab454b169c8ea5238da6fdd75aef8d042f35d0bb1c0fdad840ebd71b097f2`.
+Declared auditor23/23 actual mutations refused; receipt SHA256
+`22e0a9873d8b2b9417fe2532b80931ed493e0e8e2518c0c061338e9329543688`.
+Registry382 closed_verified/active_exec=null; браузеры/processes отсутствуют.
+No Save/new bootstrap/native output bytes/candidate/CLI claims.
+
+Следующий шаг E/J09: отдельный public owned refusal schema_mode code↔declared
+на сохранённых C/D. Source/runtime baseline проверяет совпадение observed mode,
+но plain throw из beforeTarget попадает в pending target mutation и generic
+AMBIGUOUS. Это установленный source gap; live ambiguous ещё не запускался.
+Нужно доказать local regression, затем узкий trusted-driver refusal после
+проверенного source read/discard/полного settings baseline с immutable durable
+ACK; отсутствие editor mutation/Execute и independent source/settings/graph
+до/после. Unknown read/discard/ACK/owner остаются uncertain, без replay. Не
+ослаблять generic target recovery; приёмка отказа ограничена JS existing mode
+mismatch и полным owned proof. Full E/J/F и legacy fault wrappers остаются открыты.
+
 ### E: public 32KiB source fidelity принято; declared empty выполняется — 2026-09-30
 
 Code01/profile381/exec44771 actual exit0/OBSERVED на frozen child `88ddfc958e`:
