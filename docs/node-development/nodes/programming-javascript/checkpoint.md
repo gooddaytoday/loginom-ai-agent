@@ -45,6 +45,39 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: fixed public native-real operator — подготовлен — 2026-09-30
+
+Child `7944b9e3d2` добавляет operator-only `g5-native-real` и declared counterpart:
+прежний pinned real CSV33 bytes, SHA256
+`4d731645c25b4aafbdd4c96a477341fcc5ef086ad2bda3dc9a2bfcce7966df84`;
+input4×1 Value/real, NULL/0/-1.25/10.125 и exact before-JS native bytes.
+Public helper требует подтверждённые source/owner/port/Import Execute,
+завершённые read/releases и полный typed input; ACK перед публичным JS apply.
+Business6×5/empty0×5 guards сохранены. Generic discovery/native-fixture overrides
+для этих fixed IDs запрещены до конфигурации. При native uncertainty запрещены
+диагностика/дополнительные snapshots и UI cleanup, закрывается только браузер.
+Product client runtime и catalog/knowledge не менялись.
+
+Адресные **418 PASS / 0 FAIL**, log04; actual request admission обоих modes,
+native decoder/provenance и отрицательные owner/execution/bytes/releases случаи
+проверены. Первый полный suite17935:17933 PASS/2 FAIL — VM fixtures не объявляли
+новую переменную; test-only исправление `a679a63595` и новые native-pending cases
+дали35 PASS. Повторный полный suite на `a679a63595` выполняется; live ещё нет.
+
+Code source SHA256 `5519fcf8c9232b3d7b157745ab0852033825cdac02ae2ab489ec4801243942f5`;
+declared source `901ed4c40c4a062feefa484dbb3213349e85dcf10fb20c43f6c2cb425b9639d5`.
+Private independent native oracle/auditor до live: SHA256
+`c140dee9bffc0c23570d4d0b4077cd73f88e8ac445e5335c54a8db7c7c950738` /
+`9b79baf0831c5ef11c13de14e1a729a6d2110360bd84cbe57ef5530496db8e23`.
+Аудитор самостоятельно декодирует little-endian Variant payload через Python
+struct, проверяет byte literals/владение/release и порядок before-JS admission,
+затем полный public output/source/metadata/mappings/graph/Execute/cleanup.
+Oracle/source hashes сверены до browser; предыдущие oracles/receipts неизменны.
+
+Profile364 closed_verified, active_exec=null. После full operator PASS — новый
+ordinary headed profile365 для Code real; затем independent audit/reconciliation
+и отдельный declared real. Остальные native primitives/J/E/F открыты.
+
 ### E: следующий native input/public JS блок — проектное решение — 2026-09-30
 
 Все9 declared cases завершены и profile364 closed_verified, active_exec=null.
