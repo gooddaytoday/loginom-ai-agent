@@ -21,7 +21,8 @@ import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
 import { createNodeOperationRunner } from './node-operation-runner.mjs';
 import {nodeApiTools,deliveryApiTools} from './node-api.mjs';
 import {createJavascriptSourceReadRegistry} from './javascript-source-read-registry.mjs';
-import {createJavascriptSourceReadSession} from './javascript-source-read-session.mjs';
+import {createJavascriptSourceReadSession,validateJavascriptSourceReadRequest} from './javascript-source-read-session.mjs';
+import {createJavascriptContextReadSession,validateJavascriptContextReadRequest} from './javascript-context-read.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import { configureTextImportDraft, validateTextImportRequest } from './text-import-procedure.mjs';
 
@@ -1794,15 +1795,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         accepted_phases:state.phases.map(p=>p.phase),pending_phase:state.pending?.phase??null,
         effect_possible:state.effect_possible,cleanup_complete:state.cleanup_complete}):null;
     }});
-  const sourceReads=createJavascriptSourceReadRegistry({openSession:async request=>{
+  const sourceReads=createJavascriptSourceReadRegistry({
+    validateRequest:request=>request?.kind==='context'?validateJavascriptContextReadRequest(request):validateJavascriptSourceReadRequest(request),
+    openSession:async request=>{
     if(!redactor || typeof redactor.text!=='function' || typeof redactor.redact!=='function'
       || typeof targetOrigin!=='string' || typeof targetBuild!=='string')
       throw Error('JavaScript source read host dependencies unavailable');
     if(operations.has(request.operation_id)||auxiliary.has(request.operation_id)||nodeJobs.has(request.operation_id))
       throw Error('JavaScript source operation ID conflicts with another operation');
-    const deadline=Date.now()+(request.budget_ms??300000);
+    if(request.kind==='context'&&targetBuild!=='7.4.2')throw Error('JavaScript context is not validated for observed Loginom build');
+    const deadline=Date.now()+(request.budget_ms??(request.kind==='context'?600000:300000));
     const uiEpoch=Date.now();
-    const operation={id:request.operation_id,action:{action_key:'node.source',revision:'1'},
+    const operation={id:request.operation_id,action:{action_key:request.kind==='context'?'node.context':'node.source',revision:'1'},
       checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline};
     const prepared={document_id:request.document_id,workflow_ref:request.workflow_ref,node:request.node};
     const executeSourceScript=async (code,options)=>{
@@ -1821,8 +1825,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         wrapMutation:(code,reference)=>withBrowserReceipt('('+code+')(page)',{
           ...receiptOptions(operation,reference.id,reference.action_key,reference.signature),
           operation_id:reference.id})})});
-    const session=createJavascriptSourceReadSession({request,uiEpoch,deadline,adapter,redactor,record:onRecord});
-    auxiliary.set(request.operation_id,{signature:'node.source:'+fingerprint('node.source',request)});
+    const contextChannel=until=>{
+      if(until!==deadline)throw Error('JavaScript context original deadline changed');
+      return createNodeProcedure({operation,execute:executeSourceScript,record:onRecord,
+      targetOrigin,targetBuild,preparedNodeContext:prepared,maxSteps:4096,
+      wrapMutation:(code,reference)=>withBrowserReceipt('('+code+')(page)',{
+        ...receiptOptions(operation,reference.id,reference.action_key,reference.signature),operation_id:reference.id})});
+    };
+    const graphRequest={document_id:request.document_id,workflow_ref:request.workflow_ref,
+      target:{kind:'existing',type:'programming.javascript',ref:request.node},inputs:[]};
+    const session=request.kind==='context'?createJavascriptContextReadSession({request,uiEpoch,deadline,adapter,redactor,record:onRecord,
+      channel:contextChannel,observeGraph:()=>targetAdapter(operation).observe(graphRequest,deadline)}):
+      createJavascriptSourceReadSession({request,uiEpoch,deadline,adapter,redactor,record:onRecord});
+    auxiliary.set(request.operation_id,{signature:'node.'+request.kind+':'+fingerprint('node.'+request.kind,request)});
     return session;
   }});
   const runtime=Object.freeze({
@@ -1831,7 +1846,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return nodeJobs.start(request,options);
     },
     startNodeRead:async args=>{
-      if(args.kind!=='source'){
+      if(!['source','context'].includes(args.kind)){
         if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
         return nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id)));
       }

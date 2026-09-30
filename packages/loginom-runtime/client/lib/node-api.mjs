@@ -4,6 +4,7 @@ import {validateActionParameters} from './action-catalog.mjs';
 import {nodeJobResultSchema,deliveryJobResultSchema} from './node-result-schema.mjs';
 import {validateJavascriptSourceReadRequest} from './javascript-source-read-session.mjs';
 import {javascriptSourceInitialSchema,javascriptSourceContinuationSchema,javascriptSourceReceiptSchema} from './javascript-source-read-schema.mjs';
+import {javascriptContextInitialSchema,javascriptContextReceiptSchema,validateJavascriptContextReadRequest} from './javascript-context-read.mjs';
 
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 const text=(maxLength=128)=>({type:'string',minLength:1,maxLength});
@@ -111,10 +112,11 @@ const deliveryId={...id,maxLength:80};
 const delivery=object({operation_id:deliveryId,artifact_id:id,upload_grant_id:id,budget_ms:integer(1000,1800000)});
 const resumeDelivery=object({operation_id:deliveryId,resume_id:deliveryId,budget_ms:integer(1000,1800000)});
 export const nodeOutputReadInputSchema=object({operation_id:id,source_operation_id:id,read:object({ports:array(integer(0,1),2),sample_rows:integer(0,100),require_exact_numbers:boolean},[]),budget_ms:integer(1,1800000)},['operation_id','source_operation_id']);
-const unionObject=branches=>({type:'object',properties:Object.assign({},...branches.map(branch=>branch.properties)),
+const unionObject=branches=>({type:'object',properties:{...Object.assign({},...branches.map(branch=>branch.properties)),
+  kind:{enum:[...new Set(branches.flatMap(branch=>branch.properties.kind?.const?[branch.properties.kind.const]:[]))]}},
   additionalProperties:false,oneOf:branches});
-export const nodeReadInputSchema=unionObject([nodeOutputReadInputSchema,javascriptSourceInitialSchema,javascriptSourceContinuationSchema]);
-export const nodeReadOutputSchema=unionObject([nodeJobResultSchema,javascriptSourceReceiptSchema]);
+export const nodeReadInputSchema=unionObject([nodeOutputReadInputSchema,javascriptSourceInitialSchema,javascriptSourceContinuationSchema,javascriptContextInitialSchema]);
+export const nodeReadOutputSchema=unionObject([nodeJobResultSchema,javascriptSourceReceiptSchema,javascriptContextReceiptSchema]);
 const tool=(name,description,inputSchema,readOnlyHint=false)=>({name,description,inputSchema,
  outputSchema:name==='dock_node_read'?nodeReadOutputSchema:name.startsWith('dock_node_')?nodeJobResultSchema:deliveryJobResultSchema,
  annotations:{readOnlyHint,destructiveHint:!readOnlyHint,openWorldHint:false}});
@@ -153,6 +155,7 @@ export async function dispatchNodeApi(runtime,name,args,{signal}={}) {
  if(!definition||!isNodeApiTool(name))throw Error('Node operation tool is unavailable in this session');
  if(name==='dock_node_read'){
   if(args?.kind==='source')validateJavascriptSourceReadRequest(args);
+  else if(args?.kind==='context')validateJavascriptContextReadRequest(args);
   else validateActionParameters(nodeOutputReadInputSchema,args);
  }else validateActionParameters(definition.inputSchema,args);
  if(name==='dock_node_apply'||name==='dock_node_resume'&&Object.keys(args).length>1)validateNodeApplyEnvelope(args);

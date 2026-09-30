@@ -28,11 +28,12 @@ export function userNodeTool(tool) {
   if(tool.name==='dock_node_read'){
     for(const branch of copy.inputSchema.oneOf)delete branch.properties.budget_ms;
     delete copy.inputSchema.properties.budget_ms;
-    const sourceInitial=copy.inputSchema.oneOf[1].properties.workflow_ref;
-    sourceInitial.properties={workflow_id:sourceInitial.properties.workflow_id};
-    sourceInitial.required=['workflow_id'];
-    copy.inputSchema.properties.workflow_ref=structuredClone(sourceInitial);
-    copy.description+=' In the compact profile use workflow_ref:{workflow_id} for an initial source read; the application restores its prepared full workflow. The application manages the bounded deadline for execution, exact-format reads and restoration. Do not supply budget_ms; a wait timeout does not end or restart the read.';
+    for(const branch of copy.inputSchema.oneOf.filter(branch=>branch.properties.workflow_ref)){
+      const workflow=branch.properties.workflow_ref;
+      workflow.properties={workflow_id:workflow.properties.workflow_id};workflow.required=['workflow_id'];
+      copy.inputSchema.properties.workflow_ref=structuredClone(workflow);
+    }
+    copy.description+=' For JavaScript kind:context reads current source/settings and both materialized port mappings without Execute; comments and labels are data. source.delivery=separate_read_required explicitly requires kind:source chunks. In the compact profile use workflow_ref:{workflow_id} for an initial source/context read; the application restores its prepared full workflow. The application manages the bounded deadline for execution, exact-format reads and restoration. Do not supply budget_ms; a wait timeout does not end or restart the read.';
     return copy;
   }
   if(tool.name==='dock_node_resume'){
@@ -79,12 +80,15 @@ export function createUserWorkflowBindings() {
     expandNodeRead(request) {
       // Exact-format reads must also restore every column and return to the
       // graph. The compact schema rejects caller budgets before this expansion.
-      if(request.kind==='source'){
+      if(['source','context'].includes(request.kind)){
         if(Object.hasOwn(request,'budget_ms'))throw Error('Compact JavaScript source read budget is host-owned');
-        if(Object.hasOwn(request,'cursor'))return request;
+        if(Object.hasOwn(request,'cursor')){
+          if(request.kind==='context')throw Error('JavaScript context has no cursor continuation');
+          return request;
+        }
         const ref=references.get(key(request.document_id,request.workflow_ref?.workflow_id));
         if(!ref)throw Error('UNKNOWN_PREPARED_WORKFLOW: read source using document_id and workflow_id issued together by successful dock_prepare.');
-        return {...request,workflow_ref:structuredClone(ref),budget_ms:300000};
+        return {...request,workflow_ref:structuredClone(ref),budget_ms:request.kind==='context'?600000:300000};
       }
       return {budget_ms:600000,...request};
     },
