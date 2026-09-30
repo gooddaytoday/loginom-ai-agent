@@ -46,6 +46,32 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public 32KiB source fidelity принято; declared empty выполняется — 2026-09-30
+
+Code01/profile381/exec44771 actual exit0/OBSERVED на frozen child `88ddfc958e`:
+public apply,13 verified phases,2 fresh Execute/full6×4 business oracle sum1950,
+independent public source assembled8chunks/32768UTF-8 bytes/1024LF-lines,
+Unicode/emoji/LF/URL/quotes/backslash/tabs/trailing spaces сохранены whole digest.
+Settings/generation/native schema/mappings/fullgraph/Views сохранены; no Save.
+Completed IDs `1790768126654-gzmkmem2457:842:1` / `:842:2`.
+Independent audit PASS и package/logout/browser/process absence подтверждены.
+Report SHA256 `dcc7d97c4f16019043f6ad13d7527e4bca460804238359501f766e46c9b2d32b`,
+journal `5e604356b8862ffca1aa0db7522a5c33da974a665f3ace9f86de943c9799603d`,
+receipt `fa6edf3bb73fa5f30680d9739b66b6da155442537ce30dfd18ee601f83b61f82`.
+Auditor25/25 actual mutations refused (source-only evidence copies), receipt
+SHA256 `a56e99f6740712dbade8737de597321368c8e223cbc0e0a973f8c31ee69025c4`:
+full source identity/chunk offsets/sha/budget/operation, source owner/close ACK,
+output schema/fresh/count/filter/row order/value, graph, declared flip, cleanup.
+Registry381 closed_verified перед назначением нового профиля.
+
+Declared empty01/profile382/exec54400 выполняется с тем же freeze/oracle/auditor
+на saved D package. Exact source0bytes/1line, прежняя4-column schema/0rows,
+public apply/2 fresh Execute/fullread затем independent source. Ordinary headed,
+no Save/new bootstrap, original process budget30min. Pending actions не повторять;
+после terminal independent audit + full cleanup + registry finish. Mode-flip
+owned refusal ещё не доказан; native bytes/candidate/CLI/full E/J/F не заявлены.
+Broader legacy fault-wrapper5 failures остаются отдельным проверенным ограничением.
+
 ### E: public source fidelity frozen; Code live выполняется — 2026-09-30
 
 Frozen child `88ddfc958e0b5a88e80db147416851ea6a82081f` добавляет два fixed
