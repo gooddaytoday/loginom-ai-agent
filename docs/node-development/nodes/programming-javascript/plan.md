@@ -281,7 +281,9 @@ output-only audit подтвердил полный business oracle; исход�
 recovery. `e615f4df7f` исправил контракт и ordinary cleanup при отказе oracle;
 `ed56268a6d` подключил существующий owner-bound Save после Code/source-read.
 Свежий headed Code → Save прошёл полный независимый audit и cleanup3/3;
-отдельный cold reader без source/oracle выполняется. C/D/E/F этим не завершены; receipts/status/hashes —
+отдельный cold reader без source/oracle также подтвердил source/settings,
+fresh Execute/read6×4 и cleanup3/3. Fixed C принят в isolated runtime; D/E/F и
+product candidate/CLI открыты; receipts/status/hashes —
 в checkpoint.
 
 ### Итерации, диагностика и автоматизация — P1/P2

@@ -39,7 +39,8 @@ owned completed execution identities; output read остановился до Ta
 закрыт отдельным recovery. Контракт исправлен в `e615f4df7f`; `ed56268a6d`
 подключил owner-bound Save после полного public Code/source-read. Свежий headed
 Code → Save прошёл полный независимый audit и обычный cleanup3/3; отдельный
-cold reader без source/oracle выполняется. Cold persistence ещё не принята.
+cold reader без source/oracle подтвердил source/settings, fresh Execute и
+результат6×4; cleanup3/3 проверен. Следующий этап D.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 

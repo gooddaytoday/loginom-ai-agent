@@ -24,8 +24,9 @@ output-only audit подтвердил business oracle1950 и graph preservation
 input `excluded`; original CLEANUP_UNCONFIRMED сохранён, own recovery verified.
 Контракт исправлен в `e615f4df7f`; `ed56268a6d` подключил owner-bound Save после
 public Code и независимого source-read. Fresh headed Code → Save прошёл
-полный независимый audit и ordinary cleanup3/3; отдельный cold reader выполняется,
-cold persistence ещё не подтверждена. C/D/E/F и aggregate
+полный независимый audit и ordinary cleanup3/3; independent cold reader
+подтвердил source/settings/fresh Execute/read6×4 и cleanup3/3. Fixed C принят
+в isolated runtime; D/E/F и aggregate
 gates открыты; evidence/hashes и следующий шаг — в текущей части checkpoint.
 
 | Gate | Непосредственно наблюдено | Решение / точный остаток 0B и следующий тест | Реализация / приёмка (фазы 1–6) |

@@ -3,8 +3,8 @@
 ## Текущее состояние
 
 Сводка на 2026-09-30 после B, private P1, C0/G3 и public C full read 6×4.
-Public run05 дал ограниченный output proof; исправленный Code → Save прошёл
-полный независимый audit и cleanup. Отдельный cold reader выполняется. Исходный срез
+Public run05 дал ограниченный output proof; исправленный Code → Save и
+независимый cold Execute/read6×4 прошли audit и cleanup. Следующий этап D. Исходный срез
 [acceleration review](acceleration-review.md) к [плану](plan.md): docs
 `13a02e8be2d698d5fbc7f19d146fa82d55f53e48`, code
 `7b8e19bee073cb596607688173234e57052e27b1`. Новые live evidence B
@@ -28,8 +28,9 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Stop/cancel — J13 | Private native Stop + отдельный local cancel + same-node 6×4 rerun, run08/source `0328cadfc9`, terminal за 6,612 с, cleanup 3/3 | Public/CLI lifecycle, deadline/error/recovery cases; весь G6 этим fixed case не закрыт |
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
-**Следующий связный результат:** C — полный public code lifecycle
-из [плана](plan.md); fixed private G3 bridge подтверждён ниже. Ранний P1 Stop/cancel подтверждён ниже. Ранний private
+**Следующий связный результат:** D — полный declared lifecycle с Save/cold
+из [плана](plan.md); fixed C public Code/Save/independent cold и private G3 bridge
+подтверждены ниже. Ранний P1 Stop/cancel подтверждён ниже. Ранний private
 бизнес 6×4 для обоих base modes и code changed/reordered проверен ниже. B уже подтвердил
 existing code-table через public API-path изолированного runtime; повторять
 этот фиксированный run без затронувшего изменения не требуется.
@@ -478,6 +479,36 @@ Proof: isolated public new-Code writer + owned Save/typed UI, не native bytes,
 settings/mappings, один новый owned Execute и полную произвольную actual table
 под original10min deadline. Следующий результат — независимый writer/cold business
 6×4 audit и cleanup; затем D/E/F. Цель active, готовность не повышена.
+
+### C: независимое холодное открытие 6×4 принято — 2026-09-30
+
+`c-public-code-cold-01`/profile324/source `ed56268a6d`, exec10398/exit0 —
+OBSERVED. Independent audit PASS: full source SHA/836bytes/16LF, settings digest
+`e5cbe4e387605e623851346733621cb052cefea858eae76df5076160a3749489`
+совпадает с writer; generation=true, две declared grids пусты. Тот же JS GUID
+открылся в новом document/workflow. Один новый owned completed Execute
+`1790733883766-pbpxespvgxq:624:1` дал full typed UI6×4, все cells/types/order
+совпали с отдельным pinned oracle, сумма1950. Reader получил только technical
+assignment и exact own package path, без source/expected/configuration.
+
+Input mappings5 сохранены до/после Execute; output autosync/physical port GUID
+совпали с writer. До Execute cached output sources/targets были пусты;
+после Execute материализовались4 reciprocal mappings с теми же name/label/type/
+data_kind/excluded. Это подтверждает воспроизводимость generated Code output,
+не сохранённые cached выходные колонки до Execute. Узлы/позиции/links сохранены.
+Package close/logout/browser close3/3 и process absence проверены; registry под
+lock reconciled `closed_verified`, active_exec_session=null.
+Report SHA256 `5024dab869ac3cda3ea9b7aaa35c60a0a834f0e467489d3f3d6d256fbbee98d7`,
+journal SHA256 `6ab92b415b91b3e18a94c8ae2a4020b4d4ea46b99abf29cc985a909bcd296b98`,
+independent receipt SHA256 `33c974611d249224db440dd25514507ce365e37f5fa5668ce8c643548cfd439b`.
+
+Связный fixed C Code → full public read → owned Save → independent private cold
+Execute/read6×4 принят на уровне isolated runtime. G3 fixed five-field metadata
+bridge переиспользуется в своём точном scope; aggregate gates, native bytes,
+product registration/candidate/CLI этим не закрываются. Следующий шаг D — new
+declared lifecycle с полным columns/order/types/data_kind/DefaultUsageType
+readback, затем собственный Save/cold; E/F сохраняются. Не повторять fixed C
+без изменения затронувшего контракта. Цель active.
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
