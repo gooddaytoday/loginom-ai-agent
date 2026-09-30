@@ -146,3 +146,15 @@ cap+1/line+1/module/columns и driver redaction отказали до browser ef
 No Save/native output bytes/candidate/CLI; mode-flip owned refusal — следующий
 шаг J09. Полный JavaScript operator suite18120PASS; broader all-operator5 legacy
 fault-wrapper failures не считать PASS. Точные SHA/profiles — checkpoint.
+
+### E: public existing schema-mode refusal — 2026-09-30
+
+`b17c5b7719`: explicit code↔declared requests2/2 independently refused via
+public handler после owned full effective-source read/discard/native baseline
+and durable proof ACK. FAILED/cleanup=true/pending=null; possible UI activity
+effect сохранён. Source/native settings/default usage/Required/fullgraph
+preserved, independent before/after source, no editor mutation/explicit Execute/
+Save; package/logout/browser/process absence verified. Это отказ mode change,
+не его поддержка. Runtime guards unknown owner/digest/Close/ACK/deadline/foreign
+type остаются uncertain. Full client3014PASS10SKIP/operator JS18121PASS;
+broader legacy fault-wrapper5FAIL открыт. Точные evidence/SHA — checkpoint.

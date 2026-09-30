@@ -46,6 +46,31 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public owned schema-mode refusal2/2 принято — 2026-09-30
+
+На frozen child `b17c5b7719` оба existing modes independently приняты:
+public omitted-source request opposite mode завершает known FAILED/cleanup=true/
+pending=null до editor mutation/явного Execute, сохраняет own source/native
+settings/metadata/graph, учитывает effect_possible UI activity. Code→declared
+proof ниже. Declared→Code01/profile384/exec89514 actual exit0/OBSERVED:
+report SHA256 `ed57f121e93ec12e5f83c668dbb4ffa084fdf90ace0882157a6d6f6bcb27d123`,
+journal `d17256a60c10ab1700d568f4a141bda43c895652ac7bf34995febc852b82ea22`,
+receipt `7d1b9fdb1658add9462ef23c9d673c63866ecbf2ccd70904374f2f212f66fa8f`.
+Independent source/settings before/after, native declared UsageType/default
+usage/Required metadata сохранены. No Save/native output bytes/candidate/CLI.
+Registry384 finish после auditor negatives; next fresh profile385 не назначен.
+
+Следующий связный результат E — remaining source-policy/diagnostics/public
+Stop/cancel/recovery/context/engine/assistant и budgets до F review/candidate/
+CLI. J09 mode flip now **explicitly refused**, не admitted schema change; это
+не доказательство работы edit для Required=true или произвольных columns.
+Source fidelity/empty2/2 `88ddfc958e` не повторять без затрагивающих изменений.
+Broader fault-wrapper5FAIL требуется исправить в operator decoder: syntax-only
+AST extraction current generated capability/receipt envelope, JSON literal task,
+не eval; сохранить source pins, exact fault needles и one-shot injection.
+Product executor/Protocol/HttpApi не менять ради harness. Full E/J/F/readiness
+по-прежнему открыты; acceleration-review.md не включать в commits.
+
 ### E: Code→declared owned refusal принято; declared→Code выполняется — 2026-09-30
 
 На frozen child `b17c5b7719` Code→declared01/profile383/exec3478 actual exit0/
