@@ -45,6 +45,38 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public native cardinality — keep2 выполняется — 2026-09-30
+
+Frozen child `3bfbd9968b38a8f9e9f6db7825ce0f6019bbc83e` допуск четырёх
+canonical cases через existing public handler. Code keep2/odd/duplicate и
+самостоятельный declared-empty без AssignColumns/Append/Set. Исходники/
+ordered values закреплены отдельно; substituted mode/code-empty entrypoint
+отклоняются до config/effects. Native input3×1 Value [1,2,3], общий CSV12bytes
+SHA256 `10dd7b1596d2eab4d6145699462eb2cc7c30508f78d4c5b2760c207dbb427dd5`;
+actual admission redecodes whole native baseline/owner/full child/releases/digest.
+
+Адресные tests02: 442PASS/0FAIL, exec6985/exit0. Tests01:440PASS/1FAIL —
+старый test считал каждый declared case stripped Code counterpart; исправлен
+для самостоятельно authored canonical empty, исходный отказ сохранён.
+Full affected operator suite01:18107PASS/0FAIL, exec56658/exit0, SHA256
+`e4f158e610d19e4b32032de303eb3df76259af730f8a8e4dc2af20e49bc442ea`.
+Client runtime не менялся; прежний client suite не повторялся. Authored source/
+ordered literal pins independently сверены с четырьмя descriptors.
+Private independent oracle SHA256
+`749f964853617a0315d4e5922f06e4d4984b47c17f8ad49f7b5e500a24a3b643`,
+auditor SHA256 `f6a68385a6f0f31bd3b916c32beb57a701a4f09e20de38a55f90ffe3fbf40550`.
+Independent native input section принял genuine retained keep2 whole baseline;
+source-only, не live PASS. До live заморожены oracle/source/auditor; проверяются
+native input bytes, full ordered typed output, complete source/metadata/mappings/
+graph/Views/13 phases/2 fresh Execute и cleanup. Public native output/upstream
+bytes/Save/cold/candidate/CLI не утверждаются.
+
+Keep2 ordinary headed fresh profile377, exec9636 зарегистрирован под lock;
+evidence `e-public-types-native-cardinality-keep2-01`, результат не установлен.
+Наблюдать этот handle, затем independent audit/cleanup/reconciliation; только
+после успешной проверки fresh odd, duplicate, declared-empty. J/E/F и registry
+readiness не повышены.
+
 ### E: public outside-safe characterized2/2 — 2026-09-30
 
 Code375/exec30088 и declared376/exec96870 на frozen child `81b4bfef74`
