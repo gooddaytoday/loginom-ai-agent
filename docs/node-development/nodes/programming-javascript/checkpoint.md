@@ -2,7 +2,9 @@
 
 ## Текущее состояние
 
-Сводка на 2026-09-30 после B, private P1, C0/G3 и public C materialization/Execute. Публичный read ещё не подтверждён. Исходный срез
+Сводка на 2026-09-30 после B, private P1, C0/G3 и public C full read 6×4.
+Public run05 дал ограниченный output proof; исправленный Code → Save прошёл
+полный независимый audit и cleanup. Отдельный cold reader выполняется. Исходный срез
 [acceleration review](acceleration-review.md) к [плану](plan.md): docs
 `13a02e8be2d698d5fbc7f19d146fa82d55f53e48`, code
 `7b8e19bee073cb596607688173234e57052e27b1`. Новые live evidence B
@@ -414,11 +416,68 @@ Child `97098322a1` сохраняет generic trusted boundary error в private
 полный client suite — 2957 PASS / 10 SKIP / 0 FAIL, 2967 total,
 157,995 секунд, SHA256
 `128fb55570ef033e42eb02412ec1922ade380f5ce1ba07c7f5ce1a3f9c5849d6`.
-После verified recovery/absence и suite назначен fresh profile321;
-ordinary headed `c-public-code-05`, exec40153, source `97098322a1` выполняется.
-Следующий связный результат — адресно получить underlying boundary reason,
-если отказ повторится, либо full6×4/audit/cleanup, затем Save/cold, D/E/F.
-Цель active, gates/готовность не повышены.
+### C: полный public output и исправление контракта — 2026-09-30
+
+Ordinary headed `c-public-code-05`/profile321/source `97098322a1`, exec40153,
+завершился exit1. Все 13 public phases verified, job SUCCEEDED, две distinct
+owned completed execution identities и owned Views/Table дали полный typed UI
+6×4. Независимый output-only audit сверил все входные 6×5 и выходные 6×4
+cells, schema/types/order, сумму1950, mapping/physical port и graph preservation.
+Receipt SHA256 `188e4f6d630b3b66f2c8d991281086754256f8db5b8aeb84eafad57a872e7ec5`.
+Это ограниченный output proof; public independent source после output, Save и
+ordinary cleanup в этом run не выполнены. Native bytes/candidate/CLI не доказаны.
+
+Причина operator failure подтверждена: JSON schema ошибочно требовала
+`excluded` у input mapping, которого фактический native input record не имеет.
+Исходный report CLEANUP_UNCONFIRMED сохранён, SHA256
+`2e0eb668f9805617f932fc23a97de07537262bcaa2924bace03ffe2d3ce4a320`,
+journal SHA256 `8f246d26bb96badf0d1e5dfc220f4f4c8686dfb4d1ef649ca858d84b3e899a56`.
+Отдельный exact admin recovery06/profile322/exec52392 закрыл только собственный
+Package1/`jsteach:3658` (создание01:41/disconnect01:46 UTC). Refresh подтвердил
+отсутствие пакета и сеанса; admin logout/browser close/process absence проверены.
+Recovery receipt SHA256 `eeae1aebe14785206df3040066fc00d5dbfd8304483aba9ba270cef7cf90668b`.
+
+Child `e615f4df7f` разделил input/output mapping schema/types/readback: input
+не выдумывает `excluded`, output по-прежнему требует фактическое boolean.
+Native-shaped regression проверяет JSON roundtrip и отказ недопустимых полей.
+177 runtime tests PASS, log SHA256
+`9999e366c105c534ceb251c1bc4c9e1672e4a6e56da1bf2113302cc7d1bc3550`;
+177 operator tests PASS, log SHA256
+`a3808e8c872f4e661c5d88799ed68517fa5cdd59dfcb23481a15de1862c033b7`.
+Operator снимает pending после подтверждённого public cleanup до schema/oracle,
+чтобы их отказ разрешал обычное закрытие пакета; новый source-read получает
+собственный pending. Unknown effects/replay rules не ослаблены.
+
+Child `ed56268a6d` добавил operator-only `--verify-public-code-save`, требующий
+public Code lifecycle. После полного результата и независимого public source
+он вызывает существующий owner-bound saver: свой уникальный каталог/пакет,
+Save receipt, unchanged graph и native dirty-state. Public apply сам Save не
+обещает. 60 targeted operator tests PASS, log SHA256
+`b736bc638f83b3017541a3452d09e00194eadabcb7fbfbd4654a38d093728bde`.
+Полный client suite выше относится к `97098322a1`, не к этому новому HEAD.
+
+### C: public Code → Save принят; independent cold выполняется — 2026-09-30
+
+`c-public-code-save-01`/profile323/source `ed56268a6d`, exec32352/exit0 —
+OBSERVED. Независимый audit PASS подтвердил все13 public phases, полный input6×5,
+output6×4 с exact integer/types/order, сумму1950, native mappings5/4 и shared
+physical output0, owned Views, source836bytes/16LF и независимый public source-read.
+Две разные execution IDs: `1790733376721-qxkywpybiza:1085:3` и
+`1790733376721-qxkywpybiza:1085:4`. Save receipt SUCCEEDED на собственный уникальный
+пакет; после Save native `IsPackageModified=false`, graph preservation подтверждён.
+Package close/UI logout/browser close 3/3 и process absence проверены.
+Report SHA256 `2024b78cff2555cf6401367e3d0161d06d049dc6861b7e7f61ca2cf34b1c5941`,
+journal SHA256 `23540874ab56ec6d95fc674d3568ef701fecb520788a09f502d500b17a43ca74`,
+independent receipt SHA256 `f0ba219f285e1e300847f9875b0faad128cfcc4a4afa8ed6ca896772c26e2241`.
+Proof: isolated public new-Code writer + owned Save/typed UI, не native bytes,
+не product candidate/CLI. Cold persistence ещё не принята, gates_closed=[].
+
+Под registry lock назначен fresh profile324. Separate ordinary headed
+`c-public-code-cold-01`/exec10398/source `ed56268a6d` выполняется: technical config
+и exact saved path из writer, без передачи source/oracle. Reader наблюдает source,
+settings/mappings, один новый owned Execute и полную произвольную actual table
+под original10min deadline. Следующий результат — независимый writer/cold business
+6×4 audit и cleanup; затем D/E/F. Цель active, готовность не повышена.
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 

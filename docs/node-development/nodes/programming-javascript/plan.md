@@ -273,13 +273,16 @@ native cancelled за 6,612 секунды, отдельный local cancel, sho
   `http://logi-test-plan.bg.local/app/`. Source/direct J01/J21 нужны до ревью,
   candidate-часть — после сборки; J18 не является gate разработки.
 
-Текущий результат C (2026-09-30): isolated public run02/code `55b89ef993`
-подтвердил новый Code узел, managed source/Done, полные native input/output
-mappings и две owned completed execution identities. Полный output read ещё
-не подтверждён; отдельный recovery закрыл свой пакет/сеанс. Code `4d70ea22fb`
-добавляет owned Views opening вместо недоступного общего UI-пути. После локальных
-проверок нужен новый headed full6×4 и независимый audit, затем Save/cold;
-C/D/E/F этим не завершены. Точные receipts/status/hashes — в checkpoint.
+Текущий результат C (2026-09-30): isolated public run05/code `97098322a1`
+подтвердил все 13 phases, новый Code узел, полные native mappings, две owned
+completed execution identities и owned Views/full typed UI 6×4. Независимый
+output-only audit подтвердил полный business oracle; исходный run целиком
+не принят из-за ошибки JSON schema input mapping, пакет/сеанс закрыты отдельным
+recovery. `e615f4df7f` исправил контракт и ordinary cleanup при отказе oracle;
+`ed56268a6d` подключил существующий owner-bound Save после Code/source-read.
+Свежий headed Code → Save прошёл полный независимый audit и cleanup3/3;
+отдельный cold reader без source/oracle выполняется. C/D/E/F этим не завершены; receipts/status/hashes —
+в checkpoint.
 
 ### Итерации, диагностика и автоматизация — P1/P2
 

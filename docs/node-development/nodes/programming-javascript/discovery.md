@@ -17,14 +17,16 @@ Linux по принадлежащему `Session.Version.IsWindows=false`; ди�
 остаётся проверкой реализации и приёмки. Непроверенные пункты в ней не возвращают
 закрытое решение исследования в начало.
 
-На code `55b89ef993` public C run02 в isolated runtime подтвердил создание
-нового Code JS, full source/settings и два разных owned completed Execute с
-полными input/output native mappings. Read Table не подтверждён: own Visualizers
-не материализован в общем UI-пути; original AMBIGUOUS/cleanup failure сохранён,
-пакет/сеанс закрыты отдельным own recovery. Child `4d70ea22fb` добавляет owned
-Views opening с отдельной квитанцией и read-only settlement; локальные проверки
-не равны новому live PASS. C full6×4/Save/cold, D/E/F и aggregate gates открыты.
-Evidence/hashes и следующий шаг — в текущей части checkpoint.
+Public C run05 на `97098322a1` подтвердил все13 phases, две owned completed
+Execute, полные native mappings и owned Views/full typed UI6×4. Независимый
+output-only audit подтвердил business oracle1950 и graph preservation.
+Исходный run целиком не принят: operator schema требовала отсутствующий native
+input `excluded`; original CLEANUP_UNCONFIRMED сохранён, own recovery verified.
+Контракт исправлен в `e615f4df7f`; `ed56268a6d` подключил owner-bound Save после
+public Code и независимого source-read. Fresh headed Code → Save прошёл
+полный независимый audit и ordinary cleanup3/3; отдельный cold reader выполняется,
+cold persistence ещё не подтверждена. C/D/E/F и aggregate
+gates открыты; evidence/hashes и следующий шаг — в текущей части checkpoint.
 
 | Gate | Непосредственно наблюдено | Решение / точный остаток 0B и следующий тест | Реализация / приёмка (фазы 1–6) |
 | --- | --- | --- | --- |

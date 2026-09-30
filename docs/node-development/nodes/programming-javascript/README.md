@@ -33,8 +33,13 @@ headed `public-node-apply-03` подтвердил публичный configure/
 Для C child `4d70ea22fb` составил новый Code lifecycle. Headed public run02
 подтвердил новый узел, source/Done, полные native mappings5/5 и4/4 и две разные
 owned completed execution identities; output read остановился до Table Add.
-Его пакет/сеанс закрыты отдельным recovery, original status сохранён. Owned
-Views opening доработан и локально проверен; full6×4 и Save/cold ещё требуются.
+Его пакет/сеанс закрыты отдельным recovery, original status сохранён. В отдельном run05 на `97098322a1` owned Views и полный typed UI 6×4,
+две owned Execute и независимый output-only oracle подтверждены. Исходный run
+не принят целиком: operator schema ошибочно требовала input `excluded`; пакет
+закрыт отдельным recovery. Контракт исправлен в `e615f4df7f`; `ed56268a6d`
+подключил owner-bound Save после полного public Code/source-read. Свежий headed
+Code → Save прошёл полный независимый audit и обычный cleanup3/3; отдельный
+cold reader без source/oracle выполняется. Cold persistence ещё не принята.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 
