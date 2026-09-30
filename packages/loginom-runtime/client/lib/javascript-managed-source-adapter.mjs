@@ -10,6 +10,7 @@ import {replaceManagedJavascriptSource} from './javascript-managed-source-write.
 import {dispatchManagedJavascriptCodeNext} from './javascript-managed-code-next.mjs';
 import {dispatchManagedJavascriptDone} from './javascript-managed-done.mjs';
 import {dispatchManagedJavascriptDeclared,validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
+import {javascriptSourceSettingsDigest} from './javascript-source-admission.mjs';
 
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const need = (condition, message) => { if (!condition) throw Error(message); };
@@ -113,6 +114,16 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       if(declared)need(declared.verified===true&&declared.generation===false,
         'Managed JavaScript declared schema unconfirmed');
       const settings = javascriptManagedSourceSettings(declared?.schema??generation?.output.schema??schema);
+      // Private bounded metadata evidence identifies native normalization across
+      // Done/reopening. It contains no script and never relaxes drift checks.
+      const observed = {phase: 'javascript_managed_source_settings_observed',
+        operation_id: owner.operation_id, owner: {...owner}, schema_mode: schemaMode,
+        settings: structuredClone(settings), settings_sha256: javascriptSourceSettingsDigest(settings),
+        effect_possible: false};
+      const saved = await record(structuredClone(observed));
+      need(same(Object.fromEntries(Object.keys(observed).map(key => [key, saved?.[key]])), observed),
+        'Managed JavaScript source settings journal ACK differs');
+      need(Date.now() < operationDeadline, 'Managed JavaScript source deadline changed');
       const next = await driver.dispatchManagedJavascriptNext({task, execute, record, receiptOptions});
       need(next?.status === 'SUCCEEDED' && next.output?.next_gesture_returned === true,
         'Managed JavaScript source Next refused');
