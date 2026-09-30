@@ -79,7 +79,8 @@ test('managed Close accepts a rebound graph only with the same workflow, node an
     view:{getState:()=>({shape:{node:shape}})}}};
   const tab={Controller:{Node:{data:{node:workflow}},FController:model}};
   const receipt={phase:'verified',workflowId:'flow',nodeTargetWorkflowNode:workflow,packageNode};
-  const document={querySelectorAll:()=>[graphRoot]};
+  let masks=[];
+  const document={querySelectorAll:selector=>selector==='.bg-mask-message,.x-mask-msg,.x-mask'?masks:[graphRoot]};
   const preparation={document,id:'doc'};
   const held={binding:{document,tab,workflow},preparation,account:'jsteach',receipt,
     wizardRoot:{isConnected:false},node:{tid:'MF;TF-1;Graph;node'},retained:{model:{},native:{}}};
@@ -94,6 +95,15 @@ test('managed Close accepts a rebound graph only with the same workflow, node an
   assert.equal(read().state,'waiting');
   native.FLocked=false;
   assert.equal(read().state,'closed');
+  const mask={isConnected:true,getBoundingClientRect:()=>({width:100,height:100}),
+    getAttribute:()=>task.workflow_ref.prefix+';ModelForm',classList:{contains:c=>c==='bg-mask-message'},
+    contains:e=>e===graphRoot};
+  model.FView={el:{dom:mask}};masks=[mask];
+  assert.equal(read().state,'waiting');assert.equal(read().loading_mask_count,1);
+  model.FView.el.dom={};assert.throws(read,/foreign loading mask/);
+  model.FView.el.dom=mask;mask.getAttribute=()=> 'foreign;ModelForm';
+  assert.throws(read,/foreign loading mask/);
+  masks=[];assert.equal(read().state,'closed');
   model.FDiagram.FNodes.FCollection=[];
   assert.equal(read().state,'waiting');
   model.FDiagram.FNodes.FCollection=[native];
