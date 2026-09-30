@@ -31,20 +31,26 @@ export async function runJavascriptPublicLostApplyReply({runtime,request,node,re
     throw Error('Assigned execution settled before controlled public reply loss');
   };
   try{await receiveApply();}catch(error){if(error!==lost)throw error;}
-  // Inspect/status can be repeated; apply and execution cannot. No new browser
-  // context, backend worker, request parameters, source or deadline is admitted.
-  const inspection=await runtime.inspect({operationId:request.operation_id});
-  need(inspection.operation_id===request.operation_id&&inspection.output?.operation_id===request.operation_id,
-    'Lost reply inspection belongs to another operation');
+  // The public runtime permits status/wait while its worker runs, but inspect
+  // is behind the mutation gate. Settle the retained worker before inspection.
   const recovered_job=await dispatchNodeApi(runtime,'dock_node_status',{operation_id:request.operation_id});
   need(recovered_job.operation_id===request.operation_id&&recovered_job.state==='running'&&recovered_job.attempt===1
     &&recovered_job.cancel_requested===false&&recovered_job.server_stop_requested===false
     &&same(recovered_job.progress.node,node)&&recovered_job.progress.execution?.execution_id===execution_id
     &&recovered_job.progress.execution.status==='pending'&&recovered_job.progress.pending_phase==='materialization_execute',
   'Lost reply status changed the original identified execution');
-  await acknowledge({phase:'javascript_public_lost_reply_inspected',operation_id:request.operation_id,node,
-    execution_id,deadline,inspection,recovered_job});
+  await acknowledge({phase:'javascript_public_lost_reply_status_recovered',operation_id:request.operation_id,node,
+    execution_id,deadline,recovered_job});
   const job=await stopJavascriptPublicExecution({runtime,request,node,record,onProgress,deadline,initialJob:recovered_job,now});
   need(job.attempt===1&&job.outcome.output.execution.execution_id===execution_id,'Lost reply terminal changed the original execution');
+  need(now()<deadline,'Original public lost reply deadline expired before inspection');
+  const inspection=await runtime.inspect({operationId:request.operation_id});
+  need(inspection.operation_id===request.operation_id&&inspection.output?.operation_id===request.operation_id,
+    'Lost reply inspection belongs to another operation');
+  need(inspection.status==='SUCCEEDED'&&inspection.action_key==='operation.inspect'
+    &&inspection.output.cleanup_confirmed===true&&same(inspection.output.outcome,job.outcome),
+  'Lost reply inspection differs from the settled original worker');
+  await acknowledge({phase:'javascript_public_lost_reply_inspected',operation_id:request.operation_id,node,
+    execution_id,deadline,inspection,terminal_job:job});
   return {job,inspection,recovered_job,execution_id,boundary:'public_apply_reply_after_identified_execute',browser_receipt_dropped:false};
 }
