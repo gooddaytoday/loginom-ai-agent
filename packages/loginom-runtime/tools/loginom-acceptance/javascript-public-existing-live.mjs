@@ -1,5 +1,5 @@
 // Operator-only E scenario. Business source/oracle stay outside the runtime.
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {AjvJsonSchemaValidator} from '../../client/node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js';
 import {createActionRuntime} from '../../client/lib/executor.mjs';
 import {createCandidateNodeSupport} from '../../client/lib/node-support.mjs';
@@ -9,14 +9,48 @@ import {dispatchNodeApi} from '../../client/lib/node-api.mjs';
 import {nodeApplyResultSchema} from '../../client/lib/node-result-schema.mjs';
 import {nodeResultReply} from '../../client/lib/node-result-reply.mjs';
 import {javascriptPublicCodePins} from './javascript-public-code-live.mjs';
+import {javascriptPublicSourceCase,javascriptPublicSourceOutputOracle} from './javascript-public-source-cases.mjs';
 import {javascriptDiscoveryProbe,javascriptDiscoveryOracle} from './javascript-discovery-probes.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 
+// One public source session; continuations retain its original deadline.
+export async function readJavascriptPublicExistingSource({runtime,prepared,node,deadline,record}) {
+  need(Number.isSafeInteger(deadline)&&deadline>Date.now()+30000,'Public source original deadline unavailable');
+  const operation_id='js-existing-source-'+randomUUID(),chunks=[];
+  const budget_ms=Math.max(1,Math.min(600000,deadline-Date.now()-30000));
+  let request={kind:'source',operation_id,document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,budget_ms};
+  let source='',identity;
+  do{
+    const part=await dispatchNodeApi(runtime,'dock_node_read',request);
+    const actual={source_sha256:part.source_sha256,source_utf8_bytes:part.source_utf8_bytes,source_lf_lines:part.source_lf_lines};
+    need(part.kind==='source'&&typeof part.source_text==='string'&&part.source_text.isWellFormed()
+      &&['document_id','workflow_id','node_id'].every(key=>part.owner?.[key]===node[key])
+      &&part.owner.operation_id===operation_id&&part.offset_utf8_bytes===Buffer.byteLength(source,'utf8')
+      &&part.chunk_utf8_bytes===Buffer.byteLength(part.source_text,'utf8')
+      &&(!identity||JSON.stringify(identity)===JSON.stringify(actual))
+      &&Buffer.byteLength(JSON.stringify(part),'utf8')<=16384,'Public existing source chunk identity differs');
+    identity??=actual;source+=part.source_text;
+    chunks.push({offset_utf8_bytes:part.offset_utf8_bytes,chunk_utf8_bytes:part.chunk_utf8_bytes,
+      chunk_sha256:createHash('sha256').update(part.source_text,'utf8').digest('hex'),
+      response_utf8_bytes:Buffer.byteLength(JSON.stringify(part),'utf8')});
+    need(chunks.length<=8192&&Buffer.byteLength(source,'utf8')<=32768,'Public existing source chunk bound differs');
+    request=part.cursor===null?null:{kind:'source',operation_id,cursor:part.cursor,expected_source_sha256:part.source_sha256};
+  }while(request);
+  need(JSON.stringify(javascriptSourceIdentity(source))===JSON.stringify(identity)&&!runtime.hasUnsettledWork(),
+    'Public existing complete source digest/cleanup differs');
+  const proof={operation_id,node,...identity,chunks,complete:true};
+  const ack=await record({phase:'javascript_existing_public_source_chunks_verified',proof:structuredClone(proof)});
+  need(JSON.stringify(ack.proof)===JSON.stringify(proof),'Public existing source chunks ACK differs');
+  return {kind:'source',source_text:source,...identity,cursor:null,source_read_operation_id:operation_id,chunks};
+}
+
 export async function runJavascriptPublicExistingLive({page,prepared,node,targetOrigin,redactor,record,
-  report,save,deadline,onPending,schemaMode,graph,inputVariant='base'}) {
+  report,save,deadline,onPending,schemaMode,graph,inputVariant='base',sourceCaseId=null}) {
   need(['code','declared'].includes(schemaMode)&&['base','changed','reordered'].includes(inputVariant)&&Date.now()+660000<deadline,
     'Public existing JavaScript mode/original budget unavailable');
+  const sourceCase=sourceCaseId===null?null:javascriptPublicSourceCase(sourceCaseId);
+  need(sourceCase===null||sourceCase.schema_mode===schemaMode&&inputVariant==='base','Public source case requires its fixed mode/base package');
   const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-'+inputVariant);
   const base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'});
   const support=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor});
@@ -29,15 +63,13 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   Object.assign(report,{scope:'isolated E existing source edit/Execute/full typed UI; current schema preserved',
     stage:'public-existing-source-before',original_deadline:deadline,explicit_execution_limit:inputVariant==='base'?2:3,
     candidate_verified:false,cli_verified:false,native_bytes_verified:false,gates_closed:[],
-    public_existing:{status:'RUNNING',schema_mode:schemaMode,input_variant:inputVariant,node,raw_source_in_report:false}});
+    public_existing:{status:'RUNNING',schema_mode:schemaMode,input_variant:inputVariant,source_case_id:sourceCaseId,node,raw_source_in_report:false}});
   onPending(true);await save();
-  const readSource=()=>dispatchNodeApi(runtime,'dock_node_read',{kind:'source',operation_id:'js-existing-source-'+randomUUID(),
-    document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,
-    budget_ms:Math.max(1,Math.min(180000,deadline-Date.now()-30000))});
+  const readSource=()=>readJavascriptPublicExistingSource({runtime,prepared,node,deadline,record});
   const before=await readSource();
   need(before.source_text===probe.source&&before.source_sha256===probe.source_sha256
     &&before.cursor===null&&!runtime.hasUnsettledWork(),'Public existing initial source differs from assigned package');
-  const source_text=before.source_text+'\n// E: existing node source revision; business logic preserved.\n';
+  const source_text=sourceCase?.source??before.source_text+'\n// E: existing node source revision; business logic preserved.\n';
   const expected=javascriptSourceIdentity(source_text),operation_id='js-public-existing-'+randomUUID();
   const remaining=deadline-Date.now()-60000;
   need(remaining>=600000,'Public existing original time budget unavailable');
@@ -76,7 +108,7 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   onPending(false);await save();
   need(new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(result).valid,
     'Public existing result violates diagnostic schema');
-  const oracle=javascriptDiscoveryOracle(probe,table);
+  const oracle=sourceCaseId===null?javascriptDiscoveryOracle(probe,table):javascriptPublicSourceOutputOracle(sourceCaseId,table);
   need(oracle.gate_passed===true,'Public existing full business oracle differs');
   const compact=nodeResultReply(job,{userProfile:true}).structuredContent;
   const delivered=compact?.output?.ports?.[0];
@@ -93,6 +125,6 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   need(after.source_text===source_text&&after.source_sha256===expected.source_sha256
     &&after.cursor===null&&!runtime.hasUnsettledWork(),'Public existing independent final source differs');
   Object.assign(report.public_existing,{status:'OBSERVED',configuration:result.configuration,execution:result.execution,
-    output:result.output,oracle,independent_source:{complete:true,...expected}});
+    output:result.output,oracle,independent_source:{complete:true,...expected,chunks:after.chunks,source_read_operation_id:after.source_read_operation_id}});
   report.stage='public-existing-observed';onPending(false);await save();
 }
