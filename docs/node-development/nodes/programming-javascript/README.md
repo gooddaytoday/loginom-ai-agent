@@ -30,6 +30,14 @@ headed `public-node-apply-03` подтвердил публичный configure/
 `configured_only` (полная source identity не доказана); Execute, Save/cold и
 полный продуктовый handler этим не доказаны. Краткая актуальная
 сводка и SHA — в [checkpoint](checkpoint.md#текущее-состояние).
+Для C child `4d70ea22fb` составил новый Code lifecycle. Headed public run02
+подтвердил новый узел, source/Done, полные native mappings5/5 и4/4 и две разные
+owned completed execution identities; output read остановился до Table Add.
+Его пакет/сеанс закрыты отдельным recovery, original status сохранён. Owned
+Views opening доработан и локально проверен; full6×4 и Save/cold ещё требуются.
+Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
+в продуктовом каталоге.
+
 Исследование мастера проводится в Ubuntu headed-браузере; private
 пробы подтвердили real/boolean/string/safe-int64 и Date civil/native identity,
 а также keep2/odd/duplicate cardinality с сохранением исходных данных и отдельно

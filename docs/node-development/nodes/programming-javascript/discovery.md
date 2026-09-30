@@ -1,6 +1,6 @@
 # JavaScript: рабочее исследование на Loginom 7.4.2
 
-Статус на 2026-09-29: **`discovery_required`**. Это сводка прямых наблюдений
+Статус на 2026-09-30: **`discovery_required`**. Это сводка прямых наблюдений
 фазы 0B [подплана](plan.md), а не допуск публичного обработчика или автономной
 CLI-приёмки. Стенд — `http://logi-test-plan.bg.local/app/`, Loginom Enterprise
 7.4.2; оператор — Ubuntu, только видимый headed Chromium. ОС **сервера** —
@@ -16,6 +16,15 @@ Linux по принадлежащему `Session.Version.IsWindows=false`; ди�
 Решение 0B доказывает осуществимость/выбирает контракт; последняя колонка
 остаётся проверкой реализации и приёмки. Непроверенные пункты в ней не возвращают
 закрытое решение исследования в начало.
+
+На code `55b89ef993` public C run02 в isolated runtime подтвердил создание
+нового Code JS, full source/settings и два разных owned completed Execute с
+полными input/output native mappings. Read Table не подтверждён: own Visualizers
+не материализован в общем UI-пути; original AMBIGUOUS/cleanup failure сохранён,
+пакет/сеанс закрыты отдельным own recovery. Child `4d70ea22fb` добавляет owned
+Views opening с отдельной квитанцией и read-only settlement; локальные проверки
+не равны новому live PASS. C full6×4/Save/cold, D/E/F и aggregate gates открыты.
+Evidence/hashes и следующий шаг — в текущей части checkpoint.
 
 | Gate | Непосредственно наблюдено | Решение / точный остаток 0B и следующий тест | Реализация / приёмка (фазы 1–6) |
 | --- | --- | --- | --- |

@@ -2,7 +2,7 @@
 
 ## Текущее состояние
 
-Сводка на 2026-09-30 после B, private P1, C0/G3 и runtime подготовки C. Исходный срез
+Сводка на 2026-09-30 после B, private P1, C0/G3 и public C materialization/Execute. Публичный read ещё не подтверждён. Исходный срез
 [acceleration review](acceleration-review.md) к [плану](plan.md): docs
 `13a02e8be2d698d5fbc7f19d146fa82d55f53e48`, code
 `7b8e19bee073cb596607688173234e57052e27b1`. Новые live evidence B
@@ -282,6 +282,116 @@ Syntax и git diff checks PASS. Следующий результат — compos
 Private registry/assignment closed_verified/profile311, active exec/evidence=null;
 profile312 пока не создавался. G3/C0/P1/B без затронувшего изменения не повторять.
 Цель active, готовность registry не повышена.
+
+### C: составлен public new Code lifecycle — 2026-09-30
+
+Child `8d57cf5bdf` добавляет `createJavascriptCodeNodeSupport`: new Code с одним
+входом0, default mappings и `finish=execute` в изолированном acceptance runtime.
+Полный source/module policy проверяется до target и перед каждым Execute;
+managed generation/write/Code Next/Done, независимый source/settings readback,
+полные native input/output mappings, две разные owned execution identities и
+physical Table того же output0 составлены из действующих runtime-компонентов.
+Первая execution materializes output mapping; после открытия mapping-мастера
+требуется отдельный свежий Execute для чтения всех строк. Product catalog JS
+не расширен; existing/declared/edits/reread/Save/cold и candidate/CLI ещё открыты.
+Операторские source/oracle не импортируются в `client/lib`.
+
+Public result schema и types различают прежний Done readback с explicit=false
+и новый executed readback с explicit=true, полными двумя mappings и 12–13
+квитанциями. Internal Done effects остаются null, package persistence=false.
+Адресные handler/schema/admission/shell tests: **171 PASS**, log SHA256
+`bfbadfe15f454ffc6eb92cae1dff30fddd3facdb9a8433faa1d6dbd3fafe9cc7`.
+Полный client suite: **2952 PASS / 10 skips / 0 FAIL**, 2962 total,
+157,438 с, log SHA256
+`44ffa36e42a98941a64fddcf1ad92a0ba98d2b24440421ed48210edd6193d74a`.
+Pinned Node24.19.0, package cwd; headless browser не запускался. 181 operator
+mapping-close/business/materialization regressions также PASS.
+
+Headed `c-public-code-01`, profile312/source `8d57cf5bdf`, exec89521/exit1,
+проверил own input6×5, затем получил **NOT_APPLIED/effect=false/cleanup=true**
+до target: `Pinned link.create primitive is required`. JS не создан, Execute
+не отправлен. Операторский pending flag оставался слишком консервативным,
+поэтому original report **CLEANUP_UNCONFIRMED**: browser closed, package/logout
+не подтверждены. Исходный статус сохраняется, это не unknown graph effect.
+После подтверждения отсутствия original processes отдельный ordinary headed
+admin recovery/profile314/exec80874/exit0 закрыл только Package1/`jsteach:3640`
+(создание00:38/disconnect00:41 UTC). Отсутствие после Refresh, admin logout,
+browser close и /proc absence проверены. Recovery receipt SHA256
+`0c6b522915a80cd401d7f947bcb26ea8023d79751f63e5268f0667036286e25b`.
+Промежуточный probe/profile313 закрыл browser из-за stdin EOF до действий;
+его пустой own admin session3643 также закрыт этим recovery.
+
+Child `55b89ef993` подключает настоящие pinned actions/selectors из catalog,
+включая link.create, и освобождает operator pending flag только при settled
+NOT_APPLIED/no-effect/cleanup=true, отсутствии node/pending/unsettled work.
+Unknown effects остаются заблокированы. 182 operator tests PASS; добавлена
+регрессия наличия actual link.create primitive для нового узла.
+Headed `c-public-code-02`, profile315/source `55b89ef993`, exec90334/exit1
+подтвердил public new target, input mapping5/5, Code source836 bytes/16 LF lines,
+owned Done + независимый source/settings readback, materialization execution
+`1790729431076-84k3w766q7k:1069:3`, полный output mapping4/4 с native identity
+и отдельный completed/owner_verified Execute `1790729431076-84k3w766q7k:1069:4`.
+Приняты первые 12 фаз; `read` **AMBIGUOUS**, output not_refreshed. Общий reader
+попытался использовать отсутствующую допустимую UI-ссылку JS body, когда
+собственный Visualizers ещё не материализован. Table Add не отправлен, ячейки
+6×4 не прочитаны. Повтор этого unresolved read/Execute не выполнялся.
+Original report **CLEANUP_UNCONFIRMED**, SHA256
+`7d3cccbb769f2a1b6b31c11a5cfb86b2d50e37c760493cb4449b14560de71628`,
+journal SHA256
+`950c70136681aed78e96ec2fcc36318401971823efa12ecde720981e09946579`.
+После /proc absence и registry handoff отдельный headed admin
+recovery/profile316/exec19793/exit0 закрыл только Package1/`jsteach:3645`
+(создание00:50/disconnect00:54 UTC); Refresh подтвердил отсутствие пакета/сеанса,
+admin logout/browser close/process absence проверены. Recovery receipt SHA256
+`dd70c5823b90f64fa24e06ace03739bb4a93c063c18e4eb21e2af4b77b10e4a7`.
+Original status не повышен; C output/Save/cold остаются открытыми.
+
+Child `4d70ea22fb` переносит только native output observers из private operator
+в `javascript-output-context.mjs`; origin/build явно связаны с owning runtime.
+`javascript-managed-views.mjs` переиспользует selection lease/body с native
+identity, проверяет active output0 и actual Visualizers point/control, ACK
+перед одним receipt-wrapped открытием Views и read-only settlement этой же
+native node/port/tree ancestry. Lost reply/смена snapshot не повторяют жест.
+Только после owned Views допускается штатный Table Add/read/formats/return;
+активность, Table GUID и physical mapping checks не ослаблены. Product JS catalog
+по-прежнему не расширен; runtime не импортирует operator fixtures.
+225 runtime regressions PASS, log SHA256
+`ace222ffaea9f2f8786b6c99585e5b40b922d46757a923e65dfde2a7ce26ba11`;
+194 operator regressions PASS, log SHA256
+`454b18930c8ca267987cb620f49f1ed824a23e8fee137224117c8b3e409ca492`.
+Полный client suite на этом immutable source — 2956 PASS / 10 SKIP / 0 FAIL
+(2966 total, 156,494 секунд), log SHA256
+`54e60cb9e1f06db1b833a4988c9a2a919cc3cbb8a35db543a056b8a07cef5bfa`.
+После /proc absence и registry closed_verified/profile316 назначен fresh
+profile317/source `4d70ea22fb`; ordinary headed `c-public-code-03`, exec22239,
+exit1, подтвердил materialization execution `1790731037107-ra2tr0wo06:1073:3`
+и полный output mapping. Финальный Execute не отправлен: после трёх успешных
+full source reads/discards host callback остановился в prepare process console
+(`source admission refused: boundary`). Последний sample показывает свой graph
+locked=true; точная исходная причина скрыта admission и этим ещё не доказана.
+Views/read не достигнуты, audit PASS не заявлен. Original report
+**CLEANUP_UNCONFIRMED**, SHA256
+`dd35fa0be5e1b1f44868575ff141338a42366a56ef277a9495e41dab536c928d`,
+journal SHA256
+`f8fc9980e81b20fed9c7eec5b74b984168a8e51eb1fbbb10cfbdf1b37eb3be63`.
+После process absence headed recovery04/profile318/exec79002/exit0 закрыл
+только Package1/`jsteach:3654` (создание01:17/disconnect01:21 UTC). Refresh
+подтвердил отсутствие пакета и сеанса, admin logout/browser close/process
+absence проверены; recovery receipt SHA256
+`dc4415cd047ee0091a7a61161b4deecb08ca2f52bea16b631f2c8b61ec1952e5`.
+Original failure не повышен до успешного cleanup.
+
+Child `9c4163c9aa` ужесточает read-only settlement после owned source Close:
+пока тот же native JS graph node FLocked=true, исходный Close deadline
+продолжает ждать без новых жестов. VM regression проверяет locked→unlocked
+и отказ foreign owner. В private journal сохраняется redacted исходная ошибка
+execution prepare до её wrapping в admission boundary; новых разрешений
+на Execute/replay нет. 400 адресных runtime tests PASS, SHA256
+`01afa74ce129bc364d44e2bbf31735df8f41673d8324267baaba36982f7b9b2b`.
+После verified recovery назначен fresh profile319, ordinary headed
+`c-public-code-04`/exec68658 на immutable source `9c4163c9aa` выполняется.
+Следующий связный результат — full6×4, независимый audit и cleanup; затем
+Save/cold, D/E/F. Цель active, gates/готовность не повышены.
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 

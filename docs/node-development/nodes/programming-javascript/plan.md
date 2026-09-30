@@ -273,6 +273,14 @@ native cancelled за 6,612 секунды, отдельный local cancel, sho
   `http://logi-test-plan.bg.local/app/`. Source/direct J01/J21 нужны до ревью,
   candidate-часть — после сборки; J18 не является gate разработки.
 
+Текущий результат C (2026-09-30): isolated public run02/code `55b89ef993`
+подтвердил новый Code узел, managed source/Done, полные native input/output
+mappings и две owned completed execution identities. Полный output read ещё
+не подтверждён; отдельный recovery закрыл свой пакет/сеанс. Code `4d70ea22fb`
+добавляет owned Views opening вместо недоступного общего UI-пути. После локальных
+проверок нужен новый headed full6×4 и независимый audit, затем Save/cold;
+C/D/E/F этим не завершены. Точные receipts/status/hashes — в checkpoint.
+
 ### Итерации, диагностика и автоматизация — P1/P2
 
 Единица работы — законченная возможность или снятая неопределённость. В начале
