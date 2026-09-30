@@ -90,13 +90,13 @@
     },
     "runtime-registry": {
       "path": "../../packages/loginom-runtime/client/lib/node-support.mjs",
-      "sha256": "ad4e46a95b88681128bd25b6628b78ebe2014a8f1be1ba576d9b3077e3757352",
+      "sha256": "2d8cc3db1f064e055066e8c9a0d89382ceb642f4d5bd7128a58d69258d37a43a",
       "kind": "source",
       "availability": "retained_document",
-      "source_commit": "8b7ea1225d0ed095ea48b8816a6c80b04f0d0cdf",
+      "source_commit": null,
       "runtime": null,
       "platform": null,
-      "scope": "Статически зарегистрированы 14 обработчиков; код не исполнялся."
+      "scope": "Статически зарегистрированы 15 обработчиков в текущем worktree; код узла проверен адресными тестами, автономная приёмка ожидается."
     },
     "migration-map": {
       "path": "../../docs/migration/source-map.json",
@@ -5030,13 +5030,22 @@
       "name": "Кросс-таблица",
       "slug": "transform-crosstable",
       "legacy_subplan": "15",
-      "queue_class": "backlog",
-      "handler": null,
+      "queue_class": "implemented",
+      "handler": {
+        "type": "transform.cross_table",
+        "modes": [
+          "pivot"
+        ],
+        "source": "../../packages/loginom-runtime/client/lib/crosstable-node.mjs",
+        "parameters_source": "../../packages/loginom-runtime/client/lib/crosstable-parameters.mjs"
+      },
       "card": "nodes/transform-crosstable/README.md",
       "initial_scope": "Сохранить подплан 15: фиксированные и скользящие колонки, агрегаты и изменение схемы; календарные поля можно задать в CSV.",
-      "scope_basis": "engineering_proposal_requires_live_confirmation",
+      "scope_basis": "loginom_7_4_2_live_discovery_and_candidate_source_tests",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Исторический серверный Fixed/Min/Max/Avg PASS на 1e994aa50; Mac Sliding FAIL на том же SHA. Исправление Sliding требует нового публичного 9→7 и C→D, cold и независимого child-вердикта.",
+        "Скользящий режим меняет схему при новом Execute; технические C_n имена относятся только к свежему результату.",
+        "По решению владельца fixed сохраняет все категории источника при настройке, новые значения идут в «Прочие»; явное подмножество отклоняется контрактом."
       ],
       "prerequisites": [
         "accepted_base",
@@ -5051,11 +5060,11 @@
       },
       "readiness": {
         "implementation": {
-          "status": "not_implemented",
+          "status": "implemented",
           "evidence": [
-            "runtime-registry",
-            "historical-roadmap"
-          ]
+            "runtime-registry"
+          ],
+          "note": "Sliding reader исправлен адресно с регрессиями; native fixed контракт сохранён. Свежие серверные доказательства и независимая проверка ещё NOT_RUN."
         },
         "historical_acceptance": {
           "status": "not_accepted",
@@ -5080,9 +5089,9 @@
           "evidence": []
         }
       },
-      "next_action": "До делегирования подготовить самостоятельный подплан с живым исследованием, ограниченным scope, независимыми fixtures/oracle и критериями standalone CLI приёмки; запуск требует назначения.",
+      "next_action": "Проверить два P2 (scroll CrossTable и CLI exit verdict), широкие CSV и публичный Sliding reread/cold/cleanup; свежая приёмка и независимая child-проверка нового SHA до approval.",
       "plan": "nodes/transform-crosstable/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "implementation_in_progress"
     },
     {
       "component_id": "component.transform.EnrichData",

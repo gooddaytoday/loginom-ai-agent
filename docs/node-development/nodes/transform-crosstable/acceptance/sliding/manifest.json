@@ -1,0 +1,50 @@
+{
+  "source_sha": "1e994aa50bf65ced588f58d2658caeac6e30a4f3",
+  "files": [
+    {
+      "name": "README.md",
+      "bytes": 1866,
+      "sha256": "2e44275b06b72c2871c00abf9271c28250799306a3a734bea02a409ec19abbc4"
+    },
+    {
+      "name": "SLIDING-FAILURE.md",
+      "bytes": 19949,
+      "sha256": "4ee7d18e8a9c97d064276dfe659b2c13312172c984e9a6c600603ec84b3365a1"
+    },
+    {
+      "name": "base.csv",
+      "bytes": 113,
+      "sha256": "c390928fefbe2fe6c453b1df03fabfe27977ee992a91b60d4e4989ff0037c4bb"
+    },
+    {
+      "name": "changed.csv",
+      "bytes": 90,
+      "sha256": "427cd5e638f3e1b063a4baf1a2019c1e5d3fe89db964d7c0aa2392f285a0d958"
+    },
+    {
+      "name": "expected-sliding-base-test6.json",
+      "bytes": 1740,
+      "sha256": "79292c0de8a7d753c508c6450123c9355e30c8b81201473dcffa65593861edb3"
+    },
+    {
+      "name": "expected-sliding-test6.json",
+      "bytes": 1382,
+      "sha256": "b01ae45702333a197c5b15367505a289da532692111f6bf882c092d43e592b2e"
+    },
+    {
+      "name": "reproduce-sliding-schema-portable.mjs",
+      "bytes": 1252,
+      "sha256": "2de7c216ee9d6cfd4a9453afb601bb956baee5321de6180f5df8760d3da0e67d"
+    },
+    {
+      "name": "reproduce-sliding-schema.mjs",
+      "bytes": 1072,
+      "sha256": "b6214c5f68b77df8e18368d4f231283ab5d1ac5de4a6c630830d21078d57c3fc"
+    },
+    {
+      "name": "sliding-schema-repro.log",
+      "bytes": 203,
+      "sha256": "f4eb56c82c7f98921162e4e1e5904aa0403b2581ed4271f92789b1c786d4452d"
+    }
+  ]
+}

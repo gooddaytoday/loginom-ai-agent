@@ -1,6 +1,6 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
 export type NodeType = 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
-  | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
+  | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.cross_table' | 'transform.sorting'
   | 'transform.join_data' | 'transform.union_data';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
 export interface NodeRef { document_id: string; workflow_id: string; node_id: string }
@@ -89,6 +89,13 @@ export interface GroupingParameters {
   group_by?: Array<{kind: 'input_field'; name: string}>;
   measures?: Array<{field: {kind: 'input_field'; name: string};
     function: 'sum' | 'count' | 'avg' | 'min' | 'max'; name: string; label: string}>;
+}
+export interface CrossTableParameters {
+  rows: Array<{kind: 'input_field'; name: string}>;
+  column: {kind: 'input_field'; name: string};
+  facts: Array<{field: {kind: 'input_field'; name: string}; functions: Array<'sum' | 'avg' | 'min' | 'max'>}>;
+  columns: {mode: 'sliding'; min_values: 0} |
+    {mode: 'fixed'; include_null: boolean; include_other: boolean};
 }
 export interface GroupingConfigurationReadback {
   kind: 'grouping'; scope: 'observed_before_verified_finish'; node: NodeRef;

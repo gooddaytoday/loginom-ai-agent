@@ -7,7 +7,7 @@ export const uiActionSchema = {
   type: 'object', additionalProperties: false, required: ['verb'],
   properties: {
     verb: { type: 'string', enum: ['click', 'double_click', 'right_click', 'fill', 'press', 'drag', 'scroll', 'scroll_horizontal', 'set_checked', 'replace_expression', 'set_wizard_field', 'wizard_step', 'select_wizard_option', 'apply_expression_parameters', 'cancel_expression_parameters', 'open_wizard', 'begin_wizard', 'confirm_wizard_deactivation', 'finish_wizard', 'execute_wizard', 'execute_graph_node', 'deactivate_graph_node', 'confirm_wizard_close', 'show_process_node', 'cancel_process', 'open_node_views', 'enter_table', 'apply_output_column', 'cancel_output_column', 'apply_reform_column', 'cancel_reform_column'] },
-    expected_stage: { oneOf:[{type:'string',enum:['text_import_file','text_import_format','text_export_params','text_export_format','input_mapping','output_mapping','calculator','grouping','sorting','replacement','collapse','missing_values','date_time','field_parameters','row_filter','join','union','done']},{const:['output_mapping','done']}],
+    expected_stage: { oneOf:[{type:'string',enum:['text_import_file','text_import_format','text_export_params','text_export_format','input_mapping','output_mapping','calculator','grouping','cross_table','sorting','replacement','collapse','missing_values','date_time','field_parameters','row_filter','join','union','done']},{const:['output_mapping','done']}],
       description: 'Required only for wizard_step: destination after the observed next/previous control, not the current stage. For delimited Text Import, next follows text_import_file → text_import_format → output_mapping → done; previous reverses this order. input_mapping means a separate INPUT PORT mapping wizard, never Text Import output columns. Calculator, Grouping and Sorting validation may use [output_mapping, done] for its conditional output page. Other wizard families may have different paths; inspect their current UI and sources instead of guessing. Do not pass this field to open_wizard or finish_wizard.' },
     checked: { type: 'boolean' },
     delta_y: { type: 'integer', minimum: -1000, maximum: 1000 },
@@ -35,7 +35,7 @@ export function validateUiAction(action, snapshot) {
   if (action.verb === 'scroll_horizontal' && (!Number.isInteger(action.delta_x) || !action.delta_x || Math.abs(action.delta_x)>1000)) throw new Error('Horizontal scroll requires a nonzero integer delta_x within -1000..1000');
   if (action.verb === 'set_checked' && typeof action.checked !== 'boolean') throw new Error('set_checked requires a boolean checked value');
   if (snapshot) {
-    if(action.verb==='wizard_step'&&Array.isArray(action.expected_stage)&&!['calculator','grouping','sorting','replacement','collapse','missing_values','date_time','field_parameters','row_filter','join','union'].includes(snapshot.wizard?.stage))throw new Error('Conditional destinations require a supported transform configuration');
+    if(action.verb==='wizard_step'&&Array.isArray(action.expected_stage)&&!['calculator','grouping','cross_table','sorting','replacement','collapse','missing_values','date_time','field_parameters','row_filter','join','union'].includes(snapshot.wizard?.stage))throw new Error('Conditional destinations require a supported transform configuration');
     if(action.verb==='wizard_step' && (snapshot.wizard?.status!=='observed' || snapshot.wizard.stage===action.expected_stage))throw new Error('wizard_step requires a different destination stage and an observed wizard');
     if (!Array.isArray(snapshot.ui?.elements)) throw new Error('UI action requires an observation snapshot');
     for (const ref of refs) {
@@ -260,7 +260,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       text_export_format:';ExportTextFilePreviewWizard;edtCodePage',
       input_mapping:[';TuneDataSourceInputPortWizard;grdTargetColumns',';TuneDataSourceInputPortWizard;btnAddMappingColumn',';TuneDataSourceMappingWizard;btnAddMappingColumn'],
       output_mapping:[';DataSetOutputSocketWizard;grdTargetColumns;tbl',';ColumnsMappingEngineOutputPortWizard;btnAddMappingColumn',';DerivedDataSourceOutputSocketWizard;btnAddMappingColumn',';DerivedDataSourceMappingEngineOutputPortWizard;btnAddMappingColumn'],
-      missing_values:';DataRecoveryWizard;grdColumnsSettings;tbl',collapse:';ColumnFlippingWizard;grdUsedFields;tbl',date_time:';DateReformWizard;grdDataFormat;tbl',replacement:';ReplaceColumnsWizard;grdDataList;tbl',calculator:';CalcDataWizard;btnAddExpr',grouping:';GroupDataWizard;grdUsedFields;tbl',sorting:';SortingWizard;SortingColumnCollection;grdSorting;tbl',
+      missing_values:';DataRecoveryWizard;grdColumnsSettings;tbl',collapse:';ColumnFlippingWizard;grdUsedFields;tbl',date_time:';DateReformWizard;grdDataFormat;tbl',replacement:';ReplaceColumnsWizard;grdDataList;tbl',calculator:';CalcDataWizard;btnAddExpr',grouping:';GroupDataWizard;grdUsedFields;tbl',cross_table:';CrossTabWizard;grdUsedFields;tbl',sorting:';SortingWizard;SortingColumnCollection;grdSorting;tbl',
       union:';UnionDataWizard;grdUnionData;grd-1;tbl',join:';JoinDataWizard;grdSourceColumns;tbl',row_filter:';FilterDataWizard;FilterDataPanel;tbl',field_parameters:';ReformColumnsWizard;grdTargetColumns;tbl',done:';DoneWizard;edtDisplayName'};
     const wizardButtons=['btnPrev','btnNext','btnDone','btnExecute','btnClose','btnError'];
     // Breadcrumb labels are fixed global context even for a narrow file row;
@@ -809,7 +809,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         }
       }
     }
-    if(wizard.status==='observed' && wizard.stage==='grouping') {
+    if(wizard.status==='observed' && ['grouping','cross_table'].includes(wizard.stage)) {
       const dialogTid=wizard.root_tid+';FactorEditDialog',dialogs=tids.get(dialogTid)??[];
       const factor={status:'unobserved',opening_verified:false,settings_applied:false,
         source_identity_verified:false,aggregation_settings_verified:false,options:[]};
@@ -822,13 +822,18 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if(!discoverRoots && dialogs.length===1 && fullyVisible(dialogs[0])
         && (!requestedRoot || requestedRoot===dialogs[0] || requestedRoot.contains(dialogs[0]))) {
         const dialog=dialogs[0],groupTid=dialogTid+';grpFactors',groups=tids.get(groupTid)??[];
-        const definitions=[['gdSum','sum','Сумма'],['gdCount','count','Количество'],['gdMin','min','Минимум'],
+        const groupingDefinitions=[['gdSum','sum','Сумма'],['gdCount','count','Количество'],['gdMin','min','Минимум'],
           ['gdMax','max','Максимум'],['gdAvg','average','Среднее'],['gdMedian','median','Медиана'],['gdMode','mode','Мода'],
           ['gdStdDev','standard_deviation','Стандартное откл.'],['gdUniqueCount','unique_count','Кол-во уникальных'],
           ['gdNullCount','null_count','Кол-во пропусков'],['gdFirst','first','Первый'],['gdLast','last','Последний'],
           ['gdOnly','only','Единственный'],['gdConcat','concat','Список']];
+        const definitions=wizard.stage==='cross_table'?[['','sum','Сумма'],['','count','Количество'],
+          ['','min','Минимум'],['','max','Максимум'],['','average','Среднее'],
+          ['','standard_deviation','Стандартное откл.'],['','sum_squares','Сумма квадратов'],
+          ['','unique_count','Кол-во уникальных'],['','null_count','Кол-во пропусков'],
+          ['','first','Первый'],['','last','Последний']]:groupingDefinitions;
         const owners=[...dialog.querySelectorAll('.x-form-type-checkbox')].filter(e=>(getTid(e)??'').startsWith(groupTid+';') || groups.length===1 && groups[0].contains(e));
-        let valid=groups.length===1 && dialog.contains(groups[0]) && fullyVisible(groups[0]) && owners.length===14;
+        let valid=groups.length===1 && dialog.contains(groups[0]) && fullyVisible(groups[0]) && owners.length===definitions.length;
         const options=[];
         for(const [index,[iconName,aggregation,label]] of definitions.entries()) {
           if(!valid)break;charge();
@@ -842,17 +847,18 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             || displays.length!==1 || inputs.length!==1 || !owner.contains(displays[0]) || !owner.contains(inputs[0])
             || !fullyVisible(displays[0]) || inputs[0].getAttribute('role')!=='checkbox'
             || labels.length!==1 || !fullyVisible(labels[0]) || textOf(labels[0],true)!==label
-            || icons.length!==1 || !fullyVisible(icons[0]) || !icons[0].classList.contains('bg-TBGGroupDataFunction-'+iconName)
-            || definitions.filter(([name])=>icons[0].classList.contains('bg-TBGGroupDataFunction-'+name)).length!==1) {valid=false;break;}
+            || wizard.stage==='grouping'&&(icons.length!==1 || !fullyVisible(icons[0]) || !icons[0].classList.contains('bg-TBGGroupDataFunction-'+iconName)
+            || definitions.filter(([name])=>icons[0].classList.contains('bg-TBGGroupDataFunction-'+name)).length!==1)) {valid=false;break;}
           options.push({aggregation,label,owner_ref:refOf(owner),display_ref:refOf(displays[0]),
             checked:owner.classList.contains('x-form-cb-checked'),enabled:enabled(owner),state_source:'ext_owner_class'});
         }
-        const gridTid=wizard.root_tid+';GroupDataWizard;grdUsedFields;tbl',grids=tids.get(gridTid)??[];
+        const fieldWizard=wizard.stage==='cross_table'?'CrossTabWizard':'GroupDataWizard';
+        const gridTid=wizard.root_tid+';'+fieldWizard+';grdUsedFields;tbl',grids=tids.get(gridTid)??[];
         let selected=null;
         if(grids.length===1 && wizardForms[0].contains(grids[0])) {
           const rows=[...grids[0].querySelectorAll('table.x-grid-item-selected')];charge();
           if(rows.length===1 && fullyVisible(rows[0]) && rows[0].getAttribute('data-boundview')===grids[0].getAttribute('id')) {
-            const prefix=wizard.root_tid+';GroupDataWizard;colUsedFields_';
+            const prefix=wizard.root_tid+';'+fieldWizard+';colUsedFields_';
             const cells=[...rows[0].querySelectorAll('[data-tid]')].filter(e=>!e.closest('.x-grid-row-summary') && (getTid(e)??'').startsWith(prefix));
             // The dialog is a portal sibling; a scoped dialog read does not
             // include the selected grid cell in tids. Check exact native DOM
@@ -869,7 +875,24 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         }
         if(valid && selected)Object.assign(factor,{status:'rendered_factor_options',dialog_ref:refOf(dialog),
           dialog_tid:dialogTid,group_ref:refOf(groups[0]),selected_field:selected,options,
-          definition_coverage:{status:'complete_rendered_options',count:14},count_includes_null_records:true});
+          definition_coverage:{status:'complete_rendered_options',count:definitions.length},count_includes_null_records:true});
+      }
+    }
+    if(wizard.status==='observed'&&wizard.stage==='cross_table'){
+      const tid=wizard.root_tid+';ColumnEditDialog',dialogs=tids.get(tid)??[];
+      wizard.column_editor={status:'unobserved'};
+      if(!discoverRoots&&dialogs.length===1&&visible(dialogs[0])&&(!requestedRoot||requestedRoot===dialogs[0]||requestedRoot.contains(dialogs[0]))){
+        const gridTid=wizard.root_tid+';CrossTabWizard;grdUsedFields;tbl',grids=tids.get(gridTid)??[];
+        const rows=grids.length===1?[...grids[0].querySelectorAll('table.x-grid-item-selected')]:[];charge();
+        if(rows.length===1&&visible(rows[0])&&rows[0].getAttribute('data-boundview')===grids[0].id){
+          const recordId=rows[0].getAttribute('data-recordid'),prefix=wizard.root_tid+';CrossTabWizard;colUsedFields_';
+          const cells=[...rows[0].querySelectorAll('[data-tid]')].filter(e=>(getTid(e)??'').startsWith(prefix)&&visible(e));charge();
+          if(recordId&&cells.length===1&&getTid(cells[0]).slice(prefix.length)&&!getTid(cells[0]).slice(prefix.length).includes(';')
+            &&['rbSlidingUniqueValues','rbGroupValues','cbNullGroup','cbOtherGroup','btnApply','btnCancel'].every(name=>{
+              const matches=tids.get(tid+';'+name)??[];return matches.length===1&&dialogs[0].contains(matches[0])&&visible(matches[0]);
+            }))wizard.column_editor={status:'rendered_column_options',dialog_ref:refOf(dialogs[0]),dialog_tid:tid,
+              selected_field:{record_id:recordId,field_key:getTid(cells[0]).slice(prefix.length),row_ref:refOf(rows[0]),cell_ref:refOf(cells[0])}};
+        }
       }
     }
     scanStage='output_definitions';
@@ -2136,6 +2159,27 @@ function readRenderedInputMapping(observation) {
         if(cells.length!==1||!visible(cells[0])||sensitive(cells[0]))continue;
         groupingCells.set(refOf(cells[0]),{field_key:d.Name,record_id:String(record.internalId),row_ref:refOf(row),
           grid_ref:refOf(grid),role:role??(d.Disposition===6?'group':d.Disposition===7?'measure':'invalid'),wizard_root_ref:wizard.root_ref});
+      }
+    }
+    if(!discoverRoots&&wizard.stage==='cross_table')for(const [gridName,column,role] of [
+      ['grdDataFields','colDisplayName_','available'],['grdUsedFields','colUsedFields_',null]]) {
+      const base=wizard.root_tid+';CrossTabWizard;',grids=tids.get(base+gridName+';tbl')??[];
+      if(grids.length!==1)continue;
+      const grid=grids[0],view=globalThis.Ext?.getCmp?.(grid.id),store=view?.getStore?.();
+      if(view?.el?.dom!==grid||store?.$className!=='Ext.data.ChainedStore')continue;
+      const records=store.getData?.()?.items;
+      if(!Array.isArray(records)||records.length>1003)continue;
+      const rows=[...grid.querySelectorAll('table.x-grid-item')];charge();
+      if(rows.length>200)continue;
+      for(const row of rows){
+        const index=Number(row.getAttribute('data-recordindex')),record=records[index],data=record?.data;
+        if(!Number.isSafeInteger(index)||index<0||!record?.isModel||typeof data?.DisplayName!=='string'||!data.DisplayName
+          ||row.getAttribute('data-recordid')!==String(record.internalId)||row.getAttribute('data-boundview')!==grid.id
+          ||![0,1,2,3].includes(data.Disposition)||role==='available'&&data.Disposition!==0)continue;
+        const cells=[...row.querySelectorAll('[data-tid]')].filter(e=>getTid(e)===base+column+data.DisplayName&&!e.closest('.x-grid-row-summary'));
+        if(cells.length!==1||!visible(cells[0])||sensitive(cells[0]))continue;
+        groupingCells.set(refOf(cells[0]),{field_key:data.DisplayName,record_id:String(record.internalId),row_ref:refOf(row),
+          grid_ref:refOf(grid),role:role??({1:'column',2:'row',3:'fact'}[data.Disposition]??'invalid'),wizard_root_ref:wizard.root_ref});
       }
     }
     const collapseCells=new Map();

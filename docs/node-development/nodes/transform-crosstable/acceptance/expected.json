@@ -1,0 +1,83 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.cross_table"
+    }
+  ],
+  "output_node_type": "transform.cross_table",
+  "columns": [
+    {
+      "name": "Region",
+      "label": "Region",
+      "type": "string"
+    },
+    {
+      "name": "C_1_Amount_Sum",
+      "label": "<...>|Amount|Сумма",
+      "type": "real"
+    },
+    {
+      "name": "C_1_Quantity_Sum",
+      "label": "<...>|Quantity|Сумма",
+      "type": "real"
+    },
+    {
+      "name": "C_2_Amount_Sum",
+      "label": "A|Amount|Сумма",
+      "type": "real"
+    },
+    {
+      "name": "C_2_Quantity_Sum",
+      "label": "A|Quantity|Сумма",
+      "type": "real"
+    },
+    {
+      "name": "C_3_Amount_Sum",
+      "label": "B|Amount|Сумма",
+      "type": "real"
+    },
+    {
+      "name": "C_3_Quantity_Sum",
+      "label": "B|Quantity|Сумма",
+      "type": "real"
+    },
+    {
+      "name": "C_4_Amount_Sum",
+      "label": "D|Amount|Сумма",
+      "type": "real"
+    },
+    {
+      "name": "C_4_Quantity_Sum",
+      "label": "D|Quantity|Сумма",
+      "type": "real"
+    }
+  ],
+  "rows": [
+    {
+      "Region": "North",
+      "C_1_Amount_Sum": null,
+      "C_1_Quantity_Sum": null,
+      "C_2_Amount_Sum": 15.0,
+      "C_2_Quantity_Sum": 2.0,
+      "C_3_Amount_Sum": null,
+      "C_3_Quantity_Sum": 1.0,
+      "C_4_Amount_Sum": null,
+      "C_4_Quantity_Sum": null
+    },
+    {
+      "Region": "South",
+      "C_1_Amount_Sum": 4.0,
+      "C_1_Quantity_Sum": 1.0,
+      "C_2_Amount_Sum": null,
+      "C_2_Quantity_Sum": null,
+      "C_3_Amount_Sum": 7.0,
+      "C_3_Quantity_Sum": 1.0,
+      "C_4_Amount_Sum": 8.0,
+      "C_4_Quantity_Sum": 1.0
+    }
+  ]
+}

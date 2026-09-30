@@ -52,7 +52,9 @@ export async function verifyMacArtifact(input: {
         !((await stat(file)).mode & 0o111)
       )
         throw Error("RELEASE_EXECUTABLE_INVALID")
-      if (file !== join(application, input.manifest.paths.chromium)) await $`codesign --verify --strict ${file}`.quiet()
+      // The main executable's signature seals its owning bundle's resources.
+      if (file !== join(application, input.manifest.paths.chromium))
+        await $`codesign --verify --strict ${file === executable ? application : file}`.quiet()
       const commands = await $`otool -l ${file}`.text()
       const minimum =
         commands.match(/\bminos\s+(\d+(?:\.\d+)+)/)?.[1] ?? commands.match(/\bversion\s+(\d+(?:\.\d+)+)/)?.[1]

@@ -1,0 +1,68 @@
+{
+  "package_path": "/test-6/LOG-29-mac-sliding-test6-20260929.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.cross_table"
+    }
+  ],
+  "output_node_type": "transform.cross_table",
+  "columns": [
+    {
+      "name": "Region",
+      "type": "string"
+    },
+    {
+      "name": "C_1_Amount_Sum",
+      "label": "A|Amount|Сумма",
+      "type": "real"
+    },
+    {
+      "name": "C_1_Quantity_Sum",
+      "label": "A|Quantity|Сумма",
+      "type": "real"
+    },
+    {
+      "name": "C_2_Amount_Sum",
+      "label": "B|Amount|Сумма",
+      "type": "real"
+    },
+    {
+      "name": "C_2_Quantity_Sum",
+      "label": "B|Quantity|Сумма",
+      "type": "real"
+    },
+    {
+      "name": "C_3_Amount_Sum",
+      "label": "D|Amount|Сумма",
+      "type": "real"
+    },
+    {
+      "name": "C_3_Quantity_Sum",
+      "label": "D|Quantity|Сумма",
+      "type": "real"
+    }
+  ],
+  "rows": [
+    {
+      "Region": "North",
+      "C_1_Amount_Sum": 10,
+      "C_1_Quantity_Sum": 1,
+      "C_2_Amount_Sum": null,
+      "C_2_Quantity_Sum": null,
+      "C_3_Amount_Sum": 12,
+      "C_3_Quantity_Sum": 1
+    },
+    {
+      "Region": "South",
+      "C_1_Amount_Sum": null,
+      "C_1_Quantity_Sum": null,
+      "C_2_Amount_Sum": 7,
+      "C_2_Quantity_Sum": 1,
+      "C_3_Amount_Sum": 4,
+      "C_3_Quantity_Sum": 1
+    }
+  ]
+}
