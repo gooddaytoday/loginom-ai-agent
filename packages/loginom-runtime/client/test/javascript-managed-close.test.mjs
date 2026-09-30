@@ -114,6 +114,25 @@ test('managed Close accepts a rebound graph only with the same workflow, node an
   assert.equal(read().state,'waiting');
   tab.Controller.Node.data.node=held.wizard={};
   assert.equal(read().state,'waiting');
+  const tabRoot={...mask,id:'owned-tab',getAttribute:()=>task.workflow_ref.prefix};
+  const maskSymbol=Symbol('MaskWithText'),lock={FController:tab,FElement:tabRoot,FIsActive:true,FSequence:['Загрузка']};
+  held.retained.controller=tab.Controller;held.retained.tabRoot=tabRoot;
+  tab.Controller.View=tab;tab.el={dom:tabRoot};tab[maskSymbol]=lock;
+  context.bg.ext={AfterElementTextMaskContext:{ElementSymb:maskSymbol}};
+  context.Ext={getCmp:id=>id===tabRoot.id?tab:null};masks=[tabRoot];
+  assert.equal(read().state,'waiting');
+  tab.Controller.Node.data.node=workflow;
+  assert.equal(read().loading_mask_count,1);
+  for(const [target,key,value] of [[lock,'FIsActive',false],[lock,'FController',{}],[lock,'FElement',{}],
+    [lock,'FSequence',[]],[lock,'FSequence',Array(33).fill('Загрузка')],
+    [held.retained,'controller',{}],[held.retained,'tabRoot',{}],[tab.Controller,'View',{}],[tab.el,'dom',{}]]){
+    const old=target[key];target[key]=value;assert.throws(read,/foreign loading mask/);target[key]=old;
+  }
+  Object.defineProperty(tab,maskSymbol,{configurable:true,get:()=>{throw Error('mask getter must not run');}});
+  assert.throws(read,/foreign loading mask/);
+  Object.defineProperty(tab,maskSymbol,{configurable:true,value:lock});
+  masks=[tabRoot,{...tabRoot,id:'foreign-tab'}];assert.throws(read,/foreign loading mask/);
+  masks=[];
   tab.Controller.Node.data.node={};
   assert.throws(read,/foreign active owner/);
   tab.Controller.Node.data.node=workflow;

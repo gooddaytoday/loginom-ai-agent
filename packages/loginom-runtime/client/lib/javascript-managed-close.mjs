@@ -50,10 +50,21 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
   const root=held.wizardRoot,current=tab?.Controller?.Node?.data?.node,model=tab?.Controller?.FController;
   if(!visible(root)&&dialogs.length===0){
     const masks=[...document.querySelectorAll('.bg-mask-message,.x-mask-msg,.x-mask')].filter(visible);
-    if(masks.some(e=>!app?.ModelForm||!(model instanceof app.ModelForm)||current!==held.binding.workflow
-      ||e!==model.FView?.el?.dom||e.getAttribute('data-tid')!==task.workflow_ref.prefix+';ModelForm'
-      ||!e.classList.contains('bg-mask-message')||!model.FDiagram?.FmxGraph?.container
-      ||!e.contains(model.FDiagram.FmxGraph.container)))
+    // TabForm.ChangeNode has a native bg.Lock: its retained View may stay
+    // masked while FController changes from the wizard back to ModelForm.
+    // Read the existing context; never call mask/getEl or mutate native state.
+    const tabRoot=held.retained.tabRoot,maskSymbol=globalThis.bg?.ext?.AfterElementTextMaskContext?.ElementSymb;
+    const lock=typeof maskSymbol==='symbol'?Object.getOwnPropertyDescriptor(tab??{},maskSymbol)?.value:null;
+    const ownedTabMask=e=>e===tabRoot&&tab?.Controller===held.retained.controller
+      &&held.retained.controller?.View===tab&&tab.el?.dom===tabRoot
+      &&e.getAttribute('data-tid')===task.workflow_ref.prefix&&e.classList.contains('bg-mask-message')
+      &&globalThis.Ext?.getCmp?.(e.id)===tab&&lock?.FController===tab&&lock.FElement===e
+      &&lock.FIsActive===true&&Array.isArray(lock.FSequence)&&lock.FSequence.length>0&&lock.FSequence.length<=32;
+    const ownedModelMask=e=>app?.ModelForm&&model instanceof app.ModelForm&&current===held.binding.workflow
+      &&e===model.FView?.el?.dom&&e.getAttribute('data-tid')===task.workflow_ref.prefix+';ModelForm'
+      &&e.classList.contains('bg-mask-message')&&model.FDiagram?.FmxGraph?.container
+      &&e.contains(model.FDiagram.FmxGraph.container);
+    if(masks.some(e=>!ownedTabMask(e)&&!ownedModelMask(e)))
       throw Error('Managed JavaScript Close foreign loading mask');
     // The confirmation can hide its wizard before the graph and rendered node
     // return. Wait under the original Close deadline while the retained tab
@@ -79,9 +90,6 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
     // Close can restore the graph before its asynchronous loading mask ends.
     // Wait only for the exact current ModelForm target under the original
     // cleanup deadline. A restored shape must not make a masked graph ready.
-    if(masks.some(e=>e!==model.FView?.el?.dom||e.getAttribute('data-tid')!==task.workflow_ref.prefix+';ModelForm'
-      ||!e.classList.contains('bg-mask-message')||!e.contains(graph.container)))
-      throw Error('Managed JavaScript Close foreign loading mask');
     if(masks.length)return {state:'waiting',node_id:task.owner.node_id,root_visible:false,dialog_count:0,
       loading_mask_count:masks.length};
     return {state:'closed',node_id:task.owner.node_id,root_visible:false,dialog_count:0,
