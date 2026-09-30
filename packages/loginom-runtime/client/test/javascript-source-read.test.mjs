@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {createJavascriptSourceReader,javascriptSourceIdentity} from '../lib/javascript-source-read.mjs';
+import {createJavascriptSourceReader,javascriptSourceIdentity,prepareJavascriptSourceDelivery} from '../lib/javascript-source-read.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 import {javascriptSourceOwner,sourceFixture} from './support/javascript-source-fixture.mjs';
 const owner=javascriptSourceOwner;
@@ -61,4 +61,40 @@ test('source durable production journal ACK binds delivered digest and chunk wit
  const {readdir}=await import('node:fs/promises');const names=await readdir(directory);
  const text=(await Promise.all(names.filter(name=>name.endsWith('.jsonl')).map(name=>readFile(join(directory,name),'utf8')))).join('\n');
  assert.ok(text.includes(receipt.source_sha256));assert.ok(text.includes('chunk_sha256'));assert.ok(!text.includes('unusualName'));assert.ok(!text.includes('source_text'));
+});
+
+
+test('pure source preparation uses identical UTF-8/escaped chunks before and after actual node identity',()=>{
+ const source='const text="'+'\u0001'.repeat(32754)+'";';
+ const before=prepareJavascriptSourceDelivery({source,owner:{...owner,node_id:null},redactor:createRedactor()});
+ const longest='\u0001'.repeat(256);
+ const worst={document_id:longest,workflow_id:longest,node_id:longest,operation_id:longest,ui_epoch:Number.MAX_SAFE_INTEGER};
+ const after=prepareJavascriptSourceDelivery({source,owner:worst,redactor:createRedactor()});
+ assert.deepEqual(before.chunks,after.chunks);assert.deepEqual(before.metadata,after.metadata);
+ assert.equal(after.chunks.join(''),source);
+ let offset=0;
+ for(const chunk of after.chunks){
+  assert.ok(chunk.isWellFormed()&&Buffer.byteLength(chunk)<=4096);
+  const receipt={kind:'source',owner:worst,...after.metadata,source_text:chunk,offset_utf8_bytes:offset,
+   chunk_utf8_bytes:Buffer.byteLength(chunk),cursor:'00000000-0000-4000-8000-000000000000'};
+  assert.ok(Buffer.byteLength(JSON.stringify(receipt))<=16384);
+  offset+=Buffer.byteLength(chunk);
+ }
+});
+
+test('actual source reader delivers 32KiB escaped source under maximum escaped operation identity',async()=>{
+ const source='const text="'+'\u0001'.repeat(32754)+'";',browser=sourceFixture(source);
+ const bound={...owner,operation_id:'\u0001'.repeat(256),ui_epoch:Number.MAX_SAFE_INTEGER};
+ const reader=createJavascriptSourceReader({owner:bound,deadline:Date.now()+60000,redactor:createRedactor(),record:async e=>e,
+  adapter:{open:async()=>browser.observe({context:browser.context,owner:bound,epoch:1,capture:true}),
+   read:async held=>({...browser.observe({context:browser.context,owner:bound,epoch:1,held}),settings:{mode:'code'}}),
+   discard:async()=>({closed:true,owner:bound})}});
+ let request={owner:bound},assembled='',count=0;
+ do{
+  const {receipt}=await reader.read(request);count++;
+  assert.ok(Buffer.byteLength(JSON.stringify(receipt))<=16384);
+  assert.equal(receipt.offset_utf8_bytes,Buffer.byteLength(assembled));assembled+=receipt.source_text;
+  request=receipt.cursor?{owner:bound,cursor:receipt.cursor,expected_source_sha256:receipt.source_sha256}:null;
+ }while(request);
+ assert.equal(assembled,source);assert.ok(count>8);assert.equal(reader.uncertain,false);
 });

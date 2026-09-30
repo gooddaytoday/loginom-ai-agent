@@ -11,6 +11,56 @@ export function javascriptSourceIdentity(source) {
   return Object.freeze({source_sha256: hash(source), source_utf8_bytes: bytes, source_lf_lines: lines});
 }
 
+// Shared pure admission/read preparation. The worst permitted owner produces
+// stable chunk boundaries before a new node has its actual identity.
+const sourceEnvelope=(owner,metadata,chunk,offset,cursor)=>({kind:'source',owner,...metadata,
+  source_text:chunk,offset_utf8_bytes:offset,chunk_utf8_bytes:Buffer.byteLength(chunk,'utf8'),cursor});
+function exactSourceReceipt(receipt,redactor) {
+  const cleaned=redactor.redact(receipt);
+  need(equal(cleaned,receipt),'Source exact structured redaction refused');
+  need(Buffer.byteLength(JSON.stringify(cleaned),'utf8')<=16384,'Source response budget refused');
+  return cleaned;
+}
+export function prepareJavascriptSourceDelivery({source,owner,redactor,chunkBytes=4096}) {
+  need(owner&&equal(Object.keys(owner).sort(),['document_id','node_id','operation_id','ui_epoch','workflow_id'])
+    &&['document_id','workflow_id','operation_id'].every(key=>typeof owner[key]==='string'
+    &&owner[key].length>0&&owner[key].length<=256)
+    &&(owner.node_id===null||typeof owner.node_id==='string'&&owner.node_id.length>0&&owner.node_id.length<=256)
+    &&Number.isSafeInteger(owner.ui_epoch)&&owner.ui_epoch>=0,'Source preparation owner refused');
+  need(Number.isInteger(chunkBytes)&&chunkBytes>=4&&chunkBytes<=4096
+    &&typeof redactor?.text==='function'&&typeof redactor?.redact==='function','Source preparation dependencies refused');
+  const metadata=javascriptSourceIdentity(source);
+  need(redactor.text(source)===source,'Source full redaction refused');
+  need(equal(redactor.redact({source_text:source}),{source_text:source}),'Source full structured redaction refused');
+  const placeholder='00000000-0000-4000-8000-000000000000';
+  // JSON can escape each UTF-16 owner unit into six bytes. Budget every
+  // allowed owner at that maximum, independently of the observed/new node.
+  const longest='\u0001'.repeat(256);
+  const worstOwner={document_id:longest,workflow_id:longest,node_id:longest,operation_id:longest,ui_epoch:Number.MAX_SAFE_INTEGER};
+  const worstMetadata={source_sha256:'0'.repeat(64),source_utf8_bytes:32768,source_lf_lines:1024};
+  const escapedBudget=16384-Buffer.byteLength(JSON.stringify(sourceEnvelope(worstOwner,worstMetadata,'',32768,placeholder)),'utf8')-4;
+  const chunks=[];let text='',bytes=0,escapedBytes=0;
+  for(const point of source){
+    const size=Buffer.byteLength(point,'utf8'),escapedSize=Buffer.byteLength(JSON.stringify(point),'utf8')-2;
+    if(bytes+size>chunkBytes||escapedBytes+escapedSize>escapedBudget){
+      need(text.length>0,'Source envelope budget refused');
+      chunks.push(text);text='';bytes=0;escapedBytes=0;
+    }
+    text+=point;bytes+=size;escapedBytes+=escapedSize;
+  }
+  chunks.push(text);
+  let offset=0;
+  for(const chunk of chunks){
+    exactSourceReceipt(sourceEnvelope(owner,metadata,chunk,offset,placeholder),redactor);
+    offset+=Buffer.byteLength(chunk,'utf8');
+  }
+  // Fragment inspection can grow the redactor's known context; recheck the
+  // entire prospective delivery before admitting a source mutation.
+  need(redactor.text(source)===source,'Source full redaction refused');
+  need(equal(redactor.redact({source_text:source}),{source_text:source}),'Source full structured redaction refused');
+  return {metadata,chunks};
+}
+
 // Internal production boundary; intentionally not registered as a public tool.
 // The adapter must own the existing-node navigation, not accept caller scripts.
 export function createJavascriptSourceReader({owner, deadline, adapter, redactor, record, chunkBytes = 4096}) {
@@ -39,40 +89,9 @@ export function createJavascriptSourceReader({owner, deadline, adapter, redactor
     const ack = await bounded(() => record(event));
     need(Object.keys(event).every(key => equal(ack?.[key], event[key])), 'Source journal ACK differs');
   };
-  const exact = receipt => {
-    const cleaned = redactor.redact(receipt);
-    need(equal(cleaned, receipt), 'Source exact structured redaction refused');
-    need(Buffer.byteLength(JSON.stringify(cleaned), 'utf8') <= 16384, 'Source response budget refused');
-    return cleaned;
-  };
-  const envelope = (metadata, chunk, offset, cursor) => ({kind: 'source', owner: identity, ...metadata,
-    source_text: chunk, offset_utf8_bytes: offset, chunk_utf8_bytes: Buffer.byteLength(chunk, 'utf8'), cursor});
-  const prepare = source => {
-    const metadata = javascriptSourceIdentity(source);
-    need(redactor.text(source) === source, 'Source full redaction refused');
-    need(equal(redactor.redact({source_text: source}), {source_text: source}), 'Source full structured redaction refused');
-    const placeholder = '00000000-0000-4000-8000-000000000000';
-    const escapedBudget = 16384 - Buffer.byteLength(JSON.stringify(envelope(metadata, '', 32768, placeholder)), 'utf8') - 4;
-    const chunks = []; let text = '', bytes = 0, escapedBytes = 0;
-    for (const point of source) {
-      const size = Buffer.byteLength(point, 'utf8');
-      const escapedSize = Buffer.byteLength(JSON.stringify(point), 'utf8') - 2;
-      if (bytes + size > chunkBytes || escapedBytes + escapedSize > escapedBudget) {
-        need(text.length > 0, 'Source envelope budget refused');
-        chunks.push(text); text = ''; bytes = 0; escapedBytes = 0;
-      }
-      text += point; bytes += size; escapedBytes += escapedSize;
-    }
-    chunks.push(text);
-    // Check every prospective fragment before releasing any source. JSON-like
-    // fragments can change even when structured redaction preserves the whole.
-    let offset = 0;
-    for (const chunk of chunks) {
-      exact(envelope(metadata, chunk, offset, '00000000-0000-4000-8000-000000000000'));
-      offset += Buffer.byteLength(chunk, 'utf8');
-    }
-    return {metadata, chunks};
-  };
+  const exact=receipt=>exactSourceReceipt(receipt,redactor);
+  const envelope=(metadata,chunk,offset,cursor)=>sourceEnvelope(identity,metadata,chunk,offset,cursor);
+  const prepare=source=>prepareJavascriptSourceDelivery({source,owner:identity,redactor,chunkBytes});
   return {
     get uncertain() { return uncertain; },
     async read(request) {

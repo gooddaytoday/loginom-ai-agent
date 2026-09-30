@@ -111,3 +111,28 @@ test('admission rejects missing reader dependencies before new creation can be a
  const f=fixture({kind:'new'}),base={kind:'new',owner:f.owner,deadline:f.deadline,sourceAdapter:f.sourceAdapter,record:async e=>e,redactor:createRedactor()};
  for(const patch of [{redactor:null},{sourceAdapter:null},{record:null},{chunkBytes:0},{chunkBytes:4097}])assert.throws(()=>createJavascriptSourceAdmission({...base,...patch}),{code:'dependencies'});
 });
+
+
+for(const kind of ['new','existing'])for(const scenario of ['known-text','bearer-comment','fragment'])
+ test('requested source redaction refuses before any owned read/create/write: '+kind+' '+scenario,async()=>{
+  const f=fixture({kind,secret:'SYNTHETIC_SOURCE_SECRET',chunkBytes:scenario==='fragment'?8:4096});
+  const source_text=scenario==='known-text'?'const value="SYNTHETIC_SOURCE_SECRET";'
+    :scenario==='bearer-comment'?'// Bearer abcdefghijklmnop':'aaaaaaa;[ 1, 2 ]';
+  await assert.rejects(()=>f.admission.admit({source_text,
+    ...(kind==='existing'?{expected_source_sha256:digest(original)}:{})}));
+  assert.deepEqual(f.calls,[]);assert.equal(f.admission.state,'retired');
+  assert.equal(f.events.some(e=>e.phase==='javascript_source_admitted'),false);
+  assert.equal(JSON.stringify(f.events).includes('SYNTHETIC_SOURCE_SECRET'),false);
+  await assert.rejects(()=>f.admission.admit({source_text:''}),{code:'state'});
+ });
+
+test('requested source rechecks growing redactor context after mutation dispatch ACK before callback',async()=>{
+ const redactor=createRedactor(),calls=[];
+ const owner={document_id:'d',workflow_id:'w',node_id:null,operation_id:'redaction-ack',ui_epoch:1};
+ const admission=createJavascriptSourceAdmission({kind:'new',owner,deadline:Date.now()+60000,
+  sourceAdapter:()=>{calls.push('adapter');throw Error('No adapter expected');},redactor,
+  record:async e=>{if(e.phase==='javascript_source_mutation_dispatch')redactor.prime({password:'SYNTHETIC_SOURCE_VALUE'});return e;}});
+ const receipt=await admission.admit({source_text:'const value="SYNTHETIC_SOURCE_VALUE";'});
+ await assert.rejects(()=>admission.withMutation({receipt,owner},async()=>{calls.push('mutation');throw Error('Must not mutate');}));
+ assert.deepEqual(calls,[]);assert.equal(admission.state,'retired');
+});
