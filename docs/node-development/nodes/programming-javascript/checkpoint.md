@@ -43,6 +43,25 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public safe integer — принят — 2026-09-30
+
+Safe-integer01/profile350/child `bccc8a0a08`, exec21350/exit0 — **OBSERVED**,
+independent audit **PASS**. Output3×1 Result/integer:
+-9007199254740991,0,9007199254740991 прочитаны как exact decimal integer strings;
+полный input6×5/source/mappings/graph проверены. Source SHA256
+`4191ec395e70045ec7f7e626123e849401e59eb83873be2d094560c7aa492283`;
+свежие completed IDs `1790754051638-w1mnzbock7:1141:3` и `:1141:4`.
+Package/logout/browser/process cleanup проверен; Save/cold/native bytes и
+candidate/CLI отсутствуют. Это safe-range generated output, не native int64
+roundtrip и не гарантия outside-safe арифметики.
+
+Report SHA256 `80c8da01a08dd81df53d61c6a10999ee67aa16ad9f61096c71b45aa6e3fefc20`,
+journal `7972e73c5b75b8bdadff8de5516839996957a38ffa2a834d09b4c798b14edaaa`,
+audit receipt `3e1597ab6b8f42dc359f94640c08fdb158bf3ea951f3fdb148020a0fdd2955cb`.
+Следующий civil Date01/g5-date-civil запущен на ordinary headed fresh
+profile351, exec99974; ожидаются null и 2024-02-29T23:59:59.123 с civil/
+millisecond proof. Результат пока не установлен; остаток E/F прежний.
+
 ### E: public real precision — принят — 2026-09-30
 
 Real01/profile349/child `bccc8a0a08`, exec8495/exit0 — **OBSERVED**,
