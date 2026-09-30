@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — реализация свежего public context/instruction-in-data и его delivery budgets (J19/J21); J09 Code399/declared400 и exact knowledge v1 Code401/declared402 приняты ниже. Fixed source32768/
+следующий шаг — live проверка реализованного свежего public context/instruction-in-data и его delivery budgets (J19/J21); J09 Code399/declared400 и exact knowledge v1 Code401/declared402 приняты ниже. Fixed source32768/
 empty и schema-mode refusal уже приняты ниже; сохранение manual mapping, дополнительные
 limits/redaction и context/engine/module/budgets остаются открытыми.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
@@ -46,6 +46,47 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J19/J21: current context runtime подготовлен к live — 2026-10-01
+
+Child `b0ecbeaadff8d77a30733ae08cb1e25ecd5937dc`: JS-only `dock_node_read
+kind:context` композирует managed source reader, оба native cached mapping,
+полный graph verifier и verified Close под существующим registry/browser gate.
+Повторные semantic snapshots сохраняют все native scalar/field identities;
+игнорируются только Ext record_id. Same-ID replay возвращает сохранённый ответ,
+unknown Close удерживает gate. ACK/private expected copy и исходный deadline
+проверяются также для Close/graph/context delivery. Выданные compact refs
+восстанавливаются host; budget600000ms принадлежит host. Source/source chunks
+сохраняют прежний контракт; совместная JSON-schema регрессия исправлена.
+
+Actual MCP offline transport подтвердил полный context и явный
+separate_read_required, exact structured/text copies и same-ID retry.
+Ответ ≤46000 wire UTF-8 bytes/консервативно2000 lines, schema не обрезается.
+Addressed client06:74 PASS, full client02:3179 PASS/10 SKIP/0 FAIL; operator
+addressed02:33 PASS, full02:18283 PASS/0 FAIL, actual exit0. Logs SHA256:
+`28410d83b32728d39be5bf984aea6e8bff7431ead1691ee0e6fd8b3c1e33bc2b` /
+`b55d8c924e3d38f3c106d4b9da0d3f8e44436110fd20c039ad6a9e4e887f0493` /
+`5b874c3575a9decbcd6e2c4231ec0f8a26f0043f30b6ef2e63cbcae8b0100c5d` /
+`b76e3147dc9d64c75e262c9512e5e5904e3f56ffe8cbf0d5e239c239425f80a0`.
+Initial client02 имел ошибочный full workflow fixture, client04 выявил настоящую
+union kind regression; operator full01 — пропущенный новый флаг в старой VM
+fixture. Все первичные logs сохранены, финальные проверки PASS; diff PASS.
+
+Fixed ordinary headed context-code/declared читают контекст после warmup и
+после фиксированной source/comment/physical label правки, проверяют полный6×4
+business, current5×4 mappings и exact user-v1 MCP envelope. Context read не
+делает Execute/Done/port edits/Save; четыре explicit Execute принадлежат
+отдельным warmup/edit apply. Instruction-like comment/label остаются данными.
+Это не доказательство поведения модели, changed input names или candidate/CLI.
+
+Private independent pre-live oracle v1 SHA256
+`6f94a18296d67530e2c1aaa6b12d32c7f1072d6ad2155741a9f5bb6ee3707ec3`,
+auditor v1 `02cf8452c9029aaab45986a1469a8256d3cd68a91c61049ae3b031a8e09747bb`,
+source freeze01/1448 files
+`99e97c5138ef9b8fd5afb30dd888fb5e4334b90289948c48c4392e0c98fa9a4f`.
+64 meaningful negative copies подготовлены; проверяются после primary PASS.
+Registry402 closed_verified, active exec/evidence null; следующий fresh403 Code.
+Live/context/model/candidate/CLI PASS ещё нет, discovery_required сохранён.
 
 ### E/J20: весь required knowledge v1 subset принят на isolated public уровне — 2026-09-30
 
