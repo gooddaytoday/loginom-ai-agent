@@ -45,6 +45,20 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: native safe-int64 Code live — выполняется — 2026-09-30
+
+Frozen child `0be6a698c1`, полный operator suite **18000 PASS / 0 FAIL**,
+exec78825/exit0; log SHA256
+`b2e1cd89f0b96cd75f6a83ffc448961c86be77c7c4387553825148513dc30242`.
+Client runtime не менялся; прежний client suite не повторялся.
+
+Ordinary headed `e-public-types-native-integer-safe-code-01`, fresh profile371,
+exec85090 запущен. Before-JS input4×1/native signed-int64 bytes и public Code
+exact decimal strings проверяются; результат пока не установлен. После
+terminal independent int64 audit/cleanup/reconciliation, затем отдельный
+declared safe-int64. Далее native civil Date/outside-safe и J/E/F остаток.
+No Save/cold/native output bytes/candidate/CLI proof и no unknown-effect replay.
+
 ### E: native safe-int64 fixed operator — подготовлен — 2026-09-30
 
 Frozen child `0be6a698c1235635426a971e63e5fcfb5fadc2a3` добавляет только fixed native integer-safe Code/declared
