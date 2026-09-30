@@ -151,7 +151,7 @@ for(const fault of ['ok','existing','open','not-ready','foreign-path','binding',
   const observed={...f.observed,package_name:fault==='metadata'?'other':'saved'};
   const packageNode={};
   const env={coldReader:true,existingLifecycle:fault==='existing'?'code':null,existingInputVariant:null,publicSourceCaseId:null,
-    publicSchemaRefusalCaseId:null,publicWizardRefusalCaseId:null,publicStopCaseId:null,publicCancelResumeCaseId:null,
+    publicSchemaRefusalCaseId:null,publicWizardRefusalCaseId:null,publicStopCaseId:null,publicCancelResumeCaseId:null,publicLostReplyCaseId:null,
     address:{origin:'http://logi-test-plan.bg.local'},redactor:createRedactor(),managedCloseUncertain:false,
     report,config:{url:'http://logi-test-plan.bg.local/app/',username:'jsteach'},options:{'--package':path},
     batchDeadline:deadline,directory:'/private/evidence',Math,Date,Error,JSON,Function,
