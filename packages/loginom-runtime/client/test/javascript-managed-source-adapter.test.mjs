@@ -15,6 +15,7 @@ const task = {operation_id: 'managed-js-1', owner: node, workflow_ref: prepared.
   prepared: {...prepared, node}, allowDeactivation: true};
 
 function fixture({closeFails = false, pageTransientOnce = false, wrongType = false,
+  settingsAckChanged = false,
   generationFalse = false, generationFails = false, declaredFails = false, doneFails = false, graphTransientOnce = false, graphOwnerChanged = false} = {}) {
   const calls = [], events = [];
   let pageReads = 0, graphReads = 0, codeNextSent = false;
@@ -61,7 +62,11 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     if (code === 'dispose') return {disposed: true};
     throw Error('Unexpected browser code');
   };
-  const record = async event => {events.push(structuredClone(event)); return event;};
+  const record = async event => {
+    events.push(structuredClone(event));
+    return settingsAckChanged && event.phase === 'javascript_managed_source_settings_observed'
+      ? {...event, settings_sha256: '0'.repeat(64)} : event;
+  };
   const sourceAdapter = async () => createJavascriptManagedSourceAdapter({page: {}, prepared, node, uiEpoch: 9,
     deadline, targetOrigin: 'http://logi-test-plan.bg.local', execute, record,
     receiptOptions: () => ({}), wait: async () => {}, channel: () => ({observe:async()=>{
@@ -95,6 +100,30 @@ test('managed source adapter refuses owner drift before any UI action', async ()
   const adapter = await f.sourceAdapter();
   await assert.rejects(() => adapter.open({owner: {...owner, ui_epoch: 10}, deadline}), /owner changed/);
   assert.deepEqual(f.calls, []);
+});
+
+test('private settings observation records owned bounded semantics without source', async () => {
+  const f = fixture(), adapter = await f.sourceAdapter();
+  const handle = await adapter.open({owner, deadline});
+  const events = f.events.filter(event => event.phase === 'javascript_managed_source_settings_observed');
+  assert.equal(events.length, 1);
+  assert.deepEqual(events[0].owner, owner);
+  assert.deepEqual(events[0].settings, handle.settings);
+  assert.equal(events[0].schema_mode, 'preserve');
+  assert.equal(events[0].effect_possible, false);
+  assert.match(events[0].settings_sha256, /^[a-f0-9]{64}$/);
+  assert.equal(JSON.stringify(events[0]).includes(source), false);
+  assert.equal(JSON.stringify(events[0]).includes('volatile'), false);
+  await adapter.discard(handle, {owner, deadline});
+});
+
+test('changed settings ACK stops before Next and forbids reopening unknown wizard', async () => {
+  const f = fixture({settingsAckChanged: true}), adapter = await f.sourceAdapter();
+  await assert.rejects(() => adapter.open({owner, deadline}), /settings journal ACK differs/);
+  assert.equal(f.calls.includes('next'), false);
+  assert.equal(adapter.uncertain, true);
+  await assert.rejects(() => adapter.open({owner, deadline}), /owner changed/);
+  assert.equal(f.calls.filter(call => call === 'open').length, 1);
 });
 
 test('existing non-JavaScript graph type refuses before Setting', async () => {
