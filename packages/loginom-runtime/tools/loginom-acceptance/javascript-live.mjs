@@ -79,7 +79,7 @@ import {runJavascriptStopProbe} from './javascript-stop-probe.mjs';
 import {javascriptPublicTypedIds,javascriptPublicCodeProbe,runJavascriptPublicCodeLive} from './javascript-public-code-live.mjs';
 import {runJavascriptPublicExistingLive} from './javascript-public-existing-live.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null,publicStopCaseId=null}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null,publicStopCaseId=null,publicCancelResumeCaseId=null}={}) {
 process.umask(0o077);
 if(publicProbeId!==null&&(!javascriptPublicTypedIds.includes(publicProbeId)||coldReader||packageFile||batchCases!==null
   ||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null||existingLifecycle!==null))
@@ -98,6 +98,9 @@ if(publicWizardRefusalCaseId!==null&&(publicSourceCaseId!==null||publicSchemaRef
 if(publicStopCaseId!==null&&(publicStopCaseId!=='stop-code'||existingLifecycle!=='code'||existingInputVariant!==null
   ||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null||publicWizardRefusalCaseId!==null))
   throw Error('Public Stop requires its separate fixed saved Code entrypoint');
+if(publicCancelResumeCaseId!==null&&(publicCancelResumeCaseId!=='cancel-resume-code'||existingLifecycle!=='code'||existingInputVariant!==null
+  ||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null||publicWizardRefusalCaseId!==null||publicStopCaseId!==null))
+  throw Error('Public cancel/resume requires its separate fixed saved Code entrypoint');
 if(existingInputVariant!==null&&(existingLifecycle===null||!['changed','reordered'].includes(existingInputVariant)))
   throw Error('Existing input freshness requires its assigned lifecycle and fixed variant');
 if(coldReader&&(batchCases!==null||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null))throw Error('Cold reader requires its separate private entrypoint');
@@ -1907,7 +1910,7 @@ try {
         onPending:value=>{managedCloseUncertain=value;},schemaMode:existingLifecycle,
         graph:existingInputVariant===null?graph:await executionRuntime.graph(),
         inputVariant:existingInputVariant??'base',sourceCaseId:publicSourceCaseId,schemaRefusalCaseId:publicSchemaRefusalCaseId,
-        wizardRefusalCaseId:publicWizardRefusalCaseId,stopCaseId:publicStopCaseId,readGraph:()=>executionRuntime.graph()});
+        wizardRefusalCaseId:publicWizardRefusalCaseId,stopCaseId:publicStopCaseId,cancelResumeCaseId:publicCancelResumeCaseId,readGraph:()=>executionRuntime.graph()});
       if(existingInputVariant!==null){report.explicit_execution_limit=3;
         report.scope='isolated E existing input freshness: one import and two JavaScript Execute; fixed '+existingInputVariant;}
       report.public_existing.graph_after=await executionRuntime.graph();await save();

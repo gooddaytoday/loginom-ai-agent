@@ -17,6 +17,7 @@ import {decodeTableOutput} from './table-output-values.mjs';
 import {validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
 import {javascriptExistingLifecycleBaseline} from './javascript-existing-lifecycle.mjs';
 import {admitJavascriptExistingSchema} from './javascript-existing-schema-refusal.mjs';
+import {javascriptExecutionWaitContext} from './javascript-execution-continuation.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
@@ -63,7 +64,7 @@ export function javascriptCodeReadback({node,phases}) {
 export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redactor}) {
   need(targetBuild==='7.4.2'&&typeof targetOrigin==='string'&&typeof redactor?.text==='function'
     &&typeof redactor?.redact==='function','JavaScript Code runtime dependencies unavailable');
-  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v3',modes:['script'],
+  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v4',modes:['script'],
     parameter_schema:javascriptParametersSchema,output_wizard:'separate',materialize_output:true,fullUiOutput:true,
     validate:validateJavascriptCodeRequest,configure:(ctx,parameters,drivers)=>drivers.configureJavascript(ctx,parameters),
     configurationReadback:javascriptCodeReadback}]]);
@@ -140,7 +141,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         &&(configured?.phase==='configured'||configured?.phase==='admitted'
           &&configured.kind==='existing'&&configured.intent==='preserve'),
         'JavaScript source commit must precede execution');
-      executionDriver=createNodeExecutionProcedure(channel,ctx.node,{allowDeactivate:true,verifyFailedChild:true});
+      executionDriver=createNodeExecutionProcedure(channel,ctx.node,{allowDeactivate:true,verifyFailedChild:true,retainReadWait:true});
       // Retain the owned console before execution begins. Opening it during
       // a long JavaScript execution can lose the native Stop target to redraws.
       try{await executionDriver.prepare({keepConsoleOpen:true});}
@@ -319,7 +320,18 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           evidence_ref:ctx.receipt_id,ports:[{port:0,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data}],
           table_creation:table,format_restoration:restoration,workflow_return:returned});
       },
-      verifyContinuation:async()=>false,
+      async verifyContinuation(state,{signal:nextSignal}) {
+        const ctx=javascriptExecutionWaitContext(state,{operation,owner,expected,configured,committed,inputMapping,outputMapping,now:now()});
+        if(!ctx||!executionDriver)return false;
+        enter({...ctx,signal:nextSignal});
+        const native_execution=await executionDriver.verifyReadWaitContinuation(state.execution_wait);
+        const proof={phase:'javascript_execution_wait_continuation_verified',operation_id:operation.id,
+          node:ctx.node,execution_id:ctx.execution.execution_id,deadline:ctx.deadline,
+          source_sha256:expected.source_sha256,settings_sha256:configured.settings_sha256,native_execution};
+        const ack=await onRecord(structuredClone(proof));
+        need(Object.keys(proof).every(key=>same(ack?.[key],proof[key])),'JavaScript execution continuation ACK differs');
+        return true;
+      },
     };
   };
   return {nodeApplyHandlers,nodeApplyDriverFactory};

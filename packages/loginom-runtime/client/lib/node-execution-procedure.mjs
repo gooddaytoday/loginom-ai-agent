@@ -1,5 +1,5 @@
 import {NodeReadinessTimeout} from './node-procedure.mjs';
-import {captureExecutionBaseline,identifyNewExecution,verifyCompletedExecution,verifyFailedExecution,selectFailedExecutionChild,verifyFailedChildExecution,selectExecutionChild,expectedExecutionStopProof,verifyCancelledExecution} from './node-execution-evidence.mjs';
+import {captureExecutionBaseline,identifyNewExecution,verifyCompletedExecution,verifyFailedExecution,selectFailedExecutionChild,verifyFailedChildExecution,selectExecutionChild,expectedExecutionStopProof,verifyCancelledExecution,verifyExecutionReadWait} from './node-execution-evidence.mjs';
 
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,message)=>{requireValue(xs.length===1,message);return xs[0];};
@@ -76,8 +76,8 @@ export async function revealExecutionControl(channel,node,initial,process,tid,ve
   throw new Error('Process reveal exceeded bounded scroll steps');
 }
 
-export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false,verifyFailedChild=false}={}) {
-  let baseline,execution,stopPromise,launchAttempted=false,deactivationAttempted=false,failedChildAttempted=false;
+export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false,verifyFailedChild=false,retainReadWait=false}={}) {
+  let baseline,execution,stopPromise,readWaitBinding,launchAttempted=false,deactivationAttempted=false,failedChildAttempted=false;
   const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,...extra});
   const control=(s,tid,verb='click')=>{const current=typeof tid==='function'?tid(s):tid;
     return typeof current==='string'&&current.length?s.ui.elements.filter(e=>consoleTid(e.tid,current)&&e.allowed_actions.includes(verb)):[];};
@@ -256,6 +256,19 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       })();
       return stopPromise;
     },
+    async verifyReadWaitContinuation(proof) {
+      requireValue(retainReadWait&&execution&&readWaitBinding&&!stopPromise&&proof?.read_only===true
+        &&proof.cleanup_complete===true&&proof.execution_id===execution.execution_id
+        &&JSON.stringify(proof.native_execution)===JSON.stringify(readWaitBinding),
+      'An owned read wait pause is required for continuation');
+      const snapshot=await observe('same native execution before read wait continuation',s=>{
+        requireValue(s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
+          &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k]),
+        'Read wait prepared node changed');
+        verifyExecutionReadWait(execution,s.node_processes,readWaitBinding);return true;
+      });
+      return verifyExecutionReadWait(execution,snapshot.node_processes,readWaitBinding);
+    },
     async waitCompleted({signal,stopSignal}={}) {
       requireValue(execution,'An identified execution is required');
       let s;
@@ -271,6 +284,11 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
               const group=s.node_processes.processes.find(p=>p.parent_id===null&&p.process_id===execution.group_id
                 &&p.record_id===execution.group_record_id);
               requireValue(group,'Execution group replaced while waiting');
+              // A dependency can still be running before our child exists.
+              // No resume proof exists until that child's native owner appears.
+              if(retainReadWait&&(readWaitBinding||s.node_processes.processes.some(p=>p.parent_id===execution.group_id
+                &&p.owner?.verified===true&&p.owner.node_id===node.node_id&&p.owner.source==='native_process_model_identity')))
+                readWaitBinding=verifyExecutionReadWait(execution,s.node_processes,readWaitBinding);
               if(group.state==='completed'&&group.error===false)return true;
               if(group.progress_state?.state==='failed') {verifyFailedExecution(execution,s.node_processes);return true;}
               if(group.progress_state?.verified===true&&group.progress_state.terminal===true)
@@ -283,10 +301,10 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         } catch(error) {
           // Only this loop is read-only. Once ownership/console gestures begin,
           // interruption must retain an unresolved phase until reconciled.
-          if(signal?.aborted&&error===signal.reason&&!stopSignal?.aborted) {
+          if(signal?.aborted&&error===signal.reason&&!stopSignal?.aborted&&(!retainReadWait||readWaitBinding)) {
             const interrupted=new Error(String(error.message??error));
             interrupted.nodeExecutionWaitPause={execution_id:execution.execution_id,
-              read_only:true,cleanup_complete:true};
+              read_only:true,cleanup_complete:true,...(retainReadWait?{native_execution:structuredClone(readWaitBinding)}:{})};
             throw interrupted;
           }
           if(!(error instanceof NodeReadinessTimeout)||error.condition!==condition)throw error;
