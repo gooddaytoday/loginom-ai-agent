@@ -20,9 +20,9 @@ export function verifyJavascriptPublicStopped(job,node) {
 
 // Only status/wait repeats. Unknown Stop reply or journal ACK never dispatches
 // another Stop; the original public worker and its mutation gate remain owner.
-export async function stopJavascriptPublicExecution({runtime,request,node,record,onProgress,deadline,now=Date.now}) {
+export async function stopJavascriptPublicExecution({runtime,request,node,record,onProgress,deadline,initialJob,now=Date.now}) {
   need(Number.isSafeInteger(deadline)&&now()<deadline,'Public finite Stop original deadline expired');
-  let job=await dispatchNodeApi(runtime,'dock_node_apply',request),requested=false,execution_id;
+  let job=initialJob??await dispatchNodeApi(runtime,'dock_node_apply',request),requested=false,execution_id;
   while(job.state==='running') {
     need(job.operation_id===request.operation_id,'Public Stop worker identity changed');
     need(now()<deadline,'Public finite Stop original deadline expired');

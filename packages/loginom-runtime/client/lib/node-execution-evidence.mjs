@@ -123,6 +123,28 @@ export function selectExecutionChild(execution,snapshot) {
   return structuredClone(owned[0]);
 }
 
+// A read-only pause may outlive a running child. Bind native records rather
+// than its progress state; completion still requires the usual Show Node proof.
+export function verifyExecutionReadWait(execution,snapshot,expected) {
+  const ps=inventory(snapshot,execution.node,execution.root_id);
+  requireValue(snapshot.node_context.surface==='graph'
+    &&execution.execution_id===execution.node.document_id+':'+execution.root_id+':'+execution.group_id,
+  'Read wait execution graph identity changed');
+  const group=ps.find(p=>p.parent_id===null&&p.process_id===execution.group_id&&p.record_id===execution.group_record_id);
+  const child=selectExecutionChild(execution,snapshot);
+  requireValue(child.owner?.verified===true&&child.owner.node_id===execution.node.node_id
+    &&child.owner.source==='native_process_model_identity','Read wait requires the native-owned child');
+  for(const item of [group,child])requireValue(item?.progress_state?.verified===true
+    &&item.progress_state.source==='native_progress_record'
+    &&['running','not_responding','completed','failed'].includes(item.progress_state.state),
+  'Read wait native progress state is unverified or cancelled');
+  const binding={execution_id:execution.execution_id,node:structuredClone(execution.node),root_id:execution.root_id,
+    group_id:group.process_id,group_record_id:group.record_id,process_id:child.process_id,process_record_id:child.record_id,
+    ownership_source:'native_process_model_identity'};
+  requireValue(!expected||JSON.stringify(binding)===JSON.stringify(expected),'Read wait native records changed');
+  return binding;
+}
+
 // Freeze the exact cancellable child before opening its menu. A matching
 // caption or a running group is not evidence that this is the requested node.
 // Return an expected proof to compare with the native menu; this is not itself
