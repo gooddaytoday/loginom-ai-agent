@@ -45,6 +45,35 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: declared primitive support — подготовка — 2026-09-30
+
+Child `8a3c25273b` расширяет owned declared picker на Boolean/real/datetime
+при default data kinds; integer/string сохраняют прежний путь. Значения native
+enum1/2/3/4/5 сверены с schema reader, точные labels — с существующими адаптерами
+Loginom; каждый живой picker обязан независимо подтвердить value/label до
+выбора. Owner/deadline/one-shot и unknown-effect запреты сохранены. Non-default
+DataKind и variant отклоняются до Setting. Operator-only девять declared
+counterparts используют прежние G5 bodies без единственного AssignColumns;
+expected values не получены из live и не менялись. Продуктовый catalog/knowledge
+не зарегистрирован.
+
+Actual admission 18 Code/declared requests прошёл; полный JS operator suite
+**17913 PASS / 0 FAIL**, exec8166/exit0, log SHA256
+`4d90fa9938869e6318eb6af8043a245a5c9b525da937d152b97a4fc74e1d4500`.
+Первый client suite завершился exit1: прежние tests ожидали real refusal.
+Фикстуры исправлены в `8a3c25273b`/`d4898cac03`; повторный полный client suite
+на `d4898cac03` выполняется, PASS пока не установлен. Отдельный serialized
+production picker admission проверяет все пять value/label и отказ preflight
+до эффекта. Private oracle/auditor v4 подготовлены до live: SHA256
+`20e0f1d0330bd624a27f8b603c52ee6ed5a2641ed2ddbf3587d7cbc7411a011e` /
+`51fed2d8741f93d5b8527d8c69c6239b281a4ff0cdd8df55224da35a6714b750`.
+
+Браузера пока нет, profile355 closed_verified, active_exec=null. После полного
+client PASS — fresh profile356, ordinary headed declared String NULL/empty,
+затем Boolean/real/safe integer/civil Date и cardinality/empty input. Каждый
+run требует independent audit и package/logout/browser/process cleanup;
+Save/cold/native-input roundtrip и candidate/CLI этими кейсами не доказываются.
+
 ### E: public empty input — принят; следующий declared — 2026-09-30
 
 Empty-input01/profile355/child `64221b01c8`, exec32733/exit0 — **OBSERVED**,
