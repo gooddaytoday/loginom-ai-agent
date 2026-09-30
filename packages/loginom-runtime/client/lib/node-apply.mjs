@@ -1,5 +1,6 @@
 import {createHash} from 'node:crypto';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
+import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
 import {NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
 import {NODE_READ_MODE,nodeReadHandler} from './node-read-contract.mjs';
 
@@ -232,7 +233,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&replacementClosed.draft_discarded===true&&replacementClosed.settings_applied===false
         &&replacementClosed.node_context?.verified===true
         &&['document_id','workflow_id','node_id'].every(k=>replacementClosed.node_context[k]===state.node?.[k]);
-      if((name==='target'&&['reform_mapped_preflight_completed','missing_values_preflight_completed'].includes(refusal?.verification)||replacementRefusal)
+      if((name==='target'&&(['reform_mapped_preflight_completed','missing_values_preflight_completed'].includes(refusal?.verification)
+          ||verifiedJavascriptExistingSchemaRefusal(refusal,request))||replacementRefusal)
         &&refusal?.phase===name&&refusal.status==='FAILED'
         &&refusal.effect_possible===true&&refusal.cleanup_complete===true&&refusal.settings_unchanged===true
       ){

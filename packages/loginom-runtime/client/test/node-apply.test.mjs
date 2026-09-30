@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {createTabularTransformNodeSupport} from '../lib/calculator-node.mjs';
 import {NodeProcedureStepError} from '../lib/node-procedure.mjs';
+import {javascriptSourceSettingsDigest} from '../lib/javascript-source-admission.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 const request=()=>({operation_id:'apply1',contract_revision:'1.0.0',document_id:'doc',
   workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]},
@@ -530,4 +531,32 @@ test('materialization requires explicit Execute and cannot be enabled for anothe
  const other=separateFixture();other.handlers.get('imports.text').materialize_output=true;
  other.drivers.materializeOutput=f.drivers.materializeOutput;
  await assert.rejects(()=>other.run(),/materialization requires/);assert.deepEqual(other.calls,[]);
+});
+
+for(const failure of [null,'owner','operation','mode','settings','digest','close','mutation','execute','verification','journal','foreign_type'])test('owned JavaScript mode mismatch refuses safely '+failure,async()=>{
+ const f=fixture({failJournal:failure==='journal'?'node_phase_refused':undefined}),p=request();p.target={kind:'existing',type:'programming.javascript',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node1'}};p.mode='script';p.parameters={schema_mode:'declared'};
+ f.handlers.set('programming.javascript',{...f.handlers.get('imports.text'),modes:['script']});
+ f.drivers.prepareTarget=async()=>{
+  const e=Error('JavaScript existing lifecycle preserves observed schema');
+  e.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'javascript_existing_schema_mode_refused',proof:{
+   node:p.target.ref,owner:{...p.target.ref,operation_id:p.operation_id,ui_epoch:1},admission_id:'00000000-0000-4000-8000-000000000000',observed_schema_mode:'code',requested_schema_mode:'declared',
+   source_identity:{source_sha256:'a'.repeat(64),source_utf8_bytes:0,source_lf_lines:1},settings:{generation:true,grids:[]},settings_sha256:javascriptSourceSettingsDigest({generation:true,grids:[]}),
+   source_read_discard_verified:true,settings_unchanged:true,editor_mutation_started:false,explicit_execute_requested:false}};
+  const proof=e.nodePhaseRefusal.proof;
+  if(failure==='owner')proof.owner.node_id='foreign';
+  if(failure==='operation')proof.owner.operation_id='foreign';
+  if(failure==='mode')proof.requested_schema_mode='code';
+  if(failure==='settings')proof.settings.generation=false;
+  if(failure==='digest')proof.source_identity.source_sha256='invalid';
+  if(failure==='close')proof.source_read_discard_verified=false;
+  if(failure==='mutation')proof.editor_mutation_started=true;
+  if(failure==='execute')proof.explicit_execute_requested=true;
+  if(failure==='verification')e.nodePhaseRefusal.verification='other';
+  throw e;
+ };
+ if(failure==='foreign_type'){p.target.type='imports.text';p.mode='delimited';}
+ const r=await f.run(p);
+ if(failure){assert.equal(r.status,'AMBIGUOUS');assert.equal(r.cleanup_complete,false);assert.equal(r.pending_phase,'target');return;}
+ assert.equal(r.status,'FAILED');assert.equal(r.cleanup_complete,true);assert.equal(r.pending_phase,null);
+ assert.equal(r.effect_possible,true);assert.equal(r.execution.status,'not_requested');assert.deepEqual(f.calls,['source']);
 });
