@@ -46,6 +46,40 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public native outside-safe — Code выполняется — 2026-09-30
+
+Frozen child `81b4bfef745b2ce50c835e1dd0f926f3733e9dd4`: отдельные pinned
+`g5-native-integer-outside-safe` и declared counterpart. Прежний native CSV58bytes
+SHA256 `606534ae7c03a4cc31c963a14b3029576e2f7867411d27347ab9548ccf8aa1f6`,
+3 input values -9007199254740992/9007199254740992/9007199254740993.
+Input guard требует before-JS native bytes/owner/releases и точные decimal
+strings. Public output проверяется отдельным bounded characterization contract:
+Integer Value3×1, полный unfiltered read, exact decimal strings/signed-int64,
+per-row input/output/unchanged/delta. expected output отсутствует; gate_passed,
+exact_pass и general_integer_precision_guarantee всегда false, даже если
+отдельные values совпали. Generic characterizations в entrypoint не допущены;
+остальные fixed cases сохраняют прежний exact oracle.
+
+Actual admission/output/addressed tests01: 432PASS/0FAIL, exec53073/exit0.
+Full affected operator suite01: 18025PASS/0FAIL, exec76496/exit0, SHA256
+`42b9347612c3256e7858f8eb5bf1a7054cb137efbaa4516ba045a4945ae4bc32`.
+Client runtime не менялся; его прежний suite не повторялся. Independent Python
+native input section принял retained genuine outside-safe before-JS baseline,
+source-only, без нового live credit. Независимые authored source hashes
+сверены с descriptors. До live private oracle SHA256
+`43f023b12f491b538f087fbad2689f83958be11d28aa70207223dffd21ba453b`,
+auditor SHA256 `02fac9e594655aefe82e119c71d3b89c6862fd19f0307f67ad703f06ea4e2107`;
+аудитор независимо декодирует signed native input bytes и вычисляет
+characterization из actual typed output/decimal integers, без output prediction.
+Проверяет lifecycle/source/metadata/graph/Views и cleanup; no Save/cold/output
+native bytes/candidate/CLI.
+
+Ordinary headed Code01/fresh profile375, exec30088 зарегистрирован под lock,
+evidence `e-public-types-native-outside-safe-code-01`; результат не установлен.
+Наблюдать только этот handle, затем independent audit/cleanup/reconciliation;
+отдельный declared run после успешной проверки. Затем native cardinality и
+точный остаток J06–J08/E/J/F. Registry readiness не повышена.
+
 ### E: public native civil Date2/2 принят — 2026-09-30
 
 Code373/exec83222 и declared374/exec35944 на frozen child `7d43cea036`
