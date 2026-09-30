@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readJavascriptDeclaredColumns} from '../lib/javascript-declared-schema.mjs';
+import {readJavascriptDeclaredColumns,readObservedJavascriptDeclaredColumns} from '../lib/javascript-declared-schema.mjs';
 
 const columns=[
   {name:'RowID',label:'RowID',type:'integer',data_kind:'Непрерывный',usage:'Не задано'},
@@ -21,6 +21,18 @@ test('declared readback keeps observed default usage separate from actual usage'
   assert.equal(result.length,4);
   assert.deepEqual(result[2],{index:2,...columns[2],usage_type:0,default_usage_type:4,required:false});
   assert.equal(result[0].default_usage_type,0);
+});
+
+test('existing declarations are derived from complete native metadata including default roles',()=>{
+  assert.deepEqual(readObservedJavascriptDeclaredColumns(schema),readJavascriptDeclaredColumns(schema,columns));
+  for(const change of [s=>s.inventory_complete=false,s=>s.grids[1].total=3,
+    s=>s.grids[1].fields[0].DataType=99,s=>s.grids[1].fields[0].DataKind=99,
+    s=>s.grids[1].fields[0].DefaultUsageType=99,s=>delete s.grids[1].fields[0].DefaultUsageType,
+    s=>s.grids[1].fields[0].Required=undefined,s=>s.grids[1].fields.reverse(),
+    s=>s.grids[1].fields[1].Name='RowID',s=>s.grids[1].fields=[]]) {
+    const value=structuredClone(schema);change(value);
+    assert.throws(()=>readObservedJavascriptDeclaredColumns(value));
+  }
 });
 
 test('declared readback refuses partial, foreign, reordered and mismatched native metadata',()=>{

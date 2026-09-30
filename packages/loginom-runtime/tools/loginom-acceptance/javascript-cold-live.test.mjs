@@ -141,7 +141,7 @@ for(const fault of ['ok','ancestor','icon','guid','tid','duplicate'])test('seria
   if(fault!=='ok')assert.throws(call);
 });
 
-for(const fault of ['ok','open','not-ready','foreign-path','binding','metadata','discovery'])test('actual cold open handoff: '+fault,async()=>{
+for(const fault of ['ok','existing','open','not-ready','foreign-path','binding','metadata','discovery'])test('actual cold open handoff: '+fault,async()=>{
   const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
   const begin=source.indexOf("  if(coldReader){\n    report.stage='cold-open-package'"),end=source.indexOf("  if (options['--create-node']",begin);
   assert.ok(begin>0&&end>begin);
@@ -150,7 +150,9 @@ for(const fault of ['ok','open','not-ready','foreign-path','binding','metadata',
     package_ref:{name:'saved',persisted:true,path:fault==='foreign-path'?path.replace('/jsteach/','/other/'):path}};
   const observed={...f.observed,package_name:fault==='metadata'?'other':'saved'};
   const packageNode={};
-  const env={coldReader:true,report,config:{url:'http://logi-test-plan.bg.local/app/',username:'jsteach'},options:{'--package':path},
+  const env={coldReader:true,existingLifecycle:fault==='existing'?'code':null,
+    address:{origin:'http://logi-test-plan.bg.local'},redactor:createRedactor(),managedCloseUncertain:false,
+    report,config:{url:'http://logi-test-plan.bg.local/app/',username:'jsteach'},options:{'--package':path},
     batchDeadline:deadline,directory:'/private/evidence',Math,Date,Error,JSON,Function,
     executionPrepared:null,packageHandle:null,owner:null,executionRuntime:null,executionNode:null,wizardBinding:null,coldOpenPending:false,
     guard:async()=>calls.push('guard'),remainingBatch:()=>deadline-Date.now(),waitGraphReady:async()=>{},save:async()=>{},
@@ -170,10 +172,21 @@ for(const fault of ['ok','open','not-ready','foreign-path','binding','metadata',
       return {graph:async()=>f.graph};},
     javascriptColdNodes:(...args)=>{calls.push('discover');if(fault==='discovery')throw Error('Wrong graph');return javascriptColdNodes(...args);},
     runColdRead:async()=>{calls.push('read');},
+    runJavascriptPublicExistingLive:async args=>{
+      calls.push('existing-read');assert.equal(args.schemaMode,'code');
+      same(args.node,{document_id:'doc',workflow_id:'workflow',node_id:'js'});
+      assert.equal(args.prepared,env.executionPrepared);assert.equal(args.graph,f.graph);
+      assert.equal(args.deadline,deadline);args.onPending(true);assert.equal(env.managedCloseUncertain,true);
+      args.onPending(false);report.public_existing={status:'OBSERVED'};
+    },
   };
   const realm=vm.createContext(env);vm.runInContext('globalThis.run=async()=>{'+source.slice(begin,end)+'};',realm);
-  if(fault==='ok'){await env.run();assert.equal(env.coldOpenPending,false);assert.equal(calls.at(-1),'read');assert.equal(env.packageHandle,packageNode);}
-  if(fault!=='ok'){await assert.rejects(env.run());assert.equal(calls.includes('read'),false);
+  if(['ok','existing'].includes(fault)){
+    await env.run();assert.equal(env.coldOpenPending,false);assert.equal(calls.at(-1),fault==='ok'?'read':'existing-read');
+    assert.equal(env.packageHandle,packageNode);
+    if(fault==='existing'){assert.equal(calls.includes('read'),false);assert.equal(env.managedCloseUncertain,false);assert.equal(report.public_existing.graph_after,f.graph);}
+  }
+  if(!['ok','existing'].includes(fault)){await assert.rejects(env.run());assert.equal(calls.includes('read'),false);
     assert.equal(env.coldOpenPending,fault!=='discovery');}
 });
 

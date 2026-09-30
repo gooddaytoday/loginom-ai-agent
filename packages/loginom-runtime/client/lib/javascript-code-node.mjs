@@ -12,6 +12,7 @@ import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepare
 import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
 import {validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
+import {javascriptExistingLifecycleBaseline} from './javascript-existing-lifecycle.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
@@ -21,9 +22,15 @@ const verified=(value={})=>({verified:true,cleanup_complete:true,effect_possible
 // candidate delivery are complete. No operator fixture or expected data enters it.
 export function validateJavascriptCodeRequest(parameters,mode,request) {
   validateJavascriptParameters(parameters,mode,request);
-  need(request.target.kind==='new'&&['code','declared'].includes(parameters.schema_mode)&&request.finish==='execute'
-    &&request.mappings.length===0,'JavaScript lifecycle requires a new script node, default mappings and Execute');
-  if(parameters.schema_mode==='declared')validateJavascriptDeclaredPrimitiveColumns(parameters.columns);
+  need(request.finish==='execute'
+    &&request.mappings.length===0,'JavaScript lifecycle requires preserved port mappings and explicit Execute');
+  if(request.target.kind==='new'){
+    need(['code','declared'].includes(parameters.schema_mode),'JavaScript new schema mode unavailable');
+    if(parameters.schema_mode==='declared')validateJavascriptDeclaredPrimitiveColumns(parameters.columns);
+    return parameters;
+  }
+  need(request.inputs.length===0&&parameters.columns===undefined,
+    'JavaScript existing lifecycle preserves inputs and declared columns');
   return parameters;
 }
 
@@ -52,17 +59,17 @@ export function javascriptCodeReadback({node,phases}) {
 export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redactor}) {
   need(targetBuild==='7.4.2'&&typeof targetOrigin==='string'&&typeof redactor?.text==='function'
     &&typeof redactor?.redact==='function','JavaScript Code runtime dependencies unavailable');
-  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v2',modes:['script'],
+  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v3',modes:['script'],
     parameter_schema:javascriptParametersSchema,output_wizard:'separate',materialize_output:true,fullUiOutput:true,
     validate:validateJavascriptCodeRequest,configure:(ctx,parameters,drivers)=>drivers.configureJavascript(ctx,parameters),
     configurationReadback:javascriptCodeReadback}]]);
   const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions})=>{
     const request=operation.parameters;
     const initialOwner={document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,
-      node_id:null,operation_id:operation.id,ui_epoch:Date.now()};
-    const expected=javascriptSourceIdentity(request.parameters.source_text);
+      node_id:request.target.kind==='existing'?request.target.ref.node_id:null,operation_id:operation.id,ui_epoch:Date.now()};
+    let expected=request.parameters.source_text===undefined?null:javascriptSourceIdentity(request.parameters.source_text);
     let owner,channel,signal,adapter,handle,admission,admitted,configured,committed,
-      executionDriver,executionReceipt,inputMapping,outputMapping;
+      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline;
     const enter=ctx=>{
       signal=ctx.signal;signal?.throwIfAborted();operation.deadline=ctx.deadline;
       if(ctx.node){
@@ -79,10 +86,18 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
     };
     const sourceAdapter=(boundOwner,deadline)=>{
       need(owner&&same(boundOwner,owner),'JavaScript source admission owner changed');
-      return createJavascriptManagedSourceAdapter({page:{},
+      const selected=createJavascriptManagedSourceAdapter({page:{},
         prepared:{document_id:owner.document_id,workflow_ref:request.workflow_ref,node:nodeRef(owner)},node:nodeRef(owner),
         uiEpoch:owner.ui_epoch,deadline,targetOrigin,execute,record:onRecord,receiptOptions,
         channel:remaining=>{operation.deadline=remaining;return channel;},openingBudgetMs:180000});
+      const open=selected.open.bind(selected);
+      selected.open=async input=>{
+        const opened=await open(input);
+        sourceSnapshot={owner:{...input.owner},settings:structuredClone(opened.settings),
+          schema:structuredClone(opened.schema)};
+        return opened;
+      };
+      return selected;
     };
     const policyAdmission=(kind,boundOwner,deadline)=>createJavascriptSourceAdmission({kind,owner:boundOwner,
       deadline,sourceAdapter:current=>sourceAdapter(current,deadline),redactor,record:onRecord});
@@ -117,7 +132,9 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       return mapping;
     };
     const launch=async ctx=>{
-      enter(ctx);need(committed?.owned_done_settled===true&&configured?.phase==='configured',
+      enter(ctx);need(committed?.owned_done_settled===true
+        &&(configured?.phase==='configured'||configured?.phase==='admitted'
+          &&configured.kind==='existing'&&configured.intent==='preserve'),
         'JavaScript source commit must precede execution');
       executionDriver=createNodeExecutionProcedure(channel,ctx.node,{allowDeactivate:true,verifyFailedChild:true});
       try{await executionDriver.prepare();}
@@ -136,11 +153,23 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
     return {
       verifySource:async parameters=>{
         validateJavascriptCodeRequest(parameters,request.mode,request);
-        return verified({source_sha256:javascriptSourceIdentity(parameters.source_text).source_sha256});
+        return verified(parameters.source_text===undefined?{}:
+          {source_sha256:javascriptSourceIdentity(parameters.source_text).source_sha256});
       },
       async beforeTarget(ctx){
-        enter(ctx);admission=policyAdmission('new',initialOwner,ctx.deadline);
-        admitted=await admission.admit({source_text:request.parameters.source_text});
+        enter(request.target.kind==='existing'?{...ctx,node:request.target.ref}:ctx);
+        admission=policyAdmission(request.target.kind,initialOwner,ctx.deadline);
+        admitted=await admission.admit(request.parameters.source_text===undefined?{}:
+          {source_text:request.parameters.source_text,
+            ...(request.target.kind==='existing'?{expected_source_sha256:request.parameters.expected_source_sha256}:{})});
+        if(request.target.kind==='existing'){
+          existingBaseline=javascriptExistingLifecycleBaseline({receipt:admitted,snapshot:sourceSnapshot,
+            parameters:request.parameters,owner});
+          expected??=admitted.effective_source;
+          need(admitted.effective_source.source_sha256===expected.source_sha256,
+            'JavaScript existing effective source admission differs');
+          return verified({effect_possible:true,source_sha256:expected.source_sha256,settings_changed:false});
+        }
         need(admitted.intent==='create'&&admitted.effective_source.source_sha256===expected.source_sha256,
           'JavaScript new source admission differs');
         return verified({source_sha256:expected.source_sha256,settings_changed:false});
@@ -160,16 +189,25 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       async openWizard(ctx){
         enter(ctx);need(admitted&&inputMapping,'JavaScript source/input admission unavailable');
         adapter=sourceAdapter(owner,ctx.deadline);handle=await adapter.open({owner,deadline:ctx.deadline,
-          schemaMode:request.parameters.schema_mode,
-          ...(request.parameters.schema_mode==='declared'?{columns:request.parameters.columns}:{})});
-        need(handle.settings.generation===(request.parameters.schema_mode==='code'),'JavaScript schema mode unconfirmed');
-        return verified({effect_possible:true,schema_mode:request.parameters.schema_mode,settings_observed:true});
+          schemaMode:existingBaseline?'preserve':request.parameters.schema_mode,
+          ...(!existingBaseline&&request.parameters.schema_mode==='declared'?{columns:request.parameters.columns}:{})});
+        const schema_mode=existingBaseline?.schema_mode??request.parameters.schema_mode;
+        need(handle.settings.generation===(schema_mode==='code'),'JavaScript schema mode unconfirmed');
+        if(existingBaseline){
+          need(javascriptSourceSettingsDigest(handle.settings)===existingBaseline.settings_sha256,
+            'JavaScript existing settings changed before source mutation');
+          if(existingBaseline.columns)handle.declaredColumns=structuredClone(existingBaseline.columns);
+        }
+        return verified({effect_possible:true,schema_mode,settings_observed:true});
       },
       async configureJavascript(ctx,parameters){
         enter(ctx);need(handle&&adapter,'JavaScript owned Code editor unavailable');
         const baseline=await adapter.read(handle,{owner,deadline:ctx.deadline});
+        if(existingBaseline)need(javascriptSourceIdentity(baseline.source).source_sha256===admitted.previous_source.source_sha256,
+          'JavaScript existing source changed before mutation');
         const written=await adapter.replace(handle,{owner,deadline:ctx.deadline,
-          expected_source_sha256:javascriptSourceIdentity(baseline.source).source_sha256,source_text:parameters.source_text});
+          expected_source_sha256:javascriptSourceIdentity(baseline.source).source_sha256,
+          source_text:parameters.source_text??baseline.source});
         need(written.draft_exact===true&&written.source_sha256===expected.source_sha256,'JavaScript draft digest differs');
         return verified({effect_possible:true,draft_source_sha256:written.source_sha256,wizard_commit_verified:false});
       },
@@ -177,15 +215,37 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         enter(ctx);need(mode==='done'&&handle&&adapter&&admission&&admitted,'JavaScript owned Done unavailable');
         const settings=javascriptSourceSettingsDigest(handle.settings);
         const declaredColumns=handle.declaredColumns;
-        configured=await admission.withMutation({receipt:admitted,owner:initialOwner},async()=>{
+        if(existingBaseline){
+          // Existing admission reopens the committed graph before mutation.
+          // Here the owned writer already holds the changed draft. As in B,
+          // commit that one-shot writer, then independently admit the actual
+          // committed source/settings before allowing an execution effect.
+          committed=await adapter.commit(handle,{owner,deadline:ctx.deadline});
+          admission=policyAdmission('existing',owner,ctx.deadline);
+          configured=await admission.admit({});
+          const after=javascriptExistingLifecycleBaseline({receipt:configured,snapshot:sourceSnapshot,
+            parameters:{schema_mode:existingBaseline.schema_mode},owner});
+          need(after.settings_sha256===existingBaseline.settings_sha256,
+            'JavaScript existing settings changed across Done');
+        }
+        if(!existingBaseline)configured=await admission.withMutation({receipt:admitted,owner:initialOwner},async()=>{
           committed=await adapter.commit(handle,{owner,deadline:ctx.deadline});
           return {owner};
         });
         need(configured.effective_source.source_sha256===expected.source_sha256&&configured.settings_sha256===settings,
           'JavaScript committed source/settings readback differs');
+        if(existingBaseline){
+          const observation={phase:'javascript_existing_source_commit_verified',operation_id:operation.id,
+            node:nodeRef(owner),previous_source_sha256:admitted.previous_source.source_sha256,
+            effective_source_sha256:configured.effective_source.source_sha256,
+            settings_sha256:configured.settings_sha256,committed_graph_owner_verified:true};
+          const saved=await onRecord(structuredClone(observation));
+          need(same(Object.fromEntries(Object.keys(observation).map(key=>[key,saved?.[key]])),observation),
+            'JavaScript existing commit journal ACK differs');
+        }
         handle=null;
         return verified({effect_possible:true,mode,settings_applied:true,execution_id:null,execution_started:null,
-          schema_mode:request.parameters.schema_mode,
+          schema_mode:existingBaseline?.schema_mode??request.parameters.schema_mode,
           ...(declaredColumns?{declared_columns:declaredColumns}:{}),
           explicit_execute_requested:false,wizard_commit_verified:true,graph_owner_verified:committed.graph_owner_verified,
           owned_done_settled:committed.owned_done_settled,source_readback_verified:true,settings_preserved:true,

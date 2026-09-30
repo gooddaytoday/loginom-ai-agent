@@ -76,19 +76,23 @@ import {openJavascriptPackageFileTab,readJavascriptPackageFile} from './javascri
 import {createJavascriptHeadedFocusX11} from './javascript-headed-focus-x11.mjs';
 import {runJavascriptStopProbe} from './javascript-stop-probe.mjs';
 import {runJavascriptPublicCodeLive} from './javascript-public-code-live.mjs';
+import {runJavascriptPublicExistingLive} from './javascript-public-existing-live.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null}={}) {
 process.umask(0o077);
+if(existingLifecycle!==null&&(!coldReader||!['code','declared'].includes(existingLifecycle)||packageFile))
+  throw Error('Existing lifecycle requires its separate assigned saved-package entrypoint');
 if(coldReader&&(batchCases!==null||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null))throw Error('Cold reader requires its separate private entrypoint');
 if(packageFile&&(coldReader||batchCases!==null||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null))throw Error('Package-file audit requires its separate private entrypoint');
 const {javascriptPersistenceCase}=persistenceMode===null?{}:await import('./javascript-persistence-cases.mjs');
 const batch=batchCases===null?null:javascriptBatchCases(batchCases);
 const persistence=persistenceMode===null?null:javascriptPersistenceCase(persistenceMode);
-const batchDeadline=coldReader||packageFile?Math.floor(performance.timeOrigin)+600000:persistence?Math.floor(performance.timeOrigin)+persistence.writer_budget_ms:nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch||args.includes('--verify-public-code-lifecycle')||args.includes('--verify-public-declared-lifecycle')?Date.now()+1800000:Infinity;
+const batchDeadline=existingLifecycle!==null?Math.floor(performance.timeOrigin)+1800000:coldReader||packageFile?Math.floor(performance.timeOrigin)+600000:persistence?Math.floor(performance.timeOrigin)+persistence.writer_budget_ms:nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch||args.includes('--verify-public-code-lifecycle')||args.includes('--verify-public-declared-lifecycle')?Date.now()+1800000:Infinity;
 let cleaning=false,cleanupDeadline=Infinity;
 const phaseDeadline=ms=>Math.min(cleaning?cleanupDeadline:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=(cleaning?cleanupDeadline:batchDeadline)-Date.now();if(ms<=0)throw Error(cleaning?'Original cleanup deadline expired':'Original batch deadline expired');return ms;};
 const usage = 'node javascript-live.mjs --config PRIVATE.json --profile ABS --browser ABS --evidence NEW_ABS [--server-version-only | --palette-only | --palette-hit-test | --create-node [--inspect-pages [--inspect-declared-editor [--inspect-usage-picker [--select-usage-option [--apply-usage-option]]] | --probe-source]] | --execution-case CASE [--managed-opening-probe --x11-no-focus [--verify-managed-source-write | --verify-managed-source-commit] | --verify-public-node-apply | --verify-public-code-lifecycle [--verify-public-code-save] | --verify-public-declared-lifecycle [--verify-public-declared-save]] | --discovery-probe ID]\nCASE: {declared,code}-sentinel-{next,done,preview,execute}, {declared,code}-table-execute, code-table-mismatch\nIsolated discovery IDs: '+javascriptDiscoveryIds.join(',');
+if(args.includes('--help')&&existingLifecycle!==null){console.log('node javascript-existing-'+existingLifecycle+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nFixed E existing source revision through public API; preserved schema, two owned Execute and full typed output; 30 minutes from process start; ordinary headed. No source/oracle input or Save.');return;}
 if(args.includes('--help')&&coldReader){console.log('node javascript-persistence-read-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nCold reader: observe actual source/settings/mappings, one fresh Execute and full output; 10 minutes from process start; headed only. No source or configuration input.');return;}
 if(args.includes('--help')&&packageFile){console.log('node javascript-package-file-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS --package EXACT_OWNED_LGP\nRead one previously saved owned package through pinned native FileDownloader; no JS Execute. Headed only.');return;}
 if(args.includes('--help')&&persistence){console.log('node javascript-persistence-'+persistenceMode+'-live.mjs --config PRIVATE.json --profile NEW_ABS --browser ABS --evidence NEW_ABS\nFixed '+persistenceMode+' writer: two source revisions, two explicit JS executions and two saves to one owned package; 30 minutes total; headed only. Cold reader runs separately.');return;}
@@ -212,7 +216,7 @@ if(batch||discoveryProbe||nativeInputOnly||nativeRoundtrip||sourceReadCycle||per
 const executionJournal=createExecutionJournal({directory,metadata:{sessionId:'javascript-g2',clientRevision:'operator-source',targetIdentity:{origin:address.origin,loginom_build:'7.4.2'}},redactor});
 const rootReport={version:1,scope:'G1 preparation',started_at:new Date().toISOString(),status:'RUNNING',stage:'login',
   ...(coldReader||persistence||packageFile?{host_process:{pid:process.pid,started_at:new Date(performance.timeOrigin).toISOString(),profile:resolve(options['--profile'])}}:{}),
-  ...(coldReader?{scope:'private G7 cold saved-package observation',original_deadline:batchDeadline,explicit_execution_limit:1,gates_closed:[]}:{}),
+  ...(coldReader?{scope:existingLifecycle===null?'private G7 cold saved-package observation':'isolated E existing saved-package lifecycle',original_deadline:batchDeadline,explicit_execution_limit:existingLifecycle===null?1:2,gates_closed:[]}:{}),
   ...(packageFile?{scope:'private G7 saved-package byte audit',original_deadline:batchDeadline,explicit_execution_limit:0,gates_closed:[]}:{}),
   ...(persistence?{persistence_mode:persistence.schema_mode,original_deadline:batchDeadline,explicit_execution_limit:2}:{}),
   node:process.versions.node,headless:false,server_os:{status:'not_observed'},storage:{status:'not_observed'},
@@ -1867,7 +1871,14 @@ try {
     const graph=await executionRuntime.graph(),nodes=javascriptColdNodes(graph,await observe(),executionPrepared);
     executionNode=nodes.node;report.owned_node=nodes.rendered;report.cold_discovery={graph,...nodes};
     wizardBinding=await page.evaluateHandle(observeJavascriptWizardBinding,{id:nodes.rendered.id,tid:nodes.rendered.tid,icon:nodes.rendered.icon_class,owned:packageHandle});
-    await save();await runColdRead();
+    await save();
+    if(existingLifecycle!==null){
+      await runJavascriptPublicExistingLive({page,prepared:executionPrepared,node:executionNode,
+        targetOrigin:address.origin,redactor,record:executionRecord,report,save,deadline:batchDeadline,
+        onPending:value=>{managedCloseUncertain=value;},schemaMode:existingLifecycle,graph});
+      report.public_existing.graph_after=await executionRuntime.graph();await save();
+    }
+    if(existingLifecycle===null)await runColdRead();
   }
   if (options['--create-node']||options['--palette-only']||options['--palette-hit-test']) {
     report.stage='create-draft';await guard();

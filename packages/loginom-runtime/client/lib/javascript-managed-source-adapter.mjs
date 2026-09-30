@@ -119,7 +119,8 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
         ?await driver.dispatchManagedJavascriptDeclared({task,columns,execute,record,receiptOptions}):null;
       if(declared)need(declared.verified===true&&declared.generation===false,
         'Managed JavaScript declared schema unconfirmed');
-      const settings = javascriptManagedSourceSettings(declared?.schema??generation?.output.schema??schema);
+      const configuredSchema = declared?.schema??generation?.output.schema??schema;
+      const settings = javascriptManagedSourceSettings(configuredSchema);
       // Private bounded metadata evidence identifies native normalization across
       // Done/reopening. It contains no script and never relaxes drift checks.
       const observed = {phase: 'javascript_managed_source_settings_observed',
@@ -134,7 +135,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       need(next?.status === 'SUCCEEDED' && next.output?.next_gesture_returned === true,
         'Managed JavaScript source Next refused');
       await codePage(task);
-      active = {task, owner: {...owner}, settings,
+      active = {task, owner: {...owner}, settings, schema: structuredClone(configuredSchema),
         ...(declared?{declaredColumns:structuredClone(declared.columns)}:{})};
       uncertain = false;
       return active;
