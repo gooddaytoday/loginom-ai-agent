@@ -62,8 +62,9 @@ test('managed Done uses one browser click and refuses replay or changed draft', 
 test('managed Done requires exact journal ACK before dispatch', async () => {
   let calls = 0;
   const execute = async () => {calls++; return calls === 1 ? point : {status: 'SUCCEEDED',
+    phase:'gesture_returned',effect_possible:true,cleanup_complete:true,error:null,action_revision:'1',
     action_key: 'javascript.wizard.done', operation_id: task.operation_id + ':done',
-    output: {done_gesture_returned: true, wizard_commit_verified: false}};};
+    output: {done_gesture_returned: true, wizard_commit_verified: false,execution_started:null}};};
   const receiptOptions = (id, key, signature) => ({receipt_namespace: 'private-test',
     receipt_id: id, receipt_signature: signature});
   await assert.rejects(dispatchManagedJavascriptDone({task, expected_source_sha256: sha, execute,
@@ -75,4 +76,53 @@ test('managed Done requires exact journal ACK before dispatch', async () => {
   assert.equal(result.status, 'SUCCEEDED');
   assert.equal(calls, 2);
   assert.throws(() => makeJavascriptManagedDonePointCode({...task, expected_source_sha256: 'invalid'}), /draft digest/);
+});
+
+function dispatchFixture(deadline=task.deadline) {
+  const calls=[],events=[],request={...task,deadline};
+  const receipt={status:'SUCCEEDED',phase:'gesture_returned',effect_possible:true,cleanup_complete:true,
+    error:null,action_key:'javascript.wizard.done',action_revision:'1',operation_id:task.operation_id+':done',
+    output:{done_gesture_returned:true,wizard_commit_verified:false,execution_started:null}};
+  const options={task:request,expected_source_sha256:sha,
+    execute:async()=>{calls.push(calls.length?'gesture':'point');return calls.length===1?point:receipt;},
+    record:async event=>{events.push(structuredClone(event));return{...event,recorded_at:new Date().toISOString()};},
+    receiptOptions:(id,key,signature)=>({receipt_namespace:'done-test',receipt_id:id,receipt_signature:signature})};
+  return {calls,events,receipt,options};
+}
+
+test('Done durably records immutable prepared and returned receipts under one original deadline',async()=>{
+  const f=dispatchFixture();assert.equal(await dispatchManagedJavascriptDone(f.options),f.receipt);
+  assert.deepEqual(f.calls,['point','gesture']);
+  assert.deepEqual(f.events.map(x=>x.phase),['javascript_managed_done_prepared','javascript_managed_done_returned']);
+  assert.ok(f.events.every(x=>x.deadline===task.deadline&&x.source_sha256===sha));
+  assert.deepEqual(f.events[1].receipt,f.receipt);
+});
+
+test('Done in-place intent ACK mutation cannot alter the expected event or dispatch a gesture',async()=>{
+  const f=dispatchFixture();
+  await assert.rejects(dispatchManagedJavascriptDone({...f.options,record:async event=>{event.owner.node_id='foreign';return event;}}),/ACK differs/);
+  assert.deepEqual(f.calls,['point']);assert.equal(task.owner.node_id,'node');
+});
+
+test('Done changed returned ACK retains a single possible gesture without accepting settlement',async()=>{
+  const f=dispatchFixture();
+  await assert.rejects(dispatchManagedJavascriptDone({...f.options,record:async event=>{
+    if(event.phase==='javascript_managed_done_returned')event.receipt.output.done_gesture_returned=false;
+    return event;
+  }}),/ACK differs/);
+  assert.deepEqual(f.calls,['point','gesture']);assert.equal(f.receipt.output.done_gesture_returned,true);
+});
+
+for(const change of [r=>r.status='AMBIGUOUS',r=>r.phase='observing',r=>r.effect_possible=false,
+  r=>r.cleanup_complete=false,r=>r.error={},r=>r.action_revision='2',r=>r.output.wizard_commit_verified=true,
+  r=>r.output.execution_started=false])test('Done refuses an incomplete returned receipt '+change.toString(),async()=>{
+  const f=dispatchFixture();change(f.receipt);
+  await assert.rejects(dispatchManagedJavascriptDone(f.options),/gesture unconfirmed/);
+  assert.deepEqual(f.calls,['point','gesture']);assert.equal(f.events.length,1);
+});
+
+test('hung Done prepared ACK expires under the original deadline before any gesture',async()=>{
+  const f=dispatchFixture(Date.now()+40);
+  await assert.rejects(dispatchManagedJavascriptDone({...f.options,record:()=>new Promise(()=>{})}),/journal deadline/);
+  assert.deepEqual(f.calls,['point']);
 });
