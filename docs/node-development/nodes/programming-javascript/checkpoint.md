@@ -42,6 +42,25 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: Code reordered input — принят — 2026-09-30
+
+`e-public-existing-code-reordered-01`, profile344, child `e1fd122320`,
+exec60216/exit0 — **OBSERVED**, independent audit **PASS**. Existing import
+output действительно имеет порядок DiscountPct, Customer, UnitPriceCents,
+RowID, Qty; весь input6×5 совпал с immutable reordered CSV. Прежние import/JS
+GUID, полный JS native settings/schema и graph сохранены. Source S1 тот же,
+что в fixed E Code03 и changed02. Два свежих completed JS IDs:
+`1790752342017-16exscxjjh9:1624:3` и `:1624:4`. Full output6×4 совпал с baseline,
+сумма **1950**; independent public source-read PASS. Save не отправлен.
+
+Report SHA256 `7941d2b36829e435af2562499efef8c2ec6ba6b768b5f3b7934e13724abc09f1`,
+journal `abab52c926d7eee102f320e3df6f8d7f7db90c87cd6983e2a1f6d56b5fcb2e31`,
+audit receipt `879a5e5af96d01f8e47c5beb2116c7bf9a799f403ed2aae66288c8f623a3a79f`.
+Package/logout/browser/process cleanup проверен; registry reconciled. Это
+fixed isolated public/typed UI, не native bytes/candidate/CLI. Следующий
+Declared/changed01 запущен на fresh ordinary headed profile345, exec64748;
+результат пока не установлен. J11 declared variants, остальные E/F открыты.
+
 ### E: Code changed input — принят — 2026-09-30
 
 `e-public-existing-code-changed-02`, profile343, child `e1fd122320`,
