@@ -30,8 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — Required=true/manual fields (J09). Fixed source32768/
-empty и schema-mode refusal уже приняты ниже; Required=true, дополнительные
+следующий шаг — native source Required=true/target Required=false и manual fields (J09). Fixed source32768/
+empty и schema-mode refusal уже приняты ниже; сохранение manual mapping, дополнительные
 limits/redaction и context/engine/module/budgets остаются открытыми.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
 Fixed public Code scalar output5/5, named access и empty output приняты ниже.
@@ -46,6 +46,44 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J09: подготовлена проверка Required/manual mapping — 2026-09-30
+
+Child `052909696931023b36653e4a941cc68986c4b882` добавил operator-only fixed
+`required-code`/`required-declared`. Реальные output mapping журналы Code398 и
+Declared throw392 сверены: все четыре source fields имеют `Required=true`,
+все target fields — `Required=false`. Это разные native признаки; target
+`Required=true`, пользовательский checkbox и его редактирование не подтверждены.
+
+Каждая новая headed-проба открывает только сохранённый C/D пакет, подтверждает
+первоначальный public source и два fresh Execute/full6×4. Затем существующая
+owner-bound UI процедура задаёт четырём полям прежние technical names,
+NetCents — метку `Сумма вручную`, output autosync=false и подтверждает Done.
+Public request с nonempty mapping/NetCents excluded=true должен явно отказать
+до admission; это действующая политика `mappings:[]`, а не доказательство
+особого runtime исключения по Required. Новый public source edit/comment,
+ещё два fresh Execute, полное typed6×4, независимый source-read и complete graph
+должны подтвердить сохранение ручного mapping и обоих Required-наборов.
+Save не предусмотрен; исходные сохранённые C/D пакеты не переписываются.
+
+Адресные final tests03:238 PASS, full operator all01:18270 PASS/0 FAIL,
+оба actual exit0. SHA256 logs:
+`14912528c2c1bd930f4de74814e0e68df7d2d3cdc189ebeae708c7bee3856629` /
+`a5b3296b325e850a860eade761558beeaeed4cd2f73e28f768b6dac6aefd3fe8`.
+Client tree относительно принятого `56f8df0250` не менялся; client tests
+повторно не запускались. Diff/syntax PASS. Это source-only подготовка, live PASS
+ещё нет; текущий registry398 `closed_verified`, live exec отсутствует.
+
+Независимые private pre-live oracle/auditor v1 закреплены до запуска:
+oracle SHA256 `bf925063969e779d74bee8ea577e1884a7cce61a2e9bc2d14d21c56e8daaa74f`,
+auditor `e166cff2fabcbb38abe721c107aa248268c7e17e3010c53119439ff95aedc60d`,
+source freeze01/707 files
+`f39567b6b71496501c9789bc615fe73bbf9e64fb29a94999be2a3a377fc7f4b2`.
+Negative checker01 готов к 34 meaningful source-only mutations после primary
+PASS, syntax проверен; ещё не исполнялся. Последовательность: fresh399 Code,
+independent audit/negatives/Close/logout/browser/process absence, затем fresh
+Declared на неизменном child HEAD. Assignment выполняется отдельно под lock.
+G6/candidate/CLI/full Goal остаются открытыми.
 
 ### E/J13: public apply reply loss/same worker Stop/repair принят — 2026-09-30
 

@@ -77,7 +77,11 @@ cancel/SAME-ID continuation того же execution на `56f8df0250`
 Public lost-reply recovery (J13) принят на `90c3bdd7c6`, fresh398:
 status/Stop/settlement/inspect того же worker, один original Execute, native
 cancelled14,118s/NEW repair6×4, audit/negative88/88 и cleanup/process absence.
-Первоначальный failed395 сохранён. Следующий шаг — Required=true/context/engine/module/budgets
+Первоначальный failed395 сохранён. Для J09 child `0529096969` подготовил fixed
+Code/declared native source Required=true/target Required=false, сохранение
+manual label/autosync false после public source edit и mapping refusal before
+admission; адресные238/full18270 PASS, live ещё не назначен.
+Следующий шаг — этот J09 live, затем context/engine/module/budgets
 и точный остаток E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
