@@ -47,6 +47,48 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J13: public finite Stop реализован; fresh393 назначен — 2026-09-30
+
+Child `69c1f3d60c34f8a3e37719d8a81574962fab9b13` реализовал описанный ниже
+сценарий. JavaScript launch удерживает own native console перед Execute;
+fixed operator проверяет identified worker/node/execution, immutable pre/post
+Stop ACK, one request, cancelled terminal и NEW short repair. Local cancel
+server stop не подменяет. Client all01:3143 PASS/10 SKIP/0 FAIL, actual exit0,
+SHA256 `d3bc321c45332e66fc6f17224027d84b514000b2e106a873a890b75ce1a32046`.
+Operator all02:18218 PASS/0 FAIL, actual exit0, SHA256
+`783a68201b8621e8d567168b7b4b64f75c8d70bf93c1f4f37cae9181b63391e8`.
+Первый operator suite выявил только missing fixture context для нового option;
+исправлен, addressed04:79 PASS/0 FAIL и final all02 выше. Не скрывать failed log.
+
+Fresh393/exec99264 — ordinary headed `e-public-stop-code-01`, assigned saved C.
+Pre-live independent Stop v1 auditor/oracle SHA256:
+`71316bc78869b543c44cb5820b5099825f3cbe674fd1dbe4f38e7d4ec7aa991c` /
+`31fdb8a332d384a606ce66798f9ece06373ff4e0710d65825dc8c67b071e1dee`.
+Exact finite source SHA256 сохраняет private Stop08:
+`01cf3fd043fd39a1515df43c3e5c6b8656850ad09a6bd0d1ab5a9db0a83519b5`.
+Audit требует native Cancel gesture receipt, same native cancelled child/group
+records, launch→terminal≤60s, independent source/settings/graph и business repair.
+При продолжении наблюдать exec99264 до actual terminal, без изменения source/
+oracle/profile. Затем independent audit, meaningful negatives, cleanup/process
+absence и registry reconciliation; только после этого следующий case.
+Public Stop ещё не принят; local cancel/same-ID/lost reply и full Goal открыты.
+
+### Следующая итерация E/J13: public finite Stop — design, 2026-09-30
+
+Переиспользовать private `javascript-stop-case.mjs` без изменения finite source:
+45s wall-clock/100000000 iterations, один saved Code node, без Save. Runtime
+до Execute удерживает собственную native console через existing
+`prepare({keepConsoleOpen:true})`; это уже подтверждено private Stop08 и
+serialized driver tests. Оператор ждёт только identified pending execution
+в public worker, один `dock_node_stop`, same worker wait до native cancelled
+terminal; unknown effect не повторяет. Независимые source/settings/complete
+graph после Stop, NEW same-node short repair с actual finite-source digest,
+две fresh Execute/full business6×4/1950 и ordinary cleanup обязательны.
+До live — адресные tests, freeze и fixed independent auditor/oracle. Предел
+launch→Stop terminal60s не продлевать. Local cancel/same-ID read continuation
+и lost reply проверяются отдельными cases; Stop им не засчитывается.
+Fresh393 пока не назначен; runtime/operator ещё не изменены для этой итерации.
+
 ### E/J12/J25: public sync throw/NEW repair приняты для обоих modes — 2026-09-30
 
 Source freeze `5e55e53f8a1542d5b7ac44bcf351e0d090019865`, ordinary headed:
