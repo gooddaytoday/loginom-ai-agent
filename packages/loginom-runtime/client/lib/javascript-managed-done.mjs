@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 import {withBrowserReceipt} from './executor.mjs';
 import {inspectManagedJavascriptPage, makeJavascriptManagedPageCode} from './javascript-managed-page.mjs';
 import {wizardReadiness} from './javascript-wizard-page.mjs';
+import {journalManagedJavascriptError} from './javascript-managed-wizard-error.mjs';
 
 // Done is admitted only after this owned editor has verified a complete draft
 // replacement. A returned click is still not evidence of a committed source.
@@ -106,16 +107,20 @@ export async function dispatchManagedJavascriptDone({task, expected_source_sha25
   const intent = {phase: 'javascript_managed_done_prepared', operation_id: task.operation_id,
     gesture_id, owner: task.owner, source_sha256: expected_source_sha256,
     from_tid: point.page_tid, point, deadline: task.deadline, effect_possible: false};
-  const ack = await record(intent);
-  if (JSON.stringify(Object.fromEntries(Object.keys(intent).map(key => [key, ack?.[key]]))) !== JSON.stringify(intent))
-    throw Error('Managed JavaScript Done journal ACK differs');
+  await journalManagedJavascriptError({record,deadline:task.deadline},intent);
   const signature = createHash('sha256').update(JSON.stringify([
     gesture_id, task.owner, expected_source_sha256, point, task.deadline])).digest('hex');
   const result = await execute(withBrowserReceipt('(' + code + ')(page)', {
     ...receiptOptions(gesture_id, 'javascript.wizard.done', signature), operation_id: gesture_id}),
   {timeout: Math.max(1, Math.min(35000, task.deadline - Date.now() + 5000))});
-  if (result?.status !== 'SUCCEEDED' || result.action_key !== 'javascript.wizard.done'
-    || result.operation_id !== gesture_id || result.output?.done_gesture_returned !== true)
+  if (result?.status !== 'SUCCEEDED' || result.phase!=='gesture_returned'
+    ||result.effect_possible!==true||result.cleanup_complete!==true||result.error!==null
+    ||result.action_revision!=='1'||result.action_key !== 'javascript.wizard.done'
+    || result.operation_id !== gesture_id || result.output?.done_gesture_returned !== true
+    ||result.output.wizard_commit_verified!==false||result.output.execution_started!==null||Date.now()>=task.deadline)
     throw Error('Managed JavaScript Done gesture unconfirmed');
+  await journalManagedJavascriptError({record,deadline:task.deadline},{phase:'javascript_managed_done_returned',
+    operation_id:task.operation_id,gesture_id,owner:task.owner,source_sha256:expected_source_sha256,
+    receipt:result,deadline:task.deadline,effect_possible:true});
   return result;
 }
