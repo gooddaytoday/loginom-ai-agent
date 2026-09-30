@@ -100,7 +100,7 @@ jobs:
           try {
             & $env:LOGINOM_CI_BUN_PATH typecheck
             if ($LASTEXITCODE -ne 0) { throw "Agent typecheck failed" }
-            & $env:LOGINOM_CI_BUN_PATH test test/cli/profile-windows.test.ts
+            & ..\..\script\test-windows-profile.ps1 -BunPath $env:LOGINOM_CI_BUN_PATH
             if ($LASTEXITCODE -ne 0) { throw "Windows profile tests failed" }
           } finally { Pop-Location }
 

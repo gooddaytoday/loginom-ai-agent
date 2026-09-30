@@ -287,7 +287,7 @@ test("native executable validation rejects another platform's binary", () => {
 })
 
 test.skipIf(process.platform !== "darwin")(
-  "macOS verifies the main executable's bundle seal and rejects changed resources",
+  "macOS verifies a bundle seal and rejects missing or changed resources",
   async () => {
     const directory = await mkdtemp(join(tmpdir(), "loginom-bundle-signature-"))
     const bundle = join(directory, "Loginom AI Agent.app")
@@ -340,6 +340,16 @@ test.skipIf(process.platform !== "darwin")(
       expect(
         await verifyMacArtifact({ manifest, artifact, kind: "zip", directory: join(directory, "valid") }),
       ).toMatchObject({ signing: "ad-hoc", vendorCodeSignaturesVerified: true })
+      const seal = join(bundle, "Contents/_CodeSignature/CodeResources")
+      const originalSeal = await readFile(seal)
+      await unlink(seal)
+      await rm(artifact)
+      await $`ditto -c -k --keepParent ${bundle} ${artifact}`.quiet()
+      await mkdir(join(directory, "missing-seal"))
+      await expect(
+        verifyMacArtifact({ manifest, artifact, kind: "zip", directory: join(directory, "missing-seal") }),
+      ).rejects.toThrow()
+      await writeFile(seal, originalSeal)
       // This resource is outside the runtime inventory, so only the bundle
       // signature can catch its modification.
       await writeFile(marker, "changed after signing")

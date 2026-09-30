@@ -33,6 +33,9 @@ const env = {
   LOGINOM_AI_AGENT_VERSION: args.version,
   MODELS_DEV_API_JSON: join(root, "packages/product/models.json"),
   CSC_IDENTITY_AUTO_DISCOVERY: "false",
+  // PR builds need the same ad-hoc resource seal as local candidates.
+  // electron-builder skips signing PRs by default, leaving no resource seal.
+  CSC_FOR_PULL_REQUEST: "true",
   MACOSX_DEPLOYMENT_TARGET: "14.0",
   PATH: `${dirname(process.execPath)}:${dirname(node)}:${process.env.PATH ?? "/usr/bin:/bin"}`,
 }
