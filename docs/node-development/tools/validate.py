@@ -48,7 +48,7 @@ def render(data):
         title=f"[{n['name']}]({n['card']})"
         out.append(f"| {n['legacy_subplan']} | {title} | `{h['type']}` / {modes} | {n['readiness']['historical_acceptance']['status']} | {n['readiness']['client_technical_validation']['status']}; аналитика: {n['readiness']['analytical_validation']['status']} |")
     out+=['','## Компоненты без полного обработчика','',
-          'Список не является разрешённой очередью. При назначении применяется [создание подплана](workflow/new-node-plan.md). [Подплан Кросс-таблицы](nodes/transform-crosstable/plan.md) требует исследования; остальные карточки roadmap не заменяют самостоятельный подплан.', '',
+          'Список не является разрешённой очередью. При назначении применяется [создание подплана](workflow/new-node-plan.md). Карточки roadmap не заменяют самостоятельный подплан.', '',
           '| Component ID | Узел | Категория | Следующее действие |','| --- | --- | --- | --- |']
     for n in data['nodes']:
         if n['queue_class']=='implemented':continue

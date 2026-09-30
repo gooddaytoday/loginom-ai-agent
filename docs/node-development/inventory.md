@@ -24,11 +24,11 @@
 | 14 | [Заполнение пропусков](nodes/missing-values/README.md) | `preprocessing.data_recovery` / impute | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
 | 16 | [Свёртка столбцов](nodes/collapse-columns/README.md) | `transform.collapse_columns` / unpivot | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
 | 17 | [Текстовый экспорт](nodes/text-export/README.md) | `exports.text` / delimited | accepted_scoped | reported_desktop_technical_pass; аналитика: not_revalidated_standalone |
-| 15 | [Кросс-таблица](nodes/transform-crosstable/README.md) | `transform.cross_table` / pivot | not_accepted | not_validated; аналитика: not_revalidated_standalone |
+| 15 | [Кросс-таблица](nodes/transform-crosstable/README.md) | `transform.cross_table` / pivot | accepted_scoped | validated_standalone_cli; аналитика: accepted_scoped_standalone |
 
 ## Компоненты без полного обработчика
 
-Список не является разрешённой очередью. При назначении применяется [создание подплана](workflow/new-node-plan.md). [Подплан Кросс-таблицы](nodes/transform-crosstable/plan.md) требует исследования; остальные карточки roadmap не заменяют самостоятельный подплан.
+Список не является разрешённой очередью. При назначении применяется [создание подплана](workflow/new-node-plan.md). Карточки roadmap не заменяют самостоятельный подплан.
 
 | Component ID | Узел | Категория | Следующее действие |
 | --- | --- | --- | --- |
