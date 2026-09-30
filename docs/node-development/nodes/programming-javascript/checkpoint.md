@@ -46,6 +46,32 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: Code→declared owned refusal принято; declared→Code выполняется — 2026-09-30
+
+На frozen child `b17c5b7719` Code→declared01/profile383/exec3478 actual exit0/
+OBSERVED принят independent audit. Public API: FAILED/cleanup=true/pending=null,
+только verified source/workflow phases; own admitted source read/discard и
+mode mismatch proof acknowledged. Omitted source сохранён, generation/settings/
+full native metadata/graph/links unchanged, no source mutation/explicit Execute/
+Save. UI activity effect_possible=true сохранён; cleanup/package/logout/browser/
+process absence подтверждены. Report SHA256
+`994b6ad52b5be2d2f1c3cc675f705525b98dc51af93e55d9169db09775df423f`,
+journal `3c602f1bc282e8e232c8a535a517708f82694553b89c5206eb39402630ba15a7`,
+receipt `4dec12e56293d7f7d5583a63c60d6a9d9cebc90d7df092f93382012b2d921587`.
+Auditor30/30 actual mutations refused, receipt SHA256
+`7ebfd642a862fb7a182d5725a0b8e8f4ca29ee79e3e2e1cf8e4e5c46827d602f`.
+Registry383 closed_verified до следующего assignment.
+
+Declared→Code01/profile384/exec89514 выполняется на saved D с тем же immutable
+freeze/oracle/auditor, ordinary headed/original30min, source omitted/no explicit
+Execute/no Save. Pending action не повторять. После actual terminal independent
+audit/fullcleanup/registry finish. Full E/J/F/candidate/CLI открыты. Broader
+legacy fault-wrapper5FAIL остаются; actual source показывает причину: decoder
+ожидает JSON task последним argument, текущий pinned makeCapabilityCode добавляет
+trusted native readers после task. Это operator harness mismatch, product code
+не менять для починки; безопасная syntax-only AST extraction exact browser
+capability/receipt envelope должна сохранить fault pins и one-shot injection.
+
 ### E: owned schema-mode refusal fixed; Code→declared live выполняется — 2026-09-30
 
 Frozen child `b17c5b77194d6f0febdaa6bdf452dbd4eaddd63d` вводит узкий
