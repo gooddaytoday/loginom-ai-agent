@@ -67,6 +67,9 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
     &&result.execution.status==='completed'&&result.output.status==='complete'
     &&table?.fresh===true&&table.execution_id===result.execution.execution_id&&!runtime.hasUnsettledWork(),
   'Public Code execution/result boundary unconfirmed');
+  // The settled public operation has already restored its owned graph. An
+  // operator schema/oracle refusal must still permit ordinary package cleanup.
+  onPending(false);await save();
   const validation=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(result);
   need(validation.valid,'Public Code result violates its diagnostic schema');
   const oracle=javascriptDiscoveryOracle(probe,table);
@@ -83,6 +86,7 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
       &&row.every((cell,column)=>['type','value','is_null','precision'].every(key=>cell[key]===table.sample[index][column][key]))),
   'Public Code user-v1 full output differs');
   report.stage='public-code-independent-source-read';await save();
+  onPending(true);
   const sourceRead=await dispatchNodeApi(runtime,'dock_node_read',{kind:'source',operation_id:'js-code-after-'+randomUUID(),
     document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node:result.node,
     budget_ms:Math.max(1,Math.min(180000,deadline-Date.now()-30000))});

@@ -142,7 +142,7 @@ const javascriptConfigurationReadback=object({...javascriptReadbackProperties,re
  execution_effects:object({explicit_execute_requested:{type:'boolean',const:false},internal_execution_started:{type:'null'}})});
 const javascriptExecutedConfigurationReadback=object({...javascriptReadbackProperties,receipt_ids:{...array(str),minItems:12,maxItems:13},
  execution_effects:object({explicit_execute_requested:{type:'boolean',const:true},internal_execution_started:{type:'null'}}),
- input_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))}),
+ input_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(readbackMappingField)}),
  output_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))})});
 const configurationReadback={anyOf:[exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,javascriptConfigurationReadback,javascriptExecutedConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
 export const nodeApplyResultSchema=object({operation_id:str,status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),
