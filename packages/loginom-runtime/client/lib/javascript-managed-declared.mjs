@@ -30,7 +30,7 @@ export function validateJavascriptDeclaredPrimitiveColumns(columns) {
 }
 
 // This capture never calls a Loginom RPC or mutates its native cache.
-export function inspectManagedJavascriptDeclaredContext({held,task}) {
+export function inspectManagedJavascriptDeclaredContext({held,task,capture=false}) {
   const form=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
   const tab=form?.Items?.Workspace?.getActiveTab?.();
   const preparation=globalThis.__loginomDockPreparationV1;
@@ -44,8 +44,8 @@ export function inspectManagedJavascriptDeclaredContext({held,task}) {
     ||tab?.Controller?.FController?.FView?.el?.dom!==held.wizardRoot
     ||!held.wizardRoot?.isConnected)
     throw Error('Managed JavaScript declared context changed');
-  return {prefix:task.workflow_ref.prefix,root:held.wizardRoot,native:held.wizard,
-    binding:held.wizardBinding,account:held.account,build:task.targetBuild};
+  return capture?{prefix:task.workflow_ref.prefix,root:held.wizardRoot,native:held.wizard,
+    binding:held.wizardBinding,account:held.account,build:task.targetBuild}:{verified:true};
 }
 
 export async function runManagedJavascriptDeclaredStep(page,task,inspect,observe,helpers,readSchema) {
@@ -57,7 +57,7 @@ export async function runManagedJavascriptDeclaredStep(page,task,inspect,observe
   await page.evaluate(inspect,{held:lease.handle,task});
   if(!lease.declared){
     if(task.index!==0||task.step!=='add'||task.mode!=='prepare')throw Error('Managed declared initial step differs');
-    const context=await page.evaluateHandle(inspect,{held:lease.handle,task});
+    const context=await page.evaluateHandle(inspect,{held:lease.handle,task,capture:true});
     const schema=await page.evaluate(readSchema,context);
     if(schema.verified!==true||schema.inventory_complete!==true||schema.generation?.checked!==false
       ||schema.grids.filter(grid=>grid.tid===schema.page_tid+';grdTargetColumns;tbl').length!==1
