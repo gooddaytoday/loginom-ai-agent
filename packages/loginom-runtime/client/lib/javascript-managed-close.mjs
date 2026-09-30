@@ -61,7 +61,9 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
       ||roots.length===1&&graph?.container&&roots[0]!==graph.container
       ||shape?.isConnected&&roots.length===1&&(!roots[0].contains(shape)||shape.getAttribute('data-tid')!==held.node.tid))
       throw Error('Managed JavaScript Close graph owner changed');
-    if(found.length===0||roots.length===0||!graph?.container||!shape?.isConnected)
+    // Close can repaint the graph before Loginom releases the owned node lock.
+    // A visible shape alone cannot authorize the next owned operation.
+    if(found.length===0||roots.length===0||!graph?.container||!shape?.isConnected||found[0].FLocked===true)
       return {state:'waiting',node_id:task.owner.node_id,root_visible:false,dialog_count:0};
     return {state:'closed',node_id:task.owner.node_id,root_visible:false,dialog_count:0,
       graph_tid:held.node.tid,graph_rebound:model!==held.retained.model||found[0]!==held.retained.native};
