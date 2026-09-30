@@ -30,8 +30,9 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — public source fidelity/limits/chunks/redaction и
-сохранение/явный отказ schema edits (J05/J09/J23/J26), затем точный остаток E/J/F.
+следующий шаг — public Stop/cancel/same-node recovery (J13). Fixed source32768/
+empty и schema-mode refusal уже приняты ниже; Required=true, дополнительные
+limits/redaction и context/engine/module/budgets остаются открытыми.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
 Fixed public Code scalar output5/5, named access и empty output приняты ниже.
 Fixed public existing changed/reordered freshness для обоих modes принят ниже.
@@ -45,6 +46,46 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J12/J25: public sync throw/NEW repair приняты для обоих modes — 2026-09-30
+
+Source freeze `5e55e53f8a1542d5b7ac44bcf351e0d090019865`, ordinary headed:
+Code02/profile391/exec5321 и Declared01/profile392/exec8895 — actual exit0,
+pre-live independent v5 auditor PASS. Code report/journal SHA256:
+`98eda70966ece33b39745754cc6973bb84282cd124861145b612d289d0093b1c` /
+`00bedd9fae56c961300c10793c86104158bee469cd816409427ad5afd3a2ebbc`.
+Declared report/journal SHA256:
+`430ceacefcbf105648c8eaeaeed60ba4208923823fa337b1ec2cc4cd6fd7086e` /
+`d7a8237a582cc779c59fb6da30df00dd18c1bd2129856eb2b77c4033b64b2a14`.
+Audit receipts SHA256 Code/Declared:
+`f84ae0ae32a54f785fdfc56271fe6412362f248ba528d08859174797264f4860` /
+`33c6de379a1952332c5d3610192a4cb60d31e3f70539956a95a69be1c08da07b`.
+
+Оба fixed source прошли Next/Done и independent full source/settings admission;
+`Error: E_JS_SYNC_THROW` возникла в отдельном explicit materialization Execute.
+Native failed child `1.2` принадлежит JS ModelNode; group failure отдельно от
+child не принимался. Публичный FAILED передал native child message и тот же
+execution_id; configuration=applied/output=not_refreshed. Stack содержит main
+и module frames; исходную позицию не атрибутировали и rollback не обещали.
+NEW same-node repair использовал actual committed throw digest и дал2 distinct
+fresh completed Execute, полную business schema/все24 клетки/ordered6×4/1950.
+Независимые source reads до ошибки/после ошибки/после repair, native settings/
+schema/mappings и complete graph retention сверены. Save не выполнялся.
+
+Каждый actual v5 auditor отверг47/47 meaningful mutations; Code/Declared negative
+receipts SHA256 `3880495ee6121b324f8f5939cfc0e01a39497ba2da0840aee37b0a4c24885ac5` /
+`2b1ba03dafd1e29e02341828c70af720665291d7ed827748489d3532c2e3d9cf`.
+Оба cleanup package/logout/browser и actual process absence проверены;
+registry392 closed_verified, active exec/evidence/kind=null.
+Это fixed public sync-throw/repair proof; live Done refusal, технические
+подробности при недостаточном сообщении, полный J12/J25/candidate/CLI не закрыты.
+
+**Далее:** public Stop/cancel/same-ID/lost-reply recovery (J13), затем remaining
+Required=true и J19/J20/J22/J24/module/source-direct budgets, один F review/fix
+round, immutable candidate/J27/delivery и две sequential headed CLI30m Sol low.
+Повторять принятые parse/throw/C/D persistence cases без затронувшего изменения
+не нужно. Fresh393 ещё не назначен. Не расширять конечный цикл более60s и не
+повторять неизвестные Stop/Execute/Close. Общая Goal active и незавершённая.
 
 ### E/J12/J25: throw Code02 назначен после exact recovery и TabForm mask fix — 2026-09-30
 

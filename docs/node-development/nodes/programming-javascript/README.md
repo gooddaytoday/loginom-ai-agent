@@ -67,8 +67,11 @@ Outside-safe2/2 characterized на `81b4bfef74`: native9007199254740993
 переходит в9007199254740992 в обоих modes, общей гарантии int64 нет.
 Native cardinality4/4 принят на `3bfbd9968b`: native input baseline,
 ordered keep2/odd/duplicate Code и canonical declared-empty/schema/cleanup.
-Следующий шаг — public source fidelity/limits/chunks/redaction/schema refusals
-(J05/J09/J23/J26), затем точный остаток E/J/F.
+Fixed public Code32768bytes/1024lines и declared-empty source-read, schema-mode
+refusal2/2, native Code Next SyntaxError и explicit sync throw/NEW repair обоих
+modes приняты; точные SHA и пределы в checkpoint. Следующий шаг — public
+Stop/cancel/recovery (J13), затем Required=true/context/engine/module/budgets
+и точный остаток E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 

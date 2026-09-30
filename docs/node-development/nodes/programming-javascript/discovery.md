@@ -177,3 +177,16 @@ Save; package/logout/browser/process absence verified. Это отказ mode ch
 не его поддержка. Runtime guards unknown owner/digest/Close/ACK/deadline/foreign
 type остаются uncertain. Full client3014PASS10SKIP/operator JS18121PASS;
 broader legacy fault-wrapper5FAIL открыт. Точные evidence/SHA — checkpoint.
+
+### E: public native sync throw/NEW repair — 2026-09-30
+
+На `5e55e53f8a` ordinary headed Code02 и Declared01 прошли fixed sync throw и
+NEW same-node repair. Next/Done приняты; ошибка возникла при explicit
+materialization Execute. Native failed JS child identity и Show Node доказаны,
+публичный FAILED передал `Error: E_JS_SYNC_THROW` с native stack; position не
+атрибутирована. После Done throw source остаётся applied; ремонт использует его
+digest, без обещания rollback. Два fresh repair executions дали business6×4/1950;
+source/settings/schema/complete graph и cleanup/process absence проверены.
+Pre-live independent v5 audit PASS2/2, meaningful mutations47/47 refused в каждом.
+Точные reports/receipts/hashes — в checkpoint. Это частичное закрытие G6/J12/J25;
+live Done refusal/Stop/lost reply/same-ID/candidate/CLI открыты.
