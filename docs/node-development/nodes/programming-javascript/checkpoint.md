@@ -43,6 +43,25 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public named access — принят — 2026-09-30
+
+Named-access01/profile352/child `bccc8a0a08`, exec25858/exit0 — **OBSERVED**,
+independent audit **PASS**. Output6×1 Result/integer дал exact1–6 в исходном
+порядке через InputTable.Get(i,"RowID"). Полный input6×5, source/mappings/graph
+и два свежих completed executions проверены:
+`1790754377769-yabb0yrwli:1149:3` и `:1149:4`. Source SHA256
+`f18c22929b8dfbd4587497a4ec66520314cb3607ad4bad88cdc43bfebbe42b41`.
+Package/logout/browser/process cleanup проверен; Save/cold/native bytes и
+candidate/CLI отсутствуют. Это один фиксированный named-access case;
+case sensitivity/недопустимые имена и вся API/knowledge матрица не закрыты.
+
+Report SHA256 `f9e28c86dd562b0215107ef3236bdc8b9d7286a6c30fdab7403b07fac62b9d06`,
+journal `e41d89c2eb92c9c66e6d11b074b30514e48669db773167f6033dbfede32e3a4f`,
+audit receipt `c119f24a4be0d3bd355df8f6995711d01cb564fdc0f3f9a825ab30093a62045f`.
+Следующий empty-output01/g5-empty-output запущен на ordinary headed fresh
+profile353, exec61420; ожидается0 rows с Result/integer schema. Результат
+пока не установлен. Затем one-row/empty-input и остальные E/F.
+
 ### E: public civil Date — принят — 2026-09-30
 
 Date-civil01/profile351/child `bccc8a0a08`, exec99974/exit0 — **OBSERVED**,
