@@ -555,6 +555,39 @@ cold ещё не получены. Следующий шаг — наблюда�
 и не запускать второй browser; после подтверждения writer провести cold.
 D/E/F и aggregate gates открыты; цель active.
 
+### D: отказ native serialization, recovery и исправленный writer — 2026-09-30
+
+`d-public-declared-save-01`/profile325/source `dd4768a44e`, exec92525/exit1,
+остановился в public open после4 verified phases. Подтверждённая native ошибка:
+`page.evaluate: Cannot serialize result: object reference chain is too long.`
+Ни одного declared prepared/verified step, JS Execute или Save нет. Новый context
+inspector возвращал native root/wizard/binding через обычный evaluate; это требует
+browser handle. Original CLEANUP_UNCONFIRMED report SHA256
+`b520a49d14de9810803bb330d6407adccdb7248631b09cbbdb0735adca47b4f0`,
+journal SHA256 `be3d5783f7e915f8c47f31d9676dfeadd457cae8721d9b730e26a747eeca98ef`.
+
+После original browser process absence exact headed admin recovery01/profile326/
+exec15530/exit0 закрыл только Package1/`jsteach:3662`
+(создание02:38/disconnect02:41 UTC). Package absence и затем session absence
+подтверждены отдельными Refresh, admin UI logout/browser close/process absence
+проверены. Recovery receipt SHA256
+`ec933bc5852197e61e240f96899b426972272075985ad7a4818b5f417b6a520c`.
+Исходный отказ не переписан. Embedded Dispatcher navigation была закрыта popup:
+первый click остановился на actionability без gesture; использован наблюдённый
+popup control, actual SessionsManager prefix `MF;TF-1`.
+
+Child `d6e92cd9e8`: ordinary context validation возвращает только `{verified:true}`;
+native context выдаётся лишь при internal capture=true через evaluateHandle.
+Regression запускает настоящий inspector в VM с cyclic native root, проверяет
+serializable ordinary result, сохранение native identities в capture и foreign
+account refusal. 33 targeted tests PASS, log SHA256
+`80a336d0d2403f6d31c0eed898884393437bed8903ef639dcd76d4ce37f496b5`.
+Полный suite выше относится к `dd4768a44e`; после адресной правки не повторялся.
+Syntax/diff checks PASS. После verified recovery назначен fresh profile327;
+ordinary headed `d-public-declared-save-02`/exec63979/source `d6e92cd9e8`
+выполняется. Продолжать тот же handle; immutable source не менять. Затем
+independent writer audit/cleanup и собственный cold, E/F. Цель active.
+
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
 Child code commits `05dfebe85a`, `7fe5978c0f`, `cbfb793c95` добавили operator-only
