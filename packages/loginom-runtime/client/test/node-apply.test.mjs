@@ -458,3 +458,76 @@ for(const exceedsTotal of [false,true])test('read uses remaining total budget, p
  assert.equal(f.calls.filter(c=>c==='execute').length,1);
  if(exceedsTotal)assert.match(result.error.message,/deadline elapsed/);
 });
+
+
+function javascriptMaterializationFixture() {
+ const f=separateFixture(),p=request();
+ p.target={kind:'existing',type:'programming.javascript',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node1'}};
+ p.mode='script';p.parameters={source_text:'// code',expected_source_sha256:'a'.repeat(64)};
+ f.handlers.set('programming.javascript',{revision:'js-materialization-test',modes:['script'],output_wizard:'separate',
+  materialize_output:true,validate:()=>{},configure:async()=>{f.calls.push('configure');return {verified:true,cleanup_complete:true};}});
+ f.drivers.finish=async mode=>{f.calls.push('node-'+mode);return {verified:true,cleanup_complete:true,effect_possible:true,mode,
+  execution_id:null,execution_started:null,explicit_execute_requested:false,settings_applied:true,
+  wizard_commit_verified:true,graph_owner_verified:true,source_readback_verified:true,owned_done_settled:true};};
+ f.drivers.materializeOutput=async()=>{f.calls.push('materialize');return {verified:true,cleanup_complete:true,
+  effect_possible:true,mode:'execute',execution_id:'materialization1'};};
+ f.drivers.waitExecution=async ctx=>{f.calls.push('await-'+ctx.execution.execution_id);return {verified:true,
+  cleanup_complete:true,status:'completed',owner_verified:true,execution_id:ctx.execution.execution_id};};
+ return {...f,p,run:extra=>f.run(p,extra)};
+}
+
+test('JavaScript materialization is an awaited public phase before mapping and a distinct final Execute',async()=>{
+ const f=javascriptMaterializationFixture(),result=await f.run();
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.execution.execution_id,'execution1');
+ assert.deepEqual(f.calls,['source','target','mapping','open','configure','node-done','materialize',
+  'await-materialization1','mapping','graph-execute','await-execution1','read']);
+ assert.equal(result.phases.find(p=>p.phase==='materialization_start').status,'verified');
+ assert.equal(result.phases.find(p=>p.phase==='materialization_execute').status,'verified');
+ assert.equal(f.operation.nodeApply.phases.find(p=>p.phase==='node_finish').value.execution_started,null);
+});
+
+for(const field of ['wizard_commit_verified','graph_owner_verified','source_readback_verified','owned_done_settled'])
+ test('JS intermediate Done rejects missing '+field+' before materialization',async()=>{
+ const f=javascriptMaterializationFixture(),finish=f.drivers.finish;
+ f.drivers.finish=async(...args)=>({...await finish(...args),[field]:false});
+ const result=await f.run();assert.equal(result.pending_phase,'node_finish');assert.ok(!f.calls.includes('materialize'));
+});
+
+for(const stage of ['start','wait','mapping'])test('lost '+stage+' reply cannot replay materialization or launch final Execute',async()=>{
+ const f=javascriptMaterializationFixture();
+ if(stage==='start')f.drivers.materializeOutput=async()=>{f.calls.push('materialize');throw Error('lost start reply');};
+ if(stage==='wait')f.drivers.waitExecution=async()=>{throw Error('lost wait reply');};
+ if(stage==='mapping'){let maps=0;f.drivers.mapPorts=async()=>{f.calls.push('mapping');if(++maps===2)throw Error('lost mapping reply');return {verified:true,cleanup_complete:true};};}
+ const result=await f.run();assert.equal(result.status,'AMBIGUOUS');
+ assert.equal(result.pending_phase,stage==='start'?'materialization_start':stage==='wait'?'materialization_execute':'output_mapping');
+ await assert.rejects(()=>f.run({resume:true}),/unresolved original/);
+ assert.equal(f.calls.filter(x=>x==='materialize').length,1);assert.ok(!f.calls.includes('graph-execute'));assert.ok(!f.calls.includes('read'));
+});
+
+test('verified cancellation of materialization stops before mapping, final Execute and read',async()=>{
+ const f=javascriptMaterializationFixture(),stop=new AbortController();stop.abort(Error('stop requested'));
+ f.drivers.waitExecution=async ctx=>({verified:true,cleanup_complete:true,status:'cancelled',stop_verified:true,
+  owner_verified:true,execution_id:ctx.execution.execution_id});
+ const result=await f.run({stopSignal:stop.signal});assert.equal(result.status,'FAILED');
+ assert.equal(result.execution.execution_id,'materialization1');assert.equal(result.execution.status,'cancelled');
+ assert.equal(result.checkpoint_kind,'local_node_stopped');assert.equal(result.cleanup_complete,true);
+ assert.equal(f.calls.filter(x=>x==='mapping').length,1);assert.ok(!f.calls.includes('graph-execute'));
+});
+
+test('unowned materialization terminal and reused final identity cannot produce a fresh read',async()=>{
+ for(const changed of ['owner','identity']){
+  const f=javascriptMaterializationFixture();
+  if(changed==='owner')f.drivers.waitExecution=async ctx=>({verified:true,cleanup_complete:true,status:'completed',
+   owner_verified:false,execution_id:ctx.execution.execution_id});
+  if(changed==='identity')f.drivers.finishGraph=async()=>({verified:true,cleanup_complete:true,mode:'execute',execution_id:'materialization1'});
+  const result=await f.run();assert.equal(result.status,'AMBIGUOUS');assert.ok(!f.calls.includes('read'));
+ }
+});
+
+test('materialization requires explicit Execute and cannot be enabled for another node type',async()=>{
+ const f=javascriptMaterializationFixture();f.p.finish='done';f.p.read.ports=[];
+ await assert.rejects(()=>f.run(),/materialization requires/);assert.deepEqual(f.calls,[]);
+ const other=separateFixture();other.handlers.get('imports.text').materialize_output=true;
+ other.drivers.materializeOutput=f.drivers.materializeOutput;
+ await assert.rejects(()=>other.run(),/materialization requires/);assert.deepEqual(other.calls,[]);
+});

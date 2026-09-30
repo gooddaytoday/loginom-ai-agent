@@ -125,8 +125,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
   const {graph,handler}=validateNodeApplyRequest(request,handlers);
   requireValue(operation.id===request.operation_id, 'node.apply operation identity differs');
   const separateOutput=handler.output_wizard==='separate';
+  const materialize=handler.materialize_output===true;
+  requireValue(!materialize||request.target.type==='programming.javascript'&&separateOutput
+    &&request.finish==='execute'&&typeof drivers.materializeOutput==='function',
+  'JavaScript materialization requires separate output and explicit Execute');
   requireValue(!separateOutput||request.finish==='close'||typeof drivers.finishGraph==='function','Separate output wizard requires a graph finish driver');
-  const signature=hash({request,handler_revision:handler.revision,...(separateOutput?{output_wizard:'separate'}:{})});
+  const signature=hash({request,handler_revision:handler.revision,...(separateOutput?{output_wizard:'separate'}:{}),...(materialize?{materialize_output:true}:{})});
   const acknowledge=async entry=>{
     const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,...entry};
     const saved=await record(event);
@@ -164,10 +168,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
     const prior=state.phases.find(p=>p.phase===name);
     if(prior)return structuredClone(prior.value);
     check();
-    const configuration=!['source','execute','read'].includes(name);
+    const executionPhase=['execute','materialization_execute'].includes(name);
+    const configuration=!['source','execute','materialization_execute','read'].includes(name);
     if(configuration)state.configure_deadline??=Math.min(state.deadline,now()+request.budgets.configure_ms);
     const deadline=Math.min(state.deadline,now()+budget,configuration?state.configure_deadline:Infinity,
-      name==='execute'?state.execution_wait?.deadline??Infinity:Infinity);
+      executionPhase&&state.execution_wait?.phase===name?state.execution_wait.deadline:Infinity);
     requireValue(now()<deadline,'node.apply configuration deadline elapsed');
     const oldConfigure=continuingConfigure&&name==='configure';
     const pending=oldConfigure?state.pending:{phase:name,receipt_id:operation.id+':'+name,deadline,
@@ -241,11 +246,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;
       }
       const pause=error.nodeExecutionWaitPause;
-      if(name==='execute'&&signal?.aborted&&!stopSignal?.aborted
+      if(executionPhase&&signal?.aborted&&!stopSignal?.aborted
         &&pause?.read_only===true&&pause.cleanup_complete===true
         &&pause.execution_id===state.execution.execution_id&&state.execution.status==='pending'
         &&operation.cleanupConfirmed===true&&!operation.transportUncertain) {
-        const checkpoint={...pending,...pause};
+        const checkpoint={...pending,...pause,phase:name};
         await acknowledge({phase:'node_phase_paused',signature,receipt:checkpoint});
         state.execution_wait=checkpoint;state.pending=null;state.cleanup_complete=true;
       }
@@ -266,52 +271,15 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // an ambiguous configuration effect.
     if(name==='workflow')state.effect_possible=previousEffect||value.effect_possible===true;
     state.phases.push(receipt);state.pending=null;state.cleanup_complete=true;
-    if(name==='execute')delete state.execution_wait;
+    if(executionPhase)delete state.execution_wait;
     requireValue(now()<pending.deadline,'node.apply phase deadline elapsed: '+name);
     return value;
   };
-  try {
-    // File verification does not infer identity from the displayed path. The
-    // driver checks an already completed upload/inspect/verify receipt chain.
-    await phase('source',ctx=>drivers.verifySource(request.parameters,ctx),{mutation:false});
-    if(drivers.activateWorkflow)await phase('workflow',ctx=>drivers.activateWorkflow(ctx));
-    const target=await phase('target',ctx=>drivers.prepareTarget(graph,ctx),{verify:value=>requireValue(
-      value.node?.document_id===request.document_id && value.node.workflow_id===request.workflow_ref.workflow_id
-      && id(value.node.node_id), 'Target phase returned a foreign node')});state.node=target.node;
-    const readingOnly=request.mode===NODE_READ_MODE;
-    if(!readingOnly){
-    await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));
-    await phase('open',ctx=>drivers.openWizard(ctx));
-    await phase('configure',ctx=>handler.configure(ctx,request.parameters,drivers));
-    // A separate port wizard can open only after the node settings are saved.
-    // Close must discard the node draft before any such intermediate commit.
-    if(separateOutput&&request.finish!=='close')await phase('node_finish',ctx=>drivers.finish('done',ctx),{verify:value=>{
-      requireValue(value.mode==='done'&&value.settings_applied===true&&value.execution_started===false&&value.execution_id==null,
-        'Intermediate node Done must save settings without execution');
-    }});
-    if(!separateOutput||request.finish!=='close')await phase('output_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='output'),ctx));
-    }
-    const finish=await phase('finish',ctx=>(readingOnly||separateOutput&&request.finish!=='close')
-      ?drivers.finishGraph(request.finish,ctx):drivers.finish(request.finish,ctx),{verify:value=>{
-      requireValue(value.mode===request.finish, 'Wrong wizard finish mode');
-      if(readingOnly)requireValue(value.settings_applied===false,'Output read must not apply node settings');
-      if(request.finish==='execute')requireValue(id(value.execution_id), 'A fresh execution identity is required');
-      else if(request.target.type==='programming.javascript'&&request.finish==='done'){
-        // Loginom does not expose whether Done ran internal work. The owned
-        // gesture, graph settlement and independent source readback establish
-        // the commit without claiming that unknown internal effects are false.
-        requireValue(value.execution_id==null&&value.execution_started===null
-          &&value.explicit_execute_requested===false&&value.settings_applied===true
-          &&value.wizard_commit_verified===true&&value.graph_owner_verified===true
-          &&value.source_readback_verified===true&&value.owned_done_settled===true,
-        'JavaScript Done requires settled owner and independent source readback');
-      }else requireValue(value.execution_id==null && value.execution_started===false, 'Done must not execute');
-      if(request.finish==='close')requireValue(value.draft_discarded===true && value.settings_applied===false,'Close must discard draft settings');
-    }});
-    if(request.finish==='execute') {
-      state.execution={status:'pending',execution_id:finish.execution_id};
-      const execution=await phase('execute',ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
-        verify:value=>requireValue(value.execution_id===state.execution.execution_id && ['completed','cancelled','failed'].includes(value.status)
+  const readingOnly=request.mode===NODE_READ_MODE;
+  const waitForExecution=async name=>{
+      const execution=await phase(name,ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
+        verify:value=>requireValue(value.execution_id===state.execution.execution_id
+          &&(name!=='materialization_execute'||value.owner_verified===true) && ['completed','cancelled','failed'].includes(value.status)
           && (value.status!=='cancelled'||stopSignal?.aborted===true&&value.stop_verified===true&&value.owner_verified===true)
           && (value.status!=='failed'||value.failure_verified===true&&value.output_refreshed===false
             &&['document_id','workflow_id','node_id'].every(k=>value.node?.[k]===state.node[k])&&id(value.root_id)&&id(value.group_id)&&id(value.group_record_id)
@@ -339,6 +307,62 @@ export async function applyNode({request, operation, handlers, drivers, record,
         return result;
       }
       state.execution={status:'completed',execution_id:execution.execution_id};
+      return null;
+  };
+  try {
+    // File verification does not infer identity from the displayed path. The
+    // driver checks an already completed upload/inspect/verify receipt chain.
+    await phase('source',ctx=>drivers.verifySource(request.parameters,ctx),{mutation:false});
+    if(drivers.activateWorkflow)await phase('workflow',ctx=>drivers.activateWorkflow(ctx));
+    const target=await phase('target',ctx=>drivers.prepareTarget(graph,ctx),{verify:value=>requireValue(
+      value.node?.document_id===request.document_id && value.node.workflow_id===request.workflow_ref.workflow_id
+      && id(value.node.node_id), 'Target phase returned a foreign node')});state.node=target.node;
+    if(!readingOnly){
+    await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));
+    await phase('open',ctx=>drivers.openWizard(ctx));
+    await phase('configure',ctx=>handler.configure(ctx,request.parameters,drivers));
+    // A separate port wizard can open only after the node settings are saved.
+    // Close must discard the node draft before any such intermediate commit.
+    if(separateOutput&&request.finish!=='close')await phase('node_finish',ctx=>drivers.finish('done',ctx),{verify:value=>{
+      if(request.target.type==='programming.javascript')requireValue(value.mode==='done'
+        &&value.settings_applied===true&&value.execution_started===null&&value.execution_id==null
+        &&value.explicit_execute_requested===false&&value.wizard_commit_verified===true
+        &&value.graph_owner_verified===true&&value.source_readback_verified===true&&value.owned_done_settled===true,
+      'Intermediate JavaScript Done requires settled owner and independent source readback');
+      else requireValue(value.mode==='done'&&value.settings_applied===true&&value.execution_started===false&&value.execution_id==null,
+        'Intermediate node Done must save settings without execution');
+    }});
+    if(materialize){
+      const first=await phase('materialization_start',ctx=>drivers.materializeOutput(ctx),{verify:value=>requireValue(
+        value.mode==='execute'&&id(value.execution_id),'Materialization requires a fresh execution identity')});
+      state.execution={status:'pending',execution_id:first.execution_id};
+      const terminal=await waitForExecution('materialization_execute');
+      if(terminal)return terminal;
+    }
+    if(!separateOutput||request.finish!=='close')await phase('output_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='output'),ctx));
+    }
+    const finish=await phase('finish',ctx=>(readingOnly||separateOutput&&request.finish!=='close')
+      ?drivers.finishGraph(request.finish,ctx):drivers.finish(request.finish,ctx),{verify:value=>{
+      requireValue(value.mode===request.finish, 'Wrong wizard finish mode');
+      if(readingOnly)requireValue(value.settings_applied===false,'Output read must not apply node settings');
+      if(request.finish==='execute')requireValue(id(value.execution_id)
+        &&(!materialize||value.execution_id!==state.execution.execution_id), 'A fresh execution identity is required');
+      else if(request.target.type==='programming.javascript'&&request.finish==='done'){
+        // Loginom does not expose whether Done ran internal work. The owned
+        // gesture, graph settlement and independent source readback establish
+        // the commit without claiming that unknown internal effects are false.
+        requireValue(value.execution_id==null&&value.execution_started===null
+          &&value.explicit_execute_requested===false&&value.settings_applied===true
+          &&value.wizard_commit_verified===true&&value.graph_owner_verified===true
+          &&value.source_readback_verified===true&&value.owned_done_settled===true,
+        'JavaScript Done requires settled owner and independent source readback');
+      }else requireValue(value.execution_id==null && value.execution_started===false, 'Done must not execute');
+      if(request.finish==='close')requireValue(value.draft_discarded===true && value.settings_applied===false,'Close must discard draft settings');
+    }});
+    if(request.finish==='execute') {
+      state.execution={status:'pending',execution_id:finish.execution_id};
+      const terminal=await waitForExecution('execute');
+      if(terminal)return terminal;
       // Output reading has its own work (formats, paging, restoration). The
       // configuration limit does not cap it; the total operation deadline still does.
       const output=await phase('read',ctx=>drivers.readOutput(request.read,ctx),{budget:request.budgets.total_ms,mutation:request.read.ports.length>0||handler.fileOutput===true,verify:value=>requireValue(
