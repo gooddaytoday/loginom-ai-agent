@@ -45,6 +45,26 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: declared String принят; Boolean выполняется — 2026-09-30
+
+String01/profile356/frozen child `d4898cac03`, exec81528/exit0 — OBSERVED,
+independent audit PASS. Полный String output5×1 различает NULL/empty/"null"/
+"0"/"false"; input6×5, native declared columns/default usage,8 owned column
+steps,13 lifecycle phases, source-read и graph/mappings проверены. Source
+SHA256 `c4f47a99eadfa867febe11e78a13fec432056efdaca5b6c8203a9eb59fdaa03c`;
+completed IDs `1790757124622-0822c6u8hxf8:1165:3` / `:1165:4`.
+Report SHA256 `54ed1883a8d128dc058a3d7eb31fa9903da05c1c0c23696fe06ccbfe1cbb5487`,
+journal `ef50d0a753a01172442c20003642dce0bfad3f6d4c83ca2da12a96737e951389`,
+receipt `6bb628c47d00c3801f8b5fc030cbee699e43ec04d1e26845b2e847d863ceaba9`.
+Package/logout/browser/process cleanup подтверждён; profile356 reconciled.
+Save/cold/native bytes/native-input roundtrip/candidate/CLI не доказывались.
+
+Fresh profile357, ordinary headed `e-public-types-declared-boolean-01`,
+exec18891 выполняется: NULL/false/true, declared logical/default discrete,
+source SHA256 `0dbb4d93065eea06d74dc40b8313cb6051b083a56c04a8c97bc3cb0b33fb3fa4`.
+После terminal необходим independent audit/cleanup/registry reconciliation;
+затем real/safe integer/civil Date и cardinality/empty input. J/E/F не закрыты.
+
 ### E: declared String live — выполняется — 2026-09-30
 
 Frozen child `d4898cac03ba8c6c5acc8ea20a15ad2094a49e31` (точный SHA в assignment/profile receipt) прошёл
