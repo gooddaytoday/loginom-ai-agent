@@ -46,6 +46,43 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J12/J25: память восстановилась; native modal mask исправлена — 2026-09-30
+
+Exact OpenViking read снова ответил; configuration/Peer не менялись. Ordinary
+headed admin recovery profile386/exec38357 exit0 закрыл только пакет saved C
+и собственный сеанс `jsteach:3752`. После Refresh обе записи отсутствуют;
+admin logout/browser close/actual process absence подтверждены. Receipt
+`e-public-wizard-refusal-admin-recovery-01-receipt.json`, journal SHA256
+`60715b0bbd6df2243060ed7580177534616792a905b29176ad4949337b93e812`.
+Registry386 closed_verified/active_exec=null; failed385 не переклассифицирован.
+
+Child `cf78f5b61ade6e9ae76c96fc128b2e6872f206b0` отличает native modal backdrop
+от loading. Source-backed Ext `showModalMask` использует ZIndexManager.mask,
+front modal component и maskTarget; exclusion разрешён только для unique native
+msgbox с совпадающими DOM/component/container/cache identities. Dialog по-прежнему
+boundary refusal, доступный только owned error capability. Остальные plain masks
+блокируют, foreign masks/dialogs прекращают error opening; ожидание допустимо
+только для exact wizard loading с существующим AfterElementTextMaskContext,
+FController/FElement/FIsActive/FSequence под первоначальным deadline. Gesture,
+ACK, retained owner/editor/exact source и single-flight guards сохранены.
+
+Addressed113PASS (`e-native-modal-mask-addressed-03.log`, SHA256
+`579ba2116645b88596bbbb3510a0fad3f008bcb39c936cc3f5d74ddfe533fe07`).
+Full client exec36184 exit0:3106PASS/10SKIP/0FAIL,3116 tests; SHA256
+`89b2853de3266d62df99e1e0c27b7894fc22d57fe44fa558288d3b049f6fedd0`.
+Full operator exec23074 exit0:18201PASS/0FAIL; SHA256
+`1f139249fa0cecc464d7e1142e3e21007cf349d840f807ec1048469541b8fbfc`.
+Первая all-operator серия выявила missing publicWizardRefusalCaseId в cold test
+fixture; fixture дополнена null, addressed53PASS и full rerun выше. Старый журнал
+1FAIL сохранён. Runtime guards этим test fix не ослаблены.
+
+Следующий шаг — fresh387 ordinary headed syntax-code на том же saved C,
+новый freeze cf78, прежние неизменённые independent oracle/auditor, no Save.
+После actual terminal audit/meaningful negatives/cleanup/registry reconciliation;
+declared только после этого. Это local proof, public native refusal/repair пока
+не принят. Не возвращаться к failed385 UI/жестам и не повторять rebase/прочие
+принятые одноразовые указания. E/J/F и candidate/CLI остаются открытыми.
+
 ### Точка продолжения: native syntax live отказал; память недоступна — 2026-09-30
 
 Пользователь разрешил продолжение после восстановления доступа. OpenViking
