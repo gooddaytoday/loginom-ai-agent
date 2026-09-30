@@ -26,11 +26,11 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Scalar/precision/cardinality/engine/names/errors — J06–J09/J12/J20/J24/J25 | Приватные native/typed, 30/30 engine observations, T-пробы; ссылки в discovery | G3 bridge, обязательный остаток G5/G6 и подтверждение через handler; число snippets не означает PASS |
 | Persistence — J15/J23 | Приватные code/declared/usage writer–cold–bytes, dirty-state; см. G7 discovery и исторические SHA ниже | Только фиксированные 6×2; нужны handler 6×4 и CLI |
 | Бизнес и freshness — J03/J04/J11 | Private code/base и declared/base 6×4 `ba46d2ecda`: полный typed UI oracle и fresh owned Execute | Code changed/reordered тоже прошли; остаются existing freshness, declared variants и public C/D/E; native bytes этими runs не доказаны |
-| Stop/cancel — J13 | Private run08/source `0328cadfc9`; public finite Stop/NEW same-node repair на `69c1f3d60c`, fresh393: native cancelled за 12,173 с, independent audit и negative62/62, cleanup/process absence | Public local cancel/same-ID/lost reply и CLI lifecycle; весь G6 этим fixed case не закрыт |
+| Stop/cancel — J13 | Private run08; public Stop/repair fresh393 на `69c1f3d60c`; public local read cancel/SAME-ID continuation того же native execution fresh394 на `56f8df0250`, audit/negative87/87 и cleanup/process absence | Public lost reply и CLI lifecycle; весь G6 этим fixed case не закрыт |
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — public local cancel/same-ID/lost-reply recovery (J13). Fixed source32768/
+следующий шаг — public lost-reply recovery (J13). Fixed source32768/
 empty и schema-mode refusal уже приняты ниже; Required=true, дополнительные
 limits/redaction и context/engine/module/budgets остаются открытыми.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
@@ -47,7 +47,7 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
-### E/J13: local cancel/SAME-ID continuation реализован; fresh394 назначен — 2026-09-30
+### E/J13: public local cancel/SAME-ID continuation приняты — 2026-09-30
 
 Child `56f8df0250df9e60617e85f2b35bb58e754b99f6` (handler revision v4)
 заменил прежний `verifyContinuation:false` узким допуском к retained
@@ -82,11 +82,32 @@ Pre-live private independent auditor/oracle SHA256:
 `a2184cf57c9a1e572180d8c97ea3a246c087c96ea426131ddac1178b0722e8c8`.
 Source freeze SHA256 `10c12a510fca54b3fb3045e49c88263a2d43e8a4d13a114fd28859402e8c7ce9`.
 Fresh394/exec64244 — `e-public-cancel-resume-code-01`, обычный headed на assigned
-saved C. До запуска отсутствие прежних browser processes подтверждено, registry
-owner/profile/source сверены. Наблюдать этот handle до actual terminal; timeout
-наблюдения не разрешает повтор или другой профиль. Frozen source/oracle не менять.
-После actual terminal — frozen audit/87 meaningful negatives/cleanup/process
-absence/reconciliation. Этот case ещё не принят; lost reply и full Goal открыты.
+saved C, actual exit0. Frozen audit PASS; report/journal SHA256:
+`9fc882b6ce6fd8625f21febaea0bc4c991451b8841838cc735761c1b01b99b9c` /
+`378f0121989cd8ee6e5f561dacaaaa98aa78507e8bba6251d2ab9558f6c4b837`.
+Audit receipt SHA256 `2be4230550a7718a5e90ee610a4a015403aa72c89461078c7f27d7521b5b7ea2`.
+Local cancel сохранил pending execution `1790790400371-32cpdvbgpx9:758:1`
+и native group record759/child1.2 record761. Exact same-ID apply retry не
+запускал воркер; после inspection resume attempt2 обновил только read wait и
+прочитал те же native records под исходным deadline. Raw Execute этой операции
+один. Native Stop завершился cancelled за13,976s; NEW same-node repair дала
+distinct completed executions :2/:3, full business schema/24 typed cells/ordered
+6×4/1950, independent source/settings/complete graph. Save не выполнялся.
+Actual auditor отверг87/87 meaningful mutations (62 Stop/business и25 local
+cancel/pause/inspection/SAME-ID/native continuation/no replay); negative receipt
+SHA256 `35ef27a6729cb4907ddf41893f3117146a2b3aef0e3ade5e4ddfdaed3106db38`.
+Cleanup package/logout/browser3/3, actual process absence и registry reconciliation
+проверены:394 closed_verified, active exec/evidence/kind=null.
+Принят fixed public local cancel/SAME-ID read continuation; lost reply/CLI/full
+Goal открыты. Прежние freeze/source/oracle и accepted reports не менялись.
+
+**Следующий case:** controlled loss ответа публичного apply после фактического
+первого Execute при живом исходном worker. Сначала inspection/status той же
+operation, затем wait/Stop identified execution и NEW same-node short repair;
+apply/Execute не повторять. Отдельно обозначить границу: это потеря ответа
+публичному вызывающему при retained backend receipts, а не восстановление
+потерянного browser gesture receipt. Последнее остаётся fail-closed и проверяется
+адресными input/Done/Execute/ACK tests; неизвестную мутацию не продолжать.
 
 ### E/J13: public finite Stop/NEW same-node repair приняты — 2026-09-30
 

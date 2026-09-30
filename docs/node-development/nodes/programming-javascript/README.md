@@ -72,7 +72,9 @@ refusal2/2, native Code Next SyntaxError и explicit sync throw/NEW repair об�
 modes приняты; точные SHA и пределы в checkpoint. Public finite Stop/NEW
 same-node repair на `69c1f3d60c` также принят: native cancelled за12,173s,
 independent audit/negative62/62 и cleanup/process absence. Следующий шаг —
-public local cancel/same-ID/lost-reply recovery (J13), затем Required=true/context/engine/module/budgets
+public local read cancel/SAME-ID continuation того же execution на `56f8df0250`
+также принят: один Raw Execute, audit/negative87/87, repair6×4/1950 и cleanup.
+Следующий шаг — public lost-reply recovery (J13), затем Required=true/context/engine/module/budgets
 и точный остаток E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
