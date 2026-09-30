@@ -44,6 +44,27 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: one-row output — принят — 2026-09-30
+
+One-output01/profile354/child `2eef052e7a`, exec63502/exit0 — **OBSERVED**,
+independent audit **PASS**. Output1×1 Result/integer: exact value7, полная схема,
+fresh=true и sample_complete=true. Input6×5, source/mappings/graph и два свежих
+completed IDs проверены: `1790754946749-smpra4otvr:1157:3` и `:1157:4`.
+Source SHA256 `1e205a5ed3cda595da02a5adc8dab862d3290795a593a680f695ce1d41b83bdf`.
+Package/logout/browser/process cleanup проверен, Save/cold/native bytes и
+candidate/CLI отсутствуют.
+Report SHA256 `405bd74f95f603c2aa40d5952edcbaa929caf82d336cca23696bf5753d3ce410`,
+journal `4a7ad3213d253762574e83b927dbf1e0bc8c6101a2a65495a3bfcf5d9513e059`,
+audit receipt `0546e35ec4b184c27c0138b7c690d218866494a3333c70a4c42fe35a5a039d93`.
+
+Fixed public Code output cardinalities0/1/N теперь приняты на отдельных cases,
+с сохранённой схемой и полным typed read. Empty input ещё не проверен;
+header-only `operator-only/empty.csv` уже есть в fixture manifest:46 bytes,
+SHA256 `9f20a282b37003a861e94cf6ee7ec54cc91f33d32a8fadfa5fd2997d3b8f4b2d`.
+Подготавливается fixed empty input с тем же source, что у named-access; expected
+output0 rows. Нового browser process для empty input пока нет. Остальные E/F
+открыты; статус готовности и product base прежние.
+
 ### E: one-row output — подготовка и live — 2026-09-30
 
 Child `2eef052e7a3eff4d77a3249abc56ba705e15b2eb` добавляет только fixed
