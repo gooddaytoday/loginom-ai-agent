@@ -55,7 +55,15 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     headless,
     environment: process.env,
     strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
+  }).catch((error: unknown) => {
+    // The host child is already stopped. Returning lets the profile guard release; a throw would leave PROFILE_BUSY.
+    failure(
+      error instanceof Error && /^LOGINOM_[A-Z_]+$/.test(error.message) ? error.message : "CLI_START_FAILED",
+      1,
+    )
+    return undefined
   })
+  if (!host) return
   const cleanup: { dispose?: () => Promise<void>; detach?: () => void } = {}
   try {
     if (signal?.aborted) throw Error("CLI_CANCELLED")
