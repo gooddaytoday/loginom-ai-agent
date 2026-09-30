@@ -46,6 +46,40 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J12/J25: Done barrier реализован; sync throw live назначен — 2026-09-30
+
+Работа возобновлена пользователем; code freeze `349486dabd4cf93ffb87d367a8ba888cd402aea1`.
+После one ACKed Done runtime ждёт read-only под исходным deadline: exact retained
+wizard/source либо native graph return через existing Close decision и independent
+graph type. Fixed60 retries удалены. Known current Done refusal допускает hidden
+retained CodeMirror/full draft proof, native diagnostic/one OK, затем one Close;
+arbitrary Done page/foreign mask/dialog/remount не допускаются. Done Close сохраняет
+settings/applied/discard/execution неизвестными; typed discarded/FAILED только
+после NEW source admission/discard/full baseline/complete graph retention proof.
+Native error schema различает `code_next`/`done`; actual stage не выводится из source.
+
+Final addressed tests04 —129 PASS/0 FAIL, actual exit0; log SHA256
+`3f3438d251950531a3b8270012750a501fc56d9ffe2940dab939c2e0d4e5b39a`.
+Client all01 до последней адресной проверки ранних foreign masks:3142 PASS/
+10 SKIP/0 FAIL, actual exit0; SHA256
+`4124a00668bd97c8c6324f100e8eaee674220ec14e9903260b24215248894b90`.
+Operator all01:18203 PASS/0 FAIL, actual exit0; SHA256
+`53f22dc702cbabc83a8e8dca6e693aa538c3a379cb7062168d99ce31a83b3ebc`.
+Локальные serialized-browser cases не являются live Done failure proof.
+
+Pre-live fixed throw oracle SHA256
+`b1b974672088afe097d2b1784ebd9265c43126b025967424622d1753607b9cb4`,
+independent v4 auditor SHA256
+`b0fba8a24b4aa7e42caadf946da6dede0868af46558ee6cc1abe22d201e4e87e`.
+Fixed throw source — исходный saved business source плюс
+`throw new Error("E_JS_SYNC_THROW")`; NEW same-node repair сохраняет исходный
+бизнес и должен дать2 distinct fresh Execute/full6×4/1950. Native class/marker
+проверяются; Code Next/Done и position берутся из actual diagnostic/gesture
+evidence. Previous SyntaxError oracle/auditors/receipts не менялись.
+Fresh389 назначен `e-public-wizard-refusal-throw-code-01`, ordinary headed;
+source-freeze/assignment/oracle вне git в private campaign. Declared после
+verified terminal/audit/cleanup; whole plan E/F/candidate/CLI не завершён.
+
 ### Пауза по просьбе пользователя: Done ACK сохранён — 2026-09-30 14:46 UTC
 
 Работа приостановлена по явному указанию пользователя. Main docs до этой
