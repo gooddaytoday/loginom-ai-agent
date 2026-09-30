@@ -43,6 +43,32 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public Boolean и отрицательные проверки auditor — 2026-09-30
+
+Boolean01/profile348/child `bccc8a0a08`, exec16250/exit0 — **OBSERVED**,
+independent audit **PASS**. Output3×1 Result/Boolean: null/false/true с точными
+`exact_null`/`exact_boolean`, полный input6×5, native mappings/graph и
+independent source-read проверены. Source SHA256
+`7bf18292a75218bc490b33937bfc974dd53bdbef3d45b9ac8ca14195e9aaef34`;
+свежие completed IDs `1790753705621-bkrctdg3327:1133:3` и `:1133:4`.
+Package/logout/browser/process cleanup проверен; Save/cold/native bytes и
+candidate/CLI отсутствуют.
+
+Report SHA256 `67869c5bdacb038ada21c3c000611b43a5796ca289119a53647f026501bf4bc6`,
+journal `c1579fd97cc26ff5e4073e2027a62292ba92515f43db10761872e03b86ff40e5`,
+audit receipt `34e6a3970d8ebba4f6d25f9583e8a6adaad7da5d895848134c8fd25cdd3b2259`.
+
+Фактический независимый Python auditor проверен на отдельных копиях принятого
+String evidence: 12/12 намеренных подмен отклонены без PASS receipt. Проверены
+value/NULL/type/precision/missing row/schema label/reversed order/stale execution/
+source hash/foreign document/input cell/cleanup. Оригинальные report/journal/
+receipts не менялись, browser не запускался. Negative receipt SHA256
+`ef0c4240188870bf03a4074d200ef6424f343310f1a92815d217232ce81533dd`.
+Это source-only защита fixed scalar auditor для J16, не закрытие всего J16.
+
+Следующий real01/g5-real запущен на ordinary headed fresh profile349,
+exec8495; результат пока не установлен. J06/J07/J08, остальные E/F открыты.
+
 ### E: public String null/empty — принят — 2026-09-30
 
 `e-public-types-null-empty-01`, profile347, child `bccc8a0a08`, exec84275/exit0 —
