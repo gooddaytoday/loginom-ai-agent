@@ -46,6 +46,46 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public source fidelity frozen; Code live выполняется — 2026-09-30
+
+Frozen child `88ddfc958e0b5a88e80db147416851ea6a82081f` добавляет два fixed
+operator-only cases: existing Code `fidelity-bound-code` (32768 UTF-8 bytes /
+1024 LF-lines; Unicode/emoji/LF/URL/quotes/backslash/tabs/trailing spaces,
+прежняя business logic6×4) и existing declared `empty-source-declared`
+(0bytes/1line, полная прежняя4-column schema и0rows). Public source reader
+собирает все chunks под одним operation ID/original deadline, проверяет whole
+identity/owner/offsets/16KiB receipts и immutable durable ACK. Actual serialized
+browser reader/session/registry/dispatcher tests проверяют оба source, drift,
+changed ACK и expired deadline. Actual handler preflight cap+1/line+1/import/
+columns и actual driver redaction: browser calls0. Это local proof, не live
+schema-mode refusal. Addressed tests03:59PASS, затем full **JavaScript** operator
+suite02 exec69841/exit0:18120PASS/0FAIL (включая ещё один ACK/deadline test),
+SHA256 `abd25ac7d8ad4bb06a852d01db2dfadf3c05fd3a0c0d9f201998a0aef0c7a96f`.
+Broader all-operator suite01 exec36380/exit1:18184PASS/5FAIL; все5 failures в
+unchanged legacy `fault-wrappers.test.mjs` / `readTask` receipt wrapper decoder,
+не выдавать этот запуск за PASS. Сохранён как отдельный остаток проверки.
+Первые addressed tests02:57PASS/2FAIL из-за test expectation: drift делал cap+1,
+missing schema oracle правильно throws; tests03 исправлены, runtime не ослаблен.
+
+Independent Python oracle до live восстановил fixed sources отдельно от JS
+builder и сравнил whole source. Oracle SHA256
+`2893a1d147b3addab8d9064d6d7488e10d91c6fb914294afc27dbdff2ffb6468`,
+frozen auditor SHA256
+`632a7330a991c5168a23290315ca7c06a76863356892a9aac161940ebce8de57`.
+Code target SHA256 `85acd23df49eed604fafc875942e6f8a75a26d1f9f65bab90ac71f3ce886f16e`;
+empty SHA256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Private files `e-public-source-independent-{oracle.json,audit.py}` и
+`e-public-source-host-handoff.py` в campaign; raw source/logs не в git.
+
+Live Code01/profile381/exec44771 выполняется на saved C package
+`/jsteach/js-g2-fb8332da-1019-4f64-9dbf-2833e840409f/JavaScript-57c4ec51-aafd-4d71-8508-17209482af04.lgp`.
+Headed ordinary, без X11 flags; no Save/new bootstrap. Original process budget
+30min; public apply/2 fresh Execute/full6×4 затем independent public chunked
+source. Не повторять pending actions, не менять freeze/oracle. После actual
+terminal — independent audit, package/logout/browser/process absence и registry
+finish. Только затем fresh profile382 declared empty на прежнем saved D.
+Live success пока не заявлен; E/J/F/candidate/CLI остаются открыты.
+
 ### E: pre-mutation source delivery/redaction исправлено — 2026-09-30
 
 Frozen child `a3eea77077203e1de7e0573c213789912016c78f` переносит общий pure
