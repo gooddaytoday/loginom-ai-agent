@@ -65,6 +65,15 @@ export function inspectManagedJavascriptCloseDecision({held,task}) {
     // A visible shape alone cannot authorize the next owned operation.
     if(found.length===0||roots.length===0||!graph?.container||!shape?.isConnected||found[0].FLocked===true)
       return {state:'waiting',node_id:task.owner.node_id,root_visible:false,dialog_count:0};
+    // Close can restore the graph before its asynchronous loading mask ends.
+    // Wait only for the exact current ModelForm target under the original
+    // cleanup deadline. A restored shape must not make a masked graph ready.
+    const masks=[...document.querySelectorAll('.bg-mask-message,.x-mask-msg,.x-mask')].filter(visible);
+    if(masks.some(e=>e!==model.FView?.el?.dom||e.getAttribute('data-tid')!==task.workflow_ref.prefix+';ModelForm'
+      ||!e.classList.contains('bg-mask-message')||!e.contains(graph.container)))
+      throw Error('Managed JavaScript Close foreign loading mask');
+    if(masks.length)return {state:'waiting',node_id:task.owner.node_id,root_visible:false,dialog_count:0,
+      loading_mask_count:masks.length};
     return {state:'closed',node_id:task.owner.node_id,root_visible:false,dialog_count:0,
       graph_tid:held.node.tid,graph_rebound:model!==held.retained.model||found[0]!==held.retained.native};
   }
