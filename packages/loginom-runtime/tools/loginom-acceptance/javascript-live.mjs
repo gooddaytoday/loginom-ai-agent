@@ -75,11 +75,14 @@ import {readJavascriptServerVersion} from './javascript-server-version.mjs';
 import {openJavascriptPackageFileTab,readJavascriptPackageFile} from './javascript-package-file.mjs';
 import {createJavascriptHeadedFocusX11} from './javascript-headed-focus-x11.mjs';
 import {runJavascriptStopProbe} from './javascript-stop-probe.mjs';
-import {runJavascriptPublicCodeLive} from './javascript-public-code-live.mjs';
+import {javascriptPublicTypedIds,runJavascriptPublicCodeLive} from './javascript-public-code-live.mjs';
 import {runJavascriptPublicExistingLive} from './javascript-public-existing-live.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null}={}) {
 process.umask(0o077);
+if(publicProbeId!==null&&(!javascriptPublicTypedIds.includes(publicProbeId)||coldReader||packageFile||batchCases!==null
+  ||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null||existingLifecycle!==null))
+  throw Error('Public typed probe requires its separate fixed entrypoint');
 if(existingLifecycle!==null&&(!coldReader||!['code','declared'].includes(existingLifecycle)||packageFile))
   throw Error('Existing lifecycle requires its separate assigned saved-package entrypoint');
 if(existingInputVariant!==null&&(existingLifecycle===null||!['changed','reordered'].includes(existingInputVariant)))
@@ -89,7 +92,7 @@ if(packageFile&&(coldReader||batchCases!==null||nativeInputOnly||nativeRoundtrip
 const {javascriptPersistenceCase}=persistenceMode===null?{}:await import('./javascript-persistence-cases.mjs');
 const batch=batchCases===null?null:javascriptBatchCases(batchCases);
 const persistence=persistenceMode===null?null:javascriptPersistenceCase(persistenceMode);
-const batchDeadline=existingLifecycle!==null?Math.floor(performance.timeOrigin)+1800000:coldReader||packageFile?Math.floor(performance.timeOrigin)+600000:persistence?Math.floor(performance.timeOrigin)+persistence.writer_budget_ms:nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch||args.includes('--verify-public-code-lifecycle')||args.includes('--verify-public-declared-lifecycle')?Date.now()+1800000:Infinity;
+const batchDeadline=existingLifecycle!==null||publicProbeId!==null?Math.floor(performance.timeOrigin)+1800000:coldReader||packageFile?Math.floor(performance.timeOrigin)+600000:persistence?Math.floor(performance.timeOrigin)+persistence.writer_budget_ms:nativeRoundtrip||sourceReadCycle?Date.now()+600000:batch||args.includes('--verify-public-code-lifecycle')||args.includes('--verify-public-declared-lifecycle')?Date.now()+1800000:Infinity;
 let cleaning=false,cleanupDeadline=Infinity;
 const phaseDeadline=ms=>Math.min(cleaning?cleanupDeadline:batchDeadline,Date.now()+ms);
 const remainingBatch=()=>{const ms=(cleaning?cleanupDeadline:batchDeadline)-Date.now();if(ms<=0)throw Error(cleaning?'Original cleanup deadline expired':'Original batch deadline expired');return ms;};
@@ -149,6 +152,8 @@ if(options['--verify-public-declared-save']&&!options['--verify-public-declared-
 if(options['--verify-public-code-lifecycle']&&options['--verify-public-declared-lifecycle'])
   throw Error('Public JavaScript lifecycle requires one schema mode');
 const publicMode=options['--verify-public-code-lifecycle']?'code':options['--verify-public-declared-lifecycle']?'declared':null;
+if(publicProbeId!==null&&(publicMode!=='code'||options['--verify-public-code-save']))
+  throw Error('Public typed probe requires code lifecycle without Save');
 if(publicMode&&(options['--execution-case']!==publicMode+'-table-execute'
   ||batch||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistence||coldReader||packageFile
   ||Object.keys(options).some(key=>!['--config','--profile','--browser','--evidence','--execution-case',
@@ -1963,7 +1968,7 @@ try {
     if(publicMode){
       executionNode=await runJavascriptPublicCodeLive({page,prepared:executionPrepared,input:executionInput,
         targetOrigin:address.origin,redactor,record:executionRecord,report,save,deadline:batchDeadline,
-        onPending:value=>{managedCloseUncertain=value;},schemaMode:publicMode});
+        onPending:value=>{managedCloseUncertain=value;},schemaMode:publicMode,probeId:publicProbeId});
       if(options['--verify-public-'+publicMode+'-save']){
         // Preserve the public result's package_saved=false. This separately
         // observed Save never turns configuration readback into disk evidence.

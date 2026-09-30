@@ -20,12 +20,37 @@ export async function javascriptPublicCodePins() {
     selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
 }
 
+export const javascriptPublicTypedIds=Object.freeze(['g5-null-empty','g5-boolean','g5-real',
+  'g5-safe-integer','g5-date-civil','g5-named-access','g5-empty-output']);
+
+export function javascriptPublicCodeProbe(probeId,schemaMode) {
+  need(probeId===null||schemaMode==='code'&&javascriptPublicTypedIds.includes(probeId),
+    'Public typed probe requires a fixed code case');
+  return javascriptDiscoveryProbe(probeId??'p1-business-'+schemaMode+'-base');
+}
+
+export function javascriptPublicCodeRequest({prepared,input,probe,schemaMode,remaining}) {
+  need(['code','declared'].includes(schemaMode)&&Number.isSafeInteger(remaining)&&remaining>=600000,
+    'Public Code request mode/original budget unavailable');
+  const pinned=javascriptPublicCodeProbe(javascriptPublicTypedIds.includes(probe.id)?probe.id:null,schemaMode);
+  need(JSON.stringify(probe)===JSON.stringify(pinned),'Public Code probe pin changed');
+  return {operation_id:'js-public-code-'+randomUUID(),contract_revision:'1.0.0',
+    document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,
+    target:{kind:'new',type:'programming.javascript',label:'JavaScript '+schemaMode+' '+(javascriptPublicTypedIds.includes(probe.id)?probe.id:'business')},
+    inputs:[{source:input.node,output:0,input:0}],mode:'script',
+    parameters:{schema_mode:schemaMode,source_text:probe.source,
+      ...(schemaMode==='declared'?{columns:probe.schema.map((column,index)=>({...column,
+        data_kind:column.type==='integer'?'Непрерывный':'Дискретный',usage:index===0?'Выходное':'Не задано'}))}:{})},mappings:[],finish:'execute',
+    read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},
+    budgets:{configure_ms:remaining,execute_ms:300000,total_ms:remaining}};
+}
+
 export async function runJavascriptPublicCodeLive({page,prepared,input,targetOrigin,redactor,record,
-  report,save,deadline,onPending,schemaMode='code'}) {
+  report,save,deadline,onPending,schemaMode='code',probeId=null}) {
   need(['code','declared'].includes(schemaMode),'Public JavaScript schema mode unavailable');
   const key=schemaMode==='declared'?'public_declared':'public_code';
   const stage=schemaMode==='declared'?'public-declared':'public-code';
-  const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-base');
+  const probe=javascriptPublicCodeProbe(probeId,schemaMode);
   const remaining=deadline-Date.now()-60000;
   need(remaining>=600000&&input.table?.sample_complete===true&&input.table.row_count===6
     &&input.table.schema.length===5,'Public Code lifecycle requires complete own input and original time budget');
@@ -37,19 +62,11 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
     nodeApplyHandlers:new Map([...base.nodeApplyHandlers,...code.nodeApplyHandlers]),
     nodeApplyDriverFactory:options=>options.operation.parameters.target.type==='programming.javascript'
       ?code.nodeApplyDriverFactory(options):base.nodeApplyDriverFactory(options)});
-  const request={operation_id:'js-public-code-'+randomUUID(),contract_revision:'1.0.0',
-    document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,
-    target:{kind:'new',type:'programming.javascript',label:'JavaScript '+schemaMode+' business'},
-    inputs:[{source:input.node,output:0,input:0}],mode:'script',
-    parameters:{schema_mode:schemaMode,source_text:probe.source,
-      ...(schemaMode==='declared'?{columns:probe.schema.map((column,index)=>({...column,
-        data_kind:column.type==='integer'?'Непрерывный':'Дискретный',usage:index===0?'Выходное':'Не задано'}))}:{})},mappings:[],finish:'execute',
-    read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},
-    budgets:{configure_ms:remaining,execute_ms:300000,total_ms:remaining}};
-  Object.assign(report,{scope:'isolated public '+(schemaMode==='code'?'C Code':'D declared')+' lifecycle; full typed UI business output',
+  const request=javascriptPublicCodeRequest({prepared,input,probe,schemaMode,remaining});
+  Object.assign(report,{scope:'isolated public '+(probeId===null?(schemaMode==='code'?'C Code':'D declared'):'E typed '+probeId)+' lifecycle; full typed UI output',
     original_deadline:deadline,explicit_execution_limit:2,gates_closed:[],candidate_verified:false,
     cli_verified:false,native_bytes_verified:false,stage:stage+'-apply',
-    [key]:{status:'RUNNING',operation_id:request.operation_id,target_kind:'new',
+    [key]:{status:'RUNNING',probe_id:probe.id,operation_id:request.operation_id,target_kind:'new',
       source_sha256:probe.source_sha256,oracle_sha256:probe.oracle_sha256,raw_source_in_report:false}});
   onPending(true);await save();
   let job=await dispatchNodeApi(runtime,'dock_node_apply',request);
