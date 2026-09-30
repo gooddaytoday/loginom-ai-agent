@@ -9,6 +9,7 @@ import {makeJavascriptExistingGraphTypeCode} from './javascript-existing-type.mj
 import {replaceManagedJavascriptSource} from './javascript-managed-source-write.mjs';
 import {dispatchManagedJavascriptCodeNext} from './javascript-managed-code-next.mjs';
 import {dispatchManagedJavascriptDone} from './javascript-managed-done.mjs';
+import {dispatchManagedJavascriptDeclared,validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
 
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const need = (condition, message) => { if (!condition) throw Error(message); };
@@ -31,7 +32,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
   execute, record, receiptOptions, channel, wait = ms => new Promise(resolve => setTimeout(resolve, ms)),
   openingBudgetMs = 90000,
   driver = {openManagedJavascriptExistingWizard, dispatchManagedJavascriptNext, dispatchManagedJavascriptGeneration,
-    dispatchManagedJavascriptCodeNext, dispatchManagedJavascriptDone,
+    dispatchManagedJavascriptCodeNext, dispatchManagedJavascriptDone, dispatchManagedJavascriptDeclared,
     closeManagedJavascriptWizard, makeJavascriptManagedPageCode, makeJavascriptManagedSourceCode,
     makeJavascriptManagedSelectionReadCode, makeJavascriptSchemaContextCode,
     makeJavascriptExistingGraphTypeCode, replaceManagedJavascriptSource}}) {
@@ -77,9 +78,11 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
     throw Error('Managed JavaScript Code page original deadline expired');
   };
   return {
-    async open({owner, deadline: operationDeadline, schemaMode = 'preserve'}) {
+    async open({owner, deadline: operationDeadline, schemaMode = 'preserve', columns}) {
       check(owner, operationDeadline);
-      need(['preserve', 'code'].includes(schemaMode), 'Managed JavaScript schema mode unavailable');
+      need(['preserve', 'code', 'declared'].includes(schemaMode), 'Managed JavaScript schema mode unavailable');
+      if(schemaMode==='declared')validateJavascriptDeclaredPrimitiveColumns(columns);
+      if(schemaMode!=='declared')need(columns===undefined,'Managed JavaScript unexpected columns');
       need(active === null, 'Managed JavaScript source wizard already open');
       const type = await execute(driver.makeJavascriptExistingGraphTypeCode({document_id: prepared.document_id,
         workflow_ref: prepared.workflow_ref, node}));
@@ -105,12 +108,17 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
         && generation.output?.generation_readback_verified === true
         && generation.output.schema?.generation?.checked === true,
       'Managed JavaScript generation transition unconfirmed');
-      const settings = javascriptManagedSourceSettings(generation?.output.schema ?? schema);
+      const declared=schemaMode==='declared'
+        ?await driver.dispatchManagedJavascriptDeclared({task,columns,execute,record,receiptOptions}):null;
+      if(declared)need(declared.verified===true&&declared.generation===false,
+        'Managed JavaScript declared schema unconfirmed');
+      const settings = javascriptManagedSourceSettings(declared?.schema??generation?.output.schema??schema);
       const next = await driver.dispatchManagedJavascriptNext({task, execute, record, receiptOptions});
       need(next?.status === 'SUCCEEDED' && next.output?.next_gesture_returned === true,
         'Managed JavaScript source Next refused');
       await codePage(task);
-      active = {task, owner: {...owner}, settings};
+      active = {task, owner: {...owner}, settings,
+        ...(declared?{declaredColumns:structuredClone(declared.columns)}:{})};
       uncertain = false;
       return active;
     },

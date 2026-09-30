@@ -15,7 +15,7 @@ const task = {operation_id: 'managed-js-1', owner: node, workflow_ref: prepared.
   prepared: {...prepared, node}, allowDeactivation: true};
 
 function fixture({closeFails = false, pageTransientOnce = false, wrongType = false,
-  generationFalse = false, generationFails = false, doneFails = false, graphTransientOnce = false, graphOwnerChanged = false} = {}) {
+  generationFalse = false, generationFails = false, declaredFails = false, doneFails = false, graphTransientOnce = false, graphOwnerChanged = false} = {}) {
   const calls = [], events = [];
   let pageReads = 0, graphReads = 0, codeNextSent = false;
   const driver = {
@@ -24,6 +24,11 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
       if (generationFails) throw Error('lost generation reply');
       return {status: 'SUCCEEDED', output: {generation_readback_verified: true, schema: {verified: true,
         generation: {checked: true}, grids: [{tid: 'grid', fields: [{record_id: 'volatile', Name: 'Value'}]}]}}};},
+    dispatchManagedJavascriptDeclared: async ({columns}) => {
+      calls.push('declared');if(declaredFails)throw Error('lost declared Apply reply');
+      return {verified:true,generation:false,columns:structuredClone(columns),schema:{verified:true,
+        generation:{checked:false},grids:[{tid:'grid',fields:[{record_id:'volatile',Name:columns[0].name}]}]}};
+    },
     dispatchManagedJavascriptNext: async () => {calls.push('next'); return {status: 'SUCCEEDED', output: {next_gesture_returned: true}};},
     dispatchManagedJavascriptCodeNext: async () => {calls.push('code-next');codeNextSent = true;
       return {status: 'SUCCEEDED', output: {next_gesture_returned: true, transition_verified: false}};},
@@ -207,4 +212,28 @@ test('lost generation reply blocks Next and a second opening', async () => {
   assert.equal(f.calls.includes('next'), false);
   await assert.rejects(() => adapter.open({owner, deadline, schemaMode: 'code'}), /owner changed/);
   assert.equal(f.calls.filter(call => call === 'generation').length, 1);
+});
+
+test('owned declared columns precede Next and become preserved source settings',async()=>{
+  const f=fixture({generationFalse:true}),adapter=await f.sourceAdapter();
+  const columns=[{name:'Value',label:'Value',type:'integer',data_kind:'Непрерывный',usage:'Выходное'}];
+  const handle=await adapter.open({owner,deadline,schemaMode:'declared',columns});
+  assert.equal(handle.settings.generation,false);
+  assert.deepEqual(handle.declaredColumns,columns);
+  assert.ok(f.calls.indexOf('declared')<f.calls.indexOf('next'));
+  assert.equal(f.calls.includes('generation'),false);
+  await adapter.discard(handle,{owner,deadline});
+});
+
+test('unsupported declared columns fail before Setting; uncertain Apply cannot reopen',async()=>{
+  const bad=fixture({generationFalse:true}),refused=await bad.sourceAdapter();
+  await assert.rejects(refused.open({owner,deadline,schemaMode:'declared',columns:[
+    {name:'Value',label:'Value',type:'real',data_kind:'Непрерывный',usage:'Не задано'}]}),/unsupported/);
+  assert.deepEqual(bad.calls,[]);
+  const f=fixture({generationFalse:true,declaredFails:true}),adapter=await f.sourceAdapter();
+  const columns=[{name:'Value',label:'Value',type:'integer',data_kind:'Непрерывный',usage:'Выходное'}];
+  await assert.rejects(adapter.open({owner,deadline,schemaMode:'declared',columns}),/lost declared Apply reply/);
+  assert.equal(f.calls.includes('next'),false);
+  await assert.rejects(adapter.open({owner,deadline,schemaMode:'declared',columns}),/owner changed/);
+  assert.equal(f.calls.filter(call=>call==='declared').length,1);
 });

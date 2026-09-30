@@ -23,6 +23,16 @@ test('Code lifecycle admits complete new source but refuses unsupported scopes b
  assert.throws(()=>validateJavascriptCodeRequest({...request.parameters,source_text:'import fs from "fs";'},'script',request));
 });
 
+test('declared lifecycle admits explicit supported columns and rejects unknown picker scopes before effects',()=>{
+ const declared={...structuredClone(request),parameters:{source_text:request.parameters.source_text,schema_mode:'declared',
+  columns:[{name:'Amount',label:'Amount',type:'integer',data_kind:'Непрерывный',usage:'Выходное'}]}};
+ assert.equal(validateJavascriptCodeRequest(declared.parameters,'script',declared),declared.parameters);
+ for(const patch of [{type:'real'},{data_kind:'Дискретный'},{usage:'unknown'}]){
+  const bad=structuredClone(declared);Object.assign(bad.parameters.columns[0],patch);
+  assert.throws(()=>validateJavascriptCodeRequest(bad.parameters,'script',bad));
+ }
+});
+
 function graph(){return {complete:true,document_id:'doc',workflow_ref:{workflow_id:'flow'},nodes:[
  {ref:source,locked:false,dom_epoch:'old',inputs:[],outputs:[0],position:{x:10,y:10}},
  {ref:node,locked:true,dom_epoch:'old',inputs:[0],outputs:[0],position:{x:256,y:256}}],
@@ -48,6 +58,27 @@ function phases(){
     :phase==='input_mapping'?{native_mapping:{...mapping,target_fields:mapping.target_fields.map(({excluded,...field})=>field)}}
     :phase==='materialization_execute'||phase==='execute'?{owner_verified:true,status:'completed',execution_id:phase}: {}}));
 }
+
+test('declared executed readback requires observed columns and DefaultUsageType in diagnostic schema',()=>{
+ const p=phases(),finish=p.find(phase=>phase.phase==='node_finish');
+ finish.value.schema_mode='declared';finish.value.declared_columns=[{index:0,name:'Amount',label:'Amount',type:'integer',
+  data_kind:'Непрерывный',usage:'Выходное',usage_type:0,default_usage_type:4,required:false}];
+ const readback=javascriptCodeReadback({node,phases:p});
+ const result={operation_id:'op',status:'SUCCEEDED',node,effect_possible:true,cleanup_complete:true,
+  phases:p.map(({value,...phase})=>phase),execution:{status:'completed',execution_id:'execute'},
+  output:{status:'not_refreshed',evidence_ref:null,ports:[]},package_saved:false,warnings:[],
+  configuration:{status:'applied',readback},persisted_package_verified:false,checkpoint_kind:'local_node_checkpoint'};
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
+ assert.equal(validate(JSON.parse(JSON.stringify(result))).valid,true);
+ assert.equal(readback.columns[0].default_usage_type,4);assert.equal(readback.columns[0].usage_type,0);
+ for(const mutate of [r=>delete r.configuration.readback.columns,
+  r=>delete r.configuration.readback.columns[0].default_usage_type,
+  r=>r.configuration.readback.schema_mode='code',r=>r.configuration.readback.columns[0].source_text='private']){
+  const bad=structuredClone(result);mutate(bad);assert.equal(validate(bad).valid,false);
+ }
+ delete finish.value.declared_columns;
+ assert.throws(()=>javascriptCodeReadback({node,phases:p}),/readback incomplete/);
+});
 
 test('executed Code readback survives full/user-v1 schemas and retains mapping without raw source',()=>{
  const p=phases(),readback=javascriptCodeReadback({node,phases:p});

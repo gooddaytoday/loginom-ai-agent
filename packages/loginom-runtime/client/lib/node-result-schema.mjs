@@ -144,7 +144,12 @@ const javascriptExecutedConfigurationReadback=object({...javascriptReadbackPrope
  execution_effects:object({explicit_execute_requested:{type:'boolean',const:true},internal_execution_started:{type:'null'}}),
  input_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(readbackMappingField)}),
  output_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))})});
-const configurationReadback={anyOf:[exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,javascriptConfigurationReadback,javascriptExecutedConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
+const javascriptDeclaredConfigurationReadback=object({...javascriptExecutedConfigurationReadback.properties,
+ schema_mode:values('declared'),columns:{...array(object({index:integer,name:str,label:str,
+ type:values('integer','real','string','boolean','datetime'),data_kind:values('Неопределенное','Непрерывный','Дискретный'),
+ usage:values('Не задано','Активное','Выходное','Группа','Показатель','Транзакция','Элемент'),
+ usage_type:integer,default_usage_type:integer,required:bool})),minItems:1,maxItems:64}});
+const configurationReadback={anyOf:[exportConfigurationReadback,collapseConfigurationReadback,missingValuesConfigurationReadback,dateTimeConfigurationReadback,replacementConfigurationReadback,importConfigurationReadback,calculatorConfigurationReadback,javascriptConfigurationReadback,javascriptExecutedConfigurationReadback,javascriptDeclaredConfigurationReadback,groupingConfigurationReadback,sortingConfigurationReadback,reformConfigurationReadback,filterConfigurationReadback,joinConfigurationReadback,unionConfigurationReadback,duplicatesConfigurationReadback]};
 export const nodeApplyResultSchema=object({operation_id:str,status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),
  effect_possible:bool,phases:array(receipt),node:nullable(ref),execution,output,
  package_saved:{type:'boolean',const:false},cleanup_complete:bool,warnings:array(str),

@@ -69,7 +69,9 @@ export interface TextImportConfigurationReadback {
 }
 export interface JavascriptConfigurationReadback {
   kind: 'javascript'; scope: 'observed_after_verified_finish'; node: NodeRef;
-  receipt_ids: string[]; values_are: 'independent_owned_source_readback'; schema_mode: 'code';
+  receipt_ids: string[]; values_are: 'independent_owned_source_readback'; schema_mode: 'code' | 'declared';
+  columns?: Array<{index: number; name: string; label: string; type: string; data_kind: string;
+    usage: string; usage_type: number; default_usage_type: number; required: boolean}>;
   source: {sha256: string; utf8_bytes: number; lf_lines: number};
   settings_preserved: true; wizard_commit_verified: true;
   /** Explicit execution is separate from Loginom's unknown internal Done effects. */

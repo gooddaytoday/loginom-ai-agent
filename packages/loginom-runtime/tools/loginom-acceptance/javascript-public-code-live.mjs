@@ -21,8 +21,11 @@ export async function javascriptPublicCodePins() {
 }
 
 export async function runJavascriptPublicCodeLive({page,prepared,input,targetOrigin,redactor,record,
-  report,save,deadline,onPending}) {
-  const probe=javascriptDiscoveryProbe('p1-business-code-base');
+  report,save,deadline,onPending,schemaMode='code'}) {
+  need(['code','declared'].includes(schemaMode),'Public JavaScript schema mode unavailable');
+  const key=schemaMode==='declared'?'public_declared':'public_code';
+  const stage=schemaMode==='declared'?'public-declared':'public-code';
+  const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-base');
   const remaining=deadline-Date.now()-60000;
   need(remaining>=600000&&input.table?.sample_complete===true&&input.table.row_count===6
     &&input.table.schema.length===5,'Public Code lifecycle requires complete own input and original time budget');
@@ -36,23 +39,25 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
       ?code.nodeApplyDriverFactory(options):base.nodeApplyDriverFactory(options)});
   const request={operation_id:'js-public-code-'+randomUUID(),contract_revision:'1.0.0',
     document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,
-    target:{kind:'new',type:'programming.javascript',label:'JavaScript Code business'},
+    target:{kind:'new',type:'programming.javascript',label:'JavaScript '+schemaMode+' business'},
     inputs:[{source:input.node,output:0,input:0}],mode:'script',
-    parameters:{schema_mode:'code',source_text:probe.source},mappings:[],finish:'execute',
+    parameters:{schema_mode:schemaMode,source_text:probe.source,
+      ...(schemaMode==='declared'?{columns:probe.schema.map((column,index)=>({...column,
+        data_kind:column.type==='integer'?'Непрерывный':'Дискретный',usage:index===0?'Выходное':'Не задано'}))}:{})},mappings:[],finish:'execute',
     read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},
     budgets:{configure_ms:remaining,execute_ms:300000,total_ms:remaining}};
-  Object.assign(report,{scope:'isolated public C new Code lifecycle; full typed UI business output',
+  Object.assign(report,{scope:'isolated public '+(schemaMode==='code'?'C Code':'D declared')+' lifecycle; full typed UI business output',
     original_deadline:deadline,explicit_execution_limit:2,gates_closed:[],candidate_verified:false,
-    cli_verified:false,native_bytes_verified:false,stage:'public-code-apply',
-    public_code:{status:'RUNNING',operation_id:request.operation_id,target_kind:'new',
+    cli_verified:false,native_bytes_verified:false,stage:stage+'-apply',
+    [key]:{status:'RUNNING',operation_id:request.operation_id,target_kind:'new',
       source_sha256:probe.source_sha256,oracle_sha256:probe.oracle_sha256,raw_source_in_report:false}});
   onPending(true);await save();
   let job=await dispatchNodeApi(runtime,'dock_node_apply',request);
   while(job.state==='running'){
     job=await dispatchNodeApi(runtime,'dock_node_wait',{operation_id:request.operation_id,timeout_ms:30000});
-    report.public_code.progress=job.progress;await save();
+    report[key].progress=job.progress;await save();
   }
-  report.public_code.job=job;await save();
+  report[key].job=job;await save();
   const result=job.outcome?.output,table=result?.output?.ports?.[0];
   // A confirmed refusal before target creation leaves no JS wizard or graph
   // effect to reconcile. Preserve the failed result and permit owned package cleanup.
@@ -85,17 +90,17 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
     &&compact.sample.length===table.sample.length&&compact.sample.every((row,index)=>row.length===table.sample[index].length
       &&row.every((cell,column)=>['type','value','is_null','precision'].every(key=>cell[key]===table.sample[index][column][key]))),
   'Public Code user-v1 full output differs');
-  report.stage='public-code-independent-source-read';await save();
+  report.stage=stage+'-independent-source-read';await save();
   onPending(true);
   const sourceRead=await dispatchNodeApi(runtime,'dock_node_read',{kind:'source',operation_id:'js-code-after-'+randomUUID(),
     document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node:result.node,
     budget_ms:Math.max(1,Math.min(180000,deadline-Date.now()-30000))});
   need(sourceRead.kind==='source'&&sourceRead.source_text===probe.source&&sourceRead.source_sha256===probe.source_sha256
     &&sourceRead.cursor===null&&!runtime.hasUnsettledWork(),'Independent public Code saved source differs');
-  Object.assign(report.public_code,{status:'OBSERVED',configuration:result.configuration,
+  Object.assign(report[key],{status:'OBSERVED',configuration:result.configuration,
     execution:result.execution,output:result.output,node:result.node,oracle,
     independent_source:{source_sha256:sourceRead.source_sha256,source_utf8_bytes:sourceRead.source_utf8_bytes,
       source_lf_lines:sourceRead.source_lf_lines,complete:true,raw_source_in_report:false}});
-  report.stage='public-code-observed';onPending(false);await save();
+  report.stage=stage+'-observed';onPending(false);await save();
   return result.node;
 }
