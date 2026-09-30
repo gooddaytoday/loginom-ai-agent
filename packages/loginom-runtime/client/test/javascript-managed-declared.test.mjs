@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {runInNewContext} from 'node:vm';
 import {validateJavascriptDeclaredPrimitiveColumns,makeJavascriptManagedDeclaredCode,
-  dispatchManagedJavascriptDeclared,runManagedJavascriptDeclaredStep} from '../lib/javascript-managed-declared.mjs';
+  dispatchManagedJavascriptDeclared,runManagedJavascriptDeclaredStep,
+  inspectManagedJavascriptDeclaredContext} from '../lib/javascript-managed-declared.mjs';
 
 const columns=[{name:'RowID',label:'Идентификатор',type:'integer',data_kind:'Непрерывный',usage:'Выходное'}];
 const task={operation_id:'managed-js-test',owner:{document_id:'document',workflow_id:'workflow',node_id:'node'},
@@ -10,6 +12,26 @@ const task={operation_id:'managed-js-test',owner:{document_id:'document',workflo
   prepared:{document_id:'document',workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'owned',label:'Owned'}]},
     node:{document_id:'document',workflow_id:'workflow',node_id:'node'}},allowDeactivation:true};
 const bound={...task,columns,index:0,step:'add',mode:'prepare',gesture_id:'managed-js-test:declared-0-add',usage_value:4};
+
+test('ordinary declared context validation returns serializable proof; native objects require handle capture',()=>{
+  const document={},root={isConnected:true};document.root=root;root.document=document;
+  const workflow={},node={FGuid:'node'},wizard={ParentNode:node};
+  const tab={Controller:{Node:{data:{node:wizard}},FController:{FView:{el:{dom:root}}}}};
+  const receipt={phase:'verified',workflowId:'workflow',nodeTargetWorkflowNode:workflow};
+  const preparation={document,id:'document',receipts:new Map([['owned',receipt]])};
+  const held={preparation,receipt,account:'jsteach',binding:{workflow,tab},wizard,wizardRoot:root,wizardBinding:{tab}};
+  const environment={document,__loginomDockPreparationV1:preparation,
+    bg:{app:{Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:'jsteach'}},
+      Items:{Workspace:{getActiveTab:()=>tab}}}}}}},args:{held,task}};
+  const source='('+inspectManagedJavascriptDeclaredContext.toString()+')(args)';
+  assert.equal(JSON.stringify(runInNewContext(source,environment)),JSON.stringify({verified:true}));
+  environment.args.capture=true;
+  const captured=runInNewContext(source,environment);
+  assert.equal(captured.root,root);assert.equal(captured.native,wizard);
+  assert.throws(()=>JSON.stringify(captured),/circular/);
+  environment.args.capture=false;held.account='foreign';
+  assert.throws(()=>runInNewContext(source,environment),/context changed/);
+});
 
 test('declared primitive scope refuses unsupported fields before browser effects',()=>{
   assert.equal(validateJavascriptDeclaredPrimitiveColumns(columns),columns);
