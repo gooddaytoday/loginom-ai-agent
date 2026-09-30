@@ -47,6 +47,35 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J19/J21: Code current context принят на isolated runtime — 2026-10-01
+
+Child `b0ecbeaadff8d77a30733ae08cb1e25ecd5937dc`, ordinary headed
+fresh403/exec15925, `e-public-context-code-01`, actual exit0. Два current context
+до/после fixed source/comment/physical label edit доставили полный source,
+обе5×4 mappings, owners/digests, exact user-v1 MCP envelope. Внутри каждого
+чтения — два semantic snapshots и ровно четыре owned Close/graph proof, без
+Execute/Done/portedits/Save; same-ID replay не добавил runtime events. Все поля
+и source сверены независимо с фазовыми native mappings и original/fixed source.
+Отдельные warmup/edit apply дали четыре fresh explicit completed execution IDs:
+`1790803096789-tws0yzscca:762:1` / `:2` / `:4` / `:5`.
+Фиксированная ordered business6×4/1950 и manual mapping сохранены.
+Report/journal SHA256:
+`28c970137d97a03dd170e4d77c1870cae1b0bdd362fed0cf8cb3d6e1857c0af6` /
+`006e7f1ddb2aa8ed79575e49b72b096a31e3a0016ae7b30546bd63b488a1743b`.
+Pre-live auditor v1 PASS, receipt SHA256
+`f19cae89287c21140088235c8ed9f4a088a53e6d92f62362eb8c48ba48dc5c28`.
+64 meaningful negatives отказали, checker actual exit0, receipt SHA256
+`0ccc839fe09d46ab903ec1e43dabdb51ecc64ea0812b8bbdcc4467210178b9a6`.
+Close/logout/browser3/3 и actual process absence подтверждены, registry403
+reconciled closed_verified. Fresh404 declared запущен на том же неизменном
+HEAD/oracle/auditor/freeze, exec79246; audit/cleanup результата ещё нет.
+
+Это isolated public runtime, не actual model/candidate/CLI. Изменение input
+technical names не проверено. При адресной сверке обнаружен дополнительный
+delivery gap: основной compact bridge публикует только user/source output
+schemas. После immutable declared audit требуется добавить context ветку и
+проверить фактический bridge listTools/MCP. Текущие live sources не менять.
+
 ### E/J19/J21: current context runtime подготовлен к live — 2026-10-01
 
 Child `b0ecbeaadff8d77a30733ae08cb1e25ecd5937dc`: JS-only `dock_node_read
