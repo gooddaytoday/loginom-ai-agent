@@ -78,6 +78,24 @@ Other remaining J19/J20/J22/J24/module/source-direct budgets/public Stop/lost re
 same-ID recovery, E/F/candidate/CLI не закрыты. Не повторять принятые parse runs
 без затронувшего изменения. Full plan незавершён; Goal active.
 
+Адресное чтение после закрытия388 уточнило реализацию следующего шага:
+`JavaScriptCodeWizard.PageExitAsync` присваивает Code и вызывает FEngine.Verify
+на выходе с Code, `WizardForm.DoDoneAsync` вызывает PageExitAsync и до FClosing
+передаёт ошибку ErrorHandling. Это source proof маршрута, не новый live throw.
+Текущий managed Done имеет prepared ACK, но нет returned ACK; adapter после
+Done ждёт только graph через максимум60 попыток. Existing Close допускает
+только Code page, error capability запрещает doneAttempted и требует visible
+Code editor. Следовательно, нельзя просто добавить recognition Done tooltip:
+нужны owned Done settlement с original deadline, retained hidden CodeMirror/
+exact source proof, stage-specific diagnostic и known error dialog/OK перед
+Close на Done. Graph return logic уже находится в
+`javascript-managed-close.mjs:inspectManagedJavascriptCloseDecision`; переиспользовать
+его native preparation/tab/package/workflow/shape/lock/loading guards, не
+дублировать упрощённый observer. Model не получает произвольную page/gesture.
+Rollback по-прежнему считается доказанным только после NEW source admission /
+full native baseline / complete graph. Если commit частично изменился, не
+возвращать discarded/cleanup-success. Actual public throw stage брать из run.
+
 ### E/J12/J25: Code native syntax refusal/repair принят; declared live — 2026-09-30
 
 Freeze `cf78f5b61a`, ordinary headed profile387/exec51568 actual exit0.
