@@ -29,7 +29,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** D — полный declared lifecycle с Save/cold
-из [плана](plan.md); сейчас D03/profile330/exec86607 наблюдает точные settings
+из [плана](plan.md); сейчас D04/profile332/exec92456 наблюдает точные settings
 до/после Done после D02 drift (подробности ниже). Fixed C public
 Code/Save/independent cold и private G3 bridge
 подтверждены ниже. Ранний P1 Stop/cancel подтверждён ниже. Ранний private
@@ -632,6 +632,38 @@ Diff-check PASS. Full suite выше относится к предыдущем�
 не удалять неизвестные metadata поля и не переигрывать незавершённые действия.
 После confirmed D writer — independent audit и отдельный cold; затем E/F.
 Цель active; aggregate gates/candidate/CLI открыты.
+
+### D03: переход после Done и точечный read-only fix — 2026-09-30
+
+D03/profile330/source `84445dee6a`, exec86607/exit1,03:14:03–03:17:35 UTC:
+26 column steps и source-write подтверждены. Новая settings observation до
+Done содержит полную declared схему; after observation ещё не получена.
+После Done отказ возник во втором/detail чтении: NOT_APPLIED/observing,
+workspace.observe, effect_possible=false, cleanup_complete=true,
+PREPARED_NODE_CONTEXT_CHANGED с точным `surface_unavailable`.
+В первом/root чтении этот временный переход уже обрабатывался; detail outcome
+сохранял message вместо `binding_reason`, поэтому прежний catch не распознал его.
+Done не повторялся; explicit JS Execute/Save не отправлены. Original status
+CLEANUP_UNCONFIRMED сохранён; report SHA256
+`28324ac578c998a29546f547ece396a5d30dcc5082799b5267f90eb1ceb7ee83`,
+journal SHA256 `c4272e632bdcded8526533197f5ee4cc1137333938f792178215cbae19eb019f`.
+
+После process absence exact headed recovery04/profile331/exec87428/exit0 закрыл
+Package1 и `jsteach:3667` (создание03:14/disconnect03:17 UTC), подтвердил package
+и session absence отдельными Refresh, admin logout/browser close/process
+absence. Receipt SHA256
+`bf5654afc434f68a13c5d5301220cb07cd2e04d939464b08c9b2f7afebfcd7a9`.
+
+Child `0b646d73b5` распознаёт только этот точный no-effect detail/root отказ,
+с неизменным deadline и повтором одного read-only graph observation; foreign
+owner, ambiguity/possible effect и другие ошибки остаются terminal. 104 targeted
+tests PASS, включая detail race и отказ при effect_possible=true; log SHA256
+`f0f2d80bb83cfe3294556287711b3ad8947bcd4224b47956e67c0afd1d5a7465`.
+Diff-check PASS. Под lock назначен fresh profile332; ordinary headed
+`d-public-declared-save-04`/exec92456/source `0b646d73b5` выполняется.
+Продолжать тот же handle и сравнить before/after settings, source не менять.
+При успехе independent writer audit/cleanup, затем отдельный cold; иначе
+сохранить точный отказ и own cleanup. D/E/F и цель остаются active/open.
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
