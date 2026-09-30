@@ -213,6 +213,9 @@ RESOURCES="$PAYLOAD_ROOT/resources/loginom"
 [[ -d "$SLOT_ROOT" && -d "$PROFILE" && -d "$ATTEMPTS" ]] || { echo "slot layout missing under $SLOT_ROOT" >&2; exit 1; }
 [[ -f "$CONNECTION_JSON" ]] || { echo "connection.json missing in slot profile" >&2; exit 1; }
 
+# Общий guard с diagnostic-slot.py сериализует замену устаревшей блокировки.
+exec 9>"$ATTEMPTS/.lock-guard"
+flock -x 9
 # Блокировка слота: mkdir без -p.
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   if [[ -f "$LOCK_DIR/pid" ]]; then
@@ -237,6 +240,8 @@ LOCK_OWNED=true
 printf '%s\n' "$$" >"$LOCK_DIR/pid"
 printf '%s\n' "$STARTED_EPOCH" >"$LOCK_DIR/started"
 chmod 600 "$LOCK_DIR/pid" "$LOCK_DIR/started"
+flock -u 9
+exec 9>&-
 
 # Отказ при живом CLI с тем же профилем. При неоднозначности pgrep — только lock.
 PROFILE_BUSY=false
