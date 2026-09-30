@@ -7,6 +7,7 @@ import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 import {closeJavascriptPortMapping} from './javascript-port-mapping-close.mjs';
+import {openManagedJavascriptOutputViews} from './javascript-managed-views.mjs';
 import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
 import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
@@ -201,7 +202,11 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           &&executionReceipt.execution_id===ctx.execution.execution_id&&outputMapping,
         'JavaScript final owned execution and output mapping required');
         if(!read.ports.length)return verified({status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id});
-        const table=await openNewOutputTable(channel,0);
+        const table=await openNewOutputTable(channel,0,{openViews:({output})=>openManagedJavascriptOutputViews({
+          prepared:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},node:ctx.node,output,
+          deadline:ctx.deadline,targetOrigin,execute,record:onRecord,receiptOptions,
+          wrapMutation:(code,reference)=>withBrowserReceipt('('+code+')(page)',{
+            ...receiptOptions(reference.id,reference.action_key,reference.signature),operation_id:reference.id})})});
         need(table.port_guid===outputMapping.node_context.output_port.port_guid,'JavaScript physical output port changed');
         const format=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;
         let data,restoration;
