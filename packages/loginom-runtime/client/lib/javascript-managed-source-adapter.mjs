@@ -204,8 +204,12 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
         } catch (error) {
           // The Done click can briefly unmount both wizard and graph. Retry
           // only this read-only transition, never a changed owner or gesture.
-          if (error?.nodeObservationRefusal?.error?.code !== 'PREPARED_NODE_CONTEXT_CHANGED'
-            || error.nodeObservationRefusal.binding_reason !== 'surface_unavailable') throw error;
+          const refusal = error?.nodeObservationRefusal;
+          if (refusal?.status !== 'NOT_APPLIED' || refusal.action_key !== 'workspace.observe'
+            || refusal.phase !== 'observing' || refusal.effect_possible !== false
+            || refusal.cleanup_complete !== true || refusal.error?.code !== 'PREPARED_NODE_CONTEXT_CHANGED'
+            || !(refusal.binding_reason === 'surface_unavailable'
+              || refusal.error.message === 'The prepared package, workflow or node changed: surface_unavailable')) throw error;
           await wait(Math.min(250, Math.max(1, handle.task.deadline - Date.now())));
         }
       }
