@@ -29,7 +29,9 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** D — полный declared lifecycle с Save/cold
-из [плана](plan.md); fixed C public Code/Save/independent cold и private G3 bridge
+из [плана](plan.md); сейчас D03/profile330/exec86607 наблюдает точные settings
+до/после Done после D02 drift (подробности ниже). Fixed C public
+Code/Save/independent cold и private G3 bridge
 подтверждены ниже. Ранний P1 Stop/cancel подтверждён ниже. Ранний private
 бизнес 6×4 для обоих base modes и code changed/reordered проверен ниже. B уже подтвердил
 existing code-table через public API-path изолированного runtime; повторять
@@ -587,6 +589,49 @@ Syntax/diff checks PASS. После verified recovery назначен fresh pro
 ordinary headed `d-public-declared-save-02`/exec63979/source `d6e92cd9e8`
 выполняется. Продолжать тот же handle; immutable source не менять. Затем
 independent writer audit/cleanup и собственный cold, E/F. Цель active.
+
+### D02: полный declared editor/source, отказ settings и D03 diagnostic — 2026-09-30
+
+`d-public-declared-save-02`/profile327/source `d6e92cd9e8`, exec63979/exit1,
+02:49:20–02:53:03 UTC: все26 prepared/verified column gestures подтверждены.
+Полный source634 UTF-8 bytes/15 LF записан, Next/Done и независимый source-read
+того же узла прошли. Ошибка finish: `JavaScript committed source/settings
+readback differs`; admission настроенной новой конфигурации содержит точный
+source SHA, settings SHA256
+`ec26e40bd8aad9cbd3c9d88fa2fc5a776e69d4feda39f974fef237679d37ec89`.
+Полная форма settings после Done в этом run не записана: причина drift пока
+не установлена. Ни explicit JS Execute, ни Save не отправлены. Original status
+**CLEANUP_UNCONFIRMED** сохранён; report SHA256
+`5aea9edf5e6fff1b81cb46a38e7a27af1d4c64af77824150bc99c5a6b5a3aa05`,
+journal SHA256 `9118b0a148adb168354405d4ef612d70753ccbd934ca9e991bb103b984015c77`.
+
+Exact headed recovery02/profile328 закрыл Package1 и `jsteach:3664`
+(создание02:49/disconnect02:53 UTC). Package absence подтверждён Refresh;
+таймер recovery закрыл browser до финального session Refresh/logout.
+После process absence отдельный verify-only recovery03/profile329/exec93326/
+exit0 подтвердил отсутствие `jsteach:3664`, закрыл только предыдущий собственный
+admin-сеанс3665, подтвердил его отсутствие Refresh, выполнил UI logout и browser
+close. Своих процессов нет. Combined recovery receipt SHA256
+`3b67cc843db9f0c965afffe804138f75e73f08cf767cf8514393dcf3c18add50`.
+Исходный отказ и отдельный partial recovery receipt остаются неизменными.
+
+Child `84445dee6a` добавляет private bounded semantic settings observation
+с owner/schema mode/digest перед Next как для нового declared, так и для
+независимого preserve-read после Done; raw source отсутствует. Exact journal ACK
+обязателен; при его изменении Next не отправляется и opening не повторяется.
+Действующие drift guards не ослаблены. 102 addressed runtime tests PASS,
+log SHA256 `5327e6d48f769dc3fa9192c03ec24d642b4b80e85e61d47802dfa529ae71a2a2`.
+Первый failed test log сохранён: проверка uncertain повторно вызывалась внутри
+открытого wizard; исправлено на проверку исходного deadline после ACK.
+Diff-check PASS. Full suite выше относится к предыдущему указанному SHA.
+
+Под registry.lock назначен fresh profile330; ordinary headed
+`d-public-declared-save-03`/exec86607/source `84445dee6a` выполняется.
+Наблюдать тот же handle, source не менять. Если digest снова отличается,
+сравнить конкретные значения before/after из private journal, затем own cleanup;
+не удалять неизвестные metadata поля и не переигрывать незавершённые действия.
+После confirmed D writer — independent audit и отдельный cold; затем E/F.
+Цель active; aggregate gates/candidate/CLI открыты.
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
