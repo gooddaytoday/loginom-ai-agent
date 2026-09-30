@@ -510,6 +510,51 @@ declared lifecycle с полным columns/order/types/data_kind/DefaultUsageTyp
 readback, затем собственный Save/cold; E/F сохраняются. Не повторять fixed C
 без изменения затронувшего контракта. Цель active.
 
+### D: declared runtime и первый полный headed writer — 2026-09-30
+
+Child `053b0a3670` перенёс pure native column observer в runtime и добавил strict
+complete declared readback. 8 schema/runtime и55 operator tests PASS; отдельно
+функция сверена с retained actual native business4 и usage2 observations,
+без нового browser run. `DefaultUsageType=4` при `UsageType=0` сохраняются отдельно.
+
+Child `dd4768a44e` переносит generic column procedures в runtime (operator
+переэкспортирует их) и добавляет owner-bound declared steps: durable prepared
+ACK перед каждым Add/fill/type/usage/Apply, immutable columns/order/native lease,
+pre-gesture recheck, one-shot reservation до dispatch и verified receipt/ACK.
+Неизвестный ответ блокирует последовательность; повтор жеста не разрешён.
+Declared settings входят в source admission/readback и сохраняются через Done;
+публичный результат содержит полные фактические columns/default_usage_type,
+не raw source. Оба schema modes используют общий materialize/Execute/read путь.
+Operator-only `--verify-public-declared-lifecycle --verify-public-declared-save`
+испытывает полное new-node поведение, independent public source и отдельный
+owned saver. CLI guard отвергает смешение режимов/чужие flags до private config.
+
+Initial declared scope: integer/string; explicit default kinds «Непрерывный»/
+«Дискретный» проверяются в native cache. Другие types/non-default kinds пока
+отклоняются до target creation; их picker/edit paths остаются E. Native editor
+назначение выбирается по запрошенному значению; observed DefaultUsageType,
+фактический UsageType, Required, порядок и metadata проверяются отдельно.
+
+125 targeted runtime tests PASS, log SHA256
+`65cd06f31bc910967c7df5e87ccd06ce7b560a92055fa90ad03d2c71665f0768`;
+59 operator tests PASS, log SHA256
+`cde9ce0db5079a84d9d414a82439c28c2b7213fada342005ce5b3eb9eea877cd`.
+Полный client suite: 2971 PASS /10 SKIP /0 FAIL, 2981 total,156,692 секунд,
+log SHA256 `ba42f4632b842dd1aee555bf99d32be6d558d4b5c6b1a61a96f3da02bc565c36`.
+Browser-dependent tests skipped; эта проверка не запускала headless browser.
+Syntax/diff checks PASS. Earlier failed operator logs сохранены: test с15ms
+deadline не дошёл до ожидаемого fill под concurrent suite load; test allowance
+увеличен до1000ms, one-fill/no-replay assertion сохранён. Guard test принят по
+фактическому более раннему отказу public source-read; product guards не ослаблены.
+
+После C cold cleanup/process absence под lock назначен fresh profile325.
+Ordinary headed `d-public-declared-save-01`/exec92525/source `dd4768a44e`
+выполняется. Request задаёт4 business columns, RowID usage «Выходное», остальные
+«Не задано», полный typed UI6×4 и отдельный Save. Независимый audit/cleanup и
+cold ещё не получены. Следующий шаг — наблюдать тот же handle, не менять source
+и не запускать второй browser; после подтверждения writer провести cold.
+D/E/F и aggregate gates открыты; цель active.
+
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
 Child code commits `05dfebe85a`, `7fe5978c0f`, `cbfb793c95` добавили operator-only
