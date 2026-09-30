@@ -47,6 +47,28 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J20: Code knowledge v1 example принят — 2026-09-30
+
+Child `bc6494476a5f35379d3a70b3e510fb5c8d805ab5`, fresh401/exec98313,
+`e-public-knowledge-code-01`: ordinary headed, actual exit0. Точный published
+`code-table-v1` source/SHA256
+`d2af9d87e75042c5debf58475d92060b359d888fcfce51082c1e3e13e01efcb2`
+выполнен новым JS на своём imported sales. Independent audit проверил весь
+typed input6×5 и ordered output6×2 ObservedID1..6/PhaseMarker, actual user-v1
+schema/12 cells, native mappings/graph, две fresh completed identities
+`1790799555961-v0l9px6uxn:1265:3` / `:4` и independent public source-read.
+Report/journal SHA256:
+`283c2e7741ad7f4fd805d26d725944d723086de505e40ac19c5db750672bb1fc` /
+`7167dab4fb1bd8a8aaea1ffcbe1504df62364e1b231500dfb3563ca0b24dc325`.
+Pre-live auditor v1 PASS, receipt SHA256
+`024a54b0c7822a3eec82ccae02ec2cc4b9721b396968900a1b3bfa4f071fe101`.
+Meaningful negatives32/32 отказали, checker actual exit0, receipt SHA256
+`069e62d34e8cb7912cf97765550bd802953df07034d6715d36f59c9ae9876383`.
+Close/logout/browser3/3 и process absence проверены; registry401 closed_verified.
+Save/cold/native output bytes/candidate/model delivery/CLI не подтверждаются.
+Следующий — exact declared-table-v1 в fresh402 на неизменном HEAD, прежних
+oracle/auditor/freeze. J19/J21 и весь оставшийся E/F сохраняются.
+
 ### E/J20: exact knowledge v1 public probes подготовлены — 2026-09-30
 
 Child `bc6494476a5f35379d3a70b3e510fb5c8d805ab5` добавляет два fixed IDs
