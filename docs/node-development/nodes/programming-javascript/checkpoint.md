@@ -46,6 +46,37 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public schema refusals2/2 closed; full operator regression PASS — 2026-09-30
+
+Declared→Code auditor31/31 actual mutations refused, receipt SHA256
+`ee98e3369a56fdd187818ce86893a79f119760f3405dd7e00c012cdbdcd47248`;
+Code→declared30/30 — ниже. Registry384 closed_verified/active_exec=null/
+active evidence=null, package/logout/browser/process absence подтверждены.
+Source commit assignment `b17c5b7719` — actual live freeze, сохранять как evidence;
+текущий child HEAD `3f3366e678` меняет только operator fault harness.
+
+`3f3366e678` исправляет обнаруженные legacy fault wrappers: syntax-only Acorn
+AST извлекает literal JSON task из current browserCapability5-argument envelope,
+а browserReceipt3-argument wrapper проверяет совпадение outer/inner tasks.
+Arbitrary/non-JSON/malformed/inconsistent source отказывает без eval. Source
+pins/exact injection needles/one-shot/returned actual receipt не изменены.
+Test-only response fixture дополнен обязательными phase/effect_possible; это
+не weakened product parser. Addressed01:6PASS/4FAIL показал старую response
+fixture после исправления decoder, addressed02:10PASS/0FAIL. Full **all** operator
+suite01 exec77554/exit0:18192PASS/0FAIL, SHA256
+`0e8886edbf1381afba235755c3512583afa63d588741cc7e6022e4627e8fbb73`.
+Исторические5FAIL сохраняются, новое ограничение снято. Product runtime не
+изменён этим harness fix; client3014PASS/10SKIP от schema refusal сохраняется.
+
+Следующий E/J12/J25 — public native error delivery и repair на том же узле:
+наблюдённые native child owner/execution/source digest/class/text/location либо
+явное отсутствие, known failed cleanup/no stale output; unknown replies сохраняют
+gate. Сначала source inspection и fixed cases/oracle/local regression, затем
+headed live original deadlines. Прежние source fidelity/empty и schema refusal
+runs не повторять без изменения их контракта. Source/direct budgets/J19/J20/
+J22/J24/public Stop/recovery/full E/J/F/candidate/CLI по-прежнему открыты;
+registry readiness не повышена, profile385 не назначен, live не запущен.
+
 ### E: public owned schema-mode refusal2/2 принято — 2026-09-30
 
 На frozen child `b17c5b7719` оба existing modes independently приняты:
@@ -58,7 +89,7 @@ journal `d17256a60c10ab1700d568f4a141bda43c895652ac7bf34995febc852b82ea22`,
 receipt `7d1b9fdb1658add9462ef23c9d673c63866ecbf2ccd70904374f2f212f66fa8f`.
 Independent source/settings before/after, native declared UsageType/default
 usage/Required metadata сохранены. No Save/native output bytes/candidate/CLI.
-Registry384 finish после auditor negatives; next fresh profile385 не назначен.
+Registry384 closed_verified после auditor31/31 negatives; next profile385 не назначен.
 
 Следующий связный результат E — remaining source-policy/diagnostics/public
 Stop/cancel/recovery/context/engine/assistant и budgets до F review/candidate/
