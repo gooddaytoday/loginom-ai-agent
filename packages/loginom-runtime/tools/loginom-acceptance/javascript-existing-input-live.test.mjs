@@ -8,7 +8,7 @@ import {validateActionParameters} from '../../client/lib/action-catalog.mjs';
 import {nodeApplyInputSchema} from '../../client/lib/node-api.mjs';
 import {runJavascriptOperator} from './javascript-live.mjs';
 
-const prepared={document_id:'doc',workflow_ref:{workflow_id:'flow',tab_tid:'tab',prefix:'MF;TF-1',
+const prepared={document_id:'doc',workflow_ref:{workflow_id:'flow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',
   navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сценарий',label:'Сценарий'}]}};
 const node={document_id:'doc',workflow_id:'flow',node_id:'input'};
 const storage='/jsteach/js-g2-9150c962-ad60-4cd4-a13e-bcba89b982d8';
