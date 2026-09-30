@@ -30,7 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — native civil Date input через public JS и оставшиеся J06–J08.
+следующий шаг — outside-safe native input через public JS без ложной
+гарантии точности и оставшиеся J06–J08.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
 Fixed public Code scalar output5/5, named access и empty output приняты ниже.
 Fixed public existing changed/reordered freshness для обоих modes принят ниже.
@@ -44,6 +45,38 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E: public native civil Date2/2 принят — 2026-09-30
+
+Code373/exec83222 и declared374/exec35944 на frozen child `7d43cea036`
+получили actual terminal exit0/OBSERVED, independent native/civil audits PASS,
+package/logout/browser/process cleanup. Code receipt и hashes ниже. Declared
+полный input/output3×1 NULL и две authored civil values с milliseconds,
+native input bytes/releases3/3, native schema/default usage, source, mappings/
+graph/Views/13 phases/2 fresh Execute подтверждены. Completed IDs
+`1790763433180-z61iwb8pbd:1237:3` / `:1237:4`.
+Declared report SHA256 `9cd866a3b0fe8da7a058ed39e9f89a8e9630e00f18336550cadea0c62f7edd07`,
+journal `c35628c25115a7c49073b3d03bd2153e9284e83168a4912e481a5954f6448f9b`,
+receipt `77acf65286b53549f57ae1d9d992f1c88e7cd13455a82bd7e44a0e67b320ef98`.
+Auditor30/30 mutations refused (receipt02 ниже), native input civil attestation
+и digest проверены; native output bytes/Save/cold/candidate/CLI/UTC/epoch
+не утверждаются. Profile374 closed_verified, active_exec=null; browsers и
+actual processes отсутствуют.
+
+Следующий fixed public блок — прежний integer-outside-safe CSV3×1 с native
+before-JS input bytes и identity-copy Code/declared. Его output — bounded
+characterization, не exact-input/output PASS. Требуются полная Integer schema,
+3 exact decimal strings в пределах signed-int64, полный порядок/precision и
+сопоставление каждой строки с input: unchanged/delta через decimal integer
+арифметику оператора. Даже при observed identity exact_pass и general integer
+precision guarantee остаются false. Никакого подбора expected output после
+наблюдения или переноса safe-range guarantee. Существующий generic
+characterization probe не допускать в public fixed entrypoint: отдельные pinned
+native ids с проверкой полного input и явным characterization output contract.
+Обычный lifecycle/source/metadata/cleanup и independent audit неизменны.
+До live — actual contract tests/negative mutations, полный affected operator
+suite, immutable source/oracle/auditor freeze. Затем native cardinality/точный
+остаток J06–J08/E и остальные J/F; registry readiness не повышена.
 
 ### E: public native civil Date Code принят; declared выполняется — 2026-09-30
 

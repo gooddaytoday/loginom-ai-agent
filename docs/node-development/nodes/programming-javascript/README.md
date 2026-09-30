@@ -61,7 +61,9 @@ native input bytes до JS и полный typed output/cleanup подтверж
 На `14965ef148` тот же уровень отдельно подтверждён для native Boolean2/2,
 на `800381592a` — native String8×1 в обоих modes с NULL/empty/Unicode/LF.
 На `0be6a698c1` native safe-int644×1 подтверждён в обоих modes: input bytes
-и exact output decimal strings. Следующий шаг — native Date/outside-safe и E остаток J06–J08, затем остальные J.
+и exact output decimal strings. Native civil Date3×1 также подтверждён Code/declared2/2 на `7d43cea036`: input
+bytes/owned civil attestation и полный millisecond output без UTC/epoch claims.
+Следующий шаг — outside-safe native input и E остаток J06–J08, затем остальные J.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 
