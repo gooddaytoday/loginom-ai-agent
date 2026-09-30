@@ -30,8 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — outside-safe native input через public JS без ложной
-гарантии точности и оставшиеся J06–J08.
+следующий шаг — native cardinality через public JS и оставшиеся J06–J08.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
 Fixed public Code scalar output5/5, named access и empty output приняты ниже.
 Fixed public existing changed/reordered freshness для обоих modes принят ниже.
@@ -45,6 +44,37 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E: public outside-safe characterized2/2 — 2026-09-30
+
+Code375/exec30088 и declared376/exec96870 на frozen child `81b4bfef74`
+получили actual exit0/OBSERVED, independent characterization audits PASS,
+package/logout/browser/process cleanup. Оба режима показали native input
+9007199254740993 →typed output9007199254740992, delta=-1; ±9007199254740992
+сохранились. Input exact native3×1/releases3/3, full output/schema/source/
+metadata/mappings/graph/Views/13 phases/2 fresh Execute проверены.
+exact_pass=false/gate_passed=false/general_integer_precision_guarantee=false;
+это accepted observation, не exact outside-safe guarantee. Native output
+bytes/Save/cold/candidate/CLI не покрыты. Declared completed IDs
+`1790764155287-0b52tyadr5y7:1245:3` / `:1245:4`.
+Declared report SHA256 `27b4a748b3a5d0ae996fd16cc8958f64bdb27c005567689ce72c3d449a06834c`,
+journal `4aebd068bfa29b29594c8a9ed30d44e6b6dde7b95b3bef256bff373a92da7e38`,
+receipt `92c7d56e5b145482df53dc2552964fb485d2d381880cdae3bc079dbf8ab70715`.
+Code proof и auditor28/28 refusals ниже. Profile376 closed_verified,
+active_exec=null; browser/processes отсутствуют.
+
+Следующий fixed блок native cardinality по существующему
+[native cardinality design](native-cardinality-design.md): общий pinned CSV12bytes
+Integer Value [1,2,3] с exact native input baseline/releases3/3; public Code
+keep2→[2], odd→[1,3], duplicate→[1,1,2,2,3,3] и canonical **declared** empty→[]
+с сохранённой Value Integer schema. Empty source не содержит AssignColumns/
+Append/Set; code-empty не добавляется и canonical declared-empty не заменяет.
+Четыре самостоятельных fresh headed runs, fixed independent source/ordered
+literal oracles; до live actual admission/whole baseline tests, affected suite,
+immutable source/auditor/oracle freeze. Проверяется native input + public typed
+output/lifecycle/cleanup; отдельный native output/upstream private roundtrip
+не повторяется и не заявляется public evidence. Затем точный остаток E/J/F,
+registry readiness не повышена.
 
 ### E: public outside-safe Code characterized; declared выполняется — 2026-09-30
 

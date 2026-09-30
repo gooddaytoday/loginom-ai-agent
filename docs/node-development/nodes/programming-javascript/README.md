@@ -63,7 +63,9 @@ native input bytes до JS и полный typed output/cleanup подтверж
 На `0be6a698c1` native safe-int644×1 подтверждён в обоих modes: input bytes
 и exact output decimal strings. Native civil Date3×1 также подтверждён Code/declared2/2 на `7d43cea036`: input
 bytes/owned civil attestation и полный millisecond output без UTC/epoch claims.
-Следующий шаг — outside-safe native input и E остаток J06–J08, затем остальные J.
+Outside-safe2/2 characterized на `81b4bfef74`: native9007199254740993
+переходит в9007199254740992 в обоих modes, общей гарантии int64 нет.
+Следующий шаг — native cardinality и E остаток J06–J08, затем остальные J.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 

@@ -109,7 +109,7 @@ Fixed Code one-row output и empty input также приняты на `2eef052
 `64221b01c8`. На `d4898cac03` отдельно приняты все пять fixed declared scalar outputs
 (String NULL/empty, Boolean, real, safe integer, civil Date) с native metadata/
 source/full typed audits и cleanup. Следующий результат E —
-outside-safe native input transport и точный остаток J06–J08.
+native cardinality и точный остаток J06–J08.
 Public native real input bytes/identity-copy Code/declared2/2 приняты на
 `a679a63595`; native Boolean2/2 также принят на `14965ef148`, independent
 audits/cleanup; native String2/2 принят на `800381592a` с тем же уровнем
@@ -117,6 +117,8 @@ evidence, включая NULL/empty/Unicode/LF. Native safe-int642/2 приня�
 `0be6a698c1` с input bytes/exact decimal strings/audits/cleanup.
 Native civil Date2/2 принят на `7d43cea036`: input bytes/owned civil attestation
 и полный identity-copy output с milliseconds, без UTC/epoch claims.
+Public outside-safe2/2 characterized на `81b4bfef74`: точный native input,
+9007199254740993→9007199254740992 в обоих modes; общей гарантии int64 нет.
 Native output bytes не проверены. Fixed declared named access/
 output0/1/N/empty input тоже приняты на `d4898cac03` (9/9 runs, independent audit
 и cleanup); P1 Stop/cancel принят
