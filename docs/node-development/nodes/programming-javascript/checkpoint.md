@@ -29,8 +29,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** D — полный declared lifecycle с Save/cold
-из [плана](plan.md); сейчас D04/profile332/exec92456 наблюдает точные settings
-до/после Done после D02 drift (подробности ниже). Fixed C public
+из [плана](plan.md); сейчас исправленный D05/profile334/exec19797 проходит полный
+writer/Save после установленной причины D02 drift (подробности ниже). Fixed C public
 Code/Save/independent cold и private G3 bridge
 подтверждены ниже. Ранний P1 Stop/cancel подтверждён ниже. Ранний private
 бизнес 6×4 для обоих base modes и code changed/reordered проверен ниже. B уже подтвердил
@@ -695,10 +695,18 @@ Guard source/settings не ослаблен. 109 targeted tests PASS, log SHA256
 `6f0b050e6e28d7e217c77d39047666a94d2bc238cde5bbb66f2ab3cb455a5cca`;
 это адресный offline audit actual metadata, ещё не новый live PASS.
 
-Exact own recovery05/profile333/exec39147 выполняется. После verified cleanup
-и process absence — fresh D05 на source `418abc95c0`, полный writer/Save audit,
-затем независимый cold. Full client suite этой версии запущен отдельно
-(exec85959, log `d-settings-fixed-client-suite-01.log`), результата пока нет.
+Exact own headed recovery05/profile333/exec39147/exit0 закрыл Package1/
+`jsteach:3669` (создание03:25/disconnect03:29 UTC); package/session absence
+подтверждены отдельными Refresh, admin logout/browser close/process absence
+проверены. Receipt SHA256
+`b2712c3d56dadafccfbc958a7d978739f75eb37260b4300e5ecb00d2171ffbda`.
+Под registry.lock назначен fresh profile334; ordinary headed
+`d-public-declared-save-05`/exec19797/source `418abc95c0` выполняется.
+Наблюдать тот же handle; после результата полный writer/Save audit и cleanup,
+затем независимый cold. Full client suite этой версии (exec85959/exit0):
+2977 PASS/10 SKIP/0 FAIL,2987 total,157,671 секунд; log SHA256
+`a9d3103254792452854b49053c5ab4cfd17c94fbc7cd45508fb6f23b931430ea`.
+Browser geometry tests skipped без назначенного browser; headless не запускался.
 Цель active, D/E/F/candidate/CLI открыты; source текущего browser не менять.
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
