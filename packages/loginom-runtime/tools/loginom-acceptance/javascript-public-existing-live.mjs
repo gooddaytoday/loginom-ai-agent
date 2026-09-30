@@ -11,6 +11,8 @@ import {nodeResultReply} from '../../client/lib/node-result-reply.mjs';
 import {javascriptPublicCodePins} from './javascript-public-code-live.mjs';
 import {javascriptPublicSourceCase,javascriptPublicSourceOutputOracle} from './javascript-public-source-cases.mjs';
 import {javascriptDiscoveryProbe,javascriptDiscoveryOracle} from './javascript-discovery-probes.mjs';
+import {javascriptStopProbe} from './javascript-stop-case.mjs';
+import {stopJavascriptPublicExecution} from './javascript-public-stop.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 
@@ -65,7 +67,7 @@ export async function readJavascriptPublicExistingSource({runtime,prepared,node,
 
 export async function runJavascriptPublicExistingLive({page,prepared,node,targetOrigin,redactor,record,
   report,save,deadline,onPending,schemaMode,graph,inputVariant='base',sourceCaseId=null,schemaRefusalCaseId=null,
-  wizardRefusalCaseId=null,readGraph}) {
+  wizardRefusalCaseId=null,stopCaseId=null,readGraph}) {
   need(['code','declared'].includes(schemaMode)&&['base','changed','reordered'].includes(inputVariant)&&Date.now()+660000<deadline,
     'Public existing JavaScript mode/original budget unavailable');
   const sourceCase=sourceCaseId===null?null:javascriptPublicSourceCase(sourceCaseId);
@@ -74,11 +76,19 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
     &&schemaRefusalCaseId===(schemaMode==='code'?'code-to-declared':'declared-to-code'),'Public schema refusal requires its fixed mode/base');
   need(wizardRefusalCaseId===null||sourceCaseId===null&&schemaRefusalCaseId===null&&inputVariant==='base'
     &&['syntax-'+schemaMode,'throw-'+schemaMode].includes(wizardRefusalCaseId)&&typeof readGraph==='function','Public wizard refusal requires its fixed mode/base');
+  need(stopCaseId===null||stopCaseId==='stop-code'&&schemaMode==='code'&&inputVariant==='base'
+    &&sourceCaseId===null&&schemaRefusalCaseId===null&&wizardRefusalCaseId===null&&typeof readGraph==='function',
+  'Public Stop requires its fixed Code mode/base');
   const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-'+inputVariant);
   const base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'});
   const support=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor});
   const runtime=createActionRuntime({pinned:await javascriptPublicCodePins(),allowCandidate:true,
-    targetOrigin,targetBuild:'7.4.2',redactor,onRecord:record,
+    targetOrigin,targetBuild:'7.4.2',redactor,onRecord:async event=>{
+      if(stopCaseId!==null&&event.phase==='node_phase_prepared'&&event.receipt?.phase==='materialization_start'
+        &&event.operation_id===report.public_existing?.stop?.operation_id)
+        report.public_existing.stop.launch_window_started=Date.now();
+      return record(event);
+    },
     execute:source=>Function('return ('+source+')')()(page),
     nodeApplyHandlers:new Map([...base.nodeApplyHandlers,...support.nodeApplyHandlers]),
     nodeApplyDriverFactory:options=>options.operation.parameters.target.type==='programming.javascript'
@@ -179,7 +189,38 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
       independent_source:{complete:true,...javascriptSourceIdentity(after.source_text),chunks:after.chunks,source_read_operation_id:after.source_read_operation_id}});
     onPending(false);await save();
   }
-  const source_text=sourceCase?.source??before.source_text+(wizardRefusalCaseId===null
+  if(stopCaseId!==null){
+    const fixed=javascriptStopProbe(),identity=javascriptSourceIdentity(fixed.source),operation_id='js-public-stop-'+randomUUID();
+    need(fixed.short.source===before.source_text,'Public finite Stop saved source differs');
+    report.scope='isolated E public finite native Stop and NEW same-node short repair';report.explicit_execution_limit=3;
+    report.public_existing.stop={status:'RUNNING',case_id:stopCaseId,operation_id,node,
+      previous_source_sha256:before.source_sha256,finite_source:identity,finite_loop:fixed.finite_loop,graph_before:graph};
+    const request={operation_id,contract_revision:'1.0.0',document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,
+      target:{kind:'existing',type:'programming.javascript',ref:node},inputs:[],mode:'script',
+      parameters:{source_text:fixed.source,expected_source_sha256:before.source_sha256,schema_mode:schemaMode},mappings:[],finish:'execute',
+      read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},
+      budgets:{configure_ms:600000,execute_ms:60000,total_ms:660000}};
+    report.stage='public-existing-native-stop';await save();
+    const job=await stopJavascriptPublicExecution({runtime,request,node,record,deadline:deadline-60000,
+      onProgress:async job=>{report.public_existing.stop.progress=job.progress;await save();}});
+    report.public_existing.stop.job=job;onPending(false);await save();
+    const elapsed_ms=Date.now()-report.public_existing.stop.launch_window_started;
+    need(Number.isFinite(elapsed_ms)&&elapsed_ms>0&&elapsed_ms<=60000&&!runtime.hasUnsettledWork(),
+      'Public finite Stop exceeded the original 60s launch/terminal window');
+    need(new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(job.outcome.output).valid,'Public Stop violates diagnostic schema');
+    const compact=nodeResultReply(job,{userProfile:true}).structuredContent;
+    need(JSON.stringify(compact.error)===JSON.stringify(job.outcome.output.error),'Public Stop user-v1 error differs');
+    report.stage='public-existing-native-stop-source-after';onPending(true);await save();
+    const after=await readSource(),afterGraph=await readGraph();
+    need(after.source_text===fixed.source&&after.source_sha256===identity.source_sha256&&!runtime.hasUnsettledWork(),
+      'Public Stop committed source changed');
+    repairBaseline=after.source_sha256;
+    Object.assign(report.public_existing.stop,{status:'OBSERVED',elapsed_ms,user_result:compact,graph_after:afterGraph,
+      independent_source:{complete:true,...javascriptSourceIdentity(after.source_text),chunks:after.chunks,source_read_operation_id:after.source_read_operation_id}});
+    onPending(false);await save();
+  }
+  const source_text=sourceCase?.source??before.source_text+(stopCaseId!==null
+    ?'\n// E: public native Stop repair on the SAME node.\n':wizardRefusalCaseId===null
     ?'\n// E: existing node source revision; business logic preserved.\n'
     :'\n// E: public native refusal repair on the SAME node.\n');
   const expected=javascriptSourceIdentity(source_text),operation_id='js-public-existing-'+randomUUID();
@@ -192,7 +233,8 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
     budgets:{configure_ms:remaining,execute_ms:300000,total_ms:remaining}};
   Object.assign(report.public_existing,{operation_id,previous_source_sha256:repairBaseline,
     source_sha256:expected.source_sha256,oracle_sha256:probe.oracle_sha256,graph_before:graph,
-    ...(wizardRefusalCaseId!==null?{wizard_refusal_case_id:wizardRefusalCaseId,repair_operation_id:operation_id}:{})});
+    ...(wizardRefusalCaseId!==null?{wizard_refusal_case_id:wizardRefusalCaseId,repair_operation_id:operation_id}:{}),
+    ...(stopCaseId!==null?{stop_case_id:stopCaseId,repair_operation_id:operation_id}:{})});
   report.stage='public-existing-apply';await save();
   await record({phase:'javascript_existing_workflow_blockers_observed',operation_id,
     blockers:await page.evaluate(()=>[...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')]

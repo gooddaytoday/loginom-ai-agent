@@ -79,7 +79,7 @@ import {runJavascriptStopProbe} from './javascript-stop-probe.mjs';
 import {javascriptPublicTypedIds,javascriptPublicCodeProbe,runJavascriptPublicCodeLive} from './javascript-public-code-live.mjs';
 import {runJavascriptPublicExistingLive} from './javascript-public-existing-live.mjs';
 
-export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null}={}) {
+export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null,publicSourceCaseId=null,publicSchemaRefusalCaseId=null,publicWizardRefusalCaseId=null,publicStopCaseId=null}={}) {
 process.umask(0o077);
 if(publicProbeId!==null&&(!javascriptPublicTypedIds.includes(publicProbeId)||coldReader||packageFile||batchCases!==null
   ||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null||existingLifecycle!==null))
@@ -95,6 +95,9 @@ if(publicSchemaRefusalCaseId!==null&&(publicSourceCaseId!==null||existingInputVa
 if(publicWizardRefusalCaseId!==null&&(publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null
   ||existingInputVariant!==null||existingLifecycle===null||!['syntax-'+existingLifecycle,'throw-'+existingLifecycle].includes(publicWizardRefusalCaseId)))
   throw Error('Public wizard refusal requires its separate fixed existing mode/base entrypoint');
+if(publicStopCaseId!==null&&(publicStopCaseId!=='stop-code'||existingLifecycle!=='code'||existingInputVariant!==null
+  ||publicSourceCaseId!==null||publicSchemaRefusalCaseId!==null||publicWizardRefusalCaseId!==null))
+  throw Error('Public Stop requires its separate fixed saved Code entrypoint');
 if(existingInputVariant!==null&&(existingLifecycle===null||!['changed','reordered'].includes(existingInputVariant)))
   throw Error('Existing input freshness requires its assigned lifecycle and fixed variant');
 if(coldReader&&(batchCases!==null||nativeInputOnly||nativeRoundtrip||sourceReadCycle||persistenceMode!==null))throw Error('Cold reader requires its separate private entrypoint');
@@ -1904,7 +1907,7 @@ try {
         onPending:value=>{managedCloseUncertain=value;},schemaMode:existingLifecycle,
         graph:existingInputVariant===null?graph:await executionRuntime.graph(),
         inputVariant:existingInputVariant??'base',sourceCaseId:publicSourceCaseId,schemaRefusalCaseId:publicSchemaRefusalCaseId,
-        wizardRefusalCaseId:publicWizardRefusalCaseId,readGraph:()=>executionRuntime.graph()});
+        wizardRefusalCaseId:publicWizardRefusalCaseId,stopCaseId:publicStopCaseId,readGraph:()=>executionRuntime.graph()});
       if(existingInputVariant!==null){report.explicit_execution_limit=3;
         report.scope='isolated E existing input freshness: one import and two JavaScript Execute; fixed '+existingInputVariant;}
       report.public_existing.graph_after=await executionRuntime.graph();await save();
