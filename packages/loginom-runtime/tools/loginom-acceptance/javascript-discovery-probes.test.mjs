@@ -217,7 +217,7 @@ test('empty input keeps the exact named-access source and has a distinct fixed e
 });
 
 test('fixed declared counterparts keep body, schema and independent values while removing only AssignColumns',()=>{
- for(const id of javascriptDiscoveryIds.filter(id=>id.startsWith('declared-'))){
+ for(const id of javascriptDiscoveryIds.filter(id=>id.startsWith('declared-')&&id!=='declared-g5-native-cardinality-empty')){
   const d=javascriptDiscoveryProbe(id),c=javascriptDiscoveryProbe(id.slice('declared-'.length));
   assert.equal(d.source,c.source.split('\n').filter((_,index)=>index!==1).join('\n'));
   assert.deepEqual(d.schema,c.schema);assert.deepEqual(d.expected,c.expected);
@@ -225,4 +225,13 @@ test('fixed declared counterparts keep body, schema and independent values while
   assert.equal(d.native_input_fixture,c.native_input_fixture);
   assert.equal(d.source.includes('OutputTable.AssignColumns'),false);
  }
+});
+
+
+test('canonical native empty is independently authored declared-only, never a stripped Code counterpart',()=>{
+ const probe=javascriptDiscoveryProbe('declared-g5-native-cardinality-empty');
+ assert.equal(probe.schema_mode,'declared');assert.equal(probe.native_input_fixture,'cardinality-empty');
+ assert.deepEqual(probe.expected,[]);assert.deepEqual(probe.schema,[{name:'Value',label:'Value',type:'integer'}]);
+ assert.doesNotMatch(probe.source,/AssignColumns|Append|Set\(/);
+ assert.throws(()=>javascriptDiscoveryProbe('g5-native-cardinality-empty'),/Unknown isolated discovery probe/);
 });
