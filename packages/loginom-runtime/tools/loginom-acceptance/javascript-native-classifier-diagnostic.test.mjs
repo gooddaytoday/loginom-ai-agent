@@ -91,7 +91,7 @@ for(const transportFails of [false,true])test('actual live catch/finally retains
   const start=source.lastIndexOf("} catch(error) {\n  report.status='FAILED';"),end=source.lastIndexOf('\n\n}\nif(process.argv');
   assert.ok(start>0&&end>start);
   const events=[];
-  const sandbox=vm.createContext({captureJavascriptNativeClassifierDiagnostic,
+  const sandbox=vm.createContext({captureJavascriptNativeClassifierDiagnostic,focusGuard:null,managedCloseUncertain:false,
     evaluateDiagnostic:async(fn,binding)=>{events.push('diagnostic');assert.equal(fn,diagnoseJavascriptNativeClassifier);assert.equal(binding.context.node_id,'n');if(transportFails)throw Error('SECRET');return run().output;},
     closed:()=>events.push('browser-close')});
   const outcome=await vm.runInContext(`(async()=>{

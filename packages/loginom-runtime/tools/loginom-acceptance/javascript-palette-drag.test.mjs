@@ -51,7 +51,7 @@ test('mouse-up failure still releases Alt, and any failed release forbids contin
 
 function topology(){
  const ref=id=>({document_id:'doc',workflow_id:'flow',node_id:id});
- const node=id=>({ref:ref(id),type:id==='input'?'imports.text':'bg-vendor-icon-javascript',label:id,
+ const node=id=>({ref:ref(id),type:id==='input'?'imports.text':'programming.javascript',label:id,
   inputs:id==='input'?[]:[0],outputs:[0],other_ports:[],dom_epoch:1,position:{x:0,y:0},locked:false});
  const before={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:{workflow_id:'flow'},dom_epoch:1,
   nodes:[node('input'),node('previous-js')],links:[{source:'input',output:0,target:'previous-js',input:0}],foreign_links:[]};
