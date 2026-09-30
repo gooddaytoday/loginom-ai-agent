@@ -1,5 +1,6 @@
+import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
-import { chmod, cp, mkdir, readdir, readFile, readlink, realpath, rename, rm, stat } from "node:fs/promises"
+import { cp, mkdir, readdir, readFile, readlink, realpath, rename, rm, stat } from "node:fs/promises"
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { $ } from "bun"
 import { nativeResourceCandidates } from "./native-resource-candidates"
@@ -146,11 +147,10 @@ export async function stageResources(input: {
   if (process.platform === "linux") {
     // Chrome for Testing ships chrome_sandbox, while Chromium's fallback looks for chrome-sandbox.
     // DEB installs these files as root; retain the standard setuid sandbox for kernels without user namespaces.
-    await cp(
-      join(dirname(join(staging, browser)), "chrome_sandbox"),
-      join(dirname(join(staging, browser)), "chrome-sandbox"),
-    )
-    await chmod(join(dirname(join(staging, browser)), "chrome-sandbox"), 0o4755)
+    // Bun's fs.chmod clears the setuid bit, so the mode has to be applied by /bin/chmod.
+    const sandbox = join(dirname(join(staging, browser)), "chrome-sandbox")
+    await cp(join(dirname(join(staging, browser)), "chrome_sandbox"), sandbox)
+    await setLinuxSandboxMode(sandbox)
   }
   if (process.platform === "darwin" && input.flavor === "cli") await buildKeychain(join(staging, "bin"))
   await mkdir(join(staging, "licenses"))
@@ -222,6 +222,17 @@ export async function stageResources(input: {
   await rm(destination, { recursive: true, force: true })
   await buildPhase(`${input.flavor}-resource-publish`, () => rename(staging, destination))
   return { files: files.length, destination }
+}
+
+// Chromium refuses to start unless this helper is mode 4755. Ownership is applied later, at install or package time.
+export async function setLinuxSandboxMode(path: string) {
+  await new Promise<void>((resolve, reject) => {
+    execFile("/bin/chmod", ["4755", path], { timeout: 30_000 }, (error) => {
+      if (error) reject(error)
+      else resolve()
+    })
+  })
+  if (((await stat(path)).mode & 0o7777) !== 0o4755) throw new Error("LOGINOM_SANDBOX_MODE_INVALID")
 }
 
 // Catalog compatibility is pinned independently of runtime binaries. Selecting
