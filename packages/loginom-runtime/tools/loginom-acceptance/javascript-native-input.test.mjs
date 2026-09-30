@@ -572,14 +572,14 @@ test('count loader pin verification rejects missing/changed actual source',()=>{
 
 // Exercise the public operator boundary with the production native decoder and
 // provenance checker; no browser action is available at this pure boundary.
-for(const fixtureId of ['real','boolean','string'])test('public native '+fixtureId+' admission requires exact before-JS bytes, typed cells, owner and released reads',async()=>{
+for(const fixtureId of ['real','boolean','string','integer-safe'])test('public native '+fixtureId+' admission requires exact before-JS bytes, typed cells, owner and released reads',async()=>{
  const f=await fake({fixtureId}),raw=await readJavascriptNativeInput(f.page,f.b,decodeVariantFrame,{operationId:'public-input'});
  const lifecycle=await javascriptNativeInputStatus(f.page),binding={...f.b,read_id:'public-input'};
  const provenance=nativeInputProvenance(sourceEvidence(fixtureId));
  const exact=verifyNativeInputRead(raw,{binding,lifecycle,provenance});
  const fixed=javascriptNativeFixture(fixtureId),table={...ui(),row_count:fixed.rows,sample_rows:fixed.rows,
    schema:[{name:'Value',label:'Value',type:fixed.type}],sample:fixed.values.map(value=>[{type:fixed.type,value,is_null:value===null,
-     precision:value===null?'exact_null':{real:'17_significant_digits',boolean:'exact_boolean',string:'display_text'}[fixed.type]}])};
+     precision:value===null?'exact_null':{real:'17_significant_digits',boolean:'exact_boolean',string:'display_text',integer:'exact_integer'}[fixed.type]}])};
  const input={node:provenance.node,table:{...table,port_guid:binding.port_guid,execution_id:provenance.execution.execution_id},
    native_input:{native:{exact,raw,binding,lifecycle}}};
  for(const [id,mode] of [['g5-native-'+fixtureId,'code'],['declared-g5-native-'+fixtureId,'declared']]){
@@ -588,7 +588,7 @@ for(const fixtureId of ['real','boolean','string'])test('public native '+fixture
   for(const change of [x=>x.native_input.native.lifecycle.pending=1,
     x=>x.native_input.native.lifecycle.releasedResponses=fixed.rows-1,
     x=>x.native_input.native.exact.js_created=true,
-    x=>Object.assign(x.native_input.native.exact.cells[2].native,{bytes_le:'0000000000000000',utf8_hex:''}),
+    x=>Object.assign(x.native_input.native.exact.cells[fixed.type==='integer'?1:2].native,{bytes_le:'0000000000000000',utf8_hex:''}),
     x=>x.node.document_id='foreign',x=>x.node.node_id='foreign',
     x=>x.table.execution_id='stale',x=>x.table.sample[2][0].value=0,
     x=>x.table.schema[0].name='Foreign',x=>delete x.native_input]){
