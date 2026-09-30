@@ -19,3 +19,11 @@ test('existing entrypoints require known mode and strict separate saved-package 
     }
   }
 });
+
+test('schema refusal entrypoint rejects unknown case, wrong mode and mixed edit cases before config',async()=>{
+ for(const options of [{coldReader:true,existingLifecycle:'code',publicSchemaRefusalCaseId:'unknown'},
+  {coldReader:true,existingLifecycle:'declared',publicSchemaRefusalCaseId:'code-to-declared'},
+  {coldReader:true,existingLifecycle:'code',publicSchemaRefusalCaseId:'code-to-declared',publicSourceCaseId:'fidelity-bound-code'},
+  {coldReader:true,existingLifecycle:'code',publicSchemaRefusalCaseId:'code-to-declared',existingInputVariant:'changed'}])
+  await assert.rejects(()=>runJavascriptOperator(paths,options),/Public schema refusal|Public source case/);
+});

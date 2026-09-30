@@ -13,6 +13,7 @@ import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
 import {validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
 import {javascriptExistingLifecycleBaseline} from './javascript-existing-lifecycle.mjs';
+import {admitJavascriptExistingSchema} from './javascript-existing-schema-refusal.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
@@ -163,8 +164,8 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           {source_text:request.parameters.source_text,
             ...(request.target.kind==='existing'?{expected_source_sha256:request.parameters.expected_source_sha256}:{})});
         if(request.target.kind==='existing'){
-          existingBaseline=javascriptExistingLifecycleBaseline({receipt:admitted,snapshot:sourceSnapshot,
-            parameters:request.parameters,owner});
+          existingBaseline=await admitJavascriptExistingSchema({receipt:admitted,snapshot:sourceSnapshot,
+            parameters:request.parameters,owner,record:onRecord,deadline:ctx.deadline});
           expected??=admitted.effective_source;
           need(admitted.effective_source.source_sha256===expected.source_sha256,
             'JavaScript existing effective source admission differs');
