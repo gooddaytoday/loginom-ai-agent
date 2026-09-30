@@ -46,6 +46,55 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J12/J25: runtime native Code Next refusal/recovery — 2026-09-30
+
+Child freeze `010dca575d51074073c37c3fc1153bb30fdd501d` реализует owned
+Code Next error barrier. Source-backed stage/dialog readers перенесены из
+operator в client без вызова native RPC; operator переиспользует эти readers.
+Retained selection/editor, actual package ancestry, account/build/origin,
+целый exact draft, native Ext control и hit-test проверяются перед каждым
+однократным btnError/OK. Новый отказ отличают от старой кнопки по свежему
+tooltip либо наблюдённому pending interval. Все intent/returned/refusal ACKs
+неизменяемы и ограничены первоначальным deadline; unknown reply/owner/Close/ACK
+не разрешает discard/replay.
+
+После known diagnostic и independently verified OK выполняется один Close
+своего изменённого draft и dispose. Existing handler затем делает NEW full
+source admission/discard, проверяет полный семантический native settings/schema
+и complete graph против baseline до мутации. Только этот proof разрешает
+`node_finish` → typed FAILED/cleanup=true/configuration=discarded без output
+refresh/explicit Execute. User-v1 содержит bounded redacted tooltip/dialog,
+признаки truncation, class/position только из согласованного native текста
+(иначе unrecognized), rejected source digest и инструкцию NEW operation ID /
+SAME node / actual retained expected digest. Registry readiness не повышена.
+
+Проверки actual generated browser bodies + recovery:99PASS до дополнительной
+защиты exact retained editor/source; окончательная адресная серия101PASS.
+Full client actual terminal exec76162 exit0:3094PASS/10SKIP/0FAIL,3104 tests;
+`e-native-wizard-refusal-client-all-01.log`, SHA256
+`7bfe218cc40cf804f1c85d353c43a36fd98371c90d8941c3df2cbf8139a91c05`.
+Full operator exec53843 exit0:18192PASS/0FAIL;
+`e-native-wizard-refusal-operator-all-01.log`, SHA256
+`bafa86b889f91eaf0e32cb14d425655450516956ac8c13704a80d4a299351197`.
+Оба журнала находятся в прежней приватной кампании. Ошибки ранних fixtures
+сохранены; shape/runtime guards не ослаблены. Trailing blank lines устранены
+перед final freeze; `git diff --check` PASS. Typecheck не заявлен: изменены mjs.
+
+Это source/local proof, **не public native-error live PASS**. Следующее действие:
+фиксированный public optional-chain SyntaxError case на saved C, заранее
+закреплённые oracle/auditor и meaningful negatives, затем ordinary headed
+fresh385 с registry handoff на новый freeze. После отказа отдельная NEW
+операция исправляет source на SAME node и доказывает2 fresh Execute/full6×4.
+D повторяется лишь для отличающегося declared scope. До live не менять frozen
+source и не перепроверять прежние source fidelity/mode refusals.
+Текущая ветка обрабатывает Code Next; native Done refusal, technical details
+при недостаточном основном тексте, public sync throw/Stop/recovery и прочие
+оставшиеся J/F требуют своей проверки и не объявлены закрытыми.
+Registry profile384 остаётся closed_verified/active_exec=null/active evidence=null,
+actual browser process отсутствует; fresh385 не назначен, live не запущен.
+Goal active. Память ошибок не возвращала; routine health не выполнялся.
+`acceleration-review.md` и historical untracked child files не добавлены.
+
 ### Следующее продолжение E/J12/J25: native wizard refusal/repair — 2026-09-30
 
 Текущий docs HEAD после этой записи; child `3f3366e678` clean tracked. Registry

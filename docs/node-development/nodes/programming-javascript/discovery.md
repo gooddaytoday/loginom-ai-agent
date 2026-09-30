@@ -32,6 +32,15 @@ independent cold подтвердил source/settings/new Execute/all6×4 cells 
 cleanup3/3. Fixed D принят на том же isolated уровне; E/F и aggregate
 gates открыты; evidence/hashes и следующий шаг — в текущей части checkpoint.
 
+E/J12/J25 source/local milestone `010dca575d`: runtime распознаёт свежий
+owned Code Next refusal, читает native error dialog, закрывает его OK и
+разрешает один discard своего draft. Existing handler независимо перечитывает
+полный committed source/settings/schema и complete graph перед typed FAILED;
+диагностика доставляется через bounded redacted user-v1. Full client3094PASS/
+10SKIP, operator18192PASS. Public native-error live/repair пока **не выполнен**;
+Done refusal/technical details и прочий J/F остаток сохраняются. Следующий
+fixed ordinary headed запуск и контрольные суммы — в текущей части checkpoint.
+
 | Gate | Непосредственно наблюдено | Решение / точный остаток 0B и следующий тест | Реализация / приёмка (фазы 1–6) |
 | --- | --- | --- | --- |
 | G1 — узел и редактор | Собственный JS GUID, иконка `bg-vendor-icon-javascript`. Для несоединённого узла fresh headed проход подтвердил страницы `TuneDataSourceInputPortWizard` index0 → `JavaScriptColumnsWizard` index1 → `JavaScriptCodeWizard` index2 → `DoneWizard` index4 с условно пропущенным index3. При уже подключённом input0 первая страница пропускается. CodeMirror 4.11.1, `mode=javascript`, `readOnly=false`, отступ 4, `smartIndent/electricChars=true`; код прочитан целиком и восстановлен после G4 probe. Собственный code controller держит `FEngine`/`FModuleSystem`: native proxy одного сеанса, но разных remote objects и interfaces. Два сохранённых `.lgp` 7.4.2 содержат JS `VendorGuid=28865f89-eea0-4143-b155-291791324a4b` и сериализованный `TBGJavaScriptEngine`. | Открыто: runtime component/FullType и наличие assistant/engine selector. Адресный owned read должен установить их либо обосновать явную замену FullType проверенным identity-контрактом; иконка/XML сами это не закрывают. Условные маршруты перечислить по фактическим страницам, не индексам. | Owned navigation/focus/foreign UI во всех поддержанных путях new/existing; J22 по наблюдению, без вызова помощника. Ещё не покрытые маршруты проверять при их реализации. |
