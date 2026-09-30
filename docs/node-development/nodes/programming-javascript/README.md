@@ -52,8 +52,9 @@ existing comment edit/Execute/read прошёл отдельно для code и 
 На `bccc8a0a08` fixed public Code scalar output5/5, named access и empty
 output также прошли independent typed audits и cleanup. На `2eef052e7a` и
 `64221b01c8` приняты one-row output и empty input с полной схемой/read.
-На `d4898cac03` declared String NULL/empty прошёл отдельный independent audit
-и cleanup; остальные declared scalar/cardinality cases выполняются.
+На `d4898cac03` все пять fixed public declared scalar outputs прошли отдельные
+independent audits и cleanup: String NULL/empty, Boolean, real, safe integer,
+civil Date. Named access/cardinality/empty input выполняются.
 Следующий шаг — E остаток J06–J08, затем остальные J.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
