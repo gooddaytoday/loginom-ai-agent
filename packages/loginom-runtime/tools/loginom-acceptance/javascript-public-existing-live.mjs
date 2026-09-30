@@ -49,12 +49,23 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
   Object.assign(report.public_existing,{operation_id,previous_source_sha256:before.source_sha256,
     source_sha256:expected.source_sha256,oracle_sha256:probe.oracle_sha256,graph_before:graph});
   report.stage='public-existing-apply';await save();
+  await record({phase:'javascript_existing_workflow_blockers_observed',operation_id,
+    blockers:await page.evaluate(()=>[...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')]
+      .filter(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden')
+      .map(e=>({tid:e.getAttribute('data-tid'),role:e.getAttribute('role'),classes:e.className,
+        connected:e.isConnected,check_visibility:e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true}),
+        text:e.innerText?.slice(0,300),ancestors:Array.from((function*(node){while(node){yield node;node=node.parentElement;}})(e))
+          .slice(0,12).map(node=>({tid:node.getAttribute('data-tid'),classes:node.className,
+            display:getComputedStyle(node).display,visibility:getComputedStyle(node).visibility,
+            opacity:getComputedStyle(node).opacity}))})))});
   let job=await dispatchNodeApi(runtime,'dock_node_apply',request);
   while(job.state==='running'){
     job=await dispatchNodeApi(runtime,'dock_node_wait',{operation_id,timeout_ms:30000});
     report.public_existing.progress=job.progress;await save();
   }
   report.public_existing.job=job;await save();
+  if(job.state==='settled'&&job.outcome?.status==='NOT_APPLIED'&&job.outcome.effect_possible===false
+    &&job.outcome.cleanup_complete===true&&!runtime.hasUnsettledWork())onPending(false);
   const result=job.outcome?.output,table=result?.output?.ports?.[0];
   need(job.outcome?.status==='SUCCEEDED'&&result.status==='SUCCEEDED'&&result.cleanup_complete===true
     &&JSON.stringify(result.node)===JSON.stringify(node)&&result.configuration?.readback?.schema_mode===schemaMode
