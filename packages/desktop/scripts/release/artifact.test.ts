@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { $ } from "bun"
-import { verifyMacBrowserSignature } from "./verify-macos"
+import { verifyMacArtifact, verifyMacBrowserSignature } from "./verify-macos"
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -285,6 +285,75 @@ test("native executable validation rejects another platform's binary", () => {
   expect(() => verifyExecutable(pe(), "darwin-arm64")).toThrow("RELEASE_EXECUTABLE_INVALID")
   expect(() => verifyExecutable(mac, "linux-x64")).toThrow("RELEASE_EXECUTABLE_INVALID")
 })
+
+test.skipIf(process.platform !== "darwin")(
+  "macOS verifies the main executable's bundle seal and rejects changed resources",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "loginom-bundle-signature-"))
+    const bundle = join(directory, "Loginom AI Agent.app")
+    const resources = join(bundle, "Contents/Resources/loginom")
+    const executable = join(bundle, "Contents/MacOS/loginom-ai-agent")
+    const artifact = join(directory, "agent.zip")
+    try {
+      await mkdir(resources, { recursive: true })
+      await mkdir(join(bundle, "Contents/MacOS"), { recursive: true })
+      await writeFile(join(directory, "main.c"), "int main(void) { return 0; }\n")
+      await writeFile(
+        join(bundle, "Contents/Info.plist"),
+        `<?xml version="1.0"?><plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>loginom-ai-agent</string>
+<key>CFBundleIdentifier</key><string>com.loginom.aiagent</string>
+<key>CFBundleDisplayName</key><string>Loginom AI Agent</string>
+<key>CFBundleShortVersionString</key><string>1.0.0</string>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+</dict></plist>`,
+      )
+      await $`clang -arch arm64 -mmacosx-version-min=14.0 ${join(directory, "main.c")} -o ${executable}`.quiet()
+      const code = await readFile(executable)
+      for (const file of ["node", "chrome"]) await writeFile(join(resources, file), code, { mode: 0o755 })
+      const inventory = JSON.stringify({
+        protocol: 1,
+        target: "darwin-arm64",
+        node: "node",
+        browser: "chrome",
+        files: ["node", "chrome"].map((path) => ({ path, sha256: hash(code) })),
+      })
+      await writeFile(join(resources, "resource-manifest.json"), inventory)
+      const marker = join(bundle, "Contents/Resources/marker.txt")
+      await writeFile(marker, "sealed resource")
+      await $`codesign --force --sign - ${bundle}`.quiet()
+      const manifest = decodeManifest({
+        ...releaseManifest("linux"),
+        target: { platform: "darwin", arch: "arm64", minimumOS: "14.0", backend: "v1" },
+        runtime: { ...releaseManifest("linux").runtime, resourcesSha256: hash(inventory) },
+        paths: {
+          ...releaseManifest("linux").paths,
+          node: "Contents/Resources/loginom/node",
+          chromium: "Contents/Resources/loginom/chrome",
+        },
+        installation: { ...releaseManifest("linux").installation, scope: "user" },
+        signing: { status: "ad-hoc", identity: "-", notarized: false },
+        artifacts: [{ file: "agent.zip", kind: "zip", bytes: 1, sha256: "8".repeat(64) }],
+      })
+      await $`ditto -c -k --keepParent ${bundle} ${artifact}`.quiet()
+      await mkdir(join(directory, "valid"))
+      expect(
+        await verifyMacArtifact({ manifest, artifact, kind: "zip", directory: join(directory, "valid") }),
+      ).toMatchObject({ signing: "ad-hoc", vendorCodeSignaturesVerified: true })
+      // This resource is outside the runtime inventory, so only the bundle
+      // signature can catch its modification.
+      await writeFile(marker, "changed after signing")
+      await rm(artifact)
+      await $`ditto -c -k --keepParent ${bundle} ${artifact}`.quiet()
+      await mkdir(join(directory, "altered"))
+      await expect(
+        verifyMacArtifact({ manifest, artifact, kind: "zip", directory: join(directory, "altered") }),
+      ).rejects.toThrow()
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+)
 
 test.skipIf(process.platform !== "darwin")(
   "upstream linker-signed browser code is checked without a nonexistent resource seal",
