@@ -42,6 +42,26 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: Declared changed input — принят — 2026-09-30
+
+`e-public-existing-declared-changed-01`, profile345, child `e1fd122320`,
+exec64748/exit0 — **OBSERVED**, independent audit **PASS**. Full changed input6×5
+применён к прежнему импорту; JS GUID `a6aef906-682a-4d08-8a1f-d8cf18a688f8`
+сохранён. Source S1 SHA256
+`f185abf2b6e10ad547d8393a680a9285eb3142916e4aedf0d54588def0abdc9a`
+совпадает с fixed E declared01; все native settings/declared schema, mappings
+и graph сохранены. Свежие completed IDs:
+`1790752550483-n0w99z282pi:1630:3` и `:1630:4`. Output6×4 exact: первая NetCents
+**2700**, сумма **2850**; independent public source-read PASS, Save отсутствует.
+
+Report SHA256 `e49c59be09cfe7369367f54d149734d4cbf6b57cae08f4add22274e9d277daab`,
+journal `ea708eb8230cb065cc9558d5e8d7de5af961ccd3a251b5227ae2c126dcb67e09`,
+audit receipt `7239a8c8621e7626a83bf5865d06b7cea5367f8749e84cb800c9b317932552f0`.
+Package/logout/browser/process cleanup проверен; registry reconciled. Только
+isolated public API/typed UI; native bytes/candidate/CLI не проверены.
+Declared/reordered01 запущен на fresh ordinary headed profile346, exec25498;
+результат пока не установлен. Остальные E/F открыты.
+
 ### E: Code reordered input — принят — 2026-09-30
 
 `e-public-existing-code-reordered-01`, profile344, child `e1fd122320`,
