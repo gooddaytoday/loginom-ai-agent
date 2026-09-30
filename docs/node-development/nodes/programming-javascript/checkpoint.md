@@ -45,6 +45,27 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: native Boolean Code принят; declared выполняется — 2026-09-30
+
+Code01/profile367/child `14965ef148`, exec59644/exit0 — OBSERVED,
+independent native audit PASS. Input3×1 NULL/false/true и native tag11/value
+bytes00/01 до JS/releases3/3 подтверждены; output3×1 Value/Boolean, source/
+13 phases/native mappings/graph/Views и package/logout/browser/process cleanup
+проверены. Completed IDs `1790760381452-od1pae1qi9:1209:3` / `:1209:4`.
+Report SHA256 `650d9cce45f315e39b73f43d7d1704f8baac519682ac4d7538f0689df7322730`,
+journal `701f573aba8adb5180e19d1650b5d70e3b6e6167a460ad442ae287fb05a980d4`,
+receipt `372bb7be34af3660ce883abe6091a49b5779809a773d46049507e0f2f27ac771`.
+Native input bytes доказаны, native output bytes/Save/cold/candidate/CLI нет.
+Profile367 reconciled/closed_verified.
+
+Fresh profile368 ordinary headed `e-public-types-native-boolean-declared-01`,
+exec91765 выполняется. Input прежний3×1; мастер задаёт Value/Boolean/discrete/
+output, body совпадает с real declared, source SHA256
+`901ed4c40c4a062feefa484dbb3213349e85dcf10fb20c43f6c2cb425b9639d5`.
+После terminal нужен independent native audit/cleanup/reconciliation. Затем
+native String/safe-int64/civil Date и точный остаток J/E/F. Результат этого
+прогона пока не установлен; full readiness не повышается.
+
 ### E: native Boolean подготовлен; Code live выполняется — 2026-09-30
 
 Frozen child `14965ef1482607419cfb0686e1477e0af0655900` расширяет только fixed operator allowlist/native input
