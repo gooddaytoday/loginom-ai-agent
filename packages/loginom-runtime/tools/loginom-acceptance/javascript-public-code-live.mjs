@@ -1,6 +1,7 @@
 // Acceptance operator only: the business source and oracle never enter the
 // candidate runtime or its knowledge bundle.
 import {randomUUID} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 import {AjvJsonSchemaValidator} from '../../client/node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js';
 import {createActionRuntime} from '../../client/lib/executor.mjs';
 import {createCandidateNodeSupport} from '../../client/lib/node-support.mjs';
@@ -12,6 +13,13 @@ import {javascriptDiscoveryProbe,javascriptDiscoveryOracle} from './javascript-d
 
 const need=(value,message)=>{if(!value)throw Error(message);};
 
+export async function javascriptPublicCodePins() {
+  const actions=JSON.parse(await readFile(new URL('../../executor/catalog/actions.json',import.meta.url),'utf8')).actions;
+  const selectors=JSON.parse(await readFile(new URL('../../executor/catalog/selectors.json',import.meta.url),'utf8')).selectors;
+  return {actions:new Map(actions.map(action=>[action.action_key,action])),
+    selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
+}
+
 export async function runJavascriptPublicCodeLive({page,prepared,input,targetOrigin,redactor,record,
   report,save,deadline,onPending}) {
   const probe=javascriptDiscoveryProbe('p1-business-code-base');
@@ -20,7 +28,7 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
     &&input.table.schema.length===5,'Public Code lifecycle requires complete own input and original time budget');
   const base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'});
   const code=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor});
-  const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},
+  const runtime=createActionRuntime({pinned:await javascriptPublicCodePins(),
     allowCandidate:true,targetOrigin,targetBuild:'7.4.2',redactor,onRecord:record,
     execute:source=>Function('return ('+source+')')()(page),
     nodeApplyHandlers:new Map([...base.nodeApplyHandlers,...code.nodeApplyHandlers]),
@@ -46,6 +54,13 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
   }
   report.public_code.job=job;await save();
   const result=job.outcome?.output,table=result?.output?.ports?.[0];
+  // A confirmed refusal before target creation leaves no JS wizard or graph
+  // effect to reconcile. Preserve the failed result and permit owned package cleanup.
+  if(job.state==='settled'&&job.outcome?.status==='NOT_APPLIED'&&job.outcome.effect_possible===false
+    &&job.outcome.cleanup_complete===true&&result?.node===null&&result.pending_phase===null
+    &&result.cleanup_complete===true&&result.effect_possible===false&&!runtime.hasUnsettledWork()){
+    onPending(false);await save();
+  }
   need(job.outcome?.status==='SUCCEEDED'&&result.status==='SUCCEEDED'&&result.cleanup_complete===true
     &&result.configuration?.readback?.source.sha256===probe.source_sha256
     &&result.configuration.readback.execution_effects.explicit_execute_requested===true
