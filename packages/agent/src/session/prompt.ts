@@ -814,6 +814,23 @@ const layer = Layer.effect(
             case "file:": {
               yield* Effect.logInfo("file", { mime: part.mime })
               const filepath = fileURLToPath(part.url)
+              if (part.mime === "application/x-loginom-package" || filepath.toLowerCase().endsWith(".lgp")) {
+                return [
+                  {
+                    messageID: info.id,
+                    sessionID: input.sessionID,
+                    type: "text",
+                    synthetic: true,
+                    text: `Attached Loginom package path: ${filepath}`,
+                  },
+                  {
+                    ...part,
+                    filename: part.filename ?? path.basename(filepath),
+                    messageID: info.id,
+                    sessionID: input.sessionID,
+                  },
+                ]
+              }
               const mime = (yield* fsys.isDir(filepath)) ? "application/x-directory" : part.mime
 
               const { read } = yield* registry.named()

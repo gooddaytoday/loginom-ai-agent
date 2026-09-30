@@ -100,6 +100,61 @@ describe("buildRequestParts", () => {
     )
   })
 
+  test("sends an attached Loginom package as a file path and not as bytes", () => {
+    const result = buildRequestParts({
+      prompt: [],
+      context: [],
+      images: [
+        {
+          type: "image",
+          id: "pkg",
+          filename: "demo.lgp",
+          sourcePath: "/home/user/packages/demo.lgp",
+          mime: "application/x-loginom-package",
+          dataUrl: "data:application/x-loginom-package;base64,UEsDBA==",
+        },
+      ],
+      text: "сделай отчёт",
+      messageID: "msg_lgp",
+      sessionID: "ses_lgp",
+      sessionDirectory: "/repo",
+    })
+
+    const file = result.requestParts.find((part) => part.type === "file")
+    expect(file?.type).toBe("file")
+    if (file?.type !== "file") return
+    expect(file.mime).toBe("application/x-loginom-package")
+    expect(file.filename).toBe("demo.lgp")
+    expect(file.url).toBe("file:///home/user/packages/demo.lgp")
+    expect(file.url.includes("base64")).toBe(false)
+  })
+
+  test("asks for a path when an attached Loginom package has no disk path", () => {
+    const result = buildRequestParts({
+      prompt: [],
+      context: [],
+      images: [
+        {
+          type: "image",
+          id: "pkg",
+          filename: "demo.lgp",
+          mime: "application/x-loginom-package",
+          dataUrl: "data:application/x-loginom-package;base64,UEsDBA==",
+        },
+      ],
+      text: "сделай отчёт",
+      messageID: "msg_lgp_missing",
+      sessionID: "ses_lgp_missing",
+      sessionDirectory: "/repo",
+    })
+
+    expect(result.requestParts.some((part) => part.type === "file")).toBe(false)
+    const note = result.requestParts.find((part) => part.type === "text" && part.synthetic)
+    expect(note?.type === "text" ? note.text : "").toContain("demo.lgp")
+    expect(note?.type === "text" ? note.text : "").toContain("no disk path")
+    expect(JSON.stringify(result.requestParts).includes("UEsDBA")).toBe(false)
+  })
+
   test("preserves reference aliases as directory file parts", () => {
     const result = buildRequestParts({
       prompt: [

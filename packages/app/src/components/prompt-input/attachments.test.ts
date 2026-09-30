@@ -22,6 +22,13 @@ describe("attachmentMime", () => {
     const file = new File([Uint8Array.of(0, 255, 1, 2)], "blob.bin", { type: "application/octet-stream" })
     expect(await attachmentMime(file)).toBeUndefined()
   })
+
+  test("accepts a Loginom package even when the bytes are binary", async () => {
+    const file = new File([Uint8Array.of(0x50, 0x4b, 0x03, 0x04, 0)], "demo.lgp", {
+      type: "application/octet-stream",
+    })
+    expect(await attachmentMime(file)).toBe("application/x-loginom-package")
+  })
 })
 
 describe("pickAttachmentFiles", () => {
