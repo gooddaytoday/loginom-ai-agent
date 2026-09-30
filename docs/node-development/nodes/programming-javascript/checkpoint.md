@@ -47,21 +47,23 @@ existing code-table через public API-path изолированного runt
 
 ### E: declared live — актуальная сводка — 2026-09-30
 
-Frozen child `d4898cac03ba8c6c5acc8ea20a15ad2094a49e31`: 2/9 fixed public declared cases приняли independent audit PASS. Каждый OBSERVED/terminal exit0, ordinary headed; input6×5 (empty-input0×5), точные output values/types/order/schema/precision, native declared columns/default usage,8 owned column steps,13 lifecycle phases, два свежих Execute, native mappings/graph/owned Views и независимый public source-read проверены. Package/logout/browser/process cleanup подтверждён отдельно для каждого run. Save/cold/native bytes/native-input roundtrip/candidate/CLI этими cases не доказаны.
+Frozen child `d4898cac03ba8c6c5acc8ea20a15ad2094a49e31`: 3/9 fixed public declared cases приняли independent audit PASS. Каждый OBSERVED/terminal exit0, ordinary headed; input6×5 (empty-input0×5), точные output values/types/order/schema/precision, native declared columns/default usage,8 owned column steps,13 lifecycle phases, два свежих Execute, native mappings/graph/owned Views и независимый public source-read проверены. Package/logout/browser/process cleanup подтверждён отдельно для каждого run. Save/cold/native bytes/native-input roundtrip/candidate/CLI этими cases не доказаны.
 
-| Case / profile / exec | Полный output | Свежие Execute IDs |
+| Case / exec | Полный output | Свежие Execute IDs |
 | --- | --- | --- |
 | declared-g5-boolean / 18891 | 3×1 | `1790757282280-7uzbhf85dse:1169:3` / `1790757282280-7uzbhf85dse:1169:4` |
 | declared-g5-null-empty / 81528 | 5×1 | `1790757124622-0822c6u8hxf8:1165:3` / `1790757124622-0822c6u8hxf8:1165:4` |
+| declared-g5-real / 67298 | 4×1 | `1790757444857-wejuxj3gnzk:1173:3` / `1790757444857-wejuxj3gnzk:1173:4` |
 
 Hashes исходных evidence/receipts (приватные файлы в campaign):
 
 - `e-public-types-declared-boolean-01`: source `0dbb4d93065eea06d74dc40b8313cb6051b083a56c04a8c97bc3cb0b33fb3fa4`; report `51ff6c0ace1628951ade00b10a73c49981dd933b1a05c545d48a102a0d66cfd3`; journal `ca2a5a80e240493c11851f6c7646505bc89b7651109a9c74c0a9ffb5980c6efc`; receipt `94704df3c88b39dce56d7cb6d25a066605634b130616dc2995c8b4bc8d7fd2e4`.
 - `e-public-types-declared-null-empty-01`: source `c4f47a99eadfa867febe11e78a13fec432056efdaca5b6c8203a9eb59fdaa03c`; report `54ed1883a8d128dc058a3d7eb31fa9903da05c1c0c23696fe06ccbfe1cbb5487`; journal `ef50d0a753a01172442c20003642dce0bfad3f6d4c83ca2da12a96737e951389`; receipt `6bb628c47d00c3801f8b5fc030cbee699e43ec04d1e26845b2e847d863ceaba9`.
+- `e-public-types-declared-real-01`: source `ef949879277275ec5697cf803d60816a9c049f64bc4cf8a741157b67783788ba`; report `b5cbc5beeed7d8483ee7f810854473fb87fe04a424e743fe664a64d0bdf7b96e`; journal `8c230a2e26878e39a1715857c3705cc3e32edfdcb2a305b2915d4fd1541a337a`; receipt `c009a2429b9037770cf1e735f98fc780bd0f30d1bca7bf062196ab2f9dc6d22b`.
 
 Source-only verification: client2983 PASS/10 SKIP/0 FAIL (exec41294/exit0), operator17913 PASS/0 FAIL (exec8166/exit0, перед test-only поправкой). Independent declared auditor18/18 negative mutations refused; receipt SHA256 `46ad5c2f3bcdbfc8722ff67ef306313704613966cfde9e32376154c5ebfead9d`. Исходные PASS reports не изменены.
 
-Текущий run: `e-public-types-declared-real-01`, profile `javascript-discovery-profile-358`, exec67298, browser status `running`. Результат пока не установлен; после terminal — independent audit/cleanup/reconciliation. Без неизвестного эффекта и только после подтверждённой уборки переходить к следующему fresh profile.
+Текущий run: `e-public-types-declared-safe-integer-01`, profile `javascript-discovery-profile-359`, exec39148, browser status `running`. Результат пока не установлен; после terminal — independent audit/cleanup/reconciliation. Без неизвестного эффекта и только после подтверждённой уборки переходить к следующему fresh profile.
 
 ### E: declared String принят; Boolean выполняется — 2026-09-30
 
