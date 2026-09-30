@@ -46,8 +46,10 @@ public declared6×4/metadata/default usage/Save audit и cleanup3/3;
 все6×4 cells и cleanup3/3. В первой части E/source `467da5ab9a` isolated public
 existing comment edit/Execute/read прошёл отдельно для code и declared:
 полные native settings/mappings/graph, fresh6×4 и independent public source
-проверены, cleanup3/3/process absence подтверждены. Следующий шаг — E public
-changed/reordered input freshness и остальные J.
+проверены, cleanup3/3/process absence подтверждены. На `e1fd122320` отдельно
+приняты public existing changed/reordered input freshness для обоих modes:
+все input6×5/output6×4 cells, fresh executions и cleanup проверены.
+Следующий шаг — E types/NULL/precision/0–1–N и остальные J.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 
@@ -108,7 +110,8 @@ Linux установлена отдельным чтением `Session.Version.
   short same-node rerun 6×4 подтверждены run08/source `0328cadfc9`, cleanup 3/3.
   Fixed public C/D writer/Save и independent cold подтверждены; следующий
   fixed E existing source edit/Execute/read для code/declared также принят;
-  следующий результат — public input freshness, затем остаток J и F.
+  public input freshness 4/4 также принят на `e1fd122320`; следующий
+  результат — types/NULL/precision/0–1–N, затем остаток J и F.
   Полный G6 и product candidate/CLI
   приёмка остаются открытыми.
 - После ревью проверить knowledge/budgets и J27 на immutable CLI candidate,

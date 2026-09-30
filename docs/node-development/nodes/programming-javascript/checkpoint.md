@@ -30,7 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — public existing changed/reordered input freshness.
+следующий шаг — public types/NULL/precision и 0–1–N.
+Fixed public existing changed/reordered freshness для обоих modes принят ниже.
 Fixed existing source edit/Execute/read для code и declared принят ниже.
 D05 writer/Save и independent cold01 прошли audit/cleanup (подробности ниже). Fixed C public
 Code/Save/independent cold и private G3 bridge
@@ -41,6 +42,37 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E: public freshness 4/4 принята; следующий блок — 2026-09-30
+
+Declared/reordered01/profile346/child `e1fd122320`, exec25498/exit0 —
+**OBSERVED**, independent audit **PASS**. Прежние input/JS GUID, native declared
+settings/schema, mappings и graph сохранены. Физический input order:
+DiscountPct, Customer, UnitPriceCents, RowID, Qty; полный6×5 oracle совпал.
+Source S1 тот же SHA `f185abf2b6e10ad547d8393a680a9285eb3142916e4aedf0d54588def0abdc9a`.
+Свежие completed JS IDs `1790752747863-zum9zzteog:1636:3` и `:1636:4`;
+full6×4 baseline oracle и сумма **1950** совпали. Independent public source-read
+PASS, Save не отправлен. Package/logout/browser3/3 и process absence проверены.
+
+Report SHA256 `4cedbfcb8966d95298e07ca7aa2bc2e58ed504f46e039395a1bbb30914cee982`,
+journal `a1489eb4afe691f279969008b3f385b298375ea888acc1680b082ebfb99efddb`,
+audit receipt `54d994f1cc54afb6236d88f31f128956266f49e94f56b5c0e2a2ae7165580079`.
+
+Итого fixed public API existing freshness **4/4**: Code/declared ×
+changed/reordered на `e1fd122320`. Каждый variant менял CSV на прежнем импорте,
+сохранял JS GUID и неизменную бизнес-логику, подтверждал все input/output cells
+и новые execution identities. Independent audits не импортируют runtime verifier.
+Все own resources убраны; profile346 closed_verified, active_exec=null.
+Native bytes, product registration, candidate и CLI не проверены; aggregate
+J11/E/F не объявлены закрытыми.
+
+Следующий связный блок E — фиксированные public types/NULL/precision и 0–1–N
+(J06–J08), начиная с code String null/empty. Переиспользовать public C lifecycle
+и закреплённые G5 sources/expected values, не повторять completed C/D/freshness.
+Затем остаются schema edits, source limits/chunks/redaction, diagnostics/
+recovery/Stop, context/module policy/budgets/neighbor regression и F. До нового
+live закрепить fixed operator, адресные tests и independent oracle; браузер
+обычный headed с новым профилем. Product base и официальный статус прежние.
 
 ### E: Declared changed input — принят — 2026-09-30
 
