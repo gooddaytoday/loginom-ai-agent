@@ -40,7 +40,9 @@ owned completed execution identities; output read остановился до Ta
 подключил owner-bound Save после полного public Code/source-read. Свежий headed
 Code → Save прошёл полный независимый audit и обычный cleanup3/3; отдельный
 cold reader без source/oracle подтвердил source/settings, fresh Execute и
-результат6×4; cleanup3/3 проверен. Следующий этап D.
+результат6×4; cleanup3/3 проверен. D05/source `418abc95c0` также прошёл полный
+public declared6×4/metadata/default usage/Save audit и cleanup3/3;
+сейчас выполняется его отдельный cold reader без source/oracle.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 
@@ -99,8 +101,8 @@ Linux установлена отдельным чтением `Session.Version.
   changed/reordered с неизменным oracle и cleanup 3/3; точные SHA и границы
   в checkpoint. Private конечный native Stop, отдельный local read cancel и
   short same-node rerun 6×4 подтверждены run08/source `0328cadfc9`, cleanup 3/3.
-  Следующий связный результат — C: public code lifecycle и G3 bridge, затем
-  declared через handler с независимым Save/cold. Полный G6 и public/CLI
+  Fixed public C и D writer/Save подтверждены; следующий результат — независимый
+  D cold, затем E/F. Полный G6 и product candidate/CLI
   приёмка остаются открытыми.
 - После ревью проверить knowledge/budgets и J27 на immutable CLI candidate,
   затем две автономные попытки Sol low только на назначенном стенде.

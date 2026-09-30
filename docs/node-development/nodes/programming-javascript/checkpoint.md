@@ -29,8 +29,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** D — полный declared lifecycle с Save/cold
-из [плана](plan.md); сейчас исправленный D05/profile334/exec19797 проходит полный
-writer/Save после установленной причины D02 drift (подробности ниже). Fixed C public
+из [плана](plan.md); D05 writer/Save прошёл независимый audit и cleanup, сейчас
+independent cold01/profile335/exec38835 (подробности ниже). Fixed C public
 Code/Save/independent cold и private G3 bridge
 подтверждены ниже. Ранний P1 Stop/cancel подтверждён ниже. Ранний private
 бизнес 6×4 для обоих base modes и code changed/reordered проверен ниже. B уже подтвердил
@@ -708,6 +708,41 @@ Exact own headed recovery05/profile333/exec39147/exit0 закрыл Package1/
 `a9d3103254792452854b49053c5ab4cfd17c94fbc7cd45508fb6f23b931430ea`.
 Browser geometry tests skipped без назначенного browser; headless не запускался.
 Цель active, D/E/F/candidate/CLI открыты; source текущего browser не менять.
+
+### D05: полный public declared → Save принят, independent cold запущен — 2026-09-30
+
+Ordinary headed D05/profile334/source `418abc95c0`, exec19797/exit0:
+**OBSERVED**, все13 public phases verified, полный typed input6×5 и output6×4,
+каждая ячейка/тип/порядок совпали с закреплённым oracle; NetCents total1950.
+Различные native owned completed IDs:
+`1790739550271-v2fb635pak:1105:3` и `1790739550271-v2fb635pak:1105:4`.
+26 declared prepared/verified gestures,4 actual columns и `DefaultUsageType=4`
+для RowID при `UsageType=0`, остальные default usage0/Required=false проверены.
+Полные native mappings5/5 и4/4, взаимные source-target связи, graph/positions,
+owned Views и independent public source634bytes/15 LF/SHA после output подтверждены.
+Settings digest во всех owned source reads равен
+`770ee74c3561f6f3c21a75f7351952eb5dad5bc3a4c9a54a244128324007642b`.
+
+Owned Save/native modified=false/graph preservation прошёл для уникального
+`/jsteach/js-g2-004c7386-e673-4588-8415-632dc3cbd360/JavaScript-fc0782b2-dcaa-4c5d-81a4-e3052c5a3cd7.lgp`.
+Package close/UI logout/browser close3/3 и process absence подтверждены.
+Независимый private audit выполнен с original report/journal и SHA oracle/source,
+без импорта продуктового verifier. Report SHA256
+`bf713a365daa368f1349c0cae0cf8808e6720f58e45842b02266ad0d6aeea0ae`,
+journal SHA256 `954faeb75bf7b410041fc2c79d587b9300aec027c861092752f04baa0ae73187`,
+receipt SHA256 `9ee50c10d9143bc5bdfbf30035e777c6f00f6e5e4db72adaccca4f053cdbaab2`.
+Это isolated public API-path и owned saver, не native bytes/candidate/CLI;
+aggregate gates остаются открытыми. Прежние D failures не переписаны.
+
+После verified cleanup под lock назначен fresh profile335. Отдельный ordinary
+headed `d-public-declared-cold-01`/exec38835/source `418abc95c0` выполняется.
+Reader получает только technical assignment и точный saved path; source,
+oracle и configuration не переданы. Deadline10min от начала процесса прежний.
+Наблюдать тот же handle, source не менять. После результата — independent audit
+source/settings/default usage/mappings/graph/fresh Execute/all6×4 cells и own
+cleanup; затем E/F. Cold audit отдельно учитывает только подтверждённую
+missing/null cache reference и characterized configured-only output cache;
+actual before-state ещё требуется наблюдать. Цель active.
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 

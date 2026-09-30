@@ -26,7 +26,9 @@ input `excluded`; original CLEANUP_UNCONFIRMED сохранён, own recovery ve
 public Code и независимого source-read. Fresh headed Code → Save прошёл
 полный независимый audit и ordinary cleanup3/3; independent cold reader
 подтвердил source/settings/fresh Execute/read6×4 и cleanup3/3. Fixed C принят
-в isolated runtime; D/E/F и aggregate
+в isolated runtime. D05/source `418abc95c0` прошёл полный independent audit
+public declared6×4/metadata/DefaultUsageType/Save и cleanup3/3; собственный
+independent cold выполняется. Остаток D, E/F и aggregate
 gates открыты; evidence/hashes и следующий шаг — в текущей части checkpoint.
 
 | Gate | Непосредственно наблюдено | Решение / точный остаток 0B и следующий тест | Реализация / приёмка (фазы 1–6) |
