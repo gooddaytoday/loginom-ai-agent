@@ -44,6 +44,24 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: one-row output — подготовка и live — 2026-09-30
+
+Child `2eef052e7a3eff4d77a3249abc56ba705e15b2eb` добавляет только fixed
+`g5-one-output`: Result/integer, ровно одна строка7. Existing public lifecycle
+и client runtime не менялись; прежние семь source pins не изменены. Actual
+request admission и fixed oracle negatives проверены: **87 PASS / 0 FAIL**, log
+SHA256 `0c1122705dde3fd7ebb5786508fd9e988d018d59ddb013e26488a928f7d678c5`.
+Полный17898 suite относится к предыдущему `bccc8a0a08`; на этом SHA выполнена
+адресная проверка. Source one-row SHA256
+`1e205a5ed3cda595da02a5adc8dab862d3290795a593a680f695ce1d41b83bdf`.
+Новый private oracle v2 и auditor v2 подготовлены до live, предыдущие oracle,
+reports и PASS receipts не переписывались.
+
+Ordinary headed `e-public-types-one-output-01`/fresh profile354/exec63502
+запущен. Результат пока не установлен. После terminal нужны independent audit,
+package/logout/browser/process cleanup и registry reconciliation. Затем empty
+input и точный остаток J06–J08, остальные E/F; full readiness не повышается.
+
 ### E: public typed 7/7 приняты; empty output — 2026-09-30
 
 Empty-output01/profile353/child `bccc8a0a08`, exec61420/exit0 — **OBSERVED**,
