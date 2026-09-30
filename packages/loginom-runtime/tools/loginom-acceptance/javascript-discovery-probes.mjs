@@ -24,6 +24,11 @@ const codeProbes=[
     // Independent literals from pinned sales.csv, including preserved padding.
     expected:[['["Alpha","  alpha  ","  ALPHA  "]'],['["BETA","beta","BETA"]'],
       ['["Alpha","alpha","ALPHA"]'],['["Гамма","гамма","ГАММА"]'],['["Ёж","ёж","ЁЖ"]'],['["delta","delta","DELTA"]']]},
+  {id:'g5-native-real',scope:'G5',native_input_fixture:'real',
+    source:'import {InputTable,OutputTable,DataType} from "builtIn/Data";\n'
+      +'OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Float}]);\n'
+      +'for (let row=0;row<InputTable.RowCount;row++) {\n  OutputTable.Append();\n  OutputTable.Set("Value",InputTable.Get(row,"Value"));\n}\n',
+    schema:[{name:'Value',label:'Value',type:'real'}],expected:[[null],[0],[-1.25],[10.125]],expectation:'fixed'},
   typed('g5-null-empty','String',['null','""','"null"','"0"','"false"'],[null,'','null','0','false']),
   typed('g5-undefined','String',['undefined'],null,'Unknown bridge semantics; record typed output or owned failure without choosing an expected value after observation.'),
   typed('g5-boolean','Boolean',['null','false','true'],[null,false,true]),
@@ -53,7 +58,7 @@ const codeProbes=[
 
 // Operator-only declared counterparts: the authored body and expected values
 // stay identical; schema creation belongs to the native wizard.
-const declaredIds=new Set(['g5-null-empty','g5-boolean','g5-real','g5-safe-integer',
+const declaredIds=new Set(['g5-native-real','g5-null-empty','g5-boolean','g5-real','g5-safe-integer',
   'g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
 const probes=[...codeProbes,...codeProbes.filter(probe=>declaredIds.has(probe.id)).map(probe=>{
   const lines=probe.source.split('\n');
@@ -74,7 +79,7 @@ export function javascriptDiscoveryProbe(id){
 export function javascriptDiscoveryOracle(probe,table){
   const pinned=javascriptDiscoveryProbe(probe?.id);
   need(probe.source===pinned.source&&probe.source_sha256===pinned.source_sha256
-    &&probe.input_variant===pinned.input_variant,'Discovery source/input pin changed');
+    &&probe.input_variant===pinned.input_variant&&probe.native_input_fixture===pinned.native_input_fixture,'Discovery source/input pin changed');
   verifyJavascriptMismatchTable(table);
   const schema=JSON.stringify(table.schema.map(c=>({name:c.name,label:c.label,type:c.type})))===JSON.stringify(pinned.schema);
   const values=pinned.expected!==null&&table.row_count===pinned.expected.length

@@ -222,6 +222,7 @@ test('fixed declared counterparts keep body, schema and independent values while
   assert.equal(d.source,c.source.split('\n').filter((_,index)=>index!==1).join('\n'));
   assert.deepEqual(d.schema,c.schema);assert.deepEqual(d.expected,c.expected);
   assert.equal(d.schema_mode,'declared');assert.equal(d.input_variant,c.input_variant);
+  assert.equal(d.native_input_fixture,c.native_input_fixture);
   assert.equal(d.source.includes('OutputTable.AssignColumns'),false);
  }
 });

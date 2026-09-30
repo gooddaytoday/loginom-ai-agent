@@ -75,7 +75,7 @@ import {readJavascriptServerVersion} from './javascript-server-version.mjs';
 import {openJavascriptPackageFileTab,readJavascriptPackageFile} from './javascript-package-file.mjs';
 import {createJavascriptHeadedFocusX11} from './javascript-headed-focus-x11.mjs';
 import {runJavascriptStopProbe} from './javascript-stop-probe.mjs';
-import {javascriptPublicTypedIds,runJavascriptPublicCodeLive} from './javascript-public-code-live.mjs';
+import {javascriptPublicTypedIds,javascriptPublicCodeProbe,runJavascriptPublicCodeLive} from './javascript-public-code-live.mjs';
 import {runJavascriptPublicExistingLive} from './javascript-public-existing-live.mjs';
 
 export async function runJavascriptOperator(args=process.argv.slice(2),{batchCases=null,nativeInputOnly=false,nativeRoundtrip=false,sourceReadCycle=false,persistenceMode=null,coldReader=false,packageFile=false,existingLifecycle=null,existingInputVariant=null,publicProbeId=null}={}) {
@@ -152,6 +152,7 @@ if(options['--verify-public-declared-save']&&!options['--verify-public-declared-
 if(options['--verify-public-code-lifecycle']&&options['--verify-public-declared-lifecycle'])
   throw Error('Public JavaScript lifecycle requires one schema mode');
 const publicMode=options['--verify-public-code-lifecycle']?'code':options['--verify-public-declared-lifecycle']?'declared':null;
+const publicInputFixture=publicProbeId===null?null:javascriptPublicCodeProbe(publicProbeId,publicProbeId.startsWith('declared-')?'declared':'code').native_input_fixture??null;
 if(publicProbeId!==null&&(publicMode!==(publicProbeId.startsWith('declared-')?'declared':'code')
   ||options['--verify-public-code-save']||options['--verify-public-declared-save']))
   throw Error('Public typed probe requires its fixed schema lifecycle without Save');
@@ -177,10 +178,11 @@ const metadataDiagnostic=requireJavascriptMetadataMode(options['--metadata-diagn
 if(nativeCalibrationId!==undefined&&(nativeNamedCaseId!==undefined||options['--native-fixture']!==undefined))throw Error('Calibration owns its separate fixed identity/input');
 const calibrationTrial=nativeCalibrationId!==undefined?createJavascriptCalibrationTrial(nativeCalibrationId):null;
 if(nativeNamedCaseId!==undefined&&options['--native-fixture']!==undefined)throw Error('Named case owns its immutable input fixture');
-const nativeFixtureId=telemetryTrial?javascriptTelemetryCase(nativeTelemetryCaseId).input_fixture_id:calibrationTrial?'integer-safe':nativeNamedCaseId!==undefined?javascriptNamedCase(nativeNamedCaseId).input_fixture_id:options['--native-fixture']??'real',nativeFixture=coldReader?null:javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=coldReader?null:calibrationTrial?calibrationTrial.probe:javascriptNativeRoundtripProbe(nativeFixtureId,nativeNamedCaseId,nativeTelemetryCaseId);
+const nativeFixtureId=telemetryTrial?javascriptTelemetryCase(nativeTelemetryCaseId).input_fixture_id:calibrationTrial?'integer-safe':nativeNamedCaseId!==undefined?javascriptNamedCase(nativeNamedCaseId).input_fixture_id:publicInputFixture??options['--native-fixture']??'real',nativeFixture=coldReader?null:javascriptNativeFixture(nativeFixtureId),nativeRoundtripProbe=coldReader?null:calibrationTrial?calibrationTrial.probe:javascriptNativeRoundtripProbe(nativeFixtureId,nativeNamedCaseId,nativeTelemetryCaseId);
 const namedTrial=nativeNamedCaseId!==undefined?createJavascriptNamedTrial(nativeNamedCaseId):null;
 const coercionTrial=nativeRoundtrip&&nativeFixture.coercion?createJavascriptCoercionTrial(nativeFixtureId):null;
 const discoveryProbe=options['--discovery-probe']?javascriptDiscoveryProbe(options['--discovery-probe']):null;
+if(discoveryProbe?.native_input_fixture!==undefined)throw Error('Native input probe requires its fixed public entrypoint');
 const materializationProbe=['C0-materialization','G3-bridge'].includes(discoveryProbe?.scope);
 if(discoveryProbe&&(batch||options['--execution-case']))throw Error('Discovery requires one isolated probe, not a batch or execution case');
 let executionCase=nativeRoundtrip?nativeRoundtripProbe.schema_mode+'-table-execute':discoveryProbe?discoveryProbe.schema_mode+'-table-execute':batch?.[0]??options['--execution-case'];
@@ -1949,7 +1951,7 @@ try {
       if(persistence){report.scope='private G7 persistence writer: '+persistence.schema_mode;report.gates_closed=[];}
       if(nativeRoundtrip){report.explicit_execution_limit=1;report.gates_closed=[];}
       executionRuntime=await createJavascriptExecutionRuntime({page,prepared:executionPrepared,directory,account:config.username,
-        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence||publicMode?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence||options['--verify-public-code-save']===true||options['--verify-public-declared-save']===true,inputVariant:publicProbeId?.endsWith('g5-empty-input')?'empty':discoveryProbe?.input_variant??'base',materialization:materializationProbe});
+        record:executionRecord,effectScope:()=>report.case_id,deadline:batch||nativeRoundtrip||persistence||publicMode?batchDeadline:Date.now()+1200000,nativeInputOnly:nativeInputOnly||nativeRoundtrip||publicInputFixture!==null,nativeFixtureId,nativeNamedCaseId,nativeCalibrationId,nativeTelemetryCaseId,metadataDiagnostic,persistence:!!persistence||options['--verify-public-code-save']===true||options['--verify-public-declared-save']===true,inputVariant:publicProbeId?.endsWith('g5-empty-input')?'empty':discoveryProbe?.input_variant??'base',materialization:materializationProbe});
       report.stage='prepare-typed-input';executionInput=await executionRuntime.prepareInput();
       report.execution_input=executionInput;await save();await guard();await waitGraphReady();
       if(nativeRoundtrip)await executionRuntime.armNativeRoundtrip(executionInput);
@@ -2032,13 +2034,13 @@ try {
   report.status=coercionTrial||namedTrial||telemetryTrial||calibrationTrial?'PENDING_EVIDENCE':'OBSERVED';
 } catch(error) {
   report.status='FAILED';report.failure={stage:report.stage,...redactor.redact(javascriptProbeFailure(error))};
-  const diagnostic=(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))?null:await captureJavascriptNativeClassifierDiagnostic({nativeRoundtrip,stage:report.stage,page,binding:nativeClassifierBinding});
+  const diagnostic=(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||((telemetryTrial||publicInputFixture!==null)&&executionRuntime?.nativeReadUncertain))?null:await captureJavascriptNativeClassifierDiagnostic({nativeRoundtrip,stage:report.stage,page,binding:nativeClassifierBinding});
   if(diagnostic)report.native_classifier_diagnostic=diagnostic;
   if(discoveryProbe)report.discovery_failure_context={source_sha256:discoveryProbe.source_sha256,
     terminal_receipt_observed:!!report.execution_probe?.execution,syntax_support:'not_determined'};
-  if (page&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await snapshot('failure').catch(()=>{report.failure.snapshot='unavailable';});
-  if (page&&owner&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await paletteSnapshot('failure-palette').catch(()=>{report.failure.palette_snapshot='unavailable';});
-  if (page&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) await refusalEvidence('work-refusal').catch(()=>{report.failure.refusal_evidence='unavailable';});
+  if (page&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||((telemetryTrial||publicInputFixture!==null)&&executionRuntime?.nativeReadUncertain))) await snapshot('failure').catch(()=>{report.failure.snapshot='unavailable';});
+  if (page&&owner&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||((telemetryTrial||publicInputFixture!==null)&&executionRuntime?.nativeReadUncertain))) await paletteSnapshot('failure-palette').catch(()=>{report.failure.palette_snapshot='unavailable';});
+  if (page&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||((telemetryTrial||publicInputFixture!==null)&&executionRuntime?.nativeReadUncertain))) await refusalEvidence('work-refusal').catch(()=>{report.failure.refusal_evidence='unavailable';});
 } finally {
   cleaning=true;cleanupDeadline=Date.now()+180000;report.work_stage=report.stage;report.stage='cleanup';
   try {
@@ -2163,7 +2165,7 @@ try {
       report.cleanup.logged_out=true;
     }
   } catch(error) {report.cleanup.failure=redactor.text(String(error.message)).slice(0,1200);
-    if(page&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||(telemetryTrial&&executionRuntime?.nativeReadUncertain))) {await snapshot('cleanup-failure').catch(()=>{});await refusalEvidence('cleanup-refusal').catch(()=>{report.cleanup.refusal_evidence='unavailable';});}}
+    if(page&&!(coldOpenPending||sourceCycleUncertain||sourceReaders.some(reader=>reader.uncertain)||executionRuntime?.metadataReadUncertain||((telemetryTrial||publicInputFixture!==null)&&executionRuntime?.nativeReadUncertain))) {await snapshot('cleanup-failure').catch(()=>{});await refusalEvidence('cleanup-refusal').catch(()=>{report.cleanup.refusal_evidence='unavailable';});}}
   if (session) {
     if(browserLifecycle)await browserLifecycle.beforeClose();
     await session.context.close().then(()=>{report.cleanup.browser_closed=true;},()=>{report.cleanup.browser_closed=false;});
