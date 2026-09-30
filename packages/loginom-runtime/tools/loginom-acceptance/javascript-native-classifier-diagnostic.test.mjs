@@ -86,7 +86,7 @@ test('failure capture executes once only for exact private stage',async()=>{
   assert.equal((await captureJavascriptNativeClassifierDiagnostic({nativeRoundtrip:true,stage:'prepare-typed-input',page})).status,'observed');assert.equal(count,1);
 });
 
-for(const transportFails of [false,true])test('actual live catch/finally retains original failure and cleanup: transport='+transportFails,async()=>{
+for(const nativePending of [false,true])for(const transportFails of [false,true])test('actual live catch/finally retains original failure and cleanup: transport='+transportFails+', nativePending='+nativePending,async()=>{
   const source=await readFile(new URL('./javascript-live.mjs',import.meta.url),'utf8');
   const start=source.lastIndexOf("} catch(error) {\n  report.status='FAILED';"),end=source.lastIndexOf('\n\n}\nif(process.argv');
   assert.ok(start>0&&end>start);
@@ -99,7 +99,8 @@ for(const transportFails of [false,true])test('actual live catch/finally retains
     const calibrationTrial=null,coercionTrial=null,namedTrial=null,telemetryTrial=null,nativeRoundtrip=true,nativeClassifierBinding={context:{node_id:'n'}},discoveryProbe=false;
     const persistence=null,coldReader=false,packageFile=false,packageFileReadUncertain=false,coldOpenPending=false,sourceCycleUncertain=false,sourceReaders=[];
     let cleaning=false;
-    const executionRuntime=null,paletteAdmission=null,createDeadline=0,packageHandle=null,owner=null,initialOpening={},openedWizard=false,browserLifecycle=null;
+    const publicInputFixture=${nativePending?'"real"':'null'};
+    const executionRuntime=${nativePending?'{nativeReadUncertain:true}':'null'},paletteAdmission=null,createDeadline=0,packageHandle=null,owner=null,initialOpening={},openedWizard=false,browserLifecycle=null;
     const noop=async()=>{}, locator={filter(){return this},locator(){return this},waitFor:noop,innerText:async()=> 'account'};
     const page={evaluate:evaluateDiagnostic,locator:()=>locator,waitForFunction:noop};
     const snapshot=noop,paletteSnapshot=noop,refusalEvidence=noop,requireJavascriptInitialOpeningCleanup=()=>{},guard=async()=>({packages:0}),exact=()=>locator,click=noop,save=noop;
@@ -109,10 +110,18 @@ for(const transportFails of [false,true])test('actual live catch/finally retains
     return {report,cleaning,exitCode:process.exitCode};
   })()`,sandbox);
   assert.equal(outcome.report.failure.message,'original');assert.equal(outcome.report.failure.stage,'prepare-typed-input');
-  assert.equal(outcome.report.native_classifier_diagnostic.status,transportFails?'unavailable':'observed');
-  assert.deepEqual(JSON.parse(JSON.stringify(outcome.report.cleanup)),{package_closed:true,logged_out:true,browser_closed:true,stage:'logout'});
-  assert.equal(outcome.cleaning,true);assert.equal(outcome.exitCode,1);assert.equal(outcome.report.status,'FAILED');
-  assert.deepEqual(events,['diagnostic','browser-close']);assert.ok(!JSON.stringify(outcome).includes('SECRET'));
+  if(nativePending){
+    assert.equal(outcome.report.native_classifier_diagnostic,undefined);
+    assert.equal(outcome.report.status,'CLEANUP_UNCONFIRMED');
+    assert.equal(outcome.report.cleanup.package_closed,false);assert.equal(outcome.report.cleanup.logged_out,false);
+    assert.equal(outcome.report.cleanup.browser_closed,true);assert.deepEqual(events,['browser-close']);
+  }else{
+    assert.equal(outcome.report.native_classifier_diagnostic.status,transportFails?'unavailable':'observed');
+    assert.deepEqual(JSON.parse(JSON.stringify(outcome.report.cleanup)),{package_closed:true,logged_out:true,browser_closed:true,stage:'logout'});
+    assert.equal(outcome.report.status,'FAILED');assert.deepEqual(events,['diagnostic','browser-close']);
+  }
+  assert.equal(outcome.cleaning,true);assert.equal(outcome.exitCode,1);
+  assert.ok(!JSON.stringify(outcome).includes('SECRET'));
 });
 
 test('actual journal integration retains only verified completed graph binding after persistence',async()=>{
