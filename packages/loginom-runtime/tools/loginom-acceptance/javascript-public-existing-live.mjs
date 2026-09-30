@@ -46,13 +46,16 @@ export async function readJavascriptPublicExistingSource({runtime,prepared,node,
 }
 
 export async function runJavascriptPublicExistingLive({page,prepared,node,targetOrigin,redactor,record,
-  report,save,deadline,onPending,schemaMode,graph,inputVariant='base',sourceCaseId=null,schemaRefusalCaseId=null}) {
+  report,save,deadline,onPending,schemaMode,graph,inputVariant='base',sourceCaseId=null,schemaRefusalCaseId=null,
+  wizardRefusalCaseId=null,readGraph}) {
   need(['code','declared'].includes(schemaMode)&&['base','changed','reordered'].includes(inputVariant)&&Date.now()+660000<deadline,
     'Public existing JavaScript mode/original budget unavailable');
   const sourceCase=sourceCaseId===null?null:javascriptPublicSourceCase(sourceCaseId);
   need(sourceCase===null||sourceCase.schema_mode===schemaMode&&inputVariant==='base','Public source case requires its fixed mode/base package');
   need(schemaRefusalCaseId===null||sourceCaseId===null&&inputVariant==='base'
     &&schemaRefusalCaseId===(schemaMode==='code'?'code-to-declared':'declared-to-code'),'Public schema refusal requires its fixed mode/base');
+  need(wizardRefusalCaseId===null||sourceCaseId===null&&schemaRefusalCaseId===null&&inputVariant==='base'
+    &&wizardRefusalCaseId==='syntax-'+schemaMode&&typeof readGraph==='function','Public wizard refusal requires its fixed mode/base');
   const probe=javascriptDiscoveryProbe('p1-business-'+schemaMode+'-'+inputVariant);
   const base=createCandidateNodeSupport({targetOrigin,targetBuild:'7.4.2'});
   const support=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor});
@@ -109,7 +112,53 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
       independent_source:{complete:true,...javascriptSourceIdentity(after.source_text),chunks:after.chunks,source_read_operation_id:after.source_read_operation_id}});
     report.stage='public-existing-schema-refusal-observed';onPending(false);await save();return;
   }
-  const source_text=sourceCase?.source??before.source_text+'\n// E: existing node source revision; business logic preserved.\n';
+  if(wizardRefusalCaseId!==null) {
+    const operation_id='js-public-native-refusal-'+randomUUID();
+    const source_text=before.source_text+'\nconst unsupported = ({})?.value;\n';
+    const identity=javascriptSourceIdentity(source_text),remaining=deadline-Date.now()-60000;
+    need(remaining>=1200000,'Public wizard refusal/repair original budget unavailable');
+    report.scope='isolated E public native Code Next refusal and NEW same-node repair/full typed UI';
+    report.public_existing.wizard_refusal={status:'RUNNING',case_id:wizardRefusalCaseId,operation_id,node,
+      previous_source_sha256:before.source_sha256,rejected_source:identity,graph_before:graph};
+    const request={operation_id,contract_revision:'1.0.0',document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,
+      target:{kind:'existing',type:'programming.javascript',ref:node},inputs:[],mode:'script',
+      parameters:{source_text,expected_source_sha256:before.source_sha256,schema_mode:schemaMode},mappings:[],finish:'execute',
+      read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},
+      budgets:{configure_ms:600000,execute_ms:300000,total_ms:600000}};
+    report.stage='public-existing-native-refusal';await save();
+    let job=await dispatchNodeApi(runtime,'dock_node_apply',request);
+    while(job.state==='running') {
+      job=await dispatchNodeApi(runtime,'dock_node_wait',{operation_id,timeout_ms:30000});
+      report.public_existing.wizard_refusal.progress=job.progress;await save();
+    }
+    report.public_existing.wizard_refusal.job=job;await save();
+    const result=job.outcome?.output,native=result?.error?.native;
+    need(job.state==='settled'&&job.outcome?.status==='FAILED'&&job.outcome.cleanup_complete===true
+      &&result?.status==='FAILED'&&result.cleanup_complete===true&&result.pending_phase===null
+      &&JSON.stringify(result.node)===JSON.stringify(node)&&result.configuration?.status==='discarded'
+      &&result.execution.status==='not_requested'&&result.output.status==='not_refreshed'&&result.output.ports.length===0
+      &&native?.kind==='javascript_wizard'&&native.stage==='code_next'&&native.source_sha256===identity.source_sha256
+      &&native.dialog_closed===true&&native.error_class?.name==='SyntaxError'
+      &&native.tooltip.includes('SyntaxError: Syntax error at code')&&!runtime.hasUnsettledWork(),
+    'Public native wizard diagnostic/discard/cleanup boundary unconfirmed');
+    need(new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(result).valid,
+      'Public native refusal violates diagnostic schema');
+    const compact=nodeResultReply(job,{userProfile:true}).structuredContent;
+    need(JSON.stringify(compact.error)===JSON.stringify(result.error)&&Buffer.byteLength(JSON.stringify(compact))<=16384,
+      'Public native refusal user-v1 diagnostic differs');
+    onPending(false);await save();
+    report.stage='public-existing-native-refusal-source-after';onPending(true);await save();
+    const after=await readSource(),afterGraph=await readGraph();
+    need(after.source_text===before.source_text&&after.source_sha256===before.source_sha256&&!runtime.hasUnsettledWork(),
+      'Public native refusal committed source changed');
+    Object.assign(report.public_existing.wizard_refusal,{status:'OBSERVED',user_result:compact,
+      explicit_execute_requested:false,graph_after:afterGraph,
+      independent_source:{complete:true,...javascriptSourceIdentity(after.source_text),chunks:after.chunks,source_read_operation_id:after.source_read_operation_id}});
+    onPending(false);await save();
+  }
+  const source_text=sourceCase?.source??before.source_text+(wizardRefusalCaseId===null
+    ?'\n// E: existing node source revision; business logic preserved.\n'
+    :'\n// E: public native refusal repair on the SAME node.\n');
   const expected=javascriptSourceIdentity(source_text),operation_id='js-public-existing-'+randomUUID();
   const remaining=deadline-Date.now()-60000;
   need(remaining>=600000,'Public existing original time budget unavailable');
@@ -119,7 +168,8 @@ export async function runJavascriptPublicExistingLive({page,prepared,node,target
     mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'},
     budgets:{configure_ms:remaining,execute_ms:300000,total_ms:remaining}};
   Object.assign(report.public_existing,{operation_id,previous_source_sha256:before.source_sha256,
-    source_sha256:expected.source_sha256,oracle_sha256:probe.oracle_sha256,graph_before:graph});
+    source_sha256:expected.source_sha256,oracle_sha256:probe.oracle_sha256,graph_before:graph,
+    ...(wizardRefusalCaseId!==null?{wizard_refusal_case_id:wizardRefusalCaseId,repair_operation_id:operation_id}:{})});
   report.stage='public-existing-apply';await save();
   await record({phase:'javascript_existing_workflow_blockers_observed',operation_id,
     blockers:await page.evaluate(()=>[...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')]
