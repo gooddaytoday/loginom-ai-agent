@@ -42,7 +42,8 @@ Code → Save прошёл полный независимый audit и обыч
 cold reader без source/oracle подтвердил source/settings, fresh Execute и
 результат6×4; cleanup3/3 проверен. D05/source `418abc95c0` также прошёл полный
 public declared6×4/metadata/default usage/Save audit и cleanup3/3;
-сейчас выполняется его отдельный cold reader без source/oracle.
+отдельный cold reader без source/oracle подтвердил source/settings/new Execute/
+все6×4 cells и cleanup3/3. Следующий этап E.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 
@@ -101,8 +102,9 @@ Linux установлена отдельным чтением `Session.Version.
   changed/reordered с неизменным oracle и cleanup 3/3; точные SHA и границы
   в checkpoint. Private конечный native Stop, отдельный local read cancel и
   short same-node rerun 6×4 подтверждены run08/source `0328cadfc9`, cleanup 3/3.
-  Fixed public C и D writer/Save подтверждены; следующий результат — независимый
-  D cold, затем E/F. Полный G6 и product candidate/CLI
+  Fixed public C/D writer/Save и independent cold подтверждены; следующий
+  результат — E existing source edit/Execute/read, затем остаток J и F.
+  Полный G6 и product candidate/CLI
   приёмка остаются открытыми.
 - После ревью проверить knowledge/budgets и J27 на immutable CLI candidate,
   затем две автономные попытки Sol low только на назначенном стенде.

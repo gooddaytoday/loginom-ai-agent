@@ -28,9 +28,9 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Stop/cancel — J13 | Private native Stop + отдельный local cancel + same-node 6×4 rerun, run08/source `0328cadfc9`, terminal за 6,612 с, cleanup 3/3 | Public/CLI lifecycle, deadline/error/recovery cases; весь G6 этим fixed case не закрыт |
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
-**Следующий связный результат:** D — полный declared lifecycle с Save/cold
-из [плана](plan.md); D05 writer/Save прошёл независимый audit и cleanup, сейчас
-independent cold01/profile335/exec38835 (подробности ниже). Fixed C public
+**Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
+сначала existing source edit/Execute/read с сохранением native schema.
+D05 writer/Save и independent cold01 прошли audit/cleanup (подробности ниже). Fixed C public
 Code/Save/independent cold и private G3 bridge
 подтверждены ниже. Ранний P1 Stop/cancel подтверждён ниже. Ранний private
 бизнес 6×4 для обоих base modes и code changed/reordered проверен ниже. B уже подтвердил
@@ -743,6 +743,48 @@ source/settings/default usage/mappings/graph/fresh Execute/all6×4 cells и own
 cleanup; затем E/F. Cold audit отдельно учитывает только подтверждённую
 missing/null cache reference и characterized configured-only output cache;
 actual before-state ещё требуется наблюдать. Цель active.
+
+### D cold01: source/settings/fresh6×4 подтверждены; следующий этап E — 2026-09-30
+
+Отдельный ordinary headed cold01/profile335/source `418abc95c0`, exec38835/exit0:
+**OBSERVED**, новый document/workflow при том же JS node GUID
+`a6aef906-682a-4d08-8a1f-d8cf18a688f8`. Complete source634bytes/15 LF/SHA совпал
+с writer, generation=false/4 declared columns/order/types/kinds/usage/required
+сохранились; RowID `DefaultUsageType=4`, отдельно actual `UsageType=0`.
+Raw cold metadata включает `ConnectedRecord:null`; independent auditor удаляет
+только эти exact null cache references и сверяет все остальные значения.
+Normalized settings SHA совпал с writer:
+`770ee74c3561f6f3c21a75f7351952eb5dad5bc3a4c9a54a244128324007642b`.
+Source/configuration/oracle в reader не переданы, source-write/Save отсутствуют.
+
+Новое owned completed execution `1790739972001-tcpcbtjgp6:634:1` отлично от
+двух writer IDs, проверены launch/baseline/node/group identities. Все6×4
+typed UI cells/types/schema/order и total1950 совпали с независимым expected.json.
+Before Execute input mapping5/5 сохранён. Output cache имеет complete
+configured-only targets4 и empty sources0 с native hidden-source proof;
+полные reciprocal source/target4 материализованы после собственного Execute
+и совпали с writer. Cache source до Execute не объявлен уже доказанным.
+Graph/positions/node GUIDs/links сохранены; package close/logout/browser
+close3/3 и process absence подтверждены.
+
+Report SHA256 `72d054b400a30d6e1ad2de9abbb2f415f42d21f4faffa0a9782194c56b1934ab`,
+journal SHA256 `78ab131d7330b9a8bc2b09ac0f5399a437b7d0c3db7d8f4f0166d7352f465cd0`,
+independent receipt SHA256
+`64f819c655eb9a6122798a64a5139b2fc37135d34b4f9ea520aa6bfa9d3ca7af`.
+Fixed D принят на уровне isolated public writer/owned saver и независимого
+private cold typed UI6×4; native bytes=false, candidate=false, CLI=false,
+gates_closed=[]; aggregate G3/G7 не повышены. Под lock runtime lease переведён
+в closed_verified, active browser/exec сняты. Untracked acceleration review
+и child handoff/design files сохранены без изменения. Цель active.
+
+Первый связный результат E: расширить действующий common lifecycle на existing
+JavaScript source replace/preserve → Done → новый Execute/read; current schema
+и port mappings сохраняются. Before mutation — независимый full source/digest
+и native mode/settings; explicit mode должен совпасть с observed, schema/columns
+edits/manual mappings пока отказываются до effects. Same-node identity и graph
+сохраняются; unknown effect не повторяется. Сначала local owner/digest/policy/
+schema drift/no replay tests, затем ordinary headed isolated existing edit с
+полным6×4 oracle. Это часть E, не закрытие всей J10/J11 или выпуск handler.
 
 ### P1 business 6×4: локальная подготовка и блокировка DNS — 2026-09-29
 
