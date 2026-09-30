@@ -88,7 +88,11 @@ independent audit v2, negative38/38 каждый, full6×4 и cleanup/process ab
 `bc6494476a`: independent audit/negative32/32 каждый, full6×2/user-v1/source и
 cleanup. Required primitives отделены в [engine profile](engine-profile.json),
 остальные engine observations не превращены в общую гарантию ES/Data API.
-Следующий шаг — [J19/J21 context и delivery](context-delivery-design.md), затем module/budgets
+Fixed current context Code403/declared404 наb0ecbeaadf также принят2/2:
+оба полных snapshots до/после source/comment/manual label, exact mappings/MCP,
+independent audit/negative64/64 каждый и cleanup. Compact bridge/guidance
+23e8488e29 проверен actual MCP и full client3179/10SKIP. Это не model resistance.
+Следующий шаг — [J19/J21 changed input context и delivery](context-delivery-design.md), затем module/budgets
 и точный остаток E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.

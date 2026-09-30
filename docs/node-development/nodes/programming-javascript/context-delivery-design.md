@@ -1,7 +1,9 @@
 # JavaScript: доставка текущего контекста J19/J21
 
-Статус: runtime реализован и локально проверен; live/model/CLI PASS пока нет.
-Реализация child — `b0ecbeaadff8d77a30733ae08cb1e25ecd5937dc`. Продуктовая база
+Статус: fixed Code/declared current context live2/2 приняты через independent
+audit/negative64/64 каждый/cleanup; changed input/model/candidate/CLI открыты.
+Reader child — `b0ecbeaadff8d77a30733ae08cb1e25ecd5937dc`, compact bridge и
+guidance — `23e8488e29`. Точные evidence в [checkpoint](checkpoint.md). Продуктовая база
 и общие ограничения [плана](plan.md) сохраняются. Это композиция существующих
 readers; новый универсальный интерпретатор UI не требуется.
 

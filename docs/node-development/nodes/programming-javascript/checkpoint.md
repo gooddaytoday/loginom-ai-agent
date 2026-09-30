@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — live проверка реализованного свежего public context/instruction-in-data и его delivery budgets (J19/J21); J09 Code399/declared400 и exact knowledge v1 Code401/declared402 приняты ниже. Fixed source32768/
+следующий шаг — current context при изменённом входе/старом коде и remaining delivery budgets (J19/J21); context Code403/declared404 и bridge fix приняты ниже. J09 Code399/declared400 и exact knowledge v1 Code401/declared402 также приняты. Fixed source32768/
 empty и schema-mode refusal уже приняты ниже; сохранение manual mapping, дополнительные
 limits/redaction и context/engine/module/budgets остаются открытыми.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
@@ -46,6 +46,44 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J19/J21: оба context modes приняты; compact bridge исправлен — 2026-10-01
+
+Тот же child `b0ecbeaadff8d77a30733ae08cb1e25ecd5937dc`, ordinary headed
+fresh404/exec79246, `e-public-context-declared-01`, actual exit0. Полный source
+до/после fixed comment/physical label, current обе5×4 native mappings,
+semantic snapshots/digests, exact user-v1 MCP envelope и same-ID replay
+подтверждены. Context2 reads имели восемь owned Close/graph receipts, без
+Execute/Done/portedits/Save. Отдельные warmup/edit apply — completed IDs
+`1790803471134-mct3sxkohs9:786:1` / `:2` / `:4` / `:5` и ordered6×4/1950.
+Report/journal SHA256
+`4bf1f912283bbb54a05172c18fccf60837fcaf694cdf2aa31f162b77fda0e334` /
+`29dee55117aa0b6ff60e414a773288432584ba8227a50c180f5658b711a98c0e`.
+Тот же pre-live auditor v1 PASS, receipt SHA256
+`9925aef1b1aaa4d4a173bd6415c3f1a1eb7e2bb6ff9bb8c9dd036224ee21a35e`.
+Meaningful negatives64/64 отказали, checker actual exit0, receipt SHA256
+`2ab9b36bfc49dea4aa0445caec68d605b87a6ba095f7c6621f3cd491a82dbf33`.
+Close/logout/browser3/3 и actual process absence подтверждены; registry404
+reconciled closed_verified, active exec/evidence null.
+
+Следующий child `23e8488e29` исправил выявленный compact bridge gap: реальный
+bridge listTools теперь публикует user/source/context output union с обоими
+kind, source не вытесняется. Context не попадает в full-result diagnostic
+лог подобно source. Уточнено model guidance: InputTable.Get использует input
+target_fields; upstream source_fields и script output source_fields отдельно
+от physical output target_fields. Actual bridge MCP protocol/addressed61 PASS;
+full client3179 PASS/10 SKIP/0 FAIL, actual exit0; diff PASS. Logs SHA256
+`27cbc3ff08088798e5663a6042272dda068d4fa477996e29a234943fd181d861` /
+`7e111606a3739edbdee1280ff8383fcb7daba8c96d2c904bc337343aa8addfd8`.
+Bridge менял schema/guidance, не reader/gestures; accepted live2/2 не повторялись.
+
+Следующий E/J19 case — fixed reordered upstream при старом JS source, свежий
+context с различным порядком source/target fields. Подтверждённое прежнее J11
+evidence обоих modes имеет input source order DiscountPct/Customer/UnitPriceCents/
+RowID/Qty, target order RowID/Customer/Qty/UnitPriceCents/DiscountPct, autosync=true.
+Это факт прошлых native phase receipts, ещё не новый context PASS. Изменённые
+technical names и actual model resistance/candidate/CLI остаются открытыми.
+Далее remaining J21/J22/J24/J26/cold long source/Done refusal и E/F.
 
 ### E/J19/J21: Code current context принят на isolated runtime — 2026-10-01
 
