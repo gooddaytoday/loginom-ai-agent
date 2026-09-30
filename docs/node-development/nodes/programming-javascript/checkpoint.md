@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — native String input через public JS и оставшиеся J06–J08.
+следующий шаг — native safe-int64 input через public JS и оставшиеся J06–J08.
 Fixed Code и declared output0/1/N, named access и empty input приняты ниже.
 Fixed public Code scalar output5/5, named access и empty output приняты ниже.
 Fixed public existing changed/reordered freshness для обоих modes принят ниже.
@@ -44,6 +44,33 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E: public native String2/2 принят — 2026-09-30
+
+Code/declared на frozen child `800381592a` получили independent native audits
+PASS и terminal exit0, ordinary headed. Все8 input/output String/NULL values,
+включая empty/literals/Unicode/quote/backslash/LF, сохранились; native input
+UTF-8 bytes до JS/releases8/8, metadata/source/mappings/graph/Views/13 phases/
+2 fresh Execute и package/logout/browser/process cleanup проверены.
+Code369/exec43701 proof ниже; declared370/exec22336 completed IDs
+`1790761198394-4wh1jqk0e7l:1221:3` / `:1221:4`.
+Declared report SHA256 `36b668b3e7b8079ae2cc90ff20bb0dc789fb1d2f8943e18be1475ccb63d1e099`,
+journal `c0008de700c38352e786627d69308e272612169ebb5c1346c58e93c4f40df948`,
+receipt `058a6a85582634894106c94548510304ddf598792e92e228baa0672d9652fd45`.
+Independent String auditor24/24 **actual mutations** refused, receipt02 SHA256
+`80f0e8e655202493cfeb31a9bf48ecd3b16590631592a8514eb2ae0358fe5922`.
+Negative01 остановился на ошибке fixture (String→String — no-op); это не
+дефект аудитора. В02 тип меняется на Integer, перед audit проверяется реальное
+изменение данных; первый script/copies и live proofs сохранены без изменения.
+Native input bytes доказаны; native output bytes/Save/cold/candidate/CLI нет.
+Profile370 closed_verified, active_exec=null, browser/processes отсутствуют.
+
+Следующий fixed блок — native safe-int64 input4×1 NULL/±9007199254740991/0:
+прежние CSV/native baseline, public Code/declared identity-copy, точные decimal
+strings на input/output. Explicit fixture/row/schema/pins и decoder/provenance/
+release/negative checks, independent int64 decoder/oracle до live. Затем civil
+Date и outside-safe без ложной гарантии, остаток J06–J08/E и остальные J/F.
+Registry readiness не повышена, full gates не закрыты.
 
 ### E: native String Code принят; declared выполняется — 2026-09-30
 

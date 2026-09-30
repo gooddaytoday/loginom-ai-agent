@@ -58,8 +58,9 @@ civil Date. На том же SHA отдельно приняты named access, o
 empty input; все9 declared runs получили independent PASS и полную уборку.
 На `a679a63595` public native real identity-copy отдельно прошёл Code/declared:
 native input bytes до JS и полный typed output/cleanup подтверждены.
-На `14965ef148` тот же уровень отдельно подтверждён для native Boolean2/2.
-Следующий шаг — native String/int64/Date и E остаток J06–J08, затем остальные J.
+На `14965ef148` тот же уровень отдельно подтверждён для native Boolean2/2,
+на `800381592a` — native String8×1 в обоих modes с NULL/empty/Unicode/LF.
+Следующий шаг — native int64/Date и E остаток J06–J08, затем остальные J.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 
