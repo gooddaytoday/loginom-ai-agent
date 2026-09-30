@@ -45,6 +45,29 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: native-real Code принят; declared выполняется — 2026-09-30
+
+Code01/profile365/frozen child `a679a63595`, exec43757/exit0 — OBSERVED,
+independent native audit PASS. Пinned input4×1 NULL/0/-1.25/10.125 прочитан
+с native before-JS byte proof и releases4/4; независимый Python struct decoder
+подтвердил binary64 literals. Перед public JS apply подтверждён source/owner/
+Import Execute. Полный output4×1 Value/real,2 fresh JS Execute,13 lifecycle
+phases, source/mappings/graph/Views и package/logout/browser/process cleanup
+проверены. Completed IDs `1790759699592-yxuin5fbgik:1201:3` / `:1201:4`.
+Source SHA256 `5519fcf8c9232b3d7b157745ab0852033825cdac02ae2ab489ec4801243942f5`;
+report `99fe921c9ac472c6317cf4bf092c083e6651ec9abe0b3143504e4372a9680653`,
+journal `5af0739d51564540ea6fce631792ca01a4d4dab75bde3a921a8453b7bdb5fcb9`,
+receipt `9b243ef7ebfd77e75a331159ddf5b20209be57afa79e1e6ec9054d53168618ba`.
+Native **input** bytes доказаны; native output bytes/Save/cold/candidate/CLI
+не доказаны. Profile365 reconciled/closed_verified.
+
+Fresh profile366, ordinary headed `e-public-types-native-real-declared-01`,
+exec83317 выполняется на том же frozen source, с тем же input и отдельным
+UI-declared Value/real/continuous/output. Source SHA256
+`901ed4c40c4a062feefa484dbb3213349e85dcf10fb20c43f6c2cb425b9639d5`.
+Результат пока не установлен; после terminal нужен independent native audit и
+cleanup/registry reconciliation. Остальные native primitives/J/E/F открыты.
+
 ### E: public native-real Code live — выполняется — 2026-09-30
 
 Frozen child `a679a63595eea34cdcbf1b4e8a844bfad2499402`, полный operator suite
