@@ -199,3 +199,13 @@ test('closed native error button preserves exact SyntaxError and refuses unowned
   assert.throws(()=>javascriptDiscoveryErrorButtonDiagnostic({probe,identity,error:bad}));
  }
 });
+
+test('one output row has a fixed authored oracle and refuses other cardinalities',()=>{
+ const p=javascriptDiscoveryProbe('g5-one-output');assert.deepEqual(p.expected,[['7']]);
+ const t={schema:p.schema,row_count:1,sample_rows:1,sample_complete:true,filter_enabled:false,
+  precision:{numbers_verified:true,limitations:[]},sample:[[{type:'integer',is_null:false,value:'7',precision:'exact_integer'}]]};
+ assert.equal(javascriptDiscoveryOracle(p,t).gate_passed,true);
+ t.sample[0][0].value='8';assert.equal(javascriptDiscoveryOracle(p,t).gate_passed,false);
+ t.sample[0][0].value='07';assert.throws(()=>javascriptDiscoveryOracle(p,t));
+ t.sample[0][0].value='7';t.row_count=0;assert.throws(()=>javascriptDiscoveryOracle(p,t));
+});

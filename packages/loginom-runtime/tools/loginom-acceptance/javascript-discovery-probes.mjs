@@ -28,6 +28,7 @@ const probes=[
   typed('g5-undefined','String',['undefined'],null,'Unknown bridge semantics; record typed output or owned failure without choosing an expected value after observation.'),
   typed('g5-boolean','Boolean',['null','false','true'],[null,false,true]),
   typed('g5-real','Float',['null','0','-1.25','10.125'],[null,0,-1.25,10.125]),
+  typed('g5-one-output','Integer',['7'],['7']),
   typed('g5-safe-integer','Integer',['-9007199254740991','0','9007199254740991'],['-9007199254740991','0','9007199254740991']),
   typed('g5-outside-safe','Integer',['Number("9007199254740993")'],null,'Characterization only; does not test native input int64 transport or promise exact arithmetic.'),
   ...[['fraction','1.75'],['string','"42"'],['nan','NaN'],['positive-infinity','Infinity'],['negative-infinity','-Infinity']]
