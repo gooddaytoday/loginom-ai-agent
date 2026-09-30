@@ -47,6 +47,47 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J13: local cancel/SAME-ID continuation реализован; fresh394 назначен — 2026-09-30
+
+Child `56f8df0250df9e60617e85f2b35bb58e754b99f6` (handler revision v4)
+заменил прежний `verifyContinuation:false` узким допуском к retained
+`execution_wait`. До local abort reader закрепляет native root/group/child
+records и собственный ModelNode; до появления JS child при исполнении dependencies
+обычный wait продолжается, но pause proof не создаётся. Продолжение принимает
+только ту же operation/request, verified committed source/settings/mappings,
+подтверждённый read-only pause, прежний deadline и fresh native records;
+wizard/Execute не повторяются. Changed owner/record, unknown read/ACK или
+отсутствующий live driver не дают права продолжить.
+
+Fixed `cancel-resume-code`: обычный headed, прежний saved Code и конечный45s
+source Stop08. Local cancel вызывается внутри acknowledged pending native read,
+затем settled AMBIGUOUS/cleanup, exact same-ID cached apply retry, публичная
+inspection и SAME-ID resume attempt2. Только после fresh native continuation
+тот же execution получает один native Stop; после cancelled terminal — NEW
+short repair/2 fresh Execute/full6×4, independent source/settings/graph, cleanup.
+Исходный launch→terminal≤60s и original phase deadline не продлеваются.
+
+Client addressed02:91 PASS/0 FAIL; operator addressed03:78 PASS/0 FAIL.
+Client final all03:3149 PASS/10 SKIP/0 FAIL, actual exit0, SHA256
+`6f1786afd5e6052eba1c56a2a9d79ad660137c7b4fb9d89421cf31ff43a655ac`.
+Operator final all02:18229 PASS/0 FAIL, actual exit0, SHA256
+`3aac9a432e6151ffd729d81ddaf590f02e65262d591562e0a8e39a46e691468d`.
+Первый full client all01 сохранил один failure
+прежнего native-reader test с5ms timeout; isolated variant suite и full all02,
+затем final source all03 прошли. Первый operator addressed01 выявил неправильную
+маршрутизацию resume в test fixture; исправлена, production dispatch не менялся.
+
+Pre-live private independent auditor/oracle SHA256:
+`6cf800946227f003522cba9fa3aae919ea38bd5c4cb9da672536c469420e2f28` /
+`a2184cf57c9a1e572180d8c97ea3a246c087c96ea426131ddac1178b0722e8c8`.
+Source freeze SHA256 `10c12a510fca54b3fb3045e49c88263a2d43e8a4d13a114fd28859402e8c7ce9`.
+Fresh394/exec64244 — `e-public-cancel-resume-code-01`, обычный headed на assigned
+saved C. До запуска отсутствие прежних browser processes подтверждено, registry
+owner/profile/source сверены. Наблюдать этот handle до actual terminal; timeout
+наблюдения не разрешает повтор или другой профиль. Frozen source/oracle не менять.
+После actual terminal — frozen audit/87 meaningful negatives/cleanup/process
+absence/reconciliation. Этот case ещё не принят; lost reply и full Goal открыты.
+
 ### E/J13: public finite Stop/NEW same-node repair приняты — 2026-09-30
 
 Child `69c1f3d60c34f8a3e37719d8a81574962fab9b13` реализовал описанный ниже
@@ -86,7 +127,7 @@ Package/logout/browser cleanup3/3 и actual process absence проверены; 
 
 **Следующий case:** public local read cancel → same-ID inspected continuation
 того же execution без второго Execute, затем verified terminal/short repair.
-Реальный JS driver пока возвращает `verifyContinuation:false`, поэтому общий
+На принятом Stop source реальный JS driver возвращал `verifyContinuation:false`, поэтому общий
 runtime pause/resume и private cancel не доказывают применимость к JS. Сначала
 реализовать узкий read-only допуск только к подтверждённому `execution_wait`
 того же node/operation/driver/native root/group/child под исходным deadline,
