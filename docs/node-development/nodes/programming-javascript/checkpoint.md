@@ -45,6 +45,34 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: public native civil Date Code принят; declared выполняется — 2026-09-30
+
+Code01/profile373/child `7d43cea036`, exec83222/exit0 — OBSERVED и independent
+native/civil audit PASS. Input native bytes/releases3/3, полный civil input и
+output3×1 NULL/2024-02-29T23:59:59.123/2026-03-29T01:59:59.999, format
+restoration/owner/source/mappings/graph/Views/13 phases/2 fresh Execute и
+package/logout/browser/process cleanup проверены. Completed IDs
+`1790763208623-0bs15b7h62k:1233:3` / `:1233:4`.
+Report SHA256 `57a2747fde7d67ca7aaf0a71578f7c39904b6e5cb187661e30126d82e04a3212`,
+journal `140edcaacb023de5476f46ca7fa2c595eedb0871661104e32b9567094b4a49b4`,
+receipt `3ca7bdae7eb32fc219fa3ad244287a0ba06c2cc5779a57c116b1d3f87cd25270`.
+Native input bytes/civil attestation доказаны, native output bytes/Save/cold/
+candidate/CLI и UTC/epoch/timezone conversion не доказаны. Profile373
+closed_verified, actual original browser/processes отсутствуют.
+
+Independent auditor30/30 значимых подмен refused; receipt02 SHA256
+`277e1c420402fa95a24ab40e596ee1d64dd600e2057bac6ff94735b3a5525a00`.
+Первая negative harness корректно получила refusal отсутствующей civil entry,
+но сама ожидала только AssertionError/ValueError и остановилась на KeyError.
+Harness02 учитывает KeyError; auditor/oracle не изменены, частичная попытка
+сохранена, не credited как 30/30. Source-only copies не browser runs.
+
+Declared01 ordinary headed fresh profile374, exec35944 зарегистрирован под
+lock; evidence `e-public-types-native-civil-datetime-declared-01`.
+Результат ещё не установлен. Наблюдать этот же handle, затем independent audit
+и cleanup/reconciliation; далее outside-safe без ложной гарантии и остаток
+J06–J08/E/J/F. Registry readiness не повышена.
+
 ### E: public native civil Date — Code выполняется — 2026-09-30
 
 Frozen child `7d43cea0363d6fa1414551a692357b2c9c56a2c4` добавляет fixed
