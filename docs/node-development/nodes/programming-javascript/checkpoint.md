@@ -42,6 +42,29 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E: import read admission исправлен — 2026-09-30
+
+Freshness Code/changed01/profile341/exec48888/exit1 завершился
+**CLEANUP_UNCONFIRMED** до изменения import/JS и до Execute. CSV был загружен и
+проверен, но pure apply admission отклонил `read.coverage=full`: этот режим
+допущен только для Collapse или установленного JS full UI handler. Report SHA256
+`21a309d7399e4e69fc9623b89a61b46c077becb90c6547af0a2f7a616a200d5a`.
+После отсутствия прежних процессов отдельный ordinary headed recovery342,
+exec93034/exit0, закрыл ровно собственный пакет и `jsteach:3678` (06:59 UTC),
+проверил Refresh absence, admin logout/browser/process absence. Recovery journal
+SHA256 `f6f99d27d2d6ca2f651afd368bccaef389b11e7457f12037da565d7c36b76c51`.
+Исходный report/status сохранён, чужие и исторические сеансы не затронуты.
+
+В child `e1fd122320d7f118e068b22e8f4597f5ba85c613` используется штатный import
+sample read до100 строк; оператор независимо требует sample_complete и все
+6×5 cells. JS full-read прежний. Tests проходят через действительный
+`validateNodeApplyRequest` с установленными handlers, а не только JSON schema:
+62 PASS / 0 FAIL, log SHA256
+`ff29f635f5dd351afc4f36eaa1d960c6103da9f809b67fb7d5c808415ca7d2d2`.
+Первый полный suite17890 относится к `476b1e3ae9`; последние изменения проверены
+адресно. Новый headed Code/changed02/profile343/exec75930 запущен; live результат
+пока не установлен. E/F открыты.
+
 ### E: existing input freshness — оператор и первый live — 2026-09-30
 
 Child `476b1e3ae9b2d42942138bf4eca7eefa2a3d1e54` добавляет отдельные fixed
