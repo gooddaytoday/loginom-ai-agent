@@ -22,7 +22,7 @@ export async function javascriptPublicCodePins() {
     selectors:new Map(selectors.map(selector=>[selector.symbol,selector])),pins:{}};
 }
 
-const codeTypedIds=Object.freeze(['g5-native-integer-safe','g5-native-string','g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real',
+const codeTypedIds=Object.freeze(['g5-native-civil-datetime','g5-native-integer-safe','g5-native-string','g5-native-boolean','g5-native-real','g5-null-empty','g5-boolean','g5-real',
   'g5-safe-integer','g5-date-civil','g5-named-access','g5-empty-output','g5-one-output','g5-empty-input']);
 export const javascriptPublicTypedIds=Object.freeze([...codeTypedIds,...codeTypedIds.map(id=>'declared-'+id)]);
 
@@ -55,7 +55,7 @@ export function verifyJavascriptPublicCodeInput(probe,input) {
   const pinned=javascriptPublicCodeProbe(javascriptPublicTypedIds.includes(probe.id)?probe.id:null,mode);
   need(JSON.stringify(probe)===JSON.stringify(pinned),'Public Code input probe pin changed');
   if(probe.native_input_fixture!==undefined){
-    need(['real','boolean','string','integer-safe'].includes(probe.native_input_fixture),'Public Code native input fixture unavailable');
+    need(['real','boolean','string','integer-safe','civil-datetime'].includes(probe.native_input_fixture),'Public Code native input fixture unavailable');
     const native=verifyNativeRoundtripInput(input,probe.native_input_fixture);
     verifyNativeInputUi(input.table,probe.native_input_fixture);
     need(['document_id','workflow_id','node_id'].every(key=>native.binding[key]===input.node[key]
