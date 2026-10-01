@@ -307,6 +307,29 @@ auditor pin. Если native поддержан или primary sufficient, insuf
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
 
+### E/J14: общий configuration live закреплён перед браузером — 2026-10-01
+
+Child **6043749a3f9cc22d344b7d8e4d9afd8d41dc1d15** добавляет fixed operator
+configuration-code/declared: public NEW Done/Close на saved baseline, independent
+full source/settings/graph, exact same-ID retry zero runtime events; далее NEW
+preserve Execute/two executions/full6x4 и default materialized context. Общий
+handler берётся из f066, operator не входит в продуктовую knowledge/runtime API.
+Addressed03 actualexit0/110PASS; full03 originalexec69096 actualexit0/**18563PASS**.
+Addressed01 и full02 failures тестового harness сохранены, не выданы за PASS;
+исправлены shared mutable test node и отсутствующий новый параметр VM handoff.
+Runtime unchanged: client3425PASS+10SKIP на f066 повторно не запускался.
+
+До live закреплены private oracle7042b040, auditor/30 non-noop negative cases,
+handoff и freeze **607071103a7a723a891531851e6a7ace0cea927e9dff15e181145cefae0ddbd4**
+(12751 files+61 symlinks), pin
+**3407a39a832355fc6239a6ffcefb3a2ec566632435ea98e59a032e683ee435e3**.
+Python syntax и obsolete-case assertion check PASS; actual audit/negatives после
+original run ещё не выполнены. Registry/lease под lock назначили fresh444 для
+`e-general-config-code-01`, assignment согласован/previous443 process absence.
+Следующее — original ordinary headed code run, original terminal, independent
+audit/negative copies/cleanup и reconciled lease; лишь после этого отдельный
+declared fresh profile. Source/evidence во время live не менять.
+
 ### E/J14: общий Done/Close source подтверждён — 2026-10-01
 
 На child30b после committed design a87f в основном checkout добавлены source
