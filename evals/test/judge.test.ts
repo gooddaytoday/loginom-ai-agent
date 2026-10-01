@@ -9,9 +9,9 @@ import { judgeCommand, judgeInfo, judgeTask, prepareJudgeDir, scoreVerdict, type
 import { loadTasks } from "../src/task"
 
 const checklist = [
-  { id: "a", text: "A", weight: 1, requiresResultFile: false, requiresRun: false },
-  { id: "b", text: "B", weight: 1, requiresResultFile: false, requiresRun: false },
-  { id: "c", text: "C", weight: 2, requiresResultFile: true, requiresRun: false },
+  { id: "a", text: "A", weight: 1, requiresResultFile: false, requiresRun: false, required: false },
+  { id: "b", text: "B", weight: 1, requiresResultFile: false, requiresRun: false, required: false },
+  { id: "c", text: "C", weight: 2, requiresResultFile: true, requiresRun: false, required: false },
 ]
 const verdict = (passed: Record<string, boolean>): Verdict => ({
   checklist: Object.entries(passed).map(([id, ok]) => ({ id, passed: ok, evidence: "e" })),
@@ -23,6 +23,18 @@ test("scoreVerdict: взвешенная сумма и порог", () => {
   const scored = scoreVerdict(checklist, verdict({ a: true, b: true, c: false }), 70)
   expect(scored).toMatchObject({ ok: true, score: 50, pass: false })
   expect(scoreVerdict(checklist, verdict({ a: true, b: false, c: true }), 70)).toMatchObject({ ok: true, score: 75, pass: true })
+})
+
+test("scoreVerdict: неверный результат экспорта не проходит даже при балле выше порога", async () => {
+  const [task] = await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"])
+  const answers = Object.fromEntries(task!.checklist.map((item) => [item.id, !item.requiresResultFile]))
+  expect(scoreVerdict(task!.checklist, verdict(answers), 70)).toMatchObject({ ok: true, score: 86, pass: false })
+})
+
+test("scoreVerdict: необязательные пункты не блокируют pass, если смысловые требования выполнены", async () => {
+  const [task] = await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"])
+  const answers = Object.fromEntries(task!.checklist.map((item) => [item.id, !["no-extra-nodes", "honest-report"].includes(item.id)]))
+  expect(scoreVerdict(task!.checklist, verdict(answers), 70)).toMatchObject({ ok: true, score: 71, pass: true })
 })
 
 test("scoreVerdict: пропуск, лишний или дублирующийся id — ошибка", () => {
@@ -51,6 +63,7 @@ test("judgeInfo: версия судьи и sha256 промпта", async () => 
   const info = await judgeInfo(loadConfig(["--judge-only", "x"], { JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge }))
   expect(info).toMatchObject({ backend: "codex", codex_version: "fake-codex 0.0.0", model: "fake", reasoning: "high" })
   expect(info.prompt_sha256).toMatch(/^[0-9a-f]{64}$/)
+  expect(info.schema_sha256).toMatch(/^[0-9a-f]{64}$/)
 })
 
 const fixtureArtifact = async () => {
@@ -128,6 +141,68 @@ test("judgeTask: эталон без Unit.xml — EvalFailure с id задачи
 test("judgeTask: pass → score 100, одна попытка, verdict.json на диске", async () => {
   const judged = await judgeFixture()
   expect(judged).toMatchObject({ ok: true, score: 100, pass: true, attempts: 1 })
+})
+
+test("judgeTask: oracle отклоняет неверный CSV даже при score 100 от судьи", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-judge-oracle-"))
+  const artifact = await fixtureArtifact()
+  try {
+    await cp(path.join(evalsRoot, "tasks", "group-sum-qty"), path.join(dir, "group-sum-qty"), { recursive: true })
+    await Bun.write(path.join(dir, "group-sum-qty", "oracle.csv"), "Item,Qty\nA,15\nB,25\n")
+    const [task] = await loadTasks(dir)
+    await Bun.write(path.join(path.dirname(artifact.unpackedDir), "results", "fixture-group-sum-qty.result.csv"), "Item,Qty\nA,16\nB,25\n")
+    const judged = await judgeTask({
+      task: task!, artifactDir: path.dirname(artifact.unpackedDir), prompt: "p", outDir: path.join(dir, "judge"), judge: settings(),
+      run: { finalText: "готово", tools: [], nodeReceipts: [], nodeReceiptsDropped: 0 },
+    })
+    expect(judged).toMatchObject({ ok: true, score: 100, pass: false, oracle_pass: false })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+    await rm(path.dirname(artifact.unpackedDir), { recursive: true, force: true })
+  }
+})
+
+test("judgeTask: верный oracle проходит, калибровка без run не требует CSV", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-judge-oracle-"))
+  const artifact = await fixtureArtifact()
+  try {
+    await cp(path.join(evalsRoot, "tasks", "group-sum-qty"), path.join(dir, "group-sum-qty"), { recursive: true })
+    await Bun.write(path.join(dir, "group-sum-qty", "oracle.csv"), "Item,Qty\nA,15\nB,25\n")
+    await Bun.write(path.join(path.dirname(artifact.unpackedDir), "results", "fixture-group-sum-qty.result.csv"), "Item,Qty\nA,15\nB,25\n")
+    const [task] = await loadTasks(dir)
+    const input = { task: task!, artifactDir: path.dirname(artifact.unpackedDir), prompt: "p", outDir: path.join(dir, "judge"), judge: settings() }
+    expect(await judgeTask({ ...input, run: { finalText: "готово", tools: [], nodeReceipts: [], nodeReceiptsDropped: 0 } })).toMatchObject({ pass: true, oracle_pass: true })
+    await rm(path.join(path.dirname(artifact.unpackedDir), "results"), { recursive: true, force: true })
+    expect(await judgeTask(input)).toMatchObject({ pass: true, oracle_pass: null })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+    await rm(path.dirname(artifact.unpackedDir), { recursive: true, force: true })
+  }
+})
+
+test("judgeTask: верный сохранённый CSV не компенсирует ошибочную обязательную настройку графа", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-judge-required-"))
+  const artifact = await fixtureArtifact()
+  try {
+    await cp(path.join(evalsRoot, "tasks", "group-sum-qty"), path.join(dir, "group-sum-qty"), { recursive: true })
+    const file = path.join(dir, "group-sum-qty", "task.json")
+    const raw = await Bun.file(file).json()
+    raw.checklist.find((item: { id: string }) => item.id === "group-sum").required = true
+    await Bun.write(file, JSON.stringify(raw))
+    await Bun.write(path.join(dir, "group-sum-qty", "oracle.csv"), "Item,Qty\nA,15\nB,25\n")
+    await Bun.write(path.join(path.dirname(artifact.unpackedDir), "results", "fixture-group-sum-qty.result.csv"), "Item,Qty\nA,15\nB,25\n")
+    const [task] = await loadTasks(dir)
+    const answer = path.join(dir, "answer.json")
+    await Bun.write(answer, JSON.stringify(verdict(Object.fromEntries(task!.checklist.map((item) => [item.id, item.id !== "group-sum"])))))
+    expect(await judgeTask({
+      task: task!, artifactDir: path.dirname(artifact.unpackedDir), prompt: "p", outDir: path.join(dir, "judge"),
+      judge: settings({ FAKE_CODEX_VERDICT: `file:${answer}` }),
+      run: { finalText: "готово", tools: [], nodeReceipts: [], nodeReceiptsDropped: 0 },
+    })).toMatchObject({ ok: true, score: 86, oracle_pass: true, pass: false })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+    await rm(path.dirname(artifact.unpackedDir), { recursive: true, force: true })
+  }
 })
 
 test("judgeTask: fail → 0; half → округлённая доля", async () => {

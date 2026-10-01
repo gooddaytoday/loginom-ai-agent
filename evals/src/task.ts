@@ -1,6 +1,7 @@
 import path from "node:path"
 import { readdir } from "node:fs/promises"
 import { EvalFailure } from "./fail"
+import type { EvalConfig } from "./config"
 
 type Raw = Record<string, unknown>
 
@@ -13,7 +14,13 @@ export async function loadTasks(dir: string, only?: string[]) {
     .sort()
   const unknown = (only ?? []).filter((id) => !ids.includes(id))
   if (unknown.length) throw new EvalFailure(`Неизвестные задачи: ${unknown.join(", ")} (доступны: ${ids.join(", ")})`, 2)
-  const selected = only ? ids.filter((id) => only.includes(id)) : ids
+  const selected = only
+    ? ids.filter((id) => only.includes(id))
+    : (await Promise.all(ids.map(async (id) => {
+        if (await Bun.file(path.join(dir, id, "task.json")).exists()) return id
+        console.error(`Предупреждение: ${id}: нет task.json, каталог пропущен`)
+        return undefined
+      }))).filter((id): id is string => id !== undefined)
   if (!selected.length) throw new EvalFailure(`В ${dir} нет задач`, 2)
   return Promise.all(selected.map((id) => loadTask(path.join(dir, id))))
 }
@@ -41,6 +48,8 @@ async function loadTask(dir: string) {
     checklist: checklist(raw, id),
     expectedOutput: text(raw, "expected_output", id),
     timeoutMs: optionalPositive(raw, "timeout_ms", id),
+    oracle: await Bun.file(path.join(dir, "oracle.csv")).exists() ? "oracle.csv" : undefined,
+    oracleTolerance: oracleTolerance(raw, id),
   }
   for (const rel of [task.reference, task.spec, ...task.inputs]) {
     if (!(await Bun.file(path.join(dir, rel)).exists())) throw new EvalFailure(`${id}: файл "${rel}" не найден`, 2)
@@ -79,6 +88,13 @@ function optionalPositive(raw: Raw, key: string, id: string) {
   return value
 }
 
+function oracleTolerance(raw: Raw, id: string) {
+  const value = raw.oracle_tolerance === undefined ? 0.01 : raw.oracle_tolerance
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+    throw new EvalFailure(`${id}: oracle_tolerance должен быть конечным неотрицательным числом`, 2)
+  return value
+}
+
 function checklist(raw: Raw, id: string) {
   const value = raw.checklist
   if (!Array.isArray(value) || !value.length) throw new EvalFailure(`${id}: checklist должен быть непустым массивом`, 2)
@@ -96,15 +112,32 @@ function checklist(raw: Raw, id: string) {
     const requiresRun = entry.requires_run === undefined ? false : entry.requires_run
     if (typeof requiresRun !== "boolean")
       throw new EvalFailure(`${id}: checklist[${index}].requires_run должен быть boolean`, 2)
-    return { id: itemId, text: itemText, weight, requiresResultFile, requiresRun }
+    const required = entry.required === undefined ? false : entry.required
+    if (typeof required !== "boolean")
+      throw new EvalFailure(`${id}: checklist[${index}].required должен быть boolean`, 2)
+    return { id: itemId, text: itemText, weight, requiresResultFile, requiresRun, required }
   })
   const duplicates = items.map((item) => item.id).filter((itemId, index, all) => all.indexOf(itemId) !== index)
   if (duplicates.length) throw new EvalFailure(`${id}: повторяющиеся id в checklist: ${duplicates.join(", ")}`, 2)
   return items
 }
 
-export async function agentInputsHash(tasks: Task[]) {
+export const agentPromptTail =
+  "Сохрани готовый пакет как `{package_path}`. " +
+  "Если задача требует выгрузку в файл, назови его `{result_name}`. " +
+  "Уточняющих вопросов не задавай — принимай разумные решения самостоятельно и доведи задачу до конца."
+
+export function buildAgentPrompt(prompt: string, packagePath: string, resultName: string) {
+  return `${prompt}\n\n${agentPromptTail.replace("{package_path}", () => packagePath).replace("{result_name}", () => resultName)}`
+}
+
+export function taskTimeoutMs(config: Pick<EvalConfig, "timeoutMs" | "taskTimeoutMs">, task: Task) {
+  return config.timeoutMs ?? task.timeoutMs ?? config.taskTimeoutMs
+}
+
+export async function agentInputsHash(tasks: Task[], tail = agentPromptTail) {
   const hasher = new Bun.CryptoHasher("sha256")
+  hashPart(hasher, "prompt_tail", tail)
   for (const task of tasks) {
     hasher.update(`${task.id}\n`)
     hashPart(hasher, "prompt", task.prompt)
@@ -121,6 +154,10 @@ export async function rubricHash(tasks: Task[]) {
     hashPart(hasher, "expected_output", task.expectedOutput)
     hashPart(hasher, "spec", await Bun.file(path.join(task.dir, task.spec)).bytes())
     hashPart(hasher, "reference", await Bun.file(path.join(task.dir, task.reference)).bytes())
+    if (task.oracle) {
+      hashPart(hasher, "oracle", await Bun.file(path.join(task.dir, task.oracle)).bytes())
+      hashPart(hasher, "oracle_tolerance", String(task.oracleTolerance))
+    }
   }
   return hasher.digest("hex")
 }

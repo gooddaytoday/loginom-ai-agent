@@ -1,6 +1,6 @@
 import path from "node:path"
 import os from "node:os"
-import { mkdir, stat } from "node:fs/promises"
+import { mkdir, stat, realpath, statfs } from "node:fs/promises"
 import type { EvalConfig } from "./config"
 import { evalsRoot, repoRoot } from "./config"
 import { EvalFailure } from "./fail"
@@ -8,13 +8,14 @@ import { listStorage, type ArtifactSource } from "./artifact"
 
 export type Environment = {
   git: { sha: string; dirty: boolean } | null
+  agent: Awaited<ReturnType<typeof agentInfo>> | null
   codex: { version: string } | null
   dock: { skillRevision: string | null } | null
   loginom: { imageDigest: string | null } | null
 }
 
 export async function preflight(config: EvalConfig, source: ArtifactSource): Promise<Environment> {
-  const environment: Environment = { git: await gitInfo(), codex: null, dock: null, loginom: null }
+  const environment: Environment = { git: await gitInfo(), agent: null, codex: null, dock: null, loginom: null }
   if (config.dryRun) {
     await requireFixtures()
     return environment
@@ -22,7 +23,7 @@ export async function preflight(config: EvalConfig, source: ArtifactSource): Pro
   if (!config.skipJudge) environment.codex = await codexInfo(config.judge.command)
   // --judge-only и --calibrate не запускают агента: Loginom, docker, Dock и bundle не нужны.
   if (config.judgeOnly !== undefined || config.calibrate) return environment
-  for (const tool of source.kind === "docker" ? ["unzip", "git", "pgrep", "docker"] : ["unzip", "git", "pgrep"]) {
+  for (const tool of source.kind === "docker" ? ["unzip", "git", "pgrep", "ps", "docker"] : ["unzip", "git", "pgrep", "ps"]) {
     if (!Bun.which(tool)) throw new EvalFailure(`Не найдена команда ${tool}`, 2)
   }
   const page = await fetch(config.loginom.url, { signal: AbortSignal.timeout(5_000) }).catch(() => undefined)
@@ -42,8 +43,44 @@ export async function preflight(config: EvalConfig, source: ArtifactSource): Pro
   }
   if (config.agent.cliMode === "binary" && !(await Bun.file(config.agent.cliBin ?? "").exists()))
     throw new EvalFailure(`EVAL_CLI_BIN не найден: ${config.agent.cliBin}`, 2)
+  environment.agent = await agentInfo(config)
   await mkdir(config.agent.workspaceRoot, { recursive: true })
+  await checkFreeSpace(evalsRoot)
+  await checkFreeSpace(config.agent.workspaceRoot)
   return environment
+}
+
+export async function checkFreeSpace(dir: string, minBytes = 1024 ** 3) {
+  const filesystem = await statfs(dir)
+  const available = filesystem.bavail * filesystem.bsize
+  if (available < minBytes)
+    throw new EvalFailure(`Недостаточно свободного места в ${dir}: ${available} байт, требуется ${minBytes}`, 2)
+}
+
+export async function agentInfo(config: EvalConfig) {
+  if (config.agent.cliMode !== "binary") return {
+    cliVersion: null,
+    binaryPath: null,
+    binarySha256: null,
+    sourceCommit: null,
+    sourceDirty: null,
+    sourceTreeSha256: null,
+  }
+  const binaryPath = await realpath(path.resolve(evalsRoot, config.agent.cliBin ?? "")).catch(() => undefined)
+  if (!binaryPath) throw new EvalFailure(`EVAL_CLI_BIN не найден: ${config.agent.cliBin}`, 2)
+  const hasher = new Bun.CryptoHasher("sha256")
+  for await (const chunk of Bun.file(binaryPath).stream()) hasher.update(chunk)
+  const manifest = await Bun.file(path.join(path.dirname(path.dirname(binaryPath)), "cli-manifest.json"))
+    .json().catch(() => undefined) as { metadata?: Record<string, unknown> } | undefined
+  const metadata = manifest?.metadata
+  return {
+    cliVersion: typeof metadata?.version === "string" ? metadata.version : null,
+    binaryPath,
+    binarySha256: hasher.digest("hex"),
+    sourceCommit: typeof metadata?.sourceCommit === "string" ? metadata.sourceCommit : null,
+    sourceDirty: typeof metadata?.sourceDirty === "boolean" ? metadata.sourceDirty : null,
+    sourceTreeSha256: typeof metadata?.sourceTreeSha256 === "string" ? metadata.sourceTreeSha256 : null,
+  }
 }
 
 export async function gitInfo() {

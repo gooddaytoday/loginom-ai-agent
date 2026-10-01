@@ -106,5 +106,5 @@ export async function calibrate(config: EvalConfig) {
   ].join("\n")
   await Bun.write(path.join(runDir, "calibration.md"), report)
   console.log(report)
-  return { code: 0, runDir }
+  return { code: warnings.length ? 1 : 0, runDir }
 }

@@ -1,12 +1,21 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { cp, mkdtemp, utimes, writeFile } from "node:fs/promises"
+import { chmod, cp, mkdtemp, rm, utimes, writeFile } from "node:fs/promises"
 import os from "node:os"
-import { cleanupArtifact, fetchArtifact, findListing, parseArtifactSource, parseFindOutput } from "../src/artifact"
+import { cleanupArtifact, fetchArtifact, findListing, parseArtifactSource, parseFindOutput, unzip } from "../src/artifact"
 import { evalsRoot } from "../src/config"
 
 const docker = { container: "c", storageDir: "/s" }
 const storage = parseArtifactSource(`dir:${path.join(evalsRoot, "fixtures", "storage")}`, docker)
+
+test("cleanupArtifact: пакет вне пространства имён попытки не удаляется", async () => {
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-unowned-"))
+  const artifact = await fetchArtifact({ source: storage, username: "user",
+    receipts: ["/user/fixture-group-sum-qty.lgp"], instructed: "eval-own-1.lgp",
+    resultPrefix: "eval-own-1", since: Date.now(), outDir })
+  // Если cleanup попытается удалить посторонний пакет, вызов Docker завершится ошибкой.
+  await cleanupArtifact({ kind: "docker", container: "eval-no-such-container", storageDir: "/storage" }, artifact!)
+})
 
 test("parseFindOutput: режет строки по табуляции и считает mtimeMs из секунд", () => {
   expect(parseFindOutput("a.lgp\t1758190000.123\nb.csv\t1758190001\n")).toEqual([
@@ -58,29 +67,29 @@ test("fetchArtifact: без квитанции берёт предписанно
   expect(artifact?.resultFiles).toEqual([])
 })
 
-test("fetchArtifact: scan берёт новейший .lgp после старта, перечисляет остальные, игнорирует .~lgp", async () => {
+test("fetchArtifact: scan ограничен текущей попыткой и не выбирает посторонний пакет", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-storage-"))
   const lgp = path.join(evalsRoot, "fixtures", "storage", "fixture-group-sum-qty.lgp")
   const since = Date.now() - 1_000
-  await cp(lgp, path.join(dir, "older.lgp"))
-  await cp(lgp, path.join(dir, "newest.lgp"))
-  await cp(lgp, path.join(dir, "newest.~lgp"))
-  await utimes(path.join(dir, "older.lgp"), new Date(since + 1_000), new Date(since + 1_000))
-  await utimes(path.join(dir, "newest.lgp"), new Date(since + 5_000), new Date(since + 5_000))
-  await utimes(path.join(dir, "newest.~lgp"), new Date(since + 9_000), new Date(since + 9_000))
+  await cp(lgp, path.join(dir, "eval-run-task-1-older.lgp"))
+  await cp(lgp, path.join(dir, "eval-run-task-1-newest.lgp"))
+  await cp(lgp, path.join(dir, "personal.lgp"))
+  await utimes(path.join(dir, "eval-run-task-1-older.lgp"), new Date(since + 1_000), new Date(since + 1_000))
+  await utimes(path.join(dir, "eval-run-task-1-newest.lgp"), new Date(since + 5_000), new Date(since + 5_000))
+  await utimes(path.join(dir, "personal.lgp"), new Date(since + 9_000), new Date(since + 9_000))
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-artifact-"))
   const artifact = await fetchArtifact({
     source: parseArtifactSource(`dir:${dir}`, docker),
     username: "user",
     receipts: [],
-    instructed: "missing.lgp",
-    resultPrefix: "none",
+    instructed: "eval-run-task-1.lgp",
+    resultPrefix: "eval-run-task-1",
     since,
     outDir,
   })
   expect(artifact?.origin).toBe("scan")
-  expect(artifact?.packagePath).toBe("/user/newest.lgp")
-  expect(artifact?.ambiguous).toEqual(["older.lgp"])
+  expect(artifact?.packagePath).toBe("/user/eval-run-task-1-newest.lgp")
+  expect(artifact?.ambiguous).toEqual(["eval-run-task-1-older.lgp"])
 })
 
 test("fetchArtifact: файлы результата только с префиксом и точкой", async () => {
@@ -131,4 +140,16 @@ test("parseArtifactSource: неверное значение — EvalFailure; cl
   })
   await cleanupArtifact(storage, artifact!)
   expect(await Bun.file(path.join(evalsRoot, "fixtures", "storage", "fixture-group-sum-qty.lgp")).exists()).toBe(true)
+})
+
+test("unzip: ошибка записи файлов не маскируется под отсутствие пакета агента", async () => {
+  const readonly = await mkdtemp(path.join(os.tmpdir(), "evals-readonly-"))
+  await chmod(readonly, 0o500)
+  try {
+    await expect(unzip(path.join(evalsRoot, "fixtures", "storage", "fixture-group-sum-qty.lgp"),
+      path.join(readonly, "unpacked"))).rejects.toThrow("unzip")
+  } finally {
+    await chmod(readonly, 0o700)
+    await rm(readonly, { recursive: true, force: true })
+  }
 })

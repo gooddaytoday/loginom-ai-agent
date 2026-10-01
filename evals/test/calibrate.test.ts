@@ -7,6 +7,26 @@ import { evalsRoot } from "../src/config"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
 
+test("--calibrate: выполненные пороги оставляют нулевой код", async () => {
+  const originalModel = process.env.JUDGE_MODEL
+  const originalCommand = process.env.EVAL_JUDGE_COMMAND
+  process.env.JUDGE_MODEL = "fake"
+  process.env.EVAL_JUDGE_COMMAND = fakeJudge
+  let runDir: string | undefined
+  try {
+    const result = await main(["--calibrate", "--only", "group-sum-qty"])
+    runDir = result.runDir
+    expect(result.code).toBe(0)
+    expect((await Bun.file(path.join(result.runDir, "calibration.json")).json()).warnings).toEqual([])
+  } finally {
+    if (originalModel === undefined) delete process.env.JUDGE_MODEL
+    else process.env.JUDGE_MODEL = originalModel
+    if (originalCommand === undefined) delete process.env.EVAL_JUDGE_COMMAND
+    else process.env.EVAL_JUDGE_COMMAND = originalCommand
+    if (runDir) await rm(runDir, { recursive: true, force: true })
+  }
+})
+
 test("--calibrate: positive/negative для каждой задачи, предупреждение когда negative слишком высок", async () => {
   const originalModel = process.env.JUDGE_MODEL
   const originalCommand = process.env.EVAL_JUDGE_COMMAND
@@ -22,7 +42,7 @@ test("--calibrate: positive/negative для каждой задачи, пред�
   try {
     const result = await main(["--calibrate"])
     runDir = result.runDir
-    expect(result.code).toBe(0)
+    expect(result.code).toBe(1)
     const calibration = await Bun.file(path.join(result.runDir, "calibration.json")).json()
     expect(calibration.rows).toHaveLength(6)
     expect(calibration.rows.filter((row: { kind: string }) => row.kind === "positive").every((row: { score: number }) => row.score === 100)).toBe(true)
@@ -48,7 +68,7 @@ test("--calibrate: positive/negative для каждой задачи, пред�
   }
 }, 120_000)
 
-test("--calibrate: сбой судьи пишет score=null и не роняет прогон", async () => {
+test("--calibrate: сбой судьи сохраняет диагностику и возвращает ненулевой код", async () => {
   const originalModel = process.env.JUDGE_MODEL
   const originalCommand = process.env.EVAL_JUDGE_COMMAND
   const originalVerdict = process.env.FAKE_CODEX_VERDICT
@@ -66,7 +86,7 @@ test("--calibrate: сбой судьи пишет score=null и не роняе�
     await cp(path.join(evalsRoot, "fixtures", "storage", "not-a-package.lgp"), path.join(tasksDir, "group-sum-qty", "reference.lgp"))
     const result = await main(["--calibrate", "--tasks", tasksDir])
     runDir = result.runDir
-    expect(result.code).toBe(0)
+    expect(result.code).toBe(1)
     const calibration = await Bun.file(path.join(result.runDir, "calibration.json")).json()
     const row = calibration.rows.find((item: { task: string; kind: string }) => item.task === "group-sum-qty" && item.kind === "positive")
     expect(row).toMatchObject({ score: null })
