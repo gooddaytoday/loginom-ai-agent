@@ -3,6 +3,7 @@ import { mkdir, rm, stat } from "node:fs/promises"
 import { repoRoot, type EvalConfig } from "./config"
 import type { AgentCommand } from "./cli"
 import { EvalFailure } from "./fail"
+import { groupProcesses } from "./process-group"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean }
 
@@ -38,35 +39,88 @@ export function parseView(text: string): View | undefined {
 // Guard снимаем только когда ни один процесс не ссылается на профиль (Chromium держит путь в argv).
 export async function releaseStaleWriter(profileDir: string) {
   const writer = path.join(profileDir, ".writer")
-  if (!(await exists(writer))) return false
   const busy = await profileProcesses(profileDir)
   if (busy.trim()) throw new EvalFailure(`Профиль ${profileDir} занят процессами:\n${busy.trim()}`, 2)
+  await rm(`${profileDir}.process-group`, { force: true })
+  if (!(await exists(writer))) return false
   await rm(writer, { recursive: true, force: true })
   return true
 }
 
 export async function waitProfileIdle(profileDir: string, timeoutMs = 60_000) {
-  await terminateProfileProcesses(profileDir)
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     if (!(await profileProcesses(profileDir)).trim()) return true
-    await Bun.sleep(2_000)
+    await Bun.sleep(Math.min(2_000, Math.max(0, deadline - Date.now())))
   }
   return false
 }
 
-// Matching is by argv substring; CLI children that receive the profile only via env are invisible to this check (known limitation).
+// Зарегистрированная группа включает host даже после завершения родительского CLI.
 async function profileProcesses(profileDir: string) {
+  const marker = Bun.file(`${profileDir}.process-group`)
+  const group = (await marker.exists()) ? Number((await marker.text()).trim()) : undefined
+  if (group !== undefined && (!Number.isInteger(group) || group <= 0))
+    throw new EvalFailure(`Некорректная группа процессов профиля ${profileDir}`, 2)
+  const tracked = group === undefined ? [] : await groupProcesses(group)
   const pattern = `${profileDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|[[:space:]]|$)`
   const result = await Bun.$`pgrep -u ${process.getuid?.() ?? ""} -f -- ${pattern}`.quiet().nothrow()
   if (result.exitCode > 1) throw new EvalFailure(`pgrep завершился кодом ${result.exitCode}`, 2)
-  return result.text()
+  const owners = await linuxProfileOwners(profileDir)
+  return [...tracked.map(String), ...owners.map(String), result.text().trim()].filter(Boolean).join("\n")
 }
 
-async function terminateProfileProcesses(profileDir: string) {
-  const pattern = `${profileDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|[[:space:]]|$)`
-  const result = await Bun.$`pkill -TERM -u ${process.getuid?.() ?? ""} -f -- ${pattern}`.quiet().nothrow()
-  if (result.exitCode > 1) throw new EvalFailure(`pkill завершился кодом ${result.exitCode}`, 2)
+// CLI хранит профиль только в env, а runtime — в cwd; argv не доказывает idle.
+async function linuxProfileOwners(profileDir: string) {
+  if (process.platform !== "linux") return []
+  const { readdir, readFile, readlink, realpath } = await import("node:fs/promises")
+  const canonical = await realpath(profileDir).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return path.resolve(profileDir)
+    throw error
+  })
+  const readable = <T>(operation: Promise<T>, known: boolean) => operation.catch((error: NodeJS.ErrnoException) => {
+    if (!known && ["EACCES", "EPERM"].includes(error.code ?? "")) return undefined
+    throw error
+  })
+  const processes = await Promise.all((await readdir("/proc")).filter((pid) => /^\d+$/.test(pid)).map(async (pid) => {
+    try {
+      if ((await stat(`/proc/${pid}`)).uid !== process.getuid?.()) return undefined
+      const status = await readFile(`/proc/${pid}/stat`, "utf8")
+      const fields = status.slice(status.lastIndexOf(")") + 2).split(" ")
+      if (["Z", "X"].includes(fields[0] ?? "")) return undefined
+      const named = status.slice(status.indexOf("(") + 1, status.lastIndexOf(")")).startsWith("loginom-ai-")
+      const args = ((await readable(readFile(`/proc/${pid}/cmdline`, "utf8"), named)) ?? "").split("\0")
+      const host = args.slice(1).some((arg) => path.basename(arg) === "node-host.mjs")
+      const cli = path.basename(args[0] ?? "") === "loginom-ai-agent-cli" || args.slice(1).some((arg) =>
+        arg === "src/standalone.ts" || arg.endsWith("/packages/agent/src/standalone.ts"))
+      const desktop = /^loginom-ai-agent(-dev|-beta)?$/.test(path.basename(args[0] ?? ""))
+      const known = named || host || cli || desktop
+      const environment = ((await readable(readFile(`/proc/${pid}/environ`, "utf8"), known)) ?? "").split("\0")
+      const roots = environment.flatMap((entry) => {
+        if (!/^LOGINOM_AI_AGENT_CLI_(PROFILE|ROOT)=/.test(entry)) return []
+        return [entry.slice(entry.indexOf("=") + 1)]
+      })
+      const canonicalRoots = await Promise.all(roots.map((root) => realpath(root).catch(() => undefined)))
+      const cwd = await readable(readlink(`/proc/${pid}/cwd`), known)
+      return {
+        pid: Number(pid), parent: Number(fields[1]),
+        owns: canonicalRoots.includes(canonical) || roots.includes(canonical) || cwd === canonical || cwd?.startsWith(`${canonical}${path.sep}`),
+        identified: canonicalRoots.some((root) => root !== undefined),
+        host, cli, desktop,
+      }
+    } catch (error) {
+      if (["ENOENT", "ESRCH"].includes((error as NodeJS.ErrnoException).code ?? "")) return undefined
+      throw new EvalFailure(`Не удалось проверить владельца профиля, PID ${pid}`, 2)
+    }
+  }))
+  const live = processes.filter((entry) => entry !== undefined)
+  return live.filter((entry) => {
+    if (entry.owns || (entry.cli && !entry.identified)) return true
+    if (!entry.host || entry.identified) return false
+    const parent = live.find((candidate) => candidate.pid === entry.parent)
+    // Без env host не раскрывает root; только живой известный parent доказывает чужой профиль.
+    return !parent || (!parent.identified && !parent.desktop)
+  }).map((entry) => entry.pid)
 }
 
 function parseJson(text: string): unknown {
@@ -185,6 +239,44 @@ export async function resetProfile(config: EvalConfig) {
   const busy = await profileProcesses(config.profileDir)
   if (busy.trim()) throw new EvalFailure(`Нельзя сбросить профиль: занят процессами\n${busy.trim()}`, 2)
   await rm(config.profileDir, { recursive: true, force: true })
+}
+
+// Вызывается после recovery и копирования артефактов; долговечные stores лежат вне attempts.
+export async function pruneRuntimeAttempts(profileDir: string) {
+  const { lstat, readdir } = await import("node:fs/promises")
+  const entries = (directory: string) =>
+    readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return []
+      throw error
+    })
+  if ((await entries(path.join(profileDir, "loginom", "recovery"))).some((entry) => /\.(json|tmp)$/.test(entry.name)))
+    throw new EvalFailure("Нельзя очистить runtime attempts: pending recovery", 2)
+  if (await exists(path.join(profileDir, "loginom", "connection", "pending.json")))
+    throw new EvalFailure("Нельзя очистить runtime attempts: pending connection", 2)
+  await releaseStaleWriter(profileDir)
+  const directoryInfo = (directory: string) =>
+    lstat(directory).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw error
+    })
+  const roots = await Promise.all([
+    profileDir, path.join(profileDir, "loginom"), path.join(profileDir, "loginom", "runtime"),
+  ].map(directoryInfo))
+  if (roots.some((info) => !info?.isDirectory() || info.isSymbolicLink())) return 0
+  const directories = async (directory: string) => {
+    const info = await directoryInfo(directory)
+    if (!info?.isDirectory() || info.isSymbolicLink()) return []
+    return (await entries(directory))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(directory, entry.name))
+  }
+  const generations = await directories(path.join(profileDir, "loginom", "runtime", "generations"))
+  const chats = (await Promise.all(generations.map((generation) => directories(path.join(generation, "chats"))))).flat()
+  const attempts = (await Promise.all(chats.map(directories)))
+    .flat()
+    .filter((directory) => path.basename(directory) === "attempts")
+  await Promise.all(attempts.map((directory) => rm(directory, { recursive: true, force: true })))
+  return attempts.length
 }
 
 async function status(command: AgentCommand, exitCode: 1 | 2) {

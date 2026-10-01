@@ -15,7 +15,11 @@ export async function rejudge(config: EvalConfig, runId: string) {
   const summaryFile = Bun.file(path.join(runDir, "summary.json"))
   if (!(await summaryFile.exists())) throw new EvalFailure(`Нет прогона ${runId}: ${runDir}/summary.json не найден`, 2)
   const prev = (await summaryFile.json()) as RunSummary
-  const tasks = await loadTasks(config.tasksDir, prev.task_ids)
+  const saved = await Bun.file(path.join(runDir, "config.json")).json().catch(() => undefined) as { tasksDir?: unknown } | undefined
+  const tasksDir = config.tasksDirExplicit
+    ? config.tasksDir
+    : prev.config.tasks_dir ?? (typeof saved?.tasksDir === "string" ? saved.tasksDir : config.tasksDir)
+  const tasks = await loadTasks(tasksDir, prev.task_ids)
   await preflight(config, parseArtifactSource("docker", config.loginom))
   const judge = await judgeInfo(config)
   if ((await agentInputsHash(tasks)) !== prev.agent_inputs_hash)
@@ -37,10 +41,10 @@ export async function rejudge(config: EvalConfig, runId: string) {
       const dir = path.join(runDir, group.id, String(attempt.attempt))
       const artifactDir = path.join(dir, "artifact")
       const units = await Array.fromAsync(new Bun.Glob("unpacked/Unit_*/Unit.xml").scan(artifactDir)).catch(() => [])
-      const judgeable = task && units.length > 0 && attempt.status !== "harness_error" && attempt.status !== "interrupted"
+      const judgeable = task && units.length > 0 && attempt.status !== "harness_error" && attempt.status !== "infra_error" && attempt.status !== "interrupted"
       if (!judgeable || controller.signal.aborted) {
         // Dry-run/--skip-judge оставляют score=null; при --judge-only нет артефакта → те же поля, что у живого прогона.
-        if (controller.signal.aborted || attempt.status === "harness_error" || attempt.status === "interrupted" || attempt.judge_status !== "skipped") {
+        if (controller.signal.aborted || attempt.status === "harness_error" || attempt.status === "infra_error" || attempt.status === "interrupted" || attempt.judge_status !== "skipped") {
           attempts.push(attempt)
           continue
         }
@@ -53,6 +57,8 @@ export async function rejudge(config: EvalConfig, runId: string) {
           judge_confidence: null,
           judge_summary: null,
           checklist: null,
+          oracle_pass: task?.oracle ? false : null,
+          oracle_error: task?.oracle ? "Артефакт и файл результата для oracle отсутствуют" : null,
         }
         await Bun.write(path.join(dir, "result.json"), JSON.stringify(updated, null, 2))
         attempts.push(updated)

@@ -88,3 +88,90 @@ test("--judge-only: сбой судьи помечает попытку error и
     await rm(tasksDir, { recursive: true, force: true })
   }
 }, 90_000)
+
+test("--judge-only: восстанавливает каталог внешних задач из summary", async () => {
+  const original = overrideJudgeEnv()
+  const tasksDir = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-external-"))
+  let runDir: string | undefined
+  try {
+    await cp(path.join(evalsRoot, "tasks", "group-sum-qty"), path.join(tasksDir, "external-task"), { recursive: true })
+    const file = path.join(tasksDir, "external-task", "task.json")
+    const raw = await Bun.file(file).json()
+    await Bun.write(file, JSON.stringify({ ...raw, id: "external-task" }))
+    const dry = await main(["--dry-run", "--tasks", tasksDir])
+    runDir = dry.runDir
+    const summaryFile = Bun.file(path.join(runDir!, "summary.json"))
+    const summary = await summaryFile.json()
+    summary.config.tasks_dir = tasksDir
+    await Bun.write(summaryFile, JSON.stringify(summary))
+    const result = await main(["--judge-only", path.basename(runDir!)])
+    expect(result.code).toBe(0)
+    expect((await summaryFile.json()).task_ids).toEqual(["external-task"])
+  } finally {
+    restoreJudgeEnv(original)
+    if (runDir) await rm(runDir, { recursive: true, force: true })
+    await rm(tasksDir, { recursive: true, force: true })
+  }
+}, 30_000)
+
+test("--judge-only: для старого summary восстанавливает tasksDir из config.json", async () => {
+  const original = overrideJudgeEnv()
+  const tasksDir = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-legacy-"))
+  let runDir: string | undefined
+  try {
+    await cp(path.join(evalsRoot, "tasks", "group-sum-qty"), path.join(tasksDir, "legacy-task"), { recursive: true })
+    const file = path.join(tasksDir, "legacy-task", "task.json")
+    const raw = await Bun.file(file).json()
+    await Bun.write(file, JSON.stringify({ ...raw, id: "legacy-task" }))
+    const dry = await main(["--dry-run", "--tasks", tasksDir])
+    runDir = dry.runDir
+    const summaryFile = Bun.file(path.join(runDir!, "summary.json"))
+    const summary = await summaryFile.json()
+    delete summary.config.tasks_dir
+    await Bun.write(summaryFile, JSON.stringify(summary))
+    expect((await main(["--judge-only", path.basename(runDir!)])).code).toBe(0)
+  } finally {
+    restoreJudgeEnv(original)
+    if (runDir) await rm(runDir, { recursive: true, force: true })
+    await rm(tasksDir, { recursive: true, force: true })
+  }
+}, 30_000)
+
+test("--judge-only: инфраструктурная ошибка остаётся без оценки агента", async () => {
+  const original = overrideJudgeEnv()
+  let runDir: string | undefined
+  try {
+    const dry = await main(["--dry-run", "--only", "calc-data-double"])
+    runDir = dry.runDir
+    const file = Bun.file(path.join(runDir!, "summary.json"))
+    const summary = await file.json()
+    summary.tasks[0].attempts[0].status = "infra_error"
+    await Bun.write(file, JSON.stringify(summary))
+    await main(["--judge-only", path.basename(runDir!)])
+    expect((await file.json()).tasks[0].attempts[0]).toMatchObject({ status: "infra_error", score: null, pass: null, judge_status: "skipped" })
+  } finally {
+    restoreJudgeEnv(original)
+    if (runDir) await rm(runDir, { recursive: true, force: true })
+  }
+}, 30_000)
+
+test("--judge-only: отсутствующий артефакт проваливает oracle, как в живом прогоне", async () => {
+  const original = overrideJudgeEnv()
+  const tasksDir = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-oracle-"))
+  let runDir: string | undefined
+  try {
+    await cp(path.join(evalsRoot, "tasks", "calc-data-double"), path.join(tasksDir, "calc-data-double"), { recursive: true })
+    await Bun.write(path.join(tasksDir, "calc-data-double", "oracle.csv"), "Data,Double\n1,2\n")
+    const dry = await main(["--dry-run", "--tasks", tasksDir])
+    runDir = dry.runDir
+    await main(["--judge-only", path.basename(runDir!)])
+    const summary = await Bun.file(path.join(runDir!, "summary.json")).json()
+    expect(summary.tasks[0].attempts[0]).toMatchObject({ judge_status: "no_artifact", oracle_pass: false })
+    expect(summary.metrics.oracle_checked_count).toBe(1)
+    expect(summary.metrics.oracle_pass_rate).toBe(0)
+  } finally {
+    restoreJudgeEnv(original)
+    if (runDir) await rm(runDir, { recursive: true, force: true })
+    await rm(tasksDir, { recursive: true, force: true })
+  }
+}, 30_000)

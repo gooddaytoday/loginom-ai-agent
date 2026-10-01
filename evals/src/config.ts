@@ -47,6 +47,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
       .map((id) => id.trim())
       .filter(Boolean),
     tasksDir: path.resolve(evalsRoot, values.tasks ?? "tasks"),
+    tasksDirExplicit: values.tasks !== undefined,
     label: values.label ?? null,
     repeat: positive("--repeat", values.repeat ?? env.EVAL_REPEAT, 1),
     timeoutMs: values["timeout-ms"] === undefined ? undefined : positive("--timeout-ms", values["timeout-ms"], 0),
@@ -75,6 +76,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
     },
     agent: {
       model: required("EVAL_AGENT_MODEL", !agentless) || "fake/fake-model",
+      variant: env.EVAL_AGENT_VARIANT?.trim() || "default",
       cliMode: mode,
       cliBin: env.EVAL_CLI_BIN,
       bundle: path.resolve(evalsRoot, env.EVAL_CLI_BUNDLE ?? ".bundle"),

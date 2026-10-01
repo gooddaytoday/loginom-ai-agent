@@ -23,6 +23,17 @@ test("statusFor: таблица кодов выхода и приоритет ti
   expect(statusFor(run(null), false)).toEqual({ status: "failed", stop: false })
 })
 
+test("statusFor: известный сбой старта до сессии отделён от провала начавшего работу агента", () => {
+  const startup = {
+    exitCode: 1, timedOut: false, interrupted: false, sessionId: undefined,
+    tokens: { input: 0, output: 0, reasoning: 0 }, counters: { toolCalls: 0 }, stderrHead: "LOGINOM_HOST_TIMEOUT",
+  }
+  expect(statusFor(startup, false)).toEqual({ status: "infra_error", stop: false })
+  expect(statusFor({ ...startup, sessionId: "session" }, false)).toEqual({ status: "failed", stop: false })
+  expect(statusFor({ ...startup, stderrHead: "unknown failure" }, false)).toEqual({ status: "failed", stop: false })
+  expect(statusFor({ ...startup, counters: { toolCalls: 1 } }, false)).toEqual({ status: "failed", stop: false })
+})
+
 const attempt = (over: Partial<AttemptResult>): AttemptResult => ({
   task_id: "t",
   attempt: 1,
@@ -70,7 +81,7 @@ test("aggregate: no_artifact = 0, null исключается, interrupted не 
   expect(metrics.completion_rate).toBeCloseTo(0.333, 3)
   expect(metrics.mean_score).toBe(50)
   expect(metrics.mean_score_completed).toBe(100)
-  expect(metrics.pass_rate).toBeCloseTo(0.333, 3)
+  expect(metrics.pass_rate).toBe(0.5)
   expect(metrics.scored_count).toBe(2)
   expect(metrics.excluded_count).toBe(1)
   expect(metrics.failure_kinds).toEqual({ tool: 1 })
@@ -83,6 +94,44 @@ test("aggregate: --skip-judge обнуляет метрики судьи, но �
   expect(metrics.completion_rate).toBe(1)
   expect(metrics.mean_score).toBeNull()
   expect(metrics.pass_rate).toBeNull()
+})
+
+test("aggregate: ошибка harness исключена из качества и разброса, расходы сохраняются", () => {
+  const attempts = [
+    attempt({ score: 100, pass: true }),
+    attempt({ status: "harness_error", score: 0, pass: false, judge_status: "skipped", cost: 0.02 }),
+  ]
+  expect(aggregate(attempts, false)).toMatchObject({
+    total: 1, completed: 1, completion_rate: 1, mean_score: 100, pass_rate: 1,
+    harness_error_count: 1, total_cost: 0.03, total_duration_ms: 2000,
+  })
+  expect(aggregateTask(attempts, false)).toMatchObject({ attempts: 1, mean_score: 100, min_score: 100, max_score: 100 })
+})
+
+test("aggregate: отказ судьи не считается ошибкой агента в pass_rate", () => {
+  expect(aggregate([
+    attempt({}),
+    attempt({ score: null, pass: null, judge_status: "error" }),
+    attempt({ status: "no_artifact", score: 0, pass: false, judge_status: "no_artifact" }),
+  ], false)).toMatchObject({ total: 3, pass_rate: 0.5, pass_evaluated_count: 2, judge_error_count: 1 })
+})
+
+test("aggregate: сбой инфраструктуры не снижает метрики агента", () => {
+  const attempts = [attempt({}), attempt({ status: "infra_error", score: 0, pass: false, judge_status: "skipped" })]
+  expect(aggregate(attempts, false)).toMatchObject({ total: 1, completion_rate: 1, mean_score: 100, pass_rate: 1, infra_error_count: 1 })
+  expect(aggregateTask(attempts, false)).toMatchObject({ attempts: 1, min_score: 100, max_score: 100 })
+})
+
+test("aggregate: без измеренных попыток нет показателя completion", () => {
+  expect(aggregate([attempt({ status: "infra_error", score: null, pass: null, judge_status: "skipped" })], false)).toMatchObject({
+    total: 0, completion_rate: null, mean_score: null, pass_rate: null, infra_error_count: 1,
+  })
+})
+
+test("aggregate: oracle показывает отдельную долю проверенных результатов", () => {
+  const attempts = [attempt({ oracle_pass: true }), attempt({ oracle_pass: false }), attempt({ oracle_pass: null })]
+  expect(aggregate(attempts, false)).toMatchObject({ oracle_checked_count: 2, oracle_pass_rate: 0.5 })
+  expect(aggregateTask(attempts, false)).toMatchObject({ oracle_checked_count: 2, oracle_pass_rate: 0.5 })
 })
 
 test("aggregateTask: разброс score по попыткам", () => {
@@ -121,6 +170,21 @@ test("renderReport: метрики, задачи, попытки, отказы �
   expect(report).toContain("provider")
   expect(report).toContain("APIError")
   expect(report).toContain("Остатки в хранилище")
+})
+
+test("renderReport: отдельно показывает инфраструктуру, полноту судейства и проверку oracle", () => {
+  const attempts = [attempt({ oracle_pass: false, oracle_error: "Колонки не совпали", pass: false })]
+  const report = renderReport({ ...summary(), metrics: aggregate(attempts, false), tasks: [{ id: "t", metrics: aggregateTask(attempts, false), attempts }] })
+  expect(report).toContain("oracle_pass_rate: 0.0% (проверено 1)")
+  expect(report).toContain("infra_error: 0, harness_error: 0, judge_error: 0")
+  expect(report).toContain("pass_rate: 0.0% (оценено 1)")
+  expect(report).toContain("Колонки не совпали")
+})
+
+test("renderReport: идентифицирует измеряемый binary независимо от git harness", () => {
+  const run = summary()
+  expect(renderReport({ ...run, agent: { ...run.agent, cli_mode: "binary", cli_version: "0.1.17", variant: "low", source_commit: "source123", binary_sha256: "binary123" } }))
+    .toContain("CLI 0.1.17 · variant low · source source123 · binary sha256 binary123")
 })
 
 test("renderReport: экранирует свободный текст в ячейках markdown", () => {
