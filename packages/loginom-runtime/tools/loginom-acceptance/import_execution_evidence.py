@@ -19,7 +19,8 @@ def verify_process_scroll_observations(observations, mutations):
         delta=action.get('delta_y');moves=[t for t in outcome.get('trace',[]) if t.get('event')=='ui_scroll_applied']
         target=min(scroll.get('max_top',0),max(0,scroll.get('top',0)+(delta if type(delta) is int else 0)))
         rows=[e for e in after.get('ui',{}).get('elements',[]) if e.get('process_grid',{}).get('grid_id')==grid.get('grid_id')]
-        if (control.get('tid')!='ConsoleForm;ProgressForm;trpProgress;treepanel;tree' or not grid.get('grid_id')
+        if (control.get('tid') not in ('ConsoleForm;ProgressForm;trpProgress;treepanel;tree',
+                'MF;ConsoleForm;ProgressForm;trpProgress;treepanel;tree') or not grid.get('grid_id')
                 or scroll.get('ref')!=action.get('ref') or 'scroll' not in control.get('allowed_actions',[])
                 or type(delta) is not int or not 0<abs(delta)<=1000 or target==scroll.get('top')
                 or len(moves)!=1 or moves[0].get('owner_ref')!=action.get('ref')

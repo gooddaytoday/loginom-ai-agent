@@ -2368,5 +2368,15 @@
     "baseHash": "ad4e46a95b88681128bd25b6628b78ebe2014a8f1be1ba576d9b3077e3757352",
     "hash": "e99b7f391c8167e4a8a02bbe57f6fbf10461ae70e223de18f47575757591247b",
     "reason": "Original upstream source identity/hash retained in source-map.json. Register general JavaScript lifecycle-v5 only for the validated 7.4.2 target/origin, route its ordinary driver without operator hooks and pass the bridge redactor with known secrets; default registry-only callers use the standard sanitizer. Source provenance does not certify candidate or CLI acceptance. Rebase node-javascript onto loginom a3d8e2947 preserves both branches; transformed bytes were checked in the rebased tree."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/node_procedure_evidence.py": {
+    "baseHash": "d6a2417ef57cf6bb1bc4c118505d62a369f536935d1744fc11216417748e7c58",
+    "hash": "71e0bbdaaf65c7f52ce52c570b364fc97fc5ea381c517e3a06ceaecc4505dbe9",
+    "reason": "Audit only the existing owned native Table settlement after a single acknowledged Add, bounded to the admitted read/node deadline; keep ordinary observation readiness at 15000ms and validate owner/port/cards/masks in every sample. This records transformed audit source, not product or CLI acceptance. Rebase node-javascript onto loginom a3d8e2947 preserves both branches; transformed bytes were checked in the rebased tree."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/import_execution_evidence.py": {
+    "baseHash": "4819cce760e1c94647a2af259c4f45339471e9159ebd94f32b6eef153d12f19b",
+    "hash": "6422ecad4f11438effaec18fffbfeceb0fc0f8b1fb2a712c98caa7aa8718759c",
+    "reason": "Audit the two observed native process console namespaces, ConsoleForm and MF;ConsoleForm, while retaining exact grid/ref/scroll receipt and native process history checks. This records transformed audit source, not product or CLI acceptance. Rebase node-javascript onto loginom a3d8e2947 preserves both branches; transformed bytes were checked in the rebased tree."
   }
 }

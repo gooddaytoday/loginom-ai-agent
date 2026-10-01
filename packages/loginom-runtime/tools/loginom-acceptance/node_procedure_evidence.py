@@ -247,6 +247,76 @@ def bound_port_open(action, outcome, state):
         ('direction','port','opening_operation_id','document_id','workflow_id','node_id','verified'))
 
 
+def bound_output_settlement(rows, row, samples, observations, mutations):
+    """One acknowledged Table Add may settle within its admitted node deadline."""
+    readiness = row.get('readiness', {})
+    admissions = [r for r in rows if r.get('phase') == 'node_apply_prepared']
+    if (len(admissions) != 1 or not observations or not mutations
+            or readiness.get('condition') != 'new Table card bound to output'
+            or readiness.get('required_samples') != 2):
+        return False
+    current_index = rows.index(row)
+    phase_starts = [r for r in rows[:current_index] if r.get('phase') == 'node_phase_prepared']
+    if (not phase_starts or phase_starts[-1].get('receipt', {}).get('phase') != 'read'
+            or readiness.get('deadline') != phase_starts[-1]['receipt'].get('deadline')):
+        return False
+    deadline = readiness.get('deadline')
+    timeout = readiness.get('timeout_ms')
+    port = readiness.get('settle_output_port')
+    budget = admissions[0].get('request', {}).get('budgets', {}).get('total_ms')
+    if (type(deadline) is not int or type(admissions[0].get('deadline_at')) is not int
+            or not 0 < deadline <= admissions[0]['deadline_at'] or type(budget) is not int or not 0 < budget
+            or type(timeout) not in (int, float) or not 0 < timeout <= budget
+            or not isinstance(port, str) or not port or len(samples) < 2):
+        return False
+    step, action, outcome = mutations[-1]
+    before_step, before = observations[-1]
+    controls = [e for e in before.get('ui', {}).get('elements', []) if e.get('ref') == action.get('ref')]
+    if (not before_step < step < row.get('step', 0) or action.get('verb') != 'click'
+            or outcome.get('status') != 'SUCCEEDED' or outcome.get('cleanup_complete') is not True
+            or len(controls) != 1 or controls[0].get('viewer_card', {}).get('kind') != 'add'
+            or controls[0]['viewer_card'].get('port_guid') != port):
+        return False
+    owner = before.get('prepared_node_context', {})
+    old = {t.get('view_guid') for t in before.get('node_outputs', {}).get('tables', [])}
+    prefix = before.get('workflow_ref', {}).get('prefix')
+    if owner.get('verified') is not True or not prefix:
+        return False
+    for sample in samples:
+        r = sample.get('readiness', {})
+        state = sample.get('outcome', {}).get('output', {})
+        outputs = state.get('node_outputs', {})
+        context = state.get('prepared_node_context', {})
+        masks = state.get('ui', {}).get('masks', [])
+        pending = (outputs.get('verified') is False and outputs.get('reason') == 'table_card_pending'
+            and len(outputs.get('pending_tables', [])) == 1
+            and outputs['pending_tables'][0].get('port_guid') == port and bool(masks))
+        if (any(r.get(k) != readiness.get(k) for k in ('condition', 'deadline', 'timeout_ms', 'settle_output_port', 'required_samples'))
+                or type(r.get('elapsed_ms')) not in (int, float) or not 0 <= r['elapsed_ms'] < timeout
+                or state.get('scan', {}).get('complete') is not True
+                or context.get('verified') is not True or context.get('surface') != 'views'
+                or any(not owner.get(k) or context.get(k) != owner[k] for k in ('document_id', 'workflow_id', 'node_id'))
+                or outputs.get('surface') != 'views' or not (outputs.get('verified') is True or pending)
+                or outputs.get('node_context', {}).get('verified') is not True
+                or any(outputs['node_context'].get(k) != owner[k] for k in ('document_id', 'workflow_id', 'node_id'))
+                or len([p for p in outputs.get('port_panels', []) if p.get('port_guid') == port]) != 1
+                or state.get('ui', {}).get('dialogs') != []
+                or any(m.get('kind') != 'busy' or m.get('dialog_ref') or m.get('target_tid') != prefix+';ViewsForm' for m in masks)):
+            return False
+    for sample in samples[-2:]:
+        state = sample['outcome']['output']
+        outputs = state['node_outputs']
+        added = [t for t in outputs.get('tables', []) if t.get('view_guid') not in old and t.get('port_guid') == port]
+        if (outputs.get('verified') is not True or state['ui'].get('masks') != []
+                or len(added) != 1 or not added[0].get('view_guid')
+                or len([e for e in state['ui'].get('elements', [])
+                    if e.get('viewer_card', {}).get('kind') == 'enter'
+                    and e['viewer_card'].get('view_guid') == added[0]['view_guid']
+                    and e['viewer_card'].get('port_guid') == port]) != 1):
+            return False
+    return True
+
+
 def verify_internal_sequence(events, operation_id, *, max_steps=96):
     rows = [r for r in events if r.get('operation_id') == operation_id]
     failures, observations, mutations = [], [], []
@@ -304,14 +374,20 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96):
             required_samples = row.get('readiness', {}).get('required_samples') if semantic else 4
             if semantic and required_samples not in (1, 2):
                 failures.append('invalid_readiness_policy'); required_samples = 2
-            if step != previous_step + 1 or pending or not required_samples <= len(samples) <= (80 if row.get('readiness') else 12) or observation_attempts > 80:
+            settlement = ('settle_output_port' in row.get('readiness', {})
+                and bound_output_settlement(rows, row, samples, observations, mutations))
+            if 'settle_output_port' in row.get('readiness', {}) and not settlement:
+                failures.append('unbound_output_settlement')
+            sample_limit = 4096 if settlement else 80
+            if step != previous_step + 1 or pending or not required_samples <= len(samples) <= (sample_limit if row.get('readiness') else 12) or observation_attempts > sample_limit:
                 failures.append('observation_sequence')
             readiness = row.get('readiness')
             if readiness is not None:
                 condition = readiness.get('condition')
                 if (not isinstance(condition, str) or not condition.strip()
                         or readiness.get('satisfied') is not True
-                        or not 0 <= readiness.get('elapsed_ms', -1) < readiness.get('timeout_ms', 0) <= 15000
+                        or not 0 <= readiness.get('elapsed_ms', -1) < readiness.get('timeout_ms', 0)
+                        or readiness.get('timeout_ms', 0) > 15000 and not settlement
                         or any(s.get('readiness', {}).get('condition') != condition for s in samples)
                         or any(s.get('readiness', {}).get('satisfied') is not True for s in samples[-required_samples:])):
                     failures.append('readiness_not_confirmed')
