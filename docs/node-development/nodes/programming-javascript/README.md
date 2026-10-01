@@ -19,6 +19,16 @@ source-read без исполнения и отдельное declared-зада�
 [исследовании](research.md); подготовка проверенной runtime-редакции и её
 доставка модели предусмотрены фазой 1B подплана.
 
+Общий Done/Close lifecycle-v5 на **73a8e9df31** проверен fresh ordinary headed
+Code447/declared4482/2: public Done→Close→NEW preserve Execute, exact same-ID
+retry zero events, full source/settings/graph, full6×4/1950 и default materialized
+context. Independent v2 audit/36 non-noop negatives каждого и cleanup приняты.
+Done не обещает fresh output; explicit=false/internal=null. Эти trials используют
+existing saved nodes, новый generic Done покрыт source tests; product registration,
+review/candidate/CLI остаются открыты. [Границы и hashes](checkpoint.md#текущее-состояние),
+[design](configuration-lifecycle-design.md). Failed444 и verified recovery не
+превращены в PASS.
+
 ## Состояние и границы
 
 **discovery_required**, 2026-09-29. Проведено исследование исходников,

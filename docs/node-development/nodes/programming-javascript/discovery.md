@@ -17,6 +17,16 @@ Linux по принадлежащему `Session.Version.IsWindows=false`; ди�
 остаётся проверкой реализации и приёмки. Непроверенные пункты в ней не возвращают
 закрытое решение исследования в начало.
 
+Общий Done/Close lifecycle-v5 на **73a8e9df31** проверен fresh ordinary headed
+Code447/declared4482/2: public Done→Close→NEW preserve Execute, exact same-ID
+retry zero events, full source/settings/graph, full6×4/1950 и default materialized
+context. Independent v2 audit/36 non-noop negatives каждого и cleanup приняты.
+Done не обещает fresh output; explicit=false/internal=null. Эти trials используют
+existing saved nodes, новый generic Done покрыт source tests; product registration,
+review/candidate/CLI остаются открыты. [Границы и hashes](checkpoint.md#текущее-состояние),
+[design](configuration-lifecycle-design.md). Failed444 и verified recovery не
+превращены в PASS.
+
 Public C run05 на `97098322a1` подтвердил все13 phases, две owned completed
 Execute, полные native mappings и owned Views/full typed UI6×4. Независимый
 output-only audit подтвердил business oracle1950 и graph preservation.

@@ -307,6 +307,47 @@ auditor pin. Если native поддержан или primary sufficient, insuf
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
 
+### E/J14: общий Done/Close Code+declared принят2/2 — 2026-10-01
+
+General lifecycle-v5 source **f06680e0d8**, operator6043749a3f и bounded redraw /
+returned receipt **73a8e9df312a00e4449a20e752f7788cf20522ee**. Fresh ordinary headed
+Code447/original78799 и declared448/original47270 actualexit0/OBSERVED2/2:
+NEW Done → NEW Close → NEW preserve Execute; каждый Done/Close exact-ID retry
+zero events, independent full source/settings/unchanged graph, no false fresh
+output. После configuration-only Done explicit=false/internal=null; после Close
+configuration=discarded. Два distinct completed Execute каждого mode подтверждают
+full6×4/all cells/schema/order/1950; default materialized context и final full
+source совпадают. No Save, saved baseline не заменён.
+
+Independent pre-pinned v2 audit actualexit0 обоих; **36/36 non-noop corrupted-copy
+negatives** каждого, original13385/72549 actualexit0. Declared report
+**ff60c57e9ae17aa9e1ed19270e18b4ef62df7a8320c35cf8b23b50b53847c28d**,
+journal **2ef81ebffa0a83692f6e23da6b83920ea1ef64e661b49e4a1584f864bba6ec77**,
+audit receipt **22a65906c788ccfe6a27b17bf7e205cc9d699a3e8d1b4f1ca87743231040bfb6**;
+negative receipt обоих
+**f42888c00706d0573881dc87ecae81811ad97ada7850a7de35fe763caa1d8883**.
+Code hashes ниже. Both PackageClose/logout/browser/process absence verified;
+registry/lease448 reconciled closed_verified/active_exec=null. Fresh449 не
+назначен. Failed444 и отдельные recoveries445/446 сохранены и не приняты как live.
+
+Source tests: addressed248, full client3425PASS+10SKIP, operator18580PASS,
+provenance5045 actualexit0; prior failures сохранены. Declared/code new-node Done
+допуск и phase/readback — source tests; fresh trials именно existing saved modes.
+Общий new-node Execute с intermediate Done ранее live принят C/D; не приписывать
+этим новым saved trials создание узла. Native redraw predicate не обязательно
+сработал в fresh run; ветвь напрямую проверена serialized tests.
+
+**Следующее:** адресная сверка remaining обязательных source/direct E требований
+с original ad92ddbf8c (не перечитывать весь план), затем F: one same-task
+Astra/medium review, product registration, immutable standalone candidate/J01/
+J21/J27 и две independent Sol/low/30min попытки. Natural insufficient-primary/
+Done-refusal examples не получены, пользовательский вопрос pending; отсутствие
+не выдавать за PASS и не выдумывать native failures. Original J25 требует
+preflight/native parse/sync throw, conditional details rule проверяется отдельно;
+нельзя молча превратить дополнительную live coverage в новый hard gate либо
+убрать ограничение. External TestCafe not_run, memory health дополнительно не
+проверялся (ошибок памяти не было). Goal остаётся active, продукт не выпущен.
+
 ### E/J14: general Code447 accepted, declared448 RUNNING — 2026-10-01
 
 Ordinary headed Code447/original78799 actualexit0 на73a8e9df31: public NEW Done
