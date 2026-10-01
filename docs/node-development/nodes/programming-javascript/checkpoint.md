@@ -30,8 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — J26 headed Code/Declared apply и source-bound output reread
-на immutable child `3b59423f1a`; source/direct проверки приняты ниже;
+следующий шаг — завершить текущий J26 Declared423/exec38595 и независимый audit;
+Code422 принят на immutable child `3b59423f1a`, source/direct проверки ниже;
 [G1/J22 профиль своего мастера](ui-profile-design.md) принят в bounded scope ниже;
 source/direct [response budgets](response-budget-design.md) J21 приняты ниже;
 Code410/Declared411 reordered context приняты2/2 на immutable child9c93 ниже.
@@ -51,6 +51,36 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J26: Code422 принят; Declared423 выполняется — 2026-10-01
+
+`e-source-policy-code-01`/profile422/exec74045 actual exit0/OBSERVED на immutable
+child3b59423f1a: public apply13 verified phases и output reread6 phases,3distinct
+owned Execute, оба full typed6×4/user-v1,8unsupported new/existing refusals до
+editor/Execute, same-ID reread retry без нового эффекта, final full source836bytes/
+16LF-lines. Independent audit **v3/PASS**, negative checker exec47296/exit0
+отказал14/14 non-noop evidence mutations, включая удаление первого Close и
+fresh source read после dispatch ACK. PackageClose/logout/browser/process absence
+подтверждены; registry422 приведён к `closed_verified` до нового запуска.
+Report SHA256 `4d1ed7c7b2098dc7a2bdbab47a01f14d5dad0ca48d37c7410f1e3cee2bc8fc77`,
+journal `39dbd8876b786047963e4883a67d2c3677b2cfaa091dae933c7341edac3bc9e0`,
+audit receipt `3e452ac1a29317e254e553c7cea753cf877a5436b231effb2e62f723ec81dfbb`,
+negative receipt `b547183c9295713e3889a0a04a3645fae3db81fce820376d2e32674babed0d72`.
+
+v1 audit остановился на перезаписанной переменной receipt path после проверок;
+v2 сохранил base PASS, но negative обнаружил пропуск первого source-discard в
+выбранном subset. **v2 не принят как итоговый audit.** v3 проверяет все full-source
+delivery и ровно один prior matching discard каждого; original journal содержит
+все Close. Исходные auditor/pins/failures/negative copies сохранены, browser не
+повторялся. Current private pin v3 SHA256
+`3ac8396a7c6c579a087f0859582049e3fce389e6e3b499d43dc9d3d34b9992bf`;
+auditor v3 `8b7bf1929f54264e8d4be932487ff3eda7a99a04c6e26ae025564dfa69373e30`.
+Code freeze/oracle/test logs прежние. Это исправления private audit, не runtime.
+
+Fresh423 `e-source-policy-declared-01`/exec38595 выполняется на том же code SHA
+и v3 pin. Ordinary headed, no Save, original30min process budget. Наблюдать тот
+же handle; после actual terminal — v3 audit/negative14, cleanup/process absence,
+registry finish. Gate/candidate/CLI не повышались, admin recovery не выполнялся.
 
 ### E/J26: source-bound reread реализован; direct checks приняты — 2026-10-01
 
