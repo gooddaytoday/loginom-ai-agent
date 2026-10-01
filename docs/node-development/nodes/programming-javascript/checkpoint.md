@@ -30,8 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — Declared reordered current context на immutable child9c93,
-затем [полные response budgets](response-budget-design.md) J21; Code410 принят ниже.
+следующий шаг — [полные response budgets](response-budget-design.md) J21;
+Code410/Declared411 reordered context приняты2/2 на immutable child9c93 ниже.
 Context Code403/declared404 и bridge fix, J09 Code399/declared400 и exact knowledge v1 Code401/declared402 также приняты. Fixed source32768/
 empty и schema-mode refusal уже приняты ниже; сохранение manual mapping, дополнительные
 limits/redaction и context/engine/module/budgets остаются открытыми.
@@ -143,9 +143,22 @@ exit0, negative80/80, result SHA256
 Registry410 reconciled closed_verified/active exec null. Fresh411 Declared
 reordered e-public-context-reordered-declared-01 на том же source/oracle и
 preassigned auditor v3: source freeze1449 перепроверен, ordinary headed
-DISPLAY=:1, original exec32203 зарегистрирован и RUNNING. Следить за этим
-handle до terminal; outcome/cleanup ещё не приняты. Negative checker05
-выполняет те же80 независимых cases в4 процессах после primary audit.
+DISPLAY=:1, original exec32203 actual exit0/OBSERVED, cleanup3/3 и process absence.
+Auditor v3/exec85433 actual exit0/PASS, checker05/exec93913 actual exit0:
+negative80/80 в4 процессах с non-noop guard. Report/journal/audit/negative SHA256:
+`56ad74e31a0f55dce58706b78c6b826aa8f79c81e0ed1f22e56f2d74ea2bc712` /
+`87d8f9678fad20e7e4a3f2bec8adcf10b90ea4ec863c5677e246993ba1a680da` /
+`69e70ebfe39c5ab8a4c96d6aef31071d3a64f59109969114467d96f8b732976d` /
+`dd74f3a1b1ff5283081eca647aad40264ac30efb16a6c19a24015cf3c9c988bb`.
+Все Code proofs выше подтверждены также для Declared; source721 bytes/SHA256
+`ffb57765ca3fcbc2276806fe0409ebd29e26d052cfa0f41fb079b03cf6640f73`.
+Import opening child preview mask также не появился: live подтверждает one-shot
+opening на исправленном runtime, а permissive owned-mask branch — addressed
+fixtures и исходное наблюдение405, не утверждение о его использовании в411.
+Registry411 reconciled closed_verified/active exec null. Reordered current
+context принят2/2; новые technical names/J24, model resistance/candidate/CLI
+не доказаны. Source freeze этого acceptance immutable; следующий код создаёт
+новую ревизию, исходные evidence не переписывать.
 
 J21 sizing через actual factories с синтетическими pins показал JS11597,
 весь batch15=62163 и compact bundle7313 wire bytes. Это source-only fixture,

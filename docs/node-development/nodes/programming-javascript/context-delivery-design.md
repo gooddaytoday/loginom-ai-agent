@@ -1,7 +1,9 @@
 # JavaScript: доставка текущего контекста J19/J21
 
 Статус: fixed Code/declared current context live2/2 приняты через independent
-audit/negative64/64 каждый/cleanup; changed input/model/candidate/CLI открыты.
+audit/negative64/64 каждый/cleanup. Reordered input/old source Code410/Declared411
+на9c93 также принят2/2: audit v3/negative80/80 каждый/cleanup. Переименование
+technical names, model resistance/candidate/CLI остаются открытыми.
 Reader child — `b0ecbeaadff8d77a30733ae08cb1e25ecd5937dc`, compact bridge и
 guidance — `23e8488e29`. Точные evidence в [checkpoint](checkpoint.md). Продуктовая база
 и общие ограничения [плана](plan.md) сохраняются. Это композиция существующих

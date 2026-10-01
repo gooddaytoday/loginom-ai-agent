@@ -92,8 +92,9 @@ Fixed current context Code403/declared404 наb0ecbeaadf также принят
 оба полных snapshots до/после source/comment/manual label, exact mappings/MCP,
 independent audit/negative64/64 каждый и cleanup. Compact bridge/guidance
 23e8488e29 проверен actual MCP и full client3179/10SKIP. Это не model resistance.
-Следующий шаг — Declared reordered [J19 context](context-delivery-design.md),
-затем [J21 response budgets](response-budget-design.md) и module
+Reordered current input/old source Code410/Declared411 принят2/2 на9c93,
+independent audit v3/negative80/80 каждый и cleanup; имена не переименовывались.
+Следующий шаг — [J21 response budgets](response-budget-design.md), затем module
 и точный остаток E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
