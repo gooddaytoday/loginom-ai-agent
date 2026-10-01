@@ -112,8 +112,10 @@ export function javascriptPublicCodeOracle(probe,table,input) {
 }
 
 export async function runJavascriptPublicCodeLive({page,prepared,input,targetOrigin,redactor,record,
-  report,save,deadline,onPending,schemaMode='code',probeId=null,policyReread=false,sourceCaseId=null}) {
+  report,save,deadline,onPending,schemaMode='code',probeId=null,policyReread=false,sourceCaseId=null,newDone=false,readGraph}) {
   need(['code','declared'].includes(schemaMode),'Public JavaScript schema mode unavailable');
+  need(typeof newDone==='boolean'&&(!newDone||probeId===null&&sourceCaseId===null&&!policyReread&&typeof readGraph==='function'),
+    'New Done requires its fixed business mode and graph reader');
   need(typeof policyReread==='boolean'&&(!policyReread||probeId===null&&sourceCaseId===null),'Policy reread requires the fixed business mode');
   const key=schemaMode==='declared'?'public_declared':'public_code';
   const stage=schemaMode==='declared'?'public-declared':'public-code';
@@ -129,8 +131,10 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
   const code=createJavascriptCodeNodeSupport({targetOrigin,targetBuild:'7.4.2',redactor});
   let columnNameMapping;
   const apiRecords=[];
+  let runtimeRecords=0;
   const runtime=createActionRuntime({pinned:await javascriptPublicCodePins(),
     allowCandidate:true,targetOrigin,targetBuild:'7.4.2',redactor,onRecord:async event=>{
+      runtimeRecords++;
       const ack=await record(event);
       if(policyReread)apiRecords.push(structuredClone(ack));
       if(javascriptColumnNameIds.includes(probe.id)&&event.phase==='node_phase_completed'
@@ -141,11 +145,16 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
     nodeApplyHandlers:new Map([...base.nodeApplyHandlers,...code.nodeApplyHandlers]),
     nodeApplyDriverFactory:options=>options.operation.parameters.target.type==='programming.javascript'
       ?code.nodeApplyDriverFactory(options):base.nodeApplyDriverFactory(options)});
-  const request=javascriptPublicCodeRequest({prepared,input,probe,schemaMode,remaining});
+  const initialRequest=javascriptPublicCodeRequest({prepared,input,probe,schemaMode,remaining});
+  const request=newDone?await (async()=>{
+    const {runJavascriptPublicNewDone}=await import('./javascript-public-new-done.mjs');
+    return runJavascriptPublicNewDone({runtime,prepared,input,probe,request:initialRequest,readGraph,
+      runtimeEventCount:()=>runtimeRecords,record,report,save,deadline,onPending});
+  })():initialRequest;
   Object.assign(report,{scope:'isolated public '+(probeId===null?(schemaMode==='code'?'C Code':'D declared'):'E typed '+probeId)+' lifecycle; full typed UI output',
     original_deadline:deadline,explicit_execution_limit:2,gates_closed:[],candidate_verified:false,
     cli_verified:false,native_bytes_verified:false,native_input_bytes_verified:inputProof.native_input_bytes_verified,stage:stage+'-apply',
-    [key]:{status:'RUNNING',probe_id:probe.id,...(sourceCaseId===null?{}:{source_case_id:sourceCaseId}),operation_id:request.operation_id,target_kind:'new',
+    [key]:{status:'RUNNING',probe_id:probe.id,...(sourceCaseId===null?{}:{source_case_id:sourceCaseId}),operation_id:request.operation_id,target_kind:newDone?'existing':'new',
       source_sha256:probe.source_sha256,oracle_sha256:probe.oracle_sha256,raw_source_in_report:false,
       ...(probe.knowledge?{knowledge:structuredClone(probe.knowledge)}:{})}});
   onPending(true);await save();
@@ -188,7 +197,7 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
     &&compact.sample.length===table.sample.length&&compact.sample.every((row,index)=>row.length===table.sample[index].length
       &&row.every((cell,column)=>['type','value','is_null','precision'].every(key=>cell[key]===table.sample[index][column][key]))),
   'Public Code user-v1 full output differs');
-  if(probe.knowledge||javascriptColumnNameIds.includes(probe.id)||sourceCaseId!==null)report[key].user_v1_result=structuredClone(projected);
+  if(newDone||probe.knowledge||javascriptColumnNameIds.includes(probe.id)||sourceCaseId!==null)report[key].user_v1_result=structuredClone(projected);
   if(javascriptColumnNameIds.includes(probe.id))report[key].column_names=verifyJavascriptPublicColumnNames({
     probe,table,mapping:columnNameMapping,node:result.node,readback:projected.configuration.readback});
   if(policyReread){
@@ -217,6 +226,7 @@ export async function runJavascriptPublicCodeLive({page,prepared,input,targetOri
       source_lf_lines:sourceRead.source_lf_lines,complete:true,raw_source_in_report:false,
       ...(sourceCaseId===null?{}:{chunks:sourceRead.chunks,source_read_operation_id:sourceRead.source_read_operation_id})}});
   if(sourceCaseId!==null)report.scope='isolated E J23 fixed public long Code source/Execute/full typed6x4/user-v1/chunk read before owned Save';
+  if(newDone)report.scope='isolated E new standalone Done then NEW preserve Execute/full typed6x4; no Save';
   report.stage=stage+'-observed';onPending(false);await save();
   return result.node;
 }
