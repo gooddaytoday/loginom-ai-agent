@@ -69,14 +69,16 @@ export function resolveDataPartitionParameters(parameters,mode,observed,{newNode
  return resolved;
 }
 
-export function validateDataPartitionInputParameters(parameters,resolved,native){
+export function validateDataPartitionInputParameters(parameters,resolved,native,{preview=false}={}){
  const fields=resolved.fields??native.target_fields;
  requireValue(Array.isArray(fields)&&fields.every(field=>fieldName(field.name))&&new Set(fields.map(field=>field.name)).size===fields.length,'Complete unique DataPartition input schema required');
  const names=parameters.stratified?.fields??(parameters.biased?[parameters.biased.field]:[]);
  names.forEach(name=>requireValue(fields.filter(field=>field.name===name).length===1,'DataPartition input field missing: '+name));
  if(parameters.biased){
   const source=fields.find(field=>field.name===parameters.biased.field);
-  requireValue(source.data_kind==='Дискретный','Bias field must be discrete in Loginom');
+  // The upstream preview proves names/types only. Data kind remains mandatory
+  // on the owned native input mapping before its settings are committed.
+  if(!preview)requireValue(source.data_kind==='Дискретный','Bias field must be discrete in Loginom');
   parameters.biased.adjustments.forEach(adjustment=>requireValue(adjustment.value.type===source.type,'Bias key type must match its input field'));
  }
 }

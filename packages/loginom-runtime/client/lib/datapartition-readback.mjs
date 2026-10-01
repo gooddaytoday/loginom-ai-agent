@@ -25,6 +25,14 @@ export function dataPartitionConfigurationReadback({node,phases,operation_id}){
    return {...pick(f,['index','name','label','type','data_kind','excluded']),source_name:source.name};
   });need(links.size===m.source_fields.length,'complete output schema');return {port,role:DATAPARTITION_OUTPUT_ROLES[port],port_guid:m.node_context.output_port.port_guid,autosync:m.autosync,fields,membership:membership?pick(fields.find(f=>f.source_name===membership.name),['name','label','type','data_kind']):null};
  });
+ need(c.mode!=='biased'||Array.isArray(c.method_rows)&&c.method_rows.length>0
+  &&c.method_rows.length===c.parameters.biased?.adjustments.length,'complete bias inventory');
+ const biasInventory=c.mode==='biased'?c.method_rows.map((row,index)=>{
+  need(JSON.stringify(row.value)===JSON.stringify(c.parameters.biased.adjustments[index]?.value)
+   &&row.factor===c.parameters.biased.adjustments[index].factor&&Number.isFinite(row.factor)&&row.factor>=0
+   &&[row.count,row.source_count].every(value=>Number.isSafeInteger(value)&&value>=0),'bias inventory');
+  return pick(row,['value','factor','count','source_count']);
+ }):undefined;
  return {kind:'data_partition',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),
-  mode:c.mode,parameters:structuredClone(c.parameters),requested_parameters:structuredClone(configured.value.requested_parameters),input_mapping:{port:0,autosync:im.autosync,fields:inputFields},output_mappings:outputs,package_persistence_verified:false};
+  mode:c.mode,parameters:structuredClone(c.parameters),...(biasInventory?{bias_inventory:structuredClone(biasInventory)}:{}),requested_parameters:structuredClone(configured.value.requested_parameters),input_mapping:{port:0,autosync:im.autosync,fields:inputFields},output_mappings:outputs,package_persistence_verified:false};
 }

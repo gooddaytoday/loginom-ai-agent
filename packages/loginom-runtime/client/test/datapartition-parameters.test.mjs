@@ -64,3 +64,14 @@ test('DataPartition distinguishes typed NULL, literal NULL, empty string and exa
  [{type:'integer',is_null:false,value:9007199254740992},{type:'integer',is_null:false,value:'9223372036854775808'},{type:'real',is_null:false,value:Infinity},{type:'boolean',is_null:false,value:'true'},{type:'string',is_null:true,value:'NULL'},{type:'datetime',is_null:false,value:'2026-02-30T00:00:00'}].forEach(value=>assert.throws(()=>validateDataPartitionParameters(bias([adjustment(value)]),'biased',request)));
  assert.doesNotThrow(()=>validateDataPartitionParameters(bias([adjustment({type:'datetime',is_null:false,value:'2026-10-01T00:00:00'})]),'biased',request));
 });
+
+test('bias preview validates name/type while native mapping requires an observed discrete data kind',()=>{
+ const parameters={biased:{field:'Group',adjustments:[{value:{type:'string',is_null:false,value:'A'},factor:2}]}};
+ const fields=[{name:'Group',label:'Group',type:'string'}];
+ assert.doesNotThrow(()=>validateDataPartitionInputParameters(parameters,{fields},{},{preview:true}));
+ assert.throws(()=>validateDataPartitionInputParameters(parameters,{fields},{}));
+ assert.throws(()=>validateDataPartitionInputParameters(parameters,{fields:[{...fields[0],data_kind:'Непрерывный'}]},{}));
+ assert.doesNotThrow(()=>validateDataPartitionInputParameters(parameters,{fields:[{...fields[0],data_kind:'Дискретный'}]},{}));
+ assert.throws(()=>validateDataPartitionInputParameters(parameters,{fields:[]},{},{preview:true}));
+ assert.throws(()=>validateDataPartitionInputParameters(parameters,{fields:[{...fields[0],type:'integer'}]},{},{preview:true}));
+})

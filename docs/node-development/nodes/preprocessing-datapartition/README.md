@@ -3,11 +3,11 @@
 [Подплан](plan.md) · [Данные и oracle](acceptance/README.md) · [Общий маршрут](../../three-node-plans.md).
 
 Component ID: `component.preprocessing.DataPartition`.
-Будущий runtime type: `preprocessing.data_partition` (proposed, не зарегистрирован).
+Runtime type: `preprocessing.data_partition`; candidate handler зарегистрирован.
 Подготовка: **documentation_complete**, 2026-10-01. Полный runtime-контракт:
-**discovery_required**; обработчик не реализован, приёмка NOT_RUN.
+**discovery_required**; полный candidate контракт ещё исследуется, приёмка NOT_RUN.
 
 Объём: все пять методов, строки/проценты, приоритет и положение тестового множества,
-фиксированный/случайный seed, три выходные таблицы. План подготовлен Codex по Help,
-без работы Paperclip-агентов и без открытия Loginom. Маленькие CSV взяты из сохранённых
-материалов; независимые ожидания проверяются офлайн.
+фиксированный/случайный seed, три выходные таблицы. Исторический подплан подготовлен по Help; native/public discovery и ограничения
+записаны в [discovery.md](discovery.md). Маленькие CSV и independent oracle изолированы
+от business CLI. Partial random/stratified PASS не является полной приёмкой.

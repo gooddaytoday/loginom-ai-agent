@@ -264,3 +264,37 @@ stratified/biased/sequential runs in this attempt are NOT_RUN.
 Cold integration scope interaction3c0080b6-e8cc-4172-9076-35015885781c pending.
 Task stays in_progress, draft PR only. CLI7200, full math, dynamic/recovery/save/
 cold and final result.json PASS remain NOT_RUN. No readiness is promoted.
+
+
+## Exact candidate7baf7674c: cold source и native baseline
+
+Разрешения plan14:36/16:52 разрешают собственную registry entry/hash/generated
+inventory и DataPartition cold additions. Validator теперь PASS;16 registered
+source handlers включают candidate DataPartition. Readiness/acceptance/release
+не повышались. Cold settings audit и selected-partition invariant реализованы;
+40 addressed/legacy oracle tests PASS. Native cold/CLI ещё NOT_RUN.
+
+Candidate7baf7674c3c9365ccd0eeb626124c13faf82bf29 sourceDirty=false, remote/head/
+manifest совпали. Attempt `LOG-52-public-e97416e0-1`: random create/execute/read3
+и original-S fixed-seed fresh replay PASS по independent source fixture.
+Uniform public configure/execute/read3 SUCCEEDED9/6/3, однако независимый oracle
+FAIL/DUPLICATE_OCCURRENCE: training IDs1,4,5,7,10,11 и test4,5,6 пересекаются.
+Внутри каждой роли повторов нет. Нельзя требовать disjoint у uniform до фиксации
+native правил; нельзя и молча разрешить любую кратность. N7 group/priority
+пробы подготовлены, пока NOT_RUN. Первое сообщение о PASS uniform было ошибкой
+проверки наличия файла вместо его статуса; исправление сохранено в issue.
+Attempt1 целиком FAILED; local cleanup и wrapper подтвердили close/logout.
+
+Attempt `LOG-52-public-e97416e0-2`: stratified baseline source-fixture oracle
+PASS9/6/3. Bias остановился NOT_APPLIED/effect_possible=false/cleanup_complete=true
+до создания узла: own validation требовала data_kind в upstream preview, который
+доказывает только name/label/type. Исправлено только в DataPartition: preview
+проверяет names/types, обязательный discrete kind проверяется на native input
+mapping до commit. Native input guard сохранён. Добавлена публичная
+bias_inventory с typed key, effective factor/count/source_count, без record IDs.
+Addressed/runtime regressions120/120 PASS; native новой bias delta NOT_RUN.
+Attempt2 целиком FAILED; local cleanup и wrapper подтвердили close/logout.
+
+Полные math/method axes/typed limits/dynamic/recovery/save/cold/CLI и product
+result.json PASS пока отсутствуют. Исторические FAIL сохранены; draft PR не
+передан в review.

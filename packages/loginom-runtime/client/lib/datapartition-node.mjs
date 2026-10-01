@@ -12,7 +12,7 @@ export function createDataPartitionNodeSupport(config){return createTabularTrans
  inputMappingRecovery:true,parameterSchema:dataPartitionParametersSchema,readback:dataPartitionConfigurationReadback,
  validate:validateDataPartitionParameters,validateInput:validateDataPartitionInputParameters,
  preflight:(options,ctx,config)=>preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.stratified!==undefined||options.operation.parameters.parameters.biased!==undefined,
-  resolve:(parameters,fields)=>validateDataPartitionInputParameters(parameters,{fields},{}),label:'DataPartition'}),
+  resolve:(parameters,fields)=>validateDataPartitionInputParameters(parameters,{fields},{},{preview:true}),label:'DataPartition'}),
  configurationObservation:{condition:'DataPartition configuration page',readDataPartition:true,
   ready:s=>s.wizard?.stage==='data_partition'&&s.node_data_partition?.verified===true},
  async configure(channel,parameters,{request,inputMapping}){
