@@ -14,6 +14,8 @@ same-task F review и candidate/CLI остаются открытыми; это 
 Child **8d3eb30f1a4f** добавляет partial CLI evidence/bundle проверки:
 23 SQLite/filesystem tests PASS, actualexit0. [Границы и следующий шаг](checkpoint.md#фаза-4-standalone-cli-transportbundle--2026-10-02).
 Запуск compiled candidate и native Save/cold/cleanup они не подтверждают.
+На **1b3ed092e62b** добавлены standalone Host admission binding и product target
+pins:11/13/9 адресных tests PASS. [Подробности и границы](checkpoint.md#фаза-4-standalone-native-admission-и-production-target--2026-10-02).
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·

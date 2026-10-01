@@ -911,6 +911,11 @@ handler и автономная CLI-приёмка остаются открыт
 [Границы](checkpoint.md#фаза-4-standalone-cli-transportbundle--2026-10-02):
 transport и целостность файлов не заменяют native/Save/cold/cleanup и
 авторство модели; итогового acceptance PASS эти модули не выставляют.
+Child **1b3ed092e62b** дополнительно связывает standalone Host attachment identity
+с native prepare/input_artifacts/grants и поддерживает внешний production target
+pin в configuration/output auditors. Admission11/CLI metadata13/native regression9
+PASS, включая прежние48 native negatives; header projection — source test,
+не новый live proof. [Точный checkpoint](checkpoint.md#фаза-4-standalone-native-admission-и-production-target--2026-10-02).
 `javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
 он должен связать native проверки с фактическими standalone CLI evidence
 model/input/candidate/Save/cold/cleanup до ready_for_acceptance.

@@ -4,8 +4,8 @@
 
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
-standalone CLI transport/bundle. Child
-**8d3eb30f1a4fded7fddb9f0070bef495848adfd9** tracked clean; registration на161353
+standalone CLI transport/bundle/admission. Child
+**1b3ed092e62ba83c2047d1942fe1e5ae72a9e40f** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 адресных test methods PASS, в том числе48 non-noop native mutations.
 Итоговый `javascript_node_acceptance.py` ещё TO_IMPLEMENT: подготовить связку
@@ -13,6 +13,8 @@ standalone CLI transport/bundle. Child
 до ready_for_acceptance. [Дизайн и границы](cli-auditor-design.md).
 Новые CLI evidence/candidate модули прошли23 теста на физических SQLite/filesystem
 fixtures, actualexit0; никаких compiled CLI/browser runs в этой итерации нет.
+Admission дополнительно11PASS; CLI metadata binding13PASS; native regression9PASS
+на неизменённых captures и явно отдельной тестовой проекции production header.
 JS general lifecycle-v5/driver/knowledge в product registry только7.4.2/nonempty
 origin, actual bridge redactor. Addressed65, full client3442PASS+10SKIP,
 operator18583PASS, provenance5045 actualexit0. Existing Done/Close447/448 и
@@ -38,6 +40,62 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: standalone native admission и production target — 2026-10-02
+
+Child **1b3ed092e62ba83c2047d1942fe1e5ae72a9e40f** добавляет
+`javascript_cli_admission.py` и его tests. Actual standalone Host использует
+`inputStore.admit(generation + ':' + cliSessionID, userMessageID, files, folder)`:
+нативное имя файла содержит SHA256 этого identity, attachment index и последний120
+UTF-16 units basename. Admission auditor проверяет эту фактическую связь с
+original snapshot, bytes/digest, уникальными artifact/grant IDs, `/jsteach`,
+точным destination и overwrite=reject. Не подставляет исторические Codex/Hermes
+ticket поля. CLI session ID и runtime session ID остаются различными identities.
+
+Первый успешный `loginom_dock_prepare` связывается с native `workspace_prepared`:
+fresh unsaved owned draft, foreign graph preservation, account, target,
+runtime/catalog pins. До READY не допускается native node/delivery admission.
+Повтор идентичной terminal delivery не становится новой операцией. SQLite/public
+tool metadata теперь сравниваются по digest, включая actual Host generation.
+Дополнительный user prompt refused; original prompt bytes ещё предстоит связать
+с точным controller submission. Журнал как внешний файл не аутентифицирован этим
+модулем, upload/import/output/Save/cold/cleanup и candidate use остаются вне scope.
+
+Source-сверка `execution-journal.mjs`/`workspace.mjs` выявила production header:
+`target={profile_id,loginom_build,platform,browser}`, без `origin`. У isolated
+Code449/declared450 header был origin/build. Configuration/output Python функции
+получили optional `expected_target`/`expected_origin` для точных внешних pins.
+В этом режиме все header identities должны совпадать с product pin, origin/build
+каждого native observation — со стендом. Допускаются только эквивалентные root
+`http://logi-test-plan.bg.local` и `http://logi-test-plan.bg.local/`; данные/digests
+не меняются. Default остаётся прежним строгим. CLI interfaces этих двух Python
+аудиторов прежние; итоговый controller может импортировать функции с keyword pins.
+
+| Проверка | Результат / SHA256 приватного log |
+| --- | --- |
+| Admission addressed03, original827e07 | 11PASS, actualexit0; `db1bebdb590c10efcee920fcf5ac0d3257abe5e26e4bc3be395504efd4a32a45` |
+| CLI evidence addressed05, original35a135 | 13PASS, actualexit0; `96bfe75dea11d19d197c0904112b667aec95dec2b8229e6686280940c418d7d1` |
+| Native product target addressed02, original4a3506 | 9PASS, actualexit0; `e4a49745e665e06db17cd349080b72971e78783b39c8df37035b6302f33441ae` |
+
+Команды из child `packages/loginom-runtime`: `python3 -m unittest discover
+-s tools/loginom-acceptance -p test_javascript_cli_admission.py -v`, аналогично
+`test_javascript_cli_evidence.py`; native `test_javascript_evidence.py` с прежним
+`LOGINOM_JAVASCRIPT_AUDIT_EVIDENCE_ROOT`. Последняя проверка включает исходные
+Code449/declared450 и прежние48 non-noop native mutations. Новый test меняет
+только copied journal header, проверяет внешний pin/default refusal; это
+**тестовая проекция**, не production live evidence. SHA четырёх original report/
+journal после проверки совпали с прежними immutable pins.
+
+Первая native target попытка actualexit1/2 subtest failures из-за root URL.href
+с `/`; log сохранён SHA256
+`0b4aa069bdf619a5b1f5b183727fde09df22e6918e64ed76f550024abe2ef08d`.
+Source receipt `f-javascript-cli-admission-validation-v1.json`, SHA256
+`030bc1f0b975d216999ead865fac13dabf2dc137fd5128f2f7fdeafdf3fba9e9`,
+содержит6 source hashes/exact commands/original exits/retained failed log.
+Никаких моделей, candidate или headed browser в этой итерации не запускалось;
+исходный old default и исходные captures сохранены. Остаток тот же: итоговый
+`javascript_node_acceptance.py` с actual node/source/delivery/import/Save/cold/
+cleanup и candidate-use binding, затем F/candidate/fresh headed/Sol CLI.
 
 ### Фаза 4: standalone CLI transport/bundle — 2026-10-02
 

@@ -63,6 +63,29 @@ input/output digests, полнота завершённых вызовов, от
 
 ## Проверки и воспроизводимость
 
+Native admission связывается с фактическим standalone Host, без Codex/Hermes
+ticket envelope. `packages/loginom-host/src/host.ts` передаёт в `inputStore`
+chat `${generation}:${cliSessionID}` и исходный user message ID. `inputs.ts`
+формирует имя `${SHA256(JSON.stringify([chat,userMessage]))}-${index}-${name.slice(-120)}`;
+`name` — basename, `slice` использует UTF-16. Поэтому `input_artifacts.name`
+нельзя сравнивать с простым исходным именем вложения. Индекс берётся из фактического
+порядка file parts; имя, bytes и digest связываются с original user snapshot.
+Первый успешный `loginom_dock_prepare` должен подтвердить fresh owned draft,
+runtime/catalog pins и точный native workspace journal. Upload grants должны
+иметь уникальные IDs, папку своего аккаунта, точный destination и overwrite=reject.
+Это admission proof, а не загрузка/импорт/исполнение или итоговая приёмка.
+
+Production `execution-journal.mjs` пишет в `target` фактический
+`metadata.targetIdentity` из workspace: profile_id/loginom_build/platform/browser.
+В isolated fixed captures использовался origin/build. Configuration/output
+аудиторы сохраняют прежний строгий default, а для production получают отдельно
+закреплённые target/origin: весь journal target должен совпадать с внешним pin,
+origin/build всех native observations — с известным стендом. Переписывать
+production journal под старый origin-header нельзя. Тестовая проекция header
+старого capture проверяет лишь совместимость формы; fresh CLI proof ею не заменяется.
+Для origin допустимы только URL.origin и эквивалентный root URL.href с `/`;
+пути, query/fragment и другой сервер не принимаются. Исходные bytes/digests сохранены.
+
 `javascript_cli_candidate.py` отдельно сверяет Linux x64 bundle с внешними
 immutable pins: исходный commit/tree, manifest, Node/browser и модуль JS knowledge.
 Проверка читает полный inventory, права и symlinks по контракту `cli-manifest.ts`,
