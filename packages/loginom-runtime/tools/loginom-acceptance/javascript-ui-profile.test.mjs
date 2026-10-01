@@ -3,7 +3,42 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {makeJavascriptUiProfileCode} from './javascript-ui-profile.mjs';
+import {createJavascriptUiProfileChannel} from './javascript-ui-profile-run.mjs';
 import {managedJavascriptStageFixture} from '../../client/test/support/javascript-managed-stage-fixture.mjs';
+
+test('UI observer owns an observe-only prepared procedure independently of the deliberately narrow saved runtime',async()=>{
+  const node={document_id:'document',workflow_id:'workflow',node_id:'node'};
+  const prepared={document_id:'document',workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',
+    tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]}};
+  let browserCalls=0;
+  const options={node,prepared,deadline:Date.now()+60000,targetOrigin:'http://logi-test-plan.bg.local',
+    execute:async()=>{browserCalls++;throw Error('No speculative browser work');},record:async event=>event};
+  const channel=createJavascriptUiProfileChannel(options);
+  assert.deepEqual(Object.keys(channel),['observe']);assert.equal(typeof channel.observe,'function');
+  assert.equal(Object.isFrozen(channel),true);assert.equal(browserCalls,0);
+  for(const changed of [{...options,node:{...node,node_id:null}},{...options,deadline:Date.now()-1},
+    {...options,prepared:{...prepared,document_id:'foreign'}}])assert.throws(()=>createJavascriptUiProfileChannel(changed));
+});
+
+test('observe-only UI channel runs the actual prepared-node procedure with external browser transport and journal ACKs',async()=>{
+  const node={document_id:'document',workflow_id:'workflow',node_id:'node'};
+  const prepared={document_id:'document',workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',
+    tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]}};
+  const state={origin:'http://logi-test-plan.bg.local',loginom_build:'7.4.2',workflow_ref:prepared.workflow_ref,
+    dom_epoch:{document:'document',revision:1},scan:{complete:true},wizard:{status:'absent'},
+    prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;JavaScript'},
+    ui:{masks:[],dialogs:[],elements:[],truncated:{elements:false,masks:false,dialogs:false}}};
+  const records=[],codes=[];
+  const channel=createJavascriptUiProfileChannel({node,prepared,deadline:Date.now()+60000,
+    targetOrigin:state.origin,record:async event=>{records.push(event);return structuredClone(event);},
+    execute:async code=>{codes.push(code);assert.equal(typeof code,'string');assert.ok(code.includes('"mode":"observe"'));
+      return {status:'SUCCEEDED',output:structuredClone(state)};}});
+  const observed=await channel.observe({condition:'owned existing JS graph',ready:value=>value.prepared_node_context.surface==='graph'});
+  assert.deepEqual(observed.prepared_node_context,state.prepared_node_context);
+  assert.ok(codes.length>=2);assert.ok(records.some(event=>event.phase==='node_observation_completed'));
+  assert.ok(records.every(event=>event.action_key==='diagnostic.javascript'));
+  assert.ok(!records.some(event=>event.phase.includes('mutation')));
+});
 
 function fixture(page='Code') {
   const f=managedJavascriptStageFixture(),base='MF;TF-1;WizrdMCF';
