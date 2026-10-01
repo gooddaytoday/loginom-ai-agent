@@ -1,0 +1,1095 @@
+{
+  "version": "data-partition-bias-cases-v1",
+  "derivation": "source A4/B2/typed NULL2; exact integer factor multiplication or explicit counts; native per-occurrence replacement established in historical attempt5; no observed sample used as expected",
+  "cases": [
+    {
+      "id": "bias-factor-two",
+      "expected": {
+        "version": "data-partition-sampling-v1",
+        "scope": "N8 full biased output; exact source payload and class frequency; individual source resampling checked through fresh seed replay",
+        "source_sha256": "2ec615462684b974943079180fad3ca81153e95f7cdfcb3930e4752110917822",
+        "source_rows": [
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "1"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "A"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "10"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "2"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "A"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "10"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "3"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "A"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "10"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "4"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "A"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "10"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "5"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "B"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "20"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "6"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "B"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "20"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "7"
+            },
+            {
+              "type": "string",
+              "is_null": true,
+              "value": null
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "20"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "8"
+            },
+            {
+              "type": "string",
+              "is_null": true,
+              "value": null
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "20"
+            }
+          ]
+        ],
+        "schemas": [
+          [
+            {
+              "index": 0,
+              "name": "IsTestSet",
+              "label": "Тестовое множество",
+              "type": "boolean",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 1,
+              "name": "RowID",
+              "label": "RowID",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 2,
+              "name": "Category",
+              "label": "Category",
+              "type": "string",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 3,
+              "name": "Value",
+              "label": "Value",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            }
+          ],
+          [
+            {
+              "index": 0,
+              "name": "RowID",
+              "label": "RowID",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 1,
+              "name": "Category",
+              "label": "Category",
+              "type": "string",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 2,
+              "name": "Value",
+              "label": "Value",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            }
+          ],
+          [
+            {
+              "index": 0,
+              "name": "RowID",
+              "label": "RowID",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 1,
+              "name": "Category",
+              "label": "Category",
+              "type": "string",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 2,
+              "name": "Value",
+              "label": "Value",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            }
+          ]
+        ],
+        "membership_name": "IsTestSet",
+        "replacement": true,
+        "settings": {
+          "mode": "biased",
+          "training": {
+            "unit": "percent",
+            "value": 100
+          },
+          "test": {
+            "unit": "percent",
+            "value": 0
+          },
+          "priority": "training",
+          "test_position": "algorithm",
+          "seed": {
+            "policy": "fixed",
+            "value": 17
+          },
+          "biased": {
+            "field": "Category",
+            "adjustments": [
+              {
+                "value": {
+                  "type": "string",
+                  "is_null": false,
+                  "value": "A"
+                },
+                "factor": 2.0
+              },
+              {
+                "value": {
+                  "type": "string",
+                  "is_null": false,
+                  "value": "B"
+                },
+                "factor": 1.0
+              },
+              {
+                "value": {
+                  "type": "string",
+                  "is_null": true,
+                  "value": null
+                },
+                "factor": 1.0
+              }
+            ]
+          }
+        },
+        "sizes": [
+          12,
+          12,
+          0
+        ],
+        "quotas": [
+          {
+            "role": "training",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
+            ],
+            "count": 8
+          },
+          {
+            "role": "training",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
+            ],
+            "count": 2
+          },
+          {
+            "role": "training",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
+            ],
+            "count": 2
+          },
+          {
+            "role": "test",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
+            ],
+            "count": 0
+          },
+          {
+            "role": "test",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
+            ],
+            "count": 0
+          },
+          {
+            "role": "test",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
+            ],
+            "count": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "bias-count",
+      "expected": {
+        "version": "data-partition-sampling-v1",
+        "scope": "N8 full biased output; exact source payload and class frequency; individual source resampling checked through fresh seed replay",
+        "source_sha256": "2ec615462684b974943079180fad3ca81153e95f7cdfcb3930e4752110917822",
+        "source_rows": [
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "1"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "A"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "10"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "2"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "A"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "10"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "3"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "A"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "10"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "4"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "A"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "10"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "5"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "B"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "20"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "6"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "B"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "20"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "7"
+            },
+            {
+              "type": "string",
+              "is_null": true,
+              "value": null
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "20"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "8"
+            },
+            {
+              "type": "string",
+              "is_null": true,
+              "value": null
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "20"
+            }
+          ]
+        ],
+        "schemas": [
+          [
+            {
+              "index": 0,
+              "name": "IsTestSet",
+              "label": "Тестовое множество",
+              "type": "boolean",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 1,
+              "name": "RowID",
+              "label": "RowID",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 2,
+              "name": "Category",
+              "label": "Category",
+              "type": "string",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 3,
+              "name": "Value",
+              "label": "Value",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            }
+          ],
+          [
+            {
+              "index": 0,
+              "name": "RowID",
+              "label": "RowID",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 1,
+              "name": "Category",
+              "label": "Category",
+              "type": "string",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 2,
+              "name": "Value",
+              "label": "Value",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            }
+          ],
+          [
+            {
+              "index": 0,
+              "name": "RowID",
+              "label": "RowID",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 1,
+              "name": "Category",
+              "label": "Category",
+              "type": "string",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 2,
+              "name": "Value",
+              "label": "Value",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            }
+          ]
+        ],
+        "membership_name": "IsTestSet",
+        "replacement": true,
+        "settings": {
+          "mode": "biased",
+          "training": {
+            "unit": "percent",
+            "value": 100
+          },
+          "test": {
+            "unit": "percent",
+            "value": 0
+          },
+          "priority": "training",
+          "test_position": "algorithm",
+          "seed": {
+            "policy": "fixed",
+            "value": 17
+          },
+          "biased": {
+            "field": "Category",
+            "adjustments": [
+              {
+                "value": {
+                  "type": "string",
+                  "is_null": false,
+                  "value": "A"
+                },
+                "factor": 1.5
+              },
+              {
+                "value": {
+                  "type": "string",
+                  "is_null": false,
+                  "value": "B"
+                },
+                "factor": 0.5
+              },
+              {
+                "value": {
+                  "type": "string",
+                  "is_null": true,
+                  "value": null
+                },
+                "factor": 0.5
+              }
+            ]
+          }
+        },
+        "sizes": [
+          8,
+          8,
+          0
+        ],
+        "quotas": [
+          {
+            "role": "training",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
+            ],
+            "count": 6
+          },
+          {
+            "role": "training",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
+            ],
+            "count": 1
+          },
+          {
+            "role": "training",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
+            ],
+            "count": 1
+          },
+          {
+            "role": "test",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
+            ],
+            "count": 0
+          },
+          {
+            "role": "test",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
+            ],
+            "count": 0
+          },
+          {
+            "role": "test",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
+            ],
+            "count": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "bias-half",
+      "expected": {
+        "version": "data-partition-sampling-v1",
+        "scope": "N8 full biased output; exact source payload and class frequency; individual source resampling checked through fresh seed replay",
+        "source_sha256": "2ec615462684b974943079180fad3ca81153e95f7cdfcb3930e4752110917822",
+        "source_rows": [
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "1"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "A"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "10"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "2"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "A"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "10"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "3"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "A"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "10"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "4"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "A"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "10"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "5"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "B"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "20"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "6"
+            },
+            {
+              "type": "string",
+              "is_null": false,
+              "value": "B"
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "20"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "7"
+            },
+            {
+              "type": "string",
+              "is_null": true,
+              "value": null
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "20"
+            }
+          ],
+          [
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "8"
+            },
+            {
+              "type": "string",
+              "is_null": true,
+              "value": null
+            },
+            {
+              "type": "integer",
+              "is_null": false,
+              "value": "20"
+            }
+          ]
+        ],
+        "schemas": [
+          [
+            {
+              "index": 0,
+              "name": "IsTestSet",
+              "label": "Тестовое множество",
+              "type": "boolean",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 1,
+              "name": "RowID",
+              "label": "RowID",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 2,
+              "name": "Category",
+              "label": "Category",
+              "type": "string",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 3,
+              "name": "Value",
+              "label": "Value",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            }
+          ],
+          [
+            {
+              "index": 0,
+              "name": "RowID",
+              "label": "RowID",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 1,
+              "name": "Category",
+              "label": "Category",
+              "type": "string",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 2,
+              "name": "Value",
+              "label": "Value",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            }
+          ],
+          [
+            {
+              "index": 0,
+              "name": "RowID",
+              "label": "RowID",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 1,
+              "name": "Category",
+              "label": "Category",
+              "type": "string",
+              "data_kind": "Дискретный"
+            },
+            {
+              "index": 2,
+              "name": "Value",
+              "label": "Value",
+              "type": "integer",
+              "data_kind": "Дискретный"
+            }
+          ]
+        ],
+        "membership_name": "IsTestSet",
+        "replacement": true,
+        "settings": {
+          "mode": "biased",
+          "training": {
+            "unit": "percent",
+            "value": 100
+          },
+          "test": {
+            "unit": "percent",
+            "value": 0
+          },
+          "priority": "training",
+          "test_position": "algorithm",
+          "seed": {
+            "policy": "fixed",
+            "value": 17
+          },
+          "biased": {
+            "field": "Category",
+            "adjustments": [
+              {
+                "value": {
+                  "type": "string",
+                  "is_null": false,
+                  "value": "A"
+                },
+                "factor": 0.5
+              },
+              {
+                "value": {
+                  "type": "string",
+                  "is_null": false,
+                  "value": "B"
+                },
+                "factor": 0.5
+              },
+              {
+                "value": {
+                  "type": "string",
+                  "is_null": true,
+                  "value": null
+                },
+                "factor": 0.5
+              }
+            ]
+          }
+        },
+        "sizes": [
+          4,
+          4,
+          0
+        ],
+        "quotas": [
+          {
+            "role": "training",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
+            ],
+            "count": 2
+          },
+          {
+            "role": "training",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
+            ],
+            "count": 1
+          },
+          {
+            "role": "training",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
+            ],
+            "count": 1
+          },
+          {
+            "role": "test",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
+            ],
+            "count": 0
+          },
+          {
+            "role": "test",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
+            ],
+            "count": 0
+          },
+          {
+            "role": "test",
+            "columns": [
+              1
+            ],
+            "key": [
+              {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
+            ],
+            "count": 0
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -7,7 +7,7 @@ export function compareSamplingPartition(expected,binding,result){
  if(expected.version!=='data-partition-sampling-v1'||result.node?.document_id!==binding.document_id
   ||result.node?.node_id!==binding.node_id||result.node?.workflow_id!==binding.workflow_id)return fail('OWNER_CHANGED');
  if(result.execution?.status!=='completed'||typeof result.execution.execution_id!=='string')return fail('EXECUTION_NOT_COMPLETED');
- if(result.configuration?.status==='applied'&&!isDeepStrictEqual({...result.configuration.readback?.parameters,mode:result.configuration.readback?.mode},expected.settings))return fail('EFFECTIVE_SETTINGS_CHANGED');
+ if(result.configuration?.status==='applied'&&!isDeepStrictEqual(normalizedSettings({...result.configuration.readback?.parameters,mode:result.configuration.readback?.mode}),normalizedSettings(expected.settings)))return fail('EFFECTIVE_SETTINGS_CHANGED');
  const ports=result.output?.ports;
  if(!Array.isArray(ports)||ports.length!==3||new Set(ports.map(p=>p.port)).size!==3
   ||binding.ports.length!==3||new Set(binding.ports.map(p=>p.guid)).size!==3)return fail('PORT_SET');
@@ -55,4 +55,13 @@ export function compareSamplingReplay(first,second){
  if(first.node?.node_id!==second.node?.node_id||first.execution?.execution_id===second.execution?.execution_id)return {status:'FAIL',error:'REPLAY_NOT_FRESH_SAME_NODE'};
  const rows=result=>result.output?.ports?.map(p=>({port:p.port,schema:p.schema,sample:p.sample}));
  return isDeepStrictEqual(rows(first),rows(second))?{status:'PASS'}:{status:'FAIL',error:'FIXED_SEED_REPLAY_CHANGED'};
+}
+
+function normalizedSettings(settings){
+ const result=structuredClone(settings);
+ // Native unique-value rows have their own order. The key and its exact
+ // adjustment remain significant; row placement is not a sampling setting.
+ if(result.biased?.adjustments)result.biased.adjustments.sort((a,b)=>JSON.stringify(a.value).localeCompare(JSON.stringify(b.value)));
+ if(result.stratified?.fields)result.stratified.fields.sort();
+ return result;
 }

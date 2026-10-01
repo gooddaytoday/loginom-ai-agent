@@ -15,7 +15,8 @@ empty string/NULL, real precision и коллизию membership с test_set.
 [cases.json](cases.json) содержит 80 core settings и дополнительные edge cases.
 Core проверяет 5 modes × 4 пары units × 4 стратегии приоритета/положения test.
 Fixtures base/strata/bias выбираются по методу, а не подменяют друг друга.
-Каждый запуск получает уникальный путь `/AI/DataPartition/{{CASE_ID}}-{{RUN_ID}}.lgp`.
+Каждый запуск получает уникальный путь `{{PACKAGE_PATH}}` в каталоге своего аккаунта
+`/lab-slot-a/`; его подставляет штатный acceptance harness.
 `task.md` — шаблон бизнес-задания; координатор приёмки подставляет выбранную цель,
 размеры, метод и вход без передачи expected.json или oracle исполнителю CLI.
 
@@ -73,3 +74,21 @@ Run with evidence directory, report path, exact candidate SHA and saved package
 path as four arguments. A missing row-case receipt produces PARTIAL; product
 acceptance remains NOT_RUN even when all five oracle cases pass. This script
 does not replace the qualified CLI/cold/SHA/cleanup acceptance chain.
+
+## Integer bias frequencies and resampling
+
+`biased-integer-expected.json` derives full-output class quotas from the independent
+CSV (A4/B2/typed NULL2), exact integer factors and explicit counts. The source schema,
+all payload cells, typed NULL and all three port sizes are exact. Historical native
+attempt5 established that increasing a class frequency samples source occurrences
+with replacement within that class; it does not copy each source row the same number
+of times. The native sample is not used as expected. Individual seeded occurrence
+multiplicity still requires a separate fresh replay and cold execution comparison.
+
+`check-biased-integer.mjs <evidence-directory> <report-path>` checks the source import,
+uses pre-execution configuration output mappings for port bindings, and compares
+three full bias cases. Its 15 controls per case include class quota corruption with
+unchanged total counts and matching combined membership. A PASS from this script
+certifies this limited mathematical scope; product/CLI/cold acceptance remains NOT_RUN.
+Native unique-value row order is irrelevant to the settings comparison; exact typed
+keys/factors and adjustment multiplicity remain mandatory.

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {captureExecutionBaseline,identifyNewExecution} from '../lib/node-execution-evidence.mjs';
-import {verifyDataPartitionConfigurationBaseline,prepareDataPartitionExecution} from '../lib/datapartition-execution.mjs';
+import {verifyDataPartitionConfigurationBaseline,verifyDataPartitionHistoryRefresh,prepareDataPartitionExecution} from '../lib/datapartition-execution.mjs';
 const node={document_id:'d',workflow_id:'w',node_id:'n'};
 const terminal={verified:true,state:'completed',terminal:true,can_cancel:false,source:'native_progress_record'};
 function fixture(){
@@ -71,4 +71,66 @@ for(const lost of [false,true])test('DataPartition deferred standard driver neve
  if(lost)await assert.rejects(prepared.driver.launchGraph(),/lost Execute reply/);
  if(!lost)assert.equal((await prepared.driver.launchGraph()).launch_gesture_verified,true);
  await assert.rejects(prepared.driver.launchGraph(),/not-yet-launched/);assert.equal(launches,1);
+});
+
+function historyFixture(){
+ const f=fixture();
+ const processes=Array.from({length:14},(_,index)=>[
+  {process_id:String(index+1),record_id:'old-'+index,parent_id:null,state:'completed',error:false,caption:'Активация узлов',progress_state:terminal},
+  {process_id:String(index+1)+'.1',record_id:'child-'+index,parent_id:String(index+1),state:'completed',error:false,caption:'Upstream',progress_state:terminal},
+ ]).flat();
+ const original={...f.snapshot,processes};
+ const initial=captureExecutionBaseline(original,node);
+ const before={...original,processes:[...processes,{...f.snapshot.processes[1],process_id:'15',record_id:'activation'},
+  {...f.snapshot.processes[2],process_id:'15.1',parent_id:'15',record_id:'activation-child'}]};
+ const after=structuredClone(before);after.processes.forEach((process,index)=>{process.record_id='refreshed-'+index;delete process.owner;});
+ const receipts=[['mnContextMenu;mniShowCompletedProcesses','click'],['ConsoleForm;ProgressForm;trpProgress;grd;tbl','right_click'],['mnContextMenu;mniShowCompletedProcesses','click']].map(([tid,verb],index)=>({tid,verb,result:{status:'SUCCEEDED',cleanup_complete:true,action_key:'ui.act',operation_id:'refresh-'+index}}));
+ return {initial,before,after,receipts};
+}
+
+test('DataPartition permits record recreation only after acknowledged standard history refresh',()=>{
+ const f=historyFixture();
+ const proof=verifyDataPartitionHistoryRefresh(f.initial,f.before,f.after,f.receipts);
+ assert.equal(proof.history_refresh.verified,true);
+ assert.equal(proof.configuration_activations[1].owner.node_id,node.node_id);
+ assert.equal(proof.initial_baseline.roots[0].record_id,'old-0');
+ assert.equal(proof.execution_baseline.roots[0].record_id,'refreshed-0');
+ assert.throws(()=>verifyDataPartitionConfigurationBaseline(f.initial,proof.execution_baseline,f.after),/previous process history/);
+});
+
+test('history refresh cannot hide a new Execute, wrong owner, record reuse, stale history or lost acknowledgement',()=>{
+ for(const change of [f=>f.before.processes.at(-2).caption='Активация узлов',f=>f.before.processes.at(-1).owner.node_id='other',
+  f=>f.after.processes[0].record_id=f.before.processes[1].record_id,f=>f.after.root_id='other',
+  f=>f.after.processes[1].caption='changed',f=>f.after.processes[1].progress_state={...terminal,terminal:false},
+  f=>f.after.processes.at(-1).owner={verified:true,node_id:'other',source:'native_process_model_identity'},
+  f=>f.after.processes.push({process_id:'16',record_id:'execute',parent_id:null,state:'completed',error:false,caption:'Активация узлов',progress_state:terminal}),
+  f=>f.initial.roots[0].record_id='stale',f=>f.receipts[2].result.status='AMBIGUOUS',
+  f=>f.receipts[2].result.operation_id=f.receipts[0].result.operation_id,f=>f.receipts.pop(),f=>f.receipts[1].verb='execute_graph_node']){
+  const f=historyFixture();change(f);assert.throws(()=>verifyDataPartitionHistoryRefresh(f.initial,f.before,f.after,f.receipts));
+ }
+});
+
+test('deferred standard prepare retains both filter receipts and completed history snapshots',async()=>{
+ const f=historyFixture();let opened=false,menu=false,show=true,refreshed=false,steps=0;
+ const element=(tid,allowed_actions=['click'])=>({tid,ref:tid,allowed_actions});
+ const state=()=>({wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked:false},
+  node_processes:{...(refreshed?f.after:f.before),verified:opened,show_completed:show,processes:show?(refreshed?f.after:f.before).processes:[]},ui:{elements:[
+   element('MF;cntMain;tlbMainToolbar;btnProgress'),
+   ...(opened?[element('ConsoleForm;ProgressForm;trpProgress;grd;tbl',['right_click']),element('ConsoleForm;btnClose')]:[]),
+   ...(menu?[element('mnContextMenu;mniShowCompletedProcesses',['click','press'])]:[]),
+  ]}});
+ const channel={observe:async spec=>{const current=state();assert.ok(spec.ready(current),spec.condition);return structuredClone(current);},
+  perform:async spec=>{const current=state();assert.ok(spec.ready(current),spec.condition);const action=spec.resolve(current);
+   if(action.ref==='MF;cntMain;tlbMainToolbar;btnProgress')opened=true;
+   if(action.verb==='right_click')menu=true;
+   if(action.ref==='mnContextMenu;mniShowCompletedProcesses'){show=!show;menu=false;if(show)refreshed=true;}
+   if(action.ref==='ConsoleForm;btnClose')opened=false;
+   assert.notEqual(action.verb,'execute_graph_node');
+   return {status:'SUCCEEDED',cleanup_complete:true,action_key:'ui.act',operation_id:'standard-'+(++steps)};
+  }};
+ const prepared=await prepareDataPartitionExecution(channel,node,{baseline:f.initial,configuration:{verified:true,mode:'biased'},outputs:{verified:true,ports:[0,1,2]},operation:{nodeApply:{request:{mode:'biased'}}}});
+ assert.equal(prepared.evidence.history_refresh.receipts.length,3);
+ assert.equal(prepared.evidence.configuration_activations[1].owner.node_id,node.node_id);
+ assert.equal(prepared.evidence.execution_baseline.roots[0].record_id,'refreshed-0');
+ assert.equal(opened,false);
 });

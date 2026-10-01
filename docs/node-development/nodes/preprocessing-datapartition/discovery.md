@@ -343,3 +343,29 @@ confirmed own lab-slot-a seen1/closed1/loggedOut=true; that administrative clean
 does not convert the attempt to PASS. Remaining tie/zero cases NOT_RUN.
 Use source_count2 with factors0.25/0.75 for representable 0.5/1.5 ties; also
 non-ties0.24/0.74. Round rule and partial percentage basis remain unresolved.
+
+### Current-run attempt6: long history refresh refusal
+
+Clean candidate a0a05ac3430ba88d24f6d5ca19f81b6e84d39d0e executed factor2,
+explicit counts and factor0.5 on one native node. Public three-port counts were
+12/12/0,8/8/0,4/4/0. Independent CSV class quotas/payload passed;45 controls failed.
+The attempt as a whole remains FAIL: the next half-tie operation stopped before
+Execute with `DataPartition previous process history changed`. Standard prepare
+refreshed >=30 completed process records through Show Completed hide/restore.
+Logical root IDs1..15, parent IDs, captions and completed states stayed unchanged;
+local root records2656..2684 became2764..2792. Initial and deferred prepare both
+performed the existing refresh. The final deferred record mismatch was a refusal,
+not evidence of a target Execute or a successful rounding case.
+
+Local cleanup confirmed package_closed/logged_out/unsaved_changes_discarded=true;
+wrapper FAILED command_exit1,cleanup_confirmed=true,own account seen0/closed0/logouttrue.
+The historical FAIL is retained. Remaining rounding/below-tie/percent-base/zero cases
+were NOT_RUN in this attempt.
+
+The own deferred hook now verifies the acknowledged standard hide/menu/restore,
+complete unchanged logical process history, root/node identity and record uniqueness.
+It preserves pre-refresh input-activation ownership evidence separately; it never
+admits an earlier target Execute into the new baseline. Record changes without this
+proof, lost/duplicate ack, added/changed process or different owner remain refusals.
+Shared execution code and other handlers are unchanged. Execution tests9/9 PASS;
+native retest of this source delta is NOT_RUN.
