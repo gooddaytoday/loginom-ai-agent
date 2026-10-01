@@ -30,7 +30,9 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck; ancestry/byte comparison с `1b8d100392` выполнено на e954 | Explicit URL contract выбран; owning checks перед candidate и actual compiled CLI setup/status/restart остаются |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — fixed J19 technical-name freshness Code, затем declared;
+fixed J19 technical-name freshness Code441/declared442 принят2/2 на9bc;
+следующий шаг — remaining natural E/J25 diagnostics и переход к F с явными
+пределами доказанных diagnostics; actual model resistance/candidate/CLI открыты;
 remaining natural E/J25 diagnostics остаются;
 owned technical-details expansion432 по §12 принят ниже; fixed J23 writer424/cold428 принят;
 long source writer424 принят ниже. J26 Code422/Declared423
@@ -251,29 +253,39 @@ typecheck и actual compiled CLI setup/status/restart на новом private pr
 direct headed runtime probes не доказывают candidate persistence.
 Pending context design по-прежнему не принят; нового browser profile/process нет.
 
-### Граница возобновления: opt-in утверждён — 2026-10-01
+### Граница возобновления: opt-in реализован и live принят — 2026-10-01
 
-Пользователь явно принял `allow_configured_output: true` из context design.
-Default остаётся materialized-only; opt-in допускает только verified configured
-output0 со статусом source_pending, current source и полностью verified input.
-Это не свидетельство выполненного выхода. Предыдущие ожидания решения выше —
-историческое состояние, блокировка снята человеческим утверждением.
+Пользователь явно принял allow_configured_output:true; решение реализовано в
+child9bc52b9468. Default strict/materialized-only сохранён, input fully verified;
+configured output0 имеет source_pending/native_reciprocity_verified=false и не
+считается подтверждённым выполнением. Previous pending-decision paragraphs выше
+описывают историческую блокировку, снятую человеческим утверждением.
 
-Следующие шаги: реализация request/receipt/runtime и fixed operator, actual
-runtime/MCP admission/negative tests, owning regressions. После actualexit0 —
-новый immutable child commit, source freeze/oracle/auditor/pin, fresh ordinary
-headed Code441; positive independent audit/non-noop negatives/full cleanup/process
-absence до отдельного declared. Code440 profile/evidence не переиспользовать,
-old source не выполнять для обхода refusal. В новом run сначала default refusal
-с verified cleanup, затем NEW opt-in, correction из его public input Name,
-точные retries без events, final Execute/full6×4/1950 и default materialized read.
+Full client3419PASS+10SKIP/operator18502PASS; addressed client182/operator80PASS.
+Fresh ordinary headed Code441/exec55146 и declared442/exec72958 завершились
+actualexit0/OBSERVED, independent v7 audit PASS и119/119 non-noop negatives каждого.
+Каждый run доказал default refusal/две own port Closes до NEW opt-in, exact old
+source/current CustomerNow при source-label Customer, четыре configured outputs/
+manual label/autosync=false, correction из public Name, exact retries без новых
+events, два corrected completed Execute/full6×4/1950 и final default materialized
+context. PackageClose/logout/browserClose/process absence каждого подтверждены.
+Registry/lease442 closed_verified, active_exec=null; нового браузера не назначать
+для повторения этих accepted cases. Child HEAD9bc, main canonical docs обновлены.
 
-Последнее observed состояние: child e954, Code440 FAILED/actualexit1 с полным
-PackageClose/logout/browserClose/process absence; registry closed_verified,
-active_exec=null. Нового live процесса ещё нет. J27 comparison завершено;
-remaining F/candidate/CLI/natural diagnostics открыты. Untracked
-acceleration-review.md в commits не добавлять. Выполненные разовые указания
-и unchanged accepted проверки не повторять.
+Code был pre-pinned v5; checker выявил ignored preparation observation. V7
+усилил проверку каждого full editor read; для Code это post-live re-audit без
+изменения source/evidence, для declared v7 был pre-pinned. Original failed checker
+и v6 source-only freeze-copy refusal сохранены; они не выданы за PASS. Подробности
+и SHA ниже. Source/freeze bytes и oracle unchanged, будущий candidate не закреплён.
+
+Далее remaining natural insufficient-primary/Done diagnostics E/J25 и F по
+плану: internal review, product registration, immutable candidate/J01/J21/J27,
+затем две независимые compiled CLI проверки. Fixed operator не доказывает actual
+model resistance; source/direct hidden Done и internal required-details не
+заменяют natural observations. J27 comparison уже выполнено; owning checks перед
+candidate и actual CLI restart открыты. Не повторять rebase/Cursor79e41aa8,
+accepted unchanged milestones и не включать acceleration-review.md в commits.
+Проверять OpenViking только при фактической ошибке памяти; unavailable → stop.
 
 ### E/J19: реализация opt-in и pin до fresh live — 2026-10-01
 
@@ -322,9 +334,29 @@ original capture (rb до Apply, ra после); исходный browser не �
 unchanged. V6 source-only попытка filename replacement в freeze JSON отказала
 до acceptance; v7 копирует oracle/freeze bytes точно. Originals/v5/v6 сохраняются.
 V7 pin SHAa5ccb6af: для Code это явно **post-live strengthening**, для следующего
-declared будет pre-live. V7 audit PASS/receipt80bea89d; новые119 non-noop copies
-в checker exec8636 наблюдаются до terminal. Пока не закончить registry как PASS
-и не назначать declared442. Child source во время audit/live не менять.
+declared — pre-live. V7 audit Code PASS/receipt80bea89d; checker8636 actualexit0,
+119/119 non-noop mutations refused, receipt99bd2c87. Original Code exec55146
+actualexit0; registry reconciled closed_verified до назначения declared442.
+
+Fresh ordinary headed `e-public-context-renamed-declared-01`/profile442 на9bc,
+original exec72958 actualexit0/OBSERVED. Полный v7 audit PASS/receipt4a4b8091;
+checker75075 actualexit0,119/119 refused/receipte1a2e4f5. Report SHA
+0f1c533bb877d5fed90f5351010470d5e8e944acc389d12957ef8301384fb210;
+journal7082b051f510bb8f5d04365ecb268942fa3fe3ec26d43e27b6738970f028c016.
+Code reporte38981136554eab410780cffe332b093ab9224e85402f36cf9b79a11085cb2bb;
+journal37ce1354473233f2439aa7e6db0c3cd2a46f5175c3c2e0480cc770b3aed398a9.
+Code source correction SHA9d9de95a/926bytes; declaredcd77b990/724bytes.
+Оба сохраняют exact old source до correction, label/source Customer при current
+input Name CustomerNow и manual output label/autosync=false. Default refusal
+закрывает оба порта без Execute/Apply/Save; NEW opt-in дважды читает source/
+settings и полные own cached mappings, output честно source_pending. Delivery
+ports_complete=false; final default read materialized, source/current mapping
+проверены. NEW opt-in и historical baseline exact retries дают zero new events.
+Correction использует только public technical Name; четыре distinct completed
+Execute (warmup2/correction2), full6×4/1950 каждого, полная уборка/process absence.
+Full model injection resistance, product handler/candidate/CLI/Gates не заявлены.
+Registry/lease442 closed_verified/active_exec=null; живых операций нет. Child
+source immutable9bc, unknown gesture/ACK не было и admin recovery не потребовался.
 
 ### E/J25: owned technical-details expansion432 принят — 2026-10-01
 

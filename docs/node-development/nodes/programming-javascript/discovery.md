@@ -41,7 +41,7 @@ retained physical mapping binding и actual source/settings/policy до/посл
 dispatch ACK проверены на этих paths. Saved unsupported source/drift/closed
 policy refusal/unknown cleanup — direct tests, не live injection. Sandbox/
 full engine grammar/candidate/CLI не заявлены; exact hashes в checkpoint,
-fixed J23 long source принят ниже; остаток Done refusal/J19 technical names/model resistance/E/F.
+fixed J23 long source принят ниже; остаток natural diagnostics/Done refusal/model resistance/E/F.
 
 E/J23 fixed long-source persistence принят: public new Code writer424/Save на
 060a и независимый path-only cold428 на6531 (actual exit0) подтвердили exact
@@ -50,6 +50,17 @@ cleanup/process absence. v6/v7 independent audits/negative16 each;24 cold source
 chunks delivered после Close. Source revisions разделены, writer не повторён;
 failed425 сохранён и exact recovery завершён. Native LGP bytes/candidate/CLI/
 aggregate Gates остаются открытыми; hashes и pre-body redraw fix — в checkpoint.
+
+E/J19 technical-name freshness Code441/declared442 принят2/2 на9bc52b9468:
+default materialized-only refusal/две port Closes → NEW explicit configured-output
+context/old source/current CustomerNow → correction из public Name → два corrected
+completed Execute/full6×4/1950 → final default materialized context. Pending output
+имеет source_pending/reciprocity=false; configured targets не приписаны выполнению.
+Exact new/baseline retries без events, manual label/autosync=false, graph и полная
+уборка/process absence подтверждены. Full client3419+10SKIP/operator18502PASS;
+v7 independent audits/119 negatives каждого. Code re-audit strengthened post-live
+после failed v5 negative checker, declared v7 pre-pinned. Actual model resistance,
+product handler/candidate/CLI и aggregate Gates остаются открытыми; SHA в checkpoint.
 
 E/J25 read-only native details inventory431 на1a754aa192 принят independent v4
 audit/negative20/20/actualexit0/cleanup/process absence. Fresh Code Next
@@ -64,7 +75,7 @@ SyntaxError/(:17:26), source/settings/graph retained, NEW repair/2fresh Execute/
 full6×4. v2 independent audit/negative25/25/actualexit0/cleanup/process absence.
 Default policy и hidden Done покрыты direct tests, live — fixed internal
 required-details; natural insufficient-primary/Done refusal не доказаны.
-Далее эти remaining diagnostics и J19 technical-name freshness/F; §12
+Далее remaining natural diagnostics и F; §12
 [native error design](native-error-attribution-design.md);
 J25/candidate/CLI/Gates остаются открытыми. Точные SHA в checkpoint.
 

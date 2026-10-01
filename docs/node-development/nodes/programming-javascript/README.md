@@ -79,7 +79,7 @@ Owned details expansion432/22f2cffa89 также принят: один toggle,2
 без truncation, public/user-v1 SyntaxError/(:17:26), retained source/NEW repair/
 2fresh Execute/full6×4; v2 audit/negative25/25/cleanup/process absence.
 Internal required-details proof не доказывает natural insufficient-primary
-или Done refusal; эти остатки и J19 technical-name freshness/F открыты.
+или Done refusal; эти остатки и F открыты.
 Контракт — §12 [native error design](native-error-attribution-design.md).
 Fixed public Code32768bytes/1024lines и declared-empty source-read, schema-mode
 refusal2/2, native Code Next SyntaxError и explicit sync throw/NEW repair обоих
@@ -108,6 +108,14 @@ independent audit/negative64/64 каждый и cleanup. Compact bridge/guidance
 23e8488e29 проверен actual MCP и full client3179/10SKIP. Это не model resistance.
 Reordered current input/old source Code410/Declared411 принят2/2 на9c93,
 independent audit v3/negative80/80 каждый и cleanup; имена не переименовывались.
+Technical-name context Code441/declared442 на9bc52b9468 принят2/2:
+обычный context отказал после verified Close; NEW explicit allow_configured_output
+доставил old source/current CustomerNow и честный configured output source_pending.
+Correction из public Name, два corrected completed Execute/full6×4/1950 и final
+default materialized context подтверждены. Full client3419+10SKIP/operator18502PASS;
+independent v7 audit/119 negative copies каждого/cleanup/process absence. Code
+v7 — post-live strengthening после выявленного checker gap, declared — pre-pin.
+Actual model resistance/product registration/candidate/CLI этим не доказаны.
 Source/direct [J21 response budgets](response-budget-design.md) на8bca1b00aa
 проверены: addressed76/full client3188+10SKIP/operator45, actual MCP fixture и
 recorded live replies8/8; actual candidate/CLI limits и delivery остаются в F.

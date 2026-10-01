@@ -216,7 +216,9 @@ Rename/Done отдельно не доказывают полный J19 или a
 Обычный запрос сохраняет строгую materialized-only проверку; opt-in возвращает
 current source, verified input и configured output со статусом `source_pending`,
 без утверждения о подтверждении выхода выполнением. Реализация child `9bc52b9468` прошла actual addressed/full client и operator
-checks; positive live/independent acceptance ещё требуются. Code440
+checks; ordinary headed Code441/declared442 и independent v7 audit/119 negatives
+каждого приняты2/2. Product registration/actual model/candidate/CLI ещё открыты.
+Code440
 подтвердил default refusal, предусмотренный выше: после Input Done output0 имеет
 полный configured target inventory, но materialized sources отсутствуют.
 Не запускать old source для обхода отказа. Technical rename и ACK подтверждены;
@@ -278,3 +280,13 @@ counterexamples и затронутые regressions. Независимые дв
 переигрываются без затронувшего изменения; actual model resistance/candidate/CLI
 остаются отдельными F obligations. Публичный product handler не регистрировать
 и API не выпускать этим prototype slice.
+
+Принятый live срез на9bc: Code441/exec55146 и declared442/exec72958 actualexit0,
+обоих exact old-source opt-in replies после default refusal/cleanup, correction
+из public CustomerNow, final default materialized context/full6×4/1950 и полная
+уборка/process absence. Independent v7 audit/119 non-noop negatives каждого PASS.
+V5 checker нашёл ignored preparation editor read; v7 сверяет все full reads после
+original capture, включая preparation и cache before/after Apply. Для Code это
+post-live strengthening оригинальных immutable evidence, для declared — pre-pin.
+Точные hashes/failed originals и оставшиеся границы — в checkpoint. Fixed operator
+не является actual model resistance или compiled candidate/CLI acceptance.
