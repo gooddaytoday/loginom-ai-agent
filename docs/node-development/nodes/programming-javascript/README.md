@@ -6,6 +6,12 @@
 с general lifecycle-v5. Compiled candidate и CLI ещё не проверены; accepted
 registry readiness не повышена.
 
+На child **7855b9bf11cb** реализованы независимые Python configuration/output
+аудиторы:40 адресных test methods,2 native captures и48 non-noop mutations PASS.
+[Границы и команды](checkpoint.md#фаза-4-configurationoutput-auditors--2026-10-02),
+[дизайн](cli-auditor-design.md). Итоговый standalone CLI acceptance auditor,
+same-task F review и candidate/CLI остаются открытыми; это не новый live run.
+
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·
 [реестр](../../registry.json) ·
@@ -35,7 +41,9 @@ review/candidate/CLI остаются открыты. [Границы и hashes]
 
 **discovery_required**, 2026-09-29. Проведено исследование исходников,
 официальной справки, приложенного системного справочника и e2e-репозитория.
-Продуктового apply handler JavaScript пока нет. В child code
+Следующий текст — исторический срез до product registration; актуальная source
+граница указана выше и в checkpoint. Продуктового apply handler JavaScript
+на этом историческом срезе ещё нет. В child code
 `f8ceebcac9` реализован ограниченный injected existing-code handler:
 headed `public-node-apply-03` подтвердил публичный configure/Done,
 независимый source-read и cleanup 3/3. Output mapping остался

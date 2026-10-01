@@ -901,8 +901,14 @@ Loginom, source digest и owner/execution. Применять redactor и явн
 handler и автономная CLI-приёмка остаются открытыми.
 
 Уже подготовлены [fixtures](fixtures/README.md) и ожидаемые бизнес-значения.
-Будущие `javascript_configuration_evidence.py`, `javascript_output_evidence.py`,
-`javascript_node_acceptance.py` — **TO_IMPLEMENT**, не существующие команды.
+`javascript_configuration_evidence.py` и `javascript_output_evidence.py`
+реализованы в child source **7855b9bf11cb0f091b65d105b18d945339ee6677**;
+40 адресных test methods и повторный audit Code449/declared450 прошли.
+[Дизайн](cli-auditor-design.md), exact invocation/hashes/границы — в
+[checkpoint](checkpoint.md#фаза-4-configurationoutput-auditors--2026-10-02).
+`javascript_node_acceptance.py` ещё **TO_IMPLEMENT**, не существующая команда:
+он должен связать native проверки с фактическими standalone CLI evidence
+model/input/candidate/Save/cold/cleanup до ready_for_acceptance.
 Взять структуру разделения configuration/output из
 `tools/loginom-acceptance/calculator_*` и требования точности из `collapse/*`;
 старый Hermes transport не запускать. Точный CLI/driver invocation нового

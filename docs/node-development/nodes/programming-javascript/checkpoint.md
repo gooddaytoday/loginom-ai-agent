@@ -2,15 +2,22 @@
 
 ## Текущее состояние
 
-Актуальная граница на 2026-10-01: source product registration завершён, далее
-F same-task review. Child161353dadef69e3806a8b14ae14575c40c3475d7 tracked clean:
+Актуальная граница на 2026-10-02: source product registration завершён;
+дополнительно реализованы два независимых native-аудитора фазы 4. Child
+**7855b9bf11cb0f091b65d105b18d945339ee6677** tracked clean; registration на161353
+сохранён. Configuration/output проверены на immutable Code449/declared450,
+40 адресных test methods PASS, в том числе48 non-noop native mutations.
+Итоговый `javascript_node_acceptance.py` ещё TO_IMPLEMENT: подготовить связку
+с фактическими standalone CLI model/input/candidate/Save/cold/cleanup evidence
+до ready_for_acceptance. [Дизайн и границы](cli-auditor-design.md).
 JS general lifecycle-v5/driver/knowledge в product registry только7.4.2/nonempty
 origin, actual bridge redactor. Addressed65, full client3442PASS+10SKIP,
 operator18583PASS, provenance5045 actualexit0. Existing Done/Close447/448 и
 standalone new Done449/450/preserve Execute/full6×4/1950 приняты2/2 каждый,
 ordinary headed/independent audits/negative/cleanup. Lease450 closed_verified,
 active_exec=null, процессов/browser/tests нет. J02 public input подтверждён.
-Next one **same-task Astra/medium review**, затем candidate/J01/J21/J27 и Sol CLI.
+После завершения исходников фазы 4 — один **same-task Astra/medium review**,
+затем candidate/J01/J21/J27 и Sol CLI.
 Actual current task model gpt-6.1-sol/high; async запрос переключения этой же
 задачи pending, F review не выполнен. Product release/accepted registry не повышены.
 Natural insufficient-primary/Done errors not_observed — явная граница coverage;
@@ -28,6 +35,88 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: configuration/output auditors — 2026-10-02
+
+Child **7855b9bf11cb0f091b65d105b18d945339ee6677** реализует
+`javascript_configuration_evidence.py` и `javascript_output_evidence.py` в
+`packages/loginom-runtime/tools/loginom-acceptance`. Проверки не исполняют JS.
+Admission/13 фаз и native observations/actions проверяются отдельно от summary;
+source UTF-8/LF/chunk hash после commit, Setting/Close и исходные settings
+сверяются независимо. Existing настройки сравниваются полностью с baseline.
+Input/output mapping подтверждаются через native stores, owner и reciprocity.
+Материализация и итоговый Execute проверяются как две отдельные свежие группы;
+полная Table сравнивается с operator oracle integer/string/NULL. Другие scalar
+и native-byte доказательства сохраняют свои отдельные G5 аудиторы.
+
+Общий Python procedure auditor дополнен только существующим runtime settlement
+Table после одного подтверждённого Add: текущий read deadline в границах
+admission, свой node/views/port, все samples и две устойчивые карточки, без
+посторонних масок/диалогов. Обычный readiness timeout15000ms не расширен.
+Process scroll auditor принимает ровно ConsoleForm и MF;ConsoleForm,
+сохраняет grid/ref/scroll/history checks. Product JS runtime не менялся.
+Две mapped transforms обновлены, original source-map/baseHash сохранены.
+
+Проверки, все перечисленные успешные процессы terminal с actualexit0:
+
+| Проверка | Результат / SHA256 приватного log |
+| --- | --- |
+| Addressed05 original67421 | 8 test methods,2 native cases;48 non-noop native mutations; `9eecbfb5547d66dc8246bb0260756d49aeca92d6d8944dc2a67eb7d82875c7ae` |
+| Shared procedure | 21PASS; `b9b81178c87527daaeda39c5bec57db3fa0642e23f77c9ae5985c315605ce017` |
+| Shared execution | 11PASS; `c55e97bc51ef62da0b0f6009cc0fb402585dcc658e0b75cbf223e3523c88ce72` |
+| Public unit invocation без private captures | 5PASS+3SKIP; `bbcdd249c468dbc0c91f25dd49c214d18fdf58f17e1bc59130573db6943da4c3` |
+| Provenance | 5045PASS; `91918370d54b6ee97714cadcf7b78d7415dd2e72bcc39b22a9cb47cf1fc4056a` |
+
+Конкретная regression-команда из child `packages/loginom-runtime`:
+
+```sh
+LOGINOM_JAVASCRIPT_AUDIT_EVIDENCE_ROOT=/home/george/.local/state/loginom-ai-agent/node-development/campaigns/javascript-20260926-ubuntu python3 -m unittest discover -s tools/loginom-acceptance -p test_javascript_evidence.py -v
+```
+
+Четыре отдельные CLI-вызова двух Python аудиторов Code/declared actualexit0,
+original60934. Exact argv и hashes закреплены в private
+`f-native-auditors-v2/receipt.json`, SHA256
+`69fbbb3e30370d2985032f550509b86300086477bce60fb135718b35dfc3ce77`.
+Интерфейсы для будущего controller (пути — его приватные входы):
+
+```sh
+python3 tools/loginom-acceptance/javascript_configuration_evidence.py --journal JOURNAL --request REQUEST --source AUTHORED_JS --input-columns INPUT_COLUMNS --output-columns OUTPUT_COLUMNS
+python3 tools/loginom-acceptance/javascript_output_evidence.py --journal JOURNAL --request REQUEST --expected OPERATOR_ORACLE
+```
+
+Код/expected columns/rows операторской проверки не добавлены в model-input.
+Source449/450 взят из исходного собственного fixed request и сверён с прежним
+immutable oracle pin. Проверка не доказывает авторство Sol; ни journal authenticity,
+ни Save/cold, ни candidate/CLI эти частичные аудиторы не повышают до PASS.
+CLI fixture не создавался, браузер в этой итерации не запускался; это повторный
+анализ прежних ordinary headed native журналов. New-target product route требует
+своих свежих evidence; исторические C/D журналы старого internal event формата
+этими новыми аудиторами refused и не объявлены повторно принятыми.
+
+Первый addressed01 actualexit1/8 failed subtests+1 error: тест выбирал legitimate
+pre-commit source delivery и неверный путь `node_table.page.rows`. Тест исправлен
+на post-commit delivery и actual `node_table.rows`; исходный log сохранён.
+Addressed02–05 сохранены отдельно; последняя версия проверяет также согласованные
+подмены settings+digest и native cell+sample/action digests. Последняя подмена
+refused именно independent `source_output_value_0_0`, а не только integrity check.
+Общий Python discover захватил исторические тесты других узлов, показал ошибки
+архивных путей и был остановлен SIGINT только у проверенного собственного PID.
+Original39090 actualexit130, log SHA256
+`dede9f237f6b337a5b725cb614eb4add896d326b8294f4acacdbdf0753fcd463`;
+это **не PASS** и не замена прежних Node operator18583/client3442 checks.
+TS/Protocol/HttpApi не менялись; повтор Node suite/typecheck/generate не требовался.
+
+Memory search сначала вернул ошибку несовместимых параметров mode=list/peer_scope.
+Установленный ov-memory-doctor:0 failures, data/auth/MCP/ready подтверждены;
+исправленный Experience find и exact reads прошли. Настройки памяти не менялись.
+F review не выполнен: actual turn_context20:56:18.071Z всё ещё gpt-6.1-sol/high,
+предыдущий async запрос same-task Astra/medium pending. Lease450 остаётся закрытым;
+fresh451 не назначен. `acceleration-review.md` в коммиты не добавлен.
+Source validation receipt `f-javascript-auditors-validation-v1.json`, SHA256
+`6c948c1abeb7f6820f144803152d3da1535da6474bb40b3881b9126e7736fa37`.
+Native originals и hashes всех5 новых/изменённых auditor/test files после
+проверки вновь сверены. Canonical docs validator:94 active/309 total Markdown,
+342 historical files,14 accepted handler types; `git diff --check` PASS.
 
 | Возможность / связанные J | Уровень и evidence | Остаток |
 | --- | --- | --- |
