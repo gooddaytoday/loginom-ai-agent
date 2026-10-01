@@ -460,3 +460,22 @@ read-only regressions, independent private source/output oracle, assignment
 journal hashes, независимый audit и terminal/cleanup/process absence. Никаких
 секретов/raw logs в Git; child historical dirty docs и acceleration review
 сохраняются отдельно.
+
+### 11.1. Import429: гипотеза не подтвердилась; следующий discriminating шаг
+
+Actual headed import429/exec78578 на679f прошёл Code Next и Done, error modal
+не появился. До explicit Execute source admission отказал на готовности
+prepared node для process console; Execute не отправлен. Original report —
+CLEANUP_UNCONFIRMED/exit1, его нельзя считать native diagnostic PASS. Exact
+headed admin recovery430/exec9725 exit0 закрыла только собственный пакет
+saved C в jsteach:4015 без Save и сам idle session; Package/session absence,
+logout/browser/process absence подтверждены отдельно. Неизменённый original
+report/journal сохранён, registry430 closed_verified.
+
+Выбран fixed `syntax-details-code`: прежняя доказанная optional-chain SyntaxError
+плюс **новое** read-only native inventory до sole OK, вместо повторения старого
+результата. Это discriminating UI-source observation для закрытого будущего
+details gesture. Он не доказывает недостаточность короткого primary text,
+раскрытие details, естественный Done refusal или полное J25. Source/settings/
+owned discard/NEW repair/two fresh Execute/full6×4 и cleanup остаются обязательны.
+Импорт не расширяется на другие API/модули и не маскируется как SyntaxError.

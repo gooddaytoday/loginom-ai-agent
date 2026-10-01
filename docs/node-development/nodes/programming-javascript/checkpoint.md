@@ -53,6 +53,30 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J25: import429 не дал modal; exact recovery430 завершена — 2026-10-01
+
+Import429/exec78578 actualexit1 **CLEANUP_UNCONFIRMED** на679f: Code Next и Done
+прошли, native error modal/inventory отсутствуют. Before-Execute admission
+отказал `prepared node available for process console`; explicit Execute не
+отправлен. Report SHA
+`f99666445b31cc104f949e7568a28a80e3b61051b33a549afd6b315f7b70399a`, journal
+`2b558a954706e8a8619fedb2e6ab0bc9720e5ad9b7a9b8a609f4443c5be71d4b`.
+Не diagnostic PASS, не Done refusal, не user interference. Original evidence
+не переписано, repair/output из этого run не заявлены.
+
+Fresh headed recovery430/exec9725 actualexit0: exact saved C path/timestamp
+подтвердили own jsteach:4015; package и session Stop disabled. Единственные
+Close/Yes закрыли собственный пакет без Save, затем idle session. После Refresh
+оба отсутствуют; foreign active session untouched. Admin logout/browser Close
+и actual process absence429/430 verified. Recovery journal SHA
+`1e20ff68986d13cb1bae94efae56da781fbbb13608331b89d409939339801c5e`, separate
+receipt555eab8f. Registry430 closed_verified/active_exec=null.
+
+Далее §11.1 [native error design](native-error-attribution-design.md): один
+fixed syntax-details-code на fresh431 после new source/freeze/tests/auditor.
+Цель — actual read-only native details inventory, не повтор прежней syntax
+приёмки и не expansion/insufficient-primary/Done proof. J25 остаётся открытым.
+
 ### E/J25: native technical-details discovery назначен — 2026-10-01
 
 Продолжение §11 [native error design](native-error-attribution-design.md).
