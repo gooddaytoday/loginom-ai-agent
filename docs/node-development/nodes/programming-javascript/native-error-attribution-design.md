@@ -554,3 +554,30 @@ headed fixed required-details case, pre-live independent oracle/auditor;
 native technical text/one click/Close/source/NEW repair/2fresh Execute/full6×4,
 then cleanup/process absence/negative auditor mutations. Existing short syntax/
 throw/long-source milestones без затронувшего изменения не повторять.
+
+
+### 12.1. Следующая одна natural-policy проба — regex, 2026-10-01
+
+После accepted J19 Code441/declared442 выбран один bounded operator case
+`regex-details-auto-code`. Exact suffix к сохранённому C business source:
+`\nconst diagnosticRegex = /(?<=Error: )x/;\n`. Это валидный для pinned Acorn
+regex literal с lookbehind, без loops/new API/module/RPC/Preview/Save. Его native
+поддержка на модифицированном Chakra **не предполагается**. Различающий фактор —
+regex sub-parser и его естественный формат diagnostic, а не повтор optional-chain
+SyntaxError или увеличение отсутствующего import. Literal Error: — данные.
+
+Если native Code Next откажет, existing default policy (require_details=false)
+получает actual primary, раскрывает details лишь при truncation/unrecognized
+class/location, затем sole OK/discard/independent retained baseline, NEW same-node
+repair/two fresh completed Execute/full6×4/1950 и ordinary cleanup. Exact source,
+actual stage/primary/expansion сохраняются; заранее заданного класса/позиции нет.
+Если primary sufficient, это отдельное observed sufficient outcome, **не** natural
+insufficient PASS. Если native поддерживает literal и public apply проходит,
+fixed diagnostic expectation не принимается; settled owned runtime разрешает
+ordinary cleanup, без нового запуска/смены source ради желаемой ошибки.
+
+До browser — source commit, addressed/operator regressions, exact suffix/source
+oracle, immutable freeze и независимый auditor/negative checker. Один fresh
+ordinary headed Code profile443; после него пересмотреть основание следующего
+шага, не расширять regex/API/import матрицу. Natural Done refusal не приписывать
+этой проверке. Public parameters/handlers/knowledge/client guards не расширяются.

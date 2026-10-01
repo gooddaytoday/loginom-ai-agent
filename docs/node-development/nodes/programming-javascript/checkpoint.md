@@ -287,6 +287,23 @@ candidate и actual CLI restart открыты. Не повторять rebase/C
 accepted unchanged milestones и не включать acceleration-review.md в commits.
 Проверять OpenViking только при фактической ошибке памяти; unavailable → stop.
 
+### E/J25: следующая bounded natural-policy проба — 2026-10-01
+
+Предыдущий goal turn — progress: утверждён opt-in, source9bc/full tests и fresh
+headed J19 Code/declared2/2 приняты. Сейчас реальные registry/lease442 согласованы:
+closed_verified/active_exec=null, браузерные процессы отсутствуют. Runtime source
+не меняется для следующей проверки. Анализ retained primary frontend источников
+подтвердил Done path metadata assignments и запрет fabricated exception/RPC;
+доказанного естественного Done refusal пока нет.
+
+Выбрана одна regex-details-auto-code по §12.1 native-error design: valid Acorn
+lookbehind literal, default details policy, actual native outcome без expected
+class/offset. Это другая parse category и source-only operator case, не новый
+public API/handler. До live нужны addressed/operator tests/source/freeze/oracle/
+auditor pin. Если native поддержан или primary sufficient, insufficient-primary
+остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
+назначен; source/evidence пока не созданы, живых операций нет.
+
 ### E/J19: реализация opt-in и pin до fresh live — 2026-10-01
 
 Child `9bc52b94686af82bfa1411adacffd1f56c0de399` реализует optional boolean
