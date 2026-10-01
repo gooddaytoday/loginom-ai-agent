@@ -14,7 +14,7 @@ EXECUTE_PHASES = ('source', 'workflow', 'target', 'input_mapping', 'open',
 OWNER_KEYS = ('document_id', 'workflow_id', 'node_id')
 
 
-def javascript_operation(events, request):
+def javascript_operation(events, request, *, expected_target=None, expected_origin=None):
     operation = request['operation_id']
     rows = [r for r in events if r.get('operation_id') == operation]
     admissions = [r for r in rows if r.get('phase') == 'node_apply_prepared']
@@ -28,13 +28,26 @@ def javascript_operation(events, request):
             or checkpoints[0].get('cleanup_complete') is not True):
         raise ValueError('javascript_execute_admission')
     identity = tuple(admissions[0].get(k) for k in ('session_id','runtime_revision','target'))
+    product_target = expected_target is not None or expected_origin is not None
+    if product_target and (not isinstance(expected_target,dict)
+            or set(expected_target) != {'profile_id','loginom_build','platform','browser'}
+            or not isinstance(expected_target.get('profile_id'),str) or not expected_target['profile_id']
+            or expected_target.get('loginom_build') != '7.4.2' or expected_target.get('platform') != 'linux'
+            or expected_target.get('browser') != 'chromium' or expected_origin != 'http://logi-test-plan.bg.local'):
+        raise ValueError('javascript_external_product_target_pin')
     if (not identity[0] or not identity[1] or not isinstance(identity[2],dict)
-            or identity[2].get('loginom_build') != '7.4.2' or not identity[2].get('origin')
+            or identity[2].get('loginom_build') != '7.4.2'
+            or (identity[2] != expected_target if product_target else not identity[2].get('origin'))
             or any(tuple(r.get(k) for k in ('session_id','runtime_revision','target')) != identity for r in rows)):
         raise ValueError('javascript_journal_identity')
     sequence = verify_internal_sequence(events, operation, max_steps=4096)
     if not sequence['passed']:
         raise ValueError('javascript_internal_sequence:'+','.join(sequence['failures']))
+    # Runtime observations use either URL.origin or the equivalent root URL.href.
+    # Keep the recorded value and digests intact; accept only those two forms.
+    if product_target and any(s.get('origin') not in (expected_origin,expected_origin+'/') or s.get('loginom_build') != expected_target['loginom_build']
+            for _,s in sequence['observations']):
+        raise ValueError('javascript_native_product_target_pin')
     result = checkpoints[0]
     node = result['node']
     if (any(not node.get(k) for k in OWNER_KEYS) or node['document_id'] != request['document_id']
@@ -73,7 +86,7 @@ def javascript_operation(events, request):
     return dict(rows=rows, result=result, node=node, sequence=sequence, phases=phases, identity=identity)
 
 
-def verify_javascript_configuration(events, request, expected_source, input_columns, output_columns):
+def verify_javascript_configuration(events, request, expected_source, input_columns, output_columns, *, expected_target=None, expected_origin=None):
     failures = []
     source_sha = None
     try:
@@ -81,7 +94,7 @@ def verify_javascript_configuration(events, request, expected_source, input_colu
         text = expected_source.decode('utf-8')
         if '\r' in text or '\x00' in text or len(expected_source) > 32768:
             raise ValueError('javascript_source_contract')
-        operation = javascript_operation(events, request)
+        operation = javascript_operation(events, request,expected_target=expected_target,expected_origin=expected_origin)
         node = operation['node']
         mode = request['parameters']['schema_mode']
         phases = operation['phases']

@@ -105,6 +105,31 @@ class JavascriptNativeRegressionTests(unittest.TestCase):
                 if r.get('operation_id') == report['public_new_done']['operation_id'] and r.get('phase') == 'node_apply_prepared').encode('utf-8')
             yield name,events,request,authored,inputs,oracle
 
+    def test_product_profile_header_projection_requires_external_target_and_observed_origin(self):
+        # Only the copied header representation changes; this is not a new live journal.
+        target = dict(profile_id='pinned-profile',loginom_build='7.4.2',platform='linux',browser='chromium')
+        origin = 'http://logi-test-plan.bg.local'
+        for name,original,request,source,inputs,oracle in self.cases():
+            events = copy.deepcopy(original)
+            for row in events:
+                if row.get('target') is not None:row['target'] = copy.deepcopy(target)
+            with self.subTest(name=name):
+                self.assertFalse(verify_javascript_configuration(events,request,source,inputs,oracle['schema'])['passed'])
+                config = verify_javascript_configuration(events,request,source,inputs,oracle['schema'],expected_target=target,expected_origin=origin)
+                output = verify_javascript_output(events,request,oracle['schema'],oracle['ordered_rows'],expected_target=target,expected_origin=origin)
+                self.assertTrue(config['passed'],config)
+                self.assertTrue(output['passed'],output)
+                for pinned,expected_origin in [(target,None),(None,origin),({**target,'profile_id':'foreign'},origin),
+                        ({**target,'browser':'firefox'},origin),(target,'http://foreign')]:
+                    with self.subTest(target=pinned,origin=expected_origin):
+                        self.assertFalse(verify_javascript_configuration(events,request,source,inputs,oracle['schema'],
+                            expected_target=pinned,expected_origin=expected_origin)['passed'])
+                changed = copy.deepcopy(events)
+                next(r for r in changed if r.get('operation_id') == request['operation_id'])['target']['profile_id'] = 'foreign'
+                self.assertFalse(verify_javascript_output(changed,request,oracle['schema'],oracle['ordered_rows'],
+                    expected_target=target,expected_origin=origin)['passed'])
+            self.assertNotEqual(original,events)
+
     def test_immutable_code_and_declared_native_proofs(self):
         for name,events,request,source,inputs,oracle in self.cases():
             with self.subTest(case=name):
