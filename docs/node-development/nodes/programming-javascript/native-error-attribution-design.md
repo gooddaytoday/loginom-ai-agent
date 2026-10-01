@@ -581,3 +581,12 @@ oracle, immutable freeze и независимый auditor/negative checker. О�
 ordinary headed Code profile443; после него пересмотреть основание следующего
 шага, не расширять regex/API/import матрицу. Natural Done refusal не приписывать
 этой проверке. Public parameters/handlers/knowledge/client guards не расширяются.
+
+Результат единственной пробы: child280a94c76f, fresh ordinary headed443 /
+`e-natural-regex-code-01`, originalexec57694 actualexit0/OBSERVED. Code Next
+отклонил literal с `SyntaxError` (:17:27); primary не truncated и достаточен,
+default details не раскрыты. Independent pre-pinned v1 audit PASS,22/22 negative
+copies refused; baseline retained, NEW same-node repair/2fresh Execute/full6×4/
+1950 и full cleanup доказаны. Receipt/SHA в checkpoint. Insufficient-primary и
+Done остаются открыты; гипотеза исчерпана, расширять regex/API/import matrix
+ради PASS не разрешает этот результат.

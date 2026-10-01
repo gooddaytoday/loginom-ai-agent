@@ -304,6 +304,42 @@ auditor pin. Если native поддержан или primary sufficient, insuf
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
 
+### E/J25: natural regex observation принято — 2026-10-01
+
+Fresh ordinary headed `e-natural-regex-code-01`, profile443, originalexec57694
+завершился actualexit0/OBSERVED, 15:11:13–15:13:02 UTC. Default policy дала
+**sufficient_primary**: Code Next `SyntaxError`, (:17:27), neither primary field
+truncated; details не раскрыты. Natural insufficient-primary и Done refusal
+**не доказаны**; этот run не закрывает их обязательные gates.
+
+Independently audited: actual sole native dialog/OK, discarded draft, baseline
+полностью retained; NEW repair того же узла,2fresh completed Execute/full6×4,
+all cells/types/order и sum1950; unchanged settings/graph; final public full-source
+read; no Save. PackageClose/logout/browserClose/process absence verified. Source
+`280a94c76fb210eb3af259d422db7dcbf9f7baf5`, pre-live v1 freeze/oracle/auditor/pin
+ниже unchanged. Auditor exec completed exit0; checker exec95283 actualexit0,
+**22/22** non-noop corrupted-copy refusals, including invented details/natural
+insufficient claim/forced flag/primary truncation. Audit не делегирует доверие
+operator booleans и не приписывает Done failure.
+
+Report SHA256 `d48342c2375ce28ece01dc0beccf43291654e76c5482f16fe54a39a12a37c714`;
+journal SHA256 `e4e3a458a71382aa48a675b085dbcb3c05b3bc4a02c7c66e9bef12f2be78b640`;
+independent v1 receipt SHA256
+`4a7c9a11cb40f5057e67f49f023027c5d86e4f9dc13e9dccfed72b1b396039e4`;
+negative receipt SHA256
+`bd979f103a1e1faee86222b4ef681a74dc03527a965728359e819ad5cc6e63db`.
+Registry/lease443 reconciled closed_verified/active_exec=null; новый browser не
+назначен. Предыдущие accepted opt-in J19 Code441/declared442 не повторялись.
+
+**Продолжение:** bounded regex hypothesis исчерпана, не строить матрицу
+regex/import/API ради желаемого diagnostic. Адресно пересмотреть §12 native-error
+и обязательные remaining J12/J25: выбрать только обоснованный естественный native
+trigger либо документировать неподтверждённую границу и необходимую предпосылку.
+Не фабриковать FException/RPC/hidden Done; source-only analysis не закрывает live.
+Далее F по плану: same-task review, product registration, immutable candidate,
+две independent compiled CLI проверки. Эти этапы/candidate/model resistance
+остаются открыты; Goal active, не complete.
+
 ### E/J25: pin и fresh natural regex live — 2026-10-01
 
 Child `280a94c76fb210eb3af259d422db7dcbf9f7baf5`: operator-only fixed regex case,
