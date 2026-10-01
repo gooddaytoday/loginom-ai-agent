@@ -6,6 +6,7 @@ const need=(value,message)=>{if(!value)throw Error(message);};
 // output under test must never change its expected owner/port GUIDs.
 export function compareSequentialPartition(expected,binding,result){
  if(expected.version!=='data-partition-independent-v1'||result.node?.document_id!==binding.document_id)return {status:'FAIL',error:'EXPECTED_OR_DOCUMENT_CHANGED'};
+ if(result.output?.ports?.some(port=>port.precision?.numbers_verified!==true||port.precision.limitations?.length))return {status:'FAIL',error:'NUMERIC_PRECISION'};
  if(result.configuration?.status==='applied'){
   const c=result.configuration.readback;
   if(c?.kind!=='data_partition'||!isDeepStrictEqual({...c.parameters,mode:c.mode},expected.settings))return {status:'FAIL',error:'EFFECTIVE_SETTINGS_CHANGED'};

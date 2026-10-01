@@ -59,3 +59,17 @@ Integer payload comparison uses exact decimal strings; real payload is exact.
 The datetime import profile and native membership collision strategy must be proved before
 this becomes an acceptance case. Do not rename the input to avoid the collision or infer
 a membership name from the output under test.
+
+## Sequential N7 row cases
+
+`sequential-n7-rows-expected.json` freezes analytical row IDs/payload before the
+five row-case outputs were obtained. The percentage observations are discovery
+only; their rule remains unresolved. `check-sequential-n7.mjs` compares the public
+receipts with those rows and the independent schemas, using separately bound
+port GUIDs from the first completed operation. It runs 14 corruption controls
+per successful row case, including numeric precision proof.
+
+Run with evidence directory, report path, exact candidate SHA and saved package
+path as four arguments. A missing row-case receipt produces PARTIAL; product
+acceptance remains NOT_RUN even when all five oracle cases pass. This script
+does not replace the qualified CLI/cold/SHA/cleanup acceptance chain.
