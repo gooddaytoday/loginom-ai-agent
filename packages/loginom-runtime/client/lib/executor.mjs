@@ -2398,7 +2398,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               throw error;
             }
             return {verified:true,cleanup_complete:!operation.targetPhase?.pending,
-              effect_possible:operation.targetPhase?.effect_possible===true,node:result.node.ref,target:result};
+              effect_possible:operation.targetPhase?.effect_possible===true||preflight?.effect_possible===true,
+              node:result.node.ref,target:result};
           }};
         }
         await remember(operation,resume?'node_apply_resume_prepared':'prepared');signal?.throwIfAborted();

@@ -32,7 +32,10 @@ export const nodeOutputPortSchema=port;
 const fileArtifact=object({artifact_id:str,destination:str,bytes:integer,sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},execution_id:str,verification_id:str,
  freshness_basis:values('explicit_replace_and_completed_native_execution','native_absence_check_and_completed_execution')});
 const output=object({status:values('not_refreshed','partial','complete'),evidence_ref:nullable(str),execution_id:str,ports:array(port),file_artifacts:{...array(fileArtifact),maxItems:1},
- verified:bool,cleanup_complete:bool,effect_possible:bool,no_output_requested:bool},['status','evidence_ref'],true);
+ verified:bool,cleanup_complete:bool,effect_possible:bool,no_output_requested:bool,
+ javascript_source:object({source_operation_id:str,source_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},
+  source_utf8_bytes:{type:'integer',minimum:0,maximum:32768},source_lf_lines:{type:'integer',minimum:1,maximum:1024},
+  settings_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},policy:values('javascript-module-v1')})},['status','evidence_ref'],true);
 const readbackColumn=object({index:integer,name:str,label:str,type:str,data_kind:str,used:bool});
 const readbackMappingField=object({index:integer,name:str,label:str,type:str,data_kind:str,source_name:str});
 const boundedFields=items=>({...array(items),maxItems:1000});

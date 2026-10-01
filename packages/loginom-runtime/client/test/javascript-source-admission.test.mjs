@@ -7,7 +7,7 @@ import {sourceFixture} from './support/javascript-source-fixture.mjs';
 const digest=text=>createHash('sha256').update(text).digest('hex');
 const original='import {InputTable} from "builtIn/Data"; const a="Сумма ё😀";';
 const owner={document_id:'document',workflow_id:'workflow',node_id:'node',operation_id:'admission',ui_epoch:1};
-function fixture({kind='existing',source=original,deadline=Date.now()+60000,chunkBytes=4096,record,secret,settingsTransition}={}) {
+function fixture({kind='existing',source=original,deadline=Date.now()+60000,chunkBytes=4096,record,secret,settingsTransition,expectedSource,expectedSettings}={}) {
  const browser=sourceFixture(source),events=[],calls=[],settings={generation:true,fields:['Value']};
  const startOwner={...owner,node_id:kind==='new'?null:'node'};
  const sourceAdapter=async boundOwner=>({
@@ -15,7 +15,7 @@ function fixture({kind='existing',source=original,deadline=Date.now()+60000,chun
   read:async held=>{calls.push('read');return {...browser.observe({context:browser.context,owner:boundOwner,epoch:1,held}),settings};},
   discard:async()=>{calls.push('close');return {closed:true,owner:boundOwner};}
  });
- const admission=createJavascriptSourceAdmission({kind,owner:startOwner,deadline,sourceAdapter,chunkBytes,settingsTransition,redactor:createRedactor(secret?[secret]:[]),record:async event=>{events.push(structuredClone(event));return record?record(event,browser):event;}});
+ const admission=createJavascriptSourceAdmission({kind,owner:startOwner,deadline,sourceAdapter,chunkBytes,settingsTransition,expectedSource,expectedSettings,redactor:createRedactor(secret?[secret]:[]),record:async event=>{events.push(structuredClone(event));return record?record(event,browser):event;}});
  return {browser,events,calls,settings,admission,owner:startOwner,deadline,sourceAdapter,
   mutate:async args=>{calls.push('mutate');browser.setSource(args.source_text);return {owner};},effect:async args=>{calls.push('effect');assert.equal(args.deadline,deadline);return {host_result:'returned'};}};
 }
@@ -135,4 +135,47 @@ test('requested source rechecks growing redactor context after mutation dispatch
  const receipt=await admission.admit({source_text:'const value="SYNTHETIC_SOURCE_VALUE";'});
  await assert.rejects(()=>admission.withMutation({receipt,owner},async()=>{calls.push('mutation');throw Error('Must not mutate');}));
  assert.deepEqual(calls,[]);assert.equal(admission.state,'retired');
+});
+
+for(const source_text of ['import "PRIVATE_SENTINEL";', 'export * from "PRIVATE_SENTINEL";',
+ 'require("PRIVATE_SENTINEL");', 'import("builtIn/Data");', 'const t=`${require("PRIVATE_SENTINEL")}`;', 'const x=;'])
+ test('unsupported requested replacement refuses before existing editor opens: '+source_text.slice(0,18),async()=>{
+  const f=fixture();
+  await assert.rejects(()=>f.admission.admit({source_text,expected_source_sha256:digest(original)}),{code:'policy'});
+  assert.deepEqual(f.calls,[]);assert.equal(f.admission.state,'retired');
+  assert.equal(JSON.stringify(f.events).includes('PRIVATE_SENTINEL'),false);
+ });
+
+const binding=()=>({source_sha256:digest(original),source_utf8_bytes:Buffer.byteLength(original),source_lf_lines:1});
+test('retained output source binding is snapshotted, canonically ordered and checked by the actual reader',async()=>{
+ const expectedSource={source_lf_lines:1,source_utf8_bytes:Buffer.byteLength(original),source_sha256:digest(original)};
+ const f=fixture({expectedSource});expectedSource.source_sha256=digest('changed');
+ const receipt=await f.admission.admit({});assert.deepEqual(receipt.expected_source_identity,binding());
+ await f.admission.withEffect(input(f,receipt),f.effect);
+ assert.equal(f.calls.filter(call=>call==='effect').length,1);
+});
+for(const mutate of [value=>value.source_sha256=digest('changed'),value=>value.source_utf8_bytes++,value=>value.source_lf_lines++])
+ test('retained source identity mismatch closes the reader and never executes '+mutate.toString(),async()=>{
+  const expectedSource=binding();mutate(expectedSource);const f=fixture({expectedSource});
+  await assert.rejects(()=>f.admission.admit({}),{code:'stale_identity'});
+  assert.equal(f.calls.at(-1),'close');assert.ok(!f.calls.includes('effect'));assert.equal(f.admission.state,'retired');
+ });
+for(const change of [value=>delete value.source_sha256,value=>value.source_utf8_bytes=32769,
+ value=>value.source_lf_lines=1025,value=>value.source_sha256='not-a-hash',value=>value.extra=true])
+ test('invalid retained source binding refuses before constructing a reader '+change.toString(),()=>{
+  const expectedSource=binding();change(expectedSource);assert.throws(()=>fixture({expectedSource}),{code:'source_binding'});
+ });
+test('a retained output binding cannot authorize a new node or bypass fresh saved source policy',async()=>{
+ assert.throws(()=>fixture({kind:'new',expectedSource:binding()}),{code:'source_binding'});
+ const source='import("builtIn/Data");',expectedSource={source_sha256:digest(source),source_utf8_bytes:Buffer.byteLength(source),source_lf_lines:1};
+ const f=fixture({source,expectedSource});await assert.rejects(()=>f.admission.admit({}),{code:'policy'});
+ assert.equal(f.calls.at(-1),'close');assert.ok(!f.calls.includes('effect'));
+});
+
+test('retained settings bind a fresh reader without authorizing any callback on drift',async()=>{
+ const f=fixture({expectedSettings:'a'.repeat(64)});
+ await assert.rejects(()=>f.admission.admit({}),error=>error.code==='effect_drift'
+  &&error.javascriptSourceClosedRefusal?.source_read_discard_verified===true);
+ assert.equal(f.calls.at(-1),'close');assert.ok(!f.calls.includes('effect'));
+ assert.throws(()=>fixture({expectedSettings:'bad'}),{code:'settings_binding'});
 });
