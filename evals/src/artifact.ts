@@ -52,6 +52,8 @@ async function copyOut(source: ArtifactSource, name: string, dest: string) {
 export async function unzip(lgp: string, dest: string) {
   await rm(dest, { recursive: true, force: true })
   const result = await Bun.$`unzip -o -q ${lgp} -d ${dest}`.quiet().nothrow()
+  if ([50, 126, 127].includes(result.exitCode) || /Permission denied|No space left on device/i.test(result.stderr.toString()))
+    throw new Error(`unzip (код ${result.exitCode}): ${result.stderr.toString().trim()}`)
   if (result.exitCode !== 0 && result.exitCode !== 1) return false
   const units = await Array.fromAsync(new Bun.Glob("Unit_*/Unit.xml").scan(dest))
   return units.length > 0
@@ -75,7 +77,7 @@ export async function fetchArtifact(input: {
     ? { origin: "receipt" as const, name: fromReceipts[fromReceipts.length - 1] ?? "", ambiguous: [] as string[] }
     : names.has(input.instructed)
       ? { origin: "instructed" as const, name: input.instructed, ambiguous: [] as string[] }
-      : scan(entries, input.since)
+      : scan(entries, input.since, input.resultPrefix)
   if (!chosen) return undefined
   await mkdir(input.outDir, { recursive: true })
   const localLgp = path.join(input.outDir, "package.lgp")
@@ -94,14 +96,15 @@ export async function fetchArtifact(input: {
     localLgp,
     unpackedDir,
     resultFiles,
+    cleanupFiles: [chosen.name, ...resultFiles].filter((name) => belongsToAttempt(name, input.resultPrefix)),
   }
 }
 export type Artifact = NonNullable<Awaited<ReturnType<typeof fetchArtifact>>>
 
-// Последний резерв: агент сохранил пакет под своим именем. Берём новейший .lgp после старта попытки.
-function scan(entries: { name: string; mtimeMs: number }[], since: number) {
+// Резервный поиск не должен выбирать пакет другого запуска или пользователя.
+function scan(entries: { name: string; mtimeMs: number }[], since: number, prefix: string) {
   const fresh = entries
-    .filter((entry) => entry.name.endsWith(".lgp") && entry.mtimeMs > since)
+    .filter((entry) => entry.name.endsWith(".lgp") && entry.mtimeMs > since && belongsToAttempt(entry.name, prefix))
     .sort((a, b) => b.mtimeMs - a.mtimeMs)
   const [first, ...rest] = fresh
   if (!first) return undefined
@@ -110,9 +113,14 @@ function scan(entries: { name: string; mtimeMs: number }[], since: number) {
 
 export async function cleanupArtifact(source: ArtifactSource, artifact: Artifact) {
   if (source.kind === "dir") return
-  const targets = [path.basename(artifact.packagePath), ...artifact.resultFiles].map(
+  const targets = artifact.cleanupFiles.map(
     (name) => `${source.storageDir}/${name}`,
   )
+  if (!targets.length) return
   const removed = await Bun.$`docker exec ${source.container} rm -f ${targets}`.quiet().nothrow()
   if (removed.exitCode !== 0) throw new Error(`docker exec rm: ${removed.stderr.toString().trim()}`)
+}
+
+function belongsToAttempt(name: string, prefix: string) {
+  return !name.includes("/") && (name.startsWith(`${prefix}.`) || name.startsWith(`${prefix}-`))
 }

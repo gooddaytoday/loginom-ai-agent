@@ -2,11 +2,11 @@ import path from "node:path"
 import { cp, mkdir } from "node:fs/promises"
 import { loadConfig, type EvalConfig } from "./config"
 import { EvalFailure } from "./fail"
-import { agentInputsHash, loadTasks, rubricHash, type Task } from "./task"
+import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs, type Task } from "./task"
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { cleanupArtifact, fetchArtifact, listStorage, parseArtifactSource, type ArtifactSource } from "./artifact"
 import { preflight } from "./preflight"
-import { assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
+import { assertAuth, ensureProfile, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
@@ -43,9 +43,8 @@ export async function main(argv: string[]) {
       }
     : undefined
   const attempts: AttemptResult[] = []
-  const state: { stopped: string | null; recovered: boolean; interruptedCleanup: { recovered: boolean } | null } = {
+  const state: { stopped: string | null; interruptedCleanup: { recovered: boolean } | null } = {
     stopped: null,
-    recovered: false,
     interruptedCleanup: null,
   }
   // Round-robin: сбой окружения размазывается по задачам, Ctrl+C после первого круга оставляет полное покрытие.
@@ -61,7 +60,7 @@ export async function main(argv: string[]) {
         runId,
         runDir,
         signal: controller.signal,
-        profileRecovered: state.recovered,
+        profileRecovered: false,
         judge: settings,
         skipJudge: config.skipJudge,
       })
@@ -77,7 +76,7 @@ export async function main(argv: string[]) {
           state.stopped = after.stop ?? "harness_error"
           break outer
         }
-        state.recovered = after.recovered
+        await Bun.write(path.join(runDir, task.id, String(attempt), "result.json"), JSON.stringify(result, null, 2))
         if (result.status === "interrupted") state.interruptedCleanup = { recovered: after.recovered }
       }
       if (result.status === "interrupted") break outer
@@ -93,13 +92,22 @@ export async function main(argv: string[]) {
     stopped_reason: state.stopped,
     agent: {
       cli_mode: config.agent.cliMode,
-      git_sha: environment.git?.sha ?? null,
-      dirty: environment.git?.dirty ?? null,
+      git_sha: config.agent.cliMode === "binary" ? environment.agent?.sourceCommit ?? null : environment.git?.sha ?? null,
+      dirty: config.agent.cliMode === "binary" ? environment.agent?.sourceDirty ?? null : environment.git?.dirty ?? null,
       model: config.agent.model,
+      variant: config.agent.variant,
+      cli_version: environment.agent?.cliVersion ?? null,
+      binary_path: environment.agent?.binaryPath ?? null,
+      binary_sha256: environment.agent?.binarySha256 ?? null,
+      source_commit: config.agent.cliMode === "binary" ? environment.agent?.sourceCommit ?? null : environment.git?.sha ?? null,
+      source_dirty: config.agent.cliMode === "binary" ? environment.agent?.sourceDirty ?? null : environment.git?.dirty ?? null,
+      source_tree_sha256: environment.agent?.sourceTreeSha256 ?? null,
     },
+    harness: { git_sha: environment.git?.sha ?? null, dirty: environment.git?.dirty ?? null },
     judge,
     dock: {
       skill_revision: environment.dock?.skillRevision ?? null,
+      skill_revisions: [...new Set(attempts.flatMap((item) => item.skill_revision ? [item.skill_revision] : []))].sort(),
       action_manifest_sha256: [...new Set(attempts.flatMap((item) => (item.action_manifest_sha256 ? [item.action_manifest_sha256] : [])))].sort(),
     },
     loginom: {
@@ -112,6 +120,8 @@ export async function main(argv: string[]) {
     task_ids: tasks.map((task) => task.id),
     config: {
       repeat: config.repeat,
+      tasks_dir: config.tasksDir,
+      task_timeout_ms: Object.fromEntries(tasks.map((task) => [task.id, taskTimeoutMs(config, task)])),
       timeout_ms: config.timeoutMs ?? config.taskTimeoutMs,
       judge_timeout_ms: config.judgeTimeoutMs,
       pass_threshold: config.passThreshold,
@@ -170,26 +180,25 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   )
   const name = `eval-${input.runId}-${task.id}-${attempt}`
   const packagePath = `/${config.loginom.username}/${name}.lgp`
-  const prompt =
-    `${task.prompt}\n\nСохрани готовый пакет как \`${packagePath}\`. ` +
-    `Если задача требует выгрузку в файл, назови его \`${name}.result.csv\`. ` +
-    "Уточняющих вопросов не задавай — принимай разумные решения самостоятельно и доведи задачу до конца."
+  const prompt = buildAgentPrompt(task.prompt, packagePath, `${name}.result.csv`)
   await Bun.write(path.join(outDir, "prompt.txt"), prompt)
   const since = Date.now()
   const run = await runAgent({
     command: input.command,
     taskId: task.id,
     model: config.agent.model,
+    variant: config.agent.variant,
+    profileDir: config.dryRun || config.agent.cliMode === "fake" ? undefined : config.profileDir,
     prompt,
     files,
     workdir,
-    timeoutMs: config.timeoutMs ?? task.timeoutMs ?? config.taskTimeoutMs,
+    timeoutMs: taskTimeoutMs(config, task),
     outDir,
     signal: input.signal,
   })
   const early = statusFor(run, false)
   const fetched =
-    early.status === "interrupted" || early.status === "harness_error"
+    early.status === "interrupted" || early.status === "harness_error" || early.status === "infra_error"
       ? undefined
       : await fetchArtifact({
           source: input.source,
@@ -210,7 +219,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
           (error: unknown) => describe(error),
         )
       : null
-  const noJudge = status === "harness_error" || status === "interrupted"
+  const noJudge = status === "harness_error" || status === "interrupted" || status === "infra_error"
   const judged =
     artifact && !noJudge && !input.signal.aborted && input.judge && !input.skipJudge
       ? await judgeTask({
@@ -234,6 +243,8 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         judge_confidence: null,
         judge_summary: null,
         checklist: null,
+        oracle_pass: !skippedJudge && task.oracle ? false : null,
+        oracle_error: !skippedJudge && task.oracle ? "Артефакт и файл результата для oracle отсутствуют" : null,
       }
   const result: AttemptResult = {
     ...base,
@@ -252,6 +263,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     artifact_ambiguous: artifact?.ambiguous ?? [],
     cleanup_error: cleanupError,
     action_manifest_sha256: run.actionManifestSha256 ?? null,
+    skill_revision: run.skillRevision ?? null,
     session_id: run.sessionId ?? null,
     errors: run.errors,
     stderr_head: run.stderrHead.trim() ? run.stderrHead : null,
@@ -271,16 +283,21 @@ async function prepareProfile(config: EvalConfig, command: AgentCommand) {
   await ensureProfile(config, command)
   await assertAuth(config, command)
   await recoverIfNeeded(command, 2)
+  await pruneRuntimeAttempts(config.profileDir)
 }
 
-async function afterAttempt(config: EvalConfig, command: AgentCommand, result: AttemptResult) {
+export async function afterAttempt(config: EvalConfig, command: AgentCommand, result: AttemptResult) {
   if (result.timed_out || result.interrupted) {
     if (!(await waitProfileIdle(config.profileDir)))
       return { stop: `Процессы профиля ${config.profileDir} не завершились за 60 с` }
-    await releaseStaleWriter(config.profileDir)
   }
+  const released = result.exit_code !== 0 || result.timed_out || result.interrupted
+    ? await releaseStaleWriter(config.profileDir)
+    : false
   const recovery = await recoverIfNeeded(command, 1)
-  return { recovered: recovery.recovered }
+  result.profile_recovered = released || recovery.recovered
+  await pruneRuntimeAttempts(config.profileDir)
+  return { recovered: result.profile_recovered }
 }
 
 export function installSigint(controller: AbortController) {
@@ -357,6 +374,9 @@ function emptyResult(taskId: string, attempt: number, profileRecovered: boolean)
     errors: [],
     harness_error: null,
     stderr_head: null,
+    skill_revision: null,
+    oracle_pass: null,
+    oracle_error: null,
   }
 }
 

@@ -8,6 +8,16 @@ import { evalsRoot, loadConfig } from "../src/config"
 const fixture = (name: string) => Bun.file(path.join(evalsRoot, "fixtures", name)).text()
 const fakeCommand = () => agentCommand(loadConfig(["--dry-run"], {}))
 
+test("parseEvents: квитанция сохранения читается из последовательности JSON-документов", () => {
+  const output = '{"output":{"package_ref":{"path":"/user/eval-run-task-1.lgp"}}}\n{"status":"ok"}\n{"trace":{"note":"literal } and \\\" quote"}}'
+  const parsed = parseEvents(JSON.stringify({ type: "tool_use", part: {
+    type: "tool", tool: "loginom_dock_action_run", state: {
+      status: "completed", input: { action_key: "package.save_as" }, output,
+    },
+  } }))
+  expect(parsed.saveReceipts).toEqual(["/user/eval-run-task-1.lgp"])
+})
+
 test("parseEvents: сессия, квитанция сохранения, узлы, текст, стоимость", async () => {
   const parsed = parseEvents(await fixture("fake/group-sum-qty.jsonl"))
   expect(parsed.sessionId).toBe("ses_fixture01")
@@ -107,6 +117,17 @@ test("runAgent: fake CLI — события на диске, квитанция,
   expect(run.durationMs).toBeGreaterThanOrEqual(0)
 })
 
+test("runAgent: явно передаёт выбранный reasoning variant", async () => {
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-variant-"))
+  const command = fakeCommand()
+  const argsFile = path.join(outDir, "args.json")
+  await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_ARGS_FILE: argsFile } },
+    taskId: "group-sum-qty", model: "fake/model", variant: "low", prompt: "test", files: [],
+    workdir: outDir, timeoutMs: 30_000, outDir, profileDir: outDir })
+  const args = await Bun.file(argsFile).json()
+  expect(args.slice(args.indexOf("--variant"), args.indexOf("--variant") + 2)).toEqual(["--variant", "low"])
+})
+
 test("runAgent: код выхода 1 и failureKind=tool из фикстуры", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-run-"))
   const run = await runAgent({
@@ -121,6 +142,41 @@ test("runAgent: код выхода 1 и failureKind=tool из фикстуры"
   })
   expect(run.exitCode).toBe(1)
   expect(run.failureKind).toBe("tool")
+})
+
+test("runAgent: после exit 1 завершает дочерний host без пути профиля в argv", async () => {
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-orphan-"))
+  const command = fakeCommand()
+  const pidFile = path.join(outDir, "child.pid")
+  try {
+    const run = await runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_ORPHAN_PID_FILE: pidFile } },
+      taskId: "filter-active-rows", model: "fake/model", prompt: "test", files: [],
+      workdir: outDir, timeoutMs: 30_000, outDir })
+    const pid = Number(await Bun.file(pidFile).text())
+    const state = (await Bun.$`ps -o stat= -p ${pid}`.quiet().nothrow()).text().trim()
+    expect(run.exitCode).toBe(1)
+    expect(state === "" || state.startsWith("Z")).toBe(true)
+  } finally {
+    if (await Bun.file(pidFile).exists()) {
+      const pid = Number(await Bun.file(pidFile).text())
+      try { process.kill(pid, "SIGKILL") } catch {}
+    }
+  }
+}, 15_000)
+
+test("runAgent: регистрирует активную группу профиля и снимает запись после cleanup", async () => {
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-group-record-"))
+  const command = fakeCommand()
+  const marker = `${outDir}.process-group`
+  const running = runAgent({ command: { ...command, env: { ...command.env,
+    LOGINOM_AI_AGENT_CLI_PROFILE: outDir, EVAL_FAKE_SLEEP_MS: "300" } },
+    taskId: "group-sum-qty", model: "fake/model", prompt: "test", files: [],
+    workdir: outDir, timeoutMs: 30_000, outDir, profileDir: outDir })
+  try {
+    for (let index = 0; index < 10 && !(await Bun.file(marker).exists()); index++) await Bun.sleep(10)
+    expect(await Bun.file(marker).exists()).toBe(true)
+  } finally { await running }
+  expect(await Bun.file(marker).exists()).toBe(false)
 })
 
 test("runAgent: таймаут останавливает процесс и помечает timedOut", async () => {
@@ -179,3 +235,22 @@ test("runAgent: abort через AbortSignal помечает interrupted", asyn
   expect(run.interrupted).toBe(true)
   expect(run.timedOut).toBe(false)
 }, 15_000)
+
+test("parseEvents: записывает ревизию skill из квитанции сессии", () => {
+  const parsed = parseEvents(JSON.stringify({ type: "tool_use", part: {
+    type: "tool", tool: "loginom_dock_prepare", state: { status: "completed",
+      output: '{"prepared":true,"skillRevision":"session-revision"}\n{"status":"ok"}' },
+  } }))
+  expect(parsed.skillRevision).toBe("session-revision")
+})
+
+test("runAgent: завершившийся CLI не становится timeout во время cleanup host", async () => {
+  const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-cleanup-budget-"))
+  const command = fakeCommand()
+  const run = await runAgent({ command: { ...command, env: { ...command.env,
+    EVAL_FAKE_ORPHAN_PID_FILE: path.join(outDir, "child.pid"), EVAL_FAKE_CHILD_DELAY_MS: "800" } },
+    taskId: "group-sum-qty", model: "fake/model", prompt: "test", files: [],
+    workdir: outDir, timeoutMs: 500, outDir })
+  expect(run.exitCode).toBe(0)
+  expect(run.timedOut).toBe(false)
+})

@@ -1,13 +1,38 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdtemp } from "node:fs/promises"
+import { mkdtemp, mkdir, symlink, rm } from "node:fs/promises"
 import os from "node:os"
 import { evalsRoot, loadConfig } from "../src/config"
 import { parseArtifactSource } from "../src/artifact"
 import { EvalFailure } from "../src/fail"
-import { checkStorage, dockSkillRevision, preflight } from "../src/preflight"
+import { agentInfo, checkFreeSpace, checkStorage, dockSkillRevision, preflight } from "../src/preflight"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test("agentInfo: binary идентифицируется по реальному файлу и манифесту сборки", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-agent-identity-"))
+  try {
+    const binary = path.join(dir, "release", "bin", "loginom-ai-agent-cli")
+    await mkdir(path.dirname(binary), { recursive: true })
+    await Bun.write(binary, "abc")
+    await Bun.write(path.join(dir, "release", "cli-manifest.json"), JSON.stringify({
+      metadata: { version: "0.1.17", sourceCommit: "a".repeat(40), sourceDirty: false, sourceTreeSha256: "b".repeat(64) },
+    }))
+    await symlink(binary, path.join(dir, "current-cli"))
+    const config = loadConfig(["--skip-judge"], {
+      LOGINOM_DOCK_API_KEY: "k", EVAL_AGENT_MODEL: "m/x", EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: path.join(dir, "current-cli"),
+    })
+    expect(await agentInfo(config)).toEqual({
+      cliVersion: "0.1.17", binaryPath: binary,
+      binarySha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      sourceCommit: "a".repeat(40), sourceDirty: false, sourceTreeSha256: "b".repeat(64),
+    })
+    await Bun.write(binary, "abcd")
+    expect((await agentInfo(config)).binarySha256).not.toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
 
 test("preflight: dry-run проверяет только фикстуры и читает git", async () => {
   const config = loadConfig(["--dry-run"], {})
@@ -34,6 +59,20 @@ test("checkStorage: существующий dir: проходит, отсутс
   expect(rejected).toBeInstanceOf(EvalFailure)
   expect((rejected as EvalFailure).exitCode).toBe(2)
   expect((rejected as EvalFailure).message).toContain("Хранилище Loginom недоступно")
+})
+
+test("checkFreeSpace: проверяет реальное свободное место перед прогоном", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-free-space-"))
+  try {
+    await expect(checkFreeSpace(dir)).resolves.toBeUndefined()
+    const error = await checkFreeSpace(dir, Number.MAX_SAFE_INTEGER).catch((error: unknown) => error)
+    expect(error).toBeInstanceOf(EvalFailure)
+    expect((error as EvalFailure).exitCode).toBe(2)
+    expect((error as EvalFailure).message).toContain("Недостаточно свободного места")
+    expect((error as EvalFailure).message).toContain(dir)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
 
 test("preflight: недоступный судья — EvalFailure", async () => {

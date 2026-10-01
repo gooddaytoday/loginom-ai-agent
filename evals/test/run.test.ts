@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test"
 import os from "node:os"
 import path from "node:path"
-import { cp, mkdtemp, readdir, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
 import { parseArtifactSource } from "../src/artifact"
 import { agentCommand } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
-import { main, redact, runAttempt, stamp } from "../src/run"
+import { afterAttempt, main, redact, runAttempt, stamp } from "../src/run"
 import type { RunSummary } from "../src/report"
 import { loadTasks } from "../src/task"
 
@@ -122,7 +122,8 @@ test("runAttempt: ошибка артефакта сохраняет телем�
       signal: new AbortController().signal,
       profileRecovered: false,
       skipJudge: true,
-    })
+})
+
     expect(result.status).toBe("harness_error")
     expect(result.harness_error).toMatch(/ENOENT|\/nonexistent\/xyz/)
     expect(result.cost).toBeGreaterThan(0)
@@ -231,3 +232,78 @@ test("runAttempt: с судьёй completed получает score и judge_stat
     await rm(runDir, { recursive: true, force: true })
   }
 }, 60_000)
+
+
+test("runAttempt: стартовый timeout host сохраняется без score и поиска артефакта", async () => {
+  const config = loadConfig(["--dry-run"], {})
+  const [task] = await loadTasks(config.tasksDir, ["group-sum-qty"])
+  const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-infra-"))
+  try {
+    const { result } = await runAttempt({ config, command: agentCommand(config),
+      source: { kind: "dir", dir: "/nonexistent/infra" }, task: { ...task!, id: "host-timeout" },
+      attempt: 1, runId: "infra", runDir, signal: new AbortController().signal,
+      profileRecovered: false, skipJudge: false })
+    expect(result).toMatchObject({ status: "infra_error", session_id: null,
+      score: null, pass: null, judge_status: "skipped", stderr_head: "LOGINOM_HOST_TIMEOUT\n" })
+    expect(await Bun.file(path.join(runDir, "host-timeout", "1", "result.json")).exists()).toBe(true)
+  } finally { await rm(runDir, { recursive: true, force: true }) }
+})
+
+test("afterAttempt: exit 1 со stale writer восстанавливает профиль до следующей попытки", async () => {
+  const profileDir = await mkdtemp(path.join(os.tmpdir(), "evals-stale-"))
+  const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-stale-run-"))
+  const config = { ...loadConfig(["--dry-run"], {}), profileDir }
+  const command = agentCommand(config)
+  const [task] = await loadTasks(config.tasksDir, ["group-sum-qty"])
+  try {
+    const { result } = await runAttempt({ config, command,
+      source: { kind: "dir", dir: "/nonexistent/infra" }, task: { ...task!, id: "host-timeout" },
+      attempt: 1, runId: "infra", runDir, signal: new AbortController().signal,
+      profileRecovered: false, skipJudge: false })
+    await mkdir(path.join(profileDir, ".writer"))
+    await Bun.write(path.join(profileDir, ".writer", "owner"), "stale")
+    const diagnostic = path.join(profileDir, "loginom", "runtime", "generations", "1", "chats", "old", "attempts", "one", "execution-events.jsonl")
+    await Bun.write(diagnostic, "diagnostic")
+    const recovery = await afterAttempt(config, { ...command, env: { ...command.env, EVAL_FAKE_ENFORCE_WRITER: "1" } }, result)
+    expect(recovery).toMatchObject({ recovered: true })
+    expect(result.profile_recovered).toBe(true)
+    expect(await Bun.file(path.join(profileDir, ".writer", "owner")).exists()).toBe(false)
+    expect(await Bun.file(diagnostic).exists()).toBe(false)
+  } finally {
+    await rm(profileDir, { recursive: true, force: true })
+    await rm(runDir, { recursive: true, force: true })
+  }
+})
+
+test("main: summary фиксирует переданный variant и эффективный лимит задачи", async () => {
+  const tasksDir = await mkdtemp(path.join(os.tmpdir(), "evals-metadata-"))
+  let runDir: string | undefined
+  try {
+    await cp(path.join(evalsRoot, "tasks", "group-sum-qty"), path.join(tasksDir, "group-sum-qty"), { recursive: true })
+    const file = path.join(tasksDir, "group-sum-qty", "task.json")
+    await Bun.write(file, JSON.stringify({ ...await Bun.file(file).json(), timeout_ms: 123456 }))
+    const run = await main(["--dry-run", "--tasks", tasksDir])
+    runDir = run.runDir
+    const summary = await Bun.file(path.join(runDir, "summary.json")).json()
+    expect(summary.agent.variant).toBe(loadConfig(["--dry-run"]).agent.variant)
+    expect(summary.config.task_timeout_ms).toEqual({ "group-sum-qty": 123456 })
+    expect(summary.config.tasks_dir).toBe(tasksDir)
+    expect(summary.harness.git_sha).toBeDefined()
+  } finally {
+    if (runDir) await rm(runDir, { recursive: true, force: true })
+    await rm(tasksDir, { recursive: true, force: true })
+  }
+})
+
+test("runAttempt: отсутствие артефакта проваливает обязательную oracle-ось", async () => {
+  const config = loadConfig(["--dry-run"], {})
+  const [task] = await loadTasks(config.tasksDir, ["calc-data-double"])
+  const runDir = await mkdtemp(path.join(os.tmpdir(), "evals-missing-oracle-"))
+  try {
+    const { result } = await runAttempt({ config, command: agentCommand(config),
+      source: parseArtifactSource(config.artifactSource, config.loginom), task: { ...task!, oracle: "oracle.csv" },
+      attempt: 1, runId: "missing-oracle", runDir, signal: new AbortController().signal,
+      profileRecovered: false, skipJudge: false })
+    expect(result).toMatchObject({ status: "no_artifact", oracle_pass: false, pass: false })
+  } finally { await rm(runDir, { recursive: true, force: true }) }
+})

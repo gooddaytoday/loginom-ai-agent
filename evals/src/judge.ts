@@ -6,6 +6,7 @@ import type { ChecklistItem, Task } from "./task"
 import type { AgentRun } from "./cli"
 import { unzip } from "./artifact"
 import { EvalFailure } from "./fail"
+import { checkOracle } from "./oracle"
 
 export const judgePromptFile = path.join(evalsRoot, "src", "judge-prompt.md")
 export const verdictSchemaFile = path.join(evalsRoot, "src", "verdict.schema.json")
@@ -57,7 +58,8 @@ export function scoreVerdict(checklist: ChecklistItem[], verdict: Verdict, thres
     0,
   )
   const score = Math.round((100 * passed) / total)
-  return { ok: true as const, score, pass: score >= threshold, items }
+  const requiredPassed = checklist.every((item) => !(item.required || item.requiresResultFile) || items.find((answer) => answer.id === item.id)?.passed)
+  return { ok: true as const, score, pass: score >= threshold && requiredPassed, items }
 }
 
 function parseJson(text: string): unknown {
@@ -76,6 +78,7 @@ export async function judgeInfo(config: EvalConfig) {
     model: config.judge.model,
     reasoning: config.judge.reasoning,
     prompt_sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(judgePromptFile).bytes()).digest("hex"),
+    schema_sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(verdictSchemaFile).bytes()).digest("hex"),
   }
 }
 export type JudgeInfo = Awaited<ReturnType<typeof judgeInfo>>
@@ -163,14 +166,16 @@ export async function judgeTask(input: {
   checklist?: ChecklistItem[]
 }) {
   const checklist = input.checklist ?? input.task.checklist
+  const checked = input.run ? await checkOracle(input.task, input.artifactDir) : { passed: null, error: null }
+  const oracle = { oracle_pass: checked.passed, oracle_error: checked.error }
   await prepareJudgeDir({ ...input, dir: input.outDir, checklist })
   const first = await invoke(input, checklist, 1)
-  if (first.ok) return { ...first, attempts: 1 as const }
-  if (input.signal?.aborted) return { ok: false as const, error: first.error, attempts: 1 as const }
+  if (first.ok) return { ...first, pass: first.pass && checked.passed !== false, ...oracle, attempts: 1 as const }
+  if (input.signal?.aborted) return { ok: false as const, error: first.error, ...oracle, attempts: 1 as const }
   const second = await invoke(input, checklist, 2)
   return second.ok
-    ? { ...second, attempts: 2 as const }
-    : { ok: false as const, error: `${first.error}; повтор: ${second.error}`, attempts: 2 as const }
+    ? { ...second, pass: second.pass && checked.passed !== false, ...oracle, attempts: 2 as const }
+    : { ok: false as const, error: `${first.error}; повтор: ${second.error}`, ...oracle, attempts: 2 as const }
 }
 export type Judged = Awaited<ReturnType<typeof judgeTask>> | { ok: false; error: string; attempts: 0 }
 
@@ -184,6 +189,8 @@ export function judgedFields(judged: Judged) {
       judge_confidence: judged.verdict.confidence,
       judge_summary: judged.verdict.summary,
       checklist: judged.items,
+      oracle_pass: judged.oracle_pass,
+      oracle_error: judged.oracle_error,
     }
   return {
     score: null,
@@ -193,6 +200,8 @@ export function judgedFields(judged: Judged) {
     judge_confidence: null,
     judge_summary: judged.error,
     checklist: null,
+    oracle_pass: "oracle_pass" in judged ? judged.oracle_pass : null,
+    oracle_error: "oracle_error" in judged ? judged.oracle_error : null,
   }
 }
 

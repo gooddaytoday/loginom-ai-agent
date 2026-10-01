@@ -3,7 +3,13 @@ import path from "node:path"
 const [command, sub] = Bun.argv.slice(2)
 const fixtures = path.join(import.meta.dir, "fake")
 
+if (process.env.EVAL_FAKE_ARGS_FILE) await Bun.write(process.env.EVAL_FAKE_ARGS_FILE, JSON.stringify(Bun.argv.slice(2)))
+
 if (command === "loginom") {
+  if (process.env.EVAL_FAKE_ENFORCE_WRITER && await Bun.file(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE!, ".writer", "owner")).exists()) {
+    process.stderr.write("PROFILE_BUSY\n")
+    process.exit(3)
+  }
   // Management-команды: состояние читается из файла, recover снимает recoveries.
   const stateFile = process.env.EVAL_FAKE_STATE_FILE
   const view = stateFile
@@ -28,9 +34,21 @@ if (command === "loginom") {
 }
 
 if (process.env.EVAL_FAKE_SLEEP_MS) await Bun.sleep(Number(process.env.EVAL_FAKE_SLEEP_MS))
+if (process.env.EVAL_FAKE_ORPHAN_PID_FILE) {
+  const delayed = process.env.EVAL_FAKE_CHILD_DELAY_MS
+  const child = Bun.spawn([process.execPath, "-e", delayed
+    ? `process.on('SIGTERM', () => {}); process.stdout.write('ready'); setTimeout(() => process.exit(0), ${Number(delayed)})`
+    : "setInterval(() => {}, 1000)"], {
+    env: { PATH: process.env.PATH ?? "" }, stdin: "ignore", stdout: "pipe", stderr: "ignore",
+  })
+  if (delayed) await child.stdout.getReader().read()
+  await Bun.write(process.env.EVAL_FAKE_ORPHAN_PID_FILE, String(child.pid))
+}
 const id = process.env.EVAL_TASK_ID ?? "default"
 const events = Bun.file(path.join(fixtures, `${id}.jsonl`))
 const chosen = (await events.exists()) ? events : Bun.file(path.join(fixtures, "default.jsonl"))
 process.stdout.write(await chosen.text())
 const exit = Bun.file(path.join(fixtures, `${id}.exit`))
+const stderr = Bun.file(path.join(fixtures, `${id}.stderr`))
+if (await stderr.exists()) process.stderr.write(await stderr.text())
 process.exit((await exit.exists()) ? Number((await exit.text()).trim()) : 0)

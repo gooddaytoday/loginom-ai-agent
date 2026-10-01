@@ -1,17 +1,24 @@
 import { rename } from "node:fs/promises"
 import path from "node:path"
 
-export type Status = "completed" | "failed" | "timeout" | "interrupted" | "no_artifact" | "harness_error"
+export type Status = "completed" | "failed" | "timeout" | "interrupted" | "no_artifact" | "harness_error" | "infra_error"
 export type JudgeStatus = "scored" | "no_artifact" | "skipped" | "error"
 export type FailureKind = "permission" | "recovery" | "cancelled" | "provider" | "tool" | "other"
 
 export function statusFor(
-  run: { exitCode: number | null; timedOut: boolean; interrupted: boolean },
+  run: {
+    exitCode: number | null; timedOut: boolean; interrupted: boolean
+    sessionId?: string; tokens?: { input: number; output: number; reasoning: number }
+    counters?: { toolCalls: number }; stderrHead?: string
+  },
   hasArtifact: boolean,
 ): { status: Status; stop: boolean } {
   if (run.interrupted) return { status: "interrupted", stop: true }
   if (run.timedOut) return { status: "timeout", stop: false }
   if (run.exitCode === 0) return { status: hasArtifact ? "completed" : "no_artifact", stop: false }
+  if (!run.sessionId && run.counters?.toolCalls === 0 && run.tokens?.input === 0 && run.tokens.output === 0 && run.tokens.reasoning === 0 &&
+    /\b(?:LOGINOM_HOST_(?:TIMEOUT|CLOSED|NOT_READY|REQUEST_FAILED)|LOGINOM_CONNECTION_NOT_READY|PROFILE_BUSY)\b/.test(run.stderrHead ?? ""))
+    return { status: "infra_error", stop: false }
   // Коды 2/3 — конфигурация или профиль: следующие попытки получили бы то же самое.
   if (run.exitCode === 2 || run.exitCode === 3) return { status: "harness_error", stop: true }
   return { status: "failed", stop: false }
@@ -27,6 +34,8 @@ export type AttemptResult = {
   failure_kind: FailureKind | null
   score: number | null
   pass: boolean | null
+  oracle_pass?: boolean | null
+  oracle_error?: string | null
   judge_status: JudgeStatus
   judge_attempts: number
   judge_confidence: string | null
@@ -41,6 +50,7 @@ export type AttemptResult = {
   artifact_ambiguous: string[]
   cleanup_error: string | null
   action_manifest_sha256: string | null
+  skill_revision?: string | null
   session_id: string | null
   profile_recovered: boolean
   errors: string[]
@@ -54,20 +64,29 @@ const mean = (values: number[]) =>
 const scoresOf = (list: AttemptResult[]) => list.flatMap((item) => (typeof item.score === "number" ? [item.score] : []))
 
 export function aggregate(attempts: AttemptResult[], skipJudge: boolean) {
-  const counted = attempts.filter((item) => item.status !== "interrupted")
+  const spent = attempts.filter((item) => item.status !== "interrupted")
+  const counted = spent.filter((item) => item.status !== "harness_error" && item.status !== "infra_error")
   const total = counted.length
   const completed = counted.filter((item) => item.status === "completed")
   const scored = counted.filter((item) => typeof item.score === "number")
-  const sum = (pick: (item: AttemptResult) => number) => counted.reduce((acc, item) => acc + pick(item), 0)
+  const evaluated = counted.filter((item) => item.pass !== null)
+  const oracleChecked = counted.filter((item) => typeof item.oracle_pass === "boolean")
+  const sum = (pick: (item: AttemptResult) => number) => spent.reduce((acc, item) => acc + pick(item), 0)
   return {
     total,
     completed: completed.length,
-    completion_rate: total ? round(completed.length / total, 3) : 0,
+    completion_rate: total ? round(completed.length / total, 3) : null,
     mean_score: skipJudge ? null : mean(scoresOf(scored)),
     mean_score_completed: skipJudge ? null : mean(scoresOf(completed)),
-    pass_rate: skipJudge ? null : total ? round(counted.filter((item) => item.pass === true).length / total, 3) : 0,
+    pass_rate: skipJudge || !evaluated.length ? null : round(evaluated.filter((item) => item.pass === true).length / evaluated.length, 3),
+    pass_evaluated_count: evaluated.length,
+    oracle_checked_count: oracleChecked.length,
+    oracle_pass_rate: oracleChecked.length ? round(oracleChecked.filter((item) => item.oracle_pass).length / oracleChecked.length, 3) : null,
     scored_count: scored.length,
     excluded_count: total - scored.length,
+    harness_error_count: spent.filter((item) => item.status === "harness_error").length,
+    infra_error_count: spent.filter((item) => item.status === "infra_error").length,
+    judge_error_count: counted.filter((item) => item.judge_status === "error").length,
     failure_kinds: counted.reduce<Record<string, number>>(
       (acc, item) => (item.failure_kind ? { ...acc, [item.failure_kind]: (acc[item.failure_kind] ?? 0) + 1 } : acc),
       {},
@@ -83,7 +102,7 @@ export type Metrics = ReturnType<typeof aggregate>
 
 export function aggregateTask(attempts: AttemptResult[], skipJudge: boolean) {
   const base = aggregate(attempts, skipJudge)
-  const scores = scoresOf(attempts.filter((item) => item.status !== "interrupted"))
+  const scores = scoresOf(attempts.filter((item) => item.status !== "interrupted" && item.status !== "harness_error" && item.status !== "infra_error"))
   return {
     attempts: base.total,
     completed: base.completed,
@@ -92,6 +111,8 @@ export function aggregateTask(attempts: AttemptResult[], skipJudge: boolean) {
     min_score: scores.length ? Math.min(...scores) : null,
     max_score: scores.length ? Math.max(...scores) : null,
     pass_rate: base.pass_rate,
+    oracle_checked_count: base.oracle_checked_count,
+    oracle_pass_rate: base.oracle_pass_rate,
   }
 }
 export type TaskMetrics = ReturnType<typeof aggregateTask>
@@ -104,14 +125,22 @@ export type RunSummary = {
   interrupted: boolean
   interrupted_cleanup: { recovered: boolean } | null
   stopped_reason: string | null
-  agent: { cli_mode: string; git_sha: string | null; dirty: boolean | null; model: string }
-  judge: { backend: "codex"; codex_version: string | null; model: string; reasoning: string; prompt_sha256: string } | null
-  dock: { skill_revision: string | null; action_manifest_sha256: string[] }
+  agent: {
+    cli_mode: string; git_sha: string | null; dirty: boolean | null; model: string
+    variant?: string; cli_version?: string | null; binary_path?: string | null; binary_sha256?: string | null
+    source_commit?: string | null; source_dirty?: boolean | null; source_tree_sha256?: string | null
+  }
+  harness?: { git_sha: string | null; dirty: boolean | null }
+  judge: { backend: "codex"; codex_version: string | null; model: string; reasoning: string; prompt_sha256: string; schema_sha256?: string } | null
+  dock: { skill_revision: string | null; skill_revisions?: string[]; action_manifest_sha256: string[] }
   loginom: { image_digest: string | null; container: string | null; storage_dir: string | null }
   agent_inputs_hash: string
   rubric_hash: string
   task_ids: string[]
-  config: { repeat: number; timeout_ms: number; judge_timeout_ms: number; pass_threshold: number; keep_storage: boolean }
+  config: {
+    repeat: number; timeout_ms: number; judge_timeout_ms: number; pass_threshold: number; keep_storage: boolean
+    tasks_dir?: string; task_timeout_ms?: Record<string, number>
+  }
   metrics: Metrics
   tasks: { id: string; metrics: TaskMetrics; attempts: AttemptResult[] }[]
   storage_leftovers: string[] | null
@@ -133,7 +162,7 @@ export function renderReport(summary: RunSummary) {
   const head = [
     `# Eval ${summary.run_id}${summary.label ? ` (${summary.label})` : ""}`,
     "",
-    `Агент: ${summary.agent.model} · ${summary.agent.cli_mode} · git ${summary.agent.git_sha ?? "nogit"}${summary.agent.dirty ? "-dirty" : ""}. Судья: ${summary.judge ? `${summary.judge.model}/${summary.judge.reasoning}` : "пропущен"}. Повторов: ${summary.config.repeat}.`,
+    `Агент: ${summary.agent.model} · ${summary.agent.cli_mode} · CLI ${summary.agent.cli_version ?? "неизвестен"} · variant ${summary.agent.variant ?? "неизвестен"} · source ${summary.agent.source_commit ?? (summary.agent.cli_mode === "source" ? summary.agent.git_sha : null) ?? "неизвестен"}${summary.agent.source_dirty ? "-dirty" : ""} · binary sha256 ${summary.agent.binary_sha256 ?? "—"}. Судья: ${summary.judge ? `${summary.judge.model}/${summary.judge.reasoning}` : "пропущен"}. Повторов: ${summary.config.repeat}.`,
     summary.interrupted ? "**Прогон прерван (Ctrl+C): метрики по завершённым попыткам.**" : "",
     summary.stopped_reason ? `**Прогон остановлен: ${cell(summary.stopped_reason)}**` : "",
     "",
@@ -142,7 +171,9 @@ export function renderReport(summary: RunSummary) {
     `- completion_rate: ${pct(m.completion_rate)} (${m.completed}/${m.total})`,
     `- mean_score: ${fmt(m.mean_score)} (scored ${m.scored_count}, excluded ${m.excluded_count})`,
     `- mean_score_completed: ${fmt(m.mean_score_completed)}`,
-    `- pass_rate: ${pct(m.pass_rate)}`,
+    `- pass_rate: ${pct(m.pass_rate)} (оценено ${m.pass_evaluated_count ?? m.scored_count})`,
+    `- oracle_pass_rate: ${pct(m.oracle_pass_rate ?? null)} (проверено ${m.oracle_checked_count ?? 0})`,
+    `- infra_error: ${m.infra_error_count ?? 0}, harness_error: ${m.harness_error_count ?? 0}, judge_error: ${m.judge_error_count ?? 0}`,
     `- failure_kinds: ${Object.entries(m.failure_kinds).map(([kind, count]) => `${kind}=${count}`).join(", ") || "—"}`,
     `- tool_calls: ${m.tool_calls}, tool_errors: ${m.tool_errors}, memory_tool_calls: ${m.memory_tool_calls}${m.memory_tool_calls > 0 ? " **(агент писал в память Dock)**" : ""}`,
     `- total_cost: ${m.total_cost}, total_duration: ${Math.round(m.total_duration_ms / 60000)} мин`,
@@ -158,12 +189,12 @@ export function renderReport(summary: RunSummary) {
     "",
     "## Попытки",
     "",
-    "| Задача | # | Статус | Код | failure_kind | score | pass | Время | Стоимость | Судья |",
-    "|---|---|---|---|---|---|---|---|---|---|",
+    "| Задача | # | Статус | Код | failure_kind | score | pass | oracle | Время | Стоимость | Судья |",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
     ...summary.tasks.flatMap((task) =>
       task.attempts.map(
         (item) =>
-          `| ${task.id} | ${item.attempt} | ${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${cell(item.judge_summary ?? item.judge_status)} |`,
+          `| ${task.id} | ${item.attempt} | ${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${item.oracle_pass === undefined || item.oracle_pass === null ? "—" : item.oracle_pass ? "✓" : `✗ ${cell(item.oracle_error ?? "")}`} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${cell(item.judge_summary ?? item.judge_status)} |`,
       ),
     ),
   ]

@@ -1,6 +1,9 @@
 import path from "node:path"
+import { spawn } from "node:child_process"
+import { rm, writeFile } from "node:fs/promises"
 import type { EvalConfig } from "./config"
 import { evalsRoot, repoRoot } from "./config"
+import { signalGroup, stopGroup } from "./process-group"
 
 const saveActions = new Set(["package.save_as", "package.save_checkpoint"])
 const nodeTools = new Set(["loginom_dock_node_apply", "loginom_dock_node_resume", "loginom_dock_node_wait"])
@@ -37,13 +40,14 @@ export function parseEvents(text: string) {
         saveActions.has(String(part.state?.input?.action_key)),
     )
     .flatMap((part) => {
-      const found = packagePath(parseJson(part.state?.output ?? ""))
+      const found = packagePath(firstJsonObject(part.state?.output ?? ""))
       return found ? [found] : []
     })
   const receipts = truncateReceipts(
     tools.filter((part) => nodeTools.has(part.tool ?? "") && completed(part)).map((part) => part.state?.output ?? ""),
   )
   const prepare = tools.find((part) => part.tool === "loginom_dock_prepare" && completed(part))
+  const preparation = firstJsonObject(prepare?.state?.output ?? "") as { skillRevision?: unknown } | undefined
   const errorEvents = events.filter((event) => event.type === "error")
   const steps = events.filter((event) => event.type === "step_finish").map((event) => event.part)
   const sum = (pick: (part: Part | undefined) => number | undefined) =>
@@ -54,6 +58,7 @@ export function parseEvents(text: string) {
     nodeReceipts: receipts.kept,
     nodeReceiptsDropped: receipts.dropped,
     actionManifestSha256: prepare?.state?.output?.match(/"manifest_sha256":"([0-9a-f]{64})"/)?.[1],
+    skillRevision: typeof preparation?.skillRevision === "string" ? preparation.skillRevision : undefined,
     finalText: events.filter((event) => event.type === "text").at(-1)?.part?.text,
     cost: sum((part) => part?.cost),
     tokens: {
@@ -120,11 +125,13 @@ export async function runAgent(input: {
   command: AgentCommand
   taskId: string
   model: string
+  variant?: string
   prompt: string
   files: string[]
   workdir: string
   timeoutMs: number
   outDir: string
+  profileDir?: string
   signal?: AbortSignal
 }) {
   const args = [
@@ -134,6 +141,8 @@ export async function runAgent(input: {
     "json",
     "--model",
     input.model,
+    "--variant",
+    input.variant ?? "default",
     ...input.files.flatMap((file) => ["--file", file]),
     "--dir",
     input.workdir,
@@ -156,38 +165,58 @@ export async function runAgent(input: {
     await Bun.write(path.join(input.outDir, "run.json"), JSON.stringify(run, null, 2))
     return run
   }
-  const proc = Bun.spawn([...input.command.cmd, ...args], {
+  const proc = spawn(input.command.cmd[0]!, [...input.command.cmd.slice(1), ...args], {
     cwd: input.command.cwd,
     env: { ...input.command.env, EVAL_TASK_ID: input.taskId },
-    stdin: "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
+    detached: true,
+    stdio: ["ignore", "pipe", "pipe"],
+  })
+  const exited = new Promise<number>((resolve, reject) => {
+    proc.once("error", reject)
+    proc.once("exit", (code) => resolve(code ?? -1))
+  })
+  const registered = input.profileDir && proc.pid
+    ? writeFile(`${input.profileDir}.process-group`, String(proc.pid), { flag: "wx", mode: 0o600 }).then(() => `${input.profileDir}.process-group`)
+    : Promise.resolve(undefined)
+  // Host не содержит путь профиля в argv. Его завершение доказываем по группе CLI.
+  const cleaned = Promise.all([exited, registered]).finally(async () => {
+    if (proc.pid) await stopGroup(proc.pid)
+    const marker = await registered.catch(() => undefined)
+    if (marker) await rm(marker, { force: true })
   })
   const stop = { timedOut: false, interrupted: false, terminating: false }
   // SIGINT даёт CLI шанс на штатный cleanup (host, Chromium, .writer); SIGKILL — страховка.
   const terminate = () => {
     if (stop.terminating) return
     stop.terminating = true
-    proc.kill("SIGINT")
-    const hard = setTimeout(() => proc.kill("SIGKILL"), 30_000)
-    void proc.exited.then(() => clearTimeout(hard))
+    if (!proc.pid) return
+    signalGroup(proc.pid, "SIGINT")
+    const hard = setTimeout(() => { if (proc.pid) signalGroup(proc.pid, "SIGKILL") }, 30_000)
+    void cleaned.then(() => clearTimeout(hard), () => clearTimeout(hard))
   }
   const timer = setTimeout(() => {
     stop.timedOut = true
     terminate()
   }, input.timeoutMs)
+  void exited.then(() => clearTimeout(timer), () => clearTimeout(timer))
   const onAbort = () => {
     stop.interrupted = true
     terminate()
   }
   input.signal?.addEventListener("abort", onAbort, { once: true })
-  const [stdout, stderr] = await Promise.all([
-    capture(proc.stdout, path.join(input.outDir, "events.jsonl")),
-    capture(proc.stderr, path.join(input.outDir, "stderr.txt")),
-  ])
-  await proc.exited
-  clearTimeout(timer)
-  input.signal?.removeEventListener("abort", onAbort)
+  const captured = await Promise.all([
+    capture(proc.stdout!, path.join(input.outDir, "events.jsonl")),
+    capture(proc.stderr!, path.join(input.outDir, "stderr.txt")),
+    cleaned,
+  ]).catch(async (error: unknown) => {
+    if (proc.pid) await stopGroup(proc.pid)
+    await cleaned.catch(() => undefined)
+    throw error
+  }).finally(() => {
+    clearTimeout(timer)
+    input.signal?.removeEventListener("abort", onAbort)
+  })
+  const [stdout, stderr] = captured
   const exitCode = proc.exitCode ?? -1
   const parsed = parseEvents(stdout)
   const run = {
@@ -206,7 +235,7 @@ export async function runAgent(input: {
 export type AgentRun = Awaited<ReturnType<typeof runAgent>>
 
 // Пишем поток на диск по мере поступления: после SIGKILL накопленные события не теряются.
-async function capture(stream: ReadableStream<Uint8Array>, file: string) {
+async function capture(stream: AsyncIterable<Uint8Array>, file: string) {
   const writer = Bun.file(file).writer()
   const decoder = new TextDecoder()
   const chunks: string[] = []
@@ -238,6 +267,29 @@ function packagePath(receipt: unknown) {
   const value = receipt as { output?: { package_ref?: { path?: unknown } }; package_ref?: { path?: unknown } } | undefined
   const found = value?.output?.package_ref?.path ?? value?.package_ref?.path
   return typeof found === "string" ? found : undefined
+}
+
+// Dock может добавлять отдельные JSON-документы после квитанции сохранения.
+function firstJsonObject(output: string): unknown {
+  const text = output.trimStart()
+  if (!text.startsWith("{")) return undefined
+  let depth = 0
+  let quoted = false
+  let escaped = false
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index]
+    if (quoted) {
+      if (escaped) escaped = false
+      else if (char === "\\") escaped = true
+      else if (char === '"') quoted = false
+      continue
+    }
+    if (char === '"') quoted = true
+    if (char === "{" || char === "[") depth++
+    if (char === "}" || char === "]") depth--
+    if (depth === 0) return parseJson(text.slice(0, index + 1))
+  }
+  return undefined
 }
 
 function targetType(input: Record<string, unknown> | undefined) {

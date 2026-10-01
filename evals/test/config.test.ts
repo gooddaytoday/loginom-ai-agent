@@ -51,6 +51,16 @@ test("loadConfig: binary без EVAL_CLI_BIN отклоняется", () => {
   expect(() => loadConfig([], { ...full, EVAL_CLI_MODE: "binary" })).toThrow("EVAL_CLI_BIN")
 })
 
+test("loadConfig: вариант агента задаётся явно, по умолчанию default", () => {
+  expect(loadConfig([], full).agent.variant).toBe("default")
+  expect(loadConfig([], { ...full, EVAL_AGENT_VARIANT: "low" }).agent.variant).toBe("low")
+})
+
+test("loadConfig: отличает явный --tasks от каталога по умолчанию", () => {
+  expect(loadConfig(["--judge-only", "run-1"], full).tasksDirExplicit).toBe(false)
+  expect(loadConfig(["--judge-only", "run-1", "--tasks", "custom-tasks"], full).tasksDirExplicit).toBe(true)
+})
+
 test("loadConfig: --judge-only требует только JUDGE_MODEL", () => {
   const config = loadConfig(["--judge-only", "run-1"], { JUDGE_MODEL: "gpt-6-astra" })
   expect(config.judgeOnly).toBe("run-1")

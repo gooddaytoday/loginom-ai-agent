@@ -20,10 +20,12 @@ const summary = (attempts: AttemptResult[], over: Partial<RunSummary> = {}): Run
   metrics: aggregate(attempts, false), tasks: [{ id: "group-sum-qty", metrics: aggregateTask(attempts, false), attempts }], storage_leftovers: [], ...over,
 })
 
-test("compare: дельты метрик со стрелками", () => {
+test("compare: знаковая дельта не объявляет улучшение агента", () => {
   const text = compare(summary([attempt({ score: 50 })], { run_id: "a" }), summary([attempt({ score: 90 })], { run_id: "b" }))
   expect(text).toContain("mean_score")
-  expect(text).toContain("50.0 → 90.0 ▲")
+  expect(text).toContain("50.0 → 90.0 (Δ +40.0)")
+  expect(text).toContain("Статистический вердикт «лучше/хуже» не вычисляется")
+  expect(text).not.toContain("▲")
   expect(text).not.toContain("несравнимы")
 })
 
@@ -48,4 +50,65 @@ test("compare: action_manifest_sha256 сравнивается после сор
 test("compare: прерванный прогон — предупреждение о неполном покрытии", () => {
   const text = compare(summary([attempt({})]), summary([attempt({})], { interrupted: true }))
   expect(text).toContain("неполное покрытие")
+})
+
+test("compare: неизвестный variant старого прогона нельзя считать известным variant", () => {
+  const a = summary([attempt({})])
+  const b = summary([attempt({})], { agent: { ...a.agent, variant: "low" } })
+  expect(compare(a, b)).toContain("agent.variant (null → low)")
+})
+
+test("compare: версии агента показаны как измеряемое изменение, а не несравнимость", () => {
+  const a = summary([attempt({})])
+  const text = compare(
+    { ...a, agent: { ...a.agent, cli_version: "0.1.17", source_commit: "old", binary_sha256: "first" } },
+    { ...a, agent: { ...a.agent, cli_version: "0.1.18", source_commit: "new", binary_sha256: "second" } },
+  )
+  expect(text).toContain("CLI 0.1.17, source old, binary first")
+  expect(text).toContain("CLI 0.1.18, source new, binary second")
+  expect(text).not.toContain("несравнимы")
+})
+
+test("compare: разное число измеренных попыток задачи помечает неполное покрытие", () => {
+  const text = compare(summary([attempt({}), attempt({ attempt: 2 })]), summary([attempt({})]))
+  expect(text).toContain("неполное покрытие")
+  expect(text).toContain("group-sum-qty: попыток 2 → 1")
+})
+
+test("compare: верность результата по oracle показана отдельно от балла судьи", () => {
+  const text = compare(summary([attempt({ score: 100, oracle_pass: true })]), summary([attempt({ score: 100, oracle_pass: false, pass: false })]))
+  expect(text).toContain("| oracle_pass_rate | 100.0% → 0.0% (Δ -100.0 п.п.) |")
+  expect(text).toContain("| mean_score | 100.0 → 100.0 (Δ 0.0) |")
+})
+
+test("compare: одинаковые лимиты задач сравнимы независимо от порядка, разные лимиты — нет", () => {
+  const a = summary([attempt({})])
+  const first = { ...a, config: { ...a.config, task_timeout_ms: { first: 1000, second: 2000 } } }
+  const reordered = { ...a, config: { ...a.config, task_timeout_ms: { second: 2000, first: 1000 } } }
+  const changed = { ...a, config: { ...a.config, task_timeout_ms: { first: 1000, second: 3000 } } }
+  expect(compare(first, reordered)).not.toContain("несравнимы")
+  expect(compare(first, changed)).toContain("config.task_timeout_ms")
+  expect(compare(a, first)).toContain("config.task_timeout_ms (null →")
+})
+
+test("compare: фактические ревизии Dock сравниваются после сортировки и меняют предупреждение окружения", () => {
+  const a = summary([attempt({})])
+  const first = { ...a, dock: { ...a.dock, skill_revisions: ["r1", "r2"] } }
+  const reordered = { ...a, dock: { ...a.dock, skill_revisions: ["r2", "r1"] } }
+  const changed = { ...a, dock: { ...a.dock, skill_revisions: ["r1", "r3"] } }
+  expect(compare(first, reordered)).not.toContain("изменилось окружение")
+  expect(compare(first, changed)).toContain("dock.skill_revisions")
+  expect(compare(first, changed)).not.toContain("несравнимы")
+})
+
+test("compare: одинаковое неполное покрытие обоих прогонов не скрывает разные веса задач", () => {
+  const tasks = [
+    { id: "group-sum-qty", attempts: [attempt({}), attempt({ attempt: 2 }), attempt({ attempt: 3 })] },
+    { id: "filter-active-rows", attempts: [attempt({ task_id: "filter-active-rows" }), attempt({ task_id: "filter-active-rows", attempt: 2 })] },
+  ].map((task) => ({ ...task, metrics: aggregateTask(task.attempts, false) }))
+  const a = summary(tasks.flatMap((task) => task.attempts), { tasks, task_ids: tasks.map((task) => task.id) })
+  const text = compare(a, { ...a, run_id: "b" })
+  expect(text).toContain("неполное покрытие внутри прогона a")
+  expect(text).toContain("неполное покрытие внутри прогона b")
+  expect(text).toContain("group-sum-qty=3, filter-active-rows=2")
 })
