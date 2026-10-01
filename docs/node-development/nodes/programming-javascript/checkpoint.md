@@ -140,9 +140,12 @@ Negative checker03/exec78088 отказал на собственной no-op mu
 Checker04 меняет лимит5→6 и проверяет non-noop каждого case: exec18523 actual
 exit0, negative80/80, result SHA256
 `20e3dbdb510928f42c9116184d5a4d892c2ffbc8b8b7c53bcc67ce43b34d4e9c`.
-Registry410 reconciled closed_verified/active exec null. Следующий live —
-fresh Declared reordered на том же source/oracle и preassigned auditor v3;
-negative checker05 выполняет те же80 независимых cases в4 процессах.
+Registry410 reconciled closed_verified/active exec null. Fresh411 Declared
+reordered e-public-context-reordered-declared-01 на том же source/oracle и
+preassigned auditor v3: source freeze1449 перепроверен, ordinary headed
+DISPLAY=:1, original exec32203 зарегистрирован и RUNNING. Следить за этим
+handle до terminal; outcome/cleanup ещё не приняты. Negative checker05
+выполняет те же80 независимых cases в4 процессах после primary audit.
 
 J21 sizing через actual factories с синтетическими pins показал JS11597,
 весь batch15=62163 и compact bundle7313 wire bytes. Это source-only fixture,
