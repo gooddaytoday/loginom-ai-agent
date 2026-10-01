@@ -55,7 +55,7 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
-### E/J19: technical-name cases/source готовы до live — 2026-10-01
+### E/J19: technical-name cases/source готовы; Code433 выполняется — 2026-10-01
 
 Child1aa8d49f09 добавил два closed operator cases `context-code-renamed` /
 `context-declared-renamed`. Existing shared field procedure, own input0,
@@ -76,8 +76,14 @@ guard добавлен и проверен. Client code unchanged; previous3318P
 на22f не переигрывался. Source freeze a7b96ef4/12748files+61symlinks,
 oracle32bc3cfd, auditor6f989c8c,negative84/handoff13bbba32,pin2e69f11d.
 Python syntax PASS; положительный audit/negative84 после live ещё не выполнены.
-Registry432 closed_verified/active_exec=null; next profile433 ещё не назначен.
-После пред-live admission выполнить один ordinary headed Code case, audit/
+После verified absence432 registry назначил fresh433; ordinary headed
+`e-public-context-renamed-code-01`/exec59005 на immutable1aa выполняется,
+original30min. Первое invocation actualexit1/ENOENT по ошибочному каталогу
+Chromium остановилось до browser launch: profile/evidence отсутствовали,
+process absence verified; original logSHA4e3c7212 и separate prelaunch receipt
+сохранены. Correct pinned chrome-linux64 запущен после этой проверки; это
+первый browser process433, не replay неизвестного UI effect.
+Наблюдать тот же59005 до terminal, затем independent audit/negative84 и
 cleanup/process absence перед declared. Natural insufficient-primary/Done/
 actual model/candidate/CLI/Gates остаются открытыми; accepted milestones не повторять.
 
