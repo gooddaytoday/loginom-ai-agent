@@ -10,9 +10,10 @@ new Done обоих modes; addressed125/operator18583PASS, client runtime не �
 Code449 standalone Done принят: original66167 actualexit0, independent v4 audit/27
 negatives/cleanup, lease closed_verified. v1–v3 audit failures сохранены; v4 Code
 проверен после live. Private v4 pin c33cb466 до fresh declared450 сохранён.
-J02 public input подтверждён. Fresh450 assigned/registered на том же source/v4
-pin: e-new-done-declared-01/original73246 RUNNING, ordinary headed. До terminal
-исходники child/evidence не менять; ждать именно этот handle, затем audit27/cleanup.
+J02 public input подтверждён. Declared450/original73246 actualexit0/OBSERVED,
+pre-pinned v4 audit/27 negatives/cleanup PASS; new Done2/2, lease450 closed_verified.
+Далее product registration и F review/candidate/CLI. Astra/medium переключение
+этой же задачи запрошено async; фактически сейчас gpt-6.1-sol/high.
 Natural insufficient-primary/Done error not_observed; оригинальные требования
 J25 и пределы дополнительной coverage сверены ниже. Продуктовая регистрация,
 F review/immutable candidate и Sol CLI ещё открыты. Следующий текст сохраняет
@@ -317,6 +318,34 @@ public API/handler. До live нужны addressed/operator tests/source/freeze/
 auditor pin. Если native поддержан или primary sufficient, insufficient-primary
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
+
+### E/J14: new standalone Done обоих modes accepted2/2 — 2026-10-01
+
+Childfecbc9f44d: Code449/original66167 и declared450/original73246 actualexit0/
+OBSERVED2/2, ordinary headed. New Done/read.ports=[] → independent full source/
+settings/new own node/input0 link/exact-ID zero events → NEW existing preserve
+Execute parameters={schema_mode}/two distinct completed identities/full6×4/
+allcells/types/order/1950/user-v1/final source; no Save. Done explicit=false/
+internal=null, execution=not_requested/output=not_refreshed. Existing447/448
+Done/Close уже приняты отдельно. PackageClose/logout/browser/process absence
+обоих проверены, lease450 closed_verified/active_exec=null; fresh451 не assigned.
+
+Declared v4 был pre-pinned, original v4 audit actualexit0, negative original84578
+actualexit0/27of27 non-noop. Report0a5309ad10bb6838b214192662a17a4136d4565a5303f2d2d6693edda991e843;
+journal06729e03e85f195e6c303432890a28ba4088c148c155299c5ef9aaf6b638bee1;
+receipt d437520de4098e7c3169d9fbcff6f1d8f6e57f1eb60cd142915bb3f2856e0151;
+negative714edb3864e98db1eb5d35c013200341ac6e2383971e91605e664a3a40dad445
+(те же27 названий/mutation exits, не копия report/journal). Materialization
+1790885110941-3927p5w94yp:1329:3/final:1329:4. Code v4 post-live audit amendment
+и v1–v3 failures сохранены в предыдущем разделе; evidence не переписан.
+
+Следующее — product registration общего lifecycle-v5/knowledge/driver, affected
+source tests/provenance; затем один same-task Astra/medium F review, immutable
+candidate/J01/J21/J27 и две Sol/low/30min CLI попытки. Натуральные редкие Done/
+insufficient-primary errors not_observed, это явная граница coverage, не PASS.
+Текущий task model gpt-6.1-sol/high; async запрос пользователю переключить эту же
+задачу на gpt-6-astra/medium отправлен, ответа пока нет. Не подменять ревью
+другой моделью/контекстом, не повторять live449/450 без затронувшего изменения.
 
 ### E/J14: new Done Code449 accepted; declared next — 2026-10-01
 

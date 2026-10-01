@@ -227,3 +227,10 @@ Linux установлена отдельным чтением `Session.Version.
 Независимые source/settings/mappings/graph/Views/2 fresh Execute/cleanup proofs
 проверены; candidate/CLI/full E остаются открыты. Следующий шаг — public owned
 refusal mode flip; подробности и ограничения в checkpoint.
+
+Свежий обязательный lifecycle срез 2026-10-01: existing Code447/declared448
+Done/Close/preserve Execute на73a8 и standalone new Done Code449/declared450
+наfecbc9f44d приняты2/2 каждый, ordinary headed/full source/settings/full6×4/1950/
+exact-ID zero events/independent audit+negative/cleanup. Это isolated API-path;
+product registration/review/immutable candidate/CLI остаются открыты.
+Подробности и ограничения аудита — [checkpoint](checkpoint.md).
