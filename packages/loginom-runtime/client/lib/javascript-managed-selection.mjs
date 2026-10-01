@@ -99,15 +99,19 @@ export async function runManagedJavascriptSelectionBody(page,task,inspect) {
     operation_id:task.gesture_id,output,error,trace:[]});
   if(!lease||lease.identity!==identity||lease.bodyAttempted===true)
     return outcome('NOT_APPLIED','preflight',false,{}, {code:'SELECTION_LEASE_UNAVAILABLE',message:'Selection lease unavailable'});
-  const current=await page.evaluate(inspect,{held:lease.handle,task:{...task,afterGesture:false}});
+  const current=await page.evaluate(inspect,{held:lease.handle,task:{...task,inspectPhase:'managed_pre_select_click',afterGesture:false}});
+  const sameRedraw=current.dom_replacements===task.expected.dom_replacements
+    ||task.expected.dom_replacements===0&&current.dom_replacements===1
+      &&task.expected.node_selected===false&&current.node_selected===false;
   if(current.blocked===true||current.ready===true||!current.body_point
-    ||JSON.stringify(current)!==JSON.stringify(task.expected)||Date.now()>=task.deadline)
+    ||!sameRedraw||JSON.stringify({...current,dom_replacements:task.expected.dom_replacements})!==JSON.stringify(task.expected)
+    ||Date.now()>=task.deadline)
     return outcome('NOT_APPLIED','preflight',false,{}, {code:'SELECTION_SNAPSHOT_CHANGED',message:'Selection snapshot changed'});
   lease.bodyAttempted=true;
   lease.afterGesture=true;
   lease.bodySettled=false;
   await page.mouse.click(current.body_point.x,current.body_point.y);
-  return outcome('SUCCEEDED','gesture_returned',true,{body_gesture_returned:true});
+  return outcome('SUCCEEDED','gesture_returned',true,{body_gesture_returned:true,pre_click_dom_replacements:current.dom_replacements});
 }
 
 export async function runManagedJavascriptSetting(page,task,inspect) {
@@ -200,6 +204,11 @@ export async function dispatchManagedJavascriptBody({task,before,execute,record,
     {timeout:Math.max(1,Math.min(35000,task.deadline-Date.now()+5000))});
   if(result?.operation_id!==gesture_id||result.action_key!=='javascript.selection.body')
     throw Error('Managed JavaScript body receipt identity differs');
+  const returned={phase:'javascript_managed_body_returned',operation_id:task.operation_id,gesture_id,
+    owner:task.owner,deadline:task.deadline,expected:before,receipt:structuredClone(result)};
+  const ack=await record(structuredClone(returned));
+  if(JSON.stringify(Object.fromEntries(Object.keys(returned).map(key=>[key,ack?.[key]])))!==JSON.stringify(returned))
+    throw Error('Managed JavaScript body returned journal ACK differs');
   if(result.status!=='SUCCEEDED')return result;
   while(Date.now()<task.deadline){
     const after=await execute(makeJavascriptManagedSelectionReadCode({...task,mode:'inspect',inspectPhase:'post_body'}));
