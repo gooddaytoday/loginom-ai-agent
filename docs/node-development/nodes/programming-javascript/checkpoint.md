@@ -4,8 +4,8 @@
 
 Актуальная граница на 2026-10-02: source product registration завершён;
 реализованы два независимых native-аудитора фазы 4 и частичные проверки
-standalone CLI transport/bundle/admission/public-node binding. Child
-**631bfbe75cd5924b5bc3772eaadf18b7cb0fe02f** tracked clean; registration на161353
+standalone CLI transport/bundle/admission/public-node/Save binding. Child
+**fa631186fd75fb812eda6f6a2aa49dc91b63f02b** tracked clean; registration на161353
 сохранён. Configuration/output проверены на immutable Code449/declared450,
 40 адресных test methods PASS, в том числе48 non-noop native mutations.
 Итоговый `javascript_node_acceptance.py` ещё TO_IMPLEMENT: подготовить связку
@@ -16,7 +16,8 @@ fixtures, actualexit0; никаких compiled CLI/browser runs в этой ит
 Admission дополнительно11PASS; CLI metadata binding13PASS; native regression9PASS
 на неизменённых captures и явно отдельной тестовой проекции production header.
 Compact public-node binding дополнительно17PASS на actual runtime-produced
-receipts/defaults и реальной SQLite; Save/cold/cleanup ещё не объединены.
+receipts/defaults и реальной SQLite. Last Save/dirty-state binding дополнительно19PASS;
+cold/cleanup ещё не объединены, fresh standalone Save не запускался.
 JS general lifecycle-v5/driver/knowledge в product registry только7.4.2/nonempty
 origin, actual bridge redactor. Addressed65, full client3442PASS+10SKIP,
 operator18583PASS, provenance5045 actualexit0. Existing Done/Close447/448 и
@@ -42,6 +43,66 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 в [discovery](discovery.md). Продуктовая база — `a8ad59766dbdb4f2da0b54367a755ce00891dd71`.
 Новый код B — `f8ceebcac98ac6c7eb0dc69d5eed918e85c21e86` в child worktree;
 это isolated acceptance support, не регистрация продуктового JS handler.
+
+### Фаза 4: последний CLI Save и dirty-state — 2026-10-02
+
+Child **fa631186fd75fb812eda6f6a2aa49dc91b63f02b** добавляет
+`javascript_cli_persistence.py` и19 адресных test methods. Normal-worker helper
+связывает public JS Execute/checkpoint с последним собственным Save по externally
+allocated unique path, pinned revisions обеих Save actions и native runtime/actor.
+Compact action arguments сверяются с native prepared/completed parameters,
+public receipt — с actual output projection, continuation — с native trace/output.
+Проверяются path/graph/workflow trace consistency, порядок и distinct IDs, отсутствие
+новой JS редакции между выбранным source и Save и новых admitted mutations после Save.
+`replace` допустим только для пути, уже сохранённого этим worker, с собственным
+package identity при реальном overwrite. Повтор SAME-ID не создаёт новый Save;
+identical terminal delivery не увеличивает число вызовов.
+
+Каждому фактическому public Save/retry соответствует native read-only
+`saved_package_state_observed` и второй JSON block advice. У последнего Save
+обязателен typed `modified:false` для собственных session/document/account/path;
+unavailable, отсутствующая или изменённая advice не принимается. Предыдущий
+`modified:true` допускается с runtime advice о новом checkpoint; проверен переход
+к NEW-ID checkpoint того же пути. Один checkpoint достаточен; Save As не требуется.
+Если третьим JSON block доставлена verification, она также должна совпасть с native
+`verification_delivered`. Это сверка доставки; whole call/transport coverage
+по-прежнему обеспечивает outer CLI/SQLite auditor.
+
+Fixtures вызывают настоящие `compactActionResult` и `savedPackageStateAdvice`
+на Node24.19.0 и сохраняют public parts в SQLite actual v1 schema. Негативы меняют
+path/catalog/owner/IDs/order/flags/typed bool/dirty-state/continuations/trace/calls.
+Неизменённый C Code Save journal SHA256
+`23540874ab56ec6d95fc674d3568ef701fecb520788a09f502d500b17a43ca74`
+дополнительно подтверждает форму actual native trace. В нём **нет** generic bridge
+dirty row; она не добавлялась, старый capture не повышен до нового CLI PASS.
+Coherent изменение только rendered graph остаётся возможным в этой частичной
+проверке: `native_guid_graph_verified=false`, cold/settings persistence, process
+cleanup и CLI acceptance также false. GUIDs/ports/topology/positions должен
+независимо связать следующий cold auditor; rendered Save graph этого не доказывает.
+
+Команда из child `packages/loginom-runtime`:
+
+```sh
+LOGINOM_NODE=/home/george/.local/state/loginom-ai-agent/node-development/toolchains/node-v24.19.0-linux-x64/bin/node LOGINOM_JS_SAVE_CAPTURE=/home/george/.local/state/loginom-ai-agent/node-development/campaigns/javascript-20260926-ubuntu/c-public-code-save-01/execution-events.jsonl python3 -m unittest discover -s tools/loginom-acceptance -p test_javascript_cli_persistence.py -v
+```
+
+Addressed04 originale9eae0 / completionaab312 actualexit0,19PASS. Log SHA256
+`efcd3b5e3b5cabbb2825bb69bc06f33d4e7cb76e53fc603c8b1929b2cf362f27`.
+Receipt `f-javascript-cli-persistence-validation-v1.json` SHA256
+`1033d0cdd09eb9776f5474404393f39b45522984cce1153ef511b1ea6e512604`
+закрепляет source commit,2 auditor/test и2 producer module hashes, original capture,
+Node/argv/cwd и actual exits всех4 прогонов. Failed01 actualexit1 сохранён:
+тестовый второй Save выходил за assistant completion1400 в SQLite fixture;
+fixture message завершение исправлено на2000, native/runtime правила не ослаблены.
+Failed log SHA256 `f9718f10bec0a736298f6719ab538d9b6645dca911fc34c473ca86746835c9b1`.
+
+Fresh browser/candidate/model в этой итерации не запускались. Own tests завершены;
+lease450 остаётся последним closed_verified, новый профиль не назначен. Actual
+same-task turn_context **2026-10-01T23:10:30.884Z** всё ещё gpt-6.1-sol/high;
+same-task Astra/medium F review pending, прежний async вопрос не повторялся.
+Следующее: path-only separate cold source/settings/full native GUID graph/fresh
+Execute/full6×4 и own normal cleanup/process termination; поздний model output-read
+и итоговая composition остаются обязательными. Общая Goal active, готовность не повышена.
 
 ### Фаза 4: compact public-node → native binding — 2026-10-02
 

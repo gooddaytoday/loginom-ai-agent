@@ -18,7 +18,10 @@ Child **8d3eb30f1a4f** добавляет partial CLI evidence/bundle прове
 pins:11/13/9 адресных tests PASS. [Подробности и границы](checkpoint.md#фаза-4-standalone-native-admission-и-production-target--2026-10-02).
 На **631bfbe75cd5** compact public-node/native binding прошёл17 tests с actual
 runtime-produced fixtures и SQLite. [Checkpoint](checkpoint.md#фаза-4-compact-public-node--native-binding--2026-10-02).
-Save/cold/cleanup и итоговая CLI-приёмка остаются открытыми.
+На **fa631186fd75** добавлен partial last Save/dirty-state auditor:19PASS с actual
+runtime-produced receipts/advice и SQLite, плюс immutable headed Save trace.
+[Границы](checkpoint.md#фаза-4-последний-cli-save-и-dirty-state--2026-10-02).
+Fresh CLI Save/cold/cleanup и итоговая CLI-приёмка остаются открытыми.
 
 [Подплан](plan.md) · [исследование](research.md) · [данные и oracle](fixtures/README.md) ·
 [рекомендации ревью](review-recommendations.md) · [перепроверка ускорения](acceleration-review.md) ·

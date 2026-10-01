@@ -85,6 +85,26 @@ retry без повторного native admission. Resume/multiple terminal out
 result может быть прочитан поздним `dock_node_read`; сам default apply preview
 на5 строк не является полным6-row proof и не заменяется controller-only read.
 
+`javascript_cli_persistence.py` реализует только normal-worker last Save/dirty-state
+binding. Выбранный JS Execute должен иметь public/native node binding; финальный Save
+идёт после него по externally allocated own path с pinned action revisions.
+Все public Save IDs должны иметь единственный native admission/completion;
+SAME-ID retry связывается с той же mutation и новым bridge dirty read. Новый source
+или admitted mutation после Save требуют последнего checkpoint. Первый путь нельзя
+перезаписывать; `replace` относится только к подтверждённому собственному Save.
+Public compact Save output, continuation и JSON advice сверяются с native facts.
+Последний read обязан подтвердить `modified:false`, read_only и собственные
+session/document/account/path, без заявления о persisted calculations.
+Предыдущий dirty Save может завершиться новым checkpoint; два Save не обязательны.
+
+Helper сверяет rendered graph между native Save preflight/trace, но не объявляет
+это независимым доказательством GUIDs/topology/positions. Его cold persistence,
+settings persistence, native GUID graph, process cleanup и CLI acceptance flags
+остаются false. Отдельное path-only cold чтение должно связать actual source bytes,
+settings/mappings, GUID graph и fresh полный результат с writer, после нормального
+закрытия writer. Ни runtime-produced unit fixtures, ни старый immutable trace
+не заменяют свежую headed candidate/CLI проверку.
+
 Native admission связывается с фактическим standalone Host, без Codex/Hermes
 ticket envelope. `packages/loginom-host/src/host.ts` передаёт в `inputStore`
 chat `${generation}:${cliSessionID}` и исходный user message ID. `inputs.ts`
