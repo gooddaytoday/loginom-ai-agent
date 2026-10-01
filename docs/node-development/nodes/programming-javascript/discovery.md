@@ -1,6 +1,6 @@
 # JavaScript: рабочее исследование на Loginom 7.4.2
 
-Статус на 2026-09-30: **`discovery_required`**. Это сводка прямых наблюдений
+Статус на 2026-10-01: **`discovery_required`**. Это сводка прямых наблюдений
 фазы 0B [подплана](plan.md), а не допуск публичного обработчика или автономной
 CLI-приёмки. Стенд — `http://logi-test-plan.bg.local/app/`, Loginom Enterprise
 7.4.2; оператор — Ubuntu, только видимый headed Chromium. ОС **сервера** —
@@ -31,6 +31,17 @@ public declared6×4/metadata/DefaultUsageType/Save и cleanup3/3; собстве
 independent cold подтвердил source/settings/new Execute/all6×4 cells и
 cleanup3/3. Fixed D принят на том же isolated уровне; E/F и aggregate
 gates открыты; evidence/hashes и следующий шаг — в текущей части checkpoint.
+
+E/J26 Code422/Declared423 на3b59423f1a приняты2/2: actual public apply,8new/
+existing parameter preflight refusals без editor/Execute, отдельный source-bound
+output reread,3distinct owned Execute, оба full typed6×4/user-v1, same-ID retry
+без эффекта и final full source. v3 independent audit/negative14 каждого и
+PackageClose/logout/browser/process absence подтверждены. Source/configuration/
+retained physical mapping binding и actual source/settings/policy до/после
+dispatch ACK проверены на этих paths. Saved unsupported source/drift/closed
+policy refusal/unknown cleanup — direct tests, не live injection. Sandbox/
+full engine grammar/candidate/CLI не заявлены; exact hashes в checkpoint,
+остаток J23 cold именно long source/Done refusal/J19 model resistance/E/F.
 
 E/J12/J25 source/local milestone `010dca575d`: runtime распознаёт свежий
 owned Code Next refusal, читает native error dialog, закрывает его OK и
