@@ -12,11 +12,13 @@ function fixture(id) {
     filter_enabled:false,precision:{numbers_verified:true,limitations:[]},schema,
     sample:probe.expected.map(row=>row.map((value,index)=>({value,type:schema[index].type,is_null:false,
       precision:index===0?'exact_integer':'display_text'})))};
-  const source_fields=schema.map(field=>({...field,field_id:'field'+field.index,record_id:'source'+field.index,required:true}));
+  // Native source descriptors do not expose data_kind. Only the target/physical
+  // field owns that metadata (observed by public control416 on Loginom7.4.2).
+  const source_fields=schema.map(({data_kind,...field})=>({...field,field_id:'field'+field.index,record_id:'source'+field.index,required:true}));
   const mapping={verified:true,inventory_complete:true,source_identity_verified:true,state_source:'cached_mapping_stores',
     mapping_wizard:'DataSetOutputSocketWizard',autosync:true,settings_applied:false,package_saved:false,
     node_context:{...node,verified:true,surface:'wizard',output_port:{direction:'output',port:0,port_guid:table.port_guid}},
-    source_fields,target_fields:source_fields.map(field=>({...field,record_id:'target'+field.index,
+    source_fields,target_fields:source_fields.map(field=>({...field,data_kind:schema[field.index].data_kind,record_id:'target'+field.index,
       required:false,excluded:false,inherited:false,source:structuredClone(field)}))};
   const phases=[
     {phase:'node_finish',value:{source_readback_verified:true,wizard_commit_verified:true,schema_mode:'code',
@@ -85,6 +87,7 @@ const changes={
   wrong_source_label:v=>{v.mapping.source_fields[0].label='requested';},
   wrong_target_name:v=>{v.mapping.target_fields[0].name='requested';},
   wrong_target_label:v=>{v.mapping.target_fields[0].label='requested';},
+  wrong_target_kind:v=>{v.mapping.target_fields[0].data_kind='foreign';},
   reciprocal_source:v=>{v.mapping.target_fields[0].source.field_id='foreign';},
   source_required:v=>{v.mapping.source_fields[0].required=false;},
   target_required:v=>{v.mapping.target_fields[0].required=true;},
