@@ -59,3 +59,21 @@ Initial input raw execution содержит краткую квитанцию; 
 отсутствие ABA и сохранение после cold reopen. Прежние одноколоночные D cases
 не переименованы в T и не закрыты задним числом. Полный G5, публичный handler,
 доставка знаний модели и CLI-приёмка остаются отдельными требованиями.
+
+## Публичный lifecycle: scoped J24, 2026-10-01
+
+Те же пять exact AssignColumns sources дополнительно прошли публичный new-Code
+apply lifecycle на child`eed5760102`: ordinary headed Ubuntu, native input4cells,
+два independent Execute, full typed output1×2, actual code API JSON → complete
+native source/reciprocal target mapping → physical schema, полный user-v1 и
+независимый source-read. Observed пары в первой таблице подтверждены этим путём.
+Каждый run417–421 прошёл independent audit v3, negative50/50 и cleanup3/3/
+process absence. [Дизайн и границы](public-column-names-design.md), hashes/handles
+и failed416 без повышения до PASS — в [checkpoint](checkpoint.md).
+
+Knowledge1.1 на child`276c344820` доставляет scoped Name/DisplayName rule;
+actual bridge MCP fixture и budgets/source/direct проверены. Historical1.0
+asset/exact examples unchanged. Source native descriptors не содержат data_kind:
+это свойство проверено у target и физической таблицы, не выдумано у source.
+General normalization/AddColumn/empty/collision/atomicity/ABA/full G5 и actual
+candidate/CLI этим не принимаются; прежние T/D outcomes не переписаны.

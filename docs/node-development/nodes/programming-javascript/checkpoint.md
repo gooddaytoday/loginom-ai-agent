@@ -30,7 +30,7 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — J24 technical-name/invalid/Cyrillic source→physical;
+следующий шаг — J26 effective source/module policy на всех apply/Execute/read;
 [G1/J22 профиль своего мастера](ui-profile-design.md) принят в bounded scope ниже;
 source/direct [response budgets](response-budget-design.md) J21 приняты ниже;
 Code410/Declared411 reordered context приняты2/2 на immutable child9c93 ниже.
@@ -113,7 +113,7 @@ Done refusal/technical details, J19 actual model resistance, F review/registrati
 candidate/J01/J21 actual effective limits/J27/two autonomous Sol low CLI attempts.
 Цель не завершена; никаких merge/push/rebase в этом шаге не было.
 
-### E/J24: public column-name cases подготовлены — 2026-10-01
+### E/J24: public column-name cases5/5 и knowledge1.1 source/direct приняты — 2026-10-01
 
 Продолжение после9f75/child8acf; registry415 closed_verified, active exec/evidence
 null, принадлежность lease и отсутствие своих процессов сверены. Выбран
@@ -161,7 +161,7 @@ Original oracle v1 unchanged. Auditor v2 SHA
 
 Control417/exec14929 завершён actual exit0/OBSERVED, cleanup3/3/process absence.
 Independent audit v3 PASS; negative checker v3 exec73309 actual exit0,50/50
-non-noop mutations refused. Source1376bytes/20LF lines exact, output1×2,
+non-noop mutations refused. Source1376bytes/21 source_lf_lines exact, output1×2,
 native input4cells, native source→target/physical/user-v1 and source-read полные.
 Report SHA`35376346d964dee9727371fbd307458938e093283c28bf705855efff080ca13c`,
 journal SHA`cc72c62473d2103f17db5e6af4e4b66775c38b9123d2f84c4a9dcb01add4368b`;
@@ -176,6 +176,80 @@ auditor v2 SHA проверяется отдельно alongside frozen v3 SHA
 Private handoff v3 завершил417 и назначил headed Cyrillic418/exec66795,
 `e-public-column-names-cyrillic-01`, на том же immutable childeed576.
 J24 принят только1/5: следующие4cases и knowledge rule ещё не приняты.
+
+Cyrillic418/exec66795 actual exit0/OBSERVED принят audit v3 и negative50/50
+exec25870 actual exit0; cleanup3/3/process absence. Requested Сумма → observed
+Summa, DisplayName Value preserved; code API/native source→target/physical/
+full user-v1/independent source совпали. Source1382bytes/21 source_lf_lines.
+Report SHA`c5233ac954feb117f5df7d8fdb9271b1da4c28cb4b93f2be5a242d92dd59e42d`,
+journal SHA`78163ec018b928b4e2ce549aeea2f55aed3a414fafd1206b0e465782f5bfb8da`,
+audit SHA`2549d186e212fca7177818275c3196d13e8c01f7d18a744f40dd5a6a258a9e7f`,
+negative SHA`511115db66c986f2de483e59e2965d558f70ce5335fd1970ab9f7123d0aebdc5`.
+Registry418 closed_verified; следующим назначен headed Space419/exec43769,
+`e-public-column-names-space-01` на unchanged childeed576. Текущий прогресс2/5;
+Space/leading-digit/Unicode label и knowledge rule ещё не приняты.
+
+Space419/exec43769 actual exit0/OBSERVED принят audit v3/negative50/50,
+exec21647 actual exit0; cleanup3/3/process absence. Value Total → Value_Total,
+DisplayName Value; все независимые code/native source→target/physical/user-v1/
+source read совпали. Report SHA`8e28be753eaca8d84f6fcb52bea11b675a338f54121514f054f6b2d12ebe72ca`,
+journal SHA`dd5ff3783a659c6c06a7917700e5e9e38f010ee9e9161955968b5f6196829fa7`;
+audit SHA`f17ace679c498a8a48906335c99880da8c139e4a262698318954a521ab3709b7`,
+negative SHA`f12c2639f4e1ef863ea30616673ae35cb267701bd73e800e3570bebc17d5ef3f`.
+Registry419 closed_verified; headed leading-digit420/exec38510 назначен/запущен,
+`e-public-column-names-leading-digit-01` на unchanged childeed576. Progress3/5;
+leading-digit/Unicode label и новая knowledge rule остаются открытыми.
+
+Leading-digit420/exec38510 actual exit0/OBSERVED принят audit v3/negative50/50,
+exec97697 actual exit0; cleanup3/3/process absence. 1Value → _1Value с меткой
+Value, full source/API/native mapping/physical/user-v1 proofs совпали.
+Report SHA`5722ca354b35e2d64ad38661e383502de1c5ba25e4e0f840c9e2dc0d81de384d`,
+journal SHA`1cb8b5cc570295dbdd2840ffbbdbcde0e724ff2536f48558aa6a16fd0bb66754`;
+audit SHA`98d8bffb5f2ae5b47b52f4c551cf87a6a21b6af824b42b70d5b6acc7141b8902`,
+negative SHA`866b4c51a0e6629b0c290c777c0dcd9676524a2f29ee36060dd1f39f70cd4e0b`.
+Registry420 closed_verified; последний headed Unicode-label421/exec18913
+назначен/запущен, `e-public-column-names-unicode-label-01` на unchanged
+childeed576. Progress4/5; Unicode-label и новая knowledge rule ещё открыты.
+
+Unicode-label421/exec18913 actual exit0/OBSERVED принят audit v3/negative50/50,
+exec97969 actual exit0; cleanup3/3/process absence. Name Value сохранён,
+DisplayName Сумма ё сохранена во всех observed representations и user-v1.
+Report SHA`cae3fe145eed2a9e252ee146801de2529286360b00e3f474bd059df8f6a68ae6`,
+journal SHA`a72b87d7a346f40569483c33906a5a93f268d14e7398ce8d7a09c49b1061c671`;
+audit SHA`00cc23da0fdae4532d2ba61e9cbc3a5a8b32b0071f515e160ee9a8da74757db9`,
+negative SHA`a383ea2f9cd665a0c4ac76a77536381023e84151758ad7f76dc87ab21190a50a`.
+Registry421 closed_verified, active exec/evidence null. Все5 fixed AssignColumns
+cases приняты,250/250 negative refusals; aggregate
+`e-public-column-names-accepted-v1.json` SHA
+`1ce1ec5b454a13f6c97ec06560ce406e07706bd9dfc8693da9c72faf1de046bc`.
+Native input4cells и typed output1×2 каждый; всего30cells и4507 exact journal refs.
+Source1376/1382/1380/1383/1390UTF8bytes, source_lf_lines21 каждый; поле считает
+20 LF separators плюс final line, не proposal source_lines20. API/physical
+schema equality — observed contract; normalization algorithm/AddColumn/empty/
+collision/atomicity/ABA/cold/candidate/CLI этим не объявляются проверенными.
+
+Knowledge default1.1 добавлена после finish421; exact knowledge1.0 доступна
+явным internal version selector, SHA4a8a2d6e…bc2ef и оба example source
+идентичны прежним. Guidance ASCII Name/Unicode DisplayName/fresh actual schema
+передаётся компактной карточкой, full describe содержит только5 confirmed pairs.
+Operator addressed126/126 actual exit0. Full client exec42468; следующее —
+подтвердить actual exit, проверить final MCP description budgets, сохранить
+code/docs commits, затем J26 по текущему плану. Нового browser нет.
+
+Final knowledge delivery: client3189PASS/10SKIP/exec42468 actual exit0;
+operator126/126 и addressed14/14 actual exit0. Actual bridge MCP fixture
+с substitute browser проверил compact rule, все5 full observed pairs, equality
+knowledge SHA между prepare/describe, single JS card≤20000 и mixed reply≤46000;
+нового реального browser в этих tests нет. Exact legacy1.0 object сопоставлен
+с preserved published asset, unchanged; оба example sources unchanged.
+Default knowledge1.1 SHA
+`9a4b79833948e2441a0594131708c530fb5da739cd2eea1ebb8787221dfb122d`;
+code commit`276c344820c810ebbdc15fdd2080bee86a258c00`. Live5/5 остаются на
+eed576 и не приписываются новому source HEAD. Runtime registration/readiness
+не повышены; actual candidate/CLI delivery остаётся F. Все handles завершены,
+registry421 closed_verified. Следующий связный результат — J26: effective
+policy всех apply/preserved/new/existing, обоих Execute и output/source read.
+Читать текущие exports/admission/driver, без нового bootstrap или повторов J24.
 
 ### E/G1/J22: Code414 принят; Declared415 в работе — 2026-10-01
 

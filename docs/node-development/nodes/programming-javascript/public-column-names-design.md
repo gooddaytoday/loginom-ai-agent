@@ -1,8 +1,11 @@
 # E/J24: фактические имена через публичный JS lifecycle
 
 Дата: 2026-10-01. Продолжение [плана](plan.md), после bounded G1/J22 на child8acf.
-Control417 принят independent audit v3/negative50/cleanup на child`eed5760102`;
-остальные четыре cases и новая knowledge rule ещё открыты. Source96/T observations
+Все5 cases417–421 приняты independent audit v3/negative50 каждый/cleanup
+на child`eed5760102`; knowledge1.1 source/direct delivery принята на`276c344820`:
+client3189+10SKIP/operator126/addressed14 и actual bridge MCP budgets.
+Legacy1.0 asset и examples unchanged; actual candidate/CLI delivery остаётся F.
+Source96/T observations
 остаются самостоятельными private свидетельствами, а не публичной приёмкой.
 
 ## Контракт и выбранный путь

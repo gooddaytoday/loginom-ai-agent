@@ -102,11 +102,13 @@ recorded live replies8/8; actual candidate/CLI limits и delivery остаютс
 audit/negative57 каждого и cleanup. Для existing connected input0 на7.4.2/Linux
 выбран bounded identity contract; runtime FullType остаётся null/false, hidden
 menus и engine conformance не заявлены. Final addressed97/full18327 PASS.
-Следующий шаг — J24 technical names/invalid/Cyrillic source→physical,
-по [public column-name contract](public-column-names-design.md): control417 принят,
-четыре следующих cases и обновление knowledge ещё впереди; private T96 не
-заменяет публичную проверку. Точный текущий handle/status — в checkpoint.
-Далее module/cold long source/Done refusal/J19 model resistance и E/F/candidate/CLI.
+[J24 public column-name contract](public-column-names-design.md) наeed576 принят5/5:
+source→physical/API/full user-v1/source read, audit/negative50 каждого/cleanup.
+Knowledge1.1 на276c содержит scoped rule и пять observed пар; legacy1.0/exact
+examples сохранены. Client3189/10SKIP, operator126, addressed14/actual MCP
+prepare/describe/budgets проверены; actual candidate/CLI delivery остаётся F.
+Следующий шаг — J26 module/effective source policy; далее cold long source/
+Done refusal/J19 model resistance и E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 
