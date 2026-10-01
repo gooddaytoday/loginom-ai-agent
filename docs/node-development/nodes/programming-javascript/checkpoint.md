@@ -30,8 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — E/J25 owned technical-details expansion по §12 native error design,
-actual Done diagnostics и J19 technical-name freshness; fixed J23 writer424/cold428 принят;
+следующий шаг — remaining natural E/J25 diagnostics и J19 technical-name freshness;
+owned technical-details expansion432 по §12 принят ниже; fixed J23 writer424/cold428 принят;
 long source writer424 принят ниже. J26 Code422/Declared423
 приняты2/2 на immutable child `3b59423f1a`, source/direct и live уровни ниже;
 [G1/J22 профиль своего мастера](ui-profile-design.md) принят в bounded scope ниже;
@@ -53,6 +53,33 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J25: owned technical-details expansion432 принят — 2026-10-01
+
+Ordinary headed `e-native-details-expansion-code-01`/exec41667 actualexit0/OBSERVED
+на child22f2cffa89: natural Code Next SyntaxError, sole owned DetailPanel toggle,
+202UTF8bytes technical text без truncation, public native/user-v1 delivery,
+recognized SyntaxError/(:17:26), fresh OK/closure, verified draft discard и
+independent retained source/settings/mappings/full graph. NEW same-node repair
+прошёл два distinct completed Execute `1790848033446-ek6e8e725h8:814:1`/`:2`;
+полный typed6×4/1950 совпал с pre-live oracle. Save не запрошен.
+
+Pre-live pin7905dafc/source freeze44433f74 и final tests ниже. Independent v2
+audit/PASS; negative26254 actualexit0: **25/25** non-noop mutations refused,
+включая details owner/source/unknown receipt/omission/replay/text/truncation.
+PackageClose/logout/browserClose/process absence verified; registry432
+closed_verified/active_exec=null. Новый profile не назначен.
+Report SHA256 `e98de8710b8c4fd8e84999538c59571615dd98a1e60b6b2c6516abf1268b4b68`,
+journal `4b1209be122aaa101b278958f9868c278041d22e02e0deedf18ae97616c4e7d7`,
+audit receipt `c74fc15e75b30169f791d051cc638bd3210c8a7386f9e8cf797ef362fa5d37ed`,
+negative `d2170832f344bdc38e6d1487b020f660b155ea24837481df03d941400e711432`.
+
+Это fixed internal required-details proof. Default insufficient-primary policy
+и hidden Done path проверены source/direct tests; natural insufficient-primary
+и natural Done refusal live этим не доказаны. J25 целиком, candidate/CLI/Gates
+не закрываются. Далее remaining diagnostics и J19 technical-name freshness,
+затем F. Fixed inventory431/expansion432/long-source/short syntax/throw milestones
+без затронувшего изменения не повторять; import429 hypothesis не повторять.
 
 ### E/J25: owned expansion final checks PASS; fresh432 назначен — 2026-10-01
 

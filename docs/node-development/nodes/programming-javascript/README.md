@@ -75,8 +75,12 @@ actual candidate/CLI/Gates этим не доказаны; дальше J25/J19 
 J25 read-only native details inventory431/1a754aa192 принят: actual
 `DetailPanel;btnDetais` внутри owned error modal, retained source/NEW repair/
 2fresh Execute/full6×4 и cleanup/process absence; v4 audit/negative20/20.
-Раскрытие details/insufficient-primary и Done refusal этим не доказаны;
-следующий шаг — §12 [native error design](native-error-attribution-design.md).
+Owned details expansion432/22f2cffa89 также принят: один toggle,202UTF8bytes
+без truncation, public/user-v1 SyntaxError/(:17:26), retained source/NEW repair/
+2fresh Execute/full6×4; v2 audit/negative25/25/cleanup/process absence.
+Internal required-details proof не доказывает natural insufficient-primary
+или Done refusal; эти остатки и J19 technical-name freshness/F открыты.
+Контракт — §12 [native error design](native-error-attribution-design.md).
 Fixed public Code32768bytes/1024lines и declared-empty source-read, schema-mode
 refusal2/2, native Code Next SyntaxError и explicit sync throw/NEW repair обоих
 modes приняты; точные SHA и пределы в checkpoint. Public finite Stop/NEW

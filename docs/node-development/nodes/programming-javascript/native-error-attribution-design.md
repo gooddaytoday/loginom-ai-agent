@@ -496,6 +496,14 @@ Panel и detail text hidden; button visible/native. Источники/точн�
 
 ## 12. E/J25: narrow owned details expansion — реализация следующего шага
 
+Fixed internal required-details live432/child22f2cffa89 принят independent
+v2 audit/negative25/25/actualexit0/cleanup/process absence:202UTF8bytes technical
+text без truncation, public/user-v1 SyntaxError/(:17:26), retained baseline,
+NEW repair/2fresh completed Execute/full6×4. Это выполнение контракта ниже;
+natural insufficient-primary и natural Done refusal остаются открытыми.
+Final client3318PASS+10SKIP (concurrency4), operator18456PASS, addressed142PASS.
+Original failed5ms native-read regression сохранён отдельно; SHA в checkpoint.
+
 Композиция с существующим managed error capability; generic JS/RPC/script
 actions не расширяются. Default policy раскрывает details, если первичные
 tooltip/dialog усечены либо класс/позиция не распознаны. Для проверки helper
