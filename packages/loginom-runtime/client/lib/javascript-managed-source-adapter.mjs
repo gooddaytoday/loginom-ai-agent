@@ -263,7 +263,8 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       await execute(driver.makeJavascriptManagedSelectionReadCode({...selectionTask, mode: 'dispose'}));
       active = null;
       uncertain = false;
-      return {closed: true, owner: {...owner}};
+      return {closed: true, owner: {...owner},draft_discarded:closed.draft_discarded,
+        settings_applied:closed.settings_applied,execution_started:closed.execution_started};
     },
     get uncertain() { return uncertain; },
     get active() { return active !== null; }
