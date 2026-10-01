@@ -1,0 +1,722 @@
+{
+  "version": "data-partition-independent-v1",
+  "status": "SEQUENTIAL_ROWS_ONLY_FROZEN_OTHER_METHODS_NOT_RUN",
+  "source_sha256": "10ee55a1b11489d38ac47afa259495153df135459a6b953df4b30d64c4b3e047",
+  "source_schema": [
+    {
+      "index": 0,
+      "name": "RowID",
+      "label": "RowID",
+      "type": "integer",
+      "data_kind": "Дискретный",
+      "null_semantics": "typed_null"
+    },
+    {
+      "index": 1,
+      "name": "Group",
+      "label": "Group",
+      "type": "string",
+      "data_kind": "Дискретный",
+      "null_semantics": "typed_null"
+    },
+    {
+      "index": 2,
+      "name": "Value",
+      "label": "Value",
+      "type": "integer",
+      "data_kind": "Дискретный",
+      "null_semantics": "typed_null"
+    }
+  ],
+  "source_rows": [
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "1"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "A"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "10"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "2"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "A"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "20"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "3"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "A"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "30"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "4"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "A"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "40"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "5"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "A"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "50"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "6"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "A"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "60"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "7"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "B"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "70"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "8"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "B"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "80"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "9"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "B"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "90"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "10"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "B"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "100"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "11"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "B"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "110"
+      }
+    ],
+    [
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "12"
+      },
+      {
+        "type": "string",
+        "is_null": false,
+        "value": "B"
+      },
+      {
+        "type": "integer",
+        "is_null": false,
+        "value": "120"
+      }
+    ]
+  ],
+  "settings": {
+    "mode": "sequential",
+    "training": {
+      "unit": "rows",
+      "value": 6
+    },
+    "test": {
+      "unit": "rows",
+      "value": 3
+    },
+    "priority": "training",
+    "test_position": "algorithm",
+    "seed": {
+      "policy": "fixed",
+      "value": 17
+    },
+    "sequential": {
+      "order": [
+        "training",
+        "test",
+        "unused"
+      ]
+    }
+  },
+  "ports": [
+    {
+      "index": 0,
+      "role": "combined",
+      "schema": [
+        {
+          "index": 0,
+          "name": "IsTestSet",
+          "label": "Тестовое множество",
+          "type": "boolean",
+          "data_kind": "Дискретный",
+          "null_semantics": "typed_null"
+        },
+        {
+          "index": 1,
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "data_kind": "Дискретный",
+          "null_semantics": "typed_null"
+        },
+        {
+          "index": 2,
+          "name": "Group",
+          "label": "Group",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "null_semantics": "typed_null"
+        },
+        {
+          "index": 3,
+          "name": "Value",
+          "label": "Value",
+          "type": "integer",
+          "data_kind": "Дискретный",
+          "null_semantics": "typed_null"
+        }
+      ],
+      "comparator": "sequence",
+      "rows": [
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "1"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "10"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "2"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "20"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "3"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "30"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "4"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "40"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "5"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "50"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": false
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "6"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "60"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "7"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "70"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "8"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "80"
+          }
+        ],
+        [
+          {
+            "type": "boolean",
+            "is_null": false,
+            "value": true
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "9"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "90"
+          }
+        ]
+      ]
+    },
+    {
+      "index": 1,
+      "role": "training",
+      "schema": [
+        {
+          "index": 0,
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "data_kind": "Дискретный",
+          "null_semantics": "typed_null"
+        },
+        {
+          "index": 1,
+          "name": "Group",
+          "label": "Group",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "null_semantics": "typed_null"
+        },
+        {
+          "index": 2,
+          "name": "Value",
+          "label": "Value",
+          "type": "integer",
+          "data_kind": "Дискретный",
+          "null_semantics": "typed_null"
+        }
+      ],
+      "comparator": "sequence",
+      "rows": [
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "1"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "10"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "2"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "20"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "3"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "30"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "4"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "40"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "5"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "50"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "6"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "A"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "60"
+          }
+        ]
+      ]
+    },
+    {
+      "index": 2,
+      "role": "test",
+      "schema": [
+        {
+          "index": 0,
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer",
+          "data_kind": "Дискретный",
+          "null_semantics": "typed_null"
+        },
+        {
+          "index": 1,
+          "name": "Group",
+          "label": "Group",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "null_semantics": "typed_null"
+        },
+        {
+          "index": 2,
+          "name": "Value",
+          "label": "Value",
+          "type": "integer",
+          "data_kind": "Дискретный",
+          "null_semantics": "typed_null"
+        }
+      ],
+      "comparator": "sequence",
+      "rows": [
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "7"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "70"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "8"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "80"
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "9"
+          },
+          {
+            "type": "string",
+            "is_null": false,
+            "value": "B"
+          },
+          {
+            "type": "integer",
+            "is_null": false,
+            "value": "90"
+          }
+        ]
+      ]
+    }
+  ],
+  "basis": "Input CSV arithmetic: first 6 training, next 3 test, last 3 unused; the requested native partition order, not PRNG or observed output. Combined membership follows Help."
+}

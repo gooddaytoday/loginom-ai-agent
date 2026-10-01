@@ -1,0 +1,35 @@
+{
+  "status": "PROPOSAL_FOR_OPERATOR_AFTER_FULL_IMPLEMENTATION",
+  "component_id": "component.preprocessing.DataPartition",
+  "queue_class": "backlog",
+  "readiness": "UNCHANGED; no acceptance or implemented readiness promotion",
+  "handler": {
+    "type": "preprocessing.data_partition",
+    "modes": [
+      "random",
+      "uniform",
+      "stratified",
+      "sequential",
+      "biased"
+    ],
+    "source": "../../packages/loginom-runtime/client/lib/datapartition-node.mjs",
+    "parameters_source": "../../packages/loginom-runtime/client/lib/datapartition-parameters.mjs"
+  },
+  "runtime_registry_evidence": {
+    "path": "../../packages/loginom-runtime/client/lib/node-support.mjs",
+    "old_sha256": "2d8cc3db1f064e055066e8c9a0d89382ceb642f4d5bd7128a58d69258d37a43a",
+    "proposed_sha256": "3d65fe3d4c9662304b7794ca50257eb16b3e1ffac72ffd60edd654f098fd647f",
+    "scope": "16 static registered handlers; DataPartition is an internal candidate with full mathematical/public dynamic/recovery/CLI/cold acceptance pending. Existing 15 handlers retain their readiness/history."
+  },
+  "actual_validator_errors": [
+    "runtime handlers differ: ['preprocessing.data_partition']",
+    "evidence hash runtime-registry"
+  ],
+  "prohibited_changes": "Other node entries, inventory, readiness, acceptance/release decisions, validator logic and guards remain unchanged.",
+  "validator_classification_constraint": "validate.py requires bool(handler) == (queue_class == implemented) and a regenerated inventory. Current candidate is not yet the full accepted implementation; do not promote this entry prematurely.",
+  "required_operator_scope": [
+    "DataPartition registry entry/classification/readiness based on final evidence",
+    "runtime-registry hash/scope for exact final source",
+    "derived inventory regeneration preserving other nodes"
+  ]
+}

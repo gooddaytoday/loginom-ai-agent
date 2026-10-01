@@ -185,3 +185,36 @@ Registry/readiness партии не менялись. Ожидаемые мат
 implemented handlers, в runtime16. Общие registry/inventory/readiness принадлежат
 оператору и здесь не повышались. Это сохранённый незакрытый результат проверки,
 а не основание объявить всю партию готовой или переписать validator.
+
+## Первый полный public path — чистый SHA78a2b40cb
+
+Attempt `LOG-52-public-deb574a4-25`, runtime build
+`78a2b40cb8f2316c94b58470cf9705c824870454`, sourceDirty=false, remote SHA совпал.
+Штатные managed bridge APIs в квалифицированном browser namespace использованы
+через настоящую MCP transport/client; prepare немедленно bindPrepared, один sessionId.
+
+- Delivery108bytes/hash исходного base.csv подтверждён; существующий import
+  изменён на12 строк и3 поля без пересоздания и без сохранения исторического пакета.
+- Новый DataPartition/sequential: rows6/3, training priority, seed17,
+  order training/test/unused. Public create/configure/execute/read SUCCEEDED,
+  cleanup_complete=true, все3 порта complete (9/6/3), settings readback присутствует.
+- Public dock_node_read использовал original source_operation_id, тот же node GUID
+  и новые owned completed execution; configuration.status=not_requested.
+- Independent expected сохранён из CSV **до** появления native результата:
+  first6 training, next3 test, last3 unused. Initial и reread oracle PASS.
+-13 negative controls дали FAIL: value, port, schema, NULL, added/lost occurrence,
+  duplicate с прежним count, stale execution, filter, partial, cached metadata,
+  order, membership. Это подтверждает только указанную последовательную конфигурацию.
+- Оба cleanup.json/lifecycle.json подтверждают закрытие пакета/logout; slot a свободен.
+-88 public/schema/user-response tests и388 observer/procedure regressions PASS
+  с квалифицированными SDK dependencies собранного runtime.
+
+Исторические public attempts20–24 сохранены FAILED: own script graph invocation,
+missing delivery budget, неправильный уровень upload_operation_id и SDK wait60s.
+24 имел неизвестный исход import после транспортного timeout; local cleanup отказал
+DIAGNOSTIC_SAVE_PROMPT_CHANGED, wrapper закрыл свою сессию и подтвердил освобождение.
+25 использовал заранее120s transport allowance для wait60s, без продления
+immutable node deadline; никакой исторический FAIL не заменён PASS.
+
+Остальные методы/math/limits/fulltype/edition, dynamic/recovery/save/cold/CLI7200
+остаются NOT_RUN. Этот один public PASS не является приёмкой полного узла.
