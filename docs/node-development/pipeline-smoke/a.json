@@ -2,5 +2,6 @@
   "kind": "pipeline_smoke",
   "slot": "a",
   "base_sha": "3026a403fe2c942e0fc958f6340c7b80b9fdbde9",
-  "source_issue": "LOG-48"
+  "source_issue": "LOG-48",
+  "handoff_contract_version": 1
 }
