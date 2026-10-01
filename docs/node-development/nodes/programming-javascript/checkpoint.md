@@ -30,7 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — remaining natural E/J25 diagnostics и J19 technical-name freshness;
+следующий шаг — fixed J19 technical-name freshness Code, затем declared;
+remaining natural E/J25 diagnostics остаются;
 owned technical-details expansion432 по §12 принят ниже; fixed J23 writer424/cold428 принят;
 long source writer424 принят ниже. J26 Code422/Declared423
 приняты2/2 на immutable child `3b59423f1a`, source/direct и live уровни ниже;
@@ -53,6 +54,32 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J19: technical-name cases/source готовы до live — 2026-10-01
+
+Child1aa8d49f09 добавил два closed operator cases `context-code-renamed` /
+`context-declared-renamed`. Existing shared field procedure, own input0,
+Customer→CustomerNow при label/source Customer, сохранённые types/Required/
+usage/order/autosync; initial GUID закреплён previous public context, полный
+mapping/root/owner сверяются после ACK и перед каждым gesture. Sole input Done
+проверяется existing receipt verifier; unknown edit/ACK/Done не разрешают Close/replay.
+NEW context до source edit/Execute обязан доставить fresh Name и exact old code;
+исторический same-ID replay не подменяется новым observation. Correction uses
+наблюдённый technical Name, затем four warmup/edit Execute/full6×4 и final context.
+Output materialization refusal не обходить запуском old code; §«Следующий fixed
+срез» [context design](context-delivery-design.md).
+
+Final addressed04/exec84405 actualexit0:71PASS, logSHA935b72a3. Full operator
+69509 actualexit0/18490PASS (concurrency4), logSHA6385acc9. Initial helper01
+22PASS/1FAIL выявил недостающую baseline port-GUID binding; original log сохранён,
+guard добавлен и проверен. Client code unchanged; previous3318PASS+10SKIP/69911
+на22f не переигрывался. Source freeze a7b96ef4/12748files+61symlinks,
+oracle32bc3cfd, auditor6f989c8c,negative84/handoff13bbba32,pin2e69f11d.
+Python syntax PASS; положительный audit/negative84 после live ещё не выполнены.
+Registry432 closed_verified/active_exec=null; next profile433 ещё не назначен.
+После пред-live admission выполнить один ordinary headed Code case, audit/
+cleanup/process absence перед declared. Natural insufficient-primary/Done/
+actual model/candidate/CLI/Gates остаются открытыми; accepted milestones не повторять.
 
 ### E/J25: owned technical-details expansion432 принят — 2026-10-01
 

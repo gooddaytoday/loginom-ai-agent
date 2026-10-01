@@ -97,3 +97,58 @@ code. Stale digest/request отказывает, corrected source обращае
 Operator live доказывает доставку и детерминированную обработку данных runtime.
 Поведение модели на instruction-in-data проверяется дополнительно в actual
 candidate/CLI; ручной fixed request не является таким доказательством.
+
+## Следующий fixed срез: technical input Name — 2026-10-01
+
+После accepted owned details432 использовать два sequential closed cases
+`context-code-renamed`/`context-declared-renamed`, saved C/D и fresh ordinary
+headed profiles. Это продолжение J19, без нового публичного mapping API.
+Имена source input остаются RowID/Customer/Qty/UnitPriceCents/DiscountPct.
+В собственном JS input0 заменить только target technical Name
+`Customer → CustomerNow`, label Customer сохранить. Types/Required/usage/order,
+autosync=true и reciprocal source identities сохранить; для изменённого
+target ожидается native origin_type1 (baseline всех target origin_type0/usage0
+подтверждён actual accepted input mapping432). Не объявлять expected transition
+подтверждённым live до observation/audit.
+
+Использовать existing `createNodeProcedure.openPort(input,0)` и
+`configureOutputField`, который уже принимает input_mapping/TuneDataSourceMappingWizard.
+Отдельный narrow operator helper удерживает исходный opening receipt, native
+prepared input port GUID из предыдущего public context/root/full mapping до
+каждого action (readMappings также в field editor), sole Name fill/Apply
+и sole input-port Done. Generic UI/JS/RPC capability не расширять. Unknown
+opening/edit/Done/ACK сохраняет pending; Close/discard/replay после возможной
+mapping mutation не выполнять как будто её не было. Исходный deadline сохраняется.
+
+Warmup прежнего кода/4 output fields — два completed Execute; затем baseline
+public context. Existing manual NetCents label с instruction-in-data и output
+autosync=false уже проверены ранее и сохраняются. После input rename **до нового
+Execute/source edit** получить NEW context: CustomerNow на target input0,
+Customer на его source, label Customer, exact old code/digest, schema mode и
+полные mappings/user-v1. Same-ID baseline replay остаётся исторической receipt,
+NEW ID обязан увидеть новый semantic digest. Нематериализованный output требует
+явного refusal по прежнему контракту; его нельзя заполнять запуском old code.
+
+Corrected source заменяет единственное `InputTable.Get(row,"Customer")` на
+наблюдённое `InputTable.Get(row,"CustomerNow")` и добавляет прежний inert data
+comment. NEW apply с исходным verified source digest, два fresh completed Execute,
+full6×4/1950 и independent final source/context доказывают сохранность бизнес-задачи.
+Не выводить новое имя из label/позиции. Старая и свежая receipts различаются;
+физические output names/labels/types, весь graph, другие port settings неизменны.
+Actual model resistance проверяется отдельно в F/candidate/CLI.
+
+До live: addressed tests actual shared field procedure/one-flight/owner/port/
+mapping drift/unknown ACK/Done и oracle source/label/technical-name separation;
+затронутые regressions, immutable child source/freeze, заранее закреплённый
+independent auditor/negative mutations. Затем один Code case с audit/cleanup/
+process absence перед declared. Accepted base/reordered/inventory/expansion
+milestones без затронувшего изменения не переигрывать.
+
+Source implementation — child1aa8d49f09, addressed71PASS, full operator69509
+actualexit0/18490PASS (concurrency4). Initial helper test22PASS/1FAIL обнаружил
+недостающую привязку GUID к previous context; guard добавлен, final tests прошли.
+Client source unchanged; accepted3318PASS+10SKIP на22f не переигрывался.
+Private source freeze a7b96ef4/12748files+61symlinks, oracle32bc3cfd,
+auditor6f989c8c/negative84/handoff13bbba32, pin2e69f11d; Python syntax PASS.
+Это подготовка, не live J19 acceptance; positive audit и actual non-noop negatives
+требуются после первого headed Code run.
