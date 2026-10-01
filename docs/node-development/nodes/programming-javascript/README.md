@@ -97,8 +97,13 @@ independent audit v3/negative80/80 каждый и cleanup; имена не пе
 Source/direct [J21 response budgets](response-budget-design.md) на8bca1b00aa
 проверены: addressed76/full client3188+10SKIP/operator45, actual MCP fixture и
 recorded live replies8/8; actual candidate/CLI limits и delivery остаются в F.
-Следующий шаг — [G1/J22 UI profile](ui-profile-design.md), затем module
-и точный остаток E/F/candidate/CLI.
+[G1/J22 UI profiles](ui-profile-design.md) Code414/Declared415 на8acf420997
+приняты2/2: native source/settings/graph preservation, visible controls/cache,
+audit/negative57 каждого и cleanup. Для existing connected input0 на7.4.2/Linux
+выбран bounded identity contract; runtime FullType остаётся null/false, hidden
+menus и engine conformance не заявлены. Final addressed97/full18327 PASS.
+Следующий шаг — J24 technical names/invalid/Cyrillic source→physical,
+далее module/cold long source/Done refusal/J19 model resistance и E/F/candidate/CLI.
 Точная текущая точка — в checkpoint; частичная поддержка не зарегистрирована
 в продуктовом каталоге.
 

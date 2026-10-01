@@ -30,7 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — [G1/J22 профиль своего мастера](ui-profile-design.md);
+следующий шаг — J24 technical-name/invalid/Cyrillic source→physical;
+[G1/J22 профиль своего мастера](ui-profile-design.md) принят в bounded scope ниже;
 source/direct [response budgets](response-budget-design.md) J21 приняты ниже;
 Code410/Declared411 reordered context приняты2/2 на immutable child9c93 ниже.
 Context Code403/declared404 и bridge fix, J09 Code399/declared400 и exact knowledge v1 Code401/declared402 также приняты. Fixed source32768/
@@ -49,6 +50,96 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/G1/J22: обе UI profiles приняты; bounded identity decision — 2026-10-01
+
+На immutable child8acf Code414/exec98974 и Declared415/exec7498 прошли ordinary
+headed live: actual exit0/OBSERVED, cleanup3/3 и независимый v2 audit/PASS.
+Negative checker v2 отказал57/57 non-noop mutations каждого; Code exec85529,
+Declared exec17221 — actual exit0. После finish415 registry closed_verified,
+active exec/evidence null; browser и live processes отсутствуют.
+
+| Run | Actual process | Complete preserved source | Report SHA256 | Journal SHA256 |
+| --- | --- | --- | --- | --- |
+| code/414 | 98974, exit0 | 836 bytes /16 LF lines | `62cace36759afdb4d495bdb59e913eff3681fda199a42ca6e78406979b1d7ef2` | `a6487e1c0d1bce36600e84c2281fb1f8137d00b889ababb884d65192662b7db8` |
+| declared/415 | 7498, exit0 | 634 bytes /15 LF lines | `ceeae87f4d6ba86bdeed969e5a3061636513f9e4945a2514471dcc22740198c3` | `295ad56216fd1c4d0dde8d35b25cf77d5a3d594a088c71b44bd22a6d5c648942` |
+
+Каждый report содержит31 exact compact journal references и два независимых
+preserve-open/read/discard. Source digest и все normalized native settings
+совпадают между openings. Code source836/16LF lines SHA1bc0f812…b61ec3,
+settings e5cbe4e3…49489; declared634/15LF lines SHAcdce335d…13a2,
+settings770ee74c…7642b. Semantic graph/node/ports/links сохранены.
+В обоих modes observed Columns index0→Code index1,4 bound native indicators,
+15/9 visible controls; inventory идентичен между independent opens.
+Code Columns допускает1 exact disabled delete-header mask, остальные pages0.
+Observer replies5168–6600 UTF8 bytes с navigation; предел16384 не превышен.
+First opening Columns/Code images обоих modes просмотрены; все8 image hashes
+сопоставлены audit с журналом. Native generation=true/false подтверждает schema
+mode; fallback checked:null самого inventory не заменял этот native witness.
+
+**Решение по current identity:** для existing connected input0 Code/Declared
+на pinned Loginom7.4.2/Linux принимается явно допустимая планом альтернатива
+недоступному без нового remote обращения FullType: prepared document/package/
+workflow и native JS GUID, fresh vendor-icon proof, retained own native Code
+controller/DOM и own cached FEngine/FModuleSystem proxy metadata. Наблюдены
+prototype constructor names `$bg_rpc_TIBGJavaScriptEngine_Proxy` и
+`$bg_rpc_TIBGJavaScriptModuleSystem_Proxy`, interfaces1649/1460, same session /
+different objects. Это interface/cache witness; server FullType/serialized
+TBGJavaScriptEngine этим не объявляются runtime observations. Explicit
+runtime_full_type:null/full_type_observed:false сохранены. Полная engine
+conformance и переносимость на другой build не следуют из identity proof.
+
+**Решение по J22 UI:** в наблюдённом visible inventory Columns/Code обоих
+сохранённых modes assistant/engine selector не обнаружены. Generation checkbox
+меняет output schema, Preview — предпросмотр; они не являются помощником или
+выбором движка. Helper/engine switch/source edits/Done/Save/explicit Execute
+не запрашивались; последовательность bounded native gestures проверена audit.
+Hidden menus, другие conditional pages и отсутствие внутреннего исполнения
+не заявлены. Profile observation закрыт в этом scope; actions своего handler
+и actual candidate/CLI проверять в F. Registry остаётся14/discovery_required.
+
+Declared audit/negative receipt SHA:
+`e2eaf23997e2ce093104d8d82ee5d111ff0e67209bf9cc0f83f7f01c835145e5` /
+`8abd06b22825007417965cef5ef848c23235984344ff8d9f54777ad2905097a8`.
+Code counterparts приведены в записи ниже. Failed412 и его recovery413
+остаются отдельными исходными свидетельствами; live результат414/415 их
+не переписывает. Final addressed97/full operator18327 и1512 source hashes
+подтверждены перед live. Raw helpers/logs/images остаются private, не в Git.
+
+**Следующее:** J24 — fresh native technical-name change/invalid/Cyrillic
+source→physical contract и соответствующая knowledge; private T96 — гипотезы,
+не public acceptance. Далее J26 module policy, J23 cold именно long source,
+Done refusal/technical details, J19 actual model resistance, F review/registration/
+candidate/J01/J21 actual effective limits/J27/two autonomous Sol low CLI attempts.
+Цель не завершена; никаких merge/push/rebase в этом шаге не было.
+
+### E/G1/J22: Code414 принят; Declared415 в работе — 2026-10-01
+
+Code414/exec98974 ordinary headed на immutable8acf: actual exit0/OBSERVED,
+cleanup3/3, native source/settings preserve across2 separate opens, four
+owned UI observations. Independent audit v2 actual exit0/PASS; non-noop
+negatives57/57 refused, exec85529 actual exit0. Registry414 reconciled
+closed_verified, original profile processes absent.
+
+Source836 bytes/16LF SHA `1bc0f8123e1c2a6f1924ee69e0e9373d720e4ea301f4f928d347535e06b61ec3`,
+settings SHA `e5cbe4e387605e623851346733621cb052cefea858eae76df5076160a3749489`.
+Controls15 Columns /9 Code, bottom navigation4 indicators with bound indices0→1;
+CodeMirror one editor. Cached engine proxy interface1649 and module-system1460,
+same native session/different objects; runtime_full_type:null, full_type_observed:false.
+First opening Columns/Code images просмотрены; generation checkbox — output
+schema setting, button Preview — предпросмотр. В observed visible controls
+assistant/engine selector не обнаружены; unopened menus и global absence
+не проверены. This Code result сам ещё не закрывает оба modes/полный J22.
+
+Report/journal SHA `62cace36759afdb4d495bdb59e913eff3681fda199a42ca6e78406979b1d7ef2` /
+`a6487e1c0d1bce36600e84c2281fb1f8137d00b889ababb884d65192662b7db8`.
+Audit/negative receipts SHA
+`477e019db7272ae25c2e4a51399e40d7c13e80c5a72ab847ba9206912e8415bf` /
+`5896c82b8160165ded014b4704ef240995401069459186b054cda9ec5376441f`.
+После reconciliation414 назначен fresh415 `e-ui-profile-declared-01`,
+exec7498 — сейчас active ordinary headed. Не запускать другой browser/profile
+до actual completion, audit/negative and cleanup/process absence.
+G1/J22 открыты до результата Declared и explicit bounded identity decision.
 
 ### E/G1/J22: final97/full18327 PASS; fresh414 Code назначен — 2026-10-01
 

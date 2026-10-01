@@ -79,3 +79,24 @@ slots без getters, включая пустые conditional FPages. Final addr
 operator full18324 подтверждены с оговоркой последнего narrow изменения в
 [checkpoint](checkpoint.md). Source freeze1512/helper/oracle закреплены до
 fresh412 Code. Это source verification; live identity/UI решение ещё открыто.
+
+## Принятое live решение — 2026-10-01
+
+Code414/Declared415 на8acf420997 приняты2/2: два независимых preserved openings
+каждого, native source/settings/semantic graph,15 Columns и9 Code controls,
+Code page cached engine/module metadata, audit +57 negatives каждого и полный
+cleanup/process absence. Final source tests97/full18327 PASS; исходный failed412
+сохраняется отдельно с completed owned recovery413. Evidence — в checkpoint.
+
+Для existing connected input0 обоих modes на7.4.2/Linux принят identity
+contract из prepared document/package/workflow/native JS GUID + fresh icon +
+retained own Code controller/DOM + own cached engine/module proxy metadata.
+Это допустимая scoped альтернатива FullType. FullType остаётся null/false;
+proxy interface constructor names не являются server class/fulltype.
+
+В observed visible inventory assistant/engine selector не обнаружены;
+helper/engine switch не выполнялись. Generation checkbox и Preview имеют
+иное проверенное назначение. Меню не открывались, другие conditional pages и
+hidden execution absence не объявляются. Product handler/candidate/CLI проверят
+эту границу в F; профиль не повышает readiness registry и engine conformance.
+Следующий scoped результат — J24 technical names, затем остаток E/F.
