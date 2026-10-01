@@ -30,7 +30,8 @@ registry не повышалась; 0B остаётся `discovery_required` с 
 | Target persistence — J27 | Source Host fix `9d75933fac`, ранее 44 tests + typecheck | Использовать explicit URL fix; до сборки сверить альтернативный `1b8d100392`, затем actual candidate restart |
 
 **Следующий связный результат:** E — remaining J01–J27 из [плана](plan.md),
-следующий шаг — J23 Save/cold именно long source; J26 Code422/Declared423
+следующий шаг — завершить текущий J23 cold425/exec35552 и independent audit;
+long source writer424 принят ниже. J26 Code422/Declared423
 приняты2/2 на immutable child `3b59423f1a`, source/direct и live уровни ниже;
 [G1/J22 профиль своего мастера](ui-profile-design.md) принят в bounded scope ниже;
 source/direct [response budgets](response-budget-design.md) J21 приняты ниже;
@@ -51,6 +52,45 @@ existing code-table через public API-path изолированного runt
 Далее E остаток J и F ревью/candidate/CLI; фиксированные C/D Save/cold повторять
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
+
+### E/J23: long source writer424 принят; cold425 выполняется — 2026-10-01
+
+`e-long-source-writer-01`/profile424/exec70780 actual exit0/OBSERVED на immutable
+child060a8d1cc7: new public Code apply13verified phases/2owned Execute/full6×4/
+user-v1, exact32768bytes/1024LF-lines и8independent public chunks. Новый owned
+Save/dirty-state false подтверждён; PackageClose/logout/browser/process absence
+выполнены. Independent **v6 audit/PASS**, negative exec50374/exit0 **16/16**
+non-noop mutations refused. Report SHA256
+`09c72dd5e79b68be974014a67e0840821b2af998ecb93f144adfd6cfd0e33ddc`,
+journal `5bb07639d934871fead5e441132f14a8091ff80c3ceee52e3493f4c397ac2b3d`,
+audit receipt `509d37bb64760a66c978628a48adfa7415bcde45399b64bf0b1edae5ed957806`,
+negative receipt `203aeb5092b5f2ddbb576cec145a521fff38978f605762573cdee3b7d62d4fc8`.
+Saved path
+`/jsteach/js-g2-3fa2aec4-97e6-4702-9ae2-037f971cb504/JavaScript-08dda7b5-0c27-4fcd-a28c-7c1e18b53693.lgp`;
+C/D baseline не заменялись. Registry424 closed_verified до нового процесса.
+
+Private auditor revisions сохранены: v1 не вызывался, v2 уточнил per-chunk
+`admission_id/read_id/step` (read_id общий для8chunks); v2 failed на compact
+omitted filter=false; v3 учёл create/preserve, затем failed на сравнении initial
+create с configured receipt; v4 доказал create→mutation→full read→configured own
+node/settings→pre/post-ACK full reads/Execute, затем failed на plain JSON SHA.
+v5 использует canonical sorted-object JSON settings digest, затем failed на
+adapter `schema_mode:preserve`; это intent, не observed native mode. v6 проверяет
+actual `generation=true`, две полные пустые declaration grids и неизменный
+canonical settings SHA при code/preserve intent. Cross-process сравнение settings
+и input mapping сохраняет все semantic metadata, исключая frontend prefixes/
+volatile record IDs. Runtime/browser не менялись и не переигрывались; v2–v5
+не объявляются PASS. Final private pin v6 SHA256
+`04dd78d6f488db799e3807c558b809cafa4a74b903068a9f2f18325196cd22b5`,
+auditor `ceb5af86b9ce01806174863115343e28b561c1bd6bba1ccef1b2dcc6a5b9978f`.
+
+Fresh425 `e-long-source-cold-01`/exec35552 выполняется на том же immutable code
+и v6 pin. Existing path-only cold reader получил только verified package path
+и technical assignment, без source factory/expected/schema/CSV. Ordinary headed,
+original10min budget,1fresh owned Execute/full6×4; source/settings read/rechecks
+не пишут конфигурацию. Наблюдать тот же handle. После actual terminal — v6 audit/
+negative16/cleanup/process absence/registry finish. Cold persistence/native bytes/
+candidate/CLI/Gates ещё не заявлены. Admin/новый bootstrap не выполнялись.
 
 ### E/J23: long source writer/cold подготовлен — 2026-10-01
 
