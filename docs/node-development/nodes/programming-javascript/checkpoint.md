@@ -307,6 +307,30 @@ auditor pin. Если native поддержан или primary sufficient, insuf
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
 
+### E/J14: bounded pre-body redraw source pending / suites running — 2026-10-01
+
+На child604 текущие незакоммиченные изменения ограничены owned-selection,
+managed-selection и actual serialized operator tests. Only managed first body
+pre-click admits one detached redraw при same native owner/empty initial+current
+selection и full snapshot/point compare; default inspection refused. Добавлена
+строгая returned browser receipt/journal ACK; ACK loss оставляет один click и
+не запускает replay. Actual addressed04/original95149 actualexit0/**248PASS**.
+Initial addressed01 fail1 был некорректным expiry test (менял host object после
+serialization); исправлен реальным истечением original deadline после ACK.
+
+Full client originalexec96946 и operator42983 RUNNING на одном pending source,
+concurrency4; до terminal source/tests не менять и browser не запускать.
+Три changed files local/unmapped, source attribution не изменяется. Private
+v2 oracle unchanged7042b040, auditor/36 negatives/handoff prepared и Python syntax
+PASS; freeze/pin ещё отсутствуют, не выданы за live acceptance. После terminal —
+source commit/verifier, новый freeze/pin, fresh447 Code, затем declared.
+
+Уточнение original444: прежний dispatch не писал body_returned вообще, поэтому
+само отсутствие такой записи не доказывает no click. Pre-gesture место отказа
+установлено по actual stack/source (`inspect` до mouse.click); original outcome
+AMBIGUOUS остаётся неизменным. Separate verified recovery446 освобождает resources,
+но не превращает failed live в PASS. Registry446 closed_verified/active_exec=null.
+
 ### E/J14: Code444 отказ и отдельная verified recovery — 2026-10-01
 
 Original6043749a3f/profile444/exec57140 actualexit1: general Done OBSERVED с

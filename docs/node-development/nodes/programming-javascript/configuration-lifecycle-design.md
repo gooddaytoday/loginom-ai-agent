@@ -102,3 +102,10 @@ blockers, ACK/deadline и unknown click reply по-прежнему refused; no 
 положительная и отрицательные проверки, client/operator regressions и новый
 freeze/pin. Accepted original artifacts неизменны; next live — новый profile447,
 не повтор старого operation_id и не повышение failed run до PASS.
+
+Для следующего source фиксировать returned browser receipt отдельной записью
+`javascript_managed_body_returned` с exact ACK, owner/deadline/expected snapshot
+и native pre_click_dom_replacements. Loss ACK после gesture не позволяет replay.
+У прежнего source такого event не было: отсутствие body_returned в original444
+само по себе не является proof no click; место original отказа подтверждает
+его actual stack/source до mouse.click, при сохранённом AMBIGUOUS outcome.
