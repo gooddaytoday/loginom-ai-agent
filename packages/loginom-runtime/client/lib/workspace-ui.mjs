@@ -3961,11 +3961,13 @@ function readRenderedInputMapping(observation) {
           const parameterKey=choice.field.scope==='expression_parameter'?'expression_parameters':choice.field.scope==='output_column'?'column_parameters':choice.field.scope==='reform_column'?'reform_parameters':null;
           const expressionParameter=parameterKey!==null;
           const sourceOption=choice.field.scope==='import_source';
+          const partitionOption=choice.field.scope==='data_partition';
           const exportOption=!expressionParameter&&['text_export_params','text_export_format'].includes(current.wizard.stage);
-          if(sourceOption||exportOption)for(let attempt=0;attempt<24;attempt++) {
-            const f=observed.wizard[sourceOption?'import_source':'settings']?.fields?.[choice.field.name];
+          if(sourceOption||exportOption||partitionOption)for(let attempt=0;attempt<24;attempt++) {
+            const f=observed.wizard[sourceOption?'import_source':partitionOption?'data_partition':'settings']?.fields?.[choice.field.name];
             if(f?.value===choice.label&&!observed.ui.masks.length)break;
             // Export preview refreshes its caption after the picker closes.
+            // DataPartition method changes also load their own native panel.
             // Read the original field until it settles; never select again.
             if(!observed.authenticated||observed.origin!==current.origin||observed.loginom_build!==current.loginom_build
               ||observed.dom_epoch.document!==current.dom_epoch.document||!same(observed.workflow_ref,current.workflow_ref)

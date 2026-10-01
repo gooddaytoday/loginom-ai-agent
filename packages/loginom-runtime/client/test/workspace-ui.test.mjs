@@ -5107,3 +5107,26 @@ test('fractional Reform rows retain complete definitions and native record bindi
   for(const field of s.wizard.reform_columns.fields)assert.ok(s.ui.elements.find(e=>e.ref===field.name_ref)?.allowed_actions.includes('double_click'));
  }
 });
+
+
+test('DataPartition option waits for its native panel after one gesture and retains original field guards',async()=>{
+ for(const fault of ['none','replacement','wrong_value','persistent_mask']){
+  const page=new Page(),wizard=page.add('div','MF;TF-1;WizrdMCF'),base='MF;TF-1;WizrdMCF;PartitionComponentWizard;';
+  const owner=page.add('div',base+'pedSamplingMethod;ValueControl','',undefined,wizard);
+  const input=page.add('input',null,'',undefined,owner);input.value='Случайный';
+  const tid=owner.getAttribute('data-tid'),list=page.add('div',tid+';boundlist','',{x:200,y:200,width:180,height:60});
+  page.add('div',tid+';boundlist;Равномерный_случайный','Равномерный случайный',{x:205,y:205,width:170,height:20},list);
+  const snapshot=await page.observe(),option=snapshot.ui.elements.find(e=>e.wizard_combo?.kind==='option');
+  assert.equal(option.wizard_combo.field.scope,'data_partition');
+  const click=page.mouse.click;let mask,waits=0;
+  page.mouse.click=async(...args)=>{await click(...args);list.remove();input.value='Равномерный случайный';mask=page.add('div','mask','Загрузка',{x:0,y:0,width:600,height:600});mask.attrs.class='x-mask-msg';};
+  page.waitForTimeout=async()=>{waits++;
+   if(fault==='replacement'&&waits===1){input.remove();page.add('input',null,'',undefined,owner).value='Равномерный случайный';}
+   if(fault==='wrong_value')input.value='Случайный';
+   if(fault!=='persistent_mask'&&waits===2)mask.remove();
+  };
+  const result=await page.act({verb:'select_wizard_option',ref:option.ref},snapshot);
+  assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1);assert.ok(waits>0&&waits<=24);
+ }
+});

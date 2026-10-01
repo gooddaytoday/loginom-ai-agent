@@ -16,6 +16,7 @@ export function compareSamplingPartition(expected,binding,result){
   const port=ports.find(p=>p.port===index),bound=binding.ports.find(p=>p.index===index);
   if(!port||port.role!==role||port.port_guid!==bound?.guid)return fail('PORT_IDENTITY');
   if(port.execution_id!==result.execution.execution_id||port.fresh!==true)return fail('STALE_EXECUTION');
+  if(port.precision?.numbers_verified!==true||port.precision.limitations?.length)return fail('NUMERIC_PRECISION');
   if(port.sample_complete!==true||port.filter_enabled!==false||!Array.isArray(port.sample)||port.row_count!==port.sample.length)return fail('FILTER_OR_PARTIAL');
   if(!isDeepStrictEqual(port.schema.map(f=>({index:f.index,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind})),schemas[index])
    ||port.schema.some(f=>f.data_kind_source!=='fresh_native'))return fail('SCHEMA_CHANGED_OR_CACHED');

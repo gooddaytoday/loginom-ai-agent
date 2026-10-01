@@ -57,6 +57,8 @@ test('DataPartition bias decodes exact native Int64 limbs and local dates withou
  f.fields[0].data.DataType=4;
  assert.equal(f.read().parameters.biased.adjustments[0].value.value,'9007199254740993');
  row.data.Value={lo:4294967295,hi:-1};assert.equal(f.read().parameters.biased.adjustments[0].value.value,'-1');
+ row.data.Value=9007199254740993n;assert.doesNotThrow(()=>JSON.stringify(f.read()));
+ assert.equal(f.read().method_rows[0].value.value,'9007199254740993');
  row.data.Value=9007199254740992;assert.equal(f.read().parameters.biased,undefined);
  let accessed=false;row.data.Value={get lo(){accessed=true;return 1;},hi:0};
  assert.equal(f.read().parameters.biased,undefined);assert.equal(accessed,false);

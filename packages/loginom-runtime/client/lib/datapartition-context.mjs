@@ -123,6 +123,9 @@ export function readDataPartitionBrowser(prefix){
     return null;
    };
    const adjustments=methodRows.map(r=>({value:typed(r.value),factor:r.factor}));
+   // Keep cached bigint/Date values out of JSON journals; typed keys are the
+   // canonical serializable identity. Unsupported keys remain unverified.
+   methodRows=methodRows.map((row,index)=>({...row,value:adjustments[index].value}));
    if(adjustments.every(r=>r.value))parameters.biased={field:chosen.name,adjustments};
   }
  }

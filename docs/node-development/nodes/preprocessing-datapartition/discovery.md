@@ -239,3 +239,28 @@ or bigint within signed int64. Datetime keys decode valid cached Date objects
 to local ISO milliseconds. Offline tests reject unsafe numeric values and
 getters; native bias int64/datetime remains NOT_RUN. Canonical typed key identity
 is shared between validation and selection, including local datetime precision.
+
+## Public attempt 27: random PASS, uniform configure FAIL
+
+Clean candidate270098e12bcb466bfb27bc29df757d8658cfc777, sourceDirty=false.
+Random create/execute/read completed on public path: complete combined/training/
+test counts9/6/3, exact source payload, separate owned GUIDs, fresh schemas.
+Independent source-fixture oracle PASS;16 negative controls FAIL.
+Original-S public reread on the same node, no configure, new completed execution:
+sampling and fixed-seed replay oracles both PASS. No PRNG is cloned.
+
+The following uniform creation failed AMBIGUOUS at native option selection.
+Primary post-gesture observation has the requested label and original field refs
+but a busy mask on the owned wizard. Original operation inspected; no blind retry.
+DataPartition now uses the existing bounded post-selection readback wait while
+retaining root/field/workflow/identity/deadline guards. Four positive/negative
+panel-settlement cases pass; native retry of this source delta remains NOT_RUN.
+
+Local cleanup again reports DIAGNOSTIC_SAVE_PROMPT_CHANGED. Wrapper records
+FAILED/command_exit1 and cleanup_confirmed=true, closed1/loggedOut=true on a only.
+Attempt27 is not product PASS. Full five-method matrix stopped at uniform;
+stratified/biased/sequential runs in this attempt are NOT_RUN.
+
+Cold integration scope interaction3c0080b6-e8cc-4172-9076-35015885781c pending.
+Task stays in_progress, draft PR only. CLI7200, full math, dynamic/recovery/save/
+cold and final result.json PASS remain NOT_RUN. No readiness is promoted.

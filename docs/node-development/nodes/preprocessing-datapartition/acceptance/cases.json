@@ -1,8 +1,8 @@
 {
-  "format": "documentation-planning-v1-proposed",
+  "format": "data-partition-native-contract-matrix-v1",
   "node": "preprocessing-datapartition",
-  "base_sha": "9b17e7dd947c016395e8e32e439ca775b1cbe780",
-  "status": "OFFLINE_ONLY_NOT_NODE_PASS",
+  "base_sha": "375b32bbf5d5e1376628d1b3684a2da78bda29da",
+  "status": "NATIVE_CONTRACT_RECONCILED_EXECUTION_PARTIAL_NOT_NODE_PASS",
   "inputs": [
     {
       "file": "data/base.csv",
@@ -134,7 +134,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-rows-rows-test-algorithm",
@@ -156,7 +157,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-rows-rows-test-start",
@@ -178,7 +180,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-rows-rows-test-end",
@@ -200,7 +203,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-rows-percent-training-algorithm",
@@ -222,7 +226,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-rows-percent-test-algorithm",
@@ -244,7 +249,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-rows-percent-test-start",
@@ -266,7 +272,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-rows-percent-test-end",
@@ -288,7 +295,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-percent-rows-training-algorithm",
@@ -310,7 +318,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-percent-rows-test-algorithm",
@@ -332,7 +341,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-percent-rows-test-start",
@@ -354,7 +364,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-percent-rows-test-end",
@@ -376,7 +387,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-percent-percent-training-algorithm",
@@ -398,7 +410,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-percent-percent-test-algorithm",
@@ -420,7 +433,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-percent-percent-test-start",
@@ -442,7 +456,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "random-percent-percent-test-end",
@@ -464,7 +479,8 @@
           "value": 17
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-rows-rows-training-algorithm",
@@ -486,10 +502,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-rows-rows-test-algorithm",
@@ -511,10 +535,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-rows-rows-test-start",
@@ -536,10 +568,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-rows-rows-test-end",
@@ -561,10 +601,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-rows-percent-training-algorithm",
@@ -586,10 +634,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-rows-percent-test-algorithm",
@@ -611,10 +667,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-rows-percent-test-start",
@@ -636,10 +700,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-rows-percent-test-end",
@@ -661,10 +733,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-percent-rows-training-algorithm",
@@ -686,10 +766,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-percent-rows-test-algorithm",
@@ -711,10 +799,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-percent-rows-test-start",
@@ -736,10 +832,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-percent-rows-test-end",
@@ -761,10 +865,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-percent-percent-training-algorithm",
@@ -786,10 +898,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-percent-percent-test-algorithm",
@@ -811,10 +931,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-percent-percent-test-start",
@@ -836,10 +964,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "uniform-percent-percent-test-end",
@@ -861,10 +997,18 @@
           "value": 17
         },
         "uniform": {
-          "group_size": 3
+          "training": {
+            "unit": "rows",
+            "value": 3
+          },
+          "test": {
+            "unit": "rows",
+            "value": 2
+          }
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-rows-rows-training-algorithm",
@@ -889,10 +1033,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-rows-rows-test-algorithm",
@@ -917,10 +1063,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-rows-rows-test-start",
@@ -945,10 +1093,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-rows-rows-test-end",
@@ -973,10 +1123,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-rows-percent-training-algorithm",
@@ -1001,10 +1153,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-rows-percent-test-algorithm",
@@ -1029,10 +1183,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-rows-percent-test-start",
@@ -1057,10 +1213,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-rows-percent-test-end",
@@ -1085,10 +1243,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-percent-rows-training-algorithm",
@@ -1113,10 +1273,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-percent-rows-test-algorithm",
@@ -1141,10 +1303,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-percent-rows-test-start",
@@ -1169,10 +1333,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-percent-rows-test-end",
@@ -1197,10 +1363,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-percent-percent-training-algorithm",
@@ -1225,10 +1393,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-percent-percent-test-algorithm",
@@ -1253,10 +1423,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-percent-percent-test-start",
@@ -1281,10 +1453,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "stratified-percent-percent-test-end",
@@ -1309,10 +1483,12 @@
           "fields": [
             "Group",
             "Subgroup"
-          ]
+          ],
+          "complete_unique_values": false
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-rows-rows-training-algorithm",
@@ -1334,11 +1510,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-rows-rows-test-algorithm",
@@ -1360,11 +1540,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-rows-rows-test-start",
@@ -1386,11 +1570,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-rows-rows-test-end",
@@ -1412,11 +1600,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-rows-percent-training-algorithm",
@@ -1438,11 +1630,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-rows-percent-test-algorithm",
@@ -1464,11 +1660,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-rows-percent-test-start",
@@ -1490,11 +1690,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-rows-percent-test-end",
@@ -1516,11 +1720,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-percent-rows-training-algorithm",
@@ -1542,11 +1750,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-percent-rows-test-algorithm",
@@ -1568,11 +1780,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-percent-rows-test-start",
@@ -1594,11 +1810,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-percent-rows-test-end",
@@ -1620,11 +1840,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-percent-percent-training-algorithm",
@@ -1646,11 +1870,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-percent-percent-test-algorithm",
@@ -1672,11 +1900,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-percent-percent-test-start",
@@ -1698,11 +1930,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "sequential-percent-percent-test-end",
@@ -1724,11 +1960,15 @@
           "value": 17
         },
         "sequential": {
-          "take": 2,
-          "skip": 1
+          "order": [
+            "training",
+            "test",
+            "unused"
+          ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-rows-rows-training-algorithm",
@@ -1753,21 +1993,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-rows-rows-test-algorithm",
@@ -1792,21 +2045,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-rows-rows-test-start",
@@ -1831,21 +2097,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-rows-rows-test-end",
@@ -1870,21 +2149,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-rows-percent-training-algorithm",
@@ -1909,21 +2201,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-rows-percent-test-algorithm",
@@ -1948,21 +2253,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-rows-percent-test-start",
@@ -1987,21 +2305,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-rows-percent-test-end",
@@ -2026,21 +2357,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-percent-rows-training-algorithm",
@@ -2065,21 +2409,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-percent-rows-test-algorithm",
@@ -2104,21 +2461,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-percent-rows-test-start",
@@ -2143,21 +2513,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-percent-rows-test-end",
@@ -2182,21 +2565,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-percent-percent-training-algorithm",
@@ -2221,21 +2617,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-percent-percent-test-algorithm",
@@ -2260,21 +2669,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-percent-percent-test-start",
@@ -2299,21 +2721,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     },
     {
       "id": "biased-percent-percent-test-end",
@@ -2338,21 +2773,34 @@
           "field": "Category",
           "adjustments": [
             {
-              "key": "A",
-              "factor": 2
+              "factor": 2,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "A"
+              }
             },
             {
-              "key": "B",
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": false,
+                "value": "B"
+              }
             },
             {
-              "key": null,
-              "factor": 1
+              "factor": 1,
+              "value": {
+                "type": "string",
+                "is_null": true,
+                "value": null
+              }
             }
           ]
         }
       },
-      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution"
+      "oracle": "counts/provenance/three-port agreement; unresolved allocation frozen before execution",
+      "execution": "NOT_RUN"
     }
   ],
   "core_count": 80,
@@ -2373,7 +2821,7 @@
         "data/base.csv",
         "data/uneven.csv"
       ],
-      "check": "group_size1/3/5; source and remainder quotas",
+      "check": "Independent training/test group sizes rows1/3/5 and percent; uneven source and residual quotas",
       "execution": "NOT_RUN"
     },
     {
@@ -2385,11 +2833,11 @@
       "execution": "NOT_RUN"
     },
     {
-      "id": "blocks",
+      "id": "sequence-order",
       "fixtures": [
         "data/base.csv"
       ],
-      "check": "take2/skip1, take12/skip0, exhausted and incomplete block",
+      "check": "All six native training/test/unused order permutations, both priorities and test positions; unused segment size residual. take/skip rejected as unsupported proposed keys.",
       "execution": "NOT_RUN"
     },
     {
@@ -2436,5 +2884,6 @@
       "check": "invalid field/size/seed/typed adjustment; no side effect; recover same graph",
       "execution": "NOT_RUN"
     }
-  ]
+  ],
+  "planning_base_sha": "9b17e7dd947c016395e8e32e439ca775b1cbe780"
 }
