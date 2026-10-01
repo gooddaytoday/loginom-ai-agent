@@ -2,9 +2,16 @@
 
 ## Текущее состояние
 
-Актуальная граница на 2026-10-01: E diagnostics и prerequisites перед F;
-source child30b703fac0, последняя live443 закрыта. Новые результаты J19/J25 и
-J27/source provenance — в адресных разделах ниже. Следующий текст сохраняет
+Актуальная граница на 2026-10-01: E/new standalone Done перед F. General
+handler73a8e9df31 и свежие existing Code447/declared448 Done/Close/preserve Execute
+приняты2/2; package/logout/browser/process cleanup и lease448 closed_verified.
+Operator source fecbc9f44deeb1045794811674e67ae28da4caa4 добавляет фиксированный
+new Done обоих modes; addressed125/operator18583PASS, client runtime не менялся.
+Pre-live pin61a391ba/oracle70c6b2a3/freezebdbe903c/auditor888a9fdf/negative426de96e/
+handoff1c73899c сохранены; fresh449 пока не назначен. J02 public input подтверждён.
+Natural insufficient-primary/Done error not_observed; оригинальные требования
+J25 и пределы дополнительной coverage сверены ниже. Продуктовая регистрация,
+F review/immutable candidate и Sol CLI ещё открыты. Следующий текст сохраняет
 историческую сводку после B, private P1, C0/G3 и public C full read 6×4.
 Public run05 дал ограниченный output proof; исправленный Code → Save и
 независимый cold Execute/read6×4 прошли audit и cleanup. D declared → Save и
@@ -306,6 +313,29 @@ public API/handler. До live нужны addressed/operator tests/source/freeze/
 auditor pin. Если native поддержан или primary sufficient, insufficient-primary
 остаётся открытым; не строить матрицу ради PASS. Следующий profile443 ещё не
 назначен; source/evidence пока не созданы, живых операций нет.
+
+### E/J14: new standalone Done source и pre-live pin — 2026-10-01
+
+Child fecbc9f44deeb1045794811674e67ae28da4caa4, operator-only closed entrypoint
+javascript-public-new-done-live.mjs: new public Done → independent full source,
+settings/graph/new input link/exact-ID zero events → NEW existing preserve Execute
+parameters={schema_mode}, full6×4/1950/user-v1/final source. Product API/client
+runtime unchanged; no Save. Addressed02 original49660 actualexit0/125PASS;
+full operator original92286 actualexit0/18583PASS. Addressed01 original2121
+actualexit1/124PASS/1FAIL: graph fixture shared expected link; fixture cloned,
+original failure retained. Runtime full3425PASS+10SKIP on73a8 remains applicable;
+no runtime/protocol/HttpApi/TS change, no unnecessary regeneration/typecheck.
+
+Private v1 immutable pre-pin61a391bae6d69087f34465a3a781e287948058c495862635d55f96a1b6b94e17:
+oracle70c6b2a37fb0626368aa8c26b933386fb330ee4d9520776a51deaf3867a372e8;
+freezebdbe903c87252e2d0123ce36dd5c609ca0382cec47832db1b3b7f41800b197ca
+(12754files+61symlinks); auditor888a9fdf76dcce52c8356ad543d7f8567bf6b71484819c42a6cb2bc480c4774c;
+negative426de96e95038b1647d92b8499ffe1d505dcc3cd4eddbecc9bccf638139cced6;
+handoff1c73899c0854e335eea1ed9e5a0471f8578cc22d84105f0c705730aaff316193.
+Python syntax PASS. Auditor has25 non-noop corrupted-copy mutations, actual
+positive/negatives not_run until live. Next atomic fresh449 assignment, original
+handle/terminal, independent audit/negatives/package+logout+browser+process cleanup.
+Do not reuse448, replace source during a run or promote pre-pin to live PASS.
 
 ### E: адресная сверка исходных требований / new Done — 2026-10-01
 
