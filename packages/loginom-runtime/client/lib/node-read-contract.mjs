@@ -41,6 +41,7 @@ export function buildNodeReadRequest(args,source){
  const retained=retainedMappingSchemas(node,args.source_operation_id);
  const schemas=[...previews,...retained.filter(p=>!previews.some(s=>s.port===p.port))];
  need(schemas?.length>0,'Invalid parameters.source_operation_id: the source operation has no verified table output');
+ if(request.target.type==='imports.text')schemas.forEach(p=>p.dynamic_schema={kind:'text_import_output_v1'});
  const ports=args.read?.ports??schemas.map(p=>p.port);
  need(ports.length>0&&ports.length<=3&&new Set(ports).size===ports.length
   &&ports.every(p=>Number.isInteger(p)&&p>=0&&p<=2&&schemas.filter(s=>s.port===p).length===1),
@@ -49,7 +50,7 @@ export function buildNodeReadRequest(args,source){
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,
   document_id:node.node.document_id,workflow_ref:structuredClone(request.workflow_ref),
   target:{kind:'existing',type:request.target.type,label:request.target.label,ref:structuredClone(node.node)},inputs:[],
-  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,schemas:structuredClone(schemas.filter(p=>ports.includes(p.port)))},
+  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),input_links:structuredClone(request.mode===NODE_READ_MODE?request.parameters.input_links:request.inputs??[])},
   mappings:[],finish:'execute',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
@@ -59,7 +60,7 @@ export function nodeReadHandler(handler){
    need(mode===NODE_READ_MODE&&request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0
     &&request.finish==='execute'&&request.read.coverage!== 'full'&&handler.fileOutput!==true,
     'Existing-output reads cannot create nodes, configure ports or export files');
-   need(parameters&&Object.keys(parameters).length===2&&typeof parameters.source_operation_id==='string'
+   need(parameters&&Object.keys(parameters).length===3&&Array.isArray(parameters.input_links)&&typeof parameters.source_operation_id==='string'
     &&Array.isArray(parameters.schemas)&&parameters.schemas.length===request.read.ports.length&&parameters.schemas.length>0,
     'Verified local output schemas required');
    for(const port of request.read.ports){
@@ -79,6 +80,8 @@ export function alignReadSchema(actual,expected){
   const prior=expected.find(f=>f.name===field.name);
   need(prior&&field.index===index&&['name','label','type'].every(k=>field[k]===prior[k]),
    'Output field identity changed since the source operation');
-  return {...prior,index};
+  need(field.data_kind_source!=='fresh_native'||prior.data_kind===undefined||field.data_kind===prior.data_kind,
+   'Output data kind changed since the source operation');
+  return {...prior,...field,index};
  });
 }

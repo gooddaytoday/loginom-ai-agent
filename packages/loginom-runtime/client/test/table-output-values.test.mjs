@@ -84,3 +84,15 @@ test('variant display never proves a native numeric subtype or exact value',()=>
  f.options.requireExactNumbers=false;const r=decodeTableOutput(f.output,f.options);assert.equal(r.precision.numbers_verified,false);assert.deepEqual(r.precision.limitations,['variant_display_precision']);assert.equal(r.sample[0][0].value,undefined);assert.equal(r.sample[0][0].type,'variant');}
  const empty=fixture(['variant']);empty.output.rows=[];empty.output.row_total=0;assert.equal(decodeTableOutput(empty.output,empty.options).sample.length,0);
 });
+
+test('fresh filter UI metadata overrides retained data kind without claiming cached metadata is fresh',()=>{
+ const f=fixture();
+ const retained=decodeTableOutput(f.output,f.options);
+ assert(retained.schema.every(c=>c.data_kind_source==='retained_configuration'));
+ f.options.readSettings.native_schema=f.output.columns.map(c=>({...c,data_kind:'Непрерывный',data_kind_source:'fresh_native'}));
+ const fresh=decodeTableOutput(f.output,f.options);
+ assert(fresh.schema.every(c=>c.data_kind==='Непрерывный'&&c.data_kind_source==='fresh_native'));
+ for(const change of [s=>s.pop(),s=>s[0].name='foreign',s=>s[0].type='boolean',s=>s[0].label='Other',s=>s[0].data_kind_source='cached']){
+  const current=structuredClone(f);change(current.options.readSettings.native_schema);assert.throws(()=>decodeTableOutput(current.output,current.options));
+ }
+});

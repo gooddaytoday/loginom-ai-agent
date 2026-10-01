@@ -5,10 +5,26 @@
 Loginom modules. `compare-output.mjs --expected ... --observation ... --output ...`
 returns exit 0 only for comparator PASS, and exit 1 for comparator FAIL.
 
-This is a partial implementation of the prerequisite. The cold runner and
-scenario-set adapter do not yet produce this contract. Their legacy expected
-format remains separate; existing node-plan specifications are not executable
-inputs to this comparator. Live third-port checks belong to subsequent handlers.
+The cold runner accepts an explicit `loginom-cold-scenarios-v1` envelope with
+`package_path` and `scenarios`. Each scenario has `id`, `nodes`,
+`output_node_type`, `graph`, and the independent `oracle` document above.
+Graph binding contains exact native node GUIDs/types/input/output indices, links,
+and navigation labels. Cold UI document/workflow refs are newly created; the
+retained workflow identity is rebound only after this complete saved graph audit.
+The candidate manifest must be clean and match oracle `owner.source_sha`.
+Each scenario launches one fresh completed execution and reads all oracle ports.
+Active filters, incomplete pages and schema without fresh data-kind evidence fail.
+Legacy expected without `version` keeps its separate single-port comparator.
+Unknown versions do not fall back. Node-plan specifications require an explicit
+adapter; they are not executable inputs merely because they have familiar fields.
+
+`accept-node.sh --scenario-set <json>` accepts `loginom-scenario-set-v1` with
+`scenarios: [{id, directory}]`. Directories are contained node acceptance fixtures
+with their own task/data/expected. Every scenario runs the normal CLI7200s/cold
+route in a new attempt; exit codes and input bytes/hashes remain in the aggregate
+result. Unconfirmed cleanup stops the set before another live run. Expected and
+oracle remain outside the model workspace. Live third-port checks belong to the
+subsequent handlers and are not replaced by synthetic controls.
 
 Both documents carry `version`, `owner`, and `ports`. Owner has exact
 `source_sha`, `package_path`, `workflow_id`, `node_id`. Expected ports contain
@@ -17,7 +33,7 @@ Observation ports contain the same index/role/GUID/schema, `execution_id`,
 `schema_source: "fresh_native"`, `filter_enabled: false`, `complete: true`,
 `row_count`, and `rows`. Observation execution has `id`, `status: "completed"`,
 `fresh: true`, `owner_verified: true`. Every port must share this execution ID.
-The future native adapter must establish these claims from owned native evidence;
+The native adapter must establish these claims from owned native evidence;
 the comparator cannot independently authenticate a producer's fresh flag.
 
 Schema order is explicit: each field has zero-based `index`, technical `name`,
@@ -51,3 +67,15 @@ covered by an invariant; its expected `rows` is empty.
 Graph links, effective settings, input hashes, save/cleanup and cold-context
 binding still require runner integration and verification. Table comparator PASS
 alone is not prerequisite PASS or proof of cold acceptance.
+
+Fresh data-kind evidence is read from the newly opened Table filter UI's complete
+local column store, bound to the same Table/node/execution. Dataset/RPC proxies
+are not accessed. Decoded schema records `data_kind_source`; retained
+configuration is explicitly marked `retained_configuration`, never fresh.
+Only `imports.text` (`text_import_output_v1`) and verified Sliding CrossTable
+receipts permit dynamic schema rereads; static handlers retain identity guards.
+Original input node GUIDs/ports are checked against the owned graph before execute.
+
+Full prerequisite acceptance still requires actual clean build, legacy CLI/cold,
+Sliding and 3→6/6→6 metadata scenarios, recovery/save and native settings evidence.
+Unit comparator PASS and administrative cleanup do not prove those requirements.

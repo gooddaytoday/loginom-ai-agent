@@ -265,7 +265,7 @@ export async function restoreTablePrecision(channel,proof) {
     ...(applied_format?{applied_format}:{})};
 }
 
-export async function prepareTableRead(channel,table) {
+export async function prepareTableRead(channel,table,{requireUnfiltered=false}={}) {
   const observe=(condition,ready)=>channel.observe({condition,readOutputs:true,ready});
   for(const kind of ['nulls','data_types']) {
     let s=await observe('Table '+kind+' toggle available',s=>s.ui.elements.some(e=>e.view_toggle?.kind===kind));
@@ -281,6 +281,7 @@ export async function prepareTableRead(channel,table) {
     resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===table.table_tid+';btnDataGridFilter'),'Unique Table Filter required').ref}),identity:()=>({table})});
   const read=()=>channel.observe({condition:'Table filter setting ready',tableDialog:{table,kind:'filter'},ready:s=>s.table_settings?.filter?.enabled?.status==='observed'});
   s=await read();
+  requireValue(!requireUnfiltered||s.table_settings.filter.enabled.value===false,'Active filter is forbidden for complete cold read');
   if(s.table_settings.filter.enabled.value) {
     await channel.perform({condition:'disable output Table filtering',initialObservation:s,ready:s=>s.table_settings?.filter?.enabled?.value===true,
       resolve:s=>{const setting=s.table_settings.filter.enabled,refs=[setting.input_ref,setting.display_ref];return {verb:'set_checked',checked:false,
@@ -292,5 +293,5 @@ export async function prepareTableRead(channel,table) {
   await channel.perform({condition:'apply disabled Table filter',initialObservation:s,ready:s=>s.table_settings?.filter?.enabled?.value===false,
     resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===table.table_tid+';ModalWindow_BrowseFilter;btnApply'),'Unique Table Filter Apply required').ref}),identity:()=>({table,filter:false})});
   await channel.observe({condition:'Table filter dialog closed',tableDialog:{table,kind:'filter'},ready:s=>s.ui.dialogs.length===0&&s.node_outputs?.tables?.some(t=>t.active&&t.view_guid===table.view_guid)});
-  return {table,filter_enabled:false,filter_setting:filter,null_display:true,type_icons:true,settings_applied:true};
+  return {table,...(filter.native_schema?{native_schema:filter.native_schema}:{}),filter_enabled:false,filter_setting:filter,null_display:true,type_icons:true,settings_applied:true};
 }

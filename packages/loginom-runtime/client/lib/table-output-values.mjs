@@ -5,7 +5,8 @@ const sameTable=(a,b)=>a&&b&&['view_guid','port_guid','table_tid'].every(k=>a[k]
 // use the explicit 17-significant-digit UI format; keep both canonical decimal
 // text and its binary64 value. Other display formats retain explicit limits.
 export function decodeTableOutput(output,{formatProof,readSettings,expectedColumns,requireExactNumbers=false}) {
-  const {table,columns,rows}=output;
+  const {table,rows}=output;
+  const columns=freshTableColumns(output.columns,readSettings);
   const applied=output.applied_format,expectedMask=columns.length===1&&formatProof?.fields?.length===1
     ?[...(formatProof.numeric_formats??[]),...(formatProof.datetime_formats??[])].filter(f=>f.index===0&&f.key===columns[0].name&&f.type===columns[0].type):[];
   const appliedSingle=formatProof?.format_application_pending===true&&applied?.verified===true&&sameTable(table,applied.table)
@@ -20,7 +21,7 @@ export function decodeTableOutput(output,{formatProof,readSettings,expectedColum
     &&columns.every((c,i)=>c.index===i&&['name','label','type'].every(k=>c[k]===expectedColumns[i][k])),'Table schema differs from the configured output');
   requireValue(displayOnly || (formatProof.fields?.length===columns.length&&formatProof.fields.every((f,i)=>f.index===i&&f.key===columns[i].name&&f.type===columns[i].type)),
     'Table formatting schema differs');
-  const schema=columns.map((c,i)=>({...c,data_kind:expectedColumns[i].data_kind})),limits=new Set();
+  const schema=columns.map((c,i)=>({...c,data_kind:c.data_kind??expectedColumns[i].data_kind,data_kind_source:c.data_kind_source??"retained_configuration"})),limits=new Set();
   const values=rows.map((r,i)=>{
     requireValue(r.index===i&&r.cells.length===schema.length,'Incomplete typed Table row');
     return r.cells.map((cell,j)=>{
@@ -61,4 +62,19 @@ export function decodeTableOutput(output,{formatProof,readSettings,expectedColum
   return {table,schema,row_count:output.row_total,sample:values,sample_rows:values.length,sample_complete:output.sample_complete,
     precision:{numbers_verified:!limits.has('numeric_display_precision')&&!limits.has('variant_display_precision'),limitations:[...limits],strings:'cached UI text; source completeness requires independent audit'},
     table_schema_id:output.schema_id,filter_enabled:false,...(output.read_limit?{limitations:[output.read_limit]}:{})};
+}
+
+// Enrich only a schema whose technical identity matches the current owned
+// Table's freshly opened filter UI. Cached configuration is never fresh evidence.
+export function freshTableColumns(columns,settings){
+  const fields=settings?.native_schema;
+  if(!fields)return columns;
+  requireValue(fields.length===columns.length&&new Set(fields.map(f=>f.name)).size===fields.length,
+   'Fresh Table metadata coverage differs');
+  return columns.map(field=>{
+    const matches=fields.filter(f=>f.name===field.name);
+    requireValue(matches.length===1&&matches[0].type===field.type&&matches[0].label===field.label
+     &&matches[0].data_kind_source==='fresh_native','Fresh Table metadata identity differs');
+    return {...field,data_kind:matches[0].data_kind,data_kind_source:'fresh_native'};
+  });
 }

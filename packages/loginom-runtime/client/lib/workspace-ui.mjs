@@ -3017,7 +3017,30 @@ function readRenderedInputMapping(observation) {
           tableSettings={...tableSettings,status:'observed',kind,view_key:viewKey,view_ref:refOf(view),modal_ref:refOf(modal),owner_binding:'observed_view_only'};
           if(kind==='filter') {
             const grid=unique(base+'tbl'),coverage=bounds(grid);
-            tableSettings.filter={enabled:checked('chkEnableFilter'),predicate_coverage:coverage?.rows.length===0?'complete_empty':'partial',
+            // Metadata comes from this freshly opened, owned Table filter UI's
+            // complete local column store, never the dataset/RPC proxy.
+            const filterRoot=unique(base.slice(0,-1)),component=filterRoot&&globalThis.Ext?.getCmp?.(filterRoot.id);
+            const controller=component?.Controller,columns=controller?.FColumnInfoStore;
+            const collection=columns?.getData?.(),records=collection?.items,unfiltered=collection?.getSource?.()?.items;
+            const nativeSchema=[];
+            let complete=component?.$className==='bg.components.filterdata.view.FilterDataPanel'
+              &&component.el?.dom===filterRoot&&controller.FView===component
+              &&columns?.$className==='Ext.data.Store'&&!columns.isBufferedStore&&!columns.isLoading?.()
+              &&Array.isArray(records)&&records.length<=1001&&columns.getCount?.()===records.length
+              &&(!unfiltered||unfiltered.length===records.length&&unfiltered.every(r=>records.includes(r)));
+            const own=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
+            const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};
+            if(complete)for(const record of records){
+              charge();const value=own(record,'data');
+              if(!record.isModel||![0,1].includes(own(value,'RowNumberer'))){complete=false;break;}
+              if(own(value,'RowNumberer')===1)continue;
+              const name=own(value,'Name'),label=own(value,'DisplayText'),type=types[own(value,'DataType')];
+              const kind={0:'Неопределенное',1:'Непрерывный',2:'Дискретный'}[own(value,'DataKind')];
+              if(typeof name!=='string'||!name||typeof label!=='string'||!type||!kind||own(value,'Value')!==name){complete=false;break;}
+              nativeSchema.push({index:nativeSchema.length,name,label,type,data_kind:kind,data_kind_source:'fresh_native'});
+            }
+            complete&&=nativeSchema.length>0&&new Set(nativeSchema.map(f=>f.name)).size===nativeSchema.length;
+            tableSettings.filter={...(complete?{native_schema:nativeSchema}:{}),enabled:checked('chkEnableFilter'),predicate_coverage:coverage?.rows.length===0?'complete_empty':'partial',
               predicates_complete:coverage?.rows.length===0,effective_filter_verified:false,
               ...(coverage?{rendered_row_count:coverage.rows.length,grid_ref:coverage.grid_ref,container_ref:coverage.container_ref}:{})};
           } else {

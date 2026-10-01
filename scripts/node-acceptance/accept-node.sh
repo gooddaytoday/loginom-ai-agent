@@ -11,18 +11,23 @@ NODE=""
 SLOT=""
 CLI=""
 OUT=""
+SCENARIO_SET=""
+SCENARIO_DIR=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --node) NODE="${2:-}"; shift 2 ;;
     --slot) SLOT="${2:-}"; shift 2 ;;
     --cli) CLI="${2:-}"; shift 2 ;;
     --out) OUT="${2:-}"; shift 2 ;;
+    --scenario-set) SCENARIO_SET="${2:-}"; shift 2 ;;
+    --acceptance-dir) SCENARIO_DIR="${2:-}"; shift 2 ;;
     -h|--help) usage ;;
     *) usage ;;
   esac
 done
 
 [[ -n "$NODE" && -n "$SLOT" && -n "$CLI" && -n "$OUT" ]] || usage
+[[ "$SLOT" == "${NODE_SLOT:-}" ]] || { echo "slot must equal assigned NODE_SLOT" >&2; exit 1; }
 [[ "$SLOT" =~ ^[a-z]$ ]] || { echo "slot must be a single letter a-z" >&2; exit 1; }
 [[ "$CLI" == /* && "$OUT" == /* ]] || { echo "--cli and --out must be absolute" >&2; exit 1; }
 
@@ -36,7 +41,12 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-ACCEPTANCE_DIR="$REPO_ROOT/docs/node-development/nodes/$NODE/acceptance"
+if [[ -n "$SCENARIO_SET" ]]; then
+  [[ -z "$SCENARIO_DIR" ]] || usage
+  exec python3 "$SCRIPT_DIR/scenario-set.py" --set "$SCENARIO_SET" --node "$NODE" --slot "$SLOT" --cli "$CLI" --out "$OUT"
+fi
+ACCEPTANCE_DIR="${SCENARIO_DIR:-$REPO_ROOT/docs/node-development/nodes/$NODE/acceptance}"
+[[ "$(realpath "$ACCEPTANCE_DIR")" == "$REPO_ROOT/docs/node-development/nodes/"* ]] || { echo "acceptance directory must be in node fixtures" >&2; exit 1; }
 TASK_MD="$ACCEPTANCE_DIR/task.md"
 EXPECTED_JSON="$ACCEPTANCE_DIR/expected.json"
 DATA_DIR="$ACCEPTANCE_DIR/data"
@@ -303,6 +313,14 @@ python3 - "$EXPECTED_JSON" "$EXPECTED_JSON_SLOT" "$PACKAGE_TEMPLATE" <<'PY'
 import json, pathlib, sys
 source, dest, package = sys.argv[1:]
 data = json.loads(pathlib.Path(source).read_text(encoding="utf-8"))
+if data.get("version") not in (None, "loginom-cold-scenarios-v1"):
+  raise SystemExit("EXPECTED_VERSION_UNSUPPORTED")
+def bind(value):
+  if isinstance(value, str): return value.replace("{{PACKAGE_PATH}}", package)
+  if isinstance(value, list): return [bind(v) for v in value]
+  if isinstance(value, dict): return {k:bind(v) for k,v in value.items()}
+  return value
+data=bind(data)
 data["package_path"] = package
 pathlib.Path(dest).write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 PY

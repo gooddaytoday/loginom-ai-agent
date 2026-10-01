@@ -108,3 +108,22 @@ test('first read rejects unverified phases and never borrows a missing port',()=
  const s=unreadSource();s.outcome.output.phases[0].status='pending';assert.throws(()=>buildNodeReadRequest(args,s));
  assert.throws(()=>buildNodeReadRequest({...args,read:{ports:[1]}},unreadSource()));
 });
+
+import {resolveReadOutputSchema,verifyReadInputLinks} from '../lib/node-read-driver.mjs';
+test('only explicit text-import contract admits fresh width and metadata changes',()=>{
+ const retained={schema,dynamic_schema:{kind:'text_import_output_v1'}};
+ const fresh=count=>Array.from({length:count},(_,index)=>({index,name:'F'+index,label:'Label '+index,type:'string',data_kind:'Дискретный',data_kind_source:'fresh_native'}));
+ for(const fields of [fresh(3),fresh(6),fresh(6).map(f=>({...f,label:'Changed '+f.index,data_kind:'Непрерывный'}))]){
+  assert.deepEqual(resolveReadOutputSchema(fields,retained,'imports.text').fields,fields);
+  assert.throws(()=>resolveReadOutputSchema(fields,retained,'transform.calculator'));
+  assert.throws(()=>resolveReadOutputSchema(fields.map(f=>({...f,data_kind_source:'retained'})),retained,'imports.text'));
+ }
+});
+test('original input GUID and port must still own the read graph',()=>{
+ const inputs=[{source:{document_id:'doc',workflow_id:'wf',node_id:'input'},output:0,input:0}];
+ const graph={complete:true,foreign_links:[],nodes:[{ref:{node_id:'input'},outputs:[0]}],links:[{source:'input',output:0,target:'node',input:0}]};
+ verifyReadInputLinks(graph,node,inputs);
+ for(const change of [g=>g.links[0].source='other',g=>g.links[0].input=1,g=>g.nodes[0].outputs=[],g=>g.foreign_links=['unknown'],g=>g.links.push({...g.links[0]})]){
+  const g=structuredClone(graph);change(g);assert.throws(()=>verifyReadInputLinks(g,node,inputs));
+ }
+});
