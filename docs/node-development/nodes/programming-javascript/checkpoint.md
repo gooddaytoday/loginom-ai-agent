@@ -53,6 +53,34 @@ existing code-table через public API-path изолированного runt
 без затрагивающего изменения не требуется.
 Точные условия и опорные API — в плане; это не новое назначение live-работы.
 
+### E/J25: native technical-details discovery назначен — 2026-10-01
+
+Продолжение §11 [native error design](native-error-attribution-design.md).
+Actual frontend source отделяет Code Next/Verify от Done metadata; естественный
+Done refusal пока не установлен и не подменяется syntax/throw. Child679f7c0c50
+добавил только closed operator `import-code` и bounded read-only inventory
+захваченного error modal перед штатным OK; runtime expansion отсутствует.
+Fixed missing export из supported `builtIn/Data`: source5390UTF8bytes/18LF-lines,
+SHA3a01040b52e5221e3a2e73c13e65ad17c37d626aa863e938af9e78aefe9b0aec.
+Класс/stage/truncation — actual observations, не заранее назначенные выводы.
+
+Первый общий test run13637 actualexit1:34 legacy VM fixtures не передавали
+новый case binding; сохранён как failure, без browser. Исправлены два owning
+fixtures. Адресный75880 actualexit0/1258PASS; отдельный actual host12PASS;
+final operator38453 actualexit0/**18451PASS**, SHA
+`eeb6a564b364d3f4d0c1b06db18ce6f6a18e735f4187fbbb6f2d8d30af3cc468`.
+Client production files не менялись, прежний3246PASS+10SKIP не переигрывался.
+Source freeze v2:12742files+61symlinks, SHA
+`e09dc7cf9faacc3931ccd4e41adb6e7e56ca80461362e92cae82b923f67aff28`;
+private pin807958ba/auditor8c9fe483 и20 fixed auditor negatives закреплены до live.
+
+Registry под lock назначил fresh429 `e-native-details-import-code-01` на679f,
+предыдущий428 closed_verified/process absent. Saved C exact path прочитан из
+принятой writer receipt, baseline1bc0f812; no Save. Ordinary headed/original30min.
+Прогон ещё не подтверждён; actual report/terminal/independent audit/cleanup
+требуются перед новым profile. Long-source writer424/cold428 не повторяются;
+полный J25/E/candidate/CLI/Gates остаются открытыми.
+
 ### E/J23: длинный source Save + independent cold принят — 2026-10-01
 
 Writer424/public Code/Save на060a принят v6 ранее; cold428/exec96638 на6531
