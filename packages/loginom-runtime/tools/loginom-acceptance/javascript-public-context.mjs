@@ -28,11 +28,12 @@ export function javascriptContextRenamedSource(reply,node){
   return source.replace(old,'InputTable.Get(row,'+JSON.stringify(fields[0].name)+')')+javascriptContextDataComment;
 }
 
-export function verifyJavascriptPublicContext(reply,{node,schemaMode,source,manual=false,inputVariant='base'}){
+export function verifyJavascriptPublicContext(reply,{node,schemaMode,source,manual=false,inputVariant='base',configuredOutput=false}){
   need(['base','reordered','renamed'].includes(inputVariant),'Fixed context input variant required');
   need(reply?.kind==='context'&&reply.schema_mode===schemaMode&&reply.content_is_data===true
     &&reply.cleanup_complete===true&&reply.settings_applied===false&&reply.package_saved===false
-    &&reply.explicit_execute_requested===false&&reply.observation_scope==='current_owned_source_and_materialized_ports'
+    &&reply.explicit_execute_requested===false&&reply.observation_scope===(configuredOutput
+      ?'current_owned_source_and_configured_ports':'current_owned_source_and_materialized_ports')
     &&['document_id','workflow_id','node_id'].every(k=>reply.owner?.[k]===node[k])
     &&reply.source.delivery==='complete'&&reply.source.text===source
     &&Object.entries(javascriptSourceIdentity(source)).every(([k,v])=>reply.source[k]===v),'Public current context owner/source differs');
@@ -41,8 +42,10 @@ export function verifyJavascriptPublicContext(reply,{node,schemaMode,source,manu
   const sourceNames=[inputVariant==='reordered'?['DiscountPct','Customer','UnitPriceCents','RowID','Qty']:inputNames,names[1]];
   const types=[['integer','string','integer','integer','integer'],['integer','string','integer','string']];
   need(reply.ports?.length===2&&reply.ports.every((port,index)=>port.direction===['input','output'][index]
-    &&port.port===0&&typeof port.port_guid==='string'&&port.port_guid.length>0&&port.native_reciprocity_verified===true
-    &&port.autosync===(index===0||!manual)&&same(port.source_fields.map(f=>f.name),sourceNames[index])
+    &&port.port===0&&typeof port.port_guid==='string'&&port.port_guid.length>0
+    &&port.native_reciprocity_verified===!(configuredOutput&&index===1)
+    &&(!(configuredOutput&&index===1)||port.schema_state==='source_pending'&&port.configured_inventory_verified===true)
+    &&port.autosync===(index===0||!manual)&&same(port.source_fields.map(f=>f.name),configuredOutput&&index===1?[]:sourceNames[index])
     &&same(port.target_fields.map(f=>f.name),names[index])
     &&port.source_fields.every((f,i)=>f.index===i&&f.type===types[index][i]
       &&f.label===f.name&&typeof f.field_id==='string'&&f.field_id.length>0&&typeof f.required==='boolean')
@@ -50,7 +53,9 @@ export function verifyJavascriptPublicContext(reply,{node,schemaMode,source,manu
       &&(index===0?f.excluded===undefined:f.excluded===false)
       &&f.label===(index===1&&manual&&i===2?javascriptContextDataLabel:index===0&&inputVariant==='renamed'&&i===1?'Customer':f.name)
       &&(index!==0||inputVariant!=='renamed'||i!==1||f.origin_type===1)
-      &&same(f.source,port.source_fields.find(sf=>sf.name===f.source?.name&&sf.field_id===f.source?.field_id)))),'Public current context complete native mappings differ');
+      &&(configuredOutput&&index===1?f.source===null
+        &&f.group_index===i&&f.inherited===false&&f.exclusion_source===null&&typeof f.required==='boolean'
+        :same(f.source,port.source_fields.find(sf=>sf.name===f.source?.name&&sf.field_id===f.source?.field_id))))),'Public current context complete native mappings differ');
   const wire=nodeResultReply(reply,{userProfile:true});
   need(new AjvJsonSchemaValidator().getValidator(nodeApiTools.find(t=>t.name==='dock_node_read').outputSchema)(reply).valid
     &&same(JSON.parse(wire.content[0].text),wire.structuredContent)&&same(wire.structuredContent,reply)
@@ -59,19 +64,24 @@ export function verifyJavascriptPublicContext(reply,{node,schemaMode,source,manu
   return wire;
 }
 
-export async function readJavascriptPublicContext({runtime,prepared,node,schemaMode,source,manual,deadline,record,readGraph,onPending,inputVariant='base'}){
+export async function readJavascriptPublicContext({runtime,prepared,node,schemaMode,source,manual,deadline,record,readGraph,onPending,inputVariant='base',allowConfiguredOutput=false,expectPendingRefusal=false}){
   need(deadline>Date.now()+630000,'Public context original run budget unavailable');
   const request={kind:'context',operation_id:'js-public-context-'+randomUUID(),document_id:prepared.document_id,
-    workflow_ref:prepared.workflow_ref,node,budget_ms:600000},before=await readGraph();
+    workflow_ref:prepared.workflow_ref,node,budget_ms:600000,...(allowConfiguredOutput?{allow_configured_output:true}:{})},before=await readGraph();
   let reply,wire;
   try{
     reply=await dispatchNodeApi(runtime,'dock_node_read',request);
-    wire=verifyJavascriptPublicContext(reply,{node,schemaMode,source,manual,inputVariant});
+    need(!expectPendingRefusal,'Default context unexpectedly delivered pending output');
+    wire=verifyJavascriptPublicContext(reply,{node,schemaMode,source,manual,inputVariant,configuredOutput:allowConfiguredOutput});
   }catch(error){
     if(!runtime.hasUnsettledWork()){
       verifyJavascriptMappingGraph(before,await readGraph(),node);onPending(false);
-      await record({phase:'javascript_public_context_refused_after_verified_cleanup',operation_id:request.operation_id,
-        complete_graph_unchanged:true,cleanup_complete:true,error:String(error.message).slice(0,500)});
+      const proof={request,complete_graph_unchanged:true,cleanup_complete:true,error:String(error.message).slice(0,500)};
+      const ack=await record({phase:'javascript_public_context_refused_after_verified_cleanup',operation_id:request.operation_id,...proof});
+      need(same(ack.request,request)&&ack.complete_graph_unchanged===true&&ack.cleanup_complete===true&&ack.error===proof.error,
+        'Public context refusal ACK differs');
+      if(expectPendingRefusal&&!allowConfiguredOutput&&error.message==='JavaScript context: complete materialized port owner/schema unavailable')
+        return proof;
     }
     throw error;
   }

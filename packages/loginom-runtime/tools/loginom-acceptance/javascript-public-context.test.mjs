@@ -7,7 +7,7 @@ import {javascriptDiscoveryProbe} from './javascript-discovery-probes.mjs';
 import {javascriptContextReply} from '../../client/lib/javascript-context-read.mjs';
 import {createRedactor} from '../../client/lib/redact.mjs';
 const node={document_id:'doc',workflow_id:'workflow',node_id:'node'};
-function fixture(mode,manual,inputVariant='base'){
+function fixture(mode,manual,inputVariant='base',pending=false){
   const probe=javascriptDiscoveryProbe('p1-business-'+mode+'-base');
   const source=probe.source+(manual?javascriptContextDataComment:'');
   const schemas=[[['RowID','integer'],['Customer','string'],['Qty','integer'],['UnitPriceCents','integer'],['DiscountPct','integer']],
@@ -21,6 +21,9 @@ function fixture(mode,manual,inputVariant='base'){
         ...(index===0&&inputVariant==='renamed'&&i===1?{name:'CustomerNow',origin_type:1}:{}),
         label:index===1&&manual&&i===2?javascriptContextDataLabel:f.label,source:{...ordered.find(sf=>sf.name===f.name)}}))};
   });
+  if(pending)Object.assign(ports[1],{schema_state:'source_pending',configured_inventory_verified:true,
+    native_reciprocity_verified:false,source_fields:[],target_fields:ports[1].target_fields.map((f,i)=>({...f,group_index:i,
+      inherited:false,exclusion_source:null,data_kind:f.type==='integer'?'Непрерывный':'Дискретный',source:null}))});
   return {source,reply:javascriptContextReply({owner:{...node,operation_id:'context',ui_epoch:1},source,
     settings:{generation:mode==='code'},ports,redactor:createRedactor()})};
 }
@@ -55,3 +58,17 @@ for(const args of [[],['--case','foreign'],['--case','context-code','--source','
     const result=spawnSync(process.execPath,[entry,...args],{encoding:'utf8'});assert.equal(result.status,1);
     assert.match(result.stderr,/Fixed public context|Only assigned public context/);
   });
+
+for(const mode of ['code','declared'])test('fixed oracle verifies opt-in pending old source and corrects solely from public technical Name: '+mode,()=>{
+  const f=fixture(mode,true,'renamed',true),expected={node,schemaMode:mode,source:f.source,manual:true,inputVariant:'renamed',configuredOutput:true};
+  assert.equal(verifyJavascriptPublicContext(f.reply,expected).structuredContent,f.reply);
+  assert.equal(javascriptContextRenamedSource(f.reply,node),f.source.replace('InputTable.Get(row,"Customer")','InputTable.Get(row,"CustomerNow")')+javascriptContextDataComment);
+  assert.throws(()=>verifyJavascriptPublicContext(f.reply,{...expected,configuredOutput:false}));
+  for(const mutate of [r=>r.observation_scope='current_owned_source_and_materialized_ports',
+    r=>r.ports[1].native_reciprocity_verified=true,r=>r.ports[1].schema_state='complete',
+    r=>r.ports[1].target_fields[0].source={},r=>r.ports[1].source_fields=[{}],
+    r=>r.ports[0].target_fields[1].label='CustomerNow',r=>r.ports[1].configured_inventory_verified=false,
+    r=>r.ports[1].target_fields[2].inherited=true,r=>r.ports[1].target_fields[2].label='foreign']){
+    const changed=structuredClone(f.reply);mutate(changed);assert.throws(()=>verifyJavascriptPublicContext(changed,expected));
+  }
+});

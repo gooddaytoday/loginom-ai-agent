@@ -138,8 +138,16 @@ export async function runJavascriptPublicRequiredLive({page,prepared,node,target
       inputPortGuid:report.public_context.before.reply.ports[0].port_guid,deadline,record,lifecycle:{},
       verifyGraph:async()=>verifyJavascriptMappingGraph(graph,await readGraph(),node)});
     report.stage='public-context-renamed-old-source';await save();
+    report.public_context.default_refusal=await context.readJavascriptPublicContext({runtime,prepared,node,schemaMode,source:before.source_text,
+      manual:true,deadline,record,readGraph,onPending,inputVariant,expectPendingRefusal:true});
+    report.stage='public-context-renamed-configured-output';onPending(true);await save();
+    const renamedEvents=runtimeRecords;
     report.public_context.renamed=await context.readJavascriptPublicContext({runtime,prepared,node,schemaMode,source:before.source_text,
-      manual:true,deadline,record,readGraph,onPending,inputVariant});
+      manual:true,deadline,record,readGraph,onPending,inputVariant,allowConfiguredOutput:true});
+    const renamed=report.public_context.renamed,countAfterRead=runtimeRecords;
+    need(countAfterRead>renamedEvents&&same(await dispatchNodeApi(runtime,'dock_node_read',renamed.request),renamed.reply)
+      &&countAfterRead===runtimeRecords,'Configured context exact retry emitted runtime journal events');
+    report.public_context.renamed_retry_runtime_events_added=0;
     const previous=report.public_context.before,count=runtimeRecords;
     need(same(await dispatchNodeApi(runtime,'dock_node_read',previous.request),previous.reply)&&count===runtimeRecords,
       'Historical baseline context retry changed after input rename');
